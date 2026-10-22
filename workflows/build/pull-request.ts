@@ -194,6 +194,9 @@ function pulls(branch: string): Pr[] {
 /** The line the engineer types to open the pull request, for a refusal that asks for one. */
 const OPEN_LINE = 'node pull-request.ts open --title "<the card\'s line>" --body-file "$WF_STEP_FILES/pr-body.md"';
 
+/** The `gh api` form of an edit of a pull request's own fields, for a refusal that asks a person to type one. */
+const API_LINE = (n: number, field: string) => `gh api -X PATCH repos/{owner}/{repo}/pulls/${n} -f ${field}`;
+
 /** The one open pull request of `open`, read as this script requires one; refuses a draft, another base, none, or two. */
 function sole(open: readonly Pr[], branch: string, onto: string): Pr {
   if (open.length === 0)
@@ -215,7 +218,8 @@ function sole(open: readonly Pr[], branch: string, onto: string): Pr {
   if (pr.baseRefName !== onto)
     throw new Refusal(
       `#${pr.number} is based on \`${pr.baseRefName}\`, not on the remote's default branch \`${onto}\`, so landing it would not land on ` +
-        `the base: a person rebases it (\`gh pr edit ${pr.number} --base ${onto}\`), then the step is retried with \`--recheck\``,
+        `the base: a person moves its base (\`gh pr edit ${pr.number} --base ${onto}\`, or \`${API_LINE(pr.number, `base=${onto}`)}\` ` +
+        `where \`gh pr edit\` fails on GitHub's deprecated Projects query), then the step is retried with \`--recheck\``,
     );
   return pr;
 }
@@ -327,6 +331,15 @@ function placed(): { branch: string; run: string; leaf: string; onto: string } {
   return { ...named, onto };
 }
 
+/**
+ * `pr`'s title and body set to `title` and the contents of `bodyFile`, through REST rather than `gh pr edit`: that command's GraphQL
+ * query asks for `repository.pullRequest.projectCards`, which GitHub refuses since it deprecated Projects (classic), so it fails on a
+ * pull request this script has every right to edit. `-F body=@<file>` has `gh` read the file, as `--body-file` did.
+ */
+function edited(n: number, title: string, bodyFile: string): void {
+  gh('api', '-X', 'PATCH', `repos/{owner}/{repo}/pulls/${n}`, '-f', `title=${title}`, '-F', `body=@${bodyFile}`);
+}
+
 /** `open`: the branch pushed and the pull request opened or brought up to date, and its address for the closeout. */
 function open(args: string[]): string[] {
   const { title, bodyFile } = openArgs(args);
@@ -336,7 +349,7 @@ function open(args: string[]): string[] {
   const said = [pushing(branch)];
   if (standing) {
     const pr = standing;
-    gh('pr', 'edit', String(pr.number), '--title', title, '--body-file', bodyFile);
+    edited(pr.number, title, bodyFile);
     return [...said, `#${pr.number} brought up to date with the title and body you wrote`, pr.url];
   }
   const url = gh('pr', 'create', '--base', onto, '--head', branch, '--title', title, '--body-file', bodyFile).split('\n').at(-1) ?? '';

@@ -1,9 +1,10 @@
 /**
  * A gate on disk, told as a person's stories: a step's handoff that waits for them, as `nemia start --gate`, a card's `gate:` and a
  * step's `gate: true` freeze it on a run, and as the tick holds it. What a gate means to `assess`, `listing`, `decision` and a brief is
- * pure, and lives in `assess-gates.test.ts`, `assess-sendback.test.ts` and `src/gate/gate.test.ts`. This is the part that is not: the
- * record `nemia start` writes, the files a person writes beside it, and a tick that reads both on every pass. What `nemia approve`,
- * `--gate` and a card's `gate:` refuse is `gate-refusals.test.ts`.
+ * pure, and lives in `assess-gates.test.ts` and `src/gate/gate.test.ts`. This is the part that is not: the record `nemia start` writes,
+ * the files a person writes beside it, and a tick that reads both on every pass. And what a gate refuses on disk, as one table per verb:
+ * `nemia start --gate` and a card's `gate:` before a run is written, and `nemia approve` before an approval is — each row refused by kind
+ * (`_tag`) and exit 2, and the facts its words name.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as it loads, and `WF_DEFAULT_FACTORY_STARTS` beside it: its runs start
  * in scratch repositories no factory holds.
@@ -40,7 +41,7 @@ const {
   runWith: runEngine,
   standingLiveOf,
 } = await import('../src/runner.ts');
-const { listRuns, readRun } = await import('../src/record/record.store.ts');
+const { listRuns, markCancelled, readRun } = await import('../src/record/record.store.ts');
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
@@ -122,6 +123,25 @@ const atItsGate = async (keys: Parameters<typeof planned>[0] = {}) => {
   b.settle(`${run.id}-plan`, 'succeeded', SIGNED);
   assert.deepEqual((await tick(b.e, run.id)).filed, []);
   return { run, ...b };
+};
+
+/** Refused as `tag`, exit 2, its words naming each of `facts`. */
+const refusedAs =
+  (tag: 'Missing' | 'Conflict' | 'Invalid', ...facts: string[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }) => {
+    assert.deepEqual([err._tag, err.exitCode], [tag, 2], err.message);
+    for (const fact of facts) assert.ok(err.message.includes(fact), `${err.message} does not name ${fact}`);
+    return true;
+  };
+const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
+
+/** `nemia start --gate plan` on `plan → implement → review`, run until plan has signed off and waits at its gate (or as `phase` says). */
+const heldAtGate = async (phase = 'succeeded') => {
+  const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }));
+  const b = stage.board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(`${run.id}-plan`, phase, phase === 'succeeded' ? SIGNED : undefined);
+  return { id: run.id, e: b.e };
 };
 
 test('a gated run, from `nemia start --gate` to its approval', async (t) => {
@@ -516,4 +536,156 @@ test("an inbox card's `gate:` is frozen on the run it starts", async (t) => {
     const { run } = await runPlaced(startFromInbox({ name: 'plan-the-flag-c3d4', callerRepo: repo, isolate: false }));
     assert.deepEqual(readRun(run.id).gates, ['implement']);
   });
+});
+
+test('`--gate` and a card’s `gate:`, REFUSED before a run is written', async (t) => {
+  const repo = aRepo();
+  const starting = (...gates: string[]) =>
+    runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false, gates }));
+  const typed = (...flags: string[]) =>
+    stage.main(['start', 'plan the flag', '--workflows', planned(), '--repo', repo, '--no-worktree', ...flags]);
+  const card = (name: string, gate: string) => {
+    fs.mkdirSync(inboxDir(), { recursive: true });
+    fs.writeFileSync(path.join(inboxDir(), `${name}.md`), `---\nworkflow: ${planned()}\ngate: ${gate}\n---\nPlan the flag.\n`);
+    return name;
+  };
+  const fromCard = (name: string, gates?: string[]) =>
+    runPlaced(startFromInbox({ name, callerRepo: repo, isolate: false, ...(gates ? { gates } : {}) }));
+  for (const [row, refusing, tag, facts] of [
+    [
+      'a --gate naming a step the workflow does not have, naming its steps',
+      () => starting('plan', 'desing'),
+      'Invalid',
+      ['--gate desing', 'no step "desing"', 'plan, implement, review'],
+    ],
+    ['a --gate given twice', () => starting('plan', 'plan'), 'Invalid', ['--gate plan', 'twice', 'one --gate']],
+    ['the CLI: --gate with no step', () => typed('--gate'), 'Invalid', ['--gate takes the step']],
+    ['the CLI: --gate followed by a flag', () => typed('--gate', '--no-worktree'), 'Invalid', ['--gate takes the step']],
+    ['the CLI: --gate naming no step', () => typed('--gate', 'reveiw'), 'Invalid', ['--gate reveiw', 'no step "reveiw"']],
+    [
+      '`nemia plan --gate`, by name',
+      () => stage.main(['plan', ROOT, '--gate', 'plan']),
+      'Invalid',
+      ['nemia plan does not take --gate', 'gate: true', 'nemia start <card.md> --workflows <dir> --gate <step>'],
+    ],
+    [
+      "a card's `gate:` naming no step, in the card's words",
+      () => fromCard(card('plan-the-flag-e5f6', 'desing')),
+      'Invalid',
+      ['plan-the-flag-e5f6.md: `gate: desing`', 'no step "desing"', 'plan, implement, review', 'Correct the line, or delete it'],
+    ],
+    [
+      'a card started with a --gate naming no step',
+      () => fromCard(card('plan-the-flag-g7h8', 'plan'), ['desing']),
+      'Invalid',
+      ['--gate desing', 'no step "desing"'],
+    ],
+  ] as Array<[string, () => Promise<unknown>, 'Invalid', string[]]>) {
+    await t.test(`REFUSED ${row}, no run written`, async () => {
+      const before = runsWritten();
+      await assert.rejects(refusing(), refusedAs(tag, ...facts));
+      assert.equal(runsWritten(), before);
+    });
+  }
+  await t.test('the refused cards are where they were, in the inbox', () => {
+    for (const name of ['plan-the-flag-e5f6', 'plan-the-flag-g7h8']) assert.ok(fs.existsSync(path.join(inboxDir(), `${name}.md`)), name);
+  });
+});
+
+test('`nemia approve`, REFUSED with nothing written', async (t) => {
+  const gate = await heldAtGate();
+  for (const [row, step, words, tag, facts] of [
+    [
+      'a step not gated, naming the gate there is',
+      'implement',
+      undefined,
+      'Conflict',
+      ['implement has no gate', `${gate.id} is gated at plan`],
+    ],
+    [
+      'a step the run does not have, naming its steps',
+      'desing',
+      undefined,
+      'Conflict',
+      [`${gate.id} has no step "desing"`, 'plan, implement, review'],
+    ],
+    ['empty words', 'plan', '', 'Conflict', ['--message is empty']],
+  ] as Array<[string, string, string | undefined, 'Missing' | 'Conflict' | 'Invalid', string[]]>) {
+    await t.test(`REFUSED ${row}`, async () => {
+      await assert.rejects(runWith(gate.e, approveRun(gate.id, step, words)), refusedAs(tag, ...facts));
+      assert.deepEqual(asksOf(gate.id), []);
+    });
+  }
+  await t.test('REFUSED a run not there', async () => {
+    await assert.rejects(
+      runWith(gate.e, approveRun('no-such-run-zz9z', 'plan')),
+      refusedAs('Missing', 'no such run: no-such-run-zz9z', 'nemia ls'),
+    );
+  });
+  await t.test('REFUSED a step not signed off yet: still running', async () => {
+    const running = await heldAtGate('running');
+    await assert.rejects(
+      runWith(running.e, approveRun(running.id, 'plan')),
+      refusedAs('Conflict', 'plan has not signed off yet', 'still running', 'approve it then'),
+    );
+    assert.deepEqual(asksOf(running.id), []);
+  });
+  await t.test('REFUSED a try already approved, the first approval standing', async () => {
+    await runWith(gate.e, approveRun(gate.id, 'plan', 'yes'));
+    await assert.rejects(
+      runWith(gate.e, approveRun(gate.id, 'plan', 'yes, again')),
+      refusedAs('Conflict', 'try 1 of plan is already approved', 'with words', 'on the next tick'),
+    );
+    assert.equal(JSON.parse(fs.readFileSync(path.join(asksDir(gate.id), 'approve-plan-1'), 'utf8')).message, 'yes');
+  });
+  await t.test('REFUSED while a send-back is asked for', async () => {
+    const sentBack = await heldAtGate();
+    await runWith(sentBack.e, retryRun(sentBack.id, 'plan', { mode: 'nudge', message: 'store it first' }));
+    await assert.rejects(
+      runWith(sentBack.e, approveRun(sentBack.id, 'plan')),
+      refusedAs('Conflict', 'try 2 of plan is already asked for', '(--nudge, at ', 'an approval of try 1'),
+    );
+    assert.deepEqual(asksOf(sentBack.id), ['retry-plan-2']);
+  });
+  await t.test('REFUSED a cancelled run', async () => {
+    const called = await heldAtGate();
+    markCancelled(called.id);
+    await assert.rejects(
+      runWith(called.e, approveRun(called.id, 'plan')),
+      refusedAs('Conflict', 'was cancelled at ', 'a cancelled run files nothing'),
+    );
+    assert.deepEqual(asksOf(called.id), []);
+  });
+  await t.test("REFUSED a file at the approval's name that is not one: named, with how to clear it, never read as approved", async () => {
+    const stray = await heldAtGate();
+    fs.mkdirSync(asksDir(stray.id), { recursive: true });
+    fs.writeFileSync(path.join(asksDir(stray.id), 'approve-plan-1'), 'yes please');
+    await assert.rejects(
+      runWith(stray.e, approveRun(stray.id, 'plan')),
+      refusedAs('Conflict', 'try 1 of plan cannot be approved', 'approve-plan-1 is already there', '(rm ', 'then approve again'),
+    );
+  });
+});
+
+test('`nemia approve` as typed, REFUSED before it reads a run', async (t) => {
+  const typed = (...flags: string[]) => stage.main(['approve', 'no-such-run-zz9z', 'plan', ...flags]);
+  for (const [row, flags, facts] of [
+    [
+      'a flag it does not take',
+      ['--mesage', 'yes'],
+      ['nemia approve does not take --mesage', '--answer <n>=<letter>', '--message "<words>"'],
+    ],
+    ['--message with no words', ['--message'], ['--message takes the words', 'quoted']],
+    [
+      '--message= empty',
+      ['--message='],
+      ['--message is empty', 'nemia approve no-such-run-zz9z plan --message "<words>"', 'or leave --message out'],
+    ],
+    ['--message twice', ['--message', 'a', '--message', 'b'], ['nemia approve takes --message once']],
+    ['a word it does not take', ['yes'], ['nemia approve does not take yes']],
+  ] as Array<[string, string[], string[]]>) {
+    await t.test(`REFUSED ${row}`, async () => {
+      await assert.rejects(typed(...flags), refusedAs('Invalid', ...facts));
+    });
+  }
 });

@@ -114,7 +114,7 @@ no round: the loop's target is filed again to merge the base at the commit a tri
 the landing — its approval, or, where its review routes an ungated one, the tick that files it; one of a run whose result step closes no
 loop, to `nemia retry`. Unless the ending's last landing check refused
 the merge staged on the base as it is now (`Landed`'s `refusedOn`): the conflict is semantic, and the merge is asked, its target handed
-what the check said (`refusedLanding`, `src/merge/merge.ts`; `test/ship-back.test.ts`, *the conflict is semantic*, and the refusals for a
+what the check said (`refusedLanding`, `src/merge/merge.ts`; `test/ship.test.ts`, *the conflict is semantic*, and the refusals for a
 base moved since and a check that did not finish). While a merge is asked, `nemia round` and
 `nemia accept` of its loop are refused, since either would drop it; `nemia decide` offers the merge wherever the verb would take it.
 

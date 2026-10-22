@@ -261,7 +261,7 @@ function loopRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, re
  *
  * `routed` is the ungated ending's case, and it is why `cleanNext` needs none: a merge filed there would file the work again with
  * `then: 'merge'` on the very pass that files the landing, which is the collision this refusal exists to prevent. Read before the trial
- * merge, so it answers whether the base conflicts or not (`test/ship-back.test.ts`, *a merge asked of quick's shape*).
+ * merge, so it answers whether the base conflicts or not (`test/ship.test.ts`, *a merge asked of quick's shape*).
  */
 function followerRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string | undefined {
   const approved = steps.find(
@@ -307,7 +307,7 @@ export function landingRefusedOn(record: StepRecord | undefined, sha: string): s
  *
  * It names an approval without asking whether the ending is gated, because an ungated one never reaches here: `followerRefusal` runs
  * first, and its `routed` holds the merge off for exactly the state this would answer — an ungated ending not yet filed. Filed, it is
- * either stopped, which the line above answers, or running, which `followerRefusal` answers. `test/ship-back.test.ts`, *a merge asked of
+ * either stopped, which the line above answers, or running, which `followerRefusal` answers. `test/ship.test.ts`, *a merge asked of
  * quick's shape*, reads `routed`'s words back on a clean base and a moved one alike.
  */
 function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string {

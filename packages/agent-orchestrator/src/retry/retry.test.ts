@@ -3,7 +3,7 @@
  * writes and when it is due or void, what `nemia retry` refuses (`retryRefusal`, `messageRefusal`), what a try is told of why it was
  * filed (`retrySection`), and the words a step waiting on a harness or denied a call is shown with (`waitingWords`, `answerIn`,
  * `harnessWaitLine`, `deniedWords`, `deniedOffer`). One table per function; what `assess`, `listing` and `decision` make of tries is in
- * `test/assess-retries.test.ts` and `test/assess-asks.test.ts`.
+ * `test/assess-retries.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

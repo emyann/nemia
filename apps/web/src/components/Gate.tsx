@@ -436,8 +436,9 @@ export const takenOf = (
     : { named: taken.step, said: askedSaid(taken.asked) };
 
 /**
- * Whether the step ends the run in the repository's own checkout, off the workflow the run froze (`workspace: main`, `approvedFirst` in
- * agent-orchestrator): its gate holds before it is filed, and a person's approval is what files it.
+ * Whether the step ends the run in the repository's own checkout, off the workflow the run froze (`workspace: main`, `endsOnBase` in
+ * agent-orchestrator): a gate on it holds before it is filed, and a person's approval files it; with no gate, as quick's land, the pass
+ * of the step before it that can send the work back files it instead.
  *
  * A gate on a step that works, §6's, holds the handoff after the step has signed off, so that step has a task and a closeout to read; an
  * ending step acts where nothing can be taken back, and has no closeout of its own — what a person approves is the work it would act on.

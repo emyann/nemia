@@ -207,8 +207,9 @@ rm "$S"/node_modules; git worktree remove "$S"
   merge --ff-only origin/main` in the owner's checkout. Nothing is pushed afterwards, and GitHub deletes the head branch.
 - **A landing that signed off `blocked`:** nothing was merged and the checkout is untouched. The refusal names the exact `nemia retry`
   line to type. Where it was the pull request — red `ci`, unmergeable, a head that moved past the review — send the work back to the
-  step that built it, with the refusal's words, without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what
-  failed>"`; in `build`, through review, as *Send a landing back* says. Where it was the fast-forward that was declined, the owner's
+  step that built it, with the refusal's words, without waiting to be asked, through the review: in `quick`, `nemia retry <run> review
+  --message "<what failed>"` (implement is verified and its follower filed, so a retry of it is refused); in `build`, as *Send a landing
+  back* says. Where it was the fast-forward that was declined, the owner's
   checkout holds commits `origin/main` does not: bring it onto `origin/main` by hand, then `nemia retry <run> land`. On `build`, the
   next landing is approved again by whoever approved the first: an approval is for one try. On `quick` there is nobody to approve: the
   work goes round the review once more, and its pass files the landing.

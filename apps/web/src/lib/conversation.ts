@@ -89,5 +89,8 @@ export const turnWords = (ms: number, lines: number): string => `Worked for ${du
 /** The words the line between what was read and what is new says: `2 new`. */
 export const newWords = (unread: number): string => (unread === 1 ? '1 new' : `${unread} new`);
 
-/** The words the pill over the talk says: `2 new · Jump to the latest`. */
-export const jumpWords = (unread: number): string => `${newWords(unread)} · Jump to the latest`;
+/**
+ * The words the pill over the talk says: `2 new · Jump to the latest`, and `Jump to the latest` alone where nothing is unread — a
+ * conversation nothing is counted unread in (a step's session, which a person reads by opening it) still offers the way back.
+ */
+export const jumpWords = (unread: number): string => (unread === 0 ? 'Jump to the latest' : `${newWords(unread)} · Jump to the latest`);

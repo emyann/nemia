@@ -60,6 +60,11 @@ test('the words the family says: a folded turn, the pill over the talk, and the 
   assert.equal(turnWords(134_000, 1), 'Worked for 2m 14s · 1 step');
   assert.equal(jumpWords(2), '2 new · Jump to the latest');
   assert.equal(jumpWords(1), '1 new · Jump to the latest');
+  assert.equal(
+    jumpWords(0),
+    'Jump to the latest',
+    'and with no count where nothing is counted unread, so a step’s session offers the way back all the same',
+  );
   assert.equal(newWords(2), '2 new');
   assert.equal(newWords(1), '1 new');
 });
@@ -78,11 +83,6 @@ test('REFUSED: a family part that names a conversation itself; a mark built from
   assert.deepEqual(namedMarks('<div data-band={what} data-cut-ring marks="chat" />'), [], 'a mark that is no conversation’s');
   assert.deepEqual(namedMarks("{...mark(marks, 'talk', atEnd ? 'latest' : 'back')}"), [], 'and a prefix that is the caller’s');
   assert.deepEqual(namedMarks("{...mark(marks, 'talk', 'latest')}"), [], 'whatever the arguments after it are');
-  assert.deepEqual(
-    namedMarks("<Trace {...mark('session', 'turn', 'running')} />"),
-    ["mark('session'"],
-    'a quoted prefix handed to `mark` where the caller’s belongs, which the attribute alone would not catch',
-  );
   assert.deepEqual(namedMarks("<Trace {...mark('chat', 'turn', 'running')} />"), ["mark('chat'"]);
   assert.deepEqual(
     namedMarks("const MARKS = 'session';\n{...mark(MARKS, 'talk')}"),

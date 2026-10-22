@@ -4,6 +4,9 @@
  * and the sentinel at its foot that says the latest is on screen — which is when the read mark is posted (`onRead`), and when the jump
  * pill goes.
  *
+ * The pill is drawn whenever the person has read back, counted or not: a conversation that counts nothing unread — a step's session,
+ * which is read by opening it — still offers the one way back to the latest, and `jumpWords` says the count only where there is one.
+ *
  * It scrolls on its own, its bar drawn by `markScrolls`, and follows the latest while the person is at its foot — by `drawnCount`,
  * which counts a turn by its lines, since a turn grows a line at a time and the items it is one of do not: read back, it stays
  * where they left it. It takes the room its panel gives it and no more — the panel is bounded by the window — so a long talk scrolls
@@ -123,9 +126,7 @@ export function Talk<Own>({
         )}
         <div ref={end} aria-hidden="true" className="h-px shrink-0" />
       </div>
-      {!atEnd && unread > 0 && (
-        <Jump unread={unread} marks={marks} onJump={() => end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })} />
-      )}
+      {!atEnd && <Jump unread={unread} marks={marks} onJump={() => end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })} />}
     </div>
   );
 }

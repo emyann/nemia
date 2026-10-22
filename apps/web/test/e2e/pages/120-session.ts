@@ -1,5 +1,5 @@
 import { sidebar } from '../board.ts';
-import { expectCount, expectInside, expectNone, expectVisible, Refused } from '../checks.ts';
+import { expectCount, expectInside, expectNone, expectTexts, expectVisible, Refused } from '../checks.ts';
 import { FAKE, SESSION } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
@@ -9,7 +9,8 @@ export default {
    * band that says nothing more arrives here, and the talk down to the window's foot — the brief folded to a line that opens, the calls
    * and the thoughts among them folded into one turn, the session's words from their markdown in the agent's bubble, a line the harness
    * wrote on its own as a quiet marker, and the closeout. The session has ended, so no composer is drawn at all: the band carries why,
-   * and where to go instead. The talk is photographed from its start, scrolled up as a reader scrolls to it.
+   * and where to go instead. Read back, the talk says so and a pill offers the way to the latest, with no count: nothing of a step's
+   * session is counted unread. It is photographed from its start, scrolled up as a reader scrolls to it.
    */
   name: 'session',
   route: `/runs/${FAKE.id}/steps/${SESSION.step}`,
@@ -92,13 +93,26 @@ export default {
     await expectCount(talk.locator('[data-session-message="told"]'), 0, 'nobody said anything to it: no turn of yours');
     await expectCount(page.locator('main input, main textarea:not([disabled])'), 0, 'nothing else to type into');
 
-    await talk.hover();
-    await page.mouse.wheel(0, -100_000);
     const scrolled = () => talk.evaluate((element) => element.scrollTop);
-    await expectNone(async () => {
-      const px = await scrolled();
-      return px > 0 ? `it stopped ${px} px down` : null;
-    }, 'the talk scrolls up to its start for the photograph, from its end, where it opens and only the closeout shows');
+    const toStart = async (why: string) => {
+      await talk.hover();
+      await page.mouse.wheel(0, -100_000);
+      await expectNone(async () => {
+        const px = await scrolled();
+        return px > 0 ? `it stopped ${px} px down` : null;
+      }, why);
+    };
+
+    await toStart('the talk scrolls up to its start, from its end, where it opens and only the closeout shows');
+    await expectVisible(page.locator('[data-session-talk="back"]'), 'read back, the talk says it is no longer at its latest');
+    const jump = page.locator('[data-session-jump]');
+    await expectVisible(jump, 'and a pill over it offers the way back');
+    await expectTexts(jump, ['Jump to the latest'], 'with no count: a step’s session counts nothing unread, being read by opening it');
+    await jump.click();
+    await expectVisible(page.locator('[data-session-talk="latest"]'), 'pressed, the talk is at its latest again');
+    await expectCount(page.locator('[data-session-jump]'), 0, 'and the pill goes with it');
+
+    await toStart('the talk scrolls up to its start for the photograph');
     await expectInside(brief, talk, 'the brief is in view for the photograph');
     await expectInside(line, talk, `the turn's line (${SESSION.folded}) is in view for the photograph`);
   },

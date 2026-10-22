@@ -7257,6 +7257,7 @@ test('the run page draws one tag per kind the run is behind on, and the verb to 
 });
 
 const { Worked, WorkedLine } = await import('../src/components/conversation/Worked.tsx');
+const { HARNESS_TOOL, THOUGHT_TOOL } = await import('../src/lib/sessionItems.ts');
 const { ChatLostBand, ChatRetryingBand, ChatStoppedBand, ChatUnreadableBand } = await import('../src/components/chat/ChatBand.tsx');
 const { chatItems } = await import('../src/lib/chatFollowing.ts');
 type ConversationLine = import('../src/lib/conversation.ts').ConversationLine;
@@ -7346,6 +7347,19 @@ test('a line opens to what it asked and what came back where it has either, and 
     createElement(WorkedLine, { line: line({ input: 'rg -n drainsThis', result: 'feed.ts:88' }), marks: 'chat' }),
   );
   assert.doesNotMatch(closed, /rg -n drainsThis/, 'a closed fold lays out nothing it holds');
+});
+
+test('a line that called nothing is drawn by the name its adapter gives it: a thought thinks, a harness line informs, an unknown tool is plain', () => {
+  const glyphOf = (tool: string) =>
+    /lucide-([a-z-]+)"/.exec(renderToStaticMarkup(createElement(WorkedLine, { line: line({ tool }), marks: 'session' })))?.[1];
+  assert.equal(glyphOf(THOUGHT_TOOL), 'brain', 'the name the step’s adapter writes on a thought is the one the family draws a brain for');
+  assert.equal(glyphOf(HARNESS_TOOL), 'info', 'and the one it writes on a line of the harness, the one it draws an info for');
+  assert.equal(glyphOf('Bash'), 'terminal', 'a tool the board knows draws its own');
+  assert.equal(
+    glyphOf('NoSuchToolOfAny'),
+    'wrench',
+    'and one it does not, the plain one — which is what either name renamed on one side alone would quietly become',
+  );
 });
 
 test("her session stopped is a status, the daemon lost an alert in the failure's colour, and neither is dimmed by an opacity", async () => {

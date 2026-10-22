@@ -6,6 +6,7 @@ import { ink } from '@/lib/meaning';
 import { nowOf } from '@/lib/runWords';
 import { cn } from '@/components/ui/ds/utils';
 import { RunClockCell } from './RunClockCell';
+import { RunCostCell } from './RunCostCell';
 import { previewBar } from './StepPreview';
 import { CopyId, CutFrame, CutTag, FRAMED_BOX, FRAMED_END, FRAMED_ROW, FRAMED_TABLE, RunSteps, TextLink } from './look';
 
@@ -41,8 +42,8 @@ function Now({ run }: { run: ListedRun }) {
  * The runs in flight, as the kit's dense table in the look's cut frame, in the hue of a session at work: each run's title as a link,
  * its id with a copy control and its factory, each control and each factory at one edge from row to row; its own steps as a rail, each
  * bar a button that opens its step's card; what it does now, its note cut to the column's room with the whole of it on hover; its time
- * at work at `asOf`, a preview over it breaking that clock down (`RunClockCell`); and its cost, plain.
- * Narrower than its columns, the table scrolls sideways inside its frame.
+ * at work at `asOf`, a preview over it breaking that clock down (`RunClockCell`); and its cost, a preview over it breaking its tokens
+ * down by kind (`RunCostCell`). Narrower than its columns, the table scrolls sideways inside its frame.
  */
 export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: Date }) {
   const room = Math.max(0, ...runs.map((run) => run.id.length));
@@ -98,7 +99,7 @@ export function FlightTable({ runs, asOf }: { runs: readonly ListedRun[]; asOf: 
                   <RunClockCell run={run} asOf={asOf} finished={false} />
                 </Cell>
                 <Cell data-cost className={`font-mono text-body-small whitespace-nowrap ${ink.money}`}>
-                  {run.cost?.said}
+                  <RunCostCell run={run} />
                 </Cell>
               </Row>
             ))}

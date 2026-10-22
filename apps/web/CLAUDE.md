@@ -99,7 +99,8 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - The look's own parts are `src/components/look`, taken through its door (`index.ts`) by every file outside it; each has its stories
   beside it (`<Part>.stories.tsx`), one a state. A breakdown is drawn once, by `look/Breakdown.tsx`: `BreakdownRows` for its rows and
   its foot, `BreakdownPreview` for the kit's rich tooltip over a focusable trigger the caller gives — the look's `StatTile` hangs its
-  sticker there and both runs tables their Clock cell (`components/RunClockCell.tsx`), so the card and the rows say one thing.
+  sticker there and both runs tables their Clock cell (`components/RunClockCell.tsx`) and their Cost cell (`components/RunCostCell.tsx`,
+  the run's tokens by kind, `tokensBreakdown`), and the Overview's Spent tile today's tokens, so the card and the rows say one thing.
 - What a run's Clock says has one writer, `runClock` (`lib/factory.ts`): a card says a sentence, a table's row the time at work alone
   and `not started` for a run nothing of which is filed (`place: 'row'`). The breakdown under it is `clockBreakdown`
   (`lib/breakdown.ts`), whose head is verbatim the words the tile or the cell shows and whose foot is the wall time its rows add up to.

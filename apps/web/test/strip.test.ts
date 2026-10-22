@@ -225,3 +225,49 @@ test("the quota's line says when the soonest window runs out and when it resets,
   });
   assert.equal(quotaLineOf([win({ resetsAt: null })], NOW, 'UTC'), null);
 });
+
+/** Tokens of a run: `total` split over the four kinds, `unmeasured` sessions besides. */
+const tokensOf = (total: number, unmeasured = 0, more: Partial<NonNullable<RunSummary['tokens']>> = {}): RunSummary['tokens'] => ({
+  total,
+  input: total / 2,
+  output: total / 2,
+  cacheRead: total / 4,
+  cacheWrite: total / 8,
+  uncached: total / 8,
+  measured: 1,
+  unmeasured,
+  said: '',
+  split: '',
+  ...more,
+});
+
+test("REFUSED: Spent's tokens of a run Spent does not count: they are those of exactly the runs worked today", () => {
+  const today = { ...landedToday, tokens: tokensOf(800, 1) };
+  const yesterday = { ...landedYesterday, tokens: tokensOf(8_000_000) };
+  const unmeasured = { ...failedAtMidnight, tokens: null };
+  const s = stripOf({ runs: [today, yesterday, unmeasured], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+  assert.deepEqual(
+    s.spentTokens,
+    {
+      total: 800,
+      input: 400,
+      output: 400,
+      cacheRead: 200,
+      cacheWrite: 100,
+      uncached: 100,
+      unmeasured: 2,
+    },
+    "yesterday's run is in no count; the run with a cost and no tokens is one session more that measured none",
+  );
+});
+
+test('a part of the day is null where one counted run lacks it, and the day has no tokens where no run measured any', () => {
+  const parted = { ...landedToday, tokens: tokensOf(800) };
+  const whole = { ...cancelledToday, tokens: tokensOf(80, 0, { cacheRead: null, cacheWrite: null, uncached: null }) };
+  const s = stripOf({ runs: [parted, whole], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+  assert.equal(s.spentTokens?.total, 880);
+  assert.deepEqual([s.spentTokens?.cacheRead, s.spentTokens?.cacheWrite, s.spentTokens?.uncached], [null, null, null]);
+  assert.equal(s.spentTokens?.input, 440);
+  const none = stripOf({ runs: [landedToday], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+  assert.equal(none.spentTokens, null);
+});

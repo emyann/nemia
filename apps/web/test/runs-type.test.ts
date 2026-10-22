@@ -21,6 +21,7 @@ const FILES = [
   'components/FlightTable.tsx',
   'components/FinishedTable.tsx',
   'components/RunClockCell.tsx',
+  'components/RunCostCell.tsx',
   'components/look/Breakdown.tsx',
   'components/look/Plate.tsx',
   'components/look/Sticker.tsx',

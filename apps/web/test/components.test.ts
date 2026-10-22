@@ -30,6 +30,7 @@ const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx'
 const { RunGone } = await import('../src/components/RunGone.tsx');
 const { KindsBehind } = await import('../src/components/KindsBehind.tsx');
 const { RunClockCell } = await import('../src/components/RunClockCell.tsx');
+const { RunCostCell } = await import('../src/components/RunCostCell.tsx');
 const { BreakdownRows } = await import('../src/components/look/Breakdown.tsx');
 const { clockBreakdown } = await import('../src/lib/breakdown.ts');
 const { instantWhole, instantWords } = await import('../src/lib/instant.ts');
@@ -7563,4 +7564,31 @@ test("a breakdown's rows are terms with their amounts, each named by what it cou
   assert.doesNotMatch(html, /Everything else/, 'the last line is absent where the four parts cover the wall');
   assert.match(html, /<dd[^>]*>10m<\/dd>/, "the sessions' ten minutes");
   assert.match(html, /data-breakdown-foot[^>]*>Wall time 1h, from 11 Oct 1:11 PM\.</);
+});
+
+/** The Cost cell of a row with `cost` and `tokens`. */
+const costCell = (cost: object | null, tokens: object | null): string =>
+  renderToStaticMarkup(createElement(RunCostCell, { run: { cost, tokens } as never }));
+
+const COST = { usd: 5.63, measured: 3, unmeasured: 0, said: '$5.63' };
+const TOKENS = {
+  total: 900,
+  input: 600,
+  output: 300,
+  cacheRead: 400,
+  cacheWrite: 100,
+  uncached: 100,
+  measured: 3,
+  unmeasured: 0,
+  said: '',
+  split: '',
+};
+
+test('REFUSED: a Cost cell the keyboard cannot reach to open its tokens: a row with tokens draws its cost as a button', () => {
+  const priced = costCell(COST, TOKENS);
+  assert.match(priced, /<button[^>]*data-cost-words[^>]*>\$5\.63<\/button>/, 'the cost words are a button that opens the preview');
+  const untokened = costCell(COST, null);
+  assert.match(untokened, /<span[^>]*data-cost-words[^>]*>\$5\.63<\/span>/);
+  assert.doesNotMatch(untokened, /<button/, 'no tokens to break down, so nothing for the keyboard to open');
+  assert.equal(costCell(null, TOKENS), '', 'a row with no cost says nothing');
 });

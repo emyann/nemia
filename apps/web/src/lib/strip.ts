@@ -3,6 +3,7 @@
  * work and when the quota runs out. Pure: the instant, the day's start and the time zone are handed in, the browser's own on the page.
  */
 import type { Ceilings, Factory, QuotaWindow, RunSummary } from './api';
+import type { TokenCounts } from './breakdown.ts';
 import { keptBy } from './factories.ts';
 import { inFlight, titleOf, waitsOnYou } from './factory.ts';
 import { clockWord } from './quota.ts';
@@ -17,6 +18,7 @@ export type AgentRow = { agent: string; step: string; run: string; title: string
 /**
  * The strip's numbers. `waitsOnYou` and `inFlight` are the open runs, a run that waits on a person counted with the waiting alone;
  * `landed` and `failed` the runs whose work stopped since the day began; `spentUsd` what every run worked today cost, whole;
+ * `spentTokens` the tokens of the very runs Spent counts, by kind (`tokensOf`), null where none of them measured any;
  * `perLanding` the mean cost of a landing today whose cost was measured, null before the first. `runs` and `sessions` are at work against
  * their caps, null where the machine has none. `agents` are the agents at work against the agents of the factories in view
  * (`agentsOf`), `hired` null where there are none; `rows` the steps at work, longest first, the first `ROWS_SHOWN`, and `more` how many
@@ -28,6 +30,7 @@ export type Strip = {
   landed: number;
   failed: number;
   spentUsd: number;
+  spentTokens: TokenCounts | null;
   perLanding: number | null;
   runs: { count: number; cap: number | null };
   sessions: { count: number; cap: number | null };
@@ -77,6 +80,29 @@ const capOf = (cap: number | null | undefined): number | null => (cap ? cap : nu
 
 /** A run's whole cost, nothing where none was measured. */
 const usdOf = (run: RunSummary): number => run.cost?.usd ?? 0;
+
+/** A sum of parts, null where one of them is null, as a run's own tokens rule (`runTokens` in the orchestrator). */
+const partSum = (parts: ReadonlyArray<number | null>): number | null =>
+  parts.reduce<number | null>((sum, part) => (sum === null || part === null ? null : sum + part), 0);
+
+/**
+ * The tokens of `worked`, kind by kind: a kind null where one run lacks it; the sessions that measured none, each run's own and one for
+ * each run with a cost and no tokens, which measured a cost and no token; null where no run measured any.
+ */
+const tokensOf = (worked: readonly RunSummary[]): TokenCounts | null => {
+  const counted = worked.flatMap((run) => (run.tokens ? [run.tokens] : []));
+  if (counted.length === 0) return null;
+  const sum = (key: 'total' | 'input' | 'output' | 'unmeasured') => counted.reduce((n, tokens) => n + tokens[key], 0);
+  return {
+    total: sum('total'),
+    input: sum('input'),
+    output: sum('output'),
+    cacheRead: partSum(counted.map((tokens) => tokens.cacheRead)),
+    cacheWrite: partSum(counted.map((tokens) => tokens.cacheWrite)),
+    uncached: partSum(counted.map((tokens) => tokens.uncached)),
+    unmeasured: sum('unmeasured') + worked.filter((run) => run.cost !== null && run.tokens === null).length,
+  };
+};
 
 /** Whether an open run was worked since the day began: a task of it runs, or its last one ended today. */
 const workedToday = (run: RunSummary, dayStart: number): boolean =>
@@ -138,6 +164,7 @@ export function stripOf(given: StripIn): Strip {
     landed: landed.length,
     failed: finishedToday.filter((run) => outcomeOf(run) === 'failed').length,
     spentUsd: worked.reduce((sum, run) => sum + usdOf(run), 0),
+    spentTokens: tokensOf(worked),
     perLanding: priced.length ? priced.reduce((sum, run) => sum + usdOf(run), 0) / priced.length : null,
     runs: { count: flying.length, cap: capOf(given.ceilings?.cap) },
     sessions: { count: sessionsOf(open), cap: capOf(given.ceilings?.last?.sessions) },

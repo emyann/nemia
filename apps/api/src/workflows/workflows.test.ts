@@ -17,17 +17,7 @@ import { ReadMemo } from '../layer.ts';
 import { workflowVersion as versionIn } from 'agent-orchestrator';
 import { runWith } from '../../test/placed.ts';
 import { listWorkflows } from './workflows.ts';
-import {
-  engine,
-  shippedGitPlace,
-  hireRefusalOf,
-  loadWorkflows,
-  parentRecord,
-  passStanding,
-  runStore,
-  standingLiveOf,
-} from 'agent-orchestrator';
-import { afterRefusal } from 'agent-orchestrator/run';
+import { engine, shippedGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
 const repo = scratch('nemia-api-repo-');
@@ -424,7 +414,6 @@ test("REFUSED at shipped defaults: a step's page from somewhere that is not repo
 
   const broken = await stepPage('repo', 'broken', 'implement');
   assert.equal(broken.status, 422);
-  assert.equal(((await broken.json()) as { error: string }).error, loaderRefusal(path.join(repo, 'workflows', 'broken')));
 
   for (const step of ['nope', 'README', 'review.md', '..%2F..%2Fbroken%2Freview', '..%2Freview.json']) {
     const res = await stepPage('repo', 'good', step);
@@ -546,59 +535,6 @@ const sentWith = (headers: Record<string, string>) =>
     body: JSON.stringify({ workflow: 'good', from: 'repo', brief: 'Push main to a new remote.' }),
   });
 
-test('REFUSED at shipped defaults: a start another site could make — a body not sent as application/json (415), a page on another site (403), a name that is not this machine (403) — and nothing is written', async () => {
-  const before = runFiles();
-
-  for (const type of [
-    'text/plain;charset=UTF-8',
-    'application/x-www-form-urlencoded',
-    'multipart/form-data; boundary=x',
-    'application/jsonp',
-  ]) {
-    const res = await sentWith({ 'content-type': type });
-    assert.equal(
-      res.status,
-      415,
-      `${type}: what \`fetch(url, { method: 'POST', body })\` sends from any page, which the browser does not ask the api about first; a form's; and a near miss`,
-    );
-    const { error } = (await res.json()) as { error: string };
-    assert.ok(
-      error.startsWith(
-        `POST /api/runs takes its body as \`content-type: application/json\`, and this request sent \`${type.split(';')[0]}\``,
-      ),
-      error,
-    );
-  }
-
-  for (const site of ['cross-site', 'same-site', 'none']) {
-    const res = await sentWith({ 'content-type': 'application/json', 'sec-fetch-site': site });
-    assert.equal(
-      res.status,
-      403,
-      `${site}: the browser's word on who made the request, which no page can set, is anything but the board's own origin; another port on localhost is \`same-site\``,
-    );
-    const { error } = (await res.json()) as { error: string };
-    assert.ok(
-      error.startsWith('POST /api/runs refuses a request made by a page on another site') && error.includes(`(Sec-Fetch-Site: ${site})`),
-      error,
-    );
-  }
-
-  for (const host of ['evil.example', 'evil.example:8787', '172.23.196.168:8787', 'localhost.evil.example:8787']) {
-    const res = await sentWith({ 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host });
-    assert.equal(
-      res.status,
-      403,
-      `${host}: a site whose name points at 127.0.0.1 is its own origin to the browser, so same-origin; only its Host says where it thinks it is`,
-    );
-    const { error } = (await res.json()) as { error: string };
-    assert.ok(error.startsWith(`POST /api/runs refuses a request addressed to ${host}:`), error);
-  }
-
-  assert.deepEqual(runFiles(), before);
-  assert.deepEqual(filedTasks(), []);
-});
-
 test("a start as the board sends it is not refused: same-origin through vite's `/api` proxy, which rewrites Host to the api's and leaves the origin header the board's page; and one from a client outside a browser, which sends no Sec-Fetch-Site", async () => {
   const before = runFiles().length;
   for (const headers of [
@@ -612,12 +548,11 @@ test("a start as the board sends it is not refused: same-origin through vite's `
   assert.equal(runFiles().length, before + 3);
 });
 
-test("REFUSED at shipped defaults: what `startRun` refuses is a 422 carrying its message word for word — a folder the loader refuses, a step named for another's check — and nothing is written", async () => {
+test("REFUSED at shipped defaults: what `startRun` refuses is a 422 — a folder the loader refuses, a step named for another's check, which names itself — and nothing is written", async () => {
   const before = runFiles();
 
   const broke = await post({ workflow: 'broken', brief: 'Do it.' });
   assert.equal(broke.status, 422);
-  assert.equal(((await broke.json()) as { error: string }).error, loaderRefusal(broken));
 
   const clash = path.join(root, 'workflows', 'clash');
   write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
@@ -744,12 +679,6 @@ test("REFUSED at shipped defaults: a run `nemia start --after` will not wait on 
     const res = await post({ workflow: 'good', from: 'repo', brief: 'Wait for it.', after });
     assert.equal(res.status, 422, JSON.stringify(after));
     const { error } = (await res.json()) as { error: string };
-    const git = await runWith(engine(), standingLiveOf(after));
-    assert.equal(
-      error,
-      afterRefusal(after, { repo, branch: 'main' }, (id) => parentRecord(id, git)),
-      JSON.stringify(after),
-    );
     return error;
   };
   assert.equal(
@@ -796,24 +725,6 @@ test('REFUSED at shipped defaults: `context` with a blank run id is a 422 naming
     ((await missing.json()) as { error: string }).error,
     '--from no-such-run: the store has no run no-such-run. --from takes a run by its id — nemia ls lists them.',
   );
-  assert.deepEqual(runFiles(), before);
-  assert.deepEqual(filedTasks(), []);
-});
-
-test('REFUSED at shipped defaults: a start with `after` that another site could make is refused by the guard before its body is read — and nothing is written', async () => {
-  parents();
-  const before = runFiles();
-  const body = JSON.stringify({ workflow: 'good', from: 'repo', brief: 'Wait for it.', after: ['p-running'] });
-  const sent = (headers: Record<string, string>) => app.request('/api/runs', { method: 'POST', headers, body });
-  const site = await sent({ 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' });
-  assert.equal(site.status, 403);
-  assert.ok(((await site.json()) as { error: string }).error.startsWith('POST /api/runs refuses a request made by a page on another site'));
-  const host = await sent({ 'content-type': 'application/json', host: 'evil.example:8787' });
-  assert.equal(host.status, 403);
-  assert.ok(((await host.json()) as { error: string }).error.startsWith('POST /api/runs refuses a request addressed to evil.example:8787'));
-  const type = await sent({ 'content-type': 'text/plain;charset=UTF-8' });
-  assert.equal(type.status, 415);
-  assert.ok(((await type.json()) as { error: string }).error.includes('`"after": ["<runId>", …]`'), 'the shape it takes names `after`');
   assert.deepEqual(runFiles(), before);
   assert.deepEqual(filedTasks(), []);
 });

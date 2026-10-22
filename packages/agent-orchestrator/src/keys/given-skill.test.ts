@@ -15,31 +15,30 @@ test('a bare name is a skill of the folders looked in; `folder:name` names the f
   assert.deepEqual(givenSkillOf('_tools/a.b-c_d:y'), { folder: '_tools/a.b-c_d', name: 'y' });
 });
 
-for (const odd of [
-  '',
-  ':y',
-  '.:y',
-  './app:y',
-  '/app:y',
-  'app/:y',
-  'app//x:y',
-  '../x:y',
-  'app/../x:y',
-  '.claude:y',
-  'app/.hidden:y',
-  '-app:y',
-  'app:Y',
-  'app:',
-  'a:b:y',
-  'app\\x:y',
-  'app: y',
-  'app :y',
-  'my app:y',
-]) {
-  test(`REFUSED: \`${odd}\` is neither a skill's name nor folder:name`, () => {
-    assert.equal(givenSkillOf(odd), undefined);
-  });
-}
+test("REFUSED: a spelling that is neither a skill's name nor folder:name", () => {
+  for (const odd of [
+    '',
+    ':y',
+    '.:y',
+    './app:y',
+    '/app:y',
+    'app/:y',
+    'app//x:y',
+    '../x:y',
+    'app/../x:y',
+    '.claude:y',
+    'app/.hidden:y',
+    '-app:y',
+    'app:Y',
+    'app:',
+    'a:b:y',
+    'app\\x:y',
+    'app: y',
+    'app :y',
+    'my app:y',
+  ])
+    assert.equal(givenSkillOf(odd), undefined, odd);
+});
 
 test('the bare name of a given skill is the text after its last colon', () => {
   assert.equal(bareSkillOf('y'), 'y');

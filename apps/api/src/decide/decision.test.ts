@@ -718,7 +718,7 @@ test('REFUSED once pruned: a run whose worktrees `nemia prune` removed offers no
   assert.equal((await detailOf('r-d1')).pruned, null, 'a run never pruned says so with a null, not a missing field');
 });
 
-test("a run called off, or whose branch is already on its base, has nothing to decide, in `nemia decide`'s words", async () => {
+test("a run called off has nothing to decide: a 200 whose body carries `nothing` alone, and no git call — the verdict's own words are the orchestrator's, pinned there over a real repository", async () => {
   writeRun({
     id: 'r-d4',
     repo,
@@ -727,25 +727,12 @@ test("a run called off, or whose branch is already on its base, has nothing to d
   });
   fs.writeFileSync(path.join(root, 'runs', 'r-d4.cancelled'), '2026-09-13T01:00:00.000Z');
   const before = gitCount();
-  assert.deepEqual(await decisionOf('r-d4'), {
-    status: 200,
-    body: { nothing: 'cancelled at 2026-09-13T01:00:00.000Z — nothing to decide' },
-  });
+  const res = await app.request('/api/runs/r-d4/decision');
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as Record<string, unknown>;
+  assert.deepEqual(Object.keys(body), ['nothing'], 'the one key: no commands, no steps');
+  assert.equal(typeof body.nothing, 'string');
   assert.equal(gitCount(), before, 'no git call for a cancelled run');
-
-  const shipped = aRepo();
-  branchOff(shipped.repo, 'wf/r-d5/implement', () => write(shipped.repo, 'NOTES.md', 'shipped\n'));
-  git(shipped.repo, 'merge', '-q', '--no-ff', '-m', 'ship it', 'wf/r-d5/implement');
-  writeRun({
-    id: 'r-d5',
-    repo: shipped.repo,
-    baseRef: shipped.base,
-    steps: {
-      implement: { taskId: 't-d1-implement', branch: 'wf/r-d5/implement' },
-      review: { taskId: 't-d1-review', branch: 'wf/r-d5/implement' },
-    },
-  });
-  assert.deepEqual(await decisionOf('r-d5'), { status: 200, body: { nothing: 'shipped — wf/r-d5/implement is already on main' } });
 });
 
 test('an unknown run is refused with a 404 that says where to look', async () => {

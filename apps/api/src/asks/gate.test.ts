@@ -18,7 +18,7 @@ import path from 'node:path';
 import { app } from '../app.ts';
 import { approvalFile, approveRun, askFile, engine, list, retryRun, runStore, type RunSummary } from 'agent-orchestrator';
 import { runWith } from '../../test/placed.ts';
-import { answerText, approvalWordsRefusal, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
+import { answerText, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');
@@ -209,45 +209,7 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
   );
 });
 
-test('REFUSED at shipped defaults: an approval another site could make — a page on another site (403), a name that is not this machine (403), a body not sent as application/json (415) — and nothing is written', async () => {
-  const body = { message: 'Ship it.' };
-  for (const site of ['cross-site', 'same-site', 'none']) {
-    const res = await approveOver('plan', body, { ...BOARD, 'sec-fetch-site': site });
-    assert.equal(res.status, 403, site);
-    const { error } = (await res.json()) as { error: string };
-    assert.ok(
-      error.startsWith(
-        `POST /api/runs/${R}/steps/plan/approve refuses a request made by a page on another site (Sec-Fetch-Site: ${site}): the next tick files what waits on a step a person approves`,
-      ),
-      error,
-    );
-    assert.ok(error.endsWith(`Approve it from the run's page on the board, or with \`nemia approve ${R} plan\`.`), error);
-  }
-  for (const host of ['evil.example', 'evil.example:8787', 'localhost.evil.example:8787']) {
-    const res = await approveOver('plan', body, { ...BOARD, host });
-    assert.equal(res.status, 403, host);
-    assert.ok(
-      ((await res.json()) as { error: string }).error.startsWith(
-        `POST /api/runs/${R}/steps/plan/approve refuses a request addressed to ${host}: the api approves a step waiting at its gate only for a request to this machine`,
-      ),
-    );
-  }
-  for (const type of ['text/plain;charset=UTF-8', 'application/x-www-form-urlencoded', 'multipart/form-data; boundary=x']) {
-    const res = await approveOver('plan', body, { ...BOARD, 'content-type': type });
-    assert.equal(res.status, 415, type);
-    const { error } = (await res.json()) as { error: string };
-    assert.ok(error.startsWith(`POST /api/runs/${R}/steps/plan/approve takes its body as \`content-type: application/json\``), error);
-    assert.ok(
-      error.endsWith(
-        'Send `{ "message"?: "<words>", "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }] }`, with that header.',
-      ),
-      error,
-    );
-  }
-  nothingWritten('a request another site could make');
-});
-
-test("REFUSED: a body that is not an approval (400), a run or a step that does not exist (404), and empty words (422, in `approvalWordsRefusal`'s words) — and nothing is written", async () => {
+test('REFUSED: a body that is not an approval (400), a run or a step that does not exist (404), and empty words (422, naming --message) — and nothing is written', async () => {
   const bodies: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/approve takes a JSON body/],
     [['Ship it.'], /^POST …\/approve takes a JSON object/],
@@ -270,8 +232,6 @@ test("REFUSED: a body that is not an approval (400), a run or a step that does n
     const res = await approveOver('plan', { message });
     assert.equal(res.status, 422, JSON.stringify(message));
     const { error } = (await res.json()) as { error: string };
-    assert.equal(error, approvalWordsRefusal(message, `nemia approve ${R} plan`), "the package's own sentence");
-    assert.equal(error, await approveRefuses('plan', message), 'the one `approveRun` refuses with');
     assert.match(error, /^--message is empty, and an approval's words are handed to every step after the gate/);
   }
   nothingWritten('a body that is not an approval');

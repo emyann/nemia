@@ -1919,9 +1919,56 @@ test('every read-only step is refused every call of the set that would run a pro
 });
 
 /**
- * Every line of the holder `root` that falls short of the three denies, as `<file>: <rule>`: a read-only agent's own file that does not
- * name one, and a step file of such an agent whose own `disallowedTools:` — which replaces its agent's whole — does not repeat one. A
- * step with no line of its own keeps its agent's and is nothing to say.
+ * The verbs of the read set that take git's `--output=<file>`, which creates or truncates the file it names; each measured on git 2.43 to
+ * write it (`git diff --output=x --stat HEAD~1 HEAD` prints nothing and writes `x`). `grep`, `ls-files`, `status` and `cat-file` write none.
+ */
+const OUTPUT_VERBS = ['diff', 'diff-tree', 'log', 'show', 'rev-list', 'blame', 'shortlog'];
+
+/**
+ * Every spelling of `--output` a read-only step must not run, as typed: right after the verb and late in the line, joined by `=` and
+ * apart, behind an assignment Claude Code strips and behind a wrapper. A deny that names `--output` right after the verb misses the late
+ * ones. A quoted, escaped or brace-split spelling (`--out''put`) is not here: a Bash rule matches the text as typed, and no deny string
+ * reaches it (root `CLAUDE.md`, *Agents in this repository*).
+ */
+const GIT_WRITES_A_FILE: Call[] = [
+  ...OUTPUT_VERBS.flatMap((verb) => [`git ${verb} --output=/tmp/x HEAD`, `git ${verb} --stat HEAD --output /tmp/x`]),
+  'FOO=1 git diff --output=/tmp/x HEAD',
+  'nohup git log -p --output=/tmp/x',
+  'timeout 5 git show HEAD --output=/tmp/x',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** The deny that answers `--output` anywhere in a git command, on each read-only agent and on each of its steps. */
+const WRITES_A_FILE_DENY = 'Bash(git *--output*)';
+
+/** Every deny a read-only agent's line and each of its steps' own line carries beside the read set. */
+const READ_SET_DENIES = [...RUNS_A_PROGRAM_DENIES, WRITES_A_FILE_DENY];
+
+test('every read-only step is refused every spelling of --output the fence can read, and still asks each read', () => {
+  for (const { named, step } of readOnlySteps()) {
+    assert.deepEqual(runs(step, GIT_WRITES_A_FILE), [], named);
+    assert.deepEqual(runs(step, GIT_READS, {}, []), GIT_READS.map(shown), named);
+  }
+});
+
+test('REFUSED: a read-only step without the deny of --output writes a file by each verb, and one narrowed to right after the verb misses it later', () => {
+  for (const { named, step } of readOnlySteps()) {
+    const denies = step.disallowedTools ?? [];
+    assert.ok(denies.includes(WRITES_A_FILE_DENY), `${named} denies ${WRITES_A_FILE_DENY}, so taking it off says something`);
+    const open = { ...step, disallowedTools: denies.filter((rule) => rule !== WRITES_A_FILE_DENY) };
+    assert.deepEqual(runs(open, GIT_WRITES_A_FILE), GIT_WRITES_A_FILE.map(shown), named);
+  }
+  const step = shippedStepOf('agora');
+  const narrow = {
+    ...step,
+    disallowedTools: (step.disallowedTools ?? []).map((rule) => (rule === WRITES_A_FILE_DENY ? 'Bash(git diff --output*)' : rule)),
+  };
+  assert.ok(runs(narrow, GIT_WRITES_A_FILE).includes('Bash(git diff --stat HEAD --output /tmp/x)'), 'written late, it runs');
+});
+
+/**
+ * Every line of the holder `root` that falls short of the read set's denies (`READ_SET_DENIES`), as `<file>: <rule>`: a read-only
+ * agent's own file that does not name one, and a step file of such an agent whose own `disallowedTools:` — which replaces its agent's
+ * whole — does not repeat one. A step with no line of its own keeps its agent's and is nothing to say.
  */
 function runsAProgramUndenied(root = SHIPPED_HOLDERS[0]): string[] {
   const files = [
@@ -1933,11 +1980,11 @@ function runsAProgramUndenied(root = SHIPPED_HOLDERS[0]): string[] {
   ];
   return files.flatMap((file) => {
     const line = denyLineOf(file, root);
-    return RUNS_A_PROGRAM_DENIES.filter((rule) => !line.includes(rule)).map((rule) => `${file}: ${rule}`);
+    return READ_SET_DENIES.filter((rule) => !line.includes(rule)).map((rule) => `${file}: ${rule}`);
   });
 }
 
-test("each read-only agent's file names the three denies, and each of its steps' own line repeats them", () => {
+test("each read-only agent's file names the read set's denies, and each of its steps' own line repeats them", () => {
   assert.deepEqual(runsAProgramUndenied(), []);
   assert.equal(
     shipped().filter(({ step }) => READ_ONLY_AGENTS.includes(step.agent?.name ?? '')).length,
@@ -1946,9 +1993,9 @@ test("each read-only agent's file names the three denies, and each of its steps'
   );
 });
 
-test('REFUSED: an agent file or a step file of a read-only agent that drops one of the three denies is named', () => {
-  for (const file of ['agents/agora.md', 'build/review.md', 'quick/review.md', 'intake/intake.md', 'janitor/argus.md'])
-    for (const rule of RUNS_A_PROGRAM_DENIES) {
+test("REFUSED: an agent file or a step file of a read-only agent that drops one of the read set's denies is named", () => {
+  for (const file of ['agents/agora.md', 'build/design.md', 'build/review.md', 'quick/review.md', 'intake/intake.md', 'janitor/argus.md'])
+    for (const rule of READ_SET_DENIES) {
       const root = scratch('wf-fences-denies-');
       fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
       const at = path.join(root, file);

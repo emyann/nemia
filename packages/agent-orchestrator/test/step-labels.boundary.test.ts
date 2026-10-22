@@ -5,7 +5,9 @@
  *
  * - the client's engine is handed the collector the process exports to: the shipped engine files a task on the shipped `check` harness.
  * - the client's engine of a process that exports nowhere is handed no collector: the same, with no trace.
- * - the client's engine asks a session for its tools' details when NEMIA_TOOL_DETAILS is 1: a real process, the stub `claude` started.
+ * - the client's engine asks a session for its tools' details when NEMIA_TOOL_DETAILS is 1: a real process, the stub `claude` started —
+ *   the one link of that chain no pure test reads, since `sessionTelemetryOf` and `claudeTelemetryEnv` are each pinned purely
+ *   (`src/telemetry/telemetry.test.ts`, agent-runtime's `test/telemetry.test.ts`). One spawn, not one per value.
  *
  * The test place does not model the shipped engine nor a process. `WF_ROOT` is set before the client is imported: it is read as the
  * module loads.
@@ -119,49 +121,26 @@ require('node:fs').writeFileSync(${JSON.stringify(seen)}, JSON.stringify(env));
   return { env: JSON.parse(fs.readFileSync(seen, 'utf8')) as Record<string, string>, e, id };
 };
 
-/** Ticks engine `e` in test `t` until task `id` has settled, whatever it settled as. */
-const settle = (t: TestContext, e: ClientEngine, id: string) =>
-  until(
-    t,
-    async () => {
-      await Effect.runPromise(e.tick());
-      return (await Effect.runPromise(e.view(id))).state.settled;
-    },
-    `task ${id} settled`,
-    { everyMs: 50 },
-  );
-
 test(
-  "the client's engine asks a session for its tools' details when NEMIA_TOOL_DETAILS is 1, never by default, and says a value that asks nothing",
+  "the client's engine hands a session the collector and OTEL_LOG_TOOL_DETAILS when NEMIA_TOOL_DETAILS is 1: the one link no pure test reads",
   WAITED,
   async (t) => {
-    await t.test('asked', async (t) => {
-      const { env } = await jobTelemetry(t, '1');
-      assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, 'http://127.0.0.1:9');
-      assert.equal(env.OTEL_LOG_TOOL_DETAILS, '1');
-    });
-    await t.test('unset', async (t) => {
-      const { env } = await jobTelemetry(t, undefined);
-      assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, 'http://127.0.0.1:9');
-      assert.equal(env.OTEL_LOG_TOOL_DETAILS, undefined);
-    });
-    await t.test('settled before its teardown', async (t) => {
-      const { env, e, id } = await jobTelemetry(t, '1');
-      assert.equal(env.OTEL_LOG_TOOL_DETAILS, '1');
-      await settle(t, e, id);
-    });
-    await t.test('refused', async (t) => {
-      const said = t.mock.method(console, 'error', () => {});
-      const { env } = await jobTelemetry(t, 'true');
-      assert.equal(env.OTEL_LOG_TOOL_DETAILS, undefined);
-      assert.deepEqual(
-        said.mock.calls.map((c) => c.arguments).filter((a) => String(a[0]).includes('NEMIA_TOOL_DETAILS')),
-        [
-          [
-            'nemia: NEMIA_TOOL_DETAILS is "true", which asks nothing: set it to 1 for each session to export its tools\' inputs, or unset it. Their tools\' details are left off.',
-          ],
-        ],
-      );
-    });
+    const { env } = await jobTelemetry(t, '1');
+    assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, 'http://127.0.0.1:9');
+    assert.equal(env.OTEL_LOG_TOOL_DETAILS, '1');
   },
 );
+
+test("REFUSED: a NEMIA_TOOL_DETAILS that asks nothing is said on stderr as the engine is built, and no session is started for it", async (t) => {
+  withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
+  const said = t.mock.method(console, 'error', () => {});
+  clientEngine();
+  assert.deepEqual(
+    said.mock.calls.map((c) => c.arguments).filter((a) => String(a[0]).includes('NEMIA_TOOL_DETAILS')),
+    [
+      [
+        'nemia: NEMIA_TOOL_DETAILS is "true", which asks nothing: set it to 1 for each session to export its tools\' inputs, or unset it. Their tools\' details are left off.',
+      ],
+    ],
+  );
+});

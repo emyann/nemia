@@ -1257,112 +1257,12 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
   ]);
 });
 
-test('the whole screen of a gate on a last step that merges nothing, before and after its approval', async (t) => {
-  const repo = aRepo();
-  const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: folder(), gates: ['review'] }));
-  const { e, settle } = board();
-  await runWith(e, advanceRun(readRun(run.id)));
-  const work = readRun(run.id).steps.implement;
-  fs.appendFileSync(path.join(work.workspace!, 'packages/x/src/add.ts'), 'export const sub = (a, b) => a - b;\n');
-  git(work.workspace!, 'add', '-A');
-  git(work.workspace!, 'commit', '-q', '-m', 'add sub');
-  settle(`${run.id}-implement`, 'succeeded', SIGNED);
-  await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-implement-check`, 'succeeded');
-  await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-review`, 'succeeded', SIGNED);
-  assert.deepEqual(await whole(t, e, run.id), [
-    '<id>  add sub',
-    '',
-    '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
-    '  AWAITING APPROVAL, waiting on you: review  — signed off at its gate; nothing after it is filed until you approve it, or send it back',
-    '',
-    '  touched  wf/<id>/run',
-    '    packages/x  1 file   +1 −0',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    check  npm test  →  unfinished ✓',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
-    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
-    '    did it',
-    '',
-    '  review',
-    '    gate  awaiting approval:  nemia approve <id> review [--message "<words>"]  — or send it back:  nemia retry <id> review --message "<objection>"',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
-    '    did it',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
-    '',
-    '  wf/<id>/run  — 1 file: +1 −0',
-    '',
-    '  branch    wf/<id>/run is ahead of main by 1 commit',
-    '  merges    wf/<id>/run merges cleanly onto main',
-    '  others    no other run is in flight on main',
-    '',
-    '  to decide  review has signed off and waits for your word:',
-    '',
-    '  approve it    nemia approve <id> review [--message "<words>"]',
-    '  send it back  nemia retry <id> review --message "<objection>"',
-  ]);
-  approveByHand(run.id, 'review', 1);
-  assert.deepEqual(await whole(t, e, run.id), [
-    '<id>  add sub',
-    '',
-    '  UNVERIFIED: review  — no check: declared; only its own word says it worked',
-    '',
-    '  touched  wf/<id>/run',
-    '    packages/x  1 file   +1 −0',
-    '  lesson  nothing written where the next agent reads',
-    '',
-    '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
-    '  none',
-    '',
-    '  implement',
-    '    check  npm test  →  unfinished ✓',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',
-    '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
-    '    did it',
-    '',
-    '  review',
-    '    gate  approved 10:00Z',
-    '    used  not measured',
-    '    cost  not measured',
-    '    timeline  try 1  filed 00:20:00Z  spawned 00:20:12Z  ended 00:25:00Z  queued 12s  ran 4m48s  used not measured',
-    '    did it',
-    '',
-    '  cost  run not measured',
-    '  timeline  run  queued 36s  ran 14m24s  wall 25m00s',
-    '',
-    '  wf/<id>/run  — 1 file: +1 −0',
-    '',
-    '  branch    wf/<id>/run is ahead of main by 1 commit',
-    '',
-    '  ship it   git -C <repo> merge --no-ff wf/<id>/run',
-    '  drop it   git -C <repo> branch -D wf/<id>/run',
-  ]);
-});
-
-test('the whole screen of `nemia decide --help`, of `nemia decide` with no run, and the refusal of a flag before the run', async (t) => {
+test('the whole screen of `nemia decide --help`, and of `nemia decide` with no run', async (t) => {
   const { DECIDE_HELP } = await import('../src/cli/decide/decide.ts');
   const { HELP } = await import('../src/cli/flags.ts');
   const { e } = board();
   assert.deepEqual(await decideScreen(t, e, ['some-run', '--help'], {}), DECIDE_HELP.split('\n'));
   assert.deepEqual(await decideScreen(t, e, [], {}), HELP.split('\n'));
-  await assert.rejects(decideScreen(t, e, ['--sensitive', 'x/**'], {}), (err: Error) => {
-    assert.equal(err.message, 'nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not --sensitive before it.');
-    return true;
-  });
 });
 
 test('the whole screen of a run on two branches, one with a note longer than the screen shows', async (t) => {

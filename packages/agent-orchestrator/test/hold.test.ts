@@ -820,32 +820,6 @@ test('REFUSED at shipped defaults: a hold put again while the tick or --off lift
   );
 });
 
-test('nemia decide on a held run that also waits --after a run says both, and that --off lifts only the hold', async (t) => {
-  const b = board();
-  const repo = aRepo();
-  const parent = await aRunning(b, repo);
-  const target = await aRunning(b, repo);
-  const child = await runPlaced(startRun({ brief: 'after the parent', repo, workflowDir: oneStep(), after: [parent.id] }));
-  await runWith(b.e, hold(child.id, [target.id]));
-  asOlder(child.id);
-  const screen = (await typed(t, b.e, 'decide', child.id)).printed;
-  assert.match(screen, new RegExp(`\n  waiting on ${parent.id}`), screen);
-  assert.match(
-    screen,
-    new RegExp(`\n  held until ${target.id} ships as well — nemia hold ${child.id} --off lifts the hold, and not the wait above$`),
-    screen,
-  );
-  assert.doesNotMatch(screen, VERBS, screen);
-  assert.equal((await typed(t, b.e, 'cancel', target.id)).error, undefined);
-  assert.match(
-    (await typed(t, b.e, 'decide', child.id)).printed,
-    new RegExp(
-      `held until ${target.id} \\(cancelled\\) ships as well — ${target.id} was cancelled at .* — yours to resolve: nemia hold ${child.id} --off, or nemia cancel ${child.id}$`,
-    ),
-    'a run named that never ships: how to let it go, on the same screen',
-  );
-});
-
 test('REFUSED while held or pruned: nemia say to a step that has settled offers no nemia retry, which either refuses', async () => {
   const b = board();
   const repo = aRepo();

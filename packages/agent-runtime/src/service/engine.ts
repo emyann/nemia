@@ -161,10 +161,10 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
  * The engine's verbs, each an Effect with what refuses it on its error channel, a tagged error whose message says what to do
  * instead: `FileRefused`, `TickRefused`, `AdmitRefused`, `ListRefused`, `TranscriptRefused`, `OutputRefused`, `FollowRefused`,
  * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, `BodyRefused` for `sweep` and
- * `removeBody`, `ForgetRefused` for `forget`, `KeptRefused` for `kept`, `CompactRefused` for `compact`, and `DrainRefused` for `drain`.
- * `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
- * `refusalWords(verb)` words a refusal as `ae` says it.
- * `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle that stops them.
+ * `removeBody`, `ForgetRefused` for `forget`, `KeptRefused` for `kept`, `CompactRefused` for `compact`, and `DrainRefused` for
+ * `drain`. `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
+ * `refusalWords(verb)` words a refusal as `ae` says it. `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle
+ * that stops them.
  */
 export type EngineShape = {
   /**
@@ -176,18 +176,18 @@ export type EngineShape = {
    * names a harness this engine does not have; a `deadlineSeconds` that is not a number of seconds; a `maxAttempts` or a
    * `resume`, whatever its value, which are retired: the runtime makes one attempt per start; an empty brief, cwd or resumeFrom;
    * a `cwd` that is not absolute; a `priority` that is not a whole number in int32. And in its `config`: a
-   * key that is no harness argument, or one filed beside `config` instead — `budgetUsd` among them; a `budgetUsd` that is not dollars above
-   * 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a `disallowedTools` or
-   * `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers in a `.mcp.json`'s shape; a word its
-   * harness does not take (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude Code's lists); a `contextTokens`
-   * that is not a whole number of tokens its harness takes, or any on a harness with no context window to set (`codex`); a `remoteControl`
-   * under `config` or beside it, which is Claude Code's flag and goes in `config.claude`, and a `claude.remoteControl` on a harness with no
-   * such flag (any but one brought as `'claude-bg'` or a `RunnerOps`, and one brought as `'claude'` in a task whose `background` is not
-   * true); a `background` that is not true or false, or `true` on any harness not brought as `'claude'`; a `claude` on a `HarnessSpec`
-   * without `claudeFlags`, which is not Claude Code; a `codex` that is not an object holding only `trustFrom`, an absolute path, or one on
-   * any harness but a `HarnessSpec` with `codexArgs`, which is Codex; and, on `'claude'`, a
-   * `budgetUsd` beside `background: true`, which `claude --bg` does not keep. A harness brought as a `RunnerOps` is asked
-   * only its own `refuses`.
+   * key that is no harness argument, or one filed beside `config` instead — `budgetUsd` among them; a `budgetUsd` that is not dollars
+   * above 0, or one its harness would not keep (`codex`); an empty model or effort; a `tools` that is not a list of names; a
+   * `disallowedTools` or `allowedTools` that is not a list of permission rules; an `mcp` whose entries are not MCP servers in a
+   * `.mcp.json`'s shape; a word its harness does not take (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude
+   * Code's lists); a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no context
+   * window to set (`codex`); a `remoteControl` under `config` or beside it, which is Claude Code's flag and goes in `config.claude`,
+   * and a `claude.remoteControl` on a harness with no such flag (any but one brought as `'claude-bg'` or a `RunnerOps`, and one
+   * brought as `'claude'` in a task whose `background` is not true); a `background` that is not true or false, or `true` on any
+   * harness not brought as `'claude'`; a `claude` on a `HarnessSpec` without `claudeFlags`, which is not Claude Code; a `codex` that
+   * is not an object holding only `trustFrom`, an absolute path, or one on any harness but a `HarnessSpec` with `codexArgs`, which is
+   * Codex; and, on `'claude'`, a `budgetUsd` beside `background: true`, which `claude --bg` does not keep. A harness brought as a
+   * `RunnerOps` is asked only its own `refuses`.
    */
   readonly file: (spec: TaskSpec) => Effect.Effect<string, FileRefused | JournalError>;
   /**
@@ -228,21 +228,22 @@ export type EngineShape = {
    */
   readonly view: (taskId: string) => Effect.Effect<TaskView, JournalError>;
   /**
-   * The task's path through its lifecycle, replayed off its journal alone: for each entry, from its filing to now, the state the journal
-   * says once the entry is on it, the entry's kind and its `at` (`LifecycleStep`). Writes nothing and asks no harness. A task this engine
-   * has no record of has an empty path; a journal that does not read fails with its `JournalError`.
+   * The task's path through its lifecycle, replayed off its journal alone: for each entry, from its filing to now, the state the
+   * journal says once the entry is on it, the entry's kind and its `at` (`LifecycleStep`). Writes nothing and asks no harness. A task
+   * this engine has no record of has an empty path; a journal that does not read fails with its `JournalError`.
    */
   readonly path: (taskId: string) => Effect.Effect<LifecycleStep[], JournalError>;
   /**
-   * Every task on the board, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that order
-   * with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which sessions
-   * where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none is. A view of
-   * a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up and this does not.
+   * Every task on the board, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that
+   * order with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which
+   * sessions where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none
+   * is. A view of a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up
+   * and this does not.
    *
-   * A task whose journal does not read — an entry no runtime wrote — is left out of `views` and named in `unreadable`, once, with why in
-   * the words the pass says it with (`TickReport.unreadable`): every other task is answered all the same. Any other failure, a store that
-   * cannot be listed or a harness that cannot be observed for `list()`, fails the call. Handed anything but a list of task ids, or
-   * more than one argument, it is refused with `ListRefused`, nothing read.
+   * A task whose journal does not read — an entry no runtime wrote — is left out of `views` and named in `unreadable`, once, with why
+   * in the words the pass says it with (`TickReport.unreadable`): every other task is answered all the same. Any other failure, a
+   * store that cannot be listed or a harness that cannot be observed for `list()`, fails the call. Handed anything but a list of task
+   * ids, or more than one argument, it is refused with `ListRefused`, nothing read.
    */
   readonly list: (taskIds?: readonly string[]) => Effect.Effect<TaskList, ListRefused | JournalError | RunnerError>;
   /**
@@ -325,10 +326,10 @@ export type EngineShape = {
    * `bypassPermissions`, or words longer than its inbox reads), asked of a task whose config makes it one; a task that
    * has settled, or has been asked to stop; one with no attempt in flight; then, off its harness, an attempt its harness
    * does not list; what a background session cannot carry, asked again of a session on `claude` that is no job (one an older
-   * runtime started `--bg` without `background` in its config); a session its harness lists ended; and a task on a remote A2A agent whose
-   * Task is at work, since A2A lets its caller speak only once the Task asks for input. A registry that cannot be read
-   * this time — on `claude`, a session Claude Code has registered that its listing does not show — or words the
-   * harness did not take, fail with `SayUnsent`, its `cause` what failed: ask again.
+   * runtime started `--bg` without `background` in its config); a session its harness lists ended; and a task on a remote A2A agent
+   * whose Task is at work, since A2A lets its caller speak only once the Task asks for input. A registry that cannot be read this time
+   * — on `claude`, a session Claude Code has registered that its listing does not show — or words the harness did not take, fail with
+   * `SayUnsent`, its `cause` what failed: ask again.
    *
    * A Claude Code job (`claude -p`) is told on its stdin: the words go to an inbox its worker writes on as the
    * next user message, which the job takes into the turn it is working. Once it has given its result its input
@@ -481,8 +482,8 @@ export type EngineShape = {
    * Count the captures each harness keeps of its sessions whose worker has ended, with their bytes and what they would keep of the
    * conversation's lines: only what the harness's readers read, as a capture is once its session ends (`RunnerOps.compact`); given
    * `{ yes: true }`, rewrite them so, one at a time, and keep what was read of each anew. Each capture reads the same after as before,
-   * or is left whole and named, as is one at work, one no run file names and one its reader refuses; no journal, no final answer and no
-   * other file is written. A harness that keeps every capture whole is not asked. Refused — `CompactRefused`, nothing written — for
+   * or is left whole and named, as is one at work, one no run file names and one its reader refuses; no journal, no final answer and
+   * no other file is written. A harness that keeps every capture whole is not asked. Refused — `CompactRefused`, nothing written — for
    * an argument other than nothing or `{ yes }`.
    */
   readonly compact: (options?: { yes?: boolean }) => Effect.Effect<CompactReport, CompactRefused | RunnerError>;
@@ -522,12 +523,12 @@ export type EngineShape = {
    */
   readonly tallied: <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>;
   /**
-   * Make this process the holder of the Claude Code sessions the engine runs attached (`harness/claude/attached.ts`), for as long as the
-   * scope it is taken in lasts: while held, a Claude Code task that runs to its end is spawned attached on the Agent SDK, and a session
-   * parked, or left by a holder that is gone, is resumed under its own id on the next look. As the scope closes it holds back the new
-   * tool calls of each session with none in flight, waits at most `LET_GO_MS` for each call in flight to end, then stops each session
-   * and parks it for the next holder, a call it cut at that bound kept on the session's run file and said on the log. An engine that
-   * never takes it runs such a task as a `claude -p` job.
+   * Make this process the holder of the Claude Code sessions the engine runs attached (`harness/claude/attached.ts`), for as long as
+   * the scope it is taken in lasts: while held, a Claude Code task that runs to its end is spawned attached on the Agent SDK, and a
+   * session parked, or left by a holder that is gone, is resumed under its own id on the next look. As the scope closes it holds back
+   * the new tool calls of each session with none in flight, waits at most `LET_GO_MS` for each call in flight to end, then stops each
+   * session and parks it for the next holder, a call it cut at that bound kept on the session's run file and said on the log. An
+   * engine that never takes it runs such a task as a `claude -p` job.
    *
    * Answers what the hold serves (`Served`): a loopback port of its own, speaking A2A as a reading surface alone — the card,
    * `GetTask` and `SubscribeToTask` — behind one bearer token, for the sessions of each harness configured as the literal
@@ -538,9 +539,9 @@ export type EngineShape = {
    */
   readonly hold: () => Effect.Effect<Served | null, never, Scope.Scope>;
   /**
-   * Hold back the new tool calls of the attached sessions the process `holder` holds, each at its hook until the drain is lifted, or with
-   * `null` lift it. A call in flight runs on, and so does a call that belongs to one, or the call in flight could never end; another
-   * process's holder is not held. Refused — `DrainRefused` — for a holder that is neither a process id nor null.
+   * Hold back the new tool calls of the attached sessions the process `holder` holds, each at its hook until the drain is lifted, or
+   * with `null` lift it. A call in flight runs on, and so does a call that belongs to one, or the call in flight could never end;
+   * another process's holder is not held. Refused — `DrainRefused` — for a holder that is neither a process id nor null.
    */
   readonly drain: (holder: number | null) => Effect.Effect<void, DrainRefused>;
   /**
@@ -623,10 +624,10 @@ const logsOf = <E, R>(view: Effect.Effect<TaskView, E, R>, runners: Record<strin
   });
 
 /**
- * `quota` over `runners`, the engine's harnesses as the seam offers them: the quota of the harness named, or of `fallback`, the default
- * harness, when none is, as its runner answers it (`RunnerOps.quota`). Refused with `QuotaRefused`, in this order: an argument that is not
- * one harness's name; a harness this engine does not have, naming the ones it has; and one whose runner reports no quota, naming the
- * ones that do. Each call is one ask, and nothing is journalled.
+ * `quota` over `runners`, the engine's harnesses as the seam offers them: the quota of the harness named, or of `fallback`, the
+ * default harness, when none is, as its runner answers it (`RunnerOps.quota`). Refused with `QuotaRefused`, in this order: an argument
+ * that is not one harness's name; a harness this engine does not have, naming the ones it has; and one whose runner reports no quota,
+ * naming the ones that do. Each call is one ask, and nothing is journalled.
  *
  * Traced only where it asks a harness, as `Engine.quota` with the `harness` asked: a refusal asks nothing and makes no span, so a
  * harness that reports no quota, asked as every harness is, is no error on a trace.
@@ -705,8 +706,9 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
 });
 
 /**
- * The engine over `options` that `Engine.layer` builds: the file-backed store under the `root` given — required, with no default — or the
- * `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every verb:
+ * The engine over `options` that `Engine.layer` builds: the file-backed store under the `root` given — required, with no default — or
+ * the `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every
+ * verb:
  *
  * - the store, and its `subscribe` where it has one (the file store's does), which pushes to `watch`;
  * - each harness behind its A2A agent, reached through the SDK's client in this process (`a2a/client.ts`): the agent holds
@@ -751,9 +753,9 @@ const make = (options: EngineOptions) =>
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);
-    const attached = attachedSessions(root, options.claudeExecutable);
-    const { credentials, missingCredential, telemetry } = options;
-    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, options.claudeExecutable);
+    const { credentials, missingCredential, telemetry, claudeExecutable, sayTimeoutMs } = options;
+    const attached = attachedSessions(root, claudeExecutable);
+    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, claudeExecutable, sayTimeoutMs);
     const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
     const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));
@@ -947,11 +949,11 @@ const attachVerbsOf = (attached: Attached, root: string, serving: ReturnType<typ
 });
 
 /**
- * The engine, as a service. `Engine.layer(options)` builds one from `EngineOptions`, whose `root` is required and has no default, so an
- * engine built with none does not compile; it fails with `EngineRefused` for what
- * `optionsRefusalOf` refuses; a test of a layer above takes the stand-in, `testEngine` of `agent-runtime/testing`. The default harness,
- * `defaultHarness` or else the first, takes a task that names none, and answers `logs`, `transcript` and `say` for a task whose
- * harness this engine does not have, whose `view` asks no harness.
+ * The engine, as a service. `Engine.layer(options)` builds one from `EngineOptions`, whose `root` is required and has no default, so
+ * an engine built with none does not compile; it fails with `EngineRefused` for what `optionsRefusalOf` refuses; a test of a layer
+ * above takes the stand-in, `testEngine` of `agent-runtime/testing`. The default harness, `defaultHarness` or else the first, takes a
+ * task that names none, and answers `logs`, `transcript` and `say` for a task whose harness this engine does not have, whose `view`
+ * asks no harness.
  */
 export class Engine extends Context.Service<Engine, EngineShape>()('agent-runtime/Engine') {
   static readonly layer = (options: EngineOptions): Layer.Layer<Engine, EngineRefused> => Layer.effect(Engine, make(options));

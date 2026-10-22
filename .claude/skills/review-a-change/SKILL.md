@@ -27,13 +27,20 @@ description: "Review a change in this repository as a second engineer would: aga
    document they name — and against the spec's `placement` and each change's `where`. Code in a boundary those rules give to another
    concern, an import across a boundary they hold, or a change built elsewhere than the spec placed it without a word, is a finding of
    kind `placement` that cites the rule.
-5. **Look for what the author could not see**: a rule claimed with no test that makes it refuse; a test that passes for nothing; a
-   caller that rebuilds a returned type field by field and drops the new one; a limit raised; a behaviour change the spec did not ask
-   for. You read a diff and cannot run the author's experiment, so look for the shapes that pass for nothing:
-   - A guard tested by asking whether it allows, never by making it refuse, and never at shipped defaults: it proves nothing, and
-     guards tested that way have been silently inert.
+5. **Look for what the author could not see**: a behaviour the change claims and no test proves at any level; a test that passes for
+   nothing; a caller that rebuilds a returned type field by field and drops the new one; a limit raised; a behaviour change the spec
+   did not ask for. A rule is proven once, at the cheapest level that proves it: a second fixture over the same rule in another
+   wording is no finding, and asking for one is how this suite grew. You read a diff and cannot run the author's experiment, so look
+   for the shapes that pass for nothing:
+   - A guard tested by asking whether it allows, never by making it refuse: it proves nothing, and guards tested that way have been
+     silently inert. One fixture that breaks the rule is what is owed; a guard that ships with none is the finding.
    - A fixture that does not break the rule the test claims to hold — the same order, the same name — so the test would pass with the
      rule gone.
+   - An assertion that pins a refusal's whole sentence, where the repository's own rules say its words are nobody's to check. Where
+     the repository keeps a count of what still pins one, a new line in it is the finding, as is a line lowered while the
+     assertions are still there.
+   - A test that waits out a shipped default — a floor standing at a bound the shipped code owns, rather than at a bound the test
+     shortened at the code's own seam: it buys a second of proof with a second of every pass.
    - A wall-clock bound, or a wait for a length of time rather than for the event being counted: it passes on the author's machine and
      fails under load.
    - A test that reads source text with a slice that can silently match nothing, so an assertion of absence passes for nothing.

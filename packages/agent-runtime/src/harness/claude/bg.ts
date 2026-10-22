@@ -117,6 +117,13 @@ export type ClaudeOptions = {
    */
   root: string;
   /**
+   * How long a post of a person's words to a session's inbox may take before it is read as not taken (`claudeInboxPost`). The
+   * inbox answers nothing, so this bounds a connection that hangs; a session busy past it has still been given the words. Default
+   * `SAY_TIMEOUT_MS`, the shipped bound: a parameter so that a test of what a busy inbox does can shorten it rather than wait the
+   * shipped one out (`test/say.test.ts`).
+   */
+  sayTimeoutMs?: number;
+  /**
    * Where Claude Code registers each running session, by pid: `find` finds a session there by its name, `say` its inbox, and
    * `observe` the bridge of each session it holds a process for (`claudeBridge`). Default
    * `sessions` under `$CLAUDE_CONFIG_DIR`, or under `~/.claude`, read when the runner is made.
@@ -160,7 +167,8 @@ type Begun<T> = { readAt: number; value: Promise<T> };
 
 /**
  * An attempt's key in what is kept (`Kept`): the row's name, its session, the start `claude agents` gave it, and when its usage is
- * counted from where that is another time (`countsFrom`), so a read counted from one is never handed to a look counting from the other.
+ * counted from where that is another time (`countsFrom`), so a read counted from one is never handed to a look counting from the
+ * other.
  */
 const attemptOf = (name: string, s: Sighting, startedAt: number | undefined, countFrom = startedAt) =>
   JSON.stringify([name, s.sessionId, startedAt ?? null, ...(countFrom !== startedAt ? [countFrom] : [])]);
@@ -365,7 +373,7 @@ export const claudeOps = (options: ClaudeOptions): RunnerOps => {
     logs: sessionLogs,
     transcript: sessionTranscript,
     follow: bgFollowOf(sharedListing(sh('claude', ['agents', '--all', '--json'], { verb: 'follow' }))),
-    say: sayThrough(sessionsDir, registry.pids),
+    say: sayThrough(sessionsDir, registry.pids, options.sayTimeoutMs),
     quota: claudeQuota(),
     forget: forgetUnder(root),
     kept: keptUnder(root),
@@ -864,7 +872,7 @@ const sessionTranscript: NonNullable<RunnerOps['transcript']> = (sessionId, afte
  * repeat inside Claude Code's window, drops them where nothing here can see.
  */
 const sayThrough =
-  (sessionsDir: string, pids: Registry['pids']): NonNullable<RunnerOps['say']> =>
+  (sessionsDir: string, pids: Registry['pids'], timeoutMs?: number): NonNullable<RunnerOps['say']> =>
   (session, text) =>
     Effect.tryPromise({
       try: async () => {
@@ -874,7 +882,7 @@ const sayThrough =
             `\`claude agents\` lists no process for ${session.name} (${session.sessionId}): it has exited, or this runner has not observed it.`,
           );
         }
-        await claudeInboxPost(await claudeInbox(sessionsDir, pid, session.sessionId), claudeInboxLine(session.sessionId, text));
+        await claudeInboxPost(await claudeInbox(sessionsDir, pid, session.sessionId), claudeInboxLine(session.sessionId, text), timeoutMs);
       },
       catch: (cause) => new RunnerError({ verb: 'say', message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}` }),
     });

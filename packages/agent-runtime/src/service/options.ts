@@ -42,8 +42,9 @@ export type Pooled = { pool?: string };
 
 /**
  * What `Engine.layer` builds an engine from. `maxConcurrent` is the engine's ceiling: how many sessions of each pool may be at work at
- * once, a whole number from 1. With it, a pass admits the tasks filed `queued` while their pool has room, the highest `priority` first,
- * then the earliest filed; without it, a queued task waits for `admit`. A task filed unqueued starts on the next pass, ceiling or not.
+ * once, a whole number from 1. With it, a pass admits the tasks filed `queued` while their pool has room, the highest `priority`
+ * first, then the earliest filed; without it, a queued task waits for `admit`. A task filed unqueued starts on the next pass, ceiling
+ * or not.
  */
 export type EngineOptions = {
   /** The sessions at work at once in each pool: a whole number from 1. Absent: no ceiling, and nothing is admitted but by `admit`. */
@@ -55,8 +56,8 @@ export type EngineOptions = {
   unschedulable?: () => boolean;
   /**
    * Where the file-backed store lives. Required, and with no default: an engine made with no root would write into the person's own
-   * `~/.agent-engine`, so the caller that knows where the store is says so (`AE_ROOT`, read in `src/cli/main.ts` alone). Ignored when you
-   * bring your own `journal`, which is where the records then go.
+   * `~/.agent-engine`, so the caller that knows where the store is says so (`AE_ROOT`, read in `src/cli/main.ts` alone). Ignored when
+   * you bring your own `journal`, which is where the records then go.
    */
   root: string;
   /**
@@ -83,7 +84,8 @@ export type EngineOptions = {
   /**
    * Where the sessions this engine starts export their telemetry: an OTLP/HTTP collector the process chose, handed to every spawn
    * (`telemetered`), tagged with the task's id and labels, and with the trace context of the span that filed the task. A harness that
-   * exports says it in its own variables; one that does not ignores it. Absent: no session exports, whatever the process's environment.
+   * exports says it in its own variables; one that does not ignores it. Absent: no session exports, whatever the process's
+   * environment.
    */
   telemetry?: Telemetry;
   /**
@@ -94,6 +96,13 @@ export type EngineOptions = {
    * session runs the `claude` on the PATH, whatever this says. Absent: the SDK's own.
    */
   claudeExecutable?: string;
+  /**
+   * How long a `say` to a Claude Code background session's inbox may take before it is read as not taken: the harness's own bound
+   * (`ClaudeOptions.sayTimeoutMs`), reached through here because the inbox answers nothing and only a deadline tells a hung
+   * connection from a busy session. Absent: the shipped `SAY_TIMEOUT_MS`, which is what every caller but a test of a busy inbox
+   * wants (`agent-runtime/test/say.test.ts`).
+   */
+  sayTimeoutMs?: number;
   /**
    * The engines that hold the sessions this one only reads, by the harness each holds: for each, a function asked at every follow
    * of that harness's sessions, answering the card that engine served on its own port (`Served.cards`), as the JSON it answered, or
@@ -187,7 +196,8 @@ export type TaskSpec = {
  * last attempt open, and `working` or not yet listed; a `blocked` one is not — and the
  * view of every task it left unsettled — built off the pass's one observation of each harness and the fold it made, so a
  * layer above that decides what to `admit` reads the board without asking any harness again — and what the pass
- * cost, as facts: `ms`, its wall time, and `observed`, each harness's observes made during it (`ObserveCount`). Nothing decides on them.
+ * cost, as facts: `ms`, its wall time, and `observed`, each harness's observes made during it (`ObserveCount`). Nothing decides on
+ * them.
  *
  * `refused` is every move the task's lifecycle had no edge for in this pass, off the same steps: the task, the state
  * it was in and the event it was handed. Such a task did nothing and will be asked again next pass, so a refusal that persists
@@ -248,10 +258,11 @@ export const runnersOf = (
   telemetry?: Telemetry,
   attached?: Attached,
   claudeExecutable?: string,
+  sayTimeoutMs?: number,
 ): Record<string, RunnerOps> =>
   Object.fromEntries(
     Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => {
-      const ops = runnerOf(name, h, root, credentials, missingCredential, attached, claudeExecutable);
+      const ops = runnerOf(name, h, root, credentials, missingCredential, attached, claudeExecutable, sayTimeoutMs);
       return [name, telemetry ? telemetered(ops, telemetry) : ops];
     }),
   );
@@ -265,11 +276,12 @@ const runnerOf = (
   missingCredential?: MissingCredential,
   attached?: Attached,
   claudeExecutable?: string,
+  sayTimeoutMs?: number,
 ): RunnerOps =>
   h === 'claude'
-    ? claudeCodeOps({ root, ...(claudeExecutable ? { claudeExecutable } : {}) }, attached)
+    ? claudeCodeOps({ root, ...(claudeExecutable ? { claudeExecutable } : {}), sayTimeoutMs }, attached)
     : h === 'claude-bg'
-      ? claudeOps({ root })
+      ? claudeOps({ root, sayTimeoutMs })
       : isSpec(h)
         ? detachedOps(h, root)
         : isRemote(h)

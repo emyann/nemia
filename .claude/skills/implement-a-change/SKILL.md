@@ -8,13 +8,24 @@ description: "Build a change from its spec in this repository: tests first where
 1. **Read the spec** (handed to you in your brief) and the `CLAUDE.md` of each package it touches. If main moved since your branch
    was cut, merge it in first. Build each change where the spec places it (its `where`); one that cannot live there is a wrong spec.
 2. **Prove before you build** where the spec claims a rule: write the test that makes it refuse, see it fail, then make it pass.
-   - **A guard is proven by a test that makes it refuse**, at shipped defaults. A test that asks whether it allows proves nothing;
-     guards tested that way have been silently inert.
+   - **A guard is proven by a test that makes it refuse, once.** A test that asks whether it allows proves nothing; guards tested
+     that way have been silently inert. One fixture per rule, never one per form, word or spelling: the fixture breaks the rule the
+     guard holds, and a second that breaks it again in another wording proves nothing the first did not. A guard with no fixture at
+     all does not ship.
+   - **A refusal's words are nobody's to check**, where the repository's own rules say so. Assert the fact — that it refused — its
+     kind and the exit code it carries; never the sentence. A test that pins a message's whole wording breaks the day the message is
+     made clearer, which is how a sentence comes to be owned by its test. Where the repository counts what still pins one, that
+     count only shrinks: no new line is added to it.
    - **A rule about order or names is proven by a fixture that breaks it.** Give the fixture the opposite order or another name, and
      check the test fails without the rule.
    - **A time measured on a machine is a floor, never a ceiling.** Assert identities — the parts add up to no more than the whole —
      never a wall-clock bound, and wait for the event you count, never for a length of time. A test of what is ordered or worded by
-     the clock seeds the clock rather than sleeping, and a duration a program decides on is not read off the wall clock.
+     the clock seeds the clock rather than sleeping, and a duration a program decides on is not read off the wall clock. **A
+     shipped default is not waited out**: shorten the bound at the seam the code gives for it — a parameter, an option, a harness's
+     own ops — measure the floor there, and name the shipped constant at the one site that holds it. A floor at a bound a timer
+     decides sits a little under it, since a timer fires up to a millisecond before a clock read around it says its delay is gone,
+     and far above what the call takes unbounded: break it on purpose and see how far. A test whose floor stands at a bound the
+     shipped code owns has bought a second of proof with a second of every pass, and the guard refuses a new one.
    - **A test that fails only under load is a race until shown otherwise.** Make it happen on demand first — a throwaway preload the
      process is started with, a process frozen with `SIGSTOP` (wait for its state to say so before `SIGCONT`) — then fix it.
    - **A test that depends on the environment sets it**, and takes its temporary folders from the repository's own helper rather than

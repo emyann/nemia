@@ -1751,6 +1751,47 @@ const mergeRefused = (id: string, words: RegExp) => (err: Error & { exitCode?: n
   return true;
 };
 
+/**
+ * `implement → review (loop) → ship`, quick's shape: the looping folder with its ship's `gate: true` deleted, so the review's pass files
+ * the landing and nobody approves it.
+ */
+const ungatedFolder = (): string => {
+  const dir = loopingFolder();
+  const file = path.join(dir, 'ship.md');
+  const text = fs.readFileSync(file, 'utf8');
+  assert.match(text, /^gate: true$/m);
+  fs.writeFileSync(file, text.replace(/^gate: true\n/m, ''));
+  return dir;
+};
+
+test("REFUSED: a merge asked of quick's shape — a review that passed and an ungated landing not yet filed — which the run files on the next tick", async () => {
+  for (const base of ['moved', 'clean'] as const) {
+    const repo = aRepo();
+    const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: ungatedFolder() }));
+    const { e, settle } = board();
+    await runWith(e, advanceRun(readRun(run.id)));
+    const work = readRun(run.id).steps.implement;
+    addSub(work.workspace!);
+    world().commit(work.workspace!, 'add sub');
+    settle(`${run.id}-implement`, 'succeeded', SIGNED);
+    await runWith(e, advanceRun(readRun(run.id)));
+    if (base === 'moved') mainMoves(repo);
+    settle(`${run.id}-review`, 'succeeded', { ...SIGNED, again: false });
+    assert.ok(!readRun(run.id).steps.ship?.taskId, 'the landing is not filed yet: the next pass files it');
+    fs.mkdirSync(path.join(ROOT, 'runs', `${run.id}.asks`), { recursive: true });
+    await assert.rejects(
+      runWith(e, mergeRun(run.id)),
+      mergeRefused(
+        run.id,
+        new RegExp(
+          `^ship has no gate: the run files it on the next tick, once review passes, and it merges main itself\\. If its merge stops, merge then: nemia merge ${run.id} review\\.$`,
+        ),
+      ),
+      `the base ${base}`,
+    );
+  }
+});
+
 test('REFUSED at shipped defaults: a merge of work whose trial merge onto the base is clean — nothing to merge, and the refusal says to approve the landing', async () => {
   const repo = aRepo();
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: loopingFolder() }));

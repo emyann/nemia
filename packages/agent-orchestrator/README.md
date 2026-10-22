@@ -1453,7 +1453,7 @@ gated ship runs the line whole on the merged tree.
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
 | `unverified · done` | signed off, and declared no `check:` | is filed, on the step's word |
-| `awaiting approval` | signed off at its gate — verified first, where it has a check — and the try it is on is not approved ([below](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)); or an ending step (`workspace: main`) whose work is done, held before it is filed ([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)) | **never runs** — until a person approves it: `wf approve`; or sends the work back: `wf retry --message` |
+| `awaiting approval` | signed off at its gate — verified first, where it has a check — and the try it is on is not approved ([below](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)); or a gated ending step (`workspace: main`) whose work is done, held before it is filed ([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)) — never an ungated one, which its workflow files | **never runs** — until a person approves it: `wf approve`; or sends the work back: `wf retry --message` |
 | `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, or accepts the work as it stands, below |
 | `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `wf round --budget` |
 | `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (a job: `claude`, `claude-detached`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
@@ -2038,15 +2038,17 @@ dropped. **Nothing in the packages knows what shipping means.**
   is merged into it, no `node_modules` is provisioned, and **the run commits nothing there** — what a person
   leaves lying in their checkout is theirs, and the step commits its own work as they would. The step is told
   where the work is instead of being told to read its workspace: the result branch, the base branch, and the
-  `git log` and `git diff` between them. A `check:` there is allowed on a gated step alone, and is the run's
-  (next bullet); refused by name on an ungated one, whose check would be a verdict on whatever a person left in
-  that checkout, and `retries:` beside it — a try of an ending is a person's word, `wf retry <run> ship`. Refused
+  `git log` and `git diff` between them. A `check:` there is the run's (next bullet), and is allowed where somebody's word can file
+  it: on a gated step, or on one that waits on a step with a `loop:` — a review, whose pass files the landing and whose `again: true`
+  sends the work back instead. An ungated ending with a `check:` and no such step before it is refused when the folder is loaded
+  (`validateMainWorkspace`): its check would commit onto the base branch on nobody's word. And `retries:` beside it — a try of an ending is a person's word, `wf retry <run> ship`. Refused
   on a step with a `resume:`, whose session ran in another directory — and, at
   load, on a step anything waits on or one that ends a workflow beside another: a run has one ending. A run of
   such a folder started `--no-worktree` is refused too: it has no result branch to merge.
   Its brief carries one way of handing a file over rather than the usual two: what it leaves in that checkout is collected by nobody, so
   it is told the run's artifacts directory, and that the checkout is to be left as it was found.
-- **The run checks the landing and records it, not the ending's session.** A gated `workspace: main` step with a `check:`
+- **The run checks the landing and records it, not the ending's session.** A `workspace: main` step with a `check:` — gated, or with a
+  looping step before it that routes it —
   lands the run's result the way its own step says — staging the merge (`git merge --no-ff --no-commit`) where that is
   the way its factory lands — and signs off with the message that records what landed as its closeout's `message`
   (`shipper.schema.json`): a subject of what shipped, the run's own title, and a short body read off `git log` and
@@ -2283,9 +2285,12 @@ parse-the-flag-option-in-cli-idk2  Parse the --flag option in cli.ts
 would need a runner whose session is a file that fills when someone answers, and a body nobody writes. The handoff already has
 what a gate needs — a closeout to read, and a run that files nothing until it may.
 
-- **Where the gate holds.** On a step with steps after it, the handoff: the step runs, and what follows waits for the approval. On an
-  ending step in the repository's checkout (`workspace: main`), the step itself: nothing of it is filed until a person approves it —
-  [above](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate), which is the whole of what the `dev*` folders' `ship` is.
+- **Where the gate holds.** On a step with steps after it, the handoff: the step runs, and what follows waits for the approval. On a
+  *gated* ending step in the repository's checkout (`workspace: main`), the step itself: nothing of it is filed until a person approves
+  it — [above](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate), which is the whole of what the `dev*` folders' `ship`
+  is. An ending with no gate holds nothing and waits on nobody: a step before it that can send the work back routes it instead, and the
+  tick files it once that step passes (`quick`'s land, which its review routes). `wf approve` of such a step is refused — there is
+  nothing to approve — and nothing of it is a person's to decide (`toDecide`, `endingSteps`).
 - **Where a gate is set.** On a step, `gate: true`, for every run of its workflow; `gate: false` and any other word are refused,
   with the fix. At start, `wf start --gate <step>`, once per step, for this run. On an inbox card, `gate: <step>`, one step, for
   the run the card starts, beside any `--gate` its start gives. The last two freeze into `gates` on the run's record, as the

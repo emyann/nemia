@@ -8,7 +8,8 @@ import path from 'node:path';
 import type { Trials } from '../place/place.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
-import { endingSteps, type ToDecide } from '../ending/ending.ts';
+import { type ToDecide } from '../ending/ending.ts';
+import { landsOnCheck } from '../status/status.ts';
 import { landingRefusedOn } from '../merge/merge.ts';
 import { mergeWord, mergeWordOf, type MergeWord, type StandingMerge } from '../branches/index.ts';
 
@@ -66,6 +67,9 @@ export const trialsOf = (onto: string, ours: readonly string[], theirs: readonly
 /**
  * The ending a decision reads collisions for: the one waiting at its gate, or one whose landing a check refused, which is filed and waits
  * at no gate again. Undefined for any other decision, and for a run called off or pruned.
+ *
+ * The refused landing is read over `landsOnCheck` rather than over the gated endings (`endingSteps`): an ending with no gate, filed by its
+ * workflow once its review passed, lands on its check in the same way, and its refused merge owes the same trials.
  */
 export function collisionsDue(steps: readonly Workflow[], run: Run, decide: ToDecide | undefined): string | undefined {
   if (decide?.kind === 'approve') return decide.step;
@@ -74,7 +78,7 @@ export function collisionsDue(steps: readonly Workflow[], run: Run, decide: ToDe
     const landed = run.steps[s.name]?.landed;
     return Boolean(landed && 'aborted' in landed);
   };
-  return endingSteps(steps, run).find(aborted)?.name;
+  return steps.find((step) => landsOnCheck(step, run) && aborted(step))?.name;
 }
 
 /** The run's collisions in one line: how many of the runs in flight it collides with, and which; those git could not say of. */

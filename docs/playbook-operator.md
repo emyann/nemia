@@ -209,8 +209,9 @@ rm "$S"/node_modules; git worktree remove "$S"
   line to type. Where it was the pull request — red `ci`, unmergeable, a head that moved past the review — send the work back to the
   step that built it, with the refusal's words, without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what
   failed>"`; in `build`, through review, as *Send a landing back* says. Where it was the fast-forward that was declined, the owner's
-  checkout holds commits `origin/main` does not: bring it onto `origin/main` by hand, then `nemia retry <run> land`. The next landing
-  is approved by whoever approved the first: an approval is for one try.
+  checkout holds commits `origin/main` does not: bring it onto `origin/main` by hand, then `nemia retry <run> land`. On `build`, the
+  next landing is approved again by whoever approved the first: an approval is for one try. On `quick` there is nobody to approve: the
+  work goes round the review once more, and its pass files the landing.
 - **A failed landing check:** the check is a receipt now, so a refusal says the merge did not happen as the step claimed — the pull
   request not merged, a squash instead of a merge commit, a checkout the fast-forward did not reach, a branch of the run left out.
   Read it and name the cause. A check that did not finish (a deadline) is no refusal: file the landing again.

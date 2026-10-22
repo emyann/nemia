@@ -8,15 +8,16 @@ team that works it is in `workflows/agents/`. What follows is for the operator o
 - Every run starts in this factory: `nemia start "<brief>" --workflows <workflow> --factory nemia`.
 - An idea that changes the model or needs more than one card goes to `intake` first (Iris interviews the person), and its build is
   started `--after` the intake run: `nemia start "<brief>" --workflows build --factory nemia --after <intake run>`.
-- A small change its card settles goes to `quick` (`--workflows quick`, or `workflow: quick` on its card): implement, then land,
-  which waits at its gate, with no spec and no review. `workflows/quick/README.md` says the bound; a settled change past it goes
-  straight to `build`.
-- A quick run has no review but the person's read when land waits at its gate: read its plan on the run's page and its whole change
-  in a terminal (`git diff main...wf/<run>/run`) before approving, until the board shows the change there.
+- A small change its card settles goes to `quick` (`--workflows quick`, or `workflow: quick` on its card): implement, then a review,
+  then a landing nobody is asked to approve — Agora's pass files it. `workflows/quick/README.md` says the bound; a settled change past
+  it goes straight to `build`.
+- A quick run is read by Agora, not by the person: there is nothing to bring you for its landing, and `nemia approve` is refused
+  there (*What waits on the person*, below, says what is still yours on such a run, and how to ask to read one yourself).
 - A quick run whose check refuses its size is a `build` card: cancel it and start the card with `build`, as the refusal says.
 - A landing whose check refused is sent back to the step that built the change, with the check's words (`nemia decide <run>` prints
-  them), without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what failed>"`. The next landing is
-  approved by whoever approved the first: an approval is for one try.
+  them), without waiting to be asked: in `quick`, `nemia retry <run> implement --message "<what failed>"`. On `build`, the next
+  landing is approved again by whoever approved the first: an approval is for one try. On `quick` the work goes round the review once
+  more instead, and its pass files the landing, with nobody to approve.
 - One coherent slice a card: a card cut too small slows the factory more than it saves.
 - Cards that change the command table (`packages/agent-orchestrator/src/command/`, the api's routes) or the board's frame collide with
   each other: chain them, the second started `--after` the first, never side by side.
@@ -33,7 +34,15 @@ to the person as a card to start, fold into another or drop, with what its stats
 
 - `build`'s design step's gate (Seldon's spec) is the person's when the spec changes the model, a layer's contract or anything of
   taste: a name, a shipped instruction, the board's look. Bring it with the spec's `why` and its placement findings quoted.
-- The landing step's gate (Otto) is approved only once the run's own pull request is green and mergeable on GitHub: open it — its
+- **A `quick` run's landing is not gated at all, and waits on nobody**: its review's pass files land on the next tick, and `nemia
+  approve <run> land` is refused there ("what waits on it is filed once it has passed its check, with nobody's approval, so there is
+  nothing to approve"). There is nothing to bring the person about it. What is still theirs on such a run: a check that refused, a
+  review that asked twice and is `exhausted` (`nemia round <run> review`, or `nemia accept <run> review`), and a landing that refused —
+  which goes back to implement, `nemia retry <run> implement --message "<what failed>"`. A person who wants to read a quick change
+  before it lands says so when the run starts — `nemia start … --gate land`, or the card's own `gate:` line naming land — and then
+  everything below holds for that run as for a build run.
+- The landing step's gate (Otto, on `build` and on a quick run gated at it) is approved only once the run's own pull request is green
+  and mergeable on GitHub: open it — its
   address is on the implement closeout as an artifact — and read that the `ci` context passed on the head the review read. `nemia
   decide <run>` reads the trial merge live too (`merges`), with each run in flight on `main` its branch collides with and in which
   files (`others`, `collides`), and a clean merge whose landing check refused the merged tree (`semantic`). Say what both read. When it
@@ -75,5 +84,6 @@ a run that passes it is the person's to continue.
 ## Never
 
 - Push, open a pull request or merge into `main` by hand: a run opens its pull request through `workflows/build/pull-request.ts` and
-  merges it through `workflows/build/landing.ts`, at its ending step, after the person approves it.
+  merges it through `workflows/build/landing.ts`, at its ending step — after the person approves it, or, on `quick`, once its review
+  passes.
 - Stop a process by its name: a run is cancelled with `nemia cancel`, held with `nemia hold`.

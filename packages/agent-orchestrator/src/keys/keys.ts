@@ -236,16 +236,17 @@ export function placeRequired(step: string, place: string | undefined): string {
  * `workspace:` as written: `main`, or refused. A step without the line works where the shape of the workflow puts it
  * (`workspacePlan`) — a worktree of its own, or the one it inherits — and `workspace: worktree` is that said twice, while any other word is
  * a directory the run would have to invent; `workspace: folder` reaches here only when read past `placeSpelled`, and is refused naming
- * `place: folder`. `main` takes a `check:` only beside `gate: true` — the run executes it on the merge the step
- * stages, and commits or aborts that merge onto the base branch on its word (`landingDue`); and not on codex, which cannot be denied the
- * commit (`filedDenies`) — and never a `retries:`, since a try of an ending is a person's to ask for.
+ * `place: folder`. `main` takes a `check:` — the run executes it on the merge the step stages, and commits or aborts that merge onto the
+ * base branch on its word (`landingDue`) — but not on codex, which cannot be denied the commit (`filedDenies`), and never a `retries:`,
+ * since a try of an ending is a person's to ask for. Who may file that check — a person's approval, or a step before it that can send the
+ * work back — reads the steps together, so it is `validateMainWorkspace`'s refusal and not this one's: this function is given one step's
+ * keys and cannot see what precedes it.
  */
 export function workspaceOf(
   step: string,
   workspace: string | undefined,
   check: string | undefined,
   resume: string | undefined,
-  gate: string | undefined,
   retries: string | undefined,
   harness: string | undefined,
 ): 'main' | undefined {
@@ -263,11 +264,6 @@ export function workspaceOf(
   if (workspace !== 'main') {
     refuse(
       `${step}: \`workspace: ${workspace}\` is not \`main\`. \`workspace: main\` runs the step in the repository's own checkout, where a person's own work is, rather than in a worktree of the run's: what the last step of a workflow does when it merges. A step that works in a folder the run makes, with no git repository, says \`place: folder\`. Without the line, the step works where the workflow's shape puts it.`,
-    );
-  }
-  if (check !== undefined && gate?.trim() !== 'true') {
-    refuse(
-      `${step}: \`workspace: main\` runs the step in the repository's own checkout, and \`check: ${check}\` is a command the run executes there on the merge the step leaves staged, committing it onto the base branch when it passes — which only a person's approval may start, and this step has no \`gate: true\`. Add \`gate: true\`, or delete the \`check:\` line.`,
     );
   }
   if (check !== undefined && harness === 'codex') {

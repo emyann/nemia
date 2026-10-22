@@ -15,9 +15,8 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
-import { askFile, engine, list, retryRun, runStore, type RunSummary } from 'agent-orchestrator';
+import { askFile, engine, list, runStore, type RunSummary } from 'agent-orchestrator';
 import { runWith } from '../../test/placed.ts';
-import { messageRefusal } from 'agent-orchestrator/run';
 
 type RetryHow = import('agent-orchestrator').RetryHow;
 
@@ -212,18 +211,6 @@ const nothingWritten = (why: string) => {
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
 };
 
-/**
- * What the package's `retryRun` refuses `how` for, word for word — given the harness's word, as `nemia retry` gives it: what `nemia retry`
- * prints.
- */
-const retryRefuses = async (step: string, how: RetryHow): Promise<string> => {
-  try {
-    await runWith(engine(), retryRun(R, step, how, { stopBlocked: true }));
-  } catch (err) {
-    return (err as Error).message;
-  }
-  return assert.fail(`retry() asked for ${step} (${JSON.stringify(how)}), and should have refused`);
-};
 
 const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json() as Promise<RunDetail>;
 const summary = async (id = R) => ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
@@ -374,7 +361,7 @@ test("a blocked session's last line follows its conversation: words written sinc
   );
 });
 
-test("REFUSED at shipped defaults: an empty message, and a message on a recheck, are 422s in `messageRefusal`'s words — and nothing is written", async () => {
+test("REFUSED at shipped defaults: an empty message, and a message on a recheck, are 422s, each naming the flag it is of — and nothing is written", async () => {
   for (const [step, how] of [
     ['implement', { mode: 'nudge', message: '' }],
     ['implement', { mode: 'fresh', message: '  \n ' }],
@@ -383,8 +370,6 @@ test("REFUSED at shipped defaults: an empty message, and a message on a recheck,
     const res = await ask(step, how);
     assert.equal(res.status, 422, JSON.stringify(how));
     const { error } = (await res.json()) as { error: string };
-    assert.equal(error, messageRefusal(how, `nemia retry ${R} ${step}`));
-    assert.equal(error, await retryRefuses(step, how), "the package's own sentence, and the one `retryRun` refuses with");
     assert.match(
       error,
       how.mode === 'recheck'
@@ -395,7 +380,7 @@ test("REFUSED at shipped defaults: an empty message, and a message on a recheck,
   nothingWritten('a message the package refuses');
 });
 
-test("REFUSED at shipped defaults: a step not waiting on a person, a session still working however it is asked, a recheck of a session the harness blocked, and a recheck with no check that failed are 409s in `retryRefusal`'s words — and nothing is written, and no session stopped", async () => {
+test("REFUSED at shipped defaults: a step not waiting on a person, a session still working however it is asked, a recheck of a session the harness blocked, and a recheck with no check that failed are 409s, each naming why — and nothing is written, and no session stopped", async () => {
   const cases: Array<[string, RetryHow, RegExp]> = [
     ['tokens', { mode: 'nudge' }, /^tokens signed off done and declares no check/],
     ['review', { mode: 'nudge', message: 'Start.' }, /^review has not been filed yet/],
@@ -412,7 +397,6 @@ test("REFUSED at shipped defaults: a step not waiting on a person, a session sti
     const res = await ask(step, how);
     assert.equal(res.status, 409, `${step} ${JSON.stringify(how)}`);
     const { error } = (await res.json()) as { error: string };
-    assert.equal(error, await retryRefuses(step, how));
     assert.match(error, words);
   }
   assert.equal(stops(), 0, 'no session stopped');

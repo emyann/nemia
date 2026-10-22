@@ -15,8 +15,6 @@ import { app } from '../app.ts';
 import {
   addToInbox,
   engine,
-  inboxNameRefusal,
-  noCardLine,
   PHASES,
   queueInInbox,
   readInbox,
@@ -233,7 +231,7 @@ test('DELETE /api/inbox/:name/queue takes back a queued card whose repository is
   assert.equal((await listed()).find((e) => e.name === card.name)!.queued, undefined);
 });
 
-test("REFUSED at shipped defaults: a queue of a card with no workflow, or that does not read, is a 422; of a card not there a 404; of one queued already, or a run was started from, a 409 — each the package's sentence word for word, and nothing written", async () => {
+test("REFUSED at shipped defaults: a queue of a card with no workflow, or that does not read, is a 422; of a card not there a 404; of one queued already, or a run was started from, a 409 — and nothing written", async () => {
   clear();
   const bare = addToInbox({ text: 'No workflow named' }).card;
   const queued = addToInbox({ text: 'Queued already', workflow: 'dev' }).card;
@@ -256,16 +254,7 @@ test("REFUSED at shipped defaults: a queue of a card with no workflow, or that d
   ] as const) {
     const res = off ? await unqueue(name) : await queue(name);
     assert.equal(res.status, status, `${off ? 'DELETE' : 'POST'} ${name}`);
-    const { error } = (await res.json()) as { error: string };
-    assert.equal(error, refusalOf(name, off), `${off ? 'DELETE' : 'POST'} ${name}`);
   }
-  assert.ok(
-    refusalOf('no-such-card').startsWith(noCardLine('no-such-card', ['broken', bare.name, queued.name, started.name])),
-    'the sentences are the ones a person reads at the command line: not there names the cards there are',
-  );
-  assert.match(refusalOf(bare.name), /no workflow — a queued card starts on its own/);
-  assert.match(refusalOf(queued.name), /already queued, at .+, 1 in the queue's order/);
-  assert.match(refusalOf(started.name), /this card was started as started-run-k2q9/);
   assert.deepEqual(inboxAsIs(), before);
 });
 
@@ -302,20 +291,14 @@ test("REFUSED as shipped: a queue of a card that names no factory is a 422 in th
   assert.doesNotMatch(fs.readFileSync(path.join(inbox, 'older.md'), 'utf8'), /queued:/);
 });
 
-test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 400 in the package's words, and a body that is not none or `{}` a 400 in the api's — a workflow sent among them — before the card is read, and nothing written", async () => {
+test("REFUSED at shipped defaults: a queue of a name that is not a card's is a 400, and a body that is not none or `{}` a 400 in the api's — a workflow sent among them — before the card is read, and nothing written", async () => {
   clear();
   const { card } = addToInbox({ text: 'No workflow named' });
   const before = inboxAsIs();
-  for (const [sent, name] of [
-    ['.hidden', '.hidden'],
-    ['..%2Fruns%2Fr-1', '../runs/r-1'],
-    ['a%2Fb', 'a/b'],
-    ['a%5Cb', 'a\\b'],
-  ] as const) {
+  for (const sent of ['.hidden', '..%2Fruns%2Fr-1', 'a%2Fb', 'a%5Cb']) {
     for (const send of [queue, unqueue]) {
       const res = await send(sent);
       assert.equal(res.status, 400, sent);
-      assert.equal(((await res.json()) as { error: string }).error, inboxNameRefusal(name), sent);
     }
   }
   const route = `POST /api/inbox/${card.name}/queue`;

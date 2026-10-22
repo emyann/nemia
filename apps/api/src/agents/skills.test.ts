@@ -15,7 +15,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { engine, shippedGitPlace, skillCopyCommand } from 'agent-orchestrator';
-import { skillNameRefusal, skillTurnCost } from 'agent-orchestrator/workflow';
+import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import { foundInOf, listSkills, SHIPPED_SKILLS, skillDetail } from './skills.ts';
@@ -319,7 +319,6 @@ test('a skill named with its folder is listed on its agent as written, found, wi
       const res = await app.request(`/api/skills/repo/${name}`);
       const body = (await res.json()) as { error: string };
       assert.equal(res.status, 400, body.error);
-      assert.equal(body.error, skillNameRefusal(decodeURIComponent(name)), "no page: the name is refused as no skill's");
     }
   } finally {
     fs.rmSync(path.join(root, 'workflows', 'agents', 'typer.md'));

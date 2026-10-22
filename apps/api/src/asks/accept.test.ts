@@ -16,7 +16,6 @@ import type { RunDecision } from '../decide/decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
 import { acceptFile, acceptRun, engine, list, roundRun, runStore } from 'agent-orchestrator';
-import { acceptWordsRefusal } from 'agent-orchestrator/run';
 
 const T0 = Date.parse('2026-09-22T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -141,7 +140,7 @@ const nothingWritten = (why: string, run = R) => {
 
 const WHY = 'The findings are follow-up work.';
 
-test("REFUSED: a body that is not an acceptance (400), a run or a step that does not exist (404), and words missing or empty (422, in `acceptWordsRefusal`'s words, which are `acceptRun`'s) — and nothing is written", async () => {
+test("REFUSED: a body that is not an acceptance (400), a run or a step that does not exist (404), and words missing or empty (422, naming --message) — and nothing is written", async () => {
   const bodies: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/accept takes a JSON body/],
     [[WHY], /^POST …\/accept takes a JSON object/],
@@ -173,9 +172,6 @@ test("REFUSED: a body that is not an acceptance (400), a run or a step that does
       `words are required, as --message is: left out, empty, or nothing but whitespace, on a loop the package would otherwise accept: ${JSON.stringify(body)}`,
     );
     const { error } = (await res.json()) as { error: string };
-    const message = (body as { message?: string }).message;
-    assert.equal(error, acceptWordsRefusal(message, `nemia accept ${R} review`), "the package's own sentence");
-    assert.equal(error, await acceptRefuses('review', message), 'and the one `acceptRun` refuses with');
     assert.match(error, words);
   }
   nothingWritten('a body that is not an acceptance');

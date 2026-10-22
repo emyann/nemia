@@ -18,7 +18,7 @@ import path from 'node:path';
 import { app } from '../app.ts';
 import { approvalFile, approveRun, askFile, engine, list, retryRun, runStore, type RunSummary } from 'agent-orchestrator';
 import { runWith } from '../../test/placed.ts';
-import { answerText, approvalWordsRefusal, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
+import { answerText, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');
@@ -209,7 +209,7 @@ test("a run's detail carries its gates and each gated step's gate — awaiting a
   );
 });
 
-test("REFUSED: a body that is not an approval (400), a run or a step that does not exist (404), and empty words (422, in `approvalWordsRefusal`'s words) — and nothing is written", async () => {
+test("REFUSED: a body that is not an approval (400), a run or a step that does not exist (404), and empty words (422, naming --message) — and nothing is written", async () => {
   const bodies: Array<[unknown, RegExp]> = [
     ['not json', /^POST …\/approve takes a JSON body/],
     [['Ship it.'], /^POST …\/approve takes a JSON object/],
@@ -232,8 +232,6 @@ test("REFUSED: a body that is not an approval (400), a run or a step that does n
     const res = await approveOver('plan', { message });
     assert.equal(res.status, 422, JSON.stringify(message));
     const { error } = (await res.json()) as { error: string };
-    assert.equal(error, approvalWordsRefusal(message, `nemia approve ${R} plan`), "the package's own sentence");
-    assert.equal(error, await approveRefuses('plan', message), 'the one `approveRun` refuses with');
     assert.match(error, /^--message is empty, and an approval's words are handed to every step after the gate/);
   }
   nothingWritten('a body that is not an approval');

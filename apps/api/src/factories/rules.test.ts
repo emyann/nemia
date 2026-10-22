@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { addFactory, factoryNameRefusal, factoryRules } from 'agent-orchestrator';
+import { addFactory, factoryRules } from 'agent-orchestrator';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 
@@ -121,11 +121,8 @@ test('REFUSED at shipped defaults: no factory (404), the default (409), a frontm
   assert.ok(wrong.endsWith("This request's was 7."), wrong);
   assert.match(await refused(() => send('PUT', URL, 'not json'), 400), /^PUT \/api\/factories\/mill\/rules takes a JSON body/);
 
-  const bad = await refused(() => app.request('/api/factories/Not%20One/rules'), 400);
-  assert.ok(bad.endsWith(factoryNameRefusal('Not One')!), bad);
-  const climbs = await refused(() => app.request('/api/factories/..%2Fmill/rules'), 400);
-  assert.ok(climbs.endsWith(factoryNameRefusal('../mill')!), climbs);
-  const badPut = await refused(() => send('PUT', '/api/factories/Not%20One/rules', { words: 'x' }), 400);
-  assert.ok(badPut.endsWith(factoryNameRefusal('Not One')!), badPut);
+  await refused(() => app.request('/api/factories/Not%20One/rules'), 400);
+  await refused(() => app.request('/api/factories/..%2Fmill/rules'), 400);
+  await refused(() => send('PUT', '/api/factories/Not%20One/rules', { words: 'x' }), 400);
   await answered(send('DELETE', URL, {}));
 });

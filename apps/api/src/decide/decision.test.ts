@@ -718,12 +718,7 @@ test('REFUSED once pruned: a run whose worktrees `nemia prune` removed offers no
   assert.equal((await detailOf('r-d1')).pruned, null, 'a run never pruned says so with a null, not a missing field');
 });
 
-/**
- * The two verdicts' own words are the orchestrator's, pinned there over a real repository (`test/hold.test.ts` for the cancelled
- * screen, `test/decide.test.ts` for `shipped — <branch> is already on main`). What is the api's alone, and pinned nowhere else, is
- * the status and the shape of the body it relays them in.
- */
-test('a run called off has nothing to decide: a 200 whose body carries `nothing` alone, and no git call', async () => {
+test("a run called off has nothing to decide: a 200 whose body carries `nothing` alone, and no git call — the verdict's own words are the orchestrator's, pinned there over a real repository", async () => {
   writeRun({
     id: 'r-d4',
     repo,

@@ -104,8 +104,14 @@ export function tokensSaid(count: number): string {
 /** The tokens' last line: what the total counts beyond its kinds. */
 export const TOKENS_REST = 'Counted in no kind';
 
-/** The kinds a run's tokens are counted in: the four the harness bills apart, or in and out where a session gave no parts. */
-function kindsOf(tokens: RunTokens): Array<[string, number]> {
+/**
+ * The counts a token breakdown reads: a run's own (`RunTokens`), or a sum of runs' (the Overview's Spent), with how many sessions
+ * measured none, whose tokens are in no count.
+ */
+export type TokenCounts = Pick<RunTokens, 'total' | 'input' | 'output' | 'cacheRead' | 'cacheWrite' | 'uncached' | 'unmeasured'>;
+
+/** The kinds tokens are counted in: the four the harness bills apart, or in and out where a session gave no parts. */
+function kindsOf(tokens: TokenCounts): Array<[string, number]> {
   const { cacheWrite, uncached, cacheRead } = tokens;
   if (cacheWrite === null || uncached === null || cacheRead === null) {
     return [
@@ -122,17 +128,25 @@ function kindsOf(tokens: RunTokens): Array<[string, number]> {
 }
 
 /**
- * A run's tokens by kind, and a last line for what the total counts beyond them, absent when that is nothing. The rows' counts add up
- * to `tokens.total`.
+ * Tokens by kind, and a last line for what the total counts beyond them, absent when that is nothing. The rows' counts add up to
+ * `tokens.total`, which the head says: after `cost`, the words of the dollars they are (`$5.63 for 4.10M tokens, …`), where the
+ * breakdown hangs under a cost; else as counted (`4.10M counted, …`). Where a session measured none, the head's counts are the least
+ * they were, said with `≥` as a cost is, and the foot says why. No dollars per kind: the harness prices a session whole.
  */
-export function tokensBreakdown(tokens: RunTokens): Breakdown {
+export function tokensBreakdown(tokens: TokenCounts, cost?: string): Breakdown {
   const kinds = kindsOf(tokens);
   const rest = tokens.total - kinds.reduce((sum, [, count]) => sum + count, 0);
   const parts = rest === 0 ? kinds : [...kinds, [TOKENS_REST, rest] as [string, number]];
   const fresh = tokens.cacheRead === null ? null : tokens.total - tokens.cacheRead;
+  const least = tokens.unmeasured > 0 ? '≥' : '';
+  const total =
+    cost === undefined ? `${least}${tokensSaid(tokens.total)} counted` : `${cost} for ${least}${tokensSaid(tokens.total)} tokens`;
   return {
-    head: `${tokensSaid(tokens.total)} counted${fresh === null ? '' : `, ${tokensSaid(fresh)} of them new`}`,
+    head: `${total}${fresh === null ? '' : `, ${least}${tokensSaid(fresh)} of them new`}`,
     rows: parts.map(([what, count]) => ({ what, amount: count, said: tokensSaid(count), none: count === 0 })),
-    foot: 'Each kind is billed at its own rate, reads from the cache at the lowest.',
+    foot: [
+      'Each kind is billed at its own rate, reads from the cache at the lowest.',
+      ...(least ? ['A session measured no tokens: these are the least they were.'] : []),
+    ].join(' '),
   };
 }

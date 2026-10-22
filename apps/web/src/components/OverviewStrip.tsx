@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 import { useQuery, useSuspenseQuery } from '@tanstack/react-query';
-import { CutFrame, CutTag, Sticker } from '@/components/look';
+import { CutFrame, CutTag, StatTile, Sticker } from '@/components/look';
 import { Avatar, Body, Label, Meter, Tag } from '@/components/ui/ds';
 import { ceilingsQuery, daemonQuery, factoriesQuery, type Quota, type QuotaWindow, quotaQuery, runsQuery } from '@/lib/api';
+import { tokensBreakdown } from '@/lib/breakdown';
 import { type DaemonDot, type DaemonTone, daemonDot } from '@/lib/footer';
 import { lastWords } from '@/lib/quota';
 import { dayStartOf, dollars, quotaLineOf, readoutOf, type Strip, stripOf } from '@/lib/strip';
@@ -93,7 +94,10 @@ function Heading({ children }: { children: ReactNode }) {
   );
 }
 
-/** Your factories · today: the six stickers, what is at work against its caps, and the daemon's word. */
+/**
+ * Your factories · today: the six stickers, Spent's with a preview of today's tokens by kind, what is at work against its caps, and the
+ * daemon's word.
+ */
 function Today({ strip, dot }: { strip: Strip; dot: DaemonDot }) {
   return (
     <div data-strip="today" className="flex flex-col gap-2.5 pt-3 pr-5 pb-3.5 pl-[18px]">
@@ -122,9 +126,12 @@ function Today({ strip, dot }: { strip: Strip; dot: DaemonDot }) {
         <Sticker hue="grey" label="Landed">
           {strip.landed}
         </Sticker>
-        <Sticker hue="money" label="Spent">
-          {dollars(strip.spentUsd)}
-        </Sticker>
+        <StatTile
+          hue="money"
+          label="Spent"
+          value={dollars(strip.spentUsd)}
+          breakdown={strip.spentTokens && tokensBreakdown(strip.spentTokens, `${dollars(strip.spentUsd)} today`)}
+        />
         <Sticker hue="grey" label="Per landing">
           {dollars(strip.perLanding)}
         </Sticker>

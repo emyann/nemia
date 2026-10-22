@@ -7,6 +7,7 @@ import { agoWords, endedWords } from '@/lib/runWords';
 import { instantWhole } from '@/lib/instant';
 import { cn } from '@/components/ui/ds/utils';
 import { RunClockCell } from './RunClockCell';
+import { RunCostCell } from './RunCostCell';
 import { CopyId, CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, TextLink } from './look';
 
 /** A column's heading, in the look's small caps. */
@@ -48,7 +49,7 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
         <RunClockCell run={run} asOf={asOf} finished />
       </Cell>
       <Cell data-cost className={cn(FACT, ink.money)}>
-        {run.cost?.said}
+        <RunCostCell run={run} />
       </Cell>
       <Cell>
         <span data-ended title={ended.title} className={cn('text-label-small uppercase', ink[ended.hue])}>
@@ -65,9 +66,10 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
 /**
  * One page of the finished runs, newest finished first, as the kit's dense table in the look's cut frame, quiet: each run's title as a
  * link, its factory, how long ago it was created and how long ago it finished, each with the whole instant on hover, its time at work
- * with a preview over it breaking that clock down (`RunClockCell`), its cost, how it ended, and its
- * id's end with a copy control, the last row with no line under it; then the pager, under a line of its own. A page that holds no row
- * draws no table and no line, and the pager says why. Narrower than its columns, the table scrolls sideways inside its frame.
+ * with a preview over it breaking that clock down (`RunClockCell`), its cost with a preview of its tokens by kind (`RunCostCell`), how
+ * it ended, and its id's end with a copy control, the last row with no line under it; then the pager, under a line of its own. A page
+ * that holds no row draws no table and no line, and the pager says why. Narrower than its columns, the table scrolls sideways inside its
+ * frame.
  */
 export function FinishedTable({ page }: { page: FinishedPage }) {
   const asOf = new Date(page.asOf);

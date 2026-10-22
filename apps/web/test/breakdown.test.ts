@@ -208,3 +208,22 @@ test('tokens a session gave no parts of are counted in and out, and still add up
   assert.equal(sum(tokens), whole.total);
   assert.equal(tokens.head, '4.10M counted');
 });
+
+test("a cost's preview heads with the dollars its tokens are, and the rows still add up to the total", async () => {
+  const run = await decoded();
+  const tokens = tokensBreakdown(run.tokens!, '$5.63');
+  assert.equal(tokens.head, '$5.63 for 4.10M tokens, 503k of them new');
+  assert.equal(sum(tokens), run.tokens!.total, "the tokens' rows add up to the total, a cost given or not");
+  assert.equal(tokensBreakdown({ ...run.tokens!, cacheRead: null }, '$5.63').head, '$5.63 for 4.10M tokens');
+});
+
+test('REFUSED: a total read as whole when a session measured no tokens: the head says ≥ and the foot says why', async () => {
+  const run = await decoded();
+  const short = tokensBreakdown({ ...run.tokens!, unmeasured: 1 }, '$5.63');
+  assert.equal(short.head, '$5.63 for ≥4.10M tokens, ≥503k of them new');
+  assert.match(short.foot, /measured no tokens/);
+  assert.match(tokensBreakdown({ ...run.tokens!, unmeasured: 1 }).head, /^≥4\.10M counted/);
+  const whole = tokensBreakdown(run.tokens!, '$5.63');
+  assert.doesNotMatch(whole.head, /≥/);
+  assert.doesNotMatch(whole.foot, /measured no tokens/);
+});

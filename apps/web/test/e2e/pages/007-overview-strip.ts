@@ -3,6 +3,7 @@ import type { Locator, Page } from 'playwright';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
 import type { Ceilings, Daemon, Factory, FinishedPage, RunSummary } from '../../../src/lib/api.ts';
+import { tokensBreakdown } from '../../../src/lib/breakdown.ts';
 import { daemonDot } from '../../../src/lib/footer.ts';
 import { dollars, readoutOf, type Strip, stripOf } from '../../../src/lib/strip.ts';
 import { NEIGHBOUR } from '../seed.ts';
@@ -105,14 +106,45 @@ async function expectRowsCut(strip: Locator): Promise<void> {
   if (rows.some((row) => row.lines !== 1 || !row.ellipsis)) throw new Refused('each agent row holds one line, cut with an ellipsis');
 }
 
+/**
+ * The Spent tile, reached by the keyboard, opens a preview of today's tokens by kind over the very runs Spent counts: headed by the
+ * dollars over their tokens, its rows the kinds `tokensBreakdown` gives for `want`'s sum, and Escape closes it. A seed whose day counts no
+ * tokens refuses: the preview would prove nothing.
+ */
+async function expectSpentPreview(page: Page, strip: Locator, want: Strip): Promise<void> {
+  if (!want.spentTokens) throw new Refused("the seed's day counts tokens on a run Spent counts, for its preview to be read");
+  const breakdown = tokensBreakdown(want.spentTokens, `${dollars(want.spentUsd)} today`);
+  const tile = strip.locator('[data-stat-tile="spent"]');
+  await tile.focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Tab');
+  const tooltip = page.locator('[data-slot="tooltip"]');
+  await expectVisible(tooltip, 'the Spent tile opens its preview on the focus the keyboard gives it');
+  await expectTexts(tooltip.locator('[data-slot="tooltip-headline"]'), [breakdown.head], 'headed by the dollars over their tokens');
+  await expectTexts(
+    tooltip.locator('[data-breakdown-row] dt'),
+    breakdown.rows.map((r) => r.what),
+    "today's tokens by kind",
+  );
+  await expectTexts(
+    tooltip.locator('[data-breakdown-row] dd'),
+    breakdown.rows.map((r) => r.said),
+    'each with its count',
+  );
+  await photograph(page, path.join(OUT, `overview-strip-spent-preview-${await themeOf(page)}.png`));
+  await page.keyboard.press('Escape');
+  await expectCount(tooltip, 0, 'Escape closes it');
+}
+
 export default {
   /**
    * The Overview's strip at `/`, at 1440 pixels with the rail open: its three cut frames on one row, the six stickers on one line. Each
    * number is the board's rule (`stripOf`) of the api's own answer, from the browser's midnight; Landed and Failed are the finished
    * page's today too, the api's own words for how a run ended. The readout reads the caps, the daemon's tag says what the api judged
    * of it (none ticks the e2e's store), each agent's row says the agent, its step and the run's title, cut short, never wrapped, and the
-   * quota, past its mark in the seed, says so. On a phone the frames stack, one under the other. At `?factory=default` the strip
-   * counts that factory's runs alone, and its agents against those of its own.
+   * quota, past its mark in the seed, says so. Spent opens a preview of today's tokens by kind, from the keyboard. On a phone the
+   * frames stack, one under the other. At `?factory=default` the strip counts that factory's runs alone, and its agents against those
+   * of its own.
    */
   name: 'overview-strip',
   route: '/',
@@ -146,6 +178,7 @@ export default {
       await expectTexts(strip.locator('[data-quota-past]'), ['Past 80%'], 'at the mark the api gives');
       await expectCount(strip.getByRole('meter'), 2, 'a meter for each window');
       await expectOneRow(strip);
+      await expectSpentPreview(page, strip, want);
       await settled(page);
       await photograph(page, path.join(OUT, `overview-strip-day-${await themeOf(page)}.png`));
       await page.setViewportSize(PHONE);

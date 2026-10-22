@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
-import { FINISHED_SIZE, type FinishedPage, type OpenRuns, type WaitingRun } from '../../../src/lib/api/runs.ts';
+import { FINISHED_SIZE, type FinishedPage, type ListedRun, type OpenRuns, type WaitingRun } from '../../../src/lib/api/runs.ts';
 import { rowsSaid } from '../../../src/lib/finished.ts';
 import { runClock, titleOf } from '../../../src/lib/factory.ts';
+import { tokensBreakdown } from '../../../src/lib/breakdown.ts';
 import { agoWords, endedWords, openWord, presentWait, sinceShort, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
 import {
   answered,
@@ -564,6 +565,141 @@ async function clocksSay(page: Page, open: OpenRuns, finished: FinishedPage): Pr
 }
 
 /**
+ * What the page writes into the runs' answers, in the browser alone, for each table's Cost cell to be read: the seed prices no run in
+ * flight and none on the finished page. The first row in flight costs `≥$3.21`, a session of it unmeasured; the first finished row
+ * `$1.07`, every session measured. Each one's tokens add up kind by kind to their total.
+ */
+const PRICED = {
+  'in-flight': {
+    cost: { usd: 3.21, measured: 2, unmeasured: 1, said: '≥$3.21' },
+    tokens: {
+      total: 2_480_000,
+      input: 2_300_000,
+      output: 180_000,
+      cacheRead: 2_050_000,
+      cacheWrite: 190_000,
+      uncached: 60_000,
+      measured: 2,
+      unmeasured: 1,
+      said: '≥2.48M tokens',
+      split: '',
+    },
+  },
+  finished: {
+    cost: { usd: 1.07, measured: 1, unmeasured: 0, said: '$1.07' },
+    tokens: {
+      total: 812_400,
+      input: 776_000,
+      output: 36_400,
+      cacheRead: 701_000,
+      cacheWrite: 47_000,
+      uncached: 28_000,
+      measured: 1,
+      unmeasured: 0,
+      said: '812k tokens',
+      split: '',
+    },
+  },
+};
+
+/** The rows of each table an answer at `url` carries, if it is one of the two the runs page reads. */
+const rowsAt = (url: URL, body: unknown): Array<[keyof typeof PRICED, ListedRun[]]> =>
+  url.pathname === '/api/runs-open'
+    ? [['in-flight', (body as OpenRuns).inFlight]]
+    : url.pathname === '/api/runs-finished'
+      ? [['finished', (body as FinishedPage).runs]]
+      : [];
+
+/** An answer of the runs page with each table's first row priced (`PRICED`). */
+const pricedIn = <T>(url: URL, body: T): T => {
+  for (const [table, rows] of rowsAt(url, body)) if (rows[0]) Object.assign(rows[0], PRICED[table]);
+  return body;
+};
+
+/** The runs page's two answers with each table's first row priced, routed in the page and let go by `back`. */
+async function pricedRows(page: Page): Promise<{ open: OpenRuns; finished: FinishedPage; back: () => Promise<void> }> {
+  const isRuns = (url: URL) => rowsAt(url, { inFlight: [], runs: [] }).length > 0;
+  await page.route(isRuns, async (route) => {
+    const response = await route.fetch();
+    await route.fulfill({ response, json: pricedIn(new URL(route.request().url()), await response.json()) });
+  });
+  await page.reload({ waitUntil: 'load' });
+  await idle(page);
+  const read = async <T>(pathname: string): Promise<T> => pricedIn(new URL(pathname, page.url()), await answered<T>(page, pathname));
+  const open = await read<OpenRuns>('/api/runs-open');
+  const finished = await read<FinishedPage>(`/api/runs-finished?page=1&size=${FINISHED_SIZE}`);
+  const back = async () => {
+    await page.unroute(isRuns);
+    await page.reload({ waitUntil: 'load' });
+    await idle(page);
+  };
+  return { open, finished, back };
+}
+
+/**
+ * Each table's Cost cell opens a preview of its run's tokens by kind, from the row the list carries and asking the api nothing: on a
+ * resting pointer, and on the keyboard's focus, which Escape closes. Its head is the cost's words over the total, its rows the kinds the
+ * board's own rule gives (`tokensBreakdown`), and the words keep inside their cell. The rows are priced by the page itself (`PRICED`):
+ * the one in flight, a session of which measured no tokens, heads with `≥`; the finished one, whole, without.
+ */
+async function costsSay(page: Page): Promise<void> {
+  const priced = await pricedRows(page);
+  try {
+    const short = await costSays(page, 'in-flight', priced.open.inFlight);
+    if (!short.includes('≥2.48M tokens'))
+      throw new Refused(`a run a session of which measured no tokens says its total is the least it was, with ≥ — it says "${short}"`);
+    const whole = await costSays(page, 'finished', priced.finished.runs);
+    if (whole.includes('≥')) throw new Refused(`a run every session of which measured its tokens says no ≥ — it says "${whole}"`);
+  } finally {
+    await priced.back();
+  }
+}
+
+/** That the first row of `runs` with a cost and tokens, in the table `where`, opens the preview of its tokens; its headline as shown. */
+async function costSays(page: Page, where: 'in-flight' | 'finished', runs: readonly ListedRun[]): Promise<string> {
+  const run = runs.find((r) => r.cost && r.tokens);
+  if (!run?.cost || !run.tokens) throw new Refused(`a ${where} row has a cost and tokens, for its preview to be read`);
+  const want = tokensBreakdown(run.tokens, run.cost.said);
+  const row = section(page, where).locator(`tr[data-run="${run.id}"]`);
+  const over = await row.locator('td[data-cost] [data-cost-words]').evaluate((text) => {
+    const cell = text.closest('td')!;
+    const room = cell.getBoundingClientRect().right - parseFloat(getComputedStyle(cell).paddingRight);
+    return Math.round(text.getBoundingClientRect().right - room);
+  });
+  if (over > 0) throw new Refused(`the ${where} cost's words keep inside their cell — they run ${over} px past it`);
+  const asked: string[] = [];
+  const hear = (request: { url(): string }) => void (request.url().includes(`/api/runs/${run.id}`) && asked.push(request.url()));
+  await row.scrollIntoViewIfNeeded();
+  await page.mouse.move(0, 0);
+  page.on('request', hear);
+  await row.locator('td[data-cost] button').hover();
+  await expectVisible(tooltip(page), `the Cost cell of a ${where} row opens its preview on a resting pointer`);
+  await expectTexts(tooltip(page).locator('[data-slot="tooltip-headline"]'), [want.head], "headed by the cost's words over its tokens");
+  const head = (await tooltip(page).locator('[data-slot="tooltip-headline"]').innerText()).trim();
+  await expectTexts(
+    tooltip(page).locator('[data-breakdown-row] dt'),
+    want.rows.map((r) => r.what),
+    'its rows are the kinds the tokens are counted in',
+  );
+  await expectTexts(
+    tooltip(page).locator('[data-breakdown-row] dd'),
+    want.rows.map((r) => r.said),
+    'each with its count',
+  );
+  page.off('request', hear);
+  if (asked.length) throw new Refused(`the preview opens with no request: the row carries its tokens — the page asked ${asked.join(', ')}`);
+  await page.mouse.move(0, 0);
+  await expectCount(tooltip(page), 0, 'the pointer gone, it closes');
+
+  await reachClock(page, row, where, 'cost');
+  await expectVisible(tooltip(page), `and the ${where} row's cost opens it on focus too, with no pointer`);
+  await photograph(page, path.join(OUT, `runs-cost-preview-${where}-${await themeOf(page)}.png`));
+  await page.keyboard.press('Escape');
+  await expectCount(tooltip(page), 0, 'Escape closes it');
+  return head;
+}
+
+/**
  * The finished runs' first page as the page itself was last given it, kept as each answer arrives: its `asOf` is the instant the rows
  * drew their words against. `answered` reads the api apart from the page and a moment later, so near a minute's edge its `asOf` says
  * another word than the page drew.
@@ -917,6 +1053,7 @@ async function withRegated(page: Page, drawn: () => FinishedPage | undefined): P
   await finger(page, open, finished);
   await rowsSay(page, open, finished, drawn);
   await clocksSay(page, open, finished);
+  await costsSay(page);
   await flightAligned(page);
   await lookDetails(page);
   await narrow(page);

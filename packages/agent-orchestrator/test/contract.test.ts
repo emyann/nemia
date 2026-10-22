@@ -172,7 +172,7 @@ test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow and ./te
 /** The entry a test alone imports: the test place, `testPlace` (`place/memory`). */
 const TESTING = 'agent-orchestrator/testing';
 
-/** Where `file`, which is no test's, imports the testing entry: a program that runs is given the place its layer holds, never the test's. */
+/** Where `file`, which is no test's, imports the testing entry: a program that runs is given the place its layer holds. */
 function testingBreaches(file: string, text: string): string[] {
   if (isTestFile(file) || !specifiersIn(withoutComments(text)).includes(TESTING)) return [];
   return [

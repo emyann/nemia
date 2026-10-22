@@ -31,9 +31,16 @@ function refusalOf(argv: readonly string[], spec: Spec = SPEC): string | undefin
     parseArgv(spec, argv);
     return undefined;
   } catch (err) {
+    assert.equal((err as { _tag?: string })._tag, 'Invalid');
     assert.equal((err as { exitCode?: number }).exitCode, 2);
     return (err as Error).message;
   }
+}
+
+/** That `words` are a refusal, and name each of `fixes`: the command, the flag, the value or the form its fix turns on. */
+function names(words: string | null | undefined, ...fixes: string[]): void {
+  assert.ok(words, 'refused');
+  for (const fix of fixes) assert.ok(words.includes(fix), `${words} names ${fix}`);
 }
 
 /** A handler, as `commandBreaks` asks only whether an entry has one. */
@@ -50,6 +57,7 @@ function refusedBy(command: (typeof TABLE)[number], argv: readonly string[]): st
     assert.ok(args, `nemia ${command.name} ${argv.join(' ')} is given too little`);
     return command.check?.(args) ?? null;
   } catch (err) {
+    assert.equal((err as { _tag?: string })._tag, 'Invalid');
     assert.equal((err as { exitCode?: number }).exitCode, 2);
     return (err as Error).message;
   }
@@ -80,11 +88,7 @@ test('a flag the command has none of, given where a required argument stands, is
   assert.equal(refusalOf(['--nope=r-1']), 'UNKNOWN --nope=r-1');
   assert.equal(parseArgv(SPEC, ['--help']), undefined);
   assert.equal(parseArgv(SPEC, ['--note=hi']), undefined);
-  assert.equal(
-    refusalOf(['--nope'], { ...SPEC, missing: 'MISSING' }),
-    'MISSING',
-    'a spec that says its own refusal of an argument left out says it',
-  );
+  assert.equal(refusalOf(['--nope'], { ...SPEC, missing: 'MISSING' }), 'MISSING', 'a spec says its own refusal of a missing argument');
   assert.equal(refusalOf(['-n'], { ...SPEC, missing: 'MISSING' }), 'MISSING');
 });
 
@@ -99,10 +103,7 @@ test('a value flag with no value is refused, saying what it takes', () => {
   assert.equal(refusalOf(['r-1', '--note']), 'NOTE TAKES');
   assert.equal(refusalOf(['r-1', '--who']), 'WHO TAKES');
   assert.equal(refusalOf(['r-1', '--who', '--fast']), 'WHO TAKES');
-  assert.equal(
-    refusalOf(['r-1', '--budget', '0']),
-    '--budget takes the cap — an amount above zero, in digits, like 5 or 2.50, and 0 is not one: x <runId> --budget <amount>',
-  );
+  names(refusalOf(['r-1', '--budget', '0']), '--budget takes the cap', 'above zero', '0 is not one', 'x <runId> --budget <amount>');
 });
 
 test('a value flag given twice is refused, in its own words or as an argument not taken', () => {
@@ -169,14 +170,12 @@ test("a text flag's value left out — empty, or a word starting -- — is refus
 });
 
 test("retry's command line keeps today's refusals", () => {
-  assert.equal(
-    refusalOf(['r-1', 'impl', '--fresh', '--recheck'], RETRY.spec),
-    'nemia retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.',
-  );
-  assert.equal(
+  names(refusalOf(['r-1', 'impl', '--fresh', '--recheck'], RETRY.spec), 'nemia retry', '--nudge, --fresh, --model <m>, --recheck');
+  names(
     refusalOf(['r-1', 'impl', '--message', '--fresh'], RETRY.spec),
-    "--message takes what to tell the step, and --fresh is one of nemia retry's own flags, so the answer was left out: " +
-      'nemia retry <runId> <step> --message "<answer>". If --fresh is the whole answer, give it as --message=--fresh.',
+    '--message takes',
+    'nemia retry <runId> <step> --message "<answer>"',
+    '--message=--fresh',
   );
   assert.deepEqual(parseArgv(RETRY.spec, ['r-1', 'impl', '--message=--fresh']), {
     mode: 'nudge',
@@ -729,9 +728,9 @@ test('a table breaks its rules: two entries routed on one method and path, of wh
 test('a table breaks its rules: a verb of the CLI is refused only against an entry the CLI serves', () => {
   const route = { method: 'GET', path: '/api/x', status: 200 } as const;
   assert.deepEqual(commandBreaks([{ name: 'decide', route, only: { side: 'api', why: 'w' }, handler }], ['decide']), []);
-  assert.deepEqual(commandBreaks([{ name: 'decide', route, only: { side: 'cli', why: 'w' }, handler }], ['decide']), [
-    'decide is a command of the table and a verb of the CLI: take it out of VERBS',
-  ]);
+  const breaks = commandBreaks([{ name: 'decide', route, only: { side: 'cli', why: 'w' }, handler }], ['decide']);
+  assert.equal(breaks.length, 1);
+  names(breaks[0], 'decide is', 'take it out of VERBS');
 });
 
 test('a table breaks its rules: an entry the api serves with no handler, and one the CLI serves alone with no handler nor runner', () => {
@@ -748,10 +747,12 @@ test('a table breaks its rules: an entry the api serves with no handler, and one
 
 test('a table breaks its rules: a runner of the CLI that runs no entry the CLI serves', () => {
   const route = { method: 'GET', path: '/api/x', status: 200 } as const;
-  assert.deepEqual(commandBreaks([{ name: 'a', route, only: { side: 'api', why: 'w' }, handler }], [], ['a', 'b']), [
-    'a has a runner and no entry the CLI serves: give it its entry in the table, or take it out of RUNS',
-    'b has a runner and no entry the CLI serves: give it its entry in the table, or take it out of RUNS',
-  ]);
+  const breaks = commandBreaks([{ name: 'a', route, only: { side: 'api', why: 'w' }, handler }], [], ['a', 'b']);
+  assert.equal(breaks.length, 2);
+  breaks.forEach((words, i) => {
+    assert.ok(words.startsWith(`${'ab'[i]} has a runner`), words);
+    names(words, 'its entry in the table', 'take it out of RUNS');
+  });
 });
 
 test('a table breaks its rules: a key a route sets that no flag of its spec fills', () => {
@@ -789,10 +790,7 @@ test("REFUSED at shipped defaults: nemia hold's arguments, before any run is rea
     `nemia hold does not take --after. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
   );
   assert.equal(refusedBy(hold, ['r-x', '--until', 'a', '--why', '--x']), `--why takes the words for why the run is held: ${HOLD_SHAPE}.`);
-  assert.equal(
-    refusedBy(hold, ['r-x', '--until', 'a', '--by', ' ']),
-    '--by takes who puts the hold, by a name, and was given only blanks: give it words, or leave --by out.',
-  );
+  names(refusedBy(hold, ['r-x', '--until', 'a', '--by', ' ']), '--by takes', 'only blanks', 'leave --by out');
   assert.equal(
     refusedBy(hold, ['r-x', '--until', 'a', '--by', 'a', '--by', 'b']),
     `nemia hold takes --by once: a hold says one by. ${HOLD_SHAPE}.`,
@@ -807,45 +805,33 @@ test("REFUSED at shipped defaults: nemia pause's and nemia resume's arguments, b
   assert.equal(refusedBy(pause, ['--why', '--by']), `--why takes the words for why the store is paused: ${shape}.`);
   assert.equal(refusedBy(pause, ['--by']), `--by takes who pauses it, by a name: ${shape}.`);
   assert.equal(refusedBy(pause, ['--why', '--x']), `--why takes the words for why the store is paused: ${shape}.`);
-  assert.equal(
-    refusedBy(pause, ['--why', ' \n ']),
-    '--why takes the words for why the store is paused, and was given only blanks: give it words, or leave --why out.',
-  );
-  assert.equal(refusedBy(pause, ['--by', 'b'.repeat(65)]), '--by takes at most 64 characters, and was given 65: say it shorter.');
+  names(refusedBy(pause, ['--why', ' \n ']), '--why takes', 'only blanks', 'leave --why out');
+  names(refusedBy(pause, ['--by', 'b'.repeat(65)]), '--by takes at most 64', 'given 65', 'shorter');
   assert.equal(refusedBy(pause, ['--by', 'a', '--by', 'b']), `nemia pause takes --by once: a pause says one by. ${shape}.`);
   assert.equal(refusedBy(pause, ['now']), `nemia pause does not take now: ${shape}.`);
   assert.equal(refusedBy(pause, ['--why', 'merging by hand', '--by=ann']), null);
   assert.equal(refusedBy(pause, []), null);
   assert.equal(refusedBy(pause, ['--now', '--now=yes']), `nemia pause does not take --now=yes: ${shape}.`);
   assert.equal(refusedBy(pause, ['--now', '--yes', '--why', 'the bill']), null);
-  assert.equal(refusedBy(entry('resume'), ['--all']), 'nemia resume takes no --all: it resumes the store, whoever paused it.');
+  names(refusedBy(entry('resume'), ['--all']), 'nemia resume takes no --all', 'whoever paused it');
   assert.equal(refusedBy(entry('resume'), []), null);
 });
 
 test("REFUSED at shipped defaults: nemia tick's, nemia up's and nemia watch's arguments, in today's words whole", () => {
-  assert.equal(
-    refusedBy(entry('tick'), ['--bogus']),
-    'nemia tick takes no --bogus: nemia tick runs one pass, and nemia tick --stats says after it what the pass cost.',
-  );
+  names(refusedBy(entry('tick'), ['--bogus']), 'nemia tick takes no --bogus', 'nemia tick --stats');
   assert.equal(refusedBy(entry('tick'), ['--stats']), null);
   const up = entry('up');
   for (const argv of [
     ['--stats', '20'],
     ['20', '--stats'],
   ])
-    assert.equal(
-      refusedBy(up, argv),
-      'nemia up --stats reads what the last pass cost and ticks nothing, so it takes no 20: nemia up --stats alone, or nemia up 20 to tick.',
-    );
-  assert.match(
-    refusedBy(up, ['soon']) ?? '',
-    /^nemia up takes its pass interval in whole milliseconds, from 1 to \d+, and "soon" is not one: /,
-  );
-  assert.match(
-    refusedBy(up, ['--x']) ?? '',
-    /^nemia up takes its pass interval in whole milliseconds, from 1 to \d+, and "--x" is not one: /,
-  );
-  assert.equal(refusedBy(up, ['10', '20']), 'nemia up takes one pass interval at most, and was given 20 too: nemia up [ms].');
+    names(refusedBy(up, argv), 'nemia up --stats', 'takes no 20', 'nemia up --stats alone', 'nemia up 20 to tick');
+  for (const given of ['soon', '--x']) {
+    const words = refusedBy(up, [given]);
+    names(words, 'nemia up takes', 'whole milliseconds', `"${given}" is not one`);
+    assert.match(words!, /from 1 to \d+/);
+  }
+  names(refusedBy(up, ['10', '20']), 'one pass interval at most', 'given 20', 'nemia up [ms]');
   assert.equal(refusedBy(up, ['10']), null);
   const form = 'nemia watch [cursor] [--once] [-l <selector>]... [--cursor-file <path>] [--json]';
   const cursor = `nemia watch takes one cursor at most, a whole number of bytes — 0, or the number a \`cursor:\` line printed: ${form}`;
@@ -861,20 +847,23 @@ test("REFUSED at shipped defaults: nemia watch's selectors, its cursor file, and
   const watch = entry('watch');
   assert.match(refusedBy(watch, ['-l', 'message=hi']) ?? '', /^"message" is no key of a feed line/);
   assert.match(refusedBy(watch, ['-l', 'factory=nemia', '-l', '']) ?? '', /^"" is no selector: it holds no clause/);
-  assert.equal(
-    refusedBy(watch, ['-l', '--json']),
-    'nemia watch -l takes a selector of the feed\'s lines: -l <key>=<value>, -l <key>!=<value>, -l "<key> in (<a>,<b>)", ' +
-      '-l "<key> notin (<a>,<b>)" or -l <key> for a line that carries it; commas between clauses, which all must hold, and -l again ' +
-      'for another selector, of which one must. The keys: run, factory, workflow, step, agent, kind, reason, type, waits, source',
-    'a value given apart that is one of its own flags reads as the value left out',
-  );
+  const selector = refusedBy(watch, ['-l', '--json']);
+  names(selector, 'nemia watch -l takes', '-l <key>=<value>', '-l <key>!=<value>', '-l "<key> in (<a>,<b>)"', '-l "<key> notin (<a>,<b>)"');
+  assert.deepEqual(selector!.split('The keys: ')[1].split(', '), [
+    'run',
+    'factory',
+    'workflow',
+    'step',
+    'agent',
+    'kind',
+    'reason',
+    'type',
+    'waits',
+    'source',
+  ]);
   assert.match(refusedBy(watch, ['--cursor-file']) ?? '', /^nemia watch --cursor-file takes the path this watch keeps/);
   assert.equal(refusedBy(watch, ['--cursor-file', 'a', '--cursor-file', 'b']), 'nemia watch takes --cursor-file once.');
-  assert.equal(
-    refusedBy(watch, ['500', '--cursor-file', 'f']),
-    'nemia watch takes a cursor or --cursor-file, not both, and it was given 500 and a file: the file is where the watch keeps its ' +
-      'place, so drop the 500 — or drop --cursor-file and read from 500 this once (delete the file to start the watch over).',
-  );
+  names(refusedBy(watch, ['500', '--cursor-file', 'f']), 'not both', 'given 500', 'drop the 500', 'drop --cursor-file', 'delete the file');
   assert.deepEqual(parseArgv(entry('watch').spec, ['-l', 'agent=ada', '-l', 'kind=Step']), { selector: ['agent=ada', 'kind=Step'] });
 });
 

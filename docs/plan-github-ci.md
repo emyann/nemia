@@ -106,7 +106,7 @@ and forgetting to wire it in:
   The floor was 22.18.0, where type stripping became unflagged, and rose to 24.16.0 when CI first ran the suite on it. Two things it
   cannot do: libuv 1.51.0 truncates a millisecond time set through `utimes` — 496 of 1,000 such times read back changed, which the
   runtime's capture cache and its quiescence compare with `===` — and Node's test runner takes `--test-isolation` only from 24.13.1,
-  which `workflows/build/mutants.ts` passes. The first is what sets the floor: libuv 1.52.1 keeps the millisecond, no Node 22 release
+  which the mutant runner passed before it was removed. The first is what sets the floor: libuv 1.52.1 keeps the millisecond, no Node 22 release
   ships it (22.23.3, the line's latest, carries 1.51.0), and 24.16.0 is the first 24.x that does — 24.15.0 still carries 1.51.0. So the
   floor is the first release the suite passes on, not a round number.
 - **`npm run lint` and `npm run typecheck`**, whole, on the floor. So are the e2e shards, their bound and the build: every job but the

@@ -55,8 +55,8 @@ sends it back, by instruction (`NEMIA.md`): no step is filed by itself.
 
 ## The closeout, and the gate
 
-Implement's closeout is `build`'s with two fields more (`implement.schema.json`): `plan`, what changes, where and what proves it,
-written before the work; and `pages`, the e2e pages she ran, which nothing reads but the person. At land's gate a person is shown the
+Implement declares two fields of its own (`implement.schema.json`), where `build`'s steps declare none: `plan`, what changes, where
+and what proves it, written before the work; and `pages`, the e2e pages she ran, which nothing reads but the person. At land's gate a person is shown the
 plan, the pages, the pictures and how many files and lines the branch touched (`nemia decide <run>`, and the run's page); the check's
 `wf size:` line is handed to the landing step. The board does not show the change itself at a gate: read it in a
 terminal, `git diff main...wf/<run>/run`, until it does.

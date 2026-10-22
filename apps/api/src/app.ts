@@ -2,7 +2,7 @@ import { Layer, ManagedRuntime, Metric } from 'effect';
 import { type ErrorHandler, Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
-import { feedHubLayer, gitPlaceLayer, leaseRelease, runningRelease, telemetryLayer, VERSION } from 'agent-orchestrator';
+import { feedHubLayer, gitPlaceLayer, leaseRelease, runningRelease, storeRootLayer, telemetryLayer, VERSION } from 'agent-orchestrator';
 import { isRefusal, type Refusal } from 'agent-orchestrator';
 import { agents, skills } from './agents/index.ts';
 import { customInstructions } from './custom/custom.ts';
@@ -19,7 +19,7 @@ import { saidRequest } from './request/request.ts';
 import { stats } from './stats/stats.ts';
 import { step } from './step/step.ts';
 import { Followings, steps } from './steps/index.ts';
-import { engineRead, Engine, StoreRoot } from './store.ts';
+import { engineRead, Engine } from './store.ts';
 import { builder, remover, workflows, yours } from './workflows/index.ts';
 
 /**
@@ -50,7 +50,8 @@ const RELEASE = leaseRelease(runningRelease());
 
 /**
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
- * (`Engine`) and root (`StoreRoot`), an MCP asker and a quota asker with nothing asked yet (`McpAsker`, `QuotaAsker`), reads that have
+ * (`Engine`) and the store's root, read from `env` (`StoreRoot`, `storeRootLayer`: `WF_ROOT`), an MCP asker and a quota asker with
+ * nothing asked yet (`McpAsker`, `QuotaAsker`), reads that have
  * kept nothing yet (`ReadMemo`), the steps followed live, none yet (`Followings`), the hub the feed's lines are published to as the
  * process's daemon writes them (`feedHubLayer`), and the git place (`gitPlaceLayer`).
  *
@@ -64,7 +65,7 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
   Layer.mergeAll(
     ApiConfig.layer(env, runningRelease()),
     Engine.live,
-    StoreRoot.live,
+    storeRootLayer(env),
     McpAsker.live,
     QuotaAsker.live,
     ReadMemo.live,

@@ -305,6 +305,7 @@ test("a consumer's own store is read in today's shape too: the upgrade is the Jo
   const events = [LEGACY as unknown as Event];
   const engine = builtEngine(
     Engine.layer({
+      root: scratch('ae-journal-root-'),
       journal: asyncStore({
         append: async () => {},
         read: async () => events,
@@ -733,6 +734,7 @@ test("a consumer's own store is decoded too: an entry it holds in no shape the r
   const events = [{ ...TODAY, kind: 'filled' } as unknown as Event];
   const engine = builtEngine(
     Engine.layer({
+      root: scratch('ae-journal-root-'),
       journal: asyncStore({
         append: async () => {},
         read: async () => events,

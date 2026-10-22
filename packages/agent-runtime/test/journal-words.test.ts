@@ -25,6 +25,7 @@ import type { Event, Sighting, SpawnRequest } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { scratch } from './scratch.ts';
 
 /**
  * A store in memory, and a harness whose sessions a test moves by hand, behind the engine as a consumer builds it. Its
@@ -67,7 +68,9 @@ const board = (spawnFails?: Error) => {
       return '';
     },
   };
-  const engine = builtEngine(Engine.layer({ journal: asyncStore(journal), harnesses: { fake: asyncOps(fake) } }));
+  const engine = builtEngine(
+    Engine.layer({ root: scratch('ae-journal-words-root-'), journal: asyncStore(journal), harnesses: { fake: asyncOps(fake) } }),
+  );
   const record = async (id: string) =>
     (await journal.read(id)).map((e) => ({ ...e, at: '<at>', ...('mono' in e ? { mono: '<mono>' } : {}) }));
   return { engine, sessions, asked, record };

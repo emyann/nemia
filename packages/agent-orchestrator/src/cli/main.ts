@@ -44,6 +44,7 @@ import {
   runWith,
   shippedGitPlace,
   PlaceService,
+  storeRootLayer,
   type Place,
   telemetryLayer,
   up,
@@ -267,7 +268,10 @@ function upVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
     });
   const daemon = up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken });
   return runMain(
-    daemon.pipe(Effect.scoped, Effect.provide(Layer.mergeAll(telemetryLayer(process.env), feedHubLayer(), PlaceService.layer(place)))),
+    daemon.pipe(
+      Effect.scoped,
+      Effect.provide(Layer.mergeAll(telemetryLayer(process.env), feedHubLayer(), PlaceService.layer(place), storeRootLayer(process.env))),
+    ),
   );
 }
 

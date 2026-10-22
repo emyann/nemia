@@ -38,7 +38,10 @@ below its layer is in `docs/architecture.md`, *Who owns what*.
 - **A handler reads what it needs through `served(c, …)`** (`layer.ts`), never off a module: the engine, the store's root, the
   environment and the askers are the app's services, and a test gives its own with `appOf(Layer.merge(liveOf(), …))`
   (`test/layer.test.ts`). What a read keeps between requests is the app's too (`ReadMemo`, an asker's closure): a test wanting a fresh
-  one builds an app. `StoreRoot` moves where the api looks for yours, never the package's runs or inbox, which keep its `HOME`.
+  one builds an app. `StoreRoot` is the package's own service (`orchestrator/StoreRoot`), given by the app's layer from `WF_ROOT`
+  (`storeRootLayer(env)` in `app.ts`) and re-exported by `store.ts` so a route has one import site; what the package still reads off a
+  root of its own as it loads is counted in the orchestrator's `test/global-roots.baseline.ts`, so a test that means to move those
+  sets `WF_ROOT` before it imports the package, as `test/harness.ts` does.
 - **A handler's body stays a plain `async` function inside `served`**: a failure yielded in `Effect.gen` never reaches a `try` around
   it, and the routes catch what they word themselves; `runPromise` rejects with the failure itself, so `app.onError` sees its kind.
   A package's program runs over the request's engine and the app's place with `runPlaced(placeService, e, …)`, a verb of the engine itself with `engineRead` (store.ts).

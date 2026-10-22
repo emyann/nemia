@@ -113,9 +113,9 @@ export type ClaudeOptions = {
   /**
    * Where the runner writes what it hands the CLI by path — a task's MCP config — what it records at spawn — a resumed session's
    * parent's last call — and what it records as it looks — when it first saw a working session's transcript as it stands
-   * (`quiet.ts`). Default `~/.agent-engine`.
+   * (`quiet.ts`). Required, and with no default: a runner made with no root writes into the person's own `~/.agent-engine`.
    */
-  root?: string;
+  root: string;
   /**
    * Where Claude Code registers each running session, by pid: `find` finds a session there by its name, `say` its inbox, and
    * `observe` the bridge of each session it holds a process for (`claudeBridge`). Default
@@ -341,9 +341,9 @@ const transcriptUsageSince = async (sessionId: string, since: number) => {
  * No start in the registry, no usage: without one, a resumed session's inherited conversation cannot be told from
  * its own, and a wrong count is worse than none.
  */
-export const claudeOps = (options: ClaudeOptions = {}): RunnerOps => {
+export const claudeOps = (options: ClaudeOptions): RunnerOps => {
   const now = options.now ?? (() => Date.now());
-  const root = options.root ?? path.join(os.homedir(), '.agent-engine');
+  const root = options.root;
   const sessionsDir = options.sessionsDir ?? path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'sessions');
   const reading: Reading = {
     root,

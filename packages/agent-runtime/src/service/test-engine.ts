@@ -256,8 +256,8 @@ export type TestEngine = {
    */
   readonly cutAsks: (id: string) => void;
   /**
-   * Ends the task `id`'s attempt in flight as its harness ended it, failed, and starts the next at work, as a long-lived task restarts.
-   * Throws for a task never filed or not started.
+   * Ends the task `id`'s attempt in flight as its harness ended it, failed, and starts the next at work, as a long-lived task restarts;
+   * an attempt a settle already ended is kept as it ended. Throws for a task never filed or not started.
    */
   readonly restart: (id: string) => TestTask;
   /** Plants what `kept` answers of the task `id`, in bytes, in place of what was planted before; a task not held is never named. */
@@ -546,11 +546,14 @@ const taskFor = (tasks: Map<string, TestTask>, id: string, before: string): Test
   return t;
 };
 
-/** The task `id` started again: the attempt it had kept as a failed earlier try, and a new attempt at work in its place. */
+/**
+ * The task `id` started again: the attempt it had kept as an earlier try — as it ended, where a settle ended it, else failed now — and a
+ * new attempt at work in its place.
+ */
 const restartIn = (tasks: Map<string, TestTask>, id: string): TestTask => {
   const t = tasks.get(id);
   if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);
-  t.earlier.push(attemptOf(t, 'failed', {}));
+  t.earlier.push(t.attempt.ended ? t.attempt : attemptOf(t, 'failed', {}));
   t.attempt = null;
   t.attempt = attemptOf(t, 'running (working)', {});
   t.phase = 'running (working)';

@@ -118,6 +118,26 @@ test('REFUSED: settling a task never filed, by a sentence naming the fix', () =>
   );
 });
 
+test('a restart after a settle keeps the attempt as it ended, its usage with it; a restart of one at work ends it failed', async () => {
+  const made = testEngine();
+  const engine = builtEngine(made.layer);
+  await Effect.runPromise(engine.file({ id: 'a', brief: 'do a', cwd: '/r' }));
+  const usage = { turns: 3, inputTokens: 10, outputTokens: 5 } as never;
+  made.settle('a', 'failed', { exitCode: 1, usage });
+  made.restart('a');
+  made.restart('a');
+  made.settle('a', 'succeeded', { exitCode: 0, resumeFrom: 'ae/a/2' });
+  const { attempts } = (await Effect.runPromise(engine.view('a'))).state;
+  assert.deepEqual(
+    attempts.map((a) => [a.n, a.ended, a.exitCode, a.usage, a.resumeFrom ?? null]),
+    [
+      [1, 'failed', 1, usage, null],
+      [2, 'failed', null, null, null],
+      [3, 'done', 0, null, 'ae/a/2'],
+    ],
+  );
+});
+
 test('a transcript planted for each attempt reads by its cursor, a restart starts the next attempt, and a word follows its last event', async () => {
   const made = testEngine();
   const engine = builtEngine(made.layer);

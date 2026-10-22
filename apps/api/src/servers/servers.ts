@@ -100,11 +100,11 @@ export const FACTORY_SERVER_RM_WORDS: RouteWords = {
  * read again, never on the board's minute poll.
  */
 export const factoryServers = new Hono<ApiEnv>().get('/api/factories/:factory/servers', (c) =>
-  served(c, async ({ e, placeService }) => {
+  served(c, async ({ e, placeService, home }) => {
     const { factory } = c.req.param();
     const wrong = factoryNameRefusal(factory);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${factory}/servers: ${wrong}` }, 400);
-    const listing = await runPlaced(placeService, e, FACTORY_SERVERS.handler({ factory }));
+    const listing = await runPlaced(placeService, e, FACTORY_SERVERS.handler({ factory }, undefined, home));
     return c.json({ ...listing, shipped: shippedServers(SHIPPED_SERVERS) } satisfies FactoryServersRead);
   }),
 );

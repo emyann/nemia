@@ -479,9 +479,14 @@ const statedByFactory = async (
   servers: readonly McpServer[],
   e: Engine['Service'],
   placeService: PlaceService['Service'],
+  home: string,
 ): Promise<McpServer[]> => {
   if (!servers.length) return [...servers];
-  const listing = await runPlaced(placeService, e, FACTORY_SERVERS.handler({ factory: DEFAULT_FACTORY })).catch(() => undefined);
+  const listing = await runPlaced(
+    placeService,
+    e,
+    FACTORY_SERVERS.handler({ factory: DEFAULT_FACTORY }, undefined, home),
+  ).catch(() => undefined);
   const by = new Map((listing?.servers ?? []).map((s) => [s.name, s.state]));
   return servers.map((server) => ({ ...server, factoryState: by.get(server.name) ?? null }));
 };
@@ -502,7 +507,7 @@ export async function capabilitiesWithSteps(
   }: { e: Engine['Service']; placeService: PlaceService['Service']; env: NodeJS.ProcessEnv; home: string; asker: AskServer },
 ): Promise<CapabilitiesWithSteps> {
   const capabilities = await capabilitiesOf(repo, { env, asker });
-  capabilities.mcp = await statedByFactory(capabilities.mcp, e, placeService);
+  capabilities.mcp = await statedByFactory(capabilities.mcp, e, placeService, home);
   let workflows: WorkflowListing[] = [];
   try {
     workflows = await listWorkflows(e, placeService, repo, home);

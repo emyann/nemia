@@ -167,6 +167,7 @@ test('a server that lists its tools: each with its description, and the one a ru
       args: [FIXTURE_SERVER],
       url: null,
       enabled: true,
+      factoryState: null,
       tools: [
         { name: 'echo', description: 'Say it back.\nA second line, which a one-line description leaves out.', denied: null },
         { name: 'wipe', description: 'Remove everything in the workspace.', denied: 'mcp__fixture__wipe' },
@@ -399,6 +400,7 @@ test('a server .claude/settings.json does not enable is listed, and not started'
         args: [FIXTURE_SERVER],
         url: null,
         enabled: false,
+        factoryState: null,
         tools: null,
         error: null,
         checkedAt: null,

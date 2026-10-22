@@ -19,7 +19,7 @@ import {
   VERSION,
   type RunSummary,
 } from 'agent-orchestrator';
-import { runWith } from './placed.ts';
+import { runWith } from './shipped-place.ts';
 import { claudeDetached, claudeOps } from 'agent-runtime';
 import { Effect } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';

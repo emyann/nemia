@@ -3,7 +3,8 @@
  * that says `remote: true` answers it on its detail (`filed.bridge`), a step that does not answers null, and Nemia's level answers it as
  * her `bridge` and her second `reach` line, from the same field of her task's view.
  *
- * At shipped defaults, through the engine itself: each task is journalled as filed and spawned, its session listed by the harness's
+ * A boundary test: at shipped defaults, through the engine itself, since the link is read off Claude Code's own files, which the test
+ * engine has no model of: each task is journalled as filed and spawned, its session listed by the harness's
  * registry with a process of this machine, and the registration Claude Code writes for it put in the harness's folder (`config`).
  */
 import { config, registry, root } from './harness.ts';
@@ -14,6 +15,8 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
+import { Effect } from 'effect';
+import { engine } from 'agent-orchestrator';
 
 const at = '2026-10-06T08:00:00.000Z';
 const BRIDGED = { background: true, claude: { remoteControl: true } };
@@ -98,6 +101,11 @@ test("a step that says remote: true answers its session's web link on its detail
   assert.equal(res.status, 200);
   const [implement, review] = ((await res.json()) as RunDetail).steps;
   assert.deepEqual(implement.filed?.bridge, { url: 'https://claude.ai/code/session_01StepLink', why: null });
+  assert.equal(
+    (await Effect.runPromise(engine().view('r-70-implement'))).bridge?.url,
+    implement.filed?.bridge?.url,
+    "the link is the engine's own, off the registration Claude Code wrote",
+  );
   assert.equal(review.filed?.bridge, null, 'not bridged: null, whatever its registration holds');
 
   registered(process.pid, 'aaaaaaaa-0000-4000-8000-000000000001');

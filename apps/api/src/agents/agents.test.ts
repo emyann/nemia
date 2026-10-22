@@ -14,7 +14,7 @@ import { scratch } from '../../test/scratch.ts';
 import { TEAM } from '../../test/team.ts';
 import { Layer } from 'effect';
 import { COMMANDS, clearCustomInstructions, engine, writeCustomInstructions, type AgentsRead, type CardRead } from 'agent-orchestrator';
-import { runWith } from '../../test/placed.ts';
+import { runWith } from '../../test/shipped-place.ts';
 import { app, appOf, liveOf } from '../app.ts';
 import { StoreRoot } from '../store.ts';
 const repo = scratch('nemia-api-agents-repo-');

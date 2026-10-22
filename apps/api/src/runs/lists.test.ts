@@ -3,16 +3,24 @@
  * they answer every run the whole list answers, once, each row the whole list's own with the address of its workflow's page; `?ofFactory=`
  * keeps one factory's; and a page asked wrongly is a 422 in the package's words.
  *
- * At shipped defaults: the api's own engine over a store this file seeds with folder runs, their journals written as the engine writes
- * them, and no git anywhere.
+ * On the stand-ins: the runtime's test engine, each task filed and moved by hand (`engine().settle`), and the test place, under
+ * the run records this file seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { app } from '../app.ts';
 import type { FinishedListing, OpenListing, RunListing } from './runs.ts';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor } from '../../test/placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const app = appOver(standIn, stand);
 
 /** An instant `m` minutes into the fixtures' hour. */
 const at = (m: number) => new Date(Date.UTC(2026, 9, 4, 10, m)).toISOString();
@@ -20,24 +28,18 @@ const at = (m: number) => new Date(Date.UTC(2026, 9, 4, 10, m)).toISOString();
 const DONE = { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] };
 const BLOCKED = { outcome: 'blocked', summary: 'Could not.', needs: 'a key', artifacts: [] };
 
-/** A task's journal, as the engine writes it: spawned at `from`, and signed `closeout` at `to` where one is given. */
+/** A task on the engine, at work from `from`, and signed `closeout` at `to` where one is given. */
 function journalled(taskId: string, from: string, end?: { to: string; closeout: typeof DONE | typeof BLOCKED }): void {
-  const started = [
-    { kind: 'filed', at: from, brief: 'Write it.', cwd: root, maxAttempts: 1, harness: 'codex' },
-    { kind: 'starting', at: from, attempt: 1 },
-    { kind: 'spawned', at: from, attempt: 1 },
-  ];
-  const ended = end
-    ? [
-        { kind: 'ended', at: end.to, attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout: end.closeout },
-        { kind: 'settled', at: end.to, outcome: end.closeout.outcome === 'done' ? 'succeeded' : 'failed' },
-      ]
-    : [];
-  fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
-  fs.writeFileSync(
-    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
-    [...started, ...ended].map((e) => `${JSON.stringify(e)}\n`).join(''),
-  );
+  Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd: root, harness: 'codex' }));
+  const begun = { startedAt: from, spawnedAt: from };
+  if (!end) standIn.settle(taskId, 'running (working)', begun);
+  else
+    standIn.settle(taskId, end.closeout.outcome === 'done' ? 'succeeded' : 'failed', {
+      ...begun,
+      endedAt: end.to,
+      exitCode: 0,
+      closeout: end.closeout,
+    });
 }
 
 /** A folder run of one step, created at `created`, of `factory` where one is named. */

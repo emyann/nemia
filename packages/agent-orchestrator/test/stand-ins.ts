@@ -568,7 +568,7 @@ export const STAND_INS: readonly StandIn[] = [
     name: 'the test place',
     folder: `${O}/place/memory`,
     made: 'testPlace',
-    from: [`${O}/place/memory`, `${O}/place/memory/index.ts`],
+    from: ['agent-orchestrator/testing', `${O}/place/memory`, `${O}/place/memory/index.ts`],
     walks: { file: `${O}/test/place-walks.ts`, told: 'walksOn' },
     own: `${O}/test/place-contract.test.ts`,
     real: `${O}/test/git-place.boundary.test.ts`,

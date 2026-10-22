@@ -12,7 +12,7 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { statsRun as flowNumbers } from 'agent-orchestrator';
-import { runWith } from '../../test/placed.ts';
+import { runWith } from '../../test/shipped-place.ts';
 import type { Stats } from './stats.ts';
 import { app, runtime } from '../app.ts';
 import { Engine } from '../store.ts';

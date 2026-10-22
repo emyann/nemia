@@ -3,7 +3,8 @@
  * `nemia decide`'s words (`read`), the peak against the step's `context:` cap (`peak`), and the resumed sessions that rebuilt their cache
  * (`rebuilt`) — and nothing where the runner measured none of it.
  *
- * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` first on PATH (test/harness.ts).
+ * On the stand-ins: the runtime's test engine, each task filed and moved by hand (`engine().settle`), and the test place, under
+ * the run records this file seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -11,7 +12,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from './detail.ts';
-import { app } from '../app.ts';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor } from '../../test/placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const app = appOver(standIn, stand);
 
 const T0 = Date.parse('2026-09-19T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -22,34 +31,20 @@ const write = (file: string, text: string) => {
 const done = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
 
 /** A step's task whose attempts each ended with the usage given; an attempt after the first continued the session before it. */
-const task = (taskId: string, harness: string, usages: object[]) =>
-  write(
-    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
-    [
-      { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: usages.length, harness },
-      ...usages.flatMap((usage, i) => {
-        const n = i + 1;
-        const last = n === usages.length;
-        return [
-          { kind: 'starting', at: at(n * 100), attempt: n, ...(n > 1 ? { resumeFrom: `ae/${taskId}/${n - 1}` } : {}) },
-          { kind: 'spawned', at: at(n * 100 + 1), attempt: n },
-          {
-            kind: 'ended',
-            at: at(n * 100 + 60),
-            attempt: n,
-            sessionId: `ae/${taskId}/${n}`,
-            observed: last ? 'done' : 'failed',
-            reason: 'harness',
-            ...(last ? { closeout: done } : {}),
-            usage,
-          },
-        ];
-      }),
-      { kind: 'settled', at: at(usages.length * 100 + 60), outcome: 'succeeded' },
-    ]
-      .map((e) => `${JSON.stringify(e)}\n`)
-      .join(''),
-  );
+const task = (taskId: string, harness: string, usages: object[]) => {
+  Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness }));
+  usages.forEach((usage, i) => {
+    const n = i + 1;
+    const last = n === usages.length;
+    if (n > 1) standIn.restart(taskId);
+    standIn.settle(taskId, last ? 'succeeded' : 'failed', {
+      exitCode: last ? 0 : 1,
+      usage,
+      ...(n > 1 ? { resumeFrom: `ae/${taskId}/${n - 1}` } : {}),
+      ...(last ? { closeout: done } : {}),
+    });
+  });
+};
 
 /**
  * `implement` runs under `context: 200k`: a cold attempt peaked at 150k, and its resumed one wrote its whole context to the cache again and

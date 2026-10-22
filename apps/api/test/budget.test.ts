@@ -4,8 +4,8 @@
  * decide` say of a step past its cap — and a raise, asked for through POST …/retry and POST …/round with a `budget`, refused in the
  * package's words.
  *
- * At shipped defaults: the api's own engine over the harness's scratch store (`root`), which this file seeds, and the harness's fake
- * `claude` first on PATH (test/harness.ts).
+ * On the stand-ins: the runtime's test engine, each task filed and moved by hand (`engine().settle`), and the test place, under
+ * the run records this file seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -14,20 +14,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
-import { app } from '../src/app.ts';
-import {
-  askFile,
-  decideRun,
-  engine,
-  list,
-  retryRun,
-  roundAskFile,
-  roundRun,
-  runStore,
-  type RunSummary,
-  usedLines,
-} from 'agent-orchestrator';
-import { runWith } from './placed.ts';
+import { askFile, decideRun, list, retryRun, roundAskFile, roundRun, runStore, type RunSummary, usedLines } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor, runOver } from './placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const runWith = runOver(stand.layer);
+const app = appOver(standIn, stand);
 
 type RetryHow = import('agent-orchestrator').RetryHow;
 
@@ -37,54 +34,36 @@ const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
-const journal = (taskId: string, events: object[]) =>
-  write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), events.map((event) => `${JSON.stringify(event)}\n`).join(''));
 
 /**
  * A step's task that ran once from `from` seconds, and signed off with `closeout` — its attempt with the usage the engine read of it, when
  * it read one.
  */
-const session = (taskId: string, harness: string, from: number, closeout: object, usage?: object) =>
-  journal(taskId, [
-    { kind: 'filed', at: at(from), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness },
-    { kind: 'starting', at: at(from + 1), attempt: 1 },
-    { kind: 'spawned', at: at(from + 1), attempt: 1 },
-    {
-      kind: 'ended',
-      at: at(from + 60),
-      attempt: 1,
-      sessionId: `ae/${taskId}/1`,
-      observed: 'done',
-      reason: 'harness',
-      closeout,
-      ...(usage ? { usage } : {}),
-    },
-    { kind: 'settled', at: at(from + 60), outcome: 'succeeded' },
-  ]);
+const session = (taskId: string, harness: string, from: number, closeout: object, usage?: object) => {
+  Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness }));
+  standIn.settle(taskId, 'succeeded', {
+    startedAt: at(from + 1),
+    spawnedAt: at(from + 1),
+    endedAt: at(from + 60),
+    exitCode: 0,
+    closeout,
+    ...(usage ? { usage } : {}),
+  });
+};
 
 /**
  * A check that ran to its end and exited 1: a refusal — on the engine's record, which the api reads and `nemia ls` reads (`exitVerdicts`),
- * so the two agree.
+ * so the two agree — and what it printed.
  */
 const refusedCheck = (taskId: string, from: number) => {
-  journal(taskId, [
-    {
-      kind: 'filed',
-      at: at(from),
-      brief: 'npm test',
-      cwd: '/code/app',
-      maxAttempts: 1,
-      harness: 'check',
-    },
-    { kind: 'starting', at: at(from), attempt: 1 },
-    { kind: 'spawned', at: at(from), attempt: 1 },
-    { kind: 'ended', at: at(from + 10), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'failed', reason: 'harness', exitCode: 1 },
-    { kind: 'settled', at: at(from + 10), outcome: 'failed' },
-  ]);
-  const name = `ae/${taskId}/1`;
-  const base = path.join(root, 'engine', 'runs', 'check', name.replace(/[^a-zA-Z0-9]+/g, '_'));
-  write(`${base}.json`, JSON.stringify({ name, state: 'done', pid: 0, heartbeatAt: at(from + 10), logFile: `${base}.log`, exitCode: 1 }));
-  write(`${base}.log`, 'not ok 1 - tokens are colours\n# fail 1\n');
+  Effect.runSync(engine().file({ id: taskId, brief: 'npm test', cwd: '/code/app', harness: 'check' }));
+  standIn.settle(taskId, 'failed', {
+    startedAt: at(from),
+    spawnedAt: at(from),
+    endedAt: at(from + 10),
+    exitCode: 1,
+    printed: { stdout: 'not ok 1 - tokens are colours\n# fail 1\n' },
+  });
 };
 
 const done = (summary: string, more: object = {}) => ({ outcome: 'done', summary, needs: null, artifacts: [], ...more });

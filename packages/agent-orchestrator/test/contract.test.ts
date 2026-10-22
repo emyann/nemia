@@ -29,7 +29,7 @@ const PKG = path.join(import.meta.dirname, '..');
 const GUARDED = {
   name: 'agent-orchestrator',
   dir: 'packages/agent-orchestrator',
-  entries: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/workflow'],
+  entries: ['agent-orchestrator', 'agent-orchestrator/run', 'agent-orchestrator/workflow', 'agent-orchestrator/testing'],
 } as const;
 
 const SOURCE = /\.(ts|tsx|mts|cts|js|mjs|cjs)$/;
@@ -96,7 +96,7 @@ test('the scan reads the apps above this package — or it would pass by reading
   for (const entry of GUARDED.entries) assert.ok(named.has(entry), `and some of it imports ${entry}`);
 });
 
-test('code outside packages/agent-orchestrator reaches it through agent-orchestrator, agent-orchestrator/run and agent-orchestrator/workflow alone', () => {
+test('code outside packages/agent-orchestrator reaches it through agent-orchestrator, agent-orchestrator/run, agent-orchestrator/workflow and agent-orchestrator/testing alone', () => {
   const found = workspaceFiles(GUARDED).flatMap((f) => breaches(f, fs.readFileSync(path.join(ROOT, f), 'utf8'), GUARDED));
   assert.deepEqual(found, []);
 });
@@ -104,7 +104,8 @@ test('code outside packages/agent-orchestrator reaches it through agent-orchestr
 test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolve, and a path built into src — each route', () => {
   const at = 'apps/api/test/x.test.ts';
   const refused = (text: string) => breaches(at, text, GUARDED);
-  const instead = 'reach it through agent-orchestrator or agent-orchestrator/run or agent-orchestrator/workflow';
+  const instead =
+    'reach it through agent-orchestrator or agent-orchestrator/run or agent-orchestrator/workflow or agent-orchestrator/testing';
   const subpath = "const { foldFeed } = await import('agent-orchestrator/feed');";
   const effectFace =
     "import { Missing } from 'agent-orchestrator/effect';\nimport { Invalid } from 'agent-orchestrator/src/refusal/refusal.ts';";
@@ -157,14 +158,58 @@ test('and what is not a route is not refused: the three entries, the wf CLI spaw
   assert.deepEqual(breaches('apps/web/test/e2e/x.ts', text, GUARDED), []);
 });
 
-test("agent-orchestrator's exports are . (runner.ts), ./run and ./workflow, and nothing else but its package.json", () => {
+test("agent-orchestrator's exports are . (runner.ts), ./run, ./workflow and ./testing (the test place), and nothing else but its package.json", () => {
   const { exports } = JSON.parse(fs.readFileSync(path.join(PKG, 'package.json'), 'utf8')) as { exports: Record<string, string> };
   assert.deepEqual(exports, {
     '.': './src/runner.ts',
     './run': './src/run.ts',
     './workflow': './src/workflow.ts',
+    './testing': './place/memory/index.ts',
     './package.json': './package.json',
   });
+});
+
+/** The entry a test alone imports: the test place, `testPlace` (`place/memory`). */
+const TESTING = 'agent-orchestrator/testing';
+
+/** Where `file`, which is no test's, imports the testing entry: a program that runs is given the place its layer holds. */
+function testingBreaches(file: string, text: string): string[] {
+  if (isTestFile(file) || !specifiersIn(withoutComments(text)).includes(TESTING)) return [];
+  return [
+    `${file} imports ${TESTING}, which is for tests alone: a program that runs is given its place where it is composed ` +
+      '(gitPlaceLayer), and only a test file (*.test.ts, or under a test/ folder) takes the test place',
+  ];
+}
+
+test('REFUSED: a file of a src or a bin that imports the testing entry; a test file may', () => {
+  const line = "import { testPlace } from 'agent-orchestrator/testing';";
+  for (const file of ['apps/api/src/store.ts', 'packages/agent-orchestrator/src/runner.ts', 'packages/agent-orchestrator/bin/nemia.ts'])
+    assert.equal(testingBreaches(file, line).length, 1, `refused: ${file}`);
+  assert.equal(
+    testingBreaches('apps/api/src/app.ts', "const t = await import('agent-orchestrator/testing');").length,
+    1,
+    'a dynamic import',
+  );
+  for (const file of ['apps/api/test/placed.ts', 'apps/api/src/asks/say.test.ts', 'packages/agent-orchestrator/test/x.test.ts'])
+    assert.deepEqual(testingBreaches(file, line), [], `not refused: ${file}`);
+  assert.deepEqual(testingBreaches('apps/api/src/store.ts', "import { engineOf } from 'agent-orchestrator';"), [], 'the root entry');
+  assert.deepEqual(testingBreaches('apps/api/src/store.ts', ` * ${line}`), [], 'prose');
+});
+
+test('no file that is no test imports the testing entry, in this package or outside it, and some test does', () => {
+  const listed = execFileSync('git', ['ls-files', '-co', '--exclude-standard'], { cwd: ROOT, encoding: 'utf8' });
+  const files = listed
+    .split('\n')
+    .filter((f) => SOURCE.test(f) && fs.existsSync(path.join(ROOT, f)))
+    .map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')] as const);
+  assert.ok(
+    files.some(([f, text]) => isTestFile(f) && specifiersIn(text).includes(TESTING)),
+    'a test takes the test place by the entry, so the scan reads the specifier',
+  );
+  assert.deepEqual(
+    files.flatMap(([f, text]) => testingBreaches(f, text)),
+    [],
+  );
 });
 
 /** What reads a workflow folder from disk: exported from the root, beside the controller, and never from the pure format's entry. */

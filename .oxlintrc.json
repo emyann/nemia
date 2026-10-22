@@ -234,9 +234,11 @@
         ]
       }
     },
-    // The api reaches the orchestrator's public entries alone, and never the runtime or a harness.
+    // The api reaches the orchestrator's public entries alone, and never the runtime or a harness. A test beside its source is of no layer,
+    // as one under apps/api/test is: it takes the stand-ins by the two testing entries.
     {
       "files": ["apps/api/src/**"],
+      "excludeFiles": ["apps/api/src/**/*.test.ts"],
       "rules": {
         "no-restricted-imports": [
           "error",

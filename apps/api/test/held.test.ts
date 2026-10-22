@@ -3,12 +3,12 @@
  * `input-required`. Blocked, it reads `input-required · BLOCKED` with its question, waiting on you; gated, it reads `awaiting approval`.
  * Each held to what `nemia ls` says of the same run, and neither read as a session still going.
  *
- * The runs it seeds: `h-blocked`, signed off blocked; `h-gate`, gated at plan; `h-closed`, approved — closed on the pass that filed
- * implement, and not yet settled: the engine settles it on its next pass; `h-answered`, blocked, then answered (`nemia retry --message`) —
- * the answer is the task's next turn, under the same id, and its attempt has not ended; and `h-rechecked`, whose task is filed without
+ * The runs it seeds: `h-blocked`, signed off blocked; `h-gate`, gated at plan; and `h-rechecked`, whose task is filed without
  * `holdOpen` — its check rechecked (`nemia retry --recheck`, the same task and turn), then nudged, a task of its own.
  *
- * At shipped defaults: the api's own engine over a store this file seeds, and the harness's fake `claude` (test/harness.ts) first on PATH.
+ * On the stand-ins: the runtime's test engine, each task filed and left where this file says by hand, and the test place, under the run
+ * records this file seeds. A task closed and not yet settled, and an answer that is a held task's next turn, are
+ * `held.boundary.test.ts`'s: the test engine keeps no journal to close or answer.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
@@ -17,9 +17,16 @@ import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { RunDetail } from '../src/detail/detail.ts';
-import { app } from '../src/app.ts';
-import { approveRun, engine, list, runStore, type RunSummary } from 'agent-orchestrator';
-import { runWith } from './placed.ts';
+import { list, runStore, type RunSummary } from 'agent-orchestrator';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor, runOver } from './placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const runWith = runOver(stand.layer);
+const app = appOver(standIn, stand);
 
 const T0 = Date.parse('2026-09-24T01:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -27,17 +34,11 @@ const write = (file: string, text: string) => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
 };
-const journal = (taskId: string, events: object[]) =>
-  write(path.join(root, 'engine', 'tasks', `${taskId}.jsonl`), events.map((event) => `${JSON.stringify(event)}\n`).join(''));
-
-/** A step's task filed held open that signed off with `closeout` and was neither answered nor closed: no `settled` on its journal. */
-const waiting = (taskId: string, closeout: object) =>
-  journal(taskId, [
-    { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex', holdOpen: true },
-    { kind: 'starting', at: at(1), attempt: 1 },
-    { kind: 'spawned', at: at(1), attempt: 1 },
-    { kind: 'ended', at: at(9), attempt: 1, sessionId: `ae/${taskId}/1`, observed: 'done', reason: 'harness', closeout },
-  ]);
+/** A step's task filed held open that signed off with `closeout` and was neither answered nor closed: its attempt ended, unsettled. */
+const waiting = (taskId: string, closeout: object) => {
+  Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex', holdOpen: true }));
+  standIn.settle(taskId, 'input-required', { ended: 'done', endedAt: at(9), exitCode: 0, closeout });
+};
 
 const DONE = { outcome: 'done', summary: 'The plan.', needs: null, artifacts: [] };
 const BLOCKED = { outcome: 'blocked', summary: 'Two ways to go.', needs: 'Warm colours, or cool ones?', artifacts: [] };
@@ -69,40 +70,10 @@ writeRun('h-blocked');
 waiting('h-blocked-plan', BLOCKED);
 writeRun('h-gate', ['plan']);
 waiting('h-gate-plan', DONE);
-writeRun('h-closed', ['plan']);
-waiting('h-closed-plan', DONE);
-fs.appendFileSync(path.join(root, 'engine', 'tasks', 'h-closed-plan.jsonl'), `${JSON.stringify({ kind: 'closed', at: at(30) })}\n`);
-
-writeRun('h-answered');
-waiting('h-answered-plan', BLOCKED);
-fs.appendFileSync(
-  path.join(root, 'engine', 'tasks', 'h-answered-plan.jsonl'),
-  [
-    { kind: 'input', at: at(20), text: 'Warm ones.' },
-    { kind: 'starting', at: at(21), attempt: 2 },
-    { kind: 'spawned', at: at(21), attempt: 2 },
-  ]
-    .map((event) => `${JSON.stringify(event)}\n`)
-    .join(''),
-);
-{
-  const file = path.join(root, 'runs', 'h-answered.json');
-  const run = JSON.parse(fs.readFileSync(file, 'utf8'));
-  run.steps.plan.tries = [{ taskId: 'h-answered-plan', then: 'nudge' }];
-  fs.writeFileSync(file, JSON.stringify(run));
-}
-
 writeRun('h-rechecked');
-journal('h-rechecked-plan', [
-  { kind: 'filed', at: at(0), brief: 'Do it.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
-  { kind: 'starting', at: at(1), attempt: 1 },
-  { kind: 'spawned', at: at(1), attempt: 1 },
-  { kind: 'ended', at: at(9), attempt: 1, sessionId: 'ae/h-rechecked-plan/1', observed: 'done', reason: 'harness', closeout: DONE },
-  { kind: 'settled', at: at(9), outcome: 'succeeded' },
-]);
-journal('h-rechecked-plan-try3', [
-  { kind: 'filed', at: at(40), brief: 'Do it again.', cwd: '/code/app', maxAttempts: 1, harness: 'codex' },
-]);
+Effect.runSync(engine().file({ id: 'h-rechecked-plan', brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
+standIn.settle('h-rechecked-plan', 'succeeded', { exitCode: 0, closeout: DONE });
+Effect.runSync(engine().file({ id: 'h-rechecked-plan-try3', brief: 'Do it again.', cwd: '/code/app', harness: 'codex' }));
 {
   const file = path.join(root, 'runs', 'h-rechecked.json');
   const run = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -155,46 +126,6 @@ test("a held step at its gate reads `awaiting approval`, never the engine's word
     );
     assert.deepEqual(run.waitingOnYou, ['plan']);
   }
-});
-
-test("a held step closed and not yet settled reads as it signed, never the engine's `between attempts` for a session still going — as `nemia ls` says", async () => {
-  assert.equal(
-    (await Effect.runPromise(engine().view('h-closed-plan'))).phase,
-    'between attempts',
-    'the seed: closed, and the engine has not settled it',
-  );
-  await runWith(engine(), approveRun('h-closed', 'plan'));
-  const listed = await runWith(engine(), list(engine(), runStore.runs.read('h-closed')));
-  for (const run of [await detail('h-closed'), await summary('h-closed')]) {
-    assert.deepEqual(
-      run.steps.map((s) => s.status),
-      listed.steps.map((s) => s.status),
-    );
-    assert.doesNotMatch(run.steps[0].status, /between attempts|running/);
-  }
-});
-
-test('each try of a held task a person answered is its own turn: the try answered keeps its sign-off and its end, and the turn it started reads none of them', async () => {
-  const plan = (await detail('h-answered')).steps[0];
-  assert.deepEqual(
-    plan.tries.map((t) => [t.try, t.current, t.taskId]),
-    [
-      [1, false, 'h-answered-plan'],
-      [2, true, 'h-answered-plan'],
-    ],
-    'one task, two tries',
-  );
-  const [answered, going] = plan.tries;
-  assert.deepEqual(
-    [answered.status, answered.attempts.count, answered.attempts.latest?.ended, answered.closeout?.needs],
-    ['succeeded', 1, 'done', BLOCKED.needs],
-    'the turn answered, as it signed',
-  );
-  assert.deepEqual(
-    [going.attempts.count, going.attempts.latest?.ended, going.closeout],
-    [1, null, null],
-    'the turn going on: its own attempt, still running, and no sign-off yet',
-  );
 });
 
 test("a recheck is no turn: a try after one, on the same task filed before tasks were held open, reads that task's attempts and sign-off as it did", async () => {

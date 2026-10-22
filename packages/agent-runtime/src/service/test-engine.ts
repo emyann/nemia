@@ -9,8 +9,8 @@
  * `plantMcpState(name, state)` plants the state a server reads as, `failMcpState(why)` makes the next read a look that failed, and
  * `mcpReads` counts the reads asked, which is how a test proves a pass read a record's states once rather than once per task.
  *
- * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget`, `kept`, `mcpState`
- * and the three sign-in verbs (`signIns`, `signOuts` and `settleSignIn` read and move them), each
+ * It keeps `file`, `view`, `list`, `stop`, `logs`, `feed`, `output`, `say`, `interrupt`, `transcript`, `forget`, `kept`, `mcpState`,
+ * the three sign-in verbs (`signIns`, `signOuts` and `settleSignIn` read and move them) and `io`, each
  * answering what the real engine answers over a harness that costs nothing: `test/engine-walks.ts` holds the walks both run, and `APART`
  * there what this one cannot say. Every other verb dies naming itself. Reached from another package through `agent-runtime/testing`
  * alone, and by no file of a `src`.
@@ -37,7 +37,7 @@ import type { RemoteMcpServer } from '../harness/seam.ts';
 type TranscriptEvent = Effect.Success<ReturnType<EngineShape['transcript']>>['events'][number];
 import { ForgetRefused } from './forget.ts';
 import { KeptRefused, type KeptReport } from './kept.ts';
-import { mcpStateRefusal, type TaskSpec } from './options.ts';
+import { mcpStateRefusal, type EngineIo, type TaskSpec } from './options.ts';
 import { McpStateRefused } from './mcp-state.ts';
 import type { McpSignInState } from './mcp-sign-in.ts';
 import { signInHeld } from './test-sign-in.ts';
@@ -191,6 +191,30 @@ const transcriptOf =
     return Effect.succeed({ events: events.slice(from), cursor: plantedCursor(Math.max(from, events.length)) });
   };
 
+/** The verbs whose asking `io` counts as one read each: what the stand-in answers out of what it holds. */
+const READS = ['view', 'list', 'logs', 'output', 'transcript'] as const;
+
+/**
+ * `verbs` with each read of `READS` counted once as it is asked, and `io`, which answers the count so far: the reads a test's verbs
+ * asked, where the engine counts the files it opened. No byte, spawn, write or lock is counted, and no harness observed (`APART`).
+ */
+const countedOf = <V extends Pick<EngineShape, (typeof READS)[number]>>(verbs: V): V & Pick<EngineShape, 'io'> => {
+  let reads = 0;
+  const counted = Object.fromEntries(
+    READS.map((verb) => [
+      verb,
+      (...args: unknown[]) =>
+        Effect.suspend(() => {
+          reads += 1;
+          return Reflect.apply(verbs[verb], verbs, args) as Effect.Effect<unknown, unknown>;
+        }),
+    ]),
+  ) as unknown as Pick<EngineShape, (typeof READS)[number]>;
+  const io = (): Effect.Effect<EngineIo> =>
+    Effect.sync(() => ({ bytesRead: 0, reads, spawned: 0, writes: 0, locks: 0, lockWaitMs: 0, observed: {} }));
+  return { ...verbs, ...counted, io };
+};
+
 /** A verb the stand-in does not keep: a test that reaches it has outgrown the stand-in. */
 const unkept = (verb: string) => () =>
   Effect.die(
@@ -234,8 +258,8 @@ export type TestEngine = {
    */
   readonly cutAsks: (id: string) => void;
   /**
-   * Ends the task `id`'s attempt in flight as its harness ended it, failed, and starts the next at work, as a long-lived task restarts.
-   * Throws for a task never filed or not started.
+   * Ends the task `id`'s attempt in flight as its harness ended it, failed, and starts the next at work, as a long-lived task restarts;
+   * an attempt a settle already ended is kept as it ended. Throws for a task never filed or not started.
    */
   readonly restart: (id: string) => TestTask;
   /** Plants what `kept` answers of the task `id`, in bytes, in place of what was planted before; a task not held is never named. */
@@ -428,6 +452,7 @@ const sayAskedOf =
   (taskId: string, text: string) =>
     Effect.gen(function* () {
       const refuse = (message: string) => Effect.fail(new SayRefused({ message }));
+      if (typeof text !== 'string' || !text.trim()) return yield* refuse('`text` is empty. Give the words the session should hear.');
       const t = tasks.get(taskId);
       if (!t) return yield* refuse(unknown(taskId));
       if (settledIn(taskId)) return yield* refuse(`\`${taskId}\` has settled (${t.phase}): no session of it is running to hear anything.`);
@@ -535,11 +560,14 @@ const taskFor = (tasks: Map<string, TestTask>, id: string, before: string): Test
   return t;
 };
 
-/** The task `id` started again: the attempt it had kept as a failed earlier try, and a new attempt at work in its place. */
+/**
+ * The task `id` started again: the attempt it had kept as an earlier try — as it ended, where a settle ended it, else failed now — and a
+ * new attempt at work in its place.
+ */
 const restartIn = (tasks: Map<string, TestTask>, id: string): TestTask => {
   const t = tasks.get(id);
   if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);
-  t.earlier.push(attemptOf(t, 'failed', {}));
+  t.earlier.push(t.attempt.ended ? t.attempt : attemptOf(t, 'failed', {}));
   t.attempt = null;
   t.attempt = attemptOf(t, 'running (working)', {});
   t.phase = 'running (working)';
@@ -588,7 +616,7 @@ export const testEngine = (): TestEngine => {
   const signIn = signInHeld();
   const layer = Layer.succeed(Engine)(
     Engine.of({
-      ...keptOf(held, sayRefusals, sizes, keptFailures),
+      ...countedOf(keptOf(held, sayRefusals, sizes, keptFailures)),
       mcpState: mcp.mcpState,
       ...signIn.verbs,
       tick: unkept('tick'),
@@ -599,7 +627,6 @@ export const testEngine = (): TestEngine => {
       answer: unkept('answer'),
       close: unkept('close'),
       watch: unkept('watch'),
-      io: unkept('io'),
       tallied: unkept('tallied'),
       start: unkept('start'),
       sweep: unkept('sweep'),

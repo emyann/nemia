@@ -9,6 +9,7 @@ import { Context, Effect, Layer } from 'effect';
 import {
   asked,
   engine,
+  engineOf,
   judge,
   judgedUnlessUnreadable,
   runStore,
@@ -36,6 +37,14 @@ import { isRepositoryRun, type Run } from 'agent-orchestrator/run';
  */
 export class Engine extends Context.Service<Engine, ReturnType<typeof engine>>()('api/Engine') {
   static readonly live: Layer.Layer<Engine> = Layer.sync(Engine)(engine);
+
+  /**
+   * The api's engine over the runtime's layer `runtime`, wrapped as `live` wraps its own (`engineOf`, which files every task queued):
+   * how a test gives the app the runtime's stand-in, `Engine.over(engine().layer)` of `testEngine`.
+   */
+  static over(runtime: Parameters<typeof engineOf>[0]): Layer.Layer<Engine> {
+    return Layer.sync(Engine)(() => engineOf(runtime));
+  }
 }
 
 /**

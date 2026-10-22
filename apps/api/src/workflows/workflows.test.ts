@@ -15,7 +15,7 @@ import { scratch } from '../../test/scratch.ts';
 import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import { workflowVersion as versionIn } from 'agent-orchestrator';
-import { runWith } from '../../test/placed.ts';
+import { runWith } from '../../test/shipped-place.ts';
 import { listWorkflows } from './workflows.ts';
 import { engine, shippedGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';

@@ -1,16 +1,24 @@
 /**
  * A step on a remote A2A agent (`harness: a2a:<name>`), as the api tells a person of it: on a run's detail, the agent a try was sent to and
  * where, as the store's `a2a-agents.json` gives it — never a query string, which can carry a key — and, for a step whose Task waits on its
- * caller, where it is answered: `nemia say`, not a Claude Code session the agent is not in. In a scratch store, with journals written by
- * hand.
+ * caller, where it is answered: `nemia say`, not a Claude Code session the agent is not in. In a scratch store, on the stand-ins: the
+ * runtime's test engine, each task filed and settled by hand, and the test place.
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { app } from '../src/app.ts';
 import { needsOf } from 'agent-orchestrator';
+import { Effect } from 'effect';
+import { testEngine } from 'agent-runtime/testing';
+import { testPlace } from 'agent-orchestrator/testing';
+import { appOver, engineFor } from './placed.ts';
+
+const stand = testPlace();
+const standIn = testEngine();
+const engine = () => engineFor(standIn);
+const app = appOver(standIn, stand);
 
 type TaskView = import('agent-orchestrator').TaskView;
 type Run = import('agent-orchestrator/run').Run;
@@ -23,19 +31,10 @@ const write = (file: string, text: string): void => {
 const at = (s: number) => new Date(Date.parse('2026-09-25T06:00:00.000Z') + s * 1000).toISOString();
 
 /** A task on `harness` that ran once and completed: what a remote agent's Task that answered with no data part leaves. */
-const completed = (taskId: string, harness: string) =>
-  write(
-    path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
-    [
-      { kind: 'filed', at: at(0), brief: 'Ask it.', cwd: path.join(root, 'runs', 'x', 'work', 'ask'), harness },
-      { kind: 'starting', at: at(1), attempt: 1 },
-      { kind: 'spawned', at: at(1), attempt: 1 },
-      { kind: 'ended', at: at(9), attempt: 1, sessionId: 'ctx-1', observed: 'done', reason: 'harness' },
-      { kind: 'settled', at: at(9), outcome: 'succeeded' },
-    ]
-      .map((line) => `${JSON.stringify(line)}\n`)
-      .join(''),
-  );
+const completed = (taskId: string, harness: string) => {
+  Effect.runSync(engine().file({ id: taskId, brief: 'Ask it.', cwd: path.join(root, 'runs', 'x', 'work', 'ask'), harness }));
+  standIn.settle(taskId, 'succeeded', { nativeId: 'ctx-1' });
+};
 
 /** A run of one step, `ask`, on `harness`, whose task is `taskId`. */
 const oneStep = (id: string, harness: string, taskId: string): Run => {

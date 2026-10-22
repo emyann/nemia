@@ -130,7 +130,8 @@ test('REFUSED: a card whose title is more than one line, or empty, files nothing
   const { root, repo } = world();
   const twoLines = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('Allow agora\nthe typecheck it runs', repo)] })]);
   assert.equal(twoLines.code, 1);
-  assert.match(twoLines.err, /card #2: its title is one line, what to correct, and this one is empty or more than one/);
+  assert.ok(twoLines.err.includes('card #2: its title is one line'), twoLines.err);
+  assert.ok(twoLines.err.includes('empty or more than one'), twoLines.err);
   const empty = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('  ', repo)] })]);
   assert.equal(empty.code, 1);
   assert.match(empty.err, /card #2: its title is one line/);
@@ -141,7 +142,8 @@ test('REFUSED: a card of a kind that is not fence, body, skill or on-purpose fil
   const { root, repo } = world();
   const ran = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('Deny agora the push', repo, { kind: 'deny' })] })]);
   assert.equal(ran.code, 1);
-  assert.match(ran.err, /card #2: its kind is "deny", not one of fence, body, skill, on-purpose/);
+  assert.ok(ran.err.includes('card #2: its kind is "deny"'), ran.err);
+  assert.ok(ran.err.includes('fence, body, skill, on-purpose'), 'and names the kinds it takes');
   assert.deepEqual(inbox(root), {});
 });
 
@@ -160,7 +162,9 @@ test('REFUSED: a card whose repository is not an absolute path files nothing', (
   const { root, repo } = world();
   const ran = run(root, [closeoutFile({ cards: [card('A ready card', repo), card('A card on a relative path', 'packages')] })]);
   assert.equal(ran.code, 1);
-  assert.match(ran.err, /"A card on a relative path": its repo "packages" is not an absolute path/);
+  assert.ok(ran.err.includes('"A card on a relative path": its repo "packages"'), ran.err);
+  assert.ok(ran.err.includes('is not an absolute path'), ran.err);
+  assert.ok(ran.err.includes('from the root'), 'and names the fix');
   assert.deepEqual(inbox(root), {});
 });
 
@@ -192,7 +196,8 @@ test('REFUSED: a period compared with that is not as long as the period read, or
   assert.match(shorter.err, /against, .* is 13 days, and the period 14/);
   const apart = run(root, [closeoutFile({ cards, against: { from: '2026-08-31', to: '2026-09-13' } })]);
   assert.equal(apart.code, 1);
-  assert.match(apart.err, /against ends 2026-09-13, not 2026-09-14, the day before the period starts/);
+  assert.ok(apart.err.includes('against ends 2026-09-13, not 2026-09-14'), apart.err);
+  assert.ok(apart.err.includes('compare the days just before it'), 'and names the fix');
   const backwards = run(root, [closeoutFile({ cards, period: { from: '2026-09-28', to: '2026-09-15' } })]);
   assert.equal(backwards.code, 1);
   assert.match(backwards.err, /period ends before it starts/);
@@ -206,6 +211,8 @@ test('REFUSED: no closeout, or one that is not there, files nothing and names th
   assert.match(none.err, /no closeout reached the check: WF_CLOSEOUT is empty/);
   const gone = run(root, [path.join(root, 'gone.json')]);
   assert.equal(gone.code, 1);
-  assert.match(gone.err, /no closeout reached the check: .*gone\.json does not read as JSON/);
+  assert.ok(gone.err.includes('no closeout reached the check: '), gone.err);
+  assert.ok(gone.err.includes(path.join(root, 'gone.json')), gone.err);
+  assert.ok(gone.err.includes('does not read as JSON'), gone.err);
   assert.deepEqual(inbox(root), {});
 });

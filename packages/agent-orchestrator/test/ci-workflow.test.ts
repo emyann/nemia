@@ -1302,16 +1302,12 @@ test('REFUSED: a shard matrix that is not 1..n, a shard taken off no leg, a coun
   ] as const) {
     const adrift = structuredClone(shipped);
     shardsOf(adrift).splice(0, 4, ...legs);
-    assert.deepEqual(
-      shardDrift(adrift, pages),
-      [
-        `the e2e job's matrix.shard in .github/workflows/ci.yml reads ${JSON.stringify(legs)}, not 1 to ${legs.length || 4} in order: ` +
-          `write it [${Array.from({ length: legs.length || 4 }, (_leg, i) => i + 1).join(', ')}], since the run takes its count off ` +
-          'strategy.job-total and a shard ' +
-          "outside 1..n visits nothing while another's pages are visited by nobody",
-      ],
-      why,
-    );
+    const drift = shardDrift(adrift, pages);
+    assert.equal(drift.length, 1, why);
+    assert.ok(drift[0].startsWith(`the e2e job's matrix.shard in .github/workflows/ci.yml reads ${JSON.stringify(legs)}`), why);
+    assert.ok(drift[0].includes(`not 1 to ${legs.length || 4} in order`), why);
+    assert.ok(drift[0].includes(`write it [${Array.from({ length: legs.length || 4 }, (_leg, i) => i + 1).join(', ')}]`), why);
+    assert.ok(drift[0].includes('strategy.job-total'), why);
   }
 
   const literal = structuredClone(shipped);
@@ -1457,15 +1453,13 @@ test('REFUSED: no scan job, a download unpinned or unchecked, a scan without its
   ] as const) {
     const unchecked = structuredClone(shipped);
     mangle(runSteps(unchecked, SCAN)[0]);
-    assert.deepEqual(
-      scanDrift(unchecked, config),
-      [
-        'the gitleaks job in .github/workflows/ci.yml does not check the download against a sha256: give the step env SHA256 with the ' +
-          "64-digit hash from that release's gitleaks_<version>_checksums.txt and pipe it to `sha256sum --check --strict -`, or a third " +
-          "party's bytes run here unverified",
-      ],
-      why,
-    );
+    const drift = scanDrift(unchecked, config);
+    assert.equal(drift.length, 1, why);
+    assert.ok(drift[0].startsWith('the gitleaks job in .github/workflows/ci.yml'), why);
+    assert.ok(drift[0].includes('does not check the download against a sha256'), why);
+    assert.ok(drift[0].includes('env SHA256'), why);
+    assert.ok(drift[0].includes('gitleaks_<version>_checksums.txt'), why);
+    assert.ok(drift[0].includes('`sha256sum --check --strict -`'), why);
   }
 
   for (const flag of SCAN_FLAGS) {

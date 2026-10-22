@@ -196,7 +196,8 @@ test('REFUSED: a lock placed while a live one is being put back stays, and the b
     }
   });
   assert.equal(exitCode, 2, message);
-  assert.match(message, /nemia-render-2-third0, a render in flight .* holds the slot and nemia-render-1-live00 now runs without it/);
+  assert.ok(message.includes('nemia-render-2-third0, a render in flight'), message);
+  assert.ok(message.includes('nemia-render-1-live00 now runs without it'), message);
   assert.ok(message.endsWith('run it again once both have ended'), message);
   assert.deepEqual(locked(), third, 'the lock in place stays');
   assert.deepEqual(leftBeside(), []);

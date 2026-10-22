@@ -103,19 +103,23 @@ test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolv
   const at = 'apps/api/test/x.test.ts';
   const refused = (text: string) => breaches(at, text, GUARDED);
   const instead = 'reach it through agent-orchestrator or agent-orchestrator/run or agent-orchestrator/workflow';
+  const subpath = "const { foldFeed } = await import('agent-orchestrator/feed');";
+  const effectFace =
+    "import { Missing } from 'agent-orchestrator/effect';\nimport { Invalid } from 'agent-orchestrator/src/refusal/refusal.ts';";
+  const typeOnly = "import type { Tally } from 'agent-orchestrator/src/meter/tally.store.ts';";
+  const resolved = "const f = await import(new URL('./feed.ts', import.meta.resolve('agent-orchestrator')).href);";
+  const joined = "const f = await import(path.join(ROOT, 'packages', 'agent-orchestrator', 'src', 'feed.ts'));";
   assert.deepEqual(refused("import { x } from 'agent-orchestrator/src/run.ts';"), [
     `${at} imports agent-orchestrator/src/run.ts, which is not an entry of agent-orchestrator: ${instead}`,
   ]);
-  assert.deepEqual(refused("const { foldFeed } = await import('agent-orchestrator/feed');"), [
-    `${at} imports agent-orchestrator/feed, which is not an entry of agent-orchestrator: ${instead}`,
-  ]);
+  assert.deepEqual(refused(subpath), [`${at} imports agent-orchestrator/feed, which is not an entry of agent-orchestrator: ${instead}`]);
   assert.deepEqual(
-    refused("import { Missing } from 'agent-orchestrator/effect';\nimport { Invalid } from 'agent-orchestrator/src/refusal/refusal.ts';"),
+    refused(effectFace),
     [
       `${at} imports agent-orchestrator/effect, which is not an entry of agent-orchestrator: ${instead}`,
       `${at} imports agent-orchestrator/src/refusal/refusal.ts, which is not an entry of agent-orchestrator: ${instead}`,
     ],
-    "REFUSED: the retired Effect face, and the refusals' file in src",
+    'REFUSED: the retired Effect face, and refusal.ts',
   );
   assert.deepEqual(
     breaches('apps/web/test/x.test.ts', "import { foldFeed } from '../../../packages/agent-orchestrator/src/feed.ts';", GUARDED),
@@ -130,15 +134,11 @@ test('REFUSED: a subpath not in its exports, a relative path, import.meta.resolv
     ],
     'REFUSED: a path into a feature folder',
   );
-  assert.deepEqual(refused("import type { Tally } from 'agent-orchestrator/src/meter/tally.store.ts';"), [
+  assert.deepEqual(refused(typeOnly), [
     `${at} imports agent-orchestrator/src/meter/tally.store.ts, which is not an entry of agent-orchestrator: ${instead}`,
   ]);
-  assert.deepEqual(refused("const f = await import(new URL('./feed.ts', import.meta.resolve('agent-orchestrator')).href);"), [
-    `${at}:1 resolves agent-orchestrator to build a path beside its entry: ${instead}`,
-  ]);
-  assert.deepEqual(refused("const f = await import(path.join(ROOT, 'packages', 'agent-orchestrator', 'src', 'feed.ts'));"), [
-    `${at}:1 builds a path into packages/agent-orchestrator/src: ${instead}`,
-  ]);
+  assert.deepEqual(refused(resolved), [`${at}:1 resolves agent-orchestrator to build a path beside its entry: ${instead}`]);
+  assert.deepEqual(refused(joined), [`${at}:1 builds a path into packages/agent-orchestrator/src: ${instead}`]);
 });
 
 test('and what is not a route is not refused: the three entries, the wf CLI spawned, and prose that names a file in src', () => {

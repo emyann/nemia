@@ -41,7 +41,8 @@ test('REFUSED at shipped defaults: the checkout on a store that runs an install 
   for (const argv of [['ls'], ['tick']]) {
     const { status, stderr } = nemia(root, argv);
     assert.equal(status, 2, `nemia ${argv.join(' ')}: ${stderr}`);
-    assert.match(stderr, /this is the checkout .* runs the installed release v1 \(releases\/current\)/);
+    assert.ok(stderr.includes('this is the checkout'), stderr);
+    assert.ok(stderr.includes('the installed release v1 (releases/current)'), stderr);
     assert.match(stderr, /WF_ROOT=<a scratch folder> nemia/);
     assert.match(stderr, /NEMIA_ON_INSTALLED=1/);
   }

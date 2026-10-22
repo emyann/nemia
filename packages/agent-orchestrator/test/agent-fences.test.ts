@@ -71,7 +71,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
-import { stepPlace, type Workflow } from '../src/step/step.ts';
+import { stepPlace, WorkflowError, type Workflow } from '../src/step/step.ts';
 import { readSkillRules, RULES_FILE } from '../src/skills/read.store.ts';
 import { appliesMatch, appliesOf, type SkillRule } from '../src/skills/skills.ts';
 import { filedConfig, inputsMounts, readsMounts } from '../src/filed/filed.ts';
@@ -857,7 +857,8 @@ test('the matcher reads an edit rule by the path it covers, from the root or the
   assert.equal(reaches('Edit', { tool: 'Write', path: '/a' }), true);
   assert.throws(
     () => reaches('Edit(src/**)', { tool: 'Edit', path: '/a/src/b' }),
-    (err: Error) => err.message.includes('a path from the project or the working folder is not modelled'),
+    (err: Error) =>
+      err.message.startsWith('src/**:') && err.message.includes('is not modelled') && err.message.includes('say how it reads'),
   );
 });
 
@@ -1357,12 +1358,21 @@ test("REFUSED: a quick review whose skills, mcp or tally is no more build's is u
   ];
   assert.throws(
     () => withReview('fence', (text) => text.replace(', Bash(*GIT_*)', '')),
-    /would lift `Bash\(\*GIT_\*\)`, which agents\/agora.md denies its agent agora/,
+    (e: Error) =>
+      e instanceof WorkflowError &&
+      e.message.includes('would lift `Bash(*GIT_*)`') &&
+      e.message.includes('agents/agora.md denies its agent agora') &&
+      e.message.includes('`disallowedTools: '),
     "nor the fence: a step may only tighten its agent's, so dropping one of Agora's is refused at load",
   );
   assert.throws(
     () => withReview('loop', (text) => text.replace('loop: implement\n', '').replace('rounds: 2\n', '')),
-    /land: .*this step has no `gate: true` and waits on no step with a `loop:` \(it waits on review\)/,
+    (e: Error) =>
+      e instanceof WorkflowError &&
+      e.message.includes('land: ') &&
+      e.message.includes('(it waits on review)') &&
+      e.message.includes('Add `gate: true`') &&
+      e.message.includes('a `loop:`'),
     "the loop needs no fixture here either: without it nothing can send the work back, so the whole folder is refused at load — quick's land has no gate and is filed by the review's pass",
   );
   assert.throws(

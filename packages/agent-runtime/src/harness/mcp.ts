@@ -36,7 +36,7 @@ const oauthRefuses = (name: string, oauth: unknown): string | undefined => {
   if (!isMap(oauth)) return `\`mcp.${name}.oauth\` is not an OAuth client. Give it as { "clientId": "Iv23li...", "callbackPort": 8791 }.`;
   const odd = Object.keys(oauth).find((k) => !['clientId', 'callbackPort'].includes(k));
   if (odd) {
-    return `\`mcp.${name}.oauth\` has \`${odd}\`, which it does not take: it holds \`clientId\` and \`callbackPort\` and no secret, which the harness reads from its own store alone. Take \`${odd}\` off it.`;
+    return `\`mcp.${name}.oauth\` has \`${odd}\`, which it does not take: it holds \`clientId\` and \`callbackPort\` and no secret, which Claude Code reads from its own store alone. Take \`${odd}\` off it.`;
   }
   if (typeof oauth.clientId !== 'string' || !oauth.clientId)
     return `\`mcp.${name}.oauth\` names no client. Set \`clientId\` to the OAuth app's client id, as a string.`;
@@ -52,7 +52,7 @@ const remoteRefuses = (name: string, server: Record<string, unknown>, at: string
   if (typeof server.url !== 'string' || !server.url)
     return `\`mcp.${name}.url\` is not an address. Give it as a string, like "https://example.com/mcp".`;
   if (server.type !== 'http' && server.type !== 'sse') {
-    return `${at} has a \`url\` and ${server.type === undefined ? 'no `type`' : `\`type: ${JSON.stringify(server.type)}\``}. Give "type": "http", or "sse": the harness loads no server from a url without one.`;
+    return `${at} has a \`url\` and ${server.type === undefined ? 'no `type`' : `\`type: ${JSON.stringify(server.type)}\``}. Give "type": "http", or "sse": Claude Code loads no server from a url without one.`;
   }
   if (server.headers !== undefined && !isStringMap(server.headers))
     return `\`mcp.${name}.headers\` is not a map of strings. Quote every value, like { "Authorization": "Bearer ..." }.`;

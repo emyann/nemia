@@ -2265,6 +2265,7 @@ of pure code sits beside it.
 | `src/harness/trust.ts` | a harness's trust of a folder, off the harness's own file: whether it is given (`trustedFolder`), what it is in a person's words (`folderTrust`) and the act of giving it (`trustFolder`), each `undefined` for a harness that keeps no trust |
 | `src/harness/telemetry.ts` | where an engine's sessions export (`Telemetry`), the runner that tells each spawn (`telemetered`), the trace context of the span that filed a task (`traceparentOf`), and the variables no child inherits from the engine's process (`withoutTelemetry`) |
 | `src/harness/mcp.ts` | a task's MCP servers: what is refused, the configs written, and Claude Code's flags for them; for Codex, the server names its config already has and a task's servers as its `mcp_servers` table |
+| `src/harness/mcp-state.ts` | the state of each server a caller hands — connected, needs-auth, failed, pending, disabled — read in one short-lived Claude Code session (`mcpServersRead`), with a look that failed and a state word this runtime does not know both answering unread |
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the face take it; `core/` imports `seam.ts` and `args.ts` by their own path |

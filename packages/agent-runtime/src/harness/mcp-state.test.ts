@@ -8,7 +8,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { McpServerStatus } from '@anthropic-ai/claude-agent-sdk';
-import { mcpServersRead, mcpStateRefusal, MCP_STATE_MS, type McpStatusAsk } from './mcp-state.ts';
+import { mcpServersRead, MCP_STATE_MS, type McpStatusAsk } from './mcp-state.ts';
+import { mcpStateRefusal } from '../service/options.ts';
 import { mcpServerOf } from './mcp.ts';
 import type { RemoteMcpServer } from './seam.ts';
 

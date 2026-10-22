@@ -26,19 +26,19 @@ import {
   isTranscriptCursor,
   ListRefused,
   listRefusalOf,
-  McpStateRefused,
   TRANSCRIPT_START,
   TranscriptRefused,
   type EngineShape,
 } from './engine.ts';
-import { mcpStateRefusal, type McpServerState, type McpServersRead } from '../harness/mcp-state.ts';
+import type { McpServerState, McpServersRead } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 
 /** One event of a session's transcript, as `transcript` answers it. */
 type TranscriptEvent = Effect.Success<ReturnType<EngineShape['transcript']>>['events'][number];
 import { ForgetRefused } from './forget.ts';
 import { KeptRefused, type KeptReport } from './kept.ts';
-import type { TaskSpec } from './options.ts';
+import { mcpStateRefusal, type TaskSpec } from './options.ts';
+import { McpStateRefused } from './mcp-state.ts';
 import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
 import { InterruptRefused } from './interrupt.ts';

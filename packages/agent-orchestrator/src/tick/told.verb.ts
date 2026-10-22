@@ -5,7 +5,7 @@
  * the run's folder finds them, and the run's place.
  */
 import path from 'node:path';
-import type { ClaudeFlags, CodexArgs } from '../runtime-client.ts';
+import { mcpServerOf, type ClaudeFlags, type CodexArgs } from '../runtime-client.ts';
 import { lackedOf, type Run, type StepRecord } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { filedFolders, type FiledFolders } from '../filed/filed.ts';
@@ -93,14 +93,17 @@ export const filedAt = (
 });
 
 /**
- * The MCP servers the factory `factory` records, `{}` for one that records none — and `{}`, silently here, for a record that does not
- * read: this is spread into every filing, and a throw would be a defect that stops the whole pass over one bad file. The pass refuses
- * the step itself and says why (`fileReady`), where a note can carry the file and the command to type, and `nemia factory servers`
- * refuses it loudly to the person who asks.
+ * The MCP servers the factory `factory` records, each through `mcpServerOf` — the runtime's one producer of the bytes a harness sees,
+ * applied here and nowhere else on this road, so a session is handed the spelling a state read was handed and finds the sign-in filed
+ * under it. `{}` for a factory that records none — and `{}`, silently here, for a record that does not read: this is spread into
+ * every filing, and a throw would be a defect that stops the whole pass over one bad file. The pass refuses the step itself and says
+ * why (`fileReady`), where a note can carry the file and the command to type, and `nemia factory servers` refuses it loudly to the
+ * person who asks.
  */
 const recordedServers = (factory: string | undefined): FactoryServers => {
   try {
-    return factoryServers(factory ?? DEFAULT_FACTORY);
+    const record = factoryServers(factory ?? DEFAULT_FACTORY);
+    return Object.fromEntries(Object.entries(record).map(([name, server]) => [name, mcpServerOf(server)]));
   } catch {
     return {};
   }

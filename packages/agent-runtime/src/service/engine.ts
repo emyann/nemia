@@ -86,9 +86,10 @@ import {
   type TickReport,
 } from './options.ts';
 import { harnessRefusalOf } from './harness-refusal.ts';
+import { McpStateRefused, mcpStateVerbOf } from './mcp-state.ts';
 import { traceparentOf } from '../harness/telemetry.ts';
 import { attachedSessions, putDrain, liftDrain, type Attached } from '../harness/claude/index.ts';
-import { mcpServersRead, mcpStateRefusal, type McpServersRead } from '../harness/mcp-state.ts';
+import type { McpServersRead } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 
 /** Options an engine cannot be built from (`optionsRefusalOf`), and why. Nothing was built. */
@@ -111,14 +112,6 @@ export class TranscriptRefused extends Schema.TaggedError<TranscriptRefused>()('
  * reports no quota. Nothing was asked.
  */
 export class QuotaRefused extends Schema.TaggedError<QuotaRefused>()('QuotaRefused', {
-  message: Schema.String,
-}) {}
-
-/**
- * A state read this engine will not make, and why: a record that is no map of remote servers, an empty one, an entry with no `url`,
- * or an engine with no Claude Code harness to read it through. Nothing was opened.
- */
-export class McpStateRefused extends Schema.TaggedError<McpStateRefused>()('McpStateRefused', {
   message: Schema.String,
 }) {}
 
@@ -640,29 +633,6 @@ const quotaVerbOf = (runners: Record<string, SeamOps>, fallback: string): Engine
       );
     }
     return yield* ask.pipe(Effect.withSpan('Engine.quota', { attributes: { harness: name } }));
-  });
-
-/**
- * `mcpState` over the harnesses this engine has: refused where the record is no record of remote servers (`mcpStateRefusal`), then
- * where the engine runs no Claude Code harness — the state is read through the Agent SDK's own `query()`, which is the road a harness
- * configured as `claude` runs on (`heldHarnessesOf`), so an engine with none has nothing to read it through.
- *
- * Traced where it opens a session, as `Engine.mcpState` with how many servers were asked: a refusal opens nothing and makes no span.
- */
-const mcpStateVerbOf = (harnesses: Record<string, HarnessConfig>, cwd: string, executable: string | undefined): EngineShape['mcpState'] =>
-  Effect.fnUntraced(function* (servers: Record<string, RemoteMcpServer>) {
-    const refuse = (message: string) => Effect.fail(new McpStateRefused({ message }));
-    const refused = mcpStateRefusal(servers);
-    if (refused) return yield* refuse(refused);
-    const held = heldHarnessesOf(harnesses);
-    if (!held.length) {
-      return yield* refuse(
-        `a server's state is read inside a Claude Code session, and this engine runs no Claude Code harness. Its harnesses are: ${Object.keys(harnesses).join(', ') || 'none'}.`,
-      );
-    }
-    return yield* Effect.promise(() => mcpServersRead(servers, cwd, executable === undefined ? {} : { executable })).pipe(
-      Effect.withSpan('Engine.mcpState', { attributes: { servers: Object.keys(servers).length } }),
-    );
   });
 
 /**

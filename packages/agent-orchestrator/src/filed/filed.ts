@@ -8,8 +8,7 @@ import type { Mount, Run, StepRecord } from '../record/record.ts';
 import { stepMounts } from '../factory/factory.ts';
 import { handedMounts, type HandedFiles } from '../artifacts/artifacts.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
-import { splitServers, type FactoryServers } from '../servers/servers.ts';
-import type { RemoteMcpServer } from '../runtime-client.ts';
+import { splitServers, type FactoryServer, type FactoryServers } from '../servers/servers.ts';
 
 /**
  * The harness's arguments a step is filed with, which the engine carries to the runner unread (`HarnessArgs`), all from the workflow the
@@ -143,7 +142,7 @@ export const inputsMounts = (
 const serversOf = (
   step: Pick<Workflow, 'agent'>,
   record: FactoryServers | undefined,
-): { checkoutMcp?: string[]; mcp?: Record<string, RemoteMcpServer> } => {
+): { checkoutMcp?: string[]; mcp?: Record<string, FactoryServer> } => {
   if (step.agent === undefined) return { checkoutMcp: [] };
   if (step.agent.mcp === undefined) return {};
   const { mcp, checkout } = splitServers(step.agent.mcp, record);

@@ -101,24 +101,6 @@ export const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable) =>
 export const signsInMcp = (harness: string | undefined): boolean =>
   harness === undefined || harness === 'claude' || harness === 'claude-detached';
 
-/** Why a record is no record of remote servers to read the state of, as a sentence that says what to do, or `undefined`. */
-export const mcpStateRefusal = (servers: unknown): string | undefined => {
-  if (typeof servers !== 'object' || servers === null || Array.isArray(servers)) {
-    return `takes a map of remote MCP servers by name, as a record holds them; it was handed ${JSON.stringify(servers)}. Give { "<name>": { "type": "http", "url": "https://..." } }.`;
-  }
-  const names = Object.keys(servers);
-  if (!names.length) {
-    return 'takes at least one server, and was handed none: a state is read of the servers a record holds. Ask it of a record that holds one, or do not ask.';
-  }
-  for (const name of names) {
-    const server = (servers as Record<string, unknown>)[name];
-    if (typeof server !== 'object' || server === null || !('url' in server)) {
-      return `\`${name}\` is not a remote server, and a state is read of one alone: a server the harness starts has no connection to report. Give it a \`url\`, or take it off the ask.`;
-    }
-  }
-  return undefined;
-};
-
 /** `tools` and `error` as a state carries them: each left out where the harness said none, never filled with a 0 that reads as a fact. */
 const saidOf = (s: McpServerStatus): Omit<McpServerState, 'name' | 'status'> => ({
   ...(s.tools === undefined ? {} : { tools: s.tools.length }),

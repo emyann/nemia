@@ -13,7 +13,29 @@ import { Result, Schema } from 'effect';
 import { factoryNameRefusal } from '../factory/factory.ts';
 import { firstRefusal, HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
-import { FactoryServersSchema, type FactoryServers, type FactoryServersFile } from './servers.ts';
+import type { FactoryServers, FactoryServersFile } from './servers.ts';
+
+/**
+ * One server a factory records: its wire facts — `type`, `url`, `headers` — and the facts of the OAuth client it signs in through,
+ * never a secret. The wire facts are the server's identity to the harness, which files a sign-in under
+ * `name|sha256({type,url,headers})[:16]`: changing any of them asks for a new sign-in, and `oauth`, which sits outside that hash, does
+ * not.
+ */
+
+const FactoryServerSchema = Schema.StructWithRest(
+  Schema.Struct({
+    type: Schema.Literals(['http', 'sse']),
+    url: Schema.String,
+    headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
+    oauth: Schema.optionalKey(Schema.Struct({ clientId: Schema.String, callbackPort: Schema.optionalKey(Schema.Number) })),
+  }),
+  [Schema.Record(Schema.String, Schema.Unknown)],
+);
+
+/** A factory's server record as the file holds it: its servers by name, and the keys a newer tick wrote, kept. */
+const FactoryServersSchema = Schema.StructWithRest(Schema.Struct({ servers: Schema.Record(Schema.String, FactoryServerSchema) }), [
+  Schema.Record(Schema.String, Schema.Unknown),
+]);
 
 /** The file the factory `name`'s servers are kept in. Refused (`Invalid`): a name that is no factory's. */
 export function factoryServersFile(name: string): string {

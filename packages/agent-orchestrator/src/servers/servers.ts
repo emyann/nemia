@@ -6,8 +6,6 @@
  * sign-in, so a factory keeps one entry and an agent's `allowedTools:`/`disallowedTools:` over `mcp__<server>__<tool>` names the tools
  * it may call. Pure; the file is `servers.store.ts`'s and the verbs `servers.verb.ts`'s.
  */
-import { Schema } from 'effect';
-import { mcpServerOf, type RemoteMcpServer } from '../runtime-client.ts';
 import { SERVER_NAME } from '../keys/index.ts';
 
 /** The header a factory refuses to record by name: a person types no secret, and a server signs in instead. */
@@ -19,26 +17,18 @@ export const REFUSED_HEADER = 'authorization';
  * `name|sha256({type,url,headers})[:16]`: changing any of them asks for a new sign-in, and `oauth`, which sits outside that hash, does
  * not.
  */
-export const FactoryServerSchema = Schema.StructWithRest(
-  Schema.Struct({
-    type: Schema.Literals(['http', 'sse']),
-    url: Schema.String,
-    headers: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
-    oauth: Schema.optionalKey(Schema.Struct({ clientId: Schema.String, callbackPort: Schema.optionalKey(Schema.Number) })),
-  }),
-  [Schema.Record(Schema.String, Schema.Unknown)],
-);
+export type FactoryServer = {
+  readonly type: 'http' | 'sse';
+  readonly url: string;
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly oauth?: { readonly clientId: string; readonly callbackPort?: number };
+};
 
-/** A factory's server record as the file holds it: its servers by name, and the keys a newer tick wrote, kept. */
-export const FactoryServersSchema = Schema.StructWithRest(Schema.Struct({ servers: Schema.Record(Schema.String, FactoryServerSchema) }), [
-  Schema.Record(Schema.String, Schema.Unknown),
-]);
+/** A factory's server record, as read and written (`servers.store.ts` decodes and writes the file). */
+export type FactoryServersFile = { readonly servers: FactoryServers };
 
-/** A factory's server record, as read and written. */
-export type FactoryServersFile = { readonly servers: Readonly<Record<string, RemoteMcpServer>> };
-
-/** The record's servers as a harness takes them: the same map, the runtime's own shape. */
-export type FactoryServers = Readonly<Record<string, RemoteMcpServer>>;
+/** The record's servers by name, the shape a harness takes them in. */
+export type FactoryServers = Readonly<Record<string, FactoryServer>>;
 
 /**
  * Why `name` is no name for a factory's server, or `undefined`: the same name a `.mcp.json` keys one by (`SERVER_NAME`), since an
@@ -115,15 +105,16 @@ export const factoryServersRefusal = (servers: Readonly<Record<string, unknown>>
  * otherwise refuse the step rather than resolve. A name the factory does not record resolves against the checkout exactly as it did,
  * and is still refused there when the file does not declare it.
  *
- * Each server it supplies goes through `mcpServerOf`, the runtime's one producer of a server's bytes, so a session is handed the same
- * spelling a state read was: the harness files a sign-in under those bytes, and two spellings are two servers to it. Pure.
+ * It hands a server on as the record holds it; the one producer of the bytes a harness sees (`mcpServerOf`) is applied once, by the
+ * one reader of the record (`recordedServers`, `tick/told.verb.ts`), so a session is handed the same spelling a state read was: the
+ * harness files a sign-in under those bytes, and two spellings are two servers to it. Pure.
  */
 export const splitServers = (
   named: readonly string[] | undefined,
   record: FactoryServers | undefined,
-): { mcp?: Record<string, RemoteMcpServer>; checkout: string[] } => {
+): { mcp?: Record<string, FactoryServer>; checkout: string[] } => {
   if (!named?.length) return { checkout: [] };
   const mine = named.filter((name) => record !== undefined && Object.hasOwn(record, name));
   const checkout = named.filter((name) => !mine.includes(name));
-  return { ...(mine.length ? { mcp: Object.fromEntries(mine.map((name) => [name, mcpServerOf(record![name])])) } : {}), checkout };
+  return { ...(mine.length ? { mcp: Object.fromEntries(mine.map((name) => [name, record![name]])) } : {}), checkout };
 };

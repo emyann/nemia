@@ -16,7 +16,7 @@ import { randomUUID } from 'node:crypto';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
 import { askFile, engine, list, runStore, type RunSummary } from 'agent-orchestrator';
-import { runWith } from '../../test/placed.ts';
+import { runWith } from '../../test/shipped-place.ts';
 
 type RetryHow = import('agent-orchestrator').RetryHow;
 

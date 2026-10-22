@@ -33,7 +33,7 @@ import {
   type RunSummary,
   unhold,
 } from 'agent-orchestrator';
-import { runWith } from './placed.ts';
+import { runWith } from './shipped-place.ts';
 
 type Wait = import('agent-orchestrator').Wait;
 

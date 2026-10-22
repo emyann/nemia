@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
 import { approvalFile, approveRun, askFile, engine, list, retryRun, runStore, type RunSummary } from 'agent-orchestrator';
-import { runWith } from '../../test/placed.ts';
+import { runWith } from '../../test/shipped-place.ts';
 import { answerText, approvedAnswerText, onYouWords, type Question } from 'agent-orchestrator/run';
 import { parseWorkflow } from 'agent-orchestrator/workflow';
 

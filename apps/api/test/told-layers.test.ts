@@ -13,7 +13,7 @@ import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
 import { addFactory, attachWorkflow, startRun, engine } from 'agent-orchestrator';
 import { PRECEDENCE } from 'agent-orchestrator/run';
-import { runWith } from './placed.ts';
+import { runWith } from './shipped-place.ts';
 import { scratch } from './scratch.ts';
 
 const WORKFLOWS = path.join(root, 'workflows');

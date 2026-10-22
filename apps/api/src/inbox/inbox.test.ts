@@ -11,7 +11,7 @@ import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
 import { addFactory, addToInbox, fromNote, INBOX_KEY_MEANINGS, inboxDir, startFromInbox, runStore, engine } from 'agent-orchestrator';
-import { runWith } from '../../test/placed.ts';
+import { runWith } from '../../test/shipped-place.ts';
 const repo = scratch('nemia-api-inbox-repo-');
 process.env.HKB_REPO = repo;
 execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });

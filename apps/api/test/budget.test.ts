@@ -27,7 +27,7 @@ import {
   type RunSummary,
   usedLines,
 } from 'agent-orchestrator';
-import { runWith } from './placed.ts';
+import { runWith } from './shipped-place.ts';
 
 type RetryHow = import('agent-orchestrator').RetryHow;
 

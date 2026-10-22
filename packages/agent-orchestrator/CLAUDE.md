@@ -9,8 +9,9 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
 - **A test beside its file reaches the helpers one folder further up** (`../../test/scratch.ts`).
 - **The store's root is a service, `StoreRoot` (`src/config/root.store.ts`), given where a program is composed** —
   `src/cli/main.ts` and the api's `app.ts`, each from `WF_ROOT` through `storeRootLayer(env)` — and a store function takes it as a
-  required `home: string` with no default. A new module-level root is refused by name (`test/root-given.test.ts`); what still holds
-  one as it loads is counted in `test/global-roots.baseline.ts`, which only shrinks.
+  required `home: string` with no default. `test/root-given.test.ts` refuses by name a new module-level root, a parameter defaulted to
+  one, and a new line of a body that reads one — the shape most of the debt is in, since such a function takes no root at all;
+  `test/global-roots.baseline.ts` counts the lines that still do, per file, and only shrinks.
 - **Every test process starts with `WF_ROOT`, `AE_ROOT` and `HOME` pointed at throwaway folders** (`test/ambient.ts`, loaded with
   `--import`), and the throwaway home carries a test git identity: a module that pins a root as it loads pins a throwaway one, and
   `os.homedir()` answers a throwaway too. A test that needs the person's own home reads `REAL_HOME`.

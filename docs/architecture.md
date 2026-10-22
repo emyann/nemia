@@ -248,9 +248,10 @@ Two facts a program needs are services with no default, given where the program 
 asks for one and is given none does not compile: the place a run's work lives in (`PlaceService`, `src/place/place.store.ts`) and the
 store's root (`StoreRoot`, `src/config/root.store.ts`, read from `WF_ROOT` by `storeRootLayer` at `src/cli/main.ts` and at
 `apps/api/src/app.ts`). A store function takes the root as a required `home: string` with no default. What a store module still reads
-as it loads is a debt, counted in `packages/agent-orchestrator/test/global-roots.baseline.ts` and held from growing by
-`test/root-given.test.ts`: a module that pins a root as it loads gives the live store to a caller that named none, which is how a run
-of the src tests in one process emptied `~/.agent-workflows/runs` on 2026-10-21. The runtime's half is done: `root` is required on
+as it loads is a debt, counted line by line in `packages/agent-orchestrator/test/global-roots.baseline.ts` and held from growing by
+`test/root-given.test.ts`, which refuses a new binding, a new defaulted parameter and a new body that reads one by name: a module that
+pins a root as it loads gives the live store to a caller that named none, which is how a run of the src tests in one shared process
+came to empty the person's own `~/.agent-workflows/runs`. The runtime's half is done: `root` is required on
 `EngineOptions`, `ClaudeOptions` and the journal's makers, and `packages/agent-runtime/src/cli/main.ts` is the one module that reads
 `AE_ROOT` (`test/engine-root.test.ts`).
 

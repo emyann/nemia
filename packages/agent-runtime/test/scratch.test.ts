@@ -5,7 +5,8 @@
  * runs a process names the temp directory with `machineTempDir()`, which the scan refuses only on a line that makes a root with
  * `mkdtempSync`. A Claude Code runner a test makes, and an engine, are each given their `root`, which they write to as they look
  * (`harness/claude/quiet.ts`, `service/engine.ts`): a call with none is refused. `root` is required on both today, so the typecheck
- * refuses one too — this rule is what names the call and the line, and what catches one let through by a cast.
+ * refuses one too — this rule is what names the call and the line, and what catches a rootless literal written inline and cast past
+ * the typecheck (`rootlessRunners`, whose one escape says what it does not reach).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -72,8 +73,13 @@ const RUNNERS = /\b(?:claudeOps|claudeCodeOps|Runner\.claude|Engine\.layer)\s*\(
 
 /**
  * Each call in `text` of a maker in `RUNNERS` whose arguments do not name `root`, by its line; a comment line is passed over, and so
- * is a call handed one bare name (`Engine.layer(options)`, `claudeOps(...opts)`): no literal is written there for a cast to hide, so
- * the required `root` on the options type is what refuses that one, at compile time.
+ * is a call handed one bare name (`Engine.layer(options)`, `claudeOps(...opts)`), which the rule trusts to the typecheck: the
+ * required `root` on the options type refuses that one at compile time, and this rule cannot read where the name was bound.
+ *
+ * So the one shape neither reaches is a rootless literal bound and cast on another line, then handed over by name. Six call sites in
+ * this package hand a root-carrying variable by name, which is why the escape is here rather than the sites being rewritten; the
+ * package has no rootless cast left — `test/verb-refusals.test.ts`'s was the one, and it names a root now, with no cast at all: a
+ * `maxConcurrent: 0` is a legal number the engine refuses when it builds, which is what that test is about.
  */
 const rootlessRunners = (text: string) =>
   [...text.matchAll(RUNNERS)].flatMap((m) => {
@@ -117,7 +123,7 @@ test('REFUSED: a Claude Code runner or an engine made with no root is found, whi
   assert.deepEqual(
     rootlessRunners(`${engineMaker}(options)`),
     [],
-    'one bare name: no literal is written for a cast to hide, so the required root refuses it at compile time',
+    'one bare name, trusted to the typecheck: the required root refuses it there, and this rule cannot read where it was bound',
   );
   assert.deepEqual(rootlessRunners(`${engineMaker}(...given)`), [], 'and one spread bare');
   assert.deepEqual(

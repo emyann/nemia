@@ -24,8 +24,9 @@ const SRC = path.join(import.meta.dirname, '..', 'src');
 const AE_ROOT_READER = 'cli/main.ts';
 
 /**
- * The modules that may read `os.homedir()`, each with what home it reads: the CLI's entry, for the engine's store, and the three that
- * find a harness's own configuration, which lives in the person's home whatever the engine's root is.
+ * The modules that may read `os.homedir()`, each with what home it reads: the CLI's entry, for the engine's store, and the five that
+ * find a harness's own configuration, which lives in the person's home whatever the engine's root is. Six in all, and the sweep
+ * refuses a stale entry, so the count here and the record cannot drift apart unnoticed.
  */
 const HOMEDIR_ALLOWED: Readonly<Record<string, string>> = {
   'cli/main.ts': "the engine's store, AE_ROOT's default",
@@ -97,6 +98,11 @@ test("src/cli/main.ts is the one module that reads AE_ROOT or names the engine's
 });
 
 test("os.homedir() is read in the CLI's entry and the harnesses' own homes, and nowhere else", () => {
+  assert.equal(
+    Object.keys(HOMEDIR_ALLOWED).length,
+    6,
+    "this file's own words say six: a file taken out of the allow-list is said there too",
+  );
   const refused = sources()
     .filter((f) => !(f in HOMEDIR_ALLOWED))
     .flatMap((f) => homedirRead(fs.readFileSync(path.join(SRC, f), 'utf8')).map((l) => `${f}:${l}`));

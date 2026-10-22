@@ -1,7 +1,8 @@
 /**
  * Why one step's session alone could not be read, on its run's detail (`sessionUnread`): at shipped defaults, the api's own
  * engine over a store this file seeds, a background session the harness's fake `claude` lists at work, and its transcript where Claude
- * Code keeps one (`config`), with a line that does not decode. The words are the runtime's, read afresh on every request.
+ * Code keeps one (`config`), with a line that does not decode. The words are the runtime's, read afresh on every request. A boundary
+ * test: the transcript is Claude Code's own file, which the test engine has no model of.
  */
 import { config, registry, root } from './harness.ts';
 import { test } from 'node:test';
@@ -10,6 +11,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { app } from '../src/app.ts';
+import { Effect } from 'effect';
+import { engine } from 'agent-orchestrator';
 
 type RunDetail = import('../src/detail/detail.ts').RunDetail;
 
@@ -88,6 +91,11 @@ test("REFUSED: a run's detail says why one step's session alone could not be rea
   assert.ok(words?.includes("`ae/t-build/1`'s transcript cannot be read"), `the runtime's words: ${words}`);
   assert.ok(words?.includes('"yesterday"'), `naming what did not decode: ${words}`);
   assert.equal(unread.get('review')?.sessionUnread, null, 'the step read beside it says nothing');
+  assert.equal(
+    (await Effect.runPromise(engine().view('t-build'))).unreadWhy,
+    words,
+    "the words are the engine's own, off the transcript Claude Code wrote",
+  );
 
   transcript(build, at(-1));
   const file = path.join(config, 'projects', '-code-app', `${build}.jsonl`);

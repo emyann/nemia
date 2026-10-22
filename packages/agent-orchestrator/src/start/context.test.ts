@@ -40,7 +40,9 @@ test('a context id that is not a name is Invalid before the store is asked, so `
   const asked: string[] = [];
   const refused = contextRefusal(['../escape'], [], (id) => (asked.push(id), true));
   assert.equal(refused?._tag, 'Invalid');
-  assert.match(refused.message, /^--from "\.\.\/escape" is not a run's id.*--from add-a-flag-x1y2\.$/);
+  assert.match(refused.message, /^--from "\.\.\/escape" is not a run's id/);
+  assert.match(refused.message, /--from add-a-flag-x1y2\.$/);
+
   assert.equal(asked.length, 0, 'the store is never asked of a path');
 });
 

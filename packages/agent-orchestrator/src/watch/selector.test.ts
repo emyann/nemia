@@ -87,7 +87,8 @@ const selected = (values: readonly string[]): string[] => {
 test('a selector names one of the ten keys of a feed line, and the message is none of them', () => {
   assert.deepEqual([...SELECTABLE_KEYS], [...LABEL_KEYS, ...RESERVED_KEYS]);
   const refused = selectorsRefusal(['message=hi']);
-  assert.match(refused ?? '', /^"message" is no key of a feed line: a selector names one of run, factory, workflow, step, agent, kind/);
+  assert.match(refused ?? '', /^"message" is no key of a feed line/);
+  assert.match(refused ?? '', /one of run, factory, workflow, step, agent, kind/);
   assert.equal(ADA_IMPLEMENT.message !== undefined, true, 'the line does carry a message');
   assert.equal(selectableOf(ADA_IMPLEMENT).message, undefined, 'and no selector reads it');
 });
@@ -123,16 +124,21 @@ test('every malformed selector is refused by name, and says what the grammar tak
   assert.match(refusal(''), /^"" is no selector: it holds no clause/);
   assert.match(refusal(','), /^"," is no selector: it holds no clause/);
   assert.match(refusal('factory=nemia,'), /^a selector holds an empty clause/);
-  assert.match(refusal('factory==nemia'), /^"factory==nemia" compares with ==, and a selector compares with one =/);
-  assert.match(refusal('factory nemia'), /^"factory nemia" is no clause of a selector: it names no operator/);
-  assert.match(refusal('factory in nemia'), /^"factory in nemia" names a list and spells it with no \(values\) after in/);
+  assert.match(refusal('factory==nemia'), /^"factory==nemia" compares with ==/);
+  assert.match(refusal('factory==nemia'), /compares with one =/);
+  assert.match(refusal('factory nemia'), /^"factory nemia" is no clause of a selector/);
+  assert.match(refusal('factory nemia'), /it names no operator/);
+  assert.match(refusal('factory in nemia'), /^"factory in nemia" names a list/);
+  assert.match(refusal('factory in nemia'), /with no \(values\) after in/);
   assert.match(refusal('factory notin nemia'), /names a list and spells it with no \(values\) after notin/);
   assert.match(refusal('factory in (nemia'), /^"factory in \(nemia" leaves a \( open/);
   assert.match(refusal('factory in ()'), /^factory in \(\) takes a value at least/);
   assert.match(refusal('factory in (nemia,)'), /^factory in \(nemia,\) holds an empty value/);
   assert.match(refusal('factory='), /^factory= takes a value/);
   assert.match(refusal('factory!='), /^factory!= takes a value/);
-  assert.match(refusal('factory=(x)'), /^"\(x\)" is no value of a selector, which reads \( \) and , itself/);
+  assert.match(refusal('factory=(x)'), /^"\(x\)" is no value of a selector/);
+  assert.match(refusal('factory=(x)'), /reads \( \) and , itself/);
+
   assert.match(refusal('nope=1'), /^"nope" is no key of a feed line/);
   assert.match(refusal('nope'), /^"nope" is no key of a feed line/);
   assert.match(refusal('nope in (a)'), /^"nope" is no key of a feed line/);

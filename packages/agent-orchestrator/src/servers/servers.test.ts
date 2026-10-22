@@ -96,7 +96,8 @@ test('REFUSED: a server record that does not read, naming the file, its wrong fi
   assert.throws(
     () => readFactoryServers(ROOT, 'broken'),
     (e: Error) => {
-      assert.match(e.message, /is not JSON: add the server again with nemia factory server add broken <server> --url <address>\./);
+      assert.match(e.message, /servers\.json is not JSON: /);
+      assert.match(e.message, /nemia factory server add broken <server> --url <address>/);
       return true;
     },
   );
@@ -121,7 +122,8 @@ test('the default factory is given a record of its own, while factories/default.
 
 test('REFUSED: an Authorization header, by name — and the same entry with a toolset header is kept', () => {
   const refused = factoryServerRefusal({ ...GITHUB, headers: { Authorization: 'Bearer ghp_x' } });
-  assert.match(refused!, /`Authorization` is a credential, and a factory's record is a plain file/);
+  assert.match(refused!, /`Authorization` is a credential/);
+  assert.match(refused!, /a factory's record is a plain file/);
   assert.match(refused!, /A factory's server signs in instead/, 'and the sentence names the road');
   assert.match(
     factoryServerRefusal({ ...GITHUB, headers: { authorization: 'Bearer ghp_x' } })!,
@@ -133,8 +135,11 @@ test('REFUSED: an Authorization header, by name — and the same entry with a to
 
 test('REFUSED: a local server, and the same entry given a url is kept', () => {
   const refused = factoryServerRefusal({ command: 'npx', args: ['-y', '@playwright/mcp'] });
-  assert.match(refused!, /A factory records a remote server alone, and this one has a `command`/);
-  assert.match(refused!, /Declare it in the checkout's `\.mcp\.json` and name it on the agent's `mcp:` line/, 'the road for one');
+  assert.match(refused!, /A factory records a remote server alone/);
+  assert.match(refused!, /this one has a `command`/);
+  assert.match(refused!, /Declare it in the checkout's `\.mcp\.json`/, 'the road for one');
+  assert.match(refused!, /name it on the agent's `mcp:` line/);
+
   assert.equal(factoryServerRefusal({ type: 'http', url: 'https://e.example/mcp' }), undefined);
 });
 

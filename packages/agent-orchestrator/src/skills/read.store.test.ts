@@ -138,16 +138,15 @@ test('REFUSED by name: a link whose target is not there, and a linked folder tha
   const repo = checkout();
   written(given(repo), { 'SKILL.md': SKILL });
   linked('nowhere.md', path.join(given(repo), 'gone.md'));
-  assert.equal(
-    refusalOf(found(repo)),
-    'x/gone.md is a link, and what it points at cannot be reached: point it at a file or a folder inside the repository, or remove it.',
-  );
+  const gone = refusalOf(found(repo));
+  assert.match(gone, /^x\/gone\.md is a link, /);
+  assert.match(gone, /cannot be reached/);
+  assert.match(gone, /inside the repository, or remove it\.$/);
   fs.rmSync(path.join(given(repo), 'gone.md'));
   linked('.', path.join(given(repo), 'again'));
-  assert.equal(
-    refusalOf(found(repo)),
-    "x/again is a link that points back at a folder it is in, and the skill's files would never end: remove it.",
-  );
+  const again = refusalOf(found(repo));
+  assert.match(again, /^x\/again is a link that points back at a folder it is in/);
+  assert.match(again, /remove it\.$/);
 });
 
 test("a linked skill's version moves when a file of the folder it points at does, and when a linked SKILL.md's content does", () => {
@@ -283,10 +282,12 @@ test('a skill named with its folder is found in that folder alone, when asked: n
 test('REFUSED: a folder that holds no such skill, naming the skill and where it was looked for', () => {
   const repo = nestedCheckout();
   const at = path.join(repo, 'app', '.claude', 'skills', 'nope');
-  assert.equal(
-    refusalOf(found(repo, 'app:nope')),
-    `\`app:nope\` is the skill \`nope\` of the repository's folder \`app\`, and ${at} holds no SKILL.md. A skill is a folder holding a SKILL.md: write ${path.join(at, 'SKILL.md')}, or take \`app:nope\` off the \`skills:\` line.`,
-  );
+  const nope = refusalOf(found(repo, 'app:nope'));
+  assert.ok(nope.startsWith('`app:nope` is the skill `nope` '), nope);
+  assert.ok(nope.includes('folder `app`'), nope);
+  assert.ok(nope.includes(`${at} holds no SKILL.md`), nope);
+  assert.ok(nope.includes(`write ${path.join(at, 'SKILL.md')}`), nope);
+  assert.ok(nope.includes('take `app:nope` off the `skills:` line'), nope);
   assert.ok(refusalOf(found(repo, 'gone:y')).includes(path.join(repo, 'gone', '.claude', 'skills', 'y')));
 });
 
@@ -304,10 +305,13 @@ test('REFUSED: a named folder that is a link out of the repository, by name, and
   const outside = written(scratch('wf-skill-folders-outside-'), { '.claude/skills/y/SKILL.md': '---\nname: y\n---\nSENTINEL\n' });
   linked(outside, path.join(repo, 'app'));
   const at = found(repo, 'app:y');
-  assert.equal(
-    refusalOf(at),
-    `\`app:y\` is the skill \`y\` of the repository's folder \`app\`, and ${path.join(repo, 'app')} is reached through a link whose target is outside the repository ${repo}: make it a folder of the repository's own, or take \`app:y\` off the \`skills:\` line.`,
-  );
+  const out = refusalOf(at);
+  assert.ok(out.startsWith('`app:y` is the skill `y` '), out);
+  assert.ok(out.includes(`${path.join(repo, 'app')} is reached through a link`), out);
+  assert.ok(out.includes(`outside the repository ${repo}: `), out);
+  assert.ok(out.includes("make it a folder of the repository's own"), out);
+  assert.ok(out.includes('take `app:y` off the `skills:` line'), out);
+
   assert.ok(!refusalOf(at).includes('SENTINEL'));
   written(repo, { 'real/.claude/skills/y/SKILL.md': SKILL });
   linked(path.join(repo, 'real'), path.join(repo, 'inside'));

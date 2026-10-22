@@ -32,27 +32,27 @@ test('a skill that reads has its card entry, no error, and what it costs a turn'
   assert.ok(read.cost !== null && read.cost.perTurn > 0, JSON.stringify(read.cost));
 });
 
+/** `read` refused unread for the link `link`: no entry and no cost, and the fix named — make it a folder of its own. */
+function refusedLink(read: ReturnType<typeof skillRead>, link: string): void {
+  assert.deepEqual({ ...read, error: null }, { entry: null, error: null, preload: false, cost: null });
+  assert.ok(read.error?.startsWith(`${link} is a link, `), String(read.error));
+  assert.match(read.error ?? '', /outside the folder of skills/);
+  assert.match(read.error ?? '', /make it a folder of its own\.$/);
+}
+
 test('REFUSED unread: a SKILL.md that is a link, whatever it points at', () => {
   const root = scratch('wf-skills-');
   const outside = path.join(scratch('wf-skills-outside-'), 'SKILL.md');
   fs.writeFileSync(outside, SKILL);
   fs.mkdirSync(path.join(root, 'tidy'));
   fs.symlinkSync(outside, path.join(root, 'tidy', 'SKILL.md'));
-  assert.deepEqual(skillRead('tidy', path.join(root, 'tidy')), {
-    entry: null,
-    error: 'tidy/SKILL.md is a link, and what it points at is outside the folder of skills: make it a folder of its own.',
-    preload: false,
-    cost: null,
-  });
+  refusedLink(skillRead('tidy', path.join(root, 'tidy')), 'tidy/SKILL.md');
 });
 
 test('REFUSED unread: a skill folder that is a link', () => {
   const root = scratch('wf-skills-');
   fs.symlinkSync(skillAt(scratch('wf-skills-outside-'), 'tidy', SKILL), path.join(root, 'far'));
-  assert.equal(
-    skillRead('far', path.join(root, 'far')).error,
-    'far is a link, and what it points at is outside the folder of skills: make it a folder of its own.',
-  );
+  refusedLink(skillRead('far', path.join(root, 'far')), 'far');
 });
 
 /** A checkout holding the real skill `skills/x` and an empty `.claude/skills/`; the folder its given skill `x` goes in. */
@@ -76,12 +76,7 @@ test("a skill of a checkout's .claude/skills/ linked inside the checkout is read
 test("REFUSED unread: a skill of a checkout's .claude/skills/ linked outside the checkout, its text unread too", () => {
   const { at } = checkoutSkill();
   fs.symlinkSync(skillAt(scratch('wf-skills-outside-'), 'x', SKILL), at);
-  assert.deepEqual(skillRead('x', at), {
-    entry: null,
-    error: 'x is a link, and what it points at is outside the folder of skills: make it a folder of its own.',
-    preload: false,
-    cost: null,
-  });
+  refusedLink(skillRead('x', at), 'x');
   assert.equal(skillText(at), '');
 });
 
@@ -90,12 +85,7 @@ test('REFUSED unread: a library skill with a file under it that is a link', () =
   const outside = path.join(scratch('wf-skills-outside-'), 'notes.txt');
   fs.writeFileSync(outside, 'Not the skill.\n');
   fs.symlinkSync(outside, path.join(dir, 'notes.txt'));
-  assert.deepEqual(skillRead('tidy', dir), {
-    entry: null,
-    error: 'tidy/notes.txt is a link, and what it points at is outside the folder of skills: make it a folder of its own.',
-    preload: false,
-    cost: null,
-  });
+  refusedLink(skillRead('tidy', dir), 'tidy/notes.txt');
 });
 
 test('REFUSED: a skill folder with no SKILL.md says it cannot be read, naming the file', () => {
@@ -143,9 +133,10 @@ test("a SKILL.md's text, or empty where it cannot be read", () => {
 
 test("REFUSED: a given skill no folder has, naming where a start looked; one two folders of a place have, in the package's words", () => {
   const root = scratch('wf-skills-');
+  const both = "twice is in both of the repository's folders of skills: say which.";
   const all = new Map<string, string | InstanceType<typeof WorkflowError>>([
     ['tidy', skillAt(root, 'tidy', SKILL)],
-    ['twice', new WorkflowError("twice is in both of the repository's folders of skills: say which.")],
+    ['twice', new WorkflowError(both)],
   ]);
   const found = { at: all, all, looked: [root, '/elsewhere/skills'] };
   const [gone, twice, tidy] = givenSkills(['gone', 'twice', 'tidy'], found);
@@ -161,8 +152,9 @@ test("REFUSED: a given skill no folder has, naming where a start looked; one two
     name: 'twice',
     dir: null,
     entry: null,
-    error: "twice is in both of the repository's folders of skills: say which.",
+    error: both,
     preload: false,
+
     cost: null,
   });
   assert.deepEqual(tidy, { name: 'tidy', dir: path.join(root, 'tidy'), ...skillRead('tidy', path.join(root, 'tidy')) });

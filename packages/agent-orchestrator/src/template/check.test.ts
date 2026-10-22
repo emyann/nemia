@@ -268,8 +268,9 @@ test("a skill the folder lacks is refused, an agent's or a step's, and a place s
       d[workflow].spec.steps[1].overrides.skills.push('apps/web:ds-build');
     }),
     [],
-    'a skill named with its folder is the repository’s: named, never carried',
+    'named with its folder: named, never carried',
   );
+
   assertRefused(
     refusalsOf((d) => d[AGENT].spec.skills.push('App:Y')),
     AGENT,

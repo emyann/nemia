@@ -31,9 +31,9 @@ test('a place written is said in three lines: the place and harness, what the tr
 
 test('REFUSED: nothing is said of a place already trusted; one refused says why, and one not asked says the line that asks again', () => {
   assert.deepEqual(trustedLines('nemia', [asked({ wrote: false })]), []);
-  assert.deepEqual(trustedLines('nemia', [asked({ wrote: false, refused: 'the file does not read' })]), [
-    'not trusted for A harness: /code/one — the file does not read',
-  ]);
+  const unread = trustedLines('nemia', [asked({ wrote: false, refused: 'the file does not read' })]);
+  assert.deepEqual(unread, ['not trusted for A harness: /code/one — the file does not read']);
+
   assert.deepEqual(trustedLines('nemia', [{ place: '/code/one', unasked: 'the place did not answer' }]), [
     'not trusted: /code/one was not asked of — the place did not answer. Ask again: nemia factory trust nemia',
   ]);

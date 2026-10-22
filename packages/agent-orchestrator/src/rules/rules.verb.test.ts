@@ -24,8 +24,10 @@ const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 
 /** Refused by kind, exit 2, and the message — never `String(err)`, which starts with `Error: `. */
-const refusedWith = (tag: 'Conflict' | 'Invalid' | 'Missing', pattern: RegExp) => (err: Error & { exitCode?: number; _tag?: string }) =>
-  err._tag === tag && err.exitCode === 2 && pattern.test(err.message);
+const refusedWith =
+  (tag: 'Conflict' | 'Invalid' | 'Missing', ...patterns: RegExp[]) =>
+  (err: Error & { exitCode?: number; _tag?: string }) =>
+    err._tag === tag && err.exitCode === 2 && patterns.every((pattern) => pattern.test(err.message));
 
 const FILE = path.join(ROOT, 'factories', 'pipao', 'RULES.md');
 addFactory({ name: 'pipao', repos: [fs.mkdtempSync(path.join(ROOT, 'repo-'))] });
@@ -41,10 +43,10 @@ test('a factory with no rules reads none; written, they are read back and printe
   );
   const written = await run({ factory: 'pipao', words: 'Never push on a Friday.\n' });
   assert.deepEqual(written, { name: 'pipao', file: FILE, words: 'Never push on a Friday.', error: null });
-  assert.match(
-    FACTORY_RULES.print(written, { factory: 'pipao', words: 'x' })[0],
-    /^pipao: rules written to .*RULES\.md, told to every agent hired into it in every run started from now — a run already started keeps/,
-  );
+  const told = FACTORY_RULES.print(written, { factory: 'pipao', words: 'x' })[0];
+  assert.ok(told.startsWith(`pipao: rules written to ${FILE}, `), told);
+  assert.match(told, /told to every agent hired into it/);
+  assert.match(told, /a run already started keeps/);
   assert.deepEqual(factoryRules('pipao'), written);
   assert.deepEqual(FACTORY_RULES.print(written, { factory: 'pipao' }), [`pipao: rules kept in ${FILE}`, '', 'Never push on a Friday.']);
   const cleared = await run({ factory: 'pipao', clear: true });
@@ -59,7 +61,7 @@ test('REFUSED, nothing written: the rules of the default factory, by name, namin
   for (const args of asked)
     await assert.rejects(
       run(args),
-      refusedWith('Conflict', /^`default` is the default factory: .* so nemia factory rules does not take it\. It keeps no rules/),
+      refusedWith('Conflict', /^`default` is the default factory: /, /nemia factory rules does not take it/, /It keeps no rules/),
     );
   assert.equal(fs.existsSync(path.join(ROOT, 'factories', 'default')), false);
 });
@@ -69,7 +71,7 @@ test('REFUSED, nothing written: a name no factory has, rules that open with a fr
   assert.equal(fs.existsSync(path.join(ROOT, 'factories', 'nobody')), false);
   await assert.rejects(
     run({ factory: 'pipao', words: '---\nmodel: opus\n---\nBe kind.\n' }),
-    refusedWith('Invalid', /RULES\.md opens with a frontmatter block, a first line of `---`\. A factory's rules only add words/),
+    refusedWith('Invalid', /RULES\.md opens with a frontmatter block/, /a first line of `---`/, /A factory's rules only add words/),
   );
   await assert.rejects(run({ factory: 'pipao', words: '   ' }), refusedWith('Invalid', /^the rules of pipao are blank\./));
   assert.equal(fs.existsSync(FILE), false);

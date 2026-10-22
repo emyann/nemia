@@ -467,7 +467,8 @@ test('a package a pass died making is made again, whole, and not taken for a pac
   write(path.join(nm, '.wf-making-third/index.js'), 'half\n');
   assert.throws(
     () => required(wt, 'third'),
-    "a pass that died inside the walk leaves the package's place empty and a part of it under the name it is made at: what is half made is not found as the package",
+    (err: Error & { status?: number; stderr?: string }) => err.status === 1 && /Cannot find module 'third'/.test(String(err.stderr)),
+    'what is half made is not found as the package',
   );
 
   assert.deepEqual(await provisionDeps(main, wt), { tree: 'hardlinked', made: 1 });

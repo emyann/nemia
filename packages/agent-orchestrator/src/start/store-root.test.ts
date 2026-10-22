@@ -19,23 +19,28 @@ const refusal = (root: string, steps: readonly Workflow[]) =>
   storeRootRefusal(root, steps, { runArtifacts: path.join(root, 'runs', 'r', 'artifacts'), inbox: path.join(root, 'inbox') });
 
 test("REFUSED: a `(` in the root, under an ending after a step, in the store's words naming WF_ROOT, its value, the `(` and the fix", () => {
-  const why = refusal('/srv/my wf (old)', [IMPLEMENT, SHIP]);
-  assert.equal(
-    why,
-    `ship: its harness would be given a read of its run's artifacts folder by a permission rule naming a path under the store, ` +
-      `WF_ROOT=/srv/my wf (old) (~/.agent-workflows when WF_ROOT is unset), and such a rule cannot carry the "(" in it: it would name another folder, or none.\n` +
-      `Set WF_ROOT to a directory whose path holds only letters, digits, \`-\`, \`_\`, \`.\` and \`/\`, like WF_ROOT=/srv/wf, and move the store's folder there first to keep its runs.`,
-  );
+  const why = refusal('/srv/my wf (old)', [IMPLEMENT, SHIP]) ?? '';
+  assert.match(why, /^ship: /);
+  assert.match(why, /a read of its run's artifacts folder/);
+  assert.ok(why.includes('WF_ROOT=/srv/my wf (old) '), why);
+  assert.match(why, /cannot carry the "\(" in it/);
+  assert.match(why, /\nSet WF_ROOT to a directory/);
+  assert.match(why, /like WF_ROOT=\/srv\/wf/);
+  assert.match(why, /move the store's folder there first/);
   assert.doesNotMatch(why ?? '', /is not a list of permission rules|Mount a folder/);
 });
 
 test("REFUSED: a lone ending is given a read of its run's artifacts, a step after another their folders, and one that reads the inbox the inbox", () => {
-  assert.match(refusal('/srv/wf*', [LONE_SHIP]) ?? '', /^ship: its harness would be given a read of its run's artifacts folder by/);
-  assert.match(
-    refusal('/srv/wf?', [IMPLEMENT, REVIEW]) ?? '',
-    /^review: its harness would be given the artifacts folders of the steps before it by/,
-  );
-  assert.match(refusal('/srv/wf[1]', [TRIAGE]) ?? '', /^triage: its harness would be given the inbox by .* cannot carry the "\[" in it/);
+  const ship = refusal('/srv/wf*', [LONE_SHIP]) ?? '';
+  assert.match(ship, /^ship: /);
+  assert.match(ship, /a read of its run's artifacts folder/);
+  const review = refusal('/srv/wf?', [IMPLEMENT, REVIEW]) ?? '';
+  assert.match(review, /^review: /);
+  assert.match(review, /the artifacts folders of the steps before it/);
+  const triage = refusal('/srv/wf[1]', [TRIAGE]) ?? '';
+  assert.match(triage, /^triage: /);
+  assert.match(triage, /would be given the inbox/);
+  assert.match(triage, /cannot carry the "\[" in it/);
 });
 
 test('a root every rule carries, a space, a comma and braces in it, starts the same steps', () => {

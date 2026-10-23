@@ -60,7 +60,8 @@
         "$TURBO_ROOT$/README.md",
         "$TURBO_ROOT$/LICENSE",
         "$TURBO_ROOT$/.claude/settings.json",
-        "$TURBO_ROOT$/.claude/skills/**"
+        "$TURBO_ROOT$/.claude/skills/**",
+        "$TURBO_ROOT$/apps/web/.claude/skills/**"
       ]
     },
     "agent-runtime#test": {

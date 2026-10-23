@@ -35,6 +35,10 @@ skills: review-a-change
 Review the changes on this branch. Be specific about correctness, not style.
 ```
 
+The frontmatter is YAML, as a step's is. Quote a value that holds `: ` or ` #`, as in
+`description: "Reviews a change: correctness, not style"`, and write a long one as a literal block, `|-` and the value on the lines
+below it, indented. A key that takes a list, such as `tools`, reads `Read, Grep` and `[Read, Grep]` alike.
+
 The agent's keys are defaults. A step may set one of the same keys, and the step's wins, with one exception: a key of the fence only
 narrows (below). The agents are read by `packages/agent-orchestrator/src/agents/read.store.ts`. This repository's own team sits in
 `workflows/agents/`.

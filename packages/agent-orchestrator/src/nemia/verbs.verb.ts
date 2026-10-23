@@ -5,6 +5,7 @@
  */
 import type { CommandClass } from '../admission/index.ts';
 import { CLI_VERBS, helpOf, type CommandSpec } from '../command/command.ts';
+import { renderFrontmatter } from '../frontmatter/frontmatter.ts';
 import { TABLE } from '../command/commands.verb.ts';
 
 /** The command that writes the skill again from the table, from the repository's root. */
@@ -51,9 +52,10 @@ function helpLines(entry: Entry): readonly string[] {
 }
 
 /**
- * The text of the `verbs` skill for `table` and `cliVerbs`: its frontmatter, the note that it is generated with `REGENERATE`, and a section
- * per class, each the commands of that class as `helpOf` prints them, in the table's order and then the CLI's own verbs. Left out: a
- * command out of her reach (`out`), one the api alone serves, and a verb of the CLI with no entry in `table` to class it.
+ * The text of the `verbs` skill for `table` and `cliVerbs`: its frontmatter, written as YAML (`renderFrontmatter`), the note that it
+ * is generated with `REGENERATE`, and a section per class, each the commands of that class as `helpOf` prints them, in the table's order
+ * and then the CLI's own verbs. Left out: a command out of her reach (`out`), one the api alone serves, and a verb of the CLI with no
+ * entry in `table` to class it.
  */
 export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb[]): string {
   const served = table.filter((c) => c.only?.side !== 'api');
@@ -67,8 +69,13 @@ export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb
   });
   return [
     '---',
-    'name: verbs',
-    'description: Every nemia verb you run, by who answers for it — a read, yours unasked, one that prompts the person, one that answers what waits on them — with its usage and help.',
+    renderFrontmatter([
+      ['name', 'verbs'],
+      [
+        'description',
+        'Every nemia verb you run, by who answers for it — a read, yours unasked, one that prompts the person, one that answers what waits on them — with its usage and help.',
+      ],
+    ]).replace(/\n$/, ''),
     '---',
     '# The verbs',
     '',

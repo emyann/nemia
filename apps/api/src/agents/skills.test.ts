@@ -426,7 +426,7 @@ test('a skill written on the board is made in your library, read back as its pag
   });
   assert.equal(
     fs.readFileSync(path.join(LIBRARY, 'tidy-notes', 'SKILL.md'), 'utf8'),
-    '---\nname: tidy-notes\ntitle: "Tidy notes"\ndescription: "Rewrites notes one fact a line."\ntags: ["notes"]\nexamples: ["tidy my notes"]\n---\n# Tidy\n\nOne fact a line.\n',
+    '---\nname: tidy-notes\ntitle: Tidy notes\ndescription: Rewrites notes one fact a line.\ntags: [ notes ]\nexamples: [ tidy my notes ]\n---\n# Tidy\n\nOne fact a line.\n',
   );
   assert.ok(rowOf(await listed(), 'yours', 'tidy-notes'));
 });
@@ -455,7 +455,7 @@ test('a change of a skill moves the version of every agent that gives it, and th
   assert.equal(off.status, 200);
   assert.equal(
     fs.readFileSync(path.join(LIBRARY, 'mine', 'SKILL.md'), 'utf8'),
-    '---\nname: mine\ndescription: "Writes a decision down."\ntags: ["decision"]\n---\nWrite it down, dated.\n',
+    '---\nname: mine\ndescription: Writes a decision down.\ntags: [ decision ]\n---\nWrite it down, dated.\n',
   );
 });
 

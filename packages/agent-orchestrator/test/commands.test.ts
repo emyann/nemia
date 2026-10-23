@@ -212,6 +212,7 @@ test('each command is served on the api where it was before the table, the lift 
       ['service restart', 'cli'],
       ['upgrade', 'cli'],
       ['version', 'cli'],
+      ['frontmatter rewrite', 'cli'],
       [
         'workflows write',
         [

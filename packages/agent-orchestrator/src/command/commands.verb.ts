@@ -9,7 +9,8 @@
  * card`, `agentCardRead`) and its custom instructions (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia
  * hold`, `nemia rm`, `nemia prune`), and the store's pause (`nemia pause`, `nemia resume`, and its read the api alone serves):
  * `runs.verb.ts`; Nemia's level and memory (`nemia level`, `nemia memory`: `nemia/`); an agent's rules at auto (`nemia auto`:
- * `AUTO_ENTRIES`); the reads of the store (`nemia show`, `nemia logs`, `nemia stats`: `reads.verb.ts`); and what the board
+ * `AUTO_ENTRIES`); the reads of the store (`nemia show`, `nemia logs`, `nemia stats`: `reads.verb.ts`); the rewrite of a former
+ * frontmatter as YAML (`nemia frontmatter rewrite`, `FRONTMATTER_REWRITE`); and what the board
  * alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation
  * (`PAGES`), the agent and skill libraries (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole
  * table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler: `nemia plan`, `nemia tick`, `nemia up` and
@@ -59,6 +60,7 @@ import { MEMORY } from '../nemia/memory.verb.ts';
 import { SERVICE_COMMANDS } from '../service/restart.verb.ts';
 import { RELEASES } from '../release/upgrade.verb.ts';
 import { VERSIONS } from '../release/version.verb.ts';
+import { FRONTMATTER_REWRITE } from '../frontmatter/frontmatter.verb.ts';
 import { ADMIT } from '../admission/admit.verb.ts';
 import { AUTO_ENTRIES } from '../auto/auto.verb.ts';
 import { writerText as textOf } from '../yours/yours.ts';
@@ -555,6 +557,7 @@ export const COMMANDS: readonly Command[] = [
   ...SERVICE_COMMANDS,
   ...RELEASES,
   ...VERSIONS,
+  FRONTMATTER_REWRITE,
   ...WORKFLOW_ENTRIES,
 ];
 

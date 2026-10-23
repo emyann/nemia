@@ -115,10 +115,13 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  *
  * `agent-orchestrator/workflow` is 54 rather than 52 since `stepSetRefusal` reads `LINE_NAME`, the name a run's own line of work is cut
  * under, from `workspace/workspace.ts`: two pure modules more, that file and `record/record.ts`, and no file that touches a disk.
+ *
+ * Each is 77 more since the frontmatter is YAML: `frontmatter/frontmatter.ts`, the one reader every step, agent and card goes through,
+ * and the 76 modules of the `yaml` package it parses with, none of which touches a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 98, effect: 15 },
-  'agent-orchestrator/workflow': { all: 54, effect: 15 },
+  'agent-orchestrator/run': { all: 175, effect: 15 },
+  'agent-orchestrator/workflow': { all: 131, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

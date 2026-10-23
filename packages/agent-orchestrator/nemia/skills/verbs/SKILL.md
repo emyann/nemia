@@ -396,6 +396,10 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                switched to without a rebuild, so an older tag rolls back. --repo:
                                the repository the tag is in (the running release's source);
                                --name: the service (nemia)
+  nemia frontmatter rewrite [<folder>...] [--check]
+                               rewrite as YAML each markdown file's frontmatter still in the former
+                               line form, under the folders given or the store's own. --check: write
+                               nothing, and exit 1 where a rewrite is due
   nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]
                                a workflow folder of yours, or of a templated --factory, written from
                                a draft folder; one there already, at the --version it was read at

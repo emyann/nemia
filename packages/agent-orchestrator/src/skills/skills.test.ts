@@ -14,7 +14,9 @@ test("a skill's paths are read as a list, one glob written alone or quoted as on
   assert.deepEqual(appliesOf(skill('apps/web/x.ts')), ['apps/web/x.ts']);
   assert.deepEqual(appliesOf(skill('"apps/web/**"')), ['apps/web/**']);
   assert.deepEqual(appliesOf(skill()), []);
-  assert.deepEqual(appliesOf(skill('["apps/web/**", 3]')), [], 'a list holding anything but a glob declares none');
+  assert.deepEqual(appliesOf(skill('["apps/web/**", [x]]')), [], 'a list holding anything but a glob declares none');
+  assert.deepEqual(appliesOf(skill('["apps/web/**", ""]')), [], 'an empty item too');
+  assert.deepEqual(appliesOf(skill('\n  - apps/web/**\n  - src/**')), ['apps/web/**', 'src/**'], 'a block sequence reads as its list');
   assert.deepEqual(appliesOf(skill('["apps/web/**"')), [], 'a list that does not read declares none');
 });
 

@@ -8,6 +8,7 @@
  */
 import path from 'node:path';
 import { isRemoteHarness } from '../harness/harness.ts';
+import { renderFrontmatter } from '../frontmatter/frontmatter.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { directoryFence } from '../workflow/index.ts';
 
@@ -46,16 +47,21 @@ export function tryFence(name: string, keys: FencedKeys): TryFence | string {
   );
 }
 
-/** The try's step file: the agent, the cap, the agent's version it was written at, and the try's fence `fence` (`tryFence`). */
+/**
+ * The try's step file: the agent, the cap, the agent's version it was written at, and the try's fence `fence` (`tryFence`). Its keys are
+ * written as YAML (`renderFrontmatter`), after the version's comment line.
+ */
 export const tryText = (name: string, version: string, fence: TryFence): string =>
   [
     '---',
     `${VERSION_LINE}${version}`,
-    'place: folder',
-    `agent: ${name}`,
-    `budget: ${TRY_BUDGET}`,
-    `permissionMode: ${fence.permissionMode}`,
-    ...(fence.allowedTools.length ? [`allowedTools: ${fence.allowedTools.join(', ')}`] : []),
+    renderFrontmatter([
+      ['place', 'folder'],
+      ['agent', name],
+      ['budget', String(TRY_BUDGET)],
+      ['permissionMode', fence.permissionMode],
+      ...(fence.allowedTools.length ? [['allowedTools', fence.allowedTools.join(', ')] as const] : []),
+    ]).replace(/\n$/, ''),
     '---',
     'A rehearsal of the brief: work in this folder, and write what you make here.',
     '',

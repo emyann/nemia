@@ -18,7 +18,7 @@ import {
   capabilitiesOf,
   dated,
   denyingRule,
-  frontmatterOf,
+  describedAt,
   readOnlyCommands,
   repoOf,
   serverAsk,
@@ -65,27 +65,66 @@ const fixture = (env: Record<string, string> = {}) => ({ command: process.execPa
 const startsIn = (file: string): number[] =>
   fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(Number) : [];
 
+/** `describedAt` on one SKILL.md holding `text`, falling back to `fallback`, with the warnings it left. */
+const describedFrom = (text: string, fallback = 'dir') => {
+  const repo = repoWith({ 'SKILL.md': text });
+  const warnings: string[] = [];
+  return { described: describedAt(repo, 'SKILL.md', fallback, warnings), warnings };
+};
+
 test('frontmatter: a name and a description in each form a skill or an agent writes them', () => {
-  const read = (front: string) => frontmatterOf(`---\n${front}\n---\n# The body\n`);
-  assert.deepEqual(read('name: review\ndescription: Reviews a diff.'), { name: 'review', description: 'Reviews a diff.' });
-  assert.equal(read('description: "Use when: a diff is ready, \\"now\\""')?.description, 'Use when: a diff is ready, "now"');
-  assert.equal(read("description: 'It''s for reviews: all of them'")?.description, "It's for reviews: all of them");
-  assert.equal(read('description: |\n  First line.\n  Second line.')?.description, 'First line.\nSecond line.');
-  assert.equal(read('description: >-\n  Folded\n  into one.\n\n  Then another.')?.description, 'Folded into one.\nThen another.');
-  assert.equal(read('description: Runs on\n  over two lines.')?.description, 'Runs on over two lines.');
-  assert.equal(read('description: Plain  # and a comment')?.description, 'Plain');
+  const read = (front: string) => {
+    const { described, warnings } = describedFrom(`---\n${front}\n---\n# The body\n`);
+    assert.deepEqual(warnings, [], front);
+    return described!;
+  };
+  assert.deepEqual(read('name: review\ndescription: Reviews a diff.'), {
+    name: 'review',
+    description: 'Reviews a diff.',
+    source: 'SKILL.md',
+  });
+  assert.equal(read('description: "Use when: a diff is ready, \\"now\\""').description, 'Use when: a diff is ready, "now"');
+  assert.equal(read("description: 'It''s for reviews: all of them'").description, "It's for reviews: all of them");
+  assert.equal(read('description: |\n  First line.\n  Second line.').description, 'First line.\nSecond line.\n');
+  assert.equal(read('description: >-\n  Folded\n  into one.\n\n  Then another.').description, 'Folded into one.\nThen another.');
+  assert.equal(read('description: Runs on\n  over two lines.').description, 'Runs on over two lines.');
+  assert.equal(read('description: Plain  # and a comment').description, 'Plain');
   assert.deepEqual(
     read('name: x\nmetadata:\n  type: user\ntools:\n  - Read\ndescription: after them'),
-    { name: 'x', description: 'after them' },
+    { name: 'x', description: 'after them', source: 'SKILL.md' },
     'a map or a list under a key is not a value: skipped, and the keys after it still read',
   );
-  assert.deepEqual(frontmatterOf('\uFEFF---\r\nname: crlf\r\n---\r\nbody\r\n'), { name: 'crlf' });
+  assert.equal(read('name:\n  - a\n  - list').name, 'dir', 'a name that is not text is no name: the fallback is');
+  const crlf = describedFrom('\uFEFF---\r\nname: crlf\r\n---\r\nbody\r\n');
+  assert.equal(crlf.described?.name, 'crlf');
+  assert.deepEqual(crlf.warnings, []);
 });
 
-test('frontmatter: a file without it, or whose frontmatter never closes, has none', () => {
-  assert.equal(frontmatterOf('# A skill\n\nname: not a key, prose\n'), null);
-  assert.equal(frontmatterOf('---\nname: never closed\n# The body\n'), null);
-  assert.equal(frontmatterOf(''), null);
+test('frontmatter: a file without it is named by its fallback, with no warning', () => {
+  for (const text of ['# A skill\n\nname: not a key, prose\n', '']) {
+    const { described, warnings } = describedFrom(text);
+    assert.deepEqual(described, { name: 'dir', description: null, source: 'SKILL.md' }, JSON.stringify(text));
+    assert.deepEqual(warnings, []);
+  }
+});
+
+test('frontmatter: one that never closes, or that is not YAML, is a warning naming the file, and the file is still listed by its fallback', () => {
+  for (const text of ['---\nname: never closed\n# The body\n', '---\nname: x\n  - not: [yaml\n---\nbody\n']) {
+    const { described, warnings } = describedFrom(text);
+    assert.deepEqual(described, { name: 'dir', description: null, source: 'SKILL.md' }, text);
+    assert.equal(warnings.length, 1, text);
+    assert.match(warnings[0], /^SKILL\.md:/, 'the warning names the file');
+    assert.ok(warnings[0].includes('`dir`'), 'and the name it is listed by');
+  }
+});
+
+test('frontmatter: a refused SKILL.md is a warning of the capabilities served, and its skill is still listed', async () => {
+  const repo = repoWith({ '.claude/skills/broken/SKILL.md': '---\nname: x\n  - not: [yaml\n---\nbody\n' });
+  const { status, body } = await served(repo);
+  assert.equal(status, 200);
+  assert.deepEqual(body.skills, [{ name: 'broken', description: null, source: '.claude/skills/broken/SKILL.md' }]);
+  assert.equal(body.warnings.length, 1);
+  assert.match(body.warnings[0], /^\.claude\/skills\/broken\/SKILL\.md:/);
 });
 
 test('skills and agents, with frontmatter and without: named by it or by their directory or file, with where each was read', async () => {

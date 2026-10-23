@@ -689,7 +689,7 @@ test("`nemia start` names each node's agent beside it — by the agent's name, n
 /** The card entry a SKILL.md's frontmatter gives (`skillEntryOf`), or the refusal of it. */
 const entry = (front: string) => skillEntryOf('skills/a-skill/SKILL.md', 'a-skill', `---\n${front}\n---\nHow to do it.\n`);
 
-test("a skill's card entry reads each form a one-line YAML value takes, and passes over the keys it does not read", () => {
+test("a skill's card entry reads its keys as YAML does, in any form, and passes over the keys it does not read", () => {
   assert.deepEqual(
     entry('name: a-skill\ntitle: A skill\ndescription: What it does.\ntags: ["code", "review"]\nexamples: ["Use this when…"]'),
     {
@@ -703,6 +703,17 @@ test("a skill's card entry reads each form a one-line YAML value takes, and pass
   assert.equal(entry('description: "Say \\"it\\" — twice."').description, 'Say "it" — twice.', 'double quotes read as JSON');
   assert.equal(entry("description: 'It''s done.'").description, "It's done.", "single quotes, '' a quote");
   assert.equal(entry('description: What it does. # and a comment').description, 'What it does.', 'a ` #` ends a plain value');
+  for (const front of ['description: >\n  What it does.', 'description: |\n  What it does.', 'description: What\n  it does.'])
+    assert.equal(entry(front).description, 'What it does.', `a block scalar, or a value over several lines: ${front}`);
+  assert.deepEqual(entry('description: d\ntags:\n  - code\n  - review').tags, ['code', 'review'], 'a block sequence reads as its list');
+  assert.deepEqual(entry('description: d\ntags:\n- code').tags, ['code'], 'not indented, too');
+  assert.deepEqual(entry('description: d\ntags: [code, review]').tags, ['code', 'review'], 'a flow list, its items plain');
+  assert.equal(
+    entry('description: What: it does\ntags: ["code"]').description,
+    'What: it does',
+    'a block YAML refuses is read in the former line form',
+  );
+  assert.deepEqual(entry('description: What: it does\ntags: ["code"]').tags, ['code'], 'each card key of it read as YAML alone');
   const passed = entry('description: d\nallowed-tools:\n  - Read\n  - Grep\nmetadata:\n  owner: x\npreload: true');
   assert.deepEqual(
     passed,
@@ -711,26 +722,18 @@ test("a skill's card entry reads each form a one-line YAML value takes, and pass
   );
 });
 
-test('REFUSED at shipped defaults: a SKILL.md whose card entry cannot be read off one line, or says no description', () => {
+test('REFUSED at shipped defaults: a SKILL.md whose card entry is not in the form its keys take, or says no description', () => {
   const cases: [string, RegExp][] = [
     ['name: a', /has no `description:`, and the A2A protocol marks a skill's description REQUIRED/],
     ['description: ""', /has no `description:`/],
-    ['description: >\n  What it does.', /`description` goes on over several lines/],
-    ['description: |\n  What it does.', /`description` goes on over several lines/],
-    ['description: What\n  it does.', /`description` goes on over several lines/],
-    ['description: d\ntags:\n  - code', /`tags` is a list written over several lines/],
-    ['description: d\ntags:\n- code', /`tags` is a list written over several lines/],
     ['description: d\ndescription: e', /`description` is set twice/],
-    ['description: What: it does', /holds a colon and a space, which YAML reads as a map/],
-    ['description: "never closed', /is not one quoted line/],
-    ["description: 'never closed", /is not one quoted line/],
-    ['description: *alias', /starts with a character YAML reads as something other than text/],
-    ['description: {a: b}', /starts with a character YAML reads as something other than text/],
+    ['description: {a: b}', /`description` is one line of text, not a list or a map/],
+    ['description: d\ntags: {a: b}', /`tags` is a map, and it is a list/],
+    ['description: d\ntags:\n  - [a]', /is not a list of words/],
     ['description: ["a list"]', /`description` is one line of text, not a list/],
     ['description: d\ntags: code', /`tags: code` is one line of text, and `tags` is a list/],
     ['description: d\ntags: []', /`tags` is an empty list, which says as little as none/],
     ['description: d\nexamples: []', /`examples` is an empty list/],
-    ['description: d\ntags: [code, review]', /is not a list a card reads — a list is JSON/],
     ['description: d\ntags: ["", "x"]', /is not a list of words/],
   ];
   for (const [front, why] of cases) {

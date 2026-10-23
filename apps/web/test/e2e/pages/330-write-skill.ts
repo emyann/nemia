@@ -124,10 +124,10 @@ export default {
       const expectedFile = [
         '---',
         `name: ${SKILL.name}`,
-        `title: ${JSON.stringify(SKILL.title)}`,
-        `description: ${JSON.stringify(SKILL.description)}`,
-        `tags: ${JSON.stringify(SKILL.tags)}`,
-        `examples: ${JSON.stringify(SKILL.examples)}`,
+        `title: ${SKILL.title}`,
+        `description: ${SKILL.description}`,
+        `tags: [ ${SKILL.tags.join(', ')} ]`,
+        `examples: [ ${SKILL.examples.join(', ')} ]`,
         '---',
         SKILL.body,
       ].join('\n');
@@ -184,7 +184,7 @@ export default {
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the skill — it answered ${saved.status()}: ${await saved.text()}`);
       const lines = fs.readFileSync(skillFile, 'utf8').split('\n');
-      for (const line of [`description: ${JSON.stringify(SKILL.edited)}`, 'preload: true']) {
+      for (const line of [`description: ${SKILL.edited}`, 'preload: true']) {
         if (!lines.includes(line))
           throw new Refused(`skills/${SKILL.name}/SKILL.md says ${line} — it holds ${JSON.stringify(lines.join('\n'))}`);
       }

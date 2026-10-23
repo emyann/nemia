@@ -19,7 +19,8 @@
  *
  * Pure: handed the folder's files, never reading one (`readPlan` in plan.store.ts reads them).
  */
-import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
+import { isReadme, LIST_KEYS, splitFrontmatter, WorkflowError } from '../step/step.ts';
+import { flatValue, frontmatterOrNull, readFrontmatter } from '../frontmatter/frontmatter.ts';
 
 /** One entry of a plan folder: its name there — a folder inside it with a trailing `/` — and, for a `.md` file, its text. */
 export type PlanFile = { file: string; text: string };
@@ -122,11 +123,11 @@ function afterOf(file: string, after: string | undefined): string[] {
 export type StartCard = { file: string; workflow?: string; after: string[]; body: string };
 
 /**
- * A file `nemia start` is given, read as a plan's card when it opens with a frontmatter block of keys — every line of it a key, a word
- * and a colon (`KEY_LINE`) — or null when it does not: no frontmatter, one with a line of prose, one with nothing in it, or one that never
- * closes. Null means the file's whole text is the brief, so a brief that happens to start with `---` is not eaten; a block of keys is never
- * taken into one. A key a plan's card lacks is refused by name, an inbox card's among them, naming `nemia inbox add <file>`, whose cards
- * read those keys (`startUnknown`). Pure.
+ * A file `nemia start` is given, read as a plan's card when it opens with a frontmatter block of keys — a block that reads, as YAML or in
+ * the former line form (`frontmatterOrNull`), as a map of at least one key, each a word (`KEY_WORD`) — or null when it does not: no
+ * frontmatter, one with a line of prose, one with nothing in it, or one that never closes. Null means the file's whole text is the
+ * brief, so a brief that happens to start with `---` is not eaten; a block of keys is never taken into one. A key a plan's card lacks
+ * is refused by name, an inbox card's among them, naming `nemia inbox add <file>`, whose cards read those keys (`startUnknown`). Pure.
  *
  * `nemia plan` prints `nemia start <card> --after …` for each card it did not start, and this is what makes that command start the card's
  * body. Read as a card, a file is held to what `nemia plan` holds a card to — a key set twice or to nothing, an empty body, an `after:`
@@ -141,11 +142,8 @@ export function cardToStart(file: string, text: string, after: readonly string[]
   } catch {
     return null;
   }
-  const lines = (split.block ?? '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith('#'));
-  if (!lines.length || !lines.every((line) => KEY_LINE.test(line))) return null;
+  const read = split.block === null ? null : frontmatterOrNull(split.block);
+  if (!read?.entries.length || !read.entries.every(({ key }) => KEY_WORD.test(key))) return null;
   const keys = frontmatterKeys(file, split.block!, CARD_KEYS, (key) => startUnknown(file, key));
   const body = bodyOf(file, split.body);
   const waits = afterOf(file, keys.after);
@@ -158,8 +156,8 @@ export function cardToStart(file: string, text: string, after: readonly string[]
   return { file, ...(keys.workflow !== undefined ? { workflow: keys.workflow } : {}), after: waits, body };
 }
 
-/** A frontmatter line that is a key: a word of letters, digits, `_` and `-`, then a colon. A sentence with a colon is none. */
-const KEY_LINE = /^[A-Za-z][\w-]*\s*:/;
+/** A frontmatter key that is a card's kind of key: a word of letters, digits, `_` and `-`. A sentence before a colon is none. */
+const KEY_WORD = /^[A-Za-z][\w-]*$/;
 
 /**
  * What `nemia start` says of `key` in the frontmatter of `file`, a key a plan's card lacks: that the block is read as a card's, never as
@@ -179,8 +177,9 @@ function readCardKeys(file: string, block: string): Partial<Record<CardKey, stri
 
 /**
  * A card's frontmatter as key → value, for the keys `keys` a card of its kind has — a plan's (`CARD_KEYS`) or the inbox's (`INBOX_KEYS` in
- * inbox.ts) — each set once, to something. Refused by name: a line that is not `key: value`, a key set twice or to nothing, and any key
- * not in `keys`, in the words `unknown` gives for it.
+ * inbox.ts) — each set once, to something. The block is read as YAML, or in the former line form (`readFrontmatter`), and a list on
+ * `after:` or `from:` (`LIST_KEYS`) as the comma string. Refused by name: a block in neither form, a key set twice or to nothing, a list
+ * on any other key (`flatValue`), and any key not in `keys`, in the words `unknown` gives for it.
  */
 export function frontmatterKeys<K extends string>(
   file: string,
@@ -189,22 +188,15 @@ export function frontmatterKeys<K extends string>(
   unknown: (key: string) => string,
 ): Partial<Record<K, string>> {
   const read: Partial<Record<K, string>> = {};
-  for (const raw of block.split('\n')) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-    const i = line.indexOf(':');
-    if (i <= 0)
-      refuse(
-        `${file}: \`${line}\` is not \`key: value\`. Each frontmatter line is a key, a colon and its value, and a list stays on one line: \`after: a, b\`.`,
-      );
-    const key = line.slice(0, i).trim();
-    const value = line.slice(i + 1).trim();
+  for (const entry of readFrontmatter(file, block).entries) {
+    const { key } = entry;
     if (!(keys as readonly string[]).includes(key)) refuse(unknown(key));
     if (Object.hasOwn(read, key)) {
       refuse(
         `${file}: \`${key}\` is set twice, and a card that says two things says nothing. Keep one line${key === 'after' ? ' and list every card on it: `after: a, b`' : ''}.`,
       );
     }
+    const value = flatValue(file, entry, LIST_KEYS.includes(key));
     if (!value)
       refuse(
         `${file}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`,

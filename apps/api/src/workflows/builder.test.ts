@@ -901,7 +901,7 @@ test('PUT /api/workflows/yours/:name writes the folder the steps make — a step
   assert.deepEqual(after.workflow.schemas, ['build.schema.json'], 'the schema is left as it is');
 });
 
-test("REFUSED at shipped defaults: what the package refuses is a 422 in its words, naming the steps it names — a cycle, an after naming no step, a key no step has, `maxAttempts`, a loop with no output, a schema not there, a name that is not a file's, a name twice, a list of no tools, a line break, a step with no place, no steps — and the folder is as it was", async () => {
+test("REFUSED at shipped defaults: what the package refuses is a 422 in its words, naming the steps it names — a cycle, an after naming no step, a key no step has, `maxAttempts`, a loop with no output, a schema not there, a name that is not a file's, a name twice, a list of no tools, a step with no place, no steps — and the folder is as it was", async () => {
   const dir = planned('refused');
   const before = snapshot(dir);
   const [plan, build] = (await listedSteps('refused')) as [ListedStep, ListedStep];
@@ -916,7 +916,6 @@ test("REFUSED at shipped defaults: what the package refuses is a 422 in its word
     ["a name that is not a file's", [plan, { ...build, name: 'build/it' }], ['build/it']],
     ['a name twice', [plan, build, { ...build }], ['build']],
     ['no tools', [plan, { ...build, spec: { ...build.spec, tools: [] } }], ['build']],
-    ['a line break in a check', [plan, { ...build, spec: { ...build.spec, check: 'npm test\nharness: codex' } }], ['build']],
     ['an empty body', [plan, { ...build, body: '  ' }], ['build']],
     ['a step with no place', [plan, { ...build, spec: { ...build.spec, place: null } }], ['build']],
     ['no steps', [], []],

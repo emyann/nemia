@@ -78,7 +78,6 @@ const lostEnd: Event = {
 
 test('LONG-LIVED: a session through its life — idle between turns, a crash loop its harness respawns, a gap no respawn closes ended lost, restarted after the backoff, and a stop that ends it', async (t) => {
   const s = story(t);
-  /** The task's journal as the passes write it: in flight, then held and in a gap, then ended lost, then restarted and stopped. */
   const events: Event[] = inFlight(true);
 
   await s.test('LONG-LIVED: the filing is read back off the journal, and a journal with no `restartPolicy` folds to a job', () => {

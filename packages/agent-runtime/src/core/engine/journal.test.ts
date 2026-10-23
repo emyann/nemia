@@ -63,7 +63,6 @@ test('a board is appended to, read, followed from a cursor and resumed by a fres
   const feedFile = path.join(board, 'feed.jsonl');
   const sizeOf = (file: string) => fs.statSync(file).size;
   const ids: string[] = [];
-  /** The feed's cursor once the engine's tasks are filed, where the story's own appends begin. */
   let mark = 0;
 
   await s.test('a board never written to is empty, not an error', async () => {

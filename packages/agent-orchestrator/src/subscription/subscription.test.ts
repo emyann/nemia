@@ -56,156 +56,164 @@ const linesOf = (
 
 const BLOCKED: Closeout = { outcome: 'blocked', summary: 's', artifacts: [], needs: 'a decision on the schema' };
 
-test('the default selector takes each line the feed writes for a wait on a person, pinned against feedWords', () => {
-  const waits: Array<[string, FeedLine[]]> = [
-    ['a step at its gate', linesOf(listed('awaiting approval', { onYou: true }), { status: 'awaiting approval' })],
-    ['a loop out of rounds', linesOf(listed('rounds exhausted', { onYou: true }), { status: 'running' })],
-    ['a session on its prompt', linesOf(listed('needs-human', { waits: 'permission: Bash' }), { status: 'running' })],
-    ['a blocked sign-off', linesOf(listed('succeeded · BLOCKED', { onYou: true }), { status: 'blocked' }, BLOCKED)],
-    ['a check refused', linesOf(listed('failed ✗ check (exit 1)', { onYou: true }), { status: 'failed' })],
-  ];
-  for (const [what, lines] of waits)
-    assert.ok(
-      lines.some((l) => sorted(l) === 'wake'),
-      `${what} wakes: ${JSON.stringify(lines)}`,
-    );
-});
-
-test('a tool denial is routine for the default selector, as it was for the wake words it replaces', () => {
-  const shot = upgraded({
-    at: AT,
-    run: 'r-1',
-    step: 'review',
-    word: 'denied: Bash(git push)',
-    note: 'try 2',
-    call: 'Bash(git push)',
-    try: 2,
-  });
-  assert.equal(shot.reason, 'ToolDenied');
-  assert.equal(sorted(shot), 'routine', 'nobody woken by the default selector is woken by a denial, then or now');
-  assert.equal(sorted(shot, parseSelectors(['reason=ToolDenied'])), 'wake', 'a subscription that names it is');
-});
-
-test("a run blocked, its note waiting on you: review, wakes on the run's own line, and a loop out of rounds on the step's", () => {
-  const [run] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'blocked' });
-  assert.deepEqual(run, upgraded({ at: AT, run: 'r-1', word: 'blocked', note: 'waiting on you: review' }));
-  assert.deepEqual({ reason: run.reason, type: run.type, waits: run.waits }, { reason: 'Blocked', type: 'Warning', waits: 'person' });
-  assert.equal(sorted(run), 'wake');
-  assert.equal(
-    sorted(upgraded({ at: AT, run: 'r-1', word: 'running', note: 'waiting on you: review' })),
-    'wake',
-    'by its note alone, which the tick reads into the line’s waits',
-  );
-  const [, step] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'running' });
-  assert.equal(step.word, 'rounds exhausted');
-  assert.equal(sorted(step), 'wake');
-});
-
-test("a blocked sign-off wakes by its note's needs: alone, whatever its word", () => {
-  const [, step] = linesOf(listed('succeeded · BLOCKED'), { status: 'running' }, BLOCKED);
-  assert.equal(step.note, 'needs: a decision on the schema');
-  assert.equal(sorted(upgraded({ at: AT, run: 'r-1', step: 'review', word: 'succeeded', note: step.note })), 'wake');
-});
-
-test('routine words do not wake: a step at work, verified, waiting, a run running or succeeded, a hold', () => {
-  for (const status of ['running', 'verified ✓', 'waiting', 'pending', 'succeeded · done'])
-    for (const line of linesOf(listed(status), { status: 'running' }))
-      assert.equal(sorted(line), 'routine', `${JSON.stringify(line)} is routine`);
-  assert.equal(sorted(upgraded({ at: AT, run: 'r-1', word: 'succeeded' })), 'routine');
-  assert.equal(sorted(upgraded({ at: AT, run: 'r-1', word: 'running', note: 'held until r-2 ships' })), 'routine');
-  assert.equal(
-    sorted(upgraded({ at: AT, run: 'r-1', step: 'build', word: 'running', note: 'said to twice · the needs: of it' })),
-    'routine',
-    'a wake word inside a part of the note, not leading it, is no wait the tick stamps',
-  );
-});
-
-test("a subscriber's own selectors replace the default, over the keys a line names and never its message", () => {
-  const line = linesOf(listed('verified ✓'), { status: 'running' })[1];
-  assert.equal(sorted(line, parseSelectors(['reason=CheckPassed'])), 'wake');
-  assert.equal(sorted(line, parseSelectors(['step=review'])), 'wake', 'a label of the line too');
-  assert.equal(sorted(line, parseSelectors(['reason=AwaitingApproval'])), 'routine');
-  assert.equal(sorted(line, parseSelectors(['reason=AwaitingApproval', 'type=Normal'])), 'wake', 'one selector of several must hold');
-});
-
-test('a wake is told its lines, then the digest riding it; a digest alone is told with its count', () => {
-  const wake: FeedLine = { at: AT, run: 'r-1', step: 'plan', word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' };
-  const r1: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'running' };
-  const r2: FeedLine = { at: '2026-10-05T11:59:00.000Z', run: 'r-2', step: 'build', word: 'verified ✓' };
-  assert.equal(
-    messageOf([wake], []),
-    'The feed needs your judgement:\n  12:00:00  r-1  plan  awaiting approval  · approve it: nemia approve r-1 plan',
-  );
-  const ridden = messageOf([wake], [r1, r2]).split('\n');
-  assert.deepEqual(ridden.slice(2), [
-    '',
-    'Since your last news:',
-    '2 routine lines of the feed:',
-    '  11:58:00  r-2  build  running',
-    '  11:59:00  r-2  build  verified ✓',
-  ]);
-  assert.deepEqual(digestOf([r1]).split('\n'), [
-    'News from the feed, nothing waiting on you:',
-    '1 routine line of the feed:',
-    '  11:58:00  r-2  build  running',
-  ]);
-});
-
 /** A gate's two lines, as the tick writes them at one instant: the run's, then its step's. */
 const GATE: FeedLine[] = [
   { at: AT, run: 'r-1', word: 'awaiting approval', note: 'waiting on you: approve land' },
   { at: AT, run: 'r-1', step: 'land', word: 'awaiting approval', note: 'approve it: nemia approve r-1 land' },
 ];
 
-test('the wake lines of one read are told in one message, each in the order given, the digest once under them', () => {
-  const r1: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'running' };
-  const told = (lines: FeedLine[]) => messageOf(lines, [r1]).split('\n');
-  assert.deepEqual(told(GATE), [
-    'The feed needs your judgement:',
-    '  12:00:00  r-1  —  awaiting approval  · waiting on you: approve land',
-    '  12:00:00  r-1  land  awaiting approval  · approve it: nemia approve r-1 land',
-    '',
-    'Since your last news:',
-    '1 routine line of the feed:',
-    '  11:58:00  r-2  build  running',
-  ]);
-  assert.deepEqual(told([...GATE].reverse()).slice(1, 3), told(GATE).slice(1, 3).reverse(), 'in the order given, never sorted');
+test("which lines wake a subscriber: the default selector over every line the feed writes for a wait on a person, and a subscriber's own selectors", async (t) => {
+  await t.test('the default selector takes each line the feed writes for a wait on a person, pinned against feedWords', () => {
+    const waits: Array<[string, FeedLine[]]> = [
+      ['a step at its gate', linesOf(listed('awaiting approval', { onYou: true }), { status: 'awaiting approval' })],
+      ['a loop out of rounds', linesOf(listed('rounds exhausted', { onYou: true }), { status: 'running' })],
+      ['a session on its prompt', linesOf(listed('needs-human', { waits: 'permission: Bash' }), { status: 'running' })],
+      ['a blocked sign-off', linesOf(listed('succeeded · BLOCKED', { onYou: true }), { status: 'blocked' }, BLOCKED)],
+      ['a check refused', linesOf(listed('failed ✗ check (exit 1)', { onYou: true }), { status: 'failed' })],
+    ];
+    for (const [what, lines] of waits)
+      assert.ok(
+        lines.some((l) => sorted(l) === 'wake'),
+        `${what} wakes: ${JSON.stringify(lines)}`,
+      );
+  });
+  await t.test('a tool denial is routine for the default selector, as it was for the wake words it replaces', () => {
+    const shot = upgraded({
+      at: AT,
+      run: 'r-1',
+      step: 'review',
+      word: 'denied: Bash(git push)',
+      note: 'try 2',
+      call: 'Bash(git push)',
+      try: 2,
+    });
+    assert.equal(shot.reason, 'ToolDenied');
+    assert.equal(sorted(shot), 'routine', 'nobody woken by the default selector is woken by a denial, then or now');
+    assert.equal(sorted(shot, parseSelectors(['reason=ToolDenied'])), 'wake', 'a subscription that names it is');
+  });
+  await t.test(
+    "a run blocked, its note waiting on you: review, wakes on the run's own line, and a loop out of rounds on the step's",
+    () => {
+      const [run] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'blocked' });
+      assert.deepEqual(run, upgraded({ at: AT, run: 'r-1', word: 'blocked', note: 'waiting on you: review' }));
+      assert.deepEqual({ reason: run.reason, type: run.type, waits: run.waits }, { reason: 'Blocked', type: 'Warning', waits: 'person' });
+      assert.equal(sorted(run), 'wake');
+      assert.equal(
+        sorted(upgraded({ at: AT, run: 'r-1', word: 'running', note: 'waiting on you: review' })),
+        'wake',
+        'by its note alone, which the tick reads into the line’s waits',
+      );
+      const [, step] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'running' });
+      assert.equal(step.word, 'rounds exhausted');
+      assert.equal(sorted(step), 'wake');
+    },
+  );
+  await t.test("a blocked sign-off wakes by its note's needs: alone, whatever its word", () => {
+    const [, step] = linesOf(listed('succeeded · BLOCKED'), { status: 'running' }, BLOCKED);
+    assert.equal(step.note, 'needs: a decision on the schema');
+    assert.equal(sorted(upgraded({ at: AT, run: 'r-1', step: 'review', word: 'succeeded', note: step.note })), 'wake');
+  });
+  await t.test('routine words do not wake: a step at work, verified, waiting, a run running or succeeded, a hold', () => {
+    for (const status of ['running', 'verified ✓', 'waiting', 'pending', 'succeeded · done'])
+      for (const line of linesOf(listed(status), { status: 'running' }))
+        assert.equal(sorted(line), 'routine', `${JSON.stringify(line)} is routine`);
+    assert.equal(sorted(upgraded({ at: AT, run: 'r-1', word: 'succeeded' })), 'routine');
+    assert.equal(sorted(upgraded({ at: AT, run: 'r-1', word: 'running', note: 'held until r-2 ships' })), 'routine');
+    assert.equal(
+      sorted(upgraded({ at: AT, run: 'r-1', step: 'build', word: 'running', note: 'said to twice · the needs: of it' })),
+      'routine',
+      'a wake word inside a part of the note, not leading it, is no wait the tick stamps',
+    );
+  });
+  await t.test("a subscriber's own selectors replace the default, over the keys a line names and never its message", () => {
+    const line = linesOf(listed('verified ✓'), { status: 'running' })[1];
+    assert.equal(sorted(line, parseSelectors(['reason=CheckPassed'])), 'wake');
+    assert.equal(sorted(line, parseSelectors(['step=review'])), 'wake', 'a label of the line too');
+    assert.equal(sorted(line, parseSelectors(['reason=AwaitingApproval'])), 'routine');
+    assert.equal(sorted(line, parseSelectors(['reason=AwaitingApproval', 'type=Normal'])), 'wake', 'one selector of several must hold');
+  });
 });
 
-test('a read with a wake comes to one message: every wake line, then the digest and every routine line of the read, emptied after', () => {
-  const now: Instant = { at: 2_000_000, mono: { boot: 'b', ms: 1 } };
-  const since: Instant = { at: 1_000_000, mono: { boot: 'b', ms: 0 } };
-  const folded: FeedLine = { at: '2026-10-05T11:50:00.000Z', run: 'r-2', step: 'build', word: 'running' };
-  const before: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'verified ✓' };
-  const after: FeedLine = { at: '2026-10-05T12:01:00.000Z', run: 'r-3', step: 'build', word: 'running' };
-  const read = readDelivered({ cursor: 10, digest: [folded], since }, [before, ...GATE, after], DEFAULT, 99, now);
-  assert.equal(read.message, messageOf(GATE, [folded, before, after]));
-  assert.equal(read.wakes, 2);
-  assert.deepEqual(read.next, { cursor: 99, digest: [] });
+test('messageOf and digestOf: a wake is told its lines in the order given, the digest riding it once; a digest alone is told with its count', async (t) => {
+  await t.test('a wake is told its lines, then the digest riding it; a digest alone is told with its count', () => {
+    const wake: FeedLine = { at: AT, run: 'r-1', step: 'plan', word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' };
+    const r1: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'running' };
+    const r2: FeedLine = { at: '2026-10-05T11:59:00.000Z', run: 'r-2', step: 'build', word: 'verified ✓' };
+    assert.equal(
+      messageOf([wake], []),
+      'The feed needs your judgement:\n  12:00:00  r-1  plan  awaiting approval  · approve it: nemia approve r-1 plan',
+    );
+    const ridden = messageOf([wake], [r1, r2]).split('\n');
+    assert.deepEqual(ridden.slice(2), [
+      '',
+      'Since your last news:',
+      '2 routine lines of the feed:',
+      '  11:58:00  r-2  build  running',
+      '  11:59:00  r-2  build  verified ✓',
+    ]);
+    assert.deepEqual(digestOf([r1]).split('\n'), [
+      'News from the feed, nothing waiting on you:',
+      '1 routine line of the feed:',
+      '  11:58:00  r-2  build  running',
+    ]);
+  });
+  await t.test('the wake lines of one read are told in one message, each in the order given, the digest once under them', () => {
+    const r1: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'running' };
+    const told = (lines: FeedLine[]) => messageOf(lines, [r1]).split('\n');
+    assert.deepEqual(told(GATE), [
+      'The feed needs your judgement:',
+      '  12:00:00  r-1  —  awaiting approval  · waiting on you: approve land',
+      '  12:00:00  r-1  land  awaiting approval  · approve it: nemia approve r-1 land',
+      '',
+      'Since your last news:',
+      '1 routine line of the feed:',
+      '  11:58:00  r-2  build  running',
+    ]);
+    assert.deepEqual(told([...GATE].reverse()).slice(1, 3), told(GATE).slice(1, 3).reverse(), 'in the order given, never sorted');
+  });
 });
 
-test('a read with no wake is told nothing: its routine lines folded, the digest begun now where it was empty, the cursor moved', () => {
-  const now: Instant = { at: 2_000_000, mono: { boot: 'b', ms: 1 } };
-  const since: Instant = { at: 1_000_000, mono: { boot: 'b', ms: 0 } };
-  const r1: FeedLine = { at: AT, run: 'r-2', step: 'build', word: 'running' };
-  const r2: FeedLine = { at: AT, run: 'r-2', step: 'build', word: 'verified ✓' };
-  assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [r1, r2], DEFAULT, 50, now), {
-    wakes: 0,
-    next: { cursor: 50, digest: [r1, r2], since: now },
-  });
-  assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [r2], DEFAULT, 50, now), {
-    wakes: 0,
-    next: { cursor: 50, digest: [r1, r2], since },
-  });
-  assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [], DEFAULT, 50, now), {
-    wakes: 0,
-    next: { cursor: 50, digest: [r1], since },
-  });
-  assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [], DEFAULT, 50, now), { wakes: 0, next: { cursor: 50, digest: [] } });
-  assert.deepEqual(
-    readDelivered({ cursor: 10, digest: [] }, [r1, r2], parseSelectors(['reason=ToolDenied']), 50, now),
-    { wakes: 0, next: { cursor: 50, digest: [r1, r2], since: now } },
-    'a read whose lines no selector takes says nothing and leaves the cursor past them: the bookmark with no say',
+test('readDelivered comes to one message for a read with a wake, and to none for a read without, its routine lines folded and the cursor moved', async (t) => {
+  await t.test(
+    'a read with a wake comes to one message: every wake line, then the digest and every routine line of the read, emptied after',
+    () => {
+      const now: Instant = { at: 2_000_000, mono: { boot: 'b', ms: 1 } };
+      const since: Instant = { at: 1_000_000, mono: { boot: 'b', ms: 0 } };
+      const folded: FeedLine = { at: '2026-10-05T11:50:00.000Z', run: 'r-2', step: 'build', word: 'running' };
+      const before: FeedLine = { at: '2026-10-05T11:58:00.000Z', run: 'r-2', step: 'build', word: 'verified ✓' };
+      const after: FeedLine = { at: '2026-10-05T12:01:00.000Z', run: 'r-3', step: 'build', word: 'running' };
+      const read = readDelivered({ cursor: 10, digest: [folded], since }, [before, ...GATE, after], DEFAULT, 99, now);
+      assert.equal(read.message, messageOf(GATE, [folded, before, after]));
+      assert.equal(read.wakes, 2);
+      assert.deepEqual(read.next, { cursor: 99, digest: [] });
+    },
+  );
+  await t.test(
+    'a read with no wake is told nothing: its routine lines folded, the digest begun now where it was empty, the cursor moved',
+    () => {
+      const now: Instant = { at: 2_000_000, mono: { boot: 'b', ms: 1 } };
+      const since: Instant = { at: 1_000_000, mono: { boot: 'b', ms: 0 } };
+      const r1: FeedLine = { at: AT, run: 'r-2', step: 'build', word: 'running' };
+      const r2: FeedLine = { at: AT, run: 'r-2', step: 'build', word: 'verified ✓' };
+      assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [r1, r2], DEFAULT, 50, now), {
+        wakes: 0,
+        next: { cursor: 50, digest: [r1, r2], since: now },
+      });
+      assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [r2], DEFAULT, 50, now), {
+        wakes: 0,
+        next: { cursor: 50, digest: [r1, r2], since },
+      });
+      assert.deepEqual(readDelivered({ cursor: 10, digest: [r1], since }, [], DEFAULT, 50, now), {
+        wakes: 0,
+        next: { cursor: 50, digest: [r1], since },
+      });
+      assert.deepEqual(readDelivered({ cursor: 10, digest: [] }, [], DEFAULT, 50, now), { wakes: 0, next: { cursor: 50, digest: [] } });
+      assert.deepEqual(
+        readDelivered({ cursor: 10, digest: [] }, [r1, r2], parseSelectors(['reason=ToolDenied']), 50, now),
+        { wakes: 0, next: { cursor: 50, digest: [r1, r2], since: now } },
+        'a read whose lines no selector takes says nothing and leaves the cursor past them: the bookmark with no say',
+      );
+    },
   );
 });
 

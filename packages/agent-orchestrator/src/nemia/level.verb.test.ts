@@ -42,39 +42,39 @@ const engineWith = (bridge: TaskView['bridge'], settled: string | null = null) =
 /** `nemia level`, bare, over `engineWith(bridge, settled)`. */
 const levelOver = (bridge: TaskView['bridge'], settled: string | null = null) => runWith(engineWith(bridge, settled), LEVEL.handler({}));
 
-test("her reach is her web link off her task's view where its bridge is up, why not where it was asked and is not, the attach line alone where it was not asked", async () => {
+test("`nemia level`'s reach: the attach line, then her web link off her task's view, or why not, and nothing once she is settled", async (t) => {
   writeLevel({ level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
-
-  const up = await levelOver({ url: LINK });
-  assert.deepEqual(up.reach, [ATTACH, LINK], 'the attach line first, then the link');
-  assert.deepEqual(up.bridge, { url: LINK, why: null });
-  assert.ok(LEVEL.print(up, {}).includes(`  ${LINK}`), 'printed under "reach her:"');
-
-  const down = await levelOver({ url: null, why: 'its bridge is not up yet.' });
-  assert.deepEqual(down.reach, [ATTACH, 'her web link is not up: its bridge is not up yet.'], 'why not, never a promise');
-  assert.deepEqual(down.bridge, { url: null, why: 'its bridge is not up yet.' });
-
-  const unasked = await levelOver(undefined);
-  assert.deepEqual(unasked.reach, [ATTACH], 'not asked: no web line at all');
-  assert.equal(unasked.bridge, null);
-});
-
-test("a settled task's reach is nothing and its bridge null, whatever its view holds", async () => {
-  writeLevel({ level: 'semi-auto', since: '2026-10-06T08:00:00.000Z', task: TASK });
-  const ended = await levelOver({ url: LINK }, 'stopped');
-  assert.deepEqual(ended.reach, []);
-  assert.equal(ended.bridge, null);
-});
-
-test("bridgeOf answers a task's bridge in its own words, and null for a task not filed bridged or not viewed", () => {
-  const views = new Map<string, TaskView>([
-    ['up', { bridge: { url: LINK } } as unknown as TaskView],
-    ['down', { bridge: { url: null, why: 'not yet.' } } as unknown as TaskView],
-    ['unasked', {} as unknown as TaskView],
-  ]);
-  const of = bridgeOf(views);
-  assert.deepEqual(of('up'), { url: LINK, why: null });
-  assert.deepEqual(of('down'), { url: null, why: 'not yet.' });
-  assert.equal(of('unasked'), null);
-  assert.equal(of('unviewed'), null);
+  await t.test('her bridge up: the attach line first, then the link, printed under "reach her:"', async () => {
+    const up = await levelOver({ url: LINK });
+    assert.deepEqual(up.reach, [ATTACH, LINK], 'the attach line first, then the link');
+    assert.deepEqual(up.bridge, { url: LINK, why: null });
+    assert.ok(LEVEL.print(up, {}).includes(`  ${LINK}`), 'printed under "reach her:"');
+  });
+  await t.test('her bridge asked and not up: why not, never a promise', async () => {
+    const down = await levelOver({ url: null, why: 'its bridge is not up yet.' });
+    assert.deepEqual(down.reach, [ATTACH, 'her web link is not up: its bridge is not up yet.'], 'why not, never a promise');
+    assert.deepEqual(down.bridge, { url: null, why: 'its bridge is not up yet.' });
+  });
+  await t.test('no bridge asked: the attach line alone', async () => {
+    const unasked = await levelOver(undefined);
+    assert.deepEqual(unasked.reach, [ATTACH], 'not asked: no web line at all');
+    assert.equal(unasked.bridge, null);
+  });
+  await t.test("a settled task's reach is nothing and its bridge null, whatever its view holds", async () => {
+    const ended = await levelOver({ url: LINK }, 'stopped');
+    assert.deepEqual(ended.reach, []);
+    assert.equal(ended.bridge, null);
+  });
+  await t.test("`bridgeOf` answers a task's bridge in its own words, and null for a task not filed bridged or not viewed", () => {
+    const views = new Map<string, TaskView>([
+      ['up', { bridge: { url: LINK } } as unknown as TaskView],
+      ['down', { bridge: { url: null, why: 'not yet.' } } as unknown as TaskView],
+      ['unasked', {} as unknown as TaskView],
+    ]);
+    const of = bridgeOf(views);
+    assert.deepEqual(of('up'), { url: LINK, why: null });
+    assert.deepEqual(of('down'), { url: null, why: 'not yet.' });
+    assert.equal(of('unasked'), null);
+    assert.equal(of('unviewed'), null);
+  });
 });

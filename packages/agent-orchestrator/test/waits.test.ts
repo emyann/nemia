@@ -56,12 +56,10 @@ type Allowance = { count: number; not: string };
  */
 const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/git-skill.boundary.test.ts': { count: 1, not: 'a commit date a minute ahead' },
-  'test/forget-engine.test.ts': { count: 1, not: "a fake closeout's timestamp" },
   'test/held.test.ts': { count: 1, not: 'a mocked clock set ten minutes ahead' },
   'test/tick-program.test.ts': { count: 1, not: 'a series read at a moment two minutes ahead' },
   'test/scratch.ts': { count: 1, not: "the reaper's bound on a test run's leftover processes, after its end" },
   'src/daemon/daemon.store.test.ts': { count: 1, not: 'a mocked clock set twenty minutes ahead' },
-  'src/nemia/keep.verb.test.ts': { count: 2, not: 'a raise an hour ahead, and a mocked clock set past it' },
   'src/meter/tally.store.test.ts': { count: 1, not: 'a spin that spends its time on the thread the meter measures' },
 };
 
@@ -125,6 +123,8 @@ test('REFUSED: a deadline written into a test is over its allowance, and an allo
     ]);
     counts.set('src/feed/feed.test.ts', 0);
   }
-  counts.set('src/nemia/keep.verb.test.ts', 1);
-  assert.deepEqual(deadlineBreaks(counts, DEADLINES), ['src/nemia/keep.verb.test.ts is allowed 2 but has 1: lower its count in DEADLINES']);
+  counts.set('src/daemon/daemon.store.test.ts', 0);
+  assert.deepEqual(deadlineBreaks(counts, DEADLINES), [
+    'src/daemon/daemon.store.test.ts is allowed 1 but has 0: lower its count in DEADLINES',
+  ]);
 });

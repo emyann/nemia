@@ -6194,3 +6194,30 @@ Left, each to its own card:
   settles; not asked for yet.
 - **A sign-in held across a restart**: the hold is the engine's memory, so an api restart while the person is in GitHub's tab loses it,
   and they press again.
+
+## Shipped: `nemia pause` and `nemia resume` are lines of the feed, on a Store kind (2026-10-23)
+
+Signals S4 gave a person's approve, cancel and hold their own feed lines and left pause and resume out (the owner's word, 2026-10-16):
+they act on the whole store, and the feed's kinds were Run, Step and Daemon. A daemon's line could not carry them — the fold keeps none,
+and each daemon taking the store would write the pause again.
+
+- **A `Store` involved kind**, beside Run, Step and Daemon, its one name `store` (`STORE`, `StoreLine`, `isStoreLine` in
+  `src/feed/feed.ts`). Its codes, named at design: `StorePaused` (`store paused`) and `StoreResumed` (`store resumed`), each Normal,
+  `source: person`, a one-shot, waiting on nobody, the note `since <the pause's at>` (`src/feed/reason.ts`, 41 entries, 36 codes).
+- **The verbs write nothing.** The pass already reads `$WF_ROOT/cordon` (`readPause`); it hands that pause to `emitFeed`, and
+  `storeOnce` offers the put while the pause stands and a lift for each put the feed holds whose moment is not the standing one — the
+  absence rule of a hold's, since `nemia resume` deletes the file. `oncePast`, now over an `Involved`, holds each to one line, counted off
+  the feed: a restarted or second daemon says neither again, and `nemia pause --now` on a standing pause keeps its moment and writes no
+  second put. A caller that hands no pause says nothing of the store.
+- **Every reader knows the kind**: `FeedLineSchema` (a third `StructWithRest` member), `isRunLine` (now `'run' in line`), `involvedOf`,
+  the fold (the store's shots, which a run's `removed` leaves), the log's fields (`store`), `nemia watch` and its selectors (`kind=Store`,
+  `reason=StorePaused`), the subscriptions (a line of no run is carried by every one, scoped or not), the api's `store` SSE event, and the
+  board, which reads its pause again on that event and keeps its poll as the fallback.
+
+Tested in `src/feed/reason.test.ts`, `src/feed/feed.test.ts` (the put and lift over many passes, a restart, a second pause, and a caller
+that read none; the fold), `src/watch/selector.test.ts`, `test/run-feed.test.ts` (the person's story through `nemia pause`, `--now
+--yes`, a second daemon, `nemia resume` and `nemia watch -l kind=Store`), `test/subscription-wakes.test.ts`, the api's
+`src/factory/feed.test.ts` and the board's `test/feed.test.ts`.
+
+What it leaves: a pause put and lifted between two passes is said by no line, as a hold's is. The Factory and InboxCard kinds keep their
+own later card.

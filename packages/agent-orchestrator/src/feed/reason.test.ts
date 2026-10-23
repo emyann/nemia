@@ -11,6 +11,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DENIED,
+  isOnce,
   kindsOf,
   messageOf,
   reasonOf,
@@ -139,6 +140,15 @@ const ONE_SHOTS: readonly Case[] = [
   { kind: 'Daemon', word: 'daemon started', note: 'first daemon on this store', reason: 'DaemonStarted' },
 ];
 
+/**
+ * The two words a person's pause and resume of the whole store write, spelled here by hand as the owner named them: `store paused` and
+ * `store resumed`, each with the moment the pause was put as its note.
+ */
+const STORE_LINES: readonly Case[] = [
+  { kind: 'Store', word: 'store paused', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StorePaused' },
+  { kind: 'Store', word: 'store resumed', note: 'since 2026-10-16T04:00:00.000Z', reason: 'StoreResumed' },
+];
+
 /** Every word the package can write, each with the reason the table must name for it. */
 const CASES: readonly Case[] = [
   ...RUN_LINES,
@@ -148,6 +158,7 @@ const CASES: readonly Case[] = [
   ...WAIT_WORDS,
   ...ONE_SHOTS,
   ...ACT_WORDS,
+  ...STORE_LINES,
 ];
 
 /**
@@ -162,15 +173,22 @@ function wokenByFormerWake(line: FeedLine, wake: readonly string[]): boolean {
   return wake.map((w) => w.toLowerCase()).some((w) => word.includes(w) || notes.some((part) => part.startsWith(w)));
 }
 
-/** One fixture as the tick writes it to the feed: a signed line of its run, or of its step. */
+/** One fixture as the tick writes it to the feed: a signed line of its run, of its step, or of the store. */
 const lineOf = (c: Case): FeedLine =>
-  upgraded({
-    at: '2026-10-16T04:00:00.000Z',
-    run: 'r-1',
-    ...(c.kind === 'Step' ? { step: 'plan' } : {}),
-    word: c.word,
-    ...(c.note !== undefined ? { note: c.note } : {}),
-  });
+  c.kind === 'Store'
+    ? upgraded({
+        at: '2026-10-16T04:00:00.000Z',
+        store: 'store',
+        word: c.word,
+        ...(c.note !== undefined ? { note: c.note } : {}),
+      })
+    : upgraded({
+        at: '2026-10-16T04:00:00.000Z',
+        run: 'r-1',
+        ...(c.kind === 'Step' ? { step: 'plan' } : {}),
+        word: c.word,
+        ...(c.note !== undefined ? { note: c.note } : {}),
+      });
 
 /** Whether the selectors a stored wake list converts to take `line`. */
 const takenByConverted = (wake: readonly string[], line: FeedLine): boolean =>
@@ -194,8 +212,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
       CASES.map((c) => `${reasonOf({ word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) }, c.kind)}/${c.kind}`),
     );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 39, 'the table the owner named has 39 entries');
-    assert.equal(REASON_CODES.length, 34, 'of 34 distinct codes');
+    assert.equal(entries.length, 41, 'the table the owner named has 41 entries');
+    assert.equal(REASON_CODES.length, 36, 'of 36 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],
@@ -290,6 +308,14 @@ test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads
     );
     assert.equal(sourceOf('ToolDenied'), 'runtime', 'a call the harness denied is the runtime telling us');
     assert.equal(sourceOf('DaemonStarted'), 'daemon');
+    assert.deepEqual(
+      STORE_LINES.map((c) => [sourceOf(c.reason), isOnce(c.reason), typeOf(c.reason), waitsOf(c.reason, c.note)]),
+      [
+        ['person', true, 'Normal', false],
+        ['person', true, 'Normal', false],
+      ],
+      "the store's pause and resume are a person's verbs, said once each, and wait on nobody",
+    );
     assert.equal(sourceOf('Running'), 'tick', "a word the tick judged is the tick's, which is what a reason naming no source is");
   });
 });

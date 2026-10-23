@@ -188,8 +188,9 @@ collector: the orchestrator hands the runtime the endpoint (`engine()`), with `t
 throwaway collector by name (`tools/observe/README.md`, *Point the daemon at it*).
 
 **The feed** is the orchestrator's, written once, by the daemon alone: `emitFeed` (`src/feed/feed.verb.ts`) appends a run's line to
-`feed.jsonl`, and `up`, once it holds the store, a daemon's (`emitDaemonStarted`: `{at, daemon, word: 'daemon started', note}`, the note
-saying how the one before it ended); each is the record,
+`feed.jsonl` — and the store's, its pause put or lifted (`{at, store: 'store', word: 'store paused' | 'store resumed', note}`, offered
+by the pass off the pause it reads) — and `up`, once it holds the store, a daemon's (`emitDaemonStarted`: `{at, daemon, word: 'daemon
+started', note}`, the note saying how the one before it ended); each line is about a `Run`, `Step`, `Store` or `Daemon`, and each is the record,
 logs it at Info with its labels, its reason, its type and its word, and publishes it to the process's hub (`FeedHub`, a sliding `PubSub` its layer builds,
 `feedHubLayer`). A live reader in that process, `followFeed`, takes the hub's items and reads from the file what none brought — a line
 the hub dropped, or one another process wrote — on a beat that stats the file: the api's `GET /api/feed/stream`, on the hub its daemon

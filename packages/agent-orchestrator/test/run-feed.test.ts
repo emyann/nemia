@@ -1058,3 +1058,46 @@ test(
     });
   },
 );
+
+test("the store's pause and resume, each one line of the store's, said once by the pass off the cordon it reads, whatever reads the store", async (t) => {
+  const s = story(t);
+  emptyStore();
+  const { pauseFile, readPause } = await import('../src/pause/pause.store.ts');
+  fs.rmSync(pauseFile(), { force: true });
+  t.after(() => fs.rmSync(pauseFile(), { force: true }));
+  const storeSaid = () =>
+    readFeed(0)
+      .lines.filter((l) => 'store' in l)
+      .map((l) => [l.involved, l.reason, l.word, l.note, l.source]);
+  const STORE = { kind: 'Store', name: 'store' };
+  let at = '';
+  await s.test('nemia pause, then passes, is one `store paused` of the store, a person’s deed', async () => {
+    await printedBy(t, 'pause', '--why', 'a rebase');
+    at = readPause()!.at;
+    await ticks(3);
+    assert.deepEqual(storeSaid(), [[STORE, 'StorePaused', 'store paused', `since ${at}`, 'person']]);
+  });
+  await s.test('nemia pause --now --yes on the pause that stands keeps its moment, and writes no second put', async () => {
+    await printedBy(t, 'pause', '--now', '--yes');
+    await ticks(2);
+    assert.equal(storeSaid().length, 1);
+  });
+  await s.test('a second daemon, with no fold of its own, reading the same store writes the put neither again nor never', async () => {
+    assert.deepEqual(recordFeed(judged(await tick()), { memo: freshFeedMemo(), pause: readPause() }).lines, []);
+  });
+  await s.test('nemia resume, then passes, is one `store resumed`, read off the put the feed holds', async () => {
+    await printedBy(t, 'resume');
+    await ticks(3);
+    assert.deepEqual(storeSaid(), [
+      [STORE, 'StorePaused', 'store paused', `since ${at}`, 'person'],
+      [STORE, 'StoreResumed', 'store resumed', `since ${at}`, 'person'],
+    ]);
+    assert.deepEqual(recordFeed(judged(await tick()), { memo: freshFeedMemo(), pause: readPause() }).lines, [], 'and a restart none');
+  });
+  await s.test('nemia watch -l kind=Store prints the two lines of the store and no other', async () => {
+    const printed = (await printedBy(t, 'watch', '--once', '-l', 'kind=Store')).filter((l) => /\d\d:\d\d:\d\d/.test(l));
+    assert.equal(printed.length, 2, printed.join('\n'));
+    assert.ok(printed[0].includes('store  —  store paused'), printed[0]);
+    assert.ok(printed[1].includes('store  —  store resumed'), printed[1]);
+  });
+});

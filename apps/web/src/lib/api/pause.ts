@@ -94,7 +94,10 @@ const PauseAnswerSchema = Schema.Struct({
   interrupted: Schema.optional(Schema.Array(InterruptSchema)),
 }) satisfies Schema.Schema<PauseAnswer>;
 
-/** Whether the store is paused, and what finishes under it: polled at `pace`, since the feed says nothing of either. */
+/**
+ * Whether the store is paused, and what finishes under it: read again on the feed's `store` event, the pause put or lifted (`keysOf`), and
+ * polled at `pace` besides, since the feed says nothing of what finishes under it.
+ */
 export const pauseQuery = queryOptions({
   queryKey: ['pause'],
   queryFn: () => get('/api/pause', PausedSchema),

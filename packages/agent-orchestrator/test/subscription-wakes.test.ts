@@ -8,7 +8,8 @@
  * One say per read, the digest riding a wake, a gate's lines and several gates in one message, routine lines that wait for their
  * digest, a restart that neither drops nor repeats a line, one between a say and its cursor that says it again, an unsubscribe, a name
  * subscribed again and a feed cut under the cursor; a failed say said again on its backoff, its cursor held; the hub's lines, and those
- * published while a say is in flight gathered; a digest alone once due; and a floor's scope, a daemon's line carried by every one.
+ * published while a say is in flight gathered; a digest alone once due; and a floor's scope, a daemon's line and the store's carried by
+ * every one.
  * What a line means for a subscriber and the words it is told are `src/subscription/subscription.test.ts`'s, pure; the verbs' refusals
  * `subscription.verb.test.ts`'s.
  *
@@ -524,7 +525,7 @@ function writeRun(id: string, factory: string) {
 }
 
 test(
-  "a subscription scoped by a floor is told only of the runs of factories at it or above, and every one carries a daemon's line",
+  "a subscription scoped by a floor is told only of the runs of factories at it or above, and every one carries a daemon's line and the store's",
   WAITED,
   async (t) => {
     const s = story(t);
@@ -587,6 +588,31 @@ test(
           [upgraded(started)],
           'folded into its digest, and read back off its file, upgraded',
         );
+        assert.equal(toldTo(scoped).length, 0, 'routine by the default words');
+      },
+    );
+    await s.test(
+      'the store’s line is carried by every subscription as a daemon’s is: routine in a scoped digest, a wake where it names kind=Store',
+      async () => {
+        await d.stop();
+        dropSubscription('scoped-d');
+        dropSubscription('woken-d');
+        const from = feedSize();
+        const scoped = await longLived('t-scoped-s');
+        const woken = await longLived('t-woken-s');
+        kept(t, 'scoped-s', { task: scoped, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
+        kept(t, 'woken-s', { task: woken, selectors: ['kind=Store'], digestEvery: 60, from });
+        d.start();
+        await d.quiet(5);
+        const at = new Date().toISOString();
+        const paused: FeedLine = { at, store: 'store', word: 'store paused', note: `since ${at}` };
+        appended(paused);
+        await d.clock.adjust('1 second');
+        await held(t, () => toldTo(woken).length === 1, 'the subscriber that names the store woken');
+        assert.equal(wakesIn(toldTo(woken)[0]).length, 1);
+        assert.ok(wakesIn(toldTo(woken)[0])[0].includes(`store paused  · since ${at}`), toldTo(woken)[0]);
+        await held(t, () => readDelivery('scoped-s')?.cursor === feedSize(), "the scoped one's cursor past the line");
+        assert.deepEqual(readDelivery('scoped-s')?.digest, [upgraded(paused)], 'a line of no factory is no line below the floor');
         assert.equal(toldTo(scoped).length, 0, 'routine by the default words');
       },
     );

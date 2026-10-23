@@ -7,6 +7,7 @@
  */
 import { observations, root } from '../../test/harness.ts';
 import { test } from 'node:test';
+import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -92,74 +93,81 @@ const get = async (url: string) => {
 };
 const words = (p: StepPath) => p.path.map((s) => `${s.state} <- ${s.event}`);
 
-test("the current try's path by default: each state the journal says, the entry that moved it and when, asking no harness", async () => {
-  const before = observations();
-  const { status, body } = await get('/api/runs/r-retried/steps/implement/path');
-  assert.equal(status, 200);
-  assert.deepEqual([body.taskId, body.try], ['r-retried-2', 2]);
-  assert.deepEqual(body.path, [
-    { state: 'submitted', event: 'filed', at: at(0) },
-    { state: 'starting', event: 'starting', at: at(10) },
-    { state: 'working', event: 'spawned', at: at(11) },
-  ]);
-  assert.equal(observations(), before, 'no harness is asked for a path');
+test('REFUSED: a path asked of a try that is not a whole number or not yet, a run or a step there is not, a journal that does not read', async (t) => {
+  await t.test('REFUSED: a try that is not a whole number from 1 is 400, and one past the current is 404', async () => {
+    for (const asked of ['x', '0', '1.5', '-1', '01']) {
+      const { status, body } = await get(`/api/runs/r-retried/steps/implement/path?try=${asked}`);
+      assert.equal(status, 400, asked);
+      assert.match(body.error ?? '', /is not a try: give a whole number from 1/, asked);
+    }
+    const { status, body } = await get('/api/runs/r-retried/steps/implement/path?try=3');
+    assert.equal(status, 404);
+    assert.match(body.error ?? '', /has had 2 tries, so it has no try 3/);
+  });
+  await t.test('REFUSED: a run or a step there is not is 404', async () => {
+    assert.equal((await get('/api/runs/r-none/steps/implement/path')).status, 404);
+    assert.equal((await get('/api/runs/r-retried/steps/review/path')).status, 404);
+  });
+  await t.test('REFUSED: a journal that does not read is 502, naming the task', async () => {
+    const { status, body } = await get('/api/runs/r-spoiled/steps/implement/path');
+    assert.equal(status, 502);
+    assert.match(body.error ?? '', /Could not read the journal of task r-spoiled-1 \(step 'implement', try 1\)/);
+  });
 });
 
-test('an earlier try by number is its own task, to its end', async () => {
-  const { status, body } = await get('/api/runs/r-retried/steps/implement/path?try=1');
-  assert.equal(status, 200);
-  assert.deepEqual([body.taskId, body.try], ['r-retried-1', 1]);
-  assert.deepEqual(words(body), [
-    'submitted <- filed',
-    'starting <- starting',
-    'working <- spawned',
-    'ending <- ended',
-    'failed <- settled',
-  ]);
-  const current = await get('/api/runs/r-retried/steps/implement/path?try=2');
-  assert.deepEqual(current.body, (await get('/api/runs/r-retried/steps/implement/path')).body, 'the current try, asked by number');
-});
-
-test('an earlier try of a task held open runs to the answer that opened the next turn; a recheck is the same turn', async () => {
-  const first = (await get('/api/runs/r-held/steps/implement/path?try=1')).body;
-  assert.deepEqual(words(first), ['submitted <- filed', 'starting <- starting', 'working <- spawned', 'input-required <- ended']);
-  const second = (await get('/api/runs/r-held/steps/implement/path?try=2')).body;
-  assert.deepEqual(words(second), [
-    ...words(first),
-    'submitted <- input',
-    'starting <- starting',
-    'working <- spawned',
-    'input-required <- ended',
-  ]);
-  assert.deepEqual((await get('/api/runs/r-held/steps/implement/path?try=3')).body.path, second.path, 'a recheck replaced only the check');
-  const current = (await get('/api/runs/r-held/steps/implement/path')).body;
-  assert.deepEqual([current.try, words(current).slice(-2)], [4, ['submitted <- input', 'starting <- starting']]);
-});
-
-test('REFUSED: a try that is not a whole number from 1 is 400, and one past the current is 404', async () => {
-  for (const asked of ['x', '0', '1.5', '-1', '01']) {
-    const { status, body } = await get(`/api/runs/r-retried/steps/implement/path?try=${asked}`);
-    assert.equal(status, 400, asked);
-    assert.match(body.error ?? '', /is not a try: give a whole number from 1/, asked);
-  }
-  const { status, body } = await get('/api/runs/r-retried/steps/implement/path?try=3');
-  assert.equal(status, 404);
-  assert.match(body.error ?? '', /has had 2 tries, so it has no try 3/);
-});
-
-test('REFUSED: a run or a step there is not is 404', async () => {
-  assert.equal((await get('/api/runs/r-none/steps/implement/path')).status, 404);
-  assert.equal((await get('/api/runs/r-retried/steps/review/path')).status, 404);
-});
-
-test('a step not filed yet has no task and an empty path', async () => {
-  const { status, body } = await get('/api/runs/r-unfiled/steps/implement/path');
-  assert.equal(status, 200);
-  assert.deepEqual(body, { taskId: null, try: 1, path: [] });
-});
-
-test('REFUSED: a journal that does not read is 502, naming the task', async () => {
-  const { status, body } = await get('/api/runs/r-spoiled/steps/implement/path');
-  assert.equal(status, 502);
-  assert.match(body.error ?? '', /Could not read the journal of task r-spoiled-1 \(step 'implement', try 1\)/);
+test("A person reads a step's path, try by try: none before it is filed, the current try's states, an earlier try to its end, and a held try to the answer that reopened it", async (t) => {
+  const s = story(t);
+  await s.test('a step not filed yet has no task and an empty path', async () => {
+    const { status, body } = await get('/api/runs/r-unfiled/steps/implement/path');
+    assert.equal(status, 200);
+    assert.deepEqual(body, { taskId: null, try: 1, path: [] });
+  });
+  await s.test(
+    "the current try's path by default: each state the journal says, the entry that moved it and when, asking no harness",
+    async () => {
+      const before = observations();
+      const { status, body } = await get('/api/runs/r-retried/steps/implement/path');
+      assert.equal(status, 200);
+      assert.deepEqual([body.taskId, body.try], ['r-retried-2', 2]);
+      assert.deepEqual(body.path, [
+        { state: 'submitted', event: 'filed', at: at(0) },
+        { state: 'starting', event: 'starting', at: at(10) },
+        { state: 'working', event: 'spawned', at: at(11) },
+      ]);
+      assert.equal(observations(), before, 'no harness is asked for a path');
+    },
+  );
+  await s.test('an earlier try by number is its own task, to its end', async () => {
+    const { status, body } = await get('/api/runs/r-retried/steps/implement/path?try=1');
+    assert.equal(status, 200);
+    assert.deepEqual([body.taskId, body.try], ['r-retried-1', 1]);
+    assert.deepEqual(words(body), [
+      'submitted <- filed',
+      'starting <- starting',
+      'working <- spawned',
+      'ending <- ended',
+      'failed <- settled',
+    ]);
+    const current = await get('/api/runs/r-retried/steps/implement/path?try=2');
+    assert.deepEqual(current.body, (await get('/api/runs/r-retried/steps/implement/path')).body, 'the current try, asked by number');
+  });
+  await s.test('an earlier try of a task held open runs to the answer that opened the next turn; a recheck is the same turn', async () => {
+    const first = (await get('/api/runs/r-held/steps/implement/path?try=1')).body;
+    assert.deepEqual(words(first), ['submitted <- filed', 'starting <- starting', 'working <- spawned', 'input-required <- ended']);
+    const second = (await get('/api/runs/r-held/steps/implement/path?try=2')).body;
+    assert.deepEqual(words(second), [
+      ...words(first),
+      'submitted <- input',
+      'starting <- starting',
+      'working <- spawned',
+      'input-required <- ended',
+    ]);
+    assert.deepEqual(
+      (await get('/api/runs/r-held/steps/implement/path?try=3')).body.path,
+      second.path,
+      'a recheck replaced only the check',
+    );
+    const current = (await get('/api/runs/r-held/steps/implement/path')).body;
+    assert.deepEqual([current.try, words(current).slice(-2)], [4, ['submitted <- input', 'starting <- starting']]);
+  });
 });

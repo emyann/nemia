@@ -188,97 +188,108 @@ const asked = async (query: string) => {
   return { status: res.status, body: (await res.json()) as Stats & { error?: string } };
 };
 
-test('GET /api/stats counts every run in the store, of every factory and repository, as the package counts them', async () => {
-  const { status, body } = await asked('?from=2026-09-28&to=2026-09-28&by=factory');
-  assert.equal(status, 200, body.error);
-  assert.deepEqual(
-    body.groups.map((g) => [g.key, g.total.tries, g.steps[0]?.costUsd]),
-    [
-      ['default', 1, 1],
-      ['other', 1, 2],
-      ['tallies', 0, undefined],
-    ],
-    'a run of another factory, on a repository the api does not serve, is counted; one with no try that day is a group of none',
-  );
-  assert.deepEqual(body, await runWith(e, flowNumbers({ from: '2026-09-28', to: '2026-09-28', by: 'factory' })));
-});
-
-test('GET /api/stats answers the calls refused per try as null, never 0, where every try ran on a harness that records none', async () => {
-  const { body } = await asked('?from=2026-09-28&to=2026-09-28');
-  assert.equal(body.all.total.tries, 2, 'two tries ended, each on codex');
-  assert.equal(body.all.total.deniedPerTry, null);
-  assert.equal(body.all.days[0].deniedPerTry, null);
-  assert.deepEqual([body.all.steps[0].deniedCalls, body.all.steps[0].deniedTries, body.all.steps[0].denials], [null, 0, []]);
-});
-
-test('GET /api/stats answers the skills loaded per try as null, never 0, where no end says them, and counts each where one does', async () => {
-  const { body } = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=default');
-  assert.equal(body.all.total.tries, 1);
-  assert.equal(body.all.total.skillsPerTry, null);
-  assert.equal(body.all.days[0].skillsPerTry, null);
-  assert.deepEqual([body.all.steps[0].skillLoads, body.all.steps[0].skillTries, body.all.steps[0].skills], [null, 0, []]);
-  const other = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=other');
-  assert.equal(other.body.all.total.skillsPerTry, 2);
-  const { skillLoads, skillTries, skills } = other.body.all.steps[0];
-  assert.deepEqual(
-    { skillLoads, skillTries, skills },
-    { skillLoads: 2, skillTries: 1, skills: [{ skill: 'look', count: 2, tries: 1, touched: null, loadedWhenTouched: null }] },
-  );
-});
-
-test('GET /api/stats keeps one factory with ofFactory and one repository with ofRepo, compared as strings', async () => {
-  const other = await asked('?ofFactory=other');
-  assert.deepEqual([other.body.all.total.tries, other.body.filters], [1, { factory: 'other' }]);
-  const home = await asked(`?ofRepo=${encodeURIComponent('/repos/home')}`);
-  assert.deepEqual([home.body.all.total.tries, home.body.filters], [1, { repo: '/repos/home' }]);
-  const none = await asked(`?ofRepo=${encodeURIComponent('/repos/home/')}`);
-  assert.equal(none.body.all.total.tries, 0, 'a path is not resolved: /repos/home/ is not /repos/home');
-});
-
-test('GET /api/stats refuses a key to go by it does not know, and a day that is not one, with a 422 naming what it takes', async () => {
-  const colour = await asked('?by=colour');
-  assert.deepEqual([colour.status, colour.body.error], [422, '?by= takes one of agent, step, factory, workflow, repo, not "colour".']);
-  const day = await asked('?from=2026-13-40');
-  assert.equal(day.status, 422);
-  assert.match(day.body.error ?? '', /^\?from= takes a day as YYYY-MM-DD, in UTC/);
-});
-
-test('GET /api/stats answers the change marks as the package does: a rendered skill that differs from the run before', async () => {
-  const { status, body } = await asked('?workflow=review');
-  assert.equal(status, 200, body.error);
-  assert.deepEqual(
-    body.all.marks.map((m) => [m.day, m.run, m.kind, m.name, m.since]),
-    [['2026-09-27', 'm-2', 'skill', 'review-a-change', 'm-1']],
-  );
-  assert.deepEqual(body, await runWith(e, flowNumbers({ workflow: 'review' })));
-});
-
-test('GET /api/stats answers each tally a step froze, per day and over the range, as null — never 0 — where no closeout measured it', async () => {
-  const { status, body } = await asked(`?ofFactory=tallies&from=2026-09-23&to=${TALLY_DAY}`);
-  assert.equal(status, 200, body.error);
-  assert.deepEqual(body.all.tallies, [
-    {
-      step: 'triage',
-      tally: 'issues',
-      total: { sum: 3, tries: 1 },
-      days: [
-        { day: '2026-09-23', sum: null, tries: 0 },
-        { day: TALLY_DAY, sum: 3, tries: 1 },
+test('GET /api/stats: what it counts over a store of several factories, null never 0, the change marks and the tallies, and the keys it refuses', async (t) => {
+  await t.test('GET /api/stats counts every run in the store, of every factory and repository, as the package counts them', async () => {
+    const { status, body } = await asked('?from=2026-09-28&to=2026-09-28&by=factory');
+    assert.equal(status, 200, body.error);
+    assert.deepEqual(
+      body.groups.map((g) => [g.key, g.total.tries, g.steps[0]?.costUsd]),
+      [
+        ['default', 1, 1],
+        ['other', 1, 2],
+        ['tallies', 0, undefined],
       ],
+      'a run of another factory, on a repository the api does not serve, is counted; one with no try that day is a group of none',
+    );
+    assert.deepEqual(body, await runWith(e, flowNumbers({ from: '2026-09-28', to: '2026-09-28', by: 'factory' })));
+  });
+  await t.test(
+    'GET /api/stats answers the calls refused per try as null, never 0, where every try ran on a harness that records none',
+    async () => {
+      const { body } = await asked('?from=2026-09-28&to=2026-09-28');
+      assert.equal(body.all.total.tries, 2, 'two tries ended, each on codex');
+      assert.equal(body.all.total.deniedPerTry, null);
+      assert.equal(body.all.days[0].deniedPerTry, null);
+      assert.deepEqual([body.all.steps[0].deniedCalls, body.all.steps[0].deniedTries, body.all.steps[0].denials], [null, 0, []]);
     },
-    {
-      step: 'triage',
-      tally: 'issues.open',
-      total: { sum: 2, tries: 1 },
-      days: [
-        { day: '2026-09-23', sum: null, tries: 0 },
-        { day: TALLY_DAY, sum: 2, tries: 1 },
-      ],
+  );
+  await t.test(
+    'GET /api/stats answers the skills loaded per try as null, never 0, where no end says them, and counts each where one does',
+    async () => {
+      const { body } = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=default');
+      assert.equal(body.all.total.tries, 1);
+      assert.equal(body.all.total.skillsPerTry, null);
+      assert.equal(body.all.days[0].skillsPerTry, null);
+      assert.deepEqual([body.all.steps[0].skillLoads, body.all.steps[0].skillTries, body.all.steps[0].skills], [null, 0, []]);
+      const other = await asked('?from=2026-09-28&to=2026-09-28&ofFactory=other');
+      assert.equal(other.body.all.total.skillsPerTry, 2);
+      const { skillLoads, skillTries, skills } = other.body.all.steps[0];
+      assert.deepEqual(
+        { skillLoads, skillTries, skills },
+        { skillLoads: 2, skillTries: 1, skills: [{ skill: 'look', count: 2, tries: 1, touched: null, loadedWhenTouched: null }] },
+      );
     },
-  ]);
-  assert.equal(body.all.total.tries, 2, 'the run whose closeout signed no issues is a try, and measured no tally');
-  const none = await asked('?ofFactory=other');
-  assert.deepEqual(none.body.all.tallies, [], 'a step that declares no tally has no row');
+  );
+  await t.test('GET /api/stats keeps one factory with ofFactory and one repository with ofRepo, compared as strings', async () => {
+    const other = await asked('?ofFactory=other');
+    assert.deepEqual([other.body.all.total.tries, other.body.filters], [1, { factory: 'other' }]);
+    const home = await asked(`?ofRepo=${encodeURIComponent('/repos/home')}`);
+    assert.deepEqual([home.body.all.total.tries, home.body.filters], [1, { repo: '/repos/home' }]);
+    const none = await asked(`?ofRepo=${encodeURIComponent('/repos/home/')}`);
+    assert.equal(none.body.all.total.tries, 0, 'a path is not resolved: /repos/home/ is not /repos/home');
+  });
+  await t.test(
+    'GET /api/stats answers the change marks as the package does: a rendered skill that differs from the run before',
+    async () => {
+      const { status, body } = await asked('?workflow=review');
+      assert.equal(status, 200, body.error);
+      assert.deepEqual(
+        body.all.marks.map((m) => [m.day, m.run, m.kind, m.name, m.since]),
+        [['2026-09-27', 'm-2', 'skill', 'review-a-change', 'm-1']],
+      );
+      assert.deepEqual(body, await runWith(e, flowNumbers({ workflow: 'review' })));
+    },
+  );
+  await t.test(
+    'GET /api/stats answers each tally a step froze, per day and over the range, as null — never 0 — where no closeout measured it',
+    async () => {
+      const { status, body } = await asked(`?ofFactory=tallies&from=2026-09-23&to=${TALLY_DAY}`);
+      assert.equal(status, 200, body.error);
+      assert.deepEqual(body.all.tallies, [
+        {
+          step: 'triage',
+          tally: 'issues',
+          total: { sum: 3, tries: 1 },
+          days: [
+            { day: '2026-09-23', sum: null, tries: 0 },
+            { day: TALLY_DAY, sum: 3, tries: 1 },
+          ],
+        },
+        {
+          step: 'triage',
+          tally: 'issues.open',
+          total: { sum: 2, tries: 1 },
+          days: [
+            { day: '2026-09-23', sum: null, tries: 0 },
+            { day: TALLY_DAY, sum: 2, tries: 1 },
+          ],
+        },
+      ]);
+      assert.equal(body.all.total.tries, 2, 'the run whose closeout signed no issues is a try, and measured no tally');
+      const none = await asked('?ofFactory=other');
+      assert.deepEqual(none.body.all.tallies, [], 'a step that declares no tally has no row');
+    },
+  );
+  await t.test(
+    'GET /api/stats refuses a key to go by it does not know, and a day that is not one, with a 422 naming what it takes',
+    async () => {
+      const colour = await asked('?by=colour');
+      assert.deepEqual([colour.status, colour.body.error], [422, '?by= takes one of agent, step, factory, workflow, repo, not "colour".']);
+      const day = await asked('?from=2026-13-40');
+      assert.equal(day.status, 422);
+      assert.match(day.body.error ?? '', /^\?from= takes a day as YYYY-MM-DD, in UTC/);
+    },
+  );
 });
 
 /** With the memo's check off: what the memo alone answers, and reads. */

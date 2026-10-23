@@ -7,6 +7,7 @@
  */
 import { root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';
+import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -188,182 +189,180 @@ const line = (own: ReturnType<typeof appOver>, step: string, word: string) =>
   );
 
 test(
-  'two followers of a step share one upstream, both handed each moment; another step opens its own; both gone, it is let go',
+  "Boards follow a step live: two share one upstream, one joins mid-message, a held task's stream stays open across the person's answer, and a try not pushed is sent from its start",
   WAITED,
   async (t) => {
-    const implement = working([said('a-1')]);
-    const tasks = new Map([
-      ['t-implement', implement],
-      ['t-review', working()],
-    ]);
-    const { e, follows: asked, closed } = engineOver(tasks);
-    const own = appOver(t, e);
-    const before = follows();
-    const one = await follower(t, own.app, 'implement');
-    const two = await follower(t, own.app, 'implement');
-    for (const f of [one, two]) await f.wait((s) => s.length >= 2, 'following, then the history');
-    push(implement, 1, { kind: 'partial', key: 'k', text: 'Hel', append: true, last: false });
-    implement.history.push(said('a-2'));
-    push(implement, 1, { kind: 'events', events: [said('a-2')], cursor: '2' });
-    for (const f of [one, two]) await f.wait((s) => kinds(s).includes('transcript a-2'), 'the moments pushed');
-    assert.deepEqual(kinds(one.said()), kinds(two.said()), 'both handed the same');
-    assert.deepEqual(kinds(one.said()), [
-      'following {"streamed":true}',
-      'transcript a-1',
-      'partial {"key":"k","delta":"Hel","last":false}',
-      'transcript a-2',
-    ]);
-    assert.equal(follows() - before, 1, 'one upstream opened for the two followers');
-    assert.deepEqual(asked, ['t-implement'], "the engine's follow asked once");
-    const other = await follower(t, own.app, 'review');
-    await other.wait((s) => s.length >= 1, 'following');
-    assert.equal(follows() - before, 2, 'a follower of another step opens its own');
-    await one.leave();
-    await two.leave();
-    await until(
-      t,
-      () => closed.includes('t-implement'),
-      () => `the upstream let go once both left: ${closed}`,
+    const s = story(t);
+    await s.test(
+      'two followers of a step share one upstream, both handed each moment; another step opens its own; both gone, it is let go',
+      async (t) => {
+        const implement = working([said('a-1')]);
+        const tasks = new Map([
+          ['t-implement', implement],
+          ['t-review', working()],
+        ]);
+        const { e, follows: asked, closed } = engineOver(tasks);
+        const own = appOver(t, e);
+        const before = follows();
+        const one = await follower(t, own.app, 'implement');
+        const two = await follower(t, own.app, 'implement');
+        for (const f of [one, two]) await f.wait((s) => s.length >= 2, 'following, then the history');
+        push(implement, 1, { kind: 'partial', key: 'k', text: 'Hel', append: true, last: false });
+        implement.history.push(said('a-2'));
+        push(implement, 1, { kind: 'events', events: [said('a-2')], cursor: '2' });
+        for (const f of [one, two]) await f.wait((s) => kinds(s).includes('transcript a-2'), 'the moments pushed');
+        assert.deepEqual(kinds(one.said()), kinds(two.said()), 'both handed the same');
+        assert.deepEqual(kinds(one.said()), [
+          'following {"streamed":true}',
+          'transcript a-1',
+          'partial {"key":"k","delta":"Hel","last":false}',
+          'transcript a-2',
+        ]);
+        assert.equal(follows() - before, 1, 'one upstream opened for the two followers');
+        assert.deepEqual(asked, ['t-implement'], "the engine's follow asked once");
+        const other = await follower(t, own.app, 'review');
+        await other.wait((s) => s.length >= 1, 'following');
+        assert.equal(follows() - before, 2, 'a follower of another step opens its own');
+        await one.leave();
+        await two.leave();
+        await until(
+          t,
+          () => closed.includes('t-implement'),
+          () => `the upstream let go once both left: ${closed}`,
+        );
+        assert.ok(!closed.includes('t-review'), 'the other step still followed');
+        await other.leave();
+      },
     );
-    assert.ok(!closed.includes('t-review'), 'the other step still followed');
-    await other.leave();
-  },
-);
-
-test(
-  'a follower who joins mid-message is handed the text so far as one piece, then the rest live, then the whole message',
-  WAITED,
-  async (t) => {
-    const late = working([said('a-1')]);
-    const { e } = engineOver(new Map([['t-late', late]]));
-    const own = appOver(t, e);
-    const first = await follower(t, own.app, 'late');
-    await first.wait((s) => s.length >= 2, 'following, then the history');
-    push(late, 1, { kind: 'partial', key: 'k', text: 'Hel', append: true, last: false });
-    push(late, 1, { kind: 'partial', key: 'k', text: 'lo', append: true, last: false });
-    await first.wait((s) => s.filter((b) => b.event === 'partial').length === 2, 'the two pieces');
-    const joiner = await follower(t, own.app, 'late');
-    await joiner.wait((s) => s.some((b) => b.event === 'partial'), 'the message so far');
-    push(late, 1, { kind: 'partial', key: 'k', text: ' there', append: true, last: false });
-    push(late, 1, { kind: 'partial', key: 'k', text: '', append: true, last: true });
-    late.history.push(said('a-2', 'Hello there'));
-    push(late, 1, { kind: 'events', events: [said('a-2', 'Hello there')], cursor: '2' });
-    await joiner.wait((s) => kinds(s).includes('transcript a-2'), 'the whole message');
-    assert.deepEqual(kinds(joiner.said()), [
-      'following {"streamed":true}',
-      'transcript a-1',
-      'partial {"key":"k","delta":"Hello","last":false}',
-      'partial {"key":"k","delta":" there","last":false}',
-      'partial {"key":"k","delta":"","last":true}',
-      'transcript a-2',
-    ]);
-    await first.leave();
-    await joiner.leave();
-  },
-);
-
-test(
-  "a held task's stream stays open while it waits on a person, then says moved and follows its next turn to its end",
-  WAITED,
-  async (t) => {
-    const held = working([said('a-1')]);
-    const { e } = engineOver(new Map([['t-held', held]]));
-    const own = appOver(t, e);
-    const f = await follower(t, own.app, 'held');
-    push(held, 1, { kind: 'state', state: 'input-required' });
-    Queue.endUnsafe(held.attempts[0]);
-    await f.wait((s) => s.length >= 2, 'following, then the history');
-    held.ended = 1;
-    held.history.push(said('u-2'), said('a-3'));
-    held.attempts.push(attempt());
-    await line(own, 'held', 'running');
-    await f.wait((s) => kinds(s).includes('transcript a-3'), "the next turn's history");
-    held.history.push(said('a-4'));
-    push(held, 2, { kind: 'events', events: [said('a-4')], cursor: '4' });
-    Queue.endUnsafe(held.attempts[1]);
-    held.settled = 'succeeded';
-    await line(own, 'held', 'verified');
-    assert.deepEqual(kinds(await f.ended()), [
-      'following {"streamed":true}',
-      'transcript a-1',
-      'moved {"taskId":"t-held"}',
-      'transcript a-1',
-      'transcript u-2',
-      'transcript a-3',
-      'transcript a-4',
-      'settled {"cursor":"4"}',
-    ]);
-  },
-);
-
-test(
-  "a held task's stream opened once its attempt has ended says following and its history, then moved and its next turn from the start",
-  WAITED,
-  async (t) => {
-    const opened = working([said('a-1')]);
-    Queue.endUnsafe(opened.attempts[0]);
-    opened.ended = 1;
-    const { e } = engineOver(new Map([['t-opened', opened]]));
-    const own = appOver(t, e);
-    const f = await follower(t, own.app, 'opened');
-    await f.wait((s) => s.length >= 2, 'following, then the history');
-    opened.history.push(said('u-2'));
-    opened.attempts.push(attempt());
-    await line(own, 'opened', 'running');
-    await f.wait((s) => kinds(s).includes('transcript u-2'), "the next turn's history");
-    Queue.endUnsafe(opened.attempts[1]);
-    opened.settled = 'succeeded';
-    await line(own, 'opened', 'verified');
-    assert.deepEqual(kinds(await f.ended()), [
-      'following {"streamed":true}',
-      'transcript a-1',
-      'moved {"taskId":"t-opened"}',
-      'transcript a-1',
-      'transcript u-2',
-      'settled {"cursor":"2"}',
-    ]);
-  },
-);
-
-test(
-  'a step moved to a try whose session is not pushed is sent what the try has said from its start, not the task it was opened on, then `unreadable` retrying: the stream stays open and reads the try again on a beat',
-  WAITED,
-  async (t) => {
-    const first = working([said('a-1')]);
-    const tried: Task = { ...working([said('b-1')]), unstreamed: true };
-    const { e } = engineOver(
-      new Map([
-        ['t-tried', first],
-        ['t-tried-try2', tried],
-      ]),
+    await s.test(
+      'a follower who joins mid-message is handed the text so far as one piece, then the rest live, then the whole message',
+      async (t) => {
+        const late = working([said('a-1')]);
+        const { e } = engineOver(new Map([['t-late', late]]));
+        const own = appOver(t, e);
+        const first = await follower(t, own.app, 'late');
+        await first.wait((s) => s.length >= 2, 'following, then the history');
+        push(late, 1, { kind: 'partial', key: 'k', text: 'Hel', append: true, last: false });
+        push(late, 1, { kind: 'partial', key: 'k', text: 'lo', append: true, last: false });
+        await first.wait((s) => s.filter((b) => b.event === 'partial').length === 2, 'the two pieces');
+        const joiner = await follower(t, own.app, 'late');
+        await joiner.wait((s) => s.some((b) => b.event === 'partial'), 'the message so far');
+        push(late, 1, { kind: 'partial', key: 'k', text: ' there', append: true, last: false });
+        push(late, 1, { kind: 'partial', key: 'k', text: '', append: true, last: true });
+        late.history.push(said('a-2', 'Hello there'));
+        push(late, 1, { kind: 'events', events: [said('a-2', 'Hello there')], cursor: '2' });
+        await joiner.wait((s) => kinds(s).includes('transcript a-2'), 'the whole message');
+        assert.deepEqual(kinds(joiner.said()), [
+          'following {"streamed":true}',
+          'transcript a-1',
+          'partial {"key":"k","delta":"Hello","last":false}',
+          'partial {"key":"k","delta":" there","last":false}',
+          'partial {"key":"k","delta":"","last":true}',
+          'transcript a-2',
+        ]);
+        await first.leave();
+        await joiner.leave();
+      },
     );
-    const own = appOver(t, e);
-    t.after(() => writeRun());
-    const f = await follower(t, own.app, 'tried');
-    await f.wait((s) => s.length >= 2, 'following, then the history');
-    Queue.endUnsafe(first.attempts[0]);
-    first.ended = 1;
-    first.settled = 'failed';
-    writeRun({ tried: 't-tried-try2' });
-    await line(own, 'tried', 'running');
-    await f.wait((s) => kinds(s).includes('transcript b-1'), "the try's own history, read from its start");
-    const sent = f.said();
-    assert.deepEqual(
-      kinds(sent).filter((k) => !k.startsWith('unreadable ')),
-      [
-        'following {"streamed":true}',
-        'transcript a-1',
-        'moved {"taskId":"t-tried-try2"}',
-        'following {"streamed":false}',
-        'transcript b-1',
-      ],
+    await s.test(
+      "a held task's stream stays open while it waits on a person, then says moved and follows its next turn to its end",
+      async (t) => {
+        const held = working([said('a-1')]);
+        const { e } = engineOver(new Map([['t-held', held]]));
+        const own = appOver(t, e);
+        const f = await follower(t, own.app, 'held');
+        push(held, 1, { kind: 'state', state: 'input-required' });
+        Queue.endUnsafe(held.attempts[0]);
+        await f.wait((s) => s.length >= 2, 'following, then the history');
+        held.ended = 1;
+        held.history.push(said('u-2'), said('a-3'));
+        held.attempts.push(attempt());
+        await line(own, 'held', 'running');
+        await f.wait((s) => kinds(s).includes('transcript a-3'), "the next turn's history");
+        held.history.push(said('a-4'));
+        push(held, 2, { kind: 'events', events: [said('a-4')], cursor: '4' });
+        Queue.endUnsafe(held.attempts[1]);
+        held.settled = 'succeeded';
+        await line(own, 'held', 'verified');
+        assert.deepEqual(kinds(await f.ended()), [
+          'following {"streamed":true}',
+          'transcript a-1',
+          'moved {"taskId":"t-held"}',
+          'transcript a-1',
+          'transcript u-2',
+          'transcript a-3',
+          'transcript a-4',
+          'settled {"cursor":"4"}',
+        ]);
+      },
     );
-    assert.deepEqual(JSON.parse(sent.find((b) => b.event === 'unreadable')!.data!), {
-      error: `Step 'tried' of run '${RUN}' runs a session its harness does not push as it is written: what it said so far is sent, and it is read again every few seconds.`,
-      retrying: true,
-    });
-    assert.equal(sent.filter((b) => b.event === 'settled').length, 0, 'the try is still live, and the stream is not ended');
-    await f.leave();
+    await s.test(
+      "a held task's stream opened once its attempt has ended says following and its history, then moved and its next turn from the start",
+      async (t) => {
+        const opened = working([said('a-1')]);
+        Queue.endUnsafe(opened.attempts[0]);
+        opened.ended = 1;
+        const { e } = engineOver(new Map([['t-opened', opened]]));
+        const own = appOver(t, e);
+        const f = await follower(t, own.app, 'opened');
+        await f.wait((s) => s.length >= 2, 'following, then the history');
+        opened.history.push(said('u-2'));
+        opened.attempts.push(attempt());
+        await line(own, 'opened', 'running');
+        await f.wait((s) => kinds(s).includes('transcript u-2'), "the next turn's history");
+        Queue.endUnsafe(opened.attempts[1]);
+        opened.settled = 'succeeded';
+        await line(own, 'opened', 'verified');
+        assert.deepEqual(kinds(await f.ended()), [
+          'following {"streamed":true}',
+          'transcript a-1',
+          'moved {"taskId":"t-opened"}',
+          'transcript a-1',
+          'transcript u-2',
+          'settled {"cursor":"2"}',
+        ]);
+      },
+    );
+    await s.test(
+      'a step moved to a try whose session is not pushed is sent what the try has said from its start, not the task it was opened on, then `unreadable` retrying: the stream stays open and reads the try again on a beat',
+      async (t) => {
+        const first = working([said('a-1')]);
+        const tried: Task = { ...working([said('b-1')]), unstreamed: true };
+        const { e } = engineOver(
+          new Map([
+            ['t-tried', first],
+            ['t-tried-try2', tried],
+          ]),
+        );
+        const own = appOver(t, e);
+        t.after(() => writeRun());
+        const f = await follower(t, own.app, 'tried');
+        await f.wait((s) => s.length >= 2, 'following, then the history');
+        Queue.endUnsafe(first.attempts[0]);
+        first.ended = 1;
+        first.settled = 'failed';
+        writeRun({ tried: 't-tried-try2' });
+        await line(own, 'tried', 'running');
+        await f.wait((s) => kinds(s).includes('transcript b-1'), "the try's own history, read from its start");
+        const sent = f.said();
+        assert.deepEqual(
+          kinds(sent).filter((k) => !k.startsWith('unreadable ')),
+          [
+            'following {"streamed":true}',
+            'transcript a-1',
+            'moved {"taskId":"t-tried-try2"}',
+            'following {"streamed":false}',
+            'transcript b-1',
+          ],
+        );
+        assert.deepEqual(JSON.parse(sent.find((b) => b.event === 'unreadable')!.data!), {
+          error: `Step 'tried' of run '${RUN}' runs a session its harness does not push as it is written: what it said so far is sent, and it is read again every few seconds.`,
+          retrying: true,
+        });
+        assert.equal(sent.filter((b) => b.event === 'settled').length, 0, 'the try is still live, and the stream is not ended');
+        await f.leave();
+      },
+    );
   },
 );
 

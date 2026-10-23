@@ -9,6 +9,7 @@
  */
 import { config, observations, registry, root } from '../../test/harness.ts';
 import { test, type TestContext } from 'node:test';
+import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import { Effect, Layer, Logger } from 'effect';
 import fs from 'node:fs';
@@ -177,141 +178,247 @@ const blocks = (text: string): Block[] =>
     );
 const eventsIn = (said: Block[]) => said.filter((b) => b.event === 'transcript').map((b) => JSON.parse(b.data!));
 
-test("a step's transcript is the engine's read of its task's session — its events and cursor — neither live nor open once the task settled", async () => {
-  const res = await app.request(url('implement'));
-  assert.equal(res.status, 200);
-  const body = await res.json();
-  const engines = await Effect.runPromise(engine().transcript('t-implement'));
-  assert.deepEqual(body, { ...engines, live: false, open: false }, 'a settled task is read whole, and says it will say nothing more');
-  assert.deepEqual(
-    body.events.map((e: { kind: string }) => e.kind),
-    ['text', 'thinking', 'text', 'tool_use', 'tool_result', 'tool_use', 'tool_result', 'system'],
+test("REFUSED: a step's conversation, read or streamed — a cursor no read gave, a run, step or task there is not, a conversation or a journal the engine cannot read", async (t) => {
+  await t.test('a cursor no read gave is refused with a 400 that says what to pass — on the read and on the stream', async () => {
+    for (const [route, headers] of [
+      [url('implement', '?after=page-2'), {}],
+      [streamUrl('implement', '?after=page-2'), {}],
+      [streamUrl('implement'), { 'Last-Event-ID': 'page-2' }],
+    ] as const) {
+      const res = await app.request(route, { headers });
+      assert.equal(res.status, 400, route);
+      assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${route}: an answer, not a stream`);
+      const { error } = (await res.json()) as { error: string };
+      assert.match(error, /^`page-2` is not a cursor a read of this conversation gave\. Pass the `cursor` the last read returned/, route);
+      assert.match(error, /or none to read from the start\.$/, route);
+    }
+    const fromStart = await app.request(url('implement', '?after='));
+    assert.equal(fromStart.status, 200, 'an empty `after` is none: read from the start');
+    assert.equal(((await fromStart.json()) as StepTranscript).events.length, 8);
+  });
+  await t.test(
+    'a run or a step that does not exist is a 404, worded as the log route words it; a task the engine lost is a 404 that names it',
+    async () => {
+      const log = await (await app.request(`/api/runs/${RUN}/steps/nope/log`)).json();
+      for (const route of [url('nope'), streamUrl('nope')]) {
+        const res = await app.request(route);
+        assert.equal(res.status, 404, route);
+        assert.deepEqual(await res.json(), log, route);
+      }
+      for (const route of [`/api/runs/r-nope/steps/implement/transcript`, `/api/runs/r-nope/steps/implement/transcript/stream`]) {
+        const res = await app.request(route);
+        assert.equal(res.status, 404, route);
+        assert.match(((await res.json()) as { error: string }).error, /^No run 'r-nope' in this store\./, route);
+      }
+      for (const route of [url('lost'), streamUrl('lost')]) {
+        const res = await app.request(route);
+        assert.equal(res.status, 404, route);
+        assert.match(
+          ((await res.json()) as { error: string }).error,
+          /^Step 'lost' of run 'r-talk' was filed as task t-lost, and the engine has no record of it/,
+          route,
+        );
+      }
+    },
   );
-  assert.equal(body.events[4].id, body.events[3].id, "a result carries its call's id");
-
-  const again = await app.request(url('implement', `?after=${encodeURIComponent(body.cursor)}`));
-  assert.equal(again.status, 200);
-  assert.deepEqual(
-    await again.json(),
-    { events: [], cursor: body.cursor, live: false, open: false },
-    'read again from the cursor it gave: nothing new',
-  );
-});
-
-test('a held step that signed waits on a person, and nothing of it runs: its conversation is read, not live but open — and its stream, followed for its next turn, sends it and stays open', async () => {
-  assert.equal((await Effect.runPromise(engine().view('t-held'))).phase, 'input-required', "the seed is the engine's held task, waiting");
-  assert.equal(
-    (await Effect.runPromise(engine().view('t-closed'))).phase,
-    'between attempts',
-    'closed and not yet settled: the engine calls it between attempts until its next pass',
-  );
-  for (const step of ['held', 'closed']) {
-    const engines = await Effect.runPromise(engine().transcript(`t-${step}`));
-    assert.equal(engines.events.length, 8, step);
-    assert.deepEqual(await (await app.request(url(step))).json(), { ...engines, live: false, open: true }, step);
-    const reader = (await app.request(streamUrl(step))).body!.getReader();
-    const said = await readUntil(reader, { value: '' }, (got) => eventsIn(got).length >= engines.events.length);
-    assert.deepEqual(said[0], { event: 'following', data: JSON.stringify({ streamed: true }) }, `${step}: its harness streams a turn`);
-    assert.deepEqual(eventsIn(said), engines.events, step);
-    assert.ok(!said.some((b) => b.event === 'settled'), `${step}: not settled, the stream open for the next turn`);
-    await reader.cancel();
-  }
-});
-
-test('a held step a person answered is live again, under the same task: its next turn is to run', async () => {
-  assert.equal((await Effect.runPromise(engine().view('t-answered'))).phase, 'between attempts');
-  const body = (await (await app.request(url('answered'))).json()) as StepTranscript;
-  assert.equal(body.live, true);
-  assert.equal(body.events.length, 8);
-});
-
-test('a cursor no read gave is refused with a 400 that says what to pass — on the read and on the stream', async () => {
-  for (const [route, headers] of [
-    [url('implement', '?after=page-2'), {}],
-    [streamUrl('implement', '?after=page-2'), {}],
-    [streamUrl('implement'), { 'Last-Event-ID': 'page-2' }],
-  ] as const) {
-    const res = await app.request(route, { headers });
-    assert.equal(res.status, 400, route);
-    assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${route}: an answer, not a stream`);
+  await t.test("a conversation the engine cannot read is a 502 that says how to read the step's output from the command line", async () => {
+    const sessionId = settledTask('t-broken');
+    fs.rmSync(transcriptFile(sessionId));
+    fs.mkdirSync(transcriptFile(sessionId));
+    const res = await app.request(url('broken'));
+    assert.equal(res.status, 502, 'a directory where the transcript should be: found, opened, and not read');
     const { error } = (await res.json()) as { error: string };
-    assert.match(error, /^`page-2` is not a cursor a read of this conversation gave\. Pass the `cursor` the last read returned/, route);
-    assert.match(error, /or none to read from the start\.$/, route);
-  }
-  const fromStart = await app.request(url('implement', '?after='));
-  assert.equal(fromStart.status, 200, 'an empty `after` is none: read from the start');
-  assert.equal(((await fromStart.json()) as StepTranscript).events.length, 8);
+    assert.match(error, /^Could not read the conversation of step 'broken' \(task t-broken\): /);
+    assert.match(error, /`nemia logs r-talk broken` reads its output from the command line\.$/);
+  });
+  await t.test(
+    'a live task whose journal cannot be read is a 502 on the read and on the stream, which says where the same record is read',
+    async (t) => {
+      const app = unstreamedApp(t);
+      runningTask('t-unread');
+      fs.rmSync(journalFile('t-unread'));
+      fs.mkdirSync(journalFile('t-unread'));
+      for (const route of [url('unread'), streamUrl('unread')]) {
+        const res = await app.request(route);
+        assert.equal(res.status, 502, `${route}: a directory where the journal should be, read before any stream opens`);
+        assert.match(
+          ((await res.json()) as { error: string }).error,
+          /^Could not read task t-unread of step 'unread': .*`nemia ls` reads the same record/,
+        );
+      }
+    },
+  );
 });
 
-test('a run or a step that does not exist is a 404, worded as the log route words it; a task the engine lost is a 404 that names it', async () => {
-  const log = await (await app.request(`/api/runs/${RUN}/steps/nope/log`)).json();
-  for (const route of [url('nope'), streamUrl('nope')]) {
-    const res = await app.request(route);
-    assert.equal(res.status, 404, route);
-    assert.deepEqual(await res.json(), log, route);
-  }
-  for (const route of [`/api/runs/r-nope/steps/implement/transcript`, `/api/runs/r-nope/steps/implement/transcript/stream`]) {
-    const res = await app.request(route);
-    assert.equal(res.status, 404, route);
-    assert.match(((await res.json()) as { error: string }).error, /^No run 'r-nope' in this store\./, route);
-  }
-  for (const route of [url('lost'), streamUrl('lost')]) {
-    const res = await app.request(route);
-    assert.equal(res.status, 404, route);
+test("A person reads a step's conversation through its task's life: nothing before it is filed, the engine's read once it is, a held step waiting on them, live again once answered", async (t) => {
+  const s = story(t);
+  await s.test('a step not filed yet has no conversation and nothing to follow: neither live nor open', async () => {
+    const res = await app.request(url('review'));
+    assert.equal(res.status, 200);
+    assert.deepEqual(await res.json(), { events: [], cursor: null, live: false, open: false });
+    const stream = await app.request(streamUrl('review'));
+    assert.equal(stream.status, 404);
     assert.match(
-      ((await res.json()) as { error: string }).error,
-      /^Step 'lost' of run 'r-talk' was filed as task t-lost, and the engine has no record of it/,
-      route,
+      ((await stream.json()) as { error: string }).error,
+      /^Step 'review' of run 'r-talk' is not filed yet, so it has no session to follow\./,
     );
-  }
-});
+  });
+  await s.test(
+    "a step's transcript is the engine's read of its task's session — its events and cursor — neither live nor open once the task settled",
+    async () => {
+      const res = await app.request(url('implement'));
+      assert.equal(res.status, 200);
+      const body = await res.json();
+      const engines = await Effect.runPromise(engine().transcript('t-implement'));
+      assert.deepEqual(body, { ...engines, live: false, open: false }, 'a settled task is read whole, and says it will say nothing more');
+      assert.deepEqual(
+        body.events.map((e: { kind: string }) => e.kind),
+        ['text', 'thinking', 'text', 'tool_use', 'tool_result', 'tool_use', 'tool_result', 'system'],
+      );
+      assert.equal(body.events[4].id, body.events[3].id, "a result carries its call's id");
 
-test('a step not filed yet has no conversation and nothing to follow: neither live nor open', async () => {
-  const res = await app.request(url('review'));
-  assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { events: [], cursor: null, live: false, open: false });
-  const stream = await app.request(streamUrl('review'));
-  assert.equal(stream.status, 404);
-  assert.match(
-    ((await stream.json()) as { error: string }).error,
-    /^Step 'review' of run 'r-talk' is not filed yet, so it has no session to follow\./,
+      const again = await app.request(url('implement', `?after=${encodeURIComponent(body.cursor)}`));
+      assert.equal(again.status, 200);
+      assert.deepEqual(
+        await again.json(),
+        { events: [], cursor: body.cursor, live: false, open: false },
+        'read again from the cursor it gave: nothing new',
+      );
+    },
   );
-});
-
-test("the stream of a settled task sends each event, the read's cursor as the id of the last, then `settled` — and closes", async () => {
-  const engines = await Effect.runPromise(engine().transcript('t-implement'));
-  const res = await app.request(streamUrl('implement'));
-  assert.equal(res.status, 200);
-  assert.match(res.headers.get('content-type') ?? '', /^text\/event-stream/);
-  const said = blocks(await res.text());
-  assert.deepEqual(eventsIn(said), engines.events, 'every event, off a body that resolves only once the api closes the stream');
-  const sent = said.filter((b) => b.event === 'transcript');
-  assert.deepEqual(
-    sent.map((b) => b.id),
-    [...Array(sent.length - 1).fill(undefined), engines.cursor],
-    'the cursor rides on the last event of the read only',
+  await s.test(
+    'a held step that signed waits on a person, and nothing of it runs: its conversation is read, not live but open — and its stream, followed for its next turn, sends it and stays open',
+    async () => {
+      assert.equal(
+        (await Effect.runPromise(engine().view('t-held'))).phase,
+        'input-required',
+        "the seed is the engine's held task, waiting",
+      );
+      assert.equal(
+        (await Effect.runPromise(engine().view('t-closed'))).phase,
+        'between attempts',
+        'closed and not yet settled: the engine calls it between attempts until its next pass',
+      );
+      for (const step of ['held', 'closed']) {
+        const engines = await Effect.runPromise(engine().transcript(`t-${step}`));
+        assert.equal(engines.events.length, 8, step);
+        assert.deepEqual(await (await app.request(url(step))).json(), { ...engines, live: false, open: true }, step);
+        const reader = (await app.request(streamUrl(step))).body!.getReader();
+        const said = await readUntil(reader, { value: '' }, (got) => eventsIn(got).length >= engines.events.length);
+        assert.deepEqual(said[0], { event: 'following', data: JSON.stringify({ streamed: true }) }, `${step}: its harness streams a turn`);
+        assert.deepEqual(eventsIn(said), engines.events, step);
+        assert.ok(!said.some((b) => b.event === 'settled'), `${step}: not settled, the stream open for the next turn`);
+        await reader.cancel();
+      }
+    },
   );
-  assert.deepEqual(said.at(-1), { event: 'settled', data: JSON.stringify({ cursor: engines.cursor }), id: engines.cursor });
-  assert.equal(said.length, engines.events.length + 1, 'nothing else is sent');
+  await s.test('a held step a person answered is live again, under the same task: its next turn is to run', async () => {
+    assert.equal((await Effect.runPromise(engine().view('t-answered'))).phase, 'between attempts');
+    const body = (await (await app.request(url('answered'))).json()) as StepTranscript;
+    assert.equal(body.live, true);
+    assert.equal(body.events.length, 8);
+  });
 });
 
-test('a stream reconnected with Last-Event-ID resumes from that cursor, over any `after` in its address', async () => {
-  const sessionId = randomUUID();
-  const lines = conversation(sessionId);
-  journal('t-resumed', [...started, ...ending('t-resumed', sessionId)]);
-  writeTranscript(sessionId, lines.slice(0, 4));
-  const first = await Effect.runPromise(engine().transcript('t-resumed'));
-  assert.equal(first.events.length, 3, "the first connection was sent up to here, and was cut off; the session's transcript went on");
-  writeTranscript(sessionId, lines.slice(4));
+test(
+  "A board follows a step's conversation: a settled task's events then `settled`, a reconnect from Last-Event-ID, a live session pushed as it writes, and the engine let go once the reader leaves",
+  { timeout: 30_000 },
+  async (t) => {
+    const s = story(t);
+    await s.test(
+      "the stream of a settled task sends each event, the read's cursor as the id of the last, then `settled` — and closes",
+      async () => {
+        const engines = await Effect.runPromise(engine().transcript('t-implement'));
+        const res = await app.request(streamUrl('implement'));
+        assert.equal(res.status, 200);
+        assert.match(res.headers.get('content-type') ?? '', /^text\/event-stream/);
+        const said = blocks(await res.text());
+        assert.deepEqual(eventsIn(said), engines.events, 'every event, off a body that resolves only once the api closes the stream');
+        const sent = said.filter((b) => b.event === 'transcript');
+        assert.deepEqual(
+          sent.map((b) => b.id),
+          [...Array(sent.length - 1).fill(undefined), engines.cursor],
+          'the cursor rides on the last event of the read only',
+        );
+        assert.deepEqual(said.at(-1), { event: 'settled', data: JSON.stringify({ cursor: engines.cursor }), id: engines.cursor });
+        assert.equal(said.length, engines.events.length + 1, 'nothing else is sent');
+      },
+    );
+    await s.test('a stream reconnected with Last-Event-ID resumes from that cursor, over any `after` in its address', async () => {
+      const sessionId = randomUUID();
+      const lines = conversation(sessionId);
+      journal('t-resumed', [...started, ...ending('t-resumed', sessionId)]);
+      writeTranscript(sessionId, lines.slice(0, 4));
+      const first = await Effect.runPromise(engine().transcript('t-resumed'));
+      assert.equal(first.events.length, 3, "the first connection was sent up to here, and was cut off; the session's transcript went on");
+      writeTranscript(sessionId, lines.slice(4));
 
-  const whole = await Effect.runPromise(engine().transcript('t-resumed'));
-  const res = await app.request(streamUrl('resumed', '?after=not-a-cursor'), { headers: { 'Last-Event-ID': first.cursor } });
-  assert.equal(res.status, 200);
-  const said = blocks(await res.text());
-  assert.deepEqual(eventsIn(said), whole.events.slice(3), 'only what came after the last event it was sent');
-  assert.equal(said.filter((b) => b.id).at(-1)?.id, whole.cursor);
-  assert.equal(said.at(-1)?.event, 'settled');
-});
+      const whole = await Effect.runPromise(engine().transcript('t-resumed'));
+      const res = await app.request(streamUrl('resumed', '?after=not-a-cursor'), { headers: { 'Last-Event-ID': first.cursor } });
+      assert.equal(res.status, 200);
+      const said = blocks(await res.text());
+      assert.deepEqual(eventsIn(said), whole.events.slice(3), 'only what came after the last event it was sent');
+      assert.equal(said.filter((b) => b.id).at(-1)?.id, whole.cursor);
+      assert.equal(said.at(-1)?.event, 'settled');
+    });
+    await s.test(
+      'the stream of a live background session follows it, pushed: what the session writes next is sent as it is written, once each, and `settled` once its task settles',
+      async () => {
+        const sessionId = runningTask('t-live');
+        const lines = conversation(sessionId);
+        writeTranscript(sessionId, lines.slice(0, 4));
+
+        const res = await app.request(streamUrl('live'));
+        assert.equal(res.status, 200);
+        const reader = res.body!.getReader();
+        const text = { value: '' };
+        const early = await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
+        assert.deepEqual(
+          early[0],
+          { event: 'following', data: JSON.stringify({ streamed: true }) },
+          'first, that a background session is pushed: followed from its transcript, not read again every second',
+        );
+        assert.deepEqual(
+          eventsIn(early).map((e) => e.id),
+          ['u-1:0', 'a-1:0', 'a-2:0'],
+          'what was written when it connected',
+        );
+        assert.ok(!early.some((b) => b.event === 'settled'), 'and the task has not settled');
+
+        writeTranscript(sessionId, lines.slice(4));
+        await readUntil(reader, text, (said) => eventsIn(said).length >= 8);
+        journal('t-live', ending('t-live', sessionId));
+        listed('t-live', { state: 'done', status: 'idle' });
+        await Effect.runPromise(
+          emitFeed(new Map([[RUN, { run: { word: 'running' }, steps: [{ name: 'live', word: 'succeeded' }] }]])).pipe(
+            Effect.provide(Logger.layer([])),
+          ),
+        );
+
+        const said = await readUntil(reader, text, () => false);
+        const whole = await Effect.runPromise(engine().transcript('t-live'));
+        assert.deepEqual(eventsIn(said), whole.events, 'every event, once each');
+        assert.equal(said.at(-1)?.event, 'settled', 'and then settled, and the stream closed');
+      },
+    );
+    await s.test('the stream stops asking the engine once its reader goes away', async () => {
+      const sessionId = runningTask('t-gone');
+      writeTranscript(sessionId, conversation(sessionId).slice(0, 2));
+      const res = await app.request(streamUrl('gone'));
+      const reader = res.body!.getReader();
+      await readUntil(reader, { value: '' }, (said) => eventsIn(said).length >= 1);
+      await reader.cancel();
+      await sleep(1_500);
+      const before = observations();
+      await sleep(3_000);
+      assert.equal(
+        observations(),
+        before,
+        'no `claude agents` call once the reader has gone, past a read already under way when it left: the task is still live, and nobody is reading',
+      );
+    });
+  },
+);
 
 /** Read a stream until `until` holds for what it has sent, or it ends. */
 async function readUntil(
@@ -328,76 +435,6 @@ async function readUntil(
     text.value += decoder.decode(value, { stream: true });
   }
 }
-
-test(
-  'the stream of a live background session follows it, pushed: what the session writes next is sent as it is written, once each, and `settled` once its task settles',
-  { timeout: 30_000 },
-  async () => {
-    const sessionId = runningTask('t-live');
-    const lines = conversation(sessionId);
-    writeTranscript(sessionId, lines.slice(0, 4));
-
-    const res = await app.request(streamUrl('live'));
-    assert.equal(res.status, 200);
-    const reader = res.body!.getReader();
-    const text = { value: '' };
-    const early = await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
-    assert.deepEqual(
-      early[0],
-      { event: 'following', data: JSON.stringify({ streamed: true }) },
-      'first, that a background session is pushed: followed from its transcript, not read again every second',
-    );
-    assert.deepEqual(
-      eventsIn(early).map((e) => e.id),
-      ['u-1:0', 'a-1:0', 'a-2:0'],
-      'what was written when it connected',
-    );
-    assert.ok(!early.some((b) => b.event === 'settled'), 'and the task has not settled');
-
-    writeTranscript(sessionId, lines.slice(4));
-    await readUntil(reader, text, (said) => eventsIn(said).length >= 8);
-    journal('t-live', ending('t-live', sessionId));
-    listed('t-live', { state: 'done', status: 'idle' });
-    await Effect.runPromise(
-      emitFeed(new Map([[RUN, { run: { word: 'running' }, steps: [{ name: 'live', word: 'succeeded' }] }]])).pipe(
-        Effect.provide(Logger.layer([])),
-      ),
-    );
-
-    const said = await readUntil(reader, text, () => false);
-    const whole = await Effect.runPromise(engine().transcript('t-live'));
-    assert.deepEqual(eventsIn(said), whole.events, 'every event, once each');
-    assert.equal(said.at(-1)?.event, 'settled', 'and then settled, and the stream closed');
-  },
-);
-
-test('the stream stops asking the engine once its reader goes away', { timeout: 30_000 }, async () => {
-  const sessionId = runningTask('t-gone');
-  writeTranscript(sessionId, conversation(sessionId).slice(0, 2));
-  const res = await app.request(streamUrl('gone'));
-  const reader = res.body!.getReader();
-  await readUntil(reader, { value: '' }, (said) => eventsIn(said).length >= 1);
-  await reader.cancel();
-  await sleep(1_500);
-  const before = observations();
-  await sleep(3_000);
-  assert.equal(
-    observations(),
-    before,
-    'no `claude agents` call once the reader has gone, past a read already under way when it left: the task is still live, and nobody is reading',
-  );
-});
-
-test("a conversation the engine cannot read is a 502 that says how to read the step's output from the command line", async () => {
-  const sessionId = settledTask('t-broken');
-  fs.rmSync(transcriptFile(sessionId));
-  fs.mkdirSync(transcriptFile(sessionId));
-  const res = await app.request(url('broken'));
-  assert.equal(res.status, 502, 'a directory where the transcript should be: found, opened, and not read');
-  const { error } = (await res.json()) as { error: string };
-  assert.match(error, /^Could not read the conversation of step 'broken' \(task t-broken\): /);
-  assert.match(error, /`nemia logs r-talk broken` reads its output from the command line\.$/);
-});
 
 /** The beat the unstreamed app's streams read again on (`Beats.step`), shorter than the shipped `STEP_BEAT_MS`. */
 const BEAT_MS = 100;
@@ -475,18 +512,3 @@ test(
     assert.equal(over.at(-1)?.event, 'settled', 'and the beat does not hold the stream open past the task settling');
   },
 );
-
-test('a live task whose journal cannot be read is a 502 on the read and on the stream, which says where the same record is read', async (t) => {
-  const app = unstreamedApp(t);
-  runningTask('t-unread');
-  fs.rmSync(journalFile('t-unread'));
-  fs.mkdirSync(journalFile('t-unread'));
-  for (const route of [url('unread'), streamUrl('unread')]) {
-    const res = await app.request(route);
-    assert.equal(res.status, 502, `${route}: a directory where the journal should be, read before any stream opens`);
-    assert.match(
-      ((await res.json()) as { error: string }).error,
-      /^Could not read task t-unread of step 'unread': .*`nemia ls` reads the same record/,
-    );
-  }
-});

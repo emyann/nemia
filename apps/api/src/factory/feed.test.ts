@@ -9,6 +9,7 @@
  * `createServer`, is a plain `http.Server`, not one of the HTTP/2 servers its type also allows.
  */
 import '../../test/harness.ts';
+import { story } from '../../test/checkpoints.ts';
 import { until, WAITED, type Waiter } from '../../test/waits.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -129,253 +130,313 @@ const open = async (query = '', headers: Record<string, string> = {}, over: { re
 const followers = () => Effect.runSync(Metric.value(FEED_FOLLOWERS)).value;
 
 test(
-  "a transition the tick writes to the feed arrives on the stream as it is written: named by what it is about, the line as data, the feed's end as its id",
+  'A board follows the feed: a transition arrives as it is written, the stream opens with a comment, resumes after Last-Event-ID or from its end, and carries the daemon line, a denial and a line another process wrote',
+  WAITED,
+  async (t) => {
+    const s = story(t);
+    await s.test(
+      "a transition the tick writes to the feed arrives on the stream as it is written: named by what it is about, the line as data, the feed's end as its id",
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-1': planAt('running') });
+        const from = end();
+        const { res, reader, text } = await open(`?after=${from}`);
+        try {
+          assert.match(res.headers.get('content-type') ?? '', /^text\/event-stream/);
+
+          const [gate] = await pass({ 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan') });
+          let said = await readUntil(t, reader, text, (s) => s.length >= 1);
+          assert.deepEqual(
+            said,
+            [{ event: 'step', data: JSON.stringify(gate), id: String(end()) }],
+            'the gate, and nothing that was there before the cursor',
+          );
+
+          const [done] = await pass({
+            'r-1': {
+              run: { word: 'done' },
+              steps: [{ name: 'plan', word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' }],
+            },
+          });
+          said = await readUntil(t, reader, text, (s) => s.length >= 2);
+          assert.deepEqual(said[1], { event: 'run', data: JSON.stringify(done), id: String(end()) });
+
+          const [removed] = await pass({});
+          said = await readUntil(t, reader, text, (s) => s.length >= 3);
+          assert.deepEqual(said[2], { event: 'removed', data: JSON.stringify(removed), id: String(end()) });
+          assert.equal(JSON.parse(said[2].data).word, 'removed');
+        } finally {
+          await reader.cancel();
+        }
+      },
+    );
+    await s.test(
+      'a stream says it is open before its first line, as a comment: a feed with no line yet still answers, through a proxy that sends a head with its first bytes',
+      async (t) => {
+        const pass = emptyFeed();
+        const { reader, text } = await open();
+        try {
+          const [first] = await pass({ 'r-1': planAt('running') });
+          const said = await readUntil(t, reader, text, (s) => s.length >= 1);
+          assert.ok(text.value.startsWith(OPENED), `the stream's first bytes are its comment, before any line: ${text.value}`);
+          assert.equal(said[0].data, JSON.stringify(first), 'then the first line, the comment read as nothing');
+        } finally {
+          await reader.cancel();
+        }
+      },
+    );
+    await s.test(
+      'a stream opened with no cursor reads the feed from the start; one reconnected with Last-Event-ID resumes after that event, over any `after` in its address',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-1': planAt('running') });
+        assert.equal(readFeed(0).lines.length, 2);
+        await pass({ 'r-1': planAt('succeeded') });
+        const lines = readFeed(0).lines;
+        assert.equal(lines.length, 3);
+
+        const first = await open();
+        const all = await readUntil(t, first.reader, first.text, (s) => s.length >= 3);
+        await first.reader.cancel();
+        assert.deepEqual(
+          all.map((b) => [b.event, b.data]),
+          lines.map((l) => ['step' in l && l.step ? 'step' : 'run', JSON.stringify(l)]),
+        );
+        assert.equal(all[2].id, String(end()));
+        for (const [i, b] of all.entries())
+          assert.deepEqual(
+            readFeed(Number(b.id)).lines,
+            lines.slice(i + 1),
+            `event ${i}: its id is where a read takes up after that line, and no other`,
+          );
+
+        const again = await open('?after=0', { 'Last-Event-ID': all[0].id! });
+        const resumed = await readUntil(t, again.reader, again.text, (s) => s.length >= 2);
+        await pass({ 'r-1': planAt('failed') });
+        const more = await readUntil(t, again.reader, again.text, (s) => s.length >= 3);
+        await again.reader.cancel();
+        assert.deepEqual(
+          resumed.map((b) => b.id),
+          all.slice(1).map((b) => b.id),
+          'the header wins over the address: the second and third, not the first',
+        );
+        assert.equal(JSON.parse(more[2].data!).word, 'failed', 'and then what is written next');
+
+        const fromSecond = await open(`?after=${all[1].id}`);
+        const third = await readUntil(t, fromSecond.reader, fromSecond.text, (s) => s.length >= 2);
+        await fromSecond.reader.cancel();
+        assert.deepEqual(
+          third.map((b) => b.id),
+          [all[2].id, more[2].id],
+          'from the second event on',
+        );
+
+        const empty = await open('?after=');
+        const whole = await readUntil(t, empty.reader, empty.text, (s) => s.length >= 4);
+        await empty.reader.cancel();
+        assert.equal(whole[0].id, all[0].id, 'an empty `after` is none: from the start');
+      },
+    );
+    await s.test(
+      '`from=end` starts the stream at the feed as it stands: none of the lines it holds, and the next one written',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-1': planAt('running') });
+        const { reader, text } = await open('?from=end');
+        try {
+          const [gate] = await pass({ 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan') });
+          const said = await readUntil(t, reader, text, (s) => s.length >= 1);
+          assert.deepEqual(
+            said,
+            [{ event: 'step', data: JSON.stringify(gate), id: String(end()) }],
+            'the line written after it opened, and nothing of the feed it opened on',
+          );
+        } finally {
+          await reader.cancel();
+        }
+      },
+    );
+    await s.test(
+      'a cursor wins over `from=end`: a Last-Event-ID resumes where its reader was, and the lines after it are sent',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-1': planAt('running') });
+        const size = end();
+        const { reader, text } = await open('?from=end', { 'Last-Event-ID': '0' });
+        try {
+          const said = await readUntil(t, reader, text, (s) => s.at(-1)?.id === String(size));
+          assert.ok(said.length >= 1, 'the feed from the cursor, not from its end: an EventSource reconnecting misses nothing');
+          assert.equal(said.at(-1)!.id, String(size), 'read to the end of the feed it opened on');
+        } finally {
+          await reader.cancel();
+        }
+      },
+    );
+    await s.test(
+      'a daemon’s line, as up writes it once it holds the store, is sent as a daemon event, its data the line whole',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-1': planAt('running') });
+        const v0 = { at: '2026-10-07T12:00:00.000Z', daemon: 4242, word: 'daemon started', note: 'first daemon on this store' };
+        fs.appendFileSync(feedFile(), `${JSON.stringify(v0)}\n`);
+        const lines = readFeed(0).lines;
+        const daemon = lines.at(-1)!;
+        assert.deepEqual(
+          {
+            ...v0,
+            apiVersion: 'nemia/v1',
+            involved: { kind: 'Daemon', name: '4242' },
+            labels: {},
+            reason: 'DaemonStarted',
+            type: 'Normal',
+            source: 'daemon',
+            message: 'daemon started · first daemon on this store',
+          },
+          daemon,
+          'the package reads a line written before the feed was signed back as a signed one',
+        );
+        const opened = await open();
+        const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 3);
+        await opened.reader.cancel();
+        assert.deepEqual(
+          all.map((b) => b.event),
+          ['run', 'step', 'daemon'],
+        );
+        assert.equal(all[2].data, JSON.stringify(daemon));
+      },
+    );
+    await s.test(
+      'a tool denial comes out as a step event, its data the line whole: the api names an event by what the line is about, not by its reason',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({
+          'r-1': { ...planAt('running'), denials: [{ step: 'plan', try: 2, call: 'Bash(git push)' }] },
+        });
+        const opened = await open();
+        const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 3);
+        await opened.reader.cancel();
+        assert.deepEqual(
+          all.map((b) => b.event),
+          ['run', 'step', 'step'],
+          'the run, its step, and the denial of that step — each an event of what it is about',
+        );
+        const shot = JSON.parse(all[2].data!);
+        assert.deepEqual(
+          { reason: shot.reason, type: shot.type, source: shot.source, call: shot.call, try: shot.try, step: shot.step },
+          { reason: 'ToolDenied', type: 'Warning', source: 'runtime', call: 'Bash(git push)', try: 2, step: 'plan' },
+          'and the body a reader gets is the whole line, the fields a selector will match among them',
+        );
+      },
+    );
+    await s.test(
+      "a line another process writes — a `nemia tick`, beside an api run with `--no-tick` — arrives on the stream's next beat, read from the file",
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-1': planAt('running') });
+        const { reader, text } = await open(`?after=${end()}`);
+        try {
+          const [line] = await pass.elsewhere({ 'r-1': planAt('succeeded') });
+          const said = await readUntil(t, reader, text, (s) => s.length >= 1);
+          assert.deepEqual(said, [{ event: 'step', data: JSON.stringify(line), id: String(end()) }]);
+        } finally {
+          await reader.cancel();
+        }
+      },
+    );
+  },
+);
+
+/**
+ * `query` and `headers` asked of the stream, refused with `status` before it opens: an answer, not a stream, whose words name each of
+ * `facts`. A stream opened for it is let go, so the refusal is what the row waits on.
+ */
+async function refusedBefore(query: string, headers: Record<string, string>, status: number, facts: string[]): Promise<void> {
+  const res = await app.request(`${STREAM}${query}`, { headers });
+  const where = `${query} ${JSON.stringify(headers)}`;
+  if (res.status !== status) await res.body?.cancel();
+  assert.equal(res.status, status, where);
+  assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${where}: an answer, not a stream`);
+  const { error } = (await res.json()) as { error: string };
+  for (const fact of facts) assert.ok(error.includes(fact), `${where}: names ${fact}: ${error}`);
+}
+
+test(
+  'REFUSED: GET /api/feed/stream before it opens — a cursor the feed never gave, a `from` that is not `end`, a selector the grammar refuses',
   WAITED,
   async (t) => {
     const pass = emptyFeed();
     await pass({ 'r-1': planAt('running') });
-    const from = end();
-    const { res, reader, text } = await open(`?after=${from}`);
-    try {
-      assert.match(res.headers.get('content-type') ?? '', /^text\/event-stream/);
-
-      const [gate] = await pass({ 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan') });
-      let said = await readUntil(t, reader, text, (s) => s.length >= 1);
-      assert.deepEqual(
-        said,
-        [{ event: 'step', data: JSON.stringify(gate), id: String(end()) }],
-        'the gate, and nothing that was there before the cursor',
+    const size = end();
+    const whatToPass = ['Last-Event-ID', 'pass none to read the feed from the start'];
+    const cursors: [string, string, Record<string, string>, string[]][] = [
+      [
+        'inside a line, by address',
+        `?after=${size - 2}`,
+        {},
+        [`\`${size - 2}\` is not a cursor this feed gave`, 'falls inside a line of the feed'],
+      ],
+      [
+        'inside a line, by Last-Event-ID',
+        '',
+        { 'Last-Event-ID': String(size - 2) },
+        [`\`${size - 2}\``, 'falls inside a line of the feed, not after one'],
+      ],
+      [
+        'past the end',
+        `?after=${size + 10}`,
+        {},
+        [`\`${size + 10}\` is not a cursor this feed gave`, 'past the end of the feed', `(${size} bytes`],
+      ],
+      ['not a number', '?after=abc', {}, ['`abc` is not a cursor this feed gave', 'a whole number of bytes']],
+      ['below zero', '?after=-1', {}, ['`-1` is not a cursor this feed gave', 'a whole number of bytes']],
+      ['a Last-Event-ID no stream sent', '', { 'Last-Event-ID': 'page-2' }, ['`page-2`', 'not a cursor this feed gave']],
+    ];
+    for (const [name, query, headers, facts] of cursors)
+      await t.test(`a cursor the feed never gave is a 400 naming it and what to pass: ${name}`, () =>
+        refusedBefore(query, headers, 400, [...facts, ...whatToPass]),
       );
-
-      const [done] = await pass({
-        'r-1': { run: { word: 'done' }, steps: [{ name: 'plan', word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' }] },
-      });
-      said = await readUntil(t, reader, text, (s) => s.length >= 2);
-      assert.deepEqual(said[1], { event: 'run', data: JSON.stringify(done), id: String(end()) });
-
-      const [removed] = await pass({});
-      said = await readUntil(t, reader, text, (s) => s.length >= 3);
-      assert.deepEqual(said[2], { event: 'removed', data: JSON.stringify(removed), id: String(end()) });
-      assert.equal(JSON.parse(said[2].data).word, 'removed');
-    } finally {
-      await reader.cancel();
-    }
-  },
-);
-
-test(
-  'a stream says it is open before its first line, as a comment: a feed with no line yet still answers, through a proxy that sends a head with its first bytes',
-  WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    const { reader, text } = await open();
-    try {
-      const [first] = await pass({ 'r-1': planAt('running') });
-      const said = await readUntil(t, reader, text, (s) => s.length >= 1);
-      assert.ok(text.value.startsWith(OPENED), `the stream's first bytes are its comment, before any line: ${text.value}`);
-      assert.equal(said[0].data, JSON.stringify(first), 'then the first line, the comment read as nothing');
-    } finally {
-      await reader.cancel();
-    }
-  },
-);
-
-test(
-  'a stream opened with no cursor reads the feed from the start; one reconnected with Last-Event-ID resumes after that event, over any `after` in its address',
-  WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-1': planAt('running') });
-    assert.equal(readFeed(0).lines.length, 2);
-    await pass({ 'r-1': planAt('succeeded') });
-    const lines = readFeed(0).lines;
-    assert.equal(lines.length, 3);
-
-    const first = await open();
-    const all = await readUntil(t, first.reader, first.text, (s) => s.length >= 3);
-    await first.reader.cancel();
-    assert.deepEqual(
-      all.map((b) => [b.event, b.data]),
-      lines.map((l) => ['step' in l && l.step ? 'step' : 'run', JSON.stringify(l)]),
-    );
-    assert.equal(all[2].id, String(end()));
-    for (const [i, b] of all.entries())
-      assert.deepEqual(
-        readFeed(Number(b.id)).lines,
-        lines.slice(i + 1),
-        `event ${i}: its id is where a read takes up after that line, and no other`,
-      );
-
-    const again = await open('?after=0', { 'Last-Event-ID': all[0].id! });
-    const resumed = await readUntil(t, again.reader, again.text, (s) => s.length >= 2);
-    await pass({ 'r-1': planAt('failed') });
-    const more = await readUntil(t, again.reader, again.text, (s) => s.length >= 3);
-    await again.reader.cancel();
-    assert.deepEqual(
-      resumed.map((b) => b.id),
-      all.slice(1).map((b) => b.id),
-      'the header wins over the address: the second and third, not the first',
-    );
-    assert.equal(JSON.parse(more[2].data!).word, 'failed', 'and then what is written next');
-
-    const fromSecond = await open(`?after=${all[1].id}`);
-    const third = await readUntil(t, fromSecond.reader, fromSecond.text, (s) => s.length >= 2);
-    await fromSecond.reader.cancel();
-    assert.deepEqual(
-      third.map((b) => b.id),
-      [all[2].id, more[2].id],
-      'from the second event on',
-    );
-
-    const empty = await open('?after=');
-    const whole = await readUntil(t, empty.reader, empty.text, (s) => s.length >= 4);
-    await empty.reader.cancel();
-    assert.equal(whole[0].id, all[0].id, 'an empty `after` is none: from the start');
-  },
-);
-
-test('a daemon’s line, as up writes it once it holds the store, is sent as a daemon event, its data the line whole', WAITED, async (t) => {
-  const pass = emptyFeed();
-  await pass({ 'r-1': planAt('running') });
-  const v0 = { at: '2026-10-07T12:00:00.000Z', daemon: 4242, word: 'daemon started', note: 'first daemon on this store' };
-  fs.appendFileSync(feedFile(), `${JSON.stringify(v0)}\n`);
-  const lines = readFeed(0).lines;
-  const daemon = lines.at(-1)!;
-  assert.deepEqual(
-    {
-      ...v0,
-      apiVersion: 'nemia/v1',
-      involved: { kind: 'Daemon', name: '4242' },
-      labels: {},
-      reason: 'DaemonStarted',
-      type: 'Normal',
-      source: 'daemon',
-      message: 'daemon started · first daemon on this store',
-    },
-    daemon,
-    'the package reads a line written before the feed was signed back as a signed one',
-  );
-  const opened = await open();
-  const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 3);
-  await opened.reader.cancel();
-  assert.deepEqual(
-    all.map((b) => b.event),
-    ['run', 'step', 'daemon'],
-  );
-  assert.equal(all[2].data, JSON.stringify(daemon));
-});
-
-test(
-  'a tool denial comes out as a step event, its data the line whole: the api names an event by what the line is about, not by its reason',
-  WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    await pass({
-      'r-1': { ...planAt('running'), denials: [{ step: 'plan', try: 2, call: 'Bash(git push)' }] },
+    await t.test('a cursor the feed gave is taken', async () => {
+      const taken = await open(`?after=${size}`);
+      await taken.reader.cancel();
     });
-    const opened = await open();
-    const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 3);
-    await opened.reader.cancel();
-    assert.deepEqual(
-      all.map((b) => b.event),
-      ['run', 'step', 'step'],
-      'the run, its step, and the denial of that step — each an event of what it is about',
-    );
-    const shot = JSON.parse(all[2].data!);
-    assert.deepEqual(
-      { reason: shot.reason, type: shot.type, source: shot.source, call: shot.call, try: shot.try, step: shot.step },
-      { reason: 'ToolDenied', type: 'Warning', source: 'runtime', call: 'Bash(git push)', try: 2, step: 'plan' },
-      'and the body a reader gets is the whole line, the fields a selector will match among them',
-    );
+    for (const raw of ['start', '0', 'END', ''])
+      await t.test(`a \`from\` that is not \`end\` is a 400 saying \`end\` is the one value it takes: "${raw}"`, () =>
+        refusedBefore(`?from=${raw}`, {}, 400, [
+          `\`${raw}\` is not a start`,
+          '`from=end`',
+          '`after`',
+          'pass none to read the feed from the start',
+        ]),
+      );
+    await t.test('`from=end` is taken', async () => {
+      const taken = await open('?from=end');
+      await taken.reader.cancel();
+    });
+    await t.test('no reader is left behind to count a selector refused against', async (t) => {
+      await until(
+        t,
+        () => followers() === 0,
+        () => `${followers()} readers left behind by the tests before this one`,
+        { everyMs: 20 },
+      );
+    });
+    const howAsked = ['. A selector reaches this stream as `selector`', 'pass none to follow every line'];
+    const selectors: [string, string[]][] = [
+      ['?selector=message%3Dhi', ['"message" is no key of a feed line']],
+      ['?selector=run%3D%3Da', ['compares with ==']],
+      ['?selector=run%20in%20a', ['names a list', '(values)']],
+      ['?selector=', ['is no selector']],
+      ['?selector=run%3Dr-1&selector=nope%3Dx', ['"nope" is no key of a feed line']],
+    ];
+    for (const [query, facts] of selectors)
+      await t.test(`a selector the grammar refuses is a 422 naming it and how this stream is asked for one: ${query}`, () =>
+        refusedBefore(query, {}, 422, [...facts, ...howAsked]),
+      );
+    await t.test('no reader was started for a selector the grammar refuses: it is answered before the stream opens', () => {
+      assert.equal(followers(), 0);
+    });
   },
 );
-
-test('REFUSED: a cursor the feed never gave is a 400 that names it and says what to pass — inside a line, past the end, not a number; by address and by Last-Event-ID — and one it gave is taken', async () => {
-  const pass = emptyFeed();
-  await pass({ 'r-1': planAt('running') });
-  const size = end();
-  const cases: [string, Record<string, string>, RegExp][] = [
-    [
-      `?after=${size - 2}`,
-      {},
-      new RegExp(`^\`${size - 2}\` is not a cursor this feed gave: cursor ${size - 2} falls inside a line of the feed`),
-    ],
-    ['', { 'Last-Event-ID': String(size - 2) }, /falls inside a line of the feed, not after one/],
-    [
-      `?after=${size + 10}`,
-      {},
-      new RegExp(`^\`${size + 10}\` is not a cursor this feed gave: cursor ${size + 10} is past the end of the feed \\(${size} bytes`),
-    ],
-    ['?after=abc', {}, /^`abc` is not a cursor this feed gave: a feed cursor is a whole number of bytes\./],
-    ['?after=-1', {}, /^`-1` is not a cursor this feed gave: a feed cursor is a whole number of bytes\./],
-    ['', { 'Last-Event-ID': 'page-2' }, /^`page-2` is not a cursor this feed gave/],
-  ];
-  for (const [query, headers, pattern] of cases) {
-    const res = await app.request(`${STREAM}${query}`, { headers });
-    const where = `${query} ${JSON.stringify(headers)}`;
-    assert.equal(res.status, 400, where);
-    assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${where}: an answer, not a stream`);
-    const { error } = (await res.json()) as { error: string };
-    assert.match(error, pattern, where);
-    assert.match(
-      error,
-      /the id of an event this stream sent, which an EventSource sends back as Last-Event-ID; pass none to read the feed from the start\.$/,
-      where,
-    );
-  }
-  const taken = await open(`?after=${size}`);
-  await taken.reader.cancel();
-});
-
-test('`from=end` starts the stream at the feed as it stands: none of the lines it holds, and the next one written', WAITED, async (t) => {
-  const pass = emptyFeed();
-  await pass({ 'r-1': planAt('running') });
-  const { reader, text } = await open('?from=end');
-  try {
-    const [gate] = await pass({ 'r-1': planAt('awaiting approval', 'approve it: nemia approve r-1 plan') });
-    const said = await readUntil(t, reader, text, (s) => s.length >= 1);
-    assert.deepEqual(
-      said,
-      [{ event: 'step', data: JSON.stringify(gate), id: String(end()) }],
-      'the line written after it opened, and nothing of the feed it opened on',
-    );
-  } finally {
-    await reader.cancel();
-  }
-});
-
-test('a cursor wins over `from=end`: a Last-Event-ID resumes where its reader was, and the lines after it are sent', WAITED, async (t) => {
-  const pass = emptyFeed();
-  await pass({ 'r-1': planAt('running') });
-  const size = end();
-  const { reader, text } = await open('?from=end', { 'Last-Event-ID': '0' });
-  try {
-    const said = await readUntil(t, reader, text, (s) => s.at(-1)?.id === String(size));
-    assert.ok(said.length >= 1, 'the feed from the cursor, not from its end: an EventSource reconnecting misses nothing');
-    assert.equal(said.at(-1)!.id, String(size), 'read to the end of the feed it opened on');
-  } finally {
-    await reader.cancel();
-  }
-});
-
-test('REFUSED: a `from` that is not `end` is a 400 before the stream opens, saying `end` is the one value it takes', async () => {
-  const pass = emptyFeed();
-  await pass({ 'r-1': planAt('running') });
-  for (const raw of ['start', '0', 'END', '']) {
-    const res = await app.request(`${STREAM}?from=${raw}`);
-    const where = `?from=${raw}`;
-    assert.equal(res.status, 400, where);
-    assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${where}: an answer, not a stream`);
-    const { error } = (await res.json()) as { error: string };
-    assert.equal(
-      error,
-      `\`${raw}\` is not a start this feed takes: \`from=end\` starts at the feed's end, which is the one value \`from\` takes; pass none to read the feed from the start, or a cursor this stream gave as \`after\`.`,
-      where,
-    );
-  }
-  const taken = await open('?from=end');
-  await taken.reader.cancel();
-});
 
 test('a feed truncated under the stream ends it: `unreadable`, not tried again, and the response closes', WAITED, async (t) => {
   const pass = emptyFeed();
@@ -405,23 +466,6 @@ test('a feed truncated under the stream ends it: `unreadable`, not tried again, 
     { everyMs: 20 },
   );
 });
-
-test(
-  "a line another process writes — a `nemia tick`, beside an api run with `--no-tick` — arrives on the stream's next beat, read from the file",
-  WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-1': planAt('running') });
-    const { reader, text } = await open(`?after=${end()}`);
-    try {
-      const [line] = await pass.elsewhere({ 'r-1': planAt('succeeded') });
-      const said = await readUntil(t, reader, text, (s) => s.length >= 1);
-      assert.deepEqual(said, [{ event: 'step', data: JSON.stringify(line), id: String(end()) }]);
-    } finally {
-      await reader.cancel();
-    }
-  },
-);
 
 /** The reader's beat the test below gives its app (`Beats.feed`): a few of them are waited for, never the package's seconds. */
 const BEAT_MS = 100;
@@ -494,69 +538,73 @@ test(
 );
 
 test(
-  "a stream whose reader goes is no longer counted among the feed's followers: each open stream is one, and a cancelled one is not",
+  "the feed's followers: each open stream is counted once, and let go when its reader cancels or its client closes the socket",
   WAITED,
   async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-1': planAt('running') });
-    await until(
-      t,
-      () => followers() === 0,
-      () => `${followers()} readers left behind by the tests before this one, whose streams are gone with their readers`,
-      { everyMs: 20 },
+    const s = story(t);
+    await s.test(
+      "a stream whose reader goes is no longer counted among the feed's followers: each open stream is one, and a cancelled one is not",
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-1': planAt('running') });
+        await until(
+          t,
+          () => followers() === 0,
+          () => `${followers()} readers left behind by the tests before this one, whose streams are gone with their readers`,
+          { everyMs: 20 },
+        );
+        const streams = await Promise.all([open(), open(), open()]);
+        for (const s of streams) await readUntil(t, s.reader, s.text, (said) => said.length >= 1);
+        assert.equal(followers(), 3, 'one follower a stream, each counted once it sent an event');
+        await streams[0].reader.cancel();
+        await until(
+          t,
+          () => followers() === 2,
+          () => `${followers()} followers, with one of three readers gone`,
+          { everyMs: 20 },
+        );
+        for (const s of streams.slice(1)) await s.reader.cancel();
+        await until(
+          t,
+          () => followers() === 0,
+          () => `${followers()} followers left behind by three streams whose readers went`,
+          { everyMs: 20 },
+        );
+      },
     );
-    const streams = await Promise.all([open(), open(), open()]);
-    for (const s of streams) await readUntil(t, s.reader, s.text, (said) => said.length >= 1);
-    assert.equal(followers(), 3, 'one follower a stream, each counted once it sent an event');
-    await streams[0].reader.cancel();
-    await until(
-      t,
-      () => followers() === 2,
-      () => `${followers()} followers, with one of three readers gone`,
-      { everyMs: 20 },
+    await s.test(
+      'a client that closes its socket lets its reader go too — the path `main.ts` serves, where nothing is being written when it goes',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-1': planAt('running') });
+        const server = createAdaptorServer({ fetch: app.fetch }) as Server;
+        await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+        try {
+          await until(
+            t,
+            () => followers() === 0,
+            () => `${followers()} followers left behind by the tests before this one`,
+            { everyMs: 20 },
+          );
+          const { port } = server.address() as AddressInfo;
+          const abort = new AbortController();
+          const res = await fetch(`http://127.0.0.1:${port}${STREAM}`, { signal: abort.signal });
+          assert.equal(res.status, 200);
+          await readUntil(t, res.body!.getReader(), { value: '' }, (said) => said.length >= 2);
+          assert.equal(followers(), 1);
+          abort.abort();
+          await until(
+            t,
+            () => followers() === 0,
+            () => `the reader outlived its client's socket: ${followers()} left`,
+            { everyMs: 20 },
+          );
+        } finally {
+          server.closeAllConnections();
+          await new Promise((resolve) => server.close(resolve));
+        }
+      },
     );
-    for (const s of streams.slice(1)) await s.reader.cancel();
-    await until(
-      t,
-      () => followers() === 0,
-      () => `${followers()} followers left behind by three streams whose readers went`,
-      { everyMs: 20 },
-    );
-  },
-);
-
-test(
-  'a client that closes its socket lets its reader go too — the path `main.ts` serves, where nothing is being written when it goes',
-  WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-1': planAt('running') });
-    const server = createAdaptorServer({ fetch: app.fetch }) as Server;
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-    try {
-      await until(
-        t,
-        () => followers() === 0,
-        () => `${followers()} followers left behind by the tests before this one`,
-        { everyMs: 20 },
-      );
-      const { port } = server.address() as AddressInfo;
-      const abort = new AbortController();
-      const res = await fetch(`http://127.0.0.1:${port}${STREAM}`, { signal: abort.signal });
-      assert.equal(res.status, 200);
-      await readUntil(t, res.body!.getReader(), { value: '' }, (said) => said.length >= 2);
-      assert.equal(followers(), 1);
-      abort.abort();
-      await until(
-        t,
-        () => followers() === 0,
-        () => `the reader outlived its client's socket: ${followers()} left`,
-        { everyMs: 20 },
-      );
-    } finally {
-      server.closeAllConnections();
-      await new Promise((resolve) => server.close(resolve));
-    }
   },
 );
 
@@ -590,207 +638,189 @@ const untilBookmark = (from: number, selectors: Selectors, every: Duration.Input
   runtime.runPromise(Stream.runCollect(Stream.takeUntil(feedEvents(from, selectors, every), (m) => m.event === 'bookmark')));
 
 test(
-  'a selector sends only the lines it takes, each with its own cursor as its id, and the lines between them are not sent',
+  'A board follows the feed through selectors: only the lines they take, a comma and a second selector, a bare key, and a bookmark that says where it has read to',
   WAITED,
   async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-a': planAt('running') });
-    await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
-    await pass({ 'r-a': planAt('succeeded'), 'r-b': planAt('running') });
-    const every = everySent();
-    const mine = every.filter((l) => labelOf(l.line, 'run') === 'r-a');
-    assert.equal(mine.length, 3, "three of run a's lines");
-    assert.ok(
-      every.some((l, i) => labelOf(l.line, 'run') === 'r-b' && i > 0 && i < every.length - 1),
-      "run b's lines are written between run a's, so a stream that sent the feed whole would carry them",
+    const s = story(t);
+    await s.test(
+      'a selector sends only the lines it takes, each with its own cursor as its id, and the lines between them are not sent',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-a': planAt('running') });
+        await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
+        await pass({ 'r-a': planAt('succeeded'), 'r-b': planAt('running') });
+        const every = everySent();
+        const mine = every.filter((l) => labelOf(l.line, 'run') === 'r-a');
+        assert.equal(mine.length, 3, "three of run a's lines");
+        assert.ok(
+          every.some((l, i) => labelOf(l.line, 'run') === 'r-b' && i > 0 && i < every.length - 1),
+          "run b's lines are written between run a's, so a stream that sent the feed whole would carry them",
+        );
+
+        const { reader, text } = await open('?selector=run%3Dr-a');
+        try {
+          const said = await readUntil(t, reader, text, (s) => s.length >= 3);
+          assert.deepEqual(
+            sentOf(said),
+            mine.map((l) => l.sent),
+            "run a's lines alone, each its own line's cursor as its id, with no line of run b's among them",
+          );
+          assert.equal(
+            said.filter((b) => labelOf(JSON.parse(b.data!) as FeedLine, 'run') === 'r-b').length,
+            0,
+            "a line the selector does not take never crosses the wire: run b's are dropped at the source",
+          );
+        } finally {
+          await reader.cancel();
+        }
+      },
     );
+    await s.test(
+      'every clause of one selector must hold, and one selector of those given: a comma ands, and `selector` again ors',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-a': steps('plan') });
+        await pass({ 'r-a': steps('plan', 'review') });
+        await pass({ 'r-a': steps('plan', 'review'), 'r-b': steps('review') });
+        const every = everySent();
+        const anded = every.filter((l) => labelOf(l.line, 'run') === 'r-a' && labelOf(l.line, 'step') === 'review');
+        const ored = every.filter((l) => labelOf(l.line, 'run') === 'r-a' || labelOf(l.line, 'step') === 'review');
+        assert.equal(anded.length, 1, "run a at review alone: run a's other lines and run b's review line are the fixture");
+        assert.equal(ored.length, 4, "run a's three lines and run b's review line");
 
-    const { reader, text } = await open('?selector=run%3Dr-a');
-    try {
-      const said = await readUntil(t, reader, text, (s) => s.length >= 3);
-      assert.deepEqual(
-        sentOf(said),
-        mine.map((l) => l.sent),
-        "run a's lines alone, each its own line's cursor as its id, with no line of run b's among them",
-      );
-      assert.equal(
-        said.filter((b) => labelOf(JSON.parse(b.data!) as FeedLine, 'run') === 'r-b').length,
-        0,
-        "a line the selector does not take never crosses the wire: run b's are dropped at the source",
-      );
-    } finally {
-      await reader.cancel();
-    }
-  },
-);
+        const and = await open('?selector=run%3Dr-a,step%3Dreview');
+        try {
+          const said = await readUntil(t, and.reader, and.text, (s) => s.length >= 1);
+          assert.deepEqual(
+            sentOf(said),
+            anded.map((l) => l.sent),
+            "the clauses of one selector both hold of the line it takes: run a's own run line, which carries no step, is not sent",
+          );
+        } finally {
+          await and.reader.cancel();
+        }
 
-test(
-  'every clause of one selector must hold, and one selector of those given: a comma ands, and `selector` again ors',
-  WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-a': steps('plan') });
-    await pass({ 'r-a': steps('plan', 'review') });
-    await pass({ 'r-a': steps('plan', 'review'), 'r-b': steps('review') });
-    const every = everySent();
-    const anded = every.filter((l) => labelOf(l.line, 'run') === 'r-a' && labelOf(l.line, 'step') === 'review');
-    const ored = every.filter((l) => labelOf(l.line, 'run') === 'r-a' || labelOf(l.line, 'step') === 'review');
-    assert.equal(anded.length, 1, "run a at review alone: run a's other lines and run b's review line are the fixture");
-    assert.equal(ored.length, 4, "run a's three lines and run b's review line");
-
-    const and = await open('?selector=run%3Dr-a,step%3Dreview');
-    try {
-      const said = await readUntil(t, and.reader, and.text, (s) => s.length >= 1);
-      assert.deepEqual(
-        sentOf(said),
-        anded.map((l) => l.sent),
-        "the clauses of one selector both hold of the line it takes: run a's own run line, which carries no step, is not sent",
-      );
-    } finally {
-      await and.reader.cancel();
-    }
-
-    const or = await open('?selector=run%3Dr-a&selector=step%3Dreview');
-    try {
-      const said = await readUntil(t, or.reader, or.text, (s) => s.length >= 4);
-      assert.deepEqual(
-        sentOf(said),
-        ored.map((l) => l.sent),
-        "one selector of the two holds: run a's lines and run b's review line, and nothing else",
-      );
-    } finally {
-      await or.reader.cancel();
-    }
-  },
-);
-
-test(
-  "a bookmark says where the stream has read to: the feed's own cursor, past a line the selector dropped, as its id, with an empty data field",
-  WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-a': planAt('running') });
-    await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
-    const mine = everySent().filter((l) => labelOf(l.line, 'run') === 'r-a');
-    await until(
-      t,
-      () => followers() === 0,
-      () => `${followers()} readers left behind by the tests before this one`,
-      { everyMs: 20 },
+        const or = await open('?selector=run%3Dr-a&selector=step%3Dreview');
+        try {
+          const said = await readUntil(t, or.reader, or.text, (s) => s.length >= 4);
+          assert.deepEqual(
+            sentOf(said),
+            ored.map((l) => l.sent),
+            "one selector of the two holds: run a's lines and run b's review line, and nothing else",
+          );
+        } finally {
+          await or.reader.cancel();
+        }
+      },
     );
+    await s.test('a selector the grammar takes opens the stream: a bare key sends the lines that carry it', async (t) => {
+      const pass = emptyFeed();
+      await pass({ 'r-a': planAt('running') });
+      const carried = everySent().filter((l) => labelOf(l.line, 'run') !== undefined);
+      assert.ok(carried.length >= 1, 'the feed has lines carrying a run');
+      const { reader, text } = await open('?selector=run');
+      try {
+        const said = await readUntil(t, reader, text, (s) => s.length >= carried.length);
+        assert.deepEqual(
+          sentOf(said),
+          carried.map((l) => l.sent),
+        );
+      } finally {
+        await reader.cancel();
+      }
+    });
+    await s.test(
+      "a bookmark says where the stream has read to: the feed's own cursor, past a line the selector dropped, as its id, with an empty data field",
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-a': planAt('running') });
+        await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
+        const mine = everySent().filter((l) => labelOf(l.line, 'run') === 'r-a');
+        await until(
+          t,
+          () => followers() === 0,
+          () => `${followers()} readers left behind by the tests before this one`,
+          { everyMs: 20 },
+        );
 
-    const got = await untilBookmark(0, parseSelectors(['run=r-a']), '200 millis');
-    const marked = got.at(-1)!;
-    assert.equal(marked.event, 'bookmark', 'the stream of a silent feed says where it is, named');
-    assert.equal(marked.data, '', 'the field present and empty: an EventSource both keeps the id and dispatches the event');
-    assert.match(String(marked.id), /^\d+$/);
-    assert.equal(
-      marked.id,
-      String(end()),
-      "the cursor advanced past run b's lines, which the selector dropped: a reader resuming here re-reads none of them",
+        const got = await untilBookmark(0, parseSelectors(['run=r-a']), '200 millis');
+        const marked = got.at(-1)!;
+        assert.equal(marked.event, 'bookmark', 'the stream of a silent feed says where it is, named');
+        assert.equal(marked.data, '', 'the field present and empty: an EventSource both keeps the id and dispatches the event');
+        assert.match(String(marked.id), /^\d+$/);
+        assert.equal(
+          marked.id,
+          String(end()),
+          "the cursor advanced past run b's lines, which the selector dropped: a reader resuming here re-reads none of them",
+        );
+        assert.notEqual(
+          marked.id,
+          mine.at(-1)!.sent.id,
+          "not the cursor after the last line the selector took, which is short of the feed's end",
+        );
+        assert.deepEqual(
+          got.slice(0, -1).map((m) => ({ data: m.data, id: m.id! })),
+          mine.map((l) => l.sent),
+          "run a's lines alone before it",
+        );
+        await until(
+          t,
+          () => followers() === 0,
+          () => `the reader outlived the stream that ended on its bookmark: ${followers()} left`,
+          { everyMs: 20 },
+        );
+      },
     );
-    assert.notEqual(
-      marked.id,
-      mine.at(-1)!.sent.id,
-      "not the cursor after the last line the selector took, which is short of the feed's end",
-    );
-    assert.deepEqual(
-      got.slice(0, -1).map((m) => ({ data: m.data, id: m.id! })),
-      mine.map((l) => l.sent),
-      "run a's lines alone before it",
-    );
-    await until(
-      t,
-      () => followers() === 0,
-      () => `the reader outlived the stream that ended on its bookmark: ${followers()} left`,
-      { everyMs: 20 },
-    );
-  },
-);
+    await s.test(
+      'a stream resumes after a bookmark: its id taken back as Last-Event-ID resends nothing, and the next line arrives',
+      async (t) => {
+        const pass = emptyFeed();
+        await pass({ 'r-a': planAt('running') });
+        await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
+        const got = await untilBookmark(0, parseSelectors(['run=r-a']), '200 millis');
+        const marked = got.at(-1)!;
+        assert.equal(marked.event, 'bookmark');
 
-test(
-  'a stream resumes after a bookmark: its id taken back as Last-Event-ID resends nothing, and the next line arrives',
-  WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-a': planAt('running') });
-    await pass({ 'r-a': planAt('running'), 'r-b': planAt('running') });
-    const got = await untilBookmark(0, parseSelectors(['run=r-a']), '200 millis');
-    const marked = got.at(-1)!;
-    assert.equal(marked.event, 'bookmark');
+        const again = await open('?selector=run%3Dr-a', { 'Last-Event-ID': marked.id! });
+        try {
+          const [next] = await pass({ 'r-a': planAt('succeeded'), 'r-b': planAt('running') });
+          const said = await readUntil(t, again.reader, again.text, (s) => s.length >= 1);
+          assert.deepEqual(
+            sentOf(said),
+            [{ data: JSON.stringify(next), id: String(end()) }],
+            'what was written after the bookmark, and none of the lines before it',
+          );
+        } finally {
+          await again.reader.cancel();
+        }
 
-    const again = await open('?selector=run%3Dr-a', { 'Last-Event-ID': marked.id! });
-    try {
-      const [next] = await pass({ 'r-a': planAt('succeeded'), 'r-b': planAt('running') });
-      const said = await readUntil(t, again.reader, again.text, (s) => s.length >= 1);
-      assert.deepEqual(
-        sentOf(said),
-        [{ data: JSON.stringify(next), id: String(end()) }],
-        'what was written after the bookmark, and none of the lines before it',
-      );
-    } finally {
-      await again.reader.cancel();
-    }
-
-    const fresh = emptyFeed();
-    const first = await untilBookmark(0, parseSelectors(['run=r-a']), '200 millis');
-    assert.equal(first.at(-1)!.id, '0', 'a bookmark before any line carries the cursor the stream started from');
-    const empty = await open('', { 'Last-Event-ID': first.at(-1)!.id! });
-    await empty.reader.cancel();
-    await fresh({ 'r-a': planAt('running') });
-  },
-);
-
-test('a selector the grammar takes opens the stream: a bare key sends the lines that carry it', WAITED, async (t) => {
-  const pass = emptyFeed();
-  await pass({ 'r-a': planAt('running') });
-  const carried = everySent().filter((l) => labelOf(l.line, 'run') !== undefined);
-  assert.ok(carried.length >= 1, 'the feed has lines carrying a run');
-  const { reader, text } = await open('?selector=run');
-  try {
-    const said = await readUntil(t, reader, text, (s) => s.length >= carried.length);
-    assert.deepEqual(
-      sentOf(said),
-      carried.map((l) => l.sent),
+        const fresh = emptyFeed();
+        const first = await untilBookmark(0, parseSelectors(['run=r-a']), '200 millis');
+        assert.equal(first.at(-1)!.id, '0', 'a bookmark before any line carries the cursor the stream started from');
+        const empty = await open('', { 'Last-Event-ID': first.at(-1)!.id! });
+        await empty.reader.cancel();
+        await fresh({ 'r-a': planAt('running') });
+      },
     );
-  } finally {
-    await reader.cancel();
-  }
-});
-
-test(
-  'REFUSED: a selector the grammar refuses is a 422 naming it and how this stream is asked for one, with no stream opened',
-  WAITED,
-  async (t) => {
-    const pass = emptyFeed();
-    await pass({ 'r-1': planAt('running') });
-    await until(
-      t,
-      () => followers() === 0,
-      () => `${followers()} readers left behind by the tests before this one`,
-      { everyMs: 20 },
+    await s.test(
+      "the tick's first beat is dropped: no bookmark comes among the lines the feed already holds when the stream opens",
+      async () => {
+        const pass = emptyFeed();
+        await pass({ 'r-a': planAt('running') });
+        const every = everySent();
+        assert.equal(every.length, 2, 'two lines are written before the stream is subscribed, and one read hands both on');
+        const got = await untilBookmark(0, [], '200 millis');
+        assert.deepEqual(
+          got.map((m) => [m.event, m.id]),
+          [
+            ['run', every[0].sent.id],
+            ['step', every[1].sent.id],
+            ['bookmark', every[1].sent.id],
+          ],
+          'both lines, then the beat: a first beat not dropped comes at subscription, and lands between the two lines the first read hands on',
+        );
+      },
     );
-    const cases: [string, RegExp][] = [
-      ['?selector=message%3Dhi', /^"message" is no key of a feed line: a selector names one of /],
-      ['?selector=run%3D%3Da', /compares with ==, and a selector compares with one =/],
-      ['?selector=run%20in%20a', /names a list and spells it with no \(values\) after in/],
-      ['?selector=', /is no selector: it holds no clause/],
-      ['?selector=run%3Dr-1&selector=nope%3Dx', /^"nope" is no key of a feed line/],
-    ];
-    for (const [query, pattern] of cases) {
-      const res = await app.request(`${STREAM}${query}`);
-      if (res.status !== 422) await res.body?.cancel();
-      assert.equal(res.status, 422, `${query}: a stream opened for it is let go, and the refusal is what this test waits on`);
-      assert.match(res.headers.get('content-type') ?? '', /^application\/json/, `${query}: an answer, not a stream`);
-      const { error } = (await res.json()) as { error: string };
-      assert.match(error, pattern, query);
-      assert.match(
-        error,
-        /\. A selector reaches this stream as `selector`, given again for another selector, of which one must hold; pass none to follow every line\.$/,
-        `${query}: the package's words, which end on its key list, closed by a full stop before the api's own sentence`,
-      );
-    }
-    assert.equal(followers(), 0, 'no reader was started for a selector the grammar refuses: it is answered before the stream opens');
   },
 );
 
@@ -807,21 +837,4 @@ test('the stream says where it has read to at the one cadence every surface read
     'and the api spells no cadence of its own, which would be a second cadence to drift',
   );
   assert.equal(typeof BOOKMARK_EVERY, 'string', 'the constant the package owns');
-});
-
-test("the tick's first beat is dropped: no bookmark comes among the lines the feed already holds when the stream opens", async () => {
-  const pass = emptyFeed();
-  await pass({ 'r-a': planAt('running') });
-  const every = everySent();
-  assert.equal(every.length, 2, 'two lines are written before the stream is subscribed, and one read hands both on');
-  const got = await untilBookmark(0, [], '200 millis');
-  assert.deepEqual(
-    got.map((m) => [m.event, m.id]),
-    [
-      ['run', every[0].sent.id],
-      ['step', every[1].sent.id],
-      ['bookmark', every[1].sent.id],
-    ],
-    'both lines, then the beat: a first beat not dropped comes at subscription, and lands between the two lines the first read hands on',
-  );
 });

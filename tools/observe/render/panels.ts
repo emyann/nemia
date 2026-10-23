@@ -38,12 +38,23 @@ const UNIT = 38;
 /** How long a dashboard is given to load and to settle, in milliseconds. */
 const LOAD_MS = 90_000;
 
-/** The address `uid` is opened at on the Grafana at `base`: the picks' range, run and session, the times in UTC. */
-export function addressOf(base: string, uid: string, picks: Picks): string {
+/** `at` as Grafana's time relative to `now`, to the second: `now-90s`, `now+300s`, or `now`. */
+const relative = (at: number, now: number): string => {
+  const seconds = Math.round((at - now) / 1000);
+  return seconds === 0 ? 'now' : `now${seconds > 0 ? '+' : '-'}${Math.abs(seconds)}s`;
+};
+
+/**
+ * The address `uid` is opened at on the Grafana at `base`: the picks' range, run and session, the times in UTC. Given `now`, the range is
+ * written relative to it, the same range while the page is opened: Grafana honours a panel's own range (`timeFrom`, the quota's week)
+ * only under a dashboard range that is relative, and drops it under one of two instants. Without it the two instants are written, as a
+ * held stack's lines are, which a person may open long after.
+ */
+export function addressOf(base: string, uid: string, picks: Picks, now?: number): string {
   const query = new URLSearchParams({
     orgId: '1',
-    from: String(picks.from),
-    to: String(picks.to),
+    from: now === undefined ? String(picks.from) : relative(picks.from, now),
+    to: now === undefined ? String(picks.to) : relative(picks.to, now),
     timezone: 'utc',
     'var-run': picks.run,
     'var-session': picks.session,

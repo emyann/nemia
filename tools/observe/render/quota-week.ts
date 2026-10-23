@@ -16,8 +16,8 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 /** How often the daemon reads the quota (`QUOTA_EVERY_MS`): a reading holds until the next. */
 const READING_MS = 10 * 60_000;
-/** How long the seeded week's window has run at the stamp: it reset two and a half days before it. */
-const WEEK_RUN_MS = 2.5 * DAY_MS;
+/** How long the seeded week's window has run at the stamp: it reset 2.6 days before it. */
+const WEEK_RUN_MS = 2.6 * DAY_MS;
 /** Each window's length, by the key the harness gives it. */
 const WINDOW_MS: Record<string, number> = { seven_day: 7 * DAY_MS, five_hour: 5 * HOUR_MS };
 

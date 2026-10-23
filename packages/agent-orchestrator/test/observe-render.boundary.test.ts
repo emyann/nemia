@@ -13,6 +13,7 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { scratch } from './scratch.ts';
@@ -21,7 +22,7 @@ import { boundOf, HOLD_DEFAULT, heldLines, heldName } from '../../../tools/obser
 import { dropStale, locked, lockFile, release, take, type Lock } from '../../../tools/observe/render/lock.ts';
 import { addressOf, heightOf, written, type Seen } from '../../../tools/observe/render/panels.ts';
 import { dashboardsOf, planOf } from '../../../tools/observe/render/plan.ts';
-import { NAME, nameOf, runArgv, type Compose } from '../../../tools/observe/render/stack.ts';
+import { lateConfig, NAME, nameOf, RENDER_LATE, runArgv, type Compose } from '../../../tools/observe/render/stack.ts';
 
 const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const OBSERVE = path.join(REPO, 'tools', 'observe');
@@ -34,11 +35,15 @@ const CALLS = path.join(ROOT, 'docker.calls');
 const GONE = path.join(ROOT, 'container.gone');
 
 /**
- * The stub: records its arguments; `port` fails, as a container that never came up; `wait` returns once a removal was recorded, as
- * the real one does when its container ends; everything else succeeds.
+ * The stub: records its arguments; a read of a file out of the image answers a Prometheus configuration with its window; `port` fails,
+ * as a container that never came up; `wait` returns once a removal was recorded, as the real one does when its container ends;
+ * everything else succeeds.
  */
 const STUB = `#!/bin/sh
 echo "$*" >> "${CALLS}"
+case "$*" in
+  *"--entrypoint cat"*) printf 'storage:\\n  tsdb:\\n    out_of_order_time_window: 10m\\n'; exit 0 ;;
+esac
 case "$1" in
   port) exit 1 ;;
   rm) touch "${GONE}" ;;
@@ -99,6 +104,15 @@ test("the container is the checkout's own: the pinned image, its binds read-only
   assert.deepEqual(other.slice(-3), ['-v', '/o/extra.yaml:/etc/extra.yaml:ro', 'i@sha256:1'], 'the binds are read from the file');
 });
 
+test("a render's Prometheus takes a sample a week late, the image's configuration otherwise as it is; one that sets no window is refused", () => {
+  const image = 'global:\n  scrape_native_histograms: true\nstorage:\n  tsdb:\n    out_of_order_time_window: 10m\n';
+  assert.equal(lateConfig(image), image.replace('10m', RENDER_LATE));
+  assert.equal(RENDER_LATE, '8d', "longer than the seed's week of quota");
+  assert.ok(refused(() => lateConfig('global:\n  scrape_native_histograms: true\n')).length > 0, 'REFUSED: no window to widen');
+  const argv = runArgv(COMPOSE, '/w/tools/observe', nameOf(), ['/tmp/x/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro']);
+  assert.deepEqual(argv.slice(-3, -1), ['-v', '/tmp/x/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro'], 'its own bind after the file\'s');
+});
+
 test('REFUSED: a container started under a name that is no render’s, the live stack’s among them', () => {
   for (const name of ['nemia-lgtm', 'nemia-render-*', 'nemia-render-12', 'x nemia-render-1-ab'])
     assert.ok(refused(() => runArgv(COMPOSE, OBSERVE, name)).includes("is no render's name"), name);
@@ -124,8 +138,12 @@ test('a render whose container never comes up exits non-zero, and removes it by 
   const r = ran('render.ts', ['--dashboards', 'steps', '--out', path.join(ROOT, 'out')]);
   assert.equal(r.status, 1, r.out);
   const said = calls();
-  const name = /^run -d --rm --name (\S+) /.exec(said[0])?.[1] ?? '';
+  const started = said.findIndex((line) => line.startsWith('run -d '));
+  const name = /^run -d --rm --name (\S+) /.exec(said[started] ?? '')?.[1] ?? '';
   assert.match(name, NAME, said.join('\n'));
+  assert.ok(said.slice(0, started).every((line) => line.startsWith('run --rm --entrypoint cat ')), 'only the image read before it');
+  assert.ok(said[started].includes(`/${name}/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro`), 'its own Prometheus configuration');
+  assert.equal(fs.existsSync(path.join(os.tmpdir(), name)), false, 'its own files removed with it');
   assert.equal(said.at(-1), `rm -f -v ${name}`, said.join('\n'));
   assert.ok(!said.some((line) => line.includes('nemia-lgtm') || line.includes('*')), said.join('\n'));
   assert.equal(locked(), undefined, 'the slot is let go');
@@ -253,6 +271,12 @@ test('a hold says its container, how to stop it, where Grafana listens, its coll
   assert.deepEqual(
     ['from', 'to', 'var-run', 'var-session'].map((key) => address.searchParams.get(key)),
     ['1000', '2000', 'r-1', 's-1'],
+  );
+  const opened = new URL(addressOf('http://127.0.0.1:5', 'nemia-steps', { ...picks, from: 1_000, to: 301_000 }, 61_000));
+  assert.deepEqual(
+    ['from', 'to'].map((key) => opened.searchParams.get(key)),
+    ['now-60s', 'now+240s'],
+    "a picture's range is relative to when it is opened, so a panel's own range is honoured",
   );
 });
 

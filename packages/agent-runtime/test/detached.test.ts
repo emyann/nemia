@@ -2837,3 +2837,33 @@ test('a detached look, find and stop read the run files of the sessions they are
     assert.equal('exitCode' in seen.get('ae/t16/1')!, false, 'killed by a signal: no code, not -1');
   });
 });
+
+test('a second stop while one is under way signals the harness again, and leaves the grace counted from the first', WAITED, async (t) => {
+  const grace = 3000;
+  const dir = root();
+  const cwd = scratch('ae-harness-');
+  const script = [
+    "trap 'date +%s%3N >> terms' TERM",
+    ': > started',
+    'while :; do sleep 0.1; if [ -s terms ]; then date +%s%3N >> ticks; fi; done',
+  ].join('; ');
+  const ops = detachedOps(sh(script), dir, { stopGraceMs: grace, beatMs: 200 });
+  await Effect.runPromise(ops.spawn(req('ae/g5/1', cwd)));
+  await within(t, () => fs.existsSync(path.join(cwd, 'started')), 'the harness started');
+  const worker = runningIn([dir]).find((p) => /\bae-worker\.ts\b/.test(p.args))!.pid;
+  const lines = (name: string) => {
+    const file = path.join(cwd, name);
+    return fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map(Number) : [];
+  };
+  process.kill(worker, 'SIGTERM');
+  await within(t, () => lines('ticks').length >= 20, 'the harness ticks on, two seconds into the first stop’s grace');
+  process.kill(worker, 'SIGTERM');
+  await within(t, () => lines('terms').length === 2, 'the second stop reached the harness too');
+  await within(t, () => !alive(worker) && runningIn([cwd]).length === 0, 'the worker and its harness ended');
+  const [, second] = lines('terms');
+  const last = lines('ticks').at(-1)!;
+  assert.ok(
+    last - second! < grace - 1000,
+    `the harness was killed ${last - second!} ms after the second stop: the grace runs from the first, not again from the second`,
+  );
+});

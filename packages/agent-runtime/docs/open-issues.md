@@ -27,9 +27,14 @@ only when its task asks with `config.background: true` (issue 28). Since stage 3
 same shape (issue 31). Since stage 4a part 2 (the same day), the runtime makes one attempt per start, and trying again is the
 orchestrator's (*One attempt per start*, under Fixed).
 
+State as of 2026-10-23 (the docs audit of that day): 2 and the Codex line's 36 are closed and moved under *Closed since
+2026-09-16*, the resumed job's carried cost is under *Verified live, once*, and open questions 1, 2, 3 and 5 are under
+*Answered or overtaken*. The claude.ai bridge and the interrupt's receipt, written down on 2026-10-16 as a second 36 and a
+second 37, are 39 and 40.
+
 ## Bugs
 
-### 36. The claude.ai bridge is an undeclared control request, and two things about it are unmeasured
+### 39. The claude.ai bridge is an undeclared control request, and two things about it are unmeasured
 
 **Where.** `src/harness/claude/attached-bridge.ts`, the one door; `src/harness/claude/attached-session.ts`, which opens the bridge
 after the first turn of a request that asked for it.
@@ -49,7 +54,7 @@ runtime passed the kept `bridgeSessionId` back as `reattachSessionId` — the st
 pinned, not the service's behaviour. (ii) Whether a question the session asks reaches the phone at all while `canUseTool` answers it
 in-process: the two were never both live in one probe.
 
-### 37. What an interrupt's receipt lists is unrecorded, and nothing of it reaches the person
+### 40. What an interrupt's receipt lists is unrecorded, and nothing of it reaches the person
 
 **Where.** `src/service/interrupt.ts` (the engine verb), `src/harness/claude/attached-session.ts` (`interruptTurn`), and the
 orchestrator's `chatStop`.
@@ -78,8 +83,8 @@ specified*). A follow-up card decides whether the receipt should be read, and wh
 ### 38. A file time written through `utimes` and compared exactly is carried by the Node floor, not by the code
 
 **Where.** `src/harness/detached/said.ts`: the capture cache writes a kept file's time with `fs.utimesSync(own, atimeMs / 1000,
-mtimeMs / 1000)` (:143) and then compares what it reads back exactly — `parsed.mtimeMs !== key.mtimeMs` (:83), `mtimeMs !== key.mtimeMs`
-(:141), `known.mtimeMs !== key.mtimeMs` (:257) — and `detached/compact.ts:83` carries `capture.key.mtimeMs` forward into a new key.
+mtimeMs / 1000)` (:144) and then compares what it reads back exactly — `parsed.mtimeMs !== key.mtimeMs` (:84), `mtimeMs !== key.mtimeMs`
+(:142), `known.mtimeMs !== key.mtimeMs` (:258) — and `detached/compact.ts:83` carries `capture.key.mtimeMs` forward into a new key.
 Beside them, `agent-orchestrator/src/record/files.store.ts:334` and `src/artifacts/artifacts.store.ts:240` write a time the same way,
 and `core/engine/bodies.ts:82` writes `now`.
 
@@ -95,21 +100,6 @@ still carries 1.51.0, and no Node 22 release ships 1.52 at all, so there was no 
 workaround (2026-10-19), and **the code is unchanged**: nothing rounds, and nothing compares a file time with a tolerance. If the floor
 is ever lowered, or the runtime is ever run on another libuv or another kernel that keeps a coarser time, these are the comparisons
 where it shows, and the six tests above are what names it.
-
-### 2. `advance` hands off only steps that succeeded
-
-**Where.** `agent-orchestrator/src/runner.ts:318` commits a finished step's leftover work only when its
-engine task succeeded.
-
-**Effect.** A step that fails or is stopped keeps anything it did not commit only in its worktree
-(`~/.agent-workflows/worktrees/<run>/run`): not on its branch, not merged into later steps, not
-shown by `wf decide`, and lost if the worktree is removed. The closeout contract tells steps "the run
-commits whatever you left", which holds only for succeeded steps.
-
-**Fix.** Hand off every finished step — succeeded, failed or stopped. A failed step still blocks what
-follows; this only keeps its work on its branch.
-
-**Status.** Deferred on purpose (2026-09-12): fix it when it bites.
 
 ### 3. A worktree task's Claude session stays in the registry
 
@@ -497,10 +487,10 @@ would fail on every pass — and on a harness with no such knob (`codex`, a `Har
 range). A window small enough to thrash is the task's author's to avoid: the engine sees only a `blocked` session.
 
 **Not measured.** A window of 200k on real work: what a session loses in the summary, and whether a turn's tool output ever
-refills 200k in three turns — several large reads in parallel in one turn could. The shipped workflows of work give every
-agent step `context: 200k` on the strength of the unattended run above; a step that stalls `blocked` on a thrash is the sign
-to widen it. What the summarising call costs next to the reading it saves. A `claude -p` attempt's tokens across a compaction
-under the engine.
+refills 200k in three turns — several large reads in parallel in one turn could. This repository's agents each carry
+`context: 200k` on the strength of the unattended run above, and build's implement widens it to `context: 400k`
+(`401762605`, 2026-10-10); a step that stalls `blocked` on a thrash is the sign to widen it. What the summarising call costs
+next to the reading it saves. A `claude -p` attempt's tokens across a compaction under the engine.
 
 ### 27. The A2A seam carries every call to a session, the transcript as an extension method
 
@@ -581,6 +571,11 @@ Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `
 `config.background: true` (`src/harness/claude/code.ts`); since part 2a (the same day) a job reads its brief, and the words
 said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
 `/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M12, and M14).
+
+**These are the `claude -p` road's measurements.** Since 2026-10-21 (`45824a1f2`) a job on `claude` runs its session on the
+Agent SDK's `query()`, in a process of its own, and not as `claude -p`: what the SDK road was measured to do is in
+`docs/harness.md`. `claude-detached` is the one harness left on `claude -p` (*`claude-detached` still spells `claude -p`*, at
+the end).
 
 - **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
   and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
@@ -905,23 +900,11 @@ What is left:
   by then, so this never makes a statement absent or an attempt `LOST`, but the end's cost is missing. Retrying the read means
   deciding whether a release whose stop is already done runs again.
 
-### 36. A Codex line that does not decode leaves every Codex session unread, and none of them can be forgotten (2026-10-06, fixed the same day)
-
-A line of `codex exec --json` of a type the runtime reads that `CodexEventSchema` (`harness/codex/stream.ts`) does not decode fails
-the Codex harness's whole look, so every Codex session is unread, by design (issue 35), until the run file whose output it is goes.
-Nothing makes it go: `ae forget` takes only a settled task, refuses a session its harness could not be read for (`sessionsHeld`,
-`service/forget.ts`), and a task with no deadline on that harness never settles — the gap issue 35 names. The one way out today is a
-hand removal of the run, which the repository's rules forbid. The same trap was found, and closed, for a session whose start event
-does not decode, under every detached harness: unread only while its process runs, then read as failed with no id
-(`lookOf`, `harness/detached/detached.ts`), so its harness's other sessions stay read (`test/start-event.test.ts`). **Fixed
-2026-10-06:** any other refused output is read the same way — the run that refused unread while its process is at work, failed
-once it has ended, its harness's others read, and why said on every look (`lookOf`, `test/unread-session.test.ts`); see the
-*Fixed* table.
-
 ### 37. What still reads the whole feed, and the feed's size on disk (2026-10-06)
 
 The feed is never rotated but by a forget (`rotateFeed`), so it grows by every line of every task ever filed: 72 MB on this
-machine on 2026-10-06, with no sealed file, beside 76 MB of journals over 3,935 tasks. A pass reads none of it but what was
+machine on 2026-10-06, with no sealed file, beside 76 MB of journals over 3,935 tasks; on 2026-10-23, 110 MB sealed, by a
+forget's rotation of 2026-10-21, and 4.9 MB written since. A pass reads none of it but what was
 appended since the last (`forgetNamed`, and the orchestrator's `followedFeed`; `agent-orchestrator/src/tick/feed-reads.test.ts`
 holds a restarted tick's passes to the same reads over a feed 20,000 lines longer). What still reads it whole, each once a call,
 and one of them on a pass:
@@ -1017,6 +1000,13 @@ keep the disk and those reads bounded. Not changed with the reads, so a store's 
   2.1.280, 2026-09-23, haiku, twice by the implementing step: the job exited 0, wrote `BUILT` and not `E2E`, and recorded
   `[{"tool":"Bash","what":"npm"}]`; the `--bg` control wrote `BUILT` and not `E2E`, and records no denials (issue 28). The
   first run failed only on the test's own assertion, which looked for the whole command in a denial that keeps its first word.
+- **A resumed job's carried cost on the SDK road** (`ff227991d`, `75e833ed5`, 2026-10-23). `claudeJobSpec` keeps
+  `resumeCostCarried: true`: a resumed Claude Code prints its parent's cost and API time on in its own totals, so the runner
+  reads the parent's off its run file and takes them off (`lessCarried`). Measured first of `claude -p --resume`, and now of the
+  SDK's `query()` with `Options.resume` (SDK 0.3.308, CLI 2.1.308, haiku, `docs/harness.md`): a resumed query's first result
+  carries the total its parent saved on exit, and `test/live.test.ts` (*an attached session's cost*, `AE_LIVE=1`) holds it
+  through `attachedSessions`, across a resume and a let-go's cut. What it rests on is that the parent saved one, which a
+  process killed does not (*A Claude Code killed outright loses what its process spent*, at the end).
 
 ## Verified by tests, not by a live run
 
@@ -1116,19 +1106,26 @@ keep the disk and those reads bounded. Not changed with the reads, so a store's 
 
 ## Open questions
 
-1. **Quiescence: stalled or done** for a task that asked for a closeout — answered: neither, *unsigned* (bug 1, fixed; the
-   last section).
-2. **Why a Claude session stays `working` instead of reaching `done`.** Twenty-plus sessions measured:
-   not resume, not duration, not the two together. It is the reason the quiescence floor exists.
-3. **`wf ls` choices merged as implemented** (`7f07b71`), open to revisit: an extra "waiting on you"
-   line for a run with a blocked step; `closeout unreadable` for an answer that cannot be parsed; no
-   such line for a cancelled run. The reasons are in `RESPONSE.md` on
-   `wf/make-wf-ls-say-how-each-fini-zpp7/respond`.
 4. **Should a task be able to ask for Claude in Chrome?** Every Claude Code spawn is `--no-chrome`
    (bug 9): a step cannot drive the operator's signed-in browser. Allowing it would be a field that
    says so, not a default; nothing has asked for one.
-5. **hkb migration**: two decisions to make before starting — see
-   [hkb-migration.md](hkb-migration.md), "Two consequences to decide on *before* starting".
+
+### Answered or overtaken, kept for their context (2026-10-23)
+
+1. **Quiescence: stalled or done** for a task that asked for a closeout — answered: neither, *unsigned* (bug 1, fixed
+   2026-09-14; *Quiet without a closeout*, below *Fixed*).
+2. **Why a Claude session stays `working` instead of reaching `done`.** Twenty-plus sessions measured:
+   not resume, not duration, not the two together. It is the reason the quiescence floor exists. **Never answered, and
+   overtaken**: since thin runtime stage 2 part 1 (2026-09-23) a step runs as a job, which ends at its result and not on a state
+   `claude agents` lists, and since 2026-10-21 (`45824a1f2`) on the Agent SDK. Only a session run as `claude --bg` is still read
+   off the registry, and the quiescence floor stays for it (`harness/claude/bg.ts`).
+3. **`wf ls` choices merged as implemented** (`7f07b71`), open to revisit: an extra "waiting on you"
+   line for a run with a blocked step; `closeout unreadable` for an answer that cannot be parsed; no
+   such line for a cancelled run. The reasons are in `RESPONSE.md` on
+   `wf/make-wf-ls-say-how-each-fini-zpp7/respond`. **Kept, and never revisited**: `nemia ls` prints each of the three today
+   (`lsLines`, `agent-orchestrator/src/list/list.ts`), and nothing has asked to change them.
+5. **hkb migration**: two decisions to make before starting. **Overtaken**: hkb was deprecated on 2026-10-19, so nothing
+   moves onto this engine, and the notes toward the migration were removed on 2026-10-23.
 
 ## Closed since 2026-09-16, kept for their context
 
@@ -1142,6 +1139,28 @@ said below with `src/core/admission.ts` where it names the orchestrator's `src/c
 a harness's `pool` on `Engine.layer` (the orchestrator gives `claude-detached` the pool `claude`), one `maxConcurrent` for
 every pool, and `priority` carried again, a whole number in int32, which the orchestrator files as its run's momentum.
 `test/admission.test.ts` holds each order and pool with a fixture that breaks it.
+
+2 and 36 moved here on 2026-10-23, each as it was written with the line that closed it: 2 was fixed on 2026-09-13 by
+`1465268a6`, and 36 on 2026-10-06 by `73c1ebc08`. Each has its row in *Fixed*.
+
+### 2. `advance` hands off only steps that succeeded (fixed 2026-09-13)
+
+**Where.** `agent-orchestrator/src/runner.ts:318` commits a finished step's leftover work only when its
+engine task succeeded.
+
+**Effect.** A step that fails or is stopped keeps anything it did not commit only in its worktree
+(`~/.agent-workflows/worktrees/<run>/run`): not on its branch, not merged into later steps, not
+shown by `wf decide`, and lost if the worktree is removed. The closeout contract tells steps "the run
+commits whatever you left", which holds only for succeeded steps.
+
+**Fix.** Hand off every finished step — succeeded, failed or stopped. A failed step still blocks what
+follows; this only keeps its work on its branch.
+
+**Status.** Deferred on purpose (2026-09-12): fix it when it bites.
+
+**Fixed** the next day, in `1465268a6` ("The run checks a signed step before filing what follows it"): every finished step is
+handed off, failed and stopped included, and none once its check is filed, so a suite's litter is not committed under the
+step's name.
 
 ### 19. A `blocked` session holds no slot, on reasoning rather than a measurement (moved to the orchestrator)
 
@@ -1307,6 +1326,19 @@ until the harness has started, the second read signals it. Each test fails with 
 handler answering `WORKING` until the listing says `stopped`, the other way considered, would have changed every
 harness's cancel and still left a direct caller to ask again.
 
+### 36. A Codex line that does not decode leaves every Codex session unread, and none of them can be forgotten (2026-10-06, fixed the same day)
+
+A line of `codex exec --json` of a type the runtime reads that `CodexEventSchema` (`harness/codex/stream.ts`) does not decode fails
+the Codex harness's whole look, so every Codex session is unread, by design (issue 35), until the run file whose output it is goes.
+Nothing makes it go: `ae forget` takes only a settled task, refuses a session its harness could not be read for (`sessionsHeld`,
+`service/forget.ts`), and a task with no deadline on that harness never settles — the gap issue 35 names. The one way out today is a
+hand removal of the run, which the repository's rules forbid. The same trap was found, and closed, for a session whose start event
+does not decode, under every detached harness: unread only while its process runs, then read as failed with no id
+(`lookOf`, `harness/detached/detached.ts`), so its harness's other sessions stay read (`test/start-event.test.ts`). **Fixed
+2026-10-06** (`73c1ebc08`): any other refused output is read the same way — the run that refused unread while its process is at work, failed
+once it has ended, its harness's others read, and why said on every look (`lookOf`, `test/unread-session.test.ts`); see the
+*Fixed* table.
+
 ## Fixed
 
 | Symptom | Fix | Commit |
@@ -1327,6 +1359,7 @@ harness's cancel and still left a direct caller to ask again.
 | `wf ls` could not show a blocked step | outcome beside phase | workflows `7f07b71` |
 | a task the engine forgot read as queued, so a run looked in flight for ever | `unknown`, not `pending` | workflows `0e7b02a` |
 | cancel raced a tick; a failed run with work left could still file it | cancellation in its own file, enforced every tick | workflows `f59d95c`, `3eeaf2f` (merged in `e1c9170`) |
+| a step that failed or was stopped kept what it had not committed only in its worktree: not on its branch, not merged into later steps, lost with the worktree (issue 2) | every finished step is handed off, succeeded, failed or stopped, and none once its check is filed | `1465268a6` |
 | a Codex task that asked for `read-only` ran `workspace-write`; `danger-full-access` did too | each sandbox name emitted as itself | engine `9d5257d`, `310efd3` |
 | a brief's typo was a default, and `deadlineSeconds: 5m` stopped its task on the first pass | a closed `BRIEF_KEYS`; every bad key and value refused, exit 2 (a count that overflows to `Infinity` too, found in review) | engine `60c1d01`, `3ca8ac4` |
 | an unknown harness ran on the fallback; a bad permission mode failed every tick | `file()` refuses, asking each harness for its own words | engine `310efd3` |
@@ -1357,7 +1390,7 @@ harness's cancel and still left a direct caller to ask again.
 | a continuation (`resumeFrom`) whose first spawn the harness refused, `unstartable`, started its next attempt cold, without the session it was filed to continue — with `maxAttempts` above 1 (issue 5) | `resumeTarget` continues the task's `resumeFrom` while every attempt so far ended `unstartable`; an attempt that ran — spawned, or adopted after a crash with no spawn on the record — is judged by the `resume` policy as before (the first version keyed on `spawnedAt`, and an adoption has none; found in review) | engine, 2026-09-22 |
 | with one attempt per start, the runtime continues no attempt, so issue 5's case — an `unstartable` continuation — would start its next try cold | the orchestrator's `continuesFrom` hands a `--nudge` try, a round or a `resume:` step the last attempt's session, or, where the harness never named that one — it could not start, or was lost — the `resumeFrom` it was started with; for a held task's later turn, the session that signed the turn before (`test/run.test.ts`, `test/store.test.ts`, `test/held.test.ts`) | orchestrator, 2026-09-23 (stage 4a part 2) |
 | a check that exited 0 at 607 s of a 600 s deadline settled `failed`, `deadline exceeded`: the pass that recorded its `done` end read it again past the deadline, and the deadline settled first | an end on record is judged by that end; past the deadline, `decide` still stops a live session, cuts an open attempt, settles one the deadline cut, and starts no other attempt | engine, 2026-09-24 |
-| a Codex line that does not decode left every Codex session unread until its run went, and none could be forgotten (issue 36); a `--bg` transcript that could not be read did the same to every background session (issue 35) | the session whose output or transcript cannot be read is unread alone while it may still run, its harness's others read; once ended it reads `failed`, as a refused start does, why said on every look, so its task settles and `stop`, `release` and `forget` reach it | runtime, 2026-10-06 |
+| a Codex line that does not decode left every Codex session unread until its run went, and none could be forgotten (issue 36); a `--bg` transcript that could not be read did the same to every background session (issue 35) | the session whose output or transcript cannot be read is unread alone while it may still run, its harness's others read; once ended it reads `failed`, as a refused start does, why said on every look, so its task settles and `stop`, `release` and `forget` reach it | runtime, 2026-10-06: `73c1ebc08`, `827457f48` |
 | a pass read every idle or blocked `--bg` session's transcript whole twice, for its closeout and for its usage, though nothing had written it: 3.07 MB a pass from 15 sessions on this machine (issue 38) | a closeout and a usage read are kept by the transcript's mtime in every state, and one read a look serves both; the mtime is a stat (`transcriptWrittenAt`), not the SDK's `getSessionInfo`. On a 2,010,438-byte transcript (`test/transcript.test.ts`), a look read 4,020,876 bytes before and 2,010,438 after, five looks with nothing written 20,104,810 before and 430 after, the SDK's head and tail reads (64 KiB each, 128 KiB a look) uncounted before. An idle session's mtime moves with no byte written: an interactive one (2.1.290, idle) had its transcript's mtime set 60 min 26 s after the last, its size unchanged, so a kept read is read again on such a touch | runtime, 2026-10-06 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
@@ -1503,14 +1536,6 @@ be there when the pass spawns it — so it refuses the wider case. Met while wri
 files its session as a job instead, which runs attached just the same. Nothing is wrong on the record: no caller is given a session
 without the env it asked for.
 
-## A resumed job's carried cost was unverified on the SDK road (measured 2026-10-23)
-
-`claudeJobSpec` keeps `resumeCostCarried: true`: a resumed Claude Code prints its parent's cost and API time on in its own
-totals, so the runner reads the parent's off its run file and takes them off (`lessCarried`). That was measured of
-`claude -p --resume`, and is now measured of the SDK's `query()` with `Options.resume` too (SDK 0.3.308, CLI 2.1.308,
-`docs/harness.md`): a resumed query's first result carries the total its parent saved on exit. What it rests on is that the parent
-saved one, which a process killed does not — the entry below.
-
 ## A Claude Code killed outright loses what its process spent
 
 An attached session's cost is its capture's last result, the running total of the process that printed it, which a resumed process
@@ -1542,8 +1567,8 @@ refused from the day it goes.
 ## Prose above the runtime still equates a job with `claude -p`
 
 The words a person is given were rewritten with the road: the runtime's refusals and README, the `ae` help, the step keys'
-refusals and a try's. Doc comments in the layers above were not, all of them: `claude -p` is still written for a job in some 170
-places under `packages/agent-orchestrator/src`, `apps/api/src` and the plan docs (`record.ts`, `validate.ts`, `step.ts`,
-`discipline.ts`, `reach.ts`, `detail.ts` among them). None of it is read by the machinery — it is prose, and it dates from when a
-job was a command line. It is worth a sweep, and the sweep that retires `claude-detached` is the moment for it, since the two
+refusals and a try's. Doc comments in the layers above were not, all of them: `claude -p` is still written for a job in about 20
+lines across a dozen files under `packages/agent-orchestrator/src` and `apps/api/src`, and in the plan docs (`record.ts`,
+`validate.ts`, `step.ts`, `discipline.ts`, `reach.ts`, `detail.ts` among them; counted 2026-10-23). None of it is read by the
+machinery — it is prose, and it dates from when a job was a command line. It is worth a sweep, and the sweep that retires `claude-detached` is the moment for it, since the two
 readings have to be told apart line by line: the harness that still spells `-p`, and the job that no longer does.

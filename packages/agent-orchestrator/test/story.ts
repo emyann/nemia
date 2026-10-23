@@ -37,9 +37,13 @@ type Main = (argv: string[], e: Engine | undefined, demand: undefined, place: Pl
 /** The engine's stand-in, as `testEngine` makes it. */
 type TestEngine = ReturnType<typeof testEngine>;
 
-/** The engine's stand-in, `settle` taking the attempt's closeout and exit code as arguments, and the controllers' engine over it. */
+/**
+ * The engine's stand-in, `settle` taking the attempt's closeout and exit code as arguments, `end` its own settle taking whatever the
+ * attempt ended with (a reason, a cost, its denials, what it printed), and the controllers' engine over it.
+ */
 export type Board = Omit<TestEngine, 'settle'> & {
   settle: (id: string, phase: string, closeout?: unknown, exitCode?: number) => void;
+  end: TestEngine['settle'];
   e: Engine;
 };
 
@@ -69,7 +73,7 @@ export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof e
     const made = testEngine();
     const settle = (id: string, phase: string, closeout?: unknown, exitCode?: number) =>
       made.settle(id, phase, { ...(closeout === undefined ? {} : { closeout }), ...(exitCode === undefined ? {} : { exitCode }) });
-    const board: Board = { ...made, settle, e: given.engineOf(made.layer) };
+    const board: Board = { ...made, settle, end: made.settle, e: given.engineOf(made.layer) };
     return { board, clock: undefined as Steered | undefined };
   });
   return {

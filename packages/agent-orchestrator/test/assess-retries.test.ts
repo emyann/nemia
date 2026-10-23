@@ -2,8 +2,8 @@
  * What `assess`, `stepStatus`, `listing`, `decision`, `cancelPlan` and a brief make of a step's check, of a step that ended without
  * its closeout (UNSIGNED), of the tries `retries:` and the run's own sign-off nudge file, of a person's ask for a try and the answer it
  * carries (`--message`), of a step whose session its harness blocked or waits on, and of a step its harness denied a call (`denials:
- * fail`). Pure: each row hands them the engine's view of each task and reads what they decide. The functions of a try alone are in
- * `src/retry/retry.test.ts`.
+ * fail`), and what a task held open reads of its current turn. Pure: each row hands them the engine's view of each task and reads what
+ * they decide. The functions of a try alone are in `src/retry/retry.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -46,8 +46,8 @@ import {
 } from '../src/retry/retry-ask.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import { CLOSEOUT_SCHEMA, type Closeout } from '../src/closeout/closeout.ts';
-import { closeoutAsked, closeoutOf, harnessBlocked } from '../src/views/views.verb.ts';
-import { endWords } from '../src/views/views-words.ts';
+import { closeoutAsked, closeoutOf, deniedOf, harnessBlocked } from '../src/views/views.verb.ts';
+import { endWords, phaseOfView } from '../src/views/views-words.ts';
 import type { Verdict } from '../src/check/check.ts';
 import type { Workflow } from '../src/workflow.ts';
 import { names, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
@@ -1507,4 +1507,45 @@ test("retryLines of a denied step: a new session with the bare `--fresh`, and th
       "implement: denied — its harness denied its try calls, and denials: fail passes none on. For a new run, add Bash(pytest:*) to the folder's allowedTools:, which allows it. Bash(npm), SendMessage may be its own disallowedTools: at work (Bash(npm run build), SendMessage), which beats any allowedTools:, so no rule is offered for them. This run's allowedTools: is frozen at nemia start, so a try of it is denied the same again. A new session, told to do without it:  nemia retry r-1 implement --fresh  (or continue its session: nemia retry r-1 implement)",
     ]);
   });
+});
+
+test("closeoutOf, deniedOf and closeoutAsked of a task held open: its current turn's, never the last turn's", async (t) => {
+  const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artifacts: [], needs: 'which flag: --dry-run or --force?' };
+  const view = (attempts: object[], inputs: number, phase = 'running (working)') =>
+    ({
+      id: 't',
+      phase,
+      sessionId: 's',
+      state: {
+        brief: 'b',
+        closeoutSchema: {},
+        holdOpen: true,
+        closed: false,
+        settled: null,
+        stopRequested: false,
+        said: [],
+        attempts,
+        inputs: Array.from({ length: inputs }, () => ({ at: 'x', text: 'go on' })),
+      },
+    }) as unknown as TaskView;
+  const signed = { n: 1, ended: 'done', reason: 'signed', nativeId: 'n', closeout: BLOCKED, denials: [{ tool: 'Skill', what: 'look' }] };
+  const unsigned = { n: 1, ended: 'failed', reason: 'unsigned', nativeId: 'n' };
+  const held = { id: 'r', steps: { plan: { taskId: 't' } } } as never;
+  const answered = new Map([['t', view([signed], 1)]]);
+  const waiting = new Map([['t', view([signed], 0, 'input-required')]]);
+  await t.test("an answered turn still running has not signed: the last turn's blocked closeout is not its", () =>
+    assert.equal(closeoutOf(answered, held, 'plan'), undefined),
+  );
+  await t.test('nor are its denials', () => assert.deepEqual(deniedOf(answered)('t'), []));
+  await t.test('the turn that signed is read while it waits', () => {
+    const read = closeoutOf(waiting, held, 'plan');
+    assert.ok(read && !('error' in read), JSON.stringify(read));
+    assert.equal(read.outcome, 'blocked');
+  });
+  await t.test('and its denials', () => assert.deepEqual(deniedOf(waiting)('t'), ['Skill(look)']));
+  await t.test('waiting, it reads settled, as it signed', () => assert.equal(phaseOfView(waiting.get('t')), 'succeeded'));
+  await t.test("an unsigned attempt of the last turn is not this turn's", () =>
+    assert.equal(closeoutAsked(new Map([['t', view([unsigned], 1)]]))('t'), true),
+  );
+  await t.test('and of this turn, it is', () => assert.equal(closeoutAsked(new Map([['t', view([unsigned], 0)]]))('t'), 'unsigned'));
 });

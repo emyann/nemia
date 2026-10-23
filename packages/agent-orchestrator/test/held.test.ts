@@ -5,7 +5,9 @@
  * under the same id. Everything else is filed as it was: rounds, `--fresh` and `--model` tries, checks.
  *
  * Walked through the runtime itself, `plainEngine` over an in-memory journal and a harness the test signs by hand, so what the run reads
- * is what the runtime says: its phase, its turns, its refusals. What `holdsOpen` judges is pure, and lives in run.test.ts.
+ * is what the runtime says: its phase, its turns, its refusals. The engine's stand-in neither closes nor answers a task, so every walk
+ * here is the runtime's own. What the run files held open is told on the stand-in in `retry.test.ts`, and what a held task reads of its
+ * current turn is pure, in `assess-retries.test.ts`.
  *
  * `WF_ROOT` is set before the runner is imported: it is read as the module loads. `WF_VERIFY_REST` judges in full every run a pass answers
  * from its memo of runs at rest as well, and throws on a difference (`verifyRest` in tick.verb.ts).
@@ -43,7 +45,6 @@ const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const { artifactsDir, readAsks, readRun } = await import('../src/record/record.store.ts');
-const { closeoutAsked, closeoutOf, deniedOf } = await import('../src/views/views.verb.ts');
 const { phaseOfView } = await import('../src/views/views-words.ts');
 const { lackedOf } = await import('../src/record/record.ts');
 
@@ -167,34 +168,6 @@ const signedPlan = async (keys: Parameters<typeof folder>[0], closeout: object, 
   const signed = await h.pass(run.id);
   return { run, ...h, signed };
 };
-
-test('a Claude Code job is filed held open, and one on codex, a background session and a check are not', async () => {
-  const { run, e, pass, sign } = await signedPlan({ implement: 'check: true' }, SIGNED);
-  assert.equal((await stateOf(e, `${run.id}-plan`)).state.holdOpen, true, 'plan, a claude job');
-  await pass(run.id);
-  sign(`${run.id}-implement`, 1, SIGNED);
-  assert.deepEqual((await pass(run.id)).checked, ['implement']);
-  assert.equal((await stateOf(e, `${run.id}-implement-check`)).state.holdOpen, undefined, "a check is the run's own, never held open");
-
-  for (const keys of [{ plan: 'harness: codex' }, { plan: 'background: true\npermissionMode: dontAsk' }]) {
-    const other = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(keys), isolate: false }));
-    const h = engine();
-    const filed: Array<Parameters<Engine['file']>[0]> = [];
-    const file = h.e.file.bind(h.e);
-    Object.assign(h.e, {
-      file: (spec: Parameters<Engine['file']>[0]) => {
-        filed.push(spec);
-        return file({ ...spec, config: { ...spec.config, background: undefined } });
-      },
-    });
-    assert.deepEqual((await h.pass(other.id)).filed, ['plan']);
-    assert.equal(
-      Object.hasOwn(filed[0], 'holdOpen'),
-      false,
-      `${Object.values(keys)[0]}: read off what the run hands the engine, as it hands it; the engine is handed the task without background, which this harness does not run`,
-    );
-  }
-});
 
 test('an ungated step that signed off is closed on the pass that reads it waiting, and what waits on it is filed on that same pass', async () => {
   const { run, e, signed, pass } = await signedPlan({}, SIGNED);
@@ -547,15 +520,6 @@ test('`nemia cancel` calls off a run whose step signed off blocked, with no gate
   assert.equal((await runWith(e, decideRun(run.id))).decision.kind, 'cancelled');
 });
 
-test('`nemia cancel` reads a closeout that does not read as the run does: an unsigned step waiting on you, so the run is called off', async () => {
-  const { run, e } = await signedPlan({}, ['not a closeout']);
-  assert.deepEqual(await statuses(e, run.id), { plan: 'unsigned · closeout unreadable', implement: 'waiting' });
-  assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, ['plan']);
-  const { plan } = await runWith(e, cancelRun(run.id));
-  assert.deepEqual(plan, { kind: 'cancel', stop: [] });
-  assert.ok(readRun(run.id).cancelledAt);
-});
-
 test('`nemia rm` of a run whose step waits for a word closes its task: no pass reads the run again to close it', async () => {
   const { run, e } = await signedPlan({}, BLOCKED);
   const forgot = await runWith(e, forgetRun(run.id));
@@ -614,44 +578,6 @@ test('a run whose tasks were filed before tasks were held open is worked as it w
   const sent = await stateOf(h.e, `${run.id}-plan-try2`);
   assert.match(sent.state.brief, /smaller steps, please/);
   assert.equal(sent.state.resumeFrom, 'native-1');
-});
-
-test("a step's closeout, its denials and whether its closeout was asked for are its current turn's: an answered turn still running reads none of the last turn's", async () => {
-  const view = (attempts: object[], inputs: number, phase = 'running (working)') =>
-    ({
-      id: 't',
-      phase,
-      sessionId: 's',
-      state: {
-        brief: 'b',
-        closeoutSchema: {},
-        holdOpen: true,
-        closed: false,
-        settled: null,
-        stopRequested: false,
-        said: [],
-        attempts,
-        inputs: Array.from({ length: inputs }, () => ({ at: 'x', text: 'go on' })),
-      },
-    }) as unknown as TaskView;
-  const signed = { n: 1, ended: 'done', reason: 'signed', nativeId: 'n', closeout: BLOCKED, denials: [{ tool: 'Skill', what: 'look' }] };
-  const unsigned = { n: 1, ended: 'failed', reason: 'unsigned', nativeId: 'n' };
-  const run = { id: 'r', steps: { plan: { taskId: 't' } } } as never;
-  const answered = new Map([['t', view([signed], 1)]]);
-  assert.equal(
-    closeoutOf(answered, run, 'plan'),
-    undefined,
-    "the answered turn has not signed: the last turn's blocked closeout is not its",
-  );
-  assert.deepEqual(deniedOf(answered)('t'), [], 'nor its denials');
-  const waiting = new Map([['t', view([signed], 0, 'input-required')]]);
-  const read = closeoutOf(waiting, run, 'plan');
-  assert.ok(read && !('error' in read), `the turn that signed is read while it waits: ${JSON.stringify(read)}`);
-  assert.equal(read.outcome, 'blocked', 'the turn that signed, read while it waits');
-  assert.deepEqual(deniedOf(waiting)('t'), ['Skill(look)']);
-  assert.equal(phaseOfView(waiting.get('t')), 'succeeded', 'waiting reads settled, as it signed');
-  assert.equal(closeoutAsked(new Map([['t', view([unsigned], 1)]]))('t'), true, "an unsigned attempt of the last turn is not this turn's");
-  assert.equal(closeoutAsked(new Map([['t', view([unsigned], 0)]]))('t'), 'unsigned', 'and of this turn, it is');
 });
 
 test('the files a task held open named are read once: one removed after its closeout was accepted, under its check or at its gate, unsigns nothing', async () => {

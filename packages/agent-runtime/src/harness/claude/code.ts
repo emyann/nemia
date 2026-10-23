@@ -139,6 +139,8 @@ export const claudePrepare = (r: SpawnRequest): Partial<HarnessIO> => {
  *   text output prints only the answer's prose — and which carries the session id, its `start` (`CLAUDE_RESULT_START`).
  * - `transcript` is the one `claude --bg` writes, read the same way, but only once the session has exited: its id is in
  *   the one object `--output-format json` prints, and that is printed last.
+ * - `resumeCostCarried`: a resumed `claude -p` prints its parent's cost, API time and `modelUsage` on in its own, so the runner
+ *   takes the parent run's off, as it does a job's.
  */
 export const claudeDetached: HarnessSpec = {
   name: 'claude-detached',
@@ -160,6 +162,7 @@ export const claudeDetached: HarnessSpec = {
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
   callAdmission: true,
+  resumeCostCarried: true,
 };
 
 /** The process one Claude Code job's session runs in, `bin/ae-claude-job.ts`, found from this file's own folder as `WORKER` is. */

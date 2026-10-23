@@ -2,7 +2,8 @@
  * A factory's schedules, started by the tick over a store of its own, told as stories on the stage (`story.ts`): a weekly fire over the
  * weeks — one run per due fire, to the second, once after any downtime, and never again once its run's files are removed; a fire held
  * behind the run cap and behind the queue, then started; a schedule written after its latest fire, then refused by its factory and kept
- * refused for that fire; and the end of daylight saving, neither skipped nor doubled. A pause and the level are two focused tests.
+ * refused for that fire; and the end of daylight saving, neither skipped nor doubled. The level is a focused test; a due fire held by the
+ * store's pause is a checkpoint of the pause's story, in `pause.test.ts`.
  *
  * When a schedule is due, and what its lines say, is pure, in `src/schedule/schedule.test.ts`; its refusals as it is written, in
  * `src/factory/factory.store.test.ts`.
@@ -32,7 +33,6 @@ delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const { addFactory, attachWorkflow, setSchedule, tickRun, runWith: runEngine } = await import('../src/runner.ts');
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
-const { putPause, resumePause } = await import('../src/pause/pause.store.ts');
 const { main: cli } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { filesStore } = await import('../src/record/files.store.ts');
@@ -230,19 +230,6 @@ test('a schedule written after its latest fire waits for its next; refused by it
     const next = await runWith(e, tickRun({ repo }));
     assert.equal(next.scheduled && 'refused' in next.scheduled ? next.scheduled.due : undefined, '2026-10-26T13:00:00.000Z');
   });
-});
-
-test('REFUSED while the store is paused: a due schedule starts nothing, and starts on the pass after nemia resume', async (t) => {
-  aStore(t, '2026-10-04T12:00:00Z');
-  weekly();
-  const e = runtime();
-  t.mock.timers.setTime(Date.parse(MONDAY) + 30_000);
-  putPause({ why: 'a test' });
-  const paused = await runWith(e, tickRun());
-  assert.deepEqual([paused.scheduled, listRuns()], [undefined, []]);
-  resumePause();
-  const resumed = await runWith(e, tickRun());
-  assert.deepEqual([resumed.scheduled && 'run' in resumed.scheduled, scheduledDues()], [true, [MONDAY]]);
 });
 
 test("at Manual, with no Nemia, a due schedule starts all the same: the scheduled start reads no level and no Nemia's lease", async (t) => {

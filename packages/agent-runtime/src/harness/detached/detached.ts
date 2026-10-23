@@ -35,6 +35,7 @@ import { outputIn, saidFilesAt, saidWhen, type SaidMemo } from './said.ts';
 import { compactOps } from './compact.ts';
 import { lookedFor } from './looked.ts';
 import { detachedStateOf, firstRunFile, leased, runFileIn, type Carried, type Run, type RunFile } from './run-file.ts';
+import { carriedOf, lessCarried } from './carried.ts';
 import { workerBoundsOf, type DetachedOptions } from './detached-options.ts';
 import { spawnFiles, spawnInput } from './spawn-files.ts';
 
@@ -237,6 +238,11 @@ export type HarnessOutput = {
   closeout?: { payload: unknown };
   /** What the session consumed, as far as the output says: every field a measurement, absent when not. */
   usage?: Usage;
+  /**
+   * The process's own token counts, `{}` when it counted none, where `usage`'s are the whole session's, which a resumed one carries
+   * its parent's on in (`claudeResultOutput`): what a resume reads when its parent's cannot be taken off. Never a sighting's.
+   */
+  ownTokens?: Usage;
   /** A limit its configuration set that the harness says it ended the session at — `budget`, its spend cap. */
   limit?: string;
   /** The tool calls the harness denied the session, in the order it first did. Absent when none, or when it does not say. */
@@ -403,17 +409,6 @@ const parentOf = (all: readonly Run[], resumeFrom: string, before: number, excep
   all
     .filter((o) => o.name !== except && o.run.nativeId === resumeFrom && startOf(o.run) < before)
     .sort((a, b) => startOf(b.run) - startOf(a.run))[0];
-
-/** `usage` with the parent's `carried` totals taken off: a measure either lacks, or that would go below nothing, dropped. */
-export const lessCarried = (usage: Usage, carried: Carried): Usage | undefined => {
-  const { costUsd, apiMs, ...own } = usage;
-  const less = (mine: number | undefined, theirs: number | undefined) =>
-    mine !== undefined && theirs !== undefined && mine >= theirs ? { value: mine - theirs } : undefined;
-  const cost = less(costUsd, carried.costUsd);
-  const api = less(apiMs, carried.apiMs);
-  const left: Usage = { ...own, ...(cost ? { costUsd: cost.value } : {}), ...(api ? { apiMs: api.value } : {}) };
-  return Object.keys(left).length ? left : undefined;
-};
 
 /**
  * `say` for a spec with `input`: the words appended to the inbox of the run under the session's name, as the line its harness
@@ -782,19 +777,18 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
   const carriedBy = (all: readonly Run[], resumeFrom: string, before: number, except?: string): Carried => {
     const parent = parentOf(all, resumeFrom, before, except);
     const told = parent && outputOf(parent.name, parent.run);
-    const { costUsd, apiMs } = (told && 'read' in told && told.read.usage) || {};
-    return { ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
+    return carriedOf(told && 'read' in told ? told.read : undefined);
   };
 
-  const usageOf = (run: RunFile, usage: Usage | undefined, all: () => readonly Run[]): Usage | undefined =>
-    !usage || !spec.resumeCostCarried || !run.resumeFrom
-      ? usage
-      : lessCarried(usage, run.carried ?? carriedBy(all(), run.resumeFrom, startOf(run)));
+  const usageOf = (run: RunFile, read: HarnessOutput | undefined, all: () => readonly Run[]): Usage | undefined =>
+    !read?.usage || !spec.resumeCostCarried || !run.resumeFrom
+      ? read?.usage
+      : lessCarried(read.usage, run.carried ?? carriedBy(all(), run.resumeFrom, startOf(run)), read.ownTokens);
 
   const lookAt = (name: string, run: RunFile, now: Instant, all: () => readonly Run[]): { sighting?: Sighting; warning?: string } => {
     const { as, output, warning } = lookOf(spec, name, run, now, () => outputOf(name, run), logFile(name));
     if (as === 'unread') return { warning };
-    const usage = usageOf(run, output?.read.usage, all);
+    const usage = usageOf(run, output?.read, all);
     return { sighting: sightingOf(name, run, now, statementOf(name), output, usage, as === 'failed'), warning };
   };
 

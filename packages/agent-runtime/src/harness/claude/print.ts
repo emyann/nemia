@@ -64,6 +64,14 @@ const TokensSchema = Schema.Struct({
   output_tokens: Schema.optional(Count),
 });
 
+/** One model's token counts in a result's `modelUsage`, which counts every model of the session, subagents included. */
+const ModelTokensSchema = Schema.Struct({
+  inputTokens: Schema.optional(Count),
+  cacheCreationInputTokens: Schema.optional(Count),
+  cacheReadInputTokens: Schema.optional(Count),
+  outputTokens: Schema.optional(Count),
+});
+
 /**
  * The lines of `claude -p`'s output the runtime reads, by kind — a `type`, and its `subtype` for a `system` line — in what it reads
  * of each; every other key is not checked. A field the runtime starts reading is added here.
@@ -76,6 +84,7 @@ export const PRINTED = {
     total_cost_usd: Schema.optional(Measure),
     duration_api_ms: Schema.optional(Measure),
     usage: Schema.optional(TokensSchema),
+    modelUsage: Schema.optional(Schema.Record(Schema.String, ModelTokensSchema)),
     permission_denials: Schema.optional(Schema.Array(DenialSchema)),
   }),
   'system permission_denied': Schema.Struct({

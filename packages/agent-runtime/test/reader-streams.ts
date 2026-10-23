@@ -93,6 +93,14 @@ const RESULTS = [
   }),
   resultLine({ usage: { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 } }),
   resultLine({ usage: { input_tokens: 10, output_tokens: 5 } }),
+  resultLine({
+    usage: { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 90, output_tokens: 5 },
+    modelUsage: { a: { inputTokens: 10, cacheCreationInputTokens: 0, cacheReadInputTokens: 90, outputTokens: 5 }, b: { inputTokens: 7 } },
+  }),
+  resultLine({
+    usage: { input_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 90, output_tokens: 5 },
+    modelUsage: { a: { inputTokens: 30, cacheCreationInputTokens: 4, cacheReadInputTokens: 900, outputTokens: 50 } },
+  }),
   resultLine({ total_cost_usd: 0.01804, duration_api_ms: 718, usage: { input_tokens: 0, output_tokens: 0 } }),
   resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.2 }),
   resultLine({ total_cost_usd: 'a lot', duration_api_ms: null }),

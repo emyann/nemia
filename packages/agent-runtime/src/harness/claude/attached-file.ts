@@ -12,6 +12,7 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import type { AskQuestion, SessionAsk, SessionState } from '../../core/index.ts';
 import { processStart } from './inbox.ts';
+import { CarriedSchema } from '../detached/run-file.ts';
 import type { SpawnRequest } from '../seam.ts';
 
 /**
@@ -62,7 +63,7 @@ const RunFileSchema = Schema.StructWithRest(
     /** How many new calls wait at their hook now, held back by a drain; absent when none waits. */
     heldBack: Schema.optional(Schema.Finite),
     /** What the session resumed from had spent, which its own results print on in theirs: taken off what it reports. */
-    carried: Schema.optional(Schema.Struct({ costUsd: Schema.optional(Schema.Finite), apiMs: Schema.optional(Schema.Finite) })),
+    carried: Schema.optional(CarriedSchema),
     /** How far into its say file the words were handed to the session, in bytes. */
     heard: Schema.optional(Schema.Finite),
     /** What its claude.ai bridge came to, where one was asked for: its facts, or why there is none. */

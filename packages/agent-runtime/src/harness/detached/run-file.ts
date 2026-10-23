@@ -8,6 +8,19 @@ import { instantNow } from '../../core/engine/now.ts';
 import { elapsedMs, type Instant, type Monotonic } from '../../core/clock.ts';
 
 /**
+ * What a resumed session's parent printed and its own totals carry on: cost, API time, and its whole session's tokens in their
+ * classes (`carriedOf`). Each absent when the parent gave none; the tokens absent from a run file written before they were kept.
+ */
+export const CarriedSchema = Schema.Struct({
+  costUsd: Schema.optional(Schema.Finite),
+  apiMs: Schema.optional(Schema.Finite),
+  uncachedTokens: Schema.optional(Schema.Finite),
+  cacheWriteTokens: Schema.optional(Schema.Finite),
+  cacheReadTokens: Schema.optional(Schema.Finite),
+  outputTokens: Schema.optional(Schema.Finite),
+});
+
+/**
  * How long a run file may go unbeaten before `observe` calls it dead. The worker beats every 5s. Measured from its `beat` on the
  * monotonic clock when it was written in this boot, else from its `heartbeatAt` on the wall clock (`elapsedMs`).
  */
@@ -79,7 +92,7 @@ const RunFileSchema = Schema.StructWithRest(
      * absent when the parent printed none, `{}` when there was no parent. Absent from a run file spawned before it was
      * written, whose parent is looked for among the run files instead.
      */
-    carried: Schema.optional(Schema.Struct({ costUsd: Schema.optional(Schema.Finite), apiMs: Schema.optional(Schema.Finite) })),
+    carried: Schema.optional(CarriedSchema),
     /** For a spec with `input`: what the worker writes on the harness's stdin (`RunInput`). Absent, the run takes no words. */
     input: Schema.optional(
       Schema.Struct({

@@ -29,7 +29,7 @@ import type { Observation, RunnerOps, SpawnRequest } from '../seam.ts';
 import { readTranscript } from '../transcript.ts';
 import { claudeStreamOutput } from '../detached/output.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
-import { lessCarried } from '../detached/detached.ts';
+import { carriedOf, lessCarried } from '../detached/carried.ts';
 import {
   appendAnswer,
   asksTaken,
@@ -114,8 +114,7 @@ const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun[
   const parent = [...everyRun(root).values()]
     .filter((r) => r.sessionId === resumeFrom)
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
-  const { costUsd, apiMs } = (parent && saidBy(root, parent.name).usage) || {};
-  return { ...(costUsd !== undefined ? { costUsd } : {}), ...(apiMs !== undefined ? { apiMs } : {}) };
+  return carriedOf(parent && saidBy(root, parent.name));
 };
 
 /** The bridge a run file kept, as a sighting says it: the link where one was opened, else why there is none. */
@@ -135,8 +134,8 @@ const bridgeOf = (run: AttachedRun): Pick<Sighting, 'bridge'> => {
  * restarted under its feet. A session that has ended says nothing of a process, as it did before.
  */
 const sightingOf = (root: string, run: AttachedRun): Sighting => {
-  const { denials, usage, ...said } = saidBy(root, run.name);
-  const own = usage && run.carried ? lessCarried(usage, run.carried) : usage;
+  const { denials, usage, ownTokens, ...said } = saidBy(root, run.name);
+  const own = usage && run.carried ? lessCarried(usage, run.carried, ownTokens) : usage;
   const held = isOpen(run.state) ? !holderGone(run) : undefined;
   return {
     sessionId: run.name,

@@ -985,8 +985,7 @@ const turn1 = (
     : []),
 ];
 /** The same journal filed without `holdOpen`: the control every rule of a task held open is held beside. */
-const notHeld = (events: Event[]): Event[] =>
-  events.map((e) => (e.kind === 'filed' ? (({ holdOpen: _, ...rest }) => rest)(e) : e));
+const notHeld = (events: Event[]): Event[] => events.map((e) => (e.kind === 'filed' ? (({ holdOpen: _, ...rest }) => rest)(e) : e));
 
 test('HELD OPEN: a task held open signs and waits on a person, is answered into turns that continue its session, and is closed or stopped', async (t) => {
   const s = story(t);

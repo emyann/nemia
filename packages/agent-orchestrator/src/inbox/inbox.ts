@@ -38,6 +38,7 @@ import { factoryNameRefusal, type Factory } from '../factory/factory.ts';
 import type { Run } from '../record/record.ts';
 import type { RecordMemo } from '../rest/index.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
+import { frontmatterOrNull, renderFrontmatter } from '../frontmatter/frontmatter.ts';
 
 export type InboxCard = {
   /** Its file's name in the inbox, minus `.md`: what `nemia inbox rm` and a start name it by. */
@@ -490,21 +491,24 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
   });
 }
 
-/** `given` without the keys it leaves undefined, so a key given as undefined leaves the text's own. */
+/**
+ * `given` without the keys it leaves undefined, so a key given as undefined leaves the text's own, and each value trimmed, as a card's
+ * line is read: ` /home/me/app ` is the repository, and a blank one has no value.
+ */
 const definedOf = (given: Partial<Record<InboxKey, string | undefined>>): Partial<Record<InboxKey, string>> =>
-  Object.fromEntries(Object.entries(given).filter(([, value]) => value !== undefined));
+  Object.fromEntries(Object.entries(given).flatMap(([key, value]) => (value === undefined ? [] : [[key, value.trim()]])));
 
 /**
  * The file `nemia inbox add` writes for an idea, and its body — refused, naming `from`, as the card it writes would be refused
  * (`parseInboxCard`).
  *
- * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — every line a key of `INBOX_KEYS`, or
- * an `after:`, which is refused by name — gives its keys and its body; any other text, a frontmatter that never closes included, is the
- * body whole, as `nemia start` takes a brief that is not a card. `workflow`, `repo` and `factory`, when given, are written over the text's
- * own, the keys in `INBOX_KEYS`' order. Refused too: text with nothing in it, a `workflow`, `repo` or `factory` given on more than one
- * line, and a `queued:` in the text: a card is queued once it is in the inbox, under its own name, and a time carried in from elsewhere
- * would jump the queue. A body that opens with a `---` rule of its own is given a frontmatter of one comment line, so the rule is not read
- * as the card's frontmatter.
+ * `text` is the idea as given: a note, or a file's text. A file whose frontmatter is an inbox card's — a block that reads, as YAML or in
+ * the former line form (`frontmatterOrNull`), as keys each of `INBOX_KEYS`, or an `after:`, which is refused by name — gives its keys
+ * and its body; any other text, a frontmatter that never closes included, is the body whole, as `nemia start` takes a brief that is
+ * not a card. `workflow`, `repo` and `factory`, when given, are written over the text's own, the keys in `INBOX_KEYS`' order. Refused
+ * too: text with nothing in it, a `workflow`, `repo` or `factory` given on more than one line, and a `queued:` in the text: a card is
+ * queued once it is in the inbox, under its own name, and a time carried in from elsewhere would jump the queue. A body that opens with
+ * a `---` rule of its own is given a frontmatter of one comment line, so the rule is not read as the card's frontmatter.
  *
  * `dir` is the folder a `workflow:` of the text's own that is a path was written from — the file's, as a plan card's is its plan folder —
  * and such a path is written absolute against it (`workflowAt`). Left relative, the start would read it from the inbox, and
@@ -537,13 +541,9 @@ export function ideaCard(
   try {
     split = splitFrontmatter(from, text);
   } catch {}
-  const lines = (split?.block ?? '')
-    .split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith('#'));
-  const isCardLine = (line: string) =>
-    line.indexOf(':') > 0 && ([...INBOX_KEYS, 'after'] as string[]).includes(line.slice(0, line.indexOf(':')).trim());
-  if (split && lines.length && lines.every(isCardLine)) {
+  const entries = (split?.block == null ? null : frontmatterOrNull(split.block))?.entries ?? [];
+  const isCardKey = (key: string) => ([...INBOX_KEYS, 'after'] as string[]).includes(key);
+  if (split && entries.length && entries.every(({ key }) => isCardKey(key))) {
     const read = inboxKeys(from, split.block!, true);
     if (read.queued !== undefined) {
       refuse(
@@ -555,11 +555,19 @@ export function ideaCard(
     if (keys.workflow !== undefined && dir !== undefined) keys.workflow = workflowAt(keys.workflow, dir);
   }
   const written = { ...keys, ...definedOf(given) };
-  const frontmatter = INBOX_KEYS.flatMap((key) => (written[key] !== undefined ? [`${key}: ${written[key]}`] : []));
-  if (!frontmatter.length && body.startsWith('---')) frontmatter.push('# the idea below opens with a rule of its own');
-  const card = `${frontmatter.length ? `---\n${frontmatter.join('\n')}\n---\n` : ''}${body}\n`;
+  const card = cardWritten(written, body);
   parseInboxCard(from, card, isDirectory);
   return { text: card, body };
+}
+
+/**
+ * A card's file: its keys in `INBOX_KEYS`' order, written as YAML (`renderFrontmatter`), then its body. A body that opens with a `---`
+ * rule of its own, under no key, is given a frontmatter of one YAML comment line, so the rule is not read as the card's frontmatter.
+ */
+function cardWritten(keys: Partial<Record<InboxKey, string | undefined>>, body: string): string {
+  const pairs = INBOX_KEYS.flatMap((key) => (keys[key] !== undefined ? [[key, keys[key]] as const] : []));
+  const block = pairs.length ? renderFrontmatter(pairs) : body.startsWith('---') ? '# the idea below opens with a rule of its own\n' : '';
+  return `${block ? `---\n${block}---\n` : ''}${body}\n`;
 }
 
 /**
@@ -593,9 +601,7 @@ function cardText(card: InboxCard, over: Partial<Record<InboxKey, string | undef
     from: fromLine(card.from),
     ...over,
   };
-  const frontmatter = INBOX_KEYS.flatMap((key) => (keys[key] !== undefined ? [`${key}: ${keys[key]}`] : []));
-  if (!frontmatter.length && card.body.startsWith('---')) frontmatter.push('# the idea below opens with a rule of its own');
-  const text = `${frontmatter.length ? `---\n${frontmatter.join('\n')}\n---\n` : ''}${card.body}\n`;
+  const text = cardWritten(keys, card.body);
   parseInboxCard(card.file, text, isDirectory);
   return text;
 }

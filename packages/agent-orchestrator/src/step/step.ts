@@ -370,6 +370,27 @@ export const STEP_KEYS = [
 ] as const;
 export type StepKey = (typeof STEP_KEYS)[number];
 
+/**
+ * The keys whose value is a list, written as a comma string (`tools: Read, Grep`) or a YAML list (`tools: [Read, Grep]`), each read as
+ * the comma string (`flatValue`, `frontmatter.ts`): a step's and an agent's lists, and the cards' `from:`. A list on any other key is
+ * refused, and a flow collection there in a former-form block reads the former way. A key's reader judges the items.
+ */
+export const LIST_KEYS: readonly string[] = [
+  'after',
+  'input',
+  'writable',
+  'reads',
+  'skills',
+  'mcp',
+  'tools',
+  'disallowedTools',
+  'allowedTools',
+  'tally',
+  'from',
+  'disallow',
+  'allow',
+];
+
 /** The keys that are counts: what each counts, the least that means anything, and an example. */
 export const COUNTS = {
   deadlineSeconds: { least: 1, counts: 'the seconds the engine lets the step run before stopping it', example: 900 },

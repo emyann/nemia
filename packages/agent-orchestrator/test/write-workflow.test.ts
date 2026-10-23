@@ -297,7 +297,7 @@ test('REFUSED, with the folder as it was: an `output:` naming a schema that is n
   );
 });
 
-test('REFUSED, with the folder as it was: a step name that is not a file name, one name twice, no steps, a line break in a value, and a folder that is a file', () => {
+test('REFUSED, with the folder as it was: a step name that is not a file name, one name twice, no steps, and a folder that is a file', () => {
   const dir = devIn('names');
   const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
   const named = (name: string) => [implement, { ...step(name), after: ['implement'] }];
@@ -334,10 +334,6 @@ test('REFUSED, with the folder as it was: a step name that is not a file name, o
   assert.equal(
     refusal(dir, () => writeWorkflow(dir, [])),
     `no steps to write to ${dir}, and a workflow has at least one. To remove the workflow, remove its folder.`,
-  );
-  assert.match(
-    refusal(dir, () => writeWorkflow(dir, [{ ...implement, check: 'npm test\nharness: codex' }, review])),
-    /^implement: `check` holds a line break/,
   );
 
   const file = path.join(STORE, 'a-file');
@@ -480,4 +476,14 @@ test('REFUSED at load and at write, in the same words: a `tally:` the closeout o
   writeWorkflow(dir, kept);
   assert.match(fs.readFileSync(review, 'utf8'), /^tally: findings$/m);
   assert.deepEqual(loadWorkflows(dir).find((s) => s.name === 'review')?.tally, ['findings'], 'and a tally it can hold reads back');
+});
+
+test('a line break in a value is written as a literal block, and read back as the one value, never as a key of its own', () => {
+  const dir = devIn('names');
+  const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
+  writeWorkflow(dir, [{ ...implement, check: 'npm test\nharness: codex' }, review]);
+  assert.match(fs.readFileSync(path.join(dir, 'implement.md'), 'utf8'), /^check: \|-$/m);
+  const [read] = loadWorkflows(dir) as [Workflow];
+  assert.equal(read.check, 'npm test\nharness: codex');
+  assert.equal(read.harness, implement.harness);
 });

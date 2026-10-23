@@ -81,6 +81,29 @@ test("a step's frontmatter merges by key: adjacent keys changed on each side are
   });
 });
 
+test("a step's frontmatter merges by key where a key's value is on the lines under it: a `check: |-` block and a `tools:` list", () => {
+  const check = (command: string) => `check: |-\n  npm test\n  ${command}\n`;
+  const tools = (...names: string[]) => `tools:\n${names.map((name) => `  - ${name}\n`).join('')}`;
+  const base = step(`${check('npm run lint')}${tools('Read', 'Grep')}`, 'Review it.\n');
+  const ours = step(`${check('npm run typecheck')}${tools('Read', 'Grep')}`, 'Review it.\n');
+  const theirs = step(`${check('npm run lint')}${tools('Read', 'Grep', 'Bash')}`, 'Review it.\n');
+  const merge = mergeTrees(tree({ 'w/review.md': base }), tree({ 'w/review.md': ours }), tree({ 'w/review.md': theirs }));
+  assert.deepEqual(merge.conflicts, []);
+  assert.deepEqual(composed(merge, {}), {
+    'w/review.md': step(`${check('npm run typecheck')}${tools('Read', 'Grep', 'Bash')}`, 'Review it.\n'),
+  });
+  const clash = mergeTrees(
+    tree({ 'w/review.md': base }),
+    tree({ 'w/review.md': ours }),
+    tree({ 'w/review.md': step(`${check('npm run build')}${tools('Read', 'Grep')}`, 'Review it.\n') }),
+  );
+  assert.deepEqual(
+    clash.conflicts.map((c) => [c.at, c.ours, c.theirs]),
+    [['w/review.md#check', check('npm run typecheck'), check('npm run build')]],
+    'the block conflicts as one key, its lines with it',
+  );
+});
+
 test("a step's body merges by line, a conflict addressed by the file's base lines", () => {
   const base = step('', 'one\ntwo\nthree\n');
   const merge = mergeTrees(

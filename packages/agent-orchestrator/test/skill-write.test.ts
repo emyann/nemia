@@ -72,10 +72,10 @@ test('a skill is rendered as Nemia ships its own, and read back as it was writte
     [
       '---',
       'name: tidy-notes',
-      'title: "Tidy notes"',
-      'description: "Rewrites a folder of notes: \\"one fact a line\\"."',
-      'tags: ["notes","writing"]',
-      'examples: ["tidy my notes","make these notes one fact a line"]',
+      'title: Tidy notes',
+      `description: 'Rewrites a folder of notes: "one fact a line".'`,
+      'tags: [ notes, writing ]',
+      'examples: [ tidy my notes, make these notes one fact a line ]',
       '---',
       '# Tidy notes',
       '',
@@ -103,7 +103,7 @@ test('a skill is rendered as Nemia ships its own, and read back as it was writte
 
 test('a skill given only a description is written with no title, tags or examples, and preload writes its line', () => {
   const text = renderSkill({ name: 'bare', description: 'Does one thing.', body: 'Do it.', preload: true, title: '  ', tags: null });
-  assert.equal(text, '---\nname: bare\ndescription: "Does one thing."\npreload: true\n---\nDo it.\n');
+  assert.equal(text, '---\nname: bare\ndescription: Does one thing.\npreload: true\n---\nDo it.\n');
   assert.deepEqual(skillDraftOf('SKILL.md', 'bare', text), {
     name: 'bare',
     title: null,
@@ -135,10 +135,10 @@ test('an edit keeps every key the form does not write, line for line, and the pr
   const { block } = splitFrontmatter('SKILL.md', text);
   assert.deepEqual(block!.split('\n'), [
     'name: tidy-notes',
-    'title: "Tidy notes"',
-    'description: "Rewrites a folder of notes: \\"one fact a line\\"."',
-    'tags: ["notes","writing"]',
-    'examples: ["tidy my notes","make these notes one fact a line"]',
+    'title: Tidy notes',
+    `description: 'Rewrites a folder of notes: "one fact a line".'`,
+    'tags: [ notes, writing ]',
+    'examples: [ tidy my notes, make these notes one fact a line ]',
     '# written by hand',
     'allowed-tools: Read, Grep',
     'metadata:',
@@ -170,23 +170,49 @@ test('a draft the card reader would refuse is refused in its words, and a line b
   refused({ ...DRAFT, name: 'Tidy Notes' }, /lowercase/);
 });
 
-test('withPreload changes that one line, and nothing else of the file', () => {
+/** A SKILL.md's frontmatter as YAML reads it. */
+const keysOf = (text: string) => yaml.load(splitFrontmatter('SKILL.md', text).block!) as Record<string, unknown>;
+
+test('withPreload changes that one key, and nothing else of the file', () => {
   const was = '---\nname: x\ndescription: "Does x."\npreload: false\nmetadata:\n  a: 1\n---\n\nBody, with its blank line above.\n';
   const on = withPreload('SKILL.md', was, true);
-  assert.equal(on, '---\nname: x\ndescription: "Does x."\nmetadata:\n  a: 1\npreload: true\n---\n\nBody, with its blank line above.\n');
+  assert.equal(on, '---\nname: x\ndescription: "Does x."\npreload: true\nmetadata:\n  a: 1\n---\n\nBody, with its blank line above.\n');
   assert.equal(
     withPreload('SKILL.md', on, false),
     '---\nname: x\ndescription: "Does x."\nmetadata:\n  a: 1\n---\n\nBody, with its blank line above.\n',
   );
   assert.throws(
     () => withPreload('SKILL.md', 'no frontmatter', true),
-    (err: Error) => /has no frontmatter, and `preload:` is a line of it/.test(err.message),
+    (err: Error) => err instanceof WorkflowError && err.message.startsWith('SKILL.md has no frontmatter'),
   );
-  assert.throws(
-    () => withPreload('SKILL.md', '---\ndescription: d\nmetadata:\n  preload: true\n---\n', false),
-    (err: Error) => /could not be written so it reads false/.test(err.message),
-    "a preload: the reader finds inside another key's lines is not one a line of its own could change",
-  );
+  const nested = '---\ndescription: d\nmetadata:\n  preload: true\n---\n';
+  assert.deepEqual(keysOf(withPreload('SKILL.md', nested, false)), keysOf(nested), "a preload: inside another key's is not the skill's");
+});
+
+test("withPreload toggles preload and leaves every other key's reading equal: a quoted value, a YAML list, a comment", () => {
+  const was = [
+    '---',
+    'name: x',
+    '# by hand',
+    "description: 'Reviews a change: what it breaks.'",
+    'tags:',
+    '  - code',
+    '  - review',
+    'allowed-tools: [Read, Grep]',
+    '---',
+    'Body.',
+    '',
+  ].join('\n');
+  const on = withPreload('SKILL.md', was, true);
+  const { preload, ...others } = keysOf(on);
+  assert.equal(preload, true);
+  assert.deepEqual(others, keysOf(was));
+  assert.ok(on.includes('# by hand\n'), on);
+  assert.deepEqual(skillEntryOf('SKILL.md', 'x', on), skillEntryOf('SKILL.md', 'x', was));
+  const off = withPreload('SKILL.md', on, false);
+  assert.deepEqual(keysOf(off), keysOf(was));
+  assert.equal(skillDraftOf('SKILL.md', 'x', off).preload, false);
+  assert.equal(skillDraftOf('SKILL.md', 'x', on).preload, true);
 });
 
 test('a skill is made in the library, read by the store, and refused a second time under the same name', () => {

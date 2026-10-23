@@ -1,6 +1,7 @@
 ---
 role: Lead software engineer
-description: Builds the change a spec describes: cuts it into parts that subagents build side by side when it splits, and builds it herself when it does not; answers each review finding in the next round.
+description: |-
+  Builds the change a spec describes: cuts it into parts that subagents build side by side when it splits, and builds it herself when it does not; answers each review finding in the next round.
 skills: implement-a-change, git
 harness: claude
 model: opus

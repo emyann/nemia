@@ -163,6 +163,11 @@ test('a skill costs a turn its listing, and its body too when it is preloaded', 
   assert.equal(named.listed, tokensAbout('write-a-note: Writes a note.'), 'the listing is its name and description, quotes read off');
   assert.equal(named.body, tokensAbout('# Write\n\nA body of some length.'));
   assert.equal(named.perTurn, named.listed, 'named, a turn carries its listing alone');
+  assert.equal(
+    skillTurnCost('ask', '---\ndescription: >-\n  Asks: what is it\n  for?\n---\nBody.\n').listed,
+    tokensAbout('ask: Asks: what is it for?'),
+    'a description is read as YAML reads it, a folded block too',
+  );
   const preloaded = skillTurnCost('ask', '---\ndescription: Asks.\npreload: true\n---\nThe whole body, every turn.\n');
   assert.equal(preloaded.preload, true);
   assert.equal(preloaded.perTurn, preloaded.listed + preloaded.body, 'preloaded, a turn carries its body too');

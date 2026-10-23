@@ -108,7 +108,8 @@ const PARSE: Refused[] = [
     '`after: a, b`',
   ],
   ['a key set to nothing', () => parsePlan([card('a', 'workflow:')]), /^a\.md: `workflow` has no value\./],
-  ['a line that is not a key', () => parsePlan([card('a', 'workflow dev')]), /^a\.md: `workflow dev` is not `key: value`\./],
+  ['a line that is not a key, by its line', () => parsePlan([card('a', 'workflow dev')]), /^a\.md:2: /],
+  ['a list on a key of one value, by its line', () => parsePlan([card('a', 'workflow: [dev, ui]')]), /^a\.md:2: /],
   [
     "`repo:`, an inbox card's key: a plan works on the one repository `nemia plan --repo` is given",
     () => parsePlan([card('a', 'workflow: dev\nrepo: /home/me/code/app')]),
@@ -221,6 +222,11 @@ const START: Refused[] = [
   ['an empty body', () => cardToStart('a.md', '---\nworkflow: dev\n---\n', []), /^a\.md: the body is empty\./],
   ['a key set twice', () => cardToStart('a.md', '---\nworkflow: dev\nworkflow: ui\n---\nx\n', []), /^a\.md: `workflow` is set twice/],
   ['a key set to nothing', () => cardToStart('a.md', '---\nworkflow:\n---\nx\n', []), /^a\.md: `workflow` has no value\./],
+  [
+    'a list on `workflow:`, which names one, by its line',
+    () => cardToStart('d.md', '---\nworkflow:\n  - dev\n  - ui\n---\nx\n', []),
+    /^d\.md:2: /,
+  ],
   ['an after: naming no card', () => cardToStart('a.md', '---\nafter: ,\n---\nx\n', ['r-b']), /^a\.md: `after: ,` names no card\./],
   ['an after: naming one twice', () => cardToStart('a.md', '---\nafter: b, b\n---\nx\n', ['r-b']), /^a\.md: `after: b, b` names b twice\./],
   [
@@ -349,11 +355,24 @@ test('`cardToStart`: a card file starts its body, with its `workflow:` and `afte
     { file: 'b.md', after: ['a'], body: 'Document it.' },
     'no workflow: — --workflows says, or the default',
   );
+  assert.deepEqual(
+    cardToStart('d.md', '---\nworkflow: "dev"\nafter:\n  - b\n  - c\n---\nShow the flag.\n', ['r-b', 'r-c']),
+    { file: 'd.md', workflow: 'dev', after: ['b', 'c'], body: 'Show the flag.' },
+    'a YAML card: a quoted value, and `after:` as a block list, read as `after: b, c`',
+  );
+  assert.deepEqual(
+    cardToStart('d.md', '---\nafter: [b, c]\n---\nShow the flag.\n', ['r-b', 'r-c']),
+    { file: 'd.md', after: ['b', 'c'], body: 'Show the flag.' },
+    'and as a flow list',
+  );
 
   for (const text of [
     'Parse the flag.\n',
     '---\nSome prose between two rules\n---\nParse it.\n',
     '---\nIn short: parse it\n---\nParse it.\n',
+    '---\nThis is a brief, with: a colon\n---\nParse it.\n',
+    '---\nA brief in prose, opening on a rule\n\nwith a second paragraph.\n---\nParse it.\n',
+    '---\n- a list, not keys\n---\nParse it.\n',
     '---\nA brief that opens with a rule, and never closes one.\n',
     '---\n---\nParse it.\n',
     '---\n\n# only a comment\n---\nParse it.\n',

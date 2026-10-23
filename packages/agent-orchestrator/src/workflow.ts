@@ -42,6 +42,7 @@ export {
   CLOSEOUT_FIELDS,
   DEFAULT_ROUNDS,
   isReadme,
+  LIST_KEYS,
   LOOP_REPLIES,
   outputFields,
   SKILLS_FOLDER,
@@ -52,6 +53,16 @@ export {
   WorkflowError,
 } from './step/step.ts';
 export type { OutputSchema, StepAgent, StepKey, StepOutput, Workflow } from './step/step.ts';
+export {
+  commentTails,
+  flatValue,
+  frontmatterOrNull,
+  readFrontmatter,
+  renderFrontmatter,
+  rewriteFormer,
+  withKey,
+} from './frontmatter/frontmatter.ts';
+export type { Frontmatter, FrontmatterEntry, FrontmatterPair, FrontmatterValue } from './frontmatter/frontmatter.ts';
 export {
   HARNESSES,
   isRemoteHarness,

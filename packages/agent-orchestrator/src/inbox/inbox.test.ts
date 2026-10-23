@@ -377,6 +377,24 @@ test("`ideaCard`: a note is the body; a file whose frontmatter is an inbox card'
   );
 });
 
+test('`ideaCard` reads a YAML card — quoted values, `from:` as a list — and writes it back as YAML, quoting a value that needs it', () => {
+  const yaml = '---\nworkflow: "dev"\nrepo: /home/me/code/app\nfrom:\n  - a-1x2y\n  - b-3z4w\n---\nCache the views.\n';
+  const filed = ideaCard('./idea.md', yaml, {}, isDirectory);
+  assert.equal(
+    filed.text,
+    '---\nworkflow: dev\nrepo: /home/me/code/app\nfrom: a-1x2y, b-3z4w\n---\nCache the views.\n',
+    'a card, its keys read as YAML and written in the line form wherever it reads back the same',
+  );
+  const odd = ideaCard('the idea', 'Cache the views.', { workflow: 'dev #2: the views' }, isDirectory);
+  assert.equal(read(odd.text).workflow, 'dev #2: the views', 'a value YAML would read otherwise is quoted, and reads back');
+  assert.equal(read(fromText(read(odd.text), ['a-1x2y'], isDirectory)).workflow, 'dev #2: the views', 'and written again the same');
+  assert.equal(
+    ideaCard('./brief.md', '---\nIn short: cache the views\n---\nBetween passes.\n', {}, isDirectory).body,
+    '---\nIn short: cache the views\n---\nBetween passes.',
+    "a block whose key is no card's is the body whole",
+  );
+});
+
 test("`ideaCard` writes a file's own `workflow:` that is a path absolute against the file's folder — as a plan card's is read from its plan folder — and leaves a name a name, an absolute path as it is, and a flag's over it", () => {
   const plans = '/home/me/code/app/plans';
   const filed = (workflow: string, given: { workflow?: string } = {}, dir: string | null = plans) =>
@@ -785,7 +803,7 @@ test("REFUSED by name at shipped defaults: `parseInboxCard` refuses a card's key
     ],
     'an empty body': ['---\nworkflow: dev\n---\n', [F, 'the body is empty']],
     'nothing but spaces': ['   \n', [F, 'the body is empty']],
-    'a line that is not `key: value`': ['---\nworkflow dev\n---\nx\n', [F, '`workflow dev`', 'is not `key: value`']],
+    'a line that is not `key: value`, by its line': ['---\nworkflow dev\n---\nx\n', [`${F}:2: `]],
     'a frontmatter that never closes': [
       '---\nworkflow: dev\nCache the views.\n',
       [F, 'the frontmatter', 'never closes', 'a line that is just `---`'],

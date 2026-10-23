@@ -26,15 +26,22 @@ change it.
 A file several parts need (an index, a baseline, a shared type, a config) is yours, written before or after the parts that need it. A
 phase that depends on another starts once that one is done and taken.
 
+**Write down what the parts share before they start.** Before a phase's parts start, write in one file in your files directory
+(`$WF_STEP_FILES`) what they all build on: the names, helpers and layout every part uses, the conventions they follow, and the rules they
+need from the `CLAUDE.md` files of the folders they work in. A decision two parts would each have to make on their own is yours: make it
+before they start, and write it there. Parts running at once each make choices the others do not see, and the choices clash; and one file
+read by every part costs less than every part finding the same things again.
+
 **Brief each part fully**, since a subagent knows only what you tell it: its goal and the spec's words for it, the files it owns and
-those it must not touch, the repository's rules it needs (the `CLAUDE.md` files of the folders it works in), the tests to run (those of
-what it changed, each from its package's folder as its `test` script loads it), and what to bring back: the files it changed, the tests
-it ran and their result, and what it did not do and why. A part never commits, merges or pushes, never runs the whole suite, the
+those it must not touch, the path of the shared file and that it reads it first (the brief points to it rather than repeating it), the
+tests to run (those of what it changed, each from its package's folder as its `test` script loads it), and what to bring back: its
+account, written to a file in your files directory whose path it returns, holding the files it changed, the tests it ran and their
+result, and what it did not do and why. What a part reports then stays whole, and out of your context until you read it. A part never commits, merges or pushes, never runs the whole suite, the
 end-to-end tests or the build, and starts no subagent of its own.
 
 **Run independent parts at once**, several Agent calls in one message, each with `model: "opus"`, and wait for every one to return:
 never sign off while one is running. Do a part yourself when briefing it would cost more than doing it.
 
-**Take each part as a reviewer would**: read its diff against its brief, then commit it, one commit per part, with a plain message. Once
+**Take each part as a reviewer would**: read its diff against its brief, with its account beside it, then commit it, one commit per part, with a plain message. Once
 the parts of a phase are in, run the tests across their seams, and a package's whole tests where a file many tests read has changed.
 Your summary names each part, who built it, and what you changed in it when you took it.

@@ -834,6 +834,95 @@ test(
   },
 );
 
+/** The results of the session's capture, each its `subtype` and the `total_cost_usd` it printed, in order. */
+const resultsIn = (root: string) =>
+  (fs.existsSync(filesOf(root, NAME).out) ? fs.readFileSync(filesOf(root, NAME).out, 'utf8').split('\n').filter(Boolean) : [])
+    .map((l) => JSON.parse(l) as { type?: string; subtype?: string; total_cost_usd?: number })
+    .filter((l) => l.type === 'result')
+    .map((l) => ({ subtype: l.subtype, total: l.total_cost_usd }));
+
+/** The running totals the stand-in saved as it exited cleanly, in order (`fixtures/stand-in-claude.ts`). */
+const costStates = (dir: string) => (lines(dir, 'cost-state.jsonl') as { totalCostUSD: number }[]).map((l) => l.totalCostUSD);
+
+/** Whether two costs are the same, to the cent's billionth: a sum of floats is not exact. */
+const sameCost = (a: number | undefined, b: number) => a !== undefined && Math.abs(a - b) < 1e-9;
+
+test("a session cut by its holder's let-go and resumed by the next holder costs what both of its processes spent", WAITED, async (t) => {
+  const s = story(t);
+  const { root, dir, request } = place({ call: 'Bash', cost: 0.5, output: {} });
+  const first = await holder(root, 1_000);
+  let next: Awaited<ReturnType<typeof holder>> | undefined;
+  t.after(async () => void (await next?.close()));
+
+  await s.test('cut in its call, its Claude Code prints the turn it spent and saves its total before it is gone', async (st) => {
+    await Effect.runPromise(first.attached.ops.spawn(request));
+    assert.equal((await inCall(st, root)).tool, 'Bash');
+    const child = Number(fs.readFileSync(path.join(dir, 'pid'), 'utf8'));
+    await first.close();
+    assert.equal(run(root)?.state, 'parked');
+    assert.equal(run(root)?.calling?.tool, 'Bash', 'the call it cut is kept');
+    assert.deepEqual(resultsIn(root), [{ subtype: 'error_during_execution', total: 0.5 }], 'the interrupted turn printed what it spent');
+    assert.deepEqual(costStates(dir), [0.5], 'and Claude Code saved its running total as it ended');
+    assert.equal(alive(child), false, "the session's Claude Code is gone once the let-go returns");
+    assert.equal(run(root)?.childPid, undefined, 'and the parked file names it no more');
+  });
+
+  await s.test("the next holder resumes it, and the attempt's cost is the sum of both processes", async (st) => {
+    fs.writeFileSync(path.join(dir, 'release'), '');
+    next = await holder(root);
+    const seen = await until(
+      st,
+      async () => {
+        const got = await sighted(next!);
+        return got?.state === 'completed' && got;
+      },
+      'the resumed session completed',
+      { everyMs: 50 },
+    );
+    const [, argv] = lines(dir, 'argv.jsonl') as string[][];
+    assert.ok(argv.includes('--resume=stand-in-session'), 'the session is resumed by its own id');
+    assert.ok(sameCost(seen.usage?.costUsd, 1), `0.5 for the cut process and 0.5 for its resume, not ${seen.usage?.costUsd}`);
+  });
+});
+
+test("what the next holder's sighting counts of a session's cost, by how its last holder ended", WAITED, async (t) => {
+  await t.test('let go between turns, its spend is counted once: carried on by the resume, never added again', async (rt) => {
+    const { root, dir, request } = kept({ cost: 0.5, output: {} });
+    const first = await holder(root);
+    await Effect.runPromise(first.attached.ops.spawn(request));
+    await idle(rt, root);
+    await first.close();
+    assert.deepEqual(costStates(dir), [0.5], 'the session parked between turns saved its total as its input ended');
+    const next = await holder(root);
+    rt.after(next.close);
+    await sighted(next);
+    await until(rt, () => resultsIn(root).length === 2, 'the resumed turn ended', { everyMs: 50 });
+    const seen = await sighted(next);
+    assert.ok(sameCost(seen?.usage?.costUsd, 1), `0.5 a turn, twice, not ${seen?.usage?.costUsd}`);
+  });
+
+  await t.test('its holder killed outright, the spend of the process it cut is lost: an undercount, never a double count', async (rt) => {
+    const { root, request } = kept({ cost: 0.5, output: {} });
+    const killed = { type: 'result', subtype: 'success', is_error: false, session_id: 'stand-in-session', total_cost_usd: 0.5 };
+    fs.mkdirSync(path.dirname(filesOf(root, NAME).out), { recursive: true });
+    fs.writeFileSync(filesOf(root, NAME).out, `${JSON.stringify(killed)}\n`);
+    writeRun(root, {
+      name: NAME,
+      state: 'parked',
+      owner: process.pid,
+      startedAt: new Date().toISOString(),
+      sessionId: 'stand-in-session',
+      request: { ...request, brief: undefined },
+    });
+    const next = await holder(root);
+    rt.after(next.close);
+    await sighted(next);
+    await until(rt, () => resultsIn(root).length === 2, 'the resumed turn ended', { everyMs: 50 });
+    const seen = await sighted(next);
+    assert.ok(sameCost(seen?.usage?.costUsd, 0.5), `the resume's own 0.5, its killed parent's saved nowhere, not ${seen?.usage?.costUsd}`);
+  });
+});
+
 test('a denial is journalled while the attempt is at work, before its result', WAITED, async (t) => {
   const { root, dir, request } = place({ deny: 'WebFetch', hold: true, output: {} });
   const attached = attachedSessions(root, STAND_IN);

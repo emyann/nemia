@@ -511,7 +511,9 @@ test('a parent that will not ship — cancelled, failed with nothing committed, 
     'a parent whose frozen steps cannot be read has not shipped: its read answers so, and asks git nothing of its branches',
     async () => {
       const dir = oneStep();
-      const p = await aParent(repo, { workflowDir: dir });
+      const p = await aParent(repo, { workflowDir: dir, signed: true });
+      const readable = await stage.runWith(board().e, parentRead(p.run.id, await stage.runPlaced(standingLiveOf([p.run.id]))));
+      assert.equal(readable.shipped, true, 'signed off, with its steps readable, it has shipped');
       const record = readRun(p.run.id);
       delete record.workflow;
       fs.writeFileSync(path.join(ROOT, 'runs', `${record.id}.json`), JSON.stringify(record, null, 2));

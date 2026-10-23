@@ -15,6 +15,7 @@ import type { TaskPhase } from '../src/run.ts';
 import { scratch } from './scratch.ts';
 import { promised } from './promised.ts';
 import { runGiven, runOver } from './placed.ts';
+import { names } from './assessed.ts';
 
 const ROOT = scratch('wf-hold-git-');
 process.env.WF_ROOT = ROOT;
@@ -125,18 +126,19 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
     await main(argv, e);
     return { printed: printed.join('\n'), error: undefined };
   } catch (err) {
-    return { printed: printed.join('\n'), error: err as Error & { exitCode?: number } };
+    return { printed: printed.join('\n'), error: err as Error & { exitCode?: number; _tag?: string } };
   } finally {
     log.mock.restore();
   }
 };
 
-/** A refusal through the CLI: exit 2, and a message that `pattern` matches. */
-const refused = async (t: TestContext, e: Engine, pattern: RegExp, ...argv: string[]) => {
+/** A refusal through the CLI: of the kind `tag`, exit 2, and a message that names each of `facts` — the ids, the flag, the branch. */
+const refused = async (t: TestContext, e: Engine, tag: string, facts: string[], ...argv: string[]) => {
   const { error } = await typed(t, e, ...argv);
   assert.ok(error, `nemia ${argv.join(' ')} was not refused`);
+  assert.equal(error._tag, tag, error.message);
   assert.equal(error.exitCode, 2, error.message);
-  assert.match(error.message, pattern);
+  names(error.message, ...facts);
 };
 
 /** A team whose one step works in a folder the run makes, with no repository. */
@@ -155,22 +157,15 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
 
   const pruned = await aDone(b, repo);
   assert.equal((await runWith(b.e, prune(pruned.id, { yes: true, unmerged: true }))).kind, 'pruned');
-  await refused(
-    t,
-    b.e,
-    new RegExp(`^${pruned.id} was pruned at .*: nothing of it is filed again, so there is nothing to hold\\.$`),
-    'hold',
-    pruned.id,
-    '--until',
-    target.id,
-  );
+  await refused(t, b.e, 'Conflict', [`${pruned.id} was pruned at`, 'nothing to hold'], 'hold', pruned.id, '--until', target.id);
 
   const folder = await runPlaced(startRun({ brief: 'a note', repo: fs.mkdtempSync(path.join(ROOT, 'plain-')), workflowDir: folderTeam() }));
-  await refused(t, b.e, new RegExp(`^${folder.id}'s team works in folders \\(place: folder\\)`), 'hold', folder.id, '--until', target.id);
+  await refused(t, b.e, 'Conflict', [`${folder.id}'s team works in folders`, 'place: folder'], 'hold', folder.id, '--until', target.id);
   await refused(
     t,
     b.e,
-    new RegExp(`^--until ${folder.id}: ${folder.id} is a folder run \\(place: folder\\), which never ships onto a branch`),
+    'Conflict',
+    [`--until ${folder.id}:`, `${folder.id} is a folder run`, 'never ships onto a branch'],
     'hold',
     id,
     '--until',
@@ -181,7 +176,8 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
   await refused(
     t,
     b.e,
-    new RegExp(`^--until ${inPlace.id}: ${inPlace.id} worked on main itself \\(--no-worktree\\), so it has no result branch to ship`),
+    'Conflict',
+    [`--until ${inPlace.id}:`, `${inPlace.id} worked on main itself`, '--no-worktree', 'no result branch'],
     'hold',
     id,
     '--until',
@@ -194,9 +190,8 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
   await refused(
     t,
     b.e,
-    new RegExp(
-      `^--until ${onRelease.id}: ${onRelease.id} ships onto release, and ${id} onto main, so ${id} would wait on a branch it never meets`,
-    ),
+    'Conflict',
+    [`--until ${onRelease.id}:`, `${onRelease.id} ships onto release`, `${id} onto main`],
     'hold',
     id,
     '--until',
@@ -209,9 +204,8 @@ test('REFUSED at shipped defaults: a hold on a pruned run and on a folder run, a
   await refused(
     t,
     b.e,
-    new RegExp(
-      `^--until ${dropped.id}: wf/${dropped.id}/${LINE_NAME} is gone, and git cannot find it on main, so ${id} would wait for ever`,
-    ),
+    'Conflict',
+    [`--until ${dropped.id}:`, `wf/${dropped.id}/${LINE_NAME} is gone`, 'main'],
     'hold',
     id,
     '--until',

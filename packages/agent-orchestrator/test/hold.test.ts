@@ -236,6 +236,12 @@ test('a run held until another ships: said by every screen with why and who, not
     await said(sub, 'hold', plain.id, '--until=' + target.id, '--why=it waits');
     assert.equal(readRun(plain.id).hold?.why, 'it waits', '--why=<words> is --why <words>');
     await said(sub, 'hold', plain.id, '--off');
+    await said(sub, 'hold', plain.id, '--until', target.id);
+    assert.deepEqual(
+      Object.keys(JSON.parse(fs.readFileSync(holdFileOf(plain.id), 'utf8')) as object),
+      ['at', 'until', 'by'],
+      'held again with no --why after a lift: no why of the lifted hold survives',
+    );
     const nameless = await aStarted(repo, 'held by a user the system cannot name');
     sub.mock.method(os, 'userInfo', () => {
       throw new Error('ENOENT: no such file or directory, uv_os_get_passwd');
@@ -505,6 +511,14 @@ test('a run held until another ships: said by every screen with why and who, not
 });
 
 test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arguments, the runs it names, the run it holds, its words — exit 2, and no hold written', async (t) => {
+  const holdFiles = (): string[] =>
+    fs.existsSync(path.join(ROOT, 'runs'))
+      ? fs
+          .readdirSync(path.join(ROOT, 'runs'))
+          .filter((f) => f.includes('.hold'))
+          .sort()
+      : [];
+  const heldBefore = holdFiles();
   const b = stage.board();
   const repo = aRepo();
   const target = await aRunning(b, repo);
@@ -620,6 +634,8 @@ test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arg
     ],
   ];
   const before = fs.readFileSync(holdFileOf(already.id), 'utf8');
+  const held = [...heldBefore, `${already.id}.hold`, `${worded.id}.hold`].sort();
+  assert.deepEqual(holdFiles(), held, 'the two runs held on purpose are the hold files this story adds');
   for (const [what, argv, tag, facts] of rows) {
     await t.test(what, async () => {
       const { error } = await typed(t, ...argv);
@@ -628,7 +644,7 @@ test('REFUSED by name at shipped defaults: what `nemia hold` refuses — its arg
     });
   }
   await t.test('nothing written: no hold on a run refused, and the first hold stands as it was', () => {
-    for (const r of [run, called, shipped, done, { id: 'r-x' }, { id: 'r-nope' }]) assert.ok(!fs.existsSync(holdFileOf(r.id)), r.id);
+    assert.deepEqual(holdFiles(), held, 'no hold file under runs/ but those held on purpose');
     assert.equal(fs.readFileSync(holdFileOf(already.id), 'utf8'), before);
   });
   await t.test('allowed: what is left holds — the one run that may still ship, and words at their caps', async () => {

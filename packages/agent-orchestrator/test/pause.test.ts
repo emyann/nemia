@@ -126,10 +126,20 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
           askOnDisk:
             run !== undefined && asksOf(run.id).some((f) => fs.readFileSync(path.join(asksDir(run.id), f), 'utf8').includes(taskId)),
         });
-        if (taskId === task('ended')) b.settle(taskId, 'succeeded', SIGNED);
-        return b.e.stop(taskId);
+        if (taskId !== task('ended')) return b.e.stop(taskId);
+        return Effect.promise(async () => {
+          const before = [...b.filings];
+          const asked = Object.values(runs).map((r) => asksOf(r.id));
+          await pass();
+          raced.push({
+            filed: b.filings.length - before.length,
+            asksKept: Object.values(runs).every((r, k) => asked[k].every((f) => asksOf(r.id).includes(f))),
+          });
+          b.settle(taskId, 'succeeded', SIGNED);
+        }).pipe(Effect.andThen(Effect.suspend(() => b.e.stop(taskId))));
       }),
   };
+  const raced: { filed: number; asksKept: boolean }[] = [];
   let filings: string[] = [];
 
   await s.test(
@@ -268,6 +278,7 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
         [task('session'), checkOf('checking'), task('ended')].sort().map((taskId) => ({ taskId, askOnDisk: true })),
         'each stopped only once its ask is on disk; the landing and the step asked of are never stopped',
       );
+      assert.deepEqual(raced, [{ filed: 0, asksKept: true }], 'a pass run while it still stops files nothing and sets no ask aside');
       assert.deepEqual(
         askOf(runs.session.id, 'work', 2),
         { step: 'work', try: 2, mode: 'nudge', interrupted: task('session'), at: new Date().toISOString() },

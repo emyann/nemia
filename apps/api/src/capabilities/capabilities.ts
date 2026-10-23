@@ -11,6 +11,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Context, Effect, Layer } from 'effect';
 import type { Running } from 'agent-orchestrator';
+import { WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
+import type { FrontmatterEntry } from 'agent-orchestrator/workflow';
 
 /** A skill or an agent: what its frontmatter calls it, what it says it is for, and the file it was read from. */
 export type Described = { name: string; description: string | null; source: string };
@@ -338,10 +340,12 @@ function namesIn(repo: string, dir: string, warnings: string[]): string[] {
 }
 
 /**
- * A skill or an agent from its file: named by its frontmatter, or by `fallback` when that does not name it. Null when there is no such
- * file.
+ * A skill or an agent from its file: named by its frontmatter's `name`, or by `fallback` when that does not name it, and described by its
+ * `description`, each read through the package's one frontmatter reader and taken only where it is text. Null when there is no such file.
+ * A frontmatter the reader refuses (one that never closes, or YAML in neither form) is a warning naming the file, and the file is still
+ * listed by `fallback` with no description, as a harness still loads a skill whose YAML fails.
  */
-function describedAt(repo: string, source: string, fallback: string, warnings: string[]): Described | null {
+export function describedAt(repo: string, source: string, fallback: string, warnings: string[]): Described | null {
   let text: string;
   try {
     text = fs.readFileSync(path.join(repo, source), 'utf8');
@@ -349,61 +353,20 @@ function describedAt(repo: string, source: string, fallback: string, warnings: s
     if (!absent(err)) warnings.push(`${source} could not be read (${sentenceOf(err)}), so it is not listed. Make it a readable file.`);
     return null;
   }
-  const fields = frontmatterOf(text);
-  return { name: fields?.name || fallback, description: fields?.description || null, source };
-}
-
-/**
- * The top-level `key: value` pairs of a markdown file's YAML frontmatter, or null when it has none: no `---` on
- * its first line, or one that never closes. As much YAML as a skill or an agent uses to say what it is: plain
- * values, which may run on over indented lines; single- and double-quoted strings; `|` and `>` blocks. A nested
- * map or a list under a key is skipped, not read.
- */
-export function frontmatterOf(text: string): Record<string, string> | null {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
-  if (lines[0]?.trimEnd() !== '---') return null;
-  const end = lines.findIndex((line, i) => i > 0 && line.trimEnd() === '---');
-  if (end < 0) return null;
-  const fields: Record<string, string> = {};
-  for (let i = 1; i < end; i++) {
-    const key = /^([A-Za-z0-9_][\w.-]*):(?:[ \t]+(.*))?$/.exec(lines[i]);
-    if (!key) continue;
-    const more: string[] = [];
-    while (i + 1 < end && /^(\s|$)/.test(lines[i + 1])) more.push(lines[++i]);
-    const value = valueOf(key[2]?.trim() ?? '', more);
-    if (value !== null) fields[key[1]] = value;
+  let entries: FrontmatterEntry[];
+  try {
+    const { block } = splitFrontmatter(source, text);
+    entries = block === null ? [] : readFrontmatter(source, block).entries;
+  } catch (err) {
+    if (!(err instanceof WorkflowError)) throw err;
+    warnings.push(`${err.message} Until it reads, it is listed as \`${fallback}\`, with no description.`);
+    entries = [];
   }
-  return fields;
-}
-
-/**
- * A value from the rest of its key's line and the indented lines under it. Null for a nested map or list. A `>` block folds each line break
- * between two lines of text into a space; a blank line stays a line break.
- */
-function valueOf(first: string, more: string[]): string | null {
-  const block = /^([|>])[+-]?\d*\s*(#.*)?$/.exec(first);
-  if (block) {
-    const body = dedent(more).join('\n').trim();
-    return block[1] === '|' ? body : body.replace(/([^\n])\n(?=[^\n])/g, '$1 ').replace(/\n\n/g, '\n');
-  }
-  if (!first && more.some((line) => /^\s*(-|[\w.-]+:)(\s|$)/.test(line))) return null;
-  const text = [first, ...more.map((line) => line.trim()).filter(Boolean)].join(' ');
-  if (text.startsWith('"')) {
-    const quoted = text.slice(0, text.lastIndexOf('"') + 1);
-    try {
-      return JSON.parse(quoted) as string;
-    } catch {
-      return quoted.slice(1, -1);
-    }
-  }
-  if (text.startsWith("'") && text.lastIndexOf("'") > 0) return text.slice(1, text.lastIndexOf("'")).replaceAll("''", "'");
-  return text.replace(/(^|\s)#.*$/, '').trim();
-}
-
-function dedent(lines: string[]): string[] {
-  const indents = lines.filter((line) => line.trim()).map((line) => /^\s*/.exec(line)![0].length);
-  const indent = indents.length ? Math.min(...indents) : 0;
-  return lines.map((line) => line.slice(indent).trimEnd());
+  const textOf = (key: string): string | null => {
+    const value = entries.find((entry) => entry.key === key)?.value;
+    return typeof value === 'string' && value ? value : null;
+  };
+  return { name: textOf('name') ?? fallback, description: textOf('description'), source };
 }
 
 type Json = Record<string, unknown>;

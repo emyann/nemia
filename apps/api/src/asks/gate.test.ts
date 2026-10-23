@@ -21,13 +21,13 @@ import { parseWorkflow } from 'agent-orchestrator/workflow';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor, runOver } from '../../test/placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const runWith = runOver(stand.layer);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const runWith = runOver(() => stand().layer);
+const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-16T21:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -39,7 +39,7 @@ const write = (file: string, text: string) => {
 /** A step's task that ran once on Codex and signed off with `closeout`. */
 const signedOff = (taskId: string, closeout: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
-  standIn.settle(taskId, 'succeeded', { exitCode: 0, closeout });
+  standIn().settle(taskId, 'succeeded', { exitCode: 0, closeout });
 };
 
 const PLAN = { outcome: 'done', summary: '## The plan\n\n- parse the flag\n- store it', needs: null, artifacts: [] };
@@ -84,11 +84,15 @@ const gatedRun = (id: string) => {
 };
 
 const R = 'r-gate';
-const record = gatedRun(R);
+/** The run R's record as each test's seed writes it. */
+let record = '';
 /** The same run, called off while its plan waited at its gate. */
 const CANCELLED = 'r-gate-cancelled';
-gatedRun(CANCELLED);
-write(path.join(root, 'runs', `${CANCELLED}.cancelled`), at(20));
+beforeEachTest(() => {
+  record = gatedRun(R);
+  gatedRun(CANCELLED);
+  write(path.join(root, 'runs', `${CANCELLED}.cancelled`), at(20));
+});
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
@@ -99,13 +103,13 @@ const BOARD = {
 };
 
 const approveOver = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app.request(`/api/runs/${run}/steps/${step}/approve`, {
+  app().request(`/api/runs/${run}/steps/${step}/approve`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
   });
 const ask = (step: string, body: unknown, run = R) =>
-  app.request(`/api/runs/${run}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
+  app().request(`/api/runs/${run}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 
 /** Every file under a run's asks directory, waiting or consumed. */
 const asked = (run = R): string[] => {
@@ -135,11 +139,11 @@ const approveRefuses = async (step: string, message?: string, run = R): Promise<
 
 /** What POST …/approve answers when it takes an approval (202). */
 type Approved = { try: number; at: string; message: string | null; file: string };
-const detail = async (id = R) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+const detail = async (id = R) => (await (await app().request(`/api/runs/${id}`)).json()) as RunDetail;
 const commandsOf = async (id = R): Promise<DecideCommand[]> =>
-  ((await (await app.request(`/api/runs/${id}/decision`)).json()) as Decidable).commands;
+  ((await (await app().request(`/api/runs/${id}/decision`)).json()) as Decidable).commands;
 const summary = async (id = R) => {
-  const found = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  const found = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
   assert.ok(found, `the list has ${id}`);
   return found;
 };
@@ -278,7 +282,7 @@ test("an approval as the board sends it is the package's: 202 with the try, when
   });
   assert.deepEqual(asked(), ['approve-plan-1']);
   assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, "the api wrote nothing of the run's record");
-  assert.equal(standIn.stopped.length, 0, 'and stopped nothing');
+  assert.equal(standIn().stopped.length, 0, 'and stopped nothing');
 
   const run = await detail();
   const plan = run.steps.find((s) => s.name === 'plan');
@@ -348,7 +352,7 @@ test("REFUSED at shipped defaults: sending a step back from its gate without wor
   );
   assert.deepEqual((await detail(id)).onYou, [], 'not waiting on you: what is asked of you, you asked');
   assert.deepEqual(
-    await (await app.request(`/api/runs/${id}/decision`)).json(),
+    await (await app().request(`/api/runs/${id}/decision`)).json(),
     { running: true },
     'the send-back is due, so the run moves and waits on nobody: nothing to decide, as `nemia decide` says, and so no gate offered',
   );

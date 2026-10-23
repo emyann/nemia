@@ -15,16 +15,16 @@ import type { Acceptance } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor, runOver } from '../../test/placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDecision } from '../decide/decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { acceptFile, acceptRun, list, roundRun, runStore } from 'agent-orchestrator';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const runWith = runOver(stand.layer);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const runWith = runOver(() => stand().layer);
+const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-22T09:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -36,7 +36,7 @@ const write = (file: string, text: string) => {
 /** A step's task that ran once on Codex and signed off with `closeout`. */
 const signedOff = (taskId: string, closeout: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
-  standIn.settle(taskId, 'succeeded', { exitCode: 0, closeout });
+  standIn().settle(taskId, 'succeeded', { exitCode: 0, closeout });
 };
 
 const DONE = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
@@ -90,17 +90,21 @@ const loopingRun = (id: string, on: number, again: boolean): string => {
 
 /** Out of rounds: round 2 of 2, and review asked for a third. */
 const R = 'r-acc';
-const record = loopingRun(R, 2, true);
+/** The run R's record as each test's seed writes it. */
+let record = '';
 /** Round 1 of 2, and review asked for another: the run files round 2 itself. */
 const LEFT = 'r-acc-left';
-loopingRun(LEFT, 1, true);
 /** Round 2 of 2, and review said `again: false`: the loop handed on by itself. */
 const ENDED = 'r-acc-done';
-loopingRun(ENDED, 2, false);
 /** The loop out of rounds, and the run called off. */
 const CANCELLED = 'r-acc-cancelled';
-loopingRun(CANCELLED, 2, true);
-write(path.join(root, 'runs', `${CANCELLED}.cancelled`), at(20));
+beforeEachTest(() => {
+  record = loopingRun(R, 2, true);
+  loopingRun(LEFT, 1, true);
+  loopingRun(ENDED, 2, false);
+  loopingRun(CANCELLED, 2, true);
+  write(path.join(root, 'runs', `${CANCELLED}.cancelled`), at(20));
+});
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
 const BOARD = {
@@ -111,7 +115,7 @@ const BOARD = {
 };
 
 const acceptOver = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app.request(`/api/runs/${run}/steps/${step}/accept`, {
+  app().request(`/api/runs/${run}/steps/${step}/accept`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -233,9 +237,9 @@ test("an acceptance as the board sends it is the package's: 202 with the step, t
   assert.deepEqual(JSON.parse(fs.readFileSync(took.file, 'utf8')), { step: 'review', try: 2, at: took.at, message: WHY });
   assert.deepEqual(asked(), ['accept-review-2']);
   assert.equal(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'), record, "the api wrote nothing of the run's record");
-  assert.deepEqual(standIn.stopped, [], 'and stopped nothing');
+  assert.deepEqual(standIn().stopped, [], 'and stopped nothing');
 
-  const run = (await (await app.request(`/api/runs/${R}`)).json()) as RunDetail;
+  const run = (await (await app().request(`/api/runs/${R}`)).json()) as RunDetail;
   const review = run.steps.find((s) => s.name === 'review')!;
   assert.deepEqual(review.accepted, { try: 2, at: took.at, message: WHY });
   const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
@@ -243,7 +247,7 @@ test("an acceptance as the board sends it is the package's: 202 with the step, t
   assert.equal(review.status, listed.status, 'as `nemia ls` has it until the tick files what waits');
   assert.notEqual(review.status, 'exhausted', "the loop over on the person's word");
   assert.deepEqual(run.waitingOnYou, [], 'and nobody waited on');
-  const decision = (await (await app.request(`/api/runs/${R}/decision`)).json()) as RunDecision;
+  const decision = (await (await app().request(`/api/runs/${R}/decision`)).json()) as RunDecision;
   const commands = 'commands' in decision ? decision.commands : [];
   assert.ok(!commands.some((c) => c.label === 'accept'), `accept is offered no more: ${JSON.stringify(commands)}`);
 

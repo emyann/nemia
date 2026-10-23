@@ -14,7 +14,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor } from '../../test/placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { askFile } from 'agent-orchestrator';
 import { answerText, type Question } from 'agent-orchestrator/run';
@@ -27,13 +27,14 @@ const write = (file: string, text: string) => {
   fs.writeFileSync(file, text);
 };
 
-const standIn = testEngine();
-const app = appOver(standIn, testPlace());
+const standIn = eachTest(testEngine);
+const stand = eachTest(testPlace);
+const app = eachTest(() => appOver(standIn(), stand()));
 
 /** A step's task that ran once on Codex and signed off with `closeout`. */
 const signedOff = (taskId: string, closeout: object) => {
-  Effect.runSync(engineFor(standIn).file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
-  standIn.settle(taskId, 'succeeded', { exitCode: 0, closeout });
+  Effect.runSync(engineFor(standIn()).file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
+  standIn().settle(taskId, 'succeeded', { exitCode: 0, closeout });
 };
 
 /** A step declaring `open` in its schema, and every field of `more`, as the loader reads it and the run freezes it. */
@@ -99,15 +100,17 @@ write(
     },
   }),
 );
-signedOff('t-a-design', closeout('blocked', [cut, where]));
-signedOff('t-a-spec', closeout('done', [cut]));
-signedOff('t-a-broken', closeout('blocked', [{ ...cut, recommended: 'z' }]));
-signedOff('t-a-plain', closeout('blocked', ['Postgres or MySQL?']));
-signedOff('t-a-twice', { ...closeout('blocked', [cut]), later: [{ ...where, title: cut.title }] });
+beforeEachTest(() => {
+  signedOff('t-a-design', closeout('blocked', [cut, where]));
+  signedOff('t-a-spec', closeout('done', [cut]));
+  signedOff('t-a-broken', closeout('blocked', [{ ...cut, recommended: 'z' }]));
+  signedOff('t-a-plain', closeout('blocked', ['Postgres or MySQL?']));
+  signedOff('t-a-twice', { ...closeout('blocked', [cut]), later: [{ ...where, title: cut.title }] });
+});
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin', host: '127.0.0.1:8787' };
 const ask = (step: string, body: unknown) =>
-  app.request(`/api/runs/${R}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
+  app().request(`/api/runs/${R}/steps/${step}/retry`, { method: 'POST', headers: BOARD, body: JSON.stringify(body) });
 const asksDir = path.join(root, 'runs', `${R}.asks`);
 const asked = (): string[] => (fs.existsSync(asksDir) ? (fs.readdirSync(asksDir, { recursive: true }) as string[]).sort() : []);
 const refused = async (res: Response): Promise<string> => {
@@ -116,7 +119,7 @@ const refused = async (res: Response): Promise<string> => {
 };
 
 test("a closeout's questions are on the run's detail, blocked or done; a field that asks in free text, or does not decode, has none", async () => {
-  const run = (await (await app.request(`/api/runs/${R}`)).json()) as RunDetail;
+  const run = (await (await app().request(`/api/runs/${R}`)).json()) as RunDetail;
   const questions = (name: string) => run.steps.find((s) => s.name === name)!.closeout!.questions;
   assert.deepEqual(questions('design'), [{ field: 'open', questions: [cut, where] }]);
   assert.deepEqual(questions('spec'), [{ field: 'open', questions: [cut] }], 'a done step’s questions, drawn read-only');

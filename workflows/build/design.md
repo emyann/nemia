@@ -9,8 +9,8 @@ disallowedTools: Bash(npm run build), Bash(npm run e2e), mcp__playwright__browse
 reads: costs
 ---
 Your brief says what recent runs of this workflow cost, per step and whole (*What runs of this workflow cost*): propose the cut and each
-step's `budget:` from those figures, not from a guess, and say which you went by. When the work you design would cost more than the
-owner's line for a run, which this factory's rules give, say so, and how to cut it into intents that each fit it.
+step's `budget:` from those figures, not from a guess, and say which you went by. When the work you design is larger
+than one run of this workflow usually is, say so, and how to cut it into intents that each fit one.
 
 When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used,
 never with the Skill tool, which your fence refuses.

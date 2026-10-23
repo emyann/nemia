@@ -15,13 +15,13 @@ import { PRECEDENCE } from 'agent-orchestrator/run';
 import { scratch } from './scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor, runOver } from './placed.ts';
+import { appOver, eachTest, engineFor, runOver } from './placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const runWith = runOver(stand.layer);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const runWith = runOver(() => stand().layer);
+const app = eachTest(() => appOver(standIn(), stand()));
 
 const WORKFLOWS = path.join(root, 'workflows');
 const AGENT = path.join(WORKFLOWS, 'agents', 'layered.md');
@@ -45,7 +45,7 @@ fs.writeFileSync(STEP, '---\nworkspace: folder\nagent: layered\nskills: alpha, g
 
 /** The run `id` in full, as the board reads it. */
 const detailOf = async (id: string): Promise<RunDetail> => {
-  const res = await app.request(`/api/runs/${id}`);
+  const res = await app().request(`/api/runs/${id}`);
   assert.equal(res.status, 200);
   return (await res.json()) as RunDetail;
 };
@@ -82,7 +82,7 @@ test('a run started in a factory with rules answers them as a layer of their own
   addFactory({ name: 'ruled', repos: [scratch('nemia-api-layers-ruled-')] });
   attachWorkflow({ factory: 'ruled', workflow: 'layers' });
   const rules = (method: string, words?: string) =>
-    app.request('/api/factories/ruled/rules', {
+    app().request('/api/factories/ruled/rules', {
       method,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(words === undefined ? {} : { words }),

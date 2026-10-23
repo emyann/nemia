@@ -17,12 +17,12 @@ import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor } from './placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor } from './placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const app = eachTest(() => appOver(standIn(), stand()));
 
 /** What the board is pointed at, as `HKB_REPO`: a plain directory, no git, no workflows folder of its own, read as any repository. */
 const notARepo = scratch('nemia-api-folder-here-');
@@ -46,14 +46,16 @@ const work = path.join(root, 'runs', 'f-notes', 'work');
 /** A task filed in the step's folder on the engine, and signed off. */
 function signedOff(taskId: string, cwd: string): void {
   Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd, harness: 'claude' }));
-  standIn.settle(taskId, 'succeeded', {
+  standIn().settle(taskId, 'succeeded', {
     exitCode: 0,
     closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] },
   });
 }
 
 fs.mkdirSync(path.join(work, 'write'), { recursive: true });
-signedOff('t-write', path.join(work, 'write'));
+beforeEachTest(() => {
+  signedOff('t-write', path.join(work, 'write'));
+});
 fs.writeFileSync(
   path.join(root, 'runs', 'f-notes.json'),
   JSON.stringify({
@@ -95,7 +97,7 @@ fs.writeFileSync(path.join(wrote, 'given', 'from', 'sketch', 'side.md'), 'what t
 const GIT_WORD = /\b(branch|base|merge|merged|diff|commit|worktree|repository|repo|git)\b/i;
 
 test('the runs list shows a folder run with no repository, and says its kind', async () => {
-  const res = await app.request('/api/runs');
+  const res = await app().request('/api/runs');
   assert.equal(res.status, 200);
   const run = ((await res.json()) as { id: string; repo: unknown; place: unknown }[]).find((r) => r.id === 'f-notes');
   assert.ok(run, 'the folder run is listed');
@@ -122,7 +124,7 @@ test("the runs list says each run's place in the store's words: a folder run's, 
     }),
   );
   try {
-    const listed = (await (await app.request('/api/runs')).json()) as { id: string; place: unknown }[];
+    const listed = (await (await app().request('/api/runs')).json()) as { id: string; place: unknown }[];
     assert.deepEqual(
       listed.map((r) => [r.id, r.place]),
       [
@@ -130,14 +132,14 @@ test("the runs list says each run's place in the store's words: a folder run's, 
         ['r-repo', 'repository'],
       ],
     );
-    assert.equal(((await (await app.request('/api/runs/r-repo')).json()) as { place: unknown }).place, 'repository');
+    assert.equal(((await (await app().request('/api/runs/r-repo')).json()) as { place: unknown }).place, 'repository');
   } finally {
     fs.rmSync(record);
   }
 });
 
 test("a folder run's detail has no repository, base, branch or isolation — where its work is instead, and its step's folder", async () => {
-  const res = await app.request('/api/runs/f-notes');
+  const res = await app().request('/api/runs/f-notes');
   assert.equal(res.status, 200);
   const run = (await res.json()) as Record<string, unknown> & {
     steps: {
@@ -165,7 +167,7 @@ test("a folder run's detail has no repository, base, branch or isolation — whe
 });
 
 test("a folder run's decision reads, with nothing to merge and nothing about git", async () => {
-  const res = await app.request('/api/runs/f-notes/decision');
+  const res = await app().request('/api/runs/f-notes/decision');
   assert.equal(res.status, 200);
   const decision = (await res.json()) as {
     standings: unknown[];
@@ -191,7 +193,7 @@ test("a folder run's decision reads, with nothing to merge and nothing about git
 });
 
 test('the workflows listing says which teams work in folders, with the repository a plain directory', async () => {
-  const res = await app.request('/api/workflows');
+  const res = await app().request('/api/workflows');
   assert.equal(res.status, 200);
   const listed = (await res.json()) as { name: string; from: string; folderTeam: boolean; error: string | null }[];
   const folderTeams = listed.filter((w) => w.folderTeam).map((w) => w.name);
@@ -205,7 +207,7 @@ test('the workflows listing says which teams work in folders, with the repositor
 
 test('REFUSED: POST /api/inbox files a card for a folder team with a repository — filed without one, refused with one', async () => {
   const json = { 'content-type': 'application/json' };
-  const filed = await app.request('/api/inbox', {
+  const filed = await app().request('/api/inbox', {
     method: 'POST',
     headers: json,
     body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'yours' }),
@@ -213,7 +215,7 @@ test('REFUSED: POST /api/inbox files a card for a folder team with a repository 
   assert.equal(filed.status, 201);
   assert.equal(((await filed.json()) as { repo: string | null }).repo, null, 'filed with no repository');
 
-  const refused = await app.request('/api/inbox', {
+  const refused = await app().request('/api/inbox', {
     method: 'POST',
     headers: json,
     body: JSON.stringify({ body: 'a note on tides', workflow: 'notes', from: 'yours', repo: notARepo }),
@@ -226,7 +228,7 @@ test('REFUSED: POST /api/inbox files a card for a folder team with a repository 
 });
 
 test('a folder step carries everything its folder holds: what a name reaches with its size and url, the rest by its path', async () => {
-  const run = (await (await app.request('/api/runs/f-notes')).json()) as {
+  const run = (await (await app().request('/api/runs/f-notes')).json()) as {
     steps: { files: { path: string; name?: string; url?: string; kind?: string; size?: number }[] }[];
   };
   const [write] = run.steps;
@@ -285,7 +287,7 @@ test('a folder the api cannot read says why, where one not there is an empty lis
     }),
   );
 
-  const run = (await (await app.request('/api/runs/f-gone')).json()) as {
+  const run = (await (await app().request('/api/runs/f-gone')).json()) as {
     steps: { name: string; files: unknown[]; filesError: string | null }[];
   };
   const write = run.steps.find((s) => s.name === 'write')!;
@@ -302,7 +304,7 @@ test('a folder the api cannot read says why, where one not there is an empty lis
 test("a folder step's file is served by name, and a name that is a path, or not in the folder, is refused", async () => {
   const base = '/api/runs/f-notes/steps/write/files';
 
-  const note = await app.request(`${base}/note.md`);
+  const note = await app().request(`${base}/note.md`);
   assert.deepEqual(
     [
       note.status,
@@ -317,10 +319,10 @@ test("a folder step's file is served by name, and a name that is a path, or not 
     (note.headers.get('content-security-policy') ?? '').split(/\s*;\s*/).includes('sandbox'),
     "an agent's text on the board's origin runs no script of its, as a step's named file does not",
   );
-  assert.deepEqual(Buffer.from(await (await app.request(`${base}/sketch.png`)).arrayBuffer()), PNG);
+  assert.deepEqual(Buffer.from(await (await app().request(`${base}/sketch.png`)).arrayBuffer()), PNG);
 
   for (const name of ['..%2Foutside.md', 'scratch%2Fnothing.md', 'a%5Cb.md', '..hidden.md']) {
-    const res = await app.request(`${base}/${name}`);
+    const res = await app().request(`${base}/${name}`);
     assert.equal(
       res.status,
       400,
@@ -329,7 +331,7 @@ test("a folder step's file is served by name, and a name that is a path, or not 
     assert.match(((await res.json()) as { error: string }).error, /is not the name of a file: a name has no `\/`, `\\`, or `\.\.`/, name);
   }
   for (const name of ['gone.md', 'scratch', 'link.md']) {
-    const res = await app.request(`${base}/${name}`);
+    const res = await app().request(`${base}/${name}`);
     assert.equal(res.status, 404, `${name} is not a regular file in the folder: absent, a directory, or a link that leads out of it`);
     assert.match(((await res.json()) as { error: string }).error, /has no file '.*' in its folder/, name);
   }
@@ -338,7 +340,7 @@ test("a folder step's file is served by name, and a name that is a path, or not 
 test('a card started on a folder team carries the repository it named and the run looked at none of — and a card that names none, nothing', async () => {
   const json = { 'content-type': 'application/json' };
   const file = async (body: string, repo?: string): Promise<string> => {
-    const res = await app.request('/api/inbox', {
+    const res = await app().request('/api/inbox', {
       method: 'POST',
       headers: json,
       /**
@@ -352,7 +354,7 @@ test('a card started on a folder team carries the repository it named and the ru
     return filed.name!;
   };
   const startOn = async (card: string) =>
-    app.request('/api/runs', {
+    app().request('/api/runs', {
       method: 'POST',
       headers: json,
       body: JSON.stringify({ workflow: 'notes', from: 'yours', brief: 'Write the note.', card }),
@@ -367,7 +369,7 @@ test('a card started on a folder team carries the repository it named and the ru
     [named, true, notARepo],
     "the api says what `nemia start` prints and a tick's line carries: the card's `repo:` was not looked at",
   );
-  const run = (await (await app.request(`/api/runs/${started.id}`)).json()) as { repo: unknown; place: unknown };
+  const run = (await (await app().request(`/api/runs/${started.id}`)).json()) as { repo: unknown; place: unknown };
   assert.deepEqual(
     [run.repo, run.place],
     [null, 'folder'],
@@ -403,7 +405,7 @@ test("a file a step wrote called `given` is its own work, and is listed — only
     }),
   );
 
-  const run = (await (await app.request('/api/runs/f-given')).json()) as { steps: { files: { path: string; name?: string }[] }[] };
+  const run = (await (await app().request('/api/runs/f-given')).json()) as { steps: { files: { path: string; name?: string }[] }[] };
   assert.deepEqual(
     run.steps[0].files.map((f) => f.name ?? f.path),
     ['given', 'note.md'],

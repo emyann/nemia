@@ -8,8 +8,8 @@ description: "Review a change in this repository as a second engineer would: aga
 1. **Know what was asked**: the spec handed to you, its goal and constraints. Review the change against that, not against a change you
    would have made.
 2. **Read the whole diff** against the base (`git diff <base>...HEAD`, the base as your brief names it), and the tests beside it.
-   Read a file with Read, list a folder with Glob and search with Grep; never `ls`, `find`, `head`, `cat`, `grep`, `awk`,
-   `sed` or a pipe in Bash: Bash runs only the checks and reads your step names and git's read-only questions, each bare, one per call, and never a write —
+   Read a file with Read, list a folder with Glob and search with Grep; never `grep` or a pipe in
+   Bash. `cat`, `head`, `tail`, `wc`, `cut` and `ls` read a file or a folder inside the workspace, and your fence refuses each one a path outside it; never `sed`, `awk`, `find`, `sort`, `uniq` or `tee`, which can write a file or run a program, nor `wc --files0-from`, which reads the paths a file lists. Otherwise Bash runs only the checks and reads your step names and git's read-only questions, each bare, one per call, and never a write —
    the change (`git diff`, `git log`, `git show`), the workspace (`git status`), a line's author (`git blame`), what git tracks
    (`git ls-files`), a name resolved (`git rev-parse`) and where a commit stands (`git merge-base`, `git branch --contains`). Search the
    working tree with Grep, and a revision with `git grep <pattern> <rev>`, the one search no tool here can do. Whether main is merged

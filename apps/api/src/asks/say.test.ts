@@ -16,15 +16,15 @@ import path from 'node:path';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
 import type { Said } from 'agent-orchestrator';
-import { appOver, engineFor, runOver } from '../../test/placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { list, runStore, sayRun, type RunSummary } from 'agent-orchestrator';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const runWith = runOver(stand.layer);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const runWith = runOver(() => stand().layer);
+const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-14T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -36,14 +36,16 @@ const write = (file: string, text: string) => {
 /** A Claude Code task filed and left in `phase`, with `closeout` where it ended. */
 const task = (taskId: string, phase: string, closeout?: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
-  standIn.settle(taskId, phase, closeout ? { exitCode: 0, closeout } : undefined);
+  standIn().settle(taskId, phase, closeout ? { exitCode: 0, closeout } : undefined);
 };
 
 const R = 'r-say';
 const C = 'r-say-cancelled';
-task('t-implement', 'running (working)');
-task('t-settled', 'succeeded', { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] });
-task('t-cancelled', 'running (working)');
+beforeEachTest(() => {
+  task('t-implement', 'running (working)');
+  task('t-settled', 'succeeded', { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] });
+  task('t-cancelled', 'running (working)');
+});
 
 const record = (id: string, steps: Record<string, { taskId: string | null }>) =>
   write(
@@ -75,7 +77,7 @@ const BOARD = {
 };
 
 const sayTo = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app.request(`/api/runs/${run}/steps/${step}/say`, {
+  app().request(`/api/runs/${run}/steps/${step}/say`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -89,7 +91,7 @@ const written = () => ({
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(root, 'runs', f), 'utf8')]),
   ),
-  said: [...standIn.said],
+  said: [...standIn().said],
 });
 
 /** What the package's `sayRun` refuses the words for, word for word: what `nemia say` prints. */
@@ -103,7 +105,7 @@ const sayRefuses = async (step: string, text: string, run = R): Promise<string> 
 };
 
 const detailSteps = async (id = R): Promise<RunDetail['steps']> =>
-  ((await (await app.request(`/api/runs/${id}`)).json()) as RunDetail).steps;
+  ((await (await app().request(`/api/runs/${id}`)).json()) as RunDetail).steps;
 
 test('REFUSED at shipped defaults: JSON that is not the words (400): nothing said, nothing written', async () => {
   const before = written();
@@ -171,7 +173,7 @@ test("words as the board sends them are the package's `sayRun`: 202 with the eng
   );
   assert.equal(new Date(said.at).toISOString(), said.at, 'the time the package recorded, an ISO time');
 
-  assert.deepEqual(standIn.said, [{ taskId: 't-implement', text: words }], "the words handed to the engine's say, as given, once");
+  assert.deepEqual(standIn().said, [{ taskId: 't-implement', text: words }], "the words handed to the engine's say, as given, once");
   assert.deepEqual((await Effect.runPromise(engine().view('t-implement'))).state.said, [said], "the engine's record of the task");
   const steps = await detailSteps();
   const implement = steps.find((s) => s.name === 'implement')!;
@@ -183,7 +185,7 @@ test("words as the board sends them are the package's `sayRun`: 202 with the eng
     'said to 1×',
     "`nemia ls`'s words",
   );
-  const summary = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === R)!;
+  const summary = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === R)!;
   assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');
   assert.deepEqual(written().files, records, "the runs' records untouched, and no file of the api's");
 });

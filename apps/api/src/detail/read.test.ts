@@ -15,12 +15,12 @@ import type { RunDetail } from './detail.ts';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor } from '../../test/placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-19T06:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -36,8 +36,8 @@ const task = (taskId: string, harness: string, usages: object[]) => {
   usages.forEach((usage, i) => {
     const n = i + 1;
     const last = n === usages.length;
-    if (n > 1) standIn.restart(taskId);
-    standIn.settle(taskId, last ? 'succeeded' : 'failed', {
+    if (n > 1) standIn().restart(taskId);
+    standIn().settle(taskId, last ? 'succeeded' : 'failed', {
       exitCode: last ? 0 : 1,
       usage,
       ...(n > 1 ? { resumeFrom: `ae/${taskId}/${n - 1}` } : {}),
@@ -110,11 +110,13 @@ write(
     steps: { implement: { taskId: 't-implement' }, review: { taskId: 't-review' }, plan: { taskId: 't-plan' } },
   }),
 );
-task('t-implement', 'claude', [USAGE.cold, USAGE.rebuilt]);
-task('t-review', 'claude', [USAGE.review]);
-task('t-plan', 'codex', [USAGE.plan]);
+beforeEachTest(() => {
+  task('t-implement', 'claude', [USAGE.cold, USAGE.rebuilt]);
+  task('t-review', 'claude', [USAGE.review]);
+  task('t-plan', 'codex', [USAGE.plan]);
+});
 
-const detailOf = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+const detailOf = async (id: string) => (await (await app().request(`/api/runs/${id}`)).json()) as RunDetail;
 const stepOf = async (name: string) => {
   const step = (await detailOf(R)).steps.find((s) => s.name === name);
   assert.ok(step, name);

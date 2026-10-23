@@ -20,13 +20,13 @@ import type { RunDetail } from '../src/detail/detail.ts';
 import { list, runStore, type RunSummary } from 'agent-orchestrator';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor, runOver } from './placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const runWith = runOver(stand.layer);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const runWith = runOver(() => stand().layer);
+const app = eachTest(() => appOver(standIn(), stand()));
 
 const T0 = Date.parse('2026-09-24T01:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -37,7 +37,7 @@ const write = (file: string, text: string) => {
 /** A step's task filed held open that signed off with `closeout` and was neither answered nor closed: its attempt ended, unsettled. */
 const waiting = (taskId: string, closeout: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex', holdOpen: true }));
-  standIn.settle(taskId, 'input-required', { ended: 'done', endedAt: at(9), exitCode: 0, closeout });
+  standIn().settle(taskId, 'input-required', { ended: 'done', endedAt: at(9), exitCode: 0, closeout });
 };
 
 const DONE = { outcome: 'done', summary: 'The plan.', needs: null, artifacts: [] };
@@ -67,13 +67,19 @@ function writeRun(id: string, gates?: string[]): void {
   );
 }
 writeRun('h-blocked');
-waiting('h-blocked-plan', BLOCKED);
+beforeEachTest(() => {
+  waiting('h-blocked-plan', BLOCKED);
+});
 writeRun('h-gate', ['plan']);
-waiting('h-gate-plan', DONE);
+beforeEachTest(() => {
+  waiting('h-gate-plan', DONE);
+});
 writeRun('h-rechecked');
-Effect.runSync(engine().file({ id: 'h-rechecked-plan', brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
-standIn.settle('h-rechecked-plan', 'succeeded', { exitCode: 0, closeout: DONE });
-Effect.runSync(engine().file({ id: 'h-rechecked-plan-try3', brief: 'Do it again.', cwd: '/code/app', harness: 'codex' }));
+beforeEachTest(() => {
+  Effect.runSync(engine().file({ id: 'h-rechecked-plan', brief: 'Do it.', cwd: '/code/app', harness: 'codex' }));
+  standIn().settle('h-rechecked-plan', 'succeeded', { exitCode: 0, closeout: DONE });
+  Effect.runSync(engine().file({ id: 'h-rechecked-plan-try3', brief: 'Do it again.', cwd: '/code/app', harness: 'codex' }));
+});
 {
   const file = path.join(root, 'runs', 'h-rechecked.json');
   const run = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -88,9 +94,9 @@ Effect.runSync(engine().file({ id: 'h-rechecked-plan-try3', brief: 'Do it again.
   fs.writeFileSync(file, JSON.stringify(run));
 }
 
-const detail = async (id: string) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+const detail = async (id: string) => (await (await app().request(`/api/runs/${id}`)).json()) as RunDetail;
 const summary = async (id: string) => {
-  const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  const run = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
   return run;
 };

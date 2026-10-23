@@ -64,8 +64,7 @@ Start it after the intake run whose intent it builds: `wf start "<the intent's t
 first step, design, is told the intent under *From run*; the steps after it read the spec.
 
 Design reads `costs` (`reads: costs`): its brief says what the last finished runs of build in its factory cost, per step and whole. Its
-note asks for the cut and each step's budget from those figures; the owner's line for a run is the factory's, given by its rules
-(`nemia factory rules <factory>`), never by this folder.
+note asks for the cut and each step's budget from those figures.
 
 The agents and their skills are any software factory's, and say nothing of this repository (`team-portable.test.ts`); what is ours is on
 the steps (`build-told.test.ts`). None of this workflow's steps declares a closeout of its own (no `output:`, and no schema beside

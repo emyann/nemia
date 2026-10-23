@@ -226,7 +226,7 @@ const TOLD: Told[] = [
     says: [
       SHADCN_READ,
       'The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.',
-      "the owner's line for a run, which this factory's rules give",
+      'When the work you design is larger than one run of this workflow usually is, say so, and how to cut it into intents that each fit one.',
       'To see a board in the browser, run `npm run board:serve`, bare, and open the address it prints with the `look` skill',
       NO_LIVE_BOARD,
       NO_FILENAME,

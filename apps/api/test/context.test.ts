@@ -15,12 +15,12 @@ import { addToInbox } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor } from './placed.ts';
+import { appOver, eachTest, engineFor } from './placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const app = eachTest(() => appOver(standIn(), stand()));
 
 const JSON_TYPE = { 'content-type': 'application/json' };
 
@@ -52,7 +52,7 @@ const section = (run: string, asked: string) =>
 
 test('GET /api/runs/:runId/concluded answers the run, whether it shipped and its section in context words; an unknown run is a 404', async () => {
   writeRun({ id: 'source-c1' });
-  const res = await app.request('/api/runs/source-c1/concluded');
+  const res = await app().request('/api/runs/source-c1/concluded');
   assert.equal(res.status, 200);
   const answer = (await res.json()) as { run: string; shipped: boolean; section: string };
   assert.equal(answer.run, 'source-c1');
@@ -60,14 +60,14 @@ test('GET /api/runs/:runId/concluded answers the run, whether it shipped and its
   assert.match(answer.section, /^\n## From run source-c1\n/);
   assert.match(answer.section, /Not shipped, not judged/);
 
-  const missing = await app.request('/api/runs/nobody-z9/concluded');
+  const missing = await app().request('/api/runs/nobody-z9/concluded');
   assert.equal(missing.status, 404);
   assert.match(((await missing.json()) as { error: string }).error, /the store has no run nobody-z9/);
 });
 
 test('GET /api/runs/:runId/concluded refuses an id that is not a name, never reading the record a path names — REFUSED: `..%2Fescape`', async () => {
   writeRun({ id: '../escape' });
-  const res = await app.request('/api/runs/..%2Fescape/concluded');
+  const res = await app().request('/api/runs/..%2Fescape/concluded');
   assert.equal(res.status, 422);
   const { error } = (await res.json()) as { error: string };
   assert.match(error, /"\.\.\/escape" is not a run's id/);
@@ -79,7 +79,7 @@ test("PUT /api/inbox/:name/from sets a card's from:, DELETE takes it off — REF
   const { card } = addToInbox({ text: 'Read what source-f1 concluded' });
   const file = path.join(root, 'inbox', `${card.name}.md`);
   const put = (runs: string[]) =>
-    app.request(`/api/inbox/${card.name}/from`, { method: 'PUT', headers: JSON_TYPE, body: JSON.stringify({ runs }) });
+    app().request(`/api/inbox/${card.name}/from`, { method: 'PUT', headers: JSON_TYPE, body: JSON.stringify({ runs }) });
 
   const set = await put(['source-f1']);
   assert.equal(set.status, 200);
@@ -93,7 +93,7 @@ test("PUT /api/inbox/:name/from sets a card's from:, DELETE takes it off — REF
   assert.match(((await unknown.json()) as { error: string }).error, /nobody-z9/);
   assert.equal(fs.readFileSync(file, 'utf8'), before, 'a refused from: writes nothing');
 
-  const off = await app.request(`/api/inbox/${card.name}/from`, { method: 'DELETE', headers: JSON_TYPE, body: '{}' });
+  const off = await app().request(`/api/inbox/${card.name}/from`, { method: 'DELETE', headers: JSON_TYPE, body: '{}' });
   assert.equal(off.status, 200);
   assert.deepEqual(((await off.json()) as InboxFromAnswer).was, ['source-f1']);
   assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /^from:/m);
@@ -110,7 +110,7 @@ test("a step's taskParts label each From run section by how its run was handed i
     steps: { implement: { taskId: 't-context' } },
   });
 
-  const res = await app.request('/api/runs/child-c3');
+  const res = await app().request('/api/runs/child-c3');
   assert.equal(res.status, 200);
   const detail = (await res.json()) as RunDetail;
   assert.deepEqual(detail.context, ['read-b2']);

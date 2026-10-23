@@ -2863,7 +2863,7 @@ test('a second stop while one is under way signals the harness again, and leaves
   const [, second] = lines('terms');
   const last = lines('ticks').at(-1)!;
   assert.ok(
-    last - second! < grace - 1000,
-    `the harness was killed ${last - second!} ms after the second stop: the grace runs from the first, not again from the second`,
+    last - second < grace - 1000,
+    `the harness was killed ${last - second} ms after the second stop: the grace runs from the first, not again from the second`,
   );
 });

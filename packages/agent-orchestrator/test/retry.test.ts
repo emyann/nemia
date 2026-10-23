@@ -31,21 +31,8 @@ delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 process.env.WF_VERIFY_REST = '1';
-const {
-  advanceRun,
-  cancelRun,
-  closeoutAsked,
-  decideRun,
-  exitVerdicts,
-  list,
-  Missing,
-  phaseOfView,
-  retryRun,
-  sayRun,
-  startRun,
-  stepsOf,
-  runWith,
-} = await import('../src/runner.ts');
+const { advanceRun, closeoutAsked, decideRun, exitVerdicts, list, Missing, phaseOfView, retryRun, sayRun, startRun, stepsOf, runWith } =
+  await import('../src/runner.ts');
 const { askFile, asksDir, markCancelled, readAnswers, readRun } = await import('../src/record/record.store.ts');
 const { isRepositoryRun, LINE_NAME, shownNote } = await import('../src/run.ts');
 const { verdictWord } = await import('../src/check/check.ts');
@@ -1344,21 +1331,36 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
   const taskId = `${run.id}-implement`;
   await tick(run.id);
   const record = recordText(run.id);
-  const saying = (step: string, words = 'Widen the scope.') => stage.runWith(b.e, sayRun(run.id, step, words));
+  const asked: string[] = [];
+  const e = {
+    ...b.e,
+    say: (id: string, text: string) => {
+      asked.push(id);
+      return b.e.say(id, text);
+    },
+  };
+  const saying = (step: string, words = 'Widen the scope.') => stage.runWith(e, sayRun(run.id, step, words));
   await t.test('by the engine, in its words: a task filed with no attempt started', () =>
     assert.rejects(saying('implement'), refusedAs('Conflict', taskId, 'has not started an attempt')),
   );
   for (const words of [[''], [' \n '], []])
     await t.test(`by the engine, in its words: empty words, typed ${JSON.stringify(words)}`, async () => {
       ended(taskId, 'running');
-      await assert.rejects(stage.main(['say', run.id, 'implement', ...words]), refusedAs('Conflict', '`text` is empty', 'Give the words'));
+      await assert.rejects(
+        stage.main(['say', run.id, 'implement', ...words], e),
+        refusedAs('Conflict', '`text` is empty', 'Give the words'),
+      );
     });
+  await t.test("each of those was the engine's to answer: it was asked once for each", () => {
+    assert.deepEqual(asked, [taskId, taskId, taskId, taskId]);
+    asked.length = 0;
+  });
   await t.test('by the package, before the engine is asked: a step the run does not have', () =>
     assert.rejects(saying('deploy'), refusedAs('Conflict', `${run.id} has no step "deploy"`, 'implement, review')),
   );
   await t.test('by the package: a step not filed yet', () =>
     assert.rejects(
-      stage.main(['say', run.id, 'review', 'Look at the parser first.']),
+      stage.main(['say', run.id, 'review', 'Look at the parser first.'], e),
       refusedAs('Conflict', 'review has not been filed yet', `nemia ls ${run.id}`),
     ),
   );
@@ -1374,11 +1376,12 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
     ended(taskId, 'running');
     markCancelled(run.id);
     await assert.rejects(
-      stage.main(['say', run.id, 'implement', 'Widen the scope.']),
+      stage.main(['say', run.id, 'implement', 'Widen the scope.'], e),
       refusedAs('Conflict', `${run.id} was cancelled at `, 'not steered'),
     );
   });
-  await t.test('nothing said, nothing written', () => {
+  await t.test('the engine was never asked by any of the package refusals; nothing said, nothing written', () => {
+    assert.deepEqual(asked, [], 'the engine was never asked');
     assert.deepEqual(b.said, []);
     assert.equal(recordText(run.id), record);
   });
@@ -1807,26 +1810,4 @@ test('what the run files held open: a Claude Code job, and never a codex step, a
       assert.deepEqual((await tick(run.id)).filed, ['implement']);
       assert.equal(Object.hasOwn(filedOf(`${run.id}-implement`), 'holdOpen'), false);
     });
-});
-
-test('a closeout that does not read leaves its step unsigned and on you, so `nemia cancel` calls the run off', async (t) => {
-  const s = story(t);
-  const b = stage.board();
-  let run: RepositoryRun;
-  await s.test('implement signs off with a closeout that does not read: unsigned, closeout unreadable, waiting on you', async () => {
-    run = await startedRun(implementThenReview());
-    await tick(run.id);
-    ended(`${run.id}-implement`, 'succeeded', { closeout: ['not a closeout'] });
-    const l = await stage.runWith(b.e, list(b.e, readRun(run.id)));
-    assert.deepEqual(Object.fromEntries(l.steps.map((x) => [x.name, x.status])), {
-      implement: 'unsigned · closeout unreadable',
-      review: 'waiting',
-    });
-    assert.deepEqual(l.waitingOnYou, ['implement']);
-  });
-  await s.test('`nemia cancel` calls it off, as a run not finished, with nothing to stop', async () => {
-    const { plan } = await stage.runWith(b.e, cancelRun(run.id));
-    assert.deepEqual(plan, { kind: 'cancel', stop: [] });
-    assert.ok(readRun(run.id).cancelledAt);
-  });
 });

@@ -255,13 +255,15 @@ const msOf = (env: NodeJS.ProcessEnv, name: string, fallback: number): number =>
 };
 
 /**
- * A read of the quota: how the quota is asked (`ask`, the engine's `quota` in the api), and what the read is judged against: the
- * environment its keeps and its wait are read from (`env`, `HKB_QUOTA_KEEP_MS`, `HKB_QUOTA_BACKOFF_MS` and `HKB_QUOTA_WAIT_MS` on each
- * read), how long it waits for an ask (`waitMs`, else `HKB_QUOTA_WAIT_MS`), the wall clock a person reads the times on (`now`), and the
- * monotonic clock every age the asker decides on is measured on (`mono`, `performance.now()` unless given).
+ * A read of the quota: how the quota is asked (`ask`, the engine's `quota` in the api), of which harness (`harness`: each is held apart,
+ * one ask at a time each, and a read that names none shares one of its own), and what the read is judged against: the environment its
+ * keeps and its wait are read from (`env`, `HKB_QUOTA_KEEP_MS`, `HKB_QUOTA_BACKOFF_MS` and `HKB_QUOTA_WAIT_MS` on each read), how long it
+ * waits for an ask (`waitMs`, else `HKB_QUOTA_WAIT_MS`), the wall clock a person reads the times on (`now`), and the monotonic clock every
+ * age the asker decides on is measured on (`mono`, `performance.now()` unless given).
  */
 export type ReadQuota = (opts: {
   ask: () => Promise<HarnessQuota>;
+  harness?: string;
   waitMs?: number;
   env?: NodeJS.ProcessEnv;
   now?: () => number;
@@ -299,10 +301,10 @@ const waitFor = async (settled: Promise<void>, ms: number): Promise<void> => {
 type Kept = Held & { began: number };
 
 /**
- * A quota asker with nothing held, as a fresh api has: what it holds is the last ask's outcome, the last with windows, how many
- * `unanswered` outcomes in a row since it, the ask in flight and the one queued behind it, in its own memory and nobody's file.
- * Every age it judges is on the monotonic clock (`mono`): a wall clock stepped back makes no held answer younger, nor an ask begun before
- * a read one begun after it.
+ * A quota asker with nothing held, as a fresh api has, one for each harness a read names (`ReadQuota`'s `harness`): what it holds is the
+ * last ask's outcome, the last with windows, how many `unanswered` outcomes in a row since it, the ask in flight and the one queued behind
+ * it, in its own memory and nobody's file. Every age it judges is on the monotonic clock (`mono`): a wall clock stepped back makes no held
+ * answer younger, nor an ask begun before a read one begun after it.
  *
  * Its read says the quota as the request should: from what is held while it is younger than its keep — the keep, or an `unanswered`
  * outcome's wait — counted from when its ask began; otherwise from an ask begun within the keep of the read (with a keep of 0, only one
@@ -312,6 +314,17 @@ type Kept = Held & { began: number };
  * another failure between two `unanswered` answers neither ends it nor adds to it.
  */
 export function makeQuota(): ReadQuota {
+  const each = new Map<string, ReadQuota>();
+  return (opts) => {
+    const key = opts.harness ?? '';
+    const read = each.get(key) ?? oneQuota();
+    each.set(key, read);
+    return read(opts);
+  };
+}
+
+/** One harness's asker, as `makeQuota` describes it. */
+function oneQuota(): ReadQuota {
   let held: Kept | null = null;
   let good: Held | null = null;
   let unanswered = 0;
@@ -370,6 +383,32 @@ export function makeQuota(): ReadQuota {
     return quotaOf(held, good, now(), keepMs);
   };
 }
+
+/**
+ * How long the daemon's read waits for its ask: thirty seconds, past the fifteen the runtime gives `get_usage` before it answers
+ * `timeout`, so the daemon is told what the ask came to rather than `asking`, which it would record nothing of.
+ */
+export const QUOTA_DAEMON_WAIT_MS = 30_000;
+
+/**
+ * A board's quota as the runtime words an answer: a `fresh` one's windows, as the board shows them, keys the board does not know left out;
+ * any other state an answer with no windows, which the daemon records nothing of. Pure.
+ */
+export function harnessQuotaOf(q: Quota): HarnessQuota {
+  if (q.state !== 'fresh') return { kind: 'unknown', what: `the board's quota is ${q.state}` };
+  const limits = q.windows.map(({ key, usedPercentage, resetsAt }) => ({ key, usedPercentage, resetsAt }));
+  return { kind: 'windows', limits, subscription: q.subscription };
+}
+
+/**
+ * The daemon's ask of `harness`'s quota, through `read`, the asker the boards read (`QuotaAsker`), so a board and the daemon reading the
+ * same harness share one keep, one backoff and one ask in flight: `ask` reaches the engine only when the asker would for a board, and
+ * its read waits `QUOTA_DAEMON_WAIT_MS`.
+ */
+export const daemonQuota =
+  (read: ReadQuota, harness: string, ask: () => Promise<HarnessQuota>) =>
+  (env: NodeJS.ProcessEnv = process.env): Promise<HarnessQuota> =>
+    read({ ask, harness, env, waitMs: QUOTA_DAEMON_WAIT_MS }).then(harnessQuotaOf);
 
 /** The quota asker every board's read shares, one for an app (`live`, a fresh `makeQuota`): a test gives its own with `layer`. */
 export class QuotaAsker extends Context.Service<QuotaAsker, ReadQuota>()('api/QuotaAsker') {

@@ -1,7 +1,7 @@
 # tools/observe — the side Grafana
 
 A Grafana to watch how Nemia runs while we build it: one `grafana/otel-lgtm` container holding the OpenTelemetry collector, Tempo, Loki,
-Prometheus, Pyroscope and Grafana, with six dashboards loaded from `dashboards/`. It is a tool of this repository and never ships: no
+Prometheus, Pyroscope and Grafana, with seven dashboards loaded from `dashboards/`. It is a tool of this repository and never ships: no
 package or `bin` refers to it; the build workflow's check asks a change here for its dashboards rendered (*See a change rendered*). The daemon sends nothing anywhere unless it is given an endpoint, and the stack listens on this
 machine alone (`127.0.0.1`).
 
@@ -118,6 +118,19 @@ Grafana cannot be saved, so edit the JSON here, and Grafana reads it again withi
   `sessions` are drawn by factory too, as the runtime says them by task, what belongs to no run known left in the part alone. The free space is the file system's that holds the store: under WSL the
   Linux virtual disk, far larger than what it may take. The real limit there is the Windows drive that holds its file, which nothing
   here reads, and space freed inside returns to it only when that file is compacted.
+- **Spending** — what the factory spends, from Prometheus, by factory, workflow, step and agent. **Tokens by kind**: cache reads,
+  cache writes, uncached input and output over the range, each kind's share, and over time (`step.tokens.cache_read`,
+  `step.tokens.cache_write`, `step.tokens.uncached`, which add up to `step.tokens.input` where every attempt of a session measured all
+  three, beside `step.tokens.output`). **Per task**: cost, tokens and tasks by agent, and by workflow and step, summed over the range and
+  as a mean per task. A task is a step of a run, its tries and its rounds summed, counted once when its first try settles
+  (`step.tasks`): what a step's `budget:` bounds, and a mean per try would hide what retries cost. A step whose first try settled
+  before the range adds cost and no task, so read a mean over a day or more. No dollars by kind: the harness prices a session whole.
+  **The quota**: the subscription's windows the daemon reads every ten minutes (`quota.used`, percent, and `quota.resets_at`, seconds
+  since the epoch, by `harness` and `window`), the week's used line over the last seven days whatever the range, dropping at each
+  reset, beside its **even pace**, the share of the window passed; the five-hour window's over the last day. A reading past its
+  window's reset is not drawn. The daemon asks through the one asker the board reads (`QuotaAsker`, in the api), so an open board
+  adds no ask, and its backoff after an `unanswered` answer holds; `nemia up` with no api asks the runtime itself, every ten minutes,
+  with no backoff.
 - **Passes** — a pass's time from the `pass` spans (TraceQL metrics), its phases from `pass.phase.duration` (the phases are not spans),
   and the slowest of the latest 500 `pass` and `advancePass` spans, each linked to its trace. Its tables are span tables
   (`tableType: "spans"`): a row's Duration is the span's own. A trace lasts as long as the session a pass filed, which joins it
@@ -198,11 +211,16 @@ node tools/observe/render/render.ts --stop <name>
 - **A throwaway stack** (`render/stack.ts`): one container of the image `compose.yaml` pins, with its environment and its bind
   mounts, read-only, taken from this checkout's `tools/observe`; named `nemia-render-<pid>-<random>`; Grafana and OTLP/HTTP published on
   loopback ports Docker picks; no named volume, so what it stores dies with it. It never names `nemia-lgtm`, its volume or its ports.
-  It is removed by its exact name (`docker rm -f -v <name>`) when the command ends, on a signal and on any error.
+  It is removed by its exact name (`docker rm -f -v <name>`) when the command ends, on a signal and on any error. Its Prometheus takes
+  a sample eight days late (`lateBind`): the image's own configuration, read out of the image, its `out_of_order_time_window` widened
+  from the image's minutes, since the stack writes samples of now before the seed and a week of quota would otherwise be refused, and
+  every sample its export carried with it. The live stack keeps the image's window.
 - **Fake data** (`render/seed.ts`): fixtures written by hand, posted as OTLP/HTTP JSON to the throwaway's own collector, stamped inside
   the last minute: the daemon's passes, a run's filings and appends, the waits and the denied calls of two steps (`build / implement ·
   ada`, `build / review · agora`, in the run `seeded-run-1`), that run's timeline once over (`run.timeline`, each number a span with a
-  numeric `value`), every metric System charts, and two sessions' turns with their failed `tool_result` events, of both kinds in both
+  numeric `value`), every metric System charts, a third step (`intake / plan · iris`) for the tokens by kind and the tasks, a week of
+  the quota (`render/quota-week.ts`: a sample every five minutes, read every ten, through a reset of the week and of each five-hour
+  window), and two sessions' turns with their failed `tool_result` events, of both kinds in both
   steps: the Bash tool's (seven) and other tools' (six, one with no `tool_name`). Every panel that draws series is met by two; the two profile panels are not seeded
   (`UNSEEDED`). Fixtures and not the code's emitters: a tool imports no package's `src`. `observe.test.ts` refuses a name here the code
   does not emit, and a panel the seed does not meet, counted over the rows a Loki query's literal filters keep (a seed with no failed
@@ -210,7 +228,9 @@ node tools/observe/render/render.ts --stop <name>
 - **What it writes**, into `--out`, else `$WF_ARTIFACTS`, else `.observe/` at the root (ignored by git): for each dashboard,
   `dashboard-<name>.png`, the whole page at 1600 pixels wide, and `dashboard-<name>.txt`, the text of every panel as the page drew it
   (`render/panels.ts`): each bar's name and value, a bar with no name as `(no name)`, a chart's series, a table's rows, `no data`, or
-  the error a query answered. The window is made as tall as the dashboard: Grafana loads a panel's data only once the window reaches
+  the error a query answered. Each page is opened on the picked range written relative to that moment (`now-935s` to `now+47s`), the
+  same range: Grafana honours a panel's own range (`timeFrom`, the quota's week, the largest runs' 30 minutes) only under a relative
+  one. A held stack's printed addresses keep the two instants. The window is made as tall as the dashboard: Grafana loads a panel's data only once the window reaches
   it. The `see-a-dashboard` skill says how to read them.
 - **One at a time** (`render/lock.ts`): about 0.8 GiB and a minute and a half, so a second render waits for the first, `--wait`
   seconds (600), and is refused naming the holder. The lock is a file in the system's temp directory; one left by a process that is
@@ -264,6 +284,10 @@ Measured 2026-10-11 on this stack, with one try of $1.25 posted in a factory nev
 gap between samples, so a series reads high while it is young: 1.33 for 1.25 after a minute of exports, and less as the daemon lives on.
 The worst case is a process that ends right after its first export: its series stays at 1.56 for 1.25 (measured the same day, factory
 `probe-eo38-first`, beside 1.33 for one that lived on, `probe-eo38-lived`).
+
+**The quota's gauges are no counters**: a daemon started again holds none until its first good reading, asked at once, and Prometheus
+shows a gap until then. Between readings each gauge is exported at the last one; a reading past its window's reset is hidden by the
+panels.
 
 What is still lost:
 

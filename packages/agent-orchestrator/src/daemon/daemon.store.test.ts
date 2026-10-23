@@ -1236,6 +1236,45 @@ test("the daemon asks each harness's quota and hands its reading to the passes; 
   clear();
 });
 
+test("a good reading sets the quota's gauges by harness and window, through the ask handed down and never the engine's", async () => {
+  const { askedQuota } = await import('./up.verb.ts');
+  const { Effect, Metric } = await import('effect');
+  const resetsAt = '2026-10-27T09:00:00.000Z';
+  const answers: Record<string, unknown> = {
+    claude: {
+      kind: 'windows',
+      limits: [
+        { key: 'seven_day', usedPercentage: 42, resetsAt },
+        { key: 'five_hour', usedPercentage: 7, resetsAt: null },
+      ],
+      subscription: null,
+    },
+    codex: { kind: 'unanswered', subscription: null },
+  };
+  const refusing = {
+    quota: () => {
+      throw new Error("the engine's own ask is not the one handed down");
+    },
+  } as unknown as Engine;
+  const registry = new Map();
+  const reading = await Effect.runPromise(
+    askedQuota(refusing, { codex: { week: 3 } }, ['claude', 'codex'], (name) => Effect.succeed(answers[name] as never)).pipe(
+      Effect.provideService(Metric.MetricRegistry, registry),
+    ),
+  );
+  assert.deepEqual(reading, { claude: { seven_day: 42, five_hour: 7 }, codex: { week: 3 } });
+  const snapshot = await Effect.runPromise(Metric.snapshot.pipe(Effect.provideService(Metric.MetricRegistry, registry)));
+  const gauges = snapshot
+    .filter((m) => m.id.startsWith('quota.'))
+    .map((m) => [m.id, m.attributes, (m.state as { value: number }).value])
+    .sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  assert.deepEqual(gauges, [
+    ['quota.resets_at', { harness: 'claude', window: 'seven_day' }, Date.parse(resetsAt) / 1000],
+    ['quota.used', { harness: 'claude', window: 'five_hour' }, 7],
+    ['quota.used', { harness: 'claude', window: 'seven_day' }, 42],
+  ]);
+});
+
 test('the daemon delivers the subscriptions: a wake line written to the feed is said to the subscribed task through the engine', async () => {
   clear();
   const { up } = await import('./up.verb.ts');

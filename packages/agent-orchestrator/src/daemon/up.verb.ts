@@ -3,7 +3,7 @@
  * takes the store's lease in its scope and lets it go as the scope closes; `holdUrl` writes into the lease where the api serves; and
  * `runMain` runs either as the process's command, a signal letting go of the lease before the process exits.
  */
-import { Cause, Deferred, Effect, Exit, Fiber, type Metric, type Scope } from 'effect';
+import { Cause, Deferred, Effect, Exit, Fiber, Metric, type Scope } from 'effect';
 import type { StoreRoot } from '../config/root.store.ts';
 import type { PlaceService } from '../place/place.store.ts';
 import { over, quotaHarnesses, type Engine, type HarnessQuota } from '../runtime-client.ts';
@@ -29,10 +29,17 @@ import { leaseRelease } from '../release/release.ts';
 import { runningRelease } from '../release/version.verb.ts';
 
 /**
+ * How the daemon asks a harness for its quota: the engine's `quota` unless the process hands it another. The api hands it the ask its
+ * board reads through (`QuotaAsker`), so the board and the daemon share one keep, one backoff and one ask in flight.
+ */
+export type QuotaAsk = (harness: string) => Effect.Effect<HarnessQuota, unknown>;
+
+/**
  * What `up` runs with: its interval, `every` ms; the repository a queued card that names none starts on, and the folder the lease names
  * (`repo`); the kind of daemon it is (`holder`); the calling process's own series a collector reads by their increase, born at zero
- * with the daemon's (`series`, `DAEMON_SERIES`); and what to do once the lease is taken and before the first pass, in the lease's scope
- * (`onTaken` — where the api serves, and `nemia up` says what it holds).
+ * with the daemon's (`series`, `DAEMON_SERIES`); what to do once the lease is taken and before the first pass, in the lease's scope
+ * (`onTaken` — where the api serves, and `nemia up` says what it holds); and how a harness's quota is asked (`quota`, `QuotaAsk`), the
+ * engine's own unless given.
  */
 export type UpOptions = {
   every: number;
@@ -40,6 +47,7 @@ export type UpOptions = {
   holder: HolderKind;
   series?: ReadonlyArray<Metric.Metric<never, unknown>>;
   onTaken?: (taken: TakenStore) => Effect.Effect<void, unknown, Scope.Scope>;
+  quota?: QuotaAsk;
 };
 
 /**
@@ -51,23 +59,62 @@ export const DAEMON_SERIES = [...PASS_SERIES, FEED_FOLLOW_BEATS, FEED_FOLLOW_REA
 /** How often the daemon asks each harness for its quota: the series keep it over time. */
 export const QUOTA_EVERY_MS = 600_000;
 
+/**
+ * The quota's gauges, set at each good reading by harness and window (`five_hour`, `seven_day`, …, as the harness names them): the
+ * percent of the window used (`quota.used`) and when it resets, in seconds since the epoch (`quota.resets_at`, set only where the harness
+ * gave a time). An answer with no windows sets neither, and each keeps the reading before it. A process holds none until its first good
+ * reading, so a daemon started again leaves a gap until it has asked.
+ */
+export const QUOTA_METRICS = {
+  used: Metric.gauge('quota.used', { description: "the percent of a harness's quota window used, at its last good reading" }),
+  resetsAt: Metric.gauge('quota.resets_at', {
+    description: "when a harness's quota window resets, in seconds since the epoch, at its last good reading",
+  }),
+} as const;
+
+/** Each window of `q` into the quota's gauges (`QUOTA_METRICS`) for `harness`; nothing when it reports no windows. */
+const quotaRecorded = (harness: string, q: HarnessQuota): Effect.Effect<void> =>
+  q.kind !== 'windows'
+    ? Effect.void
+    : Effect.forEach(
+        q.limits,
+        ({ key: window, usedPercentage, resetsAt }) => {
+          const at = resetsAt === null ? NaN : Date.parse(resetsAt);
+          return Effect.andThen(
+            Metric.update(Metric.withAttributes(QUOTA_METRICS.used, { harness, window }), usedPercentage),
+            Number.isFinite(at)
+              ? Metric.update(Metric.withAttributes(QUOTA_METRICS.resetsAt, { harness, window }), at / 1000)
+              : Effect.void,
+          );
+        },
+        { discard: true },
+      );
+
 /** The percent of each window `q` reports used, or none when it reports no windows. */
 const usedOf = (q: HarnessQuota): Reading[string] | undefined =>
   q.kind === 'windows' ? Object.fromEntries(q.limits.map((l) => [l.key, l.usedPercentage])) : undefined;
 
 /**
- * Each harness's quota (`quotaHarnesses`) asked of `e`, over `last`: one that answers its windows replaces its own reading, the percent of
- * each window used; one that refuses, fails, dies or answers no windows leaves its last.
+ * Each harness's quota (`quotaHarnesses`) asked through `ask` — the engine's `quota` of `e` unless given — over `last`: one that answers
+ * its windows replaces its own reading, the percent of each window used, and sets the quota's gauges (`QUOTA_METRICS`); one that refuses,
+ * fails, dies or answers no windows leaves its last, and sets none.
  */
-export const askedQuota = Effect.fn('askedQuota')(function* (e: Engine, last: Reading, names: readonly string[] = quotaHarnesses()) {
+export const askedQuota = Effect.fn('askedQuota')(function* (
+  e: Engine,
+  last: Reading,
+  names: readonly string[] = quotaHarnesses(),
+  ask: QuotaAsk = (name) => e.quota(name),
+) {
   const next = { ...last };
   for (const name of names) {
-    const used = yield* e.quota(name).pipe(
-      Effect.map(usedOf),
+    const answer = yield* Effect.suspend(() => ask(name)).pipe(
       Effect.catch(() => Effect.succeed(undefined)),
       Effect.catchDefect(() => Effect.succeed(undefined)),
     );
-    if (used) next[name] = used;
+    const used = answer && usedOf(answer);
+    if (!used) continue;
+    next[name] = used;
+    yield* quotaRecorded(name, answer);
   }
   return next;
 });
@@ -208,24 +255,24 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
 /**
  * The daemon: the store's lease taken as `holder` (`takeStore`, refused by name while another daemon of either kind ticks it) and let go
  * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; the engine's attached sessions held
- * (`hold`) inside it, so as the scope closes each is let go between two tool calls, before the lease, and what that hold serves on
- * its own port written onto the lease beside the api's url (`heldHolder`), by this process, which is the one that holds it — so
- * another process on this store can follow one of those sessions live rather than off the files; its series and the caller's
- * (`series`) born at zero and exported so (`DAEMON_SERIES`, `seriesBorn`) before anything counts into them; its line in the feed
- * (`saidStarted`); `onTaken`; then a pass on `e` every
- * interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats on a fiber forked
- * in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that finds the store taken
- * over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and every
- * `QUOTA_EVERY_MS` (`askedQuota`), and hands each pass the latest reading, which the pass keeps among the recent and so in the series. On
- * a third it delivers the store's subscriptions to the feed (`deliver`), on a fourth it keeps Nemia at the person's level (`keep`), on
- * a fifth it brings each factory made from a template to it (`reconcile`), and on a sixth it frees the worktrees of the runs the latest
- * pass answered finished (`free`), which no pass waits on. On a seventh, once the first pass has answered and every `DISK_EVERY` after,
- * it measures what the store takes on the disk (`disk`), asking the engine what it keeps by task, and hands each pass the latest
- * reading as it does the quota: no pass walks the store, and a sweep that failed leaves the passes none.
+ * (`hold`) inside it, so as the scope closes each is let go between two tool calls, before the lease, and what that hold serves on its own
+ * port written onto the lease beside the api's url (`heldHolder`), by this process, which is the one that holds it — so another process on
+ * this store can follow one of those sessions live rather than off the files; its series and the caller's (`series`) born at zero and
+ * exported so (`DAEMON_SERIES`, `seriesBorn`) before anything counts into them; its line in the feed (`saidStarted`); `onTaken`; then a
+ * pass on `e` every interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats
+ * on a fiber forked in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that
+ * finds the store taken over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and
+ * every `QUOTA_EVERY_MS` (`askedQuota`, through `quota` where given), sets the quota's gauges at each good reading (`QUOTA_METRICS`), and
+ * hands each pass the latest reading, which the pass keeps among the recent and so in the series. On a third it delivers the store's
+ * subscriptions to the feed (`deliver`), on a fourth it keeps Nemia at the person's level (`keep`), on a fifth it brings each factory made
+ * from a template to it (`reconcile`), and on a sixth it frees the worktrees of the runs the latest pass answered finished (`free`), which
+ * no pass waits on. On a seventh, once the first pass has answered and every `DISK_EVERY` after, it measures what the store takes on the
+ * disk (`disk`), asking the engine what it keeps by task, and hands each pass the latest reading as it does the quota: no pass walks the
+ * store, and a sweep that failed leaves the passes none.
  */
 export const up = (
   e: Engine,
-  { every, repo, holder, series = [], onTaken }: UpOptions,
+  { every, repo, holder, series = [], onTaken, quota }: UpOptions,
 ): Effect.Effect<never, unknown, Scope.Scope | PlaceService | StoreRoot> =>
   Effect.gen(function* () {
     const taken = yield* Effect.acquireRelease(
@@ -239,7 +286,7 @@ export const up = (
     let reading: Reading = {};
     yield* Effect.forkScoped(
       Effect.forever(
-        Effect.suspend(() => askedQuota(e, reading)).pipe(
+        Effect.suspend(() => askedQuota(e, reading, quotaHarnesses(), quota)).pipe(
           Effect.andThen((next) => Effect.sync(() => (reading = next))),
           Effect.andThen(Effect.sleep(QUOTA_EVERY_MS)),
         ),

@@ -6,6 +6,8 @@
  * `NAME`, and `remove` refuses any other, so no pattern and no other container is ever stopped from here.
  */
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { performance } from 'node:perf_hooks';
 
@@ -47,22 +49,67 @@ function bindOf(line: string, observeDir: string): string | undefined {
   return `${path.resolve(observeDir, from)}:${to}:ro`;
 }
 
+/** The pinned image of `compose`'s one service; refuses a file that names none. */
+export function imageOf(compose: Compose): string {
+  const { image } = serviceOf(compose);
+  if (!image) throw refusal('compose.yaml names no image for its service: pin one by digest');
+  return image;
+}
+
+/** Where the image keeps its Prometheus's configuration. */
+export const PROMETHEUS_CONFIG = '/otel-lgtm/prometheus.yaml';
+
+/**
+ * How late a render's Prometheus takes a sample behind the newest it holds: eight days, so the seed's week of quota is kept. The image's
+ * own window is minutes, and the stack writes samples of now before the seed is posted, so any older one is refused, and with it
+ * every sample its export carried. The live stack keeps the image's window.
+ */
+export const RENDER_LATE = '8d';
+
+/** The image's Prometheus configuration `text`, its out-of-order window set to `RENDER_LATE`; refuses a text that sets none. */
+export function lateConfig(text: string): string {
+  const window = /^(\s*out_of_order_time_window:\s*)\S+/m;
+  if (!window.test(text))
+    throw new Error(
+      `the image's ${PROMETHEUS_CONFIG} sets no storage.tsdb.out_of_order_time_window, so the seed's week would be refused: ` +
+        'add the window to lateConfig (tools/observe/render/stack.ts) as the image now writes its configuration',
+    );
+  return text.replace(window, `$1${RENDER_LATE}`);
+}
+
+/** The folder a render's own files are kept in while its container `name` lasts, removed with it (`remove`). */
+const ownDir = (name: string): string => path.join(os.tmpdir(), name);
+
+/**
+ * The bind that gives the render `name` its own Prometheus configuration: the image's, read out of it, its window widened
+ * (`lateConfig`), written beside the render and mounted read-only over it.
+ */
+export function lateBind(compose: Compose, name: string): string {
+  if (!NAME.test(name)) throw refusal(`${name} is no render's name (nemia-render-<pid>-<random>): a render starts only its own container`);
+  const text = docker(['run', '--rm', '--entrypoint', 'cat', imageOf(compose), PROMETHEUS_CONFIG]);
+  const file = path.join(ownDir(name), 'prometheus.yaml');
+  fs.mkdirSync(ownDir(name), { recursive: true });
+  fs.writeFileSync(file, lateConfig(text));
+  return `${file}:${PROMETHEUS_CONFIG}:ro`;
+}
+
 /**
  * The `docker` arguments that start the stack of `compose` as the container `name`, detached and removed when it stops: the file's
- * pinned image and environment, each of its bind mounts resolved under `observeDir` and read-only, no named volume, and Grafana and
- * OTLP/HTTP published on loopback ports Docker picks. Refuses a `name` that is no render's.
+ * pinned image and environment, each of its bind mounts resolved under `observeDir` and read-only, then `own`, the render's own binds
+ * (`lateBind`), no named volume, and Grafana and OTLP/HTTP published on loopback ports Docker picks. Refuses a `name` that is no
+ * render's.
  */
-export function runArgv(compose: Compose, observeDir: string, name: string): string[] {
+export function runArgv(compose: Compose, observeDir: string, name: string, own: readonly string[] = []): string[] {
   if (!NAME.test(name)) throw refusal(`${name} is no render's name (nemia-render-<pid>-<random>): a render starts only its own container`);
   const service = serviceOf(compose);
-  if (!service.image) throw refusal('compose.yaml names no image for its service: pin one by digest');
+  const image = imageOf(compose);
   const env = Object.entries(service.environment ?? {}).flatMap(([key, value]) => ['-e', `${key}=${value}`]);
   const binds = (service.volumes ?? []).flatMap((line) => {
     const bind = bindOf(line, observeDir);
     return bind === undefined ? [] : ['-v', bind];
   });
   const ports = [GRAFANA_PORT, OTLP_PORT].flatMap((port) => ['-p', `127.0.0.1::${port}`]);
-  return ['run', '-d', '--rm', '--name', name, ...ports, ...env, ...binds, service.image];
+  return ['run', '-d', '--rm', '--name', name, ...ports, ...env, ...binds, ...own.flatMap((bind) => ['-v', bind]), image];
 }
 
 /** Run `docker` with `args`, bounded; its stdout, or an error saying what it answered. */
@@ -86,10 +133,14 @@ function publishedOf(name: string, port: number): string {
 /** Where the started container `name` listens. */
 export const portsOf = (name: string): Ports => ({ grafana: publishedOf(name, GRAFANA_PORT), otlp: publishedOf(name, OTLP_PORT) });
 
-/** Remove the container `name` and its anonymous volumes, by that exact name; refuses a name that is no render's. */
+/**
+ * Remove the container `name` and its anonymous volumes, by that exact name, and the render's own files (`lateBind`); refuses a name
+ * that is no render's.
+ */
 export function remove(name: string): void {
   if (!NAME.test(name)) throw refusal(`${name} is no render's name (nemia-render-<pid>-<random>): a render removes only its own container`);
   spawnSync('docker', ['rm', '-f', '-v', name], { stdio: 'ignore', timeout: 60_000 });
+  fs.rmSync(ownDir(name), { recursive: true, force: true });
 }
 
 /** Wait `ms`. */

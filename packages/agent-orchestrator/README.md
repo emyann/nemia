@@ -3381,9 +3381,12 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   what each run's full pass already read — no read of the store or the engine of their own. A run's pass takes each of its tasks it
   reads settled that the run's mark does not hold (`settlesCounted`, `settlesDue`), a task shared by tries once, and reads each of its
   facts (`settledFacts`, `src/meter/step.ts`): `step.cost` (USD, where measured), `step.tokens.input` and `step.tokens.output` (where
-  measured), and `step.duration` (ms, over a minute to two hours) of a session that settled; `step.tries` by how the session ended
+  measured), the input by kind, `step.tokens.cache_read`, `step.tokens.cache_write` and `step.tokens.uncached`, each where every attempt
+  of the session measured it, so the three add up to the input, and `step.duration` (ms, over a minute to two hours) of a session that settled; `step.tries` by how the session ended
   (`done`, `blocked`, `failed`, `stopped`); `step.checks` by the check's verdict (`passed`, `refused`, `unfinished`); `step.rounds`,
-  `granted` on the pass that files a round and `exhausted` on the settle that leaves its loop out of rounds. Each is kept by `factory`, `workflow` (the folder's name), `step`, `agent` (`none` for none) and `outcome`,
+  `granted` on the pass that files a round and `exhausted` on the settle that leaves its loop out of rounds; `step.tasks`, one for a step of
+  a run, on the settle of its first try (`stepTaskId`), kept without an outcome, which the Spending dashboard divides cost and tokens
+  by. Each is kept by `factory`, `workflow` (the folder's name), `step`, `agent` (`none` for none) and `outcome`,
   and by nothing else: a fact that carries another key, a run's id or a task's, is refused (`boundedAttributes`). The tasks counted are
   marked on the run record by the pass that counts them, before the metrics are recorded: a settle is counted once, by whichever daemon
   first reads it settled, one that happened while no daemon read included; a daemon that dies between the two loses that pass's facts,
@@ -3421,7 +3424,10 @@ written to `$WF_ROOT/tick-stats.json`, over the last pass's. Nothing decides on 
   the recent its oldest queued session's wait since it was filed (`waitMs`), the machine's load (the one-minute load average over the
   cores), the checks it filed, by factory, workflow, step and agent, and the quota the daemon last read; the daemon asks each harness
   for its quota at once and every 10 minutes (`QUOTA_EVERY_MS`, `askedQuota` in `src/daemon/up.verb.ts`), and keeps a harness's last
-  reading while it does not answer. After writing the ring, the pass rolls the minutes it holds that are done and not yet kept into
+  reading while it does not answer. Each good reading also sets the gauges `quota.used` (percent) and `quota.resets_at` (seconds since
+  the epoch) by `harness` and `window` (`QUOTA_METRICS`), none until the first. The api hands its daemon the ask its board reads
+  through (`UpOptions.quota`, its `QuotaAsker`), so the two share one keep, one backoff after an `unanswered` answer and one ask in
+  flight; `nemia up` with no api asks the engine itself, every 10 minutes, with no backoff. After writing the ring, the pass rolls the minutes it holds that are done and not yet kept into
   `$WF_ROOT/metrics/minute/<YYYY-MM-DD>.jsonl`, a line a series a minute: its count, sum, least, most and last, and for a histogram its
   buckets with an exact p50 and p95 (`SERIES`, `rollMinutes`). Once an hour is done it merges its minutes into
   `$WF_ROOT/metrics/hour/<YYYY-MM-DD>.jsonl`, the percentiles read off the summed buckets (`rollHours`). What is due is read off the

@@ -26,7 +26,7 @@ import { locked, release, take } from './lock.ts';
 import { addressOf, seen, written } from './panels.ts';
 import { dashboardsOf, planOf, type Named, type Plan } from './plan.ts';
 import { arrived, picks, post, UNSEEDED, type Picks } from './seed.ts';
-import { nameOf, portsOf, ready, remove, runArgv, start, type Compose } from './stack.ts';
+import { lateBind, nameOf, portsOf, ready, remove, runArgv, start, type Compose } from './stack.ts';
 
 /** The reasons `UNSEEDED` gives for the panels of the dashboard `name`, by a panel's title. */
 const unseededOf = (name: string): Record<string, string> =>
@@ -38,7 +38,7 @@ async function pictured(browser: Browser, grafana: string, dashboards: readonly 
   const files: string[] = [];
   for (const { name, uid, file } of dashboards) {
     const page = await browser.newPage();
-    const address = addressOf(grafana, uid, at);
+    const address = addressOf(grafana, uid, at, Date.now());
     const picture = path.join(out, `dashboard-${name}.png`);
     const panels = await seen(page, file, address, picture);
     await page.close();
@@ -55,7 +55,7 @@ async function pictured(browser: Browser, grafana: string, dashboards: readonly 
  */
 async function rendered(plan: Plan, name: string, dashboards: readonly Named[], say: (line: string) => void): Promise<boolean> {
   const compose = yaml.load(fs.readFileSync(path.join(plan.observe, 'compose.yaml'), 'utf8')) as Compose;
-  start(runArgv(compose, plan.observe, name));
+  start(runArgv(compose, plan.observe, name, [lateBind(compose, name)]));
   const ports = portsOf(name);
   say(`${name} started from ${plan.observe}: Grafana on ${ports.grafana}`);
   const allOf = dashboardsOf(plan.observe);

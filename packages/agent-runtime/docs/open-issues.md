@@ -120,7 +120,7 @@ running, then removed. One kind is left there, stopped: a task that asked for a 
 need that work somewhere else first. A session whose task a person or a deadline settled before the
 `settled` entry carried its id stays listed too, since `ae logs` could not read it once removed.
 
-### 4. `claude-detached` measures its cost and tokens, and no turns or tool calls — and a resumed one's cost is not its own
+### 4. `claude-detached` measures its cost and tokens, and no turns, tool calls, peak context or tool time
 
 `agent-runtime/src/harness/detached/output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
 `total_cost_usd` and `duration_api_ms` (engine `9d075f7`), from the one `result` object `claude -p --output-format json`
@@ -134,19 +134,22 @@ resume of a spec with `resumeCostCarried` has its parent's taken off as its cost
 `usage` where the parent's were not kept; `usage` alone stays the reading where `modelUsage` is missing or partial. It has no peak context (`usage.iterations` holds the last response
 alone), no count of turns or tool calls, and no tool time.
 
-**A resumed `claude -p`'s cost is carried on, on 2.1.278.** The same `--resume` printed a `total_cost_usd` of $0.0900: its
-parent's $0.0471 and its own $0.0430 together. The engine records it as the attempt's own, as 2.1.272 made it ($0.0042 of its
-own over a parent's $0.018). Not fixed: its own share cannot be read off the result alone — its `modelUsage` is carried on
-too, and the engine prices nothing — and the parent's total is on the parent's attempt, which the runner is not handed.
-Low priority: this harness exists for comparison — and, since only `claude -p` keeps a spend cap (issue 17), for a task
-that must not spend past one.
+**A resumed `claude -p`'s cost is carried on, on 2.1.278 — fixed for `claude-detached` 2026-10-22 (engine `48b3c8e`).** The
+same `--resume` printed a `total_cost_usd` of $0.0900: its parent's $0.0471 and its own $0.0430 together, and its `modelUsage`
+carried its parent's counts on too. Its own share cannot be read off the result alone, so `claudeDetached` now says so
+(`resumeCostCarried`), as a job's spec does: the runner takes off the cost, API time and whole-session tokens the parent run
+printed, kept on the resume's run file at spawn (`carried`) or found among the run files. Proven on h4sj's implement tries
+(`test/session-results.ts`), through the shipped spec: try 2 counts its own 4.2M cache reads and $1.33, not the 89.6M and
+$43.54 its result carries (`test/detached.test.ts`). Its edge is the job's: a resume whose parent is no `claude-detached` run
+— a job's or a `--bg` session's id resumed on it — records no cost or API time, and its tokens fall back to its own `usage`,
+an undercount and never an overcount. An attempt journalled before the fix keeps what it recorded.
 
 **Narrowed for a job on `claude`** (stage 2 part 1). Measured again on 2.1.280 (issue 28, M2): a `-p --resume` printed
 $0.0257 over a parent's $0.0210, and a second resume $0.0284 — and its `duration_api_ms` is carried on the same way. So the
 job's spec says so (`resumeCostCarried`), and the worker's registry takes off the cost and API time its parent printed: the
 parent is the run under the id it resumed that started last before it. What is left: a job whose parent is no run of the
 worker's — a `--bg` session, or a session another tool started — records no cost and no API time, since what it printed
-cannot be told apart from what its parent spent. `claude-detached` records what it printed, as before.
+cannot be told apart from what its parent spent. `claude-detached` does the same since 2026-10-22, above.
 
 ### 6. The bare `file` refuses no harness's words
 

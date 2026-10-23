@@ -2,8 +2,8 @@
  * A run of the shipped quick workflow (`workflows/quick`) on the stand-ins: `implement → review → land`, with no spec before it and no
  * gate anywhere. Implement signs off its plan, its check answers, the review reads the change, and its pass files the landing with
  * nobody's approval on disk — the run waits on no person. A review that asks again files implement again instead, on the run's own
- * branch, and files no land. A check that refuses leaves the run to a person: the step declares no `retries:`, so a size refusal is
- * never answered by a try that trims the work to fit, which a copy given one shows.
+ * branch, and files no land. A check that refuses leaves the run to a person: the step declares no `retries:`, so no try answers a
+ * refusal by itself, which a copy given one shows.
  *
  * The repository the run works on holds the checkout's skill folders, as a start in this checkout finds them.
  *
@@ -98,7 +98,7 @@ const REVIEWED = (again: boolean) => ({
   replies: [],
 });
 
-test("a quick run within the bound reaches its review, and the review's pass files the landing with nobody's approval", async () => {
+test("a quick run whose check passes reaches its review, and the review's pass files the landing with nobody's approval", async () => {
   const { id, b, e } = await toTheCheck(quickFolder());
   b.settle(`${id}-implement-check`, 'succeeded', { exitCode: 0 });
   assert.deepEqual((await runWith(e, advanceRun(readRun(id)))).filed, ['review'], 'the review is filed, not the landing');

@@ -1,26 +1,22 @@
 /**
- * `node change.ts size` — what a quick build's check asks of the change itself: that it is small.
+ * `node change.ts size` — what a quick build's check says of the change itself: its size, as a fact.
  *
  * Reads the net change in the working directory: `git diff --numstat -M` from where the work began to `HEAD`. It began on `WF_BASE_REF`,
  * or, once the branch merged a newer base, on the base it merged last: the second parent of the newest merge on the branch's first
  * parent. A line added then removed counts for nothing, and a renamed file is one file.
  *
  * `size` counts the files changed and the lines added plus removed, tests and docs included, a generated file (`GENERATED`) left out,
- * and refuses a change past `LINES`: it is a card for the build workflow, and the refusal gives the two commands. The count of files
- * is said, and refuses nothing: the review reads every file.
+ * and refuses nothing by either number: the review reads the change whatever its size.
  *
- * Prints a `wf size:` line and exits 0. Exits 1, on stderr, on a refusal; and when `WF_BASE_REF` is not set, git cannot say what
- * changed, or the verb is another than `size`.
+ * Prints a `wf size:` line and exits 0. Exits 1, on stderr, when `WF_BASE_REF` is not set, git cannot say what changed, or the verb is
+ * another than `size`.
  */
 import { spawnSync } from 'node:child_process';
 
 /** A reason the step is refused: said on stderr, exit 1. */
 class Refusal extends Error {}
 
-/** The most lines a quick build changes, added plus removed. */
-const LINES = 300;
-
-/** The paths a tool writes, which the bound does not count: a file, or a folder by its closing slash. */
+/** The paths a tool writes, which the count leaves out: a file, or a folder by its closing slash. */
 const GENERATED = ['package-lock.json', 'apps/web/theme/', 'apps/web/src/routeTree.gen.ts'];
 
 /** One file of the change: its path, a renamed file's new one, and its lines added plus removed, none for a binary file. */
@@ -65,27 +61,11 @@ function changes(): Change[] {
 /** Whether a tool writes `path`. */
 const generated = (path: string): boolean => GENERATED.some((made) => (made.endsWith('/') ? path.startsWith(made) : path === made));
 
-/** The refusal of a change of `lines` lines in `files` files, which names the build workflow and the two commands that take it there. */
-function tooLarge(files: number, lines: number): Refusal {
-  const run = process.env.WF_RUN ?? '<run>';
-  return new Refusal(
-    [
-      `the change is ${lines} lines in ${files} files, past a quick build's bound of ${LINES} lines ` +
-        '(added plus removed; tests and docs count, generated files do not).',
-      'It is a card for the build workflow, which gives a change this size a spec and a review. Cancel this run and start the card there:',
-      `  nemia cancel ${run}`,
-      '  nemia start "<the card\'s text>" --workflows build --factory nemia',
-      'Do not trim the work to fit, and do not try this step again: the bound is on what the card asks, not on how it is written.',
-    ].join('\n'),
-  );
-}
-
-/** `size`: says the count, and refuses a change past `LINES`. */
+/** `size`: says the count, and refuses nothing by it. */
 function size(say: (line: string) => void): number {
   const counted = changes().filter((change) => !generated(change.path));
   const lines = counted.reduce((sum, change) => sum + change.lines, 0);
-  say(`wf size: ${counted.length} files, ${lines} lines of ${LINES}`);
-  if (lines > LINES) throw tooLarge(counted.length, lines);
+  say(`wf size: ${counted.length} files, ${lines} lines`);
   return 0;
 }
 

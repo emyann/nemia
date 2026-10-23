@@ -7,23 +7,18 @@
  * harness's arguments) to the harness on every attempt and records the end it prints — `failed`, and the limit the harness
  * says it stopped at, as a fact: the runtime judges no budget, and the orchestrator says `budget exhausted` of it.
  * The engine's `file` refuses a cap on a `claude --bg` session, which would keep none. The `claude --bg` runner is
- * still given the flag when a task reaches it with one — through a `Runner` of its own, which refuses no harness's words — and a
+ * still given the flag when a task reaches it with one: its argv, every option set, is pinned in `completion.test.ts`, and a
  * later turn of a task held open is spawned from the record the same way (`engine.test.ts`).
  *
  * The `claude -p` fake prints the result `claude -p --output-format json` prints for a session that crosses its cap, keys
- * trimmed. The `claude --bg` fake keeps a registry as `claude agents` does: `--bg` adds a session, busy, so nothing reads a
- * transcript, and `rm` removes it.
+ * trimmed.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Effect, Layer } from 'effect';
+import { Effect } from 'effect';
 import { Engine } from '../src/index.ts';
-import { file } from '../src/core/engine/filing.ts';
-import { tick } from '../src/core/engine/engine.ts';
-import { Journal } from '../src/core/engine/journal.ts';
-import { Runner } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
 import { builtEngine } from './engine.ts';
 import { until, WAITED } from '../src/waits/index.ts';
@@ -120,48 +115,3 @@ process.exitCode = 1;
     });
   },
 );
-
-test('claude --bg is given --max-budget-usd on the attempt of a task that reaches it with one — through a Runner layer of the core, since file() refuses a cap a --bg session would not keep', async () => {
-  const bin = tmp('bin');
-  const registry = path.join(bin, 'registry.json');
-  const runs = path.join(bin, 'runs.jsonl');
-  fs.writeFileSync(registry, '[]');
-  fs.writeFileSync(
-    path.join(bin, 'claude'),
-    `#!${process.execPath}
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-const rows = JSON.parse(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
-const save = () => fs.writeFileSync(${JSON.stringify(registry)}, JSON.stringify(rows));
-if (args[0] === 'agents') { process.stdout.write(JSON.stringify(rows)); process.exit(0); }
-if (args[0] === 'stop' || args[0] === 'rm') {
-  const at = rows.findIndex((r) => r.sessionId.split('-')[0] === args[1]);
-  if (at === -1) process.exit(1);
-  if (args[0] === 'stop') rows[at].state = 'stopped'; else rows.splice(at, 1);
-  save();
-  process.exit(0);
-}
-if (args[0] === '--bg') {
-  fs.appendFileSync(${JSON.stringify(runs)}, JSON.stringify(args) + '\\n');
-  rows.push({ name: args[args.indexOf('--name') + 1], sessionId: require('node:crypto').randomUUID(), state: 'working', status: 'busy', kind: 'background', startedAt: Date.now() });
-  save();
-}
-`,
-    { mode: 0o755 },
-  );
-  const root = tmp('root');
-  const layer = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), Runner.claude({ root }));
-  const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
-
-  await onPath(bin, async () => {
-    await run(file({ brief: 'the prompt', cwd: tmp('cwd'), config: { budgetUsd: 0.5 } }));
-    await run(tick());
-
-    const argvs = runsIn(runs);
-    assert.equal(argvs.length, 1, 'the attempt');
-    for (const args of argvs) {
-      assert.equal(valueOf(args, '--max-budget-usd'), '0.5', 'the cap on each');
-      assert.equal(args.at(-1), 'the prompt', 'a flag that takes a value of its own, so it cannot take the prompt');
-    }
-  });
-});

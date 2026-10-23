@@ -11,9 +11,19 @@ export const TEXT_LINK = cn(
   focusRing(),
 );
 
-/** React Aria's link, drawn as the board's text link; a `title` says whole what a cut link shows a part of. */
-function Linked({ className, ...props }: Omit<LinkProps, 'className'> & { className?: string; title?: string }) {
-  return <AriaLink {...props} data-text-link className={cn(TEXT_LINK, className)} />;
+/**
+ * React Aria's link, drawn as the board's text link; a `title` says whole what a cut link shows a part of. React Aria's `Link` keeps
+ * no `title` of the props it is given, so the title is put on the element it draws, through its `render`.
+ */
+function Linked({ className, title, ...props }: Omit<LinkProps, 'className'> & { className?: string; title?: string }) {
+  return (
+    <AriaLink
+      {...props}
+      data-text-link
+      className={cn(TEXT_LINK, className)}
+      render={title === undefined ? undefined : (dom) => ('href' in dom ? <a {...dom} title={title} /> : <span {...dom} title={title} />)}
+    />
+  );
 }
 
 /** The board's text link to a route (`routeLink`): pressed, or Enter on it, it navigates once. */

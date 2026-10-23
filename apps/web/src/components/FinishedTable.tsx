@@ -1,5 +1,5 @@
 import { Cell, Column, Row, Table, TableBody, TableHeader } from '@/components/ui/ds';
-import type { FinishedPage } from '@/lib/api';
+import { workflowNameOf, type FinishedPage } from '@/lib/api';
 import { factoryOf } from '@/lib/factories';
 import { titleOf } from '@/lib/factory';
 import { ink } from '@/lib/meaning';
@@ -8,6 +8,7 @@ import { instantWhole } from '@/lib/instant';
 import { cn } from '@/components/ui/ds/utils';
 import { RunClockCell } from './RunClockCell';
 import { RunCostCell } from './RunCostCell';
+import { workflowTarget } from './WorkflowLink';
 import { CopyId, CutFrame, FRAMED_BOX, FRAMED_ROW, FRAMED_TABLE, Pager, TextLink } from './look';
 
 /** A column's heading, in the look's small caps. */
@@ -39,6 +40,16 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
       <Cell truncate data-factory={factoryOf(run)} className="text-label-small uppercase text-on-surface-variant">
         {factoryOf(run)}
       </Cell>
+      <Cell data-workflow-cell>
+        <TextLink
+          {...workflowTarget(run.workflowPage)}
+          title={run.workflowDir}
+          data-workflow={workflowNameOf(run.workflowDir)}
+          className="block truncate font-mono text-body-small"
+        >
+          {workflowNameOf(run.workflowDir)}
+        </TextLink>
+      </Cell>
       <Cell data-created className={cn(WHEN, 'text-on-surface-variant')}>
         <Ago at={run.createdAt} asOf={asOf} />
       </Cell>
@@ -65,11 +76,12 @@ function FinishedRow({ run, asOf }: { run: FinishedPage['runs'][number]; asOf: D
 
 /**
  * One page of the finished runs, newest finished first, as the kit's dense table in the look's cut frame, quiet: each run's title as a
- * link, its factory, how long ago it was created and how long ago it finished, each with the whole instant on hover, its time at work
- * with a preview over it breaking that clock down (`RunClockCell`), its cost with a preview of its tokens by kind (`RunCostCell`), how
- * it ended, and its id's end with a copy control, the last row with no line under it; then the pager, under a line of its own. A page
- * that holds no row draws no table and no line, and the pager says why. Narrower than its columns, the table scrolls sideways inside its
- * frame.
+ * link, its factory, the workflow it ran by its folder's name with the folder whole on hover, linked to the workflow's page as
+ * `WorkflowLink` links it (`workflowTarget`), how long ago it was created and how long ago it finished, each with the whole instant on
+ * hover, its time at work with a preview over it breaking that clock down (`RunClockCell`), its cost with a preview of its tokens by kind
+ * (`RunCostCell`), how it ended, and its id's end with a copy control, the last row with no line under it; then the pager, under a line
+ * of its own. A page that holds no row draws no table and no line, and the pager says why. Narrower than its columns, the table scrolls
+ * sideways inside its frame.
  */
 export function FinishedTable({ page }: { page: FinishedPage }) {
   const asOf = new Date(page.asOf);
@@ -77,13 +89,16 @@ export function FinishedTable({ page }: { page: FinishedPage }) {
     <CutFrame size={24}>
       {page.runs.length > 0 && (
         <div data-table-box className={FRAMED_BOX}>
-          <Table aria-label="Finished runs" density="dense" className={cn('min-w-[920px] table-fixed', FRAMED_TABLE)}>
+          <Table aria-label="Finished runs" density="dense" className={cn('min-w-[1032px] table-fixed', FRAMED_TABLE)}>
             <TableHeader>
               <Column id="run" isRowHeader className={HEAD}>
                 Run
               </Column>
               <Column id="factory" className={cn(HEAD, 'w-24')}>
                 Factory
+              </Column>
+              <Column id="workflow" className={cn(HEAD, 'w-28')}>
+                Workflow
               </Column>
               <Column id="created" className={cn(HEAD, 'w-32')}>
                 Created

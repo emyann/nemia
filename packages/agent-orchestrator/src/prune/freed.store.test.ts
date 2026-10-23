@@ -3,7 +3,8 @@
  * link is never followed, and a folder that is gone is zero. Every expected number is read off the fixture's own files with `lstat`. And
  * that a walk longer than a burst (`WALK_BURST`) lets the process's other work run. And of the walk itself (`walk`): a name that does
  * not read is counted unread, its cost is the names it read and the bursts it yielded, and told a `Sort`, its bytes by kind add up to
- * the folder's, each file once.
+ * the folder's, each file once. What a name with two names, a link and a burst count stays a test each; a folder gone, a name
+ * unread and a walk's cost are rows of one table.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -64,12 +65,6 @@ test('a file shared by two folders asked together, with no name outside, is coun
   assert.deepEqual(await freed(a), [held(a)], 'asked alone, the other folder still holds it');
 });
 
-test('a folder that is gone frees nothing, beside one that is there', async () => {
-  const dir = path.join(ROOT, 'there');
-  const own = file(path.join(dir, 'own.bin'));
-  assert.deepEqual(await freed(path.join(ROOT, 'gone'), dir), [0, held(dir) + held(own)]);
-});
-
 test('a walk of more names than WALK_BURST lets a fiber started after it run before it ends', async () => {
   const dir = path.join(ROOT, 'many');
   fs.mkdirSync(dir, { recursive: true });
@@ -84,37 +79,6 @@ test('a walk of more names than WALK_BURST lets a fiber started after it run bef
     }),
   );
   assert.deepEqual(ended, ['other', 'walk']);
-});
-
-test('a name that does not read is counted unread and holds no byte, and a folder asked that is gone did not read', async () => {
-  const dir = path.join(ROOT, 'unread');
-  const own = file(path.join(dir, 'own.bin'));
-  const shut = path.join(dir, 'shut');
-  file(path.join(shut, 'hidden.bin'), 64);
-  const heldShut = held(shut);
-  fs.chmodSync(shut, 0o000);
-  try {
-    const walked = await Effect.runPromise(walk([path.join(ROOT, 'never'), dir]));
-    assert.deepEqual(walked.read, [false, true]);
-    assert.deepEqual(walked.unread, [1, process.getuid?.() === 0 ? 0 : 1], 'the folder gone, and the folder that does not list');
-    if (process.getuid?.() !== 0) assert.deepEqual(walked.bytes, [0, held(dir) + held(own) + heldShut], 'nothing under what did not list');
-  } finally {
-    fs.chmodSync(shut, 0o755);
-  }
-});
-
-test('the walk says what it cost: every name it read, the folders asked among them, and a burst yielded each WALK_BURST of them', async () => {
-  const dir = path.join(ROOT, 'cost');
-  const other = path.join(ROOT, 'cost-other');
-  fs.mkdirSync(path.join(dir, 'sub'), { recursive: true });
-  fs.mkdirSync(other, { recursive: true });
-  const planted = 2 * WALK_BURST + 7;
-  for (let k = 0; k < planted; k++) fs.writeFileSync(path.join(k % 2 ? dir : path.join(dir, 'sub'), `f${k}`), '');
-  const walked = await Effect.runPromise(walk([dir, other]));
-  assert.equal(walked.names, planted + 1 + 2, 'the files, the folder under, and the two asked');
-  assert.equal(walked.bursts, Math.floor(walked.names / WALK_BURST));
-  assert.equal(walked.bursts, 2);
-  assert.deepEqual(walked.unread, [0, 0]);
 });
 
 /** A sort by the first letter of a name inside a folder of kind `top`, and its own kind kept anywhere else. */
@@ -156,17 +120,60 @@ test('a file with two names inside under two kinds counts once, to one of them; 
   assert.equal(bytes[0], held(dir) + folders.x + folders.y + held(one), 'nothing of the file whose other name is outside');
 });
 
-test('REFUSED: a folder that does not list is unread and in no kind, never a kind at zero bytes', async () => {
-  const dir = path.join(ROOT, 'sorted-shut');
-  const shut = path.join(dir, 'z');
-  file(path.join(shut, 'hidden.bin'), 64);
-  fs.chmodSync(shut, 0o000);
-  try {
-    if (process.getuid?.() === 0) return;
-    const walked = await Effect.runPromise(walk([dir, path.join(ROOT, 'sorted-never')], { ...byLetter, kinds: ['top', 'top'] }));
-    assert.deepEqual(walked.unread, [1, 1]);
-    assert.deepEqual(walked.kinds, [{ top: held(dir), 'kind-z': held(shut) }, {}], 'the folder itself counted, nothing under it');
-  } finally {
-    fs.chmodSync(shut, 0o755);
-  }
+test("a walk's reading: a folder gone, a name that does not read, and what it cost", async (t) => {
+  await t.test('a folder that is gone frees nothing, beside one that is there', async () => {
+    const dir = path.join(ROOT, 'there');
+    const own = file(path.join(dir, 'own.bin'));
+    assert.deepEqual(await freed(path.join(ROOT, 'gone'), dir), [0, held(dir) + held(own)]);
+  });
+
+  await t.test('a name that does not read is counted unread and holds no byte, and a folder asked that is gone did not read', async () => {
+    const dir = path.join(ROOT, 'unread');
+    const own = file(path.join(dir, 'own.bin'));
+    const shut = path.join(dir, 'shut');
+    file(path.join(shut, 'hidden.bin'), 64);
+    const heldShut = held(shut);
+    fs.chmodSync(shut, 0o000);
+    try {
+      const walked = await Effect.runPromise(walk([path.join(ROOT, 'never'), dir]));
+      assert.deepEqual(walked.read, [false, true]);
+      assert.deepEqual(walked.unread, [1, process.getuid?.() === 0 ? 0 : 1], 'the folder gone, and the folder that does not list');
+      if (process.getuid?.() !== 0)
+        assert.deepEqual(walked.bytes, [0, held(dir) + held(own) + heldShut], 'nothing under what did not list');
+    } finally {
+      fs.chmodSync(shut, 0o755);
+    }
+  });
+
+  await t.test(
+    'the walk says what it cost: every name it read, the folders asked among them, and a burst yielded each WALK_BURST of them',
+    async () => {
+      const dir = path.join(ROOT, 'cost');
+      const other = path.join(ROOT, 'cost-other');
+      fs.mkdirSync(path.join(dir, 'sub'), { recursive: true });
+      fs.mkdirSync(other, { recursive: true });
+      const planted = 2 * WALK_BURST + 7;
+      for (let k = 0; k < planted; k++) fs.writeFileSync(path.join(k % 2 ? dir : path.join(dir, 'sub'), `f${k}`), '');
+      const walked = await Effect.runPromise(walk([dir, other]));
+      assert.equal(walked.names, planted + 1 + 2, 'the files, the folder under, and the two asked');
+      assert.equal(walked.bursts, Math.floor(walked.names / WALK_BURST));
+      assert.equal(walked.bursts, 2);
+      assert.deepEqual(walked.unread, [0, 0]);
+    },
+  );
+
+  await t.test('REFUSED: a folder that does not list is unread and in no kind, never a kind at zero bytes', async () => {
+    const dir = path.join(ROOT, 'sorted-shut');
+    const shut = path.join(dir, 'z');
+    file(path.join(shut, 'hidden.bin'), 64);
+    fs.chmodSync(shut, 0o000);
+    try {
+      if (process.getuid?.() === 0) return;
+      const walked = await Effect.runPromise(walk([dir, path.join(ROOT, 'sorted-never')], { ...byLetter, kinds: ['top', 'top'] }));
+      assert.deepEqual(walked.unread, [1, 1]);
+      assert.deepEqual(walked.kinds, [{ top: held(dir), 'kind-z': held(shut) }, {}], 'the folder itself counted, nothing under it');
+    } finally {
+      fs.chmodSync(shut, 0o755);
+    }
+  });
 });

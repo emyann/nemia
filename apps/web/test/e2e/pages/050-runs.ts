@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { Locator, Page, Response } from 'playwright';
 import { FINISHED_SIZE, type FinishedPage, type ListedRun, type OpenRuns, type WaitingRun } from '../../../src/lib/api/runs.ts';
 import { rowsSaid } from '../../../src/lib/finished.ts';
+import { workflowNameOf } from '../../../src/lib/api/workflows.ts';
 import { runClock, titleOf } from '../../../src/lib/factory.ts';
 import { tokensBreakdown } from '../../../src/lib/breakdown.ts';
 import { agoWords, endedWords, openWord, presentWait, sinceShort, waitSentence, waitTag } from '../../../src/lib/runWords.ts';
@@ -734,7 +735,7 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
   );
   await expectTexts(
     section(page, 'finished').locator('th'),
-    ['Run', 'Factory', 'Created', 'Finished', 'Clock', 'Cost', 'Outcome', 'Id'],
+    ['Run', 'Factory', 'Workflow', 'Created', 'Finished', 'Clock', 'Cost', 'Outcome', 'Id'],
     'the finished table has its columns',
   );
   await expectVisible(page.locator('section[data-section="finished"] [data-plate-hue="grey"]'), 'the Finished plate is at rest, in grey');
@@ -744,7 +745,7 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
       return `${style.textTransform} ${style.fontSize} ${style.fontWeight}`;
     }),
   );
-  if (heads.length !== 13 || heads.some((head) => head !== 'uppercase 11px 600'))
+  if (heads.length !== 14 || heads.some((head) => head !== 'uppercase 11px 600'))
     throw new Refused(
       `every heading of the two tables is in the look's small caps, the small label role in capitals — ${heads.join(', ')}`,
     );
@@ -790,6 +791,67 @@ async function rowsSay(page: Page, open: OpenRuns, finished: FinishedPage, given
   const refused = agosRefused(drawn);
   if (refused !== null) throw new Refused(refused);
   await expectTexts(page.locator('[data-pager-rows]'), [rowsSaid(finished)], 'the pager says the rows of the first page');
+}
+
+/** Where a finished run's workflow link leads: its workflow's page in the run's place where the api pages one, else the Workflows page. */
+const workflowAddress = (run: FinishedPage['runs'][number]): { path: string; search: Record<string, string> } =>
+  run.workflowPage
+    ? {
+        path: `/workflows/${encodeURIComponent(run.workflowPage.from)}/${encodeURIComponent(run.workflowPage.workflow)}`,
+        search: {
+          ...(run.workflowPage.factory ? { factory: run.workflowPage.factory } : {}),
+          ...(run.workflowPage.repo ? { repo: run.workflowPage.repo } : {}),
+        },
+      }
+    : { path: '/workflows', search: {} };
+
+/** A URL's path and its search, read as the board writes them, the quotes of a JSON string taken off. */
+const addressParts = (href: string): { path: string; search: Record<string, string> } => {
+  const url = new URL(href, 'http://board');
+  const search = Object.fromEntries([...url.searchParams].map(([key, value]) => [key, value.replace(/^"(.*)"$/, '$1')]));
+  return { path: url.pathname, search };
+};
+
+/**
+ * Each finished row names the workflow it ran, by its folder's name, the folder whole on hover, linked as `WorkflowLink` links a run's
+ * workflow, and its title is whole on hover too; the first row's workflow link, pressed, leads to that workflow's page, and the page
+ * comes back to Runs.
+ */
+async function workflowsSay(page: Page, finished: FinishedPage): Promise<void> {
+  const links = section(page, 'finished').locator('tr[data-run] td a[data-workflow]');
+  await expectTexts(
+    links,
+    finished.runs.map((run) => workflowNameOf(run.workflowDir)),
+    "each finished row names its workflow, by its folder's name",
+  );
+  const said = await links.evaluateAll((all) =>
+    all.map((link) => ({ title: link.getAttribute('title') ?? '', href: link.getAttribute('href') ?? '' })),
+  );
+  const wrong = finished.runs.flatMap((run, i) => {
+    const want = workflowAddress(run);
+    const got = addressParts(said[i]?.href ?? '');
+    return said[i]?.title === run.workflowDir && JSON.stringify(got) === JSON.stringify(want)
+      ? []
+      : [`${run.id}: ${JSON.stringify(said[i])}, expected ${run.workflowDir} to ${JSON.stringify(want)}`];
+  });
+  if (wrong.length) throw new Refused(`each workflow is whole on hover and links to its page — ${wrong.join('; ')}`);
+  const titled = await section(page, 'finished')
+    .locator('tr[data-run] th a, tr[data-run] td:first-child a')
+    .evaluateAll((all) => all.map((link) => link.getAttribute('title') ?? ''));
+  if (titled.join('|') !== finished.runs.map(titleOf).join('|'))
+    throw new Refused(`and each run's title, a link cut to its room, is whole on hover — ${titled.join(', ')}`);
+  const [first] = finished.runs;
+  if (!first) throw new Refused('the seed holds a finished run, to press its workflow');
+  const want = workflowAddress(first);
+  await links.first().click();
+  await page.waitForURL((url) => url.pathname === want.path, { timeout: WAIT_MS });
+  const at = addressParts(page.url());
+  if (JSON.stringify(at) !== JSON.stringify(want))
+    throw new Refused(`pressed, ${first.id}'s workflow leads to its page — at ${page.url()}, expected ${JSON.stringify(want)}`);
+  await idle(page);
+  await page.goBack();
+  await page.waitForURL((url) => url.pathname === '/runs', { timeout: WAIT_MS });
+  await expectCount(section(page, 'finished').locator('tr[data-run]'), finished.runs.length, 'back on Runs, its finished rows are drawn');
 }
 
 /** What the browser draws of each element `marks` finds under the runs page: the facts of its type, and how it is cut and lit. */
@@ -1067,6 +1129,7 @@ async function withRegated(page: Page, drawn: () => FinishedPage | undefined): P
     open.counts.waiting,
     'back on Runs with Enter, its cards are drawn',
   );
+  await workflowsSay(page, finished);
 }
 
 export default {
@@ -1076,7 +1139,7 @@ export default {
    * plain words, how long it has waited this time, and opens its run; its button stands at the card's right, under its tiles or beside
    * them; its tiles open their breakdowns, and its id is copied, from the keyboard; a finger finds the copy control, and the title
    * above it keeps its box; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's
-   * places are reached with Enter in the page, to the Inbox and back. It writes REGATED, the run at its second gate, for itself, and
+   * places are reached with Enter in the page, to the Inbox and back, and a finished row's workflow, pressed, leads to its page. It writes REGATED, the run at its second gate, for itself, and
    * takes it back at its end, on a refusal too.
    */
   name: 'runs',

@@ -4,10 +4,11 @@
  * (`rebuilt`) — and nothing where the runner measured none of it.
  *
  * On the stand-ins: the runtime's test engine, each task filed and moved by hand (`engine().settle`), and the test place, under
- * the run records this file seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn.
+ * the run records this file seeds. One story, so its checkpoints read one engine, one app and the runs it seeded in turn.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
+import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -123,135 +124,146 @@ const stepOf = async (name: string) => {
   return step;
 };
 
-test("a step's reads: its classes summed over its attempts, its peak at its `context:` cap, and the resumed session that rebuilt its cache", async () => {
-  const implement = await stepOf('implement');
-  const { cost, read, peak, rebuilt } = implement.used!;
-  assert.equal(cost, '$5.30', 'the cost alone: what the sessions read is beside it, not in it');
-  assert.equal(
-    read,
-    'read 4.4M · wrote 355k · peak 204k, at its 200k cap · a resumed session wrote its context to the cache again instead of reading it',
-  );
-  assert.equal(peak, 'cap');
-  assert.equal(rebuilt, 1);
-});
-
-test('a peak past 200k on a step with no cap is marked, and a cold session that wrote its cache once is not a rebuild', async () => {
-  const review = await stepOf('review');
-  assert.deepEqual(
-    [review.used!.read, review.used!.peak, review.used!.rebuilt],
-    ['read 2.9M · wrote 100k · peak 250k, past 200k with no cap', 'large', 0],
-  );
-});
-
-test('a runner that counted the input as one number says nothing of what it read: null, never 0', async () => {
-  const plan = await stepOf('plan');
-  assert.deepEqual([plan.used!.read, plan.used!.peak, plan.used!.rebuilt], [null, null, 0]);
-  assert.deepEqual(
-    plan.timeline.map((t) => t.used?.read),
-    [null],
-  );
-});
-
-test("the run's reads are every try's of every step, beside its cost — no class or peak where one session measured none of them", async () => {
-  const run = await detailOf(R);
-  assert.deepEqual(
-    run.read,
-    {
-      said: 'a resumed session wrote its context to the cache again instead of reading it',
-      peak: null,
-      rebuilt: 1,
+test("a run's page says what its sessions read: each step's classes, peak and rebuilt caches, and the run's own beside its cost", async (t) => {
+  const s = story(t);
+  await s.test(
+    "a step's reads: its classes summed over its attempts, its peak at its `context:` cap, and the resumed session that rebuilt its cache",
+    async () => {
+      const implement = await stepOf('implement');
+      const { cost, read, peak, rebuilt } = implement.used!;
+      assert.equal(cost, '$5.30', 'the cost alone: what the sessions read is beside it, not in it');
+      assert.equal(
+        read,
+        'read 4.4M · wrote 355k · peak 204k, at its 200k cap · a resumed session wrote its context to the cache again instead of reading it',
+      );
+      assert.equal(peak, 'cap');
+      assert.equal(rebuilt, 1);
     },
-    "`plan` counted its input as one number: a sum over the others would read as the whole run's; the rebuilt cache is still a fact",
   );
-
-  const R2 = 'r-read-all';
-  const record = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'));
-  write(
-    path.join(root, 'runs', `${R2}.json`),
-    JSON.stringify({
-      ...record,
-      id: R2,
-      workflow: record.workflow.slice(0, 2),
-      steps: { implement: { taskId: 't-implement' }, review: { taskId: 't-review' } },
-    }),
-  );
-  const all = await detailOf(R2);
-  assert.deepEqual(
-    all.read,
-    {
-      said: 'read 7.3M · wrote 455k · peak 250k, past 200k with no cap · a resumed session wrote its context to the cache again instead of reading it',
-      peak: 'large',
-      rebuilt: 1,
+  await s.test(
+    'a peak past 200k on a step with no cap is marked, and a cold session that wrote its cache once is not a rebuild',
+    async () => {
+      const review = await stepOf('review');
+      assert.deepEqual(
+        [review.used!.read, review.used!.peak, review.used!.rebuilt],
+        ['read 2.9M · wrote 100k · peak 250k, past 200k with no cap', 'large', 0],
+      );
     },
-    "the largest peak is review's, which had no cap: the run's is marked as review's is, not as implement's 200k would mark it",
   );
-});
-
-test("a session that compacted reached its cap, short of it in tokens — and the run's peak says so of its own step's compactions alone", async () => {
-  const compacted = {
-    turns: 60,
-    inputTokens: 6_000_000,
-    cacheReadTokens: 5_700_000,
-    cacheWriteTokens: 299_990,
-    uncachedTokens: 10,
-    /** A session under `--autocompact 200000` compacts short of its cap, and the context at the compaction's boundary is its peak. */
-    peakContextTokens: 173_584,
-    compactions: 2,
-    outputTokens: 20_000,
-    costUsd: 4,
-  };
-  const RC = 'r-read-compacted';
-  const run = (id: string, reviewPeak: number) => {
-    write(
-      path.join(root, 'runs', `${id}.json`),
-      JSON.stringify({
-        id,
-        repo: '/code/app',
-        workspace: '/code/app',
-        baseRef: 'abc123',
-        branch: 'main',
-        isolate: true,
-        brief: 'What it read',
-        workflowDir: path.join(root, 'no-such-workflow'),
-        createdAt: at(0),
-        workflow: [
-          { name: 'implement', after: [], body: 'Implement it.', harness: 'claude', context: 200_000 },
-          { name: 'review', after: ['implement'], body: 'Review it.', harness: 'claude' },
-        ],
-        steps: { implement: { taskId: `${id}-implement` }, review: { taskId: `${id}-review` } },
-      }),
+  await s.test('a runner that counted the input as one number says nothing of what it read: null, never 0', async () => {
+    const plan = await stepOf('plan');
+    assert.deepEqual([plan.used!.read, plan.used!.peak, plan.used!.rebuilt], [null, null, 0]);
+    assert.deepEqual(
+      plan.timeline.map((t) => t.used?.read),
+      [null],
     );
-    task(`${id}-implement`, 'claude', [compacted]);
-    task(`${id}-review`, 'claude', [{ ...USAGE.review, peakContextTokens: reviewPeak, compactions: 1 }]);
-  };
-  run(RC, 120_000);
-  const detail = await detailOf(RC);
-  const implement = detail.steps.find((s) => s.name === 'implement')?.used;
-  assert.ok(implement);
-  assert.deepEqual(
-    [implement.read, implement.peak],
-    ['read 5.7M · wrote 300k · peak 174k, compacted twice at its 200k cap', 'cap'],
-    'its peak is short of its cap, and it reached it',
-  );
-  const review = detail.steps.find((s) => s.name === 'review')?.used;
-  assert.ok(review);
-  assert.deepEqual(
-    [review.read, review.peak],
-    ['read 2.9M · wrote 100k · peak 120k, compacted', null],
-    "no cap to reach: on the harness's own window it compacted once, short of 200k",
-  );
-  assert.deepEqual(
-    detail.read,
-    { said: 'read 8.6M · wrote 400k · peak 174k, compacted twice at its 200k cap', peak: 'cap', rebuilt: 0 },
-    "implement's two, not review's third",
-  );
+  });
+  await s.test(
+    "the run's reads are every try's of every step, beside its cost — no class or peak where one session measured none of them",
+    async () => {
+      const run = await detailOf(R);
+      assert.deepEqual(
+        run.read,
+        {
+          said: 'a resumed session wrote its context to the cache again instead of reading it',
+          peak: null,
+          rebuilt: 1,
+        },
+        "`plan` counted its input as one number: a sum over the others would read as the whole run's; the rebuilt cache is still a fact",
+      );
 
-  const RL = 'r-read-compacted-larger';
-  run(RL, 180_000);
-  const larger = await detailOf(RL);
-  assert.deepEqual(
-    larger.read,
-    { said: 'read 8.6M · wrote 400k · peak 180k, compacted', peak: null, rebuilt: 0 },
-    "the peak is review's, which had no cap: implement's cap is not its",
+      const R2 = 'r-read-all';
+      const record = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${R}.json`), 'utf8'));
+      write(
+        path.join(root, 'runs', `${R2}.json`),
+        JSON.stringify({
+          ...record,
+          id: R2,
+          workflow: record.workflow.slice(0, 2),
+          steps: { implement: { taskId: 't-implement' }, review: { taskId: 't-review' } },
+        }),
+      );
+      const all = await detailOf(R2);
+      assert.deepEqual(
+        all.read,
+        {
+          said: 'read 7.3M · wrote 455k · peak 250k, past 200k with no cap · a resumed session wrote its context to the cache again instead of reading it',
+          peak: 'large',
+          rebuilt: 1,
+        },
+        "the largest peak is review's, which had no cap: the run's is marked as review's is, not as implement's 200k would mark it",
+      );
+    },
+  );
+  await s.test(
+    "a session that compacted reached its cap, short of it in tokens — and the run's peak says so of its own step's compactions alone",
+    async () => {
+      const compacted = {
+        turns: 60,
+        inputTokens: 6_000_000,
+        cacheReadTokens: 5_700_000,
+        cacheWriteTokens: 299_990,
+        uncachedTokens: 10,
+        /** A session under `--autocompact 200000` compacts short of its cap, and the context at the compaction's boundary is its peak. */
+        peakContextTokens: 173_584,
+        compactions: 2,
+        outputTokens: 20_000,
+        costUsd: 4,
+      };
+      const RC = 'r-read-compacted';
+      const run = (id: string, reviewPeak: number) => {
+        write(
+          path.join(root, 'runs', `${id}.json`),
+          JSON.stringify({
+            id,
+            repo: '/code/app',
+            workspace: '/code/app',
+            baseRef: 'abc123',
+            branch: 'main',
+            isolate: true,
+            brief: 'What it read',
+            workflowDir: path.join(root, 'no-such-workflow'),
+            createdAt: at(0),
+            workflow: [
+              { name: 'implement', after: [], body: 'Implement it.', harness: 'claude', context: 200_000 },
+              { name: 'review', after: ['implement'], body: 'Review it.', harness: 'claude' },
+            ],
+            steps: { implement: { taskId: `${id}-implement` }, review: { taskId: `${id}-review` } },
+          }),
+        );
+        task(`${id}-implement`, 'claude', [compacted]);
+        task(`${id}-review`, 'claude', [{ ...USAGE.review, peakContextTokens: reviewPeak, compactions: 1 }]);
+      };
+      run(RC, 120_000);
+      const detail = await detailOf(RC);
+      const implement = detail.steps.find((s) => s.name === 'implement')?.used;
+      assert.ok(implement);
+      assert.deepEqual(
+        [implement.read, implement.peak],
+        ['read 5.7M · wrote 300k · peak 174k, compacted twice at its 200k cap', 'cap'],
+        'its peak is short of its cap, and it reached it',
+      );
+      const review = detail.steps.find((s) => s.name === 'review')?.used;
+      assert.ok(review);
+      assert.deepEqual(
+        [review.read, review.peak],
+        ['read 2.9M · wrote 100k · peak 120k, compacted', null],
+        "no cap to reach: on the harness's own window it compacted once, short of 200k",
+      );
+      assert.deepEqual(
+        detail.read,
+        { said: 'read 8.6M · wrote 400k · peak 174k, compacted twice at its 200k cap', peak: 'cap', rebuilt: 0 },
+        "implement's two, not review's third",
+      );
+
+      const RL = 'r-read-compacted-larger';
+      run(RL, 180_000);
+      const larger = await detailOf(RL);
+      assert.deepEqual(
+        larger.read,
+        { said: 'read 8.6M · wrote 400k · peak 180k, compacted', peak: null, rebuilt: 0 },
+        "the peak is review's, which had no cap: implement's cap is not its",
+      );
+    },
   );
 });

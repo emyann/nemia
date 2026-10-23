@@ -31,15 +31,6 @@ const quietly = async <T>(t: TestContext, run: () => Promise<T>) => {
   return { answer: await run(), said: said.mock.calls.length };
 };
 
-test('REFUSAL_STATUS answers every kind of refusal, each once: 404 for Missing, 409 for Conflict, 422 for Invalid', () => {
-  const kinds = [new Missing({ message: 'm' }), new Conflict({ message: 'c' }), new Invalid({ message: 'i' })].map((r) => r._tag);
-  assert.deepEqual(Object.keys(REFUSAL_STATUS).sort(), [...kinds].sort());
-  assert.deepEqual(REFUSAL_STATUS, { Missing: 404, Conflict: 409, Invalid: 422 });
-  // @ts-expect-error -- REFUSED by the compiler: a table that leaves out a kind, as REFUSAL_STATUS is checked
-  const partial = { Missing: 404, Conflict: 409 } as const satisfies Record<Refusal['_tag'], ContentfulStatusCode>;
-  assert.equal(Object.keys(partial).length, 2);
-});
-
 test('REFUSED: each kind thrown in a mounted router is answered its status, in its words alone', async () => {
   const cases: Array<[unknown, number, string]> = [
     [new Missing({ message: "no such run: r-nope  (try 'nemia ls')" }), 404, "no such run: r-nope  (try 'nemia ls')"],
@@ -52,31 +43,45 @@ test('REFUSED: each kind thrown in a mounted router is answered its status, in i
   }
 });
 
-test('a Conflict that names the steps holding what is asked of is answered 409 with them, as `users`', async () => {
-  const thrown = new Conflict({ message: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] });
-  assert.deepEqual(await answered(thrown), {
-    status: 409,
-    body: { error: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] },
+test('answerError: what each thrown thing is answered with, a refusal by its kind and anything else a 500', async (t) => {
+  await t.test('REFUSAL_STATUS answers every kind of refusal, each once: 404 for Missing, 409 for Conflict, 422 for Invalid', () => {
+    const kinds = [new Missing({ message: 'm' }), new Conflict({ message: 'c' }), new Invalid({ message: 'i' })].map((r) => r._tag);
+    assert.deepEqual(Object.keys(REFUSAL_STATUS).sort(), [...kinds].sort());
+    assert.deepEqual(REFUSAL_STATUS, { Missing: 404, Conflict: 409, Invalid: 422 });
+    // @ts-expect-error -- REFUSED by the compiler: a table that leaves out a kind, as REFUSAL_STATUS is checked
+    const partial = { Missing: 404, Conflict: 409 } as const satisfies Record<Refusal['_tag'], ContentfulStatusCode>;
+    assert.equal(Object.keys(partial).length, 2);
   });
-});
-
-test('REFUSED: an Error carrying exitCode 2 by hand is no refusal — a 500, said on stderr — and so is any other error; an HTTPException answers its own', async (t) => {
-  const byHand = await quietly(t, () => answered(Object.assign(new Error('refused by hand.'), { exitCode: 2 })));
-  assert.deepEqual(byHand, { answer: { status: 500, body: { error: 'refused by hand.' } }, said: 1 });
-  const broken = await quietly(t, () => answered(new TypeError('x is undefined')));
-  assert.deepEqual(broken.answer, { status: 500, body: { error: 'x is undefined' } });
-  const own = await new Hono()
-    .get('/thrown', () => {
-      throw new HTTPException(418, { message: 'a teapot' });
-    })
-    .onError(answerError)
-    .request('/thrown');
-  assert.deepEqual([own.status, await own.text()], [418, 'a teapot']);
-});
-
-test("the api's own app answers with it: a card to queue that is not there is the package's Missing, a 404 in its words", async () => {
-  const res = await app.request('/api/inbox/no-such-card/queue', { method: 'POST', headers: { 'content-type': 'application/json' } });
-  assert.equal(res.status, 404);
-  const { error } = (await res.json()) as { error: string };
-  assert.ok(error.startsWith(`${noCardLine('no-such-card', [])} Queue one of those`), error);
+  await t.test('a Conflict that names the steps holding what is asked of is answered 409 with them, as `users`', async () => {
+    const thrown = new Conflict({ message: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] });
+    assert.deepEqual(await answered(thrown), {
+      status: 409,
+      body: { error: 'agents/reviewer.md is named by a step beside it.', users: ['dev/review'] },
+    });
+  });
+  await t.test(
+    'REFUSED: an Error carrying exitCode 2 by hand is no refusal — a 500, said on stderr — and so is any other error; an HTTPException answers its own',
+    async (t) => {
+      const byHand = await quietly(t, () => answered(Object.assign(new Error('refused by hand.'), { exitCode: 2 })));
+      assert.deepEqual(byHand, { answer: { status: 500, body: { error: 'refused by hand.' } }, said: 1 });
+      const broken = await quietly(t, () => answered(new TypeError('x is undefined')));
+      assert.deepEqual(broken.answer, { status: 500, body: { error: 'x is undefined' } });
+      const own = await new Hono()
+        .get('/thrown', () => {
+          throw new HTTPException(418, { message: 'a teapot' });
+        })
+        .onError(answerError)
+        .request('/thrown');
+      assert.deepEqual([own.status, await own.text()], [418, 'a teapot']);
+    },
+  );
+  await t.test(
+    "the api's own app answers with it: a card to queue that is not there is the package's Missing, a 404 in its words",
+    async () => {
+      const res = await app.request('/api/inbox/no-such-card/queue', { method: 'POST', headers: { 'content-type': 'application/json' } });
+      assert.equal(res.status, 404);
+      const { error } = (await res.json()) as { error: string };
+      assert.ok(error.startsWith(`${noCardLine('no-such-card', [])} Queue one of those`), error);
+    },
+  );
 });

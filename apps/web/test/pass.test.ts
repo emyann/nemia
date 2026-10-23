@@ -36,52 +36,53 @@ const PASS: PassCost = {
   harnesses: { claude: { calls: 1, ms: 118, listed: 3, spawned: 1 }, check: { calls: 1, ms: 2, listed: 40, spawned: 0 } },
 };
 
-test("the line says what a pass takes, in the package's rounding", () => {
-  assert.equal(passLine(PASS), 'a pass takes 212 ms');
-  assert.equal(passLine({ ms: 38.24 }), 'a pass takes 38.2 ms');
-  assert.equal(passLine({ ms: 4.216 }), 'a pass takes 4.22 ms');
-  assert.equal(msWord(99.96), '100.0');
-  assert.deepEqual([bytesWord(812), bytesWord(14_200), bytesWord(3_100_000)], ['812 B', '14.2 kB', '3.1 MB']);
-});
-
-test("the title is the breakdown: the pass, every phase in the package's order, each harness, and what measuring took", () => {
-  const now = new Date('2026-09-25T10:05:00.000Z');
-  const lines = passTitle(PASS, now, 'UTC').split('\n');
-  assert.equal(lines[0], "The daemon's last pass, at 10:00 AM: 212 ms, 12 run records read, 812.0 kB read, 1 process started.");
-  assert.deepEqual(
-    lines.slice(1, 10).map((l) => l.split(':')[0]),
-    [...PASS_PHASES],
-  );
-  assert.equal(lines[1], 'records: 20.0 ms, 12 calls, 12.0 kB read, 0 processes started');
-  assert.equal(lines[5], 'observe: 120 ms, 1 call, 0 B read, 1 process started');
-  assert.equal(lines[10], 'Observed, by harness (at once, so their times overlap):');
-  assert.deepEqual(lines.slice(11, 13), [
-    'check: 1 observe, 2.00 ms, 40 sessions or run files listed, 0 processes started',
-    'claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started',
-  ]);
-  assert.equal(lines.at(-1), 'Measuring it took 0.40 ms.');
-  assert.ok(!lines.some((l) => l.startsWith('It saw')), 'a pass from before the tick said what it saw says nothing of it');
-  assert.ok(passTitle({ ...PASS, harnesses: {} }, now, 'UTC').includes('\nNo harness was observed.\n'));
-  assert.match(
-    passTitle(PASS, new Date('2026-09-26T10:05:00.000Z'), 'UTC'),
-    /^The daemon's last pass, at Fri 10:00 AM: /,
-    'a pass of another day says its day',
-  );
-});
-
-test('the title says what the pass saw, before what measuring took, where the pass says it', () => {
-  const lines = passTitle({ ...PASS, runs: 43, tasks: 3, queued: 1, admitted: 2 }, new Date('2026-09-25T10:05:00.000Z'), 'UTC').split('\n');
-  assert.deepEqual(lines.slice(-2), [
-    'It saw 43 runs in the store, 3 tasks not settled, 1 queued and 2 admitted.',
-    'Measuring it took 0.40 ms.',
-  ]);
-});
-
-test('what a pass saw is said in words, one run in the singular', () => {
-  assert.equal(
-    seenWords({ runs: 1, tasks: 3, queued: 0, admitted: 2 }),
-    '1 run in the store, 3 tasks not settled, 0 queued and 2 admitted',
-  );
+test('passLine, passTitle and seenWords: what a pass took and saw', async (t) => {
+  await t.test("the line says what a pass takes, in the package's rounding", () => {
+    assert.equal(passLine(PASS), 'a pass takes 212 ms');
+    assert.equal(passLine({ ms: 38.24 }), 'a pass takes 38.2 ms');
+    assert.equal(passLine({ ms: 4.216 }), 'a pass takes 4.22 ms');
+    assert.equal(msWord(99.96), '100.0');
+    assert.deepEqual([bytesWord(812), bytesWord(14_200), bytesWord(3_100_000)], ['812 B', '14.2 kB', '3.1 MB']);
+  });
+  await t.test("the title is the breakdown: the pass, every phase in the package's order, each harness, and what measuring took", () => {
+    const now = new Date('2026-09-25T10:05:00.000Z');
+    const lines = passTitle(PASS, now, 'UTC').split('\n');
+    assert.equal(lines[0], "The daemon's last pass, at 10:00 AM: 212 ms, 12 run records read, 812.0 kB read, 1 process started.");
+    assert.deepEqual(
+      lines.slice(1, 10).map((l) => l.split(':')[0]),
+      [...PASS_PHASES],
+    );
+    assert.equal(lines[1], 'records: 20.0 ms, 12 calls, 12.0 kB read, 0 processes started');
+    assert.equal(lines[5], 'observe: 120 ms, 1 call, 0 B read, 1 process started');
+    assert.equal(lines[10], 'Observed, by harness (at once, so their times overlap):');
+    assert.deepEqual(lines.slice(11, 13), [
+      'check: 1 observe, 2.00 ms, 40 sessions or run files listed, 0 processes started',
+      'claude: 1 observe, 118 ms, 3 sessions or run files listed, 1 process started',
+    ]);
+    assert.equal(lines.at(-1), 'Measuring it took 0.40 ms.');
+    assert.ok(!lines.some((l) => l.startsWith('It saw')), 'a pass from before the tick said what it saw says nothing of it');
+    assert.ok(passTitle({ ...PASS, harnesses: {} }, now, 'UTC').includes('\nNo harness was observed.\n'));
+    assert.match(
+      passTitle(PASS, new Date('2026-09-26T10:05:00.000Z'), 'UTC'),
+      /^The daemon's last pass, at Fri 10:00 AM: /,
+      'a pass of another day says its day',
+    );
+  });
+  await t.test('the title says what the pass saw, before what measuring took, where the pass says it', () => {
+    const lines = passTitle({ ...PASS, runs: 43, tasks: 3, queued: 1, admitted: 2 }, new Date('2026-09-25T10:05:00.000Z'), 'UTC').split(
+      '\n',
+    );
+    assert.deepEqual(lines.slice(-2), [
+      'It saw 43 runs in the store, 3 tasks not settled, 1 queued and 2 admitted.',
+      'Measuring it took 0.40 ms.',
+    ]);
+  });
+  await t.test('what a pass saw is said in words, one run in the singular', () => {
+    assert.equal(
+      seenWords({ runs: 1, tasks: 3, queued: 0, admitted: 2 }),
+      '1 run in the store, 3 tasks not settled, 0 queued and 2 admitted',
+    );
+  });
 });
 
 /**

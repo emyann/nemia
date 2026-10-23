@@ -1,9 +1,9 @@
 /**
- * The pure functions of a try: what a try of a step continues and records (`continuesFrom`, `nextTry`), the ask `nemia pause --now`
- * writes and when it is due or void, what `nemia retry` refuses (`retryRefusal`, `messageRefusal`), what a try is told of why it was
- * filed (`retrySection`), and the words a step waiting on a harness or denied a call is shown with (`waitingWords`, `answerIn`,
- * `harnessWaitLine`, `deniedWords`, `deniedOffer`). One table per function; what `assess`, `listing` and `decision` make of tries is in
- * `test/assess-retries.test.ts`.
+ * The pure functions of a try: what a try of a step continues and records (`continuesFrom`, `nextTry`), the model it runs on
+ * (`sessionModel`), the ask `nemia pause --now` writes and when it is due or void, what `nemia retry` refuses (`retryRefusal`,
+ * `messageRefusal`), what a try is told of why it was filed (`retrySection`), and the words a step waiting on a harness or denied a call
+ * is shown with (`waitingWords`, `answerIn`, `harnessWaitLine`, `deniedWords`, `deniedOffer`). One table per function; what `assess`,
+ * `listing` and `decision` make of tries is in `test/assess-retries.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +17,7 @@ import {
   dueNote,
   messageRefusal,
   nextTry,
+  sessionModel,
   type EarlierTry,
   type Retry,
   type RetryAsk,
@@ -84,6 +85,35 @@ test('continuesFrom: the session a try continues (open issue 5)', async (t) => {
     { name: 'no attempts read continue nothing', attempts: undefined, continues: undefined },
   ];
   for (const { name, attempts, continues } of rows) await t.test(name, () => assert.equal(continuesFrom(attempts), continues));
+});
+
+test("sessionModel: a continued try runs on the model its session was started on, and a `--fresh` one goes back to the step's", async (t) => {
+  const OPUS: Workflow = { ...step('implement'), model: 'opus' };
+  const on = (...tries: EarlierTry[]): StepRecord => ({ taskId: 'now', tries });
+  const rows: Array<[string, Workflow, StepRecord | undefined, string | undefined]> = [
+    ["the first try: the step's model", OPUS, undefined, 'opus'],
+    ['a step with no model: the harness default, every try', step('implement'), on({ taskId: 'a', then: 'nudge' }), undefined],
+    ["a `--model` try's model", OPUS, on({ taskId: 'a', then: 'fresh', model: 'sonnet' }), 'sonnet'],
+    [
+      "a `--model` try's, past nudges, rounds, retries and rechecks",
+      OPUS,
+      on(
+        { taskId: 'a', then: 'fresh', model: 'sonnet' },
+        { taskId: 'b', then: 'nudge' },
+        { taskId: 'c', then: 'round' },
+        { taskId: 'd', then: 'retries' },
+        { taskId: 'e', then: 'recheck' },
+      ),
+      'sonnet',
+    ],
+    [
+      "a bare `--fresh` after it goes back to the step's",
+      OPUS,
+      on({ taskId: 'a', then: 'fresh', model: 'sonnet' }, { taskId: 'b', then: 'fresh' }, { taskId: 'c', then: 'nudge' }),
+      'opus',
+    ],
+  ];
+  for (const [name, workflow, record, model] of rows) await t.test(name, () => assert.equal(sessionModel(workflow, record), model));
 });
 
 test('nextTry: the try a step moves behind', async (t) => {

@@ -149,143 +149,148 @@ function sources(root: string): Record<string, string> {
   );
 }
 
-test('a time of day is written on a 12-hour clock: the hour with no leading zero, a plain space, AM or PM', () => {
-  assert.equal(timeOfDay(new Date('2026-10-12T09:05:00Z'), 'UTC'), '9:05 AM', 'a morning');
-  assert.equal(timeOfDay(new Date('2026-10-12T12:00:00Z'), 'UTC'), '12:00 PM', 'noon');
-  assert.equal(timeOfDay(new Date('2026-10-12T00:05:00Z'), 'UTC'), '12:05 AM', 'after midnight');
-  assert.equal(timeOfDay(new Date('2026-10-12T13:11:00Z'), 'UTC'), '1:11 PM', 'a single-digit hour of the afternoon');
-  assert.equal(timeOfDay(new Date('2026-10-12T13:11:00Z'), 'Asia/Tokyo'), '10:11 PM', 'the same instant where the person is');
-  assert.equal(timeOfDay(new Date('2026-10-12T23:59:00Z'), 'UTC'), '11:59 PM', 'the last minute of a day');
-  assert.doesNotMatch(timeOfDay(new Date('2026-10-12T13:11:00Z'), 'UTC'), /[^\d: APM]/, 'no narrow space before the period');
-});
-
-test('every word that says a time takes it from the one writer, and decides its own day beside it', () => {
-  const now = new Date('2026-10-12T15:00:00Z');
-  const at = new Date('2026-10-12T13:11:00Z');
-  assert.equal(clockWord(at, now, 'UTC'), '1:11 PM', 'the same day');
-  assert.equal(clockWord(new Date('2026-10-13T02:00:00Z'), now, 'UTC'), 'Tue 2:00 AM', 'another day, by its weekday');
-  assert.equal(whenWords(at, now, 'UTC'), '1:11 PM');
-  assert.equal(whenWords(new Date('2026-10-11T13:11:00Z'), now, 'UTC'), '11 Oct 1:11 PM', 'another day, by its date');
-  assert.equal(agoWords(at, now), '2 hours ago', 'a distance has no zone to take, and so takes none');
-  assert.equal(whenWords(new Date('2025-12-31T13:11:00Z'), now, 'UTC'), '31 Dec 2025', 'the runs page drops the time in another year');
-  assert.equal(fireWord(new Date('2026-10-20T12:00:00Z'), now, 'UTC'), '20 Oct 12:00 PM', "a far fire, in the runs page's order");
-  assert.equal(
-    fireWord(new Date('2027-01-01T09:00:00Z'), now, 'UTC'),
-    '1 Jan 2027, 9:00 AM',
-    'a fire in another year keeps its time, after a comma',
-  );
-});
-
-test('REFUSED: a second writer of an hour, by each way one is written, and never the writer itself', () => {
-  const second = (text: string) => refusals({ 'src/lib/x.ts': text }, []);
-  assert.deepEqual(second("new Intl.DateTimeFormat(undefined, { hour: '2-digit', hourCycle: 'h23' }).format(at)"), [
-    `src/lib/x.ts:1:38 (hour:) writes an hour: take the time from timeOfDay (${WRITER})`,
-    `src/lib/x.ts:1:55 (hourCycle) writes an hour: take the time from timeOfDay (${WRITER})`,
-    'src/lib/x.ts:1:5 (Intl.DateTimeFormat) writes a date: format it with date-fns (format, isSameDay, isSameYear)',
-  ]);
-  assert.equal(second('const o = {\n  hour12:\n    true };').length, 1, 'an option broken across lines');
-  assert.match(second('const o = {\n  hour\n    : "numeric" };')[0] ?? '', /^src\/lib\/x\.ts:2:3 \(hour:\)/, 'named where it starts');
-  assert.equal(second("new Intl.DateTimeFormat('en', { timeStyle: 'short' })").length, 2, 'a time style, and the formatter it sits in');
-  assert.equal(second("of('hour'); const perHour = 3; rate.hour; type T = { hours: number }").length, 0, 'a word that only holds the name');
-  assert.equal(refusals({ [WRITER]: 'const o = { hour: "numeric", hour12: true };' }, []).length, 0, 'the writer may name an hour');
-});
-
-test("REFUSED: a date formatted outside date-fns, called with `new` or without, in the writers' files too", () => {
-  const built = (text: string) => refusals({ 'src/lib/x.ts': text }, []);
-  assert.deepEqual(built("Intl.DateTimeFormat('en-US', { month: 'short' }).format(at)"), [
-    'src/lib/x.ts:1:1 (Intl.DateTimeFormat) writes a date: format it with date-fns (format, isSameDay, isSameYear)',
-  ]);
-  assert.equal(built("new Intl.DateTimeFormat('en-US').format(at)").length, 1, 'constructed with new');
-  assert.equal(built('globalThis.Intl.DateTimeFormat()').length, 1, 'reached off globalThis');
-  assert.deepEqual(
-    refusals({ [WRITER]: "Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: true }).format(at)" }, []),
-    [`${WRITER}:1:1 (Intl.DateTimeFormat) writes a date: format it with date-fns (format, isSameDay, isSameYear)`],
-    'the family has no exemption, so a second writer of an hour cannot slip back into the one writer, where OPTIONS does not look',
-  );
-  assert.equal(built('let o: Intl.DateTimeFormatOptions; const DateTimeFormatOf = 1;').length, 0, 'a type, and a word holding the name');
-  assert.equal(built('const n = new Intl.NumberFormat("en"); const i = MyIntl.DateTimeFormat;').length, 0, 'a number, and another name');
-});
-
-test('REFUSED: date-fns imported outside the four files that write a moment, and never inside them', () => {
-  const sent = `: take the time from timeOfDay (${WRITER}), or a whole instant from instantWords (${INSTANT})`;
-  const other = (text: string) => refusals({ 'src/components/Turns.tsx': text }, []);
-  assert.deepEqual(other("import { format } from 'date-fns';"), [
-    `src/components/Turns.tsx:1:24 ('date-fns') writes a moment of its own${sent}`,
-  ]);
-  assert.equal(other('import { tz } from "@date-fns/tz";').length, 1, 'the time zone package, in double quotes');
-  assert.equal(other("const { format } = await import('date-fns');").length, 1, 'imported for its value');
-  assert.equal(other("import { format } from 'date-fns/format';").length, 1, 'by a subpath');
-  assert.equal(other('const dateFns = 1; // date-fns in a word and `date-fns` in a backtick').length, 0, 'the name unquoted');
-  for (const file of WRITERS)
+test('timeOfDay and the words that say a time: a 12-hour clock, from the one writer, each word deciding its own day', async (t) => {
+  await t.test('a time of day is written on a 12-hour clock: the hour with no leading zero, a plain space, AM or PM', () => {
+    assert.equal(timeOfDay(new Date('2026-10-12T09:05:00Z'), 'UTC'), '9:05 AM', 'a morning');
+    assert.equal(timeOfDay(new Date('2026-10-12T12:00:00Z'), 'UTC'), '12:00 PM', 'noon');
+    assert.equal(timeOfDay(new Date('2026-10-12T00:05:00Z'), 'UTC'), '12:05 AM', 'after midnight');
+    assert.equal(timeOfDay(new Date('2026-10-12T13:11:00Z'), 'UTC'), '1:11 PM', 'a single-digit hour of the afternoon');
+    assert.equal(timeOfDay(new Date('2026-10-12T13:11:00Z'), 'Asia/Tokyo'), '10:11 PM', 'the same instant where the person is');
+    assert.equal(timeOfDay(new Date('2026-10-12T23:59:00Z'), 'UTC'), '11:59 PM', 'the last minute of a day');
+    assert.doesNotMatch(timeOfDay(new Date('2026-10-12T13:11:00Z'), 'UTC'), /[^\d: APM]/, 'no narrow space before the period');
+  });
+  await t.test('every word that says a time takes it from the one writer, and decides its own day beside it', () => {
+    const now = new Date('2026-10-12T15:00:00Z');
+    const at = new Date('2026-10-12T13:11:00Z');
+    assert.equal(clockWord(at, now, 'UTC'), '1:11 PM', 'the same day');
+    assert.equal(clockWord(new Date('2026-10-13T02:00:00Z'), now, 'UTC'), 'Tue 2:00 AM', 'another day, by its weekday');
+    assert.equal(whenWords(at, now, 'UTC'), '1:11 PM');
+    assert.equal(whenWords(new Date('2026-10-11T13:11:00Z'), now, 'UTC'), '11 Oct 1:11 PM', 'another day, by its date');
+    assert.equal(agoWords(at, now), '2 hours ago', 'a distance has no zone to take, and so takes none');
+    assert.equal(whenWords(new Date('2025-12-31T13:11:00Z'), now, 'UTC'), '31 Dec 2025', 'the runs page drops the time in another year');
+    assert.equal(fireWord(new Date('2026-10-20T12:00:00Z'), now, 'UTC'), '20 Oct 12:00 PM', "a far fire, in the runs page's order");
     assert.equal(
-      refusals({ [file]: "import { format, isSameDay, isSameYear } from 'date-fns';\nimport { tz } from '@date-fns/tz';" }, []).length,
-      0,
-      `${file} writes a moment, so the library is its own`,
+      fireWord(new Date('2027-01-01T09:00:00Z'), now, 'UTC'),
+      '1 Jan 2027, 9:00 AM',
+      'a fire in another year keeps its time, after a comma',
     );
+  });
 });
 
-test('REFUSED: anything written as the locale does, a date with a locale and no options too, and a number until the list names it', () => {
-  const written = (text: string) => refusals({ 'src/lib/x.ts': text }, []);
-  assert.deepEqual(written('new Date(iso).toLocaleString()'), [
-    `src/lib/x.ts writes 1 times in a locale (1:14), NUMBERS gives it 0: write an instant with instantWords (${INSTANT}), or name a number's call in NUMBERS`,
-  ]);
-  assert.equal(written("new Date(iso).toLocaleString('en-GB')").length, 1, 'a date with a locale and no options writes an hour');
-  assert.equal(written('new Date(iso).toLocaleString(undefined)').length, 1, 'with no locale of its own');
-  assert.equal(written('at.toLocaleDateString()').length, 1, 'a date alone');
-  assert.equal(written("at.toLocaleTimeString([], { minute: '2-digit' })").length, 1, 'a time in the locale');
-  assert.equal(written('at.toLocaleTimeString\n  ()').length, 1, 'broken before its parenthesis');
-  assert.equal(written('at.toLocaleString\n  (\n  "en-GB")').length, 1, 'broken around its argument');
-  assert.equal(written("count.toLocaleString('en')").length, 1, 'a number, which the guard cannot tell from a date');
-  const named: Numbers[] = [{ file: 'src/lib/x.ts', count: 1, why: 'a fixture' }];
-  assert.equal(refusals({ 'src/lib/x.ts': "count.toLocaleString('en')" }, named).length, 0, 'and none once the list names its file');
-  assert.equal(written('const toLocaleStringOf = 1; at.toISOString()').length, 0, 'a word that only holds the name');
-});
-
-test('REFUSED: one more call in a locale than the list gives a file, and a list left loose', () => {
-  const numbers: Numbers[] = [{ file: 'src/a.tsx', count: 1, why: 'a fixture' }];
-  const one = "count.toLocaleString('en')";
-  assert.equal(refusals({ 'src/a.tsx': one }, numbers).length, 0, 'the one it is given');
-  assert.deepEqual(refusals({ 'src/a.tsx': `${one}\nnew Date(iso).toLocaleString()` }, numbers), [
-    `src/a.tsx writes 2 times in a locale (1:6, 2:14), NUMBERS gives it 1: write an instant with instantWords (${INSTANT}), or name a number's call in NUMBERS`,
-  ]);
-  assert.deepEqual(refusals({ 'src/a.tsx': '' }, numbers), ['src/a.tsx writes 0 times in a locale, NUMBERS says 1: lower the list']);
-  assert.equal(refusals({}, numbers).length, 1, 'a file that is gone holds none');
-  assert.equal(refusals({ 'src/a.tsx': one, 'src/b.tsx': one }, numbers).length, 1, 'the list is by file: another file is given none');
-});
-
-test("the board's source has one writer of an hour, and writes nothing in a locale but the numbers the list names", () => {
-  const files = sources(WEB);
-  assert.ok(Object.keys(files).length > 100, `the source is read: ${Object.keys(files).length} files`);
-  assert.ok(files[WRITER]?.includes('export function timeOfDay('), `${WRITER} is read, and holds the one writer of an hour`);
-  assert.ok(files[WRITER]?.includes("from 'date-fns'"), `${WRITER} writes its hour with date-fns`);
-  assert.ok(files[INSTANT]?.includes('export function instantWords('), `${INSTANT} is read, and holds the writer of an instant`);
-  assert.equal(
-    NUMBERS.every((n) => n.why.trim()),
-    true,
-    'every number written in a locale says why',
+test("REFUSED, refusals: a second writer of an hour, a formatter, date-fns or a locale outside their files, each on a fixture, then on the board's source", async (t) => {
+  await t.test('REFUSED: a second writer of an hour, by each way one is written, and never the writer itself', () => {
+    const second = (text: string) => refusals({ 'src/lib/x.ts': text }, []);
+    assert.deepEqual(second("new Intl.DateTimeFormat(undefined, { hour: '2-digit', hourCycle: 'h23' }).format(at)"), [
+      `src/lib/x.ts:1:38 (hour:) writes an hour: take the time from timeOfDay (${WRITER})`,
+      `src/lib/x.ts:1:55 (hourCycle) writes an hour: take the time from timeOfDay (${WRITER})`,
+      'src/lib/x.ts:1:5 (Intl.DateTimeFormat) writes a date: format it with date-fns (format, isSameDay, isSameYear)',
+    ]);
+    assert.equal(second('const o = {\n  hour12:\n    true };').length, 1, 'an option broken across lines');
+    assert.match(second('const o = {\n  hour\n    : "numeric" };')[0] ?? '', /^src\/lib\/x\.ts:2:3 \(hour:\)/, 'named where it starts');
+    assert.equal(second("new Intl.DateTimeFormat('en', { timeStyle: 'short' })").length, 2, 'a time style, and the formatter it sits in');
+    assert.equal(
+      second("of('hour'); const perHour = 3; rate.hour; type T = { hours: number }").length,
+      0,
+      'a word that only holds the name',
+    );
+    assert.equal(refusals({ [WRITER]: 'const o = { hour: "numeric", hour12: true };' }, []).length, 0, 'the writer may name an hour');
+  });
+  await t.test("REFUSED: a date formatted outside date-fns, called with `new` or without, in the writers' files too", () => {
+    const built = (text: string) => refusals({ 'src/lib/x.ts': text }, []);
+    assert.deepEqual(built("Intl.DateTimeFormat('en-US', { month: 'short' }).format(at)"), [
+      'src/lib/x.ts:1:1 (Intl.DateTimeFormat) writes a date: format it with date-fns (format, isSameDay, isSameYear)',
+    ]);
+    assert.equal(built("new Intl.DateTimeFormat('en-US').format(at)").length, 1, 'constructed with new');
+    assert.equal(built('globalThis.Intl.DateTimeFormat()').length, 1, 'reached off globalThis');
+    assert.deepEqual(
+      refusals({ [WRITER]: "Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: true }).format(at)" }, []),
+      [`${WRITER}:1:1 (Intl.DateTimeFormat) writes a date: format it with date-fns (format, isSameDay, isSameYear)`],
+      'the family has no exemption, so a second writer of an hour cannot slip back into the one writer, where OPTIONS does not look',
+    );
+    assert.equal(built('let o: Intl.DateTimeFormatOptions; const DateTimeFormatOf = 1;').length, 0, 'a type, and a word holding the name');
+    assert.equal(built('const n = new Intl.NumberFormat("en"); const i = MyIntl.DateTimeFormat;').length, 0, 'a number, and another name');
+  });
+  await t.test('REFUSED: date-fns imported outside the four files that write a moment, and never inside them', () => {
+    const sent = `: take the time from timeOfDay (${WRITER}), or a whole instant from instantWords (${INSTANT})`;
+    const other = (text: string) => refusals({ 'src/components/Turns.tsx': text }, []);
+    assert.deepEqual(other("import { format } from 'date-fns';"), [
+      `src/components/Turns.tsx:1:24 ('date-fns') writes a moment of its own${sent}`,
+    ]);
+    assert.equal(other('import { tz } from "@date-fns/tz";').length, 1, 'the time zone package, in double quotes');
+    assert.equal(other("const { format } = await import('date-fns');").length, 1, 'imported for its value');
+    assert.equal(other("import { format } from 'date-fns/format';").length, 1, 'by a subpath');
+    assert.equal(other('const dateFns = 1; // date-fns in a word and `date-fns` in a backtick').length, 0, 'the name unquoted');
+    for (const file of WRITERS)
+      assert.equal(
+        refusals({ [file]: "import { format, isSameDay, isSameYear } from 'date-fns';\nimport { tz } from '@date-fns/tz';" }, []).length,
+        0,
+        `${file} writes a moment, so the library is its own`,
+      );
+  });
+  await t.test(
+    'REFUSED: anything written as the locale does, a date with a locale and no options too, and a number until the list names it',
+    () => {
+      const written = (text: string) => refusals({ 'src/lib/x.ts': text }, []);
+      assert.deepEqual(written('new Date(iso).toLocaleString()'), [
+        `src/lib/x.ts writes 1 times in a locale (1:14), NUMBERS gives it 0: write an instant with instantWords (${INSTANT}), or name a number's call in NUMBERS`,
+      ]);
+      assert.equal(written("new Date(iso).toLocaleString('en-GB')").length, 1, 'a date with a locale and no options writes an hour');
+      assert.equal(written('new Date(iso).toLocaleString(undefined)').length, 1, 'with no locale of its own');
+      assert.equal(written('at.toLocaleDateString()').length, 1, 'a date alone');
+      assert.equal(written("at.toLocaleTimeString([], { minute: '2-digit' })").length, 1, 'a time in the locale');
+      assert.equal(written('at.toLocaleTimeString\n  ()').length, 1, 'broken before its parenthesis');
+      assert.equal(written('at.toLocaleString\n  (\n  "en-GB")').length, 1, 'broken around its argument');
+      assert.equal(written("count.toLocaleString('en')").length, 1, 'a number, which the guard cannot tell from a date');
+      const named: Numbers[] = [{ file: 'src/lib/x.ts', count: 1, why: 'a fixture' }];
+      assert.equal(refusals({ 'src/lib/x.ts': "count.toLocaleString('en')" }, named).length, 0, 'and none once the list names its file');
+      assert.equal(written('const toLocaleStringOf = 1; at.toISOString()').length, 0, 'a word that only holds the name');
+    },
   );
-  const wrong = refusals(files);
-  assert.equal(wrong.length, 0, wrong.join('\n'));
-  const back = refusals({
-    ...files,
-    'src/components/Facts.tsx': `${files['src/components/Facts.tsx']}\nnew Date(iso).toLocaleString();\n`,
+  await t.test('REFUSED: one more call in a locale than the list gives a file, and a list left loose', () => {
+    const numbers: Numbers[] = [{ file: 'src/a.tsx', count: 1, why: 'a fixture' }];
+    const one = "count.toLocaleString('en')";
+    assert.equal(refusals({ 'src/a.tsx': one }, numbers).length, 0, 'the one it is given');
+    assert.deepEqual(refusals({ 'src/a.tsx': `${one}\nnew Date(iso).toLocaleString()` }, numbers), [
+      `src/a.tsx writes 2 times in a locale (1:6, 2:14), NUMBERS gives it 1: write an instant with instantWords (${INSTANT}), or name a number's call in NUMBERS`,
+    ]);
+    assert.deepEqual(refusals({ 'src/a.tsx': '' }, numbers), ['src/a.tsx writes 0 times in a locale, NUMBERS says 1: lower the list']);
+    assert.equal(refusals({}, numbers).length, 1, 'a file that is gone holds none');
+    assert.equal(refusals({ 'src/a.tsx': one, 'src/b.tsx': one }, numbers).length, 1, 'the list is by file: another file is given none');
   });
-  assert.equal(back.length, 1, back.join('\n'));
-  assert.match(back[0] ?? '', /^src\/components\/Facts\.tsx writes 1 times in a locale/, 'a toLocaleString() written back is refused');
-  const built = refusals({
-    ...files,
-    'src/components/Facts.tsx': `${files['src/components/Facts.tsx']}\nIntl.DateTimeFormat('en-US').format(d);\n`,
+  await t.test("the board's source has one writer of an hour, and writes nothing in a locale but the numbers the list names", () => {
+    const files = sources(WEB);
+    assert.ok(Object.keys(files).length > 100, `the source is read: ${Object.keys(files).length} files`);
+    assert.ok(files[WRITER]?.includes('export function timeOfDay('), `${WRITER} is read, and holds the one writer of an hour`);
+    assert.ok(files[WRITER]?.includes("from 'date-fns'"), `${WRITER} writes its hour with date-fns`);
+    assert.ok(files[INSTANT]?.includes('export function instantWords('), `${INSTANT} is read, and holds the writer of an instant`);
+    assert.equal(
+      NUMBERS.every((n) => n.why.trim()),
+      true,
+      'every number written in a locale says why',
+    );
+    const wrong = refusals(files);
+    assert.equal(wrong.length, 0, wrong.join('\n'));
+    const back = refusals({
+      ...files,
+      'src/components/Facts.tsx': `${files['src/components/Facts.tsx']}\nnew Date(iso).toLocaleString();\n`,
+    });
+    assert.equal(back.length, 1, back.join('\n'));
+    assert.match(back[0] ?? '', /^src\/components\/Facts\.tsx writes 1 times in a locale/, 'a toLocaleString() written back is refused');
+    const built = refusals({
+      ...files,
+      'src/components/Facts.tsx': `${files['src/components/Facts.tsx']}\nIntl.DateTimeFormat('en-US').format(d);\n`,
+    });
+    assert.equal(built.length, 1, built.join('\n'));
+    assert.match(built[0] ?? '', /^src\/components\/Facts\.tsx:\d+:1 \(Intl\.DateTimeFormat\) writes a date/, 'a formatter written back');
+    const took = refusals({
+      ...files,
+      'src/components/Facts.tsx': `import { format } from 'date-fns';\n${files['src/components/Facts.tsx']}`,
+    });
+    assert.equal(took.length, 1, took.join('\n'));
+    assert.match(took[0] ?? '', /^src\/components\/Facts\.tsx:1:24 \('date-fns'\) writes a moment of its own/, 'the library taken up');
+    assert.ok(
+      WRITERS.every((file) => files[file]?.length),
+      `every file of WRITERS is read: ${WRITERS.join(', ')}`,
+    );
   });
-  assert.equal(built.length, 1, built.join('\n'));
-  assert.match(built[0] ?? '', /^src\/components\/Facts\.tsx:\d+:1 \(Intl\.DateTimeFormat\) writes a date/, 'a formatter written back');
-  const took = refusals({
-    ...files,
-    'src/components/Facts.tsx': `import { format } from 'date-fns';\n${files['src/components/Facts.tsx']}`,
-  });
-  assert.equal(took.length, 1, took.join('\n'));
-  assert.match(took[0] ?? '', /^src\/components\/Facts\.tsx:1:24 \('date-fns'\) writes a moment of its own/, 'the library taken up');
-  assert.ok(
-    WRITERS.every((file) => files[file]?.length),
-    `every file of WRITERS is read: ${WRITERS.join(', ')}`,
-  );
 });

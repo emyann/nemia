@@ -16,11 +16,10 @@ import {
   type RepositoryRun,
   type Run,
   type Said,
-  type StepRecord,
 } from '../src/run.ts';
 import type {} from '../src/place/place.ts';
 import { type Closeout } from '../src/closeout/closeout.ts';
-import { sessionModel, type EarlierTry } from '../src/retry/retry-ask.ts';
+import { type EarlierTry } from '../src/retry/retry-ask.ts';
 import { firstFiledAt, runStartedAt, timeline, timelineLines, timelineTotalLines, type TaskClock } from '../src/timeline/timeline.ts';
 import { type OutputSchema, type Workflow } from '../src/workflow.ts';
 import { names, phases, run, step, STEPS } from './assessed.ts';
@@ -124,35 +123,6 @@ const saidIn =
   (n: number, again: unknown) =>
   (name: string): Closeout | undefined =>
     name === 'review' ? reviewed(again) : name === 'implement' ? (n > 1 ? answered : signedDone()) : undefined;
-
-test("`sessionModel`: a continued try runs on the model its session was started on — a `--model` try's, past nudges, rounds and rechecks — and a `--fresh` one goes back to the step's", () => {
-  const OPUS: Workflow = { ...step('implement'), model: 'opus' };
-  const on = (...tries: EarlierTry[]): StepRecord => ({ taskId: 'now', tries });
-  assert.equal(sessionModel(OPUS, undefined), 'opus');
-  assert.equal(
-    sessionModel(step('implement'), on({ taskId: 'a', then: 'nudge' })),
-    undefined,
-    'a step with no model: the harness default, every try',
-  );
-  assert.equal(sessionModel(OPUS, on({ taskId: 'a', then: 'fresh', model: 'sonnet' })), 'sonnet');
-  assert.equal(
-    sessionModel(
-      OPUS,
-      on(
-        { taskId: 'a', then: 'fresh', model: 'sonnet' },
-        { taskId: 'b', then: 'nudge' },
-        { taskId: 'c', then: 'round' },
-        { taskId: 'd', then: 'retries' },
-        { taskId: 'e', then: 'recheck' },
-      ),
-    ),
-    'sonnet',
-  );
-  assert.equal(
-    sessionModel(OPUS, on({ taskId: 'a', then: 'fresh', model: 'sonnet' }, { taskId: 'b', then: 'fresh' }, { taskId: 'c', then: 'nudge' })),
-    'opus',
-  );
-});
 
 test('REFUSED by `sayRefusal` before the engine is asked: a step the run does not have, a cancelled run, a step not filed, and a task settled each way — and null for a task in flight, or one only the engine can answer for', () => {
   const live = run({ implement: 't1', review: null });

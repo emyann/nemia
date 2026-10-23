@@ -14,6 +14,7 @@
  */
 import { observations, root } from './harness.ts';
 import { test } from 'node:test';
+import { story } from './checkpoints.ts';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -157,174 +158,190 @@ const asWaits = (waiting: Listed['waiting']): Wait[] =>
     ...(w.gone.length ? { gone: w.gone } : {}),
   }));
 
-test("the list carries each run's `after` as the record froze it, and `waiting` in `nemia ls`'s words: a root says `waiting on <run>`, and a parent that never ships says why", async () => {
-  const runs = await listedRuns();
-  const d = runs.get('d-waits')!;
-  assert.deepEqual(d.after, ['a-shipped', 'b-running']);
-  assert.deepEqual(
-    d.waiting,
-    {
-      runs: [{ run: 'b-running', missing: false, cancelledAt: null, gone: [] }],
-      word: 'waiting on b-running',
-      advice: 'nothing of d-waits is filed until nemia decide says b-running has shipped onto main; nothing to decide yet',
-      onYou: false,
+test('a run waiting on runs, read on the list, its page and its decision as `nemia ls` and `nemia decide` say: what it waits on, whether it moves, when it started', async (t) => {
+  const s = story(t);
+  await s.test(
+    "the list carries each run's `after` as the record froze it, and `waiting` in `nemia ls`'s words: a root says `waiting on <run>`, and a parent that never ships says why",
+    async () => {
+      const runs = await listedRuns();
+      const d = runs.get('d-waits')!;
+      assert.deepEqual(d.after, ['a-shipped', 'b-running']);
+      assert.deepEqual(
+        d.waiting,
+        {
+          runs: [{ run: 'b-running', missing: false, cancelledAt: null, gone: [] }],
+          word: 'waiting on b-running',
+          advice: 'nothing of d-waits is filed until nemia decide says b-running has shipped onto main; nothing to decide yet',
+          onYou: false,
+        },
+        'a-shipped has shipped, so only b-running is waited on',
+      );
+      assert.deepEqual(
+        d.steps.map((s) => [s.name, s.status]),
+        [['implement', 'waiting on b-running']],
+      );
+
+      const e = runs.get('e-cancelled-parent')!;
+      assert.deepEqual(e.waiting, {
+        runs: [{ run: 'c-cancelled', missing: false, cancelledAt, gone: [] }],
+        word: 'waiting on c-cancelled (cancelled)',
+        advice: `c-cancelled was cancelled at ${cancelledAt}, and a cancelled run never ships — yours to resolve: nemia cancel e-cancelled-parent, or start the work again without --after c-cancelled`,
+        onYou: true,
+      });
+      assert.deepEqual(runs.get('f-no-such-parent')!.waiting?.runs, [{ run: 'no-such-run', missing: true, cancelledAt: null, gone: [] }]);
+      assert.equal(runs.get('f-no-such-parent')!.waiting?.word, 'waiting on no-such-run (no such run)');
+      assert.deepEqual(runs.get('h-gone-parent')!.waiting?.runs, [
+        { run: 'x-gone', missing: false, cancelledAt: null, gone: ['wf/x-gone/implement'] },
+      ]);
+      assert.equal(runs.get('h-gone-parent')!.waiting?.word, 'waiting on x-gone (wf/x-gone/implement gone)');
+
+      assert.deepEqual(
+        [runs.get('g-parents-shipped')!.after, runs.get('g-parents-shipped')!.waiting],
+        [['a-shipped'], null],
+        'every parent shipped: nothing to wait on, and the next tick files the roots',
+      );
+      assert.deepEqual(
+        [runs.get('i-started')!.after, runs.get('i-started')!.waiting],
+        [['b-running'], null],
+        'started: its parents are not read, whatever they say',
+      );
+      assert.deepEqual([runs.get('a-shipped')!.after, runs.get('a-shipped')!.waiting], [[], null], 'started without --after');
     },
-    'a-shipped has shipped, so only b-running is waited on',
   );
-  assert.deepEqual(
-    d.steps.map((s) => [s.name, s.status]),
-    [['implement', 'waiting on b-running']],
+  await s.test(
+    "the list's words and waits are `list`'s, run by run — and `advice` is `waitAdvice` over them, `word` `waitWord`",
+    async () => {
+      const runs = await listedRuns();
+      const e = engine();
+      for (const id of [
+        'd-waits',
+        'e-cancelled-parent',
+        'f-no-such-parent',
+        'g-parents-shipped',
+        'h-gone-parent',
+        'i-started',
+        'a-shipped',
+        'b-running',
+        'c-cancelled',
+      ]) {
+        const api = runs.get(id)!;
+        const cli = await runWith(e, list(e, runStore.runs.read(id)));
+        assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
+        assert.deepEqual(
+          api.steps.map((s) => s.status),
+          cli.steps.map((s) => s.status),
+          id,
+        );
+        if (cli.waiting.length) {
+          assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
+          assert.equal(api.waiting?.advice, waitAdvice(runStore.runs.read(id), cli.waiting), id);
+          assert.equal(
+            api.waiting?.onYou,
+            !waitAdvice(runStore.runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
+            `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still ship`,
+          );
+        }
+      }
+    },
   );
-
-  const e = runs.get('e-cancelled-parent')!;
-  assert.deepEqual(e.waiting, {
-    runs: [{ run: 'c-cancelled', missing: false, cancelledAt, gone: [] }],
-    word: 'waiting on c-cancelled (cancelled)',
-    advice: `c-cancelled was cancelled at ${cancelledAt}, and a cancelled run never ships — yours to resolve: nemia cancel e-cancelled-parent, or start the work again without --after c-cancelled`,
-    onYou: true,
-  });
-  assert.deepEqual(runs.get('f-no-such-parent')!.waiting?.runs, [{ run: 'no-such-run', missing: true, cancelledAt: null, gone: [] }]);
-  assert.equal(runs.get('f-no-such-parent')!.waiting?.word, 'waiting on no-such-run (no such run)');
-  assert.deepEqual(runs.get('h-gone-parent')!.waiting?.runs, [
-    { run: 'x-gone', missing: false, cancelledAt: null, gone: ['wf/x-gone/implement'] },
-  ]);
-  assert.equal(runs.get('h-gone-parent')!.waiting?.word, 'waiting on x-gone (wf/x-gone/implement gone)');
-
-  assert.deepEqual(
-    [runs.get('g-parents-shipped')!.after, runs.get('g-parents-shipped')!.waiting],
-    [['a-shipped'], null],
-    'every parent shipped: nothing to wait on, and the next tick files the roots',
+  await s.test(
+    'a run waiting on runs moves — the tick files its roots once they ship — unless one never ships without a person, when it moves no more',
+    async () => {
+      const runs = await listedRuns();
+      const moving = Object.fromEntries(
+        ['d-waits', 'g-parents-shipped', 'e-cancelled-parent', 'f-no-such-parent', 'h-gone-parent'].map((id) => [id, runs.get(id)!.moving]),
+      );
+      assert.deepEqual(moving, {
+        'd-waits': true,
+        'g-parents-shipped': true,
+        'e-cancelled-parent': false,
+        'f-no-such-parent': false,
+        'h-gone-parent': false,
+      });
+      for (const id of Object.keys(moving))
+        assert.deepEqual(
+          [runs.get(id)!.status, runs.get(id)!.waitingOnYou],
+          ['running', []],
+          `${id}: running, as assess, which knows no gate, puts a run nothing of which is final; nobody waited on, as no step is filed`,
+        );
+    },
   );
-  assert.deepEqual(
-    [runs.get('i-started')!.after, runs.get('i-started')!.waiting],
-    [['b-running'], null],
-    'started: its parents are not read, whatever they say',
-  );
-  assert.deepEqual([runs.get('a-shipped')!.after, runs.get('a-shipped')!.waiting], [[], null], 'started without --after');
-});
-
-test("the list's words and waits are `list`'s, run by run — and `advice` is `waitAdvice` over them, `word` `waitWord`", async () => {
-  const runs = await listedRuns();
-  const e = engine();
-  for (const id of [
-    'd-waits',
-    'e-cancelled-parent',
-    'f-no-such-parent',
-    'g-parents-shipped',
-    'h-gone-parent',
-    'i-started',
-    'a-shipped',
-    'b-running',
-    'c-cancelled',
-  ]) {
-    const api = runs.get(id)!;
-    const cli = await runWith(e, list(e, runStore.runs.read(id)));
-    assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
-    assert.deepEqual(
-      api.steps.map((s) => s.status),
-      cli.steps.map((s) => s.status),
-      id,
-    );
-    if (cli.waiting.length) {
-      assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
-      assert.equal(api.waiting?.advice, waitAdvice(runStore.runs.read(id), cli.waiting), id);
-      assert.equal(
-        api.waiting?.onYou,
-        !waitAdvice(runStore.runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
-        `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still ship`,
+  await s.test("a run's detail carries the same `after`, `waiting` and `moving`", async () => {
+    const runs = await listedRuns();
+    for (const id of ['d-waits', 'e-cancelled-parent', 'i-started']) {
+      const res = await app.request(`/api/runs/${id}`);
+      assert.equal(res.status, 200);
+      const detail = (await res.json()) as RunDetail;
+      const listed = runs.get(id)!;
+      assert.deepEqual(
+        { after: detail.after, waiting: detail.waiting, moving: detail.moving },
+        { after: listed.after, waiting: listed.waiting, moving: listed.moving },
+        id,
+      );
+      assert.deepEqual(
+        detail.steps.map((s) => s.status),
+        listed.steps.map((s) => s.status),
+        id,
       );
     }
-  }
-});
-
-test('a run waiting on runs moves — the tick files its roots once they ship — unless one never ships without a person, when it moves no more', async () => {
-  const runs = await listedRuns();
-  const moving = Object.fromEntries(
-    ['d-waits', 'g-parents-shipped', 'e-cancelled-parent', 'f-no-such-parent', 'h-gone-parent'].map((id) => [id, runs.get(id)!.moving]),
-  );
-  assert.deepEqual(moving, {
-    'd-waits': true,
-    'g-parents-shipped': true,
-    'e-cancelled-parent': false,
-    'f-no-such-parent': false,
-    'h-gone-parent': false,
   });
-  for (const id of Object.keys(moving))
-    assert.deepEqual(
-      [runs.get(id)!.status, runs.get(id)!.waitingOnYou],
-      ['running', []],
-      `${id}: running, as assess, which knows no gate, puts a run nothing of which is final; nobody waited on, as no step is filed`,
-    );
-});
-
-test("a run's detail carries the same `after`, `waiting` and `moving`", async () => {
-  const runs = await listedRuns();
-  for (const id of ['d-waits', 'e-cancelled-parent', 'i-started']) {
-    const res = await app.request(`/api/runs/${id}`);
-    assert.equal(res.status, 200);
-    const detail = (await res.json()) as RunDetail;
-    const listed = runs.get(id)!;
-    assert.deepEqual(
-      { after: detail.after, waiting: detail.waiting, moving: detail.moving },
-      { after: listed.after, waiting: listed.waiting, moving: listed.moving },
-      id,
-    );
-    assert.deepEqual(
-      detail.steps.map((s) => s.status),
-      listed.steps.map((s) => s.status),
-      id,
-    );
-  }
-});
-
-test("a run started when its first task was filed, off the engine's feed, not when it was created — on the list and the detail alike; nothing filed, not started", async () => {
-  const runs = await listedRuns();
-  const started = (id: string) => [runs.get(id)!.createdAt, runs.get(id)!.startedAt];
-  assert.deepEqual(started('b-running'), [at, filedB], 'waited on a-shipped for an hour: that hour is not time at work');
-  assert.deepEqual(started('i-started'), [at, filedI]);
-  assert.deepEqual(started('a-shipped'), [at, at], 'started, and its filing not on the feed: when it was created, the only time there is');
-  for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-shipped', 'c-cancelled'])
-    assert.equal(
-      runs.get(id)!.startedAt,
-      null,
-      `${id}: waiting on runs that may still ship or never will, or its parents shipped and the tick yet to file it: not started`,
-    );
-  for (const id of ['b-running', 'i-started', 'a-shipped', 'd-waits']) {
-    const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
-    assert.equal(detail.startedAt, runs.get(id)!.startedAt, id);
-  }
-});
-
-test('reading the runs a run waits on observes no harness again: the list and the detail observe once, a shipped parent among them', async () => {
-  const before = observations();
-  await listedRuns();
-  assert.equal(
-    observations() - before,
-    0,
-    "the list: a-shipped's tasks, read to ask its nemia decide as its branch is on main, come off the views the request already read; the tasks in flight are Codex's, and only the harnesses of the runs' own tasks are looked at, Claude Code's registry never",
+  await s.test(
+    "a run started when its first task was filed, off the engine's feed, not when it was created — on the list and the detail alike; nothing filed, not started",
+    async () => {
+      const runs = await listedRuns();
+      const started = (id: string) => [runs.get(id)!.createdAt, runs.get(id)!.startedAt];
+      assert.deepEqual(started('b-running'), [at, filedB], 'waited on a-shipped for an hour: that hour is not time at work');
+      assert.deepEqual(started('i-started'), [at, filedI]);
+      assert.deepEqual(
+        started('a-shipped'),
+        [at, at],
+        'started, and its filing not on the feed: when it was created, the only time there is',
+      );
+      for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-shipped', 'c-cancelled'])
+        assert.equal(
+          runs.get(id)!.startedAt,
+          null,
+          `${id}: waiting on runs that may still ship or never will, or its parents shipped and the tick yet to file it: not started`,
+        );
+      for (const id of ['b-running', 'i-started', 'a-shipped', 'd-waits']) {
+        const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+        assert.equal(detail.startedAt, runs.get(id)!.startedAt, id);
+      }
+    },
   );
-  const again = observations();
-  assert.equal((await app.request('/api/runs/d-waits')).status, 200);
-  assert.equal(observations() - again, 0, 'the detail');
-});
-
-test('the decision of a run waiting on runs is `waiting`, and nothing else: what `nemia decide` prints for it', async () => {
-  const runs = await listedRuns();
-  const e = engine();
-  for (const id of ['d-waits', 'e-cancelled-parent', 'h-gone-parent']) {
-    const res = await app.request(`/api/runs/${id}/decision`);
-    assert.equal(res.status, 200);
-    const body = (await res.json()) as RunDecision;
-    assert.deepEqual(body, { waiting: runs.get(id)!.waiting }, id);
-    assert.ok('waiting' in body, id);
-    const { run, waiting } = await runWith(e, decideRun(id));
-    assert.deepEqual(asWaits(body.waiting), waiting, id);
-    assert.equal(body.waiting.word, waitWord(waiting), id);
-    assert.equal(body.waiting.advice, waitAdvice(run, waiting), id);
-  }
-  assert.deepEqual(
-    await (await app.request('/api/runs/g-parents-shipped/decision')).json(),
-    { running: true },
-    'every parent shipped, and not yet filed: it runs, and there is nothing to decide yet',
+  await s.test(
+    'reading the runs a run waits on observes no harness again: the list and the detail observe once, a shipped parent among them',
+    async () => {
+      const before = observations();
+      await listedRuns();
+      assert.equal(
+        observations() - before,
+        0,
+        "the list: a-shipped's tasks, read to ask its nemia decide as its branch is on main, come off the views the request already read; the tasks in flight are Codex's, and only the harnesses of the runs' own tasks are looked at, Claude Code's registry never",
+      );
+      const again = observations();
+      assert.equal((await app.request('/api/runs/d-waits')).status, 200);
+      assert.equal(observations() - again, 0, 'the detail');
+    },
   );
+  await s.test('the decision of a run waiting on runs is `waiting`, and nothing else: what `nemia decide` prints for it', async () => {
+    const runs = await listedRuns();
+    const e = engine();
+    for (const id of ['d-waits', 'e-cancelled-parent', 'h-gone-parent']) {
+      const res = await app.request(`/api/runs/${id}/decision`);
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as RunDecision;
+      assert.deepEqual(body, { waiting: runs.get(id)!.waiting }, id);
+      assert.ok('waiting' in body, id);
+      const { run, waiting } = await runWith(e, decideRun(id));
+      assert.deepEqual(asWaits(body.waiting), waiting, id);
+      assert.equal(body.waiting.word, waitWord(waiting), id);
+      assert.equal(body.waiting.advice, waitAdvice(run, waiting), id);
+    }
+    assert.deepEqual(
+      await (await app.request('/api/runs/g-parents-shipped/decision')).json(),
+      { running: true },
+      'every parent shipped, and not yet filed: it runs, and there is nothing to decide yet',
+    );
+  });
 });

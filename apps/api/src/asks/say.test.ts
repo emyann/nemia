@@ -6,6 +6,9 @@
  * seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn. The tasks: `t-implement`, at
  * work; `t-settled`, ran once and signed off; and `t-cancelled`, the cancelled run's step, at work: only the run's mark refuses it. What
  * the harness does with the words — the session's inbox, and the 502 when it cannot be given them — is `say.boundary.test.ts`'s.
+ *
+ * One table of what the route refuses, nothing said and nothing written — each 409 equal to what `sayRun` says itself — then the story
+ * of a person's words handed to a working session and read back on the step.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -19,6 +22,7 @@ import type { Said } from 'agent-orchestrator';
 import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { list, runStore, sayRun, type RunSummary } from 'agent-orchestrator';
+import { story } from '../../test/checkpoints.ts';
 
 const stand = eachTest(testPlace);
 const standIn = eachTest(testEngine);
@@ -107,85 +111,99 @@ const sayRefuses = async (step: string, text: string, run = R): Promise<string> 
 const detailSteps = async (id = R): Promise<RunDetail['steps']> =>
   ((await (await app().request(`/api/runs/${id}`)).json()) as RunDetail).steps;
 
-test('REFUSED at shipped defaults: JSON that is not the words (400): nothing said, nothing written', async () => {
+/** The error a refused request answered with, its status `status`. */
+const refusedWith = async (res: Response, status: number, said: string): Promise<string> => {
+  assert.equal(res.status, status, said);
+  return ((await res.json()) as { error: string }).error;
+};
+
+test('POST …/say: what it refuses — JSON that is not the words, words the package will not hand on, a run or step not there — nothing said, nothing written', async (t) => {
   const before = written();
-  const bodies: Array<[unknown, RegExp]> = [
-    ['Widen the scope to apps/api too.', /^POST …\/say takes a JSON body: `\{ "text": "<words>" \}`\.$/],
-    [['Widen the scope'], /^POST …\/say takes a JSON object: /],
-    [{}, /^`text` is the words to hand the step's session[\s\S]*This request's was left out/],
-    [{ text: 42 }, /^`text` is the words to hand the step's session[\s\S]*This request's was 42/],
-    [{ message: 'Widen the scope' }, /^`text` is the words[\s\S]*was left out/],
-  ];
-  for (const [sent, words] of bodies) {
-    const res = await sayTo('implement', sent);
-    assert.equal(res.status, 400, JSON.stringify(sent));
-    assert.match(((await res.json()) as { error: string }).error, words);
-  }
-  assert.deepEqual(written(), before, 'nothing written');
+
+  await t.test('REFUSED at shipped defaults: JSON that is not the words is a 400, naming `text`', async () => {
+    const bodies: Array<[unknown, RegExp]> = [
+      ['Widen the scope to apps/api too.', /^POST …\/say takes a JSON body: `\{ "text": "<words>" \}`\.$/],
+      [['Widen the scope'], /^POST …\/say takes a JSON object: /],
+      [{}, /^`text`[^]*was left out/],
+      [{ text: 42 }, /^`text`[^]*was 42/],
+      [{ message: 'Widen the scope' }, /^`text`[^]*was left out/],
+    ];
+    for (const [sent, fact] of bodies) assert.match(await refusedWith(await sayTo('implement', sent), 400, JSON.stringify(sent)), fact);
+    assert.deepEqual(written(), before, 'nothing written');
+  });
+
+  await t.test(
+    "REFUSED at shipped defaults: empty words (the engine's sentence), a settled step, a step not filed, a cancelled run — 409s in the package's words and the engine's, verbatim, as `nemia say` prints them",
+    async () => {
+      const cases: Array<[string, string, string, RegExp[]]> = [
+        [R, 'implement', '', [/^say: `text` is empty\./]],
+        [R, 'implement', ' \n\t', [/^say: `text` is empty\./]],
+        [
+          R,
+          'settled',
+          'Widen the scope.',
+          [/^settled is not running: try 1's task settled `succeeded`/, /: nemia retry r-say settled --message "<words>"\.$/],
+        ],
+        [R, 'review', 'Look at the parser first.', [/^review has not been filed yet/]],
+        [C, 'implement', 'Widen the scope.', [/^r-say-cancelled was cancelled at 2026-09-14T06:00:05\.000Z/, /not steered/]],
+      ];
+      for (const [run, step, text, facts] of cases) {
+        const error = await refusedWith(await sayTo(step, { text }, BOARD, run), 409, `${run} ${step} ${JSON.stringify(text)}`);
+        for (const fact of facts) assert.match(error, fact, `${run} ${step}`);
+        assert.equal(error, await sayRefuses(step, text, run), "the package's words, as `nemia say` prints them");
+      }
+      assert.deepEqual(written(), before, 'nothing written');
+    },
+  );
+
+  await t.test('no such run or step is a 404, naming it', async () => {
+    assert.match(
+      await refusedWith(await sayTo('implement', { text: 'Widen the scope.' }, BOARD, 'r-nope'), 404, 'no run'),
+      /^No run 'r-nope'/,
+    );
+    assert.match(await refusedWith(await sayTo('deploy', { text: 'Ship it.' }), 404, 'no step'), /^Run 'r-say' has no step 'deploy'/);
+    assert.deepEqual(written(), before, 'nothing written');
+  });
 });
 
-test("REFUSED at shipped defaults: empty words (the engine's sentence), a settled step, a step not filed, a cancelled run — 409s in the package's words and the engine's, verbatim, as `nemia say` prints them — and no such run or step, 404: nothing said, nothing written", async () => {
-  const before = written();
-  const cases: Array<[string, string, string, RegExp]> = [
-    [R, 'implement', '', /^say: `text` is empty\. Give the words the session should hear\.$/],
-    [R, 'implement', ' \n\t', /^say: `text` is empty\. Give the words the session should hear\.$/],
-    [
-      R,
-      'settled',
-      'Widen the scope.',
-      /^settled is not running: try 1's task settled `succeeded`, so no session of it is there to hear anything\. .*: nemia retry r-say settled --message "<words>"\.$/,
-    ],
-    [R, 'review', 'Look at the parser first.', /^review has not been filed yet, so there is no session to hear anything\./],
-    [
-      C,
-      'implement',
-      'Widen the scope.',
-      /^r-say-cancelled was cancelled at 2026-09-14T06:00:05\.000Z: its sessions are being stopped, not steered/,
-    ],
-  ];
-  for (const [run, step, text, words] of cases) {
-    const res = await sayTo(step, { text }, BOARD, run);
-    assert.equal(res.status, 409, `${run} ${step} ${JSON.stringify(text)}`);
-    const { error } = (await res.json()) as { error: string };
-    assert.match(error, words);
-    assert.equal(error, await sayRefuses(step, text, run), "the package's words, as `nemia say` prints them");
-  }
-  const noRun = await sayTo('implement', { text: 'Widen the scope.' }, BOARD, 'r-nope');
-  assert.equal(noRun.status, 404);
-  assert.match(((await noRun.json()) as { error: string }).error, /^No run 'r-nope' in this store/);
-  const noStep = await sayTo('deploy', { text: 'Ship it.' });
-  assert.equal(noStep.status, 404);
-  assert.match(((await noStep.json()) as { error: string }).error, /^Run 'r-say' has no step 'deploy'/);
-  assert.deepEqual(written(), before, 'nothing written');
-});
-
-test("words as the board sends them are the package's `sayRun`: 202 with the engine's entry — `at`, `attempt`, `text`, `after` — the words handed to the engine as given, the entry on the task, and on the step's detail and in its note, as `nemia ls` words it; nothing else written", async () => {
-  const records = written().files;
+test("a person's words to a working session: the package's `sayRun` hands them to the engine as given, and the step reads them on its detail, its note and the list, as `nemia ls` words it", async (t) => {
+  const s = story(t);
   const words = 'Widen the scope to apps/api too.\n\nAnd keep `--flag` as it is.';
-  const res = await sayTo('implement', { text: words });
-  assert.equal(res.status, 202, await res.clone().text());
-  const said = (await res.json()) as Said;
-  assert.deepEqual(Object.keys(said).sort(), ['after', 'at', 'attempt', 'text']);
-  assert.deepEqual(
-    [said.attempt, said.text, said.after],
-    [1, words, null],
-    'no transcript is planted for the session: no event to stand after',
-  );
-  assert.equal(new Date(said.at).toISOString(), said.at, 'the time the package recorded, an ISO time');
+  let records: Record<string, string> = {};
+  let said: Said | undefined;
 
-  assert.deepEqual(standIn().said, [{ taskId: 't-implement', text: words }], "the words handed to the engine's say, as given, once");
-  assert.deepEqual((await Effect.runPromise(engine().view('t-implement'))).state.said, [said], "the engine's record of the task");
-  const steps = await detailSteps();
-  const implement = steps.find((s) => s.name === 'implement')!;
-  assert.deepEqual([implement.said, implement.note], [[said], 'said to 1×']);
-  for (const other of steps.filter((s) => s.name !== 'implement'))
-    assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
-  assert.equal(
-    (await runWith(engine(), list(engine(), runStore.runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
-    'said to 1×',
-    "`nemia ls`'s words",
+  await s.test(
+    "words as the board sends them are a 202 with the engine's entry — `at`, `attempt`, `text`, `after` — handed to the engine as given, once, and on the task",
+    async () => {
+      records = written().files;
+      const res = await sayTo('implement', { text: words });
+      assert.equal(res.status, 202, await res.clone().text());
+      said = (await res.json()) as Said;
+      assert.deepEqual(Object.keys(said).sort(), ['after', 'at', 'attempt', 'text']);
+      assert.deepEqual([said.attempt, said.text, said.after], [1, words, null], 'no transcript planted: no event to stand after');
+      assert.equal(new Date(said.at).toISOString(), said.at, 'the time the package recorded, an ISO time');
+      assert.deepEqual(standIn().said, [{ taskId: 't-implement', text: words }], "the words handed to the engine's say, as given, once");
+      assert.deepEqual((await Effect.runPromise(engine().view('t-implement'))).state.said, [said], "the engine's record of the task");
+    },
   );
-  const summary = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === R)!;
-  assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');
-  assert.deepEqual(written().files, records, "the runs' records untouched, and no file of the api's");
+
+  await s.test(
+    "the entry is on the step's detail and in its note, `said to 1×`, as `nemia ls` and the list word it; nothing else written",
+    async () => {
+      assert.ok(said);
+      const steps = await detailSteps();
+      const implement = steps.find((s) => s.name === 'implement')!;
+      assert.deepEqual([implement.said, implement.note], [[said], 'said to 1×']);
+      for (const other of steps.filter((s) => s.name !== 'implement'))
+        assert.deepEqual(other.said, [], `${other.name}: nobody told it anything`);
+      assert.equal(
+        (await runWith(engine(), list(engine(), runStore.runs.read(R)))).steps.find((s) => s.name === 'implement')!.note,
+        'said to 1×',
+        "`nemia ls`'s words",
+      );
+      const summary = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === R)!;
+      assert.equal(summary.steps.find((s) => s.name === 'implement')!.note, 'said to 1×', 'and on the list');
+      assert.deepEqual(written().files, records, "the runs' records untouched, and no file of the api's");
+    },
+  );
 });

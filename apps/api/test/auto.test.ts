@@ -9,6 +9,7 @@
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
+import { story } from './checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,74 +43,83 @@ const WORDS = 'Try again the step implement unasked when its check passed and no
 
 propose(TRIES);
 
-test('the default is in force while nothing is confirmed, read beside what the agent proposed and the words it keeps as guidance', async () => {
-  const read = await asked('GET', '/api/auto/nemia');
-  assert.equal(read.status, 200);
-  assert.equal(read.body.isDefault, true);
-  assert.deepEqual(
-    (read.body.rules as { id: string; words: string }[]).map((r) => [r.id, r.words]),
-    [
+test('A person keeps her rules: the default in force, a proposed rule refused but as proposed, a confirm put in force once, and a drop that takes the default out', async (t) => {
+  const s = story(t);
+  await s.test(
+    'the default is in force while nothing is confirmed, read beside what the agent proposed and the words it keeps as guidance',
+    async () => {
+      const read = await asked('GET', '/api/auto/nemia');
+      assert.equal(read.status, 200);
+      assert.equal(read.body.isDefault, true);
+      assert.deepEqual(
+        (read.body.rules as { id: string; words: string }[]).map((r) => [r.id, r.words]),
+        [
+          [
+            'default',
+            'Approve any step unasked when the agent recommends it, its check passed, every reviewer accepted, no step is past its budget and nothing is left open.',
+          ],
+        ],
+      );
+      const proposed = read.body.proposed as { rules: { id: string; confirmed: boolean }[]; guidance: string[] };
+      assert.deepEqual(
+        proposed.rules.map((r) => [r.id, r.confirmed]),
+        [['tries', false]],
+      );
+      assert.deepEqual(proposed.guidance, ['answer in French']);
+      assert.equal(read.body.instruction, null);
+    },
+  );
+  await s.test(
+    'REFUSED, writing nothing: a rule not proposed, a body but {}, a request from another site, and a name that is no agent',
+    async () => {
+      const ghost = await asked('PUT', '/api/auto/nemia/rules/ghost', { words: WORDS });
+      assert.equal(ghost.status, 404);
+      assert.match(String(ghost.body.error), /^nemia proposed no rule ghost/);
+      assert.equal((await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS, why: 'go' })).status, 400);
+      const wordless = await asked('PUT', '/api/auto/nemia/rules/tries', {});
+      assert.equal(wordless.status, 422);
+      assert.match(String(wordless.body.error), /takes the rule's words as you read them/);
+      assert.equal((await asked('DELETE', '/api/auto/nemia/rules/default', { why: 'go' })).status, 400);
+      const foreign = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
+      assert.equal(foreign.status, 403);
+      assert.equal(fs.existsSync(CONFIRMED), false);
+      const hidden = await asked('GET', '/api/auto/.nemia');
+      assert.equal(hidden.status, 400);
+      assert.match(String(hidden.body.error), /is not an agent's name/);
+    },
+  );
+  await s.test(
+    'REFUSED (409), writing nothing: a confirm of the words the person read, once the agent proposed the rule otherwise',
+    async () => {
+      propose({ answer: 'approve', when: [] });
+      try {
+        const stale = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS });
+        assert.equal(stale.status, 409);
+        assert.match(String(stale.body.error), /^nemia's rule tries now reads "Approve any step unasked, whatever the run’s state\."/);
+        assert.equal(fs.existsSync(CONFIRMED), false);
+      } finally {
+        propose(TRIES);
+      }
+    },
+  );
+  await s.test('a confirm puts the rule in force beside the default; again is a 409; a drop takes the default out', async () => {
+    const confirmed = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS });
+    assert.equal(confirmed.status, 200);
+    assert.deepEqual(
+      (confirmed.body.rules as { id: string; from: string }[]).map((r) => [r.id, r.from]),
       [
-        'default',
-        'Approve any step unasked when the agent recommends it, its check passed, every reviewer accepted, no step is past its budget and nothing is left open.',
+        ['default', 'default'],
+        ['tries', 'proposed'],
       ],
-    ],
-  );
-  const proposed = read.body.proposed as { rules: { id: string; confirmed: boolean }[]; guidance: string[] };
-  assert.deepEqual(
-    proposed.rules.map((r) => [r.id, r.confirmed]),
-    [['tries', false]],
-  );
-  assert.deepEqual(proposed.guidance, ['answer in French']);
-  assert.equal(read.body.instruction, null);
-});
-
-test('REFUSED, writing nothing: a rule not proposed, a body but {}, a request from another site, and a name that is no agent', async () => {
-  const ghost = await asked('PUT', '/api/auto/nemia/rules/ghost', { words: WORDS });
-  assert.equal(ghost.status, 404);
-  assert.match(String(ghost.body.error), /^nemia proposed no rule ghost/);
-  assert.equal((await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS, why: 'go' })).status, 400);
-  const wordless = await asked('PUT', '/api/auto/nemia/rules/tries', {});
-  assert.equal(wordless.status, 422);
-  assert.match(String(wordless.body.error), /takes the rule's words as you read them/);
-  assert.equal((await asked('DELETE', '/api/auto/nemia/rules/default', { why: 'go' })).status, 400);
-  const foreign = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
-  assert.equal(foreign.status, 403);
-  assert.equal(fs.existsSync(CONFIRMED), false);
-  const hidden = await asked('GET', '/api/auto/.nemia');
-  assert.equal(hidden.status, 400);
-  assert.match(String(hidden.body.error), /is not an agent's name/);
-});
-
-test('REFUSED (409), writing nothing: a confirm of the words the person read, once the agent proposed the rule otherwise', async () => {
-  propose({ answer: 'approve', when: [] });
-  try {
-    const stale = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS });
-    assert.equal(stale.status, 409);
-    assert.match(String(stale.body.error), /^nemia's rule tries now reads "Approve any step unasked, whatever the run’s state\."/);
-    assert.equal(fs.existsSync(CONFIRMED), false);
-  } finally {
-    propose(TRIES);
-  }
-});
-
-test('a confirm puts the rule in force beside the default; again is a 409; a drop takes the default out', async () => {
-  const confirmed = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS });
-  assert.equal(confirmed.status, 200);
-  assert.deepEqual(
-    (confirmed.body.rules as { id: string; from: string }[]).map((r) => [r.id, r.from]),
-    [
-      ['default', 'default'],
-      ['tries', 'proposed'],
-    ],
-  );
-  const twice = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS });
-  assert.equal(twice.status, 409);
-  const dropped = await asked('DELETE', '/api/auto/nemia/rules/default');
-  assert.equal(dropped.status, 200);
-  assert.deepEqual(
-    (dropped.body.rules as { id: string }[]).map((r) => r.id),
-    ['tries'],
-  );
-  assert.equal(dropped.body.isDefault, false);
+    );
+    const twice = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS });
+    assert.equal(twice.status, 409);
+    const dropped = await asked('DELETE', '/api/auto/nemia/rules/default');
+    assert.equal(dropped.status, 200);
+    assert.deepEqual(
+      (dropped.body.rules as { id: string }[]).map((r) => r.id),
+      ['tries'],
+    );
+    assert.equal(dropped.body.isDefault, false);
+  });
 });

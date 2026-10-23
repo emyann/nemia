@@ -40,46 +40,51 @@ const runWith = (pinned?: readonly Pin[], step?: readonly Pin[]): Run => ({
   ...(pinned ? { pinned } : {}),
 });
 
-test('a run whose pins are the ledger’s newest is behind on nothing', () => {
-  ledger('agent', 'quiet', upTo(3));
-  assert.deepEqual(kindsOf(runWith([pin('agent', 'quiet', 3)])), []);
+test('kindsOf: the kinds a run is behind the revisions ledger on, with what it pinned and what the ledger holds now', async (t) => {
+  await t.test('a run whose pins are the ledger’s newest is behind on nothing', () => {
+    ledger('agent', 'quiet', upTo(3));
+    assert.deepEqual(kindsOf(runWith([pin('agent', 'quiet', 3)])), []);
+  });
+  await t.test('a run two revisions behind on one agent gives one entry, with what it pinned and what the ledger holds now', () => {
+    ledger('agent', 'behind', upTo(6));
+    ledger('skill', 'kept', upTo(1));
+    assert.deepEqual(kindsOf(runWith([pin('agent', 'behind', 4), pin('skill', 'kept', 1)])), [
+      { kind: 'agent', name: 'behind', pinned: 4, now: 6 },
+    ]);
+  });
+  await t.test('a record written before revisions pinned nothing, drifts on nothing, and does not throw', () => {
+    assert.deepEqual(kindsOf(runWith()), []);
+  });
+  await t.test('a kind the ledger has no entry for drifts on nothing: nothing has resolved that content but this run', () => {
+    assert.deepEqual(kindsOf(runWith([pin('workflow', 'never-in-the-ledger', 1)])), []);
+  });
+  await t.test('a step that already ran says which revision it ran on, once the run has moved past it', () => {
+    ledger('agent', 'moved', upTo(6));
+    assert.deepEqual(
+      kindsOf(runWith([pin('agent', 'moved', 6)], [pin('agent', 'moved', 5)])),
+      [{ kind: 'agent', name: 'moved', pinned: 5, now: 6, step: 'build' }],
+      'the run is on the newest, and the step that ran is one behind: the line names the step',
+    );
+  });
+  await t.test('a step on the run’s own pin says nothing of its own', () => {
+    ledger('agent', 'moved', upTo(6));
+    assert.deepEqual(
+      kindsOf(runWith([pin('agent', 'moved', 5)], [pin('agent', 'moved', 5)])),
+      [{ kind: 'agent', name: 'moved', pinned: 5, now: 6 }],
+      "the step's pin is the run's, so the run's one line says it",
+    );
+  });
 });
 
-test('a run two revisions behind on one agent gives one entry, with what it pinned and what the ledger holds now', () => {
-  ledger('agent', 'behind', upTo(6));
-  ledger('skill', 'kept', upTo(1));
-  assert.deepEqual(kindsOf(runWith([pin('agent', 'behind', 4), pin('skill', 'kept', 1)])), [
-    { kind: 'agent', name: 'behind', pinned: 4, now: 6 },
-  ]);
-});
-
-test('a record written before revisions pinned nothing, drifts on nothing, and does not throw', () => {
-  assert.deepEqual(kindsOf(runWith()), []);
-});
-
-test('a kind the ledger has no entry for drifts on nothing: nothing has resolved that content but this run', () => {
-  assert.deepEqual(kindsOf(runWith([pin('workflow', 'never-in-the-ledger', 1)])), []);
-});
-
-test('a step that already ran says which revision it ran on, once the run has moved past it; one on the run’s own pin says nothing of its own', () => {
-  ledger('agent', 'moved', upTo(6));
-  assert.deepEqual(
-    kindsOf(runWith([pin('agent', 'moved', 6)], [pin('agent', 'moved', 5)])),
-    [{ kind: 'agent', name: 'moved', pinned: 5, now: 6, step: 'build' }],
-    'the run is on the newest, and the step that ran is one behind: the line names the step',
-  );
-  assert.deepEqual(
-    kindsOf(runWith([pin('agent', 'moved', 5)], [pin('agent', 'moved', 5)])),
-    [{ kind: 'agent', name: 'moved', pinned: 5, now: 6 }],
-    "the step's pin is the run's, so the run's one line says it",
-  );
-});
-
-test('the folder’s own drift is a name-level warning, and none where the names agree', () => {
+test('driftOf: the folder’s own drift is a name-level warning, and none where the names agree', async (t) => {
   const steps = (...names: string[]): Workflow[] => names.map((name) => ({ name, after: [], body: '' }));
-  assert.equal(driftOf(runWith(), steps('build')), null);
-  const added = driftOf(runWith(), steps('build', 'review'));
-  assert.match(added!, /it has review, which the run did not start with/);
-  const removed = driftOf(runWith(), steps('review'));
-  assert.match(removed!, /it no longer has build/);
+  await t.test('the same names: no warning', () => {
+    assert.equal(driftOf(runWith(), steps('build')), null);
+  });
+  await t.test('a step the folder gained is named', () => {
+    assert.match(driftOf(runWith(), steps('build', 'review'))!, /it has review, which the run did not start with/);
+  });
+  await t.test('a step the folder lost is named', () => {
+    assert.match(driftOf(runWith(), steps('review'))!, /it no longer has build/);
+  });
 });

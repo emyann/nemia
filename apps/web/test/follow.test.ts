@@ -94,139 +94,144 @@ function followed() {
   return { stream, now: () => state, flush, stop, frames: () => asked };
 }
 
-test('the arrivals that come together are folded once, on one frame, and two of one kind join as they queue', () => {
-  const { stream, now, flush, frames } = followed();
-  stream.send('said', 'One.');
-  stream.send('said', 'Two.');
-  stream.send('marked');
-  stream.send('said', 'Three.');
-  assert.deepEqual([now().words, now().marks], [[], 0], 'nothing is folded before the frame');
-  assert.equal(frames(), 1, 'the four arrivals wait for one frame');
-  flush();
-  assert.deepEqual(now().words, ['One.', 'Two.', 'Three.'], 'in the order they came');
-  assert.equal(now().marks, 1, 'the mark between them was not joined into either side');
-});
-
-test('an event the conversation does not read brings nothing, and one of no name at all is not listened for', () => {
-  const { stream, now, flush } = followed();
-  stream.send('said', '');
-  stream.send('shouted', 'Hey.');
-  flush();
-  assert.deepEqual([now().words, now().marks], [[], 0]);
-});
-
-test('a read the api says it is making again is a notice, not an end: it fills `retrying`, leaves `error` null and keeps the stream', () => {
-  const { stream, now } = followed();
-  stream.send('unreadable', { error: 'Its journal could not be read.', retrying: true });
-  assert.deepEqual(
-    [now().retrying, now().error, now().live, now().ended, stream.readyState],
-    ['Its journal could not be read.', null, true, false, 1],
-    'the page is told why, and goes on following',
-  );
-  stream.send('readable');
-  assert.deepEqual([now().retrying, now().error, now().live], [null, null, true], 'and a read that works again clears it');
-});
-
-test('a read the api will not make again is the end: it fills `error`, clears `retrying`, and leaves what the conversation leaves', () => {
-  const { stream, now } = followed();
-  stream.send('unreadable', { error: 'Reading it again.', retrying: true });
-  stream.send('unreadable', { error: 'Its task is gone.', retrying: false });
-  assert.deepEqual([now().error, now().retrying, now().live, now().ended], ['Its task is gone.', null, false, true]);
-});
-
-test('a read the api named nothing of says the conversation’s own words', () => {
-  const { stream, now } = followed();
-  stream.send('unreadable', { retrying: false });
-  assert.equal(now().error, 'It could not be read.');
-});
-
-test('a connection made clears both, and changes nothing a page holds where there is nothing to clear', () => {
-  const { stream, now } = followed();
-  stream.send('unreadable', { error: 'Reading it again.', retrying: true });
-  stream.fire('open');
-  assert.deepEqual([now().retrying, now().error], [null, null], 'a fresh server stream sends no `readable`, so the connection clears it');
-  const before = now();
-  stream.fire('open');
-  assert.equal(now(), before, 'an open on a stream with nothing said changes nothing');
-});
-
-test('the api refusing to follow any further closes the EventSource for good, and says so', () => {
-  const { stream, now } = followed();
-  stream.readyState = CLOSED;
-  stream.fire('error');
-  assert.deepEqual([now().live, now().error], [false, 'The api refused to follow it any further.']);
-});
-
-test('REFUSED: a stream that said it is over is closed once the api has ended its response, or after the grace, never the moment its last event came', (t) => {
-  t.mock.timers.enable({ apis: ['setTimeout'] });
-
-  const over = followed();
-  over.stream.send('done');
-  assert.deepEqual(
-    [over.now().live, over.now().ended, over.stream.readyState],
-    [false, true, 1],
-    'not closed while its response may arrive',
-  );
-  endsResponse(over.stream);
-  assert.deepEqual([over.stream.readyState, over.now().error], [2, null], 'closed then, and nothing said of a refusal');
-  let closes = 0;
-  over.stream.close = () => void closes++;
-  t.mock.timers.tick(END_GRACE_MS);
-  assert.equal(closes, 0, 'the grace was cleared when it closed');
-
-  const hanging = followed();
-  hanging.stream.send('unreadable', { error: 'Its task is gone.', retrying: false });
-  t.mock.timers.tick(END_GRACE_MS - 1);
-  assert.equal(hanging.stream.readyState, 1, 'an api that never ends it: not closed before the grace');
-  t.mock.timers.tick(1);
-  assert.equal(hanging.stream.readyState, 2, 'an api that never ends it: closed after the grace');
-
-  const left = followed();
-  left.stream.send('done');
-  left.stop();
-  assert.equal(left.stream.readyState, 2, 'stopped by the page before the api ended it: closed');
-  let again = 0;
-  left.stream.close = () => void again++;
-  t.mock.timers.tick(END_GRACE_MS);
-  assert.equal(again, 0, 'stopped by the page: its grace cleared');
-});
-
-test('an end folds what arrived in the frame it cancels, so nothing said before it is lost', () => {
-  const { stream, now } = followed();
-  stream.send('said', 'The last word.');
-  stream.send('done');
-  assert.deepEqual([now().words, now().live], [['The last word.'], false]);
-});
-
-test("REFUSED: the page's frames are the browser's own functions, called as the browser calls them, which throw called off any object but the window", (t) => {
-  const window = globalThis as { requestAnimationFrame?: unknown; cancelAnimationFrame?: unknown };
-  const [request, cancel] = [window.requestAnimationFrame, window.cancelAnimationFrame];
-  const flushes: Array<() => void> = [];
-  window.requestAnimationFrame = function (this: unknown, flush: () => void) {
-    if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
-    flushes.push(flush);
-    return flushes.length;
-  };
-  window.cancelAnimationFrame = function (this: unknown) {
-    if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
-  };
-  t.after(() => Object.assign(window, { requestAnimationFrame: request, cancelAnimationFrame: cancel }));
-
-  let state = blank();
-  const stream = new Stream();
-  follow(
-    stream,
-    talker,
-    (change) => {
-      state = change(state);
+test('follow: the transport and the protocol of a followed conversation, each case on a stream of its own', async (t) => {
+  await t.test('the arrivals that come together are folded once, on one frame, and two of one kind join as they queue', () => {
+    const { stream, now, flush, frames } = followed();
+    stream.send('said', 'One.');
+    stream.send('said', 'Two.');
+    stream.send('marked');
+    stream.send('said', 'Three.');
+    assert.deepEqual([now().words, now().marks], [[], 0], 'nothing is folded before the frame');
+    assert.equal(frames(), 1, 'the four arrivals wait for one frame');
+    flush();
+    assert.deepEqual(now().words, ['One.', 'Two.', 'Three.'], 'in the order they came');
+    assert.equal(now().marks, 1, 'the mark between them was not joined into either side');
+  });
+  await t.test('an event the conversation does not read brings nothing, and one of no name at all is not listened for', () => {
+    const { stream, now, flush } = followed();
+    stream.send('said', '');
+    stream.send('shouted', 'Hey.');
+    flush();
+    assert.deepEqual([now().words, now().marks], [[], 0]);
+  });
+  await t.test(
+    'a read the api says it is making again is a notice, not an end: it fills `retrying`, leaves `error` null and keeps the stream',
+    () => {
+      const { stream, now } = followed();
+      stream.send('unreadable', { error: 'Its journal could not be read.', retrying: true });
+      assert.deepEqual(
+        [now().retrying, now().error, now().live, now().ended, stream.readyState],
+        ['Its journal could not be read.', null, true, false, 1],
+        'the page is told why, and goes on following',
+      );
+      stream.send('readable');
+      assert.deepEqual([now().retrying, now().error, now().live], [null, null, true], 'and a read that works again clears it');
     },
-    animationFrames,
   );
-  stream.send('said', 'Said while it ran.');
-  stream.send('said', 'And again.');
-  assert.equal(flushes.length, 1, 'the two events wait for one frame');
-  flushes[0]();
-  assert.deepEqual(state.words, ['Said while it ran.', 'And again.']);
+  await t.test(
+    'a read the api will not make again is the end: it fills `error`, clears `retrying`, and leaves what the conversation leaves',
+    () => {
+      const { stream, now } = followed();
+      stream.send('unreadable', { error: 'Reading it again.', retrying: true });
+      stream.send('unreadable', { error: 'Its task is gone.', retrying: false });
+      assert.deepEqual([now().error, now().retrying, now().live, now().ended], ['Its task is gone.', null, false, true]);
+    },
+  );
+  await t.test('a read the api named nothing of says the conversation’s own words', () => {
+    const { stream, now } = followed();
+    stream.send('unreadable', { retrying: false });
+    assert.equal(now().error, 'It could not be read.');
+  });
+  await t.test('a connection made clears both, and changes nothing a page holds where there is nothing to clear', () => {
+    const { stream, now } = followed();
+    stream.send('unreadable', { error: 'Reading it again.', retrying: true });
+    stream.fire('open');
+    assert.deepEqual([now().retrying, now().error], [null, null], 'a fresh server stream sends no `readable`, so the connection clears it');
+    const before = now();
+    stream.fire('open');
+    assert.equal(now(), before, 'an open on a stream with nothing said changes nothing');
+  });
+  await t.test('the api refusing to follow any further closes the EventSource for good, and says so', () => {
+    const { stream, now } = followed();
+    stream.readyState = CLOSED;
+    stream.fire('error');
+    assert.deepEqual([now().live, now().error], [false, 'The api refused to follow it any further.']);
+  });
+  await t.test(
+    'REFUSED: a stream that said it is over is closed once the api has ended its response, or after the grace, never the moment its last event came',
+    (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout'] });
+
+      const over = followed();
+      over.stream.send('done');
+      assert.deepEqual(
+        [over.now().live, over.now().ended, over.stream.readyState],
+        [false, true, 1],
+        'not closed while its response may arrive',
+      );
+      endsResponse(over.stream);
+      assert.deepEqual([over.stream.readyState, over.now().error], [2, null], 'closed then, and nothing said of a refusal');
+      let closes = 0;
+      over.stream.close = () => void closes++;
+      t.mock.timers.tick(END_GRACE_MS);
+      assert.equal(closes, 0, 'the grace was cleared when it closed');
+
+      const hanging = followed();
+      hanging.stream.send('unreadable', { error: 'Its task is gone.', retrying: false });
+      t.mock.timers.tick(END_GRACE_MS - 1);
+      assert.equal(hanging.stream.readyState, 1, 'an api that never ends it: not closed before the grace');
+      t.mock.timers.tick(1);
+      assert.equal(hanging.stream.readyState, 2, 'an api that never ends it: closed after the grace');
+
+      const left = followed();
+      left.stream.send('done');
+      left.stop();
+      assert.equal(left.stream.readyState, 2, 'stopped by the page before the api ended it: closed');
+      let again = 0;
+      left.stream.close = () => void again++;
+      t.mock.timers.tick(END_GRACE_MS);
+      assert.equal(again, 0, 'stopped by the page: its grace cleared');
+    },
+  );
+  await t.test('an end folds what arrived in the frame it cancels, so nothing said before it is lost', () => {
+    const { stream, now } = followed();
+    stream.send('said', 'The last word.');
+    stream.send('done');
+    assert.deepEqual([now().words, now().live], [['The last word.'], false]);
+  });
+  await t.test(
+    "REFUSED: the page's frames are the browser's own functions, called as the browser calls them, which throw called off any object but the window",
+    (t) => {
+      const window = globalThis as { requestAnimationFrame?: unknown; cancelAnimationFrame?: unknown };
+      const [request, cancel] = [window.requestAnimationFrame, window.cancelAnimationFrame];
+      const flushes: Array<() => void> = [];
+      window.requestAnimationFrame = function (this: unknown, flush: () => void) {
+        if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+        flushes.push(flush);
+        return flushes.length;
+      };
+      window.cancelAnimationFrame = function (this: unknown) {
+        if (this !== undefined && this !== globalThis) throw new TypeError('Illegal invocation');
+      };
+      t.after(() => Object.assign(window, { requestAnimationFrame: request, cancelAnimationFrame: cancel }));
+
+      let state = blank();
+      const stream = new Stream();
+      follow(
+        stream,
+        talker,
+        (change) => {
+          state = change(state);
+        },
+        animationFrames,
+      );
+      stream.send('said', 'Said while it ran.');
+      stream.send('said', 'And again.');
+      assert.equal(flushes.length, 1, 'the two events wait for one frame');
+      flushes[0]();
+      assert.deepEqual(state.words, ['Said while it ran.', 'And again.']);
+    },
+  );
 });
 
 /** A file of `src/lib` that listens for an `unreadable` event itself, matched across the line breaks a formatter may leave. */

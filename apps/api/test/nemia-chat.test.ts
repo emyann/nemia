@@ -12,6 +12,7 @@
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
+import { story } from './checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -61,47 +62,111 @@ async function streamed(res: Response, enough: (said: Block[]) => boolean): Prom
 const textsOf = (said: Block[]) =>
   said.filter((b) => b.event === 'chat').map((b) => (JSON.parse(b.data!) as ChatEvent & { text?: string }).text);
 
-test('a page of her history, with where she is', async () => {
-  withHer(['One.', 'Two.', 'Three.']);
-  const page = await asked('GET', '/api/nemia/chat?limit=2');
-  assert.equal(page.status, 200);
-  const body = page.body as unknown as ChatHistory;
-  assert.deepEqual(
-    body.events.map((e) => (e as { text: string }).text),
-    ['Two.', 'Three.'],
-  );
-  assert.deepEqual(body.presence, { up: true, answering: true, waitsOnYou: 0, unread: 3 });
-  assert.equal(body.before, 'm:1:e1:0');
-  assert.equal((await asked('GET', '/api/nemia/chat?limit=0')).status, 422, 'a page of no size');
-});
-
-test('REFUSED: a send with no words is a 422 and a body that is none a 400; one with words is put in her outbox, 201', async () => {
-  withHer([]);
-  const empty = await asked('POST', '/api/nemia/chat/send', { text: '   ' });
-  assert.equal(empty.status, 422);
-  assert.match(String(empty.body.error), /^The message is empty/);
-  assert.equal((await asked('POST', '/api/nemia/chat/send', { words: 'hi' })).status, 400);
-  const sent = await asked('POST', '/api/nemia/chat/send', { text: 'Hello' });
-  assert.equal(sent.status, 201);
-  assert.equal(sent.body.text, 'Hello');
-  const page = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
-  assert.deepEqual(page.events.at(-1), {
-    kind: 'message',
-    id: `p:${String(sent.body.id)}`,
-    at: sent.body.at,
-    from: 'person',
-    text: 'Hello',
-    delivered: null,
+test('A person talks with Nemia in her chat: a page of history, a send to her outbox, read marks, a question answered, and the stream from presence to a resume', async (t) => {
+  const s = story(t);
+  await s.test('a page of her history, with where she is', async () => {
+    withHer(['One.', 'Two.', 'Three.']);
+    const page = await asked('GET', '/api/nemia/chat?limit=2');
+    assert.equal(page.status, 200);
+    const body = page.body as unknown as ChatHistory;
+    assert.deepEqual(
+      body.events.map((e) => (e as { text: string }).text),
+      ['Two.', 'Three.'],
+    );
+    assert.deepEqual(body.presence, { up: true, answering: true, waitsOnYou: 0, unread: 3 });
+    assert.equal(body.before, 'm:1:e1:0');
+    assert.equal((await asked('GET', '/api/nemia/chat?limit=0')).status, 422, 'a page of no size');
   });
-});
-
-test('REFUSED: a read mark on an event she does not hold is a 404; one she holds is a 200, and unread follows it', async () => {
-  withHer(['One.', 'Two.']);
-  assert.equal((await asked('POST', '/api/nemia/chat/read', { through: 'm:9:z' })).status, 404);
-  const marked = await asked('POST', '/api/nemia/chat/read', { through: 'm:1:e0:0' });
-  assert.equal(marked.status, 200);
-  assert.equal(marked.body.through, 'm:1:e0:0');
-  assert.equal(((await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory).presence.unread, 1);
+  await s.test(
+    'REFUSED: a send with no words is a 422 and a body that is none a 400; one with words is put in her outbox, 201',
+    async () => {
+      withHer([]);
+      const empty = await asked('POST', '/api/nemia/chat/send', { text: '   ' });
+      assert.equal(empty.status, 422);
+      assert.match(String(empty.body.error), /^The message is empty/);
+      assert.equal((await asked('POST', '/api/nemia/chat/send', { words: 'hi' })).status, 400);
+      const sent = await asked('POST', '/api/nemia/chat/send', { text: 'Hello' });
+      assert.equal(sent.status, 201);
+      assert.equal(sent.body.text, 'Hello');
+      const page = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
+      assert.deepEqual(page.events.at(-1), {
+        kind: 'message',
+        id: `p:${String(sent.body.id)}`,
+        at: sent.body.at,
+        from: 'person',
+        text: 'Hello',
+        delivered: null,
+      });
+    },
+  );
+  await s.test('REFUSED: a read mark on an event she does not hold is a 404; one she holds is a 200, and unread follows it', async () => {
+    withHer(['One.', 'Two.']);
+    assert.equal((await asked('POST', '/api/nemia/chat/read', { through: 'm:9:z' })).status, 404);
+    const marked = await asked('POST', '/api/nemia/chat/read', { through: 'm:1:e0:0' });
+    assert.equal(marked.status, 200);
+    assert.equal(marked.body.through, 'm:1:e0:0');
+    assert.equal(((await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory).presence.unread, 1);
+  });
+  await s.test('a question of hers is answered by the person, drawn with their choice, and waits on them no longer', async () => {
+    withHer(['One.']);
+    const ask = waiting();
+    const question = ask.questions[0].question;
+    const before = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
+    assert.equal(before.presence.waitsOnYou, 1, 'her question waits on the person');
+    const answered = await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks: [{ question, labels: ['Cut it on read'] }] });
+    assert.equal(answered.status, 200);
+    assert.deepEqual(answered.body.answers, { [question]: 'Cut it on read' });
+    const after = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
+    const drawn = after.events.find((e: ChatEvent) => e.kind === 'question');
+    assert.deepEqual(drawn?.kind === 'question' ? drawn.chose : undefined, { [question]: 'Cut it on read' });
+    assert.equal(after.presence.waitsOnYou, 0, 'answered: it waits on nobody');
+  });
+  await s.test(
+    'REFUSED: a question her chat does not hold is a 404, one answered already a 409, picks that do not answer it a 422, a body that is none a 400',
+    async () => {
+      withHer(['One.']);
+      const ask = waiting();
+      const question = ask.questions[0].question;
+      const picks = [{ question, labels: ['Cut it on read'] }];
+      assert.equal((await asked('POST', '/api/nemia/chat/answer', { id: 'q9', picks })).status, 404);
+      assert.equal((await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks: [] })).status, 422, 'the question left out');
+      const stray = await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks: [{ question, labels: ['Something else'] }] });
+      assert.equal(stray.status, 422);
+      assert.match(String(stray.body.error), /is no choice of/);
+      assert.equal((await asked('POST', '/api/nemia/chat/answer', { id: 'q1', answers: {} })).status, 400, 'no picks at all');
+      assert.equal((await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks })).status, 200);
+      const twice = await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks });
+      assert.equal(twice.status, 409);
+      assert.match(String(twice.body.error), /read her chat again/);
+    },
+  );
+  await s.test(
+    'the stream sends presence first, then her events with the cursor, and resumes after Last-Event-ID with nothing repeated',
+    async () => {
+      const { sessionId } = withHer(['One.', 'Two.']);
+      const first = await streamed(await app.request('/api/nemia/chat/stream'), (said) => textsOf(said).length >= 2);
+      assert.equal(first[0]?.event, 'presence');
+      assert.deepEqual(JSON.parse(first[0].data!), { up: true, answering: true, waitsOnYou: 0, unread: 2 });
+      assert.deepEqual(textsOf(first), ['One.', 'Two.']);
+      const cursor = first.filter((b) => b.id !== undefined).at(-1)?.id;
+      assert.equal(cursor, '1.2.0.0.0.0.0.0.0');
+      said(sessionId, ['Three.'], 2);
+      const resumed = await streamed(
+        await app.request('/api/nemia/chat/stream', { headers: { 'Last-Event-ID': cursor } }),
+        (said) => textsOf(said).length >= 1,
+      );
+      assert.deepEqual(textsOf(resumed), ['Three.']);
+      assert.equal(resumed.filter((b) => b.id !== undefined).at(-1)?.id, '1.3.0.0.0.0.0.0.0');
+    },
+  );
+  await s.test('REFUSED: a stream from a cursor no read gave is a 422 before it opens', async () => {
+    withHer(['One.']);
+    for (const headers of [{ 'Last-Event-ID': 'page-2' }, { 'Last-Event-ID': '9.0.0.0.0' }]) {
+      const res = await app.request('/api/nemia/chat/stream', { headers });
+      assert.equal(res.status, 422);
+      assert.match(String(((await res.json()) as { error: string }).error), /is not a cursor a chat read gave/);
+    }
+  });
 });
 
 /** One question of hers waiting on the person, as the keeper wrote it into her chat. */
@@ -129,21 +194,6 @@ function waiting(ask: Ask = ASK): Ask {
   return ask;
 }
 
-test('a question of hers is answered by the person, drawn with their choice, and waits on them no longer', async () => {
-  withHer(['One.']);
-  const ask = waiting();
-  const question = ask.questions[0].question;
-  const before = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
-  assert.equal(before.presence.waitsOnYou, 1, 'her question waits on the person');
-  const answered = await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks: [{ question, labels: ['Cut it on read'] }] });
-  assert.equal(answered.status, 200);
-  assert.deepEqual(answered.body.answers, { [question]: 'Cut it on read' });
-  const after = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
-  const drawn = after.events.find((e: ChatEvent) => e.kind === 'question');
-  assert.deepEqual(drawn?.kind === 'question' ? drawn.chose : undefined, { [question]: 'Cut it on read' });
-  assert.equal(after.presence.waitsOnYou, 0, 'answered: it waits on nobody');
-});
-
 test('a question whose call was cut is served with the moment it was, and waits on nobody', async () => {
   withHer(['One.']);
   const ask = waiting();
@@ -156,55 +206,58 @@ test('a question whose call was cut is served with the moment it was, and waits 
   assert.equal(page.cursor.split('.').length, 9, 'the marks are a count of the cursor a stream resumes from');
 });
 
-test('REFUSED: a question her chat does not hold is a 404, one answered already a 409, picks that do not answer it a 422, a body that is none a 400', async () => {
-  withHer(['One.']);
-  const ask = waiting();
-  const question = ask.questions[0].question;
-  const picks = [{ question, labels: ['Cut it on read'] }];
-  assert.equal((await asked('POST', '/api/nemia/chat/answer', { id: 'q9', picks })).status, 404);
-  assert.equal((await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks: [] })).status, 422, 'the question left out');
-  const stray = await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks: [{ question, labels: ['Something else'] }] });
-  assert.equal(stray.status, 422);
-  assert.match(String(stray.body.error), /is no choice of/);
-  assert.equal((await asked('POST', '/api/nemia/chat/answer', { id: 'q1', answers: {} })).status, 400, 'no picks at all');
-  assert.equal((await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks })).status, 200);
-  const twice = await asked('POST', '/api/nemia/chat/answer', { id: 'q1', picks });
-  assert.equal(twice.status, 409);
-  assert.match(String(twice.body.error), /read her chat again/);
-});
-
-test('REFUSED: an answer made by a page on another site, or with no JSON content-type, is refused before it reaches her chat', async () => {
-  withHer(['One.']);
-  waiting();
-  const body = JSON.stringify({ id: 'q1', picks: [{ question: ASK.questions[0].question, labels: ['Cut it on read'] }] });
-  const cross = await app.request('/api/nemia/chat/answer', {
-    method: 'POST',
-    headers: { ...BOARD, 'sec-fetch-site': 'cross-site' },
-    body,
-  });
-  assert.equal(cross.status, 403);
-  const plain = await app.request('/api/nemia/chat/answer', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' }, body });
-  assert.equal(plain.status, 415);
-  const page = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
-  const drawn = page.events.find((e: ChatEvent) => e.kind === 'question');
-  assert.equal(drawn?.kind === 'question' ? drawn.chose : 'none', undefined, 'neither write reached her chat');
-});
-
-test('the stream sends presence first, then her events with the cursor, and resumes after Last-Event-ID with nothing repeated', async () => {
-  const { sessionId } = withHer(['One.', 'Two.']);
-  const first = await streamed(await app.request('/api/nemia/chat/stream'), (said) => textsOf(said).length >= 2);
-  assert.equal(first[0]?.event, 'presence');
-  assert.deepEqual(JSON.parse(first[0].data!), { up: true, answering: true, waitsOnYou: 0, unread: 2 });
-  assert.deepEqual(textsOf(first), ['One.', 'Two.']);
-  const cursor = first.filter((b) => b.id !== undefined).at(-1)?.id;
-  assert.equal(cursor, '1.2.0.0.0.0.0.0.0');
-  said(sessionId, ['Three.'], 2);
-  const resumed = await streamed(
-    await app.request('/api/nemia/chat/stream', { headers: { 'Last-Event-ID': cursor } }),
-    (said) => textsOf(said).length >= 1,
+test('REFUSED: a write to her chat before it reaches her — an answer or a stop from another site or not JSON, a stop her harness cannot make', async (t) => {
+  await t.test(
+    'REFUSED: an answer made by a page on another site, or with no JSON content-type, is refused before it reaches her chat',
+    async () => {
+      withHer(['One.']);
+      waiting();
+      const body = JSON.stringify({ id: 'q1', picks: [{ question: ASK.questions[0].question, labels: ['Cut it on read'] }] });
+      const cross = await app.request('/api/nemia/chat/answer', {
+        method: 'POST',
+        headers: { ...BOARD, 'sec-fetch-site': 'cross-site' },
+        body,
+      });
+      assert.equal(cross.status, 403);
+      const plain = await app.request('/api/nemia/chat/answer', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' }, body });
+      assert.equal(plain.status, 415);
+      const page = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
+      const drawn = page.events.find((e: ChatEvent) => e.kind === 'question');
+      assert.equal(drawn?.kind === 'question' ? drawn.chose : 'none', undefined, 'neither write reached her chat');
+    },
   );
-  assert.deepEqual(textsOf(resumed), ['Three.']);
-  assert.equal(resumed.filter((b) => b.id !== undefined).at(-1)?.id, '1.3.0.0.0.0.0.0.0');
+  await t.test(
+    "REFUSED: a stop of a session whose harness cannot end a turn is a 409 in that harness's words, and leaves no Stopped line",
+    async () => {
+      withHer(['One.']);
+      const stopped = await asked('POST', '/api/nemia/chat/stop', {});
+      assert.equal(stopped.status, 409);
+      assert.match(
+        String(stopped.body.error),
+        /does not run attached on the Agent SDK, and its turn cannot be ended without ending its session/,
+      );
+      const history = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
+      assert.deepEqual(
+        history.events.filter((e: ChatEvent) => e.kind === 'message' && e.from === 'keeper'),
+        [],
+        'a turn the runtime did not end is on no record',
+      );
+    },
+  );
+  await t.test(
+    'REFUSED: a stop made by a page on another site, or with no JSON content-type, is refused before it reaches her',
+    async () => {
+      withHer(['One.']);
+      const cross = await app.request('/api/nemia/chat/stop', {
+        method: 'POST',
+        headers: { ...BOARD, 'sec-fetch-site': 'cross-site' },
+        body: '{}',
+      });
+      assert.equal(cross.status, 403);
+      const plain = await app.request('/api/nemia/chat/stop', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' } });
+      assert.equal(plain.status, 415);
+    },
+  );
 });
 
 /** The beat a test's own chat stream reads again on (`Beats.chat`), shorter than the shipped `CHAT_BEAT_MS`. */
@@ -240,41 +293,4 @@ test('a read that fails under an open stream is `unreadable` with retrying, and 
     true,
     'the beat that reads again says `readable`, which takes the notice off the page, before what it read',
   );
-});
-
-test('REFUSED: a stream from a cursor no read gave is a 422 before it opens', async () => {
-  withHer(['One.']);
-  for (const headers of [{ 'Last-Event-ID': 'page-2' }, { 'Last-Event-ID': '9.0.0.0.0' }]) {
-    const res = await app.request('/api/nemia/chat/stream', { headers });
-    assert.equal(res.status, 422);
-    assert.match(String(((await res.json()) as { error: string }).error), /is not a cursor a chat read gave/);
-  }
-});
-
-test("REFUSED: a stop of a session whose harness cannot end a turn is a 409 in that harness's words, and leaves no Stopped line", async () => {
-  withHer(['One.']);
-  const stopped = await asked('POST', '/api/nemia/chat/stop', {});
-  assert.equal(stopped.status, 409);
-  assert.match(
-    String(stopped.body.error),
-    /does not run attached on the Agent SDK, and its turn cannot be ended without ending its session/,
-  );
-  const history = (await asked('GET', '/api/nemia/chat')).body as unknown as ChatHistory;
-  assert.deepEqual(
-    history.events.filter((e: ChatEvent) => e.kind === 'message' && e.from === 'keeper'),
-    [],
-    'a turn the runtime did not end is on no record',
-  );
-});
-
-test('REFUSED: a stop made by a page on another site, or with no JSON content-type, is refused before it reaches her', async () => {
-  withHer(['One.']);
-  const cross = await app.request('/api/nemia/chat/stop', {
-    method: 'POST',
-    headers: { ...BOARD, 'sec-fetch-site': 'cross-site' },
-    body: '{}',
-  });
-  assert.equal(cross.status, 403);
-  const plain = await app.request('/api/nemia/chat/stop', { method: 'POST', headers: { 'sec-fetch-site': 'same-origin' } });
-  assert.equal(plain.status, 415);
 });

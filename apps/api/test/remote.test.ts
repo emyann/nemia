@@ -92,7 +92,7 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
   fs.rmSync(path.join(root, 'a2a-agents.json'));
 });
 
-test('a remote step whose Task waits on its caller is answered with nemia say, and its question read with nemia logs — not in Claude Code', () => {
+test('needsOf: where a step whose Task waits on its caller is answered, by the harness it runs on', async (t) => {
   const view = (harness: string): TaskView => ({
     id: 't-asks',
     phase: 'needs-human',
@@ -130,13 +130,19 @@ test('a remote step whose Task waits on its caller is answered with nemia say, a
     waitingOnYou: [] as string[],
     beside: new Map([['ask', { waits: 'waiting for an input' }]]),
   };
-  assert.deepEqual(needsOf(run, 'ask', new Map([['t-asks', view('a2a:reviewer')]]), judged).waitingFor, {
-    words: 'waiting for an input',
-    advice: 'read its question with nemia logs r-asks ask, and answer it with nemia say r-asks ask "<your answer>"',
-  });
-  assert.deepEqual(
-    needsOf(run, 'ask', new Map([['t-asks', view('claude')]]), judged).waitingFor?.advice,
-    'answer it in Claude Code: claude agents, session ae/t-asks/1',
-    'the same wait on a harness of ours is answered where it runs',
+  await t.test(
+    'a remote step whose Task waits on its caller is answered with nemia say, and its question read with nemia logs — not in Claude Code',
+    () => {
+      assert.deepEqual(needsOf(run, 'ask', new Map([['t-asks', view('a2a:reviewer')]]), judged).waitingFor, {
+        words: 'waiting for an input',
+        advice: 'read its question with nemia logs r-asks ask, and answer it with nemia say r-asks ask "<your answer>"',
+      });
+    },
   );
+  await t.test('the same wait on a harness of ours is answered where it runs', () => {
+    assert.deepEqual(
+      needsOf(run, 'ask', new Map([['t-asks', view('claude')]]), judged).waitingFor?.advice,
+      'answer it in Claude Code: claude agents, session ae/t-asks/1',
+    );
+  });
 });

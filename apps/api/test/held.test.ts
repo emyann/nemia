@@ -12,6 +12,7 @@
  */
 import { root } from './harness.ts';
 import { test } from 'node:test';
+import { story } from './checkpoints.ts';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
 import fs from 'node:fs';
@@ -101,50 +102,60 @@ const summary = async (id: string) => {
   return run;
 };
 
-test('a held step that signed off blocked reads `input-required · BLOCKED` with its question, and waits on you — on both endpoints, as `nemia ls` says', async () => {
-  assert.equal(
-    (await Effect.runPromise(engine().view('h-blocked-plan'))).phase,
-    'input-required',
-    "the seed is the engine's held task, waiting",
+test('a step whose task is held open reads as waiting on a person, never as a session still going: blocked, gated, and rechecked on one task', async (t) => {
+  const s = story(t);
+  await s.test(
+    'a held step that signed off blocked reads `input-required · BLOCKED` with its question, and waits on you — on both endpoints, as `nemia ls` says',
+    async () => {
+      assert.equal(
+        (await Effect.runPromise(engine().view('h-blocked-plan'))).phase,
+        'input-required',
+        "the seed is the engine's held task, waiting",
+      );
+      const listed = await runWith(engine(), list(engine(), runStore.runs.read('h-blocked')));
+      for (const run of [await detail('h-blocked'), await summary('h-blocked')]) {
+        assert.deepEqual(
+          run.steps.map(({ name, status, needs }) => ({ name, status, needs })),
+          [
+            { name: 'plan', status: 'input-required · BLOCKED', needs: BLOCKED.needs },
+            { name: 'implement', status: 'waiting', needs: null },
+          ],
+        );
+        assert.deepEqual(
+          run.steps.map((s) => s.status),
+          listed.steps.map((s) => s.status),
+        );
+        assert.deepEqual(run.waitingOnYou, ['plan']);
+      }
+    },
   );
-  const listed = await runWith(engine(), list(engine(), runStore.runs.read('h-blocked')));
-  for (const run of [await detail('h-blocked'), await summary('h-blocked')]) {
-    assert.deepEqual(
-      run.steps.map(({ name, status, needs }) => ({ name, status, needs })),
-      [
-        { name: 'plan', status: 'input-required · BLOCKED', needs: BLOCKED.needs },
-        { name: 'implement', status: 'waiting', needs: null },
-      ],
-    );
-    assert.deepEqual(
-      run.steps.map((s) => s.status),
-      listed.steps.map((s) => s.status),
-    );
-    assert.deepEqual(run.waitingOnYou, ['plan']);
-  }
-});
-
-test("a held step at its gate reads `awaiting approval`, never the engine's word for a session still going, and waits on you", async () => {
-  for (const run of [await detail('h-gate'), await summary('h-gate')]) {
-    assert.deepEqual(
-      run.steps.map((s) => s.status),
-      ['awaiting approval', 'waiting'],
-    );
-    assert.deepEqual(run.waitingOnYou, ['plan']);
-  }
-});
-
-test("a recheck is no turn: a try after one, on the same task filed before tasks were held open, reads that task's attempts and sign-off as it did", async () => {
-  const plan = (await detail('h-rechecked')).steps[0];
-  assert.deepEqual(
-    plan.tries.map((t) => [t.try, t.taskId]),
-    [
-      [1, 'h-rechecked-plan'],
-      [2, 'h-rechecked-plan'],
-      [3, 'h-rechecked-plan-try3'],
-    ],
+  await s.test(
+    "a held step at its gate reads `awaiting approval`, never the engine's word for a session still going, and waits on you",
+    async () => {
+      for (const run of [await detail('h-gate'), await summary('h-gate')]) {
+        assert.deepEqual(
+          run.steps.map((s) => s.status),
+          ['awaiting approval', 'waiting'],
+        );
+        assert.deepEqual(run.waitingOnYou, ['plan']);
+      }
+    },
   );
-  for (const t of plan.tries.slice(0, 2)) {
-    assert.deepEqual([t.attempts.count, t.attempts.latest?.ended, t.closeout?.summary], [1, 'done', DONE.summary], `try ${t.try}`);
-  }
+  await s.test(
+    "a recheck is no turn: a try after one, on the same task filed before tasks were held open, reads that task's attempts and sign-off as it did",
+    async () => {
+      const plan = (await detail('h-rechecked')).steps[0];
+      assert.deepEqual(
+        plan.tries.map((t) => [t.try, t.taskId]),
+        [
+          [1, 'h-rechecked-plan'],
+          [2, 'h-rechecked-plan'],
+          [3, 'h-rechecked-plan-try3'],
+        ],
+      );
+      for (const t of plan.tries.slice(0, 2)) {
+        assert.deepEqual([t.attempts.count, t.attempts.latest?.ended, t.closeout?.summary], [1, 'done', DONE.summary], `try ${t.try}`);
+      }
+    },
+  );
 });

@@ -85,28 +85,6 @@ function unsaid(css: string): string[] {
   return SAID.filter(({ where, says }) => !says.test(blocks[where])).map(({ what }) => what);
 }
 
-test("REFUSED: the look's scroll bar rule is in the board's styles; with a block cut out, what it said is named", () => {
-  assert.deepEqual(unsaid(STYLES), [], 'the rule is whole');
-  const [parts, others, ink] = [STYLES.indexOf(PARTS), STYLES.indexOf(OTHERS), STYLES.indexOf(INK)];
-  assert.ok(parts >= 0 && others > parts && ink > others, 'the three names the slices end on are there, in order');
-  const noParts = unsaid(STYLES.slice(0, parts) + STYLES.slice(others));
-  assert.deepEqual(
-    noParts,
-    SAID.filter(({ where }) => where === 'parts').map(({ what }) => what),
-    'the parts cut out: each is named',
-  );
-  const noOthers = unsaid(STYLES.slice(0, others) + STYLES.slice(ink));
-  assert.deepEqual(
-    noOthers,
-    SAID.filter(({ where }) => where === 'others').map(({ what }) => what),
-    'the others cut out: each is named',
-  );
-  assert.deepEqual(unsaid(STYLES.replace('color-scheme: light dark;', '')), ['both colour schemes on the root'], 'the schemes cut out');
-  assert.deepEqual(unsaid(STYLES.replace("[data-scroll-bar='shown'] {\n      --bar-ink", "[data-scroll-bar='lit'] {\n      --bar-ink")), [
-    'the thumb in outline while it scrolls',
-  ]);
-});
-
 /** A stand-in for an element: what was written on it, in order. */
 type Stand = { written: string[]; setAttribute: (name: string, value: string) => void };
 const stand = (): Stand => {
@@ -147,56 +125,58 @@ function world() {
   };
 }
 
-test('a scroll marks what scrolled shown, and at rest once the linger has passed with no other; the mark is written only as it changes', () => {
-  const { source, later, calls, scroll, waits, step } = world();
-  markScrolls(source, later);
-  assert.deepEqual(calls, ['add scroll {"capture":true,"passive":true}'], 'one listener, on the way down, that cannot stop a scroll');
-  const box = stand();
-  scroll(box);
-  assert.deepEqual(box.written, [`${BAR}=shown`], 'a scroll marks the element shown');
-  assert.deepEqual(waits(), [LINGER_MS], 'and its rest is due after the linger');
-  scroll(box);
-  assert.deepEqual(box.written, [`${BAR}=shown`], 'a second scroll writes nothing: it is shown already');
-  assert.deepEqual(waits(), [LINGER_MS], 'and puts its rest off: the first is taken back');
-  step();
-  assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'the linger passed, it is at rest');
-  scroll(box);
-  assert.deepEqual(box.written.at(-1), `${BAR}=shown`, 'and a scroll after its rest shows it again');
-});
-
-test("REFUSED: the first scroll's rest does not fire while a second is still to linger", () => {
-  const { source, later, scroll, step } = world();
-  markScrolls(source, later);
-  const box = stand();
-  scroll(box);
-  scroll(box);
-  step();
-  assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'stepped once, one rest is written: the rest put off never ran');
-});
-
-test("the page's own scroll marks the document's root, and each thing that scrolls has its own rest", () => {
-  const { source, later, scroll, step } = world();
-  markScrolls(source, later);
-  const [root, box] = [stand(), stand()];
-  scroll({ documentElement: root });
-  scroll(box);
-  assert.deepEqual([root.written, box.written], [[`${BAR}=shown`], [`${BAR}=shown`]], 'the root for the page, the element for itself');
-  scroll(null);
-  scroll({ no: 'element' });
-  step();
-  assert.deepEqual([root.written.at(-1), box.written.at(-1)], [`${BAR}=rest`, `${BAR}=rest`]);
-});
-
-test('undone, nothing listens, and what was shown is at rest with no rest left due', () => {
-  const { source, later, calls, listening, scroll, waits } = world();
-  const undo = markScrolls(source, later);
-  const box = stand();
-  scroll(box);
-  undo();
-  assert.equal(listening(), false, 'the listener is taken off');
-  assert.equal(calls.at(-1), 'remove scroll');
-  assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'what was shown is put at rest');
-  assert.deepEqual(waits(), [], 'and no rest is left due');
+test('markScrolls: what scrolled shown, and at rest once its linger has passed', async (t) => {
+  await t.test(
+    'a scroll marks what scrolled shown, and at rest once the linger has passed with no other; the mark is written only as it changes',
+    () => {
+      const { source, later, calls, scroll, waits, step } = world();
+      markScrolls(source, later);
+      assert.deepEqual(calls, ['add scroll {"capture":true,"passive":true}'], 'one listener, on the way down, that cannot stop a scroll');
+      const box = stand();
+      scroll(box);
+      assert.deepEqual(box.written, [`${BAR}=shown`], 'a scroll marks the element shown');
+      assert.deepEqual(waits(), [LINGER_MS], 'and its rest is due after the linger');
+      scroll(box);
+      assert.deepEqual(box.written, [`${BAR}=shown`], 'a second scroll writes nothing: it is shown already');
+      assert.deepEqual(waits(), [LINGER_MS], 'and puts its rest off: the first is taken back');
+      step();
+      assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'the linger passed, it is at rest');
+      scroll(box);
+      assert.deepEqual(box.written.at(-1), `${BAR}=shown`, 'and a scroll after its rest shows it again');
+    },
+  );
+  await t.test("REFUSED: the first scroll's rest does not fire while a second is still to linger", () => {
+    const { source, later, scroll, step } = world();
+    markScrolls(source, later);
+    const box = stand();
+    scroll(box);
+    scroll(box);
+    step();
+    assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'stepped once, one rest is written: the rest put off never ran');
+  });
+  await t.test("the page's own scroll marks the document's root, and each thing that scrolls has its own rest", () => {
+    const { source, later, scroll, step } = world();
+    markScrolls(source, later);
+    const [root, box] = [stand(), stand()];
+    scroll({ documentElement: root });
+    scroll(box);
+    assert.deepEqual([root.written, box.written], [[`${BAR}=shown`], [`${BAR}=shown`]], 'the root for the page, the element for itself');
+    scroll(null);
+    scroll({ no: 'element' });
+    step();
+    assert.deepEqual([root.written.at(-1), box.written.at(-1)], [`${BAR}=rest`, `${BAR}=rest`]);
+  });
+  await t.test('undone, nothing listens, and what was shown is at rest with no rest left due', () => {
+    const { source, later, calls, listening, scroll, waits } = world();
+    const undo = markScrolls(source, later);
+    const box = stand();
+    scroll(box);
+    undo();
+    assert.equal(listening(), false, 'the listener is taken off');
+    assert.equal(calls.at(-1), 'remove scroll');
+    assert.deepEqual(box.written, [`${BAR}=shown`, `${BAR}=rest`], 'what was shown is put at rest');
+    assert.deepEqual(waits(), [], 'and no rest is left due');
+  });
 });
 
 /** The text of the board's file at `file`, from `from` to `to`, two names it must hold in that order. */
@@ -207,9 +187,32 @@ function sliceOf(file: string, from: string, to: string): string {
   return text.slice(start, end);
 }
 
-test("the frame marks what scrolls once, in its root, and the sidebar's list hides no scroll bar", () => {
-  assert.match(sliceOf('routes/__root.tsx', 'function Root()', 'return ('), /\n\s*useScrollMark\(\);/, 'Root calls the hook');
-  const list = sliceOf('components/ui/sidebar.tsx', 'function SidebarContent(', 'function SidebarGroup(');
-  assert.match(list, /overflow-auto/, 'the list scrolls');
-  assert.doesNotMatch(list, /no-scrollbar/, 'and wears nothing that hides its bar');
+test("the scroll bar in the board's source: the rule in its styles, and the frame that marks what scrolls", async (t) => {
+  await t.test("REFUSED: the look's scroll bar rule is in the board's styles; with a block cut out, what it said is named", () => {
+    assert.deepEqual(unsaid(STYLES), [], 'the rule is whole');
+    const [parts, others, ink] = [STYLES.indexOf(PARTS), STYLES.indexOf(OTHERS), STYLES.indexOf(INK)];
+    assert.ok(parts >= 0 && others > parts && ink > others, 'the three names the slices end on are there, in order');
+    const noParts = unsaid(STYLES.slice(0, parts) + STYLES.slice(others));
+    assert.deepEqual(
+      noParts,
+      SAID.filter(({ where }) => where === 'parts').map(({ what }) => what),
+      'the parts cut out: each is named',
+    );
+    const noOthers = unsaid(STYLES.slice(0, others) + STYLES.slice(ink));
+    assert.deepEqual(
+      noOthers,
+      SAID.filter(({ where }) => where === 'others').map(({ what }) => what),
+      'the others cut out: each is named',
+    );
+    assert.deepEqual(unsaid(STYLES.replace('color-scheme: light dark;', '')), ['both colour schemes on the root'], 'the schemes cut out');
+    assert.deepEqual(unsaid(STYLES.replace("[data-scroll-bar='shown'] {\n      --bar-ink", "[data-scroll-bar='lit'] {\n      --bar-ink")), [
+      'the thumb in outline while it scrolls',
+    ]);
+  });
+  await t.test("the frame marks what scrolls once, in its root, and the sidebar's list hides no scroll bar", () => {
+    assert.match(sliceOf('routes/__root.tsx', 'function Root()', 'return ('), /\n\s*useScrollMark\(\);/, 'Root calls the hook');
+    const list = sliceOf('components/ui/sidebar.tsx', 'function SidebarContent(', 'function SidebarGroup(');
+    assert.match(list, /overflow-auto/, 'the list scrolls');
+    assert.doesNotMatch(list, /no-scrollbar/, 'and wears nothing that hides its bar');
+  });
 });

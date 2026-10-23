@@ -99,87 +99,43 @@ const strip = (factory?: string) =>
     factory,
   });
 
-test("a run's work that stopped at or after the day's start counts today, landed or failed; one before it counts for nothing", () => {
-  const s = strip();
-  assert.equal(s.landed, 1, 'landed 10 minutes after midnight, not 10 minutes before');
-  assert.equal(s.failed, 1, 'failed on the stroke of midnight');
-  assert.equal(s.perLanding, 6, "the mean of today's landings alone: yesterday's $100 is not in it");
-});
-
-test('a landing whose cost was not measured is landed, and left out of the mean cost of a landing', () => {
-  const unpriced = ended('r-unpriced', 'succeeded', DAY + 20 * MIN, 0, { cost: null });
-  const s = stripOf({ runs: [landedToday, unpriced], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.deepEqual([s.landed, s.perLanding], [2, 6]);
-});
-
-test('a step not at work is no row, though its task started: one that asks a person waits on them', () => {
-  const asks = atWorkBy(summary([['plan', 'running']], { id: 'r-asks' }), 'plan', 'iris', NOW - 3 * MIN);
-  asks.steps[0].status = 'needs-human';
-  const s = stripOf({ runs: [asks], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.deepEqual([s.rows.length, s.agents.count, s.sessions.count], [0, 0, 0]);
-});
-
-test('a run called off or with its result undecided is neither landed nor failed, though its cost is spent today', () => {
-  const s = stripOf({ runs: [cancelledToday, undecided], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.deepEqual([s.landed, s.failed, s.spentUsd, s.perLanding], [0, 0, 6, null]);
-});
-
-test('a run that waits on a person counts in Wait on you alone, one that moves and waits too; In flight is the rest of the open runs', () => {
-  const s = strip();
-  assert.equal(s.waitsOnYou, 2, 'the run at its gate and the one that moves and waits');
-  assert.equal(s.inFlight, 2, 'the two that move and wait on nobody');
-});
-
-test("Spent is every run worked today, whole, a cost not measured counting nothing; A landing is '—' before the first", () => {
-  assert.equal(strip().spentUsd, 6 + 3 + 1 + 5 + 2 + 7 + 4, "each run worked or stopped today, never yesterday's landing");
-  const idleSinceYesterday = ended('r-idle', 'awaiting approval', DAY - 30 * MIN, 50, { waitingOnYou: ['plan'] });
-  const quiet = stripOf({ runs: [idleSinceYesterday], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.deepEqual([quiet.waitsOnYou, quiet.spentUsd], [1, 0], 'an open run not worked since midnight spends nothing today');
-  assert.equal(dollars(null), '—');
-  assert.equal(dollars(7.851), '$7.85', 'to the cent below $10');
-  assert.equal(dollars(12.684), '$13', 'whole from $10, so a sticker stays as narrow');
-  assert.equal(dollars(230.4), '$230');
-});
-
-test('the factory in view keeps its own runs, and the default factory those whose record names none', () => {
-  const kit = strip('kit');
-  assert.deepEqual([kit.inFlight, kit.waitsOnYou, kit.landed], [1, 0, 0]);
-  const home = strip('default');
-  assert.deepEqual([home.inFlight, home.waitsOnYou, home.landed], [1, 2, 1]);
-});
-
-test('the agents at work are counted once each against those hired in view, their steps longest at work first', () => {
-  const s = strip();
-  assert.deepEqual(s.agents, { count: 2, hired: 2 }, 'ada at work on two steps is one agent; hired: ada and otto');
-  assert.deepEqual(
-    s.rows.map((r) => `${r.agent} · ${r.step} · ${r.title} ${r.atWork}`),
-    ['ada · implement · The kit batch 17m', 'otto · land · The runs page 9m', 'ada · review · The kit batch 5m'],
-  );
-  assert.deepEqual(strip('default').agents, { count: 1, hired: 1 }, 'none hired in the default factory, and ada at work there');
-});
-
-test('an agent at work that no factory in view hires counts in the total too, so the count is never past it', () => {
-  const kit = (hires: Record<string, string>) =>
-    stripOf({ runs: [flying, kitFlying], factories: [factory('kit', hires)], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.deepEqual(kit({ 'build/land': 'otto' }).agents, { count: 2, hired: 2 }, 'ada at work by its step file, otto hired');
-  assert.deepEqual(kit({ 'build/land': 'otto', 'build/plan': 'iris' }).agents, { count: 2, hired: 3 }, 'and iris hired, idle');
-  const idle = stripOf({ runs: [], factories: [factory('kit', {})], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.equal(idle.agents.hired, null, 'no agent hired and none at work: no total');
-});
-
-test('three rows are shown, and the rest said as how many more', () => {
-  const many = Array.from({ length: 5 }, (_, i) =>
-    atWorkBy(summary([['s', 'running']], { id: `r-${i}` }), 's', `agent-${i}`, NOW - (i + 1) * MIN),
-  );
-  const s = stripOf({ runs: many, factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.deepEqual([s.rows.length, s.more, s.rows[0].agent], [3, 2, 'agent-4']);
-});
-
-test('the readout says each count against its cap, and drops the cap where the machine has none', () => {
-  const s = strip();
-  assert.equal(readoutOf(s), '2 OF 7 RUNS · 3 OF 50 SESSIONS');
-  const bare = stripOf({ runs: RUNS, factories: [], ceilings: ceilings({ cap: 0, last: null }), now: NOW, dayStart: DAY });
-  assert.equal(readoutOf(bare), '2 RUNS · 3 SESSIONS');
+test('stripOf and readoutOf: the factory in view, its agents at work, and the readout', async (t) => {
+  await t.test('the factory in view keeps its own runs, and the default factory those whose record names none', () => {
+    const kit = strip('kit');
+    assert.deepEqual([kit.inFlight, kit.waitsOnYou, kit.landed], [1, 0, 0]);
+    const home = strip('default');
+    assert.deepEqual([home.inFlight, home.waitsOnYou, home.landed], [1, 2, 1]);
+  });
+  await t.test('the agents at work are counted once each against those hired in view, their steps longest at work first', () => {
+    const s = strip();
+    assert.deepEqual(s.agents, { count: 2, hired: 2 }, 'ada at work on two steps is one agent; hired: ada and otto');
+    assert.deepEqual(
+      s.rows.map((r) => `${r.agent} · ${r.step} · ${r.title} ${r.atWork}`),
+      ['ada · implement · The kit batch 17m', 'otto · land · The runs page 9m', 'ada · review · The kit batch 5m'],
+    );
+    assert.deepEqual(strip('default').agents, { count: 1, hired: 1 }, 'none hired in the default factory, and ada at work there');
+  });
+  await t.test('an agent at work that no factory in view hires counts in the total too, so the count is never past it', () => {
+    const kit = (hires: Record<string, string>) =>
+      stripOf({ runs: [flying, kitFlying], factories: [factory('kit', hires)], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.deepEqual(kit({ 'build/land': 'otto' }).agents, { count: 2, hired: 2 }, 'ada at work by its step file, otto hired');
+    assert.deepEqual(kit({ 'build/land': 'otto', 'build/plan': 'iris' }).agents, { count: 2, hired: 3 }, 'and iris hired, idle');
+    const idle = stripOf({ runs: [], factories: [factory('kit', {})], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.equal(idle.agents.hired, null, 'no agent hired and none at work: no total');
+  });
+  await t.test('three rows are shown, and the rest said as how many more', () => {
+    const many = Array.from({ length: 5 }, (_, i) =>
+      atWorkBy(summary([['s', 'running']], { id: `r-${i}` }), 's', `agent-${i}`, NOW - (i + 1) * MIN),
+    );
+    const s = stripOf({ runs: many, factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.deepEqual([s.rows.length, s.more, s.rows[0].agent], [3, 2, 'agent-4']);
+  });
+  await t.test('the readout says each count against its cap, and drops the cap where the machine has none', () => {
+    const s = strip();
+    assert.equal(readoutOf(s), '2 OF 7 RUNS · 3 OF 50 SESSIONS');
+    const bare = stripOf({ runs: RUNS, factories: [], ceilings: ceilings({ cap: 0, last: null }), now: NOW, dayStart: DAY });
+    assert.equal(readoutOf(bare), '2 RUNS · 3 SESSIONS');
+  });
 });
 
 test("the day starts at midnight in the process's time zone", () => {
@@ -203,27 +159,28 @@ const win = (extra: Partial<QuotaWindow> = {}): QuotaWindow => ({
   ...extra,
 });
 
-test('a window runs out when its pace so far uses it up before it resets, and never after the reset', () => {
-  assert.equal(runsOutAt(win(), NOW), null, '50% in four hours: the rest in four more, after the reset');
-  assert.equal(
-    runsOutAt(win({ usedPercentage: 90 }), NOW),
-    NOW + 1_600_000,
-    '90% in four hours: the last 10% in 26 minutes 40, before the reset',
-  );
-  const fast = win({ usedPercentage: 90, resetsAt: at(NOW + 4 * 60 * MIN) });
-  assert.equal(runsOutAt(fast, NOW), NOW + (60 * MIN) / 9, '90% in one hour: the last 10% in a ninth of an hour');
-  assert.equal(runsOutAt(win({ key: 'other' }), NOW), null, 'a window of no known length');
-});
-
-test("the quota's line says when the soonest window runs out and when it resets, else when the most used resets", () => {
-  const fast = win({ usedPercentage: 90, resetsAt: at(NOW + 4 * 60 * MIN) });
-  const line = quotaLineOf([win({ key: 'seven_day', resetsAt: at(NOW + 86_400_000) }), fast], NOW, 'UTC');
-  assert.deepEqual(line, { runsOut: 'Runs out about 2:06 PM', resets: 'resets 6:00 PM' });
-  assert.deepEqual(quotaLineOf([win({ usedPercentage: 20 }), win({ usedPercentage: 60, key: 'other' })], NOW, 'UTC'), {
-    runsOut: null,
-    resets: 'resets 3:00 PM',
+test("runsOutAt and quotaLineOf: when a window runs out, and the quota's line", async (t) => {
+  await t.test('a window runs out when its pace so far uses it up before it resets, and never after the reset', () => {
+    assert.equal(runsOutAt(win(), NOW), null, '50% in four hours: the rest in four more, after the reset');
+    assert.equal(
+      runsOutAt(win({ usedPercentage: 90 }), NOW),
+      NOW + 1_600_000,
+      '90% in four hours: the last 10% in 26 minutes 40, before the reset',
+    );
+    const fast = win({ usedPercentage: 90, resetsAt: at(NOW + 4 * 60 * MIN) });
+    assert.equal(runsOutAt(fast, NOW), NOW + (60 * MIN) / 9, '90% in one hour: the last 10% in a ninth of an hour');
+    assert.equal(runsOutAt(win({ key: 'other' }), NOW), null, 'a window of no known length');
   });
-  assert.equal(quotaLineOf([win({ resetsAt: null })], NOW, 'UTC'), null);
+  await t.test("the quota's line says when the soonest window runs out and when it resets, else when the most used resets", () => {
+    const fast = win({ usedPercentage: 90, resetsAt: at(NOW + 4 * 60 * MIN) });
+    const line = quotaLineOf([win({ key: 'seven_day', resetsAt: at(NOW + 86_400_000) }), fast], NOW, 'UTC');
+    assert.deepEqual(line, { runsOut: 'Runs out about 2:06 PM', resets: 'resets 6:00 PM' });
+    assert.deepEqual(quotaLineOf([win({ usedPercentage: 20 }), win({ usedPercentage: 60, key: 'other' })], NOW, 'UTC'), {
+      runsOut: null,
+      resets: 'resets 3:00 PM',
+    });
+    assert.equal(quotaLineOf([win({ resetsAt: null })], NOW, 'UTC'), null);
+  });
 });
 
 /** Tokens of a run: `total` split over the four kinds, `unmeasured` sessions besides. */
@@ -241,33 +198,76 @@ const tokensOf = (total: number, unmeasured = 0, more: Partial<NonNullable<RunSu
   ...more,
 });
 
-test("REFUSED: Spent's tokens of a run Spent does not count: they are those of exactly the runs worked today", () => {
-  const today = { ...landedToday, tokens: tokensOf(800, 1) };
-  const yesterday = { ...landedYesterday, tokens: tokensOf(8_000_000) };
-  const unmeasured = { ...failedAtMidnight, tokens: null };
-  const s = stripOf({ runs: [today, yesterday, unmeasured], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.deepEqual(
-    s.spentTokens,
-    {
-      total: 800,
-      input: 400,
-      output: 400,
-      cacheRead: 200,
-      cacheWrite: 100,
-      uncached: 100,
-      unmeasured: 2,
+test('stripOf: what counts today, landed, failed, waiting and spent', async (t) => {
+  await t.test(
+    "a run's work that stopped at or after the day's start counts today, landed or failed; one before it counts for nothing",
+    () => {
+      const s = strip();
+      assert.equal(s.landed, 1, 'landed 10 minutes after midnight, not 10 minutes before');
+      assert.equal(s.failed, 1, 'failed on the stroke of midnight');
+      assert.equal(s.perLanding, 6, "the mean of today's landings alone: yesterday's $100 is not in it");
     },
-    "yesterday's run is in no count; the run with a cost and no tokens is one session more that measured none",
   );
-});
-
-test('a part of the day is null where one counted run lacks it, and the day has no tokens where no run measured any', () => {
-  const parted = { ...landedToday, tokens: tokensOf(800) };
-  const whole = { ...cancelledToday, tokens: tokensOf(80, 0, { cacheRead: null, cacheWrite: null, uncached: null }) };
-  const s = stripOf({ runs: [parted, whole], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.equal(s.spentTokens?.total, 880);
-  assert.deepEqual([s.spentTokens?.cacheRead, s.spentTokens?.cacheWrite, s.spentTokens?.uncached], [null, null, null]);
-  assert.equal(s.spentTokens?.input, 440);
-  const none = stripOf({ runs: [landedToday], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
-  assert.equal(none.spentTokens, null);
+  await t.test('a landing whose cost was not measured is landed, and left out of the mean cost of a landing', () => {
+    const unpriced = ended('r-unpriced', 'succeeded', DAY + 20 * MIN, 0, { cost: null });
+    const s = stripOf({ runs: [landedToday, unpriced], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.deepEqual([s.landed, s.perLanding], [2, 6]);
+  });
+  await t.test('a step not at work is no row, though its task started: one that asks a person waits on them', () => {
+    const asks = atWorkBy(summary([['plan', 'running']], { id: 'r-asks' }), 'plan', 'iris', NOW - 3 * MIN);
+    asks.steps[0].status = 'needs-human';
+    const s = stripOf({ runs: [asks], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.deepEqual([s.rows.length, s.agents.count, s.sessions.count], [0, 0, 0]);
+  });
+  await t.test('a run called off or with its result undecided is neither landed nor failed, though its cost is spent today', () => {
+    const s = stripOf({ runs: [cancelledToday, undecided], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.deepEqual([s.landed, s.failed, s.spentUsd, s.perLanding], [0, 0, 6, null]);
+  });
+  await t.test(
+    'a run that waits on a person counts in Wait on you alone, one that moves and waits too; In flight is the rest of the open runs',
+    () => {
+      const s = strip();
+      assert.equal(s.waitsOnYou, 2, 'the run at its gate and the one that moves and waits');
+      assert.equal(s.inFlight, 2, 'the two that move and wait on nobody');
+    },
+  );
+  await t.test("Spent is every run worked today, whole, a cost not measured counting nothing; A landing is '—' before the first", () => {
+    assert.equal(strip().spentUsd, 6 + 3 + 1 + 5 + 2 + 7 + 4, "each run worked or stopped today, never yesterday's landing");
+    const idleSinceYesterday = ended('r-idle', 'awaiting approval', DAY - 30 * MIN, 50, { waitingOnYou: ['plan'] });
+    const quiet = stripOf({ runs: [idleSinceYesterday], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.deepEqual([quiet.waitsOnYou, quiet.spentUsd], [1, 0], 'an open run not worked since midnight spends nothing today');
+    assert.equal(dollars(null), '—');
+    assert.equal(dollars(7.851), '$7.85', 'to the cent below $10');
+    assert.equal(dollars(12.684), '$13', 'whole from $10, so a sticker stays as narrow');
+    assert.equal(dollars(230.4), '$230');
+  });
+  await t.test("REFUSED: Spent's tokens of a run Spent does not count: they are those of exactly the runs worked today", () => {
+    const today = { ...landedToday, tokens: tokensOf(800, 1) };
+    const yesterday = { ...landedYesterday, tokens: tokensOf(8_000_000) };
+    const unmeasured = { ...failedAtMidnight, tokens: null };
+    const s = stripOf({ runs: [today, yesterday, unmeasured], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.deepEqual(
+      s.spentTokens,
+      {
+        total: 800,
+        input: 400,
+        output: 400,
+        cacheRead: 200,
+        cacheWrite: 100,
+        uncached: 100,
+        unmeasured: 2,
+      },
+      "yesterday's run is in no count; the run with a cost and no tokens is one session more that measured none",
+    );
+  });
+  await t.test('a part of the day is null where one counted run lacks it, and the day has no tokens where no run measured any', () => {
+    const parted = { ...landedToday, tokens: tokensOf(800) };
+    const whole = { ...cancelledToday, tokens: tokensOf(80, 0, { cacheRead: null, cacheWrite: null, uncached: null }) };
+    const s = stripOf({ runs: [parted, whole], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.equal(s.spentTokens?.total, 880);
+    assert.deepEqual([s.spentTokens?.cacheRead, s.spentTokens?.cacheWrite, s.spentTokens?.uncached], [null, null, null]);
+    assert.equal(s.spentTokens?.input, 440);
+    const none = stripOf({ runs: [landedToday], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
+    assert.equal(none.spentTokens, null);
+  });
 });

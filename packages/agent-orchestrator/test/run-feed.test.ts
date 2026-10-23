@@ -251,8 +251,10 @@ test(
       'the gate reached is one line over four passes, and the run says once, in its own word, that it waits on a person',
       async () => {
         settle(task(run, 'plan'), 'succeeded', SIGNED);
+        const before = size();
         const moved = await tick();
         const after = size();
+        assert.ok(after > before, 'the pass wrote the gate');
         assert.deepEqual(
           recordFeed(judged(moved), { memo: freshFeedMemo() }).lines,
           [],
@@ -437,6 +439,10 @@ test(
         false,
         'and the torn line is read by nobody',
       );
+      for (const step of ['plan', 'implement']) {
+        const said = words(run.id, step);
+        assert.equal(new Set(said).size, said.length, `nothing after it is said twice: ${step} ${said.join(' → ')}`);
+      }
     });
     await s.test('a watch follows the lines as they are written, in order, until stopped, and delivers nothing after', async (sub) => {
       const got: FeedLine[] = [];
@@ -455,8 +461,8 @@ test(
         await tick();
         await until(
           sub,
-          () => got.length >= 1,
-          () => `a line handed by the watch; it handed ${got.length}`,
+          () => got.length >= 2,
+          () => `two lines handed by the watch; it handed ${got.length}`,
           { bell: arrived },
         );
         assert.deepEqual(got, readFeed(from).lines.slice(0, got.length), 'the lines, in order, as the feed has them');

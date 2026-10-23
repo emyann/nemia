@@ -2598,8 +2598,8 @@ test("a resumed try's tokens are its own share: its parent's whole session taken
 const H4SJ_TRY2_OWN = { inputTokens: 4240114, uncachedTokens: 28, cacheWriteTokens: 30746, cacheReadTokens: 4209340, outputTokens: 11961 };
 
 /** The tokens of a usage, its cost and API time left out. */
-const tokensOf = (usage: object | undefined) => {
-  const { costUsd: _, apiMs: __, ...rest } = (usage ?? {}) as { costUsd?: number; apiMs?: number };
+const tokensOf = <U extends { costUsd?: number; apiMs?: number }>(usage: U | undefined) => {
+  const { costUsd: _, apiMs: __, ...rest } = usage ?? ({} as U);
   return rest;
 };
 

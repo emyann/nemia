@@ -23,6 +23,9 @@ import {
   quotaOf,
   makeQuota,
   QuotaAsker,
+  daemonQuota,
+  harnessQuotaOf,
+  QUOTA_DAEMON_WAIT_MS,
 } from './quota.ts';
 
 type Quota = import('./quota.ts').Quota;
@@ -305,6 +308,45 @@ test('REFUSED: a second read inside the keep asks nothing; one past it asks agai
   clock += 60_000;
   assert.equal((await read({ now, mono })).state, 'failed');
   assert.equal(fake.asked, before + 2, 'a failure is held as long');
+});
+
+test("the daemon's answer is the board's: a fresh quota's windows the board shows, and no windows for any other state", () => {
+  assert.deepEqual(harnessQuotaOf(quotaOf(heard(plan()), null, NOW)), {
+    kind: 'windows',
+    limits: [
+      { key: 'five_hour', usedPercentage: 38.4, resetsAt: '2026-09-19T12:00:00.048Z' },
+      { key: 'seven_day', usedPercentage: 86, resetsAt: '2026-09-22T10:00:00.000Z' },
+    ],
+    subscription: 'max',
+  });
+  for (const q of [quotaOf(null, null, NOW), quotaOf(heard(UNANSWERED), null, NOW), quotaOf(heard({ kind: 'no-plan' }), null, NOW)])
+    assert.notEqual(harnessQuotaOf(q).kind, 'windows', `REFUSED: ${q.state} gives no windows`);
+  assert.ok(QUOTA_DAEMON_WAIT_MS > 15_000, "the daemon waits past the runtime's own 15 s limit on get_usage");
+});
+
+test('REFUSED: a board and the daemon reading within the keep ask once; after an unanswered, neither asks inside its wait', async () => {
+  fresh();
+  const base = Date.now();
+  let clock = base;
+  const now = () => clock;
+  const mono = () => clock - base;
+  const before = fake.asked;
+  const counting = async () => {
+    fake.asked += 1;
+    return fake.next;
+  };
+  const daemon = daemonQuota((opts) => readQuota({ ...opts, now, mono }), counting);
+  assert.equal((await read({ now, mono })).state, 'fresh', 'a board reads');
+  clock += QUOTA_KEEP_MS - 1;
+  assert.equal((await daemon()).kind, 'windows', 'the daemon reads what the board asked for');
+  assert.equal(fake.asked, before + 1, 'one ask for both');
+  fake.next = UNANSWERED;
+  clock += 1;
+  assert.notEqual((await daemon()).kind, 'windows', 'past the keep the daemon asks, and is told nothing');
+  clock += QUOTA_BACKOFF_MS - 1;
+  await daemon();
+  await read({ now, mono });
+  assert.equal(fake.asked, before + 2, 'inside the backoff neither asks');
 });
 
 test('REFUSED: after an unanswered answer no read asks inside the wait, however many boards read; the waits grow, and a good reading begins them again', async () => {

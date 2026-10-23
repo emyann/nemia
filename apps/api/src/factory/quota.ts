@@ -371,6 +371,32 @@ export function makeQuota(): ReadQuota {
   };
 }
 
+/**
+ * How long the daemon's read waits for its ask: thirty seconds, past the fifteen the runtime gives `get_usage` before it answers
+ * `timeout`, so the daemon is told what the ask came to rather than `asking`, which it would record nothing of.
+ */
+export const QUOTA_DAEMON_WAIT_MS = 30_000;
+
+/**
+ * A board's quota as the runtime words an answer: a `fresh` one's windows, as the board shows them, keys the board does not know left out;
+ * any other state an answer with no windows, which the daemon records nothing of. Pure.
+ */
+export function harnessQuotaOf(q: Quota): HarnessQuota {
+  if (q.state !== 'fresh') return { kind: 'unknown', what: `the board's quota is ${q.state}` };
+  const limits = q.windows.map(({ key, usedPercentage, resetsAt }) => ({ key, usedPercentage, resetsAt }));
+  return { kind: 'windows', limits, subscription: q.subscription };
+}
+
+/**
+ * The daemon's ask of the quota, through `read`, the asker the boards read (`QuotaAsker`), so a board and the daemon share one keep, one
+ * backoff and one ask in flight: `ask` reaches the engine only when the asker would for a board, and its read waits
+ * `QUOTA_DAEMON_WAIT_MS`.
+ */
+export const daemonQuota =
+  (read: ReadQuota, ask: () => Promise<HarnessQuota>) =>
+  (env: NodeJS.ProcessEnv = process.env): Promise<HarnessQuota> =>
+    read({ ask, env, waitMs: QUOTA_DAEMON_WAIT_MS }).then(harnessQuotaOf);
+
 /** The quota asker every board's read shares, one for an app (`live`, a fresh `makeQuota`): a test gives its own with `layer`. */
 export class QuotaAsker extends Context.Service<QuotaAsker, ReadQuota>()('api/QuotaAsker') {
   static readonly live: Layer.Layer<QuotaAsker> = Layer.sync(QuotaAsker)(makeQuota);

@@ -7,7 +7,8 @@
  * taken over or a pass that fails ends the process. Its passes are said as `nemia up` says them, through the telemetry the app's layer
  * holds (`telemetryLayer` in `liveOf`, app.ts): the pass is given the app runtime's context whole (`Effect.provideContext`), so its lines
  * go through the same logger every request's does, its spans and its series are exported to the collector `OTEL_EXPORTER_OTLP_ENDPOINT`
- * names, its own series a collector reads by their increase (`STEP_FOLLOWS`) born at zero with the daemon's (`up`'s `series`), and the hub
+ * names, its own series a collector reads by their increase (`STEP_FOLLOWS`) born at zero with the daemon's (`up`'s `series`), its quota
+ * asked of `claude` through the asker the boards read (`daemonQuota`, `QuotaAsker`), so a board open beside it adds no ask, and the hub
  * its layer built (`FeedHub`), which the app's streams of the feed read, and the place its programs ask (`PlaceService`) come with it. The
  * runtime is disposed as the pass ends, however it ends, so the exporters post what they hold once more before the process goes.
  * With `--no-tick` it serves alone, holding nothing. It prints the port the server got: the one asked for, or a free one for `PORT=0`.
@@ -22,7 +23,8 @@ import type { Services } from './layer.ts';
 import { repoOf } from './capabilities/capabilities.ts';
 import { argsOf, HOST, portOf } from './port.ts';
 import { STEP_FOLLOWS } from './steps/following.ts';
-import { Engine } from './store.ts';
+import { daemonQuota, QuotaAsker } from './factory/quota.ts';
+import { Engine, engineRead } from './store.ts';
 
 /** Prints `err`'s message and exits with its code: 2 for a refusal, 1 for anything else. */
 const fail = (err: unknown): never => {
@@ -33,6 +35,7 @@ const fail = (err: unknown): never => {
 let port: number;
 let args: ReturnType<typeof argsOf>;
 let e: Engine['Service'];
+let asker: QuotaAsker['Service'];
 let services: Context.Context<Services>;
 const running = runningRelease();
 try {
@@ -42,6 +45,7 @@ try {
   port = portOf(process.env.PORT, args.ticks);
   services = await runtime.context();
   e = Context.get(services, Engine);
+  asker = Context.get(services, QuotaAsker);
 } catch (err) {
   fail(err);
 }
@@ -84,6 +88,10 @@ else
       repo: repoOf(process.env, running),
       holder: 'api',
       series: [STEP_FOLLOWS],
+      quota: (name) =>
+        name === 'claude'
+          ? Effect.promise(() => daemonQuota(asker!, () => engineRead('quota', e!.quota('claude')))())
+          : e!.quota(name),
       onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
     }).pipe(Effect.scoped, Effect.provideContext(services!), Effect.ensuring(runtime.disposeEffect)),
   ).catch(fail);

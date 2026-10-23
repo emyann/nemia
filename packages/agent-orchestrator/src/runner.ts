@@ -288,7 +288,7 @@ export {
 } from './daemon/daemon.store.ts';
 export type { TakenStore } from './daemon/daemon.store.ts';
 export { holdUrl, runMain, up } from './daemon/up.verb.ts';
-export type { UpOptions } from './daemon/up.verb.ts';
+export type { QuotaAsk, UpOptions } from './daemon/up.verb.ts';
 export { ensureDaemon, liveDemandHost } from './demand/demand.verb.ts';
 export type { DemandHost } from './demand/demand.verb.ts';
 export { telemetryLayer } from './telemetry/telemetry.store.ts';

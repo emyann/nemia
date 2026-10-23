@@ -1274,3 +1274,16 @@ test('a pass makes one GetTask per open remote task, and none once they settle',
     t.diagnostic(`${n} settled: pass ${report.ms.toFixed(1)} ms`);
   }
 });
+
+test('a session let go already is released again as nothing: no request, and its record stays in `remote/done/`', async () => {
+  const root = scratch('ae-remote-');
+  fs.mkdirSync(path.join(root, 'remote', 'done'), { recursive: true });
+  const doneFile = path.join(root, 'remote', 'done', `${encodeURIComponent('ae/t-gone/1')}.json`);
+  const record = `${JSON.stringify({ name: 'ae/t-gone/1', agent: 'remote', taskId: 'm-gone', reply: 'painted', ended: true })}\n`;
+  fs.writeFileSync(doneFile, record);
+  const ops = remoteOps('remote', { url: 'http://127.0.0.1:9/' }, root);
+  const session = { sessionId: 'm-gone', state: 'completed' } as Parameters<NonNullable<typeof ops.release>>[0];
+  await Effect.runPromise(ops.release!(session, {}));
+  assert.equal(fs.readFileSync(doneFile, 'utf8'), record, 'the record let go of is not moved nor rewritten');
+  assert.deepEqual(fs.readdirSync(path.join(root, 'remote')).sort(), ['done'], 'and no open record is made');
+});

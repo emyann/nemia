@@ -9,6 +9,7 @@
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
+import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -107,74 +108,84 @@ writeRun('r-child', {}, { after: ['r-bad'] });
 writeRun('r-sibling', {}, { after: ['r-good'] });
 await runWith(engine(), passStanding(runStore.runs.list()));
 
-test('GET /api/runs answers every run while one task journal holds an entry no runtime wrote, and says of the runs that read it why', async () => {
-  const res = await app.request('/api/runs');
-  assert.equal(res.status, 200, await res.clone().text());
-  const runs = new Map(((await res.json()) as RunSummary[]).map((run) => [run.id, run]));
-  assert.deepEqual([...runs.keys()].sort(), ['r-bad', 'r-child', 'r-good', 'r-sibling']);
+test('a run whose task journal holds an entry no runtime wrote is answered off its record on the list, refused on its page in those words, and counted in flight', async (t) => {
+  const s = story(t);
+  await s.test(
+    'GET /api/runs answers every run while one task journal holds an entry no runtime wrote, and says of the runs that read it why',
+    async () => {
+      const res = await app.request('/api/runs');
+      assert.equal(res.status, 200, await res.clone().text());
+      const runs = new Map(((await res.json()) as RunSummary[]).map((run) => [run.id, run]));
+      assert.deepEqual([...runs.keys()].sort(), ['r-bad', 'r-child', 'r-good', 'r-sibling']);
 
-  const good = runs.get('r-good')!;
-  assert.equal(good.status, 'succeeded');
-  assert.equal(good.unreadable, null);
-  assert.equal(runs.get('r-sibling')!.unreadable, null, 'a run waiting on a run whose tasks read is judged as ever');
-  assert.equal(good.factory, 'pipao', 'judged, a run names the factory its record names');
-  assert.equal(runs.get('r-sibling')!.factory, null, 'and a record that names none is the default factory, null');
+      const good = runs.get('r-good')!;
+      assert.equal(good.status, 'succeeded');
+      assert.equal(good.unreadable, null);
+      assert.equal(runs.get('r-sibling')!.unreadable, null, 'a run waiting on a run whose tasks read is judged as ever');
+      assert.equal(good.factory, 'pipao', 'judged, a run names the factory its record names');
+      assert.equal(runs.get('r-sibling')!.factory, null, 'and a record that names none is the default factory, null');
 
-  const bad = runs.get('r-bad')!;
-  const said = `${journal('r-bad-implement')}), entry 6 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`;
-  assert.ok(
-    bad.unreadable?.startsWith(
-      `r-bad's record reads, but the journal of its task r-bad-implement does not: r-bad-implement's journal (${said}`,
-    ),
-    bad.unreadable ?? 'null',
+      const bad = runs.get('r-bad')!;
+      const said = `${journal('r-bad-implement')}), entry 6 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`;
+      assert.ok(
+        bad.unreadable?.startsWith(
+          `r-bad's record reads, but the journal of its task r-bad-implement does not: r-bad-implement's journal (${said}`,
+        ),
+        bad.unreadable ?? 'null',
+      );
+      assert.ok(bad.unreadable?.includes('the tick does not advance it, until that journal reads again'), bad.unreadable ?? 'null');
+      assert.equal(bad.brief, 'The brief of r-bad', 'what its record says');
+      assert.equal(bad.factory, 'pipao', 'its factory among it');
+      assert.deepEqual(
+        bad.steps.map((s) => [s.name, s.taskId, s.status]),
+        [['implement', 'r-bad-implement', 'unreadable']],
+      );
+      assert.equal(bad.status, 'running', 'counted in flight, as the tick counts it');
+      assert.equal(bad.moving, true);
+      assert.deepEqual([bad.atWork, bad.tokens], [null, null], 'nothing judged: no time at work and no tokens, which are not 0');
+      assert.deepEqual(bad.waitingOnYou, []);
+
+      const child = runs.get('r-child')!;
+      assert.ok(
+        child.unreadable?.startsWith(
+          `r-child's record reads, but the journal of a task of a run it waits on does not: r-bad-implement's journal (`,
+        ),
+        child.unreadable ?? 'null',
+      );
+      assert.deepEqual(child.after, ['r-bad']);
+    },
   );
-  assert.ok(bad.unreadable?.includes('the tick does not advance it, until that journal reads again'), bad.unreadable ?? 'null');
-  assert.equal(bad.brief, 'The brief of r-bad', 'what its record says');
-  assert.equal(bad.factory, 'pipao', 'its factory among it');
-  assert.deepEqual(
-    bad.steps.map((s) => [s.name, s.taskId, s.status]),
-    [['implement', 'r-bad-implement', 'unreadable']],
+  await s.test(
+    "a run a task of which does not read has its page refused in the list's words, and every other run answered in full",
+    async () => {
+      const list = new Map(((await (await app.request('/api/runs')).json()) as RunSummary[]).map((run) => [run.id, run]));
+      for (const id of ['r-bad', 'r-child']) {
+        const res = await app.request(`/api/runs/${id}`);
+        const body = (await res.json()) as { error?: string };
+        assert.equal(res.status, 502, JSON.stringify(body));
+        assert.equal(body.error, list.get(id)!.unreadable, `${id}'s page and the list say one thing`);
+      }
+      for (const id of ['r-good', 'r-sibling']) {
+        const res = await app.request(`/api/runs/${id}`);
+        assert.equal(res.status, 200, await res.clone().text());
+      }
+    },
   );
-  assert.equal(bad.status, 'running', 'counted in flight, as the tick counts it');
-  assert.equal(bad.moving, true);
-  assert.deepEqual([bad.atWork, bad.tokens], [null, null], 'nothing judged: no time at work and no tokens, which are not 0');
-  assert.deepEqual(bad.waitingOnYou, []);
-
-  const child = runs.get('r-child')!;
-  assert.ok(
-    child.unreadable?.startsWith(
-      `r-child's record reads, but the journal of a task of a run it waits on does not: r-bad-implement's journal (`,
-    ),
-    child.unreadable ?? 'null',
+  await s.test(
+    'GET /api/ceilings answers while a task journal does not read, and counts the runs that read it in flight, as the tick does',
+    async () => {
+      const was = process.env.WF_MAX_RUNS;
+      process.env.WF_MAX_RUNS = '4';
+      try {
+        const res = await app.request('/api/ceilings');
+        assert.equal(res.status, 200, await res.clone().text());
+        const ceilings = (await res.json()) as Ceilings;
+        assert.equal(ceilings.cap, 4);
+        assert.deepEqual([...(ceilings.inFlight ?? [])].sort(), ['r-bad', 'r-child']);
+      } finally {
+        if (was === undefined) delete process.env.WF_MAX_RUNS;
+        else process.env.WF_MAX_RUNS = was;
+      }
+    },
   );
-  assert.deepEqual(child.after, ['r-bad']);
-});
-
-test("a run a task of which does not read has its page refused in the list's words, and every other run answered in full", async () => {
-  const list = new Map(((await (await app.request('/api/runs')).json()) as RunSummary[]).map((run) => [run.id, run]));
-  for (const id of ['r-bad', 'r-child']) {
-    const res = await app.request(`/api/runs/${id}`);
-    const body = (await res.json()) as { error?: string };
-    assert.equal(res.status, 502, JSON.stringify(body));
-    assert.equal(body.error, list.get(id)!.unreadable, `${id}'s page and the list say one thing`);
-  }
-  for (const id of ['r-good', 'r-sibling']) {
-    const res = await app.request(`/api/runs/${id}`);
-    assert.equal(res.status, 200, await res.clone().text());
-  }
-});
-
-test('GET /api/ceilings answers while a task journal does not read, and counts the runs that read it in flight, as the tick does', async () => {
-  const was = process.env.WF_MAX_RUNS;
-  process.env.WF_MAX_RUNS = '4';
-  try {
-    const res = await app.request('/api/ceilings');
-    assert.equal(res.status, 200, await res.clone().text());
-    const ceilings = (await res.json()) as Ceilings;
-    assert.equal(ceilings.cap, 4);
-    assert.deepEqual([...(ceilings.inFlight ?? [])].sort(), ['r-bad', 'r-child']);
-  } finally {
-    if (was === undefined) delete process.env.WF_MAX_RUNS;
-    else process.env.WF_MAX_RUNS = was;
-  }
 });

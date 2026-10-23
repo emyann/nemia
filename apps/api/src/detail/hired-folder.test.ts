@@ -7,6 +7,7 @@
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
+import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -55,17 +56,22 @@ const detailOf = async (): Promise<RunDetail> => {
   return body;
 };
 
-test('a run of a factory that hires an agent into a step whose file adds `skills:` carries no warning: its folder reads with the hires', async () => {
-  assert.equal((await detailOf()).warning, null);
-});
-
-test('REFUSED: the same folder truly broken after the start warns in the same words, with one full stop', async () => {
-  write(path.join(folder, 'design.md'), '---\nplace: git\nskills: spec-it\nsomeNewerKey: 1\n---\nDesign it.\n');
-  const { warning } = await detailOf();
-  assert.ok(warning);
-  assert.ok(
-    warning.startsWith(`The workflow folder ${folder} no longer reads as a workflow: design: \`someNewerKey\` is not a key a step has.`),
+test('a run of a factory that hires an agent into a step reads its folder with the hires, and warns once that folder truly breaks', async (t) => {
+  const s = story(t);
+  await s.test(
+    'a run of a factory that hires an agent into a step whose file adds `skills:` carries no warning: its folder reads with the hires',
+    async () => {
+      assert.equal((await detailOf()).warning, null);
+    },
   );
-  assert.match(warning, /nobody enforces\. Nothing here is read from it: .*the workflow the run froze at `nemia start`/);
-  assert.ok(!warning.includes('..'), warning);
+  await s.test('the same folder truly broken after the start warns in the same words, with one full stop', async () => {
+    write(path.join(folder, 'design.md'), '---\nplace: git\nskills: spec-it\nsomeNewerKey: 1\n---\nDesign it.\n');
+    const { warning } = await detailOf();
+    assert.ok(warning);
+    assert.ok(
+      warning.startsWith(`The workflow folder ${folder} no longer reads as a workflow: design: \`someNewerKey\` is not a key a step has.`),
+    );
+    assert.match(warning, /nobody enforces\. Nothing here is read from it: .*the workflow the run froze at `nemia start`/);
+    assert.ok(!warning.includes('..'), warning);
+  });
 });

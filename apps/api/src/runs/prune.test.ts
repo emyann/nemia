@@ -13,6 +13,7 @@
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
+import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -201,174 +202,196 @@ const hasBranch = (branch: string) => git('branch', '--list', branch).trim() !==
 /** What `nemia prune` says, without `--yes`, of the same run with the same switches: the words a refusal on the board must be. */
 const packageSays = async (id: string, how: { artifacts?: boolean; unmerged?: boolean } = {}) => runWith(engine(), prune(id, how));
 
-test("the decision's `awaiting` is what `nemia prune` refuses without `--unmerged`: a run nobody merged, and one that worked on its base branch itself, whatever its outcome — never a failed run merged by hand", async () => {
-  const awaiting = new Map<string, unknown>();
-  for (const id of ['p-merged', 'p-unmerged', 'p-running', 'p-failed-merged', 'p-direct']) {
-    const res = await app.request(`/api/runs/${id}/decision`);
-    assert.equal(res.status, 200, id);
-    const body = (await res.json()) as { awaiting?: unknown };
-    awaiting.set(id, body.awaiting ?? null);
-    const said = await packageSays(id, { artifacts: true });
-    const refusedUnmerged = said.kind === 'refused' && said.refusal!.includes(`nemia prune ${id} --unmerged`);
-    assert.equal(body.awaiting != null, refusedUnmerged, `${id}: ${JSON.stringify(body)} beside ${JSON.stringify(said)}`);
-  }
-  assert.deepEqual(Object.fromEntries(awaiting), {
-    'p-merged': null,
-    'p-unmerged': { branches: [branchOf('p-unmerged')], direct: false },
-    'p-running': null,
-    'p-failed-merged': null,
-    'p-direct': { branches: ['main'], direct: true },
+test('a finished run pruned on the board as `nemia prune` prunes it: what it refuses without `--unmerged`, a merged run pruned with its files, refused a second time, an unmerged one refused and then pruned keeping its branch', async (t) => {
+  const s = story(t);
+  await s.test(
+    "the decision's `awaiting` is what `nemia prune` refuses without `--unmerged`: a run nobody merged, and one that worked on its base branch itself, whatever its outcome — never a failed run merged by hand",
+    async () => {
+      const awaiting = new Map<string, unknown>();
+      for (const id of ['p-merged', 'p-unmerged', 'p-running', 'p-failed-merged', 'p-direct']) {
+        const res = await app.request(`/api/runs/${id}/decision`);
+        assert.equal(res.status, 200, id);
+        const body = (await res.json()) as { awaiting?: unknown };
+        awaiting.set(id, body.awaiting ?? null);
+        const said = await packageSays(id, { artifacts: true });
+        const refusedUnmerged = said.kind === 'refused' && said.refusal!.includes(`nemia prune ${id} --unmerged`);
+        assert.equal(body.awaiting != null, refusedUnmerged, `${id}: ${JSON.stringify(body)} beside ${JSON.stringify(said)}`);
+      }
+      assert.deepEqual(Object.fromEntries(awaiting), {
+        'p-merged': null,
+        'p-unmerged': { branches: [branchOf('p-unmerged')], direct: false },
+        'p-running': null,
+        'p-failed-merged': null,
+        'p-direct': { branches: ['main'], direct: true },
+      });
+    },
+  );
+  await s.test(
+    'a finished, merged run pruned on the board with its files is pruned as `nemia prune --artifacts --yes` prunes it: worktree and files gone, marker written, branch kept, and the list and the page say so',
+    async () => {
+      const before = await listed();
+      assert.equal(before.get('p-merged')!.pruned, null, 'a run nobody pruned says nothing of it');
+      assert.deepEqual((await detail('p-merged')).onDisk, { worktrees: true, files: true }, 'its page says what a prune would find');
+      const res = await pruneOn('p-merged', { artifacts: true });
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as PruneAnswer;
+      assert.equal(body.pruned, true);
+      assert.deepEqual(
+        body.worktrees.map((w) => w.path),
+        [worktreeOf('p-merged')],
+      );
+      assert.equal(body.artifacts!.path, filesDir('p-merged'));
+      assert.deepEqual(body.left, []);
+      assert.match(body.lines[0], /^p-merged {2}pruned: removed 1 worktree and its files, .* freed; its record and branches are kept$/);
+      assert.equal(fs.existsSync(worktreeOf('p-merged')), false, 'its worktree is gone');
+      assert.equal(fs.existsSync(filesDir('p-merged')), false, 'its files are gone');
+      assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.pruned')), 'it is marked pruned');
+      assert.ok(hasBranch(branchOf('p-merged')), 'its branch is kept');
+      assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.json')), 'its record is kept');
+
+      const pruned = runStore.runs.read('p-merged').pruned!;
+      assert.ok(pruned.artifacts, 'the marker says the files went');
+      const run = (await listed()).get('p-merged')!;
+      assert.deepEqual(run.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
+      assert.match(
+        run.pruned.said,
+        /its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/,
+      );
+      const page = await detail('p-merged');
+      assert.equal(page.pruned!.artifacts!.at, pruned.artifacts.at);
+      assert.deepEqual(
+        page.pruned!.worktrees.map((w) => w.path),
+        [worktreeOf('p-merged')],
+      );
+      assert.deepEqual(
+        page.onDisk,
+        { worktrees: false, files: false },
+        'nothing left for a prune to find, so the board offers none: the prune that follows would be `nothing` (the next test)',
+      );
+    },
+  );
+  await s.test(
+    'REFUSED at shipped defaults: a run pruned already, with its files, is a 409 in the words of `nemia prune`, and nothing is touched',
+    async () => {
+      for (const how of [{}, { artifacts: true }, { artifacts: true, unmerged: true }]) {
+        const before = stateOf('p-merged');
+        const said = await packageSays('p-merged', how);
+        assert.equal(said.kind, 'nothing');
+        const res = await pruneOn('p-merged', how);
+        assert.equal(res.status, 409, JSON.stringify(how));
+        assert.equal(((await res.json()) as { error: string }).error, `Nothing to prune: ${said.nothing}.`);
+        assert.deepEqual(stateOf('p-merged'), before, JSON.stringify(how));
+      }
+    },
+  );
+  await s.test(
+    'REFUSED at shipped defaults: a finished run nobody merged, pruned without `unmerged`, is a 409 in the words of `nemia prune`, naming `--unmerged`, and nothing is touched',
+    async () => {
+      for (const how of [{}, { artifacts: true }]) {
+        const before = stateOf('p-unmerged');
+        const said = await packageSays('p-unmerged', how);
+        assert.equal(said.kind, 'refused');
+        const res = await pruneOn('p-unmerged', how);
+        assert.equal(res.status, 409, JSON.stringify(how));
+        const { error } = (await res.json()) as { error: string };
+        assert.equal(error, said.refusal);
+        assert.match(
+          error,
+          /it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left/,
+        );
+        assert.ok(error.includes(`nemia prune p-unmerged --unmerged${how.artifacts ? ' --artifacts' : ''}`), error);
+        assert.deepEqual(stateOf('p-unmerged'), before, JSON.stringify(how));
+      }
+    },
+  );
+  await s.test(
+    'a finished run nobody merged, pruned with `unmerged`, loses its worktree and keeps its branch — the only copy of its work — and its files',
+    async () => {
+      const res = await pruneOn('p-unmerged', { unmerged: true });
+      assert.equal(res.status, 200);
+      assert.equal(fs.existsSync(worktreeOf('p-unmerged')), false, 'its worktree is gone');
+      assert.ok(hasBranch(branchOf('p-unmerged')), 'its branch is kept');
+      assert.ok(fs.existsSync(filesDir('p-unmerged')), 'its files are kept without `artifacts`');
+      const pruned = runStore.runs.read('p-unmerged').pruned!;
+      assert.equal(pruned.artifacts, undefined);
+      assert.deepEqual((await listed()).get('p-unmerged')!.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
+      assert.match((await listed()).get('p-unmerged')!.pruned!.said, /; its branches, record and files are kept$/);
+      assert.deepEqual(
+        (await detail('p-unmerged')).onDisk,
+        { worktrees: false, files: true },
+        'its files are still there to give back, and nothing else',
+      );
+    },
+  );
+});
+
+test('POST /api/runs/:id/prune refuses, touching nothing: a run not over or a folder run is a 409, a run the store has not a 404, a body not its two switches a 400', async (t) => {
+  await t.test(
+    'REFUSED at shipped defaults: a run not over is a 409 in the words of `nemia prune`, whatever the switches, and nothing is touched',
+    async () => {
+      for (const how of [{}, { unmerged: true }, { artifacts: true, unmerged: true }]) {
+        const before = stateOf('p-running');
+        const said = await packageSays('p-running', how);
+        assert.equal(said.kind, 'refused');
+        const res = await pruneOn('p-running', how);
+        assert.equal(res.status, 409, JSON.stringify(how));
+        const { error } = (await res.json()) as { error: string };
+        assert.equal(error, said.refusal);
+        assert.match(error, /^it is not over — nemia decide p-running says it is still running/);
+        assert.deepEqual(stateOf('p-running'), before, JSON.stringify(how));
+      }
+    },
+  );
+  await t.test('REFUSED at shipped defaults: a folder run is a 409 in the words of `nemia prune`, and its folder stays', async () => {
+    const said = await packageSays('p-folder', { artifacts: true, unmerged: true });
+    assert.equal(said.kind, 'refused');
+    const res = await pruneOn('p-folder', { artifacts: true, unmerged: true });
+    assert.equal(res.status, 409);
+    const { error } = (await res.json()) as { error: string };
+    assert.equal(error, said.refusal);
+    assert.match(error, /^a folder run: its steps' folders are its work/);
+    assert.ok(fs.existsSync(path.join(work, 'write')));
+    assert.equal(fs.existsSync(path.join(root, 'runs', 'p-folder.pruned')), false);
   });
-});
-
-test('a finished, merged run pruned on the board with its files is pruned as `nemia prune --artifacts --yes` prunes it: worktree and files gone, marker written, branch kept, and the list and the page say so', async () => {
-  const before = await listed();
-  assert.equal(before.get('p-merged')!.pruned, null, 'a run nobody pruned says nothing of it');
-  assert.deepEqual((await detail('p-merged')).onDisk, { worktrees: true, files: true }, 'its page says what a prune would find');
-  const res = await pruneOn('p-merged', { artifacts: true });
-  assert.equal(res.status, 200);
-  const body = (await res.json()) as PruneAnswer;
-  assert.equal(body.pruned, true);
-  assert.deepEqual(
-    body.worktrees.map((w) => w.path),
-    [worktreeOf('p-merged')],
+  await t.test(
+    'REFUSED at shipped defaults: a prune of a run the store has not — none by that id, an id no run can have — is a 404, and nothing is written',
+    async () => {
+      for (const id of ['no-such-run', 'Not_A_Run']) {
+        const before = fs.readdirSync(path.join(root, 'runs')).sort();
+        const res = await pruneOn(id, { artifacts: true });
+        assert.equal(res.status, 404, id);
+        assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
+        assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before, id);
+      }
+    },
   );
-  assert.equal(body.artifacts!.path, filesDir('p-merged'));
-  assert.deepEqual(body.left, []);
-  assert.match(body.lines[0], /^p-merged {2}pruned: removed 1 worktree and its files, .* freed; its record and branches are kept$/);
-  assert.equal(fs.existsSync(worktreeOf('p-merged')), false, 'its worktree is gone');
-  assert.equal(fs.existsSync(filesDir('p-merged')), false, 'its files are gone');
-  assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.pruned')), 'it is marked pruned');
-  assert.ok(hasBranch(branchOf('p-merged')), 'its branch is kept');
-  assert.ok(fs.existsSync(path.join(root, 'runs', 'p-merged.json')), 'its record is kept');
-
-  const pruned = runStore.runs.read('p-merged').pruned!;
-  assert.ok(pruned.artifacts, 'the marker says the files went');
-  const run = (await listed()).get('p-merged')!;
-  assert.deepEqual(run.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
-  assert.match(
-    run.pruned.said,
-    /its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/,
-  );
-  const page = await detail('p-merged');
-  assert.equal(page.pruned!.artifacts!.at, pruned.artifacts.at);
-  assert.deepEqual(
-    page.pruned!.worktrees.map((w) => w.path),
-    [worktreeOf('p-merged')],
-  );
-  assert.deepEqual(
-    page.onDisk,
-    { worktrees: false, files: false },
-    'nothing left for a prune to find, so the board offers none: the prune that follows would be `nothing` (the next test)',
-  );
-});
-
-test('REFUSED at shipped defaults: a run pruned already, with its files, is a 409 in the words of `nemia prune`, and nothing is touched', async () => {
-  for (const how of [{}, { artifacts: true }, { artifacts: true, unmerged: true }]) {
-    const before = stateOf('p-merged');
-    const said = await packageSays('p-merged', how);
-    assert.equal(said.kind, 'nothing');
-    const res = await pruneOn('p-merged', how);
-    assert.equal(res.status, 409, JSON.stringify(how));
-    assert.equal(((await res.json()) as { error: string }).error, `Nothing to prune: ${said.nothing}.`);
-    assert.deepEqual(stateOf('p-merged'), before, JSON.stringify(how));
-  }
-});
-
-test('REFUSED at shipped defaults: a finished run nobody merged, pruned without `unmerged`, is a 409 in the words of `nemia prune`, naming `--unmerged`, and nothing is touched', async () => {
-  for (const how of [{}, { artifacts: true }]) {
-    const before = stateOf('p-unmerged');
-    const said = await packageSays('p-unmerged', how);
-    assert.equal(said.kind, 'refused');
-    const res = await pruneOn('p-unmerged', how);
-    assert.equal(res.status, 409, JSON.stringify(how));
-    const { error } = (await res.json()) as { error: string };
-    assert.equal(error, said.refusal);
-    assert.match(
-      error,
-      /it finished and is not merged into main: pruned, none of its steps can be tried again, sent round or approved, and its branch is the one place its work is left/,
-    );
-    assert.ok(error.includes(`nemia prune p-unmerged --unmerged${how.artifacts ? ' --artifacts' : ''}`), error);
-    assert.deepEqual(stateOf('p-unmerged'), before, JSON.stringify(how));
-  }
-});
-
-test('a finished run nobody merged, pruned with `unmerged`, loses its worktree and keeps its branch — the only copy of its work — and its files', async () => {
-  const res = await pruneOn('p-unmerged', { unmerged: true });
-  assert.equal(res.status, 200);
-  assert.equal(fs.existsSync(worktreeOf('p-unmerged')), false, 'its worktree is gone');
-  assert.ok(hasBranch(branchOf('p-unmerged')), 'its branch is kept');
-  assert.ok(fs.existsSync(filesDir('p-unmerged')), 'its files are kept without `artifacts`');
-  const pruned = runStore.runs.read('p-unmerged').pruned!;
-  assert.equal(pruned.artifacts, undefined);
-  assert.deepEqual((await listed()).get('p-unmerged')!.pruned, { said: `${prunedWords(pruned)}; ${prunedKept(pruned)}` });
-  assert.match((await listed()).get('p-unmerged')!.pruned!.said, /; its branches, record and files are kept$/);
-  assert.deepEqual(
-    (await detail('p-unmerged')).onDisk,
-    { worktrees: false, files: true },
-    'its files are still there to give back, and nothing else',
-  );
-});
-
-test('REFUSED at shipped defaults: a run not over is a 409 in the words of `nemia prune`, whatever the switches, and nothing is touched', async () => {
-  for (const how of [{}, { unmerged: true }, { artifacts: true, unmerged: true }]) {
-    const before = stateOf('p-running');
-    const said = await packageSays('p-running', how);
-    assert.equal(said.kind, 'refused');
-    const res = await pruneOn('p-running', how);
-    assert.equal(res.status, 409, JSON.stringify(how));
-    const { error } = (await res.json()) as { error: string };
-    assert.equal(error, said.refusal);
-    assert.match(error, /^it is not over — nemia decide p-running says it is still running/);
-    assert.deepEqual(stateOf('p-running'), before, JSON.stringify(how));
-  }
-});
-
-test('REFUSED at shipped defaults: a folder run is a 409 in the words of `nemia prune`, and its folder stays', async () => {
-  const said = await packageSays('p-folder', { artifacts: true, unmerged: true });
-  assert.equal(said.kind, 'refused');
-  const res = await pruneOn('p-folder', { artifacts: true, unmerged: true });
-  assert.equal(res.status, 409);
-  const { error } = (await res.json()) as { error: string };
-  assert.equal(error, said.refusal);
-  assert.match(error, /^a folder run: its steps' folders are its work/);
-  assert.ok(fs.existsSync(path.join(work, 'write')));
-  assert.equal(fs.existsSync(path.join(root, 'runs', 'p-folder.pruned')), false);
-});
-
-test('REFUSED at shipped defaults: a prune of a run the store has not — none by that id, an id no run can have — is a 404, and nothing is written', async () => {
-  for (const id of ['no-such-run', 'Not_A_Run']) {
-    const before = fs.readdirSync(path.join(root, 'runs')).sort();
-    const res = await pruneOn(id, { artifacts: true });
-    assert.equal(res.status, 404, id);
-    assert.match(((await res.json()) as { error: string }).error, new RegExp(`^No run '${id}' in this store`), id);
-    assert.deepEqual(fs.readdirSync(path.join(root, 'runs')).sort(), before, id);
-  }
-});
-
-test("REFUSED at shipped defaults: a body that is not `nemia prune`'s two switches is a 400, before the run is read, and nothing is touched", async () => {
-  repositoryRun('p-body', { merge: true });
-  const cases: Array<[unknown, RegExp]> = [
-    ['not json', /^POST …\/prune takes a JSON body: `\{ "artifacts"\?: boolean, "unmerged"\?: boolean \}`\.$/],
-    [[], /^POST …\/prune takes a JSON object/],
-    ['null', /^POST …\/prune takes a JSON object/],
-    [
-      { artifacts: 'yes' },
-      /^POST …\/prune takes `artifacts` as true or false — `nemia prune`'s --artifacts — and this request sent "yes"\.$/,
-    ],
-    [{ unmerged: 1 }, /^POST …\/prune takes `unmerged` as true or false — `nemia prune`'s --unmerged — and this request sent 1\.$/],
-    [{ yes: true, force: true }, /^POST …\/prune does not take `yes`, `force`/],
-  ];
-  for (const [body, words] of cases) {
-    const before = stateOf('p-body');
-    const res = await pruneOn('p-body', body);
-    assert.equal(res.status, 400, JSON.stringify(body));
-    assert.match(((await res.json()) as { error: string }).error, words);
-    assert.deepEqual(stateOf('p-body'), before, JSON.stringify(body));
-  }
-  assert.equal(
-    (await pruneOn('p-body', { artifacts: false })).status,
-    200,
-    'the same run, sent the switches as the board sends them, is pruned: the refusals above were of the body alone',
+  await t.test(
+    "REFUSED at shipped defaults: a body that is not `nemia prune`'s two switches is a 400, before the run is read, and nothing is touched",
+    async () => {
+      repositoryRun('p-body', { merge: true });
+      const cases: Array<[unknown, RegExp]> = [
+        ['not json', /^POST …\/prune takes a JSON body: `\{ "artifacts"\?: boolean, "unmerged"\?: boolean \}`\.$/],
+        [[], /^POST …\/prune takes a JSON object/],
+        ['null', /^POST …\/prune takes a JSON object/],
+        [
+          { artifacts: 'yes' },
+          /^POST …\/prune takes `artifacts` as true or false — `nemia prune`'s --artifacts — and this request sent "yes"\.$/,
+        ],
+        [{ unmerged: 1 }, /^POST …\/prune takes `unmerged` as true or false — `nemia prune`'s --unmerged — and this request sent 1\.$/],
+        [{ yes: true, force: true }, /^POST …\/prune does not take `yes`, `force`/],
+      ];
+      for (const [body, words] of cases) {
+        const before = stateOf('p-body');
+        const res = await pruneOn('p-body', body);
+        assert.equal(res.status, 400, JSON.stringify(body));
+        assert.match(((await res.json()) as { error: string }).error, words);
+        assert.deepEqual(stateOf('p-body'), before, JSON.stringify(body));
+      }
+      assert.equal(
+        (await pruneOn('p-body', { artifacts: false })).status,
+        200,
+        'the same run, sent the switches as the board sends them, is pruned: the refusals above were of the body alone',
+      );
+    },
   );
 });

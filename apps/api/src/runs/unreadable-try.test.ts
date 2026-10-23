@@ -9,6 +9,7 @@
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
+import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -123,47 +124,55 @@ const listed = async (): Promise<Map<string, RunSummary>> => {
   return new Map(((await res.json()) as RunSummary[]).map((run) => [run.id, run]));
 };
 
-test("the list marks unreadable the step whose check's journal, or an earlier try's, does not read, and names that task", async () => {
-  const runs = await listed();
-  assert.equal(runs.get('r-good')!.unreadable, null);
-  assert.notEqual(runs.get('r-good')!.steps[0].status, 'unreadable');
-  for (const [id, task] of [
-    ['r-check', 'r-check-implement-check'],
-    ['r-try', 'r-try-implement'],
-  ]) {
-    const run = runs.get(id)!;
-    assert.ok(
-      run.unreadable?.startsWith(`${id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`),
-      run.unreadable ?? 'null',
-    );
-    assert.ok(run.unreadable?.includes('So the board does not judge the run'), run.unreadable ?? 'null');
-    assert.deepEqual(
-      run.steps.map((s) => [s.name, s.status]),
-      [['implement', 'unreadable']],
-      `${id}'s step is the one whose task does not read, though its session's own journal does`,
-    );
-  }
-});
-
-test("the decision `nemia decide` shows is refused as the run's page is, in the list's words, and answered for a run whose tasks read", async () => {
-  const runs = await listed();
-  const child = runs.get('r-child')!.unreadable;
-  assert.ok(
-    child?.startsWith(
-      `r-child's record reads, but the journal of a task of a run it waits on does not: r-check-implement-check's journal (`,
-    ),
-    child ?? 'null',
+test("a check's or an earlier try's journal that does not read marks its step unreadable on the list, and refuses the run's decision as its page", async (t) => {
+  const s = story(t);
+  await s.test(
+    "the list marks unreadable the step whose check's journal, or an earlier try's, does not read, and names that task",
+    async () => {
+      const runs = await listed();
+      assert.equal(runs.get('r-good')!.unreadable, null);
+      assert.notEqual(runs.get('r-good')!.steps[0].status, 'unreadable');
+      for (const [id, task] of [
+        ['r-check', 'r-check-implement-check'],
+        ['r-try', 'r-try-implement'],
+      ]) {
+        const run = runs.get(id)!;
+        assert.ok(
+          run.unreadable?.startsWith(`${id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`),
+          run.unreadable ?? 'null',
+        );
+        assert.ok(run.unreadable?.includes('So the board does not judge the run'), run.unreadable ?? 'null');
+        assert.deepEqual(
+          run.steps.map((s) => [s.name, s.status]),
+          [['implement', 'unreadable']],
+          `${id}'s step is the one whose task does not read, though its session's own journal does`,
+        );
+      }
+    },
   );
-  for (const id of ['r-check', 'r-try', 'r-child']) {
-    const res = await app.request(`/api/runs/${id}/decision`);
-    const body = (await res.json()) as { error?: string };
-    assert.equal(res.status, 502, JSON.stringify(body));
-    assert.ok(runs.get(id)!.unreadable, `${id} is unreadable on the list`);
-    assert.equal(body.error, runs.get(id)!.unreadable, `${id}'s decision and the list say one thing`);
-    const page = await app.request(`/api/runs/${id}`);
-    assert.equal(page.status, 502);
-    assert.equal(((await page.json()) as { error?: string }).error, body.error, `${id}'s decision and its page say one thing`);
-  }
-  const good = await app.request('/api/runs/r-good/decision');
-  assert.equal(good.status, 200, await good.clone().text());
+  await s.test(
+    "the decision `nemia decide` shows is refused as the run's page is, in the list's words, and answered for a run whose tasks read",
+    async () => {
+      const runs = await listed();
+      const child = runs.get('r-child')!.unreadable;
+      assert.ok(
+        child?.startsWith(
+          `r-child's record reads, but the journal of a task of a run it waits on does not: r-check-implement-check's journal (`,
+        ),
+        child ?? 'null',
+      );
+      for (const id of ['r-check', 'r-try', 'r-child']) {
+        const res = await app.request(`/api/runs/${id}/decision`);
+        const body = (await res.json()) as { error?: string };
+        assert.equal(res.status, 502, JSON.stringify(body));
+        assert.ok(runs.get(id)!.unreadable, `${id} is unreadable on the list`);
+        assert.equal(body.error, runs.get(id)!.unreadable, `${id}'s decision and the list say one thing`);
+        const page = await app.request(`/api/runs/${id}`);
+        assert.equal(page.status, 502);
+        assert.equal(((await page.json()) as { error?: string }).error, body.error, `${id}'s decision and its page say one thing`);
+      }
+      const good = await app.request('/api/runs/r-good/decision');
+      assert.equal(good.status, 200, await good.clone().text());
+    },
+  );
 });

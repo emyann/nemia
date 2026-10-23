@@ -41,11 +41,12 @@ check run by the run, which lands the merge or aborts it; `denials: fail` (§10)
 own task (§11, thin runtime stage 2 part 4b); a step on a remote A2A agent (thin runtime stage 6 part 2); and agents that carry their
 own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked in `docs/eval-thin-runtime.md`.
 
-**What remains, in order.** Of the numbered items, two are open:
+**What remains, in order.** Of the numbered items, three are open:
 
 1. §1, a run that grows steps from a plan.
 2. A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
    4c, admission, which is done). Rounds and tries are `-try<n>` tasks today (§11).
+3. §14, the former frontmatter form's fallback taken out, once `nemia frontmatter rewrite --check` is clean on the owner's machine.
 
 Beside them, the git-out design's deferred freeze (`docs/design-2026-09-29-git-out.md`, *Freezing* and open question 6): a team's own
 skill as a run's place, copied per run to `WF_ROOT/places/<skill>@<version>/`, a copy whose `skillVersion` drifted refusing the run's
@@ -394,7 +395,8 @@ denied, `disallow: Bash(npm run build), SendMessage`. The engine carries them on
 and each round, as `tools:` does.
 
 - `disallow:` is refused at load when it names no rule, when a comma is inside a rule's parentheses (the list is split
-  on every comma), when an entry is not one rule (a list in brackets or quotes among them), and on codex, whose message
+  on every comma), when an entry is not one rule (a list in brackets or quotes among them, until the frontmatter was read as YAML:
+  since, a YAML list in brackets reads as the list, and a quoted one as its text), and on codex, whose message
   names `permissionMode`. A quote inside the parentheses is legal, `Bash(git commit -m 'wip')`, so unlike `tools:` the
   comma check does not look in quotes: `tools:`'s check refused such a rule whenever another entry followed it. The engine's `file()` refuses a `disallowedTools` that is not a list of rules, and codex
   refuses one that denies anything rather than drop it.
@@ -441,7 +443,8 @@ harness thinks, `effort: high`. Both reach `e.file` on every filing of the step:
 (B), and `--tools` was measured not to take away the tool a closeout is made with.
 
 - `tools:` is refused at load when it names no tool, when an entry has a space or a comma inside (a list
-  without its commas, a rule such as `Bash(git diff:*)`, a list in brackets or quotes), and on codex, which has
+  without its commas, a rule such as `Bash(git diff:*)`, a list in brackets or quotes — since the frontmatter is read as YAML, a list
+  in brackets reads as the list, and a quoted one as its text), and on codex, which has
   no tool list. The codex message names `permissionMode`, the sandbox, instead.
 - `effort:` is refused by name with its harness's list, as a permission mode is.
 - The parser's permission modes and efforts are copies of the engine's, and the modes had drifted: the engine
@@ -5848,6 +5851,18 @@ on its listing when the try's fence does not reach it). Their commits: 3a `ef147
 `status/`, `wait/` and the rest through the `agent-orchestrator/run` face. The design's *Tests beside the code* moves each case into the
 folder of what it tests (`src/<feature>/<feature>.test.ts`), and a case across features stays in `test/`. A mechanical move of its own,
 as a card: the cases unchanged but their imports, each folder's file under the limits, and `suite.test.ts` finding every one.
+
+## 14. The former frontmatter form, no longer read
+
+**Registered** 2026-10-23, once the frontmatter was read as YAML. A block in the former line form, `key: the rest of the line`, never
+quoted, is still read so where YAML refuses it (`readFrontmatter`, `former: true`), and `nemia start` names each such file with the fix.
+That fallback is a second reader beside the YAML one, and a value it reads YAML would read otherwise.
+
+**Waits on** `nemia frontmatter rewrite --check` coming back clean on the owner's machine: the store's own folders, and
+`~/nemia-templates`. Then the card takes out the former reading (`formerShaped`, `formerEntries`, the `former` mark and the readers that
+branch on it, `formerFormLine` at `nemia start`), so such a block is refused naming its line and the YAML to write; `rewriteFormer` and
+the verb stay, for a folder written before that is brought in later. A run frozen before keeps its steps as records, which no
+frontmatter reader reads.
 
 ## Engine-side work
 

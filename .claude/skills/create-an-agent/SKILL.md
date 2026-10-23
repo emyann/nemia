@@ -29,6 +29,10 @@ Frontmatter, then its instructions. The other keys are how its sessions run — 
 (`sandbox` on codex), `tools`, `disallowedTools`, `allowedTools`, `remote`, `output` — and a step that names it takes each unless it sets
 its own. Wiring is the step's and refused here: `after`, `input`, `workspace`, `check`, `gate`, `loop`, `budget`, `background`.
 
+- **The frontmatter is YAML**, as a step's and a skill's are, every value read as the text written. Quote a value that holds `: ` or
+  ` #`, or opens on a YAML sign (`[`, `{`, `*`, `&`, `!`, `|`, `>`, `-`, `?`), as in `description: "Reviews a change: its correctness"`.
+  Write a long one as a literal block, `|-` and the value on the lines below it, indented. A list key takes `Read, Grep` or
+  `[Read, Grep]`; the board writes the first.
 - Say `effort:` and `context:` (`200k`): a job reads no user settings, and a session left unbounded reads up to a million tokens on every
   call.
 - `auto` is refused at load on the models measured to drop it (haiku, `claude-sonnet-4-5`); name `dontAsk` with rules there.

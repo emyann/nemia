@@ -2740,7 +2740,7 @@ test('`renderStep` writes only what a step sets: `undefined`, `null` and an empt
   );
   assert.throws(
     () => parseWorkflow('implement', '---\n---\n---\nThe brief, below a rule.\n'),
-    /`---` is not `key: value`/,
+    (e: unknown) => e instanceof WorkflowError && e.message.startsWith('implement:2:'),
     'an empty block would not do',
   );
   assert.equal(

@@ -43,6 +43,22 @@ The keys are a closed list, and a key the orchestrator does not know is refused 
 - `budget` caps what the step's tries may cost together.
 - `workspace` says which folder the step works in: a worktree of the run's own, by default, or the repository's checkout.
 
+The frontmatter is YAML, and every value reads as the text written. Quote a value that holds `: ` or ` #`, or that opens on a sign
+YAML reads (such as `[`, `{`, `*`, `&` or `-`), as in `check: "grep -q 'status: done' out.md"`. Write a long or multi-line check as a
+literal block, `|-` and the command on the lines below it, indented:
+
+```md
+---
+after: implement
+check: |-
+  npm run typecheck &&
+  npm test -- --grep "review: findings"
+gate: true
+---
+```
+
+A key that takes a list, such as `after`, reads `plan, design` and `[plan, design]` alike.
+
 The folder's `README.md` is no step: it says what the workflow is for, and the board shows it.
 
 **No key is control flow.** There are no conditions, no expressions and no templating. "Is this good enough?" is not a predicate a

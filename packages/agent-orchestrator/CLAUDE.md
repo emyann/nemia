@@ -63,7 +63,8 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   screen that quotes the step reads its own words, `ownNote` (`ending/ending.ts`), as `toDecide` and `wf decide` do.
 - **The board's listing of a step is resolved; its file is not**: write a step's own keys (`ListedStep.own`). A key the parser converts
   is written back in the form the file has (`contextText`). Code outside the package reads a step's frontmatter by calling the
-  package's reader (`splitFrontmatter`, from `agent-orchestrator/workflow`), never a parser of its own.
+  package's readers (`splitFrontmatter` for the block, `readFrontmatter` for its YAML, both from `agent-orchestrator/workflow`), never a
+  parser of its own.
 - **A test that needs a realistic folder reads the tests' team** (`test/fixtures/team`, `test/team.ts`), never a shipped one: a
   person's factories get no workflow or agent from the package, and a guard over what ships reads `shippedFolders()`.
 - **The api reads `agent-orchestrator`, `agent-orchestrator/run` and `agent-orchestrator/workflow`**, its tests with

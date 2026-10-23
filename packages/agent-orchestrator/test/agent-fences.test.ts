@@ -32,9 +32,9 @@
  * already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
  * (`SCOPED_TESTS`). An agent's fence names no command of this repository: the checks a step names in its note are allowed by the
  * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own. What else the settings and a skill
- * allow that writes the workspace or runs the suite each read-only agent denies on its own line (`ownedDenies`): shadcn's CLI in every
+ * allow that writes the workspace or runs the suite each read-only step denies on its own line (`ownedDenies`): shadcn's CLI in every
  * spelling an allow reaches (`SHADCN`), whose one read a step runs is the board's pinned `view` (`SHADCN_VIEW_NOTE`), and `npm test`;
- * intake's and the janitor's, which run no test, a test file's run and turbo's besides (`TESTLESS_AGENTS`, `TEST_RUNS`).
+ * intake and the janitor, which run no test, a test file's run and turbo's besides (`TESTLESS_AGENTS`, `TEST_RUNS`).
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
  * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
  * Implement and land, which run what no deny names, deny the live collector by its two ports on their own line, each beside every deny
@@ -2586,7 +2586,10 @@ const SHADCN: Call[] = [
 /** The whole suite by the settings' exact allow of it. */
 const NPM_TEST: Call[] = ['npm test', 'timeout 900 npm test'].map((command) => ({ tool: 'Bash', command }));
 
-/** The denies that answer `SHADCN` and `NPM_TEST`, on each read-only agent's own line, and so on each of its steps. */
+/**
+ * The denies that answer `SHADCN` and `NPM_TEST`, on the line of each read-only step's own file: no agent's file names a command of
+ * this repository.
+ */
 const READ_ONLY_DENIES = [
   'Bash(npx shadcn@latest:*)',
   'Bash(pnpm dlx shadcn@latest:*)',
@@ -2611,22 +2614,26 @@ const TEST_RUNS: Call[] = [
   'timeout 900 npx turbo run test --force --continue',
 ].map((command) => ({ tool: 'Bash', command }));
 
-/** The denies that answer `TEST_RUNS`, on the line of each of `TESTLESS_AGENTS`. */
+/** The denies that answer `TEST_RUNS`, on the line of each step of `TESTLESS_AGENTS`. */
 const TEST_RUN_DENIES = ['Bash(node --test:*)', 'Bash(npx turbo run test:*)'];
 
-/** The denies a read-only agent's own line holds for what the settings and the skills allow it besides its reads. */
+/** The denies a read-only step's own line holds, by its agent, for what the settings and the skills allow it besides its reads. */
 const ownedDenies = (agent: string): string[] => [...READ_ONLY_DENIES, ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUN_DENIES : [])];
 
 /** What a read-only agent's steps are refused of what the settings and the skills allow, by `ownedDenies`. */
 const refusedTo = (agent: string): Call[] => [...SHADCN, ...NPM_TEST, ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUNS : [])];
 
-/** Each rule of `ownedDenies` the file of a read-only agent of the holder `root` does not name, as `<file>: <rule>`. */
+/** The file of each read-only step, `<workflow>/<step>.md` from the holder, with its agent. */
+const readOnlyStepFiles = (): Array<{ file: string; agent: string }> =>
+  readOnlySteps().map(({ named, step }) => ({ file: `${named}.md`, agent: step.agent!.name }));
+
+/** Each rule of `ownedDenies` the file of a read-only step of the holder `root` does not name, as `<file>: <rule>`. */
 const ownedUndenied = (root = SHIPPED_HOLDERS[0]): string[] =>
-  READ_ONLY_AGENTS.flatMap((agent) => {
-    const line = denyLineOf(`agents/${agent}.md`, root);
+  readOnlyStepFiles().flatMap(({ file, agent }) => {
+    const line = denyLineOf(file, root);
     return ownedDenies(agent)
       .filter((rule) => !line.includes(rule))
-      .map((rule) => `agents/${agent}.md: ${rule}`);
+      .map((rule) => `${file}: ${rule}`);
   });
 
 /** The item of change-the-board that names the read of shadcn's CLI, the reference of a component on the board. */
@@ -2639,7 +2646,14 @@ const SHADCN_VIEW_ALLOW = 'Bash(npx shadcn view:*)';
 const shadcnView = (): Call[] =>
   checksOf(KIT_COMMAND.file, SHADCN_VIEW_NOTE).map((command) => ({ tool: 'Bash', command: command.replace('<component>', 'button') }));
 
-test("every read-only step is refused shadcn's CLI in every spelling an allow reaches it by, and npm test, by its agent's own deny", () => {
+test("every read-only step is refused shadcn's CLI in every spelling an allow reaches it by, and npm test, by its own deny", () => {
+  assert.deepEqual(
+    readOnlyStepFiles()
+      .map(({ file }) => file)
+      .sort(),
+    ['build/design.md', 'build/review.md', 'intake/intake.md', 'janitor/argus.md', 'quick/review.md'],
+  );
+  for (const { file } of readOnlyStepFiles()) assert.ok(fs.existsSync(path.join(SHIPPED_HOLDERS[0], file)), file);
   assert.deepEqual(ownedUndenied(), []);
   for (const { named, step } of readOnlySteps()) assert.deepEqual(runs(step, refusedTo(step.agent!.name)), [], named);
 });
@@ -2673,21 +2687,21 @@ test('REFUSED: a read-only step without any one of its denies runs each spelling
     }
 });
 
-test("REFUSED: a read-only agent's file that drops its denies is named, rule by rule", () => {
-  for (const agent of READ_ONLY_AGENTS) {
+test("REFUSED: a read-only step's file that drops its denies is named, rule by rule", () => {
+  for (const { file, agent } of readOnlyStepFiles()) {
     const root = scratch('wf-fences-owned-');
     fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
-    const at = path.join(root, 'agents', `${agent}.md`);
+    const at = path.join(root, file);
     let text = fs.readFileSync(at, 'utf8');
     for (const rule of ownedDenies(agent)) {
       const dropped = text.replace(`, ${rule}`, '');
-      assert.notEqual(dropped, text, `${agent} names ${rule}`);
+      assert.notEqual(dropped, text, `${file} names ${rule}`);
       text = dropped;
     }
     fs.writeFileSync(at, text);
     assert.deepEqual(
       ownedUndenied(root),
-      ownedDenies(agent).map((rule) => `agents/${agent}.md: ${rule}`),
+      ownedDenies(agent).map((rule) => `${file}: ${rule}`),
     );
   }
 });

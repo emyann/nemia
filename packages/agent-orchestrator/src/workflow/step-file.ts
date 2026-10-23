@@ -17,6 +17,7 @@ import {
   WorkflowError,
 } from '../step/step.ts';
 import { fenceReach } from 'agent-runtime/vocabulary';
+import { renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
   backgroundOf,
@@ -448,6 +449,9 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  * `output:` as the file it names — then the body. The inverse of `parseWorkflow`: a step it
  * read renders to a file it reads back as the same step, which `test/workflow.test.ts` holds over every shipped folder. Pure.
  *
+ * The frontmatter is written as YAML (`renderFrontmatter`): a value plain where it reads back the same, quoted where it would not, and a
+ * literal block (`|-`) for one with a line break or too long to read on one line, as a long shell `check:` is.
+ *
  * Unset is `undefined` or `null`, and an empty list where no line says the same (`EMPTY_IS_UNSET`). `rounds:` is written where the step
  * has it, the default included, and `after:` lists the step `resume:` names too, as the parser read it. A file's comments are not on
  * the step, so a render has none.
@@ -461,9 +465,9 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  *
  * It judges nothing the parser judges: a value the parser would refuse is written as given, and the parser refuses it in its own words
  * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never
- * see: a key no step has, in the parser's words, since it would be dropped; a line break in a value, which ends the line and makes what
- * follows a line of its own — a key, even; a comma inside a step's name in `after:` or `input:`, which would be read as two names; and
- * `workspace: folder`, the former spelling of `place: folder`, which the parser reads but nothing writes (`placeWritten`).
+ * see: a key no step has, in the parser's words, since it would be dropped; a comma inside a step's name in `after:` or `input:`, which
+ * would be read as two names; and `workspace: folder`, the former spelling of `place: folder`, which the parser reads but nothing writes
+ * (`placeWritten`). A line break in a value is no refusal: it is written as a literal block, which holds it.
  *
  * A step with no key and a body that opens on `---` is written after a frontmatter of one blank line: with none before it, the body
  * would be read as the frontmatter, and after an empty one, as its block.
@@ -477,13 +481,13 @@ export function renderStep(step: StepDraft): string {
   if (step.harness === 'codex' && step.permissionMode != null) refuse(codexModeWritten(step.name, step.permissionMode));
   if ((step.workspace as string | undefined) === 'folder') refuse(placeWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
-  const lines = STEP_KEYS.flatMap((key) => {
+  const pairs = STEP_KEYS.flatMap((key): FrontmatterPair[] => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : ownValue(step, key));
     if (provenance && key !== 'agent' && !provenance.keys.includes(key) && value === provenance.given?.[key]) return [];
-    return value === undefined ? [] : [`${key}: ${value}`];
+    return value === undefined ? [] : [[key, value]];
   });
   const body = String((provenance ? provenance.body : step.body) ?? '').trim();
-  if (lines.length) return `---\n${lines.map((line) => `${line}\n`).join('')}---\n${body}\n`;
+  if (pairs.length) return `---\n${renderFrontmatter(pairs)}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : `${body}\n`;
 }
 
@@ -522,11 +526,6 @@ function writtenValue(step: string, key: StepKey, value: unknown): string | unde
   } else {
     // oxlint-disable-next-line typescript/no-base-to-string -- the branches above took an object and a function
     text = String(value);
-  }
-  if (/[\r\n]/.test(text)) {
-    refuse(
-      `${step}: \`${key}\` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line${key === 'check' ? ' — commands joined with `&&`' : ''}.`,
-    );
   }
   return text;
 }

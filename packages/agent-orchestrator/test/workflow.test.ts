@@ -37,7 +37,7 @@ import {
   renderAgent,
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
-import { placeLine } from '../src/former/former.ts';
+import { formerFormLine, placeLine } from '../src/former/former.ts';
 import { readsMounts } from '../src/filed/filed.ts';
 import { FILED_AS } from '../src/keys/filed-as.ts';
 import { scratch } from './scratch.ts';
@@ -761,7 +761,7 @@ test('REFUSED: an empty tools: — blank, or only commas — is not "every tool"
   assert.throws(() => fm('review', 'tools:  , ,'), refusedWith(/names no tool/));
 });
 
-test('REFUSED: a tools: entry with a space or a comma inside — a list without its commas, a rule, or a list in brackets or quotes', () => {
+test('REFUSED: a tools: entry with a space or a comma inside — a list without its commas, a rule, or an item of a YAML list holding a comma', () => {
   assert.throws(
     () => fm('review', 'tools: Read Grep Glob'),
     refusedNaming('review: ', '`tools: Read Grep Glob`', '`Read Grep Glob`', 'comma-separated'),
@@ -770,8 +770,7 @@ test('REFUSED: a tools: entry with a space or a comma inside — a list without 
     () => fm('review', 'tools: Read, Bash(git diff, git log)'),
     refusedNaming('review: ', '`tools: Read, Bash(git diff, git log)`', 'a comma inside an entry', '`Bash(git diff`', '`git log)`'),
   );
-  assert.throws(() => fm('review', 'tools: [Read, Grep]'), refusedWith(/has a comma inside an entry/));
-  assert.throws(() => fm('review', 'tools: "Read, Grep"'), refusedWith(/has a comma inside an entry/));
+  assert.throws(() => fm('review', 'tools: [Read, "Bash(a, b)"]'), refusedWith(/^review:3: /), 'an item of a list holds no comma');
   assert.throws(
     () => fm('review', 'tools: Read, Bash(npm test)'),
     refusedNaming('review: ', '`Bash(npm test)`', 'not a tool name', '`Bash`, whole'),
@@ -781,7 +780,13 @@ test('REFUSED: a tools: entry with a space or a comma inside — a list without 
     refusedNaming('review: ', '`Bash(git:*)`', 'not a tool name'),
     'a rule with no space in it too',
   );
-  assert.throws(() => fm('review', 'tools: "Read"'), refusedNaming('review: ', '`"Read"`', 'not a tool name', 'bare'));
+});
+
+test('tools: is YAML: a flow list, a block list and a quoted value read as the comma list the line form writes', () => {
+  for (const lines of ['tools: [Read, Grep]', 'tools:\n  - Read\n  - Grep', 'tools: "Read, Grep"'])
+    assert.deepEqual(fm('review', lines).tools, ['Read', 'Grep'], lines);
+  assert.deepEqual(fm('review', 'tools: "Read"').tools, ['Read'], "quotes are YAML's, never part of the name");
+  assert.deepEqual(fm('review', 'disallow:\n  - SendMessage\n  - CronCreate').disallowedTools, ['SendMessage', 'CronCreate']);
 });
 
 test('REFUSED: tools: on a codex step, naming the sandbox sandbox: sets instead', () => {
@@ -838,7 +843,7 @@ test('REFUSED: an empty disallowedTools: — blank, or only commas — which den
   assert.throws(() => fm('review', 'disallowedTools:  , ,'), refusedWith(/names no rule/));
 });
 
-test('REFUSED: a disallowedTools: entry that is not one rule — a comma inside its parentheses, a space outside them, a list in brackets or quotes', () => {
+test('REFUSED: a disallowedTools: entry that is not one rule — a comma inside its parentheses, a space outside them', () => {
   assert.throws(
     () => fm('review', 'disallowedTools: Bash(git push, git reset)'),
     refusedNaming(
@@ -855,22 +860,16 @@ test('REFUSED: a disallowedTools: entry that is not one rule — a comma inside 
     refusedWith(/has a comma inside an entry/),
     'a comma in quotes inside the parentheses is still inside them',
   );
-  assert.throws(
-    () => fm('review', 'disallowedTools: [SendMessage, CronCreate]'),
-    refusedNaming('review: ', '`[SendMessage`', 'not one rule', 'bare name'),
-  );
-  assert.throws(
-    () => fm('review', 'disallowedTools: "SendMessage, CronCreate"'),
-    refusedNaming('review: ', '`"SendMessage`', 'not one rule', 'bare name'),
+  assert.deepEqual(
+    fm('review', 'disallowedTools: [SendMessage, CronCreate]').disallowedTools,
+    ['SendMessage', 'CronCreate'],
+    'a YAML list',
   );
   assert.throws(
     () => fm('review', 'disallowedTools: SendMessage CronCreate'),
     refusedNaming('review: ', '`disallowedTools: SendMessage CronCreate`', '`SendMessage CronCreate`', 'not one rule', 'a space outside'),
   );
-  assert.throws(
-    () => fm('review', 'disallowedTools: "SendMessage"'),
-    refusedNaming('review: ', '`"SendMessage"`', 'not one rule', 'bare name'),
-  );
+  assert.deepEqual(fm('review', 'disallowedTools: "SendMessage"').disallowedTools, ['SendMessage'], 'quoted, as YAML reads it');
   assert.throws(
     () => fm('review', 'disallowedTools: Bash(npm run build'),
     refusedNaming('review: ', '`Bash(npm run build`', 'not one rule', 'parentheses'),
@@ -919,7 +918,7 @@ test("REFUSED: an allowedTools: that names no rule, or an entry that is not one 
       '`Edit(**), Bash(npm test)`',
     ),
   );
-  assert.throws(() => fm('write', 'allowedTools: [Write, Edit]'), refusedNaming('write: ', '`[Write`', 'not one rule', 'bare name'));
+  assert.deepEqual(fm('write', 'allowedTools: [Write, Edit]').allowedTools, ['Write', 'Edit'], 'a YAML list reads as the comma list');
   assert.throws(() => fm('write', 'allowedTools: Write Edit'), refusedNaming('write: ', '`Write Edit`', 'not one rule', 'a space outside'));
   assert.throws(() => fm('write', 'allowedTools: Write(**'), refusedNaming('write: ', '`Write(**`', 'not one rule', 'parentheses'));
 });
@@ -1119,6 +1118,23 @@ test('`nemia start` is told which files still write a former name: the steps, th
   assert.deepEqual(formerKeyLines(path.join(dir, 'nope')), []);
 });
 
+test('`nemia start` is told which step and agent files are still in the former line form, which reads as it did, and nothing of a YAML one', () => {
+  const root = folder({
+    'team/write.md': '---\nplace: git\nagent: writer\ncheck: { npm test; npm run lint: x; }\n---\nWrite.\n',
+    'team/review.md': '---\nafter: write\nplace: git\ncheck: "npm test # all of it"\n---\nReview.\n',
+    'agents/writer.md': '---\nmodel: opus\ndisallowedTools: Bash(git push:*), Bash(echo a: b)\n---\nWrite.\n',
+  });
+  const dir = path.join(root, 'team');
+  const [write, review] = loadWorkflows(dir);
+  assert.equal(write.check, '{ npm test; npm run lint: x; }', 'a former line reads as the rest of the line, as it did');
+  assert.equal(review.check, 'npm test # all of it', 'a quoted value is YAML');
+  assert.deepEqual(formerKeyLines(dir), [
+    formerFormLine(path.join(dir, 'write.md')),
+    formerFormLine(path.join(root, 'agents', 'writer.md')),
+  ]);
+  assert.match(formerFormLine('w/write.md'), /^w\/write\.md: /);
+});
+
 test('`nemia start` is told which agent a step names still says `systemPrompt:`, with the line it is read as, and nothing of one on `harnessPrompt:`', () => {
   assert.equal(
     harnessPromptLine('w/agents/builder.md', 'own'),
@@ -1186,7 +1202,12 @@ test("an effort loads as written: which efforts a step's harness takes is the ru
 test('an empty check is refused, and so is one that reads as "no check" but runs as a command', () => {
   assert.throws(() => fm('implement', 'check:'), refusedNaming('implement: ', '`check` has no value', 'exit 0'));
   assert.throws(() => fm('implement', 'check:   '), /`check` has no value/);
-  for (const none of ['none', '""', "''"]) assert.throws(() => fm('implement', `check: ${none}`), /exits 127/, none);
+  assert.throws(() => fm('implement', 'check: none'), /exits 127/);
+  for (const none of ['""', "''"])
+    assert.throws(() => fm('implement', `check: ${none}`), refusedWith(/^implement: /), `${none} is YAML's empty text`);
+  assert.throws(() => fm('implement', 'check:\n  - npm test'), refusedWith(/^implement:3: /), 'a list on a key of one value');
+  assert.equal(fm('implement', 'check: [ -f x ]').check, '[ -f x ]', 'a flow list there is the shell the line form wrote');
+  assert.throws(() => fm('implement', 'check: npm test\ncheck: npm run lint'), refusedWith(/^implement: /), 'and a check set twice');
   assert.throws(() => fm('implement', 'model:'), /implement: `model` has no value\. Delete the line/, 'empty is not absent, for any key');
 });
 
@@ -1327,9 +1348,9 @@ test('a key set twice is refused rather than last-one-wins', () => {
   assert.throws(() => fm('integrate', 'after: docs\nafter: tests'), /`after` is set twice.*`after: a, b`/);
 });
 
-test('a frontmatter line that is not `key: value` is refused; blank lines and # comments are not keys', () => {
-  assert.throws(() => fm('review', 'afer implement'), /review: `afer implement` is not `key: value`/);
-  assert.throws(() => fm('review', ': codex'), /is not `key: value`/);
+test('a frontmatter line that is not `key: value` is refused, naming its line; blank lines and # comments are not keys', () => {
+  assert.throws(() => fm('review', 'afer implement'), refusedWith(/^review:3: /));
+  assert.throws(() => fm('review', ': codex'), refusedWith(/^review:3: /));
   const w = fm('review', '# a second opinion\nharness: codex\n\nafter: implement');
   assert.equal(w.harness, 'codex');
   assert.deepEqual(w.after, ['implement']);
@@ -2575,7 +2596,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
       'remote: true',
       'deadlineSeconds: 900',
       'budget: 2.5',
-      'check: npm test && node -e "console.log(1 ? 2 : 3)"',
+      `check: 'npm test && node -e "console.log(1 ? 2 : 3)"'`,
       'retries: 0',
       'gate: true',
       'output: review.schema.json',
@@ -2730,6 +2751,16 @@ test('`renderStep` writes only what a step sets: `undefined`, `null` and an empt
   assert.equal(splitFrontmatter('implement', renderStep(rule)).body, '---\nThe brief, below a rule.');
 });
 
+test('`renderStep` writes its frontmatter as YAML: a long shell `check:`, holding braces, `: ` and ` #`, as a literal block the parser reads back as the same check', () => {
+  const check =
+    '{ if [ -n "${WF_BASE_REF:-}" ]; then git diff --quiet "$WF_BASE_REF" -- docs/ || echo "docs: changed"; fi; } && npm test # the suite of what changed';
+  const step = parseWorkflow('implement', renderStep({ name: 'implement', after: [], place: 'git', check, body: 'Do it.' }));
+  const text = renderStep(step);
+  assert.ok(text.startsWith(`---\nplace: git\ncheck: |-\n  ${check}\n---\n`), text);
+  assert.equal(parseWorkflow('implement', text).check, check, 'and the parser reads it back, byte for byte');
+  assert.equal(renderStep(parseWorkflow('implement', text)), text, 'and renders to the same text again');
+});
+
 test("`renderStep` of a step over an agent writes its own denies alone, which add to its agent's: one that only repeated them writes no line", () => {
   const agents = new Map([['ada', parseAgent('ada', '---\ndisallowedTools: Bash(git push), Bash(git push:*)\n---\nWork.\n')]]);
   const parsed = (text: string) => parseWorkflow('implement', text, undefined, agents);
@@ -2742,7 +2773,7 @@ test("`renderStep` of a step over an agent writes its own denies alone, which ad
   assert.deepEqual(parsed(renderStep(repeated)).disallowedTools, ['Bash(git push)', 'Bash(git push:*)'], "which reads as the agent's");
 });
 
-test("REFUSED by `renderStep`, in the parser's words where the parser has them: a key no step has, `guide`; and what a file cannot hold — a line break in a value, a comma in a step's name in a list", () => {
+test("REFUSED by `renderStep`, in the parser's words where the parser has them: a key no step has, `guide`; and what a file cannot hold — a comma in a step's name in a list, while a line break in a value is written as a block", () => {
   const step: StepDraft = { name: 'review', after: ['implement'], place: 'git', body: 'Review it.' };
   const parsersWords = (lines: string): string => {
     try {
@@ -2777,13 +2808,13 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   );
 
   const injected = { ...step, check: 'npm test\nharness: codex' };
-  assert.throws(
-    () => renderStep(injected),
-    refusedNaming('review: ', '`check` holds a line break', 'Write it on one line', '`&&`'),
-    'written as given, the break would end the line, and what follows would be a key of its own: a harness nobody chose',
+  const written = renderStep(injected);
+  assert.match(written, /^check: \|-\n {2}npm test\n {2}harness: codex\n/m, 'a value with a line break is written as a literal block');
+  assert.deepEqual(
+    [parseWorkflow('review', written).check, parseWorkflow('review', written).harness],
+    ['npm test\nharness: codex', undefined],
+    'and reads back as the one value it was, never a key of its own: a harness nobody chose',
   );
-  assert.match(message({ ...step, model: 'opus\r' }), /^review: `model` holds a line break/);
-  assert.match(message({ ...step, tools: ['Read', 'Grep\nBash'] }), /^review: `tools` holds a line break/);
   assert.throws(
     () => renderStep({ ...step, model: { name: 'opus' } } as unknown as StepDraft),
     refusedNaming('review: ', '`model` is {"name":"opus"}', '`[object Object]`'),
@@ -2797,8 +2828,8 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   assert.match(message({ ...step, input: ['a,b'] }), /^review: `input` lists `a,b`/);
 
   for (const [draft, lines, rule] of [
-    [{ ...step, tools: [] }, 'tools: ', /^review: `tools` has no value, which reads as every tool/],
-    [{ ...step, model: '' }, 'model: ', /^review: `model` has no value\. Delete the line/],
+    [{ ...step, tools: [] }, 'tools:', /^review: `tools` has no value, which reads as every tool/],
+    [{ ...step, model: '' }, 'model:', /^review: `model` has no value\. Delete the line/],
     [{ ...step, deadlineSeconds: '5m' }, 'deadlineSeconds: 5m', /^review: `deadlineSeconds: 5m` is not a count\./],
     [{ ...step, gate: false }, 'gate: false', /^review: `gate: false` is what a step without the line already is\./],
     [{ ...step, harness: 'banana' }, 'harness: banana', /^review: `harness: banana` is not a harness a step can run on\./],
@@ -2807,7 +2838,7 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
       'disallowedTools: Bash(git push, git reset)',
       /^review: `disallowedTools: Bash\(git push, git reset\)` has a comma inside an entry/,
     ],
-    [{ ...step, output: {} }, 'output: ', /^review: `output` has no value\. Delete the line/],
+    [{ ...step, output: {} }, 'output:', /^review: `output` has no value\. Delete the line/],
   ] as const) {
     const text = renderStep(draft as unknown as StepDraft);
     assert.ok(text.includes(`\n${lines}\n`), `what the parser judges, renderStep writes as given, for the parser to refuse:\n${text}`);

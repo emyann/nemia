@@ -852,7 +852,9 @@ test("a session cut by its holder's let-go and resumed by the next holder costs 
   const { root, dir, request } = place({ call: 'Bash', cost: 0.5, output: {} });
   const first = await holder(root, 1_000);
   let next: Awaited<ReturnType<typeof holder>> | undefined;
-  t.after(async () => void (await next?.close()));
+  t.after(async () => {
+    await next?.close();
+  });
 
   await s.test('cut in its call, its Claude Code prints the turn it spent and saves its total before it is gone', async (st) => {
     await Effect.runPromise(first.attached.ops.spawn(request));

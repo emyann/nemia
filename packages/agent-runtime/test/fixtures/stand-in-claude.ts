@@ -13,9 +13,9 @@
  *
  * Its session id is `stand-in-session`, its plan's `id` where it gives one, or the one `--resume=<id>` names, as the SDK writes it.
  *
- * Its cost is Claude Code's as the SDK documents `total_cost_usd` (`sdk.d.ts:6035`) and `docs/harness.md` measures it: a running
+ * Its cost is Claude Code's as the SDK documents `total_cost_usd` (`sdk.d.ts:6034-6037`) and `docs/harness.md` measures it: a running
  * total of this process, each turn charged its plan's `cost` as it starts — so an interrupted turn has spent it — and each result
- * printing the total so far. Once its stdin ends, after the turn in flight, it saves that total as a
+ * printing the total so far. Once its stdin ends, after the turn an interrupt cut prints its result, it saves that total as a
  * `cost-state` line in `cost-state.jsonl` of its folder, where Claude Code saves one in its transcript; a `--resume=<id>` starts
  * from the last total saved for that session, and a process killed saves nothing, so its resume starts from nothing.
  */
@@ -337,9 +337,15 @@ readline.createInterface({ input: process.stdin }).on('line', (text) => {
   }
 }).on('close', () => void ended());
 
-/** Ends this process cleanly: once the turn in flight has printed its result, its running total saved where a resume reads it. */
+/**
+ * Ends this process cleanly, its running total saved where a resume reads it: at once, or once the turn an interrupt cut has printed
+ * its result. A turn in flight that no interrupt cut is not waited for, as a job's stdin ends at its result.
+ */
 const ended = async () => {
-  while (working) await new Promise((r) => setTimeout(r, 20));
+  for (;;) {
+    if (!working || !interrupted) break;
+    await new Promise((r) => setTimeout(r, 20));
+  }
   if (everStarted) fs.appendFileSync(COST_STATE, `${JSON.stringify({ type: 'cost-state', sessionId, totalCostUSD: spent })}\n`);
   process.exit(0);
 };

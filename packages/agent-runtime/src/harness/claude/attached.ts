@@ -8,9 +8,10 @@
  * - **Let go.** As the holder's scope closes, the new calls of each session with none in flight are held at their hook, it waits at
  *   most `LET_GO_MS` for each call in flight to end, then writes each session `parked` and ends its Claude Code through the SDK — an
  *   `interrupt` and the end of its input — so it prints what it spent and saves its total for the resume to carry on, killing only
- *   what outlives the bound; a call held at its hook then is never written in flight, nor run. A call that belongs to a call in flight is answered throughout, or the call it belongs to could never
- *   end and the let-go would wait on what it forbids. Past the bound the call in flight is cut, kept on the run file as `calling` and
- *   said on the log, so the next holder resumes the session told which call did not finish.
+ *   what outlives the bound; a call held at its hook then is never written in flight, nor run. A call that belongs to a call in
+ *   flight is answered throughout, or the call it belongs to could never end and the let-go would wait on what it forbids. Past the
+ *   bound the call in flight is cut, kept on the run file as `calling` and said on the log, so the next holder resumes the session
+ *   told which call did not finish.
  * - **Taken up.** On each look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of its
  *   Claude Code's process group, unless that pid is another process's now (`childOf`), and resumes it under the same session id, told
  *   it was paused (`CARRY_ON`), or, when its holder ended mid-call, which call did not finish (`crashNote`).
@@ -236,11 +237,12 @@ const ended = (root: string, live: Map<string, Live>): Effect.Effect<void> =>
 /**
  * The holder's let-go of the sessions in `live`: it says what it is waiting for, waits for the calls in flight to end, says which
  * session it cut and in what call where they did not, then parks each session at work (`parked`), waits for each Claude Code to print
- * its last result and exit and for each call held at its hook to be let go, and ends whatever is left (`ended`). Its three waits take from one `purse` of `letGoMs` (`purseOf`), the wait for the calls in
- * flight capped at `LET_GO_CALLS_SHARE` of it and the rest spent as they go, so the whole let-go ends within the budget rather than
- * taking their sum: it always returns, and within the bound, so a signal always ends the process and whatever waits for the process
- * — a service unit's stop timeout, a restart's wait for the lease — can be set above one number. `purse` is the caller's so a test
- * can read what each wait was given (`Purse.given`) and show they add up to no more than the budget.
+ * its last result and exit and for each call held at its hook to be let go, and ends whatever is left (`ended`). Its three waits
+ * take from one `purse` of `letGoMs` (`purseOf`), the wait for the calls in flight capped at `LET_GO_CALLS_SHARE` of it and the rest
+ * spent as they go, so the whole let-go ends within the budget rather than taking their sum: it always returns, and within the
+ * bound, so a signal always ends the process and whatever waits for the process — a service unit's stop timeout, a restart's wait for
+ * the lease — can be set above one number. `purse` is the caller's so a test can read what each wait was given (`Purse.given`) and
+ * show they add up to no more than the budget.
  */
 export const letGoOf = (
   root: string,

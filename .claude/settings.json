@@ -42,6 +42,7 @@
       "WebSearch",
       "WebFetch",
       "Bash(npx shadcn@latest:*)",
+      "Bash(npx shadcn view:*)",
       "Bash(node apps/web/.claude/skills/ds-spec/md3.mjs:*)"
     ]
   }

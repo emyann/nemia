@@ -6,8 +6,11 @@
  * refuses: a card whose auth cannot be met, or whose bindings are not spoken, ends the attempt `unstartable` with nothing sent; an
  * address that cannot be reached, or carries a secret, is refused when the engine is made. The secret itself is on no file the
  * runtime writes, which is read byte for byte.
+ *
+ * A story shares one agent across its checkpoints, so what it counts of the agent's traffic is counted from where the checkpoint
+ * began; a table's rows each start their own.
  */
-import { afterEach, test, type TestContext } from 'node:test';
+import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,25 +22,41 @@ import type { EngineShape, EngineOptions, TaskSpec, TaskView } from '../src/inde
 import { Engine as EngineService } from '../src/index.ts';
 import { REQUEST_MS, SEND_MS, SPAWN_WAIT_MS, remoteOps } from '../src/a2a/remote.ts';
 import { RUNTIME_EXTENSION } from '../src/a2a/map.ts';
-import { apiKey, bearer, mtls, remoteServer, type Binding, type RemoteServer, type ServerOptions } from './remote-server.ts';
+import {
+  apiKey,
+  bearer,
+  mtls,
+  remoteServer,
+  type Binding,
+  type RemoteServer,
+  type Security,
+  type ServerOptions,
+  type Step,
+  type Turn,
+} from './remote-server.ts';
 import { scratch } from './scratch.ts';
 import { stepClock } from './clock.ts';
 import { builtEngine } from './engine.ts';
+import { story } from './checkpoints.ts';
 import { until as untilEvent, WAITED } from '../src/waits/index.ts';
 
-const servers: RemoteServer[] = [];
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map((s) => s.close()));
-});
-
-const serve = async (o: ServerOptions = {}) => {
+/** A test agent, closed once the test or row `t` ends. */
+const serve = async (t: TestContext, o: ServerOptions = {}) => {
   const s = await remoteServer(o);
-  servers.push(s);
+  t.after(() => s.close());
   return s;
+};
+
+/** The URL of an agent that was there and is gone: nothing answers at it. */
+const goneUrl = async (under = '') => {
+  const s = await remoteServer();
+  await s.close();
+  return `${s.url}${under}`;
 };
 
 const SCHEMA = { type: 'object' };
 const HELD = () => [{ state: 'working' as const }];
+const DONE = () => [{ data: { ok: true }, state: 'completed' as const }];
 
 const engineOn = (s: RemoteServer, o: Partial<EngineOptions> = {}, root = scratch('ae-remote-')) => ({
   root,
@@ -65,6 +84,9 @@ const until = async (e: EngineShape, id: string, ok: (v: TaskView) => boolean, w
 };
 const settled = (e: EngineShape, id: string) => until(e, id, (v) => v.state.settled !== null, 'settled');
 const running = (e: EngineShape, id: string) => until(e, id, (v) => v.phase.startsWith('running'), 'ran');
+/** The first attempt of a task filed on `e` as `o` says, once it has settled. */
+const attemptOf = async (e: EngineShape, o: Partial<TaskSpec> = {}) =>
+  (await settled(e, await Effect.runPromise(e.file(task(o))))).state.attempts[0];
 
 const refusal = async (f: () => unknown): Promise<Error & { _tag?: string }> => {
   try {
@@ -91,6 +113,23 @@ const writeJournal = (root: string, id: string, events: object[]) => {
   fs.renameSync(`${file}.edit`, file);
 };
 const entryFile = (root: string, name: string) => path.join(root, 'remote', `${encodeURIComponent(name)}.json`);
+/**
+ * An intent to send under `name` written to the registry as a process that stopped before it recorded any answer leaves it: sent
+ * now, and, where `pid` is given, a send that process says it holds for a minute more.
+ */
+const writeIntent = (root: string, name: string, messageId: string, pid?: number) => {
+  fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
+  fs.writeFileSync(
+    entryFile(root, name),
+    JSON.stringify({
+      name,
+      agent: 'remote',
+      messageId,
+      sentAt: new Date().toISOString(),
+      ...(pid === undefined ? {} : { sending: { pid, until: new Date(Date.now() + 60_000).toISOString() } }),
+    }),
+  );
+};
 /** The start and the spawn of a journal as if written `ms` earlier, on the wall clock and on the monotonic clock of their boot. */
 const agedBy = (events: object[], ms: number): object[] =>
   events.map((ev) => {
@@ -98,9 +137,11 @@ const agedBy = (events: object[], ms: number): object[] =>
     if (e.kind !== 'starting' && e.kind !== 'spawned') return ev;
     return { ...e, at: new Date(Date.parse(e.at) - ms).toISOString(), ...(e.mono ? { mono: { ...e.mono, ms: e.mono.ms - ms } } : {}) };
   });
+/** How many calls of `method` the agent `s` has answered so far. */
+const calls = (s: RemoteServer, method: string) => s.counts[method] ?? 0;
 
-test('the test agent serves its card and answers a message on each binding it lists', async () => {
-  const s = await serve({ script: () => [{ data: { ok: true }, state: 'completed' }] });
+test('the test agent serves its card and answers a message on each binding it lists', async (t) => {
+  const s = await serve(t, { script: DONE });
   const json = await (await fetch(`${s.url}/.well-known/agent-card.json`)).json();
   const card = AgentCard.fromJSON(json);
   assert.deepEqual(
@@ -137,454 +178,688 @@ test('the test agent serves its card and answers a message on each binding it li
   );
 });
 
-test('a card that asks for a bearer token, with no credentials to give one: unstartable, naming the scheme, nothing sent', async () => {
-  const s = await serve({ security: bearer('t0k'), script: HELD });
-  const { e } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  const v = await settled(e, id);
-  assert.equal(v.state.settled, 'failed');
-  const a = v.state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.match(
-    a.error ?? '',
-    /`token` needs a secret, and `credentials` gave none: give `Engine\.layer` a `credentials` that answers for `token`/,
-  );
-  assert.match(a.error ?? '', /Nothing was sent/);
-  assert.equal(s.counts.sendMessage ?? 0, 0);
-  assert.equal(s.paths.length, 0, 'no request reached the agent');
-});
+const digest: Security = {
+  ...bearer('x'),
+  schemes: {
+    d: { scheme: { $case: 'httpAuthSecurityScheme' as const, value: { description: '', scheme: 'Digest', bearerFormat: '' } } },
+  },
+  requirements: [{ schemes: { d: { list: [] } } }],
+};
 
-test('what the runtime cannot send refuses too: an API key in a query, mutual TLS, an HTTP scheme it does not speak', async () => {
-  const digest = {
-    ...bearer('x'),
-    schemes: {
-      d: { scheme: { $case: 'httpAuthSecurityScheme' as const, value: { description: '', scheme: 'Digest', bearerFormat: '' } } },
+/** A scheme of a kind A2A 1.0 does not define, in the card's two forms. */
+const FUTURE = { wire: { futureScheme: { flow: 'x' } }, sdk: { scheme: { $case: 'futureScheme', value: {} } } };
+
+/** Each row: a card, or an agent, the runtime cannot meet, and the unstartable attempt it ends in, nothing sent. */
+const UNSTARTABLE: Array<[string, (t: TestContext) => Promise<void>]> = [
+  [
+    'a card that asks for a bearer token, with no credentials to give one: unstartable, naming the scheme, nothing sent',
+    async (t) => {
+      const s = await serve(t, { security: bearer('t0k'), script: HELD });
+      const { e } = engineOn(s);
+      const id = await Effect.runPromise(e.file(task()));
+      const v = await settled(e, id);
+      assert.equal(v.state.settled, 'failed');
+      const a = v.state.attempts[0];
+      assert.equal(a.reason, 'unstartable');
+      assert.match(
+        a.error ?? '',
+        /`token` needs a secret, and `credentials` gave none: give `Engine\.layer` a `credentials` that answers for `token`/,
+      );
+      assert.match(a.error ?? '', /Nothing was sent/);
+      assert.equal(s.counts.sendMessage ?? 0, 0);
+      assert.equal(s.paths.length, 0, 'no request reached the agent');
     },
-    requirements: [{ schemes: { d: { list: [] } } }],
-  };
-  for (const [security, said] of [
-    [apiKey('k', 'query'), /API key in a query, and this runtime sends a key only in a header/],
-    [mtls(), /mutual TLS, and this runtime holds no client certificate/],
-    [digest, /HTTP `Digest` authentication, and this runtime sends only `Bearer` and `Basic`/],
-  ] as const) {
-    const s = await serve({ security, script: HELD });
-    const { e } = engineOn(s, { credentials: () => 'a secret it has' });
-    const id = await Effect.runPromise(e.file(task()));
-    const a = (await settled(e, id)).state.attempts[0];
-    assert.equal(a.reason, 'unstartable');
-    assert.match(a.error ?? '', said);
-    assert.equal(s.paths.length, 0);
-  }
-});
-
-test('a card with two requirements is met by the first the secrets meet whole', async () => {
-  const key = apiKey('k-1');
-  const s = await serve({
-    script: () => [{ data: { ok: 1 }, state: 'completed' }],
-    security: {
-      schemes: { ...bearer('b').schemes, ...key.schemes },
-      requirements: [...bearer('b').requirements, ...key.requirements],
-      accepts: key.accepts,
+  ],
+  ...(
+    [
+      ['an API key in a query', apiKey('k', 'query'), /API key in a query, and this runtime sends a key only in a header/],
+      ['mutual TLS', mtls(), /mutual TLS, and this runtime holds no client certificate/],
+      ['an HTTP scheme it does not speak', digest, /HTTP `Digest` authentication, and this runtime sends only `Bearer` and `Basic`/],
+    ] as const
+  ).map(([what, security, said]): [string, (t: TestContext) => Promise<void>] => [
+    `what the runtime cannot send refuses too: ${what}`,
+    async (t) => {
+      const s = await serve(t, { security, script: HELD });
+      const { e } = engineOn(s, { credentials: () => 'a secret it has' });
+      const a = await attemptOf(e);
+      assert.equal(a.reason, 'unstartable');
+      assert.match(a.error ?? '', said);
+      assert.equal(s.paths.length, 0);
     },
-  });
-  const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'key' ? 'k-1' : undefined) });
-  const id = await Effect.runPromise(e.file(task()));
-  assert.equal((await settled(e, id)).state.settled, 'succeeded');
-  assert.equal(s.headers[0]['x-api-key'], 'k-1');
-  assert.equal(s.headers[0].authorization, undefined);
+  ]),
+  [
+    'a secret the agent refuses: unstartable, in words that say to check it, and the agent did nothing',
+    async (t) => {
+      const s = await serve(t, { security: bearer('right'), script: HELD });
+      const { e, root } = engineOn(s, { credentials: () => 'wrong' });
+      const id = await Effect.runPromise(e.file(task()));
+      const a = (await settled(e, id)).state.attempts[0];
+      assert.equal(a.reason, 'unstartable');
+      assert.match(a.error ?? '', /refused the request's authentication \(401/);
+      assert.equal(s.counts.sendMessage ?? 0, 0);
+      assert.ok(!fs.existsSync(entryFile(root, `ae/${id}/1`)), 'refused, the intent is taken back: nothing started under the name');
+    },
+  ],
+  [
+    'a card that offers only gRPC: unstartable, naming what the runtime speaks',
+    async (t) => {
+      const s = await serve(t, { bindings: ['GRPC'], script: HELD });
+      const a = await attemptOf(engineOn(s).e);
+      assert.equal(a.reason, 'unstartable');
+      assert.match(a.error ?? '', /offers GRPC 1\.0, and this runtime speaks JSON-RPC \(`JSONRPC`\) and REST \(`HTTP\+JSON`\)/);
+      assert.equal(s.paths.length, 0);
+    },
+  ],
+  [
+    'an agent that is not there: unstartable, since its card could not be read and nothing was sent',
+    async () => {
+      const url = await goneUrl();
+      const a = await attemptOf(builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } })));
+      assert.equal(a.reason, 'unstartable');
+      assert.match(a.error ?? '', /could not be read at .*agent-card\.json .*not reachable/);
+    },
+  ],
+  [
+    'a card that could not be read is named by its origin and path, never its query, which can carry a key',
+    async () => {
+      const url = await goneUrl('/agent.json?key=SECRET-in-the-query');
+      const a = await attemptOf(builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } })));
+      assert.equal(a.reason, 'unstartable');
+      assert.match(a.error ?? '', /could not be read at http:\/\/[^ ]*\/agent\.json \(/, 'the card is still named, by its path');
+      assert.ok(!(a.error ?? '').includes('SECRET'), a.error);
+    },
+  ],
+  [
+    'a served card that does not decode: unstartable, naming its first wrong field and the card by its path alone, and nothing sent',
+    async (t) => {
+      const s = await serve(t, { script: HELD, cardJson: () => ({ supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] }) });
+      const a = await attemptOf(engineOn(s).e);
+      assert.equal(a.reason, 'unstartable');
+      assert.match(a.error ?? '', /serves is not an A2A 1\.0 agent card this runtime reads: its `supportedInterfaces\.0\.url` is 3, where/);
+      assert.ok((a.error ?? '').includes(`what ${s.url}/.well-known/agent-card.json serves`), a.error);
+      assert.match(a.error ?? '', /The agent's operator serves the card; nothing was sent\.$/);
+      assert.equal(s.paths.length, 0, 'no A2A request was made');
+
+      const q = builtEngine(
+        EngineService.layer({
+          root: scratch('ae-remote-'),
+          harnesses: { remote: { url: `${s.url}/.well-known/agent-card.json?key=SECRET` } },
+        }),
+      );
+      const b = await attemptOf(q);
+      assert.match(b.error ?? '', /agent-card\.json serves is not an A2A 1\.0 agent card/);
+      assert.ok(!(b.error ?? '').includes('SECRET'), b.error);
+    },
+  ],
+  [
+    'a served card whose wrong field holds a huge value is refused in bounded words: its first 60 characters, cut marked',
+    async (t) => {
+      const huge = Array.from({ length: 100_000 }, (_, i) => i);
+      const s = await serve(t, { script: HELD, cardJson: () => ({ supportedInterfaces: [{ url: huge, protocolBinding: 'JSONRPC' }] }) });
+      const a = await attemptOf(engineOn(s).e);
+      assert.equal(a.reason, 'unstartable');
+      assert.ok((a.error ?? '').includes(`its \`supportedInterfaces.0.url\` is ${JSON.stringify(huge).slice(0, 60)}…, where`), a.error);
+      assert.ok(JSON.stringify(huge).length > 500_000);
+      assert.ok((a.error ?? '').length < 1000, `${(a.error ?? '').length} characters`);
+      assert.equal(s.paths.length, 0, 'no A2A request was made');
+    },
+  ],
+  ...Object.entries(FUTURE).map(([form, scheme]): [string, (t: TestContext) => Promise<void>] => [
+    `a requirement that names a scheme of a kind A2A 1.0 does not define is unmet, the card in its ${form} form`,
+    async (t) => {
+      const only = await serve(t, {
+        script: HELD,
+        cardForm: form === 'sdk' ? 'sdk' : 'wire',
+        cardJson: (c) => ({ ...c, securitySchemes: { future: scheme }, securityRequirements: [{ schemes: { future: {} } }] }),
+      });
+      const a = await attemptOf(engineOn(only, { credentials: () => 'a secret it has' }).e);
+      assert.equal(a.reason, 'unstartable', form);
+      assert.match(a.error ?? '', /`future` is a kind of scheme this runtime does not know, and cannot send\. Nothing was sent/, form);
+      assert.equal(only.paths.length, 0, form);
+    },
+  ]),
+  [
+    'a card served at one origin that names its interfaces on another: unstartable, and neither origin is sent the secret',
+    async (t) => {
+      const key = 'key-5e1d-SECRET';
+      const elsewhere = await serve(t, { security: apiKey(key), script: DONE });
+      const s = await serve(t, { security: apiKey(key), interfacesAt: elsewhere.url, script: HELD });
+      const { e, root } = engineOn(s, { credentials: () => key });
+      const a = await attemptOf(e);
+      assert.equal(a.reason, 'unstartable');
+      assert.match(
+        a.error ?? '',
+        new RegExp(
+          `card names ${elsewhere.url}/a2a/jsonrpc, ${elsewhere.url}/a2a/rest, and none is on ${s.url}, the origin the harness was given`,
+        ),
+      );
+      assert.match(a.error ?? '', /Nothing was sent/);
+      assert.equal(elsewhere.paths.length, 0, 'the other origin was sent nothing');
+      assert.equal(s.paths.length, 0);
+      assert.ok(
+        !fs.existsSync(path.join(root, 'remote')) || fs.readdirSync(path.join(root, 'remote')).length === 0,
+        'no intent was written',
+      );
+    },
+  ],
+  [
+    'a redirect from the agent is not followed: the send is refused, and the address it names is sent nothing',
+    async (t) => {
+      const key = 'key-8b2c-SECRET';
+      const elsewhere = await serve(t, { security: apiKey(key), script: DONE });
+      const s = await serve(t, { security: apiKey(key), redirectTo: elsewhere.url, script: HELD });
+      const { e, root } = engineOn(s, { credentials: () => key });
+      const a = await attemptOf(e);
+      assert.equal(a.reason, 'unstartable');
+      assert.match(a.error ?? '', new RegExp(`answered 307 to ${elsewhere.url}/a2a/jsonrpc, and a redirect is not followed`));
+      assert.equal(elsewhere.paths.length, 0, 'the address it named was sent nothing');
+      assert.equal(s.paths.length, 1, 'one send, answered with the redirect');
+      assert.equal(s.counts.sendMessage ?? 0, 0);
+      assert.deepEqual(fs.readdirSync(path.join(root, 'remote')), [], 'the intent went with the refusal');
+    },
+  ],
+];
+
+test('a card or an agent the runtime cannot meet: the attempt ends unstartable, saying why, and nothing is sent', async (t) => {
+  for (const [name, run] of UNSTARTABLE) await t.test(name, run);
 });
 
-test('a secret the agent refuses: unstartable, in words that say to check it, and the agent did nothing', async () => {
-  const s = await serve({ security: bearer('right'), script: HELD });
-  const { e, root } = engineOn(s, { credentials: () => 'wrong' });
-  const id = await Effect.runPromise(e.file(task()));
-  const a = (await settled(e, id)).state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.match(a.error ?? '', /refused the request's authentication \(401/);
-  assert.equal(s.counts.sendMessage ?? 0, 0);
-  assert.ok(!fs.existsSync(entryFile(root, `ae/${id}/1`)), 'refused, the intent is taken back: nothing started under the name');
+/** Each row: an agent reached as its card asks, wherever it lives, and the secret that went to it, or that no secret was asked. */
+const REACHED: Array<[string, (t: TestContext) => Promise<void>]> = [
+  [
+    'a card with two requirements is met by the first the secrets meet whole',
+    async (t) => {
+      const key = apiKey('k-1');
+      const s = await serve(t, {
+        script: () => [{ data: { ok: 1 }, state: 'completed' }],
+        security: {
+          schemes: { ...bearer('b').schemes, ...key.schemes },
+          requirements: [...bearer('b').requirements, ...key.requirements],
+          accepts: key.accepts,
+        },
+      });
+      const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'key' ? 'k-1' : undefined) });
+      const id = await Effect.runPromise(e.file(task()));
+      assert.equal((await settled(e, id)).state.settled, 'succeeded');
+      assert.equal(s.headers[0]['x-api-key'], 'k-1');
+      assert.equal(s.headers[0].authorization, undefined);
+    },
+  ],
+  [
+    "a card served as the SDK's own objects is read with its security schemes whole",
+    async (t) => {
+      const s = await serve(t, { cardForm: 'sdk', security: bearer('sdk-token'), script: DONE });
+      const refused = await attemptOf(engineOn(s).e);
+      assert.equal(refused.reason, 'unstartable');
+      assert.match(refused.error ?? '', /`token` needs a secret/);
+      assert.equal(s.paths.length, 0, 'refused off the card, before any request: the scheme was read');
+      const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? 'sdk-token' : undefined) });
+      assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
+    },
+  ],
+  [
+    'a scheme of a kind A2A 1.0 does not define is kept, and another requirement beside it is met',
+    async (t) => {
+      const s = await serve(t, {
+        security: bearer('t0k'),
+        script: DONE,
+        cardJson: (c) => ({
+          ...c,
+          securitySchemes: { ...(c.securitySchemes as object), future: FUTURE.wire },
+          securityRequirements: [{ schemes: { future: {} } }, ...(c.securityRequirements as object[])],
+        }),
+      });
+      const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? 't0k' : undefined) });
+      assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
+    },
+  ],
+  [
+    "a harness given by its card, not its URL, is reached on the card's interface",
+    async (t) => {
+      const s = await serve(t, { script: DONE });
+      const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
+      const asked: string[] = [];
+      const e = builtEngine(
+        EngineService.layer({
+          root: scratch('ae-remote-'),
+          harnesses: { remote: { card } },
+          credentials: (_, url) => {
+            asked.push(url);
+            return undefined;
+          },
+        }),
+      );
+      assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
+      assert.deepEqual(asked, [], 'a card that asks for no auth asks for no secret');
+    },
+  ],
+  [
+    'an agent that lives under a path has its card read beneath that path, and a URL that names a `.json` file is the card',
+    async (t) => {
+      const under = await serve(t, { prefix: '/agents/reviewer', script: DONE });
+      for (const url of [under.url, `${under.url}/`]) {
+        const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
+        assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded', url);
+      }
+      assert.deepEqual(under.cards, ['/agents/reviewer/.well-known/agent-card.json', '/agents/reviewer/.well-known/agent-card.json']);
+      assert.ok(under.paths.length && under.paths.every((p) => p.startsWith('/agents/reviewer/a2a/')), under.paths.join(' '));
+      const named = await serve(t, { prefix: '/agents/reviewer', cardAt: '/card.json', script: DONE });
+      const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url: `${named.url}/card.json` } } }));
+      assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
+      assert.deepEqual(named.cards, ['/agents/reviewer/card.json']);
+    },
+  ],
+  [
+    "credentials is asked by the harness's name too, and missingCredential words the refusal of a secret not given",
+    async (t) => {
+      const s = await serve(t, { security: bearer('t0k'), script: () => [{ data: { ok: 1 }, state: 'completed' }] });
+      const asked: string[][] = [];
+      const e = builtEngine(
+        EngineService.layer({
+          root: scratch('ae-remote-'),
+          harnesses: { reviewer: { url: s.url }, other: { url: s.url } },
+          credentials: (scheme, agentUrl, harness) => {
+            asked.push([scheme, agentUrl, harness]);
+            return harness === 'reviewer' ? 't0k' : undefined;
+          },
+          missingCredential: (scheme, _url, harness) => `set WF_A2A_${harness.toUpperCase()}_${scheme.toUpperCase()}`,
+        }),
+      );
+      assert.equal((await settled(e, await Effect.runPromise(e.file(task({ harness: 'reviewer' }))))).state.settled, 'succeeded');
+      assert.deepEqual(asked[0], ['token', s.url, 'reviewer']);
+      const a = await attemptOf(e, { harness: 'other' });
+      assert.equal(a.reason, 'unstartable');
+      assert.match(a.error ?? '', /`token` needs a secret, and `credentials` gave none: set WF_A2A_OTHER_TOKEN\./);
+      assert.equal(s.counts.sendMessage, 1, 'only the task with its secret was sent');
+    },
+  ],
+];
+
+test("a remote agent reached as its card asks: the secret it needs, sent where it lives, and none it doesn't", async (t) => {
+  for (const [name, run] of REACHED) await t.test(name, run);
 });
 
-test('a card that offers only gRPC: unstartable, naming what the runtime speaks', async () => {
-  const s = await serve({ bindings: ['GRPC'], script: HELD });
-  const { e } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  const a = (await settled(e, id)).state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.match(a.error ?? '', /offers GRPC 1\.0, and this runtime speaks JSON-RPC \(`JSONRPC`\) and REST \(`HTTP\+JSON`\)/);
-  assert.equal(s.paths.length, 0);
-});
+const ONE = { url: 'https://a.example/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' };
 
-test('an agent that is not there: unstartable, since its card could not be read and nothing was sent', async () => {
-  const s = await serve();
-  const url = s.url;
-  await s.close();
-  servers.splice(servers.indexOf(s), 1);
-  const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
-  const id = await Effect.runPromise(e.file(task()));
-  const a = (await settled(e, id)).state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.match(a.error ?? '', /could not be read at .*agent-card\.json .*not reachable/);
-});
+/** Each row: a remote agent, as a harness is configured, that the engine refuses to be made with. */
+const UNMADE: Array<[string, unknown, RegExp]> = [
+  ['a user name and password', { url: 'https://user:pw@agent.example' }, /carries a user name or password/],
+  ['a password alone', { url: 'https://:pw@agent.example' }, /carries a user name or password/],
+  ['an FTP address', { url: 'ftp://agent.example' }, /`ftp:…`, and a remote A2A agent is reached over HTTP/],
+  ['no URL at all', { url: 'not a url' }, /`not a url`, and a remote A2A agent is reached over HTTP/],
+  ['a number', { url: 7 }, /a number, and a remote A2A agent is reached over HTTP/],
+  ['neither a URL nor a card', {}, /takes one of `url` .* or `card` .*and was given neither/],
+  ['both a URL and a card', { url: 'https://a.example', card: {} }, /and was given both/],
+  ['a key beside its URL', { url: 'https://a.example', token: 's' }, /takes `url` or `card` and nothing else, and was given `token`/],
+  ['a card that is a string', { card: 'a card' }, /`card` is not an agent card/],
+  [
+    'a card with no interfaces',
+    { card: {} },
+    /`card` is not an A2A 1\.0 agent card this runtime reads: its `supportedInterfaces` is missing\. Give the JSON object/,
+  ],
+  [
+    'an interface with no binding',
+    { card: { supportedInterfaces: [{ url: 'https://a.example' }] } },
+    /its `supportedInterfaces\.0\.protocolBinding` is missing/,
+  ],
+  [
+    'an interface whose URL is a number',
+    { card: { supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] } },
+    /its `supportedInterfaces\.0\.url` is 3, where an A2A 1\.0 card holds string/,
+  ],
+  [
+    'an HTTP scheme with no scheme',
+    { card: { supportedInterfaces: [ONE], securitySchemes: { b: { httpAuthSecurityScheme: {} } } } },
+    /its `securitySchemes\.b\.httpAuthSecurityScheme\.scheme` is missing/,
+  ],
+  [
+    'a card in snake_case',
+    { card: { supported_interfaces: [ONE] } },
+    /its `supportedInterfaces` is missing, and `supported_interfaces` is there: write `supportedInterfaces`, as A2A's JSON does/,
+  ],
+];
 
-test('a card that could not be read is named by its origin and path, never its query, which can carry a key', async () => {
-  const s = await serve();
-  const url = `${s.url}/agent.json?key=SECRET-in-the-query`;
-  await s.close();
-  servers.splice(servers.indexOf(s), 1);
-  const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
-  const id = await Effect.runPromise(e.file(task()));
-  const a = (await settled(e, id)).state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.match(a.error ?? '', /could not be read at http:\/\/[^ ]*\/agent\.json \(/, 'the card is still named, by its path');
-  assert.ok(!(a.error ?? '').includes('SECRET'), a.error);
-});
-
-test('the engine refuses a remote agent it could never reach, whose address carries a secret, or whose card does not decode', async () => {
-  const ONE = { url: 'https://a.example/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' };
-  const cases: Array<[unknown, RegExp]> = [
-    [{ url: 'https://user:pw@agent.example' }, /carries a user name or password/],
-    [{ url: 'https://:pw@agent.example' }, /carries a user name or password/],
-    [{ url: 'ftp://agent.example' }, /`ftp:…`, and a remote A2A agent is reached over HTTP/],
-    [{ url: 'not a url' }, /`not a url`, and a remote A2A agent is reached over HTTP/],
-    [{ url: 7 }, /a number, and a remote A2A agent is reached over HTTP/],
-    [{}, /takes one of `url` .* or `card` .*and was given neither/],
-    [{ url: 'https://a.example', card: {} }, /and was given both/],
-    [{ url: 'https://a.example', token: 's' }, /takes `url` or `card` and nothing else, and was given `token`/],
-    [{ card: 'a card' }, /`card` is not an agent card/],
-    [{ card: {} }, /`card` is not an A2A 1\.0 agent card this runtime reads: its `supportedInterfaces` is missing\. Give the JSON object/],
-    [{ card: { supportedInterfaces: [{ url: 'https://a.example' }] } }, /its `supportedInterfaces\.0\.protocolBinding` is missing/],
-    [
-      { card: { supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] } },
-      /its `supportedInterfaces\.0\.url` is 3, where an A2A 1\.0 card holds string/,
-    ],
-    [
-      { card: { supportedInterfaces: [ONE], securitySchemes: { b: { httpAuthSecurityScheme: {} } } } },
-      /its `securitySchemes\.b\.httpAuthSecurityScheme\.scheme` is missing/,
-    ],
-    [
-      { card: { supported_interfaces: [ONE] } },
-      /its `supportedInterfaces` is missing, and `supported_interfaces` is there: write `supportedInterfaces`, as A2A's JSON does/,
-    ],
-  ];
-  for (const [agent, said] of cases) {
-    const err = await refusal(() =>
-      builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: agent as never } })),
+test('the engine refuses, when it is made or a task is filed, what a remote agent could never take', async (t) => {
+  for (const [what, agent, said] of UNMADE)
+    await t.test(
+      `a remote agent it could never reach, whose address carries a secret, or whose card does not decode: ${what}`,
+      async () => {
+        const err = await refusal(() =>
+          builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: agent as never } })),
+        );
+        assert.equal(err._tag, 'EngineRefused', String(said));
+        assert.match(err.message, said);
+        assert.ok(err.message.startsWith('the `remote` harness'), err.message);
+      },
     );
-    assert.equal(err._tag, 'EngineRefused', String(said));
-    assert.match(err.message, said);
-    assert.ok(err.message.startsWith('the `remote` harness'), err.message);
-  }
-  const err = await refusal(() =>
-    builtEngine(
-      EngineService.layer({
-        root: scratch('ae-remote-'),
-        harnesses: { remote: { url: 'https://a.example' } },
-        credentials: 'secret' as never,
-      }),
-    ),
-  );
-  assert.equal(err._tag, 'EngineRefused', err.message);
-  assert.match(err.message, /`credentials` is a function/);
+  await t.test('`credentials` that is not a function', async () => {
+    const err = await refusal(() =>
+      builtEngine(
+        EngineService.layer({
+          root: scratch('ae-remote-'),
+          harnesses: { remote: { url: 'https://a.example' } },
+          credentials: 'secret' as never,
+        }),
+      ),
+    );
+    assert.equal(err._tag, 'EngineRefused', err.message);
+    assert.match(err.message, /`credentials` is a function/);
+  });
+  await t.test('a missingCredential that is not a function', async () => {
+    const err = await refusal(() =>
+      builtEngine(EngineService.layer({ root: scratch('ae-remote-'), missingCredential: 'set it' as never })),
+    );
+    assert.match(err.message, /`missingCredential` is a function, `\(scheme, agentUrl, harness\) => words`/);
+  });
+  await t.test("a task that says which of its checkout's servers it loads, on a remote agent, which loads its operator's", async (t) => {
+    const { e } = engineOn(await serve(t));
+    const err = await refusal(() => Effect.runPromise(e.file(task({ config: { checkoutMcp: [] } }))));
+    assert.equal(err._tag, 'FileRefused', err.message);
+    assert.match(
+      err.message,
+      /the `remote` harness is a remote A2A agent, .*takes no harness arguments: take `checkoutMcp` out of `config`/,
+    );
+  });
+  await t.test('a task that carries harness arguments, on a remote agent, before anything is journalled', async (t) => {
+    const s = await serve(t);
+    const { e, root } = engineOn(s);
+    const err = await refusal(() => Effect.runPromise(e.file(task({ config: { model: 'x' } }))));
+    assert.equal(err._tag, 'FileRefused', err.message);
+    assert.match(
+      err.message,
+      /the `remote` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take `model` out of `config`/,
+    );
+    assert.ok(!fs.existsSync(path.join(root, 'tasks')) || fs.readdirSync(path.join(root, 'tasks')).length === 0);
+  });
 });
 
-test("a task that says which of its checkout's servers it loads is refused on a remote agent, which loads its operator's", async () => {
-  const { e } = engineOn(await serve());
-  const err = await refusal(() => Effect.runPromise(e.file(task({ config: { checkoutMcp: [] } }))));
-  assert.equal(err._tag, 'FileRefused', err.message);
-  assert.match(err.message, /the `remote` harness is a remote A2A agent, .*takes no harness arguments: take `checkoutMcp` out of `config`/);
-});
-
-test('a task that carries harness arguments is refused on a remote agent, before anything is journalled', async () => {
-  const s = await serve();
-  const { e, root } = engineOn(s);
-  const err = await refusal(() => Effect.runPromise(e.file(task({ config: { model: 'x' } }))));
-  assert.equal(err._tag, 'FileRefused', err.message);
-  assert.match(
-    err.message,
-    /the `remote` harness is a remote A2A agent, which runs as its operator configured it, and takes no harness arguments: take `model` out of `config`/,
-  );
-  assert.ok(!fs.existsSync(path.join(root, 'tasks')) || fs.readdirSync(path.join(root, 'tasks')).length === 0);
-});
-
-test('say to a remote task at work is refused: its Task takes words only once it asks for input', async () => {
-  const s = await serve({ script: HELD });
-  const { e, root } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  await running(e, id);
-  const err = await refusal(() => Effect.runPromise(e.say(id, 'hurry up')));
-  assert.equal(err._tag, 'SayRefused', err.message);
-  assert.match(err.message, /runs on the `remote` remote A2A agent, whose Task takes words only once it asks for input, and it is at work/);
-  assert.equal(s.counts.sendMessage, 1, 'nothing sent');
-  assert.ok(!journalOf(root, id).some((ev) => ev.kind === 'said'));
-});
-
-/** The bindings a card lists, each alone and both in each order: the end-to-end tests run on each. */
+/** The bindings a card lists, each alone and both in each order: the end-to-end story runs on each. */
 const BINDINGS: Binding[][] = [['JSONRPC'], ['HTTP+JSON'], ['JSONRPC', 'HTTP+JSON'], ['HTTP+JSON', 'JSONRPC']];
 const pathOf = (b: Binding) => (b === 'JSONRPC' ? 'jsonrpc' : 'rest');
+
+/** The brief of each task the story files, and what the agent does with its first message; a held-open conversation's answers too. */
+const BRIEF = { works: 'paint the fence', asks: 'paint it a colour', fails: 'paint with no paint', words: 'say it in words' } as const;
+const HOLD = { reply: 'answer in a message', open: 'hold the conversation open', answer: 'once more' } as const;
+const scriptOf = (t: Turn): Step[] => {
+  if (t.turn === 2) return [{ data: { colour: t.text }, state: 'completed' }];
+  switch (t.text) {
+    case BRIEF.asks:
+      return [{ state: 'input-required', words: 'which colour?' }];
+    case BRIEF.fails:
+      return [{ state: 'failed', words: 'the paint ran out' }];
+    case BRIEF.words:
+      return [{ text: 'done, in words', state: 'completed' }];
+    case HOLD.reply:
+      return [{ reply: 'here you are', data: { answer: 42 } }];
+    case HOLD.open:
+    case HOLD.answer:
+      return [{ data: { turn: t.turn, heard: t.text }, state: 'completed' }];
+    default:
+      return HELD();
+  }
+};
 
 for (const bindings of BINDINGS) {
   const on = bindings.join(' then ');
 
-  test(`${on}: a task works, completes with a data artifact, and settles succeeded with that statement`, async () => {
-    const s = await serve({ bindings, script: HELD });
-    const { e } = engineOn(s);
-    const id = await Effect.runPromise(e.file(task()));
-    const v = await running(e, id);
-    assert.equal(v.phase, 'running (working)');
-    assert.equal(v.sessionId, s.tasks()[0]);
-    assert.deepEqual(s.sent[0].metadata, { [RUNTIME_EXTENSION]: { closeoutSchema: SCHEMA } });
-    s.move(s.tasks()[0], { data: { painted: 'white' }, state: 'completed' });
-    const done = await settled(e, id);
-    assert.equal(done.state.settled, 'succeeded');
-    assert.deepEqual(done.state.attempts[0].closeout, { painted: 'white' });
-    assert.equal(done.state.attempts[0].stated, true);
-    assert.equal(done.state.attempts[0].nativeId, s.sent[0].contextId || done.state.attempts[0].nativeId);
-    assert.equal(s.counts.sendMessage, 1);
-    assert.ok(
-      s.paths.every((p) => p.split('/')[2] === pathOf(bindings[0])),
-      `every call on the card's first binding: ${s.paths.join(', ')}`,
-    );
-  });
-
-  test(`${on}: a task that asks for input is blocked, waiting for it; say answers it on its Task, and it completes`, async () => {
-    const s = await serve({
-      bindings,
-      script: (t) =>
-        t.turn === 1 ? [{ state: 'input-required', words: 'which colour?' }] : [{ data: { colour: t.text }, state: 'completed' }],
-    });
+  test(`${on}: a remote agent's tasks work and complete, ask and are answered, are stopped, fail, and hold a conversation open`, async (t) => {
+    const s = await serve(t, { bindings, script: scriptOf });
     const { e, root } = engineOn(s);
-    const id = await Effect.runPromise(e.file(task()));
-    const v = await until(e, id, (x) => x.phase === 'needs-human', 'asked for input');
-    assert.equal(v.waitingFor, 'input');
-    const said = await Effect.runPromise(e.say(id, 'blue'));
-    assert.equal(said.text, 'blue');
-    assert.equal(s.sent[1].taskId, s.tasks()[0], 'on the same Task');
-    assert.equal(s.sent[1].contextId, v.state.attempts[0].nativeId ?? s.sent[1].contextId);
-    const done = await settled(e, id);
-    assert.equal(done.state.settled, 'succeeded');
-    assert.deepEqual(done.state.attempts[0].closeout, { colour: 'blue' });
-    assert.equal(s.tasks().length, 1, 'one Task, two turns');
-    assert.ok(journalOf(root, id).some((ev) => ev.kind === 'said'));
-  });
+    const c = story(t);
+    const everyCallOnFirstBinding = () =>
+      assert.ok(
+        s.paths.every((p) => p.split('/')[2] === pathOf(bindings[0])),
+        `every call on the card's first binding: ${s.paths.join(', ')}`,
+      );
 
-  test(`${on}: stop cancels the Task once, and it settles stopped`, async () => {
-    const s = await serve({ bindings, script: HELD });
-    const { e } = engineOn(s);
-    const id = await Effect.runPromise(e.file(task()));
-    await running(e, id);
-    await Effect.runPromise(e.stop(id));
-    const done = await settled(e, id);
-    assert.equal(done.state.settled, 'stopped');
-    assert.equal(s.counts.cancelTask, 1);
-  });
+    await c.test('a task works, completes with a data artifact, and settles succeeded with that statement', async () => {
+      const [sent, made, sends] = [s.sent.length, s.tasks().length, calls(s, 'sendMessage')];
+      const id = await Effect.runPromise(e.file(task()));
+      const v = await running(e, id);
+      assert.equal(v.phase, 'running (working)');
+      assert.equal(v.sessionId, s.tasks()[made]);
+      assert.deepEqual(s.sent[sent].metadata, { [RUNTIME_EXTENSION]: { closeoutSchema: SCHEMA } });
+      s.move(s.tasks()[made], { data: { painted: 'white' }, state: 'completed' });
+      const done = await settled(e, id);
+      assert.equal(done.state.settled, 'succeeded');
+      assert.deepEqual(done.state.attempts[0].closeout, { painted: 'white' });
+      assert.equal(done.state.attempts[0].stated, true);
+      assert.equal(done.state.attempts[0].nativeId, s.sent[sent].contextId || done.state.attempts[0].nativeId);
+      assert.equal(calls(s, 'sendMessage') - sends, 1);
+      everyCallOnFirstBinding();
+    });
 
-  test(`${on}: a Task that fails settles failed`, async () => {
-    const s = await serve({ bindings, script: () => [{ state: 'failed', words: 'the paint ran out' }] });
-    const { e } = engineOn(s);
-    const id = await Effect.runPromise(e.file(task()));
-    const done = await settled(e, id);
-    assert.equal(done.state.settled, 'failed');
-    assert.equal(done.state.attempts[0].reason, 'harness');
-    assert.match(await Effect.runPromise(e.logs(id)), /FAILED — the paint ran out/);
-  });
+    await c.test('a task that asks for input is blocked, waiting for it; say answers it on its Task, and it completes', async () => {
+      const [sent, made] = [s.sent.length, s.tasks().length];
+      const id = await Effect.runPromise(e.file(task({ brief: BRIEF.asks })));
+      const v = await until(e, id, (x) => x.phase === 'needs-human', 'asked for input');
+      assert.equal(v.waitingFor, 'input');
+      const said = await Effect.runPromise(e.say(id, 'blue'));
+      assert.equal(said.text, 'blue');
+      assert.equal(s.sent[sent + 1].taskId, s.tasks()[made], 'on the same Task');
+      assert.equal(s.sent[sent + 1].contextId, v.state.attempts[0].nativeId ?? s.sent[sent + 1].contextId);
+      const done = await settled(e, id);
+      assert.equal(done.state.settled, 'succeeded');
+      assert.deepEqual(done.state.attempts[0].closeout, { colour: 'blue' });
+      assert.equal(s.tasks().length - made, 1, 'one Task, two turns');
+      assert.ok(journalOf(root, id).some((ev) => ev.kind === 'said'));
+      everyCallOnFirstBinding();
+    });
 
-  test(`${on}: a completion with no data part ends with no statement: stated false`, async () => {
-    const s = await serve({ bindings, script: () => [{ text: 'done, in words', state: 'completed' }] });
-    const { e } = engineOn(s);
-    const id = await Effect.runPromise(e.file(task()));
-    const done = await settled(e, id);
-    assert.equal(done.state.attempts[0].stated, false);
-    assert.equal(done.state.attempts[0].closeout, undefined);
+    await c.test(
+      'say to a task at work is refused; stop cancels its Task once, and it settles stopped; each verb went as an A2A method',
+      async () => {
+        const [sends, gets, cancels] = [calls(s, 'sendMessage'), calls(s, 'getTask'), calls(s, 'cancelTask')];
+        const id = await Effect.runPromise(e.file(task()));
+        await running(e, id);
+        const err = await refusal(() => Effect.runPromise(e.say(id, 'hurry up')));
+        assert.equal(err._tag, 'SayRefused', err.message);
+        assert.match(
+          err.message,
+          /runs on the `remote` remote A2A agent, whose Task takes words only once it asks for input, and it is at work/,
+        );
+        assert.equal(calls(s, 'sendMessage') - sends, 1, 'nothing sent');
+        assert.ok(!journalOf(root, id).some((ev) => ev.kind === 'said'));
+        await Effect.runPromise(e.view(id));
+        assert.match(await Effect.runPromise(e.logs(id)), /user: paint the fence\nWORKING/);
+        await Effect.runPromise(e.stop(id));
+        const done = await settled(e, id);
+        assert.equal(done.state.settled, 'stopped');
+        assert.equal(calls(s, 'cancelTask') - cancels, 1);
+        assert.equal(calls(s, 'sendMessage') - sends, 1);
+        assert.ok(calls(s, 'getTask') - gets >= 2);
+        assert.equal(calls(s, 'listTasks'), 0, 'never a listing: on an agent others use it lists theirs too');
+        everyCallOnFirstBinding();
+      },
+    );
+
+    await c.test('a Task that fails settles failed', async () => {
+      const id = await Effect.runPromise(e.file(task({ brief: BRIEF.fails })));
+      const done = await settled(e, id);
+      assert.equal(done.state.settled, 'failed');
+      assert.equal(done.state.attempts[0].reason, 'harness');
+      assert.match(await Effect.runPromise(e.logs(id)), /FAILED — the paint ran out/);
+    });
+
+    await c.test('a completion with no data part ends with no statement: stated false', async () => {
+      const a = await attemptOf(e, { brief: BRIEF.words });
+      assert.equal(a.stated, false);
+      assert.equal(a.closeout, undefined);
+    });
+
+    await c.test('an agent that answers with a Message, not a Task: the session is its reply, ended', async () => {
+      await Effect.runPromise(e.tick());
+      const gets = calls(s, 'getTask');
+      const id = await Effect.runPromise(e.file(task({ brief: HOLD.reply })));
+      const done = await settled(e, id);
+      assert.equal(done.state.settled, 'succeeded');
+      assert.deepEqual(done.state.attempts[0].closeout, { answer: 42 });
+      assert.match(await Effect.runPromise(e.logs(id)), /agent: here you are/);
+      assert.equal(calls(s, 'getTask') - gets, 0, 'no Task to ask about');
+      everyCallOnFirstBinding();
+    });
+
+    await c.test('a task held open: its answer is a new Task in the same context, as A2A continues a conversation', async () => {
+      const [sent, made] = [s.sent.length, s.tasks().length];
+      const id = await Effect.runPromise(e.file(task({ brief: HOLD.open, holdOpen: true })));
+      const first = await until(e, id, (v) => v.phase === 'input-required', 'waited for an answer');
+      await Effect.runPromise(e.answer(id, HOLD.answer));
+      const second = await until(e, id, (v) => v.phase === 'input-required' && v.state.attempts.length === 2, 'took its answer');
+      assert.equal(s.sent[sent + 1].contextId, first.state.attempts[0].nativeId, 'sent into the context of the first');
+      assert.equal(s.sent[sent + 1].taskId, '');
+      assert.equal(s.tasks().length - made, 2);
+      assert.deepEqual(second.state.attempts[1].closeout, { turn: 1, heard: HOLD.answer });
+      assert.equal(second.sessionId, first.state.attempts[0].nativeId, "settled on the context, the view's session is the conversation");
+      assert.match(await Effect.runPromise(e.logs(id)), /^user: once more\n/, 'and its logs are the latest Task in it');
+      await Effect.runPromise(e.close(id));
+      assert.equal((await settled(e, id)).state.settled, 'succeeded');
+      everyCallOnFirstBinding();
+    });
   });
 }
 
-test('a task held open: its answer is a new Task in the same context, as A2A continues a conversation', async () => {
-  const s = await serve({ script: (t) => [{ data: { turn: t.turn, heard: t.text }, state: 'completed' }] });
-  const { e } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task({ holdOpen: true })));
-  const first = await until(e, id, (v) => v.phase === 'input-required', 'waited for an answer');
-  await Effect.runPromise(e.answer(id, 'once more'));
-  const second = await until(e, id, (v) => v.phase === 'input-required' && v.state.attempts.length === 2, 'took its answer');
-  assert.equal(s.sent[1].contextId, first.state.attempts[0].nativeId, 'sent into the context of the first');
-  assert.equal(s.sent[1].taskId, '');
-  assert.equal(s.tasks().length, 2);
-  assert.deepEqual(second.state.attempts[1].closeout, { turn: 1, heard: 'once more' });
-  assert.equal(second.sessionId, first.state.attempts[0].nativeId, "settled on the context, the view's session is the conversation");
-  assert.match(await Effect.runPromise(e.logs(id)), /^user: once more\n/, 'and its logs are the latest Task in it');
-  await Effect.runPromise(e.close(id));
-  assert.equal((await settled(e, id)).state.settled, 'succeeded');
-});
+test('a remote agent across an engine restart, with a send in doubt: its Task adopted, never sent twice, lost past the grace window', async (t) => {
+  const s = await serve(t, { script: HELD });
+  const c = story(t);
+  const again = (root: string) => builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
 
-test('an agent that answers with a Message, not a Task: the session is its reply, ended', async () => {
-  const s = await serve({ script: () => [{ reply: 'here you are', data: { answer: 42 } }] });
-  const { e } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  const done = await settled(e, id);
-  assert.equal(done.state.settled, 'succeeded');
-  assert.deepEqual(done.state.attempts[0].closeout, { answer: 42 });
-  assert.match(await Effect.runPromise(e.logs(id)), /agent: here you are/);
-  assert.equal(s.counts.getTask ?? 0, 0, 'no Task to ask about');
-});
-
-test("a card served as the SDK's own objects is read with its security schemes whole", async () => {
-  const s = await serve({ cardForm: 'sdk', security: bearer('sdk-token'), script: () => [{ data: { ok: true }, state: 'completed' }] });
-  const bare = engineOn(s);
-  const refused = (await settled(bare.e, await Effect.runPromise(bare.e.file(task())))).state.attempts[0];
-  assert.equal(refused.reason, 'unstartable');
-  assert.match(refused.error ?? '', /`token` needs a secret/);
-  assert.equal(s.paths.length, 0, 'refused off the card, before any request: the scheme was read');
-  const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? 'sdk-token' : undefined) });
-  assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
-});
-
-test('a served card that does not decode: unstartable, naming its first wrong field and the card by its path alone, and nothing sent', async () => {
-  const s = await serve({ script: HELD, cardJson: () => ({ supportedInterfaces: [{ url: 3, protocolBinding: 'JSONRPC' }] }) });
-  const { e } = engineOn(s);
-  const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.match(a.error ?? '', /serves is not an A2A 1\.0 agent card this runtime reads: its `supportedInterfaces\.0\.url` is 3, where/);
-  assert.ok((a.error ?? '').includes(`what ${s.url}/.well-known/agent-card.json serves`), a.error);
-  assert.match(a.error ?? '', /The agent's operator serves the card; nothing was sent\.$/);
-  assert.equal(s.paths.length, 0, 'no A2A request was made');
-
-  const q = builtEngine(
-    EngineService.layer({
-      root: scratch('ae-remote-'),
-      harnesses: { remote: { url: `${s.url}/.well-known/agent-card.json?key=SECRET` } },
-    }),
+  await c.test(
+    'restart after `spawned`: a new engine over the same root reads the Task by GetTask and settles it, sending nothing',
+    async () => {
+      const sends = calls(s, 'sendMessage');
+      const { e, root } = engineOn(s);
+      const id = await Effect.runPromise(e.file(task()));
+      await running(e, id);
+      const next = again(root);
+      const gets = calls(s, 'getTask');
+      s.move(s.tasks().at(-1)!, { data: { ok: true }, state: 'completed' });
+      assert.equal((await settled(next, id)).state.settled, 'succeeded');
+      assert.ok(calls(s, 'getTask') > gets);
+      assert.equal(calls(s, 'sendMessage') - sends, 1);
+    },
   );
-  const b = (await settled(q, await Effect.runPromise(q.file(task())))).state.attempts[0];
-  assert.match(b.error ?? '', /agent-card\.json serves is not an A2A 1\.0 agent card/);
-  assert.ok(!(b.error ?? '').includes('SECRET'), b.error);
-});
 
-test('a served card whose wrong field holds a huge value is refused in bounded words: its first 60 characters, cut marked', async () => {
-  const huge = Array.from({ length: 100_000 }, (_, i) => i);
-  const s = await serve({ script: HELD, cardJson: () => ({ supportedInterfaces: [{ url: huge, protocolBinding: 'JSONRPC' }] }) });
-  const { e } = engineOn(s);
-  const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.ok((a.error ?? '').includes(`its \`supportedInterfaces.0.url\` is ${JSON.stringify(huge).slice(0, 60)}…, where`), a.error);
-  assert.ok(JSON.stringify(huge).length > 500_000);
-  assert.ok((a.error ?? '').length < 1000, `${(a.error ?? '').length} characters`);
-  assert.equal(s.paths.length, 0, 'no A2A request was made');
-});
+  await c.test(
+    'restart with the Task recorded and only `starting` journalled: the Task is adopted, and nothing is sent again',
+    async () => {
+      const sends = calls(s, 'sendMessage');
+      const { e, root } = engineOn(s);
+      const id = await Effect.runPromise(e.file(task()));
+      await running(e, id);
+      const taskId = s.tasks().at(-1)!;
+      writeJournal(
+        root,
+        id,
+        journalOf(root, id).filter((ev) => ev.kind !== 'spawned'),
+      );
+      await Effect.runPromise(remoteOps('remote', { url: s.url }, root).spawn({ name: `ae/${id}/1`, brief: 'b', cwd: '/w' }));
+      const next = again(root);
+      const v = await running(next, id);
+      assert.equal(v.sessionId, taskId);
+      s.move(taskId, { data: { ok: true }, state: 'completed' });
+      assert.equal((await settled(next, id)).state.settled, 'succeeded');
+      assert.equal(
+        calls(s, 'sendMessage') - sends,
+        1,
+        'a spawn asked again for the name adopts what the registry holds, and sends nothing',
+      );
+    },
+  );
 
-test('a scheme of a kind A2A 1.0 does not define is kept: a requirement that names it is unmet, in either form, and another requirement is met', async () => {
-  const future = { wire: { futureScheme: { flow: 'x' } }, sdk: { scheme: { $case: 'futureScheme', value: {} } } };
-  for (const [form, scheme] of Object.entries(future)) {
-    const only = await serve({
-      script: HELD,
-      cardForm: form === 'sdk' ? 'sdk' : 'wire',
-      cardJson: (c) => ({ ...c, securitySchemes: { future: scheme }, securityRequirements: [{ schemes: { future: {} } }] }),
-    });
-    const { e } = engineOn(only, { credentials: () => 'a secret it has' });
-    const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
-    assert.equal(a.reason, 'unstartable', form);
-    assert.match(a.error ?? '', /`future` is a kind of scheme this runtime does not know, and cannot send\. Nothing was sent/, form);
-    assert.equal(only.paths.length, 0, form);
-  }
-  const s = await serve({
-    security: bearer('t0k'),
-    script: () => [{ data: { ok: true }, state: 'completed' }],
-    cardJson: (c) => ({
-      ...c,
-      securitySchemes: { ...(c.securitySchemes as object), future: future.wire },
-      securityRequirements: [{ schemes: { future: {} } }, ...(c.securityRequirements as object[])],
-    }),
+  await c.test(
+    'an agent unreachable for a pass is not a session lost: the task reads as last seen, and settles once it answers',
+    async () => {
+      const { e, root } = engineOn(s);
+      const id = await Effect.runPromise(e.file(task()));
+      await running(e, id);
+      const taskId = s.tasks().at(-1)!;
+      const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8'));
+      const dead = builtEngine(
+        EngineService.layer({
+          root,
+          harnesses: {
+            remote: {
+              card: {
+                supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }],
+              },
+            },
+          },
+        }),
+      );
+      writeJournal(root, id, agedBy(journalOf(root, id), 10 * 60_000));
+      for (let i = 0; i < 3; i++) await Effect.runPromise(dead.tick());
+      const v = await Effect.runPromise(dead.view(id));
+      assert.equal(v.phase, 'running (working)', 'past the grace window, and not lost');
+      assert.equal(v.sessionId, entry.taskId, 'every GetTask fails at an address nothing answers: the task reads as last seen');
+      s.move(taskId, { data: { ok: true }, state: 'completed' });
+      assert.equal((await settled(e, id)).state.settled, 'succeeded');
+    },
+  );
+
+  await c.test(
+    'restart with the intent on disk and no Task: never sent twice — a spawn in doubt, then `lost` past the grace window',
+    async () => {
+      const sends = calls(s, 'sendMessage');
+      const root = scratch('ae-remote-');
+      const e = again(root);
+      const id = await Effect.runPromise(e.file(task({ id: 'in-doubt' })));
+      writeIntent(root, `ae/${id}/1`, 'm-lost');
+      await Effect.runPromise(e.tick());
+      const events = journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>;
+      const spawned = events.find((ev) => ev.kind === 'spawned');
+      assert.match(
+        spawned?.error ?? '',
+        /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
+      );
+      assert.equal((await Effect.runPromise(e.view(id))).state.settled, null, 'no refusal: a session may exist');
+      assert.equal(calls(s, 'sendMessage') - sends, 0);
+      writeJournal(root, id, agedBy(events, 10 * 60_000));
+      const done = await settled(again(root), id);
+      assert.equal(done.state.attempts[0].reason, 'lost');
+      assert.equal(calls(s, 'sendMessage') - sends, 0);
+    },
+  );
+
+  await c.test('an intent whose sending process died is in doubt: not listed, never sent again, `lost` past the grace window', async () => {
+    const sends = calls(s, 'sendMessage');
+    const root = scratch('ae-remote-');
+    const e = again(root);
+    const id = await Effect.runPromise(e.file(task({ id: 'died' })));
+    const gone = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
+    await new Promise((resolve) => gone.on('exit', resolve));
+    writeIntent(root, `ae/${id}/1`, 'm-died', gone.pid);
+    for (let i = 0; i < 5 && !journalOf(root, id).some((ev) => ev.kind === 'spawned'); i++) await Effect.runPromise(e.tick());
+    const events = journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>;
+    assert.match(
+      events.find((ev) => ev.kind === 'spawned')?.error ?? '',
+      /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
+    );
+    writeJournal(root, id, agedBy(events, 10 * 60_000));
+    const done = await settled(again(root), id);
+    assert.equal(done.state.attempts[0].reason, 'lost', 'the grace window passed with nothing listed under the name');
+    assert.equal(calls(s, 'sendMessage') - sends, 0, 'never sent');
   });
-  const { e } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? 't0k' : undefined) });
-  assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
-});
 
-test("a harness given by its card, not its URL, is reached on the card's interface", async () => {
-  const s = await serve({ script: () => [{ data: { ok: true }, state: 'completed' }] });
-  const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
-  const asked: string[] = [];
-  const e = builtEngine(
-    EngineService.layer({
-      root: scratch('ae-remote-'),
-      harnesses: { remote: { card } },
-      credentials: (_, url) => {
-        asked.push(url);
-        return undefined;
-      },
-    }),
-  );
-  assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
-  assert.deepEqual(asked, [], 'a card that asks for no auth asks for no secret');
-});
-
-test('an agent that lives under a path has its card read beneath that path, and a URL that names a `.json` file is the card', async () => {
-  const done = () => [{ data: { ok: true }, state: 'completed' as const }];
-  const under = await serve({ prefix: '/agents/reviewer', script: done });
-  for (const url of [under.url, `${under.url}/`]) {
-    const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url } } }));
-    assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded', url);
-  }
-  assert.deepEqual(under.cards, ['/agents/reviewer/.well-known/agent-card.json', '/agents/reviewer/.well-known/agent-card.json']);
-  assert.ok(under.paths.length && under.paths.every((p) => p.startsWith('/agents/reviewer/a2a/')), under.paths.join(' '));
-  const named = await serve({ prefix: '/agents/reviewer', cardAt: '/card.json', script: done });
-  const e = builtEngine(EngineService.layer({ root: scratch('ae-remote-'), harnesses: { remote: { url: `${named.url}/card.json` } } }));
-  assert.equal((await settled(e, await Effect.runPromise(e.file(task())))).state.settled, 'succeeded');
-  assert.deepEqual(named.cards, ['/agents/reviewer/card.json']);
-});
-
-test('restart after `spawned`: a new engine over the same root reads the Task by GetTask and settles it, sending nothing', async () => {
-  const s = await serve({ script: HELD });
-  const { e, root } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  await running(e, id);
-  const again = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
-  const gets = s.counts.getTask ?? 0;
-  s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
-  assert.equal((await settled(again, id)).state.settled, 'succeeded');
-  assert.ok((s.counts.getTask ?? 0) > gets);
-  assert.equal(s.counts.sendMessage, 1);
-});
-
-test('restart with the Task recorded and only `starting` journalled: the Task is adopted, and nothing is sent again', async () => {
-  const s = await serve({ script: HELD });
-  const { e, root } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  await running(e, id);
-  writeJournal(
-    root,
-    id,
-    journalOf(root, id).filter((ev) => ev.kind !== 'spawned'),
-  );
-  await Effect.runPromise(remoteOps('remote', { url: s.url }, root).spawn({ name: `ae/${id}/1`, brief: 'b', cwd: '/w' }));
-  const again = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
-  const v = await running(again, id);
-  assert.equal(v.sessionId, s.tasks()[0]);
-  s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
-  assert.equal((await settled(again, id)).state.settled, 'succeeded');
-  assert.equal(s.counts.sendMessage, 1, 'a spawn asked again for the name adopts what the registry holds, and sends nothing');
-});
-
-test('restart with the intent on disk and no Task: never sent twice — a spawn in doubt, then `lost` past the grace window', async () => {
-  const s = await serve({ script: HELD });
-  const root = scratch('ae-remote-');
-  const e = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
-  const id = await Effect.runPromise(e.file(task({ id: 'in-doubt' })));
-  const name = `ae/${id}/1`;
-  fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
-  fs.writeFileSync(entryFile(root, name), JSON.stringify({ name, agent: 'remote', messageId: 'm-lost', sentAt: new Date().toISOString() }));
-  await Effect.runPromise(e.tick());
-  const events = journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>;
-  const spawned = events.find((ev) => ev.kind === 'spawned');
-  assert.match(
-    spawned?.error ?? '',
-    /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
-  );
-  assert.equal((await Effect.runPromise(e.view(id))).state.settled, null, 'no refusal: a session may exist');
-  assert.equal(s.counts.sendMessage ?? 0, 0);
-  writeJournal(root, id, agedBy(events, 10 * 60_000));
-  const again = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
-  const done = await settled(again, id);
-  assert.equal(done.state.attempts[0].reason, 'lost');
-  assert.equal(s.counts.sendMessage ?? 0, 0);
+  await c.test('an intent whose sending process lives is left to it: read submitted in another engine, and not sent again', async () => {
+    const sends = calls(s, 'sendMessage');
+    const root = scratch('ae-remote-');
+    const e = again(root);
+    const id = await Effect.runPromise(e.file(task({ id: 'elsewhere' })));
+    const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60_000)'], { stdio: 'ignore' });
+    try {
+      writeIntent(root, `ae/${id}/1`, 'm-there', other.pid);
+      const spawned = () => (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
+      for (let i = 0; i < 5 && !spawned(); i++) await Effect.runPromise(e.tick());
+      assert.equal(spawned()?.error, undefined, 'the spawn leaves the send to the process making it');
+      await Effect.runPromise(e.tick());
+      const v = await Effect.runPromise(e.view(id));
+      assert.equal(v.phase, 'running (working)');
+      assert.equal(v.sessionId, 'm-there', 'the session is the message until the agent names its Task');
+      assert.equal(calls(s, 'sendMessage') - sends, 0, 'nothing sent from here');
+    } finally {
+      other.kill();
+    }
+  });
 });
 
 test("a registry an older runtime wrote, `seen` in its former words, is read in A2A's names, in `remote/` and in `remote/done/`, and left as written", async () => {
@@ -666,31 +941,6 @@ test("a registry an older runtime wrote, `seen` in its former words, is read in 
   assert.ok(fs.existsSync(path.join(root, 'remote', 'done', `${encodeURIComponent(`ae/${signed}/1`)}.json`)));
 });
 
-test('an agent unreachable for a pass is not a session lost: the task reads as last seen, and settles once it answers', async () => {
-  const s = await serve({ script: HELD });
-  const { e, root } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  await running(e, id);
-  const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${id}/1`), 'utf8'));
-  const dead = builtEngine(
-    EngineService.layer({
-      root,
-      harnesses: {
-        remote: {
-          card: { supportedInterfaces: [{ url: 'http://127.0.0.1:9/a2a/jsonrpc', protocolBinding: 'JSONRPC', protocolVersion: '1.0' }] },
-        },
-      },
-    }),
-  );
-  writeJournal(root, id, agedBy(journalOf(root, id), 10 * 60_000));
-  for (let i = 0; i < 3; i++) await Effect.runPromise(dead.tick());
-  const v = await Effect.runPromise(dead.view(id));
-  assert.equal(v.phase, 'running (working)', 'past the grace window, and not lost');
-  assert.equal(v.sessionId, entry.taskId, 'every GetTask fails at an address nothing answers: the task reads as last seen');
-  s.move(s.tasks()[0], { data: { ok: true }, state: 'completed' });
-  assert.equal((await settled(e, id)).state.settled, 'succeeded');
-});
-
 /** Every file under `dir`, as text. */
 const everyFile = (dir: string): Array<[string, string]> =>
   fs
@@ -699,9 +949,9 @@ const everyFile = (dir: string): Array<[string, string]> =>
     .filter((f) => fs.statSync(f).isFile())
     .map((f) => [f, fs.readFileSync(f, 'utf8')]);
 
-test('the secret is sent, and written nowhere: not the journal, the registry, the feed, nor the view', async () => {
+test('the secret is sent, and written nowhere: not the journal, the registry, the feed, nor the view', async (t) => {
   const token = 'tok-3f9a-SECRET-7c21';
-  const s = await serve({ security: bearer(token), script: HELD });
+  const s = await serve(t, { security: bearer(token), script: HELD });
   const { e, root } = engineOn(s, { credentials: (scheme) => (scheme === 'token' ? token : undefined) });
   const id = await Effect.runPromise(e.file(task()));
   await running(e, id);
@@ -722,39 +972,6 @@ test('the secret is sent, and written nowhere: not the journal, the registry, th
   assert.ok(!JSON.stringify(await Effect.runPromise(e.feed())).includes(token));
 });
 
-test('a card served at one origin that names its interfaces on another: unstartable, and neither origin is sent the secret', async () => {
-  const key = 'key-5e1d-SECRET';
-  const elsewhere = await serve({ security: apiKey(key), script: () => [{ data: { ok: true }, state: 'completed' }] });
-  const s = await serve({ security: apiKey(key), interfacesAt: elsewhere.url, script: HELD });
-  const { e, root } = engineOn(s, { credentials: () => key });
-  const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.match(
-    a.error ?? '',
-    new RegExp(
-      `card names ${elsewhere.url}/a2a/jsonrpc, ${elsewhere.url}/a2a/rest, and none is on ${s.url}, the origin the harness was given`,
-    ),
-  );
-  assert.match(a.error ?? '', /Nothing was sent/);
-  assert.equal(elsewhere.paths.length, 0, 'the other origin was sent nothing');
-  assert.equal(s.paths.length, 0);
-  assert.ok(!fs.existsSync(path.join(root, 'remote')) || fs.readdirSync(path.join(root, 'remote')).length === 0, 'no intent was written');
-});
-
-test('a redirect from the agent is not followed: the send is refused, and the address it names is sent nothing', async () => {
-  const key = 'key-8b2c-SECRET';
-  const elsewhere = await serve({ security: apiKey(key), script: () => [{ data: { ok: true }, state: 'completed' }] });
-  const s = await serve({ security: apiKey(key), redirectTo: elsewhere.url, script: HELD });
-  const { e, root } = engineOn(s, { credentials: () => key });
-  const a = (await settled(e, await Effect.runPromise(e.file(task())))).state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.match(a.error ?? '', new RegExp(`answered 307 to ${elsewhere.url}/a2a/jsonrpc, and a redirect is not followed`));
-  assert.equal(elsewhere.paths.length, 0, 'the address it named was sent nothing');
-  assert.equal(s.paths.length, 1, 'one send, answered with the redirect');
-  assert.equal(s.counts.sendMessage ?? 0, 0);
-  assert.deepEqual(fs.readdirSync(path.join(root, 'remote')), [], 'the intent went with the refusal');
-});
-
 /** How long `f` took, in ms, and what it gave. */
 const timed = async <A>(f: () => Promise<A>): Promise<[number, A]> => {
   const from = performance.now();
@@ -766,7 +983,7 @@ test(
   'a request the agent holds is given up after its bound: a card not read refuses, a send is in doubt, a GetTask reads as last seen',
   WAITED,
   async (t) => {
-    const s = await serve({ script: HELD });
+    const s = await serve(t, { script: HELD });
     const root = scratch('ae-remote-');
     const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
     const ops = remoteOps('remote', { url: s.url }, root, undefined, 300, { sendMs: 600, spawnWaitMs: 100 });
@@ -841,8 +1058,8 @@ const HELD_MS = 300;
  */
 const TIMER_SLACK_MS = 50;
 
-test('a request the agent holds holds a pass for the request bound, and the task reads as last seen', async () => {
-  const s = await serve({ script: HELD });
+test('a request the agent holds holds a pass for the request bound, and the task reads as last seen', async (t) => {
+  const s = await serve(t, { script: HELD });
   const root = scratch('ae-remote-');
   const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
   assert.ok(HELD_MS < REQUEST_MS, 'the bound is shortened at the seam, never lengthened past the shipped one');
@@ -865,7 +1082,7 @@ test(
   'an agent that replies later than the request bound is read submitted, then ends with its reply, sent once: the send leaves the pass',
   WAITED,
   async (t) => {
-    const s = await serve({ script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: 1_500 }] });
+    const s = await serve(t, { script: () => [{ reply: 'slow and sure', data: { verdict: 'fine' }, after: 1_500 }] });
     const root = scratch('ae-remote-');
     const card = (await (await fetch(`${s.url}/.well-known/agent-card.json`)).json()) as Record<string, unknown>;
     assert.ok(SPAWN_HELD_MS < SPAWN_WAIT_MS && HELD_MS < REQUEST_MS, 'both bounds shortened at the seam, never lengthened');
@@ -915,10 +1132,10 @@ const HELD_PASS_BOUND_MS = 60_000;
 test(
   'a pass returns while the agent holds the send, and the next task in it is served; released, the task completes with its data',
   { timeout: HELD_PASS_BOUND_MS },
-  async () => {
+  async (t) => {
     const g = gate();
-    const held = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
-    const quick = await serve({ script: () => [{ data: { ok: 'quick' }, state: 'completed' }] });
+    const held = await serve(t, { script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
+    const quick = await serve(t, { script: () => [{ data: { ok: 'quick' }, state: 'completed' }] });
     const root = scratch('ae-remote-');
     const e = builtEngine(EngineService.layer({ root, harnesses: { held: { url: held.url }, quick: { url: quick.url } } }));
     const a = await Effect.runPromise(e.file(task({ harness: 'held' })));
@@ -948,77 +1165,42 @@ test(
   },
 );
 
-test("a remote Task's statement is kept when the wall clock steps back after the attempt began", async (t) => {
-  const g = gate();
-  const s = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
-  const { e } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  await running(e, id);
-  stepClock(t, -60_000);
-  g.open();
-  const v = await settled(e, id);
-  assert.equal(v.state.settled, 'succeeded');
-  assert.deepEqual(v.state.attempts[0].closeout, { ok: 'held' }, 'what the agent sent is on the record');
-  assert.notEqual(v.state.attempts[0].stated, false);
-});
-
-test("a remote agent's Message reply keeps its data when the wall clock steps back after the attempt began", async (t) => {
-  const g = gate();
-  const s = await serve({ script: () => [{ reply: 'r', data: { ok: 'replied' }, until: g.shut }] });
-  const { e } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  await running(e, id);
-  stepClock(t, -60_000);
-  g.open();
-  const v = await settled(e, id);
-  assert.equal(v.state.settled, 'succeeded');
-  assert.deepEqual(v.state.attempts[0].closeout, { ok: 'replied' }, 'what the agent sent is on the record');
-  assert.notEqual(v.state.attempts[0].stated, false);
-});
-
-test('an intent whose sending process lives is left to it: read submitted in another engine, and not sent again', async () => {
-  const s = await serve({ script: HELD });
-  const root = scratch('ae-remote-');
-  const e = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
-  const id = await Effect.runPromise(e.file(task({ id: 'elsewhere' })));
-  const name = `ae/${id}/1`;
-  const other = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60_000)'], { stdio: 'ignore' });
-  try {
-    fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
-    fs.writeFileSync(
-      entryFile(root, name),
-      JSON.stringify({
-        name,
-        agent: 'remote',
-        messageId: 'm-there',
-        sentAt: new Date().toISOString(),
-        sending: { pid: other.pid, until: new Date(Date.now() + 60_000).toISOString() },
-      }),
-    );
-    const spawned = () => (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
-    for (let i = 0; i < 5 && !spawned(); i++) await Effect.runPromise(e.tick());
-    assert.equal(spawned()?.error, undefined, 'the spawn leaves the send to the process making it');
-    await Effect.runPromise(e.tick());
-    const v = await Effect.runPromise(e.view(id));
-    assert.equal(v.phase, 'running (working)');
-    assert.equal(v.sessionId, 'm-there', 'the session is the message until the agent names its Task');
-    assert.equal(s.counts.sendMessage ?? 0, 0, 'nothing sent from here');
-  } finally {
-    other.kill();
-  }
+test("a remote statement is kept when the wall clock steps back after the attempt began, as a Task's or as a Message's", async (t) => {
+  const rows: Array<[string, (until: Promise<void>) => Step[], unknown]> = [
+    ["a remote Task's statement", (until) => [{ until, data: { ok: 'held' }, state: 'completed' }], { ok: 'held' }],
+    ["a remote agent's Message reply keeps its data", (until) => [{ reply: 'r', data: { ok: 'replied' }, until }], { ok: 'replied' }],
+  ];
+  for (const [name, steps, closeout] of rows)
+    await t.test(name, async (t) => {
+      const g = gate();
+      const s = await serve(t, { script: () => steps(g.shut) });
+      const { e } = engineOn(s);
+      const id = await Effect.runPromise(e.file(task()));
+      await running(e, id);
+      stepClock(t, -60_000);
+      g.open();
+      const v = await settled(e, id);
+      assert.equal(v.state.settled, 'succeeded');
+      assert.deepEqual(v.state.attempts[0].closeout, closeout, 'what the agent sent is on the record');
+      assert.notEqual(v.state.attempts[0].stated, false);
+    });
 });
 
 test(
-  'a send under way is not read in doubt when the wall clock steps forward past its bound: the lease is measured on the monotonic clock',
+  'a spawn writes its send lease on both clocks, and a send under way is not read in doubt when the wall clock steps forward past its bound',
   WAITED,
   async (t: TestContext) => {
     const g = gate();
-    const s = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
+    const s = await serve(t, { script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
     const root = scratch('ae-remote-');
     const sendMs = 60_000;
     const ops = remoteOps('remote', { url: s.url }, root, undefined, REQUEST_MS, { sendMs, spawnWaitMs: 50 });
     try {
       await Effect.runPromise(ops.spawn({ name: 'ae/held/1', brief: 'b', cwd: '/w' }));
+      const entry = JSON.parse(fs.readFileSync(entryFile(root, 'ae/held/1'), 'utf8'));
+      assert.equal(Date.parse(entry.sending.until) - Date.parse(entry.sentAt), sendMs, '`until` on the wall clock');
+      assert.equal(entry.sending.mono.boot, fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim(), '`mono` of this boot');
+      assert.equal(typeof entry.sending.mono.ms, 'number');
       await untilEvent(t, () => s.counts.sendMessage === 1, 'the send under way reached the other party', { everyMs: 5 });
       stepClock(t, sendMs + 60_000);
       assert.equal((await Effect.runPromise(ops.observe)).get('ae/held/1')?.state, 'submitted', 'still being sent: a Task submitted');
@@ -1030,56 +1212,9 @@ test(
   },
 );
 
-test('a spawn writes its send lease on both clocks: `until` on the wall clock, and `mono` on the monotonic clock of this boot', async () => {
+test('a stop while the agent holds the send cuts it: the task settles stopped, and a Task the agent then makes is cancelled', async (t) => {
   const g = gate();
-  const s = await serve({ script: () => [{ until: g.shut, data: { ok: 'held' }, state: 'completed' }] });
-  const root = scratch('ae-remote-');
-  const ops = remoteOps('remote', { url: s.url }, root, undefined, REQUEST_MS, { sendMs: 60_000, spawnWaitMs: 50 });
-  try {
-    await Effect.runPromise(ops.spawn({ name: 'ae/held/1', brief: 'b', cwd: '/w' }));
-    const entry = JSON.parse(fs.readFileSync(entryFile(root, 'ae/held/1'), 'utf8'));
-    assert.equal(Date.parse(entry.sending.until) - Date.parse(entry.sentAt), 60_000);
-    assert.equal(entry.sending.mono.boot, fs.readFileSync('/proc/sys/kernel/random/boot_id', 'utf8').trim());
-    assert.equal(typeof entry.sending.mono.ms, 'number');
-  } finally {
-    g.open();
-  }
-});
-
-test('an intent whose sending process died is in doubt: not listed, never sent again, `lost` past the grace window', async () => {
-  const s = await serve({ script: HELD });
-  const root = scratch('ae-remote-');
-  const e = builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } }));
-  const id = await Effect.runPromise(e.file(task({ id: 'died' })));
-  const name = `ae/${id}/1`;
-  const gone = spawn(process.execPath, ['-e', ''], { stdio: 'ignore' });
-  await new Promise((resolve) => gone.on('exit', resolve));
-  fs.mkdirSync(path.join(root, 'remote'), { recursive: true });
-  fs.writeFileSync(
-    entryFile(root, name),
-    JSON.stringify({
-      name,
-      agent: 'remote',
-      messageId: 'm-died',
-      sentAt: new Date().toISOString(),
-      sending: { pid: gone.pid, until: new Date(Date.now() + 60_000).toISOString() },
-    }),
-  );
-  for (let i = 0; i < 5 && !journalOf(root, id).some((ev) => ev.kind === 'spawned'); i++) await Effect.runPromise(e.tick());
-  const events = journalOf(root, id) as Array<{ kind: string; at: string; error?: string }>;
-  assert.match(
-    events.find((ev) => ev.kind === 'spawned')?.error ?? '',
-    /its answer was never recorded, since the process sending it stopped first: whether the agent made a Task of it is not known, and it is not sent twice/,
-  );
-  writeJournal(root, id, agedBy(events, 10 * 60_000));
-  const done = await settled(builtEngine(EngineService.layer({ root, harnesses: { remote: { url: s.url } } })), id);
-  assert.equal(done.state.attempts[0].reason, 'lost', 'the grace window passed with nothing listed under the name');
-  assert.equal(s.counts.sendMessage ?? 0, 0, 'never sent');
-});
-
-test('a stop while the agent holds the send cuts it: the task settles stopped, and a Task the agent then makes is cancelled', async () => {
-  const g = gate();
-  const s = await serve({ script: () => [{ until: g.shut, state: 'working' }] });
+  const s = await serve(t, { script: () => [{ until: g.shut, state: 'working' }] });
   const { root, e } = engineOn(s);
   const id = await Effect.runPromise(e.file(task()));
   await Effect.runPromise(e.tick());
@@ -1097,8 +1232,8 @@ test('a stop while the agent holds the send cuts it: the task settles stopped, a
   assert.equal(fs.existsSync(entryFile(root, `ae/${id}/1`)), false, 'nothing brought back into the open registry');
 });
 
-test('a refusal that comes after the spawn returned ends the session `rejected`, in its words on `logs`, and the intent is kept', async () => {
-  const s = await serve({ security: bearer('right'), slowMs: SPAWN_WAIT_MS + 500, script: HELD });
+test('a refusal that comes after the spawn returned ends the session `rejected`, in its words on `logs`, and the intent is kept', async (t) => {
+  const s = await serve(t, { security: bearer('right'), slowMs: SPAWN_WAIT_MS + 500, script: HELD });
   const { root, e } = engineOn(s, { credentials: () => 'wrong' });
   const id = await Effect.runPromise(e.file(task()));
   const v = await until(e, id, (x) => x.state.settled !== null, 'settled', 400);
@@ -1112,52 +1247,9 @@ test('a refusal that comes after the spawn returned ends the session `rejected`,
   );
 });
 
-test("credentials is asked by the harness's name too, and missingCredential words the refusal of a secret not given", async () => {
-  const s = await serve({ security: bearer('t0k'), script: () => [{ data: { ok: 1 }, state: 'completed' }] });
-  const asked: string[][] = [];
-  const root = scratch('ae-remote-');
-  const e = builtEngine(
-    EngineService.layer({
-      root,
-      harnesses: { reviewer: { url: s.url }, other: { url: s.url } },
-      credentials: (scheme, agentUrl, harness) => {
-        asked.push([scheme, agentUrl, harness]);
-        return harness === 'reviewer' ? 't0k' : undefined;
-      },
-      missingCredential: (scheme, _url, harness) => `set WF_A2A_${harness.toUpperCase()}_${scheme.toUpperCase()}`,
-    }),
-  );
-  assert.equal((await settled(e, await Effect.runPromise(e.file(task({ harness: 'reviewer' }))))).state.settled, 'succeeded');
-  assert.deepEqual(asked[0], ['token', s.url, 'reviewer']);
-  const a = (await settled(e, await Effect.runPromise(e.file(task({ harness: 'other' }))))).state.attempts[0];
-  assert.equal(a.reason, 'unstartable');
-  assert.match(a.error ?? '', /`token` needs a secret, and `credentials` gave none: set WF_A2A_OTHER_TOKEN\./);
-  assert.equal(s.counts.sendMessage, 1, 'only the task with its secret was sent');
-});
-
-test('the engine refuses a missingCredential that is not a function', async () => {
-  const err = await refusal(() => builtEngine(EngineService.layer({ root: scratch('ae-remote-'), missingCredential: 'set it' as never })));
-  assert.match(err.message, /`missingCredential` is a function, `\(scheme, agentUrl, harness\) => words`/);
-});
-
-test('every verb reaches the agent as an A2A method: SendMessage, GetTask, CancelTask', async () => {
-  const s = await serve({ script: HELD });
-  const { e } = engineOn(s);
-  const id = await Effect.runPromise(e.file(task()));
-  await running(e, id);
-  await Effect.runPromise(e.view(id));
-  assert.match(await Effect.runPromise(e.logs(id)), /user: paint the fence\nWORKING/);
-  await Effect.runPromise(e.stop(id));
-  await settled(e, id);
-  assert.equal(s.counts.sendMessage, 1);
-  assert.ok((s.counts.getTask ?? 0) >= 2);
-  assert.equal(s.counts.cancelTask, 1);
-  assert.equal(s.counts.listTasks ?? 0, 0, 'never a listing: on an agent others use it lists theirs too');
-});
-
 test('a pass makes one GetTask per open remote task, and none once they settle', async (t: TestContext) => {
   for (const n of [3, 6]) {
-    const s = await serve({ script: HELD });
+    const s = await serve(t, { script: HELD });
     const { e } = engineOn(s);
     const ids = await Promise.all(Array.from({ length: n }, () => Effect.runPromise(e.file(task()))));
     for (const id of ids) await running(e, id);

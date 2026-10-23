@@ -1,6 +1,6 @@
 # quick
 
-Build a small change a card settles, on main, with no spec: Ada plans and builds it in one session, Agora reads it as a second
+Build a change a card settles, on main, with no spec: Ada plans and builds it in one session, Agora reads it as a second
 engineer would, and Otto lands it once that review passes. Nobody is asked to approve the landing — the review is what stands between
 the work and the base branch.
 
@@ -10,20 +10,13 @@ implement → review → land
 
 ## What goes through quick, and what through build
 
-A card goes through `quick` when both hold:
+A card goes through `quick` when **the card settles it**: it says what to change and leaves no decision — no taste call, no name, no
+choice between behaviours — so it needs no design. Implement signs off `blocked` on a decision the card does not give, and never makes
+it. Its size bounds nothing: the review reads every file and every line, tests and docs among them, and any part of the repository may
+be touched.
 
-- **The card settles it.** It says what to change and leaves no decision: no taste call, no name, no choice between behaviours.
-  Implement signs off `blocked` on a decision the card does not give, and never makes it.
-- **It is within the bound**: at most **300 lines** changed, added plus removed. Tests and docs count: the review
-  reads them, and a test changed to pass is what the review must catch. Generated files do not
-  (`package-lock.json`, `apps/web/theme/`, `apps/web/src/routeTree.gen.ts`). Any part of the repository may be touched.
-
-Everything else goes through [`build`](../build/README.md): a change that needs a design, one past the bound, one a review is likely
-to send back twice. A card says which with `workflow: quick` or `workflow: build`.
-
-The number is `LINES` in `change.ts`, with `GENERATED`; how many files the lines are in is not bounded, since the review reads
-every file. Changing either is a quick card: the script, this file and the
-step's note, which `packages/agent-orchestrator/test/quick-check.boundary.test.ts` holds to the same number.
+Everything else goes through [`build`](../build/README.md): a change that needs a design, or one a review is likely to send back twice.
+A card says which with `workflow: quick` or `workflow: build`.
 
 ## Implement's check
 
@@ -32,9 +25,10 @@ The check is the cheap set, and CI: it runs `change.ts size`, `pictures.ts`, `pr
 Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never from the tree it judges:
 
 1. `change.ts size`, first: the net change from the base the branch holds to `HEAD` (`git diff --numstat -M`, so a line added then
-   removed counts for nothing and a rename is one file). Past `LINES` lines it refuses, however many files they are in, and says what
-   to do next: `nemia cancel <run>`, then start the card with `build`. The step has no `retries:`, so the refusal waits on a person and no try trims the work to fit.
-   Its `wf size:` line is the bound's own count; the `touched` list is the place's report, and may count a rename as two.
+   removed counts for nothing and a rename is one file). It says the files and the lines, a generated file
+   (`package-lock.json`, `apps/web/theme/`, `apps/web/src/routeTree.gen.ts`, `GENERATED` in `change.ts`) left out, and refuses
+   nothing by them. Its `wf size:` line is the review's measure of the change; the `touched` list is the place's report, and may count
+   a rename as two. The step has no `retries:`: a refusal of any clause waits on a person.
 2. `build`'s `pictures.ts` and `probe.ts`, where they are in `workflows/build/`: a change under `apps/web/src` owes a picture, and
    no probe is left live.
 3. `build`'s `pull-request.ts`, where it is in `workflows/build/`: `push` pushes the branch and refuses unless the one open, non-draft
@@ -55,13 +49,16 @@ request.
 `review.md` is `build`'s review with what quick says of itself: Agora's, read-only, closing implement's loop, with the same fence,
 skills, mcp servers and tally (`agent-fences.test.ts` holds the two equal there), and no `input:` — a quick run has no spec, so what
 was asked is the card. Its note names quick's own five check scripts and says that nothing ran the typecheck, the lint or a package's
-tests on this machine, so the reviewer runs the types and the lint itself; it names the bound, and it says that its pass files the
+tests on this machine, so the reviewer runs the types and the lint itself; and it says that its pass files the
 landing, so `again: true` is the only way back and it names no step.
 
-`rounds: 2`, where build's review has 3: a card that a review has to send back twice is a card the bound was wrong about, and the
+`rounds: 2`, where build's review has 3: a card that a review has to send back twice is a card that wanted `build`, and the
 second objection leaves the step `exhausted` with the run waiting on a person, who types `nemia round <run> review` for a third or
-`nemia accept <run> review` to take the work as it stands. `budget: 12`, where build's has 16: the diff is at most 300 lines, there is
-no spec to read, and the review reads one step's closeout rather than two.
+`nemia accept <run> review` to take the work as it stands. `budget: 12`, where build's has 16: there is no spec to read, and the review reads
+one step's closeout rather than two. It held before the line bound went and holds without it: quick's 15 review tries to 2026-10-22
+cost $0.67 each on average, and build's 32, which read larger changes beside a spec, $3.85 against their 16 (`nemia stats --workflow
+<workflow> --by step`). A long mechanical diff costs reading, not judgement; a review that runs out on one says so in the run's
+figures, and the budget is a quick card then.
 
 **A finding sends the work back** to implement, on the same branch, with the findings in its brief — the workflow routes that, not the
 reviewer. A person sends it back only through the review: at the review's stop, `nemia round <run> review` for another round or

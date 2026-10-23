@@ -18,10 +18,10 @@
  * pull request that are its own (`READS_THE_PULL_REQUEST`), and claims no more that the check ran the whole suite.
  *
  * The quick workflow's implement is told what build's is (`IMPLEMENT_TOLD`), and what makes a build quick (`QUICK_TOLD`): its plan
- * first, no decision of its own, the bound and the pages it names; it is given the kit's skills as build's steps are. Its review is
- * told what build's review is of the pull request and the base, and its own (`QUICK_REVIEW_TOLD`): the card in place of a spec, the
- * bound, that nothing ran the suite on this machine, and that its pass lands the change with no person's gate after it — while what
- * build's review alone says is `BUILD_REVIEW_TOLD`.
+ * first, no decision of its own, that its size bounds nothing, and the pages it names; it is given the kit's skills as build's
+ * steps are. Its review is told what build's review is of the pull request and the base, and its own (`QUICK_REVIEW_TOLD`): the card
+ * in place of a spec, that its size bounds nothing, that nothing ran the suite on this machine, and that its pass lands the change with
+ * no person's gate after it — while what build's review alone says is `BUILD_REVIEW_TOLD`.
  *
  * The five steps that touch the board — build's design, implement and review, and quick's implement and review — are each given
  * `react-aria`, this
@@ -182,7 +182,7 @@ const IMPLEMENT_TOLD = [
   ...LOOK_PARTS_TOLD,
 ];
 
-/** What quick's implement is told that build's is not: to plan first, to decide nothing, the bound, to run its tests and name its pages. */
+/** What quick's implement is told that build's is not: to plan first, to decide nothing, no size bound, to run its tests, its pages. */
 const QUICK_TOLD = [
   'no spec was written for you',
   "a review reads your plan and your change — Agora's, read-only, which asks for another round or passes",
@@ -191,16 +191,17 @@ const QUICK_TOLD = [
   "It goes in your closeout's `plan`",
   '**Decide nothing the card does not give.**',
   'sign off `blocked` and say in `needs` what is undecided; do not choose for them.',
-  'The check measures it first (`workflows/quick/change.ts`) and refuses a change past that number',
-  'do not trim it to fit, split it or drop its tests: sign off `blocked`',
+  '**A quick build has no size bound**: quick is for a card that needs no design, whatever its size.',
+  'said as a fact and refused by no number',
+  'Do not trim the work, split it or drop its tests to make it look smaller',
   "**Name the pages** the change touches in your closeout's `pages`",
   '**Nothing runs your tests for you.**',
   "Run them yourself before you sign off, as `CLAUDE.md`, *Check your work*, says of a step's session",
 ];
 
 /**
- * What quick's review is told that build's is not: the card in place of a spec, implement's own declared fields, the bound, quick's five
- * check scripts and that nothing ran the suite here, and that its pass lands the change with no person's gate after it.
+ * What quick's review is told that build's is not: the card in place of a spec, implement's own declared fields, no size bound,
+ * quick's five check scripts and that nothing ran the suite here, and that its pass lands the change with no person's gate after it.
  */
 const QUICK_REVIEW_TOLD = [
   'This is a quick run: **no spec was written**, so what was asked is the card itself',
@@ -209,8 +210,8 @@ const QUICK_REVIEW_TOLD = [
   "the run files `land`, which merges this run's pull request and fast-forwards the base branch, and nobody reads the change between your word and the merge",
   '`again: true` is the only way back',
   "you name no step: what comes after you is the workflow's, never yours",
-  '**A quick build is small**: at most 300 lines changed, in any number of files,',
-  'A change that only fits the bound because a test was trimmed, split off or left unwritten is a finding',
+  '**A quick build has no size bound**: quick is for a card that needs no design, whatever its size, so read every file and every line',
+  'A test trimmed, split off or left unwritten is a finding.',
   '**Nothing ran the suite on this machine.**',
   "Implement's check is the cheap set and CI: `change.ts size`, `pictures.ts`, `probe.ts`, `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else",
   'no typecheck, no lint, no declaration, no test of a package and no e2e page here',
@@ -225,7 +226,7 @@ const TOLD: Told[] = [
     says: [
       SHADCN_READ,
       'The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.',
-      "the owner's line for a run, which this factory's rules give",
+      'When the work you design is larger than one run of this workflow usually is, say so, and how to cut it into intents that each fit one.',
       'To see a board in the browser, run `npm run board:serve`, bare, and open the address it prints with the `look` skill',
       NO_LIVE_BOARD,
       NO_FILENAME,

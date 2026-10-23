@@ -115,7 +115,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   place's `git` skill on its `skills:`; the three writers (Ada, Grace, Otto) run `auto` and need no allow. Nothing in the set writes
   the repository's history, its refs or its configuration — `git merge-tree` writes a loose object and no ref, and `git status` and
   `git describe --dirty` refresh the worktree's index and rewrite it when they can take its lock — and `git push` stays refused by the
-  writers' `disallowedTools:`, Grace's held equal to Ada's. **What the set would let git write a file or run a program by is denied
+  writers' `disallowedTools:`, Grace's held equal to Ada's. The set holds `cat`, `head`, `tail`, `wc`, `cut` and `ls` too, each kept
+  inside the working tree by Claude Code's own check of a path and `wc --files0-from` by `Bash(wc *--f*)`; `sed`, `awk`, `find`, `sort`,
+  `uniq` and `tee` stay out, each able to write a file or run a program. **What the set would let git write a file or run a program by is denied
   beside it**, on each of the four, and so on every step of theirs, whose `disallowedTools:` adds to its agent's, since no allow rule
   can exclude an option and an allow is matched with a leading assignment stripped: `Bash(git grep *O*)` and `Bash(git grep *--op*)`
   for the pager option, which runs a
@@ -165,8 +167,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   Grace (lead software engineer, who builds a wide card through subagents), Agora (code reviewer), Otto (release engineer), Argus
   (janitor). No workflow here names Grace: she fills implement in `build-team`, a person's copy of `build` kept in the store, not in
   the repository. And four workflows: `intake` (an idea to an intent), `build` (an
-  intent to main, started `--after` the intake run), `quick` (a small card that settles its change to main: implement, then a review
-  whose pass files an ungated land, within the bound `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:
+  intent to main, started `--after` the intake run), `quick` (a card that settles its change, whatever its size, to main: implement, then a review
+  whose pass files an ungated land, as `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:
   the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as shipped
   (`SHIPPED_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.

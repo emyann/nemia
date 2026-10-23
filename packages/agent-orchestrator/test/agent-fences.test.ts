@@ -1367,7 +1367,7 @@ test("quick's review is build's review but what each workflow says of its own: t
     "build's review reads the spec; a quick run has none, so the card is what was asked",
   );
   assert.deepEqual([build.rounds, quick?.rounds], [3, 2], "quick's loop caps tighter: a card that asks twice is a build card");
-  assert.deepEqual([build.budget, quick?.budget], [16, 12], "and a review within quick's bound costs less");
+  assert.deepEqual([build.budget, quick?.budget], [16, 12], 'and a review with no spec to read costs less');
   assert.equal(quick?.gate, undefined, "nothing waits on a person at quick's review: its pass files the landing");
 });
 
@@ -1664,8 +1664,8 @@ test("every shipped skill's rules.json reads, and every call that breaks one of 
 test('REFUSED: a call that breaks a shipped rule, allowed to the step given the skill, is named — by its own allow or the settings', () => {
   const [spec] = SHIPPED_RULES.filter(({ skill }) => skill === 'write-a-spec');
   assert.ok(spec, 'write-a-spec declares its rules');
-  const seldon = shippedAllowed('seldon', 'build', 'Agent, Bash(cat:*)');
-  assert.deepEqual(unbreakable(seldon, spec.rules), ['design: read-with-read Bash(cat:*)']);
+  const seldon = shippedAllowed('seldon', 'build', 'Agent, Bash(sed:*)');
+  assert.deepEqual(unbreakable(seldon, spec.rules), ['design: read-with-read Bash(sed:*)']);
   const cd = [{ id: 'checks-bare', says: 'never cd', breaks: ['Bash(cd:*)'] }];
   const ownDenies = shippedStepOf('seldon').disallowedTools ?? [];
   assert.ok(ownDenies.includes('Bash(cd:*)'), 'Seldon denies cd itself');
@@ -1673,7 +1673,7 @@ test('REFUSED: a call that breaks a shipped rule, allowed to the step given the 
   const unDenied = { ...shippedStepOf('seldon'), disallowedTools: ownDenies.filter((rule) => rule !== 'Bash(cd:*)') };
   assert.deepEqual(unbreakable(unDenied, cd), ['design: checks-bare Bash(cd:*)'], "without it, the settings' allow reaches cd");
   assert.deepEqual(
-    unbreakable({ ...seldon, disallowedTools: [...ownDenies, 'Bash(cat:*)'] }, spec.rules),
+    unbreakable({ ...seldon, disallowedTools: [...ownDenies, 'Bash(sed:*)'] }, spec.rules),
     [],
     'a deny of its own refuses it',
   );
@@ -1832,16 +1832,23 @@ const GIT_WRITES: Call[] = [
 
 /**
  * What of `calls` a dontAsk job runs: each whose every part an allow reaches — the step's own, `settings`' and `grants`, a skill's — and
- * no deny of its own or of `settings` does. Each as a rule would name it.
+ * no deny of its own or of `settings` does, nor Claude Code's own check of a path outside the working tree (`readsOutside`), unless
+ * `inside` is false, which reads the rules alone. Each as a rule would name it.
  */
-function runs(step: Step, calls: readonly Call[], settings: Settings = SETTINGS, grants: readonly string[] = SKILL_GRANTS): string[] {
+function runs(
+  step: Step,
+  calls: readonly Call[],
+  settings: Settings = SETTINGS,
+  grants: readonly string[] = SKILL_GRANTS,
+  inside = true,
+): string[] {
   assert.ok(dontAskJob(step), `${step.name} is a dontAsk job, which runs only what an allow reaches`);
   const allows = granting([...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants]);
   const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
   return calls
     .filter(
       (call) =>
-        partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part))) &&
+        partsOfCall(call).every((part) => allows.some((rule) => reaches(rule, part)) && !(inside && readsOutside(part))) &&
         !deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))),
     )
     .map(shown);
@@ -1861,8 +1868,79 @@ const agoraAllowed = (allowed = 'Agent'): Step => shippedAllowed('agora', 'build
 const gitAllowed = (agent: string, edit: (line: string) => string): Step =>
   shippedAllowed(agent, WORKFLOW_OF[agent], edit((shippedStepOf(agent).allowedTools ?? []).join(', ')));
 
-/** The git rules of a step's own allow, in the order its agent writes them. */
-const gitRulesOf = (step: Step): string[] => (step.allowedTools ?? []).filter((rule) => rule.startsWith('Bash(git'));
+/**
+ * The plain text tools each read-only agent allows beside git's questions, by its own allow. None of them writes a file or runs a
+ * program: a `>` is a write Claude Code refuses a dontAsk job with no `Edit` allow, and each verb's own options name no output file and
+ * no program. What each can read outside the working tree is held by Claude Code's own check (`CLAUDE_KEEPS_INSIDE`), but `wc
+ * --files0-from=<file>`, which reads a list of paths from a file and counts each: that check reads no path inside the list, so its
+ * deny (`WC_READS_A_LIST_DENY`) names it. Left out on purpose, each able to write a file or run a program: `sed` (`w`, `-i`), `awk`
+ * (`system()`, `>`), `find` (`-exec`, `-delete`, `-fprint`), `sort` (`-o`), `uniq` (its output file) and `tee`.
+ */
+const TEXT_ALLOWS = ['Bash(wc:*)', 'Bash(cut:*)', 'Bash(head:*)', 'Bash(tail:*)', 'Bash(cat:*)', 'Bash(ls:*)'];
+
+/** A read of each text tool inside the working tree, which every read-only agent runs by its own allow. */
+const TEXT_READS: Call[] = [
+  'cat CLAUDE.md',
+  'head -n 20 CLAUDE.md',
+  'tail -n 5 CLAUDE.md',
+  'wc -l CLAUDE.md',
+  'cut -d: -f1 package.json',
+  'ls',
+  'ls -la packages',
+].map((command) => ({ tool: 'Bash', command }));
+
+/**
+ * The verbs whose paths Claude Code keeps inside the session's working folders by its own check, before any rule: measured on 2.1.308
+ * a dontAsk session allowed `Bash(cat:*)`, `Bash(head:*)`, `Bash(tail:*)`, `Bash(wc:*)`, `Bash(cut:*)` and `Bash(ls:*)`
+ * ran each on a file of its folder and was refused each on `/etc/hostname`, `..`, `../<file>`, `~/<file>`, `$HOME/<file>`, after
+ * `--`, behind `<`, and on a link in its folder to `/etc/hostname`; and refused `cat <file> > <file>`. It ran `wc --files0-from=<list>`,
+ * whose list named `/etc/hostname`, and read it; with `Bash(wc *--f*)` denied, it refused that, `wc --f=<list>` and
+ * `wc -l --files0=<list>`, and still ran `wc -l <file>`, `cat <file> | wc -l` and `head -1 <file> && ls`. It resolves a path: `ls
+ * ./../<its folder>` ran.
+ */
+const CLAUDE_KEEPS_INSIDE = ['cat', 'head', 'tail', 'wc', 'cut', 'ls'];
+
+/**
+ * Whether Claude Code's own check refuses a part as reading outside the working tree (`CLAUDE_KEEPS_INSIDE`): a word after the verb
+ * that opens `/`, `~` or `$`, or that climbs with `..`. A link is not modelled here, having no file system: measured, it is refused.
+ * A `..` that climbs back inside is refused here and run by Claude Code, a read inside either way.
+ */
+function readsOutside(part: Call): boolean {
+  const [verb, ...words] = (part.command ?? '').split(/\s+/);
+  return CLAUDE_KEEPS_INSIDE.includes(verb) && words.some((word) => /^[/~$]/.test(word) || /(?:^|\/)\.\.(?:\/|$)/.test(word));
+}
+
+/** The text tools' reads outside the working tree, each refused by Claude Code's own check, as measured (`CLAUDE_KEEPS_INSIDE`). */
+const TEXT_READS_OUTSIDE: Call[] = [
+  'cat /etc/hostname',
+  'cat -- /etc/hostname',
+  'head -1 /etc/hostname',
+  'tail -1 /etc/hostname',
+  'wc -l /etc/hostname',
+  'cut -c1-3 /etc/hostname',
+  'ls /etc',
+  'ls -la /',
+  'ls ..',
+  'head -1 ../outside',
+  'cat ~/.bashrc',
+  'cat $HOME/.bashrc',
+].map((command) => ({ tool: 'Bash', command }));
+
+/**
+ * `wc --files0-from=<file>` as typed, which reads outside through the paths its file lists, as measured. GNU `wc` takes any unambiguous
+ * abbreviation of a long option and `--files0-from` is its only one that begins `--f`, so the deny is `--f` anywhere after `wc`
+ * (`wc --f=<list>` was measured to read it); a file named with `--f` in it is refused with them.
+ */
+const WC_READS_A_LIST: Call[] = ['wc --files0-from=list0', 'wc --f=list0', 'wc -l --files0=list0', 'FOO=1 wc --files0-from=-'].map(
+  (command) => ({ tool: 'Bash', command }),
+);
+
+/** The deny that answers `wc --files0-from`, on each read-only agent's line, and so on each of its steps. */
+const WC_READS_A_LIST_DENY = 'Bash(wc *--f*)';
+
+/** The rules of the read set on a step's own allow, git's and the text tools', in the order its agent writes them. */
+const readRulesOf = (step: Step): string[] =>
+  (step.allowedTools ?? []).filter((rule) => rule.startsWith('Bash(git') || TEXT_ALLOWS.includes(rule));
 
 test("every read-only agent asks each of git's read-only questions by its own allow, whatever the settings say", () => {
   for (const agent of READ_ONLY_AGENTS) {
@@ -1872,10 +1950,31 @@ test("every read-only agent asks each of git's read-only questions by its own al
   }
 });
 
-test('the read-only agents carry one and the same set of git rules, so no line of them drifts from another', () => {
-  const [first, ...rest] = READ_ONLY_AGENTS.map((agent) => gitRulesOf(shippedStepOf(agent)));
+test("the read-only agents carry one and the same read set, git's and the text tools', so no line of them drifts from another", () => {
+  const [first, ...rest] = READ_ONLY_AGENTS.map((agent) => readRulesOf(shippedStepOf(agent)));
   assert.ok(first.length >= 24, `the set is written out on each line: ${first.join(', ')}`);
   for (const [index, rules] of rest.entries()) assert.deepEqual(rules, first, READ_ONLY_AGENTS[index + 1]);
+});
+
+test('every read-only step reads with the text tools inside the working tree, and is refused each read outside it', () => {
+  for (const { named, step } of readOnlySteps()) {
+    for (const rule of TEXT_ALLOWS) assert.ok(step.allowedTools?.includes(rule), `${named} allows ${rule}`);
+    assert.deepEqual(runs(step, TEXT_READS, {}, []), TEXT_READS.map(shown), `${named}: by its own allow, no settings read`);
+    assert.deepEqual(runs(step, TEXT_READS_OUTSIDE), [], `${named}: by Claude Code's own check`);
+    assert.deepEqual(runs(step, WC_READS_A_LIST), [], `${named}: by its own deny`);
+  }
+});
+
+test('REFUSED: without Claude Code’s check of a path, or without the deny of wc --files0-from, a read-only step reads outside', () => {
+  const step = shippedStepOf('agora');
+  assert.deepEqual(runs(step, TEXT_READS_OUTSIDE, SETTINGS, SKILL_GRANTS, false), TEXT_READS_OUTSIDE.map(shown), 'the allows alone');
+  const open = { ...step, disallowedTools: (step.disallowedTools ?? []).filter((rule) => rule !== WC_READS_A_LIST_DENY) };
+  assert.deepEqual(runs(open, WC_READS_A_LIST), WC_READS_A_LIST.map(shown), 'its check reads no path in the list');
+  for (const verb of ['sed', 'awk', 'find', 'sort', 'uniq', 'tee'])
+    assert.ok(
+      !(step.allowedTools ?? []).some((rule) => rule.startsWith(`Bash(${verb}`)),
+      `${verb} writes a file or runs a program, and stays out`,
+    );
 });
 
 test('every read-only agent is refused every git write: no allow of its own, of the settings or of a skill reaches one', () => {
@@ -2002,7 +2101,7 @@ const GIT_READS_OUTSIDE: Call[] = [
 const READS_OUTSIDE_DENIES = ['Bash(git *--no-ind*)', 'Bash(git blame *--con*)', 'Bash(git grep -f*)', 'Bash(git grep * -f*)'];
 
 /** Every deny a read-only agent's line carries beside the read set, which each of its steps is refused with its own. */
-const READ_SET_DENIES = [...RUNS_A_PROGRAM_DENIES, WRITES_A_FILE_DENY, ...READS_OUTSIDE_DENIES];
+const READ_SET_DENIES = [...RUNS_A_PROGRAM_DENIES, WRITES_A_FILE_DENY, ...READS_OUTSIDE_DENIES, WC_READS_A_LIST_DENY];
 
 test('every read-only step is refused every spelling of a read outside the repository the fence can read, and still asks each read', () => {
   for (const { named, step } of readOnlySteps()) {

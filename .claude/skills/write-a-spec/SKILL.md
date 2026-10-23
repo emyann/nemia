@@ -25,8 +25,8 @@ intent, so restate the intent's goal and constraints in it.
 7. **Ask what is the person's.** A choice the intent leaves open, a trade-off only they can weigh: ask it in a round, numbered, each with
    your recommended answer. Record each answer, and who gave it, in `decisions`.
 
-Read a file with Read, list a folder with Glob and search with Grep; never `ls`, `find`, `head`, `cat`, `grep`, `awk`, `sed` or a pipe in
-Bash: it runs the checks below and git's read-only questions — `git diff`, `git log`, `git show`, `git status`, `git blame`,
+Read a file with Read, list a folder with Glob and search with Grep; never `grep` or a pipe in
+Bash. `cat`, `head`, `tail`, `wc`, `cut` and `ls` read a file or a folder inside the workspace, and your fence refuses each one a path outside it; never `sed`, `awk`, `find`, `sort`, `uniq` or `tee`, which can write a file or run a program, nor `wc --files0-from`, which reads the paths a file lists. Otherwise Bash runs the checks below and git's read-only questions — `git diff`, `git log`, `git show`, `git status`, `git blame`,
 `git grep <pattern> <rev>`, `git ls-files`, `git rev-parse`, `git merge-base` and the rest of the read-only set your fence allows — each
 bare and one per call, and never a write. Read, Grep and Glob reach this workspace, by paths from its root, and each folder your brief says you
 may read, under its own path; never another run's folder, the store (`~/.agent-workflows`), `~/.claude`, `~/.cache` or a system path:

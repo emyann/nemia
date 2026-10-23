@@ -8,12 +8,11 @@ team that works it is in `workflows/agents/`. What follows is for the operator o
 - Every run starts in this factory: `nemia start "<brief>" --workflows <workflow> --factory nemia`.
 - An idea that changes the model or needs more than one card goes to `intake` first (Iris interviews the person), and its build is
   started `--after` the intake run: `nemia start "<brief>" --workflows build --factory nemia --after <intake run>`.
-- A small change its card settles goes to `quick` (`--workflows quick`, or `workflow: quick` on its card): implement, then a review,
-  then a landing nobody is asked to approve — Agora's pass files it. `workflows/quick/README.md` says the bound; a settled change past
-  it goes straight to `build`.
+- A change its card settles, needing no design whatever its size, goes to `quick` (`--workflows quick`, or `workflow: quick` on its card): implement, then a review,
+  then a landing nobody is asked to approve — Agora's pass files it. `workflows/quick/README.md` says what goes through it; a card that
+  leaves a decision open goes straight to `build`.
 - A quick run is read by Agora, not by the person: there is nothing to bring you for its landing, and `nemia approve` is refused
   there (*What waits on the person*, below, says what is still yours on such a run, and how to ask to read one yourself).
-- A quick run whose check refuses its size is a `build` card: cancel it and start the card with `build`, as the refusal says.
 - A landing whose check refused is sent back to the step that built the change, with the check's words (`nemia decide <run>` prints
   them), without waiting to be asked: in `quick`, through the review's loop, `nemia retry <run> review --message "<what failed>"` —
   implement is verified and its follower filed, so `nemia retry <run> implement` is refused there. On `build`, the next landing is

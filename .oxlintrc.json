@@ -801,7 +801,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/detached/detached.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 156, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 155, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {
@@ -813,7 +813,7 @@
     {
       "files": ["packages/agent-runtime/src/harness/sdk.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 84, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 30 }],
         "sonarjs/cognitive-complexity": ["error", 28]
       }

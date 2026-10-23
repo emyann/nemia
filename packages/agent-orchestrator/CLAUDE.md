@@ -101,8 +101,9 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
 - **Build a line's fields, never spread another's**: the fold keys on `involved`, not on `run`/`step`, so a hand-built fixture that
   spreads a run's line and adds a `step` keeps the run's `involved` and folds under the run.
 - **A one-shot is counted off the feed's own lines**, under its reason, what it is about, its try and its note (`onceKey`, `oncePast`),
-  never remembered and never a thing's last word: counting by place cannot tell two offers of one fact from two facts. A new one-shot is
-  offered from `word-feed.verb.ts`, off what the pass already read, and the note is what tells one occurrence from another.
+  never remembered and never a thing's last word: counting by place cannot tell two offers of one fact from two facts. A run's new
+  one-shot is offered from `word-feed.verb.ts`, off what the pass already read, the store's from `storeOnce` (`feed.ts`), off the pause
+  the pass read (`readPause`, handed to `emitFeed` as `pause`), and the note is what tells one occurrence from another.
 
 ## The tick
 

@@ -16,21 +16,25 @@ export {
   freshMemo,
   involvedOf,
   isRunLine,
+  isStoreLine,
   lineAsRead,
   publishedOf,
   REMOVED,
   SIGNAL_WORDS,
   startedLine,
+  STORE,
   upgraded,
 } from './feed.ts';
 export type {
   DaemonLine,
   FeedAppended,
+  FeedCloseout,
   FeedDenial,
   FeedFold,
   FeedLabels,
   FeedLine,
   FeedMemo,
+  FeedPause,
   FeedPublished,
   FeedSaid,
   FeedWords,
@@ -41,6 +45,7 @@ export type {
   RunLine,
   SignalSource,
   SignalType,
+  StoreLine,
 } from './feed.ts';
 export { DENIED, isOnce, kindsOf, messageOf, reasonOf, REASONS, REASON_CODES, sourceOf, typeOf, waitsOf } from './reason.ts';
 export type { Said } from './reason.ts';

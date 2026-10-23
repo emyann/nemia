@@ -108,43 +108,63 @@ test('at shipped defaults, every verb is taken exactly from the states its data 
   );
 });
 
-test('REFUSED: a state the data lists and the guard refuses is said, and that the verb is never taken there', () => {
-  const from = [...VERBS.find((v) => v.verb === 'requestStop')!.from, 'completed' as const];
-  assert.deepEqual(verbBreaches(planted('requestStop', { from }), VERB_GUARDS, WRITES, ALL), [
-    "requestStop's guard `stoppable` refuses in completed, which its data lists",
-    'requestStop is never accepted in completed, which its data lists',
-  ]);
-});
+/** A row of the table: its name and the planted fixture it holds the checker to. */
+type Row = { name: string; run: () => void };
 
-test('REFUSED: a verb whose data names another state than the one its entry makes the next pass read', () => {
-  assert.deepEqual(verbBreaches(planted('close', { to: 'submitted' }), VERB_GUARDS, WRITES, ALL), [
-    'close journalled: the next pass reads ending, not submitted',
-  ]);
-});
+const REFUSED: Row[] = [
+  {
+    name: 'REFUSED: a state the data lists and the guard refuses is said, and that the verb is never taken there',
+    run: () => {
+      const from = [...VERBS.find((v) => v.verb === 'requestStop')!.from, 'completed' as const];
+      assert.deepEqual(verbBreaches(planted('requestStop', { from }), VERB_GUARDS, WRITES, ALL), [
+        "requestStop's guard `stoppable` refuses in completed, which its data lists",
+        'requestStop is never accepted in completed, which its data lists',
+      ]);
+    },
+  },
+  {
+    name: 'REFUSED: a verb whose data names another state than the one its entry makes the next pass read',
+    run: () => {
+      assert.deepEqual(verbBreaches(planted('close', { to: 'submitted' }), VERB_GUARDS, WRITES, ALL), [
+        'close journalled: the next pass reads ending, not submitted',
+      ]);
+    },
+  },
+  {
+    name: 'REFUSED: a refusal that lets a verb journal where it is not taken from',
+    run: () => {
+      const writes = { ...WRITES, requestStop: { ...WRITES.requestStop, refusal: () => undefined } };
+      assert.deepEqual(verbBreaches(VERBS, VERB_GUARDS, writes, ALL), [
+        'requestStop journals in stopping, completed, failed, canceled, which it is not taken from',
+      ]);
+    },
+  },
+  {
+    name: 'REFUSED: a guard that holds in a state its data does not list',
+    run: () => {
+      const breaches = verbBreaches(VERBS, { ...VERB_GUARDS, stoppable: () => true }, WRITES, ALL);
+      assert.deepEqual(breaches, [
+        "requestStop's guard `stoppable` holds in stopping, which its data does not list",
+        "requestStop's guard `stoppable` holds in completed, which its data does not list",
+        "requestStop's guard `stoppable` holds in failed, which its data does not list",
+        "requestStop's guard `stoppable` holds in canceled, which its data does not list",
+      ]);
+    },
+  },
+  {
+    name: 'REFUSED: a verb in the data with no writer, a writer whose entry is another kind, and a guard with no predicate',
+    run: () => {
+      const extra: Verb = { verb: 'reopen', entry: 'input', by: 'person', from: ['completed'], to: 'submitted', guard: 'awaitsWord' };
+      assert.deepEqual(verbBreaches([...copy(), extra], VERB_GUARDS, WRITES, ALL), ['reopen has no writer: nothing journals it']);
+      const writes = { ...WRITES, close: { ...WRITES.close, entry: { kind: 'input', at: at(9 * S), text: 'go on' } as Event } };
+      assert.deepEqual(verbBreaches(VERBS, VERB_GUARDS, writes, ALL), ['close journals `input`, not the `closed` its data names']);
+      assert.deepEqual(verbBreaches(planted('answer', { guard: 'waits' }), VERB_GUARDS, WRITES, ALL), [
+        "answer's guard `waits` has no predicate",
+      ]);
+    },
+  },
+];
 
-test('REFUSED: a refusal that lets a verb journal where it is not taken from', () => {
-  const writes = { ...WRITES, requestStop: { ...WRITES.requestStop, refusal: () => undefined } };
-  assert.deepEqual(verbBreaches(VERBS, VERB_GUARDS, writes, ALL), [
-    'requestStop journals in stopping, completed, failed, canceled, which it is not taken from',
-  ]);
-});
-
-test('REFUSED: a guard that holds in a state its data does not list', () => {
-  const breaches = verbBreaches(VERBS, { ...VERB_GUARDS, stoppable: () => true }, WRITES, ALL);
-  assert.deepEqual(breaches, [
-    "requestStop's guard `stoppable` holds in stopping, which its data does not list",
-    "requestStop's guard `stoppable` holds in completed, which its data does not list",
-    "requestStop's guard `stoppable` holds in failed, which its data does not list",
-    "requestStop's guard `stoppable` holds in canceled, which its data does not list",
-  ]);
-});
-
-test('REFUSED: a verb in the data with no writer, a writer whose entry is another kind, and a guard with no predicate', () => {
-  const extra: Verb = { verb: 'reopen', entry: 'input', by: 'person', from: ['completed'], to: 'submitted', guard: 'awaitsWord' };
-  assert.deepEqual(verbBreaches([...copy(), extra], VERB_GUARDS, WRITES, ALL), ['reopen has no writer: nothing journals it']);
-  const writes = { ...WRITES, close: { ...WRITES.close, entry: { kind: 'input', at: at(9 * S), text: 'go on' } as Event } };
-  assert.deepEqual(verbBreaches(VERBS, VERB_GUARDS, writes, ALL), ['close journals `input`, not the `closed` its data names']);
-  assert.deepEqual(verbBreaches(planted('answer', { guard: 'waits' }), VERB_GUARDS, WRITES, ALL), [
-    "answer's guard `waits` has no predicate",
-  ]);
+test('REFUSED: verbBreaches says each way a verb and its data can disagree, and nothing else', async (t) => {
+  for (const row of REFUSED) await t.test(row.name, row.run);
 });

@@ -98,6 +98,9 @@ const journalled = (action: Action, ms: number): Event[] => {
   }
 };
 
+/** A row of a table: its name and its claim. */
+type Row = { name: string; run: () => void };
+
 const edgeKey = (from: string, event: string, to: string) => `${from} --${event}--> ${to}`;
 
 test('every move of the corpus is an edge of the machine, and lands where the journal it writes then says', () => {
@@ -133,7 +136,7 @@ test('every move of the corpus is an edge of the machine, and lands where the jo
       reason: 'unstartable',
       error: 'no such model',
     },
-    "the engine's one event, which only the spawn call can know: from the intent, the attempt's unstartable end",
+    "the spawn call's one event: an unstartable end",
   );
   assert.equal(lifecycleOf(fold(TASK, [...JOURNALS['intent, no spawn'], ...journalled(end, 2 * S)])), 'ending');
   taken.add(edgeKey('starting', 'SPAWN_REFUSED', 'ending'));
@@ -170,60 +173,57 @@ test('ADOPTION after a crash: an intent with no spawn and a session under its na
   assert.equal(lifecycleOf(state), 'starting', 'the journal is the state: reading it again reads the same, restart or not');
 });
 
-test('REFUSED: an event with no edge in the state it meets is refused, at shipped defaults, and nothing is done; a final state refuses every event', () => {
-  const sighting: Sighting = { sessionId: 's', state: 'working' };
-  const seen = { attempt: 1, sighting, asked: false, holds: false };
-  const cases: Array<[LifecycleState, LifecycleEvent]> = [
-    ['submitted', { type: 'UNSPAWNED', attempt: 1, name: 'n' }],
-    ['submitted', { type: 'SESSION_LIVE', ...seen }],
-    ['starting', { type: 'LOST', attempt: 1 }],
-    ['starting', { type: 'READY', attempt: 2 }],
-    ['working', { type: 'SPAWN_REFUSED', attempt: 1, error: 'e' }],
-    ['working', { type: 'NOTHING_OPEN' }],
-    ['input-required', { type: 'SESSION_LIVE', ...seen }],
-    ['input-required', { type: 'READY', attempt: 2 }],
-    ['stopping', { type: 'DEADLINE_PASSED', attempt: 1, live: true, sighting }],
-    ['stopping', { type: 'READY', attempt: 1 }],
-    ['ending', { type: 'READY', attempt: 2 }],
-    ['ending', { type: 'SESSION_ENDED', ...seen }],
-  ];
-  for (const [from, event] of cases)
-    assert.deepEqual(transition(from, event), { refused: { state: from, event: event.type } }, `${from} on ${event.type}`);
-  for (const from of FINAL)
-    for (const e of edgesOf()) assert.ok('refused' in transition(from, { type: e.event } as LifecycleEvent), `${from} took ${e.event}`);
-});
+/** An event with no edge: what the machine answers, and what `decide` does with it. */
+const REFUSED_ROWS: Row[] = [
+  {
+    name: 'REFUSED: an event with no edge in the state it meets is refused, at shipped defaults, and nothing is done; a final state refuses every event',
+    run: () => {
+      const sighting: Sighting = { sessionId: 's', state: 'working' };
+      const seen = { attempt: 1, sighting, asked: false, holds: false };
+      const cases: Array<[LifecycleState, LifecycleEvent]> = [
+        ['submitted', { type: 'UNSPAWNED', attempt: 1, name: 'n' }],
+        ['submitted', { type: 'SESSION_LIVE', ...seen }],
+        ['starting', { type: 'LOST', attempt: 1 }],
+        ['starting', { type: 'READY', attempt: 2 }],
+        ['working', { type: 'SPAWN_REFUSED', attempt: 1, error: 'e' }],
+        ['working', { type: 'NOTHING_OPEN' }],
+        ['input-required', { type: 'SESSION_LIVE', ...seen }],
+        ['input-required', { type: 'READY', attempt: 2 }],
+        ['stopping', { type: 'DEADLINE_PASSED', attempt: 1, live: true, sighting }],
+        ['stopping', { type: 'READY', attempt: 1 }],
+        ['ending', { type: 'READY', attempt: 2 }],
+        ['ending', { type: 'SESSION_ENDED', ...seen }],
+      ];
+      for (const [from, event] of cases)
+        assert.deepEqual(transition(from, event), { refused: { state: from, event: event.type } }, `${from} on ${event.type}`);
+      for (const from of FINAL)
+        for (const e of edgesOf()) assert.ok('refused' in transition(from, { type: e.event } as LifecycleEvent), `${from} took ${e.event}`);
+    },
+  },
+  {
+    name: 'REFUSED: decide answers a missing edge with nothing, and says which — it never guesses a move',
+    run: () => {
+      const state = fold(TASK, JOURNALS.spawned);
+      const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'completed' as const }]]);
+      const now = { at: new Date(T0.getTime() + 5 * S), graceMs: 30_000 };
+      assert.equal(decide(state, observed, now).do, 'record-end', 'the shipped lifecycle ends it');
+      assert.deepEqual(decide(state, observed, now, withoutEdge('working', 'SESSION_ENDED')), {
+        do: 'nothing',
+        why: 'refused: no edge from working on SESSION_ENDED',
+        refused: { state: 'working', event: 'SESSION_ENDED' },
+      });
+      assert.deepEqual(spawnRefused(fold(TASK, JOURNALS['intent, no spawn']), 1, 'e', withoutEdge('starting', 'SPAWN_REFUSED')), {
+        do: 'nothing',
+        why: 'refused: no edge from starting on SPAWN_REFUSED',
+        refused: { state: 'starting', event: 'SPAWN_REFUSED' },
+      });
+      assert.equal(decide(state, observed, now).do, 'record-end', 'the pruned machine is a copy: the shipped one keeps the edge');
+    },
+  },
+];
 
-test('REFUSED: decide answers a missing edge with nothing, and says which — it never guesses a move', () => {
-  const state = fold(TASK, JOURNALS.spawned);
-  const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'completed' as const }]]);
-  const now = { at: new Date(T0.getTime() + 5 * S), graceMs: 30_000 };
-  assert.equal(decide(state, observed, now).do, 'record-end', 'the shipped lifecycle ends it');
-  assert.deepEqual(decide(state, observed, now, withoutEdge('working', 'SESSION_ENDED')), {
-    do: 'nothing',
-    why: 'refused: no edge from working on SESSION_ENDED',
-    refused: { state: 'working', event: 'SESSION_ENDED' },
-  });
-  assert.deepEqual(spawnRefused(fold(TASK, JOURNALS['intent, no spawn']), 1, 'e', withoutEdge('starting', 'SPAWN_REFUSED')), {
-    do: 'nothing',
-    why: 'refused: no edge from starting on SPAWN_REFUSED',
-    refused: { state: 'starting', event: 'SPAWN_REFUSED' },
-  });
-  assert.equal(decide(state, observed, now).do, 'record-end', 'the pruned machine is a copy: the shipped one keeps the edge');
-});
-
-test('a settled task is decided nothing before anything is observed of it, on any pass — its state is final and would refuse every event', () => {
-  for (const outcome of ['succeeded', 'failed', 'stopped'] as const) {
-    const state = fold(TASK, [...JOURNALS.spawned, { kind: 'settled', at: at(3 * S), outcome }]);
-    assert.equal(settledQuiet(state), true);
-    const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' as const }]]);
-    const now = { at: new Date(T0.getTime() + 99 * S), graceMs: 30_000 };
-    assert.deepEqual(decide(state, observed, now), { do: 'nothing', why: `settled: ${outcome}` }, 'no refusal on it');
-    assert.ok(FINAL.has(lifecycleOf(state)), 'what the short-circuit saves: its state is final, and asked, the machine would refuse it');
-    assert.deepEqual(transition(lifecycleOf(state), observe(state, observed, now)), {
-      refused: { state: lifecycleOf(state), event: 'SETTLED' },
-    });
-  }
-  assert.equal(settledQuiet(fold(TASK, JOURNALS.spawned)), false);
+test('REFUSED: an event the machine has no edge for is refused, never guessed — by the machine, and by `decide`', async (t) => {
+  for (const row of REFUSED_ROWS) await t.test(row.name, row.run);
 });
 
 /**
@@ -244,28 +244,64 @@ const LATER: Record<string, Event[]> = {
   'settled again': [{ kind: 'settled', at: at(4 * S), outcome: 'succeeded' }],
 };
 
-test("what the tick's memo rests on: a settled task decides nothing in every journal shape, under every sighting and clock, whatever is appended after", () => {
-  let cases = 0;
-  for (const c of corpus())
-    for (const outcome of ['succeeded', 'failed', 'stopped'] as const)
-      for (const [l, later] of Object.entries(LATER)) {
-        const state = fold(TASK, [...c.events, { kind: 'settled', at: at(3 * S), outcome }, ...later]);
-        assert.equal(settledQuiet(state), true, `${c.name} · settled ${outcome} · ${l}: still settled`);
-        assert.deepEqual(
-          decide(state, c.observed, c.now),
-          { do: 'nothing', why: `settled: ${state.settled}` },
-          `${c.name} · settled ${outcome} · ${l}`,
+/** A settled task, on any pass and after any entry: what the memo rests on. */
+const SETTLED_ROWS: Row[] = [
+  {
+    name: 'a settled task is decided nothing before anything is observed of it, on any pass — its state is final and would refuse every event',
+    run: () => {
+      for (const outcome of ['succeeded', 'failed', 'stopped'] as const) {
+        const state = fold(TASK, [...JOURNALS.spawned, { kind: 'settled', at: at(3 * S), outcome }]);
+        assert.equal(settledQuiet(state), true);
+        const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' as const }]]);
+        const now = { at: new Date(T0.getTime() + 99 * S), graceMs: 30_000 };
+        assert.deepEqual(decide(state, observed, now), { do: 'nothing', why: `settled: ${outcome}` }, 'no refusal on it');
+        assert.ok(
+          FINAL.has(lifecycleOf(state)),
+          'what the short-circuit saves: its state is final, and asked, the machine would refuse it',
         );
-        cases++;
+        assert.deepEqual(transition(lifecycleOf(state), observe(state, observed, now)), {
+          refused: { state: lifecycleOf(state), event: 'SETTLED' },
+        });
       }
-  assert.ok(cases > 10_000, `every shape, every outcome, every later entry (${cases} cases)`);
-  const open = fold(TASK, [filed({ deadlineSeconds: 1 }), starting(1), spawned(1), { kind: 'settled', at: at(3 * S), outcome: 'stopped' }]);
-  assert.equal(open.attempts.at(-1)!.ended, null, 'the attempt is open');
-  assert.equal(
-    decide(open, new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' }]]), { at: new Date(T0.getTime() + 1e9), graceMs: 0 }).do,
-    'nothing',
-    'settled over an attempt still open, with its session live and the deadline long past',
-  );
+      assert.equal(settledQuiet(fold(TASK, JOURNALS.spawned)), false);
+    },
+  },
+  {
+    name: "what the tick's memo rests on: a settled task decides nothing in every journal shape, under every sighting and clock, whatever is appended after",
+    run: () => {
+      let cases = 0;
+      for (const c of corpus())
+        for (const outcome of ['succeeded', 'failed', 'stopped'] as const)
+          for (const [l, later] of Object.entries(LATER)) {
+            const state = fold(TASK, [...c.events, { kind: 'settled', at: at(3 * S), outcome }, ...later]);
+            assert.equal(settledQuiet(state), true, `${c.name} · settled ${outcome} · ${l}: still settled`);
+            assert.deepEqual(
+              decide(state, c.observed, c.now),
+              { do: 'nothing', why: `settled: ${state.settled}` },
+              `${c.name} · settled ${outcome} · ${l}`,
+            );
+            cases++;
+          }
+      assert.ok(cases > 10_000, `every shape, every outcome, every later entry (${cases} cases)`);
+      const open = fold(TASK, [
+        filed({ deadlineSeconds: 1 }),
+        starting(1),
+        spawned(1),
+        { kind: 'settled', at: at(3 * S), outcome: 'stopped' },
+      ]);
+      assert.equal(open.attempts.at(-1)!.ended, null, 'the attempt is open');
+      assert.equal(
+        decide(open, new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' }]]), { at: new Date(T0.getTime() + 1e9), graceMs: 0 })
+          .do,
+        'nothing',
+        'settled over an attempt still open, with its session live and the deadline long past',
+      );
+    },
+  },
+];
+
+test('a settled task is final: it decides nothing, before anything is observed and whatever is appended after', async (t) => {
+  for (const row of SETTLED_ROWS) await t.test(row.name, row.run);
 });
 
 /** The states no move reaches from `submitted`, over the machine's edges and the verbs given. */
@@ -283,67 +319,83 @@ const unreached = (verbs: readonly Verb[]): LifecycleState[] => {
   return STATES.filter((s) => !reached.has(s));
 };
 
-test('the machine: its states are the ones named, each edge names one action, every state but a final one leaves or holds by an edge, every state is reached, and a guarded edge falls through to one with no guard, so a guard never leaves an event unanswered', () => {
-  assert.deepEqual(statesOf(), [...STATES]);
-  assert.deepEqual([...FINAL].sort(), ['canceled', 'completed', 'failed']);
-  const actions = new Set(['nothing', 'start', 'spawn', 'record-end', 'stop', 'settle']);
-  for (const e of edgesOf()) assert.ok(actions.has(e.action), `${e.from} on ${e.event} does ${e.action}, not one action`);
-  for (const s of STATES)
-    if (!FINAL.has(s))
-      assert.ok(
-        edgesOf().some((e) => e.from === s),
-        `${s} has no edge`,
+/** The machine read as data: what it holds, and what is drawn from it. */
+const MACHINE_ROWS: Row[] = [
+  {
+    name: 'the machine: its states are the ones named, each edge names one action, every state but a final one leaves or holds by an edge, every state is reached, and a guarded edge falls through to one with no guard, so a guard never leaves an event unanswered',
+    run: () => {
+      assert.deepEqual(statesOf(), [...STATES]);
+      assert.deepEqual([...FINAL].sort(), ['canceled', 'completed', 'failed']);
+      const actions = new Set(['nothing', 'start', 'spawn', 'record-end', 'stop', 'settle']);
+      for (const e of edgesOf()) assert.ok(actions.has(e.action), `${e.from} on ${e.event} does ${e.action}, not one action`);
+      for (const s of STATES)
+        if (!FINAL.has(s))
+          assert.ok(
+            edgesOf().some((e) => e.from === s),
+            `${s} has no edge`,
+          );
+      assert.deepEqual(unreached(VERBS), [], "reached from where a task begins, by the pass's edges and a person's verbs");
+      assert.deepEqual(
+        unreached(VERBS.filter((v) => v.verb !== 'requestStop')),
+        ['stopping'],
+        'a person asking it to stop is the one way into `stopping`: no pass moves there',
       );
-  assert.deepEqual(unreached(VERBS), [], "reached from where a task begins, by the pass's edges and a person's verbs");
-  assert.deepEqual(
-    unreached(VERBS.filter((v) => v.verb !== 'requestStop')),
-    ['stopping'],
-    'a person asking it to stop is the one way into `stopping`: no pass moves there',
-  );
-  const last = new Map(edgesOf().map((e) => [`${e.from} ${e.event}`, e]));
-  for (const [k, e] of last) assert.equal(e.guard, undefined, `${k}: its last edge is guarded`);
-});
+      const last = new Map(edgesOf().map((e) => [`${e.from} ${e.event}`, e]));
+      for (const [k, e] of last) assert.equal(e.guard, undefined, `${k}: its last edge is guarded`);
+    },
+  },
+  {
+    name: 'the diagram is drawn from the machine: an edge taken away takes exactly its one line with it',
+    run: () => {
+      const line = '  working --> ending: LOST / record-end';
+      const whole = diagram().split('\n');
+      assert.ok(whole.includes(line), 'the edge is drawn');
+      assert.deepEqual(
+        diagram(machineWithout('working', 'LOST')).split('\n'),
+        whole.filter((l) => l !== line),
+      );
+    },
+  },
+  {
+    name: "the diagram draws a person's verbs from their data: one line per state each is taken from, and a verb taken away takes exactly its lines",
+    run: () => {
+      const whole = diagram().split('\n');
+      const close = '  input_required --> ending: close [awaitsWord] (by person)';
+      assert.ok(whole.includes(close), 'a verb is drawn with its guard and who writes it');
+      assert.ok(whole.includes('  working --> stopping: requestStop [stoppable] (by person)'));
+      assert.equal(whole.filter((l) => l.includes(': requestStop ')).length, 5, 'one line per state the stop is taken from');
+      assert.deepEqual(
+        diagram(
+          undefined,
+          VERBS.filter((v) => v.verb !== 'close'),
+        ).split('\n'),
+        whole.filter((l) => l !== close),
+      );
+    },
+  },
+  {
+    name: 'the graph a board draws is the machine read as plain data, and a fresh copy on every call',
+    run: () => {
+      const graph = lifecycleGraph();
+      assert.deepEqual(graph, { initial: 'submitted', states: statesOf(), final: [...FINAL], edges: edgesOf(), verbs: VERBS });
+      assert.deepEqual(graph.states, [...STATES]);
+      assert.deepEqual(JSON.parse(JSON.stringify(graph)), graph, 'plain data: a JSON round trip changes nothing');
+      graph.edges.pop();
+      graph.states.pop();
+      assert.deepEqual(lifecycleGraph().edges, edgesOf(), 'a caller that changes its copy changes no other');
+      const verbs: unknown = JSON.parse(JSON.stringify(VERBS));
+      lifecycleGraph().verbs[0].from.pop();
+      assert.deepEqual(lifecycleGraph().verbs, verbs, 'nor the verbs, down to the states each is taken from');
+      assert.ok(
+        lifecycleGraph().edges.some((e) => e.from === 'ending' && e.event === 'CLOSED' && e.guard === 'lastDone' && e.to === 'completed'),
+        'a guarded edge keeps its guard',
+      );
+    },
+  },
+];
 
-test('the diagram is drawn from the machine: an edge taken away takes exactly its one line with it', () => {
-  const line = '  working --> ending: LOST / record-end';
-  const whole = diagram().split('\n');
-  assert.ok(whole.includes(line), 'the edge is drawn');
-  assert.deepEqual(
-    diagram(machineWithout('working', 'LOST')).split('\n'),
-    whole.filter((l) => l !== line),
-  );
-});
-
-test("the diagram draws a person's verbs from their data: one line per state each is taken from, and a verb taken away takes exactly its lines", () => {
-  const whole = diagram().split('\n');
-  const close = '  input_required --> ending: close [awaitsWord] (by person)';
-  assert.ok(whole.includes(close), 'a verb is drawn with its guard and who writes it');
-  assert.ok(whole.includes('  working --> stopping: requestStop [stoppable] (by person)'));
-  assert.equal(whole.filter((l) => l.includes(': requestStop ')).length, 5, 'one line per state the stop is taken from');
-  assert.deepEqual(
-    diagram(
-      undefined,
-      VERBS.filter((v) => v.verb !== 'close'),
-    ).split('\n'),
-    whole.filter((l) => l !== close),
-  );
-});
-
-test('the graph a board draws is the machine read as plain data, and a fresh copy on every call', () => {
-  const graph = lifecycleGraph();
-  assert.deepEqual(graph, { initial: 'submitted', states: statesOf(), final: [...FINAL], edges: edgesOf(), verbs: VERBS });
-  assert.deepEqual(graph.states, [...STATES]);
-  assert.deepEqual(JSON.parse(JSON.stringify(graph)), graph, 'plain data: a JSON round trip changes nothing');
-  graph.edges.pop();
-  graph.states.pop();
-  assert.deepEqual(lifecycleGraph().edges, edgesOf(), 'a caller that changes its copy changes no other');
-  const verbs: unknown = JSON.parse(JSON.stringify(VERBS));
-  lifecycleGraph().verbs[0].from.pop();
-  assert.deepEqual(lifecycleGraph().verbs, verbs, 'nor the verbs, down to the states each is taken from');
-  assert.ok(
-    lifecycleGraph().edges.some((e) => e.from === 'ending' && e.event === 'CLOSED' && e.guard === 'lastDone' && e.to === 'completed'),
-    'a guarded edge keeps its guard',
-  );
+test('the machine as data: its states, edges and reach, the diagram drawn from it, and the graph a board draws', async (t) => {
+  for (const row of MACHINE_ROWS) await t.test(row.name, row.run);
 });
 
 test('UNREAD: a pass that could not read the harness does nothing to an attempt in flight, past its grace too, and never reads it lost', () => {

@@ -1689,3 +1689,9 @@ test('claudeTranscriptEvents: a line of a Claude transcript as the events it say
     },
   );
 });
+
+test('a transcript named but not on disk reads as none: no events, and a cursor at the start', async () => {
+  const { readTranscript, noTranscript } = await import('../src/harness/transcript.ts');
+  const missing = path.join(scratch('ae-transcript-missing-'), 'gone.jsonl');
+  assert.deepEqual(await readTranscript(missing, undefined, () => []), noTranscript());
+});

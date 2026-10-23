@@ -21,6 +21,7 @@ import { Engine, type EngineShape } from '../src/index.ts';
 import { machineTempDir, scratch } from './scratch.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { story } from './checkpoints.ts';
 
 /** Claude Code 2.1.278's answers to `get_usage`, recorded by hand (`fixtures/get-usage-*.json`): the control response it printed. */
 const recorded = (name: 'plan' | 'no-plan' | 'unsupported' | 'unanswered'): { response?: unknown; error?: string } =>
@@ -87,57 +88,66 @@ const PLAN = {
   subscription: 'max',
 };
 
-test("Claude Code 2.1.278's recorded answers read as what they were: the plan's limits, no plan, nothing from the usage service", () => {
-  assert.deepEqual(quotaOfUsage(usageOf('plan')), PLAN);
-  assert.deepEqual(quotaOfUsage(usageOf('no-plan')), { kind: 'no-plan' });
-  assert.deepEqual(quotaOfUsage(usageOf('unanswered')), { kind: 'unanswered', subscription: 'max' });
-});
-
-test('REFUSED: an answer in a shape this code does not read is unknown, and says what it found; a limit with no number is left out', () => {
-  assert.deepEqual(quotaOfUsage('nope'), { kind: 'unknown', what: 'its response is not an object' });
-  assert.deepEqual(quotaOfUsage({}), { kind: 'unknown', what: 'it has no rate_limits_available' });
-  assert.deepEqual(quotaOfUsage({ rate_limits_available: true, rate_limits: [] }), {
-    kind: 'unknown',
-    what: 'its rate_limits are not an object',
-  });
-  const limits = { five_hour: { utilization: null }, seven_day: { utilization: Infinity }, day: { utilization: 7, resets_at: 'soon' } };
-  assert.deepEqual(quotaOfUsage({ rate_limits_available: true, rate_limits: limits }), {
-    kind: 'windows',
-    limits: [{ key: 'day', usedPercentage: 7, resetsAt: null }],
-    subscription: null,
-  });
-});
-
-test('REFUSED: a refusal reads by what the SDK named it: the question refused, no Claude Code to ask, or how the process went', () => {
-  const refused = recorded('unsupported').error!;
-  assert.deepEqual(quotaOfRefusal(thrown(refused, { errorClass: 'control_request_failed' })), {
-    kind: 'unknown',
-    what: 'it refused the request (Unsupported control request subtype: get_usage_nope)',
-  });
-  assert.deepEqual(quotaOfRefusal(thrown('Claude Code executable not found at /nope.', { errorClass: 'executable_not_found' })), {
-    kind: 'missing',
-  });
-  assert.deepEqual(
-    quotaOfRefusal(
-      thrown('Claude Code process exited with code 3. stderr: claude: the harness was told to fail', {
-        errorClass: 'process_exited_nonzero',
-        exitCode: 3,
-      }),
-    ),
-    { kind: 'failed', code: 3, signal: null, said: 'claude: the harness was told to fail' },
-    "what the child said is the stderr tail the SDK joins to its message, not the SDK's own sentence about the exit",
+test("quotaOfUsage and quotaOfRefusal: what an answer and a refusal read as — Claude Code 2.1.278's recorded answers, a shape this code does not read, and how the SDK named a refusal", async (t) => {
+  await t.test(
+    "Claude Code 2.1.278's recorded answers read as what they were: the plan's limits, no plan, nothing from the usage service",
+    () => {
+      assert.deepEqual(quotaOfUsage(usageOf('plan')), PLAN);
+      assert.deepEqual(quotaOfUsage(usageOf('no-plan')), { kind: 'no-plan' });
+      assert.deepEqual(quotaOfUsage(usageOf('unanswered')), { kind: 'unanswered', subscription: 'max' });
+    },
   );
-  assert.deepEqual(
-    quotaOfRefusal(
-      thrown('Claude Code process terminated by signal SIGKILL. stderr: out of memory', {
-        errorClass: 'process_killed_by_signal',
-        signal: 'SIGKILL',
-      }),
-    ),
-    { kind: 'failed', code: null, signal: 'SIGKILL', said: 'out of memory' },
-    "the signal is a field of the SDK's error, read as one",
+  await t.test(
+    'REFUSED: an answer in a shape this code does not read is unknown, and says what it found; a limit with no number is left out',
+    () => {
+      assert.deepEqual(quotaOfUsage('nope'), { kind: 'unknown', what: 'its response is not an object' });
+      assert.deepEqual(quotaOfUsage({}), { kind: 'unknown', what: 'it has no rate_limits_available' });
+      assert.deepEqual(quotaOfUsage({ rate_limits_available: true, rate_limits: [] }), {
+        kind: 'unknown',
+        what: 'its rate_limits are not an object',
+      });
+      const limits = { five_hour: { utilization: null }, seven_day: { utilization: Infinity }, day: { utilization: 7, resets_at: 'soon' } };
+      assert.deepEqual(quotaOfUsage({ rate_limits_available: true, rate_limits: limits }), {
+        kind: 'windows',
+        limits: [{ key: 'day', usedPercentage: 7, resetsAt: null }],
+        subscription: null,
+      });
+    },
   );
-  assert.deepEqual(quotaOfRefusal('nope'), { kind: 'failed', code: null, signal: null, said: 'nope' });
+  await t.test(
+    'REFUSED: a refusal reads by what the SDK named it: the question refused, no Claude Code to ask, or how the process went',
+    () => {
+      const refused = recorded('unsupported').error!;
+      assert.deepEqual(quotaOfRefusal(thrown(refused, { errorClass: 'control_request_failed' })), {
+        kind: 'unknown',
+        what: 'it refused the request (Unsupported control request subtype: get_usage_nope)',
+      });
+      assert.deepEqual(quotaOfRefusal(thrown('Claude Code executable not found at /nope.', { errorClass: 'executable_not_found' })), {
+        kind: 'missing',
+      });
+      assert.deepEqual(
+        quotaOfRefusal(
+          thrown('Claude Code process exited with code 3. stderr: claude: the harness was told to fail', {
+            errorClass: 'process_exited_nonzero',
+            exitCode: 3,
+          }),
+        ),
+        { kind: 'failed', code: 3, signal: null, said: 'claude: the harness was told to fail' },
+        "what the child said is the stderr tail the SDK joins to its message, not the SDK's own sentence about the exit",
+      );
+      assert.deepEqual(
+        quotaOfRefusal(
+          thrown('Claude Code process terminated by signal SIGKILL. stderr: out of memory', {
+            errorClass: 'process_killed_by_signal',
+            signal: 'SIGKILL',
+          }),
+        ),
+        { kind: 'failed', code: null, signal: 'SIGKILL', said: 'out of memory' },
+        "the signal is a field of the SDK's error, read as one",
+      );
+      assert.deepEqual(quotaOfRefusal('nope'), { kind: 'failed', code: null, signal: null, said: 'nope' });
+    },
+  );
 });
 
 test("REFUSED: an ask's query is opened for the question alone: in the temporary directory, without the user's settings, writing no session", () => {
@@ -177,12 +187,6 @@ test("REFUSED: an ask's query is opened for the question alone: in the temporary
   assert.equal(usageOptions('/bin/claude').pathToClaudeCodeExecutable, '/bin/claude', 'the Claude Code named is the one asked');
 });
 
-test("an ask puts the question once, skipping the behaviours scan, and closes its query on the answer; the command it was given is the query's", async () => {
-  const stand = standIn(async () => usageOf('plan'));
-  assert.deepEqual(await Effect.runPromise(claudeQuota({ command: '/bin/claude', ask: stand.ask })), PLAN);
-  assert.deepEqual(stand.seen, { asks: 1, closes: 1, command: '/bin/claude', skipBehaviors: true });
-});
-
 test('REFUSED: an ask that threw, timed out or was interrupted closes its query all the same', async () => {
   const refused = standIn(() => Promise.reject(thrown('no claude', { errorClass: 'executable_not_found' })));
   assert.deepEqual(await Effect.runPromise(claudeQuota({ ask: refused.ask })), { kind: 'missing' });
@@ -200,36 +204,10 @@ test('REFUSED: an ask that threw, timed out or was interrupted closes its query 
   assert.deepEqual(held.seen.closes, 1, 'an interrupted ask closed its query before the interruption returned');
 });
 
-test("the engine's quota asks its default harness, or the one named, and answers the same either way", async () => {
-  const engine = engineOver(standIn(async () => usageOf('plan')).ask);
-  assert.deepEqual(await Effect.runPromise(engine.quota()), PLAN);
-  assert.deepEqual(await Effect.runPromise(engine.quota('claude')), PLAN);
-  const asking = engineOver(standIn(async () => usageOf('unanswered')).ask);
-  assert.deepEqual(await Effect.runPromise(asking.quota('claude')), await Effect.runPromise(asking.quota()));
-});
-
-test('REFUSED: a quota asked of a harness that has none, of one the engine has not, or with other arguments', async () => {
+test("the engine's quota: asked of its default harness or the one named, the same either way, one span with its harness; refused for a harness that has none, one it has not, or other arguments, asking nothing and tracing nothing", async (t) => {
+  const s = story(t);
   const stand = standIn(async () => usageOf('plan'));
   const engine = engineOver(stand.ask);
-  const untyped = <F>(f: F) => f as (...args: unknown[]) => EngineShape['quota'] extends (...a: never[]) => infer R ? R : never;
-  const cases: Array<[() => ReturnType<EngineShape['quota']>, string]> = [
-    [() => engine.quota('fake'), 'the `fake` harness reports no quota. Ask one that does: claude.'],
-    [() => engine.quota('nope'), '`nope` is not a harness this engine has. Its harnesses are: claude, fake.'],
-    [() => untyped(engine.quota)(42), "takes one harness's name, or nothing for the default harness (`claude`); it was handed 42."],
-    [
-      () => untyped(engine.quota)('claude', 'fake'),
-      'takes one harness\'s name, or nothing for the default harness (`claude`); it was handed "claude", "fake".',
-    ],
-  ];
-  for (const [asked, words] of cases) {
-    const refused = await Effect.runPromise(Effect.flip(asked()));
-    assert.deepEqual([refused._tag, refused.message], ['QuotaRefused', words]);
-  }
-  assert.equal(stand.seen.asks, 0, 'no refused quota asked anything');
-});
-
-test('a quota refused for a harness that reports none makes no span, and no error on a trace; an ask is one span, with its harness', async () => {
-  const engine = engineOver(standIn(async () => usageOf('plan')).ask);
   const spans: Tracer.NativeSpan[] = [];
   const tracer = Tracer.make({
     span(options) {
@@ -239,16 +217,60 @@ test('a quota refused for a harness that reports none makes no span, and no erro
     },
   });
   const traced = <A, E>(asked: Effect.Effect<A, E>) => Effect.runPromise(Effect.exit(asked).pipe(Effect.withTracer(tracer)));
-  assert.equal(Exit.isFailure(await traced(engine.quota('fake'))), true, 'still refused');
-  assert.deepEqual(
-    spans.map((s) => s.name),
-    [],
-    'a refusal asks nothing, and traces nothing',
+
+  await s.test(
+    "an ask puts the question once, skipping the behaviours scan, and closes its query on the answer; the command it was given is the query's",
+    async () => {
+      const stand = standIn(async () => usageOf('plan'));
+      assert.deepEqual(await Effect.runPromise(claudeQuota({ command: '/bin/claude', ask: stand.ask })), PLAN);
+      assert.deepEqual(stand.seen, { asks: 1, closes: 1, command: '/bin/claude', skipBehaviors: true });
+    },
   );
-  assert.equal(Exit.isSuccess(await traced(engine.quota('claude'))), true);
-  assert.deepEqual(
-    spans.map((s) => [s.name, s.attributes.get('harness'), s.status._tag === 'Ended' && Exit.isSuccess(s.status.exit)]),
-    [['Engine.quota', 'claude', true]],
-    'the ask of a harness that reports a quota is one span, ended well',
+
+  await s.test(
+    'REFUSED: a quota asked of a harness that has none, of one the engine has not, or with other arguments — and no refused quota asked anything',
+    async () => {
+      const untyped = <F>(f: F) => f as (...args: unknown[]) => EngineShape['quota'] extends (...a: never[]) => infer R ? R : never;
+      const cases: Array<[() => ReturnType<EngineShape['quota']>, string]> = [
+        [() => engine.quota('fake'), 'the `fake` harness reports no quota. Ask one that does: claude.'],
+        [() => engine.quota('nope'), '`nope` is not a harness this engine has. Its harnesses are: claude, fake.'],
+        [() => untyped(engine.quota)(42), "takes one harness's name, or nothing for the default harness (`claude`); it was handed 42."],
+        [
+          () => untyped(engine.quota)('claude', 'fake'),
+          'takes one harness\'s name, or nothing for the default harness (`claude`); it was handed "claude", "fake".',
+        ],
+      ];
+      for (const [asked, words] of cases) {
+        const refused = await Effect.runPromise(Effect.flip(asked()));
+        assert.deepEqual([refused._tag, refused.message], ['QuotaRefused', words]);
+      }
+      assert.equal(stand.seen.asks, 0, 'no refused quota asked anything');
+    },
+  );
+
+  await s.test('a quota refused for a harness that reports none makes no span, and no error on a trace', async () => {
+    assert.equal(Exit.isFailure(await traced(engine.quota('fake'))), true, 'still refused');
+    assert.deepEqual(
+      spans.map((x) => x.name),
+      [],
+      'a refusal asks nothing, and traces nothing',
+    );
+  });
+
+  await s.test(
+    'asked of its default harness, or the one named, it answers the same, an ask one span with its harness, ended well',
+    async () => {
+      assert.deepEqual(await Effect.runPromise(engine.quota()), PLAN);
+      const named = await traced(engine.quota('claude'));
+      assert.deepEqual(Exit.isSuccess(named) ? named.value : named, PLAN, 'the harness named answers its plan, as the default does');
+      assert.deepEqual(
+        spans.map((x) => [x.name, x.attributes.get('harness'), x.status._tag === 'Ended' && Exit.isSuccess(x.status.exit)]),
+        [['Engine.quota', 'claude', true]],
+        'the ask of a harness that reports a quota is one span, ended well',
+      );
+      assert.deepEqual(stand.seen.asks, 2, 'each asked once');
+      const asking = engineOver(standIn(async () => usageOf('unanswered')).ask);
+      assert.deepEqual(await Effect.runPromise(asking.quota('claude')), await Effect.runPromise(asking.quota()));
+    },
   );
 });

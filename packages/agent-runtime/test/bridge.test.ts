@@ -44,24 +44,27 @@ const register = (dir: string, change: Record<string, unknown> = {}, pid = PID) 
 /** `claudeBridge` of `PID` and `SESSION` under `dir`, its process started at `START`. */
 const bridgeIn = (dir: string, by: { uid?: number } = {}) => claudeBridge(dir, PID, SESSION, { startOf: () => START, ...by });
 
-test("a registration of the session, with a `bridgeSessionId`, gives the link that opens it: Claude Code's form, measured live", async () => {
-  const dir = tmp('up');
-  register(dir);
-  assert.deepEqual(await bridgeIn(dir), { url: LINK });
-});
+test('claudeBridge: the link a registration of the session gives, or why it gives none', async (t) => {
+  await t.test(
+    "a registration of the session, with a `bridgeSessionId`, gives the link that opens it: Claude Code's form, measured live",
+    async () => {
+      const dir = tmp('up');
+      register(dir);
+      assert.deepEqual(await bridgeIn(dir), { url: LINK });
+    },
+  );
 
-test('a registration of the session with no `bridgeSessionId` yet gives no link, and says why by naming the field', async () => {
-  const dir = tmp('down');
-  register(dir, { bridgeSessionId: undefined });
-  const got = await bridgeIn(dir);
-  assert.equal(got.url, null);
-  assert.match('why' in got ? got.why : '', /`bridgeSessionId` yet/);
-  register(dir, { bridgeSessionId: null });
-  assert.equal((await bridgeIn(dir)).url, null, 'a null is no id either');
-});
+  await t.test('a registration of the session with no `bridgeSessionId` yet gives no link, and says why by naming the field', async () => {
+    const dir = tmp('down');
+    register(dir, { bridgeSessionId: undefined });
+    const got = await bridgeIn(dir);
+    assert.equal(got.url, null);
+    assert.match('why' in got ? got.why : '', /`bridgeSessionId` yet/);
+    register(dir, { bridgeSessionId: null });
+    assert.equal((await bridgeIn(dir)).url, null, 'a null is no id either');
+  });
 
-test('a registration that is not the session gives no link, whatever bridgeSessionId it holds: each guard refuses its own', async () => {
-  const cases: [string, (dir: string) => void, RegExp][] = [
+  const stale: [string, (dir: string) => void, RegExp][] = [
     ['none for the pid', () => {}, /cannot be read/],
     ['another pid inside', (dir) => register(dir, { pid: PID + 1 }), /registers pid 4243, not 4242/],
     ['another session', (dir) => register(dir, { sessionId: 'another' }), /registers session "another" now/],
@@ -72,31 +75,37 @@ test('a registration that is not the session gives no link, whatever bridgeSessi
     ['no JSON', (dir) => fs.writeFileSync(path.join(dir, `${PID}.json`), '{'), /cannot be read/],
     ['JSON but no registration', (dir) => fs.writeFileSync(path.join(dir, `${PID}.json`), 'null'), /holds no registration/],
   ];
-  for (const [name, make, why] of cases) {
-    const dir = tmp('stale');
-    make(dir);
-    const got = await bridgeIn(dir);
-    assert.equal(got.url, null, `${name}: no link`);
-    assert.match('why' in got ? got.why : '', why, name);
-  }
-  const dir = tmp('theirs');
-  register(dir);
-  const theirs = await bridgeIn(dir, { uid: (process.getuid?.() ?? 0) + 1 });
-  assert.equal(theirs.url, null, 'a file another user owns: no link');
-  assert.match('why' in theirs ? theirs.why : '', /is owned by uid \d+, not by you/);
-});
+  for (const [name, make, why] of stale)
+    await t.test(`a registration that is not the session gives no link, whatever bridgeSessionId it holds: ${name}`, async () => {
+      const dir = tmp('stale');
+      make(dir);
+      const got = await bridgeIn(dir);
+      assert.equal(got.url, null, `${name}: no link`);
+      assert.match('why' in got ? got.why : '', why, name);
+    });
 
-test('a `bridgeSessionId` not of the form `session_…` is refused by name and quoted, and no link is built from it', async () => {
-  for (const id of ['sess-xyz', 'session_../evil', 'session_', 42, `session_${'x'.repeat(500)}!`]) {
-    const dir = tmp('malformed');
-    register(dir, { bridgeSessionId: id });
-    const got = await bridgeIn(dir);
-    assert.equal(got.url, null, `${JSON.stringify(id).slice(0, 20)}: no link`);
-    const why = 'why' in got ? got.why : '';
-    assert.match(why, /`bridgeSessionId` is /);
-    assert.ok(why.includes(JSON.stringify(id).slice(0, 40)), `the value is quoted: ${why}`);
-    assert.ok(why.length < 400, 'and cut: another party wrote it');
-  }
+  await t.test('a registration that is not the session gives no link: a file another user owns', async () => {
+    const dir = tmp('theirs');
+    register(dir);
+    const theirs = await bridgeIn(dir, { uid: (process.getuid?.() ?? 0) + 1 });
+    assert.equal(theirs.url, null, 'a file another user owns: no link');
+    assert.match('why' in theirs ? theirs.why : '', /is owned by uid \d+, not by you/);
+  });
+
+  for (const id of ['sess-xyz', 'session_../evil', 'session_', 42, `session_${'x'.repeat(500)}!`])
+    await t.test(
+      `a \`bridgeSessionId\` not of the form \`session_…\` is refused by name and quoted: ${JSON.stringify(id).slice(0, 20)}`,
+      async () => {
+        const dir = tmp('malformed');
+        register(dir, { bridgeSessionId: id });
+        const got = await bridgeIn(dir);
+        assert.equal(got.url, null, `${JSON.stringify(id).slice(0, 20)}: no link`);
+        const why = 'why' in got ? got.why : '';
+        assert.match(why, /`bridgeSessionId` is /);
+        assert.ok(why.includes(JSON.stringify(id).slice(0, 40)), `the value is quoted: ${why}`);
+        assert.ok(why.length < 400, 'and cut: another party wrote it');
+      },
+    );
 });
 
 type Row = { name: string; sessionId: string; state: string; status: string; startedAt: number; pid?: number };
@@ -164,47 +173,55 @@ const running = async (claudeFlags: { remoteControl: true } | undefined, rows: (
   return { engine, id, write };
 };
 
-test("a task filed bridged carries its session's link on its view while it is up, and says why not, never nothing, while it is not", async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const { engine, id, write } = await running({ remoteControl: true }, claude.rows);
-    const view = () => Effect.runPromise(engine.view(id));
+test("a task's view: its session's link while it is up, why not while it is not, and no bridge where none was asked", async (t) => {
+  await t.test(
+    "a task filed bridged carries its session's link on its view while it is up, and says why not, never nothing, while it is not",
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const { engine, id, write } = await running({ remoteControl: true }, claude.rows);
+        const view = () => Effect.runPromise(engine.view(id));
 
-    write();
-    assert.deepEqual((await view()).bridge, { url: LINK }, 'asked and up: the link');
+        write();
+        assert.deepEqual((await view()).bridge, { url: LINK }, 'asked and up: the link');
 
-    write({ bridgeSessionId: undefined });
-    const down = (await view()).bridge;
-    assert.equal(down?.url, null, 'asked and not up: no link');
-    assert.match(down && 'why' in down ? down.why : '', /`bridgeSessionId` yet/, 'and why, from the registration');
+        write({ bridgeSessionId: undefined });
+        const down = (await view()).bridge;
+        assert.equal(down?.url, null, 'asked and not up: no link');
+        assert.match(down && 'why' in down ? down.why : '', /`bridgeSessionId` yet/, 'and why, from the registration');
 
-    write({ sessionId: 'another' });
-    assert.equal((await view()).bridge?.url, null, "another session's registration under the pid gives none");
+        write({ sessionId: 'another' });
+        assert.equal((await view()).bridge?.url, null, "another session's registration under the pid gives none");
 
-    write();
-    claude.set({ pid: undefined });
-    const respawning = (await view()).bridge;
-    assert.equal(respawning?.url, null, 'a session listed with no process is not read');
-    assert.match(respawning && 'why' in respawning ? respawning.why : '', /no process of its session is seen/);
+        write();
+        claude.set({ pid: undefined });
+        const respawning = (await view()).bridge;
+        assert.equal(respawning?.url, null, 'a session listed with no process is not read');
+        assert.match(respawning && 'why' in respawning ? respawning.why : '', /no process of its session is seen/);
 
-    claude.set({ pid: process.pid });
-    assert.deepEqual((await view()).bridge, { url: LINK }, 'read afresh: the process back, the link back');
+        claude.set({ pid: process.pid });
+        assert.deepEqual((await view()).bridge, { url: LINK }, 'read afresh: the process back, the link back');
 
-    await Effect.runPromise(engine.stop(id));
-    for (let i = 0; i < 5 && !(await view()).state.settled; i++) await Effect.runPromise(engine.tick());
-    const ended = await view();
-    assert.ok(ended.state.settled, 'the task settled');
-    const gone = ended.bridge;
-    assert.equal(gone?.url, null, 'ended: no link');
-    assert.match(gone && 'why' in gone ? gone.why : '', /its session has ended/);
-  });
-});
+        await Effect.runPromise(engine.stop(id));
+        for (let i = 0; i < 5 && !(await view()).state.settled; i++) await Effect.runPromise(engine.tick());
+        const ended = await view();
+        assert.ok(ended.state.settled, 'the task settled');
+        const gone = ended.bridge;
+        assert.equal(gone?.url, null, 'ended: no link');
+        assert.match(gone && 'why' in gone ? gone.why : '', /its session has ended/);
+      });
+    },
+  );
 
-test('a task not filed bridged carries no bridge on its view, whatever its registration holds: only it is not bridged', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const { engine, id, write } = await running(undefined, claude.rows);
-    write();
-    assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(id)), 'bridge'), false);
-  });
+  await t.test(
+    'a task not filed bridged carries no bridge on its view, whatever its registration holds: only it is not bridged',
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const { engine, id, write } = await running(undefined, claude.rows);
+        write();
+        assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(id)), 'bridge'), false);
+      });
+    },
+  );
 });

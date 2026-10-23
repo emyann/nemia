@@ -42,6 +42,7 @@ import { codex } from '../src/harness/codex/codex.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { scratch } from './scratch.ts';
+import { story } from './checkpoints.ts';
 import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
@@ -188,113 +189,189 @@ const ran = async (t: Waiter, client: Client, r: SpawnRequest): Promise<Task> =>
   return get(client, r.name);
 };
 
-test("a Codex Task's context is its thread: empty until Codex prints it, the thread after — and listed by it", WAITED, async (t) => {
-  const root = tmp('store');
-  const cwd = workdir({ gate: 'go' });
-  const client = agent(root);
-  await send(client, { name: 'ae/c-ctx/1', brief: 'the brief', cwd, harness: 'codex' });
-  await holds(t, () => pidIn(cwd, 'pid') > 0, 'the fake codex started');
-  const before = await get(client, 'ae/c-ctx/1');
-  assert.equal(before.status!.state, TaskState.TASK_STATE_WORKING);
-  assert.equal(before.contextId, '', 'no context is known before `thread.started`: nothing is invented');
-  assert.deepEqual((await list(client, { contextId: THREAD })).tasks, [], 'nor listed under a thread not yet printed');
-
-  fs.writeFileSync(path.join(cwd, 'go'), '');
-  await holds(t, async () => (await get(client, 'ae/c-ctx/1')).contextId === THREAD, 'the thread read as the context');
-  await holds(t, () => stateIs(client, 'ae/c-ctx/1', TaskState.TASK_STATE_COMPLETED), 'completed');
-  assert.equal((await get(client, 'ae/c-ctx/1')).contextId, THREAD, 'and kept once it ended');
-  assert.deepEqual(
-    (await list(client, { contextId: THREAD })).tasks.map((t) => t.id),
-    ['ae/c-ctx/1'],
-  );
-  assert.deepEqual((await list(client, { contextId: 'another-thread' })).tasks, []);
-});
-
 test(
-  "a Codex session's closing statement is its Task's one Artifact: JSON off `-o` as data, prose as text/plain — and a listing carries it only when asked",
+  'a Codex session through the seam: its thread is its context, its statement its one Artifact, a cancel ends what it started, and it takes no words while it runs but streams',
   WAITED,
   async (t) => {
-    const root = tmp('store');
-    const client = agent(root);
+    const s = story(t);
+    await s.test("a Codex Task's context is its thread: empty until Codex prints it, the thread after — and listed by it", async (t) => {
+      const root = tmp('store');
+      const cwd = workdir({ gate: 'go' });
+      const client = agent(root);
+      await send(client, { name: 'ae/c-ctx/1', brief: 'the brief', cwd, harness: 'codex' });
+      await holds(t, () => pidIn(cwd, 'pid') > 0, 'the fake codex started');
+      const before = await get(client, 'ae/c-ctx/1');
+      assert.equal(before.status!.state, TaskState.TASK_STATE_WORKING);
+      assert.equal(before.contextId, '', 'no context is known before `thread.started`: nothing is invented');
+      assert.deepEqual((await list(client, { contextId: THREAD })).tasks, [], 'nor listed under a thread not yet printed');
 
-    const done = await ran(t, client, { name: 'ae/c-art/1', brief: 'b', cwd: workdir(), harness: 'codex', closeoutSchema: SCHEMA });
-    assert.equal(done.artifacts.length, 1);
-    const [artifact] = done.artifacts;
-    assert.equal(artifact.artifactId, 'closeout');
-    assert.equal(artifact.parts[0].content!.$case, 'data');
-    assert.deepEqual(closeoutOf(done), { outcome: 'done', summary: 'turn 1' });
-    assert.equal(artifact.metadata?.at, undefined, "no time: the spawn cleared Codex's `-o` file before the run, so it is the run's own");
-
-    assert.deepEqual(
-      (await list(client)).tasks.map((t) => [t.id, t.artifacts]),
-      [['ae/c-art/1', []]],
-      "A2A's default leaves it out of a listing",
-    );
-    assert.deepEqual(
-      (await list(client, { includeArtifacts: true })).tasks.map((t) => t.artifacts),
-      [done.artifacts],
-      'and includeArtifacts puts it in',
-    );
-
-    const prose = await ran(t, client, {
-      name: 'ae/c-art/2',
-      brief: 'b',
-      cwd: workdir({ prose: true }),
-      harness: 'codex',
-      closeoutSchema: SCHEMA,
+      fs.writeFileSync(path.join(cwd, 'go'), '');
+      await holds(t, async () => (await get(client, 'ae/c-ctx/1')).contextId === THREAD, 'the thread read as the context');
+      await holds(t, () => stateIs(client, 'ae/c-ctx/1', TaskState.TASK_STATE_COMPLETED), 'completed');
+      assert.equal((await get(client, 'ae/c-ctx/1')).contextId, THREAD, 'and kept once it ended');
+      assert.deepEqual(
+        (await list(client, { contextId: THREAD })).tasks.map((t) => t.id),
+        ['ae/c-ctx/1'],
+      );
+      assert.deepEqual((await list(client, { contextId: 'another-thread' })).tasks, []);
     });
-    assert.equal(prose.artifacts.length, 1);
-    assert.equal(prose.artifacts[0].parts[0].content!.$case, 'text');
-    assert.equal(prose.artifacts[0].parts[0].mediaType, 'text/plain');
-    assert.equal(closeoutOf(prose), 'turn 1, in prose');
 
-    const plain = workdir();
-    const unasked = await ran(t, client, { name: 'ae/c-art/3', brief: 'b', cwd: plain, harness: 'codex' });
-    assert.equal(argvOf(plain)[0].includes('-o'), false, 'no statement asked for, no `-o`');
-    assert.deepEqual(unasked.artifacts, [], 'and no Artifact');
-  },
-);
+    await s.test(
+      "a Codex session's closing statement is its Task's one Artifact: JSON off `-o` as data, prose as text/plain — and a listing carries it only when asked",
+      async (t) => {
+        const root = tmp('store');
+        const client = agent(root);
 
-test(
-  'cancelTask ends a working Codex session and what it started, answers CANCELED again once stopped, and refuses a session that finished on its own',
-  WAITED,
-  async (t) => {
-    const root = tmp('store');
-    const cwd = workdir({ grandchild: true, sleepMs: 30_000 });
-    const client = agent(root);
-    await send(client, { name: 'ae/c-stop/1', brief: 'b', cwd, harness: 'codex' });
-    await holds(t, async () => (await get(client, 'ae/c-stop/1')).contextId === THREAD, 'the thread printed');
-    const harness = pidIn(cwd, 'pid');
-    const grandchild = pidIn(cwd, 'grandchild');
-    assert.ok(harness > 0 && grandchild > 0 && alive(harness) && alive(grandchild), 'the fake and its own child run');
+        const done = await ran(t, client, { name: 'ae/c-art/1', brief: 'b', cwd: workdir(), harness: 'codex', closeoutSchema: SCHEMA });
+        assert.equal(done.artifacts.length, 1);
+        const [artifact] = done.artifacts;
+        assert.equal(artifact.artifactId, 'closeout');
+        assert.equal(artifact.parts[0].content!.$case, 'data');
+        assert.deepEqual(closeoutOf(done), { outcome: 'done', summary: 'turn 1' });
+        assert.equal(
+          artifact.metadata?.at,
+          undefined,
+          "no time: the spawn cleared Codex's `-o` file before the run, so it is the run's own",
+        );
 
-    const canceled = await client.cancelTask({ tenant: '', id: 'ae/c-stop/1', metadata: undefined });
-    assert.equal(canceled.status!.state, TaskState.TASK_STATE_CANCELED);
-    assert.equal(canceled.contextId, THREAD);
-    await holds(t, () => stateIs(client, 'ae/c-stop/1', TaskState.TASK_STATE_CANCELED), 'read CANCELED');
-    await holds(t, () => !alive(harness), 'the harness ended');
-    await holds(t, () => !alive(grandchild), 'what the harness started ended with it: its process group was killed');
-    const again = await client.cancelTask({ tenant: '', id: 'ae/c-stop/1', metadata: undefined });
-    assert.equal(again.status!.state, TaskState.TASK_STATE_CANCELED, 'a repeat cancel is answered as the first, as A2A answers one');
+        assert.deepEqual(
+          (await list(client)).tasks.map((t) => [t.id, t.artifacts]),
+          [['ae/c-art/1', []]],
+          "A2A's default leaves it out of a listing",
+        );
+        assert.deepEqual(
+          (await list(client, { includeArtifacts: true })).tasks.map((t) => t.artifacts),
+          [done.artifacts],
+          'and includeArtifacts puts it in',
+        );
 
-    await ran(t, client, { name: 'ae/c-stop/2', brief: 'b', cwd: workdir(), harness: 'codex' });
-    await assert.rejects(
-      client.cancelTask({ tenant: '', id: 'ae/c-stop/2', metadata: undefined }),
-      (e: Error) =>
-        e.constructor.name === 'TaskNotCancelableError' &&
-        e.message === 'session `ae/c-stop/2` has ended (done): there is nothing to stop.',
+        const prose = await ran(t, client, {
+          name: 'ae/c-art/2',
+          brief: 'b',
+          cwd: workdir({ prose: true }),
+          harness: 'codex',
+          closeoutSchema: SCHEMA,
+        });
+        assert.equal(prose.artifacts.length, 1);
+        assert.equal(prose.artifacts[0].parts[0].content!.$case, 'text');
+        assert.equal(prose.artifacts[0].parts[0].mediaType, 'text/plain');
+        assert.equal(closeoutOf(prose), 'turn 1, in prose');
+
+        const plain = workdir();
+        const unasked = await ran(t, client, { name: 'ae/c-art/3', brief: 'b', cwd: plain, harness: 'codex' });
+        assert.equal(argvOf(plain)[0].includes('-o'), false, 'no statement asked for, no `-o`');
+        assert.deepEqual(unasked.artifacts, [], 'and no Artifact');
+      },
     );
-    assert.equal((await get(client, 'ae/c-stop/2')).status!.state, TaskState.TASK_STATE_COMPLETED, 'and it is left as it ended');
 
-    const early = workdir({ sleepMs: 30_000 });
-    await send(client, { name: 'ae/c-stop/3', brief: 'b', cwd: early, harness: 'codex' });
-    assert.equal(
-      (await client.cancelTask({ tenant: '', id: 'ae/c-stop/3', metadata: undefined })).status!.state,
-      TaskState.TASK_STATE_CANCELED,
+    await s.test(
+      'cancelTask ends a working Codex session and what it started, answers CANCELED again once stopped, and refuses a session that finished on its own',
+      async (t) => {
+        const root = tmp('store');
+        const cwd = workdir({ grandchild: true, sleepMs: 30_000 });
+        const client = agent(root);
+        await send(client, { name: 'ae/c-stop/1', brief: 'b', cwd, harness: 'codex' });
+        await holds(t, async () => (await get(client, 'ae/c-stop/1')).contextId === THREAD, 'the thread printed');
+        const harness = pidIn(cwd, 'pid');
+        const grandchild = pidIn(cwd, 'grandchild');
+        assert.ok(harness > 0 && grandchild > 0 && alive(harness) && alive(grandchild), 'the fake and its own child run');
+
+        const canceled = await client.cancelTask({ tenant: '', id: 'ae/c-stop/1', metadata: undefined });
+        assert.equal(canceled.status!.state, TaskState.TASK_STATE_CANCELED);
+        assert.equal(canceled.contextId, THREAD);
+        await holds(t, () => stateIs(client, 'ae/c-stop/1', TaskState.TASK_STATE_CANCELED), 'read CANCELED');
+        await holds(t, () => !alive(harness), 'the harness ended');
+        await holds(t, () => !alive(grandchild), 'what the harness started ended with it: its process group was killed');
+        const again = await client.cancelTask({ tenant: '', id: 'ae/c-stop/1', metadata: undefined });
+        assert.equal(again.status!.state, TaskState.TASK_STATE_CANCELED, 'a repeat cancel is answered as the first, as A2A answers one');
+
+        await ran(t, client, { name: 'ae/c-stop/2', brief: 'b', cwd: workdir(), harness: 'codex' });
+        await assert.rejects(
+          client.cancelTask({ tenant: '', id: 'ae/c-stop/2', metadata: undefined }),
+          (e: Error) =>
+            e.constructor.name === 'TaskNotCancelableError' &&
+            e.message === 'session `ae/c-stop/2` has ended (done): there is nothing to stop.',
+        );
+        assert.equal((await get(client, 'ae/c-stop/2')).status!.state, TaskState.TASK_STATE_COMPLETED, 'and it is left as it ended');
+
+        const early = workdir({ sleepMs: 30_000 });
+        await send(client, { name: 'ae/c-stop/3', brief: 'b', cwd: early, harness: 'codex' });
+        assert.equal(
+          (await client.cancelTask({ tenant: '', id: 'ae/c-stop/3', metadata: undefined })).status!.state,
+          TaskState.TASK_STATE_CANCELED,
+        );
+        await holds(t, () => stateIs(client, 'ae/c-stop/3', TaskState.TASK_STATE_CANCELED), 'a cancel sent at once read CANCELED');
+        const started = pidIn(early, 'pid');
+        assert.ok(!(started > 0 && alive(started)), 'and no harness is left running');
+      },
     );
-    await holds(t, () => stateIs(client, 'ae/c-stop/3', TaskState.TASK_STATE_CANCELED), 'a cancel sent at once read CANCELED');
-    const started = pidIn(early, 'pid');
-    assert.ok(!(started > 0 && alive(started)), 'and no harness is left running');
+
+    await s.test(
+      'what `codex exec` cannot take while it runs: its card says no words, and a follow-up is refused, naming the spawn in its context once it has ended — nothing written to it; and that spawn resumes it',
+      async (t) => {
+        const root = tmp('store');
+        const ops = detachedOps(codex, root);
+        const card = cardOf('codex', ops);
+        assert.ok(card.capabilities, 'its card says what it can do');
+        assert.equal(card.capabilities.streaming, true, 'its card says it streams: a session is followed from its stdout and its rollout');
+        const extension = card.capabilities.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
+        assert.deepEqual(extension.params, {
+          methods: ['sessionLogs', 'sessionOutput', 'sessionTranscript', 'observeSessions', 'forgetSession', 'sessionKept'],
+          say: false,
+        });
+
+        const cwd = workdir({ gate: 'go' });
+        const client = agent(root);
+        await send(client, { name: 'ae/c-say/1', brief: 'b', cwd, harness: 'codex' });
+        await holds(
+          t,
+          async () => (await get(client, 'ae/c-say/1')).status!.state === TaskState.TASK_STATE_WORKING && pidIn(cwd, 'pid') > 0,
+          'working',
+        );
+        const subscribed = client.resubscribeTask({ tenant: '', id: 'ae/c-say/1' });
+        const first = await subscribed.next();
+        const opened = first.value?.payload?.$case === 'task' ? first.value.payload.value : undefined;
+        assert.equal(
+          opened?.status?.state,
+          TaskState.TASK_STATE_WORKING,
+          'a subscription to the working session is answered: its Task, working',
+        );
+        await assert.rejects(
+          client.sendMessage({
+            tenant: '',
+            message: followUpOf('ae/c-say/1', 'hello', 'm-said'),
+            metadata: undefined,
+            configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
+          }),
+          (e: Error) =>
+            e instanceof UnsupportedOperationError &&
+            e.message ===
+              "the `codex` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session's contextId.",
+        );
+        const runs = fs.readdirSync(path.join(root, 'runs', 'codex'));
+        assert.equal(
+          runs.some((f) => f.endsWith('.inbox.jsonl')),
+          false,
+          'no inbox written',
+        );
+        const run = JSON.parse(fs.readFileSync(path.join(root, 'runs', 'codex', 'ae_c_say_1.json'), 'utf8')) as Record<string, unknown>;
+        assert.equal('input' in run, false, 'and the worker holds no way in: its stdin is not open');
+        fs.writeFileSync(path.join(cwd, 'go'), '');
+        const states: TaskState[] = [];
+        for await (const r of subscribed) {
+          if (r.payload?.$case === 'task' || r.payload?.$case === 'statusUpdate') states.push(r.payload.value.status!.state);
+        }
+        assert.equal(states.at(-1), TaskState.TASK_STATE_COMPLETED, 'the subscription read to its end: the session completed');
+        await holds(t, () => stateIs(client, 'ae/c-say/1', TaskState.TASK_STATE_COMPLETED), 'completed');
+
+        const context = (await get(client, 'ae/c-say/1')).contextId;
+        assert.equal(context, THREAD);
+        const next = await ran(t, client, { name: 'ae/c-say/2', brief: 'hello', cwd, harness: 'codex', resumeFrom: context });
+        assert.deepEqual(argvOf(cwd)[1].slice(-3), ['resume', THREAD, 'hello'], 'the words reach the same thread, as a turn of its own');
+        assert.equal(next.contextId, THREAD, 'in the same context');
+        assert.deepEqual((await list(client, { contextId: THREAD })).tasks.map((t) => t.id).sort(), ['ae/c-say/1', 'ae/c-say/2']);
+      },
+    );
   },
 );
 
@@ -418,73 +495,5 @@ test(
     await holds(t, () => phase('input-required'), 'turn 1 signed and waiting');
     await Effect.runPromise(engine.close(id));
     await holds(t, () => phase('succeeded'), 'closed and settled');
-  },
-);
-
-test(
-  'what `codex exec` cannot take while it runs: its card says no words, and a follow-up is refused, naming the spawn in its context once it has ended — nothing written to it; and that spawn resumes it',
-  WAITED,
-  async (t) => {
-    const root = tmp('store');
-    const ops = detachedOps(codex, root);
-    const card = cardOf('codex', ops);
-    assert.ok(card.capabilities, 'its card says what it can do');
-    assert.equal(card.capabilities.streaming, true, 'its card says it streams: a session is followed from its stdout and its rollout');
-    const extension = card.capabilities.extensions.find((e) => e.uri === RUNTIME_EXTENSION)!;
-    assert.deepEqual(extension.params, {
-      methods: ['sessionLogs', 'sessionOutput', 'sessionTranscript', 'observeSessions', 'forgetSession', 'sessionKept'],
-      say: false,
-    });
-
-    const cwd = workdir({ gate: 'go' });
-    const client = agent(root);
-    await send(client, { name: 'ae/c-say/1', brief: 'b', cwd, harness: 'codex' });
-    await holds(
-      t,
-      async () => (await get(client, 'ae/c-say/1')).status!.state === TaskState.TASK_STATE_WORKING && pidIn(cwd, 'pid') > 0,
-      'working',
-    );
-    const subscribed = client.resubscribeTask({ tenant: '', id: 'ae/c-say/1' });
-    const first = await subscribed.next();
-    const opened = first.value?.payload?.$case === 'task' ? first.value.payload.value : undefined;
-    assert.equal(
-      opened?.status?.state,
-      TaskState.TASK_STATE_WORKING,
-      'a subscription to the working session is answered: its Task, working',
-    );
-    await assert.rejects(
-      client.sendMessage({
-        tenant: '',
-        message: followUpOf('ae/c-say/1', 'hello', 'm-said'),
-        metadata: undefined,
-        configuration: { acceptedOutputModes: [], taskPushNotificationConfig: undefined, returnImmediately: true },
-      }),
-      (e: Error) =>
-        e instanceof UnsupportedOperationError &&
-        e.message ===
-          "the `codex` harness has no channel into a running session: it takes no words once a session has started. Once this session has ended, go on with its conversation by spawning a session of its own — a message marked `urn:agent-runtime:session:v1` — in this session's contextId.",
-    );
-    const runs = fs.readdirSync(path.join(root, 'runs', 'codex'));
-    assert.equal(
-      runs.some((f) => f.endsWith('.inbox.jsonl')),
-      false,
-      'no inbox written',
-    );
-    const run = JSON.parse(fs.readFileSync(path.join(root, 'runs', 'codex', 'ae_c_say_1.json'), 'utf8')) as Record<string, unknown>;
-    assert.equal('input' in run, false, 'and the worker holds no way in: its stdin is not open');
-    fs.writeFileSync(path.join(cwd, 'go'), '');
-    const states: TaskState[] = [];
-    for await (const r of subscribed) {
-      if (r.payload?.$case === 'task' || r.payload?.$case === 'statusUpdate') states.push(r.payload.value.status!.state);
-    }
-    assert.equal(states.at(-1), TaskState.TASK_STATE_COMPLETED, 'the subscription read to its end: the session completed');
-    await holds(t, () => stateIs(client, 'ae/c-say/1', TaskState.TASK_STATE_COMPLETED), 'completed');
-
-    const context = (await get(client, 'ae/c-say/1')).contextId;
-    assert.equal(context, THREAD);
-    const next = await ran(t, client, { name: 'ae/c-say/2', brief: 'hello', cwd, harness: 'codex', resumeFrom: context });
-    assert.deepEqual(argvOf(cwd)[1].slice(-3), ['resume', THREAD, 'hello'], 'the words reach the same thread, as a turn of its own');
-    assert.equal(next.contextId, THREAD, 'in the same context');
-    assert.deepEqual((await list(client, { contextId: THREAD })).tasks.map((t) => t.id).sort(), ['ae/c-say/1', 'ae/c-say/2']);
   },
 );

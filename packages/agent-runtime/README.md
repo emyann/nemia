@@ -2054,7 +2054,7 @@ sighting gave it — its session's id — is on the record too, the handle its h
 a check's `logs` (its verdict) are read by. Before, a harness that cannot `find` was observed on every view of a task settled
 days ago: with 192 runs in the store, a pass of the tick made 183 observes, 171 of them the `check` harness listing about
 300 run files each — 52,497 listings and about 1.5 s every 4 s. A pass now observes the `check` harness once, and once
-more for each check in flight (`test/settled-view.test.ts`). `find` itself took about 2 ms to find
+more for each check in flight (`test/io.test.ts`). `find` itself took about 2 ms to find
 a session and 6 ms to find none among the 21 registrations there.
 
 **A registration outlives its process** — 18 of those 21 had none — so one is taken only when it is a file this user

@@ -17,6 +17,7 @@ import type { RunnerOps } from '../src/harness/seam.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
 import { scratch } from './scratch.ts';
+import { story } from './checkpoints.ts';
 
 /**
  * A journal in memory and a harness whose sessions a test moves by hand: what outlives a runtime's process. With
@@ -88,48 +89,62 @@ const listing = {
   includeArtifacts: false,
 };
 
-test('a restarted runtime answers for a session it never started, then stops it and settles, before and after a tick', async () => {
+test('a restarted runtime answers for a session it never started, then stops it and settles, before and after a tick', async (t) => {
+  const s = story(t);
   const w = world();
   const a = w.runtime();
-  const id = await Effect.runPromise(a.file(filing));
-  await Effect.runPromise(a.tick());
-  assert.deepEqual(w.sessions.get('ae/t-r/1'), { sessionId: 's-1', state: 'working', busy: true, nativeId: 's-1' });
+  let id = '';
+  let b = a;
 
-  const b = w.runtime();
-  const fresh = w.client();
-  const task = await fresh.getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
-  assert.equal(
-    task.status!.state,
-    TaskState.TASK_STATE_WORKING,
-    'the first runtime gone, the second not yet ticked: an agent that holds nothing answers off the harness',
-  );
-  assert.deepEqual(sightingOf(task), w.sessions.get('ae/t-r/1'));
-  const listed = await fresh.listTasks(listing);
-  assert.deepEqual(
-    listed.tasks.map((t) => [t.id, t.contextId, t.status!.state]),
-    [['ae/t-r/1', 's-1', TaskState.TASK_STATE_WORKING]],
+  await s.test('the first runtime files the task and spawns its session', async () => {
+    id = await Effect.runPromise(a.file(filing));
+    await Effect.runPromise(a.tick());
+    assert.deepEqual(w.sessions.get('ae/t-r/1'), { sessionId: 's-1', state: 'working', busy: true, nativeId: 's-1' });
+  });
+
+  await s.test(
+    'the first runtime gone, the second not yet ticked: an agent that holds nothing answers off the harness, by id and by its context',
+    async () => {
+      b = w.runtime();
+      const fresh = w.client();
+      const task = await fresh.getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
+      assert.equal(task.status!.state, TaskState.TASK_STATE_WORKING);
+      assert.deepEqual(sightingOf(task), w.sessions.get('ae/t-r/1'));
+      const listed = await fresh.listTasks(listing);
+      assert.deepEqual(
+        listed.tasks.map((t) => [t.id, t.contextId, t.status!.state]),
+        [['ae/t-r/1', 's-1', TaskState.TASK_STATE_WORKING]],
+      );
+    },
   );
 
-  await Effect.runPromise(b.stop(id));
-  w.asked.length = 0;
-  await Effect.runPromise(b.tick());
-  assert.deepEqual(
-    w.asked,
-    [
-      ['observe', undefined],
-      ['observe', undefined],
-      ['stop', 's-1'],
-    ],
-    "the second runtime's pass observes; then its agent, asked to cancel, observes to find the session and stops it on the harness",
+  await s.test(
+    "asked to stop, the second runtime's pass observes, finds the session through its agent and stops it on the harness; the next settles it",
+    async () => {
+      await Effect.runPromise(b.stop(id));
+      w.asked.length = 0;
+      await Effect.runPromise(b.tick());
+      assert.deepEqual(
+        w.asked,
+        [
+          ['observe', undefined],
+          ['observe', undefined],
+          ['stop', 's-1'],
+        ],
+        "the second runtime's pass observes; then its agent, asked to cancel, observes to find the session and stops it on the harness",
+      );
+      assert.equal(w.sessions.get('ae/t-r/1')!.state, 'canceled');
+      await Effect.runPromise(b.tick());
+      assert.equal((await Effect.runPromise(b.view(id))).phase, 'stopped');
+    },
   );
-  assert.equal(w.sessions.get('ae/t-r/1')!.state, 'canceled');
-  await Effect.runPromise(b.tick());
-  assert.equal((await Effect.runPromise(b.view(id))).phase, 'stopped');
 
-  w.sessions.delete('ae/t-r/1');
-  const after = await w.client().getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
-  assert.equal(after.status!.state, TaskState.TASK_STATE_CANCELED, 'the harness let the session go: the journal answers for it');
-  assert.equal((after.metadata!.attempt as { reason: string }).reason, 'operator');
+  await s.test('the harness let the session go: the journal answers for it, canceled by the operator', async () => {
+    w.sessions.delete('ae/t-r/1');
+    const after = await w.client().getTask({ tenant: '', id: 'ae/t-r/1', historyLength: undefined });
+    assert.equal(after.status!.state, TaskState.TASK_STATE_CANCELED);
+    assert.equal((after.metadata!.attempt as { reason: string }).reason, 'operator');
+  });
 });
 
 test('a spawn the runtime died inside is adopted by the next one by name, never started twice', async () => {

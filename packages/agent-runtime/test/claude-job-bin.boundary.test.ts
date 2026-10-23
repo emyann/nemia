@@ -77,55 +77,57 @@ const alive = (pid: number): boolean => {
   }
 };
 
-test("a job's session is denied by Claude Code, and a session with no result leaves 1 saying so", WAITED, async () => {
-  const dir = scratch('ae-job-bin-');
-  const claude = standIn(dir, 'process.exit(0);');
-  const at = requestFile(dir, { name: 'ae/t/1', brief: 'say it', cwd: dir, config: { tools: ['Read'] } });
+test('the job bin, run as the worker runs it: denied by Claude Code, refused before it starts, ended by a SIGTERM', WAITED, async (t) => {
+  await t.test("a job's session is denied by Claude Code, and a session with no result leaves 1 saying so", async () => {
+    const dir = scratch('ae-job-bin-');
+    const claude = standIn(dir, 'process.exit(0);');
+    const at = requestFile(dir, { name: 'ae/t/1', brief: 'say it', cwd: dir, config: { tools: ['Read'] } });
 
-  const { code, err } = await ranBin(at, { AE_CLAUDE_EXECUTABLE: claude });
+    const { code, err } = await ranBin(at, { AE_CLAUDE_EXECUTABLE: claude });
 
-  const argv = JSON.parse(fs.readFileSync(path.join(dir, 'argv.json'), 'utf8')) as string[];
-  assert.equal(
-    sdkArgValue(argv, '--permission-prompts'),
-    'none',
-    `Claude Code answers its own prompts, so nothing is asked of a process that would die with its answer: ${argv.join(' ')}`,
-  );
-  assert.equal(code, 1, `a session that gave no result is no session that said nothing: ${err}`);
-  assert.match(err, /no result line/, err);
-});
-
-test('a request the options refuse starts no Claude Code, and the bin leaves 1 in the refusal’s words', WAITED, async () => {
-  const dir = scratch('ae-job-bin-');
-  const claude = standIn(dir, 'process.exit(0);');
-  const at = requestFile(dir, {
-    name: 'ae/t/2',
-    brief: 'b',
-    cwd: dir,
-    config: { claude: { appendSystemPromptFile: 'a.md', systemPromptFile: 'b.md' } },
+    const argv = JSON.parse(fs.readFileSync(path.join(dir, 'argv.json'), 'utf8')) as string[];
+    assert.equal(
+      sdkArgValue(argv, '--permission-prompts'),
+      'none',
+      `Claude Code answers its own prompts, so nothing is asked of a process that would die with its answer: ${argv.join(' ')}`,
+    );
+    assert.equal(code, 1, `a session that gave no result is no session that said nothing: ${err}`);
+    assert.match(err, /no result line/, err);
   });
 
-  const { code, err } = await ranBin(at, { AE_CLAUDE_EXECUTABLE: claude });
+  await t.test('a request the options refuse starts no Claude Code, and the bin leaves 1 in the refusal’s words', async () => {
+    const dir = scratch('ae-job-bin-');
+    const claude = standIn(dir, 'process.exit(0);');
+    const at = requestFile(dir, {
+      name: 'ae/t/2',
+      brief: 'b',
+      cwd: dir,
+      config: { claude: { appendSystemPromptFile: 'a.md', systemPromptFile: 'b.md' } },
+    });
 
-  assert.equal(code, 1, err);
-  assert.match(err, /appendSystemPromptFile/, 'the refusal names the first flag');
-  assert.match(err, /systemPromptFile/, 'and the second');
-  assert.equal(fs.existsSync(path.join(dir, 'argv.json')), false, 'and no Claude Code was started');
-});
+    const { code, err } = await ranBin(at, { AE_CLAUDE_EXECUTABLE: claude });
 
-test('a SIGTERM ends the session: the bin leaves, and the Claude Code it started is gone with it', WAITED, async (t) => {
-  const dir = scratch('ae-job-bin-');
-  const pidFile = path.join(dir, 'claude.pid');
-  const claude = standIn(dir, `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\nsetInterval(() => {}, 1000);`);
-  const at = requestFile(dir, { name: 'ae/t/3', brief: 'b', cwd: dir, config: {} });
+    assert.equal(code, 1, err);
+    assert.match(err, /appendSystemPromptFile/, 'the refusal names the first flag');
+    assert.match(err, /systemPromptFile/, 'and the second');
+    assert.equal(fs.existsSync(path.join(dir, 'argv.json')), false, 'and no Claude Code was started');
+  });
 
-  let bin = 0;
-  const ending = ranBin(at, { AE_CLAUDE_EXECUTABLE: claude }, (pid) => (bin = pid));
-  await until(t, () => fs.existsSync(pidFile), 'the session’s Claude Code started', { everyMs: 50 });
-  const child = Number(fs.readFileSync(pidFile, 'utf8'));
-  assert.ok(alive(child), 'it is running');
+  await t.test('a SIGTERM ends the session: the bin leaves, and the Claude Code it started is gone with it', async (t) => {
+    const dir = scratch('ae-job-bin-');
+    const pidFile = path.join(dir, 'claude.pid');
+    const claude = standIn(dir, `fs.writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));\nsetInterval(() => {}, 1000);`);
+    const at = requestFile(dir, { name: 'ae/t/3', brief: 'b', cwd: dir, config: {} });
 
-  process.kill(bin, 'SIGTERM');
-  const { code, signal } = await ending;
-  assert.ok(code !== 0, `the stop is no success: ${code} ${signal}`);
-  await until(t, () => !alive(child), 'the Claude Code it started is gone with it', { everyMs: 50 });
+    let bin = 0;
+    const ending = ranBin(at, { AE_CLAUDE_EXECUTABLE: claude }, (pid) => (bin = pid));
+    await until(t, () => fs.existsSync(pidFile), 'the session’s Claude Code started', { everyMs: 50 });
+    const child = Number(fs.readFileSync(pidFile, 'utf8'));
+    assert.ok(alive(child), 'it is running');
+
+    process.kill(bin, 'SIGTERM');
+    const { code, signal } = await ending;
+    assert.ok(code !== 0, `the stop is no success: ${code} ${signal}`);
+    await until(t, () => !alive(child), 'the Claude Code it started is gone with it', { everyMs: 50 });
+  });
 });

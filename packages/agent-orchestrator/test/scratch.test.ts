@@ -93,8 +93,8 @@ const repoFilesApart = (root: string): string[] =>
     apartFrom(root, `packages/agent-orchestrator/test/${name}`, [`tools/guards/test/${name}`]),
   );
 
-/** The copies of the orchestrator's story checkpoints under `root`, in the api and the web, where one is not the original. */
-const CHECKPOINT_COPIES = ['apps/api/test/checkpoints.ts', 'apps/web/test/checkpoints.ts'];
+/** The copies of the orchestrator's story checkpoints under `root`, in the api, the web and the runtime, where one is not the original. */
+const CHECKPOINT_COPIES = ['apps/api/test/checkpoints.ts', 'apps/web/test/checkpoints.ts', 'packages/agent-runtime/test/checkpoints.ts'];
 const checkpointsApart = (root: string): string[] => apartFrom(root, 'packages/agent-orchestrator/test/checkpoints.ts', CHECKPOINT_COPIES);
 
 /** A root whose workspaces are the runtime and the guards, each file of `files` written under it. */
@@ -120,6 +120,7 @@ test("REFUSED: a copy of the helper, or of the repository's files, one byte apar
     'packages/agent-orchestrator/test/checkpoints.ts': 'export const d = 1;\n',
     'apps/api/test/checkpoints.ts': 'export const d = 1;\n',
     'apps/web/test/checkpoints.ts': 'export const d = 1; \n',
+    'packages/agent-runtime/test/checkpoints.ts': 'export const d = 1;\n',
   });
   assert.deepEqual(scratchApart(root), ['tools/guards/test/scratch.ts']);
   assert.deepEqual(repoFilesApart(root), ['tools/guards/test/repo-files.ts']);
@@ -143,7 +144,7 @@ test("the guards' copies of the repository's files and workspaces are the orches
   );
 });
 
-test("the api's and the web's copies of the story checkpoints are the orchestrator's, byte for byte", () => {
+test("the api's, the web's and the runtime's copies of the story checkpoints are the orchestrator's, byte for byte", () => {
   assert.deepEqual(
     checkpointsApart(REPO),
     [],

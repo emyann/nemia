@@ -17,6 +17,7 @@ import { instantNow } from '../src/core/engine/now.ts';
 import { elapsedMs } from '../src/core/clock.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';
 import { scratch } from './scratch.ts';
+import { story } from './checkpoints.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
@@ -58,56 +59,73 @@ const onDisk = (root: string) =>
     .map((f) => (fs.existsSync(path.join(root, f)) ? fs.readFileSync(path.join(root, f), 'utf8') : ''))
     .join('');
 
-test('a reader parked at line 7 and one at line 20 each read on across a rotation: the lines kept, in order, once, the forgotten counted', async () => {
+test('a feed is rotated by two forgets while readers are parked in it: each reads on, the lines kept, in order, once, the forgotten counted', async (t) => {
+  const s = story(t);
   const { root, ops, head, sealed } = await store();
-  const at7 = cursorAfter(head, 7);
-  const at20 = cursorAfter(head, 20);
-  const was7 = await read(ops, at7);
-  const was20 = await read(ops, at20);
-  const aLines = (from: number) => [...Array(30).keys()].map((i) => i + 1).filter((n) => n > from && ownerOf(n) === 'a').length;
+  const lines = [...Array(30).keys()].map((i) => i + 1);
+  const linesAfterOf = (ids: readonly string[], from = 0) => lines.filter((n) => n > from && ids.includes(ownerOf(n))).length;
+  const parked = [5, 7, 20].map((n) => ({ n, at: cursorAfter(head, n) }));
+  const was = new Map<number, Awaited<ReturnType<typeof read>>>();
+  for (const { n, at } of parked) was.set(n, await read(ops, at));
 
-  const rotated = await forget(ops, ['a']);
-  assert.equal(rotated?.linesForgotten, aLines(0), "every line of a's");
-  assert.ok(rotated && rotated.bytesAfter < rotated.bytesBefore, `the feed shrank: ${JSON.stringify(rotated)}`);
-  assert.ok(fs.readFileSync(head, 'utf8').startsWith('{"feedBase":'), 'the head begins with its first cursor');
-  assert.equal(fs.readFileSync(head, 'utf8').indexOf('\n'), HEADER_BYTES - 1);
-  assert.ok(fs.existsSync(sealed), 'the lines before it are sealed');
-  assert.ok(!onDisk(root).includes('"taskId":"a"'), "no line of a's is left on disk");
-  assert.ok(!fs.existsSync(path.join(root, 'tasks', 'a.jsonl')), "and a's journal is gone");
+  await s.test(
+    "a forget of a rotates the feed: every line of a's is gone from the disk, and the lines before the rotation are sealed",
+    async () => {
+      const rotated = await forget(ops, ['a']);
+      assert.equal(rotated?.linesForgotten, linesAfterOf(['a']), "every line of a's");
+      assert.ok(rotated && rotated.bytesAfter < rotated.bytesBefore, `the feed shrank: ${JSON.stringify(rotated)}`);
+      assert.ok(fs.readFileSync(head, 'utf8').startsWith('{"feedBase":'), 'the head begins with its first cursor');
+      assert.equal(fs.readFileSync(head, 'utf8').indexOf('\n'), HEADER_BYTES - 1);
+      assert.ok(fs.existsSync(sealed), 'the lines before it are sealed');
+      assert.ok(!onDisk(root).includes('"taskId":"a"'), "no line of a's is left on disk");
+      assert.ok(!fs.existsSync(path.join(root, 'tasks', 'a.jsonl')), "and a's journal is gone");
+    },
+  );
 
-  for (const [was, at, from] of [
-    [was7, at7, 7],
-    [was20, at20, 20],
-  ] as const) {
-    const now = await read(ops, at);
-    assert.deepEqual(texts(now.entries), texts(without(was.entries, ['a'])), `the reader at line ${from} reads the lines kept after it`);
-    assert.equal(now.cursor, was.cursor, `and stops where it stopped before, at the end`);
-    assert.equal(now.forgotten, aLines(from), `told how many lines after line ${from} were forgotten`);
-  }
+  await s.test(
+    'a reader parked at line 7 and one at line 20 each read on across the rotation: the lines kept, in order, once, the forgotten counted',
+    async () => {
+      for (const from of [7, 20]) {
+        const before = was.get(from)!;
+        const now = await read(ops, parked.find((p) => p.n === from)!.at);
+        assert.deepEqual(
+          texts(now.entries),
+          texts(without(before.entries, ['a'])),
+          `the reader at line ${from} reads the lines kept after it`,
+        );
+        assert.equal(now.cursor, before.cursor, `and stops where it stopped before, at the end`);
+        assert.equal(now.forgotten, linesAfterOf(['a'], from), `told how many lines after line ${from} were forgotten`);
+      }
+    },
+  );
 
-  await Effect.runPromise(ops.append('b', said(31) as never));
-  const next = await read(ops, was7.cursor);
-  assert.deepEqual(texts(next.entries), ['b n31'], 'a line appended after the rotation comes after every cursor before it');
-  assert.equal(next.forgotten, undefined);
-  assert.ok(next.cursor > was7.cursor);
-  const whole = await read(ops, 0);
-  assert.equal(whole.entries.length, 30 - aLines(0) + 1, 'from 0, every line kept and the new one');
-  assert.equal(whole.cursor, next.cursor);
-  assert.equal(whole.forgotten, aLines(0));
-});
+  await s.test('a reader parked inside a run of forgotten lines is told of those after it alone', async () => {
+    const gone = (n: number) => ownerOf(n) !== 'b';
+    assert.ok(gone(5) && gone(6) && gone(20) && gone(21), 'lines 5 and 6, and 20 and 21, are each one run of the forgotten');
+    await forget(ops, ['c']);
+    for (const n of [5, 20]) {
+      const now = await read(ops, parked.find((p) => p.n === n)!.at);
+      const after = lines.filter((m) => m > n);
+      assert.equal(now.forgotten, after.filter(gone).length, `the reader at line ${n} is told of the forgotten lines after it`);
+      assert.equal(now.entries.length, after.filter((m) => !gone(m)).length, 'and reads the kept ones');
+    }
+  });
 
-test('a reader parked inside a run of forgotten lines is told of those after it alone', async () => {
-  const { ops, head } = await store();
-  const gone = (n: number) => ownerOf(n) !== 'b';
-  assert.ok(gone(5) && gone(6) && gone(20) && gone(21), 'lines 5 and 6, and 20 and 21, are each one run of the forgotten');
-  const parked = [5, 20].map((n) => ({ n, at: cursorAfter(head, n) }));
-  await forget(ops, ['a', 'c']);
-  for (const { n, at } of parked) {
-    const now = await read(ops, at);
-    const after = [...Array(30).keys()].map((i) => i + 1).filter((m) => m > n);
-    assert.equal(now.forgotten, after.filter(gone).length, `the reader at line ${n} is told of the forgotten lines after it`);
-    assert.equal(now.entries.length, after.filter((m) => !gone(m)).length, 'and reads the kept ones');
-  }
+  await s.test(
+    'a line appended after the rotations comes after every cursor before them, and a read from 0 counts every line forgotten',
+    async () => {
+      const at7 = was.get(7)!;
+      await Effect.runPromise(ops.append('b', said(31) as never));
+      const next = await read(ops, at7.cursor);
+      assert.deepEqual(texts(next.entries), ['b n31'], 'a line appended after the rotation comes after every cursor before it');
+      assert.equal(next.forgotten, undefined);
+      assert.ok(next.cursor > at7.cursor);
+      const whole = await read(ops, 0);
+      assert.equal(whole.entries.length, 30 - linesAfterOf(['a', 'c']) + 1, 'from 0, every line kept and the new one');
+      assert.equal(whole.cursor, next.cursor);
+      assert.equal(whole.forgotten, linesAfterOf(['a', 'c']));
+    },
+  );
 });
 
 test('a feed written before rotations, with no header and a line cut short at its end, is rotated without moving a cursor or losing the cut line', async () => {
@@ -380,25 +398,30 @@ const storeOf = async (counts: Record<string, number>) => {
   return ops;
 };
 
-test('a rotation answers the lines it forgot of each task, and leaves out a task given that had none', async () => {
-  const ops = await storeOf({ a: 3, c: 2, b: 5 });
-  const rotated = await forget(ops, ['a', 'b', 'z']);
-  assert.deepEqual(rotated?.linesByTask, { a: 3, b: 5 });
-  assert.equal(rotated?.linesForgotten, 8);
-});
+test("a store's count of each task's feed lines, and what a rotation answers it forgot of each", async (t) => {
+  await t.test('a rotation answers the lines it forgot of each task, and leaves out a task given that had none', async () => {
+    const ops = await storeOf({ a: 3, c: 2, b: 5 });
+    const rotated = await forget(ops, ['a', 'b', 'z']);
+    assert.deepEqual(rotated?.linesByTask, { a: 3, b: 5 });
+    assert.equal(rotated?.linesForgotten, 8);
+  });
 
-test("the store's count of each task's feed lines is what a rotation then forgets of it, skips a line forgotten before, and is no prefix match", async () => {
-  const ops = await storeOf({ a: 3, ab: 4, b: 5, c: 2 });
-  const counted = (ids: string[]) => Effect.runPromise(ops.feedLines!(ids));
-  assert.deepEqual(await counted(['a', 'b', 'z']), { a: 3, b: 5, z: 0 });
-  assert.deepEqual(await counted(['ab']), { ab: 4 }, "an id another task's begins with counts its own lines alone");
-  await forget(ops, ['c']);
-  await Effect.runPromise(ops.append('d', filed(40) as never));
-  assert.deepEqual(
-    await counted(['a', 'c', 'd']),
-    { a: 3, c: 0, d: 1 },
-    'the lines a rotation forgot are not counted; those it sealed and those after it are',
+  await t.test(
+    "the store's count of each task's feed lines is what a rotation then forgets of it, skips a line forgotten before, and is no prefix match",
+    async () => {
+      const ops = await storeOf({ a: 3, ab: 4, b: 5, c: 2 });
+      const counted = (ids: string[]) => Effect.runPromise(ops.feedLines!(ids));
+      assert.deepEqual(await counted(['a', 'b', 'z']), { a: 3, b: 5, z: 0 });
+      assert.deepEqual(await counted(['ab']), { ab: 4 }, "an id another task's begins with counts its own lines alone");
+      await forget(ops, ['c']);
+      await Effect.runPromise(ops.append('d', filed(40) as never));
+      assert.deepEqual(
+        await counted(['a', 'c', 'd']),
+        { a: 3, c: 0, d: 1 },
+        'the lines a rotation forgot are not counted; those it sealed and those after it are',
+      );
+      const rotated = await forget(ops, ['a', 'b', 'c', 'd']);
+      assert.deepEqual(rotated?.linesByTask, { a: 3, b: 5, d: 1 });
+    },
   );
-  const rotated = await forget(ops, ['a', 'b', 'c', 'd']);
-  assert.deepEqual(rotated?.linesByTask, { a: 3, b: 5, d: 1 });
 });

@@ -120,134 +120,145 @@ const settledNote = async (engine: ReturnType<typeof builtEngine>, id: string) =
   return entry?.event.kind === 'settled' ? entry.event.note : undefined;
 };
 
-test("a task that asked for a closeout, whose session goes quiet without one, ends saying so — `stated: false` — and the runtime continues nothing: the nudge is the layer above's", async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const root = tmp('root');
-    const engine = builtEngine(Engine.layer({ root }));
-    const id = await Effect.runPromise(
-      engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
+test('a session that ends without the closing statement its task asked for, at shipped defaults: `stated: false` on its end, and nothing continued', async (t) => {
+  await t.test(
+    "a task that asked for a closeout, whose session goes quiet without one, ends saying so — `stated: false` — and the runtime continues nothing: the nudge is the layer above's",
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const root = tmp('root');
+        const engine = builtEngine(Engine.layer({ root }));
+        const id = await Effect.runPromise(
+          engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
+        );
+        await Effect.runPromise(engine.tick());
+        const [row] = claude.rows();
 
-    wrote(row.sessionId, await begun(engine, id), 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
-    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
-    claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
-    await Effect.runPromise(engine.tick());
+        wrote(row.sessionId, await begun(engine, id), 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
+        await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
+        claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
+        await Effect.runPromise(engine.tick());
 
-    const v = await Effect.runPromise(engine.view(id));
-    const [first] = v.state.attempts;
-    assert.deepEqual(
-      [first?.ended, first?.reason, first?.stated, first?.closeout],
-      ['done', 'harness', false, undefined],
-      'ended as quiet ends, and said to have stated nothing: the fact the orchestrator reads as unsigned',
-    );
-    assert.deepEqual(claude.rows(), [], 'its session let go');
+        const v = await Effect.runPromise(engine.view(id));
+        const [first] = v.state.attempts;
+        assert.deepEqual(
+          [first?.ended, first?.reason, first?.stated, first?.closeout],
+          ['done', 'harness', false, undefined],
+          'ended as quiet ends, and said to have stated nothing: the fact the orchestrator reads as unsigned',
+        );
+        assert.deepEqual(claude.rows(), [], 'its session let go');
 
-    await Effect.runPromise(engine.tick());
-    assert.equal((await Effect.runPromise(engine.view(id))).state.attempts.length, 1, 'no attempt follows');
-    assert.equal(claude.spawns().length, 1, 'nothing continued, and nobody told a nudge');
-    assert.equal(await settledNote(engine, id), undefined);
+        await Effect.runPromise(engine.tick());
+        assert.equal((await Effect.runPromise(engine.view(id))).state.attempts.length, 1, 'no attempt follows');
+        assert.equal(claude.spawns().length, 1, 'nothing continued, and nobody told a nudge');
+        assert.equal(await settledNote(engine, id), undefined);
+      });
+    },
+  );
+
+  await t.test('a task that asked for no closeout ends on quiet as it always did: succeeded, and nothing continued', async () => {
+    const claude = fakeClaude();
+    await onPath(claude.bin, async () => {
+      const root = tmp('root');
+      const engine = builtEngine(Engine.layer({ root }));
+      const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
+      await Effect.runPromise(engine.tick());
+      const [row] = claude.rows();
+      wrote(row.sessionId, await begun(engine, id), 10 * MINUTES, prompt('the prompt'), says('msg_1', 'Done.'));
+      await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
+      claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
+
+      await Effect.runPromise(engine.tick());
+      const v = await Effect.runPromise(engine.view(id));
+      assert.equal(v.state.settled, 'succeeded');
+      assert.deepEqual(
+        v.state.attempts.map((a) => [a.ended, a.reason]),
+        [['done', 'harness']],
+      );
+      assert.equal(claude.spawns().length, 1, 'nothing continued');
+    });
   });
-});
 
-test('a task that asked for no closeout ends on quiet as it always did: succeeded, and nothing continued', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const root = tmp('root');
-    const engine = builtEngine(Engine.layer({ root }));
-    const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    wrote(row.sessionId, await begun(engine, id), 10 * MINUTES, prompt('the prompt'), says('msg_1', 'Done.'));
-    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
-    claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
+  await t.test(
+    "quiet after a statement of its own succeeds with it; quiet after only its parent's statement, resumed, has stated nothing",
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const root = tmp('root');
+        const engine = builtEngine(Engine.layer({ root }));
 
-    await Effect.runPromise(engine.tick());
-    const v = await Effect.runPromise(engine.view(id));
-    assert.equal(v.state.settled, 'succeeded');
-    assert.deepEqual(
-      v.state.attempts.map((a) => [a.ended, a.reason]),
-      [['done', 'harness']],
-    );
-    assert.equal(claude.spawns().length, 1, 'nothing continued');
-  });
-});
+        const said = await Effect.runPromise(
+          engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
+        );
+        await Effect.runPromise(engine.tick());
+        const [row] = claude.rows();
+        wrote(row.sessionId, await begun(engine, said), 10 * MINUTES, prompt('the prompt'), closes('msg_1', { outcome: 'done' }));
+        await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
+        claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
+        await Effect.runPromise(engine.tick());
+        const v = await Effect.runPromise(engine.view(said));
+        assert.equal(v.state.settled, 'succeeded');
+        assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
+        assert.equal(v.state.attempts[0]?.stated, true);
 
-test("quiet after a statement of its own succeeds with it; quiet after only its parent's statement, resumed, has stated nothing", async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const root = tmp('root');
-    const engine = builtEngine(Engine.layer({ root }));
+        const inherited = await Effect.runPromise(
+          engine.file({
+            config: { background: true },
+            brief: 'go on',
+            cwd: tmp('cwd'),
+            closeoutSchema: SCHEMA,
+            resumeFrom: row.sessionId,
+          }),
+        );
+        await Effect.runPromise(engine.tick());
+        const other = claude.rows().find((r) => r.name === `ae/${inherited}/1`)!;
+        assert.equal(other.sessionId, row.sessionId, "resumed into its parent's transcript, which ends on the parent's statement");
+        claude.set(other.name, { startedAt: Date.now() - 20 * MINUTES });
+        await seenFor(root, other.name, other.sessionId, 10 * MINUTES);
+        await Effect.runPromise(engine.tick());
+        const w = await Effect.runPromise(engine.view(inherited));
+        assert.equal(w.state.attempts[0]?.stated, false, "a parent's statement is not this attempt's");
+        assert.equal(
+          w.state.attempts[0]?.closeout,
+          undefined,
+          "and no closeout: its transcript holds only its parent's conversation, statement included, under the call id its spawn recorded",
+        );
+      });
+    },
+  );
 
-    const said = await Effect.runPromise(
-      engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    wrote(row.sessionId, await begun(engine, said), 10 * MINUTES, prompt('the prompt'), closes('msg_1', { outcome: 'done' }));
-    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
-    claude.set(row.name, { startedAt: Date.now() - 20 * MINUTES });
-    await Effect.runPromise(engine.tick());
-    const v = await Effect.runPromise(engine.view(said));
-    assert.equal(v.state.settled, 'succeeded');
-    assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
-    assert.equal(v.state.attempts[0]?.stated, true);
+  await t.test(
+    "THE HARNESS'S `done` without a statement is said to have stated nothing too, for a task that asked for one: the second door, reported — and a task that asked for nothing is told of nothing",
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+        const asked = await Effect.runPromise(
+          engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
+        );
+        const nothing = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
+        await Effect.runPromise(engine.tick());
+        for (const row of claude.rows()) {
+          wrote(row.sessionId, await begun(engine, row.name.split('/')[1]), 0, prompt('the prompt'), says('msg_1', 'I have finished.'));
+          claude.set(row.name, { state: 'done' });
+        }
+        await Effect.runPromise(engine.tick());
 
-    const inherited = await Effect.runPromise(
-      engine.file({
-        config: { background: true },
-        brief: 'go on',
-        cwd: tmp('cwd'),
-        closeoutSchema: SCHEMA,
-        resumeFrom: row.sessionId,
-      }),
-    );
-    await Effect.runPromise(engine.tick());
-    const other = claude.rows().find((r) => r.name === `ae/${inherited}/1`)!;
-    assert.equal(other.sessionId, row.sessionId, "resumed into its parent's transcript, which ends on the parent's statement");
-    claude.set(other.name, { startedAt: Date.now() - 20 * MINUTES });
-    await seenFor(root, other.name, other.sessionId, 10 * MINUTES);
-    await Effect.runPromise(engine.tick());
-    const w = await Effect.runPromise(engine.view(inherited));
-    assert.equal(w.state.attempts[0]?.stated, false, "a parent's statement is not this attempt's");
-    assert.equal(
-      w.state.attempts[0]?.closeout,
-      undefined,
-      "and no closeout: its transcript holds only its parent's conversation, statement included, under the call id its spawn recorded",
-    );
-  });
-});
+        const v = await Effect.runPromise(engine.view(asked));
+        assert.deepEqual(
+          v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.stated]),
+          [['done', 'harness', undefined, false]],
+          'it never said it had finished, and the record says so',
+        );
 
-test("THE HARNESS'S `done` without a statement is said to have stated nothing too, for a task that asked for one: the second door, reported — and a task that asked for nothing is told of nothing", async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const asked = await Effect.runPromise(
-      engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
-    );
-    const nothing = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
-    await Effect.runPromise(engine.tick());
-    for (const row of claude.rows()) {
-      wrote(row.sessionId, await begun(engine, row.name.split('/')[1]), 0, prompt('the prompt'), says('msg_1', 'I have finished.'));
-      claude.set(row.name, { state: 'done' });
-    }
-    await Effect.runPromise(engine.tick());
-
-    const v = await Effect.runPromise(engine.view(asked));
-    assert.deepEqual(
-      v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.stated]),
-      [['done', 'harness', undefined, false]],
-      'it never said it had finished, and the record says so',
-    );
-
-    const w = await Effect.runPromise(engine.view(nothing));
-    assert.equal(w.state.settled, 'succeeded', "the harness's word is the only end a task that asked for nothing has");
-    assert.deepEqual(
-      w.state.attempts.map((a) => [a.ended, a.reason]),
-      [['done', 'harness']],
-    );
-    assert.equal('stated' in w.state.attempts[0], false);
-  });
+        const w = await Effect.runPromise(engine.view(nothing));
+        assert.equal(w.state.settled, 'succeeded', "the harness's word is the only end a task that asked for nothing has");
+        assert.deepEqual(
+          w.state.attempts.map((a) => [a.ended, a.reason]),
+          [['done', 'harness']],
+        );
+        assert.equal('stated' in w.state.attempts[0], false);
+      });
+    },
+  );
 });

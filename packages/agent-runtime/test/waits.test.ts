@@ -239,7 +239,7 @@ type Allowance = { count: number; not: string };
 const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/scratch.ts': { count: 1, not: "the reaper's bound on a test run's leftover processes, after its end" },
   'test/transcript.test.ts': { count: 2, not: "a mocked clock's shift, wall and monotonic" },
-  'test/remote-agent.test.ts': { count: 2, not: "a send's `until` a minute ahead, written into a run file" },
+  'test/remote-agent.test.ts': { count: 1, not: "a send's `until` a minute ahead, written into a run file" },
   'test/detached.test.ts': {
     count: 2,
     not:
@@ -303,6 +303,6 @@ test('REFUSED: a deadline written into a test is over its allowance, and an allo
     ]);
     counts.set('src/core/clock.test.ts', 0);
   }
-  counts.set('test/remote-agent.test.ts', 1);
-  assert.deepEqual(deadlineBreaks(counts, DEADLINES), ['test/remote-agent.test.ts is allowed 2 but has 1: lower its count in DEADLINES']);
+  counts.set('test/transcript.test.ts', 1);
+  assert.deepEqual(deadlineBreaks(counts, DEADLINES), ['test/transcript.test.ts is allowed 2 but has 1: lower its count in DEADLINES']);
 });

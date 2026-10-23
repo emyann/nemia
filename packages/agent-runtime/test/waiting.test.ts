@@ -15,6 +15,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { story } from './checkpoints.ts';
 
 const tmp = (label: string) => scratch(`ae-waiting-${label}-`);
 
@@ -53,71 +54,53 @@ if (args[0] === '--bg') {
   };
 };
 
-const onPath = async <T>(bin: string, f: () => Promise<T>): Promise<T> => {
-  const prev = process.env.PATH;
-  process.env.PATH = `${bin}:${prev}`;
-  try {
-    return await f();
-  } finally {
-    process.env.PATH = prev;
-  }
-};
-
-/** A task whose one session the registry lists blocked, and the engine that reads it. */
-const blocked = async () => {
-  const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-  const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
-  await Effect.runPromise(engine.tick());
-  return { engine, id };
-};
-
-test("a blocked session carries what its harness says it waits for, in the harness's own words, onto the task's view", async () => {
+test("a session blocked on a person carries what its harness says it waits for onto the task's view, read afresh on each look, and nothing once it stops waiting or says nothing", async (t) => {
+  const s = story(t);
   const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const { engine, id } = await blocked();
-    const [row] = claude.rows();
-    claude.set(row.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
+  const prev = process.env.PATH;
+  process.env.PATH = `${claude.bin}:${prev}`;
+  t.after(() => {
+    process.env.PATH = prev;
+  });
+  const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+  let id = '';
+  let name = '';
+  const view = () => Effect.runPromise(engine.view(id));
 
-    const v = await Effect.runPromise(engine.view(id));
+  await s.test("blocked, it carries what its harness says it waits for, in the harness's own words, beside the phase", async () => {
+    id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
+    await Effect.runPromise(engine.tick());
+    [{ name }] = claude.rows();
+    claude.set(name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
+    const v = await view();
     assert.equal(v.phase, 'needs-human', 'the phase is the word everything above judges on, and it is unchanged');
     assert.equal(v.waitingFor, 'permission prompt', 'and beside it, what the harness says it waits for');
   });
-});
 
-test('a blocked session whose harness says nothing carries nothing: the field is absent, not empty', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const { engine, id } = await blocked();
-    const [row] = claude.rows();
-    claude.set(row.name, { state: 'blocked', status: 'waiting' });
-
-    const v = await Effect.runPromise(engine.view(id));
-    assert.equal(v.phase, 'needs-human');
-    assert.equal(Object.hasOwn(v, 'waitingFor'), false, 'nothing said is nothing carried');
-
-    claude.set(row.name, { waitingFor: '   ' });
-    assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(id)), 'waitingFor'), false, 'a blank word is no word');
-    claude.set(row.name, { waitingFor: { reason: 'permission prompt' } });
-    assert.equal(Object.hasOwn(await Effect.runPromise(engine.view(id)), 'waitingFor'), false, 'and neither is one that is not a string');
-  });
-});
-
-test('level-triggered: the word is read afresh each pass — the second pass shows the new one and none of the old, and a session that stops waiting loses it', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const { engine, id } = await blocked();
-    const [row] = claude.rows();
-
-    claude.set(row.name, { state: 'blocked', status: 'waiting', waitingFor: 'permission prompt' });
-    assert.equal((await Effect.runPromise(engine.view(id))).waitingFor, 'permission prompt');
-
-    claude.set(row.name, { waitingFor: 'workspace trust dialog' });
-    const second = await Effect.runPromise(engine.view(id));
+  await s.test('level-triggered: the next look shows the new word and none of the old — nothing is carried between passes', async () => {
+    claude.set(name, { waitingFor: 'workspace trust dialog' });
+    const second = await view();
     assert.equal(second.waitingFor, 'workspace trust dialog', 'the second pass shows the new word');
     assert.equal(second.waitingFor?.includes('permission'), false, 'and none of the old: nothing is carried between passes');
+  });
 
-    claude.set(row.name, { state: 'working', status: 'busy', waitingFor: 'permission prompt' });
-    const third = await Effect.runPromise(engine.view(id));
+  await s.test(
+    'a harness that says nothing, a blank word, or one that is not a string carries nothing: the field is absent, not empty',
+    async () => {
+      claude.set(name, { waitingFor: undefined });
+      const v = await view();
+      assert.equal(v.phase, 'needs-human');
+      assert.equal(Object.hasOwn(v, 'waitingFor'), false, 'nothing said is nothing carried');
+      claude.set(name, { waitingFor: '   ' });
+      assert.equal(Object.hasOwn(await view(), 'waitingFor'), false, 'a blank word is no word');
+      claude.set(name, { waitingFor: { reason: 'permission prompt' } });
+      assert.equal(Object.hasOwn(await view(), 'waitingFor'), false, 'and neither is one that is not a string');
+    },
+  );
+
+  await s.test('working again, it carries no word though its harness still says one: the field rides on needs-human alone', async () => {
+    claude.set(name, { state: 'working', status: 'busy', waitingFor: 'permission prompt' });
+    const third = await view();
     assert.equal(third.phase.startsWith('needs-human'), false, 'it is working again');
     assert.equal(Object.hasOwn(third, 'waitingFor'), false, 'and carries no word: the field rides on needs-human alone');
   });

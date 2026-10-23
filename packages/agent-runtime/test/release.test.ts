@@ -182,317 +182,345 @@ const wrote = (row: Row, ago: number) => {
   fs.utimesSync(file, at, at);
 };
 
-test('a task that gave its closeout settles, and its session is stopped and removed in that pass — the next tick does not see it', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const id = await Effect.runPromise(
-      engine.file({
-        config: { background: true },
-        brief: 'the prompt',
-        cwd: tmp('cwd'),
-        closeoutSchema: { type: 'object' },
-      }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    assert.equal(row?.name, `ae/${id}/1`, 'spawned');
-    said(row, await begun(engine, id), { outcome: 'done' });
+test('release at shipped defaults: a finished Claude Code session is stopped if it runs, removed unless a worktree holds its work, and what it cost read once stopped', async (t) => {
+  await t.test(
+    'a task that gave its closeout settles, and its session is stopped and removed in that pass — the next tick does not see it',
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+        const id = await Effect.runPromise(
+          engine.file({
+            config: { background: true },
+            brief: 'the prompt',
+            cwd: tmp('cwd'),
+            closeoutSchema: { type: 'object' },
+          }),
+        );
+        await Effect.runPromise(engine.tick());
+        const [row] = claude.rows();
+        assert.equal(row?.name, `ae/${id}/1`, 'spawned');
+        said(row, await begun(engine, id), { outcome: 'done' });
 
-    await Effect.runPromise(engine.tick());
-    assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
-    assert.deepEqual(
-      claude.releases(),
-      [
-        ['stop', short(row)],
-        ['rm', short(row)],
-      ],
-      'stopped, since it still ran, then removed',
-    );
-    assert.deepEqual(claude.rows(), [], 'gone from claude agents');
+        await Effect.runPromise(engine.tick());
+        assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
+        assert.deepEqual(
+          claude.releases(),
+          [
+            ['stop', short(row)],
+            ['rm', short(row)],
+          ],
+          'stopped, since it still ran, then removed',
+        );
+        assert.deepEqual(claude.rows(), [], 'gone from claude agents');
 
-    await Effect.runPromise(engine.tick());
-    assert.equal(claude.releases().length, 2, 'the next tick does not see it, and asks nothing more');
-    const v = await Effect.runPromise(engine.view(id));
-    assert.equal(v.phase, 'succeeded');
-    assert.equal(v.sessionId, row.sessionId, 'its id, as recorded when its attempt ended');
-    assert.match(await Effect.runPromise(engine.logs(id)), /the prompt/, "and its transcript still read, through the task's own harness");
-  });
-});
+        await Effect.runPromise(engine.tick());
+        assert.equal(claude.releases().length, 2, 'the next tick does not see it, and asks nothing more');
+        const v = await Effect.runPromise(engine.view(id));
+        assert.equal(v.phase, 'succeeded');
+        assert.equal(v.sessionId, row.sessionId, 'its id, as recorded when its attempt ended');
+        assert.match(
+          await Effect.runPromise(engine.logs(id)),
+          /the prompt/,
+          "and its transcript still read, through the task's own harness",
+        );
+      });
+    },
+  );
 
-test("a session's cost, which Claude Code writes only as its process exits, is read once its release has stopped it — and put on the attempt once", async () => {
-  for (const worktree of [false, true]) {
+  await t.test(
+    "a session's cost, which Claude Code writes only as its process exits, is read once its release has stopped it — and put on the attempt once",
+    async () => {
+      for (const worktree of [false, true]) {
+        const claude = fakeClaude();
+        claude.costOnStop({ totalCostUSD: 0.25, totalAPIDuration: 4000, totalToolDuration: 300, hasUnknownModelCost: false });
+        await onPath(claude.bin, async () => {
+          const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+          const id = await Effect.runPromise(
+            engine.file({
+              brief: 'the prompt',
+              cwd: tmp('cwd'),
+              closeoutSchema: { type: 'object' },
+              config: { background: true, ...(worktree ? { worktree: true } : {}) },
+            }),
+          );
+          await Effect.runPromise(engine.tick());
+          const [row] = claude.rows();
+          said(row, await begun(engine, id), { outcome: 'done' });
+
+          for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
+          const at = `worktree: ${worktree}`;
+          const { state } = await Effect.runPromise(engine.view(id));
+          assert.equal(state.settled, 'succeeded', at);
+          const entries = (await Effect.runPromise(engine.feed(0))).entries.filter((e) => e.taskId === id).map((e) => e.event);
+          const ended = entries.find((e) => e.kind === 'ended');
+          assert.equal(
+            ended?.kind === 'ended' ? ended.usage?.costUsd : 'no end',
+            undefined,
+            `${at}: its end was read while its process ran, with no cost in it`,
+          );
+          assert.equal(
+            entries.filter((e) => e.kind === 'measured').length,
+            1,
+            `${at}: measured once over three passes, though a worktree task's session stays listed`,
+          );
+          assert.deepEqual(
+            state.attempts[0]?.usage,
+            { turns: 1, toolCalls: 1, costUsd: 0.25, apiMs: 4000, toolMs: 300 },
+            `${at}: on the attempt`,
+          );
+          assert.deepEqual(
+            claude.releases().map((c) => c[0]),
+            worktree ? ['stop'] : ['stop', 'rm'],
+            `${at}: released as before`,
+          );
+        });
+      }
+    },
+  );
+
+  await t.test('a session listed done whose process still runs is stopped before it goes — its cost is written only then', async () => {
     const claude = fakeClaude();
-    claude.costOnStop({ totalCostUSD: 0.25, totalAPIDuration: 4000, totalToolDuration: 300, hasUnknownModelCost: false });
+    claude.costOnStop({ totalCostUSD: 0.0143, totalAPIDuration: 1081, totalToolDuration: 0, hasUnknownModelCost: false });
     await onPath(claude.bin, async () => {
       const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-      const id = await Effect.runPromise(
-        engine.file({
-          brief: 'the prompt',
-          cwd: tmp('cwd'),
-          closeoutSchema: { type: 'object' },
-          config: { background: true, ...(worktree ? { worktree: true } : {}) },
-        }),
-      );
+      const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
       await Effect.runPromise(engine.tick());
       const [row] = claude.rows();
-      said(row, await begun(engine, id), { outcome: 'done' });
+      wrote(row, 0);
+      claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done', pid: 424242 })));
 
-      for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
-      const at = `worktree: ${worktree}`;
+      await Effect.runPromise(engine.tick());
       const { state } = await Effect.runPromise(engine.view(id));
-      assert.equal(state.settled, 'succeeded', at);
-      const entries = (await Effect.runPromise(engine.feed(0))).entries.filter((e) => e.taskId === id).map((e) => e.event);
-      const ended = entries.find((e) => e.kind === 'ended');
-      assert.equal(
-        ended?.kind === 'ended' ? ended.usage?.costUsd : 'no end',
-        undefined,
-        `${at}: its end was read while its process ran, with no cost in it`,
-      );
-      assert.equal(
-        entries.filter((e) => e.kind === 'measured').length,
-        1,
-        `${at}: measured once over three passes, though a worktree task's session stays listed`,
-      );
-      assert.deepEqual(
-        state.attempts[0]?.usage,
-        { turns: 1, toolCalls: 1, costUsd: 0.25, apiMs: 4000, toolMs: 300 },
-        `${at}: on the attempt`,
-      );
-      assert.deepEqual(
-        claude.releases().map((c) => c[0]),
-        worktree ? ['stop'] : ['stop', 'rm'],
-        `${at}: released as before`,
-      );
-    });
-  }
-});
-
-test('a session listed done whose process still runs is stopped before it goes — its cost is written only then', async () => {
-  const claude = fakeClaude();
-  claude.costOnStop({ totalCostUSD: 0.0143, totalAPIDuration: 1081, totalToolDuration: 0, hasUnknownModelCost: false });
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    wrote(row, 0);
-    claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done', pid: 424242 })));
-
-    await Effect.runPromise(engine.tick());
-    const { state } = await Effect.runPromise(engine.view(id));
-    assert.equal(state.settled, 'succeeded');
-    assert.deepEqual(
-      claude.releases(),
-      [
-        ['stop', short(row)],
-        ['rm', short(row)],
-      ],
-      'stopped, since its process ran, then removed',
-    );
-    assert.equal(state.attempts[0]?.usage?.costUsd, 0.0143, 'and what it cost read in between');
-  });
-});
-
-test('a task that asked for a worktree has its session stopped and never removed — claude rm deletes the worktree, with the work in it', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const id = await Effect.runPromise(
-      engine.file({
-        brief: 'the prompt',
-        cwd: tmp('cwd'),
-        config: { background: true, worktree: true },
-        closeoutSchema: { type: 'object' },
-      }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    said(row, await begun(engine, id), { outcome: 'done' });
-
-    for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
-    assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
-    assert.deepEqual(claude.releases(), [['stop', short(row)]], 'stopped once, and no rm on any pass');
-    assert.deepEqual(
-      claude.rows().map((r) => r.state),
-      ['stopped'],
-      'still listed',
-    );
-  });
-});
-
-test('a session ended by quiet is stopped before it goes — its end is on the record, and claude agents still has it working', async () => {
-  for (const worktree of [false, true]) {
-    const claude = fakeClaude();
-    await onPath(claude.bin, async () => {
-      const root = tmp('root');
-      const engine = builtEngine(Engine.layer({ root }));
-      const id = await Effect.runPromise(
-        engine.file({
-          brief: 'the prompt',
-          cwd: tmp('cwd'),
-          config: { background: true, ...(worktree ? { worktree: true } : {}) },
-        }),
-      );
-      await Effect.runPromise(engine.tick());
-      const [row] = claude.rows();
-      wrote(row, 10 * 60_000);
-      await seenFor(root, row.name, row.sessionId, 10 * 60_000);
-      claude.setRows(claude.rows().map((r) => ({ ...r, startedAt: Date.now() - 20 * 60_000 })));
-
-      for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
-      const at = `worktree: ${worktree}`;
-      assert.equal((await Effect.runPromise(engine.view(id))).state.attempts[0]?.ended, 'done', `${at}: ended by quiet, with no statement`);
+      assert.equal(state.settled, 'succeeded');
       assert.deepEqual(
         claude.releases(),
-        worktree
-          ? [['stop', short(row)]]
-          : [
-              ['stop', short(row)],
-              ['rm', short(row)],
-            ],
-        `${at}: stopped first`,
+        [
+          ['stop', short(row)],
+          ['rm', short(row)],
+        ],
+        'stopped, since its process ran, then removed',
+      );
+      assert.equal(state.attempts[0]?.usage?.costUsd, 0.0143, 'and what it cost read in between');
+    });
+  });
+
+  await t.test(
+    'a task that asked for a worktree has its session stopped and never removed — claude rm deletes the worktree, with the work in it',
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+        const id = await Effect.runPromise(
+          engine.file({
+            brief: 'the prompt',
+            cwd: tmp('cwd'),
+            config: { background: true, worktree: true },
+            closeoutSchema: { type: 'object' },
+          }),
+        );
+        await Effect.runPromise(engine.tick());
+        const [row] = claude.rows();
+        said(row, await begun(engine, id), { outcome: 'done' });
+
+        for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
+        assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
+        assert.deepEqual(claude.releases(), [['stop', short(row)]], 'stopped once, and no rm on any pass');
+        assert.deepEqual(
+          claude.rows().map((r) => r.state),
+          ['stopped'],
+          'still listed',
+        );
+      });
+    },
+  );
+
+  await t.test(
+    'a session ended by quiet is stopped before it goes — its end is on the record, and claude agents still has it working',
+    async () => {
+      for (const worktree of [false, true]) {
+        const claude = fakeClaude();
+        await onPath(claude.bin, async () => {
+          const root = tmp('root');
+          const engine = builtEngine(Engine.layer({ root }));
+          const id = await Effect.runPromise(
+            engine.file({
+              brief: 'the prompt',
+              cwd: tmp('cwd'),
+              config: { background: true, ...(worktree ? { worktree: true } : {}) },
+            }),
+          );
+          await Effect.runPromise(engine.tick());
+          const [row] = claude.rows();
+          wrote(row, 10 * 60_000);
+          await seenFor(root, row.name, row.sessionId, 10 * 60_000);
+          claude.setRows(claude.rows().map((r) => ({ ...r, startedAt: Date.now() - 20 * 60_000 })));
+
+          for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
+          const at = `worktree: ${worktree}`;
+          assert.equal(
+            (await Effect.runPromise(engine.view(id))).state.attempts[0]?.ended,
+            'done',
+            `${at}: ended by quiet, with no statement`,
+          );
+          assert.deepEqual(
+            claude.releases(),
+            worktree
+              ? [['stop', short(row)]]
+              : [
+                  ['stop', short(row)],
+                  ['rm', short(row)],
+                ],
+            `${at}: stopped first`,
+          );
+          assert.deepEqual(
+            claude.rows().map((r) => r.state),
+            worktree ? ['stopped'] : [],
+            at,
+          );
+        });
+      }
+    },
+  );
+
+  await t.test(
+    'no session is released while its attempt runs; one a person stopped is released once its task settles, its id recorded for logs',
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+        const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
+        await Effect.runPromise(engine.tick());
+        const [row] = claude.rows();
+        wrote(row, 0);
+        for (let i = 0; i < 2; i++) await Effect.runPromise(engine.tick());
+        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working (quiescent)');
+        assert.deepEqual(claude.releases(), [], 'running: nothing stopped, nothing removed');
+
+        await Effect.runPromise(engine.stop(id));
+        for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
+        const v = await Effect.runPromise(engine.view(id));
+        assert.equal(v.state.settled, 'stopped');
+        assert.deepEqual(
+          [v.state.attempts[0]?.ended, v.state.attempts[0]?.reason],
+          ['stopped', 'operator'],
+          'ended, saying why it has no statement',
+        );
+        assert.equal(v.state.attempts[0]?.nativeId, row.sessionId, 'its session id, recorded as it ended');
+        assert.deepEqual(
+          claude.releases(),
+          [
+            ['stop', short(row)],
+            ['rm', short(row)],
+          ],
+          "the person's stop, then — stopped by then — only rm",
+        );
+        assert.deepEqual(claude.rows(), []);
+        assert.equal(v.sessionId, row.sessionId);
+        assert.match(await Effect.runPromise(engine.logs(id)), /the prompt/, 'and ae logs still reads it');
+      });
+    },
+  );
+
+  await t.test('a session stopped at its deadline is released once its task settles, as one a person stopped is', async () => {
+    const claude = fakeClaude();
+    await onPath(claude.bin, async () => {
+      const tasks: Record<string, Event[]> = {};
+      const engine = builtEngine(Engine.layer({ root: tmp('root'), journal: asyncStore(inMemory(tasks)) }));
+      const deadlineSeconds = 600;
+      const id = await Effect.runPromise(
+        engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), deadlineSeconds }),
+      );
+      const longAgo = Date.now() - 2 * deadlineSeconds * 1000;
+      const at = new Date(longAgo).toISOString();
+      tasks[id].push({ kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 });
+      const row = { name: `ae/${id}/1`, sessionId: randomUUID(), state: 'working', status: 'idle', startedAt: longAgo };
+      claude.setRows([row]);
+      for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
+      const v = await Effect.runPromise(engine.view(id));
+      assert.equal(v.state.settled, 'failed');
+      assert.deepEqual(
+        [v.state.attempts[0]?.ended, v.state.attempts[0]?.reason],
+        ['failed', 'deadline'],
+        'ended, saying why it has no statement',
       );
       assert.deepEqual(
-        claude.rows().map((r) => r.state),
-        worktree ? ['stopped'] : [],
-        at,
+        claude.releases(),
+        [
+          ['stop', short(row)],
+          ['rm', short(row)],
+        ],
+        'stopped by the deadline, then removed',
       );
     });
-  }
-});
-
-test('no session is released while its attempt runs; one a person stopped is released once its task settles, its id recorded for logs', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const id = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd') }));
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    wrote(row, 0);
-    for (let i = 0; i < 2; i++) await Effect.runPromise(engine.tick());
-    assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working (quiescent)');
-    assert.deepEqual(claude.releases(), [], 'running: nothing stopped, nothing removed');
-
-    await Effect.runPromise(engine.stop(id));
-    for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
-    const v = await Effect.runPromise(engine.view(id));
-    assert.equal(v.state.settled, 'stopped');
-    assert.deepEqual(
-      [v.state.attempts[0]?.ended, v.state.attempts[0]?.reason],
-      ['stopped', 'operator'],
-      'ended, saying why it has no statement',
-    );
-    assert.equal(v.state.attempts[0]?.nativeId, row.sessionId, 'its session id, recorded as it ended');
-    assert.deepEqual(
-      claude.releases(),
-      [
-        ['stop', short(row)],
-        ['rm', short(row)],
-      ],
-      "the person's stop, then — stopped by then — only rm",
-    );
-    assert.deepEqual(claude.rows(), []);
-    assert.equal(v.sessionId, row.sessionId);
-    assert.match(await Effect.runPromise(engine.logs(id)), /the prompt/, 'and ae logs still reads it');
   });
-});
 
-test('a session stopped at its deadline is released once its task settles, as one a person stopped is', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const tasks: Record<string, Event[]> = {};
-    const engine = builtEngine(Engine.layer({ root: tmp('root'), journal: asyncStore(inMemory(tasks)) }));
-    const deadlineSeconds = 600;
-    const id = await Effect.runPromise(
-      engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), deadlineSeconds }),
-    );
-    const longAgo = Date.now() - 2 * deadlineSeconds * 1000;
-    const at = new Date(longAgo).toISOString();
-    tasks[id].push({ kind: 'starting', at, attempt: 1 }, { kind: 'spawned', at, attempt: 1 });
-    const row = { name: `ae/${id}/1`, sessionId: randomUUID(), state: 'working', status: 'idle', startedAt: longAgo };
-    claude.setRows([row]);
-    for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
-    const v = await Effect.runPromise(engine.view(id));
-    assert.equal(v.state.settled, 'failed');
-    assert.deepEqual(
-      [v.state.attempts[0]?.ended, v.state.attempts[0]?.reason],
-      ['failed', 'deadline'],
-      'ended, saying why it has no statement',
-    );
-    assert.deepEqual(
-      claude.releases(),
-      [
-        ['stop', short(row)],
-        ['rm', short(row)],
-      ],
-      'stopped by the deadline, then removed',
-    );
-  });
-});
+  await t.test(
+    "a task settled before its session's id was recorded keeps that session listed — removed, ae logs could not read it",
+    async () => {
+      const claude = fakeClaude();
+      const unrecorded = randomUUID();
+      const recorded = randomUUID();
+      claude.setRows([
+        { name: 'ae/before/1', sessionId: unrecorded, state: 'stopped', status: 'idle', startedAt: Date.now() },
+        { name: 'ae/after/1', sessionId: recorded, state: 'stopped', status: 'idle', startedAt: Date.now() },
+      ]);
+      const at = new Date().toISOString();
+      const stopped = (settled: Event): Event[] => [
+        { kind: 'filed', at, brief: 'the prompt', cwd: '/r', harness: 'claude' },
+        { kind: 'starting', at, attempt: 1 },
+        { kind: 'spawned', at, attempt: 1 },
+        { kind: 'stop-requested', at },
+        settled,
+      ];
+      const tasks: Record<string, Event[]> = {
+        before: stopped({ kind: 'settled', at, outcome: 'stopped', note: 'operator' }),
+        after: stopped({ kind: 'settled', at, outcome: 'stopped', note: 'operator', nativeId: recorded }),
+      };
+      await onPath(claude.bin, async () => {
+        const engine = builtEngine(Engine.layer({ root: tmp('root'), journal: asyncStore(inMemory(tasks)) }));
+        for (let i = 0; i < 2; i++) await Effect.runPromise(engine.tick());
+        assert.deepEqual(claude.releases(), [['rm', recorded.split('-')[0]]], 'the session whose id is on the record, and only it');
+        assert.deepEqual(
+          claude.rows().map((r) => r.name),
+          ['ae/before/1'],
+          'a journal an older engine wrote settles a stopped task with no session id: that session stays listed',
+        );
+      });
+    },
+  );
 
-test("a task settled before its session's id was recorded keeps that session listed — removed, ae logs could not read it", async () => {
-  const claude = fakeClaude();
-  const unrecorded = randomUUID();
-  const recorded = randomUUID();
-  claude.setRows([
-    { name: 'ae/before/1', sessionId: unrecorded, state: 'stopped', status: 'idle', startedAt: Date.now() },
-    { name: 'ae/after/1', sessionId: recorded, state: 'stopped', status: 'idle', startedAt: Date.now() },
-  ]);
-  const at = new Date().toISOString();
-  const stopped = (settled: Event): Event[] => [
-    { kind: 'filed', at, brief: 'the prompt', cwd: '/r', harness: 'claude' },
-    { kind: 'starting', at, attempt: 1 },
-    { kind: 'spawned', at, attempt: 1 },
-    { kind: 'stop-requested', at },
-    settled,
-  ];
-  const tasks: Record<string, Event[]> = {
-    before: stopped({ kind: 'settled', at, outcome: 'stopped', note: 'operator' }),
-    after: stopped({ kind: 'settled', at, outcome: 'stopped', note: 'operator', nativeId: recorded }),
-  };
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root'), journal: asyncStore(inMemory(tasks)) }));
-    for (let i = 0; i < 2; i++) await Effect.runPromise(engine.tick());
-    assert.deepEqual(claude.releases(), [['rm', recorded.split('-')[0]]], 'the session whose id is on the record, and only it');
-    assert.deepEqual(
-      claude.rows().map((r) => r.name),
-      ['ae/before/1'],
-      'a journal an older engine wrote settles a stopped task with no session id: that session stays listed',
-    );
-  });
-});
+  await t.test('a release the harness refuses fails nothing else in the pass, and is asked again until it succeeds', async () => {
+    const claude = fakeClaude();
+    await onPath(claude.bin, async () => {
+      const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+      const done = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'exits on its own', cwd: tmp('cwd') }));
+      await Effect.runPromise(engine.tick());
+      claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done' })));
+      claude.rmFails(true);
+      const next = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'filed after', cwd: tmp('cwd') }));
 
-test('a release the harness refuses fails nothing else in the pass, and is asked again until it succeeds', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const done = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'exits on its own', cwd: tmp('cwd') }));
-    await Effect.runPromise(engine.tick());
-    claude.setRows(claude.rows().map((r) => ({ ...r, state: 'done' })));
-    claude.rmFails(true);
-    const next = await Effect.runPromise(engine.file({ config: { background: true }, brief: 'filed after', cwd: tmp('cwd') }));
+      await Effect.runPromise(engine.tick());
+      assert.equal((await Effect.runPromise(engine.view(done))).state.settled, 'succeeded');
+      assert.equal((await Effect.runPromise(engine.view(next))).state.attempts.length, 1, 'the other task was still started');
+      await Effect.runPromise(engine.tick());
+      const row = claude.rows().find((r) => r.name === `ae/${done}/1`)!;
+      assert.deepEqual(
+        claude.releases(),
+        [
+          ['rm', short(row)],
+          ['rm', short(row)],
+        ],
+        'it had exited, so no stop; removal asked on each pass',
+      );
 
-    await Effect.runPromise(engine.tick());
-    assert.equal((await Effect.runPromise(engine.view(done))).state.settled, 'succeeded');
-    assert.equal((await Effect.runPromise(engine.view(next))).state.attempts.length, 1, 'the other task was still started');
-    await Effect.runPromise(engine.tick());
-    const row = claude.rows().find((r) => r.name === `ae/${done}/1`)!;
-    assert.deepEqual(
-      claude.releases(),
-      [
-        ['rm', short(row)],
-        ['rm', short(row)],
-      ],
-      'it had exited, so no stop; removal asked on each pass',
-    );
-
-    claude.rmFails(false);
-    await Effect.runPromise(engine.tick());
-    assert.equal(
-      claude.rows().some((r) => r.name === `ae/${done}/1`),
-      false,
-      'and removed once the harness allows it',
-    );
+      claude.rmFails(false);
+      await Effect.runPromise(engine.tick());
+      assert.equal(
+        claude.rows().some((r) => r.name === `ae/${done}/1`),
+        false,
+        'and removed once the harness allows it',
+      );
+    });
   });
 });

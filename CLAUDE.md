@@ -142,7 +142,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   lines equal. Each step of the four denies too, on its own file's line (an agent's names no command of this repository), what the
   settings and shadcn's skill allow that writes the workspace or runs the suite: shadcn's CLI in each spelling an allow reaches (`npx shadcn@latest`, `pnpm dlx`, `bunx --bun`), its one read being the
   board's pinned `npx shadcn view` the settings allow, and `npm test`; intake and the janitor, which run no test, `node --test` and `npx
-  turbo run test` besides, while design and review keep the checks their notes name.
+  turbo run test` besides, while design and review keep the checks their notes name and are refused a build on that line
+  (`npx turbo run test *build*`).
 
 ## Where things are
 

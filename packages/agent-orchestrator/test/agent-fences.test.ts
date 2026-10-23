@@ -34,7 +34,8 @@
  * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own. What else the settings and a skill
  * allow that writes the workspace or runs the suite each read-only step denies on its own line (`ownedDenies`): shadcn's CLI in every
  * spelling an allow reaches (`SHADCN`), whose one read a step runs is the board's pinned `view` (`SHADCN_VIEW_NOTE`), and `npm test`;
- * intake and the janitor, which run no test, a test file's run and turbo's besides (`TESTLESS_AGENTS`, `TEST_RUNS`).
+ * intake and the janitor, which run no test, a test file's run and turbo's besides (`TESTLESS_AGENTS`, `TEST_RUNS`), and design and
+ * review, which run a package's tests, a build carried on turbo's test line (`TEST_BUILDS`).
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
  * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
  * Implement and land, which run what no deny names, deny the live collector by its two ports on their own line, each beside every deny
@@ -2617,11 +2618,29 @@ const TEST_RUNS: Call[] = [
 /** The denies that answer `TEST_RUNS`, on the line of each step of `TESTLESS_AGENTS`. */
 const TEST_RUN_DENIES = ['Bash(node --test:*)', 'Bash(npx turbo run test:*)'];
 
+/**
+ * A build carried on the line of turbo's test, which the settings' `npx turbo run test` reaches: it runs the whole suite and writes each
+ * package's output. Design and review, which keep a package's tests (`SCOPED_TESTS`), are refused it by a glob of its own.
+ */
+const TEST_BUILDS: Call[] = [
+  'npx turbo run test build',
+  'npx turbo run test --force --continue build',
+  'npx turbo run test --filter=web build',
+  'npx turbo run test docs#build',
+  'timeout 900 npx turbo run test build',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** The deny that answers `TEST_BUILDS`, on the line of each read-only step that runs tests. */
+const TEST_BUILD_DENIES = ['Bash(npx turbo run test *build*)'];
+
 /** The denies a read-only step's own line holds, by its agent, for what the settings and the skills allow it besides its reads. */
-const ownedDenies = (agent: string): string[] => [...READ_ONLY_DENIES, ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUN_DENIES : [])];
+const ownedDenies = (agent: string): string[] => [
+  ...READ_ONLY_DENIES,
+  ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUN_DENIES : TEST_BUILD_DENIES),
+];
 
 /** What a read-only agent's steps are refused of what the settings and the skills allow, by `ownedDenies`. */
-const refusedTo = (agent: string): Call[] => [...SHADCN, ...NPM_TEST, ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUNS : [])];
+const refusedTo = (agent: string): Call[] => [...SHADCN, ...NPM_TEST, ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUNS : TEST_BUILDS)];
 
 /** The file of each read-only step, `<workflow>/<step>.md` from the holder, with its agent. */
 const readOnlyStepFiles = (): Array<{ file: string; agent: string }> =>
@@ -2646,7 +2665,7 @@ const SHADCN_VIEW_ALLOW = 'Bash(npx shadcn view:*)';
 const shadcnView = (): Call[] =>
   checksOf(KIT_COMMAND.file, SHADCN_VIEW_NOTE).map((command) => ({ tool: 'Bash', command: command.replace('<component>', 'button') }));
 
-test("every read-only step is refused shadcn's CLI in every spelling an allow reaches it by, and npm test, by its own deny", () => {
+test("every read-only step is refused shadcn's CLI in every spelling an allow reaches it by, npm test and a build on turbo's test, by its own deny", () => {
   assert.deepEqual(
     readOnlyStepFiles()
       .map(({ file }) => file)

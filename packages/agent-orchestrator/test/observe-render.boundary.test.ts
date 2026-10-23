@@ -110,7 +110,7 @@ test("a render's Prometheus takes a sample a week late, the image's configuratio
   assert.equal(RENDER_LATE, '8d', "longer than the seed's week of quota");
   assert.ok(refused(() => lateConfig('global:\n  scrape_native_histograms: true\n')).length > 0, 'REFUSED: no window to widen');
   const argv = runArgv(COMPOSE, '/w/tools/observe', nameOf(), ['/tmp/x/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro']);
-  assert.deepEqual(argv.slice(-3, -1), ['-v', '/tmp/x/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro'], 'its own bind after the file\'s');
+  assert.deepEqual(argv.slice(-3, -1), ['-v', '/tmp/x/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro'], "its own bind after the file's");
 });
 
 test('REFUSED: a container started under a name that is no render’s, the live stack’s among them', () => {
@@ -141,7 +141,10 @@ test('a render whose container never comes up exits non-zero, and removes it by 
   const started = said.findIndex((line) => line.startsWith('run -d '));
   const name = /^run -d --rm --name (\S+) /.exec(said[started] ?? '')?.[1] ?? '';
   assert.match(name, NAME, said.join('\n'));
-  assert.ok(said.slice(0, started).every((line) => line.startsWith('run --rm --entrypoint cat ')), 'only the image read before it');
+  assert.ok(
+    said.slice(0, started).every((line) => line.startsWith('run --rm --entrypoint cat ')),
+    'only the image read before it',
+  );
   assert.ok(said[started].includes(`/${name}/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro`), 'its own Prometheus configuration');
   assert.equal(fs.existsSync(path.join(os.tmpdir(), name)), false, 'its own files removed with it');
   assert.equal(said.at(-1), `rm -f -v ${name}`, said.join('\n'));

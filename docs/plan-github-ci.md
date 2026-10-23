@@ -1,8 +1,8 @@
 # Moving to GitHub, with CI
 
-2026-09-25, and still the one document to open to learn where the GitHub move stands. Steps 1 to 3 are done; step 5, CI, is being
-built now under the intent `the-ci-is-the-check-nemia-s-j94s` (signed 2026-10-19, twenty-six decisions, six cards), which also decided
-what of Nemia's own checks CI takes over. Step 6 is a named follow-on intent, not this one.
+2026-09-25, and still the one document to open to learn where the GitHub move stands. Steps 1 to 3 are done, and so is step 5, CI: it was
+built under the intent `the-ci-is-the-check-nemia-s-j94s` (signed 2026-10-19, twenty-six decisions, six cards), which also decided
+what of Nemia's own checks CI takes over; a run's round has been judged by `ci` on its pull request since `bcba88e51` (2026-10-19). Step 6 is a named follow-on intent, not this one.
 
 ## Why now
 

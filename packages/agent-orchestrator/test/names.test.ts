@@ -44,7 +44,6 @@ const HISTORY = [
   'docs/pivot-2026-09-18/',
   'docs/plan-hold-the-bar.md',
   'docs/night-*.md',
-  'packages/agent-runtime/docs/hkb-migration.md',
 ];
 
 /** Whether a file is under one entry of `HISTORY`: the whole path, never a part of it. */
@@ -235,7 +234,7 @@ test('REFUSED: a file beside history is live, and history is matched whole', () 
   assert.equal(inHistory('docs/design-2026-09-25-agents-and-skills.md'), true);
   assert.equal(inHistory('docs/spike-2026-09-25-agents-skills.md'), true);
   assert.equal(inHistory('docs/eval-2026-09-25-composable-workflows/brief.md'), true);
-  assert.equal(inHistory(`packages/agent-runtime/docs/${OLD}-migration.md`), true);
+  assert.equal(inHistory('docs/plan-hold-the-bar.md'), true);
   for (const live of [
     'docs/night-2026-09-22.md.bak',
     'docs/night/notes.md',

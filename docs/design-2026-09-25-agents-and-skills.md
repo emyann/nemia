@@ -1,5 +1,9 @@
 # Design, 2026-09-25: agents and skills in Claude Code's own format
 
+> **Status (2026-10-23): landed.** Built by its cards 1a to 4 (agent-orchestrator's `docs/features.md`, §12), among them
+> `9e38e5a62` (1b), `cc13d4c88` (2), `ef147a1a2`, `c8145caac` and `60afb7b34` (3a to 3c), 2026-09-25 and 26. Since 2026-09-29 the
+> package ships no agents or skills (`62132eb3a`): what this note says HKB ships is history.
+
 A design note, approved by the owner on 2026-09-25. It rests on the owner's decisions of 2026-09-25 and on the measurements
 in `docs/spike-2026-09-25-agents-skills.md` (F1–F20, Claude Code 2.1.282).
 

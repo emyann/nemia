@@ -1,11 +1,14 @@
 /**
  * `HARNESS_CHOICES`, the words each default harness takes for a key of a task's config: every word a harness is offered is one
  * `configRefusal` takes of it, and a harness has a list of permission modes or of sandboxes as `fenceReach` says its fence is set,
- * never both and never neither. Each rule is made to refuse with a planted table.
+ * never both and never neither; `HARNESS_KNOBS` says the same harnesses the same words, and the knobs their fence takes. Each rule is
+ * made to refuse with a planted table.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { HARNESS_CHOICES, fenceReach } from '../src/vocabulary.ts';
+import { HARNESS_KNOBS } from '../src/harness/choices.ts';
+import { CLAUDE_OWNED_FLAGS } from '../src/harness/claude/vocabulary.ts';
 import { configRefusal } from '../src/index.ts';
 import { DEFAULT_HARNESSES } from '../src/service/default-harnesses.ts';
 
@@ -46,29 +49,57 @@ function choicesBreaks(table: Choices): string[] {
   return out;
 }
 
-test('every word HARNESS_CHOICES offers a harness is one configRefusal takes of it', () => {
-  assert.deepEqual(refusedWords(HARNESS_CHOICES), []);
+test('HARNESS_CHOICES ⊆ what configRefusal takes, each harness offered the fence words fenceReach sets it by, and HARNESS_KNOBS its mirror', async (t) => {
+  await t.test('every word HARNESS_CHOICES offers a harness is one configRefusal takes of it', () => {
+    assert.deepEqual(refusedWords(HARNESS_CHOICES), []);
+  });
+  await t.test('each harness HARNESS_CHOICES names is a default harness, offered the list its fence is set by and not the other', () => {
+    assert.deepEqual(choicesBreaks(HARNESS_CHOICES), []);
+  });
+  await t.test(
+    'HARNESS_KNOBS names the harnesses HARNESS_CHOICES does, each with the effort and the fence words HARNESS_CHOICES gives it',
+    () => {
+      assert.deepEqual(Object.keys(HARNESS_KNOBS).sort(), Object.keys(HARNESS_CHOICES.effort).sort());
+      for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
+        assert.equal(knobs.effort, HARNESS_CHOICES.effort[harness], harness);
+        const fence = HARNESS_CHOICES.permissionMode[harness] ? 'permissionMode' : 'sandbox';
+        assert.equal(knobs.fence.key, fence, harness);
+        assert.equal(knobs.fence.words, HARNESS_CHOICES[fence][harness], harness);
+      }
+    },
+  );
+  await t.test(
+    'a harness fenced by its permission mode takes the tool lists, a context window and any flag but those the runtime owns',
+    () => {
+      for (const [harness, knobs] of Object.entries(HARNESS_KNOBS)) {
+        const moded = knobs.fence.key === 'permissionMode';
+        assert.deepEqual(knobs.fence.lists, moded ? ['tools', 'allowedTools', 'disallowedTools'] : [], harness);
+        assert.equal(knobs.context, moded, harness);
+        if (moded) assert.equal('owned' in knobs.flags && knobs.flags.owned, CLAUDE_OWNED_FLAGS, harness);
+        else assert.deepEqual(knobs.flags, { only: ['trustFrom'] }, harness);
+      }
+    },
+  );
 });
 
-test('REFUSED: a word HARNESS_CHOICES would offer that configRefusal refuses', () => {
-  for (const key of Object.keys(HARNESS_CHOICES) as (keyof Choices)[])
-    for (const harness of Object.keys(HARNESS_CHOICES[key])) {
-      const planted = { ...HARNESS_CHOICES, [key]: { ...HARNESS_CHOICES[key], [harness]: ['nope'] } };
-      assert.equal(refusedWords(planted).length, 1, `${key} on ${harness}`);
-    }
-});
-
-test('each harness HARNESS_CHOICES names is a default harness, offered the list its fence is set by and not the other', () => {
-  assert.deepEqual(choicesBreaks(HARNESS_CHOICES), []);
-});
-
-test('REFUSED: codex offered a permissionMode list, Claude Code a sandbox list, or a harness the runtime has not', () => {
-  const codexModes = { ...HARNESS_CHOICES, permissionMode: { ...HARNESS_CHOICES.permissionMode, codex: ['read-only'] } };
-  assert.deepEqual(choicesBreaks(codexModes), ['codex is fenced by sandbox, and is offered a permissionMode list']);
-  const claudeSandbox = { ...HARNESS_CHOICES, sandbox: { ...HARNESS_CHOICES.sandbox, claude: ['read-only'] } };
-  assert.deepEqual(choicesBreaks(claudeSandbox), ['claude is fenced by mode, and is offered a sandbox list']);
-  const { codex: _codex, ...noCodex } = HARNESS_CHOICES.sandbox;
-  assert.deepEqual(choicesBreaks({ ...HARNESS_CHOICES, sandbox: noCodex }), ['codex is fenced by sandbox, and is offered no sandbox list']);
-  const unknown = { ...HARNESS_CHOICES, effort: { ...HARNESS_CHOICES.effort, gemini: ['high'] } };
-  assert.deepEqual(choicesBreaks(unknown), ['gemini is offered words, and is no default harness']);
+test('REFUSED: the checks over HARNESS_CHOICES, each made to refuse by a planted table', async (t) => {
+  await t.test('a word HARNESS_CHOICES would offer that configRefusal refuses', () => {
+    for (const key of Object.keys(HARNESS_CHOICES) as (keyof Choices)[])
+      for (const harness of Object.keys(HARNESS_CHOICES[key])) {
+        const planted = { ...HARNESS_CHOICES, [key]: { ...HARNESS_CHOICES[key], [harness]: ['nope'] } };
+        assert.equal(refusedWords(planted).length, 1, `${key} on ${harness}`);
+      }
+  });
+  await t.test('codex offered a permissionMode list, Claude Code a sandbox list, or a harness the runtime has not', () => {
+    const codexModes = { ...HARNESS_CHOICES, permissionMode: { ...HARNESS_CHOICES.permissionMode, codex: ['read-only'] } };
+    assert.deepEqual(choicesBreaks(codexModes), ['codex is fenced by sandbox, and is offered a permissionMode list']);
+    const claudeSandbox = { ...HARNESS_CHOICES, sandbox: { ...HARNESS_CHOICES.sandbox, claude: ['read-only'] } };
+    assert.deepEqual(choicesBreaks(claudeSandbox), ['claude is fenced by mode, and is offered a sandbox list']);
+    const { codex: _codex, ...noCodex } = HARNESS_CHOICES.sandbox;
+    assert.deepEqual(choicesBreaks({ ...HARNESS_CHOICES, sandbox: noCodex }), [
+      'codex is fenced by sandbox, and is offered no sandbox list',
+    ]);
+    const unknown = { ...HARNESS_CHOICES, effort: { ...HARNESS_CHOICES.effort, gemini: ['high'] } };
+    assert.deepEqual(choicesBreaks(unknown), ['gemini is offered words, and is no default harness']);
+  });
 });

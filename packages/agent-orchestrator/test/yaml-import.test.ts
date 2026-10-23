@@ -1,6 +1,7 @@
 /**
- * `yaml` is the orchestrator's one YAML parser, and src/template/template.store.ts alone imports it, among the package's `src` and
- * `bin`: a pure file reads a template's documents as the store hands them over. A test beside its file is of no kind, and may read
+ * `yaml` is the orchestrator's one YAML parser, and two files alone import it, among the package's `src` and `bin`:
+ * src/template/template.store.ts, whose pure files read a template's documents as the store hands them over, and
+ * src/frontmatter/frontmatter.ts, the one reader and writer of every frontmatter block. A test beside its file is of no kind, and may read
  * back what a store wrote. Imports are read by TypeScript's own scan, so an import broken over lines, an `export … from` and a dynamic
  * `import()` are each found.
  */
@@ -13,8 +14,9 @@ import { scratch } from './scratch.ts';
 
 const PACKAGE = path.join(import.meta.dirname, '..');
 
-/** The file that may import `yaml`, by path from the package. */
-const IMPORTER = 'src/template/template.store.ts';
+/** The files that may import `yaml`, by path from the package, sorted. */
+const IMPORTERS = ['src/frontmatter/frontmatter.ts', 'src/template/template.store.ts'];
+const IMPORTER = IMPORTERS[1];
 
 /** Every `.ts` file under `dir`'s `src` and `bin` but a test, by path from `dir`. */
 function sourcesOf(dir: string): string[] {
@@ -39,9 +41,9 @@ function yamlImporters(dir: string): string[] {
     .sort();
 }
 
-test('yaml is imported by src/template/template.store.ts alone, among the src and bin of agent-orchestrator', () => {
+test('yaml is imported by src/template/template.store.ts and src/frontmatter/frontmatter.ts alone, among the src and bin of agent-orchestrator', () => {
   assert.ok(sourcesOf(PACKAGE).length > 100, 'the scan reads the package, or it would pass by reading nothing');
-  assert.deepEqual(yamlImporters(PACKAGE), [IMPORTER]);
+  assert.deepEqual(yamlImporters(PACKAGE), IMPORTERS);
 });
 
 test('REFUSED: a yaml import outside the store, broken over lines, re-exported, by a subpath or dynamic, in src or bin', () => {

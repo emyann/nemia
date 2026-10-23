@@ -125,32 +125,37 @@ test('the engine reaches a harness through the A2A seam for every verb it asks, 
   assert.deepEqual(s.direct, [], 'none asked outside the seam, and every one asked, so none passed by being skipped');
 });
 
-test("REFUSED: a driver asked directly, its own verbs spread beside the seam's three, is named for each verb", async () => {
-  const s = spy();
-  const direct = asyncOps(s.runner);
-  const seam = a2aOps('fake', direct, async () => []);
-  const besideTheSeam = { ...direct, spawn: seam.spawn, observe: seam.observe, stop: seam.stop };
-  await marked(async () => {
-    s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
-    await Effect.runPromise(besideTheSeam.find!('ae/t-1/1'));
-    await Effect.runPromise(besideTheSeam.logs('s-9'));
-    await Effect.runPromise(besideTheSeam.release!({ sessionId: 's-9', state: 'completed' }, {}));
-    await Effect.runPromise(besideTheSeam.say!({ name: 'ae/t-1/1', sessionId: 's-9' }, 'hi'));
-    await Effect.runPromise(besideTheSeam.observe);
+test('REFUSED: a verb asked beside the seam is named, whichever shape bypasses it', async (t) => {
+  await t.test("REFUSED: a driver asked directly, its own verbs spread beside the seam's three, is named for each verb", async () => {
+    const s = spy();
+    const direct = asyncOps(s.runner);
+    const seam = a2aOps('fake', direct, async () => []);
+    const besideTheSeam = { ...direct, spawn: seam.spawn, observe: seam.observe, stop: seam.stop };
+    await marked(async () => {
+      s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
+      await Effect.runPromise(besideTheSeam.find!('ae/t-1/1'));
+      await Effect.runPromise(besideTheSeam.logs('s-9'));
+      await Effect.runPromise(besideTheSeam.release!({ sessionId: 's-9', state: 'completed' }, {}));
+      await Effect.runPromise(besideTheSeam.say!({ name: 'ae/t-1/1', sessionId: 's-9' }, 'hi'));
+      await Effect.runPromise(besideTheSeam.observe);
+    });
+    assert.deepEqual(s.direct, ['find', 'logs', 'release', 'say'], 'every verb that bypassed the seam, and the observe that did not');
+    assert.ok(s.direct.some((verb) => !EXEMPT.includes(verb)));
   });
-  assert.deepEqual(s.direct, ['find', 'logs', 'release', 'say'], 'every verb that bypassed the seam, and the observe that did not');
-  assert.ok(s.direct.some((verb) => !EXEMPT.includes(verb)));
-});
 
-test('REFUSED: the transcript read directly, spread from the driver beside every other verb through the seam, is named', async () => {
-  const s = spy();
-  const direct = asyncOps(s.runner);
-  const transcriptBeside = { ...a2aOps('fake', direct, async () => []), transcript: direct.transcript! };
-  await marked(async () => {
-    s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
-    await Effect.runPromise(transcriptBeside.transcript('s-9'));
-    await Effect.runPromise(transcriptBeside.logs('s-9'));
-  });
-  assert.deepEqual(s.direct, ['transcript'], 'the transcript bypassed the seam, and the logs did not');
-  assert.ok(s.direct.some((verb) => !EXEMPT.includes(verb)));
+  await t.test(
+    'REFUSED: the transcript read directly, spread from the driver beside every other verb through the seam, is named',
+    async () => {
+      const s = spy();
+      const direct = asyncOps(s.runner);
+      const transcriptBeside = { ...a2aOps('fake', direct, async () => []), transcript: direct.transcript! };
+      await marked(async () => {
+        s.sessions.set('ae/t-1/1', { sessionId: 's-9', state: 'completed' });
+        await Effect.runPromise(transcriptBeside.transcript('s-9'));
+        await Effect.runPromise(transcriptBeside.logs('s-9'));
+      });
+      assert.deepEqual(s.direct, ['transcript'], 'the transcript bypassed the seam, and the logs did not');
+      assert.ok(s.direct.some((verb) => !EXEMPT.includes(verb)));
+    },
+  );
 });

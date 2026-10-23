@@ -725,31 +725,41 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       assert.doesNotMatch((await typed(t, b.e, 'ls', run.id)).printed.join('\n'), /waiting on you/, 'and `nemia ls` agrees');
 
       const whole = await decideScreen(tt, b.e, [run.id], { '<id>': run.id, '<root>': ROOT, '<repo>': repo, '<at>': at }, placeNow());
-      assert.deepEqual(whole.slice(0, 5), [
-        '<id>  add a flag',
-        '  pruned at <at> — its worktrees were removed (nemia prune); its branches, record and files are kept',
-        '',
-        '  BLOCKED: implement',
-        '  OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at <at> — its worktrees were removed (nemia prune); nothing after it ran',
-      ]);
-      for (const line of [
-        '  touched  wf/<id>/run',
-        '    (root)  1 file   +1 −0',
-        '  lesson  nothing written where the next agent reads',
-        '  none',
-        '  implement  BLOCKED',
-        '    cost  $3.40 · budget $3',
-        '    did it',
-        '    needs: a word',
-        '  cost  run $3.40',
-        '  wf/<id>/run  — 1 file: +1 −0',
-        '  ship it   git -C <repo> merge --no-ff wf/<id>/run',
-        '  drop it   git -C <repo> branch -D wf/<id>/run',
-      ])
-        assert.ok(whole.includes(line), `${line}\n${whole.join('\n')}`);
-      assert.ok(
-        whole.some((l) => l.startsWith('  branch    wf/<id>/run is ahead of main by 1 commit')),
-        whole.join('\n'),
+      const timesCut = whole.map((l) => l.replace(/^( *timeline {2}(?:try 1 {2}filed|run {2}queued) ).*$/, '$1<times>'));
+      assert.deepEqual(
+        timesCut,
+        [
+          '<id>  add a flag',
+          '  pruned at <at> — its worktrees were removed (nemia prune); its branches, record and files are kept',
+          '',
+          '  BLOCKED: implement',
+          '  OVER BUDGET: implement ($3.40 of $3)  — nothing more is filed for it, raised or not, since the run was pruned at <at> — its worktrees were removed (nemia prune); nothing after it ran',
+          '',
+          '  touched  wf/<id>/run',
+          '    (root)  1 file   +1 −0',
+          '  lesson  nothing written where the next agent reads',
+          '',
+          '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
+          '  none',
+          '',
+          '  implement  BLOCKED',
+          '    used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured',
+          '    cost  $3.40 · budget $3',
+          '    timeline  try 1  filed <times>',
+          '    did it',
+          '    needs: a word',
+          '',
+          '  cost  run $3.40',
+          '  timeline  run  queued <times>',
+          '',
+          '  wf/<id>/run  — 1 file: +1 −0',
+          '',
+          '  branch    wf/<id>/run is ahead of main by 1 commit',
+          '',
+          '  ship it   git -C <repo> merge --no-ff wf/<id>/run',
+          '  drop it   git -C <repo> branch -D wf/<id>/run',
+        ],
+        'the whole screen, in order, each timeline cut where the times the stand-in stamps off the wall clock start',
       );
     },
   );

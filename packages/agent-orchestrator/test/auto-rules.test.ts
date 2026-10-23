@@ -199,11 +199,25 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
       assert.equal(await decidedAtAuto('nemia approve g-semi build'), 'ask', 'the same state at semi-auto');
       assert.equal(await decidedAtAuto('nemia approve g-refused build'), 'ask', 'its check refused');
       assert.equal(await decidedAtAuto('nemia approve g-gone build'), 'ask', 'a run that does not read');
+      const IMPLEMENT = { name: 'implement', after: [], body: 'Build it.', harness: 'codex', check: 'npm test' };
+      writeRun('g-tries', 'auto', [{ ...IMPLEMENT, gate: true }], {
+        implement: { taskId: 'g-tries-implement', check: { taskId: 'g-tries-check' } },
+      });
+      settled('g-tries-implement', { outcome: 'done', summary: 'Built.', artifacts: [] });
+      settled('g-tries-check', undefined, 0);
+      assert.equal(await decidedAtAuto('nemia retry g-tries implement'), undefined, '`tries` allows a try of implement, its check passed');
       assert.equal(
-        await decidedAtAuto('nemia retry g-auto build --budget 5'),
+        await decidedAtAuto('nemia retry g-tries implement --budget 5'),
         'ask',
-        "a try that raises a step's cap, whatever the rules allow",
+        "the same try raising the step's cap, whatever the rules allow",
       );
+      writeRun('g-free', 'auto', [IMPLEMENT], {
+        implement: { taskId: 'g-free-implement', check: { taskId: 'g-free-check' } },
+      });
+      settled('g-free-implement', { outcome: 'done', summary: 'Built.', artifacts: [] });
+      settled('g-free-check', undefined, 0);
+      assert.equal(await decidedAtAuto('nemia retry g-free implement'), undefined, 'a try of a step that waits on no one');
+      assert.equal(await decidedAtAuto('nemia retry g-free implement --budget 5'), 'ask', 'is asked once it raises the cap');
     },
   );
   await s.test('REFUSED: a confirm of a rule is asked every time, at auto', async () => {

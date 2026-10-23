@@ -370,7 +370,7 @@ test("every package's tests are held to the baseline: no new file, no new kind, 
         `the scan reads ${pkg}/${dir}`,
       );
   const kindsOf = (file: string): readonly Kind[] | undefined => found.get(file)?.kinds;
-  assert.deepEqual(kindsOf(`${T}/hold.test.ts`), ['git', 'process', 'place', 'hand']);
+  assert.deepEqual(kindsOf(`${T}/forget-linked.test.ts`), ['git', 'process', 'place', 'hand']);
   assert.deepEqual(kindsOf('packages/agent-runtime/test/detached.test.ts'), ['git', 'process']);
   assert.deepEqual(kindsOf('apps/api/test/layer.test.ts'), ['engine', 'hand']);
   assert.deepEqual(kindsOf(`${T}/test-place.test.ts`), [], 'a test on the stand-in reaches nothing real');

@@ -16,7 +16,7 @@
 import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
 import { attemptVerdict } from '../check/check.ts';
-import type { Run } from '../record/record.ts';
+import { stepTaskId, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { StepStatus } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
@@ -79,7 +79,7 @@ export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: 
 
 /**
  * One fact of a step a pass records: a session that settled (`try`), with what it cost in dollars where measured, its tokens where
- * measured and how long it ran; a check that settled (`check`); a round its loop was granted or ran out of (`round`); a wait outside the
+ * measured, in and out and the input by kind, and how long it ran, `task` on the step's first try; a check that settled (`check`); a round its loop was granted or ran out of (`round`); a wait outside the
  * step's sessions that ended (`WaitFact`); a call its harness denied one of its sessions (`DeniedFact`); a number of its run's timeline
  * once the run is over (`TimelineFact`). `attributes` are `stepAttributes`, the outcome among them: `done`, `blocked`, `failed` or
  * `stopped` for a try; `passed`, `refused` or `unfinished` for a check; `granted` or `exhausted` for a round.
@@ -91,6 +91,10 @@ export type StepFact =
       costUsd?: number;
       inputTokens?: number;
       outputTokens?: number;
+      cacheReadTokens?: number;
+      cacheWriteTokens?: number;
+      uncachedTokens?: number;
+      task?: true;
       ms: number;
     }
   | { metric: 'check' | 'round'; attributes: Record<string, string> }
@@ -147,7 +151,11 @@ export function checkOutcome(view: FactView): string {
   return verdict === 'unfinished' ? verdict : verdict === 0 ? 'passed' : 'refused';
 }
 
-/** The fact of one session that settled. */
+/**
+ * The fact of one session that settled: its cost, its tokens in and out and of each kind of input (cache reads, cache
+ * writes, uncached) where every attempt measured it (`sumUsage`), never 0 in its place, and `task` on the
+ * step's first try (`stepTaskId`), the one settle a step of a run is counted by as a task, whatever tries and rounds follow it.
+ */
 function tryFact(run: Run, step: Workflow, taskId: string, view: FactView, reads: FactReads): StepFact {
   const record = run.steps[step.name];
   const outcome = tryOutcome(view, record?.taskId === taskId, reads.signedOff(step.name));
@@ -159,6 +167,10 @@ function tryFact(run: Run, step: Workflow, taskId: string, view: FactView, reads
     ...(spend && spend.measured > 0 ? { costUsd: spend.usd } : {}),
     ...(usage?.inputTokens !== undefined ? { inputTokens: usage.inputTokens } : {}),
     ...(usage?.outputTokens !== undefined ? { outputTokens: usage.outputTokens } : {}),
+    ...(usage?.cacheReadTokens !== undefined ? { cacheReadTokens: usage.cacheReadTokens } : {}),
+    ...(usage?.cacheWriteTokens !== undefined ? { cacheWriteTokens: usage.cacheWriteTokens } : {}),
+    ...(usage?.uncachedTokens !== undefined ? { uncachedTokens: usage.uncachedTokens } : {}),
+    ...(taskId === stepTaskId(run, step.name) ? { task: true as const } : {}),
     ms: ranMs(view),
   };
 }

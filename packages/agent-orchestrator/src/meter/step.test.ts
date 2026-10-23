@@ -220,6 +220,52 @@ test('a session that settled with a cost records its cost once, by the five attr
   assert.ok(snapshot.every((m) => !('run' in (m.attributes ?? {}))));
 });
 
+/** A view like `view`'s, its attempts' usage measured by kind as `kinds` say: a missing kind on any attempt is measured on none. */
+const kindedView = (...kinds: Array<{ cacheReadTokens?: number; cacheWriteTokens?: number; uncachedTokens?: number }>): FactView => ({
+  state: {
+    brief: 'Do it.',
+    settled: 'succeeded',
+    attempts: kinds.map((k) => ({
+      startedAt: '2026-10-06T10:00:00.000Z',
+      spawnedAt: '2026-10-06T10:00:00.000Z',
+      endedAt: '2026-10-06T10:05:00.000Z',
+      reason: null,
+      usage: { inputTokens: (k.cacheReadTokens ?? 0) + (k.cacheWriteTokens ?? 0) + (k.uncachedTokens ?? 0), outputTokens: 300, ...k },
+    })),
+  },
+});
+
+test("a try's input by kind where every attempt measured it, and a step of a run counted as one task at its first try alone", async () => {
+  const twice = {
+    ...RUN,
+    steps: { work: { status: 'running', taskId: 'r-1-work-try2', tries: [{ taskId: 'r-1-work' }] } },
+  } as unknown as Run;
+  const views = new Map<string, FactView>([
+    ['r-1-work', kindedView({ cacheReadTokens: 900, cacheWriteTokens: 250, uncachedTokens: 50 })],
+    ['r-1-work-try2', kindedView({ cacheReadTokens: 100, cacheWriteTokens: 20, uncachedTokens: 5 }, { cacheReadTokens: 7 })],
+  ]);
+  const facts = settledFacts(twice, [WORK], new Set(views.keys()), reads({ views }));
+  const kinds = facts.map((f) =>
+    f.metric === 'try' ? [f.inputTokens, f.cacheReadTokens, f.cacheWriteTokens, f.uncachedTokens, f.task ?? false] : [],
+  );
+  assert.deepEqual(kinds, [
+    [132, 107, undefined, undefined, false],
+    [1200, 900, 250, 50, true],
+  ]);
+  assert.equal('cacheWriteTokens' in facts[0], false, 'a kind one attempt did not measure is said nowhere, never as 0');
+
+  const snapshot = await recorded(facts);
+  const count = (id: string) => snapshot.filter((m) => m.id === id).reduce((n, m) => n + (m.state as { count: number }).count, 0);
+  assert.deepEqual(
+    ['step.tokens.cache_read', 'step.tokens.cache_write', 'step.tokens.uncached', 'step.tokens.input'].map(count),
+    [1007, 250, 50, 1332],
+  );
+  assert.equal(count('step.tries'), 2, 'two tries');
+  const tasks = snapshot.filter((m) => m.id === 'step.tasks');
+  assert.equal(count('step.tasks'), 1, 'REFUSED: the try after the first is no task of its own');
+  assert.deepEqual(tasks[0].attributes, { factory: 'nemia', workflow: 'build', step: 'work', agent: 'ada' }, 'no outcome');
+});
+
 test('each series a fact writes is exported at zero, then at its value: two exports, and none where no fact writes a metric', async () => {
   const registry = new Map();
   const own = <A, E>(program: Effect.Effect<A, E>) =>

@@ -335,8 +335,8 @@ test('REFUSED: a board and the daemon reading within the keep ask once; after an
     fake.asked += 1;
     return fake.next;
   };
-  const daemon = daemonQuota((opts) => readQuota({ ...opts, now, mono }), counting);
-  assert.equal((await read({ now, mono })).state, 'fresh', 'a board reads');
+  const daemon = daemonQuota((opts) => readQuota({ ...opts, now, mono }), 'board', counting);
+  assert.equal((await read({ now, mono, harness: 'board' })).state, 'fresh', 'a board reads');
   clock += QUOTA_KEEP_MS - 1;
   assert.equal((await daemon()).kind, 'windows', 'the daemon reads what the board asked for');
   assert.equal(fake.asked, before + 1, 'one ask for both');
@@ -345,8 +345,12 @@ test('REFUSED: a board and the daemon reading within the keep ask once; after an
   assert.notEqual((await daemon()).kind, 'windows', 'past the keep the daemon asks, and is told nothing');
   clock += QUOTA_BACKOFF_MS - 1;
   await daemon();
-  await read({ now, mono });
+  await read({ now, mono, harness: 'board' });
   assert.equal(fake.asked, before + 2, 'inside the backoff neither asks');
+  fake.next = plan();
+  const other = await daemonQuota((opts) => readQuota({ ...opts, now, mono }), 'another', counting)();
+  assert.equal(other.kind, 'windows', "REFUSED: another harness is never answered from the board's harness's held answer");
+  assert.equal(fake.asked, before + 3, 'another harness asks for itself');
 });
 
 test('REFUSED: after an unanswered answer no read asks inside the wait, however many boards read; the waits grow, and a good reading begins them again', async () => {
@@ -429,11 +433,12 @@ test('HKB_QUOTA_BACKOFF_MS sets the first wait — 0 asks on every read — and 
   }
 });
 
-test('REFUSED: reads that come while an ask is in flight join it: one ask for all of them, the route among them', async (t) => {
+test('REFUSED: reads of the harness the route reads that come while an ask is in flight join it: one ask for all of them, the route among them', async (t) => {
   fresh();
   t.mock.timers.enable({ apis: ['Date'], now: NOW });
   const before = asks() + fake.asked;
-  const all = await Promise.all([read(), read(), get(), read()]);
+  const route = { harness: 'claude' };
+  const all = await Promise.all([read(route), read(route), get(), read(route)]);
   assert.deepEqual(
     all.map((q) => q.state),
     ['fresh', 'fresh', 'fresh', 'fresh'],

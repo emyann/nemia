@@ -205,7 +205,10 @@ export function appOf(layer: Layer.Layer<Services>): { app: Hono<ApiEnv>; runtim
     )
     .get('/api/daemon', (c) => c.json(readDaemon()))
     .get('/api/quota', (c) =>
-      served(c, async ({ e, env, quota }) => c.json(await quota({ env, ask: () => engineRead('quota', e.quota('claude')) }))),
+      served(c, async ({ e, env, quota }) => {
+        const harness = 'claude';
+        return c.json(await quota({ env, harness, ask: () => engineRead('quota', e.quota(harness)) }));
+      }),
     )
     .route('/', commands)
     .route('/', steps)

@@ -13,7 +13,6 @@ import assert from 'node:assert/strict';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { scratch } from './scratch.ts';
@@ -63,9 +62,15 @@ const fresh = (): void => {
   for (const file of [CALLS, GONE, lockFile()]) fs.rmSync(file, { force: true });
 };
 
-/** Run a file of the render with `args`, bounded, its environment this one's; its exit and what it said. */
+/** The system's temp folder a render run here is given, where it keeps its own files (`lateBind`). */
+const RENDER_TMP = scratch('wf-observe-render-tmp-');
+
+/**
+ * Run a file of the render with `args`, bounded, its environment this one's but its temp folder (`RENDER_TMP`); its exit and what it
+ * said.
+ */
 function ran(file: string, args: string[]): { status: number | null; out: string } {
-  const env: NodeJS.ProcessEnv = { ...process.env };
+  const env: NodeJS.ProcessEnv = { ...process.env, TMPDIR: RENDER_TMP };
   delete env.NODE_TEST_CONTEXT;
   delete env.WF_ARTIFACTS;
   const r = spawnSync(process.execPath, [path.join(RENDER, file), ...args], { env, encoding: 'utf8', timeout: 100_000 });
@@ -146,7 +151,7 @@ test('a render whose container never comes up exits non-zero, and removes it by 
     'only the image read before it',
   );
   assert.ok(said[started].includes(`/${name}/prometheus.yaml:/otel-lgtm/prometheus.yaml:ro`), 'its own Prometheus configuration');
-  assert.equal(fs.existsSync(path.join(os.tmpdir(), name)), false, 'its own files removed with it');
+  assert.equal(fs.existsSync(path.join(RENDER_TMP, name)), false, 'its own files removed with it');
   assert.equal(said.at(-1), `rm -f -v ${name}`, said.join('\n'));
   assert.ok(!said.some((line) => line.includes('nemia-lgtm') || line.includes('*')), said.join('\n'));
   assert.equal(locked(), undefined, 'the slot is let go');

@@ -3,7 +3,7 @@
  * `tick()`, and the views `taskPhases` makes of a run's tasks — every task of every run, each pass — counted on the runtime's meter, the
  * `observed, by harness` lines of `nemia up --stats`.
  *
- * A view of a settled check is read off its record (`agent-runtime`'s `settled-view.test.ts`), never by observing the check harness,
+ * A view of a settled check is read off its record (`agent-runtime`'s `test/io.test.ts`), never by observing the check harness,
  * which lists every run file it ever ran: on a live store of 197 runs, one pass that observed it for each view listed 52976 of them in
  * 799 ms. So the count is one for the pass and one for each check in flight.
  *

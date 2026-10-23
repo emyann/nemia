@@ -15,12 +15,12 @@ import type { FinishedListing, OpenListing, RunListing } from './runs.ts';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor } from '../../test/placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor } from '../../test/placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const app = eachTest(() => appOver(standIn(), stand()));
 
 /** An instant `m` minutes into the fixtures' hour. */
 const at = (m: number) => new Date(Date.UTC(2026, 9, 4, 10, m)).toISOString();
@@ -32,9 +32,9 @@ const BLOCKED = { outcome: 'blocked', summary: 'Could not.', needs: 'a key', art
 function journalled(taskId: string, from: string, end?: { to: string; closeout: typeof DONE | typeof BLOCKED }): void {
   Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd: root, harness: 'codex' }));
   const begun = { startedAt: from, spawnedAt: from };
-  if (!end) standIn.settle(taskId, 'running (working)', begun);
+  if (!end) standIn().settle(taskId, 'running (working)', begun);
   else
-    standIn.settle(taskId, end.closeout.outcome === 'done' ? 'succeeded' : 'failed', {
+    standIn().settle(taskId, end.closeout.outcome === 'done' ? 'succeeded' : 'failed', {
       ...begun,
       endedAt: end.to,
       exitCode: 0,
@@ -67,18 +67,20 @@ const finished = (id: string, created: number, to: number, factory?: string) => 
   aRun(id, at(created), factory);
 };
 
-finished('l-first', 0, 50, 'nemia');
-finished('l-second', 5, 20);
-finished('l-third', 10, 30, 'nemia');
-finished('l-fourth', 15, 40);
-finished('l-fifth', 16, 45, 'pipao');
-journalled('l-asks-write', at(20), { to: at(25), closeout: BLOCKED });
-aRun('l-asks', at(20), 'nemia');
-journalled('l-moves-write', at(30));
-aRun('l-moves', at(30));
+beforeEachTest(() => {
+  finished('l-first', 0, 50, 'nemia');
+  finished('l-second', 5, 20);
+  finished('l-third', 10, 30, 'nemia');
+  finished('l-fourth', 15, 40);
+  finished('l-fifth', 16, 45, 'pipao');
+  journalled('l-asks-write', at(20), { to: at(25), closeout: BLOCKED });
+  aRun('l-asks', at(20), 'nemia');
+  journalled('l-moves-write', at(30));
+  aRun('l-moves', at(30));
+});
 
 const read = async <T>(address: string): Promise<T> => {
-  const res = await app.request(address);
+  const res = await app().request(address);
   assert.equal(res.status, 200, `${address}: ${await res.clone().text()}`);
   return (await res.json()) as T;
 };
@@ -200,7 +202,7 @@ test('asked without a page or a size, the finished runs answer page 1 of nine; a
 
 test('REFUSED with a 422 in the package’s words: a page that is no whole number from 1, a size that is none from 1 to 100', async () => {
   const refused = async (query: string, said: string) => {
-    const res = await app.request(`/api/runs-finished?${query}`);
+    const res = await app().request(`/api/runs-finished?${query}`);
     assert.equal(res.status, 422, `${query}: ${await res.clone().text()}`);
     assert.deepEqual(await res.json(), { error: `the finished runs are read a page at a time: ${said}` });
   };

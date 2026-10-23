@@ -22,13 +22,13 @@ import { startRun, tryFolder } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor, runOver } from '../../test/placed.ts';
+import { appOver, eachTest, engineFor, runOver } from '../../test/placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const runWith = runOver(stand.layer);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const runWith = runOver(() => stand().layer);
+const app = eachTest(() => appOver(standIn(), stand()));
 
 /** The board's repository: a plain directory, with agents of its own and a skill only it has. */
 const repo = scratch('nemia-api-try-repo-');
@@ -97,9 +97,13 @@ type AgentListing = import('./agents.ts').AgentListing;
 
 const json = { 'content-type': 'application/json' };
 const tryIt = (name: string, body: unknown, from = 'yours', headers: Record<string, string> = json) =>
-  app.request(`/api/agents/${from}/${name}/try`, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  app().request(`/api/agents/${from}/${name}/try`, {
+    method: 'POST',
+    headers,
+    body: typeof body === 'string' ? body : JSON.stringify(body),
+  });
 const remove = (id: string, headers: Record<string, string> = json) =>
-  app.request(`/api/runs/${id}`, { method: 'DELETE', headers, body: '{}' });
+  app().request(`/api/runs/${id}`, { method: 'DELETE', headers, body: '{}' });
 
 const records = (): string[] =>
   fs.existsSync(RUNS)
@@ -125,13 +129,13 @@ async function refused(res: Response | Promise<Response>, status: number, patter
 /** A task filed in the step's folder on the engine, and signed off. */
 function signedOff(taskId: string, cwd: string): void {
   Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd, harness: 'claude' }));
-  standIn.settle(taskId, 'succeeded', {
+  standIn().settle(taskId, 'succeeded', {
     exitCode: 0,
     closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] },
   });
 }
 
-const listed = async (): Promise<RunSummary[]> => (await (await app.request('/api/runs')).json()) as RunSummary[];
+const listed = async (): Promise<RunSummary[]> => (await (await app().request('/api/runs')).json()) as RunSummary[];
 
 let first = '';
 
@@ -163,7 +167,7 @@ test('a try of an agent of yours writes its folder and starts a folder run of it
   for (const line of ['place: folder', 'agent: scribe', 'budget: 1', 'permissionMode: dontAsk', 'allowedTools: Edit(**)']) {
     assert.ok(text.split('\n').includes(line), `the try's step says ${line}`);
   }
-  const agent = (await (await app.request('/api/agents/yours/scribe')).json()) as AgentListing;
+  const agent = (await (await app().request('/api/agents/yours/scribe')).json()) as AgentListing;
   assert.ok(text.includes(`# version ${agent.version}`), "and records the agent's version it was written at");
 
   const run = JSON.parse(fs.readFileSync(path.join(RUNS, `${first}.json`), 'utf8'));
@@ -186,7 +190,7 @@ test('a try of an agent of yours writes its folder and starts a folder run of it
   const summary = (await listed()).find((r) => r.id === first)!;
   assert.deepEqual(summary.try, { agent: 'scribe' });
   assert.equal(summary.moving, true, 'a try nothing has filed yet moves: a tick files it');
-  const detail = (await (await app.request(`/api/runs/${first}`)).json()) as RunDetail;
+  const detail = (await (await app().request(`/api/runs/${first}`)).json()) as RunDetail;
   assert.deepEqual(detail.try, { agent: 'scribe' });
 });
 
@@ -223,7 +227,7 @@ test("REFUSED: a try never runs with its agent's rules outside its folder — an
     /allows `Bash, Edit\(\/home\/\*\*\)` in a mode that asks first/,
   );
   assert.match(why, /none of those rules is inside the folder/);
-  const agents = (await (await app.request('/api/agents')).json()) as AgentListing[];
+  const agents = (await (await app().request('/api/agents')).json()) as AgentListing[];
   assert.equal(agents.find((agent) => agent.name === 'outward')!.untried!.why, why, 'the listing says what the try refuses with');
   assert.equal(agents.find((agent) => agent.name === 'careful')!.untried, null);
   const keys = { permissionMode: 'default', allowedTools: 'Bash, Edit(/home/**)' };
@@ -239,7 +243,7 @@ test('a run that is no try says so', async () => {
   const run = await runWith(engine(), startRun({ brief: 'Write a note.', repo: '', workflowDir: other }));
   try {
     assert.equal((await listed()).find((r) => r.id === run.id)!.try, null);
-    assert.equal(((await (await app.request(`/api/runs/${run.id}`)).json()) as RunDetail).try, null);
+    assert.equal(((await (await app().request(`/api/runs/${run.id}`)).json()) as RunDetail).try, null);
     const res = await remove(run.id);
     const body = (await res.json()) as { error: string };
     assert.equal(res.status, 409, "the board removes only a try: another run is `nemia rm`'s, which says what it leaves");
@@ -270,7 +274,7 @@ test('once the try has ended, the agent can be tried again, and its folder is wr
   assert.equal((await remove(second)).status, 200);
 
   fs.writeFileSync(path.join(YOURS, 'scribe.md'), SCRIBE.replace('Write the notes.', 'Write the notes, briefly.'));
-  const agent = (await (await app.request('/api/agents/yours/scribe')).json()) as AgentListing;
+  const agent = (await (await app().request('/api/agents/yours/scribe')).json()) as AgentListing;
   const third = await idOf(await tryIt('scribe', { brief: 'Write them again.' }));
   assert.ok(
     fs.readFileSync(folder, 'utf8').includes(`# version ${agent.version}`),
@@ -292,6 +296,7 @@ test('a try still in flight is not removed: the package says to cancel it first'
 });
 
 test('the board removes a try: its record and the folders it worked in', async () => {
+  ended(first);
   const workspace = JSON.parse(fs.readFileSync(path.join(RUNS, `${first}.json`), 'utf8')).workspace;
   assert.ok(fs.existsSync(workspace));
   const res = await remove(first);
@@ -346,7 +351,7 @@ test('an agent that names MCP servers is refused a try before anything is writte
   assert.equal(res.status, 422, await res.clone().text());
   assert.equal(((await res.json()) as { error: string }).error, SERVERS_UNTRIED);
   assert.equal(fs.existsSync(path.join(TRIES, 'browsing')), false, 'no try folder for it');
-  const agents = (await (await app.request('/api/agents')).json()) as AgentListing[];
+  const agents = (await (await app().request('/api/agents')).json()) as AgentListing[];
   assert.deepEqual(agents.find((agent) => agent.from === 'yours' && agent.name === 'browsing')?.untried, {
     why: SERVERS_UNTRIED,
     copy: null,
@@ -354,7 +359,7 @@ test('an agent that names MCP servers is refused a try before anything is writte
 });
 
 test('the listing says why an agent cannot be tried, in the words the try refuses with, and the copy for a repository agent', async () => {
-  const agents = (await (await app.request('/api/agents')).json()) as AgentListing[];
+  const agents = (await (await app().request('/api/agents')).json()) as AgentListing[];
   const of = (from: string, name: string) => agents.find((agent) => agent.from === from && agent.name === name)!;
   assert.equal(of('yours', 'scribe').untried, null, 'nothing refuses a try of scribe');
   assert.match(of('yours', 'coder').untried!.why, /runs on `codex`/);

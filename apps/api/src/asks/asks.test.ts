@@ -18,13 +18,13 @@ import { askFile, list, runStore, type RunSummary } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor, runOver } from '../../test/placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor, runOver } from '../../test/placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const runWith = runOver(stand.layer);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const runWith = runOver(() => stand().layer);
+const app = eachTest(() => appOver(standIn(), stand()));
 
 type RetryHow = import('agent-orchestrator').RetryHow;
 
@@ -38,7 +38,7 @@ const write = (file: string, text: string) => {
 /** A task filed on `harness` and left in `phase`, with `end` laid over its attempt. */
 const task = (taskId: string, harness: string, phase: string, end?: { exitCode?: number; closeout?: object }) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness }));
-  standIn.settle(taskId, phase, end);
+  standIn().settle(taskId, phase, end);
 };
 /** A step's task that ran once on Codex and signed off with `closeout`. */
 const signedOff = (taskId: string, closeout: object) => task(taskId, 'codex', 'succeeded', { exitCode: 0, closeout });
@@ -94,16 +94,18 @@ fs.writeFileSync(
     },
   }),
 );
-signedOff('t-implement', blocked);
-signedOff('t-theme', { outcome: 'done', summary: 'Themed it.', artifacts: [] });
-task('t-theme-check', 'check', 'failed', { exitCode: 1 });
-signedOff('t-tokens', { outcome: 'done', summary: 'Picked them.', artifacts: [] });
 /** Claude Code tasks whose sessions the harness blocked, their attempts never ended: the engine's `needs-human`. */
 const blockedSession = (taskId: string) => task(taskId, 'claude', 'needs-human');
-blockedSession('t-held');
-blockedSession('t-idle');
-blockedSession('t-silent');
-task('t-working', 'claude', 'running (working)');
+beforeEachTest(() => {
+  signedOff('t-implement', blocked);
+  signedOff('t-theme', { outcome: 'done', summary: 'Themed it.', artifacts: [] });
+  task('t-theme-check', 'check', 'failed', { exitCode: 1 });
+  signedOff('t-tokens', { outcome: 'done', summary: 'Picked them.', artifacts: [] });
+  blockedSession('t-held');
+  blockedSession('t-idle');
+  blockedSession('t-silent');
+  task('t-working', 'claude', 'running (working)');
+});
 
 const record = fs.readFileSync(recordFile, 'utf8');
 
@@ -116,7 +118,7 @@ const BOARD = {
 };
 
 const ask = (step: string, body: unknown, headers: Record<string, string> = BOARD, run = R) =>
-  app.request(`/api/runs/${run}/steps/${step}/retry`, {
+  app().request(`/api/runs/${run}/steps/${step}/retry`, {
     method: 'POST',
     headers,
     body: typeof body === 'string' ? body : JSON.stringify(body),
@@ -134,8 +136,8 @@ const nothingWritten = (why: string) => {
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, `the run's record untouched: ${why}`);
 };
 
-const detail = async (id = R) => (await app.request(`/api/runs/${id}`)).json() as Promise<RunDetail>;
-const summary = async (id = R) => ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
+const detail = async (id = R) => (await app().request(`/api/runs/${id}`)).json() as Promise<RunDetail>;
+const summary = async (id = R) => ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id)!;
 
 test('REFUSED at shipped defaults: an empty message, and a message on a recheck, are 422s, each naming the flag it is of — and nothing is written', async () => {
   for (const [step, how] of [
@@ -175,7 +177,7 @@ test('REFUSED at shipped defaults: a step not waiting on a person, a session sti
     const { error } = (await res.json()) as { error: string };
     assert.match(error, words);
   }
-  assert.equal(standIn.stopped.length, 0, 'no session stopped');
+  assert.equal(standIn().stopped.length, 0, 'no session stopped');
   nothingWritten('a step the package will not try again');
 });
 
@@ -265,7 +267,7 @@ test("an answer as the board sends it is the package's ask: 202 with the try, it
 });
 
 test("a session the harness blocked is continued as `nemia retry` continues it: 202 with the package's `stopFirst`, the ask written with its mode and nothing else — no session stopped, the engine's tasks and the run's record as they were — and the step reads `nemia ls`'s `stopping its blocked session`", async () => {
-  const tasksOf = () => ['t-held', 't-idle'].map((id) => JSON.stringify(standIn.tasks.get(id)));
+  const tasksOf = () => ['t-held', 't-idle'].map((id) => JSON.stringify(standIn().tasks.get(id)));
   const tasks = tasksOf();
 
   const res = await ask('held', { mode: 'nudge' });
@@ -291,9 +293,9 @@ test("a session the harness blocked is continued as `nemia retry` continues it: 
 
   assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
   assert.deepEqual(tasksOf(), tasks, "nor of the engine's tasks");
-  assert.deepEqual([standIn.said, standIn.interrupts], [[], []], 'and said nothing to a session');
+  assert.deepEqual([standIn().said, standIn().interrupts], [[], []], 'and said nothing to a session');
   assert.equal(
-    standIn.stopped.length,
+    standIn().stopped.length,
     0,
     "and stopped no session: the api wrote the asks and nothing else, stopping the session is the tick's",
   );
@@ -326,7 +328,7 @@ test("a session the harness blocked is continued as `nemia retry` continues it: 
   assert.equal(again.status, 409, "asked once: a second Continue is refused in the package's words");
   const { error } = (await again.json()) as { error: string };
   assert.ok(error.startsWith('try 2 of held is already asked for (--nudge, at '), error);
-  assert.equal(standIn.stopped.length, 0, 'and still nothing is stopped');
+  assert.equal(standIn().stopped.length, 0, 'and still nothing is stopped');
 });
 
 test("a try a person answered carries the answer, as `nemia decide` prints it — the note says `answered`, as `list`'s does — and a try nobody answered, none", async () => {

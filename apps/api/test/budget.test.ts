@@ -18,13 +18,13 @@ import { askFile, decideRun, list, retryRun, roundAskFile, roundRun, runStore, t
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor, runOver } from './placed.ts';
+import { appOver, beforeEachTest, eachTest, engineFor, runOver } from './placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const runWith = runOver(stand.layer);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const runWith = runOver(() => stand().layer);
+const app = eachTest(() => appOver(standIn(), stand()));
 
 type RetryHow = import('agent-orchestrator').RetryHow;
 
@@ -41,7 +41,7 @@ const write = (file: string, text: string) => {
  */
 const session = (taskId: string, harness: string, from: number, closeout: object, usage?: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness }));
-  standIn.settle(taskId, 'succeeded', {
+  standIn().settle(taskId, 'succeeded', {
     startedAt: at(from + 1),
     spawnedAt: at(from + 1),
     endedAt: at(from + 60),
@@ -57,7 +57,7 @@ const session = (taskId: string, harness: string, from: number, closeout: object
  */
 const refusedCheck = (taskId: string, from: number) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'npm test', cwd: '/code/app', harness: 'check' }));
-  standIn.settle(taskId, 'failed', {
+  standIn().settle(taskId, 'failed', {
     startedAt: at(from),
     spawnedAt: at(from),
     endedAt: at(from + 10),
@@ -122,25 +122,28 @@ write(
     },
   }),
 );
-session('t-implement-1', 'claude', 0, done('Implemented it.'), USAGE.implement1);
-session('t-review-1', 'codex', 100, done('Two findings.', { again: true }), USAGE.review);
-session(
-  't-implement-2',
-  'claude',
-  200,
-  done('Answered the review.', {
-    /**
-     * A loop's target owes its answers to the findings of the review before it: without them it reads unsigned, and a try would take it on.
-     */
-    replies: [{ finding: 'src/cache.ts — never expires', answer: 'fixed', why: 'It expires now.' }],
-  }),
-  USAGE.implement2,
-);
-session('t-review-2', 'codex', 300, done('One finding is still open.', { again: true }), USAGE.review);
-session('t-tokens-1', 'claude', 0, done('Picked them.'), USAGE.tokens1);
-refusedCheck('t-tokens-1-check', 70);
-session('t-tokens-2', 'claude', 100, done('Picked them again.'), USAGE.tokens2);
-refusedCheck('t-tokens-2-check', 170);
+beforeEachTest(() => {
+  session('t-implement-1', 'claude', 0, done('Implemented it.'), USAGE.implement1);
+  session('t-review-1', 'codex', 100, done('Two findings.', { again: true }), USAGE.review);
+  session(
+    't-implement-2',
+    'claude',
+    200,
+    done('Answered the review.', {
+      /**
+       * A loop's target owes its answers to the findings of the review before it: without them it reads unsigned, and a try would take
+       * it on.
+       */
+      replies: [{ finding: 'src/cache.ts — never expires', answer: 'fixed', why: 'It expires now.' }],
+    }),
+    USAGE.implement2,
+  );
+  session('t-review-2', 'codex', 300, done('One finding is still open.', { again: true }), USAGE.review);
+  session('t-tokens-1', 'claude', 0, done('Picked them.'), USAGE.tokens1);
+  refusedCheck('t-tokens-1-check', 70);
+  session('t-tokens-2', 'claude', 100, done('Picked them again.'), USAGE.tokens2);
+  refusedCheck('t-tokens-2-check', 170);
+});
 
 /** A run nobody priced: one Codex step, done. */
 const FREE = 'r-free';
@@ -160,7 +163,9 @@ write(
     steps: { plan: { taskId: 't-plan' } },
   }),
 );
-session('t-plan', 'codex', 0, done('Planned it.'), USAGE.review);
+beforeEachTest(() => {
+  session('t-plan', 'codex', 0, done('Planned it.'), USAGE.review);
+});
 
 /**
  * R2: past a budget on its own work. `palette` has `budget: 1`, and its one session cost $1.50 and signed off blocked with a question;
@@ -187,21 +192,23 @@ write(
     steps: { palette: { taskId: 't-palette' }, lint: { taskId: 't-lint', check: { taskId: 't-lint-check' } } },
   }),
 );
-session(
-  't-palette',
-  'claude',
-  0,
-  { outcome: 'blocked', summary: 'Two palettes drafted.', needs: PALETTE_NEEDS, artifacts: [] },
-  { costUsd: 1.5 },
-);
-session('t-lint', 'claude', 0, done('Linted it.'), { costUsd: 1.2 });
-refusedCheck('t-lint-check', 70);
+beforeEachTest(() => {
+  session(
+    't-palette',
+    'claude',
+    0,
+    { outcome: 'blocked', summary: 'Two palettes drafted.', needs: PALETTE_NEEDS, artifacts: [] },
+    { costUsd: 1.5 },
+  );
+  session('t-lint', 'claude', 0, done('Linted it.'), { costUsd: 1.2 });
+  refusedCheck('t-lint-check', 70);
+});
 
 const record = fs.readFileSync(recordFile, 'utf8');
 
-const detail = async (id = R) => (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
+const detail = async (id = R) => (await (await app().request(`/api/runs/${id}`)).json()) as RunDetail;
 const summary = async (id = R) => {
-  const run = ((await (await app.request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
+  const run = ((await (await app().request('/api/runs')).json()) as RunSummary[]).find((r) => r.id === id);
   assert.ok(run, `${id} is on the list`);
   return run;
 };
@@ -210,7 +217,7 @@ const stepOf = (run: RunDetail, name: string) => {
   assert.ok(step, name);
   return step;
 };
-const decision = async (id = R) => (await (await app.request(`/api/runs/${id}/decision`)).json()) as RunDecision;
+const decision = async (id = R) => (await (await app().request(`/api/runs/${id}/decision`)).json()) as RunDecision;
 type Refused = { error: string };
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
@@ -221,7 +228,7 @@ const BOARD = {
   host: '127.0.0.1:8787',
 };
 const post = (route: string, body: unknown, headers: Record<string, string> = BOARD) =>
-  app.request(route, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
+  app().request(route, { method: 'POST', headers, body: typeof body === 'string' ? body : JSON.stringify(body) });
 const askTry = (step: string, body: unknown, headers?: Record<string, string>, run = R) =>
   post(`/api/runs/${run}/steps/${step}/retry`, body, headers);
 const askRound = (body: unknown, headers?: Record<string, string>) => post(`/api/runs/${R}/round`, body, headers);
@@ -397,7 +404,7 @@ test("a step over its budget, on the list and on the detail, in `nemia ls`'s wor
 
 test("the decision says what `nemia decide` says of steps held on their budget — the OVER BUDGET line, the run's cost — and offers the raise, a try's and a round's", async () => {
   const said = await runWith(engine(), decideRun(R));
-  const res = await app.request(`/api/runs/${R}/decision`);
+  const res = await app().request(`/api/runs/${R}/decision`);
   assert.equal(res.status, 200);
   const body = (await res.json()) as RunDecision;
   assert.ok('overBudget' in body, JSON.stringify(body));

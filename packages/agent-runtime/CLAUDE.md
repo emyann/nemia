@@ -8,6 +8,10 @@ harnesses' words, `HARNESS_CHOICES`, `fenceReach`, `unruledIn` and `configFolder
 (`test/vocabulary-door.test.ts`). The orchestrator reaches it through its one client; what is still above it and a candidate to come
 down is in `docs/architecture.md`, *Who owns what*.
 
+- **A person's story is one test, its checkpoints `story` subtests** (`test/checkpoints.ts`, a byte-for-byte copy of the
+  orchestrator's: the runtime imports nothing above it), and a function's inputs are one test whose rows are `t.test` subtests. A
+  focused test of its own is for a race, a crash window, a real boundary or an invariant of a pure function.
+
 ## The pass
 
 - **The pass skips a settled task until the feed names it**, so every write to a journal goes through `Journal.append`. The engine's own

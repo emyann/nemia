@@ -13,12 +13,12 @@ import { needsOf } from 'agent-orchestrator';
 import { Effect } from 'effect';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from 'agent-orchestrator/testing';
-import { appOver, engineFor } from './placed.ts';
+import { appOver, eachTest, engineFor } from './placed.ts';
 
-const stand = testPlace();
-const standIn = testEngine();
-const engine = () => engineFor(standIn);
-const app = appOver(standIn, stand);
+const stand = eachTest(testPlace);
+const standIn = eachTest(testEngine);
+const engine = () => engineFor(standIn());
+const app = eachTest(() => appOver(standIn(), stand()));
 
 type TaskView = import('agent-orchestrator').TaskView;
 type Run = import('agent-orchestrator/run').Run;
@@ -33,7 +33,7 @@ const at = (s: number) => new Date(Date.parse('2026-09-25T06:00:00.000Z') + s * 
 /** A task on `harness` that ran once and completed: what a remote agent's Task that answered with no data part leaves. */
 const completed = (taskId: string, harness: string) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Ask it.', cwd: path.join(root, 'runs', 'x', 'work', 'ask'), harness }));
-  standIn.settle(taskId, 'succeeded', { nativeId: 'ctx-1' });
+  standIn().settle(taskId, 'succeeded', { nativeId: 'ctx-1' });
 };
 
 /** A run of one step, `ask`, on `harness`, whose task is `taskId`. */
@@ -56,7 +56,7 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
   write(path.join(root, 'a2a-agents.json'), JSON.stringify({ reviewer: { url: 'https://agents.example.com/reviewer?key=s3cret' } }));
   completed('t-remote', 'a2a:reviewer');
   oneStep('r-remote', 'a2a:reviewer', 't-remote');
-  const res = await app.request('/api/runs/r-remote');
+  const res = await app().request('/api/runs/r-remote');
   assert.equal(res.status, 200);
   const text = await res.text();
   const [ask] = (JSON.parse(text) as RunDetail).steps;
@@ -69,7 +69,7 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
     JSON.stringify({ reviewer: { card: { supportedInterfaces: [{ url: 'https://a2a.example.org/rpc', protocolBinding: 'JSONRPC' }] } } }),
   );
   assert.deepEqual(
-    ((await (await app.request('/api/runs/r-remote')).json()) as RunDetail).steps[0].filed?.remote,
+    ((await (await app().request('/api/runs/r-remote')).json()) as RunDetail).steps[0].filed?.remote,
     { name: 'reviewer', address: 'https://a2a.example.org/rpc' },
     "an agent given by its card is addressed by the card's first interface",
   );
@@ -77,12 +77,12 @@ test("a run's detail names the remote agent a try was sent to, and where, with n
   completed('t-gone', 'a2a:critic');
   oneStep('r-gone', 'a2a:critic', 't-gone');
   assert.deepEqual(
-    ((await (await app.request('/api/runs/r-gone')).json()) as RunDetail).steps[0].filed?.remote,
+    ((await (await app().request('/api/runs/r-gone')).json()) as RunDetail).steps[0].filed?.remote,
     { name: 'critic', address: null },
     'a name taken out of the file: the name, which is on the task, and no address',
   );
   write(path.join(root, 'a2a-agents.json'), '{ "reviewer": ');
-  const refused = await app.request('/api/runs/r-remote');
+  const refused = await app().request('/api/runs/r-remote');
   assert.equal(refused.status, 200, 'the page is still drawn');
   assert.deepEqual(
     ((await refused.json()) as RunDetail).steps[0].filed?.remote,

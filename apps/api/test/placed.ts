@@ -63,3 +63,11 @@ export function eachTest<A>(make: () => A): () => A {
     return now.made;
   };
 }
+
+/**
+ * `seed` run before each test of the file that calls this at its head, after the stand-ins named above it are made: what every test of
+ * the file reads (a task filed and settled, a run's record), set again on the test's own stand-ins.
+ */
+export function beforeEachTest(seed: () => void): void {
+  eachTest(seed);
+}

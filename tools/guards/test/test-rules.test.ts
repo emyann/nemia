@@ -12,6 +12,9 @@
  * - **A shipped default is not waited out.** `waitedOut` finds an assertion that floors a measured duration at a bound the shipped
  *   code owns — `assert.ok(waited >= FEED_LOCK_WAIT_MS)` — which buys a second of proof with a second of every pass. The bound is
  *   shortened at the seam the code gives for it instead, and the floor measured there.
+ * - **An api test's stand-ins are its own.** `sharedStandIns` finds a `testPlace()` or `testEngine()` made at a file's head, outside
+ *   any test, which every test of the file then shares, so one can pass only because of the test before it; `eachTest(testPlace)`
+ *   (`apps/api/test/placed.ts`) makes one per test. Held over `apps/api` alone, with no baseline: none is left there.
  *
  * Each rule is a pure function over one test file's source text, proven first on planted sources it must refuse and must not, then
  * swept over every test file of the repository. What still holds one is counted per file in `test/test-rules.baseline.ts`: the sweep
@@ -269,6 +272,28 @@ export const waitedOut = (text: string): string[] => {
   return [...found.keys()].sort((a, b) => a - b).map((line) => found.get(line) as string);
 };
 
+/**
+ * Each line of `text` that makes a `testPlace()` or `testEngine()` at the file's head: a call to either at a line's first column,
+ * outside every test and helper, whose stand-in every test of the file would share. `eachTest(testPlace)` names the maker without
+ * calling it, and a call inside a test or a helper is indented.
+ */
+export const sharedStandIns = (text: string): string[] => {
+  const clean = uncommented(text);
+  const found: string[] = [];
+  clean.split('\n').forEach((line, i) => {
+    if (/^\S/.test(line) && /(?<![\w$.])(?:testPlace|testEngine)\s*\(/.test(line)) found.push(`${i + 1}: ${line.trim()}`);
+  });
+  return found;
+};
+
+test("REFUSED: a stand-in made at a test file's head is found; one made per test, or inside a test, is not", () => {
+  const head = "import { testPlace } from 'agent-orchestrator/testing';\n";
+  assert.deepEqual(sharedStandIns(`${head}const stand = testPlace();\n`), ['2: const stand = testPlace();']);
+  assert.deepEqual(sharedStandIns(`${head}const stand = eachTest(testPlace);\n`), [], 'one per test');
+  assert.deepEqual(sharedStandIns(`${head}test('x', () => {\n  const stand = testPlace();\n});\n`), [], 'one inside a test');
+  assert.deepEqual(sharedStandIns(`${head}/** const stand = testPlace(); */\n`), [], 'one quoted in a comment');
+});
+
 test('REFUSED: an assertion that expects a whole sentence of what the code said is found, however it is written', () => {
   const sentence = 'the `check` of a step that is a gate is refused: a gate has no check to run';
   assert.deepEqual(pinnedWords(`assert.equal(e.message, '${sentence}');\n`), [
@@ -434,6 +459,12 @@ test('no test of the repository floors a measured duration at a bound the shippe
     ),
     [],
   );
+});
+
+test('no test of the api shares a stand-in across its tests: each makes its own with `eachTest` (`apps/api/test/placed.ts`)', () => {
+  const files = testFiles().filter((f) => f.startsWith('apps/api/'));
+  assert.ok(files.length > 50, 'the sweep reads the api’s test files');
+  assert.deepEqual(sweep(files, sharedStandIns), {});
 });
 
 test('every file either baseline names is a test file of the repository', () => {

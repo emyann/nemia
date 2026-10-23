@@ -7,6 +7,7 @@ never as percentages, since the sources do not move.
 ```sh
 node tools/coverage/record.ts packages/agent-orchestrator --out before.json
 node tools/coverage/compare.ts before.json after.json
+node tools/coverage/compare.ts before.json before-2.json -- after.json after-2.json
 ```
 
 `record.ts` runs the package's own `test` script in its folder (no shard: `WF_TEST_SHARD` is unset), with Node's
@@ -18,3 +19,10 @@ when nothing fell, 1 naming each file that fell and the lines it lost, 2 when it
 A branch is judged by V8's ranges, kept raw from each process (`NODE_V8_COVERAGE`): a range is taken when any one test process took
 it, since V8 leaves out a block that ran as often as the one around it and lcov, merged after, reads an arm whose sibling ran in another
 test file as untaken. A record of version 1, written before, is refused with 2: record it again.
+
+A line's hit comes from the lcov the runner writes after merging its processes' coverage, and that merge is lossy: Node's
+`mergeCoverageRanges` keeps a range no test took only where the next process reports a zero range of its own at the same place, so a
+block no test takes reads as hit whenever some process ran the code around it in another shape (a loop never entered), and which
+processes do that varies from run to run. Given several records on a side, split by `--`, `compare.ts` judges a line or an arm fallen
+only when every record before reached it and none after does; one the records disagree on is said apart as varying, and exits 0. The
+measure of a fall stays exact: a line every record before reached and no record after reaches refuses with 1.

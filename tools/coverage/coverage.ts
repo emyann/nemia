@@ -211,50 +211,73 @@ export const recordOf = (
 };
 
 /**
- * The lines of the arms `was` took that `now` takes no more, each read as the innermost range of `now` around it, itself where
- * `now` knows it: an arm `now` never reported ran, in every process of it, as often as that range.
+ * Whether `arms`, one record's of a file, took the arm `key`: by itself where the record knows it, else by the innermost range of the
+ * record around it, which V8 left it out for equalling. A record without the file took nothing.
  */
-const armsLostIn = (was: FileCoverage['arms'], now: FileCoverage['arms'] = { taken: {}, untaken: {} }): number[] => {
-  const spans = Object.keys({ ...now.taken, ...now.untaken }).map((key) => [key, ...key.split('-').map(Number)] as const);
-  const takenNow = (key: string): boolean => {
-    const [start, end] = key.split('-').map(Number);
-    const around = spans.filter(([, s, e]) => s <= start && end <= e).sort(([, a, x], [, b, y]) => b - a || x - y)[0];
-    return around !== undefined && around[0] in now.taken;
-  };
-  const lost = Object.entries(was.taken).flatMap(([key, line]) => (takenNow(key) ? [] : [line]));
-  return [...new Set(lost)].sort((a, b) => a - b);
+const takenIn = (arms: FileCoverage['arms'] | undefined, key: string): boolean => {
+  if (!arms) return false;
+  const [start, end] = key.split('-').map(Number);
+  const spans = Object.keys({ ...arms.taken, ...arms.untaken }).map((at) => [at, ...at.split('-').map(Number)] as const);
+  const around = spans.filter(([, s, e]) => s <= start && end <= e).sort(([, a, x], [, b, y]) => b - a || x - y)[0];
+  return around !== undefined && around[0] in arms.taken;
 };
 
+/** What the records said of a file that is no fall: the lines and the arms' lines some record reached and another did not. */
+export type Varying = { file: string; lines: number[]; armLines: number[] };
+
 /**
- * The files of `before` whose coverage fell in `after`: a line hit before and not after, fewer lines hit, an arm some test took
- * before and none takes after, or the file gone. A file only `after` has is no fall; lcov's branch count is said, never judged.
+ * Each of `keys` that every record before reached and no record after reaches, `lost`, and each the records disagree on, `varying`:
+ * reached in one record of a side and not in another, or reached after by some and not all.
  */
-export const compared = (before: CoverageRecord, after: CoverageRecord): Fall[] => {
+const verdicts = <K>(keys: Iterable<K>, before: ((key: K) => boolean)[], after: ((key: K) => boolean)[]) => {
+  const lost: K[] = [];
+  const varying: K[] = [];
+  for (const key of keys) {
+    const [was, now] = [before.map((has) => has(key)), after.map((has) => has(key))];
+    if (was.every(Boolean) && !now.some(Boolean)) lost.push(key);
+    else if (![...was, ...now].every(Boolean)) varying.push(key);
+  }
+  return { lost, varying };
+};
+
+const ordered = (lines: number[]): number[] => [...new Set(lines)].sort((a, b) => a - b);
+
+/**
+ * The files whose coverage fell from the records `before` to the records `after`, and what varies between the records. A line, or a
+ * branch's arm, falls when every record before reached it and none after does, and so does a file's count of lines or branches hit
+ * when the most any record after hits is under the fewest any record before hit: what one record of either side reached and another
+ * did not varies, as Node's merge of its processes' coverage leaves a line from run to run, and is said apart, judged no fall. A file
+ * only `after` has is no fall; lcov's branch count is said, never judged.
+ */
+export const judged = (before: CoverageRecord[], after: CoverageRecord[]): { falls: Fall[]; varying: Varying[] } => {
   const falls: Fall[] = [];
-  for (const [file, was] of Object.entries(before.files)) {
-    const now = after.files[file];
-    const lines = { before: was.lines.hit, after: now?.lines.hit ?? 0 };
-    const branches = { before: was.branches.hit, after: now?.branches.hit ?? 0 };
-    if (!now) {
-      falls.push({
-        file,
-        gone: true,
-        linesLost: was.lines.hitLines,
-        armsLost: armsLostIn(was.arms, undefined),
-        lines,
-        branches,
-      });
-      continue;
+  const varying: Varying[] = [];
+  for (const file of [...new Set(before.flatMap((record) => Object.keys(record.files)))].sort()) {
+    const [was, now] = [before.map((record) => record.files[file]), after.map((record) => record.files[file])];
+    const hits = (side: (FileCoverage | undefined)[]) =>
+      side.map((c) => new Set(c?.lines.hitLines)).map((set) => (at: number) => set.has(at));
+    const lines = verdicts(new Set(was.flatMap((c) => c?.lines.hitLines ?? [])), hits(was), hits(now));
+    const lineOf = new Map(was.flatMap((c) => Object.entries(c?.arms.taken ?? {})));
+    const takes = (side: (FileCoverage | undefined)[]) => side.map((c) => (key: string) => takenIn(c?.arms, key));
+    const arms = verdicts(lineOf.keys(), takes(was), takes(now));
+    const count = (side: (FileCoverage | undefined)[], of: 'lines' | 'branches', most: boolean) =>
+      (most ? Math.max : Math.min)(...side.map((c) => c?.[of].hit ?? 0));
+    const counts = { before: count(was, 'lines', false), after: count(now, 'lines', true) };
+    const branches = { before: count(was, 'branches', false), after: count(now, 'branches', true) };
+    const armsLost = ordered(arms.lost.map((key) => lineOf.get(key)!));
+    const gone = now.every((c) => c === undefined);
+    if (lines.lost.length > 0 || armsLost.length > 0 || counts.after < counts.before || (gone && was.every(Boolean))) {
+      falls.push({ file, gone, linesLost: ordered(lines.lost), armsLost, lines: counts, branches });
     }
-    const still = new Set(now.lines.hitLines);
-    const linesLost = was.lines.hitLines.filter((at) => !still.has(at));
-    const armsLost = armsLostIn(was.arms, now.arms);
-    if (linesLost.length > 0 || armsLost.length > 0 || lines.after < lines.before) {
-      falls.push({ file, gone: false, linesLost, armsLost, lines, branches });
+    if (lines.varying.length > 0 || arms.varying.length > 0) {
+      varying.push({ file, lines: ordered(lines.varying), armLines: ordered(arms.varying.map((key) => lineOf.get(key)!)) });
     }
   }
-  return falls;
+  return { falls, varying };
 };
+
+/** The files of `before` whose coverage fell in `after`, one record on each side (`judged`). */
+export const compared = (before: CoverageRecord, after: CoverageRecord): Fall[] => judged([before], [after]).falls;
 
 /** A string as one word of a POSIX shell's line: in single quotes, a quote inside it closed, escaped and reopened. */
 const quoted = (word: string): string => `'${word.replaceAll("'", `'\\''`)}'`;

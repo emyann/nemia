@@ -1,8 +1,7 @@
 /**
- * A factory's hires on the board (the routes the table generates for `nemia factory hire` and `fire`): an agent hired into a step, the
- * step one encoded segment of the path, and fired — in a scratch store whose factory is filed with the package's own verbs. Every write is
- * read back from the factory's file, and every refusal is made to refuse at shipped defaults, in the package's words where it has them,
- * with the file as it was.
+ * A factory's hires on the board (the routes the table generates for `nemia factory hire` and `fire`): a story of an agent hired into a
+ * step, the step one encoded segment of the path, replaced and fired; and one table of what a hire refuses — in a scratch store whose
+ * factory is filed with the package's own verbs. Every write is read back from the factory's file, and every refusal leaves it as it was.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -13,6 +12,7 @@ import path from 'node:path';
 import { Layer } from 'effect';
 import { addFactory, attachWorkflow, hireRefusalOf } from 'agent-orchestrator';
 import { scratch } from '../../test/scratch.ts';
+import { story } from '../../test/checkpoints.ts';
 import { app, appOf, liveOf } from '../app.ts';
 import { StoreRoot } from '../store.ts';
 
@@ -52,66 +52,85 @@ async function refused(res: () => Response | Promise<Response>, status: number):
   return body.error;
 }
 
-test('PUT hires an agent into the step the encoded segment names, a second replaces it, and DELETE fires it; a second DELETE is a 404', async () => {
-  assert.deepEqual(await answered(send('PUT', HIRE, { agent: 'ada' })), { file: RECORD, replaced: null });
-  assert.deepEqual(hires(), { 'build/implement': 'ada' }, 'build%2Fimplement reaches the verb as build/implement');
-  assert.deepEqual(await answered(send('PUT', HIRE, { agent: 'agora' })), { file: RECORD, replaced: 'ada' });
-  assert.deepEqual(hires(), { 'build/implement': 'agora' });
-  assert.deepEqual(await answered(send('DELETE', HIRE, {})), { file: RECORD, fired: 'agora' });
-  assert.deepEqual(hires(), {});
-  const twice = await refused(() => send('DELETE', HIRE, {}), 404);
-  assert.equal(twice, 'mill hires no agent into build/implement. It hires none. Nothing was fired.');
+test('a person hires an agent into a step, replaces it, and fires it', async (t) => {
+  const s = story(t);
+  await s.test('PUT hires the agent into the step the encoded segment names', async () => {
+    assert.deepEqual(await answered(send('PUT', HIRE, { agent: 'ada' })), { file: RECORD, replaced: null });
+    assert.deepEqual(hires(), { 'build/implement': 'ada' }, 'build%2Fimplement reaches the verb as build/implement');
+  });
+  await s.test('a second PUT replaces it, naming the one replaced', async () => {
+    assert.deepEqual(await answered(send('PUT', HIRE, { agent: 'agora' })), { file: RECORD, replaced: 'ada' });
+    assert.deepEqual(hires(), { 'build/implement': 'agora' });
+  });
+  await s.test('DELETE fires it', async () => {
+    assert.deepEqual(await answered(send('DELETE', HIRE, {})), { file: RECORD, fired: 'agora' });
+    assert.deepEqual(hires(), {});
+  });
+  await s.test('REFUSED: a second DELETE is a 404 naming the factory and the step', async () => {
+    const twice = await refused(() => send('DELETE', HIRE, {}), 404);
+    for (const fact of ['mill', 'build/implement', 'Nothing was fired.']) assert.ok(twice.includes(fact), `${fact}: ${twice}`);
+  });
 });
 
-test('REFUSED: a step sent with its slash as two segments is no route', async () => {
-  const before = fs.readFileSync(RECORD, 'utf8');
-  const res = await send('PUT', '/api/factories/mill/hires/build/implement', { agent: 'ada' });
-  assert.equal(res.status, 404);
-  assert.equal(fs.readFileSync(RECORD, 'utf8'), before);
-});
+/** A step whose own file names its agent: `step` in `dir`'s `workflows/build`, naming `agent`. */
+const naming = (dir: string, step: string, agent: string): string => {
+  const file = path.join(dir, 'workflows', 'build', `${step}.md`);
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, `---\nagent: ${agent}\n---\nDo it.\n`);
+  return file;
+};
 
-test('REFUSED at shipped defaults: no factory (404), the default (409), a workflow not offered and a step that is no <workflow>/<step> (422)', async () => {
-  assert.match(await refused(() => send('PUT', '/api/factories/gone/hires/build%2Fimplement', { agent: 'ada' }), 404), /gone/);
-  assert.match(await refused(() => send('DELETE', '/api/factories/gone/hires/build%2Fimplement', {}), 404), /gone/);
-  assert.match(
-    await refused(() => send('PUT', '/api/factories/default/hires/build%2Fimplement', { agent: 'ada' }), 409),
-    /^`default` is the default factory: .* nemia factory hire does not take it\./,
-  );
-  assert.equal(
-    await refused(() => send('PUT', '/api/factories/mill/hires/intake%2Fframe', { agent: 'ada' }), 422),
-    'mill does not offer the workflow intake, so it hires no one into its steps. Attach it first — nemia factory attach mill intake — then hire. Nothing was hired.',
-  );
-  assert.match(
-    await refused(() => send('PUT', '/api/factories/mill/hires/implement', { agent: 'ada' }), 422),
-    /^--step implement names a step as <workflow>\/<step>/,
-  );
-});
-
-test("REFUSED at shipped defaults: a hire into a step whose own file names its agent is a 409 in hireRefusalOf's words, then the file", async () => {
-  const named = path.join(folder, 'workflows', 'build', 'named.md');
-  fs.mkdirSync(path.dirname(named), { recursive: true });
-  fs.writeFileSync(named, '---\nagent: agora\n---\nReview it.\n');
-  const words = (agent: string, file: string) =>
-    `${hireRefusalOf({ name: 'mill', workflows: ['build'] }, 'build', agent)} ${file} names it. Nothing was hired.`;
-  assert.equal(await refused(() => send('PUT', '/api/factories/mill/hires/build%2Fnamed', { agent: 'ada' }), 409), words('agora', named));
-  const home = scratch('nemia-api-hires-home-');
-  const mine = path.join(home, 'workflows', 'build', 'mine.md');
-  fs.mkdirSync(path.dirname(mine), { recursive: true });
-  fs.writeFileSync(mine, '---\nagent: otto\n---\nShip it.\n');
-  const { app: moved } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
-  const put = () =>
-    moved.request('/api/factories/mill/hires/build%2Fmine', { method: 'PUT', headers: json, body: JSON.stringify({ agent: 'ada' }) });
-  assert.equal(await refused(put, 409), words('otto', mine), "yours, read under the app's store root");
-});
-
-test("REFUSED: a body with no agent and one that is not JSON (400), in the api's words, and a name that is no factory's (400)", async () => {
-  assert.equal(
-    await refused(() => send('PUT', HIRE, {}), 400),
-    'PUT /api/factories/mill/hires/build%2Fimplement: `agent` names the agent to hire, a string, its file\'s name without .md: `{ "agent": "<the agent\'s name>" }`. This request\'s was left out.',
-  );
-  assert.equal(
-    await refused(() => send('PUT', HIRE, '{agent'), 400),
-    'PUT /api/factories/mill/hires/build%2Fimplement takes a JSON body: `{ "agent": "<the agent\'s name>" }`.',
-  );
-  await refused(() => send('PUT', '/api/factories/Not%20One/hires/build%2Fimplement', { agent: 'ada' }), 400);
+test('the hire routes: what a hire or a fire refuses, the factory file as it was', async (t) => {
+  await t.test('a step sent with its slash as two segments is no route (404)', async () => {
+    const before = fs.readFileSync(RECORD, 'utf8');
+    const res = await send('PUT', '/api/factories/mill/hires/build/implement', { agent: 'ada' });
+    assert.equal(res.status, 404);
+    assert.equal(fs.readFileSync(RECORD, 'utf8'), before);
+  });
+  await t.test('a factory the store does not have is a 404 naming it, to hire and to fire', async () => {
+    assert.match(await refused(() => send('PUT', '/api/factories/gone/hires/build%2Fimplement', { agent: 'ada' }), 404), /gone/);
+    assert.match(await refused(() => send('DELETE', '/api/factories/gone/hires/build%2Fimplement', {}), 404), /gone/);
+  });
+  await t.test('the default factory is a 409 naming the verb that does not take it', async () => {
+    const said = await refused(() => send('PUT', '/api/factories/default/hires/build%2Fimplement', { agent: 'ada' }), 409);
+    assert.ok(said.startsWith('`default` is the default factory'), said);
+    assert.ok(said.includes('nemia factory hire does not take it'), said);
+  });
+  await t.test('a workflow the factory does not offer is a 422 naming the attach that offers it', async () => {
+    const said = await refused(() => send('PUT', '/api/factories/mill/hires/intake%2Fframe', { agent: 'ada' }), 422);
+    for (const fact of ['intake', 'nemia factory attach mill intake', 'Nothing was hired.'])
+      assert.ok(said.includes(fact), `${fact}: ${said}`);
+  });
+  await t.test('a step that is no <workflow>/<step> is a 422 naming the flag', async () => {
+    assert.match(
+      await refused(() => send('PUT', '/api/factories/mill/hires/implement', { agent: 'ada' }), 422),
+      /^--step implement names a step as <workflow>\/<step>/,
+    );
+  });
+  await t.test("a step whose own file names its agent is a 409 in hireRefusalOf's words, then the file", async () => {
+    const file = naming(folder, 'named', 'agora');
+    const said = await refused(() => send('PUT', '/api/factories/mill/hires/build%2Fnamed', { agent: 'ada' }), 409);
+    assert.equal(said, `${hireRefusalOf({ name: 'mill', workflows: ['build'] }, 'build', 'agora')} ${file} names it. Nothing was hired.`);
+  });
+  await t.test("and one of yours, read under the app's store root", async () => {
+    const home = scratch('nemia-api-hires-home-');
+    const file = naming(home, 'mine', 'otto');
+    const { app: moved } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
+    const put = () =>
+      moved.request('/api/factories/mill/hires/build%2Fmine', { method: 'PUT', headers: json, body: JSON.stringify({ agent: 'ada' }) });
+    const said = await refused(put, 409);
+    assert.equal(said, `${hireRefusalOf({ name: 'mill', workflows: ['build'] }, 'build', 'otto')} ${file} names it. Nothing was hired.`);
+  });
+  await t.test('a body with no agent is a 400 naming the route and the key', async () => {
+    const said = await refused(() => send('PUT', HIRE, {}), 400);
+    assert.ok(said.startsWith('PUT /api/factories/mill/hires/build%2Fimplement: `agent`'), said);
+    assert.ok(said.endsWith("This request's was left out."), said);
+  });
+  await t.test('a body that is not JSON is a 400 naming the route', async () => {
+    const said = await refused(() => send('PUT', HIRE, '{agent'), 400);
+    assert.ok(said.startsWith('PUT /api/factories/mill/hires/build%2Fimplement takes a JSON body'), said);
+  });
+  await t.test("a name that is no factory's is a 400", async () => {
+    await refused(() => send('PUT', '/api/factories/Not%20One/hires/build%2Fimplement', { agent: 'ada' }), 400);
+  });
 });

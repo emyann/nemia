@@ -2545,9 +2545,9 @@ test("the id a run resumed is kept on its run file only by a spec whose totals c
   assert.equal('resumeFrom' in (await read({ ...sh('true'), name: 'other' }, 'ae/w/2')), false);
 });
 
-/** A run file in `dir`'s `sh` runs, as a worker leaves it once its harness has exited 0, with `log` as its output. */
-const doneRun = (dir: string, name: string, patch: object = {}, log = resultLine({ total_cost_usd: 0.01 })) => {
-  const runs = path.join(dir, 'runs', 'sh');
+/** A run file in `dir`'s runs of `harness` (`sh`), as a worker leaves it once its harness has exited 0, with `log` as its output. */
+const doneRun = (dir: string, name: string, patch: object = {}, log = resultLine({ total_cost_usd: 0.01 }), harness = 'sh') => {
+  const runs = path.join(dir, 'runs', harness);
   fs.mkdirSync(runs, { recursive: true });
   const file = name.replace(/[^a-zA-Z0-9]+/g, '_');
   const at = '2026-09-23T12:00:00Z';
@@ -2592,6 +2592,60 @@ test("a resumed try's tokens are its own share: its parent's whole session taken
     [{}, 130082],
     "a run file that kept no tokens of its parent's: the process's own usage, which here counted none",
   );
+});
+
+/** h4sj's try 2's own share: 4.2M cache reads where its `modelUsage` carries try 1's 85.4M on. */
+const H4SJ_TRY2_OWN = { inputTokens: 4240114, uncachedTokens: 28, cacheWriteTokens: 30746, cacheReadTokens: 4209340, outputTokens: 11961 };
+
+/** The tokens of a usage, its cost and API time left out. */
+const tokensOf = (usage: object | undefined) => {
+  const { costUsd: _, apiMs: __, ...rest } = (usage ?? {}) as { costUsd?: number; apiMs?: number };
+  return rest;
+};
+
+test("claude-detached's resumed try counts its own tokens, cost and API time, its parent's taken off", async () => {
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
+  const dir = root();
+  const at = (s: number) => ({ nativeId: SESSION, startedAt: `2026-10-22T09:00:0${s}Z` });
+  doneRun(dir, 'ae/h/1', at(0), H4SJ_IMPLEMENT, claudeDetached.name);
+  doneRun(dir, 'ae/h/2', { ...at(1), resumeFrom: SESSION }, H4SJ_IMPLEMENT_TRY2, claudeDetached.name);
+  const seen = await Effect.runPromise(detachedOps(claudeDetached, dir).observe);
+  assert.equal(tokensOf(seen.get('ae/h/1')?.usage).cacheReadTokens, 85418088, 'try 1 is its whole session');
+  const told = await Effect.runPromise(detachedOps(claudeDetached, dir).observeFor!([{ name: 'ae/h/2' }]));
+  for (const usage of [seen.get('ae/h/2')?.usage, told.seen.get('ae/h/2')?.usage]) {
+    assert.deepEqual(tokensOf(usage), H4SJ_TRY2_OWN, "h4sj's try 2: its 4.2M cache reads, not the 89.6M its modelUsage carries");
+    assert.ok(usage?.costUsd !== undefined && Math.abs(usage.costUsd - 1.327168) < 1e-9, `cost ${usage?.costUsd}`);
+    assert.equal(usage?.apiMs, 130082);
+  }
+});
+
+test("claude-detached's resumed spawn carries its parent's totals on its run file, and its try counts its own", WAITED, async (t) => {
+  const { claudeDetached } = await import('../src/harness/claude/code.ts');
+  const bin = scratch('ae-fake-claude-');
+  const printed = path.join(bin, 'result.json');
+  fs.writeFileSync(printed, `${JSON.stringify({ ...JSON.parse(H4SJ_IMPLEMENT_TRY2), session_id: SESSION })}\n`);
+  fs.writeFileSync(
+    path.join(bin, 'claude'),
+    ['#!/bin/sh', `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`, `cat '${printed}'`].join('\n'),
+    { mode: 0o755 },
+  );
+  const prev = process.env.PATH;
+  process.env.PATH = `${bin}:${prev}`;
+  try {
+    const dir = root();
+    doneRun(dir, 'ae/h/1', { nativeId: SESSION, startedAt: '2026-10-22T09:00:00Z' }, H4SJ_IMPLEMENT, claudeDetached.name);
+    const ops = detachedOps(claudeDetached, dir);
+    await Effect.runPromise(ops.spawn({ ...req('ae/h/2', dir), resumeFrom: SESSION }));
+    const run = JSON.parse(fs.readFileSync(path.join(dir, 'runs', claudeDetached.name, 'ae_h_2.json'), 'utf8'));
+    assert.equal(run.resumeFrom, SESSION);
+    assert.deepEqual(run.carried, carriedOf(claudeResultOutput(H4SJ_IMPLEMENT)), "try 1's whole session, kept at spawn");
+    await settle(t, ops, 'ae/h/2', 'completed');
+    const usage = (await Effect.runPromise(detachedOps(claudeDetached, dir).observe)).get('ae/h/2')?.usage;
+    assert.deepEqual(tokensOf(usage), H4SJ_TRY2_OWN);
+    assert.ok(usage?.costUsd !== undefined && Math.abs(usage.costUsd - 1.327168) < 1e-9, `cost ${usage?.costUsd}`);
+  } finally {
+    process.env.PATH = prev;
+  }
 });
 
 test('a detached look reads the run file and output of each session it is asked about and no other', async () => {

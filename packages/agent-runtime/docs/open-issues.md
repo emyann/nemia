@@ -1503,15 +1503,29 @@ be there when the pass spawns it — so it refuses the wider case. Met while wri
 files its session as a job instead, which runs attached just the same. Nothing is wrong on the record: no caller is given a session
 without the env it asked for.
 
-## A resumed job's carried cost is unverified on the SDK road
+## A resumed job's carried cost was unverified on the SDK road (measured 2026-10-23)
 
 `claudeJobSpec` keeps `resumeCostCarried: true`: a resumed Claude Code prints its parent's cost and API time on in its own
 totals, so the runner reads the parent's off its run file and takes them off (`lessCarried`). That was measured of
-`claude -p --resume`. A job now runs the same Claude Code through the Agent SDK's `query()` with `Options.resume`, which the SDK
-spells as `--resume=<id>` on the same CLI, so the same result message should carry the same totals — but nothing in this change
-measures it: the probe of 2026-10-21 ran a fresh job, and the suite's stand-in prints whatever its plan says. If the SDK's result
-does not carry the parent's totals, a resumed job's cost is reported low by the carry taken off it. A probe that resumes a real
-job and compares its `total_cost_usd` with its parent's would settle it.
+`claude -p --resume`, and is now measured of the SDK's `query()` with `Options.resume` too (SDK 0.3.308, CLI 2.1.308,
+`docs/harness.md`): a resumed query's first result carries the total its parent saved on exit. What it rests on is that the parent
+saved one, which a process killed does not — the entry below.
+
+## A Claude Code killed outright loses what its process spent
+
+An attached session's cost is its capture's last result, the running total of the process that printed it, which a resumed process
+carries on from the total its parent saved as it exited (`docs/harness.md`). A holder's let-go ends each session through the SDK's
+interrupt and the end of its input, so a session cut by a restart saves its total and the next holder's resume carries it on
+(`parked`, `harness/claude/attached.ts`). A holder that never runs its let-go — killed outright, out of memory, a second signal
+mid-let-go — leaves its sessions' Claude Code to the next holder, which kills it (`adopt`); and a let-go whose Claude Code does not
+exit within what is left of `LET_GO_MS` kills it. Such a process saves nothing, so what it spent since its session's last saved
+total is lost to the attempt: an undercount, never a double count. Pricing the transcript's tokens by a table of our own would cover
+it, and was refused at design (2026-10-23) as a second cost source drifting from Claude Code's own; revisit if the stats show it
+bites.
+
+The step's spend cap does not hold across those processes either: the SDK's `maxBudgetUsd` counts only the spend since its `query()`
+call started (`sdk.d.ts:6034-6037`), and `adopt` resumes with the task's whole `config.budgetUsd`, so every restart of the holder
+hands the session its whole cap again. Left to an intent of its own by the person's answer at the design gate (2026-10-23).
 
 ## `claude-detached` still spells `claude -p`, and is the only road that does
 

@@ -12,6 +12,12 @@
  * Code exports from the environment it is given (`postLog`).
  *
  * Its session id is `stand-in-session`, its plan's `id` where it gives one, or the one `--resume=<id>` names, as the SDK writes it.
+ *
+ * Its cost is Claude Code's as the SDK documents `total_cost_usd` (`sdk.d.ts:6034-6037`) and `docs/harness.md` measures it: a running
+ * total of this process, each turn charged its plan's `cost` as it starts — so an interrupted turn has spent it — and each result
+ * printing the total so far. Once its stdin ends, after the turn an interrupt cut prints its result, it saves that total as a
+ * `cost-state` line in `cost-state.jsonl` of its folder, where Claude Code saves one in its transcript; a `--resume=<id>` starts
+ * from the last total saved for that session, and a process killed saves nothing, so its resume starts from nothing.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -23,8 +29,8 @@ import readline from 'node:readline';
  * appears in its folder or until an `interrupt` request comes, which ends the turn with that call still held and unanswered, as
  * Claude Code leaves it; `nested`, once the file `nest` appears, ask the `PreToolUse` hooks of a second call of that tool, while
  * `call`'s is still in flight and before its release, carrying `agent_id` as a sub-agent's call does where `fromSubAgent`; `hold`,
- * wait until the file `end` appears, or until an `interrupt` request comes; then its result, `output` as its `structured_output` and
- * `cost` as its `total_cost_usd` (0.01 when absent).
+ * wait until the file `end` appears, or until an `interrupt` request comes; then its result, `output` as its `structured_output`, and
+ * `cost` what the turn adds to the running total its `total_cost_usd` prints (0.01 when absent).
  *
  * `stream` makes it print, before its result and only when its argv carries `--include-partial-messages` — the argument the SDK
  * passes for `includePartialMessages` — a message begun, a text block opened, one piece of text, then, once the file `more` appears
@@ -67,6 +73,24 @@ const note = (file: string, value: unknown) => fs.appendFileSync(path.join(dir, 
 note('argv.jsonl', argv);
 fs.writeFileSync(path.join(dir, 'pid'), String(process.pid));
 fs.writeFileSync(path.join(dir, 'env.json'), JSON.stringify(process.env));
+
+/** Where the stand-in saves its running total on a clean exit, a `cost-state` line per exit, as Claude Code's transcript keeps it. */
+const COST_STATE = path.join(dir, 'cost-state.jsonl');
+
+/** The running total of the session `id` saved by the last process of it that exited cleanly: nothing where none did. */
+const savedCost = (id: string | undefined): number => {
+  if (id === undefined || !fs.existsSync(COST_STATE)) return 0;
+  const saved = fs
+    .readFileSync(COST_STATE, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => JSON.parse(l) as { sessionId: string; totalCostUSD: number })
+    .filter((l) => l.sessionId === id);
+  return saved.at(-1)?.totalCostUSD ?? 0;
+};
+
+/** What this process's session has cost so far: a resume's saved total carried on, and each turn's `cost` as it starts. */
+let spent = savedCost(resumed);
 
 const print = (line: object) => process.stdout.write(`${JSON.stringify(line)}\n`);
 const pending = new Map<string, (response: unknown) => void>();
@@ -158,6 +182,7 @@ let mine: string[] = [];
 /** One turn's work, once a user message came. */
 const work = async () => {
   print({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), tools: [], model: 'stand-in' });
+  spent += plan.cost ?? 0.01;
   if (plan.deny) print({ type: 'system', subtype: 'permission_denied', tool_name: plan.deny, tool_use_id: 'denied-1', session_id: sessionId });
   if (plan.ask)
     note('answers.jsonl', {
@@ -174,6 +199,8 @@ const work = async () => {
   }
   if (plan.call && !interrupted) {
     await appears('release');
+  }
+  if (plan.call && !interrupted) {
     await hooked('PostToolUse', plan.call, 'call-1');
     print({ type: 'user', session_id: sessionId, message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'call-1', content: 'ok' }] } });
   }
@@ -192,7 +219,7 @@ const work = async () => {
     ...(cut ? { errors: ['Interrupted by user'] } : {}),
     session_id: sessionId,
     num_turns: 1,
-    total_cost_usd: plan.cost ?? 0.01,
+    total_cost_usd: spent,
     usage: { input_tokens: 1, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 1 },
     ...(plan.output !== undefined ? { structured_output: plan.output } : {}),
   });
@@ -308,4 +335,17 @@ readline.createInterface({ input: process.stdin }).on('line', (text) => {
     queued.push({ text: String(line.message?.content ?? ''), uuid: String(line.uuid ?? '') });
     next();
   }
-}).on('close', () => process.exit(0));
+}).on('close', () => void ended());
+
+/**
+ * Ends this process cleanly, its running total saved where a resume reads it: at once, or once the turn an interrupt cut has printed
+ * its result. A turn in flight that no interrupt cut is not waited for, as a job's stdin ends at its result.
+ */
+const ended = async () => {
+  for (;;) {
+    if (!working || !interrupted) break;
+    await new Promise((r) => setTimeout(r, 20));
+  }
+  if (everStarted) fs.appendFileSync(COST_STATE, `${JSON.stringify({ type: 'cost-state', sessionId, totalCostUSD: spent })}\n`);
+  process.exit(0);
+};

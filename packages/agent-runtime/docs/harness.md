@@ -188,3 +188,22 @@ What the GitHub sign-in card measured of the CLI that stores the secret, **Claud
   left the sign-in in flight, and what it clears of a completed sign-in is unmeasured.
 - **Unmeasured still**: the token exchange on 0.3.308, and a task session finding a sign-in made through `--scope local` with a real
   token. Both stand on `izq1-measurement.md`'s 0.3.270 sign-in and its refresh, and on the key above being the one it measured.
+
+What a session's cost does across its processes, measured **2026-10-23 on Agent SDK 0.3.308 and the Claude Code it bundles,
+2.1.308**, with Haiku, by a script on `query()` and again through `attachedSessions` (`test/live.test.ts`, *an attached session's
+cost*, `AE_LIVE=1`). `total_cost_usd` is the running total of one `query()` call, and a resumed one "continues from the total its
+transcript saved, when it has one" (`sdk.d.ts:6034-6037`); this is what that saving takes:
+
+- **A process that ends cleanly saves its total, and a resumed query carries it on.** A session that ran to its result and whose
+  input was closed exited 0 and appended a `cost-state` line (`totalCostUSD` equal to its result's `total_cost_usd`) to its
+  transcript; a second `query()` with `resume` printed, on its first result, that total plus its own turn (0.00366 → 0.00518; through
+  `attachedSessions`, 0.00466 → 0.00512, `carried` taking the parent's off). So the SDK road carries the parent on as `claude -p
+  --resume` did, and `resumeCostCarried` holds for it.
+- **An `interrupt` and then the end of the input end a session at work with its total saved.** Cut in a `sleep 120` call, it printed
+  an `error_during_execution` result with its running total, saved a `cost-state` of the same, and exited (code 1) 313 ms after the
+  interrupt was sent; through the let-go, the whole let-go took 276 ms past its wait for the call. The SDK's iterator throws on that
+  error result once the input is closed (`Claude Code returned an error result`). Resumed, its first result carried the cut total on
+  (0.00111 → 0.00182).
+- **A process killed (`SIGKILL`) prints no result and saves nothing, and its resume counts from nothing**: the resume's first result
+  was 0.00037, its own turn alone. So a holder that kills its sessions' Claude Code loses what they spent, which is why the let-go ends
+  them through the SDK (`parked`, `harness/claude/attached.ts`) and kills only what outlives its bound.

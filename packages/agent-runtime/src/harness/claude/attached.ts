@@ -6,10 +6,12 @@
  *   engine reads the run files and writes a stop, or words to say, beside one; a Claude Code task it starts runs as a job
  *   (`claudeCodeOps`).
  * - **Let go.** As the holder's scope closes, the new calls of each session with none in flight are held at their hook, it waits at
- *   most `LET_GO_MS` for each call in flight to end, then writes each session `parked` and aborts it; a call held at its hook then is
- *   never written in flight. A call that belongs to a call in flight is answered throughout, or the call it belongs to could never
- *   end and the let-go would wait on what it forbids. Past the bound the call in flight is cut, kept on the run file as `calling` and
- *   said on the log, so the next holder resumes the session told which call did not finish.
+ *   most `LET_GO_MS` for each call in flight to end, then writes each session `parked` and ends its Claude Code through the SDK — an
+ *   `interrupt` and the end of its input — so it prints what it spent and saves its total for the resume to carry on, killing only
+ *   what outlives the bound; a call held at its hook then is never written in flight, nor run. A call that belongs to a call in
+ *   flight is answered throughout, or the call it belongs to could never end and the let-go would wait on what it forbids. Past the
+ *   bound the call in flight is cut, kept on the run file as `calling` and said on the log, so the next holder resumes the session
+ *   told which call did not finish.
  * - **Taken up.** On each look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of its
  *   Claude Code's process group, unless that pid is another process's now (`childOf`), and resumes it under the same session id, told
  *   it was paused (`CARRY_ON`), or, when its holder ended mid-call, which call did not finish (`crashNote`).
@@ -186,12 +188,13 @@ const inCallOf = (live: Map<string, Live>): Live[] => [...live.values()].filter(
 const toolOf = (l: Live): string => l.run.calling?.tool ?? 'a tool';
 
 /**
- * Each session of `live` at work, or idle between a long-lived session's turns, written `parked`, aborted and its Claude Code's
- * process group killed, its file its holder's last word; the call it was cut in kept as `calling` where `cut`, which is what tells
- * the next holder which call did not finish. The park
- * ends the session's Claude Code itself rather than leave it to the waits after it, which a spent budget can cut short: a parked
- * session never leaves a process behind. The group it kills is the one `childOf` answers, so a pid another process has taken since
- * is left alone. Uninterruptible as one: a second signal leaves no session neither parked nor running.
+ * Each session of `live` at work, or idle between a long-lived session's turns, written `parked`, its file its holder's last word;
+ * the call it was cut in kept as `calling` where `cut`, which is what tells the next holder which call did not finish. Its Claude Code
+ * is ended through the SDK, never killed here: a session at work is sent the SDK's `interrupt`, and its input is closed once that is
+ * answered, so Claude Code prints the turn it cut as a result and saves its running total as it exits, which the resumed process
+ * carries on (`docs/harness.md`). A killed Claude Code saves nothing, and its spend would be lost to the attempt. The run file keeps
+ * the process's facts until `ended` takes them off, so a holder that dies before then leaves the next holder what it kills.
+ * Uninterruptible as one: a second signal leaves no session neither parked nor running.
  */
 const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Effect<void> =>
   Effect.sync(() => {
@@ -199,24 +202,47 @@ const parked = (root: string, live: Map<string, Live>, cut: boolean): Effect.Eff
       if (!l.abort || (l.run.state !== 'working' && l.run.state !== 'idle')) continue;
       cutAsks(root, l.run.name);
       const kept = cut && workingIn(l) > 0 ? l.run.calling : undefined;
-      const group = childOf(l.run);
-      const { calling: _, childPid: __, childStart: ___, ...rest } = l.run;
+      const working = l.run.state === 'working';
+      const { calling: _, ...rest } = l.run;
       l.run = { ...rest, state: 'parked', ...(kept ? { calling: kept } : {}) };
       writeRun(root, l.run);
       l.letGo = true;
+      const ask = working ? l.q?.interrupt : undefined;
+      void Promise.resolve()
+        .then(() => ask?.call(l.q))
+        .catch(() => undefined)
+        .finally(() => l.input?.close());
+    }
+  }).pipe(Effect.uninterruptible);
+
+/**
+ * What is left of each session `parked` let go, ended: its query aborted, its Claude Code's process group killed where it outlived the
+ * waits, and its run file written without the process's facts, so a let-go never leaves a process behind. The group it kills is the
+ * one `childOf` answers, so a pid another process has taken since is left alone, and a run file another holder has taken since is
+ * not written. Uninterruptible as one, like the park.
+ */
+const ended = (root: string, live: Map<string, Live>): Effect.Effect<void> =>
+  Effect.sync(() => {
+    for (const l of live.values()) {
+      if (!l.abort || !l.letGo || l.run.state !== 'parked') continue;
       l.abort.abort();
-      killGroup(group);
+      killGroup(childOf(l.run));
+      const { childPid: _, childStart: __, ...rest } = l.run;
+      l.run = rest;
+      const now = readRun(filesOf(root, l.run.name).run);
+      if (now?.state === 'parked' && now.owner === l.run.owner && now.ownerStart === l.run.ownerStart) writeRun(root, l.run);
     }
   }).pipe(Effect.uninterruptible);
 
 /**
  * The holder's let-go of the sessions in `live`: it says what it is waiting for, waits for the calls in flight to end, says which
- * session it cut and in what call where they did not, then parks each session at work (`parked`) and waits for each to end and for
- * each call held at its hook to be let go. Its three waits take from one `purse` of `letGoMs` (`purseOf`), the wait for the calls in
- * flight capped at `LET_GO_CALLS_SHARE` of it and the rest spent as they go, so the whole let-go ends within the budget rather than
- * taking their sum: it always returns, and within the bound, so a signal always ends the process and whatever waits for the process
- * — a service unit's stop timeout, a restart's wait for the lease — can be set above one number. `purse` is the caller's so a test
- * can read what each wait was given (`Purse.given`) and show they add up to no more than the budget.
+ * session it cut and in what call where they did not, then parks each session at work (`parked`), waits for each Claude Code to print
+ * its last result and exit and for each call held at its hook to be let go, and ends whatever is left (`ended`). Its three waits
+ * take from one `purse` of `letGoMs` (`purseOf`), the wait for the calls in flight capped at `LET_GO_CALLS_SHARE` of it and the rest
+ * spent as they go, so the whole let-go ends within the budget rather than taking their sum: it always returns, and within the
+ * bound, so a signal always ends the process and whatever waits for the process — a service unit's stop timeout, a restart's wait for
+ * the lease — can be set above one number. `purse` is the caller's so a test can read what each wait was given (`Purse.given`) and
+ * show they add up to no more than the budget.
  */
 export const letGoOf = (
   root: string,
@@ -240,6 +266,7 @@ export const letGoOf = (
     yield* parked(root, live, !quiet);
     yield* Effect.promise(() => Promise.all([...live.values()].map((l) => l.done))).pipe(Effect.timeoutOption(purse.take()));
     yield* waitedOut(() => ![...live.values()].some((l) => l.waiting), purse.take());
+    yield* ended(root, live);
   });
 
 /**

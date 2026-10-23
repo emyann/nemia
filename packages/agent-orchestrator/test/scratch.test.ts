@@ -93,6 +93,10 @@ const repoFilesApart = (root: string): string[] =>
     apartFrom(root, `packages/agent-orchestrator/test/${name}`, [`tools/guards/test/${name}`]),
   );
 
+/** The copies of the orchestrator's story checkpoints under `root`, in the api and the web, where one is not the original. */
+const CHECKPOINT_COPIES = ['apps/api/test/checkpoints.ts', 'apps/web/test/checkpoints.ts'];
+const checkpointsApart = (root: string): string[] => apartFrom(root, 'packages/agent-orchestrator/test/checkpoints.ts', CHECKPOINT_COPIES);
+
 /** A root whose workspaces are the runtime and the guards, each file of `files` written under it. */
 const rootOf = (files: Record<string, string>): string => {
   const root = scratch('wf-copies-');
@@ -113,12 +117,17 @@ test("REFUSED: a copy of the helper, or of the repository's files, one byte apar
     'tools/guards/test/repo-files.ts': 'export const b = 1;\r\n',
     'packages/agent-orchestrator/test/workspaces.ts': 'export const c = 1;\n',
     'tools/guards/test/workspaces.ts': 'export const c = 1;\n',
+    'packages/agent-orchestrator/test/checkpoints.ts': 'export const d = 1;\n',
+    'apps/api/test/checkpoints.ts': 'export const d = 1;\n',
+    'apps/web/test/checkpoints.ts': 'export const d = 1; \n',
   });
   assert.deepEqual(scratchApart(root), ['tools/guards/test/scratch.ts']);
   assert.deepEqual(repoFilesApart(root), ['tools/guards/test/repo-files.ts']);
+  assert.deepEqual(checkpointsApart(root), ['apps/web/test/checkpoints.ts']);
   fs.writeFileSync(path.join(root, 'tools/guards/test/scratch.ts'), 'export const a = 1;\n');
   fs.writeFileSync(path.join(root, 'tools/guards/test/repo-files.ts'), 'export const b = 1;\n');
-  assert.deepEqual([...scratchApart(root), ...repoFilesApart(root)], [], 'an equal copy is let through');
+  fs.writeFileSync(path.join(root, 'apps/web/test/checkpoints.ts'), 'export const d = 1;\n');
+  assert.deepEqual([...scratchApart(root), ...repoFilesApart(root), ...checkpointsApart(root)], [], 'an equal copy is let through');
 });
 
 test("each workspace's copy of the helper is the runtime's, byte for byte", () => {
@@ -131,5 +140,13 @@ test("the guards' copies of the repository's files and workspaces are the orches
     repoFilesApart(REPO),
     [],
     'copy packages/agent-orchestrator/test/<file> over tools/guards/test/<file>: a change is made there and copied',
+  );
+});
+
+test("the api's and the web's copies of the story checkpoints are the orchestrator's, byte for byte", () => {
+  assert.deepEqual(
+    checkpointsApart(REPO),
+    [],
+    'copy packages/agent-orchestrator/test/checkpoints.ts over each of these: a change is made there and copied',
   );
 });

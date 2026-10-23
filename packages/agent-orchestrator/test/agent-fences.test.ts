@@ -1367,7 +1367,7 @@ test("quick's review is build's review but what each workflow says of its own: t
     "build's review reads the spec; a quick run has none, so the card is what was asked",
   );
   assert.deepEqual([build.rounds, quick?.rounds], [3, 2], "quick's loop caps tighter: a card that asks twice is a build card");
-  assert.deepEqual([build.budget, quick?.budget], [16, 12], "and a review within quick's bound costs less");
+  assert.deepEqual([build.budget, quick?.budget], [16, 12], 'and a review with no spec to read costs less');
   assert.equal(quick?.gate, undefined, "nothing waits on a person at quick's review: its pass files the landing");
 });
 

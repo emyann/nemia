@@ -38,13 +38,12 @@ as you wrote it, corrected where the work proved it wrong. Then build it, with t
 **Decide nothing the card does not give.** When the change needs a decision the card leaves open (a taste call, a name a person will
 read, which of two behaviours), sign off `blocked` and say in `needs` what is undecided; do not choose for them.
 
-**A quick build is small**: at most 300 lines changed, in any number of files, added plus removed, tests and docs counted, generated files
-(`package-lock.json`, `apps/web/theme/`, `apps/web/src/routeTree.gen.ts`) left out. The check measures it first
-(`workflows/quick/change.ts`) and refuses a change past that number: a person then starts the card with `build`. When the work
-grows past the bound, do not trim it to fit, split it or drop its tests: sign off `blocked`, and say in `needs` that the card is a
-`build` card and why.
+**A quick build has no size bound**: quick is for a card that needs no design, whatever its size. The check measures it first
+(`workflows/quick/change.ts`): files and lines, added plus removed, tests and docs counted, generated files (`package-lock.json`,
+`apps/web/theme/`, `apps/web/src/routeTree.gen.ts`) left out, said as a fact and refused by no number. Do not trim the work, split it
+or drop its tests to make it look smaller: the review reads every line.
 
-**Nothing runs your tests for you.** The check proves the bound, the pictures and the probes, then pushes
+**Nothing runs your tests for you.** The check measures the change, proves the pictures and the probes, then pushes
 the branch and waits on CI: it runs `change.ts size`, `pictures.ts`, `probe.ts`, `pull-request.ts push` and
 `pull-request.ts wait`, in that order, and nothing else. Run them yourself before you sign off, as `CLAUDE.md`, *Check your work*, says
 of a step's session: the tests of what you changed, the types and the lint, and for a change to the board the e2e pages it touches, with
@@ -79,7 +78,7 @@ with your browser, add `--hold`, and stop the stack it names when you are done: 
 
 **Merge the base before you sign off**, on every try: the base moves while you work, `ci` judges the commit your check pushes and
 nothing judges the merged tree afterwards — the landing's check is a receipt — so a base you did not merge is a base GitHub may call
-unmergeable at the landing, which refuses rather than lands. The bound counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
+unmergeable at the landing, which refuses rather than lands. The measure counts your own change alone, from the base you merged last. The base is the branch the repository's own checkout is on, and from your worktree git names its tip
 `main-worktree/HEAD`, whatever that branch is called. Commit your work, then `git merge main-worktree/HEAD`, made as the `git` skill
 says a merge is made: keep both meanings in each conflict, and sign off `blocked` where both cannot hold. Then run again the tests of
 what the merge touched: those of each file of yours it changed, and of each file it changed that your code or your tests read.

@@ -93,7 +93,8 @@ test('REFUSED by name at shipped defaults: a card with no `workflow:`, an empty 
     refusedWith(/^b\.md: `after` is set twice/, 'list every card on it', '`after: a, b`'),
   );
   assert.throws(() => parsePlan([card('a', 'workflow:')]), refusedWith(/^a\.md: `workflow` has no value\./));
-  assert.throws(() => parsePlan([card('a', 'workflow dev')]), refusedWith(/^a\.md: `workflow dev` is not `key: value`\./));
+  assert.throws(() => parsePlan([card('a', 'workflow dev')]), refusedWith(/^a\.md:2: /));
+  assert.throws(() => parsePlan([card('a', 'workflow: [dev, ui]')]), refusedWith(/^a\.md:2: /), 'a list on a key of one value');
   assert.throws(
     () => parsePlan([card('a', 'workflow: dev\nrepo: /home/me/code/app')]),
     refusedWith(
@@ -239,11 +240,29 @@ test('`cardToStart`: a card file starts its body, with its `workflow:` and `afte
     { file: 'b.md', after: ['a'], body: 'Document it.' },
     'no workflow: — --workflows says, or the default',
   );
+  assert.deepEqual(
+    cardToStart('d.md', '---\nworkflow: "dev"\nafter:\n  - b\n  - c\n---\nShow the flag.\n', ['r-b', 'r-c']),
+    { file: 'd.md', workflow: 'dev', after: ['b', 'c'], body: 'Show the flag.' },
+    'a YAML card: a quoted value, and `after:` as a block list, read as `after: b, c`',
+  );
+  assert.deepEqual(
+    cardToStart('d.md', '---\nafter: [b, c]\n---\nShow the flag.\n', ['r-b', 'r-c']),
+    { file: 'd.md', after: ['b', 'c'], body: 'Show the flag.' },
+    'and as a flow list',
+  );
+  assert.throws(
+    () => cardToStart('d.md', '---\nworkflow:\n  - dev\n  - ui\n---\nx\n', []),
+    refusedWith(/^d\.md:2: /),
+    'a list on `workflow:`, which names one, is refused by its line',
+  );
 
   for (const text of [
     'Parse the flag.\n',
     '---\nSome prose between two rules\n---\nParse it.\n',
     '---\nIn short: parse it\n---\nParse it.\n',
+    '---\nThis is a brief, with: a colon\n---\nParse it.\n',
+    '---\nA brief in prose, opening on a rule\n\nwith a second paragraph.\n---\nParse it.\n',
+    '---\n- a list, not keys\n---\nParse it.\n',
     '---\nA brief that opens with a rule, and never closes one.\n',
     '---\n---\nParse it.\n',
     '---\n\n# only a comment\n---\nParse it.\n',

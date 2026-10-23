@@ -13,7 +13,16 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import { AGENTS_FOLDER, isReadme, SKILLS_FOLDER, STEP_KEYS, WorkflowError, type StepKey, type Workflow } from '../step/step.ts';
 import { PLACES } from '../keys/index.ts';
-import { codexModeLine, formerKeyLine, formerKeysIn, frontmatterKey, harnessPromptLine, placeLine } from '../former/former.ts';
+import {
+  codexModeLine,
+  formerFormLine,
+  formerKeyLine,
+  formerKeysIn,
+  frontmatterKey,
+  harnessPromptLine,
+  inFormerForm,
+  placeLine,
+} from '../former/former.ts';
 import { agentsDir, agentsFolderRefusal, parseFolder, readmeDescription, stepFiles, type Fills } from './folder.ts';
 import { HARNESS_PROMPTS } from '../agents/agents.ts';
 import { agentsFor } from '../agents/read.store.ts';
@@ -57,7 +66,8 @@ export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): 
  * A file that runs on codex — by its own `harness:` line, or a step's by its agent's — and still names its sandbox as `permissionMode:` is
  * named too (`codexModeLine`): the parser reads the line as `sandbox:`. So is an agent that still says `systemPrompt:`
  * (`harnessPromptLine`), which the parser reads as `harnessPrompt:`, and a step file that still says `workspace: folder` (`placeLine`),
- * which the parser reads as `place: folder`.
+ * which the parser reads as `place: folder`. And each step or agent file whose frontmatter is still in the former line form, not YAML
+ * (`formerFormLine`): the parser reads it, and `nemia frontmatter rewrite` writes it as YAML.
  */
 export function formerKeyLines(dir: string): string[] {
   const steps = stepTexts(dir);
@@ -70,6 +80,7 @@ export function formerKeyLines(dir: string): string[] {
     ...steps.flatMap(({ file, text, harness }) => {
       const at = path.join(dir, file);
       return [
+        ...(inFormerForm(text) ? [formerFormLine(at)] : []),
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
         ...codexMode(at, text, harness),
         ...(frontmatterKey(text, 'workspace') === 'folder' ? [placeLine(at)] : []),
@@ -80,6 +91,7 @@ export function formerKeyLines(dir: string): string[] {
       const text = textAt(at);
       const prompt = frontmatterKey(text, 'systemPrompt');
       return [
+        ...(inFormerForm(text) ? [formerFormLine(at)] : []),
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
         ...codexMode(at, text, frontmatterKey(text, 'harness')),
         ...(prompt === undefined ? [] : [harnessPromptLine(at, prompt)]),

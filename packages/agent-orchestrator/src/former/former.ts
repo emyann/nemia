@@ -5,7 +5,8 @@
  * asks for under either key (`modeOf`), an agent's own key renamed and its words (`FORMER_OWN_KEYS`, `harnessPromptNamed`), and a step
  * frozen on a run record under an old name (`asNamed`).
  */
-import { refuse, splitFrontmatter, type StepAgent, type StepKey, type Workflow } from '../step/step.ts';
+import { LIST_KEYS, refuse, splitFrontmatter, type StepAgent, type StepKey, type Workflow } from '../step/step.ts';
+import { flatValue, frontmatterOrNull, readFrontmatter, type FrontmatterEntry } from '../frontmatter/frontmatter.ts';
 import { ALLOW_EXAMPLE, BUDGET_EXAMPLE, DISALLOW_EXAMPLE, TOOLS_EXAMPLE } from '../keys/index.ts';
 import type { AgentOwnKey, HarnessPrompt, RoleKey } from '../agents/agents.ts';
 
@@ -108,10 +109,12 @@ export type Spelled = Partial<Record<string, string>>;
 const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, written) ? FORMER_KEYS[written] : written);
 
 /**
- * The frontmatter as key → value: every line a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. A
- * line under a key's former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as
- * written. Blank lines and lines opening on `#`, the comment character, are skipped. A key set twice, under either name, is refused rather
- * than last-one-wins: both values are something the author meant, and a step would wait on half of what it was written to wait on.
+ * The frontmatter as key → value: every key a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. The
+ * block is read as YAML, or in the former line form (`readFrontmatter`), which refuses a block in neither; a list on a key that holds one
+ * (`LIST_KEYS`) reads as the comma string, `tools: [Read, Grep]` as `Read, Grep`, and a list on any other key is refused (`flatValue`). A
+ * key under its former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as
+ * written. A key set twice, under either name, is refused rather than last-one-wins: both values are something the author meant, and a
+ * step would wait on half of what it was written to wait on.
  */
 export function readKeys<K extends string>(
   step: string,
@@ -120,19 +123,9 @@ export function readKeys<K extends string>(
 ): { meta: Partial<Record<K, string>>; spelled: Spelled } {
   const meta: Partial<Record<K, string>> = {};
   const spelled: Spelled = {};
-  for (const raw of block.split('\n')) {
-    const line = raw.trim();
-    if (!line || line.startsWith('#')) continue;
-    const i = line.indexOf(':');
-    if (i <= 0) {
-      refuse(
-        `${step}: \`${line}\` is not \`key: value\`. Each frontmatter line is a key, a colon and its value, and a list stays on one line: \`after: a, b\`.`,
-      );
-    }
-    const written = line.slice(0, i).trim();
+  for (const entry of readFrontmatter(step, block).entries) {
+    const written = entry.key;
     const key = keyNamed(written);
-    const value = line.slice(i + 1).trim();
-
     const refused = refusal(key);
     if (refused !== undefined) refuse(refused);
     if (Object.hasOwn(meta, key)) {
@@ -146,65 +139,61 @@ export function readKeys<K extends string>(
         `${step}: \`${written}\` is set twice, and a step that says two things says nothing. Keep one line${key === 'after' ? ' and list every step on it: `after: a, b`' : ''}.`,
       );
     }
-    if (!value) {
-      refuse(
-        key === 'check'
-          ? `${step}: \`check\` has no value. Give the command that must exit 0 in the step's workspace — \`check: npm test\` — or delete the line, and the step runs no check.`
-          : key === 'tools'
-            ? `${step}: \`tools\` has no value, which reads as every tool to one person and as none to another. Name the tools the session may have — ${TOOLS_EXAMPLE} — or delete the line, and the step has the harness's own set.`
-            : key === 'disallowedTools'
-              ? `${step}: \`${written}\` has no value, which denies nothing and reads as a fence. Name what the session may not have — ${DISALLOW_EXAMPLE} — or delete the line, and the step is denied nothing beyond the checkout's settings.`
-              : key === 'allowedTools'
-                ? `${step}: \`${written}\` has no value, which allows nothing and reads as a permission. Name what the session may do without being asked — ${ALLOW_EXAMPLE} — or delete the line, and the step may do only what its \`permissionMode\` allows by itself.`
-                : key === 'budget'
-                  ? `${step}: \`budget\` has no value, which reads as no cap to one person and as nothing to spend to another. Give the most the step's tries may cost together, in dollars — ${BUDGET_EXAMPLE} — or delete the line, and the step has no budget.`
-                  : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`,
-      );
-    }
+    const value = flatValue(step, entry, LIST_KEYS.includes(key));
+    if (!value) refuse(noValue(step, key, written));
     meta[key as K] = value;
     if (written !== key) spelled[key] = written;
   }
   return { meta, spelled };
 }
 
+/** Why a key written with no value is refused, and what to write: the command, the tools or the dollars it takes, or the line deleted. */
+const noValue = (step: string, key: string, written: string): string =>
+  key === 'check'
+    ? `${step}: \`check\` has no value. Give the command that must exit 0 in the step's workspace — \`check: npm test\` — or delete the line, and the step runs no check.`
+    : key === 'tools'
+      ? `${step}: \`tools\` has no value, which reads as every tool to one person and as none to another. Name the tools the session may have — ${TOOLS_EXAMPLE} — or delete the line, and the step has the harness's own set.`
+      : key === 'disallowedTools'
+        ? `${step}: \`${written}\` has no value, which denies nothing and reads as a fence. Name what the session may not have — ${DISALLOW_EXAMPLE} — or delete the line, and the step is denied nothing beyond the checkout's settings.`
+        : key === 'allowedTools'
+          ? `${step}: \`${written}\` has no value, which allows nothing and reads as a permission. Name what the session may do without being asked — ${ALLOW_EXAMPLE} — or delete the line, and the step may do only what its \`permissionMode\` allows by itself.`
+          : key === 'budget'
+            ? `${step}: \`budget\` has no value, which reads as no cap to one person and as nothing to spend to another. Give the most the step's tries may cost together, in dollars — ${BUDGET_EXAMPLE} — or delete the line, and the step has no budget.`
+            : `${step}: \`${key}\` has no value. Delete the line rather than leaving it blank — an empty key is not the same as an absent one.`;
+
+/** A file's frontmatter as it reads (`readFrontmatter`), or null for a file with none, one that never closes, or one in neither form. */
+function frontmatterOf(text: string): { entries: FrontmatterEntry[]; former: boolean } | null {
+  try {
+    const { block } = splitFrontmatter('', text);
+    return block === null ? null : frontmatterOrNull(block);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * The value a file's frontmatter gives `key`, read as the parser reads it — each line trimmed, the key trimmed before its colon — or
- * `undefined` for a file with no such line, or whose frontmatter never closes (the parser refuses it). `agent : coder` names `coder`.
+ * The value a file's frontmatter gives `key`, read as the parser reads it (`readFrontmatter`): its text, a list as the comma string — or
+ * `undefined` for a file with no such key, an empty one, one that holds a map, or whose frontmatter never closes or reads in neither form
+ * (the parser refuses it). Never throws: for a listing, which names what a file says before the parser judges it. `agent : coder` names
+ * `coder`.
  */
 export function frontmatterKey(text: string, key: string): string | undefined {
-  let block: string | null;
-  try {
-    block = splitFrontmatter('', text).block;
-  } catch {
-    return undefined;
-  }
-  for (const raw of (block ?? '').split('\n')) {
-    const line = raw.trim();
-    const i = line.indexOf(':');
-    if (line.startsWith('#') || i <= 0 || line.slice(0, i).trim() !== key) continue;
-    return line.slice(i + 1).trim() || undefined;
-  }
+  const value = frontmatterOf(text)?.entries.find((entry) => entry.key === key)?.value;
+  if (typeof value === 'string') return value || undefined;
+  if (Array.isArray(value) && value.every((item) => typeof item === 'string')) return value.join(', ') || undefined;
   return undefined;
 }
 
 /**
  * The former key names (`FORMER_KEYS`) a file's frontmatter still uses, in the order it uses them — none for a file whose frontmatter never
- * closes.
+ * closes, or reads in neither form.
  */
 export function formerKeysIn(text: string): string[] {
-  let block: string | null;
-  try {
-    block = splitFrontmatter('', text).block;
-  } catch {
-    return [];
-  }
-  return (block ?? '').split('\n').flatMap((raw) => {
-    const line = raw.trim();
-    const i = line.indexOf(':');
-    const key = i > 0 && !line.startsWith('#') ? line.slice(0, i).trim() : '';
-    return Object.hasOwn(FORMER_KEYS, key) ? [key] : [];
-  });
+  return (frontmatterOf(text)?.entries ?? []).flatMap(({ key }) => (Object.hasOwn(FORMER_KEYS, key) ? [key] : []));
 }
+
+/** Whether a file's frontmatter is read in the former line form (`readFrontmatter` marks it `former`): what `formerFormLine` names. */
+export const inFormerForm = (text: string): boolean => frontmatterOf(text)?.former === true;
 
 /**
  * Why a former name is not written: read from a file, it is never put in one (`renderStep`, `renderAgent`). What sends one is a stale form
@@ -237,6 +226,13 @@ export const codexModeLine = (file: string, word: string): string =>
  */
 export const formerKeyLine = (file: string, former: string): string =>
   `${file}: \`${former}:\` is read as \`${FORMER_KEYS[former]}:\`, Claude Code's name for it. The former name is still read; rename the line, or save the file from the board, which writes the new name.`;
+
+/**
+ * What `nemia start` says of a file whose frontmatter is still in the former line form (`inFormerForm`), `key: the rest of the line`,
+ * never quoted: that it is still read, and the fix. The one writer of it.
+ */
+export const formerFormLine = (file: string): string =>
+  `${file}: the frontmatter is in the former line form, \`key: the rest of the line\`, which is still read, and is not YAML. Rewrite it as YAML, every value the same: nemia frontmatter rewrite <folder>, or save the file from the board.`;
 
 /**
  * What `nemia start` says of an agent file that still says `systemPrompt:` (`FORMER_OWN_KEYS`), and as what it is read. The one writer of

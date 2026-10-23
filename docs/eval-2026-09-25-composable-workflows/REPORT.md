@@ -1,5 +1,9 @@
 # Making workflows composable and extensible: evaluation and recommendation
 
+> **Status (2026-10-23): not adopted.** Overtaken by the routing design (`docs/design-2026-09-29-routing.md`) and by the pull-request
+> scripts (`workflows/build/pull-request.ts` and `landing.ts`, from `bcba88e51`, 2026-10-19), which push and land a run's work in place
+> of the services this report weighed.
+
 *hkb-v2 at `c0954da`, 2026-09-25. Evidence is drawn from three design proposals, two judging passes and the code.*
 
 ## 1. The question

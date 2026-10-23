@@ -1,5 +1,9 @@
 # Design, 2026-09-29: Git out of the packages
 
+> **Status (2026-10-23): landed.** The git place's skill came first (`80f653573`, 2026-09-29); its cards followed on 2026-10-06,
+> among them D (`abda36a04`), F (`3aae49afb`), C1b (`6fcfde23b`), I1 (`0b227e441`) and I2 (`e3592abe8`). The banner below says what
+> changed since: the seam became a service on 2026-10-11, and the freeze of a place was given up.
+
 A design note for the owner to approve. It changes no code. It rests on the owner's words of 2026-09-29 and on the source as it is at
 `8b6e1077` (line numbers are that commit's). Where it reads a file that a feature-folder slice is about to move, it names today's path.
 

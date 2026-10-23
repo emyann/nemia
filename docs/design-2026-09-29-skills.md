@@ -1,5 +1,9 @@
 # Design, 2026-09-29: skills in levels, generic default agents
 
+> **Status (2026-10-23): superseded.** The clean start (`62132eb3a`, 2026-09-29) took out the shipped agents and skills this note
+> builds its levels on; `2708171de` (2026-10-21) turned off every skill a run can see but the step's own; and skills by level, as the
+> levels are today, is an inbox card of its own. Read this note for its reasoning, not as a plan.
+
 A design note for the owner to approve. It builds on `docs/design-2026-09-25-agents-and-skills.md` (the 09-25 note) and on the
 composable-workflows evaluation (`docs/eval-2026-09-25-composable-workflows/REPORT.md`). It argues from the code at `48a74cc3` and changes
 none. Claude Code's own rules are quoted from its documentation (code.claude.com/docs/en/skills, read 2026-09-29), not measured on the

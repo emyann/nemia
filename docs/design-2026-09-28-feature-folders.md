@@ -1,5 +1,8 @@
 # Design, 2026-09-28: feature folders and size limits
 
+> **Status (2026-10-23): landed.** The packages were put into feature folders on 2026-09-28 (`05da9c41e`, `f23438191`,
+> `742d857ee`), and the orchestrator's last slices, 3 to 7, followed on 2026-09-29 (`c82e9b81e` to `a52928fc4`).
+
 A design note for the owner to approve. It changes no code. It rests on the owner's decisions of 2026-09-28 and on measurements taken on
 `694f45c` with oxlint 1.86 and eslint-plugin-sonarjs 4.2.2.
 

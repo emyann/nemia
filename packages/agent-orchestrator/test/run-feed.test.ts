@@ -145,10 +145,13 @@ const started = (brief: string, workflowDir = GATED, isolate = false): Promise<R
 /** Every line of a run in the feed, read off the file as a reader with cursor 0 would. */
 const lines = (): RunLine[] => readFeed(0).lines.filter(isRunLine);
 const size = (): number => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
-/** The words of a run's own lines, or of one step's, in order. */
+/**
+ * The words of a run's own lines, or of one step's, in order — but each `closed out`: a closeout read is a one-shot of its own, read with
+ * `said(run, 'ClosedOut')`, written on the pass that reads the word the step ended on.
+ */
 const words = (run: string, step?: string): string[] =>
   lines()
-    .filter((l) => l.run === run && l.step === step)
+    .filter((l) => l.run === run && l.step === step && l.reason !== 'ClosedOut')
     .map((l) => l.word);
 /** The lines of `reason` about `run`, with the fields a selector matches one by. */
 const said = (run: string, reason: Reason) =>
@@ -785,8 +788,9 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
         ['pending', undefined],
         ['unverified · done', undefined],
         ['denied: Bash(git push)', 'try 1'],
+        ['closed out', 'try 1'],
       ],
-      'the denial of the step that ended is its own line, once, beside the word it ended on',
+      'the denial of the step that ended is its own line, once, beside the word it ended on and its closeout read',
     );
     assert.equal(words(run.id).at(-1), 'succeeded', 'and the run says it finished');
   });
@@ -831,6 +835,70 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
   });
 });
 
+test("a step's closeout read is a one-shot `closed out` of its step and try, said once across passes and a restart, and never written whole", async (t) => {
+  const s = story(t);
+  emptyStore();
+  const closed = (run: Run) => said(run.id, 'ClosedOut').map((l) => [l.step, l.word, l.note, l.try, l.type]);
+  const SAID = { ...SIGNED, summary: 'summary-only-in-the-log-record' };
+  let run: Run;
+  await s.test('a step that signed off is one `closed out` line over three passes, with its labels and its try', async () => {
+    run = await started('the closeout');
+    await tick();
+    settle(task(run, 'plan'), 'succeeded', SAID);
+    await ticks(3);
+    assert.deepEqual(closed(run), [['plan', 'closed out', 'try 1', 1, 'Normal']]);
+    const record = readRun(run.id);
+    const line = lines().find((l) => l.run === run.id && l.reason === 'ClosedOut')!;
+    assert.deepEqual(
+      line.labels,
+      stepLabels(
+        record,
+        stepsOf(record).find((st) => st.name === 'plan')!,
+      ),
+    );
+  });
+  await s.test('REFUSED: the closeout itself is never in the feed — the pass reads it, and the line carries its try alone', async () => {
+    const pass = await tick();
+    const told = judged(pass).get(run.id)!.closeouts!;
+    assert.deepEqual(
+      told.map((c) => [c.step, c.try, 'summary' in c.read && c.read.summary]),
+      [['plan', 1, SAID.summary]],
+      'the pass read the closeout its step gave, for its log record',
+    );
+    assert.equal(fs.readFileSync(FEED, 'utf8').includes(SAID.summary), false, "the feed's file never holds it");
+  });
+  await s.test('a restarted daemon, folding the feed afresh, writes no closeout again', async () => {
+    assert.deepEqual(
+      recordFeed(judged(await tick()), { memo: freshFeedMemo() }).lines.filter((l) => l.reason === 'ClosedOut'),
+      [],
+    );
+  });
+  await s.test('REFUSED: a recheck says no closeout again — its turn, and its closeout, are the try before it', async () => {
+    const before = readRun(run.id);
+    const plan = before.steps.plan;
+    rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, then: 'recheck' }] } } });
+    assert.equal(tryOf(readRun(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
+    await ticks(3);
+    assert.deepEqual(closed(run), [['plan', 'closed out', 'try 1', 1, 'Normal']]);
+  });
+  await s.test('a closeout signed off blocked, and one the run cannot read, are each one line too', async () => {
+    const blocked = await started('the blocked closeout');
+    const unread = await started('the unreadable closeout');
+    await tick();
+    settle(task(blocked, 'plan'), 'succeeded', { ...SIGNED, outcome: 'blocked', needs: 'a name' });
+    settle(task(unread, 'plan'), 'succeeded', 'not json {');
+    await ticks(3);
+    assert.deepEqual(closed(blocked), [['plan', 'closed out', 'try 1', 1, 'Normal']]);
+    assert.deepEqual(closed(unread), [['plan', 'closed out', 'try 1', 1, 'Normal']]);
+    const told = judged(await tick()).get(unread.id)!.closeouts!;
+    assert.deepEqual(
+      told.map((c) => [c.said, 'error' in c.read]),
+      [['not json {', true]],
+      'what came back, and that the run could not read it',
+    );
+  });
+});
+
 test('a run waiting on a person says what it waits on, never failed: an ending at its gate, and a step that signed off blocked', async (t) => {
   const s = story(t);
   emptyStore();
@@ -868,7 +936,7 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
       settle(task(run, 'plan'), 'succeeded', { outcome: 'blocked', summary: 'stopped', artifacts: [], needs });
       await ticks(3);
       const plan = lines()
-        .filter((l) => l.run === run.id && l.step === 'plan')
+        .filter((l) => l.run === run.id && l.step === 'plan' && l.reason !== 'ClosedOut')
         .at(-1)!;
       assert.match(plan.word, /BLOCKED/);
       assert.equal(plan.note, 'needs: Which colour — red, or blue? The brief says both.');
@@ -891,7 +959,7 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
     settle(task(other, 'plan'), 'succeeded', { ...SIGNED, needs: 'nothing, really' });
     await ticks(2);
     const clipped = lines()
-      .filter((l) => l.run === long.id && l.step === 'plan')
+      .filter((l) => l.run === long.id && l.step === 'plan' && l.reason !== 'ClosedOut')
       .at(-1)!.note!;
     assert.ok(
       clipped.startsWith('needs: why why') && clipped.endsWith('…') && clipped.length <= 'needs: '.length + 200,

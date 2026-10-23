@@ -128,8 +128,12 @@ const ACT_WORDS: readonly Case[] = [
   { kind: 'Step', word: 'session lost', note: 'try 3', reason: 'SessionLost' },
 ];
 
-/** The one-shot a tool denial writes, and the one line a daemon writes. */
+/**
+ * The one-shot a tool denial writes, the one a step's closeout read writes — `closed out`, spelled here by hand as the owner named it —
+ * and the one line a daemon writes.
+ */
 const ONE_SHOTS: readonly Case[] = [
+  { kind: 'Step', word: 'closed out', note: 'try 2', reason: 'ClosedOut' },
   { kind: 'Step', word: `${DENIED}Bash(grep)`, note: 'try 2', reason: 'ToolDenied' },
   { kind: 'Step', word: `${DENIED}Skill(look)`, note: 'try 1', reason: 'ToolDenied' },
   { kind: 'Daemon', word: 'daemon started', note: 'first daemon on this store', reason: 'DaemonStarted' },
@@ -190,8 +194,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
       CASES.map((c) => `${reasonOf({ word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) }, c.kind)}/${c.kind}`),
     );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 38, 'the table the owner named has 38 entries');
-    assert.equal(REASON_CODES.length, 33, 'of 33 distinct codes');
+    assert.equal(entries.length, 39, 'the table the owner named has 39 entries');
+    assert.equal(REASON_CODES.length, 34, 'of 34 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],

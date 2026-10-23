@@ -375,6 +375,18 @@ export const taskTryOf = (run: Run, step: string): number => {
 };
 
 /**
+ * The try the current turn of a step's task was given, from 1: the try it is on, less each recheck behind it, since a recheck replaces the
+ * check alone and the session's turn — and the closeout it gave — stays the try's before it. A try answered into the session the task
+ * holds open is a turn of its own, and its own try. What a closeout read off the task's current turn belongs to (`closeoutsOf`). Pure.
+ */
+export const turnTryOf = (run: Run, step: string): number => {
+  const tries = run.steps[step]?.tries ?? [];
+  let at = tries.length + 1;
+  while (at > 1 && tries[at - 2].then === 'recheck') at--;
+  return at;
+};
+
+/**
  * The id of a step's check task. Derived, never generated: a pass that files the check and dies
  * before writing the run down finds it under this id on the next pass, and adopts it rather than
  * filing a second — the engine's own rule for a session, one layer up.

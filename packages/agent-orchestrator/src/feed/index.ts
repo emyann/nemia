@@ -26,6 +26,7 @@ export {
 export type {
   DaemonLine,
   FeedAppended,
+  FeedCloseout,
   FeedDenial,
   FeedFold,
   FeedLabels,

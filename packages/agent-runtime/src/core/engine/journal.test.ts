@@ -719,9 +719,10 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
         }),
       }),
     );
-    await assert.rejects(Effect.runPromise(engine.view('t-own')), (e: Error) =>
-      e.message.includes(`t-own's journal, entry 1 is no event this runtime writes (its kind is "filled"`),
-    );
+    await assert.rejects(Effect.runPromise(engine.view('t-own')), (e: Error) => {
+      naming(e.message, "t-own's journal, entry 1 is no event", 'this runtime writes', '(its kind is "filled"');
+      return true;
+    });
   });
 });
 

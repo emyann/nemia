@@ -1,6 +1,9 @@
 /**
- * Nemia's machine, pure: what the keeper owes at each state, a task stopped from outside never filed again, a level that is none refused
- * her diagram drawing each edge and each verb, and her settings turning the daemon's start off.
+ * Nemia's machine, pure: the keeper's decision table (`nemiaDue`, `nemiaState`) — what it owes at each state, a task stopped from outside
+ * never filed again, a tell, a delivery and an ask carried only while she is kept and up — her custom words judged changed and the words
+ * that tell her, a word that is no level, her task's id, her diagram drawing each edge and each verb, her selectors waking her alone on
+ * a denied call, and her settings turning the daemon's start off. The keeper acting on the table, on the engine's stand-in, is told in
+ * `test/nemia-keeper.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,6 +11,7 @@ import { DEFAULT_SELECTORS } from '../subscription/index.ts';
 import { parseSelectors, selects } from '../watch/selector.ts';
 import { DEMAND_OFF } from '../demand/demand.ts';
 import { DENIED, upgraded } from '../feed/index.ts';
+import { names } from '../../test/assessed.ts';
 import {
   NEMIA_SELECTORS,
   customChanged,
@@ -33,116 +37,122 @@ const OPEN: HerTask = { settled: false, stopRequested: false };
 const SETTLED: HerTask = { settled: true, stopRequested: false };
 const STOPPING: HerTask = { settled: false, stopRequested: true };
 
-test('the keeper owes a filing, then a subscription, then nothing, while some factory is above manual', () => {
-  assert.deepEqual(nemiaDue(SEMI, undefined, undefined), ['file']);
-  assert.deepEqual(nemiaDue(SEMI, OPEN, undefined), ['subscribe']);
-  assert.deepEqual(nemiaDue(SEMI, OPEN, HERS), []);
-  assert.equal(nemiaState(SEMI, OPEN, HERS), 'kept');
-  assert.deepEqual(nemiaDue(SEMI, OPEN, OLDER), ['drop', 'subscribe'], 'a subscription left for an older task is put again');
-});
-
-test('the keeper tells her a changed custom instruction while she is kept, and in no other state', () => {
-  const STALE: Keeping = { ...SEMI, stale: true };
-  assert.deepEqual(nemiaDue(STALE, OPEN, HERS), ['tell']);
-  assert.deepEqual(nemiaDue({ ...SEMI, stale: false }, OPEN, HERS), [], 'her filed words are the ones that compose now');
-  assert.deepEqual(nemiaDue(STALE, OPEN, undefined), ['subscribe'], 'filed: subscribed first, told on a later beat');
-  assert.deepEqual(nemiaDue(STALE, OPEN, OLDER), ['drop', 'subscribe']);
-  assert.deepEqual(nemiaDue(STALE, undefined, undefined), ['file'], 'due: filed with the words that compose now');
-  for (const task of [SETTLED, STOPPING]) assert.deepEqual(nemiaDue(STALE, task, HERS), ['drop'], 'stopped: nothing to tell');
-  assert.deepEqual(nemiaDue({ ...MANUAL, stale: true }, OPEN, HERS), ['stop', 'drop'], 'leaving: stopped, not told');
-});
-
-test("REFUSED: the keeper delivers the person's chat words only while she is kept and her session is live", () => {
-  const OWED = { ...SEMI, owed: true, up: true };
-  assert.deepEqual(nemiaDue(OWED, OPEN, HERS), ['deliver']);
-  assert.deepEqual(nemiaDue({ ...OWED, stale: true }, OPEN, HERS), ['tell', 'deliver'], 'told first, then delivered');
-  assert.deepEqual(nemiaDue({ ...OWED, up: false }, OPEN, HERS), [], 'kept but down: kept for later');
-  assert.deepEqual(nemiaDue({ ...OWED, owed: false }, OPEN, HERS), [], 'nothing owed');
-  assert.deepEqual(nemiaDue(OWED, OPEN, undefined), ['subscribe'], 'filed: not yet kept');
-  assert.deepEqual(nemiaDue({ ...OWED, trusted: false }, undefined, undefined), [], 'untrusted');
-  assert.deepEqual(nemiaDue({ ...MANUAL, owed: true, up: true }, OPEN, HERS), ['stop', 'drop'], 'leaving');
-});
-
-test('REFUSED: a question of hers is written down and its answer carried only while she is kept and her session is live', () => {
-  const ASKING = { ...SEMI, asking: true, up: true };
-  assert.deepEqual(nemiaDue(ASKING, OPEN, HERS), ['record']);
-  assert.deepEqual(nemiaDue({ ...ASKING, asking: false }, OPEN, HERS), [], 'her view holds no question: nothing to write down');
-  assert.deepEqual(nemiaDue({ ...ASKING, up: false }, OPEN, HERS), [], 'kept but down: no session holds a question open');
-  assert.deepEqual(nemiaDue({ ...ASKING, answered: true }, OPEN, HERS), ['record', 'answer'], 'written down first, then answered');
-  assert.deepEqual(nemiaDue({ ...SEMI, answered: true, up: true }, OPEN, HERS), ['answer'], 'an answer owed of a question gone');
-  assert.deepEqual(nemiaDue({ ...SEMI, answered: true, asking: true }, OPEN, HERS), [], 'down: carried on a later beat');
-  assert.deepEqual(nemiaDue({ ...ASKING, answered: true }, OPEN, undefined), ['subscribe'], 'filed: not yet kept');
-  assert.deepEqual(nemiaDue({ ...MANUAL, asking: true, answered: true, up: true }, OPEN, HERS), ['stop', 'drop'], 'leaving');
-  assert.deepEqual(
-    nemiaDue({ ...SEMI, closing: true, up: true }, OPEN, HERS),
-    ['record'],
-    'her view holds no question, and the chat holds one whose call is gone: the beat runs to mark what became of it',
+test('`nemiaDue` and `nemiaState`: what the keeper owes, and where she stands, at each state', async (t) => {
+  await t.test('a filing, then a subscription, then nothing, while some factory is above manual', () => {
+    assert.deepEqual(nemiaDue(SEMI, undefined, undefined), ['file']);
+    assert.deepEqual(nemiaDue(SEMI, OPEN, undefined), ['subscribe']);
+    assert.deepEqual(nemiaDue(SEMI, OPEN, HERS), []);
+    assert.equal(nemiaState(SEMI, OPEN, HERS), 'kept');
+    assert.deepEqual(nemiaDue(SEMI, OPEN, OLDER), ['drop', 'subscribe'], 'a subscription left for an older task is put again');
+  });
+  await t.test('a changed custom instruction is told while she is kept, and in no other state', () => {
+    const STALE: Keeping = { ...SEMI, stale: true };
+    assert.deepEqual(nemiaDue(STALE, OPEN, HERS), ['tell']);
+    assert.deepEqual(nemiaDue({ ...SEMI, stale: false }, OPEN, HERS), [], 'her filed words are the ones that compose now');
+    assert.deepEqual(nemiaDue(STALE, OPEN, undefined), ['subscribe'], 'filed: subscribed first, told on a later beat');
+    assert.deepEqual(nemiaDue(STALE, OPEN, OLDER), ['drop', 'subscribe']);
+    assert.deepEqual(nemiaDue(STALE, undefined, undefined), ['file'], 'due: filed with the words that compose now');
+    for (const task of [SETTLED, STOPPING]) assert.deepEqual(nemiaDue(STALE, task, HERS), ['drop'], 'stopped: nothing to tell');
+    assert.deepEqual(nemiaDue({ ...MANUAL, stale: true }, OPEN, HERS), ['stop', 'drop'], 'leaving: stopped, not told');
+  });
+  await t.test("REFUSED: the person's chat words are delivered only while she is kept and her session is live", () => {
+    const OWED = { ...SEMI, owed: true, up: true };
+    assert.deepEqual(nemiaDue(OWED, OPEN, HERS), ['deliver']);
+    assert.deepEqual(nemiaDue({ ...OWED, stale: true }, OPEN, HERS), ['tell', 'deliver'], 'told first, then delivered');
+    assert.deepEqual(nemiaDue({ ...OWED, up: false }, OPEN, HERS), [], 'kept but down: kept for later');
+    assert.deepEqual(nemiaDue({ ...OWED, owed: false }, OPEN, HERS), [], 'nothing owed');
+    assert.deepEqual(nemiaDue(OWED, OPEN, undefined), ['subscribe'], 'filed: not yet kept');
+    assert.deepEqual(nemiaDue({ ...OWED, trusted: false }, undefined, undefined), [], 'untrusted');
+    assert.deepEqual(nemiaDue({ ...MANUAL, owed: true, up: true }, OPEN, HERS), ['stop', 'drop'], 'leaving');
+  });
+  await t.test('REFUSED: a question of hers is written down and its answer carried only while she is kept and her session is live', () => {
+    const ASKING = { ...SEMI, asking: true, up: true };
+    assert.deepEqual(nemiaDue(ASKING, OPEN, HERS), ['record']);
+    assert.deepEqual(nemiaDue({ ...ASKING, asking: false }, OPEN, HERS), [], 'her view holds no question: nothing to write down');
+    assert.deepEqual(nemiaDue({ ...ASKING, up: false }, OPEN, HERS), [], 'kept but down: no session holds a question open');
+    assert.deepEqual(nemiaDue({ ...ASKING, answered: true }, OPEN, HERS), ['record', 'answer'], 'written down first, then answered');
+    assert.deepEqual(nemiaDue({ ...SEMI, answered: true, up: true }, OPEN, HERS), ['answer'], 'an answer owed of a question gone');
+    assert.deepEqual(nemiaDue({ ...SEMI, answered: true, asking: true }, OPEN, HERS), [], 'down: carried on a later beat');
+    assert.deepEqual(nemiaDue({ ...ASKING, answered: true }, OPEN, undefined), ['subscribe'], 'filed: not yet kept');
+    assert.deepEqual(nemiaDue({ ...MANUAL, asking: true, answered: true, up: true }, OPEN, HERS), ['stop', 'drop'], 'leaving');
+    assert.deepEqual(
+      nemiaDue({ ...SEMI, closing: true, up: true }, OPEN, HERS),
+      ['record'],
+      'her view holds no question, and the chat holds one whose call is gone: the beat runs to mark what became of it',
+    );
+    assert.deepEqual(nemiaDue({ ...SEMI, closing: false, up: true }, OPEN, HERS), [], 'nothing open and nothing to mark');
+    assert.deepEqual(nemiaDue({ ...SEMI, closing: true, up: false }, OPEN, HERS), [], 'down: the world is read again when she is up');
+  });
+  await t.test('REFUSED: a subscription of hers without her floor is no keeping; it is dropped and put again with it', () => {
+    assert.equal(nemiaState(SEMI, OPEN, UNSCOPED), 'filed');
+    assert.deepEqual(nemiaDue(SEMI, OPEN, UNSCOPED), ['drop', 'subscribe']);
+  });
+  await t.test('REFUSED: a task stopped or ended from outside is never filed again at semi-auto; a subscription left is dropped', () => {
+    for (const task of [SETTLED, STOPPING]) {
+      assert.equal(nemiaState(SEMI, task, undefined), 'stopped');
+      assert.deepEqual(nemiaDue(SEMI, task, undefined), []);
+      assert.deepEqual(nemiaDue(SEMI, task, HERS), ['drop']);
+    }
+  });
+  await t.test('with no factory above manual, her open task is stopped and her subscription dropped; with neither, nothing is owed', () => {
+    assert.deepEqual(nemiaDue(MANUAL, OPEN, HERS), ['stop', 'drop']);
+    assert.equal(nemiaState(MANUAL, OPEN, HERS), 'leaving');
+    assert.deepEqual(nemiaDue(MANUAL, STOPPING, HERS), ['drop'], 'a stop asked is not asked again');
+    assert.deepEqual(nemiaDue(MANUAL, SETTLED, undefined), []);
+    assert.deepEqual(nemiaDue({ above: false }, undefined, undefined), [], 'no level set is manual');
+    assert.equal(nemiaState({ above: false }, undefined, undefined), 'off');
+  });
+  await t.test(
+    'REFUSED: no task is filed while her folder is not trusted; once it is, or for a harness that keeps no trust, she is filed',
+    () => {
+      const UNTRUSTED: Keeping = { ...SEMI, trusted: false };
+      assert.equal(nemiaState(UNTRUSTED, undefined, undefined), 'untrusted');
+      assert.deepEqual(nemiaDue(UNTRUSTED, undefined, undefined), [], 'her session waits for the person to trust her folder');
+      assert.deepEqual(nemiaDue(UNTRUSTED, undefined, OLDER), [], 'nothing owed while she waits');
+      assert.deepEqual(nemiaDue({ ...SEMI, trusted: true }, undefined, undefined), ['file']);
+      assert.deepEqual(nemiaDue(SEMI, undefined, undefined), ['file'], 'a harness that keeps no trust');
+      assert.equal(nemiaState(UNTRUSTED, OPEN, undefined), 'filed', 'trust lost later never stops a running session');
+      assert.equal(nemiaState(UNTRUSTED, OPEN, HERS), 'kept');
+      assert.equal(nemiaState({ above: false, trusted: false }, undefined, undefined), 'off', 'manual: nothing waits');
+    },
   );
-  assert.deepEqual(nemiaDue({ ...SEMI, closing: false, up: true }, OPEN, HERS), [], 'nothing open and nothing to mark');
-  assert.deepEqual(nemiaDue({ ...SEMI, closing: true, up: false }, OPEN, HERS), [], 'down: the world is read again when she is up');
 });
 
-test('her custom words changed are those she was not last filed or told with; her shipped instruction is never compared', () => {
+test('`customChanged` and `toldCustom`: her custom words changed are those she was not last filed or told with, and are told whole', async (t) => {
   const FILED = 'Her shipped instruction.\n\nAnswer in French.\n';
-  assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in French.', 'Another instruction.\n'), false);
-  assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in Dutch.', FILED), true);
-  assert.equal(customChanged({ words: 'Answer in French.' }, undefined, FILED), true, 'removed: told');
-  assert.equal(customChanged({}, 'Answer in French.', FILED), true, 'added: told');
-  assert.equal(customChanged({}, undefined, 'Another instruction.\n\nOnce a paragraph of hers.\n'), false);
-  assert.equal(customChanged(undefined, 'Answer in French.', FILED), false, 'no record: her instruction ends with them');
-  assert.equal(customChanged(undefined, 'Answer in Dutch.', FILED), true, 'no record: it ends with others');
-  assert.equal(customChanged(undefined, 'Answer in Dutch.', undefined), true, 'no record and no instruction');
-  assert.equal(customChanged(undefined, undefined, FILED), false, 'no record: whether she had words is unknown, so no removal');
+  await t.test('her shipped instruction is never compared: the same words under another instruction are no change', () => {
+    assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in French.', 'Another instruction.\n'), false);
+    assert.equal(customChanged({}, undefined, 'Another instruction.\n\nOnce a paragraph of hers.\n'), false);
+  });
+  await t.test('a record of what she was told: other words, words removed and words added are each a change', () => {
+    assert.equal(customChanged({ words: 'Answer in French.' }, 'Answer in Dutch.', FILED), true);
+    assert.equal(customChanged({ words: 'Answer in French.' }, undefined, FILED), true, 'removed: told');
+    assert.equal(customChanged({}, 'Answer in French.', FILED), true, 'added: told');
+  });
+  await t.test('no record: judged by the words her instruction ends with, and never a removal', () => {
+    assert.equal(customChanged(undefined, 'Answer in French.', FILED), false, 'no record: her instruction ends with them');
+    assert.equal(customChanged(undefined, 'Answer in Dutch.', FILED), true, 'no record: it ends with others');
+    assert.equal(customChanged(undefined, 'Answer in Dutch.', undefined), true, 'no record and no instruction');
+    assert.equal(customChanged(undefined, undefined, FILED), false, 'no record: whether she had words is unknown, so no removal');
+  });
+  await t.test("the words that tell her carry the person's new words whole, or say she has none", () => {
+    const told = toldCustom('Answer in French.\nTimes in Montreal.');
+    assert.ok(told.includes('Answer in French.\nTimes in Montreal.'), told);
+    assert.match(told, /replac/);
+    const cleared = toldCustom(undefined);
+    assert.match(cleared, /removed/);
+    assert.match(cleared, /none/);
+  });
 });
 
-test("the words that tell her a change carry the person's new words whole, or say she has none", () => {
-  const told = toldCustom('Answer in French.\nTimes in Montreal.');
-  assert.ok(told.includes('Answer in French.\nTimes in Montreal.'), told);
-  assert.match(told, /replac/);
-  const cleared = toldCustom(undefined);
-  assert.match(cleared, /removed/);
-  assert.match(cleared, /none/);
-});
-
-test('REFUSED: a subscription of hers without her floor is no keeping; it is dropped and put again with it', () => {
-  assert.equal(nemiaState(SEMI, OPEN, UNSCOPED), 'filed');
-  assert.deepEqual(nemiaDue(SEMI, OPEN, UNSCOPED), ['drop', 'subscribe']);
-});
-
-test('REFUSED: a task stopped or ended from outside is never filed again at semi-auto; a subscription left is dropped', () => {
-  for (const task of [SETTLED, STOPPING]) {
-    assert.equal(nemiaState(SEMI, task, undefined), 'stopped');
-    assert.deepEqual(nemiaDue(SEMI, task, undefined), []);
-    assert.deepEqual(nemiaDue(SEMI, task, HERS), ['drop']);
-  }
-});
-
-test('with no factory above manual, her open task is stopped and her subscription dropped; with neither, nothing is owed', () => {
-  assert.deepEqual(nemiaDue(MANUAL, OPEN, HERS), ['stop', 'drop']);
-  assert.equal(nemiaState(MANUAL, OPEN, HERS), 'leaving');
-  assert.deepEqual(nemiaDue(MANUAL, STOPPING, HERS), ['drop'], 'a stop asked is not asked again');
-  assert.deepEqual(nemiaDue(MANUAL, SETTLED, undefined), []);
-  assert.deepEqual(nemiaDue({ above: false }, undefined, undefined), [], 'no level set is manual');
-  assert.equal(nemiaState({ above: false }, undefined, undefined), 'off');
-});
-
-test('REFUSED: no task is filed while her folder is not trusted; once it is, or for a harness that keeps no trust, she is filed', () => {
-  const UNTRUSTED: Keeping = { ...SEMI, trusted: false };
-  assert.equal(nemiaState(UNTRUSTED, undefined, undefined), 'untrusted');
-  assert.deepEqual(nemiaDue(UNTRUSTED, undefined, undefined), [], 'her session waits for the person to trust her folder');
-  assert.deepEqual(nemiaDue(UNTRUSTED, undefined, OLDER), [], 'nothing owed while she waits');
-  assert.deepEqual(nemiaDue({ ...SEMI, trusted: true }, undefined, undefined), ['file']);
-  assert.deepEqual(nemiaDue(SEMI, undefined, undefined), ['file'], 'a harness that keeps no trust');
-  assert.equal(nemiaState(UNTRUSTED, OPEN, undefined), 'filed', 'trust lost later never stops a running session');
-  assert.equal(nemiaState(UNTRUSTED, OPEN, HERS), 'kept');
-  assert.equal(nemiaState({ above: false, trusted: false }, undefined, undefined), 'off', 'manual: nothing waits');
-});
-
-test('REFUSED: a word that is no level; manual, semi-auto and auto are levels', () => {
-  assert.equal(levelRefusal('manual'), undefined);
-  assert.equal(levelRefusal('semi-auto'), undefined);
-  assert.equal(levelRefusal('auto'), undefined);
-  assert.equal(levelRefusal('on'), '"on" is no level: nemia level [manual|semi-auto|auto] [--factory <name> [--for <duration> | --end]].');
+test('`levelRefusal`: manual, semi-auto and auto are levels; a word that is none is refused, naming the command', async (t) => {
+  for (const level of ['manual', 'semi-auto', 'auto'])
+    await t.test(`${level} is a level`, () => {
+      assert.equal(levelRefusal(level), undefined);
+    });
+  await t.test('REFUSED: "on" is no level', () => {
+    names(levelRefusal('on'), '"on"', 'nemia level [manual|semi-auto|auto]', '--factory <name>', '--for <duration>', '--end');
+  });
 });
 
 test("her task's id is nemia- and the digits of the moment a factory was put above manual", () => {

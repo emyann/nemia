@@ -36,39 +36,6 @@ const FAMILY = path.join(import.meta.dirname, '..', 'src', 'components', 'conver
 export const namedMarks = (source: string): string[] =>
   source.match(/data-(?:chat|session)-[\w-]*|\bmark\(\s*(?:'[^']*'|"[^"]*"|`[^`]*`)/g) ?? [];
 
-test('a family part writes its mark under the prefix its caller names, so each conversation keeps the names its pages read', () => {
-  assert.deepEqual(mark('chat', 'talk', 'latest'), { 'data-chat-talk': 'latest' });
-  assert.deepEqual(mark('session', 'talk', 'latest'), { 'data-session-talk': 'latest' });
-  assert.deepEqual(mark('chat', 'step', 'running'), { 'data-chat-step': 'running' });
-  assert.deepEqual(mark('session', 'step', 'running'), { 'data-session-step': 'running' });
-  assert.deepEqual(mark('chat', 'empty'), { 'data-chat-empty': true }, 'a mark with no value is what React writes for a bare one');
-  assert.deepEqual(mark('session', 'jump'), { 'data-session-jump': true });
-  assert.notDeepEqual(mark('session', 'talk', 'latest'), mark('chat', 'talk', 'latest'), 'two prefixes are two attributes');
-});
-
-test('a line draws in the state its own state maps to: done plain, and the one that waits on a person in the look’s own', () => {
-  const states: ConversationState[] = ['done', 'running', 'error', 'pending', 'waits'];
-  assert.deepEqual(
-    states.map((state) => traceStatusOf(state)),
-    [undefined, 'running', 'error', 'pending', 'yours'],
-  );
-  assert.notEqual(traceStatusOf('waits'), 'pending', 'a line that waits on a person is never drawn at rest');
-});
-
-test('the words the family says: a folded turn, the pill over the talk, and the line over what is new', () => {
-  assert.equal(turnWords(134_000, 2), 'Worked for 2m 14s · 2 steps');
-  assert.equal(turnWords(134_000, 1), 'Worked for 2m 14s · 1 step');
-  assert.equal(jumpWords(2), '2 new · Jump to the latest');
-  assert.equal(jumpWords(1), '1 new · Jump to the latest');
-  assert.equal(
-    jumpWords(0),
-    'Jump to the latest',
-    'and with no count where nothing is counted unread, so a step’s session offers the way back all the same',
-  );
-  assert.equal(newWords(2), '2 new');
-  assert.equal(newWords(1), '1 new');
-});
-
 test('REFUSED: a family part that names a conversation itself; a mark built from the caller’s prefix, and one of neither, are not', () => {
   assert.deepEqual(namedMarks('<div data-chat-talk="latest" />'), ['data-chat-talk']);
   assert.deepEqual(namedMarks('<div data-session-step={line.state} />'), ['data-session-step']);
@@ -107,44 +74,79 @@ test('REFUSED: a family part that names a conversation itself; a mark built from
     );
 });
 
-test('a talk follows its latest by how much is drawn, which a turn grows a line at a time without growing the items', () => {
-  const said = (id: string): ConversationItem => ({
-    kind: 'said',
-    id,
-    who: 'You',
-    at: '',
-    text: '',
-    markdown: false,
-    yours: true,
-    links: [],
+test("the family's pure rules: a mark under its caller's prefix, a line's trace state, the words it says, and how much is drawn", async (t) => {
+  await t.test(
+    'a family part writes its mark under the prefix its caller names, so each conversation keeps the names its pages read',
+    () => {
+      assert.deepEqual(mark('chat', 'talk', 'latest'), { 'data-chat-talk': 'latest' });
+      assert.deepEqual(mark('session', 'talk', 'latest'), { 'data-session-talk': 'latest' });
+      assert.deepEqual(mark('chat', 'step', 'running'), { 'data-chat-step': 'running' });
+      assert.deepEqual(mark('session', 'step', 'running'), { 'data-session-step': 'running' });
+      assert.deepEqual(mark('chat', 'empty'), { 'data-chat-empty': true }, 'a mark with no value is what React writes for a bare one');
+      assert.deepEqual(mark('session', 'jump'), { 'data-session-jump': true });
+      assert.notDeepEqual(mark('session', 'talk', 'latest'), mark('chat', 'talk', 'latest'), 'two prefixes are two attributes');
+    },
+  );
+  await t.test('a line draws in the state its own state maps to: done plain, and the one that waits on a person in the look’s own', () => {
+    const states: ConversationState[] = ['done', 'running', 'error', 'pending', 'waits'];
+    assert.deepEqual(
+      states.map((state) => traceStatusOf(state)),
+      [undefined, 'running', 'error', 'pending', 'yours'],
+    );
+    assert.notEqual(traceStatusOf('waits'), 'pending', 'a line that waits on a person is never drawn at rest');
   });
-  const work = (lines: number): ConversationItem => ({
-    kind: 'work',
-    id: 'w:1',
-    running: true,
-    ms: 0,
-    lines: Array.from({ length: lines }, (_, i) => ({ id: `l:${i}`, tool: 'Read', sentence: '', state: 'done' as const })),
+  await t.test('the words the family says: a folded turn, the pill over the talk, and the line over what is new', () => {
+    assert.equal(turnWords(134_000, 2), 'Worked for 2m 14s · 2 steps');
+    assert.equal(turnWords(134_000, 1), 'Worked for 2m 14s · 1 step');
+    assert.equal(jumpWords(2), '2 new · Jump to the latest');
+    assert.equal(jumpWords(1), '1 new · Jump to the latest');
+    assert.equal(
+      jumpWords(0),
+      'Jump to the latest',
+      'and with no count where nothing is counted unread, so a step’s session offers the way back all the same',
+    );
+    assert.equal(newWords(2), '2 new');
+    assert.equal(newWords(1), '1 new');
   });
-  const [before, after] = [
-    [said('p:1'), work(1)],
-    [said('p:1'), work(9)],
-  ];
-  assert.equal(before.length, after.length, 'a turn of one line and a turn of nine are one item either way');
-  assert.equal(drawnCount(before), 2);
-  assert.equal(drawnCount(after), 10, 'and what is drawn grows with every line of it');
-  assert.deepEqual(drawnCount([]), 0);
-  assert.equal(drawnCount([said('p:1'), { kind: 'note', id: 'n:1', what: 'session', words: '' }]), 2, 'anything else counts as one');
+  await t.test('a talk follows its latest by how much is drawn, which a turn grows a line at a time without growing the items', () => {
+    const said = (id: string): ConversationItem => ({
+      kind: 'said',
+      id,
+      who: 'You',
+      at: '',
+      text: '',
+      markdown: false,
+      yours: true,
+      links: [],
+    });
+    const work = (lines: number): ConversationItem => ({
+      kind: 'work',
+      id: 'w:1',
+      running: true,
+      ms: 0,
+      lines: Array.from({ length: lines }, (_, i) => ({ id: `l:${i}`, tool: 'Read', sentence: '', state: 'done' as const })),
+    });
+    const [before, after] = [
+      [said('p:1'), work(1)],
+      [said('p:1'), work(9)],
+    ];
+    assert.equal(before.length, after.length, 'a turn of one line and a turn of nine are one item either way');
+    assert.equal(drawnCount(before), 2);
+    assert.equal(drawnCount(after), 10, 'and what is drawn grows with every line of it');
+    assert.deepEqual(drawnCount([]), 0);
+    assert.equal(drawnCount([said('p:1'), { kind: 'note', id: 'n:1', what: 'session', words: '' }]), 2, 'anything else counts as one');
 
-  const talk = fs.readFileSync(path.join(FAMILY, 'Talk.tsx'), 'utf8');
-  assert.match(talk, /const drawn = drawnCount\(items\);/, 'and the talk follows its latest by that number');
-  assert.match(
-    talk,
-    /\}, \[atEnd, drawn, writing\]\);/,
-    'and by the message being written too: a text that grows is one item however long, so the talk would stop following it halfway',
-  );
-  assert.doesNotMatch(
-    talk,
-    /items\.length/,
-    'never by the count of its items: a turn grows a line at a time without growing them, and the talk would stand still for every line after the first',
-  );
+    const talk = fs.readFileSync(path.join(FAMILY, 'Talk.tsx'), 'utf8');
+    assert.match(talk, /const drawn = drawnCount\(items\);/, 'and the talk follows its latest by that number');
+    assert.match(
+      talk,
+      /\}, \[atEnd, drawn, writing\]\);/,
+      'and by the message being written too: a text that grows is one item however long, so the talk would stop following it halfway',
+    );
+    assert.doesNotMatch(
+      talk,
+      /items\.length/,
+      'never by the count of its items: a turn grows a line at a time without growing them, and the talk would stand still for every line after the first',
+    );
+  });
 });

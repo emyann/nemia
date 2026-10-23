@@ -24,7 +24,7 @@ const { TextLink } = await import('../src/components/look/TextLink.tsx');
 async function drawn(element: ReactElement, at = '/'): Promise<string> {
   const router = createRouter({ routeTree: createRootRoute(), history: createMemoryHistory({ initialEntries: [at] }) });
   await router.load();
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
+  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
   return renderToStaticMarkup(createElement(RouterContextProvider, { router, children: element }));
 }
 
@@ -42,121 +42,6 @@ const STEPS = [
   { name: 'land', status: 'awaiting approval' },
 ];
 
-test('the steps rail: one bar a step by its state, its names in the hue of what waits or failed, and read aloud as one picture', async () => {
-  const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, names: true }));
-  assert.match(tagWith(html, 'data-run-steps'), /role="img"/);
-  assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits for you"/);
-  assert.deepEqual(
-    [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
-    [
-      ['design', 'verified'],
-      ['implement', 'working'],
-      ['review', 'failed-check'],
-      ['land', 'awaiting-approval'],
-    ],
-  );
-  assert.match(tagWith(html, 'data-step-name="land"'), /text-yours/);
-  assert.match(tagWith(html, 'data-step-name="review"'), /text-failure/);
-  assert.match(tagWith(html, 'data-step-name="design"'), /text-on-surface-variant/);
-  const [gate, atWork] = [tagWith(html, 'data-step="land"'), tagWith(html, 'data-step="implement"')];
-  assert.match(gate, /bg-transparent/, 'the step that waits on a person is hollow');
-  assert.doesNotMatch(gate, /bg-yours/);
-  assert.match(
-    gate,
-    /box-shadow:inset 0 0 0 1\.5px var\(--meaning-yours\), 0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 45%, transparent\)/,
-    'edged in its hue, and glowing',
-  );
-  assert.doesNotMatch(atWork, /box-shadow/, "the step at work's bar carries no glow of its own");
-  assert.match(
-    tagWith(html, 'data-step-breath'),
-    /box-shadow:0 0 12px color-mix\(in srgb, var\(--meaning-alive\) 70%, transparent\)/,
-    'the step at work glows, on a layer of its own',
-  );
-  assert.match(html, /data-step="implement"[^>]*><span aria-hidden="true" data-step-breath/, "the layer is the step at work's");
-  assert.equal(html.match(/data-step-breath/g)?.length, 1, 'and no other step has one');
-  for (const dark of ['design', 'review'])
-    assert.doesNotMatch(tagWith(html, `data-step="${dark}"`), /box-shadow/, `${dark} neither waits nor works: no glow`);
-  assert.match(tagWith(html, 'data-step="implement"'), /bg-alive /, 'the step at work is the lit bar, in its hue itself');
-  assert.doesNotMatch(tagWith(html, 'data-step="implement"'), /bg-alive-container/);
-  assert.match(tagWith(html, 'data-step="review"'), /bg-failure-container/, 'every other bar is drawn as its state is on every page');
-  const bare = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: true }));
-  assert.doesNotMatch(bare, /data-step-name/, 'no names unless asked');
-  assert.match(tagWith(bare, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
-});
-
-test('the steps rail with a wrap: a group named as the rail is said, each bar inside what the wrap gives, its step and state handed', async () => {
-  const wrap = (bar: unknown, step: { name: string; state: string }) =>
-    createElement('button', { 'data-wrapped': `${step.name} ${step.state}` }, bar as ReactElement);
-  const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, wrap }));
-  const rail = tagWith(html, 'data-run-steps');
-  assert.match(rail, /role="group"/);
-  assert.doesNotMatch(rail, /role="img"/);
-  assert.match(rail, /aria-label="design verified, implement at work, review failed its check, land waits for you"/);
-  assert.deepEqual(
-    [...html.matchAll(/data-wrapped="([^"]+)"><span data-step="([^"]+)"/g)].map((m) => [m[1], m[2]]),
-    [
-      ['design verified', 'design'],
-      ['implement working', 'implement'],
-      ['review failed-check', 'review'],
-      ['land awaiting-approval', 'land'],
-    ],
-  );
-});
-
-test('the pager: Newer and Older keep the address and change its page alone, and say the rows and where it stands', async () => {
-  const html = await drawn(createElement(Pager, { page: 2, pages: 3, total: 25, size: 9 }), '/?factory=nemia&page=2');
-  assert.match(html, /role="group" aria-label="Pages of finished runs"/);
-  assert.match(tagWith(html, 'data-pager-rows'), /data-pager-rows/);
-  assert.match(html, />Runs 10–18 of 25</);
-  assert.match(html, />Page 2 \/ 3</);
-  assert.match(tagWith(html, 'data-pager-newer'), /href="\/\?factory=nemia"/, 'Newer drops the page for the first, and keeps the factory');
-  assert.match(tagWith(html, 'data-pager-older'), /href="\/\?factory=nemia&amp;page=3"/);
-});
-
-test('REFUSED: the pager at an end offers no link there, and from a page past the last Newer leads to the last', async () => {
-  const first = await drawn(createElement(Pager, { page: 1, pages: 3, total: 25, size: 9 }));
-  const newer = tagWith(first, 'data-pager-newer');
-  assert.match(newer, /aria-disabled="true"/);
-  assert.doesNotMatch(newer, /href=/);
-  assert.match(tagWith(first, 'data-pager-older'), /href="\/\?page=2"/);
-  const last = await drawn(createElement(Pager, { page: 3, pages: 3, total: 25, size: 9 }), '/?page=3');
-  assert.match(tagWith(last, 'data-pager-older'), /aria-disabled="true"/);
-  assert.match(tagWith(last, 'data-pager-newer'), /href="\/\?page=2"/);
-  const past = await drawn(createElement(Pager, { page: 80, pages: 3, total: 25, size: 9 }), '/?page=80');
-  assert.match(past, />Page 80 is past the last, 3\.</);
-  assert.match(tagWith(past, 'data-pager-newer'), /href="\/\?page=3"/);
-  assert.match(tagWith(past, 'data-pager-older'), /aria-disabled="true"/);
-});
-
-test('the text link is a link to its route, underlined under the pointer and the keyboard alone, with a ring for the keyboard', async () => {
-  const html = await drawn(createElement(TextLink, { to: '/', search: { factory: 'nemia' } } as never, 'Read the review'));
-  const link = tagWith(html, 'data-text-link');
-  assert.match(link, /^<a /);
-  assert.match(link, /href="\/\?factory=nemia"/);
-  assert.match(link, / no-underline /, 'no line at rest: a title reads as a title');
-  assert.match(link, / hover:underline /, 'underlined under the pointer');
-  assert.match(link, / focus-visible:underline /, 'and with the keyboard on it');
-  assert.doesNotMatch(link, /(?<![\w:-])underline(?![\w-])/, 'never underlined at rest');
-  assert.match(link, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/, "the kit's ring, not its own");
-  assert.doesNotMatch(link, /ring-2\b|ring-offset/);
-  assert.match(html, />Read the review</);
-});
-
-test('the plate: its count, its heading and a barcode nobody reads, in grey too; quiet, in grey with none', async () => {
-  const loud = await drawn(createElement(Plate, { count: 2, title: 'Waiting on you' }));
-  assert.match(tagWith(loud, 'data-plate='), /data-plate="loud"[^>]*bg-yours text-on-yours/);
-  assert.match(loud, /data-plate-count[^>]*>2</);
-  assert.match(loud, /<h2[^>]*>Waiting on you<\/h2>/);
-  assert.match(tagWith(loud, 'data-plate-barcode'), /aria-hidden="true"/);
-  assert.match(tagWith(loud, 'data-plate-barcode'), /currentColor/);
-  const rest = await drawn(createElement(Plate, { count: 6, title: 'Finished', hue: 'grey' }));
-  assert.match(tagWith(rest, 'data-plate='), /data-plate="loud"[^>]*data-plate-hue="grey"[^>]*bg-rest text-on-rest/);
-  assert.match(tagWith(rest, 'data-plate-barcode'), /currentColor/, 'a plate that counts runs keeps its barcode, at rest too');
-  const quiet = await drawn(createElement(Plate, { count: 0, title: 'Waiting on you', quiet: true }));
-  assert.match(tagWith(quiet, 'data-plate='), /data-plate="quiet"[^>]*bg-rest text-on-rest/);
-  assert.doesNotMatch(quiet, /data-plate-barcode/);
-});
-
 /** The canvas's barcode of each plate: an inked bar and a gap in turn, in pixels. */
 const BARS = {
   yours: 'currentColor 0 2px, transparent 2px 3px, currentColor 3px 4px, transparent 4px 7px, currentColor 7px 10px, transparent 10px 12px',
@@ -170,229 +55,366 @@ const wrongBarcodes = (barcodeOf: (hue: keyof typeof BARS) => string): string[] 
     (hue) => !barcodeOf(hue).includes(`background-image:repeating-linear-gradient(90deg, ${BARS[hue]})`),
   );
 
-test('each plate carries its own barcode, bar for bar, and two swapped are seen', async () => {
-  const tags = Object.fromEntries(
-    await Promise.all(
-      (Object.keys(BARS) as (keyof typeof BARS)[]).map(
-        async (hue) => [hue, tagWith(await drawn(createElement(Plate, { count: 2, title: 'Runs', hue })), 'data-plate-barcode')] as const,
-      ),
-    ),
-  );
-  assert.equal(wrongBarcodes((hue) => tags[hue]).length, 0, `each plate carries its own barcode — ${JSON.stringify(tags)}`);
-  assert.equal(new Set(Object.values(tags)).size, 3, 'no two plates carry the same');
-  const swapped: Record<string, string> = { ...tags, alive: tags.grey, grey: tags.alive };
-  assert.equal(wrongBarcodes((hue) => swapped[hue]).join(','), 'alive,grey', 'two barcodes swapped: the check names both plates');
-});
-
-test('the cut tag cuts its top-right corner by seven pixels, around what it holds', async () => {
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(CutTag, { children: 'YOUR WORD' }));
-  assert.match(
-    tagWith(html, 'data-cut-tag'),
-    /clip-path:polygon\(0 0, calc\(100% - 7px\) 0, 100% 7px, 100% 100%, 0 100%\)/,
-    'the corner is cut as the canvas cuts it',
-  );
-  assert.match(html, />YOUR WORD<\/span>$/);
-});
-
-test('the pager writes its buttons in the label face, never the mono of its counts, and rings them as the kit does', async () => {
-  const html = await drawn(createElement(Pager, { page: 2, pages: 3, total: 25, size: 9 }));
-  for (const mark of ['data-pager-newer', 'data-pager-older']) {
-    const button = tagWith(html, mark);
-    assert.match(button, /\bfont-plain\b/, `${mark} is in the label face`);
-    assert.match(button, /text-label-large uppercase/);
-    assert.match(button, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/);
-    assert.doesNotMatch(button, /font-mono|ring-2\b|ring-offset/);
-  }
-});
-
-test('the sticker: a label over its value, filled in its hue', async () => {
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
-  assert.match(tagWith(html, 'data-sticker'), /data-sticker="money"[^>]*bg-money text-on-money/);
-  assert.match(html, />Cost<\/span><span[^>]*>\$4\.25</);
-});
-
-test('the scan lines: a glow and lines in the hue of a session at work, thinned, and the glow alone without lines', async () => {
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(ScanLines, { children: 'page' }));
-  const ground = tagWith(html, 'data-scan-lines');
-  assert.match(ground, /radial-gradient\(/);
-  assert.match(ground, /repeating-linear-gradient\(/);
-  assert.match(ground, /var\(--meaning-alive\) 7%/);
-  assert.match(ground, /var\(--meaning-alive\) 4%/);
-  assert.doesNotMatch(ground, /#[0-9a-f]{3,8}\b|rgb\(|hsl\(/i, 'no colour written by hand');
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const plain = tagWith(await drawn(createElement(ScanLines, { lines: false, children: 'page' })), 'data-scan-lines');
-  assert.doesNotMatch(plain, /repeating-linear-gradient/);
-});
-
-test('the cut frame: a shape nobody reads or presses, before what the frame holds: an edge in its hue around the card ground', async () => {
-  const child = createElement('button', { type: 'button' }, 'Approve');
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
-  assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="yours"/);
-  const shape = tagWith(html, 'data-cut-shape');
-  assert.match(shape, /aria-hidden="true"/);
-  assert.match(shape, /pointer-events-none/);
-  assert.match(shape, /filter:drop-shadow\(0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 26%, transparent\)\)/, 'its glow');
-  assert.match(
-    tagWith(html, 'data-cut-edge'),
-    /background-color:var\(--meaning-yours\);clip-path:polygon\(0px 0px, calc\(100% - 28px\) 0px, 100% 28px, 100% 100%, 28px 100%, 0px calc\(100% - 28px\)\)/,
-  );
-  assert.match(
-    tagWith(html, 'data-cut-ground'),
-    /bg-card[^>]*clip-path:polygon\(1px 1px, calc\(100% - 28\.41px\) 1px, calc\(100% - 1px\) 28\.41px,/,
-    "the ground a pixel inside the edge, its cut beside the edge's",
-  );
-  assert.ok(html.indexOf('data-cut-ground') < html.indexOf('<button'), 'the shape comes before the content, which stands above it');
-  assert.match(html, /<div class="relative"><button/);
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const quiet = await drawn(createElement(CutFrame, { size: 24, children: child }));
-  assert.match(tagWith(quiet, 'data-cut-edge'), /var\(--md-sys-color-outline-variant\);clip-path:polygon\(0px 0px, calc\(100% - 24px\)/);
-  assert.doesNotMatch(tagWith(quiet, 'data-cut-shape'), /filter/, 'a frame with no hue casts no glow');
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const alive = await drawn(createElement(CutFrame, { hue: 'alive', children: child }));
-  assert.doesNotMatch(tagWith(alive, 'data-cut-shape'), /filter/, 'nor one of a session at work');
-});
-
-test('a frame of what failed: its edge in failure, and no glow', async () => {
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(CutFrame, { hue: 'failure', children: createElement('span', null, 'Not sent') }));
-  assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="failure"/);
-  assert.match(tagWith(html, 'data-cut-edge'), /background-color:var\(--meaning-failure\);/);
-  assert.doesNotMatch(tagWith(html, 'data-cut-shape'), /filter/);
-});
-
-test("the cut field: its edge drawn in the cut shape, the whole of it in a session's hue when the focus is in it", async () => {
-  const field = createElement('input', { 'aria-label': 'Message' });
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(CutField, { size: 10, children: field }));
-  const shape = tagWith(html, 'data-cut-shape');
-  assert.match(shape, /aria-hidden="true"/);
-  assert.match(shape, /pointer-events-none/);
-  assert.doesNotMatch(shape, /filter/, 'a field casts no glow');
-  assert.match(tagWith(html, 'data-cut-field'), /group\/field/, 'the focus in it is read from the box itself');
-  const edge = tagWith(html, 'data-cut-edge');
-  assert.match(edge, /clip-path:polygon\(0px 0px, calc\(100% - 10px\) 0px, 100% 10px, 100% 100%, 10px 100%, 0px calc\(100% - 10px\)\)/);
-  assert.match(edge, /\bbg-outline-variant\b/, "quiet, the outline's hue");
-  assert.match(edge, /\bgroup-focus-within\/field:bg-alive\b/, "with the focus in it, a session's hue, the diagonals with the sides");
-  assert.match(
-    tagWith(html, 'data-cut-ground="quiet"'),
-    /group-focus-within\/field:hidden[^>]*clip-path:polygon\(1px 1px,/,
-    'quiet, the ground a pixel inside the edge',
-  );
-  assert.match(
-    tagWith(html, 'data-cut-ground="focus"'),
-    /hidden group-focus-within\/field:block[^>]*clip-path:polygon\(2px 2px,/,
-    'focused, two pixels inside it: the edge the width it has quiet and a pixel more',
-  );
-  assert.deepEqual(
-    html.match(/(?:focus-within:|focus-visible:|data-focus-visible:)?ring-[\w[]/g),
-    null,
-    'no rectangular ring on the field or on the frame: a clip would take it off the two cut corners',
-  );
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const quiet = await drawn(createElement(CutField, { ground: 'bg-surface-container', children: field }));
-  assert.match(tagWith(quiet, 'data-cut-edge'), /calc\(100% - 12px\) 0px/, 'a field cut 12 by default');
-  for (const layer of ['quiet', 'focus']) assert.match(tagWith(quiet, `data-cut-ground="${layer}"`), /\bbg-surface-container\b/);
-});
-
-test('a cue: its words in small caps, in the ink of its hue, in a frame of that hue cut 9', async () => {
-  const inks = { yours: 'text-yours', alive: 'text-alive', failure: 'text-failure', none: 'text-on-surface-variant' } as const;
-  for (const [hue, ink] of Object.entries(inks)) {
-    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-    const html = await drawn(createElement(CutCue, { hue: hue as keyof typeof inks, children: 'Answering' }));
-    assert.match(tagWith(html, 'data-cut-frame'), new RegExp(`data-cut-frame="${hue}"`));
-    assert.match(tagWith(html, 'data-cut-edge'), /clip-path:polygon\(0px 0px, calc\(100% - 9px\) 0px, 100% 9px,/, `${hue}: cut 9`);
-    const words = tagWith(html, 'data-cue');
-    assert.match(words, new RegExp(`data-cue="${hue}"`));
-    assert.match(words, /text-label-small/);
-    assert.match(words, /uppercase/);
-    assert.match(words, new RegExp(`\\b${ink}\\b`), `${hue}: its ink`);
-    assert.equal(/filter/.test(tagWith(html, 'data-cut-shape')), hue === 'yours', `${hue}: only what waits on you glows`);
-  }
-});
-
 /** How many elements of `markup` name a grain. */
 const grains = (markup: string): number => markup.split('data-grain=').length - 1;
-
-test("the grain: the cut frame's ground wears the surface's, a sticker and a plate a label's, a tag and a button none", async () => {
-  const child = createElement('button', { type: 'button' }, 'Approve');
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const frame = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
-  assert.match(tagWith(frame, 'data-cut-ground'), /data-grain="surface"/);
-  assert.equal(grains(frame), 1, 'the ground alone: neither the edge, the shape that casts the glow, nor what the frame holds');
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const sticker = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
-  assert.match(tagWith(sticker, 'data-sticker'), /data-grain="label"/);
-  assert.equal(grains(sticker), 1);
-  for (const quiet of [false, true]) {
-    const plate = await drawn(createElement(Plate, { count: 2, title: 'Waiting on you', quiet }));
-    assert.match(tagWith(plate, 'data-plate='), /data-grain="label"/, quiet ? 'a quiet plate' : 'a loud plate');
-    assert.equal(grains(plate), 1, 'the barcode wears none');
-  }
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  assert.equal(grains(await drawn(createElement(CutTag, { children: 'YOUR WORD' }))), 0, 'a cut tag');
-  const { CutButton } = await import('../src/components/look/CutButton.tsx');
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  assert.equal(grains(await drawn(createElement(CutButton, { to: '/runs', children: 'Open' }))), 0, 'a cut button');
-});
 
 /** Each way `markup` would cut what an element holds off: a clip path, or an overflow that hides or clips. */
 const clips = (markup: string): string[] => [...markup.matchAll(/clip-?path|overflow-(?:hidden|clip)|overflow\s*:/gi)].map((m) => m[0]);
 
-test('REFUSED: the cut frame clips what it holds: only its shape, which holds nothing, is cut, so a focus ring inside is whole', async () => {
-  assert.deepEqual(clips('style="clip-path:polygon(0 0)"'), ['clip-path']);
-  assert.deepEqual(clips('style={{ clipPath: "polygon(0 0)" }}'), ['clipPath']);
-  assert.deepEqual(clips('class="relative overflow-hidden"'), ['overflow-hidden']);
-  assert.deepEqual(clips('class="overflow-clip" style="overflow:hidden"'), ['overflow-clip', 'overflow:']);
-  const child = createElement('button', { type: 'button' }, 'Approve');
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(CutFrame, { hue: 'yours', className: 'h-full', children: child }));
-  const shape = /<span[^>]*data-cut-shape[^>]*>(?:<span[^>]*><\/span>)+<\/span>/.exec(html);
-  assert.ok(shape, 'the shape is a span that holds its two layers and nothing else');
-  assert.equal(clips(shape[0]).length, 2, 'each layer of the shape is cut');
-  assert.deepEqual(clips(html.replace(shape[0], '')), [], 'and nothing else of the frame is: not the frame, not what holds its content');
+test('the cut parts: CutTag, CutFrame, CutField and CutCue, the grain each wears, and no clip on what a frame holds', async (t) => {
+  await t.test('the cut tag cuts its top-right corner by seven pixels, around what it holds', async () => {
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(CutTag, { children: 'YOUR WORD' }));
+    assert.match(
+      tagWith(html, 'data-cut-tag'),
+      /clip-path:polygon\(0 0, calc\(100% - 7px\) 0, 100% 7px, 100% 100%, 0 100%\)/,
+      'the corner is cut as the canvas cuts it',
+    );
+    assert.match(html, />YOUR WORD<\/span>$/);
+  });
+  await t.test(
+    'the cut frame: a shape nobody reads or presses, before what the frame holds: an edge in its hue around the card ground',
+    async () => {
+      const child = createElement('button', { type: 'button' }, 'Approve');
+      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+      const html = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
+      assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="yours"/);
+      const shape = tagWith(html, 'data-cut-shape');
+      assert.match(shape, /aria-hidden="true"/);
+      assert.match(shape, /pointer-events-none/);
+      assert.match(shape, /filter:drop-shadow\(0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 26%, transparent\)\)/, 'its glow');
+      assert.match(
+        tagWith(html, 'data-cut-edge'),
+        /background-color:var\(--meaning-yours\);clip-path:polygon\(0px 0px, calc\(100% - 28px\) 0px, 100% 28px, 100% 100%, 28px 100%, 0px calc\(100% - 28px\)\)/,
+      );
+      assert.match(
+        tagWith(html, 'data-cut-ground'),
+        /bg-card[^>]*clip-path:polygon\(1px 1px, calc\(100% - 28\.41px\) 1px, calc\(100% - 1px\) 28\.41px,/,
+        "the ground a pixel inside the edge, its cut beside the edge's",
+      );
+      assert.ok(html.indexOf('data-cut-ground') < html.indexOf('<button'), 'the shape comes before the content, which stands above it');
+      assert.match(html, /<div class="relative"><button/);
+      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+      const quiet = await drawn(createElement(CutFrame, { size: 24, children: child }));
+      assert.match(
+        tagWith(quiet, 'data-cut-edge'),
+        /var\(--md-sys-color-outline-variant\);clip-path:polygon\(0px 0px, calc\(100% - 24px\)/,
+      );
+      assert.doesNotMatch(tagWith(quiet, 'data-cut-shape'), /filter/, 'a frame with no hue casts no glow');
+      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+      const alive = await drawn(createElement(CutFrame, { hue: 'alive', children: child }));
+      assert.doesNotMatch(tagWith(alive, 'data-cut-shape'), /filter/, 'nor one of a session at work');
+    },
+  );
+  await t.test('a frame of what failed: its edge in failure, and no glow', async () => {
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(CutFrame, { hue: 'failure', children: createElement('span', null, 'Not sent') }));
+    assert.match(tagWith(html, 'data-cut-frame'), /data-cut-frame="failure"/);
+    assert.match(tagWith(html, 'data-cut-edge'), /background-color:var\(--meaning-failure\);/);
+    assert.doesNotMatch(tagWith(html, 'data-cut-shape'), /filter/);
+  });
+  await t.test("the cut field: its edge drawn in the cut shape, the whole of it in a session's hue when the focus is in it", async () => {
+    const field = createElement('input', { 'aria-label': 'Message' });
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(CutField, { size: 10, children: field }));
+    const shape = tagWith(html, 'data-cut-shape');
+    assert.match(shape, /aria-hidden="true"/);
+    assert.match(shape, /pointer-events-none/);
+    assert.doesNotMatch(shape, /filter/, 'a field casts no glow');
+    assert.match(tagWith(html, 'data-cut-field'), /group\/field/, 'the focus in it is read from the box itself');
+    const edge = tagWith(html, 'data-cut-edge');
+    assert.match(edge, /clip-path:polygon\(0px 0px, calc\(100% - 10px\) 0px, 100% 10px, 100% 100%, 10px 100%, 0px calc\(100% - 10px\)\)/);
+    assert.match(edge, /\bbg-outline-variant\b/, "quiet, the outline's hue");
+    assert.match(edge, /\bgroup-focus-within\/field:bg-alive\b/, "with the focus in it, a session's hue, the diagonals with the sides");
+    assert.match(
+      tagWith(html, 'data-cut-ground="quiet"'),
+      /group-focus-within\/field:hidden[^>]*clip-path:polygon\(1px 1px,/,
+      'quiet, the ground a pixel inside the edge',
+    );
+    assert.match(
+      tagWith(html, 'data-cut-ground="focus"'),
+      /hidden group-focus-within\/field:block[^>]*clip-path:polygon\(2px 2px,/,
+      'focused, two pixels inside it: the edge the width it has quiet and a pixel more',
+    );
+    assert.deepEqual(
+      html.match(/(?:focus-within:|focus-visible:|data-focus-visible:)?ring-[\w[]/g),
+      null,
+      'no rectangular ring on the field or on the frame: a clip would take it off the two cut corners',
+    );
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const quiet = await drawn(createElement(CutField, { ground: 'bg-surface-container', children: field }));
+    assert.match(tagWith(quiet, 'data-cut-edge'), /calc\(100% - 12px\) 0px/, 'a field cut 12 by default');
+    for (const layer of ['quiet', 'focus']) assert.match(tagWith(quiet, `data-cut-ground="${layer}"`), /\bbg-surface-container\b/);
+  });
+  await t.test('a cue: its words in small caps, in the ink of its hue, in a frame of that hue cut 9', async () => {
+    const inks = { yours: 'text-yours', alive: 'text-alive', failure: 'text-failure', none: 'text-on-surface-variant' } as const;
+    for (const [hue, ink] of Object.entries(inks)) {
+      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+      const html = await drawn(createElement(CutCue, { hue: hue as keyof typeof inks, children: 'Answering' }));
+      assert.match(tagWith(html, 'data-cut-frame'), new RegExp(`data-cut-frame="${hue}"`));
+      assert.match(tagWith(html, 'data-cut-edge'), /clip-path:polygon\(0px 0px, calc\(100% - 9px\) 0px, 100% 9px,/, `${hue}: cut 9`);
+      const words = tagWith(html, 'data-cue');
+      assert.match(words, new RegExp(`data-cue="${hue}"`));
+      assert.match(words, /text-label-small/);
+      assert.match(words, /uppercase/);
+      assert.match(words, new RegExp(`\\b${ink}\\b`), `${hue}: its ink`);
+      assert.equal(/filter/.test(tagWith(html, 'data-cut-shape')), hue === 'yours', `${hue}: only what waits on you glows`);
+    }
+  });
+  await t.test(
+    "the grain: the cut frame's ground wears the surface's, a sticker and a plate a label's, a tag and a button none",
+    async () => {
+      const child = createElement('button', { type: 'button' }, 'Approve');
+      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+      const frame = await drawn(createElement(CutFrame, { hue: 'yours', children: child }));
+      assert.match(tagWith(frame, 'data-cut-ground'), /data-grain="surface"/);
+      assert.equal(grains(frame), 1, 'the ground alone: neither the edge, the shape that casts the glow, nor what the frame holds');
+      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+      const sticker = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
+      assert.match(tagWith(sticker, 'data-sticker'), /data-grain="label"/);
+      assert.equal(grains(sticker), 1);
+      for (const quiet of [false, true]) {
+        const plate = await drawn(createElement(Plate, { count: 2, title: 'Waiting on you', quiet }));
+        assert.match(tagWith(plate, 'data-plate='), /data-grain="label"/, quiet ? 'a quiet plate' : 'a loud plate');
+        assert.equal(grains(plate), 1, 'the barcode wears none');
+      }
+      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+      assert.equal(grains(await drawn(createElement(CutTag, { children: 'YOUR WORD' }))), 0, 'a cut tag');
+      const { CutButton } = await import('../src/components/look/CutButton.tsx');
+      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+      assert.equal(grains(await drawn(createElement(CutButton, { to: '/runs', children: 'Open' }))), 0, 'a cut button');
+    },
+  );
+  await t.test(
+    'REFUSED: the cut frame clips what it holds: only its shape, which holds nothing, is cut, so a focus ring inside is whole',
+    async () => {
+      assert.deepEqual(clips('style="clip-path:polygon(0 0)"'), ['clip-path']);
+      assert.deepEqual(clips('style={{ clipPath: "polygon(0 0)" }}'), ['clipPath']);
+      assert.deepEqual(clips('class="relative overflow-hidden"'), ['overflow-hidden']);
+      assert.deepEqual(clips('class="overflow-clip" style="overflow:hidden"'), ['overflow-clip', 'overflow:']);
+      const child = createElement('button', { type: 'button' }, 'Approve');
+      // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+      const html = await drawn(createElement(CutFrame, { hue: 'yours', className: 'h-full', children: child }));
+      const shape = /<span[^>]*data-cut-shape[^>]*>(?:<span[^>]*><\/span>)+<\/span>/.exec(html);
+      assert.ok(shape, 'the shape is a span that holds its two layers and nothing else');
+      assert.equal(clips(shape[0]).length, 2, 'each layer of the shape is cut');
+      assert.deepEqual(
+        clips(html.replace(shape[0], '')),
+        [],
+        'and nothing else of the frame is: not the frame, not what holds its content',
+      );
+    },
+  );
 });
 
-test('a step done is filled in the rail whether a check says so or its own word does, and a step to come stays hollow', async () => {
-  const steps = [
-    { name: 'design', status: 'unverified' },
-    { name: 'implement', status: 'verified ✓' },
-    { name: 'review', status: 'waiting' },
-  ];
-  const html = await drawn(createElement(RunSteps, { steps, cancelled: false, held: false }));
-  const classOf = (step: string) => tagWith(html, `data-step="${step}"`).match(/class="([^"]*)"/)?.[1];
-  assert.match(tagWith(html, 'data-step="design"'), /data-state="unverified"/, 'the state is still said as it is');
-  assert.equal(classOf('design'), classOf('implement'), 'done on its own word is drawn as done on a check');
-  assert.match(classOf('design') ?? '', /bg-sage /, 'filled');
-  assert.notEqual(classOf('review'), classOf('design'), 'a step to come is not drawn as one done');
-  assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
+test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page', async (t) => {
+  await t.test(
+    'the steps rail: one bar a step by its state, its names in the hue of what waits or failed, and read aloud as one picture',
+    async () => {
+      const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, names: true }));
+      assert.match(tagWith(html, 'data-run-steps'), /role="img"/);
+      assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits for you"/);
+      assert.deepEqual(
+        [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+        [
+          ['design', 'verified'],
+          ['implement', 'working'],
+          ['review', 'failed-check'],
+          ['land', 'awaiting-approval'],
+        ],
+      );
+      assert.match(tagWith(html, 'data-step-name="land"'), /text-yours/);
+      assert.match(tagWith(html, 'data-step-name="review"'), /text-failure/);
+      assert.match(tagWith(html, 'data-step-name="design"'), /text-on-surface-variant/);
+      const [gate, atWork] = [tagWith(html, 'data-step="land"'), tagWith(html, 'data-step="implement"')];
+      assert.match(gate, /bg-transparent/, 'the step that waits on a person is hollow');
+      assert.doesNotMatch(gate, /bg-yours/);
+      assert.match(
+        gate,
+        /box-shadow:inset 0 0 0 1\.5px var\(--meaning-yours\), 0 0 10px color-mix\(in srgb, var\(--meaning-yours\) 45%, transparent\)/,
+        'edged in its hue, and glowing',
+      );
+      assert.doesNotMatch(atWork, /box-shadow/, "the step at work's bar carries no glow of its own");
+      assert.match(
+        tagWith(html, 'data-step-breath'),
+        /box-shadow:0 0 12px color-mix\(in srgb, var\(--meaning-alive\) 70%, transparent\)/,
+        'the step at work glows, on a layer of its own',
+      );
+      assert.match(html, /data-step="implement"[^>]*><span aria-hidden="true" data-step-breath/, "the layer is the step at work's");
+      assert.equal(html.match(/data-step-breath/g)?.length, 1, 'and no other step has one');
+      for (const dark of ['design', 'review'])
+        assert.doesNotMatch(tagWith(html, `data-step="${dark}"`), /box-shadow/, `${dark} neither waits nor works: no glow`);
+      assert.match(tagWith(html, 'data-step="implement"'), /bg-alive /, 'the step at work is the lit bar, in its hue itself');
+      assert.doesNotMatch(tagWith(html, 'data-step="implement"'), /bg-alive-container/);
+      assert.match(tagWith(html, 'data-step="review"'), /bg-failure-container/, 'every other bar is drawn as its state is on every page');
+      const bare = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: true }));
+      assert.doesNotMatch(bare, /data-step-name/, 'no names unless asked');
+      assert.match(tagWith(bare, 'data-step="land"'), /data-state="held"/, "a held run's gate is drawn held");
+    },
+  );
+  await t.test(
+    'the steps rail with a wrap: a group named as the rail is said, each bar inside what the wrap gives, its step and state handed',
+    async () => {
+      const wrap = (bar: unknown, step: { name: string; state: string }) =>
+        createElement('button', { 'data-wrapped': `${step.name} ${step.state}` }, bar as ReactElement);
+      const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, wrap }));
+      const rail = tagWith(html, 'data-run-steps');
+      assert.match(rail, /role="group"/);
+      assert.doesNotMatch(rail, /role="img"/);
+      assert.match(rail, /aria-label="design verified, implement at work, review failed its check, land waits for you"/);
+      assert.deepEqual(
+        [...html.matchAll(/data-wrapped="([^"]+)"><span data-step="([^"]+)"/g)].map((m) => [m[1], m[2]]),
+        [
+          ['design verified', 'design'],
+          ['implement working', 'implement'],
+          ['review failed-check', 'review'],
+          ['land awaiting-approval', 'land'],
+        ],
+      );
+    },
+  );
+  await t.test(
+    'a step done is filled in the rail whether a check says so or its own word does, and a step to come stays hollow',
+    async () => {
+      const steps = [
+        { name: 'design', status: 'unverified' },
+        { name: 'implement', status: 'verified ✓' },
+        { name: 'review', status: 'waiting' },
+      ];
+      const html = await drawn(createElement(RunSteps, { steps, cancelled: false, held: false }));
+      const classOf = (step: string) => tagWith(html, `data-step="${step}"`).match(/class="([^"]*)"/)?.[1];
+      assert.match(tagWith(html, 'data-step="design"'), /data-state="unverified"/, 'the state is still said as it is');
+      assert.equal(classOf('design'), classOf('implement'), 'done on its own word is drawn as done on a check');
+      assert.match(classOf('design') ?? '', /bg-sage /, 'filled');
+      assert.notEqual(classOf('review'), classOf('design'), 'a step to come is not drawn as one done');
+      assert.match(html, /aria-label="design done, implement verified, review to come"/, 'read aloud, a check is told from a word');
+    },
+  );
+  await t.test('the pager: Newer and Older keep the address and change its page alone, and say the rows and where it stands', async () => {
+    const html = await drawn(createElement(Pager, { page: 2, pages: 3, total: 25, size: 9 }), '/?factory=nemia&page=2');
+    assert.match(html, /role="group" aria-label="Pages of finished runs"/);
+    assert.match(tagWith(html, 'data-pager-rows'), /data-pager-rows/);
+    assert.match(html, />Runs 10–18 of 25</);
+    assert.match(html, />Page 2 \/ 3</);
+    assert.match(
+      tagWith(html, 'data-pager-newer'),
+      /href="\/\?factory=nemia"/,
+      'Newer drops the page for the first, and keeps the factory',
+    );
+    assert.match(tagWith(html, 'data-pager-older'), /href="\/\?factory=nemia&amp;page=3"/);
+  });
+  await t.test('REFUSED: the pager at an end offers no link there, and from a page past the last Newer leads to the last', async () => {
+    const first = await drawn(createElement(Pager, { page: 1, pages: 3, total: 25, size: 9 }));
+    const newer = tagWith(first, 'data-pager-newer');
+    assert.match(newer, /aria-disabled="true"/);
+    assert.doesNotMatch(newer, /href=/);
+    assert.match(tagWith(first, 'data-pager-older'), /href="\/\?page=2"/);
+    const last = await drawn(createElement(Pager, { page: 3, pages: 3, total: 25, size: 9 }), '/?page=3');
+    assert.match(tagWith(last, 'data-pager-older'), /aria-disabled="true"/);
+    assert.match(tagWith(last, 'data-pager-newer'), /href="\/\?page=2"/);
+    const past = await drawn(createElement(Pager, { page: 80, pages: 3, total: 25, size: 9 }), '/?page=80');
+    assert.match(past, />Page 80 is past the last, 3\.</);
+    assert.match(tagWith(past, 'data-pager-newer'), /href="\/\?page=3"/);
+    assert.match(tagWith(past, 'data-pager-older'), /aria-disabled="true"/);
+  });
+  await t.test('the pager writes its buttons in the label face, never the mono of its counts, and rings them as the kit does', async () => {
+    const html = await drawn(createElement(Pager, { page: 2, pages: 3, total: 25, size: 9 }));
+    for (const mark of ['data-pager-newer', 'data-pager-older']) {
+      const button = tagWith(html, mark);
+      assert.match(button, /\bfont-plain\b/, `${mark} is in the label face`);
+      assert.match(button, /text-label-large uppercase/);
+      assert.match(button, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/);
+      assert.doesNotMatch(button, /font-mono|ring-2\b|ring-offset/);
+    }
+  });
+  await t.test(
+    'the text link is a link to its route, underlined under the pointer and the keyboard alone, with a ring for the keyboard',
+    async () => {
+      const html = await drawn(createElement(TextLink, { to: '/', search: { factory: 'nemia' } } as never, 'Read the review'));
+      const link = tagWith(html, 'data-text-link');
+      assert.match(link, /^<a /);
+      assert.match(link, /href="\/\?factory=nemia"/);
+      assert.match(link, / no-underline /, 'no line at rest: a title reads as a title');
+      assert.match(link, / hover:underline /, 'underlined under the pointer');
+      assert.match(link, / focus-visible:underline /, 'and with the keyboard on it');
+      assert.doesNotMatch(link, /(?<![\w:-])underline(?![\w-])/, 'never underlined at rest');
+      assert.match(link, /outline-none outline-3 outline-offset-2 outline-ring focus-visible:outline-solid/, "the kit's ring, not its own");
+      assert.doesNotMatch(link, /ring-2\b|ring-offset/);
+      assert.match(html, />Read the review</);
+    },
+  );
 });
 
-test("a page's name stands over a hairline, lit under the name alone, as wide as the name and never a fixed width", async () => {
-  // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` among the props, and a .ts file has no JSX.
-  const html = await drawn(createElement(PageName, { children: 'Factories' }));
-  const [name, rule, text, lit] = ['data-page-name', 'data-page-rule', 'data-page-name-text', 'data-page-rule-lit'].map((mark) =>
-    tagWith(html, `${mark}[ >=]`),
-  );
-  assert.match(name, /^<h1 /);
-  assert.match(name, /\bpb-4\.5\b/, '18 pixels under the name');
-  assert.doesNotMatch(name, /border-b|style=/, 'the name carries no rule of its own, nor an image a contrast measure cannot read');
-  assert.match(rule, /aria-hidden="true"/);
-  assert.match(rule, /\binset-x-0\b/, 'the hairline runs the whole h1');
-  assert.match(rule, /\bh-px\b/);
-  assert.match(rule, /background-color:var\(--md-sys-color-outline-variant\)/);
-  assert.match(text, /\bw-fit\b/, "the name's own box is as wide as the name");
-  assert.match(lit, /aria-hidden="true"/);
-  assert.match(lit, /\binset-x-0\b/, "the lit part spans the name's box");
-  assert.match(lit, /\s-bottom-4\.5\s/, "on the h1's rule, 18 pixels under the name");
-  assert.match(lit, /background-color:var\(--meaning-alive\)/);
-  assert.doesNotMatch(lit, /\bw-|\d+px|width/, 'the lit part has no width of its own');
-  assert.match(
-    html,
-    /<span data-page-name-text[^>]*>Factories<span aria-hidden="true" data-page-rule-lit/,
-    'the lit part hangs from the name',
-  );
+test("Plate, PageName, Sticker and ScanLines: the look's headings, tiles and ground", async (t) => {
+  await t.test('the plate: its count, its heading and a barcode nobody reads, in grey too; quiet, in grey with none', async () => {
+    const loud = await drawn(createElement(Plate, { count: 2, title: 'Waiting on you' }));
+    assert.match(tagWith(loud, 'data-plate='), /data-plate="loud"[^>]*bg-yours text-on-yours/);
+    assert.match(loud, /data-plate-count[^>]*>2</);
+    assert.match(loud, /<h2[^>]*>Waiting on you<\/h2>/);
+    assert.match(tagWith(loud, 'data-plate-barcode'), /aria-hidden="true"/);
+    assert.match(tagWith(loud, 'data-plate-barcode'), /currentColor/);
+    const rest = await drawn(createElement(Plate, { count: 6, title: 'Finished', hue: 'grey' }));
+    assert.match(tagWith(rest, 'data-plate='), /data-plate="loud"[^>]*data-plate-hue="grey"[^>]*bg-rest text-on-rest/);
+    assert.match(tagWith(rest, 'data-plate-barcode'), /currentColor/, 'a plate that counts runs keeps its barcode, at rest too');
+    const quiet = await drawn(createElement(Plate, { count: 0, title: 'Waiting on you', quiet: true }));
+    assert.match(tagWith(quiet, 'data-plate='), /data-plate="quiet"[^>]*bg-rest text-on-rest/);
+    assert.doesNotMatch(quiet, /data-plate-barcode/);
+  });
+  await t.test('each plate carries its own barcode, bar for bar, and two swapped are seen', async () => {
+    const tags = Object.fromEntries(
+      await Promise.all(
+        (Object.keys(BARS) as (keyof typeof BARS)[]).map(
+          async (hue) => [hue, tagWith(await drawn(createElement(Plate, { count: 2, title: 'Runs', hue })), 'data-plate-barcode')] as const,
+        ),
+      ),
+    );
+    assert.equal(wrongBarcodes((hue) => tags[hue]).length, 0, `each plate carries its own barcode — ${JSON.stringify(tags)}`);
+    assert.equal(new Set(Object.values(tags)).size, 3, 'no two plates carry the same');
+    const swapped: Record<string, string> = { ...tags, alive: tags.grey, grey: tags.alive };
+    assert.equal(wrongBarcodes((hue) => swapped[hue]).join(','), 'alive,grey', 'two barcodes swapped: the check names both plates');
+  });
+  await t.test("a page's name stands over a hairline, lit under the name alone, as wide as the name and never a fixed width", async () => {
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(PageName, { children: 'Factories' }));
+    const [name, rule, text, lit] = ['data-page-name', 'data-page-rule', 'data-page-name-text', 'data-page-rule-lit'].map((mark) =>
+      tagWith(html, `${mark}[ >=]`),
+    );
+    assert.match(name, /^<h1 /);
+    assert.match(name, /\bpb-4\.5\b/, '18 pixels under the name');
+    assert.doesNotMatch(name, /border-b|style=/, 'the name carries no rule of its own, nor an image a contrast measure cannot read');
+    assert.match(rule, /aria-hidden="true"/);
+    assert.match(rule, /\binset-x-0\b/, 'the hairline runs the whole h1');
+    assert.match(rule, /\bh-px\b/);
+    assert.match(rule, /background-color:var\(--md-sys-color-outline-variant\)/);
+    assert.match(text, /\bw-fit\b/, "the name's own box is as wide as the name");
+    assert.match(lit, /aria-hidden="true"/);
+    assert.match(lit, /\binset-x-0\b/, "the lit part spans the name's box");
+    assert.match(lit, /\s-bottom-4\.5\s/, "on the h1's rule, 18 pixels under the name");
+    assert.match(lit, /background-color:var\(--meaning-alive\)/);
+    assert.doesNotMatch(lit, /\bw-|\d+px|width/, 'the lit part has no width of its own');
+    assert.match(
+      html,
+      /<span data-page-name-text[^>]*>Factories<span aria-hidden="true" data-page-rule-lit/,
+      'the lit part hangs from the name',
+    );
+  });
+  await t.test('the sticker: a label over its value, filled in its hue', async () => {
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(Sticker, { hue: 'money', label: 'Cost', children: '$4.25' }));
+    assert.match(tagWith(html, 'data-sticker'), /data-sticker="money"[^>]*bg-money text-on-money/);
+    assert.match(html, />Cost<\/span><span[^>]*>\$4\.25</);
+  });
+  await t.test('the scan lines: a glow and lines in the hue of a session at work, thinned, and the glow alone without lines', async () => {
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const html = await drawn(createElement(ScanLines, { children: 'page' }));
+    const ground = tagWith(html, 'data-scan-lines');
+    assert.match(ground, /radial-gradient\(/);
+    assert.match(ground, /repeating-linear-gradient\(/);
+    assert.match(ground, /var\(--meaning-alive\) 7%/);
+    assert.match(ground, /var\(--meaning-alive\) 4%/);
+    assert.doesNotMatch(ground, /#[0-9a-f]{3,8}\b|rgb\(|hsl\(/i, 'no colour written by hand');
+    // oxlint-disable-next-line react/no-children-prop -- createElement's type wants `children` in the props; a .ts file has no JSX.
+    const plain = tagWith(await drawn(createElement(ScanLines, { lines: false, children: 'page' })), 'data-scan-lines');
+    assert.doesNotMatch(plain, /repeating-linear-gradient/);
+  });
 });

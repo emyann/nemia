@@ -159,6 +159,12 @@ test('the former form is read where YAML refuses it or reads a flow map, and a b
       );
     }
   });
+  await t.test('a document marker inside the block', () => {
+    assert.throws(
+      () => readFrontmatter('t', '---\n'),
+      (e: unknown) => e instanceof WorkflowError && e.message.startsWith('t:2:'),
+    );
+  });
   await t.test('prose is not a map of keys', () => {
     assert.throws(() => readFrontmatter('t', 'This is a brief, not keys\n'), WorkflowError);
   });

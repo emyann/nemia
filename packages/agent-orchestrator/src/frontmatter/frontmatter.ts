@@ -82,13 +82,20 @@ const YAML_FIX =
  * A frontmatter block (the lines between the two `---`, as `splitFrontmatter` hands it) as its keys, in order, each with its line. Read as
  * YAML 1.2; read the former way and marked `former` when YAML refuses it, or reads a flow collection on a step's key that holds one
  * value (`ONE_VALUE`), and its every line is a former one. Refused, as `WorkflowError`, naming the file's line and
- * the fix: a block in neither form, one that is not a map of keys (a line of prose), and a key that is not a word of text.
+ * the fix: a block in neither form, one that is not a map of keys (a line of prose), a key that is not a word of text, and a line that
+ * is a YAML document's marker (`---`, `...`), which would end the block.
  */
 export function readFrontmatter(name: string, block: string): Frontmatter {
   const counter = new LineCounter();
   const doc = parsed(block, counter);
   const lineAt = (offset: number | undefined): number =>
     offset === undefined ? FIRST_LINE : counter.linePos(offset).line + FIRST_LINE - 1;
+  const marker = block.split('\n').findIndex((line) => /^(---|\.\.\.)[ \t]*$/.test(line));
+  if (marker >= 0) {
+    refuse(
+      `${name}:${marker + FIRST_LINE}: a line of \`${block.split('\n')[marker]}\` inside the frontmatter would end it, and every line after it be lost. The frontmatter ends at the first line that is just \`---\`: delete this one, or put the rule in the body.`,
+    );
+  }
   const shaped = formerShaped(block);
   if (doc.errors.length) {
     if (shaped) return { entries: formerEntries(block), former: true };

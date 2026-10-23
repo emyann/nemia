@@ -197,15 +197,16 @@ test('`ae kept`: what each task of a store keeps on the disk, counted once, and 
   });
 
   await s.test('the parts of every task add up to no more than a walk of the root in the same measure', async () => {
-    await journalled(root, 'i1', { brief: 'c'.repeat(30000), nativeId: 'sess-i1' });
-    await journalled(root, 'i2', { brief: 'c'.repeat(30000) });
-    await journalled(root, 'i3', { brief: 'd'.repeat(5000) });
-    plant(path.join(root, 'runs', HARNESS, 'ae_i1_1.stdout'), 50000);
-    plant(path.join(root, 'runs', HARNESS, 'ae_i2_1.json'), 100);
-    const { tasks } = await Effect.runPromise(engine.kept());
+    const own = scratch('ae-kept-root-');
+    await journalled(own, 'i1', { brief: 'c'.repeat(30000), nativeId: 'sess-i1' });
+    await journalled(own, 'i2', { brief: 'c'.repeat(30000) });
+    await journalled(own, 'i3', { brief: 'd'.repeat(5000) });
+    plant(path.join(own, 'runs', HARNESS, 'ae_i1_1.stdout'), 50000);
+    plant(path.join(own, 'runs', HARNESS, 'ae_i2_1.json'), 100);
+    const { tasks } = await Effect.runPromise(engineOn(own).kept());
     const parts = tasks.reduce((sum, task) => sum + task.journal + task.bodies + task.output + task.files, 0);
     assert.ok(parts > 80000, `the parts were measured: ${parts}`);
-    assert.ok(parts <= diskBytesOf(root)!, `${parts} is no more than the root's ${diskBytesOf(root)}`);
+    assert.ok(parts <= diskBytesOf(own)!, `${parts} is no more than the root's ${diskBytesOf(own)}, a root of these tasks alone`);
   });
 });
 

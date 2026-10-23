@@ -22,6 +22,7 @@ import { CLAUDE_JOB_ENV } from './job-env.ts';
 import type { SpawnRequest } from '../seam.ts';
 import type { ClaudeFlags } from './vocabulary.ts';
 import { scratch } from '../../../test/scratch.ts';
+import { story } from '../../../test/checkpoints.ts';
 
 const SCHEMA = { type: 'object', properties: { anything: { 'x-no-runtime-reads-this': true } } };
 
@@ -72,138 +73,178 @@ const valuesOf = (argv: string[], flag: string): string[] => {
   return at < 0 ? [] : [argv[at + 1]];
 };
 
-test('every deny, allow, tool and added folder of the job is in the attached options', () => {
+test('attachedOptions: a rich task is fenced as claude -p is for the same task, on the SDK’s own options', async (t) => {
+  const s = story(t);
   const argv = claudePrintFlags(RICH, undefined);
   const given = attachedOptions(RICH);
-  assert.deepEqual(given.disallowedTools, valuesOf(argv, '--disallowedTools')[0].split(','));
-  assert.deepEqual(given.allowedTools, valuesOf(argv, '--allowedTools')[0].split(','));
-  assert.deepEqual(given.tools, valuesOf(argv, '--tools')[0].split(','));
-  assert.deepEqual(given.additionalDirectories, argv.slice(argv.indexOf('--add-dir') + 1, argv.indexOf('--add-dir') + 3));
+
+  await s.test('the options carry these keys and no other: a key added is a question — what is it, and has claude -p it too?', () => {
+    assert.deepEqual(Object.keys(given).sort(), [
+      'additionalDirectories',
+      'allowedTools',
+      'cwd',
+      'disallowedTools',
+      'effort',
+      'env',
+      'extraArgs',
+      'includePartialMessages',
+      'maxBudgetUsd',
+      'mcpServers',
+      'model',
+      'outputFormat',
+      'permissionMode',
+      'plugins',
+      'resume',
+      'settingSources',
+      'settings',
+      'strictMcpConfig',
+      'systemPrompt',
+      'tools',
+    ]);
+  });
+
+  await s.test('every deny, allow, tool and added folder of the job is in the attached options', () => {
+    assert.deepEqual(given.disallowedTools, valuesOf(argv, '--disallowedTools')[0].split(','));
+    assert.deepEqual(given.allowedTools, valuesOf(argv, '--allowedTools')[0].split(','));
+    assert.deepEqual(given.tools, valuesOf(argv, '--tools')[0].split(','));
+    assert.deepEqual(given.additionalDirectories, argv.slice(argv.indexOf('--add-dir') + 1, argv.indexOf('--add-dir') + 3));
+  });
+
+  await s.test('the mode, model, effort, budget, resume, worktree, settings and window of the job are in the attached options', () => {
+    assert.equal(given.permissionMode, valuesOf(argv, '--permission-mode')[0]);
+    assert.equal(given.model, valuesOf(argv, '--model')[0]);
+    assert.equal(given.effort, valuesOf(argv, '--effort')[0]);
+    assert.equal(String(given.maxBudgetUsd), valuesOf(argv, '--max-budget-usd')[0]);
+    assert.equal(given.resume, valuesOf(argv, '--resume')[0]);
+    assert.deepEqual(given.settingSources, valuesOf(argv, '--setting-sources'));
+    assert.equal(given.extraArgs?.worktree, valuesOf(argv, '--worktree')[0]);
+    assert.deepEqual(
+      given.settings,
+      { ...(JSON.parse(valuesOf(argv, '--settings')[0]) as object), autoCompactWindow: Number(valuesOf(argv, '--autocompact')[0]) },
+      "the job's settings, on the SDK's own option, the window the job spells as a flag in them",
+    );
+    assert.deepEqual(given.plugins, [{ type: 'local', path: path.resolve(CWD, valuesOf(argv, '--plugin-dir')[0]) }]);
+  });
+
+  await s.test('the closing statement schema is handed on as given, and the environment is a job’s with the task’s under it', () => {
+    assert.equal(given.outputFormat?.type, 'json_schema');
+    assert.equal(given.outputFormat?.schema, SCHEMA, 'the same object, unread');
+    assert.equal(given.env?.MINE, '1');
+    for (const [k, v] of Object.entries(CLAUDE_JOB_ENV)) assert.equal(given.env?.[k], v);
+  });
+
+  await s.test('the session’s servers are the SDK’s own option, the task’s server winning a name the checkout gives too', () => {
+    assert.deepEqual(
+      given.mcpServers,
+      { repo: { command: 'repo-server' }, both: { command: 'ours' }, mine: { command: 'my-server' } },
+      'the checkout’s `.mcp.json` whole, the task’s own laid over it — on `mcpServers`, never a `--mcp-config` file',
+    );
+  });
+
+  await s.test('the servers’ fence is the SDK’s own option, strict for every task', () => {
+    assert.ok(argv.includes('--strict-mcp-config'), 'a job is spawned strict');
+    assert.equal(given.strictMcpConfig, true, 'and so is an attached session, on `strictMcpConfig`');
+  });
+
+  await s.test('an attached session is given Claude Code’s own system prompt, the agent’s appended to it', () => {
+    assert.deepEqual(
+      given.systemPrompt,
+      { type: 'preset', preset: 'claude_code', append: 'you are the agent' },
+      'the preset, so Claude Code renders its own prompt, with the agent’s text appended to it — never the file’s path on a flag',
+    );
+  });
+
+  await s.test('the context window is a key of those same settings, and no flag of its own', () => {
+    assert.equal(given.settings && typeof given.settings === 'object' && given.settings.autoCompactWindow, 200_000);
+    assert.equal(given.extraArgs?.autocompact, undefined, 'the window is no longer spelled onto the command line');
+  });
+
+  await s.test('extraArgs holds the flags the SDK has no option for, and nothing else', () => {
+    assert.deepEqual(
+      given.extraArgs,
+      { 'mcp-debug': null, 'no-chrome': null, worktree: 'tree' },
+      'the task’s own unmapped flag, and the two of 0.3.308: no Chrome and the worktree',
+    );
+  });
 });
 
-test('the mode, model, effort, budget, resume, worktree, settings and window of the job are in the attached options', () => {
-  const argv = claudePrintFlags(RICH, undefined);
-  const given = attachedOptions(RICH);
-  assert.equal(given.permissionMode, valuesOf(argv, '--permission-mode')[0]);
-  assert.equal(given.model, valuesOf(argv, '--model')[0]);
-  assert.equal(given.effort, valuesOf(argv, '--effort')[0]);
-  assert.equal(String(given.maxBudgetUsd), valuesOf(argv, '--max-budget-usd')[0]);
-  assert.equal(given.resume, valuesOf(argv, '--resume')[0]);
-  assert.deepEqual(given.settingSources, valuesOf(argv, '--setting-sources'));
-  assert.equal(given.extraArgs?.worktree, valuesOf(argv, '--worktree')[0]);
-  assert.deepEqual(
-    given.settings,
-    { ...(JSON.parse(valuesOf(argv, '--settings')[0]) as object), autoCompactWindow: Number(valuesOf(argv, '--autocompact')[0]) },
-    "the job's settings, on the SDK's own option, the window the job spells as a flag in them",
-  );
-  assert.deepEqual(given.plugins, [{ type: 'local', path: path.resolve(CWD, valuesOf(argv, '--plugin-dir')[0]) }]);
-});
+/** A refusal's words hold every one of `names`. */
+const refusedNaming =
+  (...names: string[]) =>
+  (err: Error) =>
+    names.every((name) => err.message.includes(name));
 
-test('the closing statement schema is handed on as given, and the environment is a job’s with the task’s under it', () => {
-  const given = attachedOptions(RICH);
-  assert.equal(given.outputFormat?.type, 'json_schema');
-  assert.equal(given.outputFormat?.schema, SCHEMA, 'the same object, unread');
-  assert.equal(given.env?.MINE, '1');
-  for (const [k, v] of Object.entries(CLAUDE_JOB_ENV)) assert.equal(given.env?.[k], v);
-});
+const ROWS: { name: string; check: () => void }[] = [
+  {
+    name: 'a task with no server of its own and no .mcp.json is given no servers at all, and no file is written for it',
+    check: () => {
+      const bare = scratch('ae-attached-options-bare-');
+      const given = attachedOptions({ name: 'ae/t/1', brief: 'work', cwd: bare });
+      assert.equal(given.mcpServers, undefined, 'absent, not an empty map: there is nothing to name');
+      assert.equal(given.strictMcpConfig, true, 'still strict: no server is loaded for it either way');
+      assert.deepEqual(fs.readdirSync(bare), [], 'and the options write no file: the servers are a value now');
+    },
+  },
+  {
+    name: 'a task with systemPromptFile is given that file’s text in place of Claude Code’s prompt',
+    check: () =>
+      assert.equal(
+        attachedOptions(withClaude({ systemPromptFile: REPLACE })).systemPrompt,
+        'you are nobody Claude Code knows',
+        'the text alone replaces the preset, as `--system-prompt-file` replaced Claude Code’s prompt',
+      ),
+  },
+  {
+    name: 'a task naming no prompt file still asks for the bare preset: the SDK sends an empty system prompt when it is unasked',
+    check: () => assert.deepEqual(attachedOptions(withClaude({})).systemPrompt, { type: 'preset', preset: 'claude_code' }),
+  },
+  {
+    name: 'an appended prompt file named relatively is read from the session’s own cwd, as Claude Code read the flag’s path',
+    check: () =>
+      assert.deepEqual(
+        attachedOptions(withClaude({ appendSystemPromptFile: 'beside.md' })).systemPrompt,
+        { type: 'preset', preset: 'claude_code', append: 'you are the agent beside the work' },
+        'the file in the task’s cwd, never one beside whatever process the engine runs in',
+      ),
+  },
+  {
+    name: 'and the same for the prompt that replaces Claude Code’s own',
+    check: () =>
+      assert.equal(attachedOptions(withClaude({ systemPromptFile: 'beside.md' })).systemPrompt, 'you are the agent beside the work'),
+  },
+  {
+    name: 'REFUSED: a task giving both prompt files, naming both keys and the harness that takes both flags',
+    check: () =>
+      assert.throws(
+        () => attachedOptions(withClaude({ appendSystemPromptFile: APPEND, systemPromptFile: REPLACE })),
+        refusedNaming('appendSystemPromptFile', 'systemPromptFile', 'claude-detached'),
+      ),
+  },
+  {
+    name: 'REFUSED: a prompt file that cannot be read, naming the key and the path',
+    check: () => {
+      const absent = path.join(CWD, 'not-there.md');
+      assert.throws(() => attachedOptions(withClaude({ appendSystemPromptFile: absent })), refusedNaming('appendSystemPromptFile', absent));
+    },
+  },
+  {
+    name: 'a task whose settings are a file’s path keeps the window as a flag: the runtime rewrites no settings file',
+    check: () => {
+      const given = attachedOptions(withClaude({ settings: '/a/settings.json', appendSystemPromptFile: APPEND }));
+      assert.equal(given.settings, '/a/settings.json', 'the path as given, as `auto-memory.test.ts` holds for the settings themselves');
+      assert.equal(given.extraArgs?.autocompact, '200000', 'and the window on the one flag left that reaches it');
+    },
+  },
+  {
+    name: 'REFUSED: a flag of config.claude given twice, naming the flag and the detached job',
+    check: () =>
+      assert.throws(
+        () => attachedOptions({ ...RICH, config: { claude: { mcpDebug: ['a', 'b'] } } }),
+        refusedNaming('`config.claude.mcpDebug`', 'claude-detached'),
+      ),
+  },
+];
 
-test('the session’s servers are the SDK’s own option, the task’s server winning a name the checkout gives too', () => {
-  const given = attachedOptions(RICH);
-  assert.deepEqual(
-    given.mcpServers,
-    { repo: { command: 'repo-server' }, both: { command: 'ours' }, mine: { command: 'my-server' } },
-    'the checkout’s `.mcp.json` whole, the task’s own laid over it — on `mcpServers`, never a `--mcp-config` file',
-  );
-});
-
-test('the servers’ fence is the SDK’s own option, strict for every task', () => {
-  const argv = claudePrintFlags(RICH, undefined);
-  assert.ok(argv.includes('--strict-mcp-config'), 'a job is spawned strict');
-  assert.equal(attachedOptions(RICH).strictMcpConfig, true, 'and so is an attached session, on `strictMcpConfig`');
-});
-
-test('a task with no server of its own and no .mcp.json is given no servers at all, and no file is written for it', () => {
-  const bare = scratch('ae-attached-options-bare-');
-  const given = attachedOptions({ name: 'ae/t/1', brief: 'work', cwd: bare });
-  assert.equal(given.mcpServers, undefined, 'absent, not an empty map: there is nothing to name');
-  assert.equal(given.strictMcpConfig, true, 'still strict: no server is loaded for it either way');
-  assert.deepEqual(fs.readdirSync(bare), [], 'and the options write no file: the servers are a value now');
-});
-
-test('an attached session is given Claude Code’s own system prompt, the agent’s appended to it', () => {
-  const given = attachedOptions(RICH);
-  assert.deepEqual(
-    given.systemPrompt,
-    { type: 'preset', preset: 'claude_code', append: 'you are the agent' },
-    'the preset, so Claude Code renders its own prompt, with the agent’s text appended to it — never the file’s path on a flag',
-  );
-});
-
-test('a task with systemPromptFile is given that file’s text in place of Claude Code’s prompt, and one with neither the bare preset', () => {
-  assert.equal(
-    attachedOptions(withClaude({ systemPromptFile: REPLACE })).systemPrompt,
-    'you are nobody Claude Code knows',
-    'the text alone replaces the preset, as `--system-prompt-file` replaced Claude Code’s prompt',
-  );
-  assert.deepEqual(
-    attachedOptions(withClaude({})).systemPrompt,
-    { type: 'preset', preset: 'claude_code' },
-    'and a task naming no prompt file still asks for the preset: the SDK sends an empty system prompt when it is unasked',
-  );
-});
-
-test('a prompt file named relatively is read from the session’s own cwd, as Claude Code read the flag’s path and as a plugin folder is', () => {
-  assert.deepEqual(
-    attachedOptions(withClaude({ appendSystemPromptFile: 'beside.md' })).systemPrompt,
-    { type: 'preset', preset: 'claude_code', append: 'you are the agent beside the work' },
-    'the file in the task’s cwd, never one beside whatever process the engine runs in',
-  );
-  assert.equal(
-    attachedOptions(withClaude({ systemPromptFile: 'beside.md' })).systemPrompt,
-    'you are the agent beside the work',
-    'and the same for the prompt that replaces Claude Code’s own',
-  );
-});
-
-test('a task giving both prompt files is refused, naming both keys and the harness that takes both flags', () => {
-  assert.throws(
-    () => attachedOptions(withClaude({ appendSystemPromptFile: APPEND, systemPromptFile: REPLACE })),
-    (err: Error) =>
-      err.message.includes('appendSystemPromptFile') && err.message.includes('systemPromptFile') && err.message.includes('claude-detached'),
-  );
-});
-
-test('a prompt file that cannot be read is refused, naming the key and the path', () => {
-  const absent = path.join(CWD, 'not-there.md');
-  assert.throws(
-    () => attachedOptions(withClaude({ appendSystemPromptFile: absent })),
-    (err: Error) => err.message.includes('appendSystemPromptFile') && err.message.includes(absent),
-  );
-});
-
-test('the context window is a key of those same settings, and no flag of its own', () => {
-  const given = attachedOptions(RICH);
-  assert.equal(given.settings && typeof given.settings === 'object' && given.settings.autoCompactWindow, 200_000);
-  assert.equal(given.extraArgs?.autocompact, undefined, 'the window is no longer spelled onto the command line');
-});
-
-test('a task whose settings are a file’s path keeps the window as a flag: the runtime rewrites no settings file', () => {
-  const given = attachedOptions(withClaude({ settings: '/a/settings.json', appendSystemPromptFile: APPEND }));
-  assert.equal(given.settings, '/a/settings.json', 'the path as given, as `auto-memory.test.ts` holds for the settings themselves');
-  assert.equal(given.extraArgs?.autocompact, '200000', 'and the window on the one flag left that reaches it');
-});
-
-test('extraArgs holds the flags the SDK has no option for, and nothing else', () => {
-  assert.deepEqual(
-    attachedOptions(RICH).extraArgs,
-    { 'mcp-debug': null, 'no-chrome': null, worktree: 'tree' },
-    'the task’s own unmapped flag, and the two of 0.3.308: no Chrome and the worktree',
-  );
-});
-
-test('a flag of config.claude given twice is refused, naming the detached job', () => {
-  assert.throws(
-    () => attachedOptions({ ...RICH, config: { claude: { mcpDebug: ['a', 'b'] } } }),
-    (err: Error) => err.message.includes('claude-detached'),
-  );
+test('attachedOptions: a bare task, the prompt files and the refusals of what the options cannot carry', async (t) => {
+  for (const row of ROWS) await t.test(row.name, row.check);
 });

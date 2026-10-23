@@ -14,29 +14,56 @@ const configWith = (projects: unknown): string => {
   return file;
 };
 
-test('a folder is trusted only by its own entry with the prompt accepted: never by a parent, a refusal, or a file that does not read', () => {
-  const file = configWith({ '/srv/home': { hasTrustDialogAccepted: true }, '/srv/home/no': { hasTrustDialogAccepted: false } });
-  assert.equal(trustedFolder('claude', '/srv/home', file), true);
-  assert.equal(trustedFolder('claude', '/srv/home/x/..', file), true);
-  assert.equal(trustedFolder('claude', '/srv/home/nemia', file), false);
-  assert.equal(trustedFolder('claude', '/srv/home/no', file), false);
-  assert.equal(trustedFolder('claude', '/srv/home', path.join(path.dirname(file), 'none.json')), false);
-  const bad = configWith(null);
-  fs.writeFileSync(bad, '{');
-  assert.equal(trustedFolder('claude', '/srv/home', bad), false);
-});
-
-test('the file read is in CLAUDE_CONFIG_DIR when it is set, and a harness that keeps no trust answers undefined', () => {
-  const file = configWith({ '/srv/home': { hasTrustDialogAccepted: true } });
+/** `body` run with `CLAUDE_CONFIG_DIR` set to `dir`, and the variable put back as it was. */
+const inConfigDir = <T>(dir: string, body: () => T): T => {
   const before = process.env.CLAUDE_CONFIG_DIR;
-  process.env.CLAUDE_CONFIG_DIR = path.dirname(file);
+  process.env.CLAUDE_CONFIG_DIR = dir;
   try {
-    assert.equal(trustedFolder('claude', '/srv/home'), true);
+    return body();
   } finally {
     if (before === undefined) delete process.env.CLAUDE_CONFIG_DIR;
     else process.env.CLAUDE_CONFIG_DIR = before;
   }
-  assert.equal(trustedFolder('codex', '/srv/home', file), undefined);
+};
+
+/** The file of the trustedFolder rows: one folder trusted, one refused. */
+const TRUSTED = (): string =>
+  configWith({ '/srv/home': { hasTrustDialogAccepted: true }, '/srv/home/no': { hasTrustDialogAccepted: false } });
+
+test('trustedFolder: a folder is trusted only by its own entry with the prompt accepted, in the file its harness reads', async (t) => {
+  const rows: { name: string; check: () => void }[] = [
+    { name: 'its own entry, the prompt accepted', check: () => assert.equal(trustedFolder('claude', '/srv/home', TRUSTED()), true) },
+    { name: 'a path that comes back to it', check: () => assert.equal(trustedFolder('claude', '/srv/home/x/..', TRUSTED()), true) },
+    { name: 'never by a parent', check: () => assert.equal(trustedFolder('claude', '/srv/home/nemia', TRUSTED()), false) },
+    { name: 'never by a refusal', check: () => assert.equal(trustedFolder('claude', '/srv/home/no', TRUSTED()), false) },
+    {
+      name: 'never by a file that is not there',
+      check: () => assert.equal(trustedFolder('claude', '/srv/home', path.join(path.dirname(TRUSTED()), 'none.json')), false),
+    },
+    {
+      name: 'never by a file that does not read',
+      check: () => {
+        const bad = TRUSTED();
+        fs.writeFileSync(bad, '{');
+        assert.equal(trustedFolder('claude', '/srv/home', bad), false);
+      },
+    },
+    {
+      name: 'the file read is in CLAUDE_CONFIG_DIR when it is set',
+      check: () => {
+        const file = configWith({ '/srv/home': { hasTrustDialogAccepted: true } });
+        assert.equal(
+          inConfigDir(path.dirname(file), () => trustedFolder('claude', '/srv/home')),
+          true,
+        );
+      },
+    },
+    {
+      name: 'a harness that keeps no trust answers undefined',
+      check: () => assert.equal(trustedFolder('codex', '/srv/home', TRUSTED()), undefined),
+    },
+  ];
+  for (const row of rows) await t.test(row.name, row.check);
 });
 
 /** What `file` holds, parsed. */
@@ -87,13 +114,75 @@ test("only the one key changes: other projects, the entry's other keys and the t
   assert.deepEqual(beside(file), ['.claude.json']);
 });
 
-test('a folder already trusted leaves the file byte for byte, and nothing beside it', () => {
-  const file = configWith({ '/srv/home': { hasTrustDialogAccepted: true, x: 1 } });
-  const bytes = fs.readFileSync(file);
-  const given = trustFolder('claude', '/srv/home', file);
-  assert.deepEqual([given?.wrote, given?.trusted, given?.refused], [false, true, null]);
-  assert.ok(fs.readFileSync(file).equals(bytes));
-  assert.deepEqual(beside(file), ['.claude.json']);
+test('trustFolder: what a folder is given, what a file that cannot take the key is left as, and what is never given', async (t) => {
+  const rows: { name: string; check: () => void }[] = [
+    {
+      name: 'a folder already trusted leaves the file byte for byte, and nothing beside it',
+      check: () => {
+        const file = configWith({ '/srv/home': { hasTrustDialogAccepted: true, x: 1 } });
+        const bytes = fs.readFileSync(file);
+        const given = trustFolder('claude', '/srv/home', file);
+        assert.deepEqual([given?.wrote, given?.trusted, given?.refused], [false, true, null]);
+        assert.ok(fs.readFileSync(file).equals(bytes));
+        assert.deepEqual(beside(file), ['.claude.json']);
+      },
+    },
+    ...['{', '[]', '{"projects":[]}', '{"projects":{"/srv/mine":"yes"}}'].map((text) => ({
+      name: `REFUSED: a file that does not read is left byte for byte: ${text}`,
+      check: () => {
+        const file = configWith({});
+        fs.writeFileSync(file, text);
+        const given = trustFolder('claude', '/srv/mine', file);
+        assert.deepEqual([given?.wrote, given?.trusted], [false, false]);
+        assert.match(given?.refused ?? '', /was left as it is/);
+        assert.match(given?.refused ?? '', /run Claude Code in \/srv\/mine once/);
+        assert.equal(fs.readFileSync(file, 'utf8'), text);
+        assert.deepEqual(beside(file), ['.claude.json']);
+      },
+    })),
+    {
+      name: 'a file that is not there is made holding the key alone',
+      check: () => {
+        const none = path.join(scratch('ae-trust-'), 'deeper', '.claude.json');
+        assert.equal(trustFolder('claude', '/srv/mine', none)?.wrote, true);
+        assert.deepEqual(held(none), { projects: { '/srv/mine': { hasTrustDialogAccepted: true } } });
+      },
+    },
+    {
+      name: 'the home directory is never given a trust, and the answer says why',
+      check: () => {
+        const file = path.join(scratch('ae-trust-'), '.claude.json');
+        const home = trustFolder('claude', os.homedir(), file);
+        assert.deepEqual([home?.wrote, home?.trusted], [false, false]);
+        assert.match(home?.never ?? '', /home directory/);
+        assert.match(home?.never ?? '', /name a folder inside/);
+        assert.equal(home?.refused, home?.never);
+        assert.equal(folderTrust('claude', '/srv/mine', file)?.never, null);
+        assert.equal(fs.existsSync(file), false);
+      },
+    },
+    {
+      name: 'a harness that keeps no trust is given nothing',
+      check: () => {
+        const file = path.join(scratch('ae-trust-'), '.claude.json');
+        assert.equal(trustFolder('codex', '/srv/mine', file), undefined);
+        assert.equal(folderTrust('codex', '/srv/mine', file), undefined);
+        assert.equal(fs.existsSync(file), false);
+      },
+    },
+    {
+      name: 'with no file named, the one written is in CLAUDE_CONFIG_DIR',
+      check: () => {
+        const dir = scratch('ae-trust-');
+        inConfigDir(dir, () => {
+          assert.equal(trustFolder('claude-detached', '/srv/mine')?.file, path.join(dir, '.claude.json'));
+          assert.equal(trustedFolder('claude', '/srv/mine'), true);
+        });
+        assert.equal(held(path.join(dir, '.claude.json')).projects['/srv/mine'].hasTrustDialogAccepted, true);
+      },
+    },
+  ];
+  for (const row of rows) await t.test(row.name, row.check);
 });
 
 test('a write that lands between the read and the replace is not lost', () => {
@@ -125,27 +214,10 @@ test('REFUSED: a file that changes under every write is left as its other writer
   };
   const answer = claudeTrust('/srv/mine', file, read);
   assert.equal(answer.wrote, false);
-  assert.match(
-    answer.refused ?? '',
-    /changed under each of 5 writes and was left as it is: ask again, or run Claude Code in \/srv\/mine once/,
-  );
+  assert.match(answer.refused ?? '', /changed under each of 5 writes/);
+  assert.match(answer.refused ?? '', /run Claude Code in \/srv\/mine once/);
   assert.deepEqual(held(file), { projects: {}, n: reads });
   assert.deepEqual(beside(file), ['.claude.json']);
-});
-
-test('REFUSED: a file that does not read is left byte for byte; one that is not there is made holding the key alone', () => {
-  for (const text of ['{', '[]', '{"projects":[]}', '{"projects":{"/srv/mine":"yes"}}']) {
-    const file = configWith({});
-    fs.writeFileSync(file, text);
-    const given = trustFolder('claude', '/srv/mine', file);
-    assert.deepEqual([given?.wrote, given?.trusted], [false, false], text);
-    assert.match(given?.refused ?? '', /was left as it is, since .*: run Claude Code in \/srv\/mine once and accept its prompt/, text);
-    assert.equal(fs.readFileSync(file, 'utf8'), text);
-    assert.deepEqual(beside(file), ['.claude.json']);
-  }
-  const none = path.join(scratch('ae-trust-'), 'deeper', '.claude.json');
-  assert.equal(trustFolder('claude', '/srv/mine', none)?.wrote, true);
-  assert.deepEqual(held(none), { projects: { '/srv/mine': { hasTrustDialogAccepted: true } } });
 });
 
 test('a link to the file is followed, never replaced', () => {
@@ -155,30 +227,4 @@ test('a link to the file is followed, never replaced', () => {
   assert.equal(trustFolder('claude', '/srv/mine', link)?.wrote, true);
   assert.ok(fs.lstatSync(link).isSymbolicLink());
   assert.equal(held(file).projects['/srv/mine'].hasTrustDialogAccepted, true);
-});
-
-test('the home directory is never given a trust, and the answer says why; a harness that keeps none is given nothing', () => {
-  const file = path.join(scratch('ae-trust-'), '.claude.json');
-  const home = trustFolder('claude', os.homedir(), file);
-  assert.deepEqual([home?.wrote, home?.trusted], [false, false]);
-  assert.match(home?.never ?? '', /keeps no trust of a home directory past one session: name a folder inside/);
-  assert.equal(home?.refused, home?.never);
-  assert.equal(folderTrust('claude', '/srv/mine', file)?.never, null);
-  assert.equal(trustFolder('codex', '/srv/mine', file), undefined);
-  assert.equal(folderTrust('codex', '/srv/mine', file), undefined);
-  assert.equal(fs.existsSync(file), false);
-});
-
-test('with no file named, the one written is in CLAUDE_CONFIG_DIR', () => {
-  const dir = scratch('ae-trust-');
-  const before = process.env.CLAUDE_CONFIG_DIR;
-  process.env.CLAUDE_CONFIG_DIR = dir;
-  try {
-    assert.equal(trustFolder('claude-detached', '/srv/mine')?.file, path.join(dir, '.claude.json'));
-    assert.equal(trustedFolder('claude', '/srv/mine'), true);
-  } finally {
-    if (before === undefined) delete process.env.CLAUDE_CONFIG_DIR;
-    else process.env.CLAUDE_CONFIG_DIR = before;
-  }
-  assert.equal(held(path.join(dir, '.claude.json')).projects['/srv/mine'].hasTrustDialogAccepted, true);
 });

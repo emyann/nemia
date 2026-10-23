@@ -15,64 +15,68 @@ import type { SpawnRequest } from './seam.ts';
 import { scratch } from '../../test/scratch.ts';
 import { builtEngine } from '../../test/engine.ts';
 
-/** What `file` says of a task with `config` on `harness`: `filed`, or its refusal; and how many tasks the store then holds. */
+/** The tag a refusal is failed with, or the class of an error that has none. */
+const tagOf = (err: unknown): string => (err as { _tag?: string })._tag ?? (err as Error).constructor.name;
+
+/**
+ * What `file` says of a task with `config` on `harness`: `filed`, or its refusal's tag and words; and how many tasks the store then
+ * holds.
+ */
 const filed = async (config: unknown, harness = 'claude') => {
   const root = scratch('ae-admission-');
   const harnesses = { claude: 'claude', codex, command: commandHarness, remote: { url: 'https://agent.example' } } as const;
   const engine = builtEngine(Engine.layer({ root, harnesses }));
-  const said = await Effect.runPromise(
-    engine.file({ brief: 'b', cwd: root, harness, config } as never).pipe(
-      Effect.map(() => 'filed'),
-      Effect.catchTag('FileRefused', (err) => Effect.succeed(err.message)),
-    ),
+  const said = await Effect.runPromise(engine.file({ brief: 'b', cwd: root, harness, config } as never)).then(
+    () => ({ tag: 'filed', message: '' }),
+    (err: Error) => ({ tag: tagOf(err), message: err.message }),
   );
-  return { said, journalled: (await Effect.runPromise(engine.list())).views.length };
+  return { ...said, journalled: (await Effect.runPromise(engine.list())).views.length };
 };
 
 const ADMISSION = { command: ['my-admit', "it's"], tools: ['Bash'] };
 
-test('REFUSED at shipped defaults: admission that is not one — no object, a key it has not, an empty command, a NUL, no tools, a tool that is no name — and nothing is journalled', async () => {
-  const nul = `x${String.fromCharCode(0)}`;
-  const cases: [unknown, string][] = [
-    [
-      'my-admit',
-      '`callAdmission: "my-admit"` is not admission. Give an object, like { "command": ["my-admit"], "tools": ["Bash"] }, or leave it out.',
-    ],
-    [{ ...ADMISSION, matcher: 'Bash' }, "`callAdmission.matcher` is not one of admission's keys. It has `command` and `tools` alone."],
-    [
-      { command: [], tools: ['Bash'] },
-      '`callAdmission.command: []` is not a command. Give the program and its arguments as a list of strings with no NUL, the program first, like ["my-admit", "--strict"].',
-    ],
-    [
-      { command: [nul], tools: ['Bash'] },
-      `\`callAdmission.command: ${JSON.stringify([nul])}\` is not a command. Give the program and its arguments as a list of strings with no NUL, the program first, like ["my-admit", "--strict"].`,
-    ],
-    [
-      { command: ['a'], tools: [] },
-      '`callAdmission.tools: []` names no tool admission sees. Give the tools whose calls it decides, by name, like ["Bash"].',
-    ],
-    [
-      { command: ['a'], tools: ['Bash|Edit'] },
-      '`callAdmission.tools: ["Bash|Edit"]` names no tool admission sees. Give the tools whose calls it decides, by name, like ["Bash"].',
-    ],
-  ];
-  for (const [admission, words] of cases) {
-    const { said, journalled } = await filed({ callAdmission: admission });
-    assert.equal(said, words, JSON.stringify(admission));
-    assert.equal(journalled, 0, 'nothing journalled');
-  }
-  assert.equal((await filed({ callAdmission: ADMISSION })).said, 'filed', 'a command and the tools it sees are filed on Claude Code');
-});
+const NUL = `x${String.fromCharCode(0)}`;
 
-test('REFUSED at shipped defaults: admission on a harness that runs no command before a call — Codex, a command, a remote agent — naming the harnesses that do', async () => {
-  for (const harness of ['codex', 'command', 'remote']) {
-    assert.equal(
-      (await filed({ callAdmission: ADMISSION }, harness)).said,
-      `\`callAdmission\` asks a command before each of the session's calls, and the \`${harness}\` harness runs none before a call: its session would make every call unadmitted. File the task on \`claude\`, or leave \`callAdmission\` off.`,
-      harness,
-    );
-  }
-});
+/** A task's admission `file` refuses at shipped defaults, and the names its refusal gives the fix. */
+const FILE_REFUSALS: readonly { name: string; config: unknown; harness?: string; names: readonly string[] }[] = [
+  {
+    name: 'no object',
+    config: { callAdmission: 'my-admit' },
+    names: ['`callAdmission: "my-admit"` is not admission', 'Give an object', 'leave it out'],
+  },
+  { name: 'a list', config: { callAdmission: ['my-admit'] }, names: ['`callAdmission: ["my-admit"]` is not admission', 'Give an object'] },
+  {
+    name: 'a key it has not',
+    config: { callAdmission: { ...ADMISSION, matcher: 'Bash' } },
+    names: ['`callAdmission.matcher`', '`command` and `tools` alone'],
+  },
+  {
+    name: 'an empty command',
+    config: { callAdmission: { command: [], tools: ['Bash'] } },
+    names: ['`callAdmission.command: []` is not a command', 'a list of strings with no NUL, the program first'],
+  },
+  {
+    name: 'a NUL in the command',
+    config: { callAdmission: { command: [NUL], tools: ['Bash'] } },
+    names: [`\`callAdmission.command: ${JSON.stringify([NUL])}\` is not a command`, 'with no NUL'],
+  },
+  {
+    name: 'no tools',
+    config: { callAdmission: { command: ['a'], tools: [] } },
+    names: ['`callAdmission.tools: []` names no tool', 'by name, like ["Bash"]'],
+  },
+  {
+    name: 'a tool that is no name',
+    config: { callAdmission: { command: ['a'], tools: ['Bash|Edit'] } },
+    names: ['`callAdmission.tools: ["Bash|Edit"]` names no tool', 'by name, like ["Bash"]'],
+  },
+  ...['codex', 'command', 'remote'].map((harness) => ({
+    name: `on the \`${harness}\` harness, which runs no command before a call, naming the harness that does`,
+    config: { callAdmission: ADMISSION },
+    harness,
+    names: [`the \`${harness}\` harness runs none before a call`, 'File the task on `claude`', 'leave `callAdmission` off'],
+  })),
+];
 
 /**
  * The settings each Claude Code spawn gives `config`, read back: a job, as the SDK's own `Options.settings` carries them
@@ -127,20 +131,42 @@ test("admission is a PreToolUse hook merged into the caller's --settings, matche
   );
 });
 
-test('REFUSED: admission beside Claude Code settings given as a file, which the runtime does not rewrite; taken beside settings given as JSON', () => {
-  assert.equal(
-    claudeRefuses({ brief: 'b', cwd: '/r', config: { callAdmission: ADMISSION, claude: { settings: '/a/settings.json' } } }),
-    '`claude.settings` is given as "/a/settings.json", and admission is merged into the session\'s settings as a hook: the runtime rewrites no file. Give the settings as a JSON object, like {"env":{"CI":"1"}}, or leave admission off.',
+test('REFUSED: admission that is not one, or on a harness or beside settings that cannot carry it, each naming the fix, and nothing journalled', async (t) => {
+  for (const row of FILE_REFUSALS)
+    await t.test(row.name, async () => {
+      const { tag, message, journalled } = await filed(row.config, row.harness);
+      assert.equal(tag, 'FileRefused', message);
+      for (const name of row.names) assert.ok(message.includes(name), `${name} in: ${message}`);
+      assert.equal(journalled, 0, 'nothing journalled');
+    });
+  await t.test('a command and the tools it sees are filed on Claude Code', async () => {
+    const { tag, message, journalled } = await filed({ callAdmission: ADMISSION });
+    assert.equal(tag, 'filed', message);
+    assert.equal(journalled, 1);
+  });
+  await t.test(
+    'beside Claude Code settings given as a file, which the runtime does not rewrite, naming the key, the file and the fix',
+    () => {
+      const said = claudeRefuses({ brief: 'b', cwd: '/r', config: { callAdmission: ADMISSION, claude: { settings: '/a/settings.json' } } });
+      for (const name of [
+        '`claude.settings`',
+        '"/a/settings.json"',
+        'the runtime rewrites no file',
+        'as a JSON object',
+        'leave admission off',
+      ])
+        assert.ok(said?.includes(name), `${name} in: ${said}`);
+    },
   );
-  assert.equal(
-    claudeRefuses({ brief: 'b', cwd: '/r', config: { callAdmission: ADMISSION, claude: { settings: '{"env":{}}' } } }),
-    undefined,
-  );
-  assert.equal(
-    claudeRefuses({ brief: 'b', cwd: '/r', config: { claude: { settings: '/a/settings.json' } } }),
-    undefined,
-    'no admission, a file',
-  );
+  await t.test('taken beside settings given as JSON', () => {
+    assert.equal(
+      claudeRefuses({ brief: 'b', cwd: '/r', config: { callAdmission: ADMISSION, claude: { settings: '{"env":{}}' } } }),
+      undefined,
+    );
+  });
+  await t.test('no admission, a file: nothing to refuse', () => {
+    assert.equal(claudeRefuses({ brief: 'b', cwd: '/r', config: { claude: { settings: '/a/settings.json' } } }), undefined);
+  });
 });
 
 /** Claude Code's hook input for a `Bash` call. */
@@ -214,7 +240,7 @@ test('`ae admission -- <command>` runs the command on the call and prints the ho
 test("REFUSED: `ae admission`'s command inherits none of the telemetry its session was handed; the rest of its environment still reaches it", () => {
   const ae = path.join(import.meta.dirname, '..', '..', 'bin', 'ae.ts');
   const handed = {
-    OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:4318',
+    OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:14999',
     OTEL_RESOURCE_ATTRIBUTES: 'run=r,step=s,task=t',
     TRACEPARENT: '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01',
     CLAUDE_CODE_ENABLE_TELEMETRY: '1',

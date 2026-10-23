@@ -31,6 +31,10 @@ import type { SessionState, Sighting, Usage } from '../core/index.ts';
 import { Runner, RunnerError } from './seam.ts';
 import { renderTranscript } from './claude/transcript.ts';
 import type { HarnessArgs } from './args.ts';
+import { sessionTokensOf } from './detached/output.ts';
+
+/** A result's `usage`: the main thread's tokens alone. */
+type MainThread = { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number };
 
 /** What the in-process runner knows about one session it is running. */
 type Live = { sessionId: string; state: SessionState; abort: AbortController; toolCalls: number; usage?: Usage };
@@ -44,6 +48,7 @@ type Live = { sessionId: string; state: SessionState; abort: AbortController; to
  * - `observe` lists every session this process runs, with its `usage` once the SDK's `result` message has given it
  *   and none before. The usage is what the SDK reports and nothing more: a cost or a token count it leaves out stays
  *   out rather than becoming a 0 that reads as free, and the input's classes are given only when the SDK gave all three.
+ *   Its tokens are every model's of the session, subagents included (`sessionTokensOf`), else the main thread's (`usage`).
  * - A session whose messages end without a `result` — an abort, a crashed child — is `canceled` when it was aborted
  *   and `failed` otherwise, never left `working` for the engine to wait on until its grace window expires.
  * - `logs` reads the stored transcript as typed messages (`getSessionMessages`), and works on sessions this process
@@ -78,9 +83,7 @@ export const sdkRunner = () => {
             const calls = (m.message.content as Array<{ type?: string }>).filter((b) => b.type === 'tool_use').length;
             set({ toolCalls: (live.get(name)?.toolCalls ?? 0) + calls });
           } else if (m.type === 'result') {
-            const u = m.usage as
-              | { input_tokens?: number; output_tokens?: number; cache_creation_input_tokens?: number; cache_read_input_tokens?: number }
-              | undefined;
+            const u = m.usage as MainThread | undefined;
             set({
               sessionId: m.session_id,
               state: m.is_error ? 'failed' : 'completed',
@@ -102,6 +105,7 @@ export const sdkRunner = () => {
                       cacheReadTokens: u.cache_read_input_tokens,
                     }
                   : {}),
+                ...sessionTokensOf(m.modelUsage),
                 ...(typeof m.total_cost_usd === 'number' ? { costUsd: m.total_cost_usd } : {}),
               },
             });

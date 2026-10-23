@@ -127,7 +127,11 @@ need that work somewhere else first. A session whose task a person or a deadline
 prints. Its tokens are read from the same object's `usage`, in their three classes, since 2026-09-19: on 2.1.278 that `usage`
 is the process's own — a `--resume` printed 10 uncached, 21,392 written and 0 read, where its `modelUsage` carried its parent's
 counts on. On 2.1.272 the same `usage` had counted 0 input and 0 output tokens in a run whose `modelUsage` counted thousands,
-so a `usage` whose input sums to 0 gives no tokens. It has no peak context (`usage.iterations` holds the last response
+so a `usage` whose input sums to 0 gives no tokens. Since 2026-10-22 its tokens are its `modelUsage`'s, every model of the
+session together, subagents included, where every model gives every class: `usage` counts the main thread alone, which put a
+step done by subagents at a quarter of its reads (`rewrite-six-of-the-orchestra-uv7v`'s implement: 22.3M against 91.1M). A
+resume of a spec with `resumeCostCarried` has its parent's taken off as its cost does (`tokensLess`), and falls back to its own
+`usage` where the parent's were not kept; `usage` alone stays the reading where `modelUsage` is missing or partial. It has no peak context (`usage.iterations` holds the last response
 alone), no count of turns or tool calls, and no tool time.
 
 **A resumed `claude -p`'s cost is carried on, on 2.1.278.** The same `--resume` printed a `total_cost_usd` of $0.0900: its

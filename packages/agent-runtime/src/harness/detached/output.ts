@@ -33,11 +33,14 @@ type DeniedEntry = { tool_name: string; tool_use_id?: string; tool_input?: unkno
  * that knows the parent takes it off (`resumeCostCarried`). The result counts no tool time, and its turns are not read
  * here: `num_turns` counts prompts' turns, not responses.
  *
- * Its tokens are its `usage`'s, in their classes — `input_tokens` uncached, `cache_creation_input_tokens` written,
- * `cache_read_input_tokens` read — and the process's own: a `--resume`'s `usage` counts its own input, where its
- * `modelUsage` carries its parent's on. A `usage` whose input sums to 0 is not a count — every response reads its prompt
- * — and gives none: Claude Code can print one beside a `modelUsage` that counts thousands. No peak: `usage.iterations`
- * holds the last response alone, not the largest.
+ * Its tokens are its `modelUsage`'s, every model of the session together, subagents included, each class summed —
+ * `inputTokens` uncached, `cacheCreationInputTokens` written, `cacheReadInputTokens` read — where every model gives every
+ * class: `usage` counts the main thread alone. A `--resume`'s `modelUsage` carries its parent's on, as its cost does, so
+ * the process's own `usage` is kept beside it (`ownTokens`) for a reader that cannot take the parent's off. A `modelUsage`
+ * missing, or partial, gives the `usage`'s counts in their classes — `input_tokens` uncached, `cache_creation_input_tokens`
+ * written, `cache_read_input_tokens` read — as the tokens. A count whose input sums to 0 is not a count — every response
+ * reads its prompt — and gives none: Claude Code can print a `usage` so beside a `modelUsage` that counts thousands. No
+ * peak: `usage.iterations` holds the last response alone, not the largest.
  *
  * A session that stopped at its `--max-budget-usd` says so as its `subtype`, `error_max_budget_usd`, and exits 1 with
  * `is_error`, `terminal_reason: budget_exhausted` and "Reached maximum budget ($0.01)" for a $0.01 cap. Its
@@ -66,6 +69,22 @@ const tokensOf = (usage: Printed<'result'>['usage']): Usage => {
 };
 
 /**
+ * Every model's token counts in a `modelUsage` together, in their classes, when each model gives every class and their input sums
+ * to more than 0; else none. A class a model left out sums to `NaN`, which no comparison passes.
+ */
+export const sessionTokensOf = (modelUsage: Printed<'result'>['modelUsage']): Usage => {
+  const models = Object.values(modelUsage ?? {});
+  const sum = (key: keyof (typeof models)[number]) => models.reduce((n, m) => n + (m[key] ?? NaN), 0);
+  const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = (
+    ['inputTokens', 'cacheCreationInputTokens', 'cacheReadInputTokens', 'outputTokens'] as const
+  ).map(sum);
+  const inputTokens = uncachedTokens + cacheWriteTokens + cacheReadTokens;
+  return models.length && inputTokens > 0 && outputTokens >= 0
+    ? { inputTokens, uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens }
+    : {};
+};
+
+/**
  * `claudeResultOutput`'s reading of `result`, with the denials a stream named before its result (`claudeStreamOutput`) joined
  * ahead of the result's own. Everything else is the result's alone, and a stream with no result says only what it denied.
  */
@@ -77,14 +96,18 @@ const readClaude = (
   const denials = deniedCalls([...denied, ...(result?.permission_denials ?? [])], inputs);
   if (!result) return denials.length ? { denials } : {};
   const { total_cost_usd: costUsd, duration_api_ms: apiMs } = result;
+  const own = tokensOf(result.usage);
+  const session = sessionTokensOf(result.modelUsage);
+  const whole = Object.keys(session).length > 0;
   const usage: Usage = {
-    ...tokensOf(result.usage),
+    ...(whole ? session : own),
     ...(costUsd !== undefined ? { costUsd } : {}),
     ...(apiMs !== undefined ? { apiMs } : {}),
   };
   return {
     ...(result.structured_output != null ? { closeout: { payload: result.structured_output } } : {}),
     ...(Object.keys(usage).length ? { usage } : {}),
+    ...(whole ? { ownTokens: own } : {}),
     ...(result.subtype === 'error_max_budget_usd' ? { limit: 'budget' } : {}),
     ...(denials.length ? { denials } : {}),
   };

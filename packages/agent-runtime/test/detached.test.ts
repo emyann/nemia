@@ -41,6 +41,8 @@ import {
   type HarnessSpec,
 } from '../src/harness/detached/detached.ts';
 import { claudeResultOutput, claudeStreamOutput } from '../src/harness/detached/output.ts';
+import { carriedOf } from '../src/harness/detached/carried.ts';
+import { H4SJ_IMPLEMENT, H4SJ_IMPLEMENT_TRY2, UV7V_IMPLEMENT } from './session-results.ts';
 import { codex, trustedProjects } from '../src/harness/codex/codex.ts';
 import { Engine } from '../src/index.ts';
 import { execFileSync } from 'node:child_process';
@@ -1789,26 +1791,30 @@ test('claude -p that stopped at its budget says so in its result — the limit `
   );
 });
 
-test("claude -p's tokens are its result's usage, in their three classes, and none from a usage that counted nothing", () => {
-  const resumed = {
-    input_tokens: 10,
-    cache_creation_input_tokens: 21392,
-    cache_read_input_tokens: 0,
-    output_tokens: 36,
-    iterations: [{ input_tokens: 10 }],
-  };
+test("claude -p's tokens are every model's of its session, subagents included, and its usage's where modelUsage is missing or partial", () => {
+  const read = claudeResultOutput(UV7V_IMPLEMENT);
   assert.deepEqual(
-    claudeResultOutput(
-      resultLine({
-        usage: resumed,
-        modelUsage: {
-          'claude-haiku-4-5': { inputTokens: 36, cacheCreationInputTokens: 42481, cacheReadInputTokens: 21875, outputTokens: 569 },
-        },
-      }),
-    ).usage,
-    { inputTokens: 21402, uncachedTokens: 10, cacheWriteTokens: 21392, cacheReadTokens: 0, outputTokens: 36 },
-    'no peak: iterations holds the last response alone',
+    read.usage,
+    {
+      inputTokens: 92614492,
+      uncachedTokens: 23989,
+      cacheWriteTokens: 1469794,
+      cacheReadTokens: 91120709,
+      outputTokens: 518341,
+      costUsd: 36.826279499999984,
+      apiMs: 4764556,
+    },
+    "uv7v's implement: its four subagents' reads counted, where its usage counts the main thread's 22.3M",
   );
+  assert.equal(read.ownTokens?.cacheReadTokens, 22286449, "the process's own usage kept beside, for a resume's fallback");
+  const { modelUsage, ...main } = JSON.parse(UV7V_IMPLEMENT);
+  const partial = { ...modelUsage, 'claude-haiku-5-5': { inputTokens: 20922, outputTokens: 29 } };
+  for (const line of [main, { ...main, modelUsage: partial }, { ...main, modelUsage: {} }])
+    assert.deepEqual(
+      [claudeResultOutput(JSON.stringify(line)).usage?.cacheReadTokens, 'ownTokens' in claudeResultOutput(JSON.stringify(line))],
+      [22286449, false],
+      'no modelUsage, or a model missing a class: the usage, as before, and nothing beside it',
+    );
   assert.equal(
     'usage' in
       claudeResultOutput(
@@ -2558,6 +2564,35 @@ const readsOf = async (f: () => Promise<unknown>) => {
   await f();
   return ioCounts().reads - before;
 };
+
+test("a resumed try's tokens are its own share: its parent's whole session taken off, never its parent's too", async () => {
+  const dir = root();
+  const spec: HarnessSpec = { ...sh('true'), readOutput: claudeResultOutput, resumeCostCarried: true };
+  const at = (s: number) => ({ nativeId: SESSION, startedAt: `2026-10-22T09:00:0${s}Z` });
+  const zeroed = { input_tokens: 0, cache_creation_input_tokens: 0, cache_read_input_tokens: 0, output_tokens: 0 };
+  const uncounted = JSON.stringify({ ...JSON.parse(H4SJ_IMPLEMENT_TRY2), usage: zeroed });
+  const carried = carriedOf(claudeResultOutput(H4SJ_IMPLEMENT));
+  doneRun(dir, 'ae/h/1', at(0), H4SJ_IMPLEMENT);
+  doneRun(dir, 'ae/h/2', { ...at(1), resumeFrom: SESSION }, H4SJ_IMPLEMENT_TRY2);
+  doneRun(dir, 'ae/h/3', { ...at(2), nativeId: 'other', resumeFrom: SESSION, carried }, uncounted);
+  const { costUsd, apiMs } = carried;
+  doneRun(dir, 'ae/h/4', { ...at(3), nativeId: 'other', resumeFrom: SESSION, carried: { costUsd, apiMs } }, uncounted);
+  const seen = await Effect.runPromise(detachedOps(spec, dir).observe);
+  const tokens = (name: string) => {
+    const { costUsd: _, apiMs: __, ...rest } = seen.get(name)?.usage ?? {};
+    return rest;
+  };
+  const own = { inputTokens: 4240114, uncachedTokens: 28, cacheWriteTokens: 30746, cacheReadTokens: 4209340, outputTokens: 11961 };
+  assert.equal(tokens('ae/h/1').cacheReadTokens, 85418088, 'try 1 is its whole session');
+  assert.deepEqual(tokens('ae/h/2'), own, "h4sj's try 2: its 4.2M, not the 89.6M its modelUsage carries");
+  assert.equal(seen.get('ae/h/2')?.usage?.apiMs, 130082, 'its cost and API time taken off as before');
+  assert.deepEqual(tokens('ae/h/3'), own, "the parent's whole session, kept on its run file, taken off each class");
+  assert.deepEqual(
+    [tokens('ae/h/4'), seen.get('ae/h/4')?.usage?.apiMs],
+    [{}, 130082],
+    "a run file that kept no tokens of its parent's: the process's own usage, which here counted none",
+  );
+});
 
 test('a detached look reads the run file and output of each session it is asked about and no other', async () => {
   const dir = root();

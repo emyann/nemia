@@ -24,15 +24,7 @@ import { type ApiEnv, Beats } from '../layer.ts';
  * shape alone — the api relays the feed and judges nothing from it.
  */
 const feedEventOf = (line: FeedLine): 'store' | 'daemon' | 'step' | 'removed' | 'run' =>
-  'store' in line
-    ? 'store'
-    : 'daemon' in line
-      ? 'daemon'
-      : line.step !== undefined
-        ? 'step'
-        : line.word === REMOVED
-          ? 'removed'
-          : 'run';
+  'store' in line ? 'store' : 'daemon' in line ? 'daemon' : line.step !== undefined ? 'step' : line.word === REMOVED ? 'removed' : 'run';
 
 /**
  * Where a reader of the feed starts: the byte its cursor names — none, or an empty one, is 0, the whole feed, as `nemia watch` and `ae

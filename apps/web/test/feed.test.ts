@@ -181,7 +181,11 @@ test("the store's line, its pause put or lifted, reads the pause again on the li
   assert.deepEqual(keysOf('store'), [['pause'], ['pause', 'now'], ['daemon']]);
   const f = followed();
   f.stream().opens();
-  f.stream().send('store', { at: '2026-10-23T06:00:00.000Z', store: 'store', word: 'store paused', note: 'since 2026-10-23T06:00:00.000Z' }, '10');
+  f.stream().send(
+    'store',
+    { at: '2026-10-23T06:00:00.000Z', store: 'store', word: 'store paused', note: 'since 2026-10-23T06:00:00.000Z' },
+    '10',
+  );
   f.frame();
   assert.deepEqual(f.invalidated, [[['pause'], ['pause', 'now'], ['daemon']]], 'read on the line, not on the pause poll');
   f.stop();

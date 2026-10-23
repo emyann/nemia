@@ -7,9 +7,9 @@
  * free to be reworded; the code a watcher matches on is not. So this table is the one place that classifies a word, and every reason it
  * can answer is named here: a selector written against it keeps meaning what it meant when the prose moves.
  *
- * **The codes are the owner's.** The 41 entries below — 11 of a run, 27 of a step, 1 of a daemon, 2 of the store, 36 distinct codes, five of them shared
- * between a run and a step — were named at their slices' design gates, and a rename breaks every selector and every stored subscription
- * that quotes one.
+ * **The codes are the owner's.** The 41 entries below — 11 of a run, 27 of a step, 1 of a daemon, 2 of the store, 36 distinct codes,
+ * five of them shared between a run and a step — were named at their slices' design gates, and a rename breaks every selector and every
+ * stored subscription that quotes one.
  *
  * **Recognition is ordered** (`reasonOf`): the prefix `denied: ` of a one-shot before the bare `denied` of a check a person refused; the
  * suffix `· BLOCKED` before the word it is suffixed to, since a step that signed off blocked waits on a person whatever its session came

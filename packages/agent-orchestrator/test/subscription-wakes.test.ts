@@ -8,7 +8,8 @@
  * One say per read, the digest riding a wake, a gate's lines and several gates in one message, routine lines that wait for their
  * digest, a restart that neither drops nor repeats a line, one between a say and its cursor that says it again, an unsubscribe, a name
  * subscribed again and a feed cut under the cursor; a failed say said again on its backoff, its cursor held; the hub's lines, and those
- * published while a say is in flight gathered; a digest alone once due; and a floor's scope, a daemon's line and the store's carried by every one.
+ * published while a say is in flight gathered; a digest alone once due; and a floor's scope, a daemon's line and the store's carried by
+ * every one.
  * What a line means for a subscriber and the words it is told are `src/subscription/subscription.test.ts`'s, pure; the verbs' refusals
  * `subscription.verb.test.ts`'s.
  *

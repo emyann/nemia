@@ -155,9 +155,9 @@ const SIGNAL_KEYS = {
 };
 
 /**
- * A line of the feed as `recordFeed` and `recordDaemonLine` write one (`FeedLine`): a run's, a daemon's or the store's, each with what a v1 line signs
- * itself with. `StructWithRest`, so a key this version does not name survives a read and a write back — a digest the deliverer keeps holds
- * whole lines (`subscription.store.ts`, which decodes with this very schema).
+ * A line of the feed as `recordFeed` and `recordDaemonLine` write one (`FeedLine`): a run's, a daemon's or the store's, each with what a
+ * v1 line signs itself with. `StructWithRest`, so a key this version does not name survives a read and a write back — a digest the
+ * deliverer keeps holds whole lines (`subscription.store.ts`, which decodes with this very schema).
  */
 export const FeedLineSchema = Schema.Union([
   Schema.StructWithRest(

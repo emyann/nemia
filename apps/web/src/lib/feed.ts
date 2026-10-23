@@ -42,7 +42,7 @@ export const FLUSH_MS = 1_000;
  * daemon's, so a daemon started while the board says none does is seen on its first line, not on the fallback a minute later. A
  * daemon's own line is that first line, and reads the daemon's standing alone: it names no run, and moves no run's record.
  *
- * The store's line — `nemia pause` or `nemia resume`, said by the tick that read it — reads the pause again, and what a pause at once
+ * The store's line — its pause put or lifted, said by the tick that read it — reads the pause again, and what a pause at once
  * would stop, and the daemon's standing as every tick's line does: it names no run either. The pause's own poll (`pauseQuery`) stays as
  * the fallback.
  */

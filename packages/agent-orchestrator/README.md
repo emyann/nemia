@@ -68,7 +68,7 @@ nemia watch               # the same from the start, then each line as the tick 
 
 It is `$WF_ROOT/feed.jsonl`, a line of JSON per change. Every line a `nemia` of this version writes is a
 typed, labelled signal, as a Kubernetes `Event` is: `apiVersion: "nemia/v1"`, `involved` what it is about
-(`{kind, name}`, kind `Run`, `Step` or `Daemon`, a step named `<run>/<step>`), `labels` the run, its factory,
+(`{kind, name}`, kind `Run`, `Step`, `Daemon` or `Store`, a step named `<run>/<step>`, the store `store`), `labels` the run, its factory,
 its workflow and, on a step's line, the step and its agent — the same `stepLabels` a filing gives its
 session — `reason` a stable code a machine selects on, from the closed table in `src/feed/reason.ts`,
 `type` `Normal` or `Warning`, `waits: "person"` where the line waits on somebody, `source` the `tick`,
@@ -92,7 +92,13 @@ whose record is gone (`wf rm`) gets one `removed`. `up`, once it holds the store
 own — its pid and `word: "daemon started"`, `reason: "DaemonStarted"`, and how the daemon before it ended:
 `first daemon on this store`, `last stopped at <time>`, or `last gone without a stop: took … over from pid …`
 — so a follower sees a restart, and a crash before it, in the feed it already reads. It is routine to a
-subscription, and no run's: the fold and a run's `removed` leave it out. **Nothing reads it to decide**: every pass still
+subscription, and no run's: the fold and a run's `removed` leave it out. The store has lines of its own, about `Store/store`:
+`nemia pause` (and the board's pause, which calls it) is one `store paused`, `reason: "StorePaused"`, and `nemia resume` one
+`store resumed`, `reason: "StoreResumed"`, each `source: "person"`, its note `since <the moment the pause was put>`. The verbs write
+no line: the tick's pass, which reads the store's pause (`$WF_ROOT/cordon`) already, offers the put while the pause stands and the lift
+for each put the feed holds that no longer stands (`storeOnce`), each counted off the feed's own lines, so a second daemon or a restart
+says neither again; a pause put and lifted between two passes leaves no line, since a pass reads what stands. `nemia watch -l
+kind=Store` follows them, and the api sends them as a `store` event. **Nothing reads it to decide**: every pass still
 judges from the world, and a feed deleted by hand costs its history, never a decision.
 
 What a pass compares against is the feed itself, folded, not something it remembers: a daemon keeps
@@ -3968,7 +3974,7 @@ holding a concurrency slot forever.
 | `src/decide/decide.verb.ts` | what a person reads of a run: `wf decide` (`decideRun`) |
 | `src/runner.ts` | the package's root: each name it exports re-exported by name from the file that holds it, and nothing else |
 | `src/meter/meter.ts` | what a pass costs — pure: its phases (`PHASES`), its cost composed (`passCost`) and read off disk (`parsePassCost`), the passes of an interval (`addPass`, `summaryDue`), and the line `wf up` says once a minute and the breakdown `--stats` prints (`summaryLine`, `breakdownLines`) |
-| `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, a run's or a daemon's (`startedLine`), the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
+| `src/feed/feed.ts` | the feed of what the tick judged — pure: the line, a run's, a daemon's (`startedLine`) or the store's (`storeOnce`, its pause put and lifted), the fold of the lines and what a pass owes it (`foldFeed`, `feedChanges`), a line in words (`feedLineWords`), and a run's steps as the feed says them (`feedWords`); the file is `src/feed/feed.store.ts`'s |
 | `src/watch/selector.ts` | the feed's selector grammar — pure: the keys a selector may name (`SELECTABLE_KEYS`, the labels and the five reserved, which no label may take: `labelKeysRefusal`), every malformed form refused by name (`selectorsRefusal`), the parse of checked text (`parseSelectors`), what a line offers a selector (`selectableOf`) and whether it is selected (`selects`) |
 | `src/cli/main.ts` | the verbs' table: `main`, which looks up the command in the table or the verb in `VERBS` and runs it, or prints the help; and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch` — with its liveness (`livenessLines`) — and `wf rm` and `wf prune` |
 | `src/daemon/up.verb.ts` | the daemon's loop, one for its two kinds, the api's process and `wf up`: `up`, which takes the store's lease in its scope and lets it go as the scope closes; `holdUrl`, which writes into the lease where the api serves; and `runMain`, which runs either as the process's command |
@@ -4002,7 +4008,7 @@ for the same reason, and so does the `wf` command.
 | `daemon.json` | the store taken by one `wf up`, its to write alone: pid, start, cwd, interval, last completed pass, `stoppedAt` once it stopped, and what its engine holds and serves (`holder`, never a secret) (`src/daemon/daemon.ts`) |
 | `tick.json` | the ceilings the last pass ran with, the tick's to write: what `wf ls` and `wf decide` judge the cap on runs in flight by |
 | `standing.json` | where the result branches stood on the last pass, the tick's to write (`src/standing/standing.store.ts`): for each repository, place and base branch, the place's `standing` answer or the words it was not read with, and when |
-| `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, and a line each time a daemon takes the store, the daemon's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `nemia watch` reads and follows, and nothing decides on |
+| `feed.jsonl` | what the tick judged of each run and each step, a line each time it changed, and a line each time a daemon takes the store, one for each pause of the store put and lifted, the daemon's to append (`src/feed/feed.ts`, `src/feed/feed.store.ts`): what `nemia watch` reads and follows, and nothing decides on |
 | `worktrees/<id>/run/` (`worktrees/<id>/<step>/` for a fork) | the run's line of work, or a fork's |
 | `checks/` | each check's stderr |
 | `engine/` | the engine's board: `AE_ROOT` for `ae watch` |

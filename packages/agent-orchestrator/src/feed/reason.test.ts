@@ -183,12 +183,12 @@ const lineOf = (c: Case): FeedLine =>
         ...(c.note !== undefined ? { note: c.note } : {}),
       })
     : upgraded({
-    at: '2026-10-16T04:00:00.000Z',
-    run: 'r-1',
-    ...(c.kind === 'Step' ? { step: 'plan' } : {}),
-    word: c.word,
-    ...(c.note !== undefined ? { note: c.note } : {}),
-  });
+        at: '2026-10-16T04:00:00.000Z',
+        run: 'r-1',
+        ...(c.kind === 'Step' ? { step: 'plan' } : {}),
+        word: c.word,
+        ...(c.note !== undefined ? { note: c.note } : {}),
+      });
 
 /** Whether the selectors a stored wake list converts to take `line`. */
 const takenByConverted = (wake: readonly string[], line: FeedLine): boolean =>

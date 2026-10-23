@@ -261,7 +261,8 @@ test("the engine's quota: asked of its default harness or the one named, the sam
     'asked of its default harness, or the one named, it answers the same, an ask one span with its harness, ended well',
     async () => {
       assert.deepEqual(await Effect.runPromise(engine.quota()), PLAN);
-      assert.equal(Exit.isSuccess(await traced(engine.quota('claude'))), true);
+      const named = await traced(engine.quota('claude'));
+      assert.deepEqual(Exit.isSuccess(named) ? named.value : named, PLAN, 'the harness named answers its plan, as the default does');
       assert.deepEqual(
         spans.map((x) => [x.name, x.attributes.get('harness'), x.status._tag === 'Ended' && Exit.isSuccess(x.status.exit)]),
         [['Engine.quota', 'claude', true]],

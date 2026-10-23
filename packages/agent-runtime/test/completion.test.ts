@@ -236,10 +236,16 @@ test('a background session works busy, falls quiet once its own closeout is its 
         'Claude Code lists a session that gave its closeout and ended its turn as blocked and idle: the engine ends that attempt only if it is handed the statement',
       );
       assert.equal(first?.state, 'input-required');
+      assert.deepEqual(first?.usage, { turns: 5 }, 'a blocked session reports its usage too');
       const before = { ...reads };
       for (let i = 0; i < 10; i++) {
         clock.t += 1_000;
-        assert.deepEqual((await look())?.closeout, { payload: 7, at: clock.written }, `look ${i + 1}`);
+        const seen = await look();
+        assert.deepEqual(
+          { said: seen?.closeout, usage: seen?.usage },
+          { said: { payload: 7, at: clock.written }, usage: { turns: 5 } },
+          `look ${i + 1}`,
+        );
       }
       assert.deepEqual(reads, before, 'ten looks over a transcript nothing wrote: no read');
       clock.t += 10 * Q;

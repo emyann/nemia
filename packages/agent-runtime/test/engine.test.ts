@@ -498,6 +498,11 @@ test('a person stops a running job: the harness is told, the next pass settles i
       await b.run(tick());
       assert.equal(b.sessions.get(nameFor('asked', 1))?.state, 'canceled', 'the harness was actually told');
       assert.equal(await b.run(phaseOf('asked')), 'running (stopped)', 'not settled on an assumption');
+      assert.deepEqual(
+        [...b.sessions.keys()].sort(),
+        ['asked', 'broke', 'done'].map((id) => nameFor(id, 1)).sort(),
+        'the stop pass started no session',
+      );
     },
   );
 
@@ -513,6 +518,11 @@ test('a person stops a running job: the harness is told, the next pass settles i
   await s.test('the pass after sees it canceled and writes it down: stopped', async () => {
     await b.run(tick());
     assert.equal(await b.run(phaseOf('asked')), 'stopped', 'the second pass sees it and writes it down');
+    assert.deepEqual(
+      [...b.sessions.keys()].sort(),
+      ['asked', 'broke', 'done'].map((id) => nameFor(id, 1)).sort(),
+      'nor did the pass that settled it',
+    );
     before = { done: await entries('done'), asked: await entries('asked') };
   });
 

@@ -81,20 +81,20 @@ const told = (got: Followed[]) =>
   );
 
 test(
-  "a Codex session is followed live: its state while it has named no thread, then each of its rollout's messages once and in order as Codex writes them, never a piece of text, and it ends when it settles",
+  "a Codex session is followed live: its state, then each of its rollout's messages once and in order as Codex writes them, never a piece of text, and it ends when it settles",
   WAITED,
   async (t) => {
     const s = story(t);
     const first = message('msg_1', 'Reading the note.');
     const second = message('msg_2', 'It is right.');
     const third = message('msg_3', 'Done.');
-    const c = session('ae/c1/1', STARTED, 'working', undefined);
+    const c = session('ae/c1/1', STARTED, 'working', THREAD);
     const got: Followed[] = [];
     let ended: ReturnType<typeof follow>;
     await s.test('the codex harness follows a session live: its spec keeps its streams, reads its stdout and its rollout', () => {
       assert.equal(typeof c.ops.follow, 'function');
     });
-    await s.test('a Codex session that has not named its thread yet says its state, and waits for its rollout', async () => {
+    await s.test('a followed Codex session says its state, and waits for its rollout', async () => {
       c.rollout(first.record);
       ended = follow(c.ops, 'ae/c1/1', got);
       await until(
@@ -105,7 +105,7 @@ test(
       );
       assert.deepEqual(told(got), ['state working']);
     });
-    await s.test('once its thread is named, each message it writes is said once and in order; what was written before is not', async () => {
+    await s.test('each message it writes is said once and in order; what was written before the follow is not', async () => {
       c.stdout(first.line);
       c.setState('working', THREAD);
       c.stdout(second.line);
@@ -137,6 +137,60 @@ test(
     });
   },
 );
+
+test(
+  'a Codex session that has not named its thread yet says its state and waits, reads its rollout from the start once it names it, and ends when it settles',
+  WAITED,
+  async (t) => {
+    const s = story(t);
+    const first = message('msg_1', 'Reading the note.');
+    const c = session('ae/c2/1', STARTED, 'working', '');
+    c.rollout(first.record);
+    const got: Followed[] = [];
+    const ended = follow(c.ops, 'ae/c2/1', got);
+    await s.test('unnamed, it says its state and nothing of a rollout it cannot know is its own', async () => {
+      await until(
+        t,
+        () => got.length >= 1,
+        () => `the state: ${JSON.stringify(got)}`,
+        { bell: rung },
+      );
+      c.stdout(first.line);
+      c.stdout(line({ type: 'turn.completed', usage: { input_tokens: 1, cached_input_tokens: 0, output_tokens: 1 } }));
+      assert.deepEqual(told(got), ['state working']);
+    });
+    await s.test('once it names its thread, its rollout is read from the start', async () => {
+      c.setState('working', THREAD);
+      await until(
+        t,
+        () => got.some((m) => m.kind === 'events'),
+        () => `the rollout: ${JSON.stringify(got)}`,
+        { bell: rung },
+      );
+      assert.deepEqual(told(got), ['state working', 'events Reading the note.']);
+    });
+    await s.test('it ends when the session settles', async () => {
+      c.setState('done', THREAD);
+      assert.ok(Exit.isSuccess(await ended));
+      assert.deepEqual(told(got), ['state working', 'events Reading the note.', 'state completed']);
+    });
+  },
+);
+
+test('a Codex session that settles having never named its thread is followed to its end: its state, then completed', WAITED, async (t) => {
+  const c = session('ae/c4/1', STARTED, 'working', '');
+  const got: Followed[] = [];
+  const ended = follow(c.ops, 'ae/c4/1', got);
+  await until(
+    t,
+    () => got.length >= 1,
+    () => `the state: ${JSON.stringify(got)}`,
+    { bell: rung },
+  );
+  c.setState('done');
+  assert.ok(Exit.isSuccess(await ended));
+  assert.deepEqual(told(got), ['state working', 'state completed']);
+});
 
 test('REFUSED: a Codex session whose stdout says a line that does not decode fails the follow, naming the line, its field and the schema', async () => {
   const s = session('ae/c3/1', STARTED + line({ type: 'turn.completed', usage: { input_tokens: 'many' } }), 'done');

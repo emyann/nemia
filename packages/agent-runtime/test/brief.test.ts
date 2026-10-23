@@ -308,6 +308,17 @@ test("`ae` refuses at exit 2 with the sentence and files nothing: a brief `ae st
     assert.equal(fs.existsSync(path.join(dir, 'tasks')), false);
   });
 
+  await t.test('`ae start` on a brief `file()` refuses (a harness there is none of) exits 2 with its sentence, not a stack trace, and files nothing', () => {
+    const dir = tmp();
+    const file = path.join(dir, 'brief.md');
+    fs.writeFileSync(file, brief('harness: banana'));
+    const r = spawnSync(process.execPath, [ae, 'start', file], { env: { ...process.env, AE_ROOT: dir }, encoding: 'utf8' });
+    assert.equal(r.status, 2, r.stderr);
+    assert.match(r.stderr, /^file: /);
+    assert.doesNotMatch(r.stderr, /\n\s+at /, 'no stack trace');
+    assert.equal(fs.existsSync(path.join(dir, 'tasks')), false);
+  });
+
   await t.test('`ae ls` with `AE_MAX_CONCURRENT` set exits 2 with the sentence, and writes nothing', () => {
     const dir = tmp();
     const r = spawnSync(process.execPath, [ae, 'ls'], { env: { ...process.env, AE_ROOT: dir, AE_MAX_CONCURRENT: '3' }, encoding: 'utf8' });

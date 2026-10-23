@@ -257,6 +257,10 @@ test(
       firstHeld = false;
       await first.close();
       assert.equal(run(root)?.state, 'parked', 'a session let go between turns is parked for the next holder');
+      const parked = run(root)!;
+      const { epoch, ...bridgeKept } = parked.bridge!;
+      assert.notEqual(epoch, undefined, 'the parked run file keeps the bridge the first holder opened');
+      writeRun(root, { ...parked, bridge: bridgeKept });
       second = await holder(root);
       await sighted(second);
       await until(st, () => lines(dir, 'argv.jsonl').length === 2, 'the next holder started its Claude Code', { everyMs: 50 });

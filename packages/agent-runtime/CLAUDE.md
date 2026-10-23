@@ -272,6 +272,9 @@ What Claude Code does as the steps meet it. Where the orchestrator's code holds 
 - **A path inside `Read(//…)` or `Edit(//…)` carries a space, a comma and braces; `*`, `?` and `[` widen it, and a `\` misses its own
   folder** (2.1.291, 2026-10-06, allow and deny alike): `CLAUDE_UNRULED` holds the set, with `(`/`)` the runtime's `RULE` refuses;
   `\*` is read as an escape, unused yet.
+- **A dontAsk session allowed `cat`, `head`, `tail`, `wc`, `cut` or `ls` is refused it on a path outside its working folders, by
+  Claude Code's own check before any rule** (2.1.308, 2026-10-22: `/etc/…`, `../…`, `~`, `$HOME`, `<`, a link out), and not on the paths
+  `wc --files0-from=<list>` reads (`CLAUDE_KEEPS_INSIDE` in `agent-orchestrator/test/agent-fences.test.ts`).
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
 - **Under a mode that refuses what no allow rule reaches — `default`, `manual`, `dontAsk`, `acceptEdits` — only `Read`, `Grep`, `Glob`
   and `Skill` run with no rule** (`CLAUDE_UNFENCED`, `CLAUDE_REFUSING_MODES`). `Read` was measured (2.1.289, the added-folder line

@@ -115,7 +115,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   place's `git` skill on its `skills:`; the three writers (Ada, Grace, Otto) run `auto` and need no allow. Nothing in the set writes
   the repository's history, its refs or its configuration — `git merge-tree` writes a loose object and no ref, and `git status` and
   `git describe --dirty` refresh the worktree's index and rewrite it when they can take its lock — and `git push` stays refused by the
-  writers' `disallowedTools:`, Grace's held equal to Ada's. **What the set would let git write a file or run a program by is denied
+  writers' `disallowedTools:`, Grace's held equal to Ada's. The set holds `cat`, `head`, `tail`, `wc`, `cut` and `ls` too, each kept
+  inside the working tree by Claude Code's own check of a path and `wc --files0-from` by `Bash(wc *--f*)`; `sed`, `awk`, `find`, `sort`,
+  `uniq` and `tee` stay out, each able to write a file or run a program. **What the set would let git write a file or run a program by is denied
   beside it**, on each of the four, and so on every step of theirs, whose `disallowedTools:` adds to its agent's, since no allow rule
   can exclude an option and an allow is matched with a leading assignment stripped: `Bash(git grep *O*)` and `Bash(git grep *--op*)`
   for the pager option, which runs a

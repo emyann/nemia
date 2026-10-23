@@ -2,12 +2,9 @@
   "rules": [
     {
       "id": "read-with-read",
-      "says": "Read a file with Read, list a folder with Glob and search with Grep; never ls, find, head, cat, grep, awk, sed or a pipe in Bash",
+      "says": "Read a file with Read, list a folder with Glob and search with Grep; never find, grep, awk, sed or a pipe in Bash; cat, head, tail, wc, cut and ls run inside the workspace",
       "breaks": [
-        "Bash(ls:*)",
         "Bash(find:*)",
-        "Bash(head:*)",
-        "Bash(cat:*)",
         "Bash(grep:*)",
         "Bash(awk:*)",
         "Bash(sed:*)"

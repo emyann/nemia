@@ -11,7 +11,16 @@ import { Context, Effect, Layer, Metric, PubSub, Stream, type Duration } from 'e
 import type { NonEmptyReadonlyArray } from 'effect/Array';
 import { tried } from '../runtime-client.ts';
 import { isRefusal, type Refusal } from '../refusal/refusal.ts';
-import { feedSaidWords, isRunLine, publishedOf, type DaemonLine, type FeedLine, type FeedPublished, type FeedWords } from './feed.ts';
+import {
+  feedSaidWords,
+  isRunLine,
+  publishedOf,
+  type DaemonLine,
+  type FeedCloseout,
+  type FeedLine,
+  type FeedPublished,
+  type FeedWords,
+} from './feed.ts';
 import { feedSize, readFeedEnds, recordDaemonLine, recordFeed } from './feed.store.ts';
 
 /**
@@ -61,25 +70,55 @@ export const FEED_FOLLOW_LINES = Metric.counter('feed.follow.lines', {
  * its workflow, and on a step's line the step and its agent — its daemon's pid where it is a daemon's, the reason a machine selects on,
  * how serious it is, and its word.
  */
-const logged = (line: FeedLine): Effect.Effect<void> =>
-  Effect.logInfo(feedSaidWords(line)).pipe(
-    Effect.annotateLogs({
-      ...line.labels,
-      ...(isRunLine(line) ? { run: line.run, ...(line.step !== undefined ? { step: line.step } : {}) } : { daemon: line.daemon }),
-      ...(line.reason !== undefined ? { reason: line.reason } : {}),
-      ...(line.type !== undefined ? { type: line.type } : {}),
-      word: line.word,
-    }),
-  );
+const logged = (line: FeedLine): Effect.Effect<void> => Effect.logInfo(feedSaidWords(line)).pipe(Effect.annotateLogs(lineFields(line)));
+
+/** What a line's log record is annotated with (`logged`): its labels, its run and step or its daemon, its reason, type, try and word. */
+const lineFields = (line: FeedLine): Record<string, unknown> => ({
+  ...line.labels,
+  ...(isRunLine(line) ? { run: line.run, ...(line.step !== undefined ? { step: line.step } : {}) } : { daemon: line.daemon }),
+  ...(line.reason !== undefined ? { reason: line.reason } : {}),
+  ...(line.type !== undefined ? { type: line.type } : {}),
+  ...(line.try !== undefined ? { try: line.try } : {}),
+  word: line.word,
+});
 
 /**
- * A pass's words written to the feed where they changed (`recordFeed`), each line written logged (`logged`) and, where the process has a
+ * Logs a `closed out` line as the closeout it marks: the closeout as the run read it, whole, as a JSON object in the message — so Loki's
+ * `| json` parses it — annotated as the line is (`lineFields`: the step's labels and its try) and with its `outcome`, at Info for `done`
+ * and Warning for `blocked`. One the run could not read is logged at Warning, its message what came back (`said`) and why it was refused
+ * (`error`, `parseCloseout`'s). This record is the line's one record: the feed's file keeps the line alone, and never the closeout.
+ */
+const closeoutLogged = (line: FeedLine, c: FeedCloseout): Effect.Effect<void> => {
+  const fields = lineFields(line);
+  if ('error' in c.read) return Effect.logWarning(JSON.stringify({ error: c.read.error, said: c.said })).pipe(Effect.annotateLogs(fields));
+  const message = JSON.stringify(c.read);
+  const annotated = { ...fields, outcome: c.read.outcome };
+  return (c.read.outcome === 'blocked' ? Effect.logWarning(message) : Effect.logInfo(message)).pipe(Effect.annotateLogs(annotated));
+};
+
+/**
+ * Logs each line a pass wrote: a `closed out` line as the closeout the pass read beside it (`closeoutLogged`, off `now`'s `closeouts` by
+ * its run, step and try), every other as its words (`logged`).
+ */
+const loggedOf =
+  (now: ReadonlyMap<string, FeedWords>) =>
+  (line: FeedLine): Effect.Effect<void> => {
+    const closeout =
+      isRunLine(line) && line.reason === 'ClosedOut'
+        ? now.get(line.run)?.closeouts?.find((c) => c.step === line.step && c.try === line.try)
+        : undefined;
+    return closeout ? closeoutLogged(line, closeout) : logged(line);
+  };
+
+/**
+ * A pass's words written to the feed where they changed (`recordFeed`), each line written logged (`loggedOf`: a `closed out` line as its
+ * closeout, every other as its words) and, where the process has a
  * hub (`FeedHub`), published to it with the bytes it was written at (`publishedOf`): none when another writer's bytes landed among them.
  * Answers with the lines written. Fails with a refusal of the store, and dies of anything else it threw.
  */
 export const emitFeed = Effect.fn('emitFeed')(function* (now: ReadonlyMap<string, FeedWords>, options?: Parameters<typeof recordFeed>[1]) {
   const appended = yield* tried(() => recordFeed(now, options));
-  yield* Effect.forEach(appended.lines, logged, { discard: true });
+  yield* Effect.forEach(appended.lines, loggedOf(now), { discard: true });
   const hub = yield* FeedHub;
   if (hub) yield* PubSub.publishAll(hub, publishedOf(appended));
   return appended.lines;

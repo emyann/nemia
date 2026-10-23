@@ -114,6 +114,13 @@ selector matches — `denied: Bash(git push)  · try 2` on a screen. It waits on
 fold, and is written once however many passes read it: what says it has been written already is the feed's
 own lines with that step and that try, counted, so a restarted daemon writes it neither again nor never.
 
+**A step's closeout is logged once, as JSON**, the same way: the first pass that reads a try's closeout writes a one-shot line,
+`reason: "ClosedOut"`, `closed out  · try 2`, and the daemon's log record of that line carries the closeout itself as its message
+— `JSON.stringify` of what the run read, so LogQL's `| json` parses it — annotated with the line's labels, its `try` and the
+closeout's `outcome`, at Info for `done` and Warning for `blocked`. One the run cannot read is logged at Warning, its message what
+came back (`said`) and the `error` that refused it. The feed's file holds the line alone, never the closeout: a blocked closeout of
+one run is `{service_name="nemia"} | json | run="<run-id>" | outcome="blocked"` in Loki. A recheck of the same turn says none again.
+
 **The cursor is the engine's**: a byte offset, 0 or the number a `cursor:` line printed, that never
 expires. A read stops at the last newline, so it never passes a line half written, and one after
 it goes on from that line's start. A cursor inside a line, or past the end, is refused by name

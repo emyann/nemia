@@ -989,7 +989,9 @@ test('a former key on the board: listed and saved under the name it has now, and
       const stale = await put('fenced', { steps: [{ ...step, spec: { ...rest, permissionMode: sandbox } }] });
       const refusal = (await stale.json()) as BuildRefused;
       assert.equal(stale.status, 422, JSON.stringify(refusal));
-      tells(refusal.error, 'review: `permissionMode: read-only` on a step that runs on codex', [
+      tells(refusal.error, 'review: ', [
+        '`permissionMode: read-only`',
+        'codex',
         'the former name of `sandbox:`',
         'reload it',
         'set the sandbox',

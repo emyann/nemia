@@ -122,7 +122,7 @@ const refused = async (res: Response): Promise<string> => {
 };
 
 test('POST …/retry with answers: what it refuses — answers that do not fit the questions the step asks now, answers on a recheck, answers that are no list — 400s, and nothing written', async (t) => {
-  const rows: Array<[string, string, object, RegExp]> = [
+  const rows: Array<[string, string, object, RegExp | RegExp[]]> = [
     [
       'an option the question does not offer',
       'design',
@@ -133,7 +133,7 @@ test('POST …/retry with answers: what it refuses — answers that do not fit t
           { question: where.title, chose: ['gate'] },
         ],
       },
-      /offers no "c": its options are "a", "b"/,
+      [/^"How is the card cut\?" offers no "c"/, /its options are "a", "b"/],
     ],
     [
       'a question left unanswered',
@@ -162,9 +162,10 @@ test('POST …/retry with answers: what it refuses — answers that do not fit t
     ['answers on a recheck', 'design', { mode: 'recheck', answers: [{ question: cut.title, chose: ['a'] }] }, /a recheck files no session/],
     ['answers that are no list', 'design', { mode: 'nudge', answers: 'a' }, /^`answers` are/],
   ];
-  for (const [name, step, body, fact] of rows)
+  for (const [name, step, body, facts] of rows)
     await t.test(name, async () => {
-      assert.match(await refused(await ask(step, body)), fact);
+      const said = await refused(await ask(step, body));
+      for (const fact of [facts].flat()) assert.match(said, fact);
       assert.deepEqual(asked(), []);
     });
 });

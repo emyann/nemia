@@ -229,6 +229,6 @@ test('GET /api/runs-finished refuses with a 422 a page that is no whole number f
       const body = (await res.json()) as { error?: string };
       assert.equal(res.status, 422, JSON.stringify(body));
       assert.deepEqual(Object.keys(body), ['error'], 'the refusal and nothing else');
-      names(body.error, field, `\`${value}\``);
+      names(body.error, `${field} takes`, `as in ${field}=`, `\`${value}\``);
     });
 });

@@ -278,10 +278,9 @@ test('POST …/approve: what it refuses — a body, a run or step not there, emp
         { question: cut.title, chose: ['c'] },
         { question: where.title, chose: ['gate'] },
       ];
-      assert.match(
-        await refused400(await approveOver('design', { answers: misfit }, BOARD, id), id),
-        /offers no "c": its options are "a", "b"/,
-      );
+      const misfitSaid = await refused400(await approveOver('design', { answers: misfit }, BOARD, id), id);
+      assert.match(misfitSaid, /^"How is the card cut\?" offers no "c"/, 'the question that misfits, by its title');
+      assert.match(misfitSaid, /its options are "a", "b"/);
       assert.match(
         await refused400(await approveOver('design', { answers: [{ question: cut.title, chose: ['a'] }] }, BOARD, id), id),
         /^"Where do the answers go\?" is not answered/,

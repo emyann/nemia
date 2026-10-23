@@ -15,6 +15,9 @@
  *   Claude Code's behaviour): a session held on `query()` with its servers on `Options.mcpServers`, its agent prompt on
  *   `Options.systemPrompt`'s `append` and auto-memory off in `Options.settings` reports the one server it was given, the word only
  *   the appended prompt names, Claude Code's own instructions before that prompt, and leaves no `MEMORY.md` behind.
+ * - An attached session's cost across its processes: a resumed query's first result carries on the total its parent saved as it
+ *   exited, and a session cut by its holder's let-go prints the turn it was cut in, saves its total, and its resume carries it on
+ *   (`docs/harness.md`). What it read is said as diagnostics; what the let-go rests on is asserted.
  * - The release of a settled session: `claude rm` could take the transcript with it, so a session told a word settles and is
  *   released, then `ae logs` still reads it and a second task resuming it still says the word.
  * - `say`, whose inbox answers nothing: a session told to wait for a message naming a file is told a name, and writes that file
@@ -1759,6 +1762,135 @@ test(
           } catch {}
         }
       }
+    }
+  },
+);
+
+/** The running totals Claude Code saved in the session `id`'s transcript as each of its processes exited, in order. */
+const savedTotals = (id: string | undefined): number[] => {
+  const file = id ? claudeTranscriptFile(id) : undefined;
+  if (file === undefined || !fs.existsSync(file)) return [];
+  return fs
+    .readFileSync(file, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .flatMap((l) => {
+      const line = JSON.parse(l) as { type?: string; totalCostUSD?: number };
+      return line.type === 'cost-state' && typeof line.totalCostUSD === 'number' ? [line.totalCostUSD] : [];
+    });
+};
+
+/** The `total_cost_usd` of each result an attached session's capture holds, in order, its processes one after another. */
+const totalsOf = (root: string, name: string): number[] => {
+  const out = filesOf(root, name).out;
+  if (!fs.existsSync(out)) return [];
+  return fs
+    .readFileSync(out, 'utf8')
+    .split('\n')
+    .filter(Boolean)
+    .flatMap((l) => {
+      const line = JSON.parse(l) as { type?: string; total_cost_usd?: number };
+      return line.type === 'result' && typeof line.total_cost_usd === 'number' ? [line.total_cost_usd] : [];
+    });
+};
+
+const CUT_BRIEF =
+  'First say hello in one word. Then run the shell command `sleep 120` with your Bash tool and wait for it to end. Then say done.';
+const BACK_CLOSEOUT = { type: 'object', properties: { word: { type: 'string' } }, required: ['word'], additionalProperties: false };
+
+test(
+  "an attached session's cost: a resumed query carries on the total its parent saved, and a session cut by a let-go saves its own",
+  { skip, timeout: 10 * 60_000 },
+  async (t) => {
+    const root = tmp('attached-cost');
+    const cwd = tmp('attached-cost-cwd');
+    const config = { model: 'haiku', effort: 'low' as const, budgetUsd: 1, allowedTools: ['Bash'], permissionMode: 'dontAsk' };
+    const ended = (name: string) =>
+      waitUntil(
+        t,
+        () => {
+          const s = readRun(filesOf(root, name).run)?.state;
+          return s === undefined || s === 'working' || s === 'idle' ? undefined : s;
+        },
+        `${name} ended`,
+        { everyMs: 2_000 },
+      );
+    const ids: string[] = [];
+    try {
+      const first = attachedSessions(root);
+      const firstScope = Scope.makeUnsafe();
+      await Effect.runPromise(Scope.provide(first.hold, firstScope));
+      await Effect.runPromise(
+        first.ops.spawn({ name: 'ae/live-cost/1', brief: 'Say the word alpha.', cwd, closeoutSchema: BACK_CLOSEOUT, config }),
+      );
+      assert.equal(await ended('ae/live-cost/1'), 'completed');
+      const parentId = readRun(filesOf(root, 'ae/live-cost/1').run)?.sessionId;
+      if (parentId) ids.push(parentId);
+      await Effect.runPromise(
+        first.ops.spawn({
+          name: 'ae/live-cost/2',
+          brief: 'Say the word you said before.',
+          cwd,
+          closeoutSchema: BACK_CLOSEOUT,
+          config,
+          resumeFrom: parentId,
+        }),
+      );
+      assert.equal(await ended('ae/live-cost/2'), 'completed');
+      const [parentTotal] = totalsOf(root, 'ae/live-cost/1');
+      const [resumedTotal] = totalsOf(root, 'ae/live-cost/2');
+      t.diagnostic(
+        `(a) parent printed ${parentTotal}, saved ${JSON.stringify(savedTotals(parentId))}; its resume's first result printed ` +
+          `${resumedTotal}`,
+      );
+      assert.ok(parentTotal !== undefined && resumedTotal !== undefined && resumedTotal > parentTotal, 'a resume carries its parent on');
+
+      const cutter = attachedSessions(root, undefined, { letGoMs: 30_000 });
+      const cutScope = Scope.makeUnsafe();
+      await Effect.runPromise(Scope.provide(cutter.hold, cutScope));
+      await Effect.runPromise(Scope.close(firstScope, Exit.void));
+      const name = 'ae/live-cost/3';
+      await Effect.runPromise(cutter.ops.spawn({ name, brief: CUT_BRIEF, cwd, closeoutSchema: BACK_CLOSEOUT, config }));
+      await waitUntil(t, () => readRun(filesOf(root, name).run)?.calling?.tool === 'Bash', 'the session in its sleep', {
+        everyMs: 1_000,
+      });
+      const cutAt = Date.now();
+      await Effect.runPromise(Scope.close(cutScope, Exit.void));
+      const letGoMs = Date.now() - cutAt;
+      const cut = readRun(filesOf(root, name).run);
+      if (cut?.sessionId) ids.push(cut.sessionId);
+      const cutTotals = totalsOf(root, name);
+      const cutSaved = savedTotals(cut?.sessionId);
+      t.diagnostic(`(b) cut: ${cut?.state}, printed ${JSON.stringify(cutTotals)}, saved ${JSON.stringify(cutSaved)}, let-go ${letGoMs} ms`);
+      assert.equal(cut?.state, 'parked');
+      assert.equal(cutTotals.length, 1, 'the cut process printed the turn it was cut in as a result');
+      assert.equal(cutSaved.length, 1, 'and saved its running total as it exited');
+      const next = attachedSessions(root);
+      const nextScope = Scope.makeUnsafe();
+      await Effect.runPromise(Scope.provide(next.hold, nextScope));
+      try {
+        await Effect.runPromise(next.ops.observe);
+        await waitUntil(
+          t,
+          () => totalsOf(root, name).length >= 2 && readRun(filesOf(root, name).run)?.state !== 'working',
+          'the resume ended',
+          {
+            everyMs: 2_000,
+          },
+        );
+      } finally {
+        await Effect.runPromise(Scope.close(nextScope, Exit.void));
+      }
+      const all = totalsOf(root, name);
+      t.diagnostic(`(b) resumed: printed ${JSON.stringify(all)}, saved ${JSON.stringify(savedTotals(cut?.sessionId))}`);
+      assert.ok((all.at(-1) ?? 0) >= (cutTotals[0] ?? Infinity), "the resume's total carries the cut process's spend on");
+    } finally {
+      for (const id of ids)
+        for (const verb of ['stop', 'rm']) {
+          try {
+            execFileSync('claude', [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
+          } catch {}
+        }
     }
   },
 );

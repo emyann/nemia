@@ -144,6 +144,10 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **A holder's whole let-go is bounded by one budget its waits share** (`LET_GO_MS`, `leftOf`, `attached.ts`), never one bound each,
   and it says on its log what it waits for and what it cut. The restart's wait for the lease, `stopMs`, is not the bound it gives a
   call in flight (`takeover.verb.ts`).
+- **A let-go ends a session's Claude Code by the SDK's `interrupt` and the end of its input, and kills only what outlives its
+  budget** (`parked`, `ended`, `harness/claude/attached.ts`): a killed Claude Code saves no running total, so its resume counts from
+  nothing and what it spent is lost to the attempt, whose cost is its last result's (`docs/harness.md`). The parked run file keeps the
+  process's facts until the let-go ends, so a holder that dies first leaves the next one what to kill.
 - **A `parked` run that carries `calling` is a call its holder cut**: the next holder resumes that session with `crashNote`, the road a
   crashed holder's session already takes (`noteOf`, `attached.ts`).
 - **The Agent SDK (0.3.308) speaks to its CLI in control requests both ways, and writes a resume as one argument, `--resume=<id>`**: the

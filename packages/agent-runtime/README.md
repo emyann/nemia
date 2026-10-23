@@ -2198,8 +2198,11 @@ PATH, whatever it says.
   `Options` where it has one — the servers as `mcpServers` with `strictMcpConfig`, the agent's prompt as `systemPrompt`'s `append`
   on the `claude_code` preset, the context window as `autoCompactWindow` in the one `settings` object — and on `extraArgs` where it
   has none. A call that would ask a person is answered in the holder (`canUseTool`): denied, and written as a denial.
-- **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits with no bound for each call in
-  flight, then writes each session `parked` and stops it; a call still held at its hook then is never written in flight.
+- **Let go.** As the holder's scope closes, new calls wait at their `PreToolUse` hook, it waits within one budget (`LET_GO_MS`) for
+  each call in flight, then writes each session `parked` and ends its Claude Code through the SDK — an `interrupt` to a session at
+  work, then the end of its input — so Claude Code prints the turn it cut and saves its running total, which the resumed process
+  carries on: the attempt's last result is its whole spend, across processes (`docs/harness.md`). What outlives the budget is killed,
+  and its spend lost (`docs/open-issues.md`). A call still held at its hook then is never written in flight, nor run.
 - **Taken up.** On a look, a holder adopts a session parked, or one whose holder's process is gone: it kills what is left of
   its Claude Code's process group, unless that pid is another process's now (`childStart`), then resumes it under the same id (`--resume=<id>`, no fork), told it was paused, or, after a
   crash, which call did not finish. A non-holder reads such a session as `working`.
@@ -2404,7 +2407,7 @@ of pure code sits beside it.
 | `test/a2a-boundary.test.ts` | only `src/a2a/` imports the A2A SDK, its face left out, and neither entry exports an SDK name or value — each made to refuse planted source |
 | `test/journal-words.test.ts` | the journal's words for six runs through `builtEngine` (`test/engine.ts`), pinned: the seam beneath the harnesses changes none of them |
 | `test/readme.test.ts` | this file, held to the code |
-| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, a `--bg` session spending past one, its cost read once let go, and a session bridged by `remoteControl` beside one that is not, against real Claude Code — `AE_LIVE=1` only |
+| `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, a `--bg` session spending past one, its cost read once let go, and a session bridged by `remoteControl` beside one that is not, an attached session's cost carried across a resume and a let-go's cut, against real Claude Code — `AE_LIVE=1` only |
 | `docs/harness.md` | what Claude Code does as the steps meet it, measured |
 | `docs/open-issues.md` | what is still wrong or half-verified |
 | `docs/hkb-migration.md` | notes toward moving hkb onto this engine |

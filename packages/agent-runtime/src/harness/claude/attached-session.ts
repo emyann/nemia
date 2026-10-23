@@ -117,6 +117,19 @@ const waitWhile = async (held: Held, signal: AbortSignal, live: Live): Promise<v
 };
 
 /**
+ * What a new call held at its hook as its session is let go is answered with: nothing, once the call's signal or the session's abort
+ * says it is over. The let-go ends the session's Claude Code by an interrupt (`parked`, `attached.ts`), which cuts the turn with this
+ * call unanswered, as Claude Code leaves it; let through, the call would run while the session is being ended.
+ */
+const cutWhileHeld = (signal: AbortSignal, live: Live): Promise<object> =>
+  new Promise((resolve) => {
+    const over = () => resolve({});
+    if (signal.aborted || live.abort.signal.aborted) return over();
+    signal.addEventListener('abort', over, { once: true });
+    live.abort.signal.addEventListener('abort', over, { once: true });
+  });
+
+/**
  * Whether the call a `PreToolUse` hook was given belongs to a call already in flight: the SDK marks a sub-agent's call with
  * `agent_id`, and absent for the main thread (the SDK's hook input), so such a call is answered however the session's calls are held.
  */
@@ -258,6 +271,7 @@ const hooksOf = (root: string, live: Live, held: Held, mayAsk: boolean): Partial
               live.waiting++;
               if (held(live)) rewrite(root, live);
               await waitWhile(held, signal, live).finally(() => live.waiting--);
+              if (live.letGo) return await cutWhileHeld(signal, live);
             }
             const tool = (input as { tool_name?: string }).tool_name ?? 'a tool';
             if (id) live.calls.set(id, { tool, since: new Date().toISOString() });

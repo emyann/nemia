@@ -15,7 +15,8 @@ applies: ["apps/web/**"]
    `.claude/skills/shadcn/SKILL.md` with Read, and, for the facts its command would have printed, `apps/web/components.json` and the
    files of `apps/web/src/components/ui`.
 4. **Its CLI runs from `apps/web`**, or from the root with `-c apps/web`. Its rules know radix and base, not React Aria: on the board
-   the reference is what `npx shadcn@latest add <component> --view <file>` prints, never what you remember.
+   the reference is what `npx shadcn view <component> -c apps/web` prints, never what you remember: the board's pinned CLI's read
+   of the registry's item for its style, which writes nothing, and the one form of the CLI a step that designs or reviews may run.
 5. **Read `apps/web/CLAUDE.md`** before you change a page: it holds the board's facts — where each thing is written, its
    commands, and what its own code promises that no test refuses. What its tools do, and the holes they leave, are *The board's
    traps* at the end of this skill: read them before you write, not after a check has refused you.

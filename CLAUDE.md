@@ -139,7 +139,10 @@ What the `create-an-agent` skill, being generic, does not say here:
   what file it can be made to write and what program it can be made to run. The set is on the agents rather than in `.claude/settings.json` so
   that the team travels to a factory that is not this checkout; `packages/agent-orchestrator/test/agent-fences.test.ts` holds every read
   open to each of the four, every write refused, every spelling of `--output` and of a read outside it can read refused, and the four
-  lines equal.
+  lines equal. Each of the four denies too, on its own line, what the settings and shadcn's skill allow that writes the workspace or runs
+  the suite: shadcn's CLI in each spelling an allow reaches (`npx shadcn@latest`, `pnpm dlx`, `bunx --bun`), its one read being the
+  board's pinned `npx shadcn view` the settings allow, and `npm test`; Iris and Argus, whose steps run no test, `node --test` and `npx
+  turbo run test` besides, while design and review keep the checks their notes name.
 
 ## Where things are
 

@@ -31,7 +31,10 @@
  * git question Agora's skill names is one that allow reaches (`askedGit`). Its step is refused the whole suite its round's check
  * already ran by a deny of its own of each spelling (`WHOLE_SUITE`), and runs a package's tests and a file's
  * (`SCOPED_TESTS`). An agent's fence names no command of this repository: the checks a step names in its note are allowed by the
- * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own.
+ * settings (`CHECKERS`, `unallowed`), and the denies that answer those allows are the step's own. What else the settings and a skill
+ * allow that writes the workspace or runs the suite each read-only agent denies on its own line (`ownedDenies`): shadcn's CLI in every
+ * spelling an allow reaches (`SHADCN`), whose one read a step runs is the board's pinned `view` (`SHADCN_VIEW_NOTE`), and `npm test`;
+ * intake's and the janitor's, which run no test, a test file's run and turbo's besides (`TESTLESS_AGENTS`, `TEST_RUNS`).
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
  * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
  * Implement and land, which run what no deny names, deny the live collector by its two ports on their own line, each beside every deny
@@ -1387,7 +1390,7 @@ test("REFUSED: a quick review whose skills, mcp, tally or fence is no more build
     ['skills', (text) => text.replace(', apps/web:ds-spec', '')],
     ['mcp', (text) => text.replace('mcp: playwright\n', '')],
     ['tally', (text) => text.replace(', findings.kind=placement', '')],
-    ['fence', (text) => text.replace(', Bash(npm test)', '')],
+    ['fence', (text) => text.replace(', Bash(npm run e2e)', '')],
   ];
   assert.throws(
     () => withReview('loop', (text) => text.replace('loop: implement\n', '').replace('rounds: 2\n', '')),
@@ -2561,6 +2564,141 @@ test("REFUSED: Agora without its denies of the whole suite, read from its file a
   const whole = new Set(WHOLE_SUITE.map(shown));
   const open = { ...agora, disallowedTools: (agora.disallowedTools ?? []).filter((rule) => !whole.has(rule)) };
   assert.deepEqual(runs(open, WHOLE_SUITE), WHOLE_SUITE.map(shown));
+});
+
+/**
+ * shadcn's CLI in each spelling an allow reaches a read-only step by: the settings' `npx shadcn@latest`, and the three runners shadcn's
+ * own skill grants (`npx`, `pnpm dlx`, `bunx --bun`). `add`, `init` and `apply` write the workspace, and a glob cannot tell a subcommand
+ * after an option (`-c apps/web add`) from one that writes nothing, so each spelling is denied whole, its `view` with it: the read a
+ * step that designs or reviews runs is the board's pinned CLI (`SHADCN_VIEW_NOTE`), a spelling no deny of these reaches.
+ */
+const SHADCN: Call[] = [
+  'npx shadcn@latest add button',
+  'npx shadcn@latest -c apps/web add button',
+  'npx shadcn@latest init --preset base-nova',
+  'npx shadcn@latest apply a2r6bw',
+  'npx shadcn@latest view button',
+  'timeout 60 npx shadcn@latest add button',
+  'pnpm dlx shadcn@latest add button',
+  'bunx --bun shadcn@latest add button',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** The whole suite by the settings' exact allow of it. */
+const NPM_TEST: Call[] = ['npm test', 'timeout 900 npm test'].map((command) => ({ tool: 'Bash', command }));
+
+/** The denies that answer `SHADCN` and `NPM_TEST`, on each read-only agent's own line, and so on each of its steps. */
+const READ_ONLY_DENIES = [
+  'Bash(npx shadcn@latest:*)',
+  'Bash(pnpm dlx shadcn@latest:*)',
+  'Bash(bunx --bun shadcn@latest:*)',
+  'Bash(npm test)',
+];
+
+/**
+ * The read-only agents whose steps run no test: intake's and the janitor's. Design and review run the checks their notes name
+ * (`CHECKERS`, `SCOPED_TESTS`), which the settings allow.
+ */
+const TESTLESS_AGENTS = ['iris', 'argus'];
+
+/** A test file's run and turbo's, in the spellings the settings' `node --test` and `npx turbo run test` reach. */
+const TEST_RUNS: Call[] = [
+  'node --test test/a.test.ts',
+  'node --test apps/web/test/e2e/board.e2e.ts',
+  'npx turbo run test',
+  'npx turbo run test --force --continue',
+  'npx turbo run test build',
+  'npx turbo run test --filter=web',
+  'timeout 900 npx turbo run test --force --continue',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** The denies that answer `TEST_RUNS`, on the line of each of `TESTLESS_AGENTS`. */
+const TEST_RUN_DENIES = ['Bash(node --test:*)', 'Bash(npx turbo run test:*)'];
+
+/** The denies a read-only agent's own line holds for what the settings and the skills allow it besides its reads. */
+const ownedDenies = (agent: string): string[] => [...READ_ONLY_DENIES, ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUN_DENIES : [])];
+
+/** What a read-only agent's steps are refused of what the settings and the skills allow, by `ownedDenies`. */
+const refusedTo = (agent: string): Call[] => [...SHADCN, ...NPM_TEST, ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUNS : [])];
+
+/** Each rule of `ownedDenies` the file of a read-only agent of the holder `root` does not name, as `<file>: <rule>`. */
+const ownedUndenied = (root = SHIPPED_HOLDERS[0]): string[] =>
+  READ_ONLY_AGENTS.flatMap((agent) => {
+    const line = denyLineOf(`agents/${agent}.md`, root);
+    return ownedDenies(agent)
+      .filter((rule) => !line.includes(rule))
+      .map((rule) => `agents/${agent}.md: ${rule}`);
+  });
+
+/** The item of change-the-board that names the read of shadcn's CLI, the reference of a component on the board. */
+const SHADCN_VIEW_NOTE = '**Its CLI runs from `apps/web`**';
+
+/** The settings' allow of that read, the board's pinned CLI's `view`. */
+const SHADCN_VIEW_ALLOW = 'Bash(npx shadcn view:*)';
+
+/** The read change-the-board names, its placeholder filled in. */
+const shadcnView = (): Call[] =>
+  checksOf(KIT_COMMAND.file, SHADCN_VIEW_NOTE).map((command) => ({ tool: 'Bash', command: command.replace('<component>', 'button') }));
+
+test("every read-only step is refused shadcn's CLI in every spelling an allow reaches it by, and npm test, by its agent's own deny", () => {
+  assert.deepEqual(ownedUndenied(), []);
+  for (const { named, step } of readOnlySteps()) assert.deepEqual(runs(step, refusedTo(step.agent!.name)), [], named);
+});
+
+test("intake and the janitor are refused a test file's run and turbo's, and design and review run a package's tests and a file's", () => {
+  for (const { named, step } of readOnlySteps())
+    if (TESTLESS_AGENTS.includes(step.agent!.name)) assert.deepEqual(runs(step, [...TEST_RUNS, ...SCOPED_TESTS]), [], named);
+    else assert.deepEqual(runs(step, SCOPED_TESTS), SCOPED_TESTS.map(shown), named);
+});
+
+test("the read of shadcn's CLI change-the-board names is the board's pinned view, the settings allow it, and design and review run it", () => {
+  const view = shadcnView();
+  assert.deepEqual(view.map(shown), ['Bash(npx shadcn view button -c apps/web)']);
+  assert.ok(SETTINGS_ALLOWS.includes(SHADCN_VIEW_ALLOW), `${SHADCN_VIEW_ALLOW} is in the settings`);
+  const writes = ['npx shadcn add button -c apps/web', 'npx shadcn init'].map((command) => ({ tool: 'Bash', command }) as const);
+  for (const { named, step } of readOnlySteps()) {
+    assert.deepEqual(runs(step, view), view.map(shown), named);
+    assert.deepEqual(runs(step, writes), [], `${named}: the pinned CLI writes by no allow`);
+  }
+});
+
+test('REFUSED: a read-only step without any one of its denies runs each spelling that deny refuses, and no other', () => {
+  for (const { named, step } of readOnlySteps())
+    for (const rule of ownedDenies(step.agent!.name)) {
+      const denies = step.disallowedTools ?? [];
+      assert.ok(denies.includes(rule), `${named} denies ${rule}, so taking it off says something`);
+      const calls = refusedTo(step.agent!.name);
+      const its = calls.filter((call) => deniedPartsOfCall(call).some((part) => reaches(rule, part))).map(shown);
+      assert.ok(its.length > 0, `${rule} reaches a spelling of ${named}'s`);
+      assert.deepEqual(runs({ ...step, disallowedTools: denies.filter((kept) => kept !== rule) }, calls), its, `${named} without ${rule}`);
+    }
+});
+
+test("REFUSED: a read-only agent's file that drops its denies is named, rule by rule", () => {
+  for (const agent of READ_ONLY_AGENTS) {
+    const root = scratch('wf-fences-owned-');
+    fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
+    const at = path.join(root, 'agents', `${agent}.md`);
+    let text = fs.readFileSync(at, 'utf8');
+    for (const rule of ownedDenies(agent)) {
+      const dropped = text.replace(`, ${rule}`, '');
+      assert.notEqual(dropped, text, `${agent} names ${rule}`);
+      text = dropped;
+    }
+    fs.writeFileSync(at, text);
+    assert.deepEqual(
+      ownedUndenied(root),
+      ownedDenies(agent).map((rule) => `agents/${agent}.md: ${rule}`),
+    );
+  }
+});
+
+test("REFUSED: without the settings' allow of the pinned view, design and review read no reference, and a note that names it no more throws", () => {
+  const without = { permissions: { allow: SETTINGS_ALLOWS.filter((rule) => rule !== SHADCN_VIEW_ALLOW) } };
+  for (const agent of ['seldon', 'agora']) assert.deepEqual(runs(shippedStepOf(agent), shadcnView(), without), [], agent);
+  assert.throws(
+    () => checksOf(KIT_COMMAND.file, '**Its CLI runs from the root**'),
+    (err: Error) => err.message.includes(`${KIT_COMMAND.file}: no "**Its CLI runs from the root**"`),
+  );
 });
 
 test("REFUSED: a git question review-a-change names that Agora's own allow does not reach is named", () => {

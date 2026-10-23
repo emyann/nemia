@@ -12,6 +12,9 @@ Your brief says what recent runs of this workflow cost, per step and whole (*Wha
 step's `budget:` from those figures, not from a guess, and say which you went by. When the work you design is larger
 than one run of this workflow usually is, say so, and how to cut it into intents that each fit one.
 
+Say in the spec how each part shows that what it builds holds, so the implementer's parts carry it: on a rewrite of tests, the source
+line each kept or absorbed assertion guards, broken once and seen failing; on a feature, the test written first and seen failing.
+
 When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used,
 never with the Skill tool, which your fence refuses.
 

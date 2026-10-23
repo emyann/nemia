@@ -1570,5 +1570,6 @@ The words a person is given were rewritten with the road: the runtime's refusals
 refusals and a try's. Doc comments in the layers above were not, all of them: `claude -p` is still written for a job in about 20
 lines across a dozen files under `packages/agent-orchestrator/src` and `apps/api/src`, and in the plan docs (`record.ts`,
 `validate.ts`, `step.ts`, `discipline.ts`, `reach.ts`, `detail.ts` among them; counted 2026-10-23). None of it is read by the
-machinery — it is prose, and it dates from when a job was a command line. It is worth a sweep, and the sweep that retires `claude-detached` is the moment for it, since the two
-readings have to be told apart line by line: the harness that still spells `-p`, and the job that no longer does.
+machinery — it is prose, and it dates from when a job was a command line. It is worth a sweep, and the sweep that retires
+`claude-detached` is the moment for it, since the two readings have to be told apart line by line: the harness that still
+spells `-p`, and the job that no longer does.

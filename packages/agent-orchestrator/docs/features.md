@@ -5528,7 +5528,9 @@ Next: 2c, a workflow that marks a mount writable on purpose.
 
 ## 2. Remote Control on a step, and a supervisor session
 
-**The package half is built**, on the engine's `remoteControl` (`92d6783`). What was registered is kept below as it was asked.
+**Shipped**, with no record of its own but this one: the package half on the engine's `remoteControl` (`92d6783`), and the
+board's *Reach* row (2026-10-06). Its registration, its measurement of 2026-09-16 and what it needed are in this file's history
+before 2026-10-23.
 
 - **`remote: true` on a step**, in `STEP_KEYS` after `disallow`, with its line in `STEP_KEY_MEANINGS`. It is carried as `remoteControl`
   on every filing of the step's session — the first, each try `retries:` or `wf retry` files, each round, the looping step's and its
@@ -5545,29 +5547,6 @@ Next: 2c, a workflow that marks a mount writable on purpose.
 - **Left**: nothing. *Since: the supervisor shipped as §9 (2026-09-17); whether a session was in fact bridged is read off its
   registration onto its task's view (`TaskView.bridge`, runtime open issue 23), and a step's detail answers it (`StepFiled.bridge`),
   drawn as a *Reach* row in the step's facts on the run page and its inspector (2026-10-06).*
-
-**Registered** 2026-09-16, by the operator: not now, but the ability has to exist. The aim is a session supervising the
-whole workload — an orchestrator — that the operator can reach from a phone whenever something waits on a person: a
-merge to accept, an answer to give.
-
-**Measured** (2026-09-16, Claude Code 2.1.273, three throwaway Haiku sessions, each stopped and removed): a `claude --bg`
-session is listed in the web's agents view only when its registration under `~/.claude/sessions/` carries a
-`bridgeSessionId`, and it gets one only when started with `--remote-control`. Without the flag none appears, from a clean
-environment or from the daemon's; with it, one appears at once. The engine's Claude runner passes no such flag, so every
-worker it spawns is invisible there. A worker of the old hkb from 2.1.266 (2026-09-08) carries a bridge id, so Claude Code
-used to bridge background sessions on its own. The docs do not say when that changed; an open Claude Code issue on
-auto-registration with Remote Control fits.
-
-**What it needs.**
-
-- Engine: a field on the task — `remoteControl: true`, say — read by the Claude runner and passed as `--remote-control` on
-  the spawn. A knob on the workload as a field carried on the task, never a default: Remote Control lets the session be
-  driven from claude.ai or a phone, not only seen. Refused on a harness that has no such flag. A live measurement that a
-  spawned worker lands in the agents view.
-- agent-orchestrator: a step key — `remote:`, say — carried on every filing of the step as `budget:` is. Later, the
-  supervisor: a session of its own, not a step of any run, that watches the store and acts, with Remote Control on. What it
-  is told and what it may do is its own design; nothing here decides it.
-- Board: the run page says a step's session is reachable from the phone when it is, with its link. *Done 2026-10-06.*
 
 ## 3. The queue: a cap on runs in flight, and cards that start themselves
 

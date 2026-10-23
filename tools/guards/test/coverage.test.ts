@@ -155,6 +155,13 @@ test('records on either side tell a line or an arm the records disagree on, whic
     ['a line one before-record hit and another did not varies, and is no fall', [two, one], [one], [[], []], [[2], []]],
     ['a line one after-record hits and another does not varies, and is no fall', [two], [two, one], [[], []], [[2], []]],
     [
+      'two before-records each hitting a line the other did not, and an after-record hitting neither, vary: no fall, though fewer are hit',
+      [recordWith({ 'src/a.ts': cover([1, 2, 3], 4) }), recordWith({ 'src/a.ts': cover([1, 2, 4], 4) })],
+      [recordWith({ 'src/a.ts': cover([1, 2], 4) })],
+      [[], []],
+      [[3, 4], []],
+    ],
+    [
       'a line every before-record hit and no after-record hits is REFUSED, by its file and line',
       [two, two],
       [one, one],

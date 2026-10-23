@@ -244,10 +244,11 @@ const ordered = (lines: number[]): number[] => [...new Set(lines)].sort((a, b) =
 
 /**
  * The files whose coverage fell from the records `before` to the records `after`, and what varies between the records. A line, or a
- * branch's arm, falls when every record before reached it and none after does, and so does a file's count of lines or branches hit
- * when the most any record after hits is under the fewest any record before hit: what one record of either side reached and another
- * did not varies, as Node's merge of its processes' coverage leaves a line from run to run, and is said apart, judged no fall. A file
- * only `after` has is no fall; lcov's branch count is said, never judged.
+ * branch's arm, falls when every record before reached it and none after does; what one record of either side reached and another
+ * did not varies, as Node's merge of its processes' coverage leaves a line from run to run, and is said apart, judged no fall. A file's
+ * count of lines hit falls only between one record on each side, where lcov's LH may say what its DA lines do not: across several,
+ * fewer hit is a line that varied. The counts said are the fewest any record before hit and the most any after hits. A file only
+ * `after` has is no fall; lcov's branch count is said, never judged.
  */
 export const judged = (before: CoverageRecord[], after: CoverageRecord[]): { falls: Fall[]; varying: Varying[] } => {
   const falls: Fall[] = [];
@@ -266,7 +267,8 @@ export const judged = (before: CoverageRecord[], after: CoverageRecord[]): { fal
     const branches = { before: count(was, 'branches', false), after: count(now, 'branches', true) };
     const armsLost = ordered(arms.lost.map((key) => lineOf.get(key)!));
     const gone = now.every((c) => c === undefined);
-    if (lines.lost.length > 0 || armsLost.length > 0 || counts.after < counts.before || (gone && was.every(Boolean))) {
+    const fewer = was.length === 1 && now.length === 1 && counts.after < counts.before;
+    if (lines.lost.length > 0 || armsLost.length > 0 || fewer || (gone && was.every(Boolean))) {
       falls.push({ file, gone, linesLost: ordered(lines.lost), armsLost, lines: counts, branches });
     }
     if (lines.varying.length > 0 || arms.varying.length > 0) {

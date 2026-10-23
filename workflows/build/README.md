@@ -1,6 +1,6 @@
 # build
 
-Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Ada builds it; Agora
+Build an accepted intent into working, reviewed code on main. Seldon writes the spec, which a person approves; Grace builds it; Agora
 reviews it and sends it back while a finding is worth a round, three at most; Otto lands it, once a person approves the landing.
 A change its card settles, which needs no design, goes through [`quick`](../quick/README.md), whatever its size, with no spec.
 
@@ -10,7 +10,7 @@ design → implement ⇄ review → land
 
 Implement pushes its branch and opens the pull request through `pull-request.ts`, read from the base as the others are: it pushes this
 run's own branch, never another and never the base and never forced, and opens or updates the one pull request of the branch, never a
-draft, printing the address that goes on Ada's closeout as an artifact value. Her check pushes again through the same script and refuses
+draft, printing the address that goes on Grace's closeout as an artifact value. Her check pushes again through the same script and refuses
 unless the pull request's head is the commit it judges — GitHub moves that head a moment after the push, so it is read again for up to
 30 s before the refusal — then waits on the `ci` context (1800 s for it to start, 2400 s whole): CI runs
 the suite, the types, the lint, the whole e2e and the build on that commit, and a red, cancelled or missing `ci` is the check's refusal,
@@ -42,7 +42,7 @@ repository's skill for reading them.
 It runs `probe.ts`, read from the base as well: a session a step starts to measure something, a probe, is named `<run>-probe-<label>`
 (`node workflows/build/probe.ts start <label> -- <prompt>`), runs in the machinery's trusted folder `$WF_ROOT/probes`, and says in its
 first message whether the person must act; it reaches the person's phone through Remote Control only with `--answer`, and the step then
-stops `blocked` on the `needs` line it prints. The check refuses while a probe named for the run is live, naming `probe.ts stop`. Ada's
+stops `blocked` on the `needs` line it prints. The check refuses while a probe named for the run is live, naming `probe.ts stop`. Grace's
 and Otto's fences refuse a bare `claude --bg` or Remote Control, and an edit of a harness's trust or local settings anywhere.
 
 Review counts what it closes out on (`tally: findings, findings.kind=placement`): the findings of each round, and those of
@@ -51,7 +51,7 @@ them whose `kind` is `placement` (a change in a boundary the repository's rules 
 A doc or a workflow file turbo does not hash is judged by `ci`, which runs on clean runners with no cache of this machine's, on the
 commit implement's check pushed; nothing is replayed from a cache there, and land's receipt replays nothing at all.
 Implement's check runs no suite itself: `ci` runs it on the pushed commit, on clean runners and with no cache of this machine's, and
-Ada's session runs only the tests of what she changed.
+Grace's session runs only the tests of what she changed.
 
 Implement merges the base into its branch before each sign-off (`git merge main-worktree/HEAD`: the tip of the branch the repository's
 own checkout is on, whatever it is called), so its check runs on the merged tree, and measures again what its change wrote by a measure.

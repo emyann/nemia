@@ -228,7 +228,7 @@ test('a folder’s version moves with a skill named with its folder, of one segm
 const BUILD = path.join(REPO, 'workflows', 'build');
 const KIT_STEPS = [
   ['design', 'seldon'],
-  ['implement', 'ada'],
+  ['implement', 'grace'],
   ['review', 'agora'],
 ] as const;
 

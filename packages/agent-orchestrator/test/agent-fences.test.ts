@@ -552,10 +552,10 @@ test('the matcher splits a command into the parts Claude Code matches, strips th
 });
 
 /**
- * The agents of the team no shipped step names, each with the agent whose fence is theirs: Grace runs in `build-team`, a person's copy of
- * build kept in their store, not in this repository, and her fence is Ada's, so every test here of Ada's fence holds hers.
+ * The agents of the team no shipped step names, each with the agent whose fence is theirs: Ada fills implement in no shipped workflow since
+ * Grace does, and her file stays for a factory that hires her, her fence Grace's, so every test here of Grace's fence holds hers.
  */
-const FENCED_AS: Readonly<Record<string, string>> = { grace: 'ada' };
+const FENCED_AS: Readonly<Record<string, string>> = { ada: 'grace' };
 
 /** An agent's own fence, as its file in `dir` says it: its permission mode and its deny list. */
 const ownFenceOf = (name: string, dir: string): { permissionMode?: string; disallowedTools?: string } => {
@@ -584,23 +584,23 @@ test('every shipped agent is named by a shipped step, so the fence below reads e
   }
 });
 
-test("REFUSED: Grace without one rule of Ada's deny list, or in another mode, is named", () => {
+test("REFUSED: Ada without one rule of Grace's deny list, or in another mode, is named", () => {
   const edited = (edit: (text: string) => string): string[] => {
-    const root = scratch('wf-fences-grace-');
+    const root = scratch('wf-fences-ada-');
     fs.cpSync(path.join(SHIPPED_HOLDERS[0], 'agents'), root, { recursive: true });
-    const file = path.join(root, 'grace.md');
+    const file = path.join(root, 'ada.md');
     const text = fs.readFileSync(file, 'utf8');
-    assert.notEqual(edit(text), text, 'grace.md has what the edit changes');
+    assert.notEqual(edit(text), text, 'ada.md has what the edit changes');
     fs.writeFileSync(file, edit(text));
     return fencesApart(root);
   };
   assert.deepEqual(
     edited((text) => text.replace(', mcp__github__merge_pull_request', '')),
-    ['grace: fenced apart from ada'],
+    ['ada: fenced apart from grace'],
   );
   assert.deepEqual(
     edited((text) => text.replace('permissionMode: auto', 'permissionMode: bypassPermissions')),
-    ['grace: fenced apart from ada'],
+    ['ada: fenced apart from grace'],
   );
 });
 
@@ -823,11 +823,11 @@ const killsByName = (step: string): string[] =>
     (call) => `${step}: ${shown(call)}`,
   );
 
-test("REFUSED: Ada without its deny of pkill and killall, read from its file as a run reads it, is open on each kill by name, the compound's too", () => {
-  const ada = shippedStepOf('ada');
-  const line = ada.disallowedTools!.filter((rule) => rule !== 'Bash(pkill:*)' && rule !== 'Bash(killall:*)');
-  assert.equal(line.length, ada.disallowedTools!.length - 2, 'Ada denies both by name');
-  const bare = shippedWith('ada', 'build', 'disallowedTools', line.join(', '));
+test("REFUSED: Grace without its deny of pkill and killall, read from its file as a run reads it, is open on each kill by name, the compound's too", () => {
+  const grace = shippedStepOf('grace');
+  const line = grace.disallowedTools!.filter((rule) => rule !== 'Bash(pkill:*)' && rule !== 'Bash(killall:*)');
+  assert.equal(line.length, grace.disallowedTools!.length - 2, 'Grace denies both by name');
+  const bare = shippedWith('grace', 'build', 'disallowedTools', line.join(', '));
   assert.equal(bare.permissionMode, 'auto');
   assert.deepEqual(unfenced(bare), killsByName(bare.name));
   assert.ok(
@@ -840,8 +840,8 @@ test("REFUSED: Ada without its deny of pkill and killall, read from its file as 
 const ghWrites = (step: string): string[] =>
   FENCED.filter((call) => /^gh\b/.test(call.command ?? '')).map((call) => `${step}: ${shown(call)}`);
 
-test('REFUSED: Ada and Otto without their deny of gh, read from their files as a run reads them, are open on every gh write', () => {
-  for (const agent of ['ada', 'otto']) {
+test('REFUSED: Grace and Otto without their deny of gh, read from their files as a run reads them, are open on every gh write', () => {
+  for (const agent of ['grace', 'otto']) {
     const step = shippedStepOf(agent);
     const line = step.disallowedTools!.filter((rule) => rule !== 'Bash(gh)' && rule !== 'Bash(gh:*)');
     assert.equal(line.length, step.disallowedTools!.length - 2, `${agent} denies gh whole, bare and with arguments`);
@@ -915,10 +915,10 @@ test('every shipped step is refused a session of its own started by hand, in the
   assert.deepEqual(open, []);
 });
 
-/** The rules of Ada's and Otto's fence that refuse a session started by hand: a deny of `claude` with a flag or a subcommand. */
+/** The rules of Grace's and Otto's fence that refuse a session started by hand: a deny of `claude` with a flag or a subcommand. */
 const probeRule = (rule: string): boolean => rule.startsWith('Bash(claude ');
 
-for (const agent of ['ada', 'otto'])
+for (const agent of ['grace', 'otto'])
   test(`REFUSED: ${agent} without its deny of a background session and Remote Control, read from its file as a run reads it, is open on each`, () => {
     const step = shippedStepOf(agent);
     assert.equal(step.permissionMode, 'auto');
@@ -937,15 +937,15 @@ const editsDenied = (step: Step, files: string[]): string[] =>
     ['Edit', 'Write'].every((tool) => (step.disallowedTools ?? []).some((rule) => reaches(rule, { tool, path: file }))),
   );
 
-test("Ada and Otto are refused an edit of a harness's trust or local settings anywhere, and not one in their own worktree", () => {
-  for (const agent of ['ada', 'otto']) {
+test("Grace and Otto are refused an edit of a harness's trust or local settings anywhere, and not one in their own worktree", () => {
+  for (const agent of ['grace', 'otto']) {
     const step = shippedStepOf(agent);
     assert.deepEqual(editsDenied(step, HARNESS_FILES), HARNESS_FILES, agent);
     assert.deepEqual(editsDenied(step, [OWN_FILE]), [], agent);
   }
 });
 
-for (const agent of ['ada', 'otto'])
+for (const agent of ['grace', 'otto'])
   test(`REFUSED: ${agent} without its deny of a folder's local settings, read from its file as a run reads it, may edit the owner's`, () => {
     const step = shippedStepOf(agent);
     const line = step.disallowedTools!.filter((rule) => rule !== 'Edit(//**/.claude/settings.local.json)');
@@ -995,9 +995,9 @@ function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'dis
 
 /** The steps that run what no deny names, each with its file under the shipped holder: the two whose own line denies the collector. */
 const COLLECTOR_FENCED = [
-  { agent: 'ada', workflow: 'build', file: 'build/implement.md' },
+  { agent: 'grace', workflow: 'build', file: 'build/implement.md' },
   { agent: 'otto', workflow: 'build', file: 'build/land.md' },
-  { agent: 'ada', workflow: 'quick', file: 'quick/implement.md' },
+  { agent: 'grace', workflow: 'quick', file: 'quick/implement.md' },
   { agent: 'otto', workflow: 'quick', file: 'quick/land.md' },
 ];
 
@@ -2409,10 +2409,10 @@ const deniesMerge = (step: Step): string[] =>
   (step.disallowedTools ?? []).filter((rule) => reaches(rule, { tool: 'Bash', command: 'git merge main-worktree/HEAD' }));
 
 test('implement merges the base into its branch by no allow, and no deny of its fence reaches the merge', () => {
-  const ada = shippedStepOf('ada');
-  assert.equal(ada.permissionMode, 'auto');
-  assert.deepEqual(deniesMerge(ada), []);
-  const fenced = { ...ada, disallowedTools: [...(ada.disallowedTools ?? []), 'Bash(git merge:*)', 'Bash(git:*)'] };
+  const grace = shippedStepOf('grace');
+  assert.equal(grace.permissionMode, 'auto');
+  assert.deepEqual(deniesMerge(grace), []);
+  const fenced = { ...grace, disallowedTools: [...(grace.disallowedTools ?? []), 'Bash(git merge:*)', 'Bash(git:*)'] };
   assert.deepEqual(deniesMerge(fenced), ['Bash(git merge:*)', 'Bash(git:*)']);
 });
 
@@ -2434,11 +2434,11 @@ const DOCKER: Call[] = ['docker run -d --rm grafana/otel-lgtm', 'docker rm -f ne
 }));
 
 test('the render of a dashboard is the implementer’s alone: design and review are refused each form of it, and Docker by hand', () => {
-  const ada = shippedStepOf('ada');
-  assert.equal(ada.name, 'implement');
-  assert.notEqual(ada.permissionMode, 'dontAsk', 'the implementer runs what no deny names');
+  const grace = shippedStepOf('grace');
+  assert.equal(grace.name, 'implement');
+  assert.notEqual(grace.permissionMode, 'dontAsk', 'the implementer runs what no deny names');
   assert.deepEqual(
-    unfenced(ada, SETTINGS, RENDERS),
+    unfenced(grace, SETTINGS, RENDERS),
     RENDERS.map((call) => `implement: ${shown(call)}`),
   );
   const named = checksOf('workflows/build/implement.md', RENDER_NOTE, /`(node tools\/observe\/[^`]*)`/g);
@@ -2453,7 +2453,7 @@ test('REFUSED: design or review that an allow of the render reaches, by the sett
   for (const agent of ['seldon', 'agora']) assert.deepEqual(runs(shippedStepOf(agent), RENDERS, settings), RENDERS.map(shown), agent);
   const own = { ...shippedStepOf('agora'), allowedTools: [...(shippedStepOf('agora').allowedTools ?? []), allow, 'Bash(docker:*)'] };
   assert.deepEqual(runs(own, [...RENDERS, ...DOCKER]), [...RENDERS, ...DOCKER].map(shown));
-  const fenced = { ...shippedStepOf('ada'), disallowedTools: [...(shippedStepOf('ada').disallowedTools ?? []), allow] };
+  const fenced = { ...shippedStepOf('grace'), disallowedTools: [...(shippedStepOf('grace').disallowedTools ?? []), allow] };
   assert.deepEqual(unfenced(fenced, SETTINGS, RENDERS), [], 'a deny of its own would refuse the implementer');
 });
 
@@ -2485,7 +2485,7 @@ test('every shipped step is refused the live collector by address: implement and
     );
   }
   assert.deepEqual(
-    unfenced(shippedStepOf('ada'), SETTINGS, RENDERS),
+    unfenced(shippedStepOf('grace'), SETTINGS, RENDERS),
     RENDERS.map((call) => `implement: ${shown(call)}`),
     'and the render, which holds a throwaway collector, still runs',
   );
@@ -2522,7 +2522,7 @@ test('REFUSED: implement or land with one of its two address rules cut is open o
 test("REFUSED: a deny read against the unwrapped part alone leaves the collector's address in a leading assignment open", () => {
   const assigned = LIVE_COLLECTOR.filter((call) => /^(?:cd \S+ && )?[A-Z_]+=/.test(call.command ?? ''));
   assert.equal(assigned.length, 3);
-  const denies = shippedStepOf('ada').disallowedTools ?? [];
+  const denies = shippedStepOf('grace').disallowedTools ?? [];
   for (const call of assigned) {
     assert.ok(!partsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part))), `${shown(call)}, unwrapped, names no port`);
     assert.ok(
@@ -3085,7 +3085,7 @@ const GITHUB_FILE_WRITES = [
   'actions_run_trigger',
 ].map((tool) => `mcp__github__${tool}`);
 
-/** Every GitHub tool that writes, which Ada, read-only on GitHub in this card, is denied by name. */
+/** Every GitHub tool that writes, which Grace, read-only on GitHub in this card, is denied by name. */
 const GITHUB_WRITES = [
   ...GITHUB_FILE_WRITES,
   ...[
@@ -3112,7 +3112,7 @@ const deniedTo = (step: Step, tools: readonly string[]): string[] =>
 /** The shipped steps that run `agent`, each as its folder resolves it. */
 const stepsOf = (agent: string): Step[] => shipped().flatMap(({ step }) => (step.agent?.name === agent ? [step] : []));
 
-test("GitHub's tools are fenced per agent: Agora reads, Ada reads and writes nothing, Otto merges and writes no file, the rest reach none", () => {
+test("GitHub's tools are fenced per agent: Agora reads, Grace reads and writes nothing, Otto merges and writes no file, the rest reach none", () => {
   for (const step of stepsOf('agora')) {
     assert.deepEqual(
       runs(
@@ -3131,7 +3131,7 @@ test("GitHub's tools are fenced per agent: Agora reads, Ada reads and writes not
       `${step.name}: and no write reaches Agora`,
     );
   }
-  for (const step of stepsOf('ada')) {
+  for (const step of stepsOf('grace')) {
     assert.equal(step.permissionMode, 'auto', step.name);
     assert.deepEqual(deniedTo(step, GITHUB_WRITES), GITHUB_WRITES, `${step.name}: every write denied by name`);
     assert.deepEqual(deniedTo(step, GITHUB_READS), [], `${step.name}: every read left open`);
@@ -3158,12 +3158,12 @@ test("GitHub's tools are fenced per agent: Agora reads, Ada reads and writes not
   );
 });
 
-test('REFUSED: Ada without her deny of merge_pull_request, read from her files as a run reads them, may merge; Agora allowed a write may write', () => {
-  const ada = shippedEdited('ada', 'build', 'a deny of merge_pull_request', (text) =>
+test('REFUSED: Grace without her deny of merge_pull_request, read from her files as a run reads them, may merge; Agora allowed a write may write', () => {
+  const grace = shippedEdited('grace', 'build', 'a deny of merge_pull_request', (text) =>
     text.replace(', mcp__github__merge_pull_request', ''),
   );
   assert.deepEqual(
-    GITHUB_WRITES.filter((tool) => !deniedTo(ada, GITHUB_WRITES).includes(tool)),
+    GITHUB_WRITES.filter((tool) => !deniedTo(grace, GITHUB_WRITES).includes(tool)),
     ['mcp__github__merge_pull_request'],
   );
   const agora = shippedEdited('agora', 'build', 'an allowedTools line', (text) =>

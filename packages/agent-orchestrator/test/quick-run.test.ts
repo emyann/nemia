@@ -72,7 +72,7 @@ async function toTheCheck(dir: string) {
   assert.deepEqual(
     (readRun(run.id).workflow ?? []).map((step) => [step.name, step.agent?.name, step.gate === true]),
     [
-      ['implement', 'ada', false],
+      ['implement', 'grace', false],
       ['review', 'agora', false],
       ['land', 'otto', false],
     ],

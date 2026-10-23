@@ -1,6 +1,6 @@
 # quick
 
-Build a change a card settles, on main, with no spec: Ada plans and builds it in one session, Agora reads it as a second
+Build a change a card settles, on main, with no spec: Grace plans and builds it in one session, Agora reads it as a second
 engineer would, and Otto lands it once that review passes. Nobody is asked to approve the landing — the review is what stands between
 the work and the base branch.
 
@@ -35,7 +35,7 @@ Each script is read from the run's base (`git show "$WF_BASE_REF:…"`), never f
    pull request of it is at the commit the check judges; `wait` polls the `ci` context of that head and refuses a red, cancelled or
    missing one with the Actions URL, the failing jobs and a tail of their log.
 
-No typecheck, no lint, no test of a package and no e2e page on this machine: nothing here runs Ada's tests for her before the review.
+No typecheck, no lint, no test of a package and no e2e page on this machine: nothing here runs Grace's tests for her before the review.
 Her session runs the tests of what she changed, the types, the lint and the e2e pages a change to the board touches, as `CLAUDE.md`,
 *Check your work*, says of a step's session; CI's `ci` context runs the suite, the types, the lint and the whole e2e on the commit the
 check pushed, and the check waits on it. Land then merges that same pull request through `build`'s `landing.ts` and fast-forwards the

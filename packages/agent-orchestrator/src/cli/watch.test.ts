@@ -1,9 +1,11 @@
 /**
  * `nemia watch`'s own lines: the store's liveness said once as it falls and once as it comes back (`livenessLines`), read off a lease
- * the test scripts; the lines `-l waits=person` takes, in place of the retired `--wake`, each of which is refused by name
- * (`retiredWakeRefusal`); `--json`, the feed's lines with their cursor on stdout and the watch's own words on stderr (`watchPrinted`);
- * the lines a `-l` selector takes, with the cursor file that reaches the feed's end whatever it drops; and the bookmark a silent watch
- * says at its cadence, the clock steered.
+ * the test scripts; what `-l waits=person` takes, in place of the retired `--wake`, and what `--json` prints of a line; every refusal of
+ * what was typed, by name, before a line is read — the retired flags (`retiredWakeRefusal`), a malformed selector, a cursor beside a
+ * cursor file, a cursor file in no directory or holding no number; `--json`, the feed's lines with their cursor on stdout and the
+ * watch's own words on stderr (`watchPrinted`); the lines a `-l` selector takes, with the cursor file that reaches the feed's end
+ * whatever it drops; and the bookmark a silent watch says at its cadence, the clock steered. `nemia watch` over a run's feed, `--once`,
+ * its selectors, its cursor file and a feed cut under it, is `test/run-feed.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -14,16 +16,25 @@ import { livenessWords, type DaemonFile, type DaemonStanding } from '../daemon/d
 import { startedLine, upgraded, type FeedLine } from '../feed/index.ts';
 import { watchedLine, type Watched } from '../subscription/index.ts';
 import { parseSelectors, selects } from '../watch/selector.ts';
+import { testPlace } from '../../place/memory/index.ts';
+import { testEngine, bell, until, WAITED } from 'agent-runtime/testing';
 import { steeredClock } from '../../test/steered.ts';
 import { scratch } from '../../test/scratch.ts';
-import { bell, until, WAITED } from 'agent-runtime/testing';
+import { eachTest } from '../../test/placed.ts';
+import { names } from '../../test/assessed.ts';
+import { heldUnasked } from '../../test/unasked.ts';
 
 const ROOT = scratch('wf-watch-');
 process.env.WF_ROOT = ROOT;
 const FEED = path.join(ROOT, 'feed.jsonl');
-const { livenessLines, watching, watchPrinted } = await import('./main.ts');
+const { livenessLines, main, watching, watchPrinted } = await import('./main.ts');
 const { RAN } = await import('../command/runs.verb.ts');
 const { parseArgv } = await import('../command/command.ts');
+const { engineOf } = await import('../runtime-client.ts');
+
+const stand = eachTest(testPlace);
+const engine = eachTest(testEngine);
+heldUnasked(engine);
 
 const NOW = Date.parse('2026-10-07T12:00:00.000Z');
 const AT = new Date(NOW).toISOString();
@@ -58,33 +69,34 @@ const said = (lease: ReturnType<typeof scripted>, n: number) =>
     ),
   );
 
-test('the watch says the store down once when its daemon goes silent, and up once when it ticks again', async () => {
-  const lease = scripted(['ticking', 'ticking', 'stalled', 'stalled', 'stalled', 'ticking', 'ticking']);
-  const lines = await said(lease, 2);
-  assert.deepEqual(
-    lines.map((l) => l.state),
-    ['down', 'up'],
-  );
-  assert.equal(lease.reads(), 6, 'the store read up twice, down three times, and up once more: the two up at the start say nothing');
-  assert.match(lines[0].text, /^api: stalled, pid 4242/);
-  assert.match(lines[1].text, /^api: ticking, pid 4242/);
-  assert.equal(lines[0].at, AT);
-  assert.equal(livenessWords(lines[0]), `12:00:00  daemon down  · ${lines[0].text}`);
-  assert.deepEqual(JSON.parse(livenessWords(lines[1], true)), { liveness: 'up', at: AT, note: lines[1].text });
-});
-
-test('a watch started while the store is down says so at once', async () => {
-  const lines = await said(scripted(['stalled', 'ticking']), 2);
-  assert.deepEqual(
-    lines.map((l) => l.state),
-    ['down', 'up'],
-  );
-  const none = await said(scripted(['none']), 1);
-  assert.deepEqual(
-    none.map((l) => l.state),
-    ['down'],
-  );
-  assert.match(none[0].text, /^daemon: none has held this store — nothing ticks it/);
+test('livenessLines says the store down once as its daemon falls silent and up once as it ticks again, at once where it starts down', async (t) => {
+  await t.test('the watch says the store down once when its daemon goes silent, and up once when it ticks again', async () => {
+    const lease = scripted(['ticking', 'ticking', 'stalled', 'stalled', 'stalled', 'ticking', 'ticking']);
+    const lines = await said(lease, 2);
+    assert.deepEqual(
+      lines.map((l) => l.state),
+      ['down', 'up'],
+    );
+    assert.equal(lease.reads(), 6, 'the store read up twice, down three times, and up once more: the two up at the start say nothing');
+    assert.match(lines[0].text, /^api: stalled, pid 4242/);
+    assert.match(lines[1].text, /^api: ticking, pid 4242/);
+    assert.equal(lines[0].at, AT);
+    assert.equal(livenessWords(lines[0]), `12:00:00  daemon down  · ${lines[0].text}`);
+    assert.deepEqual(JSON.parse(livenessWords(lines[1], true)), { liveness: 'up', at: AT, note: lines[1].text });
+  });
+  await t.test('a watch started while the store is down says so at once', async () => {
+    const lines = await said(scripted(['stalled', 'ticking']), 2);
+    assert.deepEqual(
+      lines.map((l) => l.state),
+      ['down', 'up'],
+    );
+    const none = await said(scripted(['none']), 1);
+    assert.deepEqual(
+      none.map((l) => l.state),
+      ['down'],
+    );
+    assert.match(none[0].text, /^daemon: none has held this store — nothing ticks it/);
+  });
 });
 
 /** A run's line of the feed, signed as the tick signs one (`upgraded`), its word and note as given. */
@@ -110,38 +122,75 @@ const ROUTINE: FeedLine[] = [
 /** `nemia watch`'s spec, where the retired flags are refused by name. */
 const WATCH = RAN.find((r) => r.name === 'watch')!;
 
-test('`-l waits=person` keeps the lines that wait on a person, and none of the routine; with no -l, every line', () => {
-  const kept = (selectors: readonly string[]) => [...WAKES, ...ROUTINE].filter((l) => selects(parseSelectors(selectors), l));
-  assert.deepEqual(kept(['waits=person']), WAKES);
-  assert.deepEqual(kept(['kind=Daemon']), [ROUTINE[3]], 'another selector names other lines');
-  assert.deepEqual(kept(['waits=person', 'kind=Daemon']), [...WAKES, ROUTINE[3]], 'or beside it, as -l given again');
-  assert.equal(selects(parseSelectors(['waits=person']), ROUTINE[4]), false, 'a tool denial waits on nobody, as it is today');
-  assert.deepEqual(kept([]), [...WAKES, ...ROUTINE], 'with none, every line');
+test('what a watch takes and prints of a line: `-l waits=person` in place of the retired wake words, and `--json` the line whole', async (t) => {
+  await t.test('`-l waits=person` keeps the lines that wait on a person, and none of the routine; with no -l, every line', () => {
+    const kept = (selectors: readonly string[]) => [...WAKES, ...ROUTINE].filter((l) => selects(parseSelectors(selectors), l));
+    assert.deepEqual(kept(['waits=person']), WAKES);
+    assert.deepEqual(kept(['kind=Daemon']), [ROUTINE[3]], 'another selector names other lines');
+    assert.deepEqual(kept(['waits=person', 'kind=Daemon']), [...WAKES, ROUTINE[3]], 'or beside it, as -l given again');
+    assert.equal(selects(parseSelectors(['waits=person']), ROUTINE[4]), false, 'a tool denial waits on nobody, as it is today');
+    assert.deepEqual(kept([]), [...WAKES, ...ROUTINE], 'with none, every line');
+  });
+  await t.test('`--json` prints a line of the feed whole, with the cursor just after it; without, in words', () => {
+    const daemon = ROUTINE[3];
+    assert.deepEqual(JSON.parse(watchedLine(daemon, 412, { json: true })), { ...daemon, cursor: 412 });
+    assert.deepEqual(JSON.parse(watchedLine(WAKES[0], 90, { json: true })), { ...WAKES[0], cursor: 90 });
+    assert.equal(watchedLine(WAKES[0], 90, {}), '12:00:00  r-1  build  awaiting approval', 'and the words a person reads do not move');
+    assert.equal(WAKES[0].reason, 'AwaitingApproval', 'the line printed whole is a signed one');
+  });
 });
 
-test('REFUSED: each flag retired with the wake words, by name, naming the selector to type', () => {
-  for (const argv of [['--wake'], ['--wake-word', 'failed'], ['--wake=1'], ['--wake-word=failed']]) {
-    const said = (() => {
-      try {
-        parseArgv(WATCH.spec, argv);
-      } catch (err) {
-        assert.equal((err as { exitCode?: number }).exitCode, 2, String(err));
-        return (err as Error).message;
-      }
-      return assert.fail(`${argv.join(' ')} was not refused`);
-    })();
-    assert.match(said, /^nemia watch no longer takes --wake/, argv.join(' '));
-    assert.match(said, /-l waits=person/);
+/** What `nemia <argv>` was refused with, at exit 2. */
+const refused = async (argv: string[]): Promise<string> => {
+  try {
+    await main(argv, engineOf(engine().layer), undefined, stand().place);
+  } catch (err) {
+    assert.equal((err as { exitCode?: number }).exitCode, 2, (err as Error).message);
+    return (err as Error).message;
   }
-  assert.ok(parseArgv(WATCH.spec, ['-l', 'waits=person']), 'and the selector it names reads');
-});
+  return assert.fail(`nemia ${argv.join(' ')} was taken`);
+};
 
-test('`--json` prints a line of the feed whole, with the cursor just after it; without, in words', () => {
-  const daemon = ROUTINE[3];
-  assert.deepEqual(JSON.parse(watchedLine(daemon, 412, { json: true })), { ...daemon, cursor: 412 });
-  assert.deepEqual(JSON.parse(watchedLine(WAKES[0], 90, { json: true })), { ...WAKES[0], cursor: 90 });
-  assert.equal(watchedLine(WAKES[0], 90, {}), '12:00:00  r-1  build  awaiting approval', 'and the words a person reads do not move');
-  assert.equal(WAKES[0].reason, 'AwaitingApproval', 'the line printed whole is a signed one');
+test('REFUSED: nemia watch refuses what was typed, by name, before a line is read', async (t) => {
+  await t.test('REFUSED: each flag retired with the wake words, by name, naming the selector to type', () => {
+    for (const argv of [['--wake'], ['--wake-word', 'failed'], ['--wake=1'], ['--wake-word=failed']]) {
+      const said = (() => {
+        try {
+          parseArgv(WATCH.spec, argv);
+        } catch (err) {
+          assert.equal((err as { exitCode?: number }).exitCode, 2, String(err));
+          return (err as Error).message;
+        }
+        return assert.fail(`${argv.join(' ')} was not refused`);
+      })();
+      assert.match(said, /^nemia watch no longer takes --wake/, argv.join(' '));
+      assert.match(said, /-l waits=person/);
+    }
+    assert.ok(parseArgv(WATCH.spec, ['-l', 'waits=person']), 'and the selector it names reads');
+  });
+  await t.test(
+    'a malformed selector, a cursor beside a cursor file, a cursor file in no directory, a flag it does not take',
+    async (sub) => {
+      fs.writeFileSync(FEED, `${JSON.stringify(line('running'))}\n`);
+      const end = fs.statSync(FEED).size;
+      const log = sub.mock.method(console, 'log', () => {});
+      names(await refused(['watch', '--once', '-l', 'message=hi']), '"message" is no key of a feed line');
+      names(await refused(['watch', '-l', 'factory==nemia']), '"factory==nemia"', '==');
+      names(await refused(['watch', '--once', '-l', 'factory in nemia']), 'no (values) after in');
+      names(await refused(['watch', '--once', '-l', '']), '"" is no selector');
+      names(await refused(['watch', String(end), '--cursor-file', path.join(ROOT, 'x.cursor')]), 'a cursor or --cursor-file, not both');
+      names(await refused(['watch', '--once', '--cursor-file', path.join(ROOT, 'nope', 'x.cursor')]), path.join(ROOT, 'nope'), 'make it');
+      names(await refused(['watch', '--once', '-L']), 'nemia watch does not take -L', 'nemia watch [cursor]');
+      assert.equal(log.mock.callCount(), 0, 'nothing was printed: each was refused before a line was read');
+    },
+  );
+  await t.test('a cursor file that holds no whole number, named, and the feed never read from its start instead', async (sub) => {
+    const file = path.join(ROOT, 'junk.cursor');
+    fs.writeFileSync(file, 'nineteen\n');
+    const log = sub.mock.method(console, 'log', () => {});
+    names(await refused(['watch', '--once', '--cursor-file', file]), file, 'is no cursor file', '"nineteen"');
+    assert.equal(log.mock.callCount(), 0);
+  });
 });
 
 test(

@@ -6,7 +6,9 @@
  *
  * Walked through the runtime itself over an in-memory journal and a harness the test signs by hand, as rest-store.test.ts does, and every
  * filing `queued` as the store's own engine files it (`engineOf`), under the store's own admission (`storeAdmission`), so admission is
- * the runtime's: a task filed waits until a pass admits it, and none is admitted while the pause stands. A store of its own, since
+ * the runtime's: a task filed waits until a pass admits it, and none is admitted while the pause stands — what the engine's stand-in,
+ * which has no pass that admits, cannot say, nor a landing whose journal does not read. The pause put, put at once and resumed, as a
+ * person tells it, is on the stand-ins in `test/pause.test.ts`. A store of its own, since
  * `tick` reads every run under `WF_ROOT`, which is read as the module loads and so set before the import.
  */
 import { test, type TestContext } from 'node:test';
@@ -40,7 +42,6 @@ const stand = () => place;
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const { resumePause, putPause } = await import('../pause/pause.store.ts');
-const { pauseNow } = await import('../pause/pause.verb.ts');
 const { pausedRead, runsListed } = await import('../list/list.verb.ts');
 const { PAUSE_WAIT } = await import('../list/list.ts');
 const { COMMANDS } = await import('../command/commands.verb.ts');
@@ -343,95 +344,3 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.ok(h.spawned.length > before, 'and sessions started again');
   assert.notEqual((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task admitted');
 });
-
-test(
-  'a pause at once stops each session and check at work but a landing, and the resume continues each; one that ended first is not tried',
-  WAITED,
-  async (t) => {
-    for (let k = 0; k < 6; k++) {
-      h.signAll();
-      await pass();
-    }
-    const lands = aRepo();
-    const session = await begun(ONE);
-    const checking = await begun(CHECKED);
-    const ended = await begun(ONE);
-    const landing = await begun(SHIP, { repo: lands, isolate: true });
-    await pass();
-    worked(landing.id);
-    await pass();
-    await pass();
-    h.signAll([session, ended]);
-    await atGate(t, landing, 'ship');
-    await runWith(h.e, approveRun(landing.id, 'ship'));
-    for (let k = 0; k < 3; k++) await pass();
-    const sessionTask = taskOf(session, 'work')!;
-    const checkTask = readRun(checking.id).steps.work?.check?.taskId;
-    assert.ok(
-      checkTask && (await Effect.runPromise(h.e.view(checkTask))).phase.startsWith('running'),
-      "checking's check runs as the pause is put",
-    );
-    assert.ok(taskOf(landing, 'ship'), "landing's ship at work as the pause is put");
-    const before = h.spawned.length;
-
-    const endedTask = taskOf(ended, 'work')!;
-    const racing = new Proxy(h.e, {
-      get: (target, key) =>
-        key === 'stop'
-          ? (taskId: string) =>
-              Effect.gen(function* () {
-                if (taskId === endedTask) {
-                  h.signAll([session, checking, landing]);
-                  yield* Effect.promise(() => pass());
-                }
-                return yield* target.stop(taskId);
-              })
-          : Reflect.get(target, key),
-    });
-    const now = await runWith(racing, pauseNow({ why: 'the bill', by: 'ann' }));
-    const mine = (i: { run: string }) => [session.id, checking.id, ended.id, landing.id].includes(i.run);
-    assert.deepEqual(
-      now.interrupted
-        .filter(mine)
-        .map((i) => `${i.run} ${i.step} ${i.kind}`)
-        .sort(),
-      [`${checking.id} work check`, `${ended.id} work session`, `${session.id} work session`].sort(),
-      'the landing is left to finish',
-    );
-    for (let k = 0; k < 3; k++) await pass();
-    assert.equal((await Effect.runPromise(h.e.view(sessionTask))).phase, 'stopped');
-    assert.equal((await Effect.runPromise(h.e.view(checkTask))).phase, 'stopped');
-    assert.equal((await Effect.runPromise(h.e.view(endedTask))).phase, 'succeeded', 'a session that ended before its stop was taken');
-    assert.notEqual((await Effect.runPromise(h.e.view(taskOf(landing, 'ship')!))).phase, 'stopped', 'the landing finishes');
-    assert.deepEqual(
-      fs.readdirSync(asksDir(landing.id)).filter((f) => f.startsWith('retry-')),
-      [],
-      'and is asked no try',
-    );
-    assert.deepEqual(
-      fs.readdirSync(asksDir(ended.id)).filter((f) => f !== 'done'),
-      [],
-      'its ask set aside',
-    );
-    assert.deepEqual(fs.readdirSync(path.join(asksDir(ended.id), 'done')), ['retry-work-2']);
-    await pass(freshRestMemo());
-    assert.deepEqual(h.spawned.slice(before), [], 'a restarted daemon files nothing while paused');
-    assert.equal(taskOf(session, 'work'), sessionTask);
-
-    resumePause();
-    await pass();
-    const resumed = readRun(session.id).steps.work;
-    assert.notEqual(resumed.taskId, sessionTask, "session's try 2 filed");
-    assert.deepEqual(resumed.tries, [{ taskId: sessionTask, then: 'nudge', paused: true }]);
-    const stoppedAttempt = (await Effect.runPromise(h.e.view(sessionTask))).state.attempts.at(-1)!;
-    assert.equal(
-      (await Effect.runPromise(h.e.view(resumed.taskId!))).state.resumeFrom,
-      stoppedAttempt.nativeId,
-      'continuing the session it stopped',
-    );
-    const rechecked = readRun(checking.id).steps.work;
-    assert.notEqual(rechecked.check?.taskId, checkTask, "checking's check filed again");
-    assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checkTask }, then: 'recheck', paused: true });
-    assert.equal(readRun(ended.id).steps.work?.tries, undefined, 'the run whose session ended first is not tried');
-  },
-);

@@ -7,7 +7,7 @@
  * only be refused (`nemia-chat.test.ts`, the 409). Her record, her transcript and her level file are planted as there (`her.ts`), and
  * the history is read back through the api's own projection of them. An engine given to the app by hand is what the stand-ins rule
  * names a boundary test for; the stop verb's own path — the interrupt through the one client, then the line — is proven on the
- * engine's stand-in (`packages/agent-orchestrator/src/chat/chat.verb.test.ts`).
+ * engine's stand-in (`packages/agent-orchestrator/test/nemia-chat.test.ts`).
  */
 import './harness.ts';
 import { test } from 'node:test';

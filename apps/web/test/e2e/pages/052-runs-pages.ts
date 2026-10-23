@@ -121,6 +121,25 @@ async function expectRoom(page: Page, assertion: string): Promise<void> {
   }, assertion);
 }
 
+/** The longest name of a workflow in use today, which the Workflow column holds uncut. */
+const LONGEST_WORKFLOW = 'build-team';
+
+/** The Workflow column's links, each cut to its cell's room. */
+const workflowsOf = (page: Page): Locator => page.locator('section[data-section="finished"] tr[data-run] td a[data-workflow]');
+
+/** Every Workflow link shows its name whole: what it holds fits the room it is cut to. */
+async function expectWorkflowsWhole(page: Page, assertion: string): Promise<void> {
+  await expectNone(async () => {
+    if (!(await workflowsOf(page).count())) return 'no workflow to look at';
+    const cut = await workflowsOf(page).evaluateAll((all) =>
+      all.flatMap((link) =>
+        link.scrollWidth > link.clientWidth ? [`"${link.textContent}" ${link.scrollWidth} in ${link.clientWidth} px`] : [],
+      ),
+    );
+    return cut.length ? `${cut.join(', ')} cut` : null;
+  }, assertion);
+}
+
 /**
  * Every column the owner saw overlap has its room, at both widths: a run from more than a year back says how long ago it was, uncut,
  * and so do the longest words the column takes, written into every such cell and taken out again.
@@ -159,6 +178,19 @@ async function datesFit(page: Page): Promise<void> {
       if (wide) await page.setViewportSize(wide);
       await tight.evaluateAll((all, was) => all.forEach((text, i) => (text.firstChild!.nodeValue = was[i] ?? '')), said);
     }
+    const named = await workflowsOf(page).evaluateAll((all) => all.map((link) => link.textContent ?? ''));
+    try {
+      await workflowsOf(page).evaluateAll((all, name) => all.forEach((link) => (link.textContent = name)), LONGEST_WORKFLOW);
+      await expectWorkflowsWhole(page, `the Workflow column holds the longest name in use, "${LONGEST_WORKFLOW}", uncut`);
+      if (wide) {
+        await page.setViewportSize({ width: 560, height: wide.height });
+        await expectWorkflowsWhole(page, `and so it does at a phone\u2019s width`);
+        await page.setViewportSize(wide);
+      }
+    } finally {
+      if (wide) await page.setViewportSize(wide);
+      await workflowsOf(page).evaluateAll((all, was) => all.forEach((link, i) => (link.textContent = was[i] ?? '')), named);
+    }
   } finally {
     back();
   }
@@ -169,8 +201,8 @@ export default {
    * The finished runs a page at a time, the page in the address beside the factory: eighteen finished runs written into one factory
    * make it three pages; page 3 loaded by its address, and loaded again, is page 3 of that factory; Newer and Older move a page,
    * by the pointer and by the keyboard; a page past the last says so; and a run from more than a year back, as the longest words a
-   * column takes, has its column's room, at the page's width and at a phone's. The runs are taken back, and the page left on the
-   * seed's.
+   * column takes, has its column's room, at the page's width and at a phone's, and the longest workflow's name its own. The runs are
+   * taken back, and the page left on the seed's.
    */
   name: 'runs-pages',
   route: `/runs?factory=${FACTORY}`,

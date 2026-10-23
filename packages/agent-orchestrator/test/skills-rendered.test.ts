@@ -13,7 +13,7 @@ import yaml from 'js-yaml';
 import { skillEntryOf, splitFrontmatter } from '../src/workflow.ts';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { skillsFor } from '../src/skills/read.store.ts';
-import { appliesOf } from '../src/skills/skills.ts';
+import { appliesOf, renderSkill, skillDraftOf, withPreload } from '../src/skills/skills.ts';
 import { briefBody, pluginOf, unrendered } from '../src/agents/agents.ts';
 import { scratch } from './scratch.ts';
 import { placesOf, SHIPPED_HOLDERS, TEAM, TEAM_DEV } from './team.ts';
@@ -68,6 +68,29 @@ test("a card entry and a skill's paths read a SKILL.md's frontmatter as YAML doe
     };
     assert.deepEqual(skillEntryOf(file, id, text), expected, file);
     assert.deepEqual(appliesOf(text), keys.applies === undefined ? [] : [keys.applies].flat(), `${file}: its applies:`);
+  }
+});
+
+test('every SKILL.md there is, written again from its draft or its preload switched, reads as YAML with each of its keys as it was', () => {
+  const files = SKILL_FOLDERS.flatMap((dir) =>
+    fs.existsSync(dir) ? fs.readdirSync(dir).map((name) => path.join(dir, name, 'SKILL.md')) : [],
+  ).filter((file) => fs.existsSync(file));
+  assert.ok(files.length > 3, files.join('\n'));
+  for (const file of files) {
+    const text = fs.readFileSync(file, 'utf8');
+    const id = path.basename(path.dirname(file));
+    const { name: _, title, preload, ...keys } = frontmatterOf(file, text);
+    const draft = skillDraftOf(file, id, text);
+    const { name, title: written, preload: on, ...again } = frontmatterOf(file, renderSkill(draft, text));
+    assert.equal(name, id, file);
+    assert.equal(written, typeof title === 'string' && title.trim() ? title.trim() : undefined, file);
+    assert.equal(on, preload === true || preload === 'true' ? true : undefined, file);
+    assert.deepEqual(again, { ...keys, description: draft.description }, file);
+    const switched = frontmatterOf(file, withPreload(file, text, !draft.preload));
+    assert.equal(switched.preload === true, !draft.preload, file);
+    delete switched.preload;
+    const { preload: __, ...before } = frontmatterOf(file, text);
+    assert.deepEqual(switched, before, `${file}: its preload switched`);
   }
 });
 

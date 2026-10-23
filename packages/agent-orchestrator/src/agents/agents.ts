@@ -45,12 +45,12 @@ import {
   FORMER_KEYS,
   FORMER_OWN_KEYS,
   formerKeyWritten,
-  frontmatterKey,
   harnessPromptNamed,
   readKeys,
 } from '../former/former.ts';
 import { headedLayers, stepFrom } from '../workflow/index.ts';
 import type { AgentSkill } from '../skills/skills.ts';
+import { frontmatterOrNull, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 
 /**
@@ -135,17 +135,23 @@ export type SkillCost = { preload: boolean; listed: number; body: number; perTur
 /** Tokens, about: four characters to a token, rounded up. */
 export const tokensAbout = (text: string): number => Math.ceil(text.length / 4);
 
-/** `SkillCost` of the skill `id`, from its SKILL.md's `text`: one whose frontmatter never closes is read as all body. */
+/**
+ * `SkillCost` of the skill `id`, from its SKILL.md's `text`: one whose frontmatter never closes is read as all body, and one whose
+ * frontmatter does not read (`frontmatterOrNull`) as having no description and no preload.
+ */
 export function skillTurnCost(id: string, text: string): SkillCost {
   let block: string | null = null;
   let body = text;
   try {
     ({ block, body } = splitFrontmatter(`${id}/SKILL.md`, text));
   } catch {}
-  const framed = `---\n${block ?? ''}---\n`;
-  const preload = block !== null && frontmatterKey(framed, 'preload') === 'true';
-  const description = block === null ? '' : (frontmatterKey(framed, 'description') ?? '').replace(/^(["'])(.*)\1$/, '$2');
-  const listed = tokensAbout(`${id}: ${description}`);
+  const entries = block === null ? [] : (frontmatterOrNull(block)?.entries ?? []);
+  const said = (key: string): string => {
+    const value = entries.find((entry) => entry.key === key)?.value;
+    return typeof value === 'string' ? value.trim() : '';
+  };
+  const preload = said('preload') === 'true';
+  const listed = tokensAbout(`${id}: ${said('description')}`);
   const told = tokensAbout(body);
   return { preload, listed, body: told, perTurn: listed + (preload ? told : 0) };
 }
@@ -390,7 +396,8 @@ function refuseStale(file: string, draft: AgentDraft): void {
  * it rendered before it writes. Refused here is only what a file cannot hold: a key an agent may not set — `agent:`, a step's wiring, one
  * no agent has — in the parser's words (`agentKeyRefusal`), since it would be written and then refused, or dropped; one of its own lines
  * among the keys, where it would be written twice; a card file (`cardRetired`), which a stale page sends as `card` or as a `skills:` naming
- * one, and which is written nowhere; and a line break in a value, which would make what follows it a line of its own — a key, even.
+ * one, and which is written nowhere. Each value is written trimmed, through `renderFrontmatter`: quoted where plain would read otherwise
+ * (`: `, ` #`), and a value with a line break as a literal block.
  */
 export function renderAgent(draft: AgentDraft): string {
   const file = `${AGENTS_FOLDER}/${draft.name}.md`;
@@ -415,17 +422,9 @@ export function renderAgent(draft: AgentDraft): string {
     mcp: draft.mcp,
   };
   const values: Array<[string, string | null | undefined]> = AGENT_KEYS.map((key) => [key, isOwnKey(key) ? own[key] : keys[key]]);
-  const lines = values.flatMap(([key, value]) => {
-    if (value == null) return [];
-    const text = String(value);
-    if (/[\r\n]/.test(text))
-      refuse(
-        `${file}: \`${key}\` holds a line break, and a frontmatter line is one key and its value: what follows the break would be read as a line of its own. Write it on one line.`,
-      );
-    return [`${key}: ${text}`];
-  });
+  const pairs = values.flatMap(([key, value]): FrontmatterPair[] => (value == null ? [] : [[key, String(value).trim()]]));
   const body = String(draft.body ?? '').trim();
-  if (lines.length) return `---\n${lines.map((line) => `${line}\n`).join('')}---\n${body}\n`;
+  if (pairs.length) return `---\n${renderFrontmatter(pairs)}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : body ? `${body}\n` : '';
 }
 
@@ -655,10 +654,11 @@ export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[])
 export const noCodingStyle = (agent: string): string =>
   [
     '---',
-    `name: ${NO_CODING_STYLE}`,
-    `description: Claude Code's system prompt less its coding instructions, for the ${agent} agent, which does not write code.`,
-    'keep-coding-instructions: false',
-    '---',
+    renderFrontmatter([
+      ['name', NO_CODING_STYLE],
+      ['description', `Claude Code's system prompt less its coding instructions, for the ${agent} agent, which does not write code.`],
+      ['keep-coding-instructions', 'false'],
+    ]) + '---',
     '',
     'Follow the instructions appended after this prompt: they say what you are for and how you work.',
     '',

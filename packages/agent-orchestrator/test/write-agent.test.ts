@@ -115,7 +115,7 @@ test('a render writes the role and the description first, the keys in their orde
   );
 });
 
-test('a render refuses a key no agent has, agent:, wiring, the role or the description among the keys and a line break, by name', () => {
+test('a render refuses a key no agent has, agent:, wiring, the role or the description among the keys, by name', () => {
   const r = (keys: Record<string, string>, description?: string) => () => renderAgent({ name: 'a', description, keys: keys, body: 'x' });
   assert.throws(r({ agent: 'b' }), (e: Error) => e.message.startsWith("agents/a.md: `agent` is a step's key"));
   assert.throws(r({ check: 'npm test' }), (e: Error) => e.message.startsWith('agents/a.md: `check` is wiring, and belongs on the step'));
@@ -128,12 +128,19 @@ test('a render refuses a key no agent has, agent:, wiring, the role or the descr
       e.message.startsWith("agents/a.md: `role` is the agent's own line") &&
       e.message.includes('give it as the role, once'),
   );
-  assert.throws(
-    () => renderAgent({ name: 'a', role: 'one\ntwo', keys: {}, body: 'x' }),
-    (e: Error) => e.message.startsWith('agents/a.md: `role` holds a line break'),
-  );
-  assert.throws(r({ model: 'opus\ncheck: rm -rf /' }), (e: Error) => e.message.startsWith('agents/a.md: `model` holds a line break'));
-  assert.throws(r({}, 'one\ntwo'), (e: Error) => e.message.startsWith('agents/a.md: `description` holds a line break'));
+});
+
+test('a render writes a value YAML would read otherwise quoted, and one with a line break as a block, and each reads back the same', () => {
+  const said = 'Builds the change a spec describes: cuts it into commits, and # tests each.';
+  const quoted = renderAgent({ name: 'a', description: said, keys: { model: 'opus' }, body: 'x' });
+  assert.equal(quoted, `---\ndescription: "${said}"\nmodel: opus\n---\nx\n`);
+  assert.equal(parseAgent('a', quoted).description, said);
+  const lines = renderAgent({ name: 'a', role: 'Product\nengineer', description: 'one\ntwo', keys: {}, body: 'x' });
+  assert.equal(lines, '---\nrole: |-\n  Product\n  engineer\ndescription: |-\n  one\n  two\n---\nx\n');
+  assert.equal(parseAgent('a', lines).description, 'one\ntwo');
+  assert.equal(parseAgent('a', lines).role, 'Product\nengineer');
+  const smuggled = renderAgent({ name: 'a', keys: { model: 'opus\ncheck: rm -rf /' }, body: 'x' });
+  assert.ok(!/^check:/m.test(smuggled), `a line break makes no key of its own: ${smuggled}`);
 });
 
 test('a name is refused unless it is one file of the agents folder that a step can name', () => {

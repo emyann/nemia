@@ -1,5 +1,9 @@
 # Design discussion, 2026-10-15: kinds and revisions, the closeout's shape, and sessions attached to the daemon
 
+> **Status (2026-10-23): landed.** Every kind has a revision, a run pins what it resolved and shows its drift (`d217bf084`,
+> 2026-10-15; `6203d2186`, `d6d84c41c`); Claude Code steps run attached to the daemon on the Agent SDK (`f62c73462`, 2026-10-15), and a
+> long-lived session runs attached (`a8569a2f0`, 2026-10-16).
+
 **Status: the open choices are decided (section 5, the morning of 2026-10-15); handed to Iris as the input of an intake.** Not a spec,
 not a plan. It records what the owner and the operator session worked out on the night of 2026-10-14 to 15, starting from the
 store's disk footprint, at main `ab023d78`. Where it says *decided*, the owner said so; everything else is the session's reading, for

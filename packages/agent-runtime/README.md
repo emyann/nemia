@@ -2410,7 +2410,6 @@ of pure code sits beside it.
 | `test/live.test.ts` | the `--tools` fence, the `--disallowedTools` deny (run from a checkout Claude Code trusts), `--strict-mcp-config`, what a released session still has, `say` into a working session, a session that ends its turn without its closing statement, a `claude -p` session stopped at its budget, a `--bg` session spending past one, its cost read once let go, and a session bridged by `remoteControl` beside one that is not, an attached session's cost carried across a resume and a let-go's cut, against real Claude Code — `AE_LIVE=1` only |
 | `docs/harness.md` | what Claude Code does as the steps meet it, measured |
 | `docs/open-issues.md` | what is still wrong or half-verified |
-| `docs/hkb-migration.md` | notes toward moving hkb onto this engine |
 
 If a change wants an `if` in `engine.ts`, it probably belongs in `decide`. That line is what keeps
 this small, and it is the one rule worth defending.

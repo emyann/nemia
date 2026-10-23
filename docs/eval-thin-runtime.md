@@ -171,7 +171,7 @@ kubelet."* It exists for three reasons, and all three survive a thin runtime:
   pass sees the state it left. The orchestrator is built the same way.
 - **Pure, so it is tested as data.** The judgement is one function over plain values, so every transition is a test without a
   harness. The reason is the project's own history: the board this replaced had its reconcile as one 1,390-line effectful
-  function (`packages/agent-runtime/docs/hkb-migration.md`), where one change meant holding fifteen phases in mind at once.
+  function, where one change meant holding fifteen phases in mind at once.
 
 ### The lifecycle as a statechart, with XState
 
@@ -459,7 +459,7 @@ orchestrator's calls to the runtime change.
      with the work done. The in-doubt words name the bound, the README says an agent must answer a send within it, and
      open issue 34 counts this beside the crash; a test at shipped defaults shows it happen.
 
-   The rest is filed as three parts (as of 2026-09-28, part 2 is done and parts 3 and 4 remain):
+   The rest is filed as three parts (as of 2026-10-07, parts 2 and 4 are done and part 3 remains):
    - **Part 2: a workflow step names a remote agent through its `harness:` key.** The orchestrator's `runtime-client.ts`
      builds the entries and supplies `credentials` from the environment, and `harnessOf` and `KEY_HELP` accept them. The
      api's builder and listing and the board's harness picker learn the new values. The part also decides how a remote
@@ -469,9 +469,16 @@ orchestrator's calls to the runtime change.
      name: `a2a-agents.json` in the store maps a name to `{ url }` or `{ card }`, and a step says `harness: a2a:<name>`. Secrets
      come from `WF_A2A_<NAME>_<SCHEME>` on every request. A remote step is filed with no `config` (`localFields`), a question is
      answered with `wf say`, and the builder offers each declared agent as a harness. agent-orchestrator's features.md, *Shipped:
-     a step on a remote A2A agent*, says what it left: a remote step's transcript, and `output:` on a remote step. Parts 3 and 4
-     remain.
+     a step on a remote A2A agent*, says what it left: a remote step's transcript, and `output:` on a remote step. Part 3
+     remains.
    - **Part 3: the gRPC binding.** `@grpc/grpc-js`, `@bufbuild/protobuf`, and the SDK's `client/grpc` and `server/grpc`.
    - **Part 4: streaming and subscribe.** SendStreamingMessage and SubscribeToTask, relayed to the transcript and the feed,
      and a restarted runtime resubscribing. It also carries what stage 2 part 5a deferred: the collected files as
      Artifacts, and one A2A Task per runtime task.
+     **Streaming and subscribe done, 2026-10-07 (`b342b3da0`, `0c479816f`).** The runtime's A2A agent answers SubscribeToTask
+     for a `claude -p` task, reading the worker's run file into stream events, and the api relays one subscription per live
+     session to every follower of the step's transcript, down to the board. A remote agent whose card says `streaming: true` is
+     followed through its own Task's stream, resubscribed from where it was when it drops; one that does not stream keeps the
+     1 s re-read. SendStreamingMessage stays refused. What the part carried from 5a did not come with it: the runtime README's
+     *Streaming is done* and its *Not done* say what is served and what is not. Of stage 6's parts, the gRPC binding (part 3)
+     is the one still open.

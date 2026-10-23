@@ -41,23 +41,18 @@ check run by the run, which lands the merge or aborts it; `denials: fail` (§10)
 own task (§11, thin runtime stage 2 part 4b); a step on a remote A2A agent (thin runtime stage 6 part 2); and agents that carry their
 own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked in `docs/eval-thin-runtime.md`.
 
-**What remains, in order.** Of the numbered items, three are open:
+**What remains, in order.** Of the numbered items, four are open:
 
 1. §1, a run that grows steps from a plan.
 2. A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
    4c, admission, which is done). Rounds and tries are `-try<n>` tasks today (§11).
-3. §14, the former frontmatter form's fallback taken out, once `nemia frontmatter rewrite --check` is clean on the owner's machine.
+3. §13, the cases `test/run.test.ts` still holds: the say cases, to move beside `src/say/`; its timeline cases are fj03 slice 4's.
+4. §14, the former frontmatter form's fallback taken out, once `nemia frontmatter rewrite --check` is clean on the owner's machine:
+   carded, waiting in the inbox.
 
-Beside them, the git-out design's deferred freeze (`docs/design-2026-09-29-git-out.md`, *Freezing* and open question 6): a team's own
-skill as a run's place, copied per run to `WF_ROOT/places/<skill>@<version>/`, a copy whose `skillVersion` drifted refusing the run's
-passes, `nemia prune` removing a copy no record names, and `nemia refreeze`. Card C2 records `placeSkill` and runs the package's own place,
-which ships as a release that never changes under a run; the card is filed once G has landed (H has, below), so the first copy carries
-every verb and `say` key, and `placeSkill.version` becomes the copy's name then. Card E has landed: `nemia rm` and `nemia prune` read,
-hand off and remove a run's worktrees and branches through its place (`inventory`, `handoff`, `remove`), and call no git of their own.
-
-Then the *Engine-side work* at the end: waking the tick on a harness registry change rather than a timer, and the hkb migration; and
-thin runtime stage 6 parts 3 (the gRPC binding) and 4 (streaming and subscribe). Each *Shipped* section names what it left, and those
-leftovers are open too.
+Then the *Engine-side work* at the end: waking the tick on a harness registry change rather than a timer; and thin runtime stage 6
+part 3, the gRPC binding, its one part still open (part 4, streaming and subscribe, landed on 2026-10-07: `b342b3da0`, `0c479816f`).
+Each *Shipped* section names what it left, and those leftovers are open too.
 
 ## Shipped: the check
 
@@ -3263,7 +3258,7 @@ What it leaves:
 
 ## Shipped: a gate — a step's handoff that waits for a person
 
-§6 below, in full. `dev-planned`'s plan paused by prose: a brief that said to wait made it sign off `blocked`, a person answered with
+§6 below. `dev-planned`'s plan paused by prose: a brief that said to wait made it sign off `blocked`, a person answered with
 `wf retry --message`, which cost a try, and a plan that signed off `done` started implement at once. The shape §6 chose held: the
 handoff is the gate, not a step of its own. The package first; the board's half — Approve on the run page, the card's need,
 `POST …/approve` — shipped in the apps run after it, under *The board half* below. Read first: the README's *A gate*, `hasGate` and `atGate` in `status/status.ts`,
@@ -3452,7 +3447,7 @@ What it leaves:
 
 ## Shipped: the workflow builder — steps and their edges drawn on the board, written back as the folder
 
-§4 below, in full. The Workflows page drew each folder read-only, and nothing in the packages wrote a step back to markdown. Now a folder of
+§4 below. The Workflows page drew each folder read-only, and nothing in the packages wrote a step back to markdown. Now a folder of
 yours is built on the board: blocks and the edges between them, a form per step, saved back as the folder's files. The package half came
 first (`renderStep`, `writeWorkflow`), then the api and the board in the apps run after it.
 
@@ -4773,8 +4768,7 @@ chose the rule already there: a folder run's `runs/<id>/work/<step>` lives exact
   (the steps after a loop continue its folders), and a gate's send-back (`sentBack`); only a run whose every step succeeded is
   never written again (`retryRefusal`). Removing a folder would also make the board lie: `folderFiles` reads a missing folder as an
   empty one, and the run's page says *the folder is empty*. People are told where the folders are, by `wf start` and `wf decide`,
-  and `wf decide` offers `wf rm` as *forgets the run with its folders and files*. A git run keeps its far larger worktrees until
-  `wf rm` on the same rule.
+  and `wf decide` offers `wf rm` as *forgets the run with its folders and files*.
 - **Not built, and what each would have cost.** *Cleaned* at a run's end: breaks every path above, and needs a new word on the
   board for a folder that is gone. A verb to drop `work/` and keep the record: a second forget with its own refusals, for 3 KB. A
   step key (`kept` | `cleaned`), or *none at all* for a step that needs no files: a key with three obligations outside the package
@@ -5534,7 +5528,9 @@ Next: 2c, a workflow that marks a mount writable on purpose.
 
 ## 2. Remote Control on a step, and a supervisor session
 
-**The package half is built**, on the engine's `remoteControl` (`92d6783`). What was registered is kept below as it was asked.
+**Shipped**, with no record of its own but this one: the package half on the engine's `remoteControl` (`92d6783`), and the
+board's *Reach* row (2026-10-06). Its registration, its measurement of 2026-09-16 and what it needed are in this file's history
+before 2026-10-23.
 
 - **`remote: true` on a step**, in `STEP_KEYS` after `disallow`, with its line in `STEP_KEY_MEANINGS`. It is carried as `remoteControl`
   on every filing of the step's session — the first, each try `retries:` or `wf retry` files, each round, the looping step's and its
@@ -5552,29 +5548,6 @@ Next: 2c, a workflow that marks a mount writable on purpose.
   registration onto its task's view (`TaskView.bridge`, runtime open issue 23), and a step's detail answers it (`StepFiled.bridge`),
   drawn as a *Reach* row in the step's facts on the run page and its inspector (2026-10-06).*
 
-**Registered** 2026-09-16, by the operator: not now, but the ability has to exist. The aim is a session supervising the
-whole workload — an orchestrator — that the operator can reach from a phone whenever something waits on a person: a
-merge to accept, an answer to give.
-
-**Measured** (2026-09-16, Claude Code 2.1.273, three throwaway Haiku sessions, each stopped and removed): a `claude --bg`
-session is listed in the web's agents view only when its registration under `~/.claude/sessions/` carries a
-`bridgeSessionId`, and it gets one only when started with `--remote-control`. Without the flag none appears, from a clean
-environment or from the daemon's; with it, one appears at once. The engine's Claude runner passes no such flag, so every
-worker it spawns is invisible there. A worker of the old hkb from 2.1.266 (2026-09-08) carries a bridge id, so Claude Code
-used to bridge background sessions on its own. The docs do not say when that changed; an open Claude Code issue on
-auto-registration with Remote Control fits.
-
-**What it needs.**
-
-- Engine: a field on the task — `remoteControl: true`, say — read by the Claude runner and passed as `--remote-control` on
-  the spawn. A knob on the workload as a field carried on the task, never a default: Remote Control lets the session be
-  driven from claude.ai or a phone, not only seen. Refused on a harness that has no such flag. A live measurement that a
-  spawned worker lands in the agents view.
-- agent-orchestrator: a step key — `remote:`, say — carried on every filing of the step as `budget:` is. Later, the
-  supervisor: a session of its own, not a step of any run, that watches the store and acts, with Remote Control on. What it
-  is told and what it may do is its own design; nothing here decides it.
-- Board: the run page says a step's session is reachable from the phone when it is, with its link. *Done 2026-10-06.*
-
 ## 3. The queue: a cap on runs in flight, and cards that start themselves
 
 Shipped 2026-09-17 as *Shipped: the queue — a cap on runs in flight, and cards that start themselves*, above, which says what was
@@ -5585,40 +5558,8 @@ session is the engine's (Engine-side work, below: filing order and `priority`). 
 ## 4. The workflow builder: steps and their edges drawn on the board, written back as the folder
 
 Shipped 2026-09-17 as *Shipped: the workflow builder — steps and their edges drawn on the board, written back as the folder*, above:
-the package first, then the api and the board under *The board half* there. What was registered is kept as it was asked.
-
-**Registered** 2026-09-16, by the operator: define a step on the board, draw the workflow by dragging arrows between
-blocks, and have the builder amend the folder's files to match. To be written as an inbox card.
-
-**What exists.** The Workflows page draws a folder with React Flow (`apps/web/src/components/WorkflowCanvas.tsx`:
-`SpecNode`, `stepEdges`, `nodesDraggable` off), read-only: no handles, no `onConnect`. The api lists folders from two
-sources, the repository's `workflows/` and the store's (`sourcesOf` in `apps/api/src/workflows/workflows.ts`), and writes nothing
-into the checkout; its six writes all go through the package. The package parses a folder (`loadWorkflows`, `STEP_KEYS`
-the closed list of a step's keys, `COUNTS` what each count means, every refusal by name) and has no writer: nothing in
-the packages renders a step back to markdown.
-
-**What it needs.**
-
-- **Package, small.** A pure `renderStep(step)` — frontmatter in `STEP_KEYS` order, then the body — the inverse of the
-  parser, and a round-trip test: load, render, parse again, equal. `writeWorkflow(dir, steps, readme?)` in write.store.ts:
-  renders every step, parses the rendered folder in memory before a byte is written, so every parser refusal surfaces
-  first (a key it does not have, `after:` naming no step, a cycle, a loop that is not a back edge), then writes the
-  files, removes a step's file that is no longer in the set, and leaves `output:` schema files and the README as they
-  are. Nothing in `assess`, `advance` or the run model changes: a run still freezes its folder at `wf start`.
-- **Api, small.** `PUT /api/workflows/:name`, the seventh guarded write, the steps in the listing's own shape. Written
-  to the store's folder ("yours") by default; the repository's only with `"from": "repo"`, which is a write into the
-  person's checkout that git will show as changed — the one new kind of write on the board, and a decision to make
-  before it is built. Read back after the write; refusals are the parser's sentences with a 422.
-- **Board.** The Workflows page gains a builder mode: handles on the blocks; dragging from A to B writes `after: A` on
-  B; a second handle for the loop edge (`loop:`, with `rounds:`); an edge deleted takes the key with it; a block added
-  is a step with a name and a body; a step's inspector is a form drawn from `STEP_KEYS` and `COUNTS` (harness, model,
-  effort, permission mode, tools, disallow, deadline, attempts, budget, check, retries, output, loop, rounds) and the
-  body; Save puts the folder and shows a refusal by the step it names; unsaved changes are marked; a new workflow is a
-  name and a first step. An `output:` names a schema file: point at one beside the step, or paste JSON to write one.
-- **e2e.** A builder page on the temporary store: add a step, drag an edge, save, read the folder back through the
-  api, and take the write back before the page ends.
-
-About one package run and one or two `dev-build` runs; the second if the inspector's form is its own piece of work.
+the package first, then the api and the board under *The board half* there. Its registration, which that record quotes, is in this
+file's history before 2026-10-23.
 
 ## 5. Markdown rendered on the board, and a card's page with its keys explained
 
@@ -5627,182 +5568,28 @@ and its sources. The number kept so §6 and §7 keep theirs.
 
 ## 6. A gate: a step's handoff that waits for a person
 
-Shipped 2026-09-17 as *Shipped: a gate — a step's handoff that waits for a person*, above: the package first, then the board half — the
-Factory's card, Approve on the run page, `POST …/approve` — under *The board half* there. What was registered is kept as it was asked.
-
-**Registered** 2026-09-16, by the operator: a card, then a plan, then a person reads the plan before anyone implements
-it — and the same pause placeable in any workflow. Asked as a design question: is the gate the handoff, or a step of
-its own that could go anywhere?
-
-**What exists.** `dev-planned`'s plan step pauses by prose: a brief that says to wait for approval makes it sign off
-`blocked` with the plan in `needs`, and a person answers with `wf retry --message` or the run page's answer box. Nothing
-in the machinery holds it — a plan that signs off `done` lets implement start — and approving costs a try, since the
-answer continues the agent's session so it can sign off again. The plan's §5 "no mid-run human gate; the run boundary
-is the gate" predates the inbox and the board's answer box. A run already has one state a person owns, *waiting on
-you*, with an ask file behind it and a box on the board; that state has three reasons today (blocked, unsigned, over
-budget).
-
-**The shape: the handoff is the gate.** Argo Workflows made suspension a step (`suspend`), Tekton a custom task; here a
-step is a session on a harness, and a person is not a harness — a gate step would need a runner whose "session" is a file
-that fills when someone answers, and a step whose body nobody writes. The handoff already has everything a gate needs.
-
-**What it needs.**
-
-- **`gate: true` on a step** — this step's closeout waits for a person before anything after it is filed. It composes
-  with `check:`: verified first, then held. **And `wf start --gate <step>`**, or `gate:` on an inbox card naming a step,
-  for a run gated at a step its folder does not gate. Both freeze into one field on the record, `gates`, read by `assess`;
-  a step named that the workflow does not have is refused at start.
-- **Held by the tick, level-triggered.** A gated step that signed off reads `awaiting approval`; nothing after it is
-  filed on any pass until an approval is on disk, whatever the agent wrote. No session runs and no budget is spent while
-  it waits. `wf ls`: `waiting on you: approve plan`; the run's outcome is `blocked` for `--after` and the Factory.
-- **`wf approve <run> <step> [--message "<words>"]`** writes `runs/<id>.asks/approve-<step>` beside the retry asks — one
-  writer, composed on read — with the time and the words; refused for a step that is not gated, not signed off, or
-  already approved. Sending back is `wf retry <run> <step> --message`, as today: the session continues with the
-  objection, signs off again, and the gate holds again; an approval given before the send-back is spent by it.
-- **What the next step is told.** The approval and its words reach every step after the gate as data, `## Approved`
-  under the brief, as a parent run's closeout does (`## From run <id>`): a person's decision on the record, read by the
-  implementer and by the reviewer after.
-- **`wf decide`** prints the gate under the step (`approved 23:10Z — "ship the second reading"`), and a run cancelled
-  while gated is cancelled as any run is. `wf rm` refuses a run at a gate: something is due to be asked for.
-- **Board.** The Factory's card says `approve plan`; the run page shows the gated step's closeout, rendered as markdown,
-  with Approve (a box for the words) and Send back (the answer box that exists); `POST …/approve`, the seventh
-  guarded write. From a phone once Remote Control (§2) lands.
-- **`dev-planned` and `dev-planned-build`** put `gate: true` on `plan`? No: a folder decides for every run of it, and a
-  plan that reads one way should start implement at once. Keep the folders as they are and let the card or the start
-  say `--gate plan`; a `dev-gated` folder is not needed.
-
-One agent-orchestrator run (the key, the record field, `assess`, the verb, the brief section, README, tests that refuse:
-a gated step's dependents never filed without the file, an approval for the wrong step refused, a send-back spending
-the approval) — about $40; then one apps run (the button, the card's need, the e2e) — about $30.
+Shipped 2026-09-17 as *Shipped: a gate — a step's handoff that waits for a person*, above: the package first, then the board half —
+the Factory's card, Approve on the run page, `POST …/approve` — under *The board half* there. Its registration, which that record
+quotes, is in this file's history before 2026-10-23.
 
 ## 7. The web app's components on React Aria, not Radix
 
-Shipped 2026-09-17 as *Shipped: the web app's components on React Aria*, above, with what the base does not offer. What was registered is
-kept as it was asked.
-
-**Registered** 2026-09-17, by the operator: the shadcn base for `apps/web` should be React Aria rather than Radix.
-
-**What exists.** `apps/web/components.json` says `"style": "radix-nova"`; `radix-ui` 1.6.7 and `shadcn` 4.21.0 are in
-`apps/web/package.json`; the board's own components and the `ai-elements` ones compose Radix primitives (`asChild`
-triggers, Radix menus and dialogs). The repository carries the `shadcn` skill (`.claude/skills/shadcn`, installed
-2026-09-17), whose rules distinguish the bases (`base-vs-radix.md`, and the toast rule that names React Aria projects).
-The e2e visits every page in both themes and finds elements by role and name, so a base switch that keeps the roles
-keeps the checks.
-
-**What it needs.** A study first, on `workflows/dev-planned-build` with the shadcn skill in hand: which bases the
-installed shadcn CLI offers and the exact name of the React Aria one (`npx shadcn@latest info`, `docs`, and the
-preset builder), which of the app's installed components exist for that base and which do not, and what the app's
-own compositions must change (`asChild` and the like). Then the switch: `components.json` on the new base, each
-component re-added with `--dry-run` and `--diff` and the local edits carried over, the app's compositions adapted,
-`npm run build` and `npm run e2e` green in both themes, every page looked at (the `look` skill). What the base does
-not offer is named, not worked around. The lockfile committed with the dependency changes.
-
-One `dev-planned-build` run, the plan waiting for approval; likely the largest apps change so far.
+Shipped 2026-09-17 as *Shipped: the web app's components on React Aria*, above, with what the base does not offer. Its registration,
+which that record quotes, is in this file's history before 2026-10-23.
 
 ## 8. The end of a run is a step of its workflow, and a finished run is a decision on the board
 
 Shipped 2026-09-17 as *Shipped: the end of a run is a step of its workflow*, above: the package half — `workspace: main`, the ending's
-gate, `to decide`, `wf decide`'s facts and `ship.md` on the four `dev*` folders — and then the board's half, the Factory's count and its
-marked card, the Runs page's group, the run page's banner and the ending's gate panel. What was registered is kept as it was asked.
-
-**Registered** 2026-09-17, by the operator. First as a pain: a card started from the Inbox finished its run and, with nothing
-asking for a merge, seemed to vanish — off the Factory, a row among the finished, its branch waiting for a `wf decide` nobody
-was told to run. Then as a design: the end of a run must not be a policy in code (merge, or a PR), because what a person does
-with a run's product varies — merge a branch, open a PR, publish a study, read an artifact and keep it — and the product
-should let each user write their own ending the way they write everything else here, in markdown.
-
-**What exists.** The run boundary is the gate (plan §5): a run's result is a branch, `wf decide` prints `git merge` and
-`git branch -D` as ship it and drop it, and a person merges after a trial merge. A run that succeeded with nothing committed
-counts as shipped for `--after`. The board says `finished`; its "waiting on you" covers blocked, unsigned, over budget and at
-a gate (§6, shipped 2026-09-17: `gate: true` on a step, `--gate <step>` at start, `wf approve`, Approve and Send back on the
-run page), never a result nobody has decided. Nothing counts results to decide.
-
-**The shape.**
-
-- **The end is a step.** What happens when the work is done is the workflow's last step, in prose. `workflows/dev/ship.md`
-  says: trial merge onto the base branch, the full check, commit or abort, in the folder's own words — a person can read and
-  edit it, and another repository's says "open a PR with the closeout as the body" instead. A research workflow has no such
-  step. Nothing in the packages knows what shipping means.
-- **The gate is the decision.** `gate: true` on that last step (or `--gate ship` at start) stops the run before it runs:
-  the board shows *waiting on you: approve ship* with the closeout rendered, the branch's diff, the screenshots; Approve with
-  words runs the step, Send back objects. This is the loop the operator's session ran by hand on 2026-09-16 and 17, without
-  a supervisor.
-- **A research run is the same shape with nothing after the gate.** Its last step, the study, is gated; approving it is the
-  acceptance; the product is the closeout and the artifacts in the store; nothing is merged and nothing is dropped —
-  dropping deletes a branch, and this branch holds nothing. The run stays as a record until `wf rm`.
-- **`wf decide` reports facts, not verbs:** what the branch holds against the base (on it, ahead by N, gone), the closeout,
-  the artifacts, and what the last step would do next in the folder's words, with the command that approves it. The git
-  commands remain only for a folder whose last step is not an ending — the hand-driven fallback, as today.
-- **To decide**, a fifth reason a run waits on a person: a run at its result whose last gated step nobody has approved; or,
-  in a folder with no gated ending, whose branch is ahead of the base and not gone. Approval, or git, ends it; level-triggered,
-  read each pass. `wf ls` says `→ to decide: <last step's first line> — wf approve <run> <step>`; the api's `onYou` carries
-  it; the Factory's header counts them (`2 to decide`) and keeps such a card on the floor, marked, until decided; the Runs page
-  groups *To decide* between *In flight* and *Finished*; the run page's banner says it.
-- **`workspace: main` on a step**: it runs in the repository's checkout rather than a worktree, since merging onto the base
-  is the one thing a worktree cannot do; refused on any step with a `check:`, and on any step that is not the last; its
-  session gets the checkout's `.claude/settings.json` as any step does. The `dev*` folders gain `ship.md` with it, gated by
-  default — so every run of them stops at Approve, the way the operator decided each merge by hand today — and the fence
-  test holds it to the same denies as implement.
-- **`--after` is unchanged:** a child starts when its parent is shipped as git sees it (the branch on the base, or nothing
-  to commit), which a run's `ship.md` makes true when it merges, and a research run makes true by succeeding.
-
-One agent-orchestrator run (`workspace: main`; *to decide* in `assess`, `listing` and the vocabulary; `wf decide`'s facts;
-`ship.md` on the four `dev*` folders, gated; tests that refuse: a check on a main-workspace step, a main workspace on a step
-that is not last, a to-decide run that never reads shipped, an approved ending that runs and a sent-back one that does not),
-then one apps run (the counts, the group, the banner; the run page's gate panel showing the diff and the artifacts beside the
-closeout; e2e with a to-decide run and an approved ending in the seed).
+gate, `to decide`, `wf decide`'s facts and `ship.md` on the four `dev*` folders — and then the board's half, the Factory's count and
+its marked card, the Runs page's group, the run page's banner and the ending's gate panel. Its registration, which that record quotes,
+is in this file's history before 2026-10-23.
 
 ## 9. The supervisor: what the operator's session did on 2026-09-16 and 17, as a step that never ends
 
-Shipped 2026-09-17 as *Shipped: the supervisor — a workflow of one step that never ends*, above: the folder, `slot: none` for a run the
-cap does not hold, and the never-ending path held by tests — with the first run, its measurement and the board's half still to come.
-What was registered is kept as it was asked.
-
-**Registered** 2026-09-17, by the operator, after a day of watching this session run the board: "what if I had what you
-did in the board? What shape would that have?"
-
-**What the session did, as a loop.** It watched the store (`wf ls`, the daemon's log) for four kinds of moment and acted
-on each, then wrote down what it learned:
-
-- **a run at its result:** read `wf decide`, the branch's commits and stat, the e2e's screenshots for a web change; ran the
-  trial merge (`git merge --no-ff --no-commit`, the full check, resolving conflicts that were additive by keeping both
-  sides); put a brief to the person — rounds and cost, what shipped, what the review left, what was resolved — as one
-  question with two answers, merge or hold; acted on the answer; recorded the merge in the plan; restarted the daemon
-  when the merged code was the tick's; the chained runs then started on their own;
-- **a plan that stopped for approval:** read its `needs`, put its questions to the person with the options as the plan
-  wrote them, wrote the answer back with `wf retry --message`;
-- **a stall:** a session idle after a lost connection, one that signed off in prose, one held by its own background
-  shell — diagnosed off the registry, the transcript and the process tree, continued it with a note or ended the shell,
-  and recorded the trap (engine open issue 24, CLAUDE.md);
-- **an idea from the operator:** registered as a section here with the design, filed as a run when told to.
-
-**The shape.**
-
-- **Machinery first, no model:** the gate (§6, shipped), the queue (§3, shipped), the end as a step and *to decide* (§8).
-  These make every moment above a state the tick reads and the board shows, with a button. A person who runs no
-  supervisor sees the gate pop on the board and acts on it there. With §8, the merge the session ran by hand today is the
-  `ship.md` step a person approves.
-- **The supervisor, a model, reads the workflow's own markdown and never decides what an ending means.** A workflow of
-  one step that never ends — `workflows/supervisor/`, harness `claude`, `workspace: main` (§8; its commits are bookkeeping:
-  the plan, features.md, CLAUDE.md lessons), `remote: true` so a phone can open it (§2), and its tools the `wf` verbs plus
-  git and the suite. Its brief is the loop above. For a run to decide it reads the folder's README and last step — what
-  that workflow's ending is — the closeout, the diff and the screenshots, and prepares the decision: the brief a person
-  decides from. **Its questions to the person are gates on its own run:** it signs off `blocked` with the brief and the
-  options in `needs`; the board shows *waiting on you: approve supervisor* with the words box; the answer continues the
-  same session (`wf retry --message`, or the run page), so the session keeps its context as the operator's did. On a yes it
-  approves the run's own gate (`wf approve <run> ship`), and the folder's step does the shipping; the supervisor never types
-  git for a run. It takes a session slot and no run slot; the queue does not hold it.
-- **Stalls are its second job:** a run at its result is the common case, but a session gone quiet, one that signed off in
-  prose, one held by its own shell are what cost the operator's attention today. It reads them off the registry and the
-  transcript as the session did, continues with a note, ends a shell, and records the trap where the next agent reads.
-
-**What the supervisor would need that the packages lack today:** §8 in full (it is the supervisor's hands); a step that
-never ends — a step with no closeout schema that signs off `blocked` many times, each answer a try, which the plan step
-already does; a way for it to read a run's screenshots from the store (the `look` skill, present); and one measurement —
-how long such a session lasts before the harness compacts it, and what it forgets after.
-
-Order: §8, then the workflow folder and a first run supervising this repository for a day, with the operator watching what
-it asks and what it gets wrong.
+Shipped 2026-09-17 as *Shipped: the supervisor — a workflow of one step that never ends*, above: the folder, `slot: none` for a run
+the cap does not hold, and the never-ending path held by tests. That record names what it left: the board's half, and the first run,
+where §9's one measurement is — how long such a session lasts before its harness compacts it, and what it forgets after. Its
+registration, which that record quotes, is in this file's history before 2026-10-23.
 
 ## 10. `denials: fail`: a step that fails on what it was denied
 
@@ -5812,22 +5599,14 @@ keeps its.
 
 ## 11. A gate held open by the runtime (thin runtime stage 2 part 4b)
 
-Shipped 2026-09-24 as *Shipped: a gate and a blocked sign-off wait on the step's own task*, above. What was registered is kept as it
-was asked. A step's tries and rounds as attempts of one task, called 4c below and not the runtime's stage 4c (admission, done
-2026-09-25), is still open, as *tries as attempts* (2026-09-28).
-
-**Registered** 2026-09-23, the orchestrator's half of R1. Part 4a shipped the runtime's: a task filed `holdOpen: true` waits
-`input-required` with nothing running when an attempt signs, `answer` starts a turn that `--resume`s its session, and
-`close` settles it (`packages/agent-runtime/README.md`, *Waiting for a person*; measured live as M12). Today a gate's
-answer is a new task filed with `resumeFrom`; with 4b a gated step, or a sign-off the harness blocked, would be one task
-held open: `wf approve` its close, and the words a person sends back with it (`--message`) its answer. **Waits on the owner's reading**, with 4c — a step's tries
-and rounds as attempts of one task — which may fold into part 5. Its trap is known: `input-required` is a phase four places
-compare exactly, so it goes beside `needs-human` on every surface, never into it (CLAUDE.md).
+Shipped 2026-09-24 as *Shipped: a gate and a blocked sign-off wait on the step's own task*, above. Its registration, which that record
+quotes, is in this file's history before 2026-10-23. A step's tries and rounds as attempts of one task, called 4c in that registration
+and not the runtime's stage 4c (admission, done 2026-09-25), is still open, as *tries as attempts* (2026-09-28).
 
 ## 12. An agent that carries its own skills, in Claude Code's own format
 
-**Measured** 2026-09-25, nothing built. [`docs/spike-2026-09-25-agents-skills.md`](../../../docs/spike-2026-09-25-agents-skills.md)
-holds the findings that the design depends on, measured on Claude Code 2.1.282:
+**Measured** 2026-09-25, and built since by cards 1a to 4 (below).
+[`docs/spike-2026-09-25-agents-skills.md`](../../../docs/spike-2026-09-25-agents-skills.md) holds the findings that the design depends on, measured on Claude Code 2.1.282:
 
 - An agent's body is appended with `--append-system-prompt-file`. `--agent` and `--system-prompt` replace the default prompt.
 - Skills are served as one `--plugin-dir`, namespaced and invocable in `dontAsk`. An agent's `skills:` preloads nothing on the main thread.
@@ -5841,16 +5620,19 @@ Built since, by the design's cards: 1a (the machinery) and 1b (the shipped proce
 skills on the board from your library, this repository's and Nemia's shipped ones, a shipped one copied into your library first, each
 with what it costs a turn; `systemPrompt` as radios by what the agent does), and 3b (a skill of your own written on the board, with a
 page of its own that lists who gives it and holds `preload:` as a switch with its cost), and 3c (an agent tried on a short brief from its page on the board, a try refused and said
-on its listing when the try's fence does not reach it). Their commits: 3a `ef147a1` and 3b `c8145ca` (2026-09-25), 3c `60afb7b`
-(2026-09-26). Noted 2026-09-28; until then the line said 3c followed.
+on its listing when the try's fence does not reach it). Their commits: 3a `ef147a1a2` and 3b `c8145caac` (2026-09-25), 3c
+`60afb7b34` (2026-09-26). Noted 2026-09-28; until then the line said 3c followed.
 
 ## 13. `run.test.ts` beside the folders of `run.ts`
 
-**Deferred** from the feature-folders slices 4a and 4b, which cut `run.ts` into its folders and moved none of its cases: `test/run.test.ts`
-(about 9,400 lines) still tests `assess`, `retry/`, `round/`, `forget/`, `list/`, `start/inputs.ts`, `decide/`, `brief/`, `record/`,
-`status/`, `wait/` and the rest through the `agent-orchestrator/run` face. The design's *Tests beside the code* moves each case into the
-folder of what it tests (`src/<feature>/<feature>.test.ts`), and a case across features stays in `test/`. A mechanical move of its own,
-as a card: the cases unchanged but their imports, each folder's file under the limits, and `suite.test.ts` finding every one.
+**What is left** of the move deferred from the feature-folders slices 4a and 4b. The test rewrite into stories and tables (fj03) took
+most of `test/run.test.ts`'s cases out into its stories and tables, and its 9,400 lines are 838. Two groups stay:
+
+- **The say cases** — `sayRefusal`, `saidLines`, `said to 2×` on `nemia ls`, `## Said to your session` in a try's brief and in a round's
+  — to move beside `src/say/`, as the design's *Tests beside the code* says (`src/<feature>/<feature>.test.ts`; a case across features
+  stays in `test/`), the cases unchanged but their imports, and `suite.test.ts` finding the file.
+- **The timeline cases** are fj03 slice 4's (the orchestrator's stats and timeline tests as scenarios and tables), carded in the inbox:
+  they move with that rewrite, not before.
 
 ## 14. The former frontmatter form, no longer read
 
@@ -5869,7 +5651,6 @@ frontmatter reader reads.
 Not agent-orchestrator features, listed so nothing is lost:
 
 - waking the tick loop on harness registry changes instead of a timer (agent-runtime README);
-- the hkb migration ([agent-runtime/docs/hkb-migration.md](../../agent-runtime/docs/hkb-migration.md));
 - ~~a task field for Remote Control~~ *done, engine `92d6783`: `remoteControl: true` on the task; and in the workflow layer, `remote: true`
   on a step, carried on every filing of its session and refused at start on a harness the engine refuses it for* (§2 above);
 - ~~a `blocked` session holding a concurrency slot~~ *done, engine `912d537`*: count `working` only toward the ceiling and keep the wider

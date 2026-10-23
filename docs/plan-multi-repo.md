@@ -1,5 +1,8 @@
 # Plan: the Factory on several repositories
 
+> **Status (2026-10-23): superseded by factories** (`65142b5a1`, `8abba04fa`, 2026-09-30): a run starts in a factory, and a factory
+> names its repository. Nothing below was built as written.
+
 Written 2026-09-22, from a session with the owner. The owner's order: finish P2's list first (`docs/pivot-2026-09-18.md`
 §6), then use the Factory on the other projects on this machine — pipao-v2 first named. Nothing here is built or filed.
 Every claim about the code was read on main at `0b5c7ef`; paths are the repository's.

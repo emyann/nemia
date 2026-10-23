@@ -265,6 +265,31 @@ test('a daemon’s line, as up writes it once it holds the store, is sent as a d
   assert.equal(all[2].data, JSON.stringify(daemon));
 });
 
+test("the store's pause put and lifted, as the tick writes them, are each sent as a store event, its data the line whole", WAITED, async (t) => {
+  const pass = emptyFeed();
+  await pass({ 'r-1': planAt('running') });
+  const memo = freshFeedMemo();
+  const at = '2026-10-23T06:00:00.000Z';
+  for (const pause of [{ at }, null])
+    await runtime.runPromise(
+      emitFeed(new Map([['r-1', planAt('running')]]), { memo, pause }).pipe(Effect.provide(Logger.layer([]))),
+    );
+  const lines = readFeed(0).lines;
+  const opened = await open();
+  const all = await readUntil(t, opened.reader, opened.text, (s) => s.length >= 4);
+  await opened.reader.cancel();
+  assert.deepEqual(
+    all.map((b) => b.event),
+    ['run', 'step', 'store', 'store'],
+    'a line of no run and no step is the store’s, never a run event',
+  );
+  assert.deepEqual(
+    all.slice(2).map((b) => JSON.parse(b.data!).reason),
+    ['StorePaused', 'StoreResumed'],
+  );
+  assert.equal(all[3].data, JSON.stringify(lines.at(-1)));
+});
+
 test(
   'a tool denial comes out as a step event, its data the line whole: the api names an event by what the line is about, not by its reason',
   WAITED,

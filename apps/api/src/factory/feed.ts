@@ -19,12 +19,20 @@ import {
 import { type ApiEnv, Beats } from '../layer.ts';
 
 /**
- * What a line of the workflow feed is about, as its SSE event names it: a daemon that took the store (`daemon`), a step's word (`step`),
- * a run gone from the store (`removed`), or a run's own word (`run`). Read off the line's shape alone — the api relays the feed and judges
- * nothing from it.
+ * What a line of the workflow feed is about, as its SSE event names it: the store, its pause put or lifted (`store`), a daemon that took
+ * the store (`daemon`), a step's word (`step`), a run gone from the store (`removed`), or a run's own word (`run`). Read off the line's
+ * shape alone — the api relays the feed and judges nothing from it.
  */
-const feedEventOf = (line: FeedLine): 'daemon' | 'step' | 'removed' | 'run' =>
-  'daemon' in line ? 'daemon' : line.step !== undefined ? 'step' : line.word === REMOVED ? 'removed' : 'run';
+const feedEventOf = (line: FeedLine): 'store' | 'daemon' | 'step' | 'removed' | 'run' =>
+  'store' in line
+    ? 'store'
+    : 'daemon' in line
+      ? 'daemon'
+      : line.step !== undefined
+        ? 'step'
+        : line.word === REMOVED
+          ? 'removed'
+          : 'run';
 
 /**
  * Where a reader of the feed starts: the byte its cursor names — none, or an empty one, is 0, the whole feed, as `nemia watch` and `ae

@@ -79,10 +79,11 @@ export const stepAttributes = (run: Pick<Run, 'factory' | 'workflowDir'>, step: 
 
 /**
  * One fact of a step a pass records: a session that settled (`try`), with what it cost in dollars where measured, its tokens where
- * measured, in and out and the input by kind, and how long it ran, `task` on the step's first try; a check that settled (`check`); a round its loop was granted or ran out of (`round`); a wait outside the
- * step's sessions that ended (`WaitFact`); a call its harness denied one of its sessions (`DeniedFact`); a number of its run's timeline
- * once the run is over (`TimelineFact`). `attributes` are `stepAttributes`, the outcome among them: `done`, `blocked`, `failed` or
- * `stopped` for a try; `passed`, `refused` or `unfinished` for a check; `granted` or `exhausted` for a round.
+ * measured, in and out and the input by kind, and how long it ran, `task` on the step's first try; a check that settled (`check`); a round
+ * its loop was granted or ran out of (`round`); a wait outside the step's sessions that ended (`WaitFact`); a call its harness denied one
+ * of its sessions (`DeniedFact`); a number of its run's timeline once the run is over (`TimelineFact`). `attributes` are `stepAttributes`,
+ * the outcome among them: `done`, `blocked`, `failed` or `stopped` for a try; `passed`, `refused` or `unfinished` for a check; `granted`
+ * or `exhausted` for a round.
  */
 export type StepFact =
   | {

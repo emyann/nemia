@@ -185,12 +185,12 @@ export const GATE_BOUNDS = [60_000, 300_000, 900_000, 1_800_000, 3_600_000, 7_20
 /**
  * The metrics of a step, each by the attributes of `stepAttributes` alone: what its settled sessions cost (`step.cost`, USD, where
  * measured), their tokens (`step.tokens.input`, `step.tokens.output`, where measured), the input by kind where measured
- * (`step.tokens.cache_read`, `step.tokens.cache_write`, `step.tokens.uncached`, which add up to `step.tokens.input`), the tasks — a
- * step of a run, counted once at its first try's settle, by the four labels and no outcome (`step.tasks`) — and their time (`step.duration`, ms); the sessions
- * by how they ended (`step.tries`), the checks by their verdict (`step.checks`) and the rounds granted and run out of (`step.rounds`);
- * and the waits outside its sessions (`WaitFact`): a session's in the queue (`step.queue.duration`), its check's run by verdict
- * (`step.check.duration`), both over `WAIT_BOUNDS`, and a person's at its gate (`step.gate.wait`, over `GATE_BOUNDS`), each in ms. Each
- * counter only grows, so a collector reads it as one. A call a harness denied is none of them: it is a span (`DENIED_SPAN`).
+ * (`step.tokens.cache_read`, `step.tokens.cache_write`, `step.tokens.uncached`, which add up to `step.tokens.input`), the tasks — a step
+ * of a run, counted once at its first try's settle, by the four labels and no outcome (`step.tasks`) — and their time (`step.duration`,
+ * ms); the sessions by how they ended (`step.tries`), the checks by their verdict (`step.checks`) and the rounds granted and run out of
+ * (`step.rounds`); and the waits outside its sessions (`WaitFact`): a session's in the queue (`step.queue.duration`), its check's run by
+ * verdict (`step.check.duration`), both over `WAIT_BOUNDS`, and a person's at its gate (`step.gate.wait`, over `GATE_BOUNDS`), each in ms.
+ * Each counter only grows, so a collector reads it as one. A call a harness denied is none of them: it is a span (`DENIED_SPAN`).
  */
 export const STEP_METRICS = {
   cost: Metric.counter('step.cost', { description: "a step's settled sessions' cost, in USD", incremental: true }),
@@ -209,7 +209,7 @@ export const STEP_METRICS = {
     incremental: true,
   }),
   tasks: Metric.counter('step.tasks', {
-    description: "the steps of runs whose first try settled: a task, its tries and rounds summed, by no outcome",
+    description: 'the steps of runs whose first try settled: a task, its tries and rounds summed, by no outcome',
     incremental: true,
   }),
   duration: Metric.histogram('step.duration', { description: "a step's settled session's time, in ms", boundaries: STEP_BOUNDS }),

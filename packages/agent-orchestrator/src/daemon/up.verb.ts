@@ -82,7 +82,9 @@ const quotaRecorded = (harness: string, q: HarnessQuota): Effect.Effect<void> =>
           const at = resetsAt === null ? NaN : Date.parse(resetsAt);
           return Effect.andThen(
             Metric.update(Metric.withAttributes(QUOTA_METRICS.used, { harness, window }), usedPercentage),
-            Number.isFinite(at) ? Metric.update(Metric.withAttributes(QUOTA_METRICS.resetsAt, { harness, window }), at / 1000) : Effect.void,
+            Number.isFinite(at)
+              ? Metric.update(Metric.withAttributes(QUOTA_METRICS.resetsAt, { harness, window }), at / 1000)
+              : Effect.void,
           );
         },
         { discard: true },
@@ -253,20 +255,20 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
 /**
  * The daemon: the store's lease taken as `holder` (`takeStore`, refused by name while another daemon of either kind ticks it) and let go
  * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; the engine's attached sessions held
- * (`hold`) inside it, so as the scope closes each is let go between two tool calls, before the lease, and what that hold serves on
- * its own port written onto the lease beside the api's url (`heldHolder`), by this process, which is the one that holds it — so
- * another process on this store can follow one of those sessions live rather than off the files; its series and the caller's
- * (`series`) born at zero and exported so (`DAEMON_SERIES`, `seriesBorn`) before anything counts into them; its line in the feed
- * (`saidStarted`); `onTaken`; then a pass on `e` every
- * interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats on a fiber forked
- * in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that finds the store taken
- * over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and every
- * `QUOTA_EVERY_MS` (`askedQuota`, through `quota` where given), sets the quota's gauges at each good reading (`QUOTA_METRICS`), and hands each pass the latest reading, which the pass keeps among the recent and so in the series. On
- * a third it delivers the store's subscriptions to the feed (`deliver`), on a fourth it keeps Nemia at the person's level (`keep`), on
- * a fifth it brings each factory made from a template to it (`reconcile`), and on a sixth it frees the worktrees of the runs the latest
- * pass answered finished (`free`), which no pass waits on. On a seventh, once the first pass has answered and every `DISK_EVERY` after,
- * it measures what the store takes on the disk (`disk`), asking the engine what it keeps by task, and hands each pass the latest
- * reading as it does the quota: no pass walks the store, and a sweep that failed leaves the passes none.
+ * (`hold`) inside it, so as the scope closes each is let go between two tool calls, before the lease, and what that hold serves on its own
+ * port written onto the lease beside the api's url (`heldHolder`), by this process, which is the one that holds it — so another process on
+ * this store can follow one of those sessions live rather than off the files; its series and the caller's (`series`) born at zero and
+ * exported so (`DAEMON_SERIES`, `seriesBorn`) before anything counts into them; its line in the feed (`saidStarted`); `onTaken`; then a
+ * pass on `e` every interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats
+ * on a fiber forked in the scope, so a long pass is not taken for stalled and taken over mid-pass, and it fails at the first pass that
+ * finds the store taken over (`stillHeld`, `takenFromLine`). On another fiber in the scope it asks each harness for its quota, at once and
+ * every `QUOTA_EVERY_MS` (`askedQuota`, through `quota` where given), sets the quota's gauges at each good reading (`QUOTA_METRICS`), and
+ * hands each pass the latest reading, which the pass keeps among the recent and so in the series. On a third it delivers the store's
+ * subscriptions to the feed (`deliver`), on a fourth it keeps Nemia at the person's level (`keep`), on a fifth it brings each factory made
+ * from a template to it (`reconcile`), and on a sixth it frees the worktrees of the runs the latest pass answered finished (`free`), which
+ * no pass waits on. On a seventh, once the first pass has answered and every `DISK_EVERY` after, it measures what the store takes on the
+ * disk (`disk`), asking the engine what it keeps by task, and hands each pass the latest reading as it does the quota: no pass walks the
+ * store, and a sweep that failed leaves the passes none.
  */
 export const up = (
   e: Engine,

@@ -11,6 +11,7 @@
  * `packages/agent-orchestrator/test/observe.test.ts` holds the names here to those the code emits, and the dashboards to the seed.
  */
 import { asked, awaited } from './stack.ts';
+import { quota, type Sampled } from './quota-week.ts';
 
 /** The attributes of a seeded span: each a word, or a number where the code sends one. */
 export type SpanAttributes = Record<string, string | number>;
@@ -31,6 +32,7 @@ export type MetricSeed = {
   kind: 'histogram' | 'gauge' | 'total' | 'counter';
   series: [Record<string, string>, number][];
   restarted?: true;
+  sampled?: Sampled;
 };
 
 /** `metric`, seeded across a restart of the daemon (`MetricSeed`'s `restarted`). */
@@ -207,6 +209,20 @@ const bySteps = (name: string, kind: MetricSeed['kind'], values: [typeof IMPLEME
 /** A metric with one series and no attribute. */
 const lone = (name: string, kind: MetricSeed['kind'], value: number): MetricSeed => ({ name, kind, series: [[{}, value]] });
 
+/** A step whose sessions the seed counts by kind of token and by task beside the two it tells of: a third agent for the Spending bars. */
+const PLAN = { factory: 'nemia', workflow: 'intake', step: 'plan', agent: 'iris' };
+
+/** A count of what three steps' sessions settled `done`: IMPLEMENT's, REVIEW's and PLAN's, in that order. */
+const done = (name: string, values: [number, number, number]): MetricSeed =>
+  bySteps(
+    name,
+    'total',
+    values.map((value, i) => [[IMPLEMENT, REVIEW, PLAN][i], 'done', value]),
+  );
+
+/** A metric kept by a step's four labels and no outcome, as `step.tasks` is: each of `values` a series. */
+const byKeys = (name: string, values: [typeof IMPLEMENT, number][]): MetricSeed => ({ name, kind: 'total', series: values });
+
 /** What the daemon says in the seed. */
 const DAEMON: ServiceSeed = {
   service: 'nemia',
@@ -302,15 +318,28 @@ const DAEMON: ServiceSeed = {
     bySteps('step.cost', 'total', [
       [IMPLEMENT, 'done', 4.2],
       [REVIEW, 'done', 2.1],
+      [PLAN, 'done', 0.9],
     ]),
     bySteps('step.tokens.input', 'total', [
       [IMPLEMENT, 'done', 52_000],
       [REVIEW, 'done', 18_000],
+      [PLAN, 'done', 8_000],
     ]),
     bySteps('step.tokens.output', 'total', [
       [IMPLEMENT, 'done', 9_000],
       [REVIEW, 'done', 4_000],
+      [PLAN, 'done', 2_500],
     ]),
+    done('step.tokens.cache_read', [44_000, 15_500, 6_000]),
+    done('step.tokens.cache_write', [6_500, 2_000, 1_800]),
+    done('step.tokens.uncached', [1_500, 500, 200]),
+    byKeys('step.tasks', [
+      [IMPLEMENT, 3],
+      [REVIEW, 2],
+      [PLAN, 1],
+    ]),
+    quota('quota.used'),
+    quota('quota.resets_at'),
     bySteps('step.duration', 'histogram', [
       [IMPLEMENT, 'done', 900_000],
       [REVIEW, 'done', 60_000],
@@ -437,11 +466,17 @@ function spansOf(span: SpanSeed, now: number, id: (width: number) => string, tra
 const RESTART = Math.floor(POINTS / 2);
 
 /**
- * The data points of one metric series, a sample every `POINT_GAP_MS` up to `now`, growing to `value` unless it is a gauge; a series
- * `restarted` grows to it twice, from zero at the first sample and again at `RESTART`, its second process started there.
+ * The data points of one metric series, a sample every `POINT_GAP_MS` up to `now`, growing to `value` unless it is a gauge, or its
+ * history where it is `sampled`; a series `restarted` grows to it twice, from zero at the first sample and again at `RESTART`, its
+ * second process started there.
  */
 function pointsOf(metric: MetricSeed, attributes: Record<string, string>, value: number, now: number): object[] {
-  const { kind } = metric;
+  const { kind, sampled } = metric;
+  if (sampled)
+    return Array.from({ length: sampled.count }, (_, i) => {
+      const ago = (sampled.count - 1 - i) * sampled.every;
+      return { attributes: listed(attributes), timeUnixNano: nanos(now - ago), asDouble: sampled.at(attributes, ago, now) };
+    });
   const timeOf = (i: number) => now - (POINTS - 1 - i) * POINT_GAP_MS;
   const bucket = BOUNDS.findIndex((bound) => value <= bound);
   return Array.from({ length: POINTS }, (_, i) => {
@@ -504,10 +539,15 @@ export function stamped(seed: readonly ServiceSeed[], now: number): { traces: ob
   };
 }
 
-/** Post the seed, stamped now, to the collector at `otlp`; the stamp, milliseconds since the epoch. */
+/**
+ * Post the seed, stamped now, to the collector at `otlp`, its histories first (`Sampled`), oldest sample first; the stamp, milliseconds
+ * since the epoch.
+ */
 export async function post(otlp: string, seed: readonly ServiceSeed[] = SEED): Promise<number> {
   const now = Date.now();
-  const bodies = stamped(seed, now);
+  const only = (history: boolean) => seed.map((s) => ({ ...s, metrics: s.metrics.filter((m) => (m.sampled !== undefined) === history) }));
+  await asked(`${otlp}/v1/metrics`, stamped(only(true), now).metrics);
+  const bodies = stamped(only(false), now);
   await asked(`${otlp}/v1/metrics`, bodies.metrics);
   await asked(`${otlp}/v1/logs`, bodies.logs);
   await asked(`${otlp}/v1/traces`, bodies.traces);

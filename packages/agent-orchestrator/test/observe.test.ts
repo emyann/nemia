@@ -382,7 +382,7 @@ const KNOWN: Known = {
 const PROMQL_WORDS = new Set(
   [
     'sum avg max min count group topk by without on ignoring and or unless rate increase delta histogram_quantile vector',
-    'label_values label_replace clamp_min',
+    'label_values label_replace clamp_min time',
   ]
     .join(' ')
     .split(' '),
@@ -670,7 +670,15 @@ test('REFUSED: an image by tag, a short digest, and a port the daemon exports to
 });
 
 test("each dashboard parses, has its own uid, and points at the image's datasources", () => {
-  assert.deepEqual([...DASHBOARDS.values()].map((d) => d.title).sort(), ['A run', 'Passes', 'Steps', 'System', 'Time', 'Timeline']);
+  assert.deepEqual([...DASHBOARDS.values()].map((d) => d.title).sort(), [
+    'A run',
+    'Passes',
+    'Spending',
+    'Steps',
+    'System',
+    'Time',
+    'Timeline',
+  ]);
   assert.equal(new Set([...DASHBOARDS.values()].map((d) => d.uid)).size, DASHBOARDS.size);
   for (const [file, d] of DASHBOARDS) {
     assert.equal(

@@ -89,9 +89,7 @@ else
       holder: 'api',
       series: [STEP_FOLLOWS],
       quota: (name) =>
-        name === 'claude'
-          ? Effect.promise(() => daemonQuota(asker!, () => engineRead('quota', e!.quota('claude')))())
-          : e!.quota(name),
+        name === 'claude' ? Effect.promise(() => daemonQuota(asker!, () => engineRead('quota', e!.quota('claude')))()) : e!.quota(name),
       onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
     }).pipe(Effect.scoped, Effect.provideContext(services!), Effect.ensuring(runtime.disposeEffect)),
   ).catch(fail);

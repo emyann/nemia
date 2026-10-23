@@ -57,7 +57,7 @@ holds what every change needs.
   tools/test-costs/report.ts <dir>...` ranks them. A package's peak is its largest process, not the sum of the files running at once.
 - A change to tests alone shows that no source file's coverage dropped: `node tools/coverage/record.ts <package-dir> --out
   before.json` before it and `after.json` after, then `node tools/coverage/compare.ts before.json after.json`, which exits 1 naming
-  each file whose hit lines or branches fell. A session's measure, never run by the suite or CI: it runs the package's whole suite.
+  each file whose hit lines or branches fell; records on each side of a `--` say apart, as varying, a line they disagree on. A session's measure, never run by the suite or CI: it runs the package's whole suite.
 - **A run's checks inherit the daemon's environment** (`WF_MAX_CONCURRENT=50` on the owner's machine): a test that relies on a default
   passes there and fails by hand. All of it but the telemetry, which the runtime takes out of every child that is no session and the
   three test seats drop.

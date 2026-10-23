@@ -8,7 +8,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { compared, recordOf, withCoverage, type CoverageRecord, type FileCoverage, type V8Script } from '../../coverage/coverage.ts';
+import {
+  compared,
+  judged,
+  recordOf,
+  withCoverage,
+  type CoverageRecord,
+  type FileCoverage,
+  type V8Script,
+} from '../../coverage/coverage.ts';
 import { main } from '../../coverage/compare.ts';
 
 const PKG = '/repo/packages/p';
@@ -130,6 +138,66 @@ test("a branch is judged by its arms, each taken when any test process took it, 
   }
 });
 
+test('records on either side tell a line or an arm the records disagree on, which varies, from one no test takes any more', async (t) => {
+  const two = recordWith({ 'src/a.ts': cover([1, 2], 2) });
+  const one = recordWith({ 'src/a.ts': cover([1], 2) });
+  const arm = (taken: boolean): CoverageRecord => ({
+    ...two,
+    files: { 'src/a.ts': { ...cover([1, 2], 2), arms: { taken: taken ? { '10-20': 2 } : {}, untaken: taken ? {} : { '10-20': 2 } } } },
+  });
+  const rows: [
+    name: string,
+    before: CoverageRecord[],
+    after: CoverageRecord[],
+    lost: [number[], number[]],
+    varying: [number[], number[]],
+  ][] = [
+    ['a line one before-record hit and another did not varies, and is no fall', [two, one], [one], [[], []], [[2], []]],
+    ['a line one after-record hits and another does not varies, and is no fall', [two], [two, one], [[], []], [[2], []]],
+    [
+      'two before-records each hitting a line the other did not, and an after-record hitting neither, vary: no fall, though fewer are hit',
+      [recordWith({ 'src/a.ts': cover([1, 2, 3], 4) }), recordWith({ 'src/a.ts': cover([1, 2, 4], 4) })],
+      [recordWith({ 'src/a.ts': cover([1, 2], 4) })],
+      [[], []],
+      [[3, 4], []],
+    ],
+    [
+      'a line every before-record hit and no after-record hits is REFUSED, by its file and line',
+      [two, two],
+      [one, one],
+      [[2], []],
+      [[], []],
+    ],
+    [
+      'an arm one after-record takes and another does not varies, and is no fall',
+      [arm(true)],
+      [arm(true), arm(false)],
+      [[], []],
+      [[], [2]],
+    ],
+    [
+      'an arm every before-record took and no after-record takes is REFUSED, by its line',
+      [arm(true), arm(true)],
+      [arm(false)],
+      [[], [2]],
+      [[], []],
+    ],
+  ];
+  for (const [name, before, after, lost, varying] of rows) {
+    await t.test(name, () => {
+      const found = judged(before, after);
+      assert.deepEqual(
+        found.falls.map((fall) => [fall.file, fall.linesLost, fall.armsLost]),
+        lost.flat().length > 0 ? [['src/a.ts', ...lost]] : [],
+      );
+      assert.deepEqual(
+        found.varying.map((v) => [v.file, v.lines, v.armLines]),
+        varying.flat().length > 0 ? [['src/a.ts', ...varying]] : [],
+      );
+    });
+  }
+});
+
 test('the coverage flags go right after the script’s node, so its reporters keep their destinations', () => {
   const script = "node --test --test-reporter=spec --test-reporter-destination=stdout 'test/*.test.ts'";
   assert.equal(
@@ -139,7 +207,7 @@ test('the coverage flags go right after the script’s node, so its reporters ke
   assert.equal(withCoverage('tsx --test', '/tmp/l'), undefined, 'a script that does not start with node is refused');
 });
 
-test("compare's main answers 0 when nothing fell, 1 when a file's coverage fell, and 2 on arguments that are not two records", () => {
+test("compare's main answers 0 when nothing fell, 1 when a file's coverage fell, and 2 on arguments that are not two sides of records", () => {
   const dir = scratch('coverage-');
   const write = (name: string, record: unknown) => {
     const file = path.join(dir, name);
@@ -174,4 +242,22 @@ test("compare's main answers 0 when nothing fell, 1 when a file's coverage fell,
     main([before, path.join(dir, 'missing.json')], () => {}),
     2,
   );
+  lines.length = 0;
+  assert.equal(main([before, fell, '--', fell], said), 0, 'a line hit in one before-record of two varies: no fall');
+  assert.ok(
+    lines.some((line) => line.includes('src/a.ts') && /\b2\b/.test(line.split(':').slice(1).join(':'))),
+    lines.join('\n'),
+  );
+  assert.equal(main([before, same, '--', fell, fell], said), 1, 'a line every before-record hit and no after-record hits fell');
+  for (const sides of [
+    [before, '--'],
+    ['--', same],
+    [before, '--', same, '--', fell],
+  ]) {
+    assert.equal(
+      main(sides, () => {}),
+      2,
+      `two sides, each of one record or more: ${sides.join(' ')}`,
+    );
+  }
 });

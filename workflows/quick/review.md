@@ -21,11 +21,10 @@ this run's pull request and fast-forwards the base branch, and nobody reads the 
 is the only way back — it files implement again, on the same branch, with your findings — and you name no step: what comes after you is
 the workflow's, never yours.
 
-**A quick build is small**: at most 300 lines changed, in any number of files, added plus removed, tests and docs counted, generated files
-(`package-lock.json`, `apps/web/theme/`, `apps/web/src/routeTree.gen.ts`) left out — implement's check measured it and its `wf size:`
-line is in your brief. A change that only fits the bound because a test was trimmed, split off or left unwritten is a finding. A change
-the card turns out to need past the bound is a finding too, with `again: true` and `kind` `other`: it says so, and a person starts the
-card with `build`.
+**A quick build has no size bound**: quick is for a card that needs no design, whatever its size, so read every file and every line
+of it — implement's check measured it and its `wf size:` line is in your brief. A test trimmed, split off or left unwritten is a
+finding. A change the card turns out to need a design for is a finding too, with `again: true` and `kind` `other`: it says so, and a
+person starts the card with `build`.
 
 **Nothing ran the suite on this machine.** Implement's check is the cheap set and CI: `change.ts size`, `pictures.ts`, `probe.ts`,
 `pull-request.ts push` and `pull-request.ts wait`, in that order, and nothing else — no typecheck, no lint, no declaration, no test of a

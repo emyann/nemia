@@ -224,8 +224,7 @@ rm "$S"/node_modules; git worktree remove "$S"
   factory. An architect who proposes a cut on cost alone is shown the measured history.
 - **A change to the product's model, or one spanning several cards, goes through an intake first** (Iris, the `intake` workflow): the
   intent is the system's durable record of the person's decisions, and her confirmation round catches misreadings. A contained change is
-  a build card, or a quick card (`workflow: quick`) when its card settles it within the bound `workflows/quick/README.md` says; a quick
-  run whose check refuses its size is cancelled and its card started with `build`. In auto mode, Iris may interview the operator, who answers from the person's decisions and brings them the taste calls.
+  a build card, or a quick card (`workflow: quick`) when its card settles it, whatever its size (`workflows/quick/README.md`). In auto mode, Iris may interview the operator, who answers from the person's decisions and brings them the taste calls.
 - **Chain** with `--after <run>` when runs touch the same files, or when one's design depends on another's result. `--after` also hands
   the run that waited the other's conclusions (`## From run`); context without a wait is `--from` once it lands
   (`context-is-not-a-wait-a-run-zovw`).

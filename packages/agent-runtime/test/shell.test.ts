@@ -118,107 +118,135 @@ const closingTurn = (id: string, payload: object) => [
   { type: 'system', subtype: 'turn_duration', durationMs: 11_545 },
 ];
 
-test('a session held busy by a background shell, its closeout the last word in its transcript, is read as quiet: its closeout is recorded, the task settles, and the session is let go', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const root = tmp('root');
-    const engine = builtEngine(Engine.layer({ root }));
-    const id = await Effect.runPromise(
-      engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    assert.equal(row?.status, 'busy', 'its process is doing something: the shell it left running');
-    const began = await begun(engine, id);
+test('a session held by a background shell, at shipped defaults: its own closeout as the last word of a cold transcript ends it, an advancing one or none does not', async (t) => {
+  await t.test(
+    'a session held busy by a background shell, its closeout the last word in its transcript, is read as quiet: its closeout is recorded, the task settles, and the session is let go',
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const root = tmp('root');
+        const engine = builtEngine(Engine.layer({ root }));
+        const id = await Effect.runPromise(
+          engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
+        );
+        await Effect.runPromise(engine.tick());
+        const [row] = claude.rows();
+        assert.equal(row?.status, 'busy', 'its process is doing something: the shell it left running');
+        const began = await begun(engine, id);
 
-    wrote(row.sessionId, began + 1, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
-    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
-    claude.set(row.name, { startedAt: began - 20 * MINUTES });
-    await Effect.runPromise(engine.tick());
+        wrote(row.sessionId, began + 1, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
+        await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
+        claude.set(row.name, { startedAt: began - 20 * MINUTES });
+        await Effect.runPromise(engine.tick());
 
-    const v = await Effect.runPromise(engine.view(id));
-    assert.equal(v.state.settled, 'succeeded');
-    assert.deepEqual(
-      v.state.attempts[0]?.closeout,
-      { outcome: 'done' },
-      'the closeout on the record, seventy minutes earlier than a person could have read it',
-    );
-    assert.equal(v.state.attempts[0]?.reason, 'harness');
-    assert.deepEqual(claude.rows(), [], 'and the session let go, which is what ends the shell');
-  });
-});
+        const v = await Effect.runPromise(engine.view(id));
+        assert.equal(v.state.settled, 'succeeded');
+        assert.deepEqual(
+          v.state.attempts[0]?.closeout,
+          { outcome: 'done' },
+          'the closeout on the record, seventy minutes earlier than a person could have read it',
+        );
+        assert.equal(v.state.attempts[0]?.reason, 'harness');
+        assert.deepEqual(claude.rows(), [], 'and the session let go, which is what ends the shell');
+      });
+    },
+  );
 
-test('a session held busy whose transcript is still advancing is left alone — nothing about a working session is quiet', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const id = await Effect.runPromise(
-      engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    const began = await begun(engine, id);
+  await t.test(
+    'a session held busy whose transcript is still advancing is left alone — nothing about a working session is quiet',
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+        const id = await Effect.runPromise(
+          engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
+        );
+        await Effect.runPromise(engine.tick());
+        const [row] = claude.rows();
+        const began = await begun(engine, id);
 
-    wrote(row.sessionId, began + 1, 1_000, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
-    claude.set(row.name, { startedAt: began - 20 * MINUTES });
-    await Effect.runPromise(engine.tick());
+        wrote(row.sessionId, began + 1, 1_000, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
+        claude.set(row.name, { startedAt: began - 20 * MINUTES });
+        await Effect.runPromise(engine.tick());
 
-    const v = await Effect.runPromise(engine.view(id));
-    assert.equal(v.state.settled, null, 'still running');
-    assert.equal(v.state.attempts[0]?.ended, null, 'a statement given a second ago, which it may yet revise, ends nothing');
-    assert.equal(claude.rows().length, 1, 'and its session untouched');
-  });
-});
+        const v = await Effect.runPromise(engine.view(id));
+        assert.equal(v.state.settled, null, 'still running');
+        assert.equal(v.state.attempts[0]?.ended, null, 'a statement given a second ago, which it may yet revise, ends nothing');
+        assert.equal(claude.rows().length, 1, 'and its session untouched');
+      });
+    },
+  );
 
-test('a session held busy that gave no closeout is left where it was: the existing rule takes it once the registry lists it idle', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const root = tmp('root');
-    const engine = builtEngine(Engine.layer({ root }));
-    const id = await Effect.runPromise(
-      engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    const began = await begun(engine, id);
+  await t.test(
+    'a session held busy that gave no closeout is left where it was: the existing rule takes it once the registry lists it idle',
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const root = tmp('root');
+        const engine = builtEngine(Engine.layer({ root }));
+        const id = await Effect.runPromise(
+          engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
+        );
+        await Effect.runPromise(engine.tick());
+        const [row] = claude.rows();
+        const began = await begun(engine, id);
 
-    wrote(row.sessionId, began + 1, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
-    await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
-    claude.set(row.name, { startedAt: began - 20 * MINUTES });
-    await Effect.runPromise(engine.tick());
-    assert.equal(
-      (await Effect.runPromise(engine.view(id))).state.attempts[0]?.ended,
-      null,
-      'a busy session with nothing said is not quiet',
-    );
+        wrote(row.sessionId, began + 1, 10 * MINUTES, prompt('the prompt'), says('msg_1', 'I have finished.'));
+        await seenFor(root, row.name, row.sessionId, 10 * MINUTES);
+        claude.set(row.name, { startedAt: began - 20 * MINUTES });
+        await Effect.runPromise(engine.tick());
+        assert.equal(
+          (await Effect.runPromise(engine.view(id))).state.attempts[0]?.ended,
+          null,
+          'a busy session with nothing said is not quiet',
+        );
 
-    claude.set(row.name, { status: 'idle' });
-    await Effect.runPromise(engine.tick());
-    const v = await Effect.runPromise(engine.view(id));
-    assert.deepEqual(
-      [v.state.attempts[0]?.ended, v.state.attempts[0]?.stated],
-      ['done', false],
-      'idle, the quiescence floor reads it quiet with no statement: `stated: false`, which the layer above reads as unsigned',
-    );
-  });
-});
+        claude.set(row.name, { status: 'idle' });
+        await Effect.runPromise(engine.tick());
+        const v = await Effect.runPromise(engine.view(id));
+        assert.deepEqual(
+          [v.state.attempts[0]?.ended, v.state.attempts[0]?.stated],
+          ['done', false],
+          'idle, the quiescence floor reads it quiet with no statement: `stated: false`, which the layer above reads as unsigned',
+        );
+      });
+    },
+  );
 
-test('a session the registry lists `shell` is not busy at all: the quiescence floor reads it quiet, closeout or not', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const id = await Effect.runPromise(
-      engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    const began = await begun(engine, id);
-    wrote(row.sessionId, began + 1, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
-    claude.set(row.name, { status: 'shell', startedAt: began - 20 * MINUTES });
-    await Effect.runPromise(engine.tick());
+  await t.test(
+    'a session the registry lists `shell` is not busy at all: the quiescence floor reads it quiet, closeout or not',
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const root = tmp('root');
+        const engine = builtEngine(Engine.layer({ root }));
+        const id = await Effect.runPromise(
+          engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
+        );
+        const silent = await Effect.runPromise(
+          engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: SCHEMA }),
+        );
+        await Effect.runPromise(engine.tick());
+        const row = claude.rows().find((r) => r.name === `ae/${id}/1`)!;
+        const quiet = claude.rows().find((r) => r.name === `ae/${silent}/1`)!;
+        const began = await begun(engine, id);
+        wrote(row.sessionId, began + 1, 10 * MINUTES, prompt('the prompt'), ...closingTurn('msg_1', { outcome: 'done' }));
+        claude.set(row.name, { status: 'shell', startedAt: began - 20 * MINUTES });
+        wrote(quiet.sessionId, (await begun(engine, silent)) + 1, 10 * MINUTES, prompt('the prompt'), says('msg_2', 'I have finished.'));
+        await seenFor(root, quiet.name, quiet.sessionId, 10 * MINUTES);
+        claude.set(quiet.name, { status: 'shell', startedAt: began - 20 * MINUTES });
+        await Effect.runPromise(engine.tick());
 
-    const v = await Effect.runPromise(engine.view(id));
-    assert.equal(v.state.settled, 'succeeded');
-    assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
-  });
+        const v = await Effect.runPromise(engine.view(id));
+        assert.equal(v.state.settled, 'succeeded');
+        assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
+        const w = await Effect.runPromise(engine.view(silent));
+        assert.deepEqual(
+          [w.state.attempts[0]?.ended, w.state.attempts[0]?.stated],
+          ['done', false],
+          'and with nothing said, quiet all the same, where a busy one is not',
+        );
+      });
+    },
+  );
 });

@@ -100,88 +100,160 @@ const prompt = (content: string) => ({ type: 'user', message: { role: 'user', co
 const response = (id: string, ...content: object[]) => ({ type: 'assistant', message: { id, role: 'assistant', content, usage: TOKENS } });
 const call = (id: string, name: string, input: object = {}) => ({ type: 'tool_use', id, name, input });
 
-test("a session resumed under the same id is read for its new attempt: its own closeout, not the last one's, and usage since its own start", async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const schema = { type: 'object' };
+test('a resumed or re-read session at shipped defaults is read for its own attempt: its own statement and usage, read again once its transcript grows', async (t) => {
+  await t.test(
+    "a session resumed under the same id is read for its new attempt: its own closeout, not the last one's, and usage since its own start",
+    async () => {
+      const claude = fakeClaude();
+      await onPath(claude.bin, async () => {
+        const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+        const schema = { type: 'object' };
 
-    const first = await Effect.runPromise(
-      engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: schema }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    const began = await begun(engine, first);
-    claude.set(row.name, { startedAt: began });
-    append(
-      row.sessionId,
-      began + 1,
-      prompt('the prompt'),
-      response('msg_1', call('tu_1', 'Read')),
-      response('msg_2', call('tu_2', 'StructuredOutput', { outcome: 'done', by: 'first' })),
-    );
-    age(row.sessionId, 30_000);
-    claude.set(row.name, { state: 'done' });
-    await Effect.runPromise(engine.tick());
-    const [was] = (await Effect.runPromise(engine.view(first))).state.attempts;
-    assert.deepEqual(was?.closeout, { outcome: 'done', by: 'first' }, 'the first try, listed done, ends with its closeout');
-    assert.deepEqual(
-      was?.usage,
-      {
-        turns: 2,
-        toolCalls: 2,
-        inputTokens: 200,
-        uncachedTokens: 20,
-        cacheWriteTokens: 0,
-        cacheReadTokens: 180,
-        outputTokens: 10,
-        peakContextTokens: 100,
-        firstContextTokens: 100,
-        firstCacheWriteTokens: 0,
-      },
-      'the first try ends with its usage: two responses',
-    );
+        const first = await Effect.runPromise(
+          engine.file({ config: { background: true }, brief: 'the prompt', cwd: tmp('cwd'), closeoutSchema: schema }),
+        );
+        await Effect.runPromise(engine.tick());
+        const [row] = claude.rows();
+        const began = await begun(engine, first);
+        claude.set(row.name, { startedAt: began });
+        append(
+          row.sessionId,
+          began + 1,
+          prompt('the prompt'),
+          response('msg_1', call('tu_1', 'Read')),
+          response('msg_2', call('tu_2', 'StructuredOutput', { outcome: 'done', by: 'first' })),
+        );
+        age(row.sessionId, 30_000);
+        claude.set(row.name, { state: 'done' });
+        await Effect.runPromise(engine.tick());
+        const [was] = (await Effect.runPromise(engine.view(first))).state.attempts;
+        assert.deepEqual(was?.closeout, { outcome: 'done', by: 'first' }, 'the first try, listed done, ends with its closeout');
+        assert.deepEqual(
+          was?.usage,
+          {
+            turns: 2,
+            toolCalls: 2,
+            inputTokens: 200,
+            uncachedTokens: 20,
+            cacheWriteTokens: 0,
+            cacheReadTokens: 180,
+            outputTokens: 10,
+            peakContextTokens: 100,
+            firstContextTokens: 100,
+            firstCacheWriteTokens: 0,
+          },
+          'the first try ends with its usage: two responses',
+        );
 
-    const retry = await Effect.runPromise(
-      engine.file({
-        config: { background: true },
-        brief: 'give your closeout',
-        cwd: tmp('cwd'),
-        closeoutSchema: schema,
-        resumeFrom: row.sessionId,
-      }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [resumed] = claude.rows();
-    assert.equal(resumed?.name, `ae/${retry}/1`, 'the retry continues that session');
-    assert.equal(resumed?.sessionId, row.sessionId, 'the same id');
+        const retry = await Effect.runPromise(
+          engine.file({
+            config: { background: true },
+            brief: 'give your closeout',
+            cwd: tmp('cwd'),
+            closeoutSchema: schema,
+            resumeFrom: row.sessionId,
+          }),
+        );
+        await Effect.runPromise(engine.tick());
+        const [resumed] = claude.rows();
+        assert.equal(resumed?.name, `ae/${retry}/1`, 'the retry continues that session');
+        assert.equal(resumed?.sessionId, row.sessionId, 'the same id');
 
-    const again = Math.max(await begun(engine, retry), began + 1) + 1;
-    claude.set(resumed.name, { state: 'done', startedAt: again });
-    assert.deepEqual(
-      (await Effect.runPromise(engine.view(retry))).usage,
-      { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
-      "nothing since its own start — not the first try's count",
-    );
+        const again = Math.max(await begun(engine, retry), began + 1) + 1;
+        claude.set(resumed.name, { state: 'done', startedAt: again });
+        assert.deepEqual(
+          (await Effect.runPromise(engine.view(retry))).usage,
+          { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
+          "nothing since its own start — not the first try's count",
+        );
 
-    append(
-      row.sessionId,
-      again + 1,
-      prompt('give your closeout'),
-      response('msg_3', { type: 'text', text: 'Giving it.' }),
-      response('msg_4', call('tu_3', 'Bash')),
-      response('msg_5', call('tu_4', 'StructuredOutput', { outcome: 'done', by: 'retry' })),
-    );
-    await Effect.runPromise(engine.tick());
+        append(
+          row.sessionId,
+          again + 1,
+          prompt('give your closeout'),
+          response('msg_3', { type: 'text', text: 'Giving it.' }),
+          response('msg_4', call('tu_3', 'Bash')),
+          response('msg_5', call('tu_4', 'StructuredOutput', { outcome: 'done', by: 'retry' })),
+        );
+        await Effect.runPromise(engine.tick());
 
-    const v = await Effect.runPromise(engine.view(retry));
-    assert.equal(v.state.settled, 'succeeded');
-    const [is] = v.state.attempts;
-    assert.deepEqual(is?.closeout, { outcome: 'done', by: 'retry' }, "its own statement, not the first try's");
-    assert.notDeepEqual(is?.usage, was?.usage, "not the first try's count");
-    assert.deepEqual(
-      is?.usage,
-      {
+        const v = await Effect.runPromise(engine.view(retry));
+        assert.equal(v.state.settled, 'succeeded');
+        const [is] = v.state.attempts;
+        assert.deepEqual(is?.closeout, { outcome: 'done', by: 'retry' }, "its own statement, not the first try's");
+        assert.notDeepEqual(is?.usage, was?.usage, "not the first try's count");
+        assert.deepEqual(
+          is?.usage,
+          {
+            turns: 3,
+            toolCalls: 2,
+            inputTokens: 300,
+            uncachedTokens: 30,
+            cacheWriteTokens: 0,
+            cacheReadTokens: 270,
+            outputTokens: 15,
+            peakContextTokens: 100,
+            firstContextTokens: 100,
+            firstCacheWriteTokens: 0,
+          },
+          'only the responses since its own start',
+        );
+      });
+    },
+  );
+
+  await t.test('a statement read as nothing from a final sighting is read again once the transcript has grown, and found', async () => {
+    const claude = fakeClaude();
+    await onPath(claude.bin, async () => {
+      const engine = builtEngine(Engine.layer({ root: tmp('root') }));
+      const id = await Effect.runPromise(
+        engine.file({
+          config: { background: true },
+          brief: 'the prompt',
+          cwd: tmp('cwd'),
+          closeoutSchema: { type: 'object' },
+        }),
+      );
+      await Effect.runPromise(engine.tick());
+      const [row] = claude.rows();
+      const began = await begun(engine, id);
+      claude.set(row.name, { startedAt: began });
+      append(row.sessionId, began + 1, prompt('the prompt'), response('msg_1', call('tu_1', 'Bash', { run_in_background: true })));
+      age(row.sessionId, 30_000);
+
+      claude.set(row.name, { state: 'done' });
+      assert.deepEqual(
+        (await Effect.runPromise(engine.view(id))).usage,
+        {
+          turns: 1,
+          toolCalls: 1,
+          inputTokens: 100,
+          uncachedTokens: 10,
+          cacheWriteTokens: 0,
+          cacheReadTokens: 90,
+          outputTokens: 5,
+          peakContextTokens: 100,
+          firstContextTokens: 100,
+          firstCacheWriteTokens: 0,
+        },
+        'listed final between two turns, for one observation, and seen only by a view: nothing said yet',
+      );
+      append(row.sessionId, began + 2, response('msg_2', { type: 'text', text: 'the background task finished' }));
+      age(row.sessionId, 30_000);
+      assert.equal(
+        (await Effect.runPromise(engine.view(id))).usage?.turns,
+        2,
+        'written after the read, though stamped before it as a wall clock stepped back stamps it: its mtime changed, so read again',
+      );
+
+      append(row.sessionId, began + 3, response('msg_3', call('tu_2', 'StructuredOutput', { outcome: 'done' })));
+      await Effect.runPromise(engine.tick());
+
+      const v = await Effect.runPromise(engine.view(id));
+      assert.equal(v.state.settled, 'succeeded');
+      const [a] = v.state.attempts;
+      assert.deepEqual(a?.closeout, { outcome: 'done' }, 'found, not the nothing read before it was made');
+      assert.deepEqual(a?.usage, {
         turns: 3,
         toolCalls: 2,
         inputTokens: 300,
@@ -192,74 +264,7 @@ test("a session resumed under the same id is read for its new attempt: its own c
         peakContextTokens: 100,
         firstContextTokens: 100,
         firstCacheWriteTokens: 0,
-      },
-      'only the responses since its own start',
-    );
-  });
-});
-
-test('a statement read as nothing from a final sighting is read again once the transcript has grown, and found', async () => {
-  const claude = fakeClaude();
-  await onPath(claude.bin, async () => {
-    const engine = builtEngine(Engine.layer({ root: tmp('root') }));
-    const id = await Effect.runPromise(
-      engine.file({
-        config: { background: true },
-        brief: 'the prompt',
-        cwd: tmp('cwd'),
-        closeoutSchema: { type: 'object' },
-      }),
-    );
-    await Effect.runPromise(engine.tick());
-    const [row] = claude.rows();
-    const began = await begun(engine, id);
-    claude.set(row.name, { startedAt: began });
-    append(row.sessionId, began + 1, prompt('the prompt'), response('msg_1', call('tu_1', 'Bash', { run_in_background: true })));
-    age(row.sessionId, 30_000);
-
-    claude.set(row.name, { state: 'done' });
-    assert.deepEqual(
-      (await Effect.runPromise(engine.view(id))).usage,
-      {
-        turns: 1,
-        toolCalls: 1,
-        inputTokens: 100,
-        uncachedTokens: 10,
-        cacheWriteTokens: 0,
-        cacheReadTokens: 90,
-        outputTokens: 5,
-        peakContextTokens: 100,
-        firstContextTokens: 100,
-        firstCacheWriteTokens: 0,
-      },
-      'listed final between two turns, for one observation, and seen only by a view: nothing said yet',
-    );
-    append(row.sessionId, began + 2, response('msg_2', { type: 'text', text: 'the background task finished' }));
-    age(row.sessionId, 30_000);
-    assert.equal(
-      (await Effect.runPromise(engine.view(id))).usage?.turns,
-      2,
-      'written after the read, though stamped before it as a wall clock stepped back stamps it: its mtime changed, so read again',
-    );
-
-    append(row.sessionId, began + 3, response('msg_3', call('tu_2', 'StructuredOutput', { outcome: 'done' })));
-    await Effect.runPromise(engine.tick());
-
-    const v = await Effect.runPromise(engine.view(id));
-    assert.equal(v.state.settled, 'succeeded');
-    const [a] = v.state.attempts;
-    assert.deepEqual(a?.closeout, { outcome: 'done' }, 'found, not the nothing read before it was made');
-    assert.deepEqual(a?.usage, {
-      turns: 3,
-      toolCalls: 2,
-      inputTokens: 300,
-      uncachedTokens: 30,
-      cacheWriteTokens: 0,
-      cacheReadTokens: 270,
-      outputTokens: 15,
-      peakContextTokens: 100,
-      firstContextTokens: 100,
-      firstCacheWriteTokens: 0,
+      });
     });
   });
 });

@@ -24,6 +24,7 @@ import {
   foldFeed,
   freshFold,
   isRunLine,
+  isStoreLine,
   publishedOf,
   REMOVED,
   upgraded,
@@ -31,6 +32,7 @@ import {
   type FeedWords,
   type Reason,
   type RunLine,
+  type StoreLine,
 } from './feed.ts';
 import { scratch } from '../../test/scratch.ts';
 
@@ -53,6 +55,8 @@ const emptyStore = () => fs.rmSync(FEED, { force: true });
 
 /** Every line in the feed, read off the file as a reader with cursor 0 would. */
 const lines = (): RunLine[] => readFeed(0).lines.filter(isRunLine);
+/** The store's lines in the feed: its pause put and lifted. */
+const storeLines = (): StoreLine[] => readFeed(0).lines.filter(isStoreLine);
 const size = (): number => fs.statSync(FEED, { throwIfNoEntry: false })?.size ?? 0;
 
 /** What a pass judged of a step at work, with the calls `denials` says it was denied, and the labels a filing gives it. */
@@ -296,6 +300,53 @@ test("recordFeed writes a one-shot once per occurrence, counted off the feed's o
       ],
       "liftHold takes the hold off the record before the pass is worded, so a pass that reads one and lifts it sees only its lift: the person's own nemia hold must not lose its line there, and neither is said twice over ten passes",
     );
+  });
+  await t.test("the store's pause says its put once while it stands and its lift once it is gone, each a person's, read off the feed", async (t) => {
+    emptyStore();
+    const memo = freshFeedMemo();
+    const put = '2026-10-16T03:45:00.000Z';
+    const again = '2026-10-16T06:00:00.000Z';
+    const pass = (pause: { at: string } | null, m = memo) => recordFeed(new Map(), { at: AT, memo: m, pause });
+    const words = () => storeLines().map((l) => [l.word, l.note]);
+    await t.test('a pause that stands is one put over many passes', () => {
+      for (let i = 0; i < 10; i++) pass({ at: put });
+      assert.deepEqual(words(), [['store paused', `since ${put}`]]);
+      assert.deepEqual(
+        storeLines().map((l) => [l.involved, l.reason, l.type, l.source, l.waits, l.labels]),
+        [[{ kind: 'Store', name: 'store' }, 'StorePaused', 'Normal', 'person', undefined, {}]],
+        "about the store, a person's deed, waiting on nobody, of no run",
+      );
+    });
+    await t.test('a daemon with no fold writes the standing put neither again nor never', () => {
+      for (let i = 0; i < 3; i++) pass({ at: put }, freshFeedMemo());
+      assert.equal(storeLines().length, 1);
+    });
+    await t.test('a pause gone is one lift, sourced person, the put read back off the feed', () => {
+      for (let i = 0; i < 10; i++) pass(null);
+      assert.deepEqual(words(), [
+        ['store paused', `since ${put}`],
+        ['store resumed', `since ${put}`],
+      ]);
+      assert.equal(storeLines()[1].source, 'person', 'only nemia resume takes the pause away');
+    });
+    await t.test('a pause put again is a second put and a second lift, told apart by its moment', () => {
+      for (let i = 0; i < 3; i++) pass({ at: again });
+      for (let i = 0; i < 3; i++) pass(null);
+      for (let i = 0; i < 3; i++) pass(null, freshFeedMemo());
+      assert.deepEqual(words(), [
+        ['store paused', `since ${put}`],
+        ['store resumed', `since ${put}`],
+        ['store paused', `since ${again}`],
+        ['store resumed', `since ${again}`],
+      ]);
+    });
+    await t.test('a caller that read no pause says nothing of the store, however the feed stands', () => {
+      pass({ at: '2026-10-16T07:00:00.000Z' });
+      const before = storeLines().length;
+      recordFeed(new Map(), { at: AT, memo });
+      recordFeed(new Map(), { at: AT, memo: freshFeedMemo() });
+      assert.equal(storeLines().length, before, 'no absence is read where nobody looked');
+    });
   });
   await t.test('each fault the runtime journalled is one line per occurrence, and neither waits on a person', () => {
     emptyStore();
@@ -1046,6 +1097,17 @@ test('foldFeed keeps the last word of each run and step, forgets a removed run, 
       );
     },
   );
+  await t.test("a store line is a one-shot of the store's, never a run's word, and a run removed leaves it", () => {
+    const at = '2026-10-16T03:45:00.000Z';
+    const paused: FeedLine = { at, store: 'store', word: 'store paused', note: `since ${at}` };
+    assert.equal(isRunLine(paused), false);
+    assert.equal(isStoreLine(paused), true);
+    assert.deepEqual(upgraded(paused).involved, { kind: 'Store', name: 'store' }, 'a line written before it was signed is the store all the same');
+    const fold = foldFeed(freshFold(), [paused, { at, run: 'r-1', word: 'running' }, { at, run: 'r-1', word: REMOVED }]);
+    assert.deepEqual([...fold.said.keys()], [], 'no word of the store is kept, and the run is forgotten');
+    assert.deepEqual([...fold.shots.entries()], [[`StorePaused Store/store#0#since ${at}`, 1]], 'and the put is counted still');
+    assert.deepEqual(feedChanges(fold, new Map(), at, new Set(), { at }), [], 'so the put standing is owed again by nobody');
+  });
   await t.test(
     'REFUSED: a run at rest whose words stand owes no line for a note reworded — a word moved, a step new to the fold and a run gone still do',
     () => {

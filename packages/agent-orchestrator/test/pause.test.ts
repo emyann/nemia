@@ -10,6 +10,9 @@
  * `src/pause/pause.store.test.ts`. The runtime's own admission under the pause — a task filed and not admitted while it stands — is
  * walked on the real runtime in `src/tick/pause.test.ts`, which the stand-in cannot model.
  *
+ * The story opens on a store where no run has a task, which the pause read then reads no task of: it is the file's first test, and the
+ * warm read after it takes its own records away as it ends, so the store is quiet there in whatever order the two run.
+ *
  * The tick is the store's pass (`tickRun`), on the stage's engine given a pass of its own that does nothing and no tally, as
  * `queue-store.test.ts` gives it. A schedule's `now` is the wall's, so the story steers `Date` with node's mock timers, at the fire's
  * instant written as a literal. `WF_ROOT` is set before the import, since the module reads it as it loads, and the run cap high, so the
@@ -40,7 +43,7 @@ const { pauseFile, readPause } = await import('../src/pause/pause.store.ts');
 const { nowRead } = await import('../src/pause/pause.verb.ts');
 const { pausedRead } = await import('../src/list/list.verb.ts');
 const { pauseSaid } = await import('../src/daemon/up.verb.ts');
-const { pausedWords, RESUMED } = await import('../src/pause/pause.ts');
+const { currentTasks, pausedWords, RESUMED } = await import('../src/pause/pause.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { recordMemo } = await import('../src/rest/index.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
@@ -129,6 +132,31 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
   };
   let filings: string[] = [];
 
+  await s.test(
+    'a store with nothing at work: `nemia pause --now --yes` puts the pause, stopping nothing; a folder run started under it is filed nothing, and the pause reads Paused, nothing finishing',
+    async (sub) => {
+      assert.deepEqual([readPause(), listRuns().flatMap(currentTasks)], [null, []], 'no run of the store has a task yet');
+      const said = await printedBy(sub, () => stage.main(['pause', '--now', '--yes', '--why', 'quiet', '--by', 'ann'], stopping));
+      names(said[0], 'paused at once', 'by ann: quiet', 'nemia resume');
+      names(said[1], 'nothing was stopped');
+      assert.deepEqual([readPause()?.why, readPause()?.by, stops], ['quiet', 'ann', []]);
+      const team = fs.mkdtempSync(path.join(ROOT, 'wf-'));
+      fs.writeFileSync(path.join(team, 'work.md'), '---\nplace: folder\n---\nwork it\n');
+      const loose = await begun(team, { isolate: true });
+      assert.equal(loose.place?.kind, 'folder');
+      filings = [...b.filings];
+      await pass();
+      assert.deepEqual(b.filings, filings, 'nothing of the folder run is filed under the pause');
+      const standing = await stage.runWith(b.e, pausedRead());
+      assert.deepEqual([standing.finishing, standing.staged, standing.held], [[], [], []], 'a folder run holds no merge staged');
+      assert.match(pausedWords(standing) ?? '', /^Paused since /);
+      const feed = await printedBy(sub, () => stage.main(['watch', '--once']));
+      assert.equal(feed[0], pausedWords(standing), feed.join('\n'));
+      markCancelled(loose.id);
+      assert.deepEqual(await printedBy(sub, () => stage.main(['resume'])), [RESUMED]);
+      assert.equal(readPause(), null);
+    },
+  );
   await s.test('a session, a check and a landing at work, a step a person already asked a try of, and one about to end', async () => {
     runs.session = await begun(ONE);
     runs.checking = await begun(CHECKED);
@@ -380,8 +408,12 @@ test("a warm read of what a pause at once would stop reads the live runs' record
         steps: { implement: { taskId } },
       }),
     );
+  const ids = ['r-live', ...Array.from({ length: 200 }, (_, n) => `fin-${String(n).padStart(3, '0')}`)];
+  t.after(() => {
+    for (const id of ids) fs.rmSync(path.join(ROOT, 'runs', `${id}.json`), { force: true });
+  });
   write('r-live', 'live-1');
-  for (let n = 0; n < 200; n++) write(`fin-${String(n).padStart(3, '0')}`, `fin-${n}`);
+  for (let n = 0; n < 200; n++) write(ids[n + 1], `fin-${n}`);
   await Effect.runPromise(b.e.file({ id: 'live-1', brief: 'b', cwd: ROOT }));
   b.settle('live-1', 'running');
   const memo = recordMemo<RunTasks>();

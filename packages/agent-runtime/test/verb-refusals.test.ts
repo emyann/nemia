@@ -21,6 +21,7 @@ import { VERBS as LIFECYCLE_VERBS } from '../src/core/lifecycle.ts';
 import { scratch } from './scratch.ts';
 import { asyncOps, asyncStore, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { story } from './checkpoints.ts';
 
 /** A store in memory, which both engines are handed. */
 const memoryJournal = (): AsyncJournal => {
@@ -142,76 +143,116 @@ const VERBS = [
   'watch',
 ];
 
-test('the Engine service has the verbs pinned, each a function', async () => {
-  const { effect } = engines();
-  const service = await effect((e) => Effect.succeed(e));
-  assert.deepEqual(Object.keys(service).sort(), VERBS);
-  for (const verb of VERBS) assert.equal(typeof service[verb as keyof EngineShape], 'function', verb);
-});
-
-test('each verb gives the same answer through either engine, over one store', async () => {
+test('one store, two engines — one built once, one provided its layer for each call — and each verb gives the same answer through either', async (t) => {
+  const s = story(t);
   const { effect, built, sessions, heard } = engines();
-  assert.equal(await effect((e) => e.file({ brief: 'one', cwd: '/r', id: 'one', queued: true })), 'one');
-  assert.equal(await Effect.runPromise(built.file({ brief: 'two', cwd: '/r', id: 'two', queued: true })), 'two');
-  assert.deepEqual(await effect((e) => e.view('one')), await Effect.runPromise(built.view('one')));
-  assert.deepEqual(await effect((e) => e.list(['one', 'two'])), await Effect.runPromise(built.list(['one', 'two'])));
-  assert.deepEqual(await effect((e) => e.list()), await Effect.runPromise(built.list()));
-  assert.deepEqual(await effect((e) => e.feed(0)), await Effect.runPromise(built.feed(0)));
-  assert.deepEqual(
-    [await effect((e) => e.output('one', 'stdout')), await Effect.runPromise(built.output('two', 'stdout'))],
-    [undefined, undefined],
-  );
 
-  assert.deepEqual(await effect((e) => e.admit(['one'])), ['one']);
-  assert.deepEqual(await Effect.runPromise(built.admit(['two'])), ['two']);
-  const report = await effect((e) => e.tick());
-  assert.deepEqual([report.tasks, sessions.size, report.observed.fake?.calls], [2, 2, 1]);
-  const again = await Effect.runPromise(built.tick());
-  assert.deepEqual(Object.keys(again).sort(), Object.keys(report).sort());
-  for (const id of ['one', 'two']) {
-    const view = await Effect.runPromise(built.view(id));
-    assert.equal(view.phase, 'running (working)', id);
-    assert.deepEqual(await effect((e) => e.view(id)), view, id);
-    assert.equal(await effect((e) => e.logs(id)), await Effect.runPromise(built.logs(id)));
-    const observed = Effect.runSync(built.io()).observed;
+  await s.test('the Engine service has the verbs pinned, each a function', async () => {
+    const service = await effect((e) => Effect.succeed(e));
+    assert.deepEqual(Object.keys(service).sort(), VERBS);
+    for (const verb of VERBS) assert.equal(typeof service[verb as keyof EngineShape], 'function', verb);
+  });
+
+  await s.test('filed through either, each reads the same: view, list, feed, and no output before an attempt', async () => {
+    assert.equal(await effect((e) => e.file({ brief: 'one', cwd: '/r', id: 'one', queued: true })), 'one');
+    assert.equal(await Effect.runPromise(built.file({ brief: 'two', cwd: '/r', id: 'two', queued: true })), 'two');
+    assert.deepEqual(await effect((e) => e.view('one')), await Effect.runPromise(built.view('one')));
+    assert.deepEqual(await effect((e) => e.list(['one', 'two'])), await Effect.runPromise(built.list(['one', 'two'])));
+    assert.deepEqual(await effect((e) => e.list()), await Effect.runPromise(built.list()));
+    assert.deepEqual(await effect((e) => e.feed(0)), await Effect.runPromise(built.feed(0)));
     assert.deepEqual(
-      [await effect((e) => e.output(id, 'stderr', 5)), await Effect.runPromise(built.output(id, 'stdout'))],
-      [`stderr of ae/${id}/1, its last 5 bytes`, `stdout of ae/${id}/1`],
-      'asked of the latest attempt, by the name the engine chose',
+      [await effect((e) => e.output('one', 'stdout')), await Effect.runPromise(built.output('two', 'stdout'))],
+      [undefined, undefined],
     );
-    assert.deepEqual(Effect.runSync(built.io()).observed, observed, 'output observes nothing');
-    const path = await Effect.runPromise(built.path(id));
+  });
+
+  await s.test('watch and start run through either engine, and each stops', async () => {
+    type Handle = { stop: () => void };
+    const firstOf = async <A>(begin: (got: (a: A) => void, failed: (e: unknown) => void) => Promise<Handle>): Promise<A> => {
+      const got: A[] = [];
+      let heardOne!: () => void;
+      let failed!: (e: unknown) => void;
+      const once = new Promise<void>((resolve, reject) => ((heardOne = resolve), (failed = reject)));
+      const handle = await begin((a) => (got.push(a), heardOne()), failed);
+      await once;
+      handle.stop();
+      return got[0];
+    };
+
+    const heardByService = await firstOf<FeedEntry>((onEntry, onError) => effect((e) => e.watch({ onEntry, onError })));
+    const heardByPromise = await firstOf<FeedEntry>(async (onEntry, onError) => Effect.runSync(built.watch({ onEntry, onError })));
+    assert.deepEqual(heardByService, heardByPromise);
+    assert.equal(heardByService.event.kind, 'filed');
+
+    const tickedByService = await firstOf<TickReport>((onTick, onError) => effect((e) => e.start({ intervalMs: 1, onTick, onError })));
+    const tickedByPromise = await firstOf<TickReport>(async (onTick, onError) =>
+      Effect.runSync(built.start({ intervalMs: 1, onTick, onError })),
+    );
+    assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [2, 2]);
+    assert.equal(sessions.size, 0, 'queued, neither started');
+  });
+
+  await s.test('admitted and ticked through either, each reads the same: view, logs, output of the latest attempt, path', async () => {
+    assert.deepEqual(await effect((e) => e.admit(['one'])), ['one']);
+    assert.deepEqual(await Effect.runPromise(built.admit(['two'])), ['two']);
+    const report = await effect((e) => e.tick());
+    assert.deepEqual([report.tasks, sessions.size, report.observed.fake?.calls], [2, 2, 1]);
+    const again = await Effect.runPromise(built.tick());
+    assert.deepEqual(Object.keys(again).sort(), Object.keys(report).sort());
+    for (const id of ['one', 'two']) {
+      const view = await Effect.runPromise(built.view(id));
+      assert.equal(view.phase, 'running (working)', id);
+      assert.deepEqual(await effect((e) => e.view(id)), view, id);
+      assert.equal(await effect((e) => e.logs(id)), await Effect.runPromise(built.logs(id)));
+      const observed = Effect.runSync(built.io()).observed;
+      assert.deepEqual(
+        [await effect((e) => e.output(id, 'stderr', 5)), await Effect.runPromise(built.output(id, 'stdout'))],
+        [`stderr of ae/${id}/1, its last 5 bytes`, `stdout of ae/${id}/1`],
+        'asked of the latest attempt, by the name the engine chose',
+      );
+      assert.deepEqual(Effect.runSync(built.io()).observed, observed, 'output observes nothing');
+      const path = await Effect.runPromise(built.path(id));
+      assert.deepEqual(
+        path.map((s) => `${s.state} <- ${s.event}`),
+        ['submitted <- filed', 'submitted <- admitted', 'starting <- starting', 'working <- spawned'],
+        id,
+      );
+      assert.deepEqual(await effect((e) => e.path(id)), path, id);
+    }
+    assert.deepEqual([await effect((e) => e.path('ghost')), await Effect.runPromise(built.path('ghost'))], [[], []]);
+  });
+
+  await s.test('words said through either reach the harness, journalled, and read back the same', async () => {
+    const toOne = await effect((e) => e.say('one', 'from the service'));
+    const toTwo = await Effect.runPromise(built.say('two', 'from the built engine'));
     assert.deepEqual(
-      path.map((s) => `${s.state} <- ${s.event}`),
-      ['submitted <- filed', 'submitted <- admitted', 'starting <- starting', 'working <- spawned'],
-      id,
+      [toOne.text, toTwo.text, heard],
+      ['from the service', 'from the built engine', ['from the service', 'from the built engine']],
     );
-    assert.deepEqual(await effect((e) => e.path(id)), path, id);
-  }
-  assert.deepEqual([await effect((e) => e.path('ghost')), await Effect.runPromise(built.path('ghost'))], [[], []]);
+    assert.deepEqual(await effect((e) => e.transcript('one')), await Effect.runPromise(built.transcript('one')));
+    assert.deepEqual((await Effect.runPromise(built.view('one'))).state.said, [toOne]);
+  });
 
-  const toOne = await effect((e) => e.say('one', 'from the service'));
-  const toTwo = await Effect.runPromise(built.say('two', 'from the built engine'));
-  assert.deepEqual(
-    [toOne.text, toTwo.text, heard],
-    ['from the service', 'from the built engine', ['from the service', 'from the built engine']],
-  );
-  assert.deepEqual(await effect((e) => e.transcript('one')), await Effect.runPromise(built.transcript('one')));
-  assert.deepEqual((await Effect.runPromise(built.view('one'))).state.said, [toOne]);
+  await s.test('a stop through either is asked; io and sweep read the same', async () => {
+    await effect((e) => e.stop('one'));
+    await Effect.runPromise(built.stop('two'));
+    for (const id of ['one', 'two']) assert.equal((await effect((e) => e.view(id))).state.stopRequested, true, id);
 
-  await effect((e) => e.stop('one'));
-  await Effect.runPromise(built.stop('two'));
-  for (const id of ['one', 'two']) assert.equal((await effect((e) => e.view(id))).state.stopRequested, true, id);
+    const io = await effect((e) => e.io());
+    assert.deepEqual(Object.keys(io).sort(), Object.keys(Effect.runSync(built.io())).sort());
 
-  const io = await effect((e) => e.io());
-  assert.deepEqual(Object.keys(io).sort(), Object.keys(Effect.runSync(built.io())).sort());
+    const none = { removable: 0, bytes: 0, kept: 0, removed: 0, removedBytes: 0 };
+    assert.deepEqual(
+      [await effect((e) => e.sweep()), await Effect.runPromise(built.sweep({ yes: true }))],
+      [none, none],
+      'a store that keeps no bodies has none',
+    );
+  });
 
-  const none = { removable: 0, bytes: 0, kept: 0, removed: 0, removedBytes: 0 };
-  assert.deepEqual(
-    [await effect((e) => e.sweep()), await Effect.runPromise(built.sweep({ yes: true }))],
-    [none, none],
-    'a store that keeps no bodies has none',
-  );
+  await s.test('follow of a task whose harness streams, before its first attempt, is nothing to follow, and no refusal', async () => {
+    await Effect.runPromise(built.file({ brief: 'late', cwd: '/r', id: 'late', harness: 'claude', queued: true }));
+    assert.equal(await effect((e) => e.follow('late')), undefined);
+  });
 });
 
 test('a brief filed in parts is kept once, read back whole, and a body its journal names is refused removal', async () => {
@@ -287,34 +328,7 @@ test('a long-lived task through either engine: filed with its restart policy, id
   for (const id of ['one', 'two']) assert.equal((await effect((e) => e.view(id))).state.settled, 'stopped', id);
 });
 
-test('watch and start run through either engine, and each stops', async () => {
-  const { effect, built } = engines();
-  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
-  type Handle = { stop: () => void };
-  const firstOf = async <A>(begin: (got: (a: A) => void, failed: (e: unknown) => void) => Promise<Handle>): Promise<A> => {
-    const got: A[] = [];
-    let heard!: () => void;
-    let failed!: (e: unknown) => void;
-    const once = new Promise<void>((resolve, reject) => ((heard = resolve), (failed = reject)));
-    const handle = await begin((a) => (got.push(a), heard()), failed);
-    await once;
-    handle.stop();
-    return got[0];
-  };
-
-  const heardByService = await firstOf<FeedEntry>((onEntry, onError) => effect((e) => e.watch({ onEntry, onError })));
-  const heardByPromise = await firstOf<FeedEntry>(async (onEntry, onError) => Effect.runSync(built.watch({ onEntry, onError })));
-  assert.deepEqual(heardByService, heardByPromise);
-  assert.equal(heardByService.event.kind, 'filed');
-
-  const tickedByService = await firstOf<TickReport>((onTick, onError) => effect((e) => e.start({ intervalMs: 1, onTick, onError })));
-  const tickedByPromise = await firstOf<TickReport>(async (onTick, onError) =>
-    Effect.runSync(built.start({ intervalMs: 1, onTick, onError })),
-  );
-  assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [1, 1]);
-});
-
-test('each refusal is a tagged error, and refusalWords words it behind the verb, exit code 2', async () => {
+test('each refusal is a tagged error, and refusalWords words it behind the verb, exit code 2: a row per verb and fault, nothing journalled', async (t) => {
   const { effect, built } = engines();
   await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
   const untyped = <F>(f: F) => f as (...args: unknown[]) => never;
@@ -463,87 +477,91 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
     ),
   ];
   for (const [verb, tag, refused, words] of cases) {
-    const tagged = await failure(refused());
-    assert.equal(tagged._tag, tag, `${verb}: ${tagged.message}`);
-    assert.match(tagged.message, words, verb);
-    const plain = refusalWords(verb)(tagged) as Error & { _tag?: string; exitCode?: number };
-    assert.deepEqual([plain.message, plain.exitCode, plain._tag], [`${verb}: ${tagged.message}`, 2, undefined], verb);
+    await t.test(`${verb}: ${words.source.slice(0, 80)}`, async () => {
+      const tagged = await failure(refused());
+      assert.equal(tagged._tag, tag, `${verb}: ${tagged.message}`);
+      assert.match(tagged.message, words, verb);
+      const plain = refusalWords(verb)(tagged) as Error & { _tag?: string; exitCode?: number };
+      assert.deepEqual([plain.message, plain.exitCode, plain._tag], [`${verb}: ${tagged.message}`, 2, undefined], verb);
+    });
   }
-  assert.deepEqual(
-    (await Effect.runPromise(built.feed(0))).entries.map((e) => [e.taskId, e.event.kind]),
-    [['one', 'filed']],
-    'nothing refused was journalled',
+  await t.test('output refuses a task whose harness keeps no whole streams, naming logs', async () => {
+    await Effect.runPromise(built.file({ brief: 'mixed', cwd: '/r', id: 'mixed', harness: 'claude', queued: true }));
+    const tagged = await failure(effect((e) => e.output('mixed', 'stdout')));
+    assert.equal(tagged._tag, 'OutputRefused');
+    assert.equal(
+      tagged.message,
+      'the `claude` harness keeps no whole streams: it mixes them in one log. `logs` gives what its session printed.',
+    );
+  });
+  await t.test('nothing refused was journalled', async () => {
+    assert.deepEqual(
+      (await Effect.runPromise(built.feed(0))).entries.map((e) => [e.taskId, e.event.kind]),
+      [
+        ['one', 'filed'],
+        ['mixed', 'filed'],
+      ],
+      'nothing refused was journalled',
+    );
+  });
+});
+
+test("refusalWords and the failures beside the refusals: say's failure that is no refusal carries its cause and no exit code, interrupt journals nothing and is no lifecycle verb, an engine's options refused as ae says it", async (t) => {
+  await t.test(
+    "say's failure that is not a refusal is SayUnsent, with its cause, and refusalWords words it behind the verb with the cause and no exit code",
+    async () => {
+      const { effect, built, unreadable } = engines();
+      await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
+      await Effect.runPromise(built.tick());
+      unreadable.now = true;
+      const unsent = await failure(effect((e) => e.say('one', 'hi')));
+      assert.equal(unsent._tag, 'SayUnsent');
+      assert.match(
+        unsent.message,
+        /^the `fake` registry could not be read \(.*the registry is not there.*\), so ae\/one\/1 could not be found\./,
+      );
+      const plain = refusalWords('say')(unsent) as Error & { _tag?: string; exitCode?: number };
+      assert.deepEqual([plain.message, plain.exitCode, plain._tag], [`say: ${unsent.message}`, undefined, undefined]);
+      assert.ok(unsent.cause instanceof Error && plain.cause instanceof Error, 'each carries what failed');
+      assert.equal(plain.cause.message, unsent.cause.message);
+    },
   );
-});
 
-test("say's failure that is not a refusal is SayUnsent, with its cause, and refusalWords words it behind the verb with the cause and no exit code", async () => {
-  const { effect, built, unreadable } = engines();
-  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
-  await Effect.runPromise(built.tick());
-  unreadable.now = true;
-  const unsent = await failure(effect((e) => e.say('one', 'hi')));
-  assert.equal(unsent._tag, 'SayUnsent');
-  assert.match(
-    unsent.message,
-    /^the `fake` registry could not be read \(.*the registry is not there.*\), so ae\/one\/1 could not be found\./,
-  );
-  const plain = refusalWords('say')(unsent) as Error & { _tag?: string; exitCode?: number };
-  assert.deepEqual([plain.message, plain.exitCode, plain._tag], [`say: ${unsent.message}`, undefined, undefined]);
-  assert.ok(unsent.cause instanceof Error && plain.cause instanceof Error, 'each carries what failed');
-  assert.equal(plain.cause.message, unsent.cause.message);
-});
+  await t.test('interrupt is no lifecycle verb: it is on no VERBS entry, and a refusal of it journals nothing', async () => {
+    const { effect, built } = engines();
+    assert.ok(
+      !LIFECYCLE_VERBS.map((v) => v.verb as string).includes('interrupt'),
+      'an interrupt journals no entry the next pass reads as a state',
+    );
+    await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
+    await failure(effect((e) => e.interrupt('one')));
+    assert.deepEqual(
+      (await Effect.runPromise(built.feed(0))).entries.map((e) => [e.taskId, e.event.kind]),
+      [['one', 'filed']],
+      'nothing of the interrupt was journalled',
+    );
+  });
 
-test('interrupt is no lifecycle verb: it is on no VERBS entry, and a refusal of it journals nothing', async () => {
-  const { effect, built } = engines();
-  assert.ok(
-    !LIFECYCLE_VERBS.map((v) => v.verb as string).includes('interrupt'),
-    'an interrupt journals no entry the next pass reads as a state',
-  );
-  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
-  await failure(effect((e) => e.interrupt('one')));
-  assert.deepEqual(
-    (await Effect.runPromise(built.feed(0))).entries.map((e) => [e.taskId, e.event.kind]),
-    [['one', 'filed']],
-    'nothing of the interrupt was journalled',
-  );
-});
+  await t.test("interrupt's refusal of a task settled is tagged and worded", async () => {
+    const { effect, built } = engines();
+    await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
+    await Effect.runPromise(built.stop('one'));
+    const asked = await failure(effect((e) => e.interrupt('one')));
+    assert.equal(asked._tag, 'InterruptRefused');
+    const plain = refusalWords('interrupt')(asked) as Error & { exitCode?: number };
+    assert.deepEqual([plain.message, plain.exitCode], [`interrupt: ${asked.message}`, 2]);
+  });
 
-test("interrupt's refusal of a task settled and of one with no attempt in flight is tagged and worded", async () => {
-  const { effect, built } = engines();
-  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one' }));
-  await Effect.runPromise(built.stop('one'));
-  const asked = await failure(effect((e) => e.interrupt('one')));
-  assert.equal(asked._tag, 'InterruptRefused');
-  const plain = refusalWords('interrupt')(asked) as Error & { exitCode?: number };
-  assert.deepEqual([plain.message, plain.exitCode], [`interrupt: ${asked.message}`, 2]);
-});
-
-test('options an engine cannot be built from: EngineRefused from the layer, worded by refusalWords as ae says it', async () => {
-  const options: EngineOptions = {
-    root: scratch('ae-verbs-refused-'),
-    journal: asyncStore(memoryJournal()),
-    maxConcurrent: 0,
-  };
-  const refused = await failure(Effect.runPromise(Engine.use((e) => Effect.succeed(e)).pipe(Effect.provide(Engine.layer(options)))));
-  assert.equal(refused._tag, 'EngineRefused');
-  assert.match(refused.message, /^`maxConcurrent: 0` is not a ceiling\./);
-  const plain = refusalWords('ae')(refused) as Error & { exitCode?: number };
-  assert.deepEqual([plain.message, plain.exitCode], [`ae: ${refused.message}`, 2]);
-});
-
-test('output refuses a task whose harness keeps no whole streams, naming logs', async () => {
-  const { effect, built } = engines();
-  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one', harness: 'claude', queued: true }));
-  const tagged = await failure(effect((e) => e.output('one', 'stdout')));
-  assert.equal(tagged._tag, 'OutputRefused');
-  assert.equal(
-    tagged.message,
-    'the `claude` harness keeps no whole streams: it mixes them in one log. `logs` gives what its session printed.',
-  );
-});
-
-test('follow of a task whose harness streams, before its first attempt, is nothing to follow, and no refusal', async () => {
-  const { effect, built } = engines();
-  await Effect.runPromise(built.file({ brief: 'one', cwd: '/r', id: 'one', harness: 'claude', queued: true }));
-  assert.equal(await effect((e) => e.follow('one')), undefined);
+  await t.test('options an engine cannot be built from: EngineRefused from the layer, worded by refusalWords as ae says it', async () => {
+    const options: EngineOptions = {
+      root: scratch('ae-verbs-refused-'),
+      journal: asyncStore(memoryJournal()),
+      maxConcurrent: 0,
+    };
+    const refused = await failure(Effect.runPromise(Engine.use((e) => Effect.succeed(e)).pipe(Effect.provide(Engine.layer(options)))));
+    assert.equal(refused._tag, 'EngineRefused');
+    assert.match(refused.message, /^`maxConcurrent: 0` is not a ceiling\./);
+    const plain = refusalWords('ae')(refused) as Error & { exitCode?: number };
+    assert.deepEqual([plain.message, plain.exitCode], [`ae: ${refused.message}`, 2]);
+  });
 });

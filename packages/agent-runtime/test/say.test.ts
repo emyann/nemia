@@ -15,7 +15,7 @@
  *   failed listing is the only thing that misses the session: on `claude` the listing reads past a registry that
  *   failed, and its jobs stay seen.
  * - The cases of a session that cannot be found each get a board of their own, so that each case's registration and
- *   inbox are the only ones its engine reads.
+ *   inbox are the only ones its engine reads; the refusals share one, each on a task of its own.
  */
 import { Effect } from 'effect';
 import { test } from 'node:test';
@@ -27,6 +27,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import type { EngineShape, Event, FeedEntry, Sighting, TaskSpec, TranscriptEvent } from '../src/index.ts';
 import { scratch } from './scratch.ts';
+import { story } from './checkpoints.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
 import { instantNow } from '../src/core/engine/now.ts';
 import { elapsedMs } from '../src/core/clock.ts';
@@ -250,61 +251,114 @@ const failed = async (engine: EngineShape, id: string, pattern: RegExp) => {
   assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, []);
 };
 
-test("at shipped defaults, say hands the words verbatim to the running session's inbox, addressed to its session, then journals them", async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, row, box } = await running(engine);
-  const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
+const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
 
-  const said = await Effect.runPromise(engine.say(id, text));
+/**
+ * `ae`, run as a child — and not with `spawnSync`: the inbox is a socket in this process, and a process blocked
+ * in `spawnSync` accepts no connection, so the child's words would wait out their timeout.
+ */
+const aeRun = (args: string[], env: NodeJS.ProcessEnv) =>
+  new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve) => {
+    const child = spawn(process.execPath, [ae, ...args], { env });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.setEncoding('utf8').on('data', (d: string) => {
+      stdout += d;
+    });
+    child.stderr.setEncoding('utf8').on('data', (d: string) => {
+      stderr += d;
+    });
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
 
-  assert.deepEqual(
-    await box.heard(1),
-    [{ type: 'user', session_id: row.sessionId, message: { role: 'user', content: text } }],
-    'one line, the words as given, for this session',
-  );
-  assert.equal(said.attempt, 1);
-  assert.equal(said.text, text);
-  assert.ok(Number.isFinite(Date.parse(said.at)), 'dated');
-  assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said], 'view carries it');
-  const last = (await entries(engine, id)).at(-1)!.event;
-  assert.deepEqual(last, { kind: 'said', ...said }, 'and the feed has it, last');
-
-  const again = await Effect.runPromise(engine.say(id, 'and the web app'));
-  assert.deepEqual(
-    (await Effect.runPromise(engine.view(id))).state.said.map((s) => s.text),
-    [text, 'and the web app'],
-    'said twice, journalled twice, in order: the record keeps what a person did, not what is new',
-  );
-  assert.equal(again.attempt, 1);
-  assert.equal((await box.heard(2)).length, 2);
-  await box.close();
-});
-
-test('a session its harness lists blocked is running, and its inbox is handed the words as a working one is', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, row, box } = await running(engine);
-  fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'blocked', status: 'idle' } : r)));
-  await Effect.runPromise(engine.say(id, 'you may run the migration'));
-  assert.equal((await box.heard(1)).length, 1);
-  assert.equal((await Effect.runPromise(engine.view(id))).state.said.length, 1);
-  await box.close();
-});
-
-test('a task journalled on claude before a job was its default runs --bg with no background in its config, and hears the words', async () => {
-  const root = tmp('board');
-  const engine = builtEngine(EngineService.layer({ root }));
-  const { id, box } = await running(engine);
+/** The first filing's `background` taken off a task's journal, as a runtime before a job was Claude's default wrote it. */
+const asFiledBeforeJobs = (root: string, id: string) => {
   const journal = path.join(root, 'tasks', `${id}.jsonl`);
   const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
   const event = JSON.parse(filed);
   delete event.config.background;
   fs.writeFileSync(journal, [JSON.stringify(event), ...rest].join('\n'));
-  assert.equal((await Effect.runPromise(engine.view(id))).state.config?.background, undefined, 'the record names no mode');
+};
 
-  await Effect.runPromise(engine.say(id, 'and the web app'));
-  assert.equal((await box.heard(1)).length, 1, 'the words reached its inbox');
-  assert.equal((await Effect.runPromise(engine.view(id))).state.said.length, 1);
-  await box.close();
+test('a person says words to a background session at shipped defaults: verbatim to its inbox for its session, journalled in order, heard while it is listed blocked, and `ae say` prints the line', async (t) => {
+  const s = story(t);
+  const root = tmp('board');
+  const engine = builtEngine(EngineService.layer({ root }));
+  const env = { ...process.env, AE_ROOT: root };
+  const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
+  const boxes: Array<{ close: () => Promise<void> }> = [];
+  let task!: Awaited<ReturnType<typeof running>>;
+
+  try {
+    await s.test(
+      "say hands the words verbatim to the running session's inbox, addressed to its session, then journals them, last in the feed",
+      async () => {
+        task = await running(engine);
+        boxes.push(task.box);
+        const said = await Effect.runPromise(engine.say(task.id, text));
+        assert.deepEqual(
+          await task.box.heard(1),
+          [{ type: 'user', session_id: task.row.sessionId, message: { role: 'user', content: text } }],
+          'one line, the words as given, for this session',
+        );
+        assert.equal(said.attempt, 1);
+        assert.equal(said.text, text);
+        assert.ok(Number.isFinite(Date.parse(said.at)), 'dated');
+        assert.deepEqual((await Effect.runPromise(engine.view(task.id))).state.said, [said], 'view carries it');
+        const last = (await entries(engine, task.id)).at(-1)!.event;
+        assert.deepEqual(last, { kind: 'said', ...said }, 'and the feed has it, last');
+      },
+    );
+
+    await s.test('said twice, journalled twice, in order: the record keeps what a person did, not what is new', async () => {
+      const again = await Effect.runPromise(engine.say(task.id, 'and the web app'));
+      assert.deepEqual(
+        (await Effect.runPromise(engine.view(task.id))).state.said.map((x) => x.text),
+        [text, 'and the web app'],
+        'said twice, journalled twice, in order: the record keeps what a person did, not what is new',
+      );
+      assert.equal(again.attempt, 1);
+      assert.equal((await task.box.heard(2)).length, 2);
+    });
+
+    await s.test('a session its harness lists blocked is running, and its inbox is handed the words as a working one is', async () => {
+      fake.setRows(fake.rows().map((r) => (r.sessionId === task.row.sessionId ? { ...r, state: 'blocked', status: 'idle' } : r)));
+      await Effect.runPromise(engine.say(task.id, 'you may run the migration'));
+      assert.equal((await task.box.heard(3)).length, 3);
+      assert.equal((await Effect.runPromise(engine.view(task.id))).state.said.length, 3);
+    });
+
+    await s.test(
+      'ae say <id> prints the line it journalled, the words being everything after the id; ae say <id> "" exits 2 and journals nothing',
+      async () => {
+        const ok = await aeRun(['say', task.id, 'widen', 'the scope to the api'], env);
+        assert.equal(ok.status, 0, ok.stderr);
+        assert.match(ok.stdout, new RegExp(`${task.id}\\s+said\\s+to attempt 1: widen the scope to the api`));
+        assert.equal(task.box.lines.at(-1)?.message?.content, 'widen the scope to the api');
+
+        const empty = await aeRun(['say', task.id, ''], env);
+        assert.equal(empty.status, 2, empty.stderr);
+        assert.match(empty.stderr, /`text` is empty/);
+        assert.equal((await Effect.runPromise(engine.view(task.id))).state.said.length, 4, 'only the first was journalled');
+        assert.equal(task.box.lines.length, 4);
+      },
+    );
+
+    await s.test(
+      'a task journalled on claude before a job was its default runs --bg with no background in its config, and hears the words',
+      async () => {
+        const old = await running(engine);
+        boxes.push(old.box);
+        asFiledBeforeJobs(root, old.id);
+        assert.equal((await Effect.runPromise(engine.view(old.id))).state.config?.background, undefined, 'the record names no mode');
+        await Effect.runPromise(engine.say(old.id, 'and the web app'));
+        assert.equal((await old.box.heard(1)).length, 1, 'the words reached its inbox');
+        assert.equal((await Effect.runPromise(engine.view(old.id))).state.said.length, 1);
+      },
+    );
+  } finally {
+    for (const box of boxes) await box.close();
+  }
 });
 
 /** What `read` answers, in test `t`, once it answers anything: read again every 50ms. */
@@ -325,42 +379,6 @@ const job = async (t: Waiter, engine: EngineShape, brief: string, spec: Partial<
   await heard(t, () => (toldIn(dir)?.includes(brief) ? true : undefined), `${brief} read its brief`);
   return { id, told: () => toldIn(dir)!, letGo: () => fs.writeFileSync(path.join(dir, 'end'), '') };
 };
-
-test(
-  'at shipped defaults, a job is told on its stdin: the words, verbatim, as the next user message after its brief — then journalled',
-  WAITED,
-  async (t) => {
-    const engine = builtEngine(EngineService.layer({ root: tmp('board'), claudeExecutable: STAND_IN }));
-    const { id, told } = await job(t, engine, 'job-told');
-    const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
-
-    const said = await Effect.runPromise(engine.say(id, text));
-    assert.equal(said.attempt, 1);
-    assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said], 'journalled');
-    const read = await heard(t, () => (told().length > 1 ? told() : undefined), 'the words on its input');
-    assert.deepEqual(read, ['job-told', text], 'one message each, a line break in the words kept inside theirs');
-
-    await Effect.runPromise(engine.say(id, 'and the web app'));
-    await heard(t, () => (told().length === 3 ? true : undefined), 'the second words');
-    assert.equal(told()[2], 'and the web app', 'in the order they were said');
-    await Effect.runPromise(engine.stop(id));
-    await Effect.runPromise(engine.tick());
-  },
-);
-
-test(
-  "a job in bypassPermissions is told: what Claude Code's inbox holds for an approval is a background session's, and a job has no inbox",
-  WAITED,
-  async (t) => {
-    const engine = builtEngine(EngineService.layer({ root: tmp('board'), claudeExecutable: STAND_IN }));
-    const { id, told } = await job(t, engine, 'job-bypass', { config: { permissionMode: 'bypassPermissions' } });
-    await Effect.runPromise(engine.say(id, 'carry on'));
-    await heard(t, () => (told().length === 2 ? true : undefined), 'the words on its input');
-    assert.equal((await Effect.runPromise(engine.view(id))).state.said.length, 1);
-    await Effect.runPromise(engine.stop(id));
-    await Effect.runPromise(engine.tick());
-  },
-);
 
 /** Whether the worker of `runFile` has closed its session's input and written the state it ended on: nothing writes it after. */
 const workerDone = (runFile: string): true | undefined => {
@@ -386,218 +404,329 @@ const withInputClosed = (runFile: string): string => {
 };
 
 test(
-  'a job that has given its result reads nothing more: words said before it exits are rejected, not journalled — and once it has settled, refused',
+  'a person tells a job at shipped defaults on its stdin: verbatim, as the next user message after its brief, in order, in bypassPermissions too — and nothing more once it has given its result',
   WAITED,
   async (t) => {
+    const s = story(t);
     const root = tmp('board');
     const engine = builtEngine(EngineService.layer({ root, claudeExecutable: STAND_IN }));
-    const { id, told, letGo } = await job(t, engine, 'job-lingers');
-    await Effect.runPromise(engine.say(id, 'finish and linger'));
-    await heard(t, () => (told().length === 2 ? true : undefined), 'the words on its input');
-    letGo();
-    const workerFile = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
-    const runFile = workerFile('.json');
-    await heard(t, () => workerDone(runFile), 'its input closed at its result, and its worker done writing');
-    assert.deepEqual(
-      (await Effect.runPromise(engine.view(id))).state.said.map((s) => s.text),
-      ['finish and linger'],
-      'the words said before its result are the only ones journalled',
-    );
-    assert.equal(told().length, 2, 'and the only ones its session read');
 
-    const was = withInputClosed(runFile);
-    const before = fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8');
-    await assert.rejects(
-      Effect.runPromise(engine.say(id, 'one more thing')),
-      (e: Refusal) => {
-        assert.equal(e._tag, 'SayUnsent', e.message);
-        assert.match(e.message, /has given its result and reads no more words/);
-        return true;
-      },
-      "its harness lists it working, so this is the worker's word, not the engine's: unsent, no refusal",
-    );
-    assert.deepEqual(
-      (await Effect.runPromise(engine.view(id))).state.said.map((s) => s.text),
-      ['finish and linger'],
-      'nothing more journalled',
-    );
-    assert.equal(fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8'), before, 'nothing appended');
-    assert.equal(before.split('\n').filter(Boolean).length, 1);
-    fs.writeFileSync(runFile, was);
+    await s.test('a job is told the words, verbatim, as the next user message after its brief — then journalled', async (sub) => {
+      const { id, told } = await job(sub, engine, 'job-told');
+      const text = 'Widen the scope to `apps/api` too.\nAnd answer: yes, "keep" the old route — ça va.';
+      const said = await Effect.runPromise(engine.say(id, text));
+      assert.equal(said.attempt, 1);
+      assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said], 'journalled');
+      const read = await heard(sub, () => (told().length > 1 ? told() : undefined), 'the words on its input');
+      assert.deepEqual(read, ['job-told', text], 'one message each, a line break in the words kept inside theirs');
 
-    await Effect.runPromise(engine.stop(id));
-    for (let i = 0; i < 20 && !(await Effect.runPromise(engine.view(id))).state.settled; i++) {
+      await Effect.runPromise(engine.say(id, 'and the web app'));
+      await heard(sub, () => (told().length === 3 ? true : undefined), 'the second words');
+      assert.equal(told()[2], 'and the web app', 'in the order they were said');
+      await Effect.runPromise(engine.stop(id));
       await Effect.runPromise(engine.tick());
-      await new Promise((r) => setTimeout(r, 50));
-    }
-    await refused(engine, id, 'hello', /has settled/);
+    });
+
+    await s.test(
+      "a job in bypassPermissions is told: what Claude Code's inbox holds for an approval is a background session's, and a job has no inbox",
+      async (sub) => {
+        const { id, told } = await job(sub, engine, 'job-bypass', { config: { permissionMode: 'bypassPermissions' } });
+        await Effect.runPromise(engine.say(id, 'carry on'));
+        await heard(sub, () => (told().length === 2 ? true : undefined), 'the words on its input');
+        assert.equal((await Effect.runPromise(engine.view(id))).state.said.length, 1);
+        await Effect.runPromise(engine.stop(id));
+        await Effect.runPromise(engine.tick());
+      },
+    );
+
+    let lingering = '';
+    await s.test(
+      'a job that has given its result reads nothing more: words said before it exits are rejected unsent, not journalled',
+      async (sub) => {
+        const { id, told, letGo } = await job(sub, engine, 'job-lingers');
+        lingering = id;
+        await Effect.runPromise(engine.say(id, 'finish and linger'));
+        await heard(sub, () => (told().length === 2 ? true : undefined), 'the words on its input');
+        letGo();
+        const workerFile = (ext: string) => path.join(root, 'runs', 'claude', `ae/${id}/1`.replace(/[^a-zA-Z0-9]+/g, '_') + ext);
+        const runFile = workerFile('.json');
+        await heard(sub, () => workerDone(runFile), 'its input closed at its result, and its worker done writing');
+        assert.deepEqual(
+          (await Effect.runPromise(engine.view(id))).state.said.map((x) => x.text),
+          ['finish and linger'],
+          'the words said before its result are the only ones journalled',
+        );
+        assert.equal(told().length, 2, 'and the only ones its session read');
+
+        const was = withInputClosed(runFile);
+        const before = fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8');
+        await assert.rejects(
+          Effect.runPromise(engine.say(id, 'one more thing')),
+          (e: Refusal) => {
+            assert.equal(e._tag, 'SayUnsent', e.message);
+            assert.match(e.message, /has given its result and reads no more words/);
+            return true;
+          },
+          "its harness lists it working, so this is the worker's word, not the engine's: unsent, no refusal",
+        );
+        assert.deepEqual(
+          (await Effect.runPromise(engine.view(id))).state.said.map((x) => x.text),
+          ['finish and linger'],
+          'nothing more journalled',
+        );
+        assert.equal(fs.readFileSync(workerFile('.inbox.jsonl'), 'utf8'), before, 'nothing appended');
+        assert.equal(before.split('\n').filter(Boolean).length, 1);
+        fs.writeFileSync(runFile, was);
+      },
+    );
+
+    await s.test('once it has settled, refused', async () => {
+      await Effect.runPromise(engine.stop(lingering));
+      for (let i = 0; i < 20 && !(await Effect.runPromise(engine.view(lingering))).state.settled; i++) {
+        await Effect.runPromise(engine.tick());
+        await new Promise((r) => setTimeout(r, 50));
+      }
+      await refused(engine, lingering, 'hello', /has settled/);
+    });
   },
 );
 
-test('refused: empty words, and words that are only whitespace', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, box } = await running(engine);
-  await refused(engine, id, '', /`text` is empty/, box);
-  await refused(engine, id, ' \n\t ', /`text` is empty/, box);
-  await box.close();
-});
+/** A session's row in the fake's registry set to `fields`. */
+const listAs = (row: Row, fields: Partial<Row>) =>
+  fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, ...fields } : r)));
 
-test('refused: a task the engine has no record of', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  await refused(engine, 'no-such-task', 'hello', /`no-such-task` is not a task on this board/);
-});
+/**
+ * Each refusal of `say` at shipped defaults: SayRefused, the sentence matched, and neither the journal nor the inbox moved. The rows
+ * share one engine, each on a task of its own; a row that files a job and never ticks it comes last, since the pass would start it.
+ */
+const SAY_REFUSALS: Array<{
+  name: string;
+  says: RegExp;
+  text?: string;
+  task: (engine: EngineShape, root: string) => Promise<{ id: string; box?: Awaited<ReturnType<typeof inbox>> }>;
+}> = [
+  { name: 'empty words', says: /`text` is empty/, text: '', task: (engine) => running(engine) },
+  { name: 'words that are only whitespace', says: /`text` is empty/, text: ' \n\t ', task: (engine) => running(engine) },
+  {
+    name: 'a task the engine has no record of',
+    says: /`no-such-task` is not a task on this board/,
+    task: async () => ({ id: 'no-such-task' }),
+  },
+  {
+    name: 'a Codex task, in its own words — `codex exec` takes nothing while it runs',
+    says: /`codex exec` reads its prompt once and takes nothing while it runs/,
+    task: async (engine) => ({ id: await Effect.runPromise(engine.file({ brief: 'review', cwd: work, harness: 'codex' })) }),
+  },
+  {
+    name: 'a claude-detached task, in its own words — no session id to address until it exits',
+    says: /learns its session's id only from what it prints as it exits/,
+    task: async (engine) => ({ id: await Effect.runPromise(engine.file({ brief: 'review', cwd: work, harness: 'claude-detached' })) }),
+  },
+  {
+    name: 'a Claude task in bypassPermissions, though its session runs and has an inbox — the words would wait for an approval nobody gives',
+    says: /permissionMode: bypassPermissions`, and Claude Code holds a message/,
+    task: (engine) => running(engine, { config: { permissionMode: 'bypassPermissions' } }),
+  },
+  {
+    name: 'a task journalled on claude before a job was its default, in bypassPermissions — known for a background session once its harness lists it',
+    says: /permissionMode: bypassPermissions`, and Claude Code holds a message/,
+    task: async (engine, root) => {
+      const r = await running(engine, { config: { permissionMode: 'bypassPermissions' } });
+      asFiledBeforeJobs(root, r.id);
+      return r;
+    },
+  },
+  {
+    name: "words longer than Claude Code's inbox reads",
+    says: /inbox drops a line over 1048576/,
+    text: 'x'.repeat(CLAUDE_INBOX_LINE_MAX),
+    task: (engine) => running(engine),
+  },
+  {
+    name: 'a task that has not started an attempt',
+    says: /has not started an attempt yet/,
+    task: async (engine) => ({ id: await Effect.runPromise(engine.file({ brief: 'queued', cwd: work, config: { background: true } })) }),
+  },
+  {
+    name: 'a task that has settled, naming `resumeFrom`',
+    says: /has settled \(succeeded\).*`resumeFrom`/,
+    task: async (engine) => {
+      const r = await running(engine);
+      listAs(r.row, { state: 'done' });
+      for (let i = 0; i < 5 && !(await Effect.runPromise(engine.view(r.id))).state.settled; i++) await Effect.runPromise(engine.tick());
+      assert.equal((await Effect.runPromise(engine.view(r.id))).state.settled, 'succeeded');
+      return r;
+    },
+  },
+  {
+    name: 'a task asked to stop, before its session has',
+    says: /has been asked to stop/,
+    task: async (engine) => {
+      const r = await running(engine);
+      await Effect.runPromise(engine.stop(r.id));
+      return r;
+    },
+  },
+  {
+    name: 'an attempt that has ended on a task that has not settled — one held open between turns, where nothing runs to hear anything until a person answers it',
+    says: /has no attempt running: attempt 1 ended `done`/,
+    task: async (engine) => {
+      const r = await running(engine, { holdOpen: true, closeoutSchema: { type: 'object' } });
+      listAs(r.row, { state: 'done' });
+      await Effect.runPromise(engine.tick());
+      const { state } = await Effect.runPromise(engine.view(r.id));
+      assert.deepEqual(
+        state.attempts.map((a) => a.ended),
+        ['done'],
+        'the end is written',
+      );
+      assert.equal(state.settled, null, 'and the task waits');
+      return r;
+    },
+  },
+  {
+    name: 'an attempt its harness does not list',
+    says: /its harness lists no `ae\/.+\/1`/,
+    task: async (engine) => {
+      const r = await running(engine);
+      fake.setRows(fake.rows().filter((x) => x.sessionId !== r.row.sessionId));
+      return r;
+    },
+  },
+  {
+    name: 'an attempt its harness lists as no longer running',
+    says: /session is `done` on its harness, not running/,
+    task: async (engine) => {
+      const r = await running(engine);
+      listAs(r.row, { state: 'done' });
+      return r;
+    },
+  },
+  {
+    name: 'a background session in bypassPermissions, before anything is read',
+    says: /permissionMode: bypassPermissions`/,
+    task: async (engine) => ({
+      id: await Effect.runPromise(
+        engine.file({ brief: 'b', cwd: work, config: { background: true, permissionMode: 'bypassPermissions' } }),
+      ),
+    }),
+  },
+  ...[undefined, { permissionMode: 'bypassPermissions' as const }].map((config) => ({
+    name: `a job ${config ? 'in bypassPermissions ' : ''}before its attempt, refused only as any task is — never for its mode: a job's words go on its stdin, which takes a mode Claude Code's inbox does not`,
+    says: /has not started an attempt yet/,
+    task: async (engine: EngineShape) => ({ id: await Effect.runPromise(engine.file({ brief: 'b', cwd: work, config })) }),
+  })),
+];
 
-test('refused: a Codex task, in its own words — `codex exec` takes nothing while it runs', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const id = await Effect.runPromise(engine.file({ brief: 'review', cwd: work, harness: 'codex' }));
-  await refused(engine, id, 'hello', /`codex exec` reads its prompt once and takes nothing while it runs/);
-});
+/**
+ * Each delivery `say` could not make: SayUnsent — not a refusal, so ask again — the sentence matched, and nothing journalled. Each row
+ * on a board of its own, so that its registration and inbox are the only ones its engine reads.
+ */
+const SAY_UNSENT: Array<{
+  name: string;
+  says: RegExp;
+  task: (engine: EngineShape) => Promise<{ id: string; heard?: () => number; done: () => Promise<void> }>;
+}> = [
+  {
+    name: 'a registry that cannot be read rejects, not refuses: ask again',
+    says: /the `claude` registry could not be read/,
+    task: async (engine) => {
+      const { id, row, box } = await running(engine);
+      fs.writeFileSync(
+        path.join(sessions, `${process.pid}.json`),
+        JSON.stringify({
+          pid: process.pid,
+          sessionId: row.sessionId,
+          name: row.name,
+          kind: 'bg',
+          procStart: processStart(process.pid),
+          messagingSocketPath: box.path,
+        }),
+      );
+      fake.agentsFails(true);
+      return {
+        id,
+        heard: () => box.lines.length,
+        done: async () => {
+          fake.agentsFails(false);
+          fs.rmSync(path.join(sessions, `${process.pid}.json`));
+          await box.close();
+        },
+      };
+    },
+  },
+  {
+    name: 'a session with no registration',
+    says: /was not given the words.*registration.*cannot be read/,
+    task: async (engine) => {
+      const r = await running(engine, {}, false);
+      return { id: r.id, done: () => r.box.close() };
+    },
+  },
+  {
+    name: 'a session registered to another session: the socket of a pid that passed to another session hears nothing',
+    says: /is registered to 11111111-2222-3333-4444-555555555555 now/,
+    task: async (engine) => {
+      const r = await running(engine, {}, false);
+      register(r.row, { sessionId: '11111111-2222-3333-4444-555555555555', messagingSocketPath: r.box.path });
+      return { id: r.id, heard: () => r.box.lines.length, done: () => r.box.close() };
+    },
+  },
+  {
+    name: 'a session with no inbox',
+    says: /has no inbox/,
+    task: async (engine) => {
+      const r = await running(engine, {}, false);
+      register(r.row, {});
+      return { id: r.id, done: () => r.box.close() };
+    },
+  },
+  {
+    name: 'a session whose inbox is gone',
+    says: /inbox, .* is not there/,
+    task: async (engine) => {
+      const r = await running(engine);
+      await r.box.close();
+      fs.rmSync(r.box.path, { force: true });
+      return { id: r.id, done: async () => {} };
+    },
+  },
+  {
+    name: 'a session listed with no process — exited — rejects: nothing to find its inbox by',
+    says: /`claude agents` lists no process for/,
+    task: async (engine) => {
+      const r = await running(engine);
+      listAs(r.row, { pid: undefined });
+      return { id: r.id, heard: () => r.box.lines.length, done: () => r.box.close() };
+    },
+  },
+];
 
-test('refused: a claude-detached task, in its own words — no session id to address until it exits', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const id = await Effect.runPromise(engine.file({ brief: 'review', cwd: work, harness: 'claude-detached' }));
-  await refused(engine, id, 'hello', /learns its session's id only from what it prints as it exits/);
-});
-
-test('refused: a Claude task in bypassPermissions, though its session runs and has an inbox — the words would wait for an approval nobody gives', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, box } = await running(engine, { config: { permissionMode: 'bypassPermissions' } });
-  await refused(engine, id, 'hello', /permissionMode: bypassPermissions`, and Claude Code holds a message/, box);
-  await box.close();
-});
-
-test('refused: a task journalled on claude before a job was its default, in bypassPermissions — known for a background session once its harness lists it', async () => {
+test('say: what it refuses — SayRefused, nothing sent and nothing journalled — and what it could not deliver — SayUnsent, nothing journalled: ask again', async (t) => {
   const root = tmp('board');
   const engine = builtEngine(EngineService.layer({ root }));
-  const { id, box } = await running(engine, { config: { permissionMode: 'bypassPermissions' } });
-  const journal = path.join(root, 'tasks', `${id}.jsonl`);
-  const [filed, ...rest] = fs.readFileSync(journal, 'utf8').split('\n');
-  const event = JSON.parse(filed);
-  delete event.config.background;
-  fs.writeFileSync(journal, [JSON.stringify(event), ...rest].join('\n'));
-  await refused(engine, id, 'hello', /permissionMode: bypassPermissions`, and Claude Code holds a message/, box);
-  await box.close();
-});
-
-test("refused: words longer than Claude Code's inbox reads", async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, box } = await running(engine);
-  await refused(engine, id, 'x'.repeat(CLAUDE_INBOX_LINE_MAX), /inbox drops a line over 1048576/, box);
-  await box.close();
-});
-
-test('refused: a task that has not started an attempt', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const id = await Effect.runPromise(engine.file({ brief: 'queued', cwd: work, config: { background: true } }));
-  await refused(engine, id, 'hello', /has not started an attempt yet/);
-});
-
-test('refused: a task that has settled', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, row, box } = await running(engine);
-  fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'done' } : r)));
-  for (let i = 0; i < 5 && !(await Effect.runPromise(engine.view(id))).state.settled; i++) await Effect.runPromise(engine.tick());
-  assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
-  await refused(engine, id, 'hello', /has settled \(succeeded\).*`resumeFrom`/, box);
-  await box.close();
-});
-
-test('refused: a task asked to stop, before its session has', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, box } = await running(engine);
-  await Effect.runPromise(engine.stop(id));
-  await refused(engine, id, 'hello', /has been asked to stop/, box);
-  await box.close();
-});
-
-test('refused: an attempt that has ended on a task that has not settled — one held open between turns, where nothing runs to hear anything until a person answers it', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, row, box } = await running(engine, { holdOpen: true, closeoutSchema: { type: 'object' } });
-  fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, state: 'done' } : r)));
-  await Effect.runPromise(engine.tick());
-  const { state } = await Effect.runPromise(engine.view(id));
-  assert.deepEqual(
-    state.attempts.map((a) => a.ended),
-    ['done'],
-    'the end is written',
-  );
-  assert.equal(state.settled, null, 'and the task waits');
-  await refused(engine, id, 'hello', /has no attempt running: attempt 1 ended `done`/, box);
-  await box.close();
-});
-
-test('refused: an attempt its harness does not list, and one it lists as no longer running', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const gone = await running(engine);
-  fake.setRows(fake.rows().filter((r) => r.sessionId !== gone.row.sessionId));
-  await refused(engine, gone.id, 'hello', /its harness lists no `ae\/.+\/1`/, gone.box);
-
-  const quiet = await running(engine);
-  fake.setRows(fake.rows().map((r) => (r.sessionId === quiet.row.sessionId ? { ...r, state: 'done' } : r)));
-  await refused(engine, quiet.id, 'hello', /session is `done` on its harness, not running/, quiet.box);
-  await gone.box.close();
-  await quiet.box.close();
-});
-
-test('a registry that cannot be read rejects, not refuses: ask again', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, row, box } = await running(engine);
-  fs.writeFileSync(
-    path.join(sessions, `${process.pid}.json`),
-    JSON.stringify({
-      pid: process.pid,
-      sessionId: row.sessionId,
-      name: row.name,
-      kind: 'bg',
-      procStart: processStart(process.pid),
-      messagingSocketPath: box.path,
-    }),
-  );
-  fake.agentsFails(true);
-  try {
-    await failed(engine, id, /the `claude` registry could not be read/);
-  } finally {
-    fake.agentsFails(false);
-    fs.rmSync(path.join(sessions, `${process.pid}.json`));
+  for (const row of SAY_REFUSALS) {
+    await t.test(`refused: ${row.name}`, async () => {
+      const { id, box } = await row.task(engine, root);
+      try {
+        await refused(engine, id, row.text ?? 'hello', row.says, box);
+      } finally {
+        await box?.close();
+      }
+    });
   }
-  assert.equal(box.lines.length, 0);
-  await box.close();
-});
-
-test('a session with no registration, one registered to another session, one with no inbox, and one whose inbox is gone: rejected, nothing journalled', async () => {
-  const board = () => builtEngine(EngineService.layer({ root: tmp('board') }));
-
-  const e1 = board();
-  const unregistered = await running(e1, {}, false);
-  await failed(e1, unregistered.id, /was not given the words.*registration.*cannot be read/);
-
-  const e2 = board();
-  const reused = await running(e2, {}, false);
-  register(reused.row, { sessionId: '11111111-2222-3333-4444-555555555555', messagingSocketPath: reused.box.path });
-  await failed(e2, reused.id, /is registered to 11111111-2222-3333-4444-555555555555 now/);
-  assert.equal(reused.box.lines.length, 0, 'the socket of a pid that passed to another session hears nothing');
-
-  const e3 = board();
-  const noInbox = await running(e3, {}, false);
-  register(noInbox.row, {});
-  await failed(e3, noInbox.id, /has no inbox/);
-
-  const e4 = board();
-  const closed = await running(e4);
-  await closed.box.close();
-  fs.rmSync(closed.box.path, { force: true });
-  await failed(e4, closed.id, /inbox, .* is not there/);
-
-  for (const r of [unregistered, reused, noInbox]) await r.box.close();
-});
-
-test('a session listed with no process — exited — rejects: nothing to find its inbox by', async () => {
-  const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
-  const { id, row, box } = await running(engine);
-  fake.setRows(fake.rows().map((r) => (r.sessionId === row.sessionId ? { ...r, pid: undefined } : r)));
-  await failed(engine, id, /`claude agents` lists no process for/);
-  assert.equal(box.lines.length, 0);
-  await box.close();
+  for (const row of SAY_UNSENT) {
+    await t.test(`rejected: ${row.name}`, async () => {
+      const own = builtEngine(EngineService.layer({ root: tmp('board') }));
+      const { id, heard: lines, done } = await row.task(own);
+      try {
+        await failed(own, id, row.says);
+        if (lines) assert.equal(lines(), 0, 'nothing sent');
+      } finally {
+        await done();
+      }
+    });
+  }
 });
 
 test("an inbox that is a symlink to a real socket is refused before anything is sent — so is a registration another user owns, or a plain file in the socket's place", async () => {
@@ -766,63 +895,6 @@ const promiseHarness = (
   };
 };
 
-test("an AsyncRunner's own say is handed the session as observed and the words; without one, its tasks are refused", async () => {
-  const heard: Array<{ session: { name: string; sessionId: string }; text: string }> = [];
-  const engine = builtEngine(
-    EngineService.layer({
-      root: scratch('ae-say-root-'),
-      journal: asyncStore(memoryJournal()),
-      harnesses: { mine: asyncOps(promiseHarness(heard)) },
-    }),
-  );
-  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
-  await Effect.runPromise(engine.tick());
-  const said = await Effect.runPromise(engine.say(id, 'hello'));
-  assert.deepEqual(heard, [{ session: { name: `ae/${id}/1`, sessionId: 's-1' }, text: 'hello' }]);
-  assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said]);
-
-  const mute = builtEngine(
-    EngineService.layer({
-      root: scratch('ae-say-root-'),
-      journal: asyncStore(memoryJournal()),
-      harnesses: { mine: asyncOps(promiseHarness()) },
-    }),
-  );
-  const muteId = await Effect.runPromise(mute.file({ brief: 'b', cwd: '/repo' }));
-  await Effect.runPromise(mute.tick());
-  await refused(mute, muteId, 'hello', /the `mine` harness has no channel into a running session/);
-});
-
-test("an AsyncRunner's say that rejects journals nothing; a journal that fails after the words were taken says so", async () => {
-  const engine = builtEngine(
-    EngineService.layer({
-      root: scratch('ae-say-root-'),
-      journal: asyncStore(memoryJournal()),
-      harnesses: { mine: asyncOps(promiseHarness([], 'the line is down')) },
-    }),
-  );
-  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
-  await Effect.runPromise(engine.tick());
-  await failed(engine, id, /ae\/.+\/1 was not given the words \(the line is down\)\. Nothing was journalled/);
-
-  const heard: Array<{ session: { name: string; sessionId: string }; text: string }> = [];
-  const readOnly = builtEngine(
-    EngineService.layer({
-      root: scratch('ae-say-root-'),
-      journal: asyncStore(memoryJournal('said')),
-      harnesses: { mine: asyncOps(promiseHarness(heard)) },
-    }),
-  );
-  const roId = await Effect.runPromise(readOnly.file({ brief: 'b', cwd: '/repo' }));
-  await Effect.runPromise(readOnly.tick());
-  await assert.rejects(
-    Effect.runPromise(readOnly.say(roId, 'hello')),
-    (e: Refusal) =>
-      e._tag === 'SayUnsent' && /was given the words, but they could not be journalled \(the store is read-only now\)/.test(e.message),
-  );
-  assert.equal(heard.length, 1, 'the words did go');
-});
-
 /**
  * `promiseHarness` with a conversation: `transcript` answers `events` as they stand, or rejects with `unread`, and `say` puts the
  * words' arrival on the end of them, as a session that reads them writes it.
@@ -842,92 +914,89 @@ const talkingHarness = (heard: string[], events: TranscriptEvent[], unread?: str
   };
 };
 
-const toldThrough = async (harness: AsyncRunner) => {
+/** The engine over `harness` alone and `journal`, a task filed and ticked once, so its session is listed working. */
+const toldThrough = async (harness: AsyncRunner, journal = memoryJournal()) => {
   const engine = builtEngine(
-    EngineService.layer({ root: scratch('ae-say-root-'), journal: asyncStore(memoryJournal()), harnesses: { mine: asyncOps(harness) } }),
+    EngineService.layer({ root: scratch('ae-say-root-'), journal: asyncStore(journal), harnesses: { mine: asyncOps(harness) } }),
   );
   const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
   await Effect.runPromise(engine.tick());
   return { engine, id };
 };
 
-test("said's after is the last event the session's transcript held before the words were handed over, never the one they wrote", async () => {
-  const heard: string[] = [];
-  const at = new Date().toISOString();
-  const events: TranscriptEvent[] = [
-    { id: 'u-1', at, role: 'user', kind: 'text', text: 'Implement it.' },
-    { id: 'c-1', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Read', input: {} } },
-  ];
-  const { engine, id } = await toldThrough(talkingHarness(heard, events));
-  const said = await Effect.runPromise(engine.say(id, 'hello'));
-  assert.deepEqual(heard, ['hello'], 'the words were handed over');
-  assert.deepEqual(said.after, { kind: 'tool_use', id: 'c-1' });
-  assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said], 'journalled with it');
-  const again = await Effect.runPromise(engine.say(id, 'and again'));
-  assert.deepEqual(again.after, { kind: 'system', id: 'arrival-1' }, "said again: after the first words' arrival");
-});
-
-test("said's after is null when the harness keeps no conversation, holds no event yet, or cannot read it: the words still go, and are journalled", async () => {
-  const quiet: string[] = [];
-  const keepsNone = await toldThrough(promiseHarness([]));
-  assert.equal((await Effect.runPromise(keepsNone.engine.say(keepsNone.id, 'hello'))).after, null, 'no conversation kept');
-  const empty = await toldThrough(talkingHarness(quiet, []));
-  assert.equal((await Effect.runPromise(empty.engine.say(empty.id, 'hello'))).after, null, 'none held yet');
-  const unread: string[] = [];
-  const failing = await toldThrough(talkingHarness(unread, [], 'the transcript is gone'));
-  const said = await Effect.runPromise(failing.engine.say(failing.id, 'hello'));
-  assert.equal(said.after, null, 'a read that failed');
-  assert.deepEqual(unread, ['hello'], 'the words went all the same');
-  assert.deepEqual((await Effect.runPromise(failing.engine.view(failing.id))).state.said, [said]);
-});
-
-test('a said journalled with no after reads back with a null one', async () => {
-  const journal = memoryJournal();
-  const engine = builtEngine(
-    EngineService.layer({ root: scratch('ae-say-root-'), journal: asyncStore(journal), harnesses: { mine: asyncOps(promiseHarness([])) } }),
-  );
-  const id = await Effect.runPromise(engine.file({ brief: 'b', cwd: '/repo' }));
-  await Effect.runPromise(engine.tick());
-  const at = new Date().toISOString();
-  await journal.append(id, { kind: 'said', at, attempt: 1, text: 'from before' });
-  assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [{ at, attempt: 1, text: 'from before', after: null }]);
-});
-
-const ae = fileURLToPath(new URL('../bin/ae.ts', import.meta.url));
-
-/**
- * `ae`, run as a child — and not with `spawnSync`: the inbox is a socket in this process, and a process blocked
- * in `spawnSync` accepts no connection, so the child's words would wait out their timeout.
- */
-const aeRun = (args: string[], env: NodeJS.ProcessEnv) =>
-  new Promise<{ status: number | null; stdout: string; stderr: string }>((resolve) => {
-    const child = spawn(process.execPath, [ae, ...args], { env });
-    let stdout = '';
-    let stderr = '';
-    child.stdout.setEncoding('utf8').on('data', (d: string) => {
-      stdout += d;
-    });
-    child.stderr.setEncoding('utf8').on('data', (d: string) => {
-      stderr += d;
-    });
-    child.on('close', (status) => resolve({ status, stdout, stderr }));
+test('say through a runner brought as an AsyncRunner: its own say is handed the session and the words, its failure journals nothing, and `after` names the event the words came after', async (t) => {
+  await t.test("an AsyncRunner's own say is handed the session as observed and the words", async () => {
+    const heardBy: Array<{ session: { name: string; sessionId: string }; text: string }> = [];
+    const { engine, id } = await toldThrough(promiseHarness(heardBy));
+    const said = await Effect.runPromise(engine.say(id, 'hello'));
+    assert.deepEqual(heardBy, [{ session: { name: `ae/${id}/1`, sessionId: 's-1' }, text: 'hello' }]);
+    assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said]);
   });
 
-test('ae say <id> prints the line it journalled, the words being everything after the id; ae say <id> "" exits 2 and journals nothing', async () => {
-  const root = tmp('cli-board');
-  const engine = builtEngine(EngineService.layer({ root }));
-  const { id, box } = await running(engine);
-  const env = { ...process.env, AE_ROOT: root };
+  await t.test('without a say of its own, its tasks are refused', async () => {
+    const mute = await toldThrough(promiseHarness());
+    await refused(mute.engine, mute.id, 'hello', /the `mine` harness has no channel into a running session/);
+  });
 
-  const ok = await aeRun(['say', id, 'widen', 'the scope to the api'], env);
-  assert.equal(ok.status, 0, ok.stderr);
-  assert.match(ok.stdout, new RegExp(`${id}\\s+said\\s+to attempt 1: widen the scope to the api`));
-  assert.equal(box.lines.at(-1)?.message?.content, 'widen the scope to the api');
+  await t.test("an AsyncRunner's say that rejects journals nothing", async () => {
+    const { engine, id } = await toldThrough(promiseHarness([], 'the line is down'));
+    await failed(engine, id, /ae\/.+\/1 was not given the words \(the line is down\)\. Nothing was journalled/);
+  });
 
-  const empty = await aeRun(['say', id, ''], env);
-  assert.equal(empty.status, 2, empty.stderr);
-  assert.match(empty.stderr, /`text` is empty/);
-  assert.equal((await Effect.runPromise(engine.view(id))).state.said.length, 1, 'only the first was journalled');
-  assert.equal(box.lines.length, 1);
-  await box.close();
+  await t.test('a journal that fails after the words were taken says so', async () => {
+    const heardBy: Array<{ session: { name: string; sessionId: string }; text: string }> = [];
+    const { engine, id } = await toldThrough(promiseHarness(heardBy), memoryJournal('said'));
+    await assert.rejects(
+      Effect.runPromise(engine.say(id, 'hello')),
+      (e: Refusal) =>
+        e._tag === 'SayUnsent' && /was given the words, but they could not be journalled \(the store is read-only now\)/.test(e.message),
+    );
+    assert.equal(heardBy.length, 1, 'the words did go');
+  });
+
+  await t.test(
+    "said's after is the last event the session's transcript held before the words were handed over, never the one they wrote",
+    async () => {
+      const heardBy: string[] = [];
+      const at = new Date().toISOString();
+      const events: TranscriptEvent[] = [
+        { id: 'u-1', at, role: 'user', kind: 'text', text: 'Implement it.' },
+        { id: 'c-1', at, role: 'assistant', kind: 'tool_use', tool: { name: 'Read', input: {} } },
+      ];
+      const { engine, id } = await toldThrough(talkingHarness(heardBy, events));
+      const said = await Effect.runPromise(engine.say(id, 'hello'));
+      assert.deepEqual(heardBy, ['hello'], 'the words were handed over');
+      assert.deepEqual(said.after, { kind: 'tool_use', id: 'c-1' });
+      assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [said], 'journalled with it');
+      const again = await Effect.runPromise(engine.say(id, 'and again'));
+      assert.deepEqual(again.after, { kind: 'system', id: 'arrival-1' }, "said again: after the first words' arrival");
+    },
+  );
+
+  await t.test("said's after is null when the harness keeps no conversation", async () => {
+    const keepsNone = await toldThrough(promiseHarness([]));
+    assert.equal((await Effect.runPromise(keepsNone.engine.say(keepsNone.id, 'hello'))).after, null, 'no conversation kept');
+  });
+
+  await t.test("said's after is null when the conversation holds no event yet", async () => {
+    const empty = await toldThrough(talkingHarness([], []));
+    assert.equal((await Effect.runPromise(empty.engine.say(empty.id, 'hello'))).after, null, 'none held yet');
+  });
+
+  await t.test("said's after is null when the conversation cannot be read: the words still go, and are journalled", async () => {
+    const unread: string[] = [];
+    const failing = await toldThrough(talkingHarness(unread, [], 'the transcript is gone'));
+    const said = await Effect.runPromise(failing.engine.say(failing.id, 'hello'));
+    assert.equal(said.after, null, 'a read that failed');
+    assert.deepEqual(unread, ['hello'], 'the words went all the same');
+    assert.deepEqual((await Effect.runPromise(failing.engine.view(failing.id))).state.said, [said]);
+  });
+
+  await t.test('a said journalled with no after reads back with a null one', async () => {
+    const journal = memoryJournal();
+    const { engine, id } = await toldThrough(promiseHarness([]), journal);
+    const at = new Date().toISOString();
+    await journal.append(id, { kind: 'said', at, attempt: 1, text: 'from before' });
+    assert.deepEqual((await Effect.runPromise(engine.view(id))).state.said, [{ at, attempt: 1, text: 'from before', after: null }]);
+  });
 });

@@ -30,6 +30,8 @@ decisions and for what you write. Read a file yourself when you are about to cha
 **When the work splits, cut it into parts along the spec's phases**, each part a distinct area, so that no two parts running at once write the same file.
 A file several parts need (an index, a baseline, a shared type, a config) is yours, written before or after the parts that need it. A
 phase that depends on another starts once that one is done and taken.
+Each part works in a git worktree of its own, which you make from the run branch's head before the part starts (`git worktree add`),
+never in the run's worktree or another part's.
 
 **Write down what the parts share before they start.** Before a phase's parts start, write in one file in your files directory
 (`$WF_STEP_FILES`) what they all build on: the names, helpers and layout every part uses, the conventions they follow, and the rules they
@@ -46,7 +48,10 @@ end-to-end tests or the build, and starts no subagent of its own.
 
 **Run independent parts at once**, several Agent calls in one message, each with `model: "opus"`, and wait for every one to return:
 never sign off while one is running. Do a part yourself when briefing it would cost more than doing it.
+Nothing restores, checks out or resets a folder another part writes in: a throwaway edit a part makes is undone in its own worktree, by
+that part.
 
-**Take each part as a reviewer would**: read its diff against its brief, with its account beside it, then commit it, one commit per part, with a plain message. Once
+**Take each part as a reviewer would**: read its diff in its worktree against its brief, with its account beside it, then take its work
+into the run's worktree yourself, as one commit per part with a plain message, and remove the part's worktree once taken. Once
 the parts of a phase are in, run the tests across their seams, and a package's whole tests where a file many tests read has changed.
 Your summary names each part, who built it, and what you changed in it when you took it.

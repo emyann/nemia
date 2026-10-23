@@ -1138,9 +1138,9 @@ export default {
    * it, the runs in flight and one page of the finished as quiet tables, each under a plate that says the api's count. A card says its
    * plain words, how long it has waited this time, and opens its run; its button stands at the card's right, under its tiles or beside
    * them; its tiles open their breakdowns, and its id is copied, from the keyboard; a finger finds the copy control, and the title
-   * above it keeps its box; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's
-   * places are reached with Enter in the page, to the Inbox and back, and a finished row's workflow, pressed, leads to its page. It writes REGATED, the run at its second gate, for itself, and
-   * takes it back at its end, on a refusal too.
+   * above it keeps its box; 390 wide breaks nothing; and no text pair is under 4.5:1 in either scheme. The menu's places are reached
+   * with Enter in the page, to the Inbox and back, and a finished row's workflow, pressed, leads to its page. It writes REGATED, the run
+   * at its second gate, for itself, and takes it back at its end, on a refusal too.
    */
   name: 'runs',
   route: '/runs',

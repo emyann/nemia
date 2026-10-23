@@ -19,6 +19,7 @@ import {
   type FeedAppended,
   type FeedLine,
   type FeedMemo,
+  type FeedPause,
   type FeedWords,
   lineAsRead,
 } from './feed.ts';
@@ -33,8 +34,9 @@ const feedMemo: FeedMemo = freshMemo();
 /**
  * Write what the pass judged of every run in the store, where it is not what the feed said of it last (`recordFeedFile`): the lines
  * written, and where their bytes went (`FeedAppended`). `now` is every run the pass judged: one the feed still names that is not in it is
- * gone, and gets its `removed` — but for one of `unjudged`, which the pass read and could not judge (`feedChanges`). `memo` is for a test,
- * which starts one afresh to be a restarted daemon.
+ * gone, and gets its `removed` — but for one of `unjudged`, which the pass read and could not judge (`feedChanges`). `pause` is the store's
+ * pause as the pass read it (`readPause`), whose put and lift the feed says once each; a caller that read none gives none, and nothing is
+ * said of the store. `memo` is for a test, which starts one afresh to be a restarted daemon.
  */
 export const recordFeed = (
   now: ReadonlyMap<string, FeedWords>,
@@ -42,8 +44,9 @@ export const recordFeed = (
     at = new Date().toISOString(),
     memo = feedMemo,
     unjudged = new Set<string>(),
-  }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string> } = {},
-): FeedAppended => within('act', () => recordFeedFile(feedFile(), now, at, memo, unjudged));
+    pause,
+  }: { at?: string; memo?: FeedMemo; unjudged?: ReadonlySet<string>; pause?: FeedPause } = {},
+): FeedAppended => within('act', () => recordFeedFile(feedFile(), now, at, memo, unjudged, pause));
 
 /**
  * Appends a daemon's line (`startedLine`) to the feed, after a newline where its last line was left unended, as `recordFeed` appends; the
@@ -152,7 +155,7 @@ const SIGNAL_KEYS = {
 };
 
 /**
- * A line of the feed as `recordFeed` and `recordDaemonLine` write one (`FeedLine`): a run's, or a daemon's, each with what a v1 line signs
+ * A line of the feed as `recordFeed` and `recordDaemonLine` write one (`FeedLine`): a run's, a daemon's or the store's, each with what a v1 line signs
  * itself with. `StructWithRest`, so a key this version does not name survives a read and a write back — a digest the deliverer keeps holds
  * whole lines (`subscription.store.ts`, which decodes with this very schema).
  */
@@ -173,6 +176,16 @@ export const FeedLineSchema = Schema.Union([
       at: Schema.String,
       daemon: Schema.Finite,
       word: Schema.Literal(DAEMON_STARTED),
+      note: Schema.optionalKey(Schema.String),
+      ...SIGNAL_KEYS,
+    }),
+    Rest,
+  ),
+  Schema.StructWithRest(
+    Schema.Struct({
+      at: Schema.String,
+      store: Schema.String,
+      word: Schema.String,
       note: Schema.optionalKey(Schema.String),
       ...SIGNAL_KEYS,
     }),
@@ -267,6 +280,7 @@ function recordFeedFile(
   at: string,
   memo: FeedMemo,
   unjudged: ReadonlySet<string>,
+  pause: FeedPause | undefined,
 ): FeedAppended {
   const stat = statOf(file);
   const size = stat?.size ?? 0;
@@ -276,7 +290,7 @@ function recordFeedFile(
   foldFeed(memo.fold, read.lines);
   memo.cursor = read.cursor;
   memo.ino = stat?.ino;
-  const lines = feedChanges(memo.fold, now, at, unjudged);
+  const lines = feedChanges(memo.fold, now, at, unjudged, pause);
   if (!lines.length) return { lines, before: size, after: size, leading: '' };
   const leading = read.cursor < size ? '\n' : '';
   fs.mkdirSync(path.dirname(file), { recursive: true });

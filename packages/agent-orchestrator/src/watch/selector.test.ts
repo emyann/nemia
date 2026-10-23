@@ -65,6 +65,12 @@ const IRIS_INTAKE = step({ run: 'r-4', factory: 'pipao', workflow: 'intake', nam
 const NO_AGENT = agentless({ run: 'r-8', factory: 'pipao', workflow: 'intake', name: 'file' });
 const RUN_LINE = runLine('r-1', 'nemia', 'build');
 const DAEMON = startedLine(4242, { kind: 'none' }, AT, Date.parse(AT));
+
+/** The store's line of the feed, its pause put or lifted, built whole as the feed signs one: of no run, carrying no labels. */
+const storeLine = (word: string): FeedLine =>
+  upgraded({ at: AT, store: 'store', word, note: `since ${AT}`, involved: { kind: 'Store', name: 'store' }, labels: {} });
+const STORE_PAUSED = storeLine('store paused');
+const STORE_RESUMED = storeLine('store resumed');
 const EVERY: readonly FeedLine[] = [
   ADA_IMPLEMENT,
   ADA_DESIGN,
@@ -76,13 +82,15 @@ const EVERY: readonly FeedLine[] = [
   NO_AGENT,
   RUN_LINE,
   DAEMON,
+  STORE_PAUSED,
+  STORE_RESUMED,
 ];
 
 /** The lines of `EVERY` the selectors `values` spell select, by what each line is about. */
 const selected = (values: readonly string[]): string[] => {
   assert.equal(selectorsRefusal(values), undefined, values.join(' | '));
   const sel = parseSelectors(values);
-  return EVERY.filter((l) => selects(sel, l)).map((l) => ('daemon' in l ? `pid ${l.daemon}` : `${l.run}/${l.step ?? '—'}`));
+  return EVERY.filter((l) => selects(sel, l)).map((l) => ('daemon' in l ? `pid ${l.daemon}` : 'store' in l ? `store: ${l.word}` : `${l.run}/${l.step ?? '—'}`));
 };
 
 test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and every malformed selector or reserved label refused by name', async (t) => {
@@ -158,6 +166,7 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
       source: 'tick',
     });
     assert.deepEqual(selectableOf(DAEMON), { kind: 'Daemon', reason: 'DaemonStarted', type: 'Normal', source: 'daemon' });
+    assert.deepEqual(selectableOf(STORE_PAUSED), { kind: 'Store', reason: 'StorePaused', type: 'Normal', source: 'person' });
     const gate = step({ run: 'r-9', factory: 'nemia', workflow: 'build', name: 'design', agent: 'seldon' }, 'awaiting approval');
     assert.equal(selectableOf(gate).waits, 'person', 'a line that waits on a person says so under waits');
   });
@@ -165,8 +174,8 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     assert.deepEqual(selected(['factory=nemia']), ['r-1/implement', 'r-2/design', 'r-5/implement', 'r-7/review', 'r-1/—']);
     assert.deepEqual(
       selected(['factory!=nemia']),
-      ['r-3/implement', 'r-6/design', 'r-4/interview', 'r-8/file', 'pid 4242'],
-      "a daemon's line carries no factory",
+      ['r-3/implement', 'r-6/design', 'r-4/interview', 'r-8/file', 'pid 4242', 'store: store paused', 'store: store resumed'],
+      "a daemon's line carries no factory, nor the store's",
     );
     assert.deepEqual(selected(['agent']), [
       'r-1/implement',
@@ -179,7 +188,22 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
       'r-8/file',
     ]);
     assert.deepEqual(selected(['waits']), [], 'and no line of these waits on a person');
-    assert.deepEqual(selected(['reason notin (Running)']), ['pid 4242'], 'a line with another reason, and one with none, are selected');
+    assert.deepEqual(
+      selected(['reason notin (Running)']),
+      ['pid 4242', 'store: store paused', 'store: store resumed'],
+      'a line with another reason, and one with none, are selected',
+    );
+  });
+  await t.test("kind=Store takes the store's lines alone, and reason=StorePaused its put alone", () => {
+    assert.deepEqual(selected(['kind=Store']), ['store: store paused', 'store: store resumed']);
+    assert.equal(
+      selected(['kind!=Store']).some((l) => l.startsWith('store')),
+      false,
+      'and kind!=Store leaves both out',
+    );
+    assert.equal(selected(['kind!=Store']).length, EVERY.length - 2, 'and takes every other line');
+    assert.deepEqual(selected(['reason=StorePaused']), ['store: store paused']);
+    assert.deepEqual(selected(['source=person,kind=Store']), ['store: store paused', 'store: store resumed']);
   });
   await t.test('AND within one selector, OR across two', () => {
     assert.deepEqual(selected(['factory=nemia,workflow=build,agent=ada,step=implement']), ['r-1/implement']);
@@ -210,7 +234,7 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
       { typed: 'agent=ada,step=design', selects: ['r-2/design'], drop: 'agent=ada', then: ['r-2/design', 'r-6/design'] },
       { typed: 'factory=pipao,agent=agora', selects: ['r-3/implement'], drop: 'factory=pipao', then: ['r-3/implement', 'r-7/review'] },
     ];
-    const whole: string[] = EVERY.map((l) => ('daemon' in l ? `pid ${l.daemon}` : `${l.run}/${l.step ?? '—'}`));
+    const whole: string[] = EVERY.map((l) => ('daemon' in l ? `pid ${l.daemon}` : 'store' in l ? `store: ${l.word}` : `${l.run}/${l.step ?? '—'}`));
     for (const c of cases) {
       assert.deepEqual(selected([c.typed]), c.selects, c.typed);
       const left = c.typed
@@ -228,7 +252,19 @@ test('selects and selectableOf: what a signed line offers a selector, and the li
     assert.equal(selected(['agent!=none']).includes('r-8/file'), false, 'and agent!=none is how a person leaves agentless steps out');
     assert.deepEqual(
       selected(['agent!=none']),
-      ['r-1/implement', 'r-2/design', 'r-5/implement', 'r-3/implement', 'r-7/review', 'r-6/design', 'r-4/interview', 'r-1/—', 'pid 4242'],
+      [
+        'r-1/implement',
+        'r-2/design',
+        'r-5/implement',
+        'r-3/implement',
+        'r-7/review',
+        'r-6/design',
+        'r-4/interview',
+        'r-1/—',
+        'pid 4242',
+        'store: store paused',
+        'store: store resumed',
+      ],
       'a line that carries no agent at all is still taken by !=, as of any key it does not carry',
     );
     assert.deepEqual(selected(['agent=none']), ['r-8/file'], 'and agent=none takes the agentless steps alone');

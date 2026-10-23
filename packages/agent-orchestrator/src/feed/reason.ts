@@ -7,7 +7,7 @@
  * free to be reworded; the code a watcher matches on is not. So this table is the one place that classifies a word, and every reason it
  * can answer is named here: a selector written against it keeps meaning what it meant when the prose moves.
  *
- * **The codes are the owner's.** The 39 entries below — 11 of a run, 27 of a step, 1 of a daemon, 34 distinct codes, five of them shared
+ * **The codes are the owner's.** The 41 entries below — 11 of a run, 27 of a step, 1 of a daemon, 2 of the store, 36 distinct codes, five of them shared
  * between a run and a step — were named at their slices' design gates, and a rename breaks every selector and every stored subscription
  * that quotes one.
  *
@@ -23,8 +23,11 @@
 import { SLOT_WAIT } from '../cap/cap.ts';
 import { PAUSE_WAIT } from '../list/list.ts';
 
-/** The kinds of thing the feed writes a line about: a run, one of its steps, or a daemon that took the store. */
-export type InvolvedKind = 'Run' | 'Step' | 'Daemon';
+/**
+ * The kinds of thing the feed writes a line about: a run, one of its steps, a daemon that took the store, or the store itself — its
+ * pause, put by `nemia pause` and lifted by `nemia resume`, which is no run's and no daemon's.
+ */
+export type InvolvedKind = 'Run' | 'Step' | 'Daemon' | 'Store';
 
 /** How serious a signal is, as Kubernetes types an `Event`: routine news, or something gone wrong. */
 export type SignalType = 'Normal' | 'Warning';
@@ -72,6 +75,8 @@ export const SIGNAL_WORDS = {
   SpawnFailed: 'nothing started',
   SessionLost: 'session lost',
   ClosedOut: 'closed out',
+  StorePaused: 'store paused',
+  StoreResumed: 'store resumed',
 } as const satisfies Partial<Record<keyof typeof REASONS, string>>;
 
 /**
@@ -114,6 +119,8 @@ export const REASONS = {
   ClosedOut: { kinds: ['Step'], type: 'Normal', once: true },
   Unknown: { kinds: ['Step'], type: 'Warning' },
   DaemonStarted: { kinds: ['Daemon'], type: 'Normal', source: 'daemon' },
+  StorePaused: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
+  StoreResumed: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
 } as const satisfies Record<string, Entry>;
 
 /** One of the feed's reasons, the code a machine selects on. */
@@ -210,6 +217,12 @@ const STEP_WORDS: readonly Rule[] = [
   { is: 'unknown', reason: 'Unknown' },
 ];
 
+/** The store's words: its pause put and lifted, each a person's verb, said once per pause (`storeOnce`). */
+const STORE_WORDS: readonly Rule[] = [
+  { is: SIGNAL_WORDS.StorePaused, reason: 'StorePaused' },
+  { is: SIGNAL_WORDS.StoreResumed, reason: 'StoreResumed' },
+];
+
 /** Whether `rule` recognises `word`: the whole word, or its beginning. */
 const matches = (rule: Rule, word: string): boolean => (rule.is !== undefined ? word === rule.is : word.startsWith(rule.starts));
 
@@ -228,6 +241,7 @@ const isHeld = (note: string | undefined): boolean => note !== undefined && note
 export function reasonOf(said: Said, kind: InvolvedKind): Reason {
   if (kind === 'Daemon') return 'DaemonStarted';
   const { word } = said;
+  if (kind === 'Store') return STORE_WORDS.find((rule) => matches(rule, word))?.reason ?? 'Unknown';
   if (word.startsWith(DENIED)) return 'ToolDenied';
   if (word.endsWith(BLOCKED_END)) return 'Blocked';
   const said0 = word.split(PART)[0];

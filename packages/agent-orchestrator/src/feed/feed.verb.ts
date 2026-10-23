@@ -14,6 +14,7 @@ import { isRefusal, type Refusal } from '../refusal/refusal.ts';
 import {
   feedSaidWords,
   isRunLine,
+  isStoreLine,
   publishedOf,
   type DaemonLine,
   type FeedCloseout,
@@ -67,15 +68,23 @@ export const FEED_FOLLOW_LINES = Metric.counter('feed.follow.lines', {
 
 /**
  * Logs one line of the feed at Info, annotated with its labels as a filing's spans and logs are (`stepLabels`) — the run, its factory and
- * its workflow, and on a step's line the step and its agent — its daemon's pid where it is a daemon's, the reason a machine selects on,
+ * its workflow, and on a step's line the step and its agent — its daemon's pid where it is a daemon's, its store where it is the store's,
+ * the reason a machine selects on,
  * how serious it is, and its word.
  */
 const logged = (line: FeedLine): Effect.Effect<void> => Effect.logInfo(feedSaidWords(line)).pipe(Effect.annotateLogs(lineFields(line)));
 
-/** What a line's log record is annotated with (`logged`): its labels, its run and step or its daemon, its reason, type, try and word. */
+/**
+ * What a line's log record is annotated with (`logged`): its labels, its run and step, its daemon or its store, its reason, type, try and
+ * word.
+ */
 const lineFields = (line: FeedLine): Record<string, unknown> => ({
   ...line.labels,
-  ...(isRunLine(line) ? { run: line.run, ...(line.step !== undefined ? { step: line.step } : {}) } : { daemon: line.daemon }),
+  ...(isRunLine(line)
+    ? { run: line.run, ...(line.step !== undefined ? { step: line.step } : {}) }
+    : isStoreLine(line)
+      ? { store: line.store }
+      : { daemon: line.daemon }),
   ...(line.reason !== undefined ? { reason: line.reason } : {}),
   ...(line.type !== undefined ? { type: line.type } : {}),
   ...(line.try !== undefined ? { try: line.try } : {}),
@@ -111,7 +120,8 @@ const loggedOf =
   };
 
 /**
- * A pass's words written to the feed where they changed (`recordFeed`), each line written logged (`loggedOf`: a `closed out` line as its
+ * A pass's words written to the feed where they changed (`recordFeed`), with the store's pause put or lifted where the pass hands the
+ * pause it read (`pause`), each line written logged (`loggedOf`: a `closed out` line as its
  * closeout, every other as its words) and, where the process has a
  * hub (`FeedHub`), published to it with the bytes it was written at (`publishedOf`): none when another writer's bytes landed among them.
  * Answers with the lines written. Fails with a refusal of the store, and dies of anything else it threw.

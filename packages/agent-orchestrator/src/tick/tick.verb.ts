@@ -23,7 +23,7 @@ import { tipsSeen } from '../branches/index.ts';
 import { admissionOrder, slotFree, type RunSlot } from '../cap/cap.ts';
 import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import { readPause } from '../pause/pause.store.ts';
-import { finishingAmong, type Finishing, type PauseStanding } from '../pause/pause.ts';
+import { finishingAmong, type Finishing, type Pause, type PauseStanding } from '../pause/pause.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { stepsOrNone, unloadedFolder } from '../record/steps.store.ts';
 import { hasStarted } from '../wait/wait.ts';
@@ -266,7 +266,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const forgetting = yield* withinEffect('act', finishForgetting().pipe(over(e)));
   yield* Effect.annotateCurrentSpan({ runs: runs.length, rested: resting?.rested ?? 0 });
   return {
-    ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging)),
+    ...passOf(report, runs, judging, queue, yield* feedErrorOf(runs, judging, pause)),
     ...(scheduled ? { scheduled } : {}),
     ...(forgetting.length ? { forgetting } : {}),
     ...(pause
@@ -336,11 +336,15 @@ const waitingJudged = Effect.fn('waitingJudged')(function* (
   return counted;
 });
 
-/** Why the feed could not be written with what the pass judged (`emitFeed`), or undefined once it was: never the pass's failure. */
-const feedErrorOf = (runs: readonly Run[], { done, unjudged }: Judging): Effect.Effect<string | undefined> =>
+/**
+ * Why the feed could not be written with what the pass judged (`emitFeed`) and the store's pause it read at its start (`pause`, whose
+ * put and lift the feed says), or undefined once it was: never the pass's failure.
+ */
+const feedErrorOf = (runs: readonly Run[], { done, unjudged }: Judging, pause: Pause | null): Effect.Effect<string | undefined> =>
   Effect.exit(
     emitFeed(new Map(runs.flatMap((run) => (done.has(run.id) ? [[run.id, done.get(run.id)!.feed] as const] : []))), {
       unjudged: new Set(unjudged.keys()),
+      pause,
     }),
   ).pipe(
     Effect.map((written) =>

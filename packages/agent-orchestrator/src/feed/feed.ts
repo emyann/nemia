@@ -352,9 +352,20 @@ const denialOnce = (d: FeedDenial): Once => ({
 });
 
 /**
+ * The one-shot a step's closeout read says: `closed out`, its note the try it is of. The note is all the line carries of it — the closeout
+ * itself is in the log record `emitFeed` writes beside the line (`FeedCloseout`), never in the feed.
+ */
+const closeoutOnce = (c: FeedCloseout): Once => ({
+  step: c.step,
+  word: SIGNAL_WORDS.ClosedOut,
+  note: `try ${c.try}`,
+  try: c.try,
+});
+
+/**
  * The lines a pass owes the feed for the one-shots `words` carries: each call its steps were denied, each act a person took on the run
- * (`acts`), its hold's put and lift (`holdOnce`) and each fault the runtime journalled (`faults`) — each written once per occurrence
- * (`oncePast`), stamped through the one door (`upgraded`). Pure.
+ * (`acts`), its hold's put and lift (`holdOnce`), each fault the runtime journalled (`faults`) and each closeout its steps gave
+ * (`closeouts`) — each written once per occurrence (`oncePast`), stamped through the one door (`upgraded`). Pure.
  */
 function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): RunLine[] {
   const runLabels = words.labels ?? { run };
@@ -363,6 +374,7 @@ function onceLines(fold: FeedFold, at: string, run: string, words: FeedWords): R
     ...(words.acts ?? []),
     ...holdOnce(fold, run, words.held, words.lifted),
     ...(words.faults ?? []),
+    ...(words.closeouts ?? []).map(closeoutOnce),
   ];
   return oncePast(fold, run, offers).map(
     (o) =>
@@ -474,8 +486,8 @@ export type FeedSaid = { word: string; note?: string };
  *
  * Beside the words, the one-shots the pass read of the run, each written once per occurrence and no part of any word: the calls its
  * steps were denied (`denials`), the acts a person took on it (`acts`, from `actsOf`), the faults the runtime journalled (`faults`, from
- * `faultsOf`), the moment the hold on its record was put (`held`) and the moment of the hold this pass lifted itself (`lifted`), which
- * `holdOnce` pairs into a put and a lift.
+ * `faultsOf`), the closeouts its steps' current turns gave (`closeouts`, from `closeoutsOf`), the moment the hold on its record was put
+ * (`held`) and the moment of the hold this pass lifted itself (`lifted`), which `holdOnce` pairs into a put and a lift.
  */
 export type FeedWords = {
   run: FeedSaid;
@@ -485,9 +497,18 @@ export type FeedWords = {
   denials?: readonly FeedDenial[];
   acts?: readonly Once[];
   faults?: readonly Once[];
+  closeouts?: readonly FeedCloseout[];
   held?: string;
   lifted?: string;
 };
+
+/**
+ * A closeout a step's current turn gave, as the pass read it off the task's view: the step, the try it is of (from 1), what came back
+ * (`said`) and what the run read of it (`read`: the closeout, or why it could not — `parseCloseout`'s error). A `closed out` one-shot is
+ * written of it once (`closeoutOnce`); the closeout rides beside that line only as far as its log record (`emitFeed`), and the feed's file
+ * keeps the line alone, so a review's findings or a spec's body costs `feed.jsonl` nothing.
+ */
+export type FeedCloseout = { step: string; try: number; said: unknown; read: Closeout | { error: string } };
 
 /**
  * One call a step's sessions were denied, as a pass read it off the task's view: the step, the try it belongs to (from 1, as the task's
@@ -528,9 +549,9 @@ export const feedPhase = (word: string): string =>
  * @param closeoutOf How each step signed off, as `listing` was handed it: a step that signed off blocked says what it needs beside its
  *   word.
  * @param labelled The labels of the run and of each of its steps, from the one source a filing's labels come from (`stepLabels`), and the
- *   one-shots the pass read of the run beside them — the calls its steps were denied, a person's acts, the runtime's faults, and the two
- *   moments a hold is paired by (`FeedWords`). The labels have one writer, the pass that files the steps: nothing here decides what a
- *   label is.
+ *   one-shots the pass read of the run beside them — the calls its steps were denied, a person's acts, the runtime's faults, the closeouts
+ *   its steps gave, and the two moments a hold is paired by (`FeedWords`). The labels have one writer, the pass that files the steps:
+ *   nothing here decides what a label is.
  */
 export function feedWords(
   l: Listing,
@@ -543,6 +564,7 @@ export function feedWords(
     denials?: readonly FeedDenial[];
     acts?: readonly Once[];
     faults?: readonly Once[];
+    closeouts?: readonly FeedCloseout[];
     held?: string;
     lifted?: string;
   } = {},
@@ -553,6 +575,7 @@ export function feedWords(
     ...(labelled.denials?.length ? { denials: labelled.denials } : {}),
     ...(labelled.acts?.length ? { acts: labelled.acts } : {}),
     ...(labelled.faults?.length ? { faults: labelled.faults } : {}),
+    ...(labelled.closeouts?.length ? { closeouts: labelled.closeouts } : {}),
     ...(labelled.held !== undefined ? { held: labelled.held } : {}),
     ...(labelled.lifted !== undefined ? { lifted: labelled.lifted } : {}),
     run: {

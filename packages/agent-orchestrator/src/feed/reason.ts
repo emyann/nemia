@@ -7,7 +7,7 @@
  * free to be reworded; the code a watcher matches on is not. So this table is the one place that classifies a word, and every reason it
  * can answer is named here: a selector written against it keeps meaning what it meant when the prose moves.
  *
- * **The codes are the owner's.** The 38 entries below — 11 of a run, 26 of a step, 1 of a daemon, 33 distinct codes, five of them shared
+ * **The codes are the owner's.** The 39 entries below — 11 of a run, 27 of a step, 1 of a daemon, 34 distinct codes, five of them shared
  * between a run and a step — were named at their slices' design gates, and a rename breaks every selector and every stored subscription
  * that quotes one.
  *
@@ -55,8 +55,9 @@ export const DAEMON_STARTED = 'daemon started';
 export const DENIED = 'denied: ';
 
 /**
- * The word each of a person's acts and each of the two runtime faults says, the one place it is spelled: the owner named these six at this
- * slice's design gate, and `reason.test.ts` holds each literally beside the rule below that reads it back.
+ * The word each of a person's acts, each of the two runtime faults and a step's closeout read says, the one place it is spelled: the owner
+ * named the first six at their slice's design gate and `closed out` on its card, and `reason.test.ts` holds each literally beside the rule
+ * below that reads it back.
  *
  * **None of them may carry a word a subscriber was woken by.** The prose match is retired, but `reason.test.ts` still holds `waitsOf`
  * identical to it over every word the package writes (`FORMER_DEFAULT_WAKE`, and the selectors `selectorsOfWake` converts it to): that
@@ -70,6 +71,7 @@ export const SIGNAL_WORDS = {
   HoldLifted: 'hold lifted',
   SpawnFailed: 'nothing started',
   SessionLost: 'session lost',
+  ClosedOut: 'closed out',
 } as const satisfies Partial<Record<keyof typeof REASONS, string>>;
 
 /**
@@ -109,6 +111,7 @@ export const REASONS = {
   HoldLifted: { kinds: ['Run'], type: 'Normal', source: 'person', once: true },
   SpawnFailed: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
   SessionLost: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
+  ClosedOut: { kinds: ['Step'], type: 'Normal', once: true },
   Unknown: { kinds: ['Step'], type: 'Warning' },
   DaemonStarted: { kinds: ['Daemon'], type: 'Normal', source: 'daemon' },
 } as const satisfies Record<string, Entry>;
@@ -203,6 +206,7 @@ const STEP_WORDS: readonly Rule[] = [
   { is: SIGNAL_WORDS.Approved, reason: 'Approved' },
   { is: SIGNAL_WORDS.SpawnFailed, reason: 'SpawnFailed' },
   { is: SIGNAL_WORDS.SessionLost, reason: 'SessionLost' },
+  { is: SIGNAL_WORDS.ClosedOut, reason: 'ClosedOut' },
   { is: 'unknown', reason: 'Unknown' },
 ];
 

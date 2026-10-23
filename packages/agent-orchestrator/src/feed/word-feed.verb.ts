@@ -6,12 +6,12 @@
  * what the pass already read — the engine's views, the run's record, the person's answers — and asks the runtime nothing of its own.
  */
 import { listing } from '../list/list.ts';
-import { feedPhase, feedWords, SIGNAL_WORDS, type FeedDenial, type FeedWords, type Once } from './index.ts';
-import { closeoutOf, saidCount, waitingOf } from '../views/views.verb.ts';
+import { feedPhase, feedWords, SIGNAL_WORDS, type FeedCloseout, type FeedDenial, type FeedWords, type Once } from './index.ts';
+import { closeoutOf, closeoutTold, saidCount, waitingOf } from '../views/views.verb.ts';
 import { engineWord } from '../views/views-words.ts';
 import { runStore } from '../record/files.store.ts';
 import { denialText, type TaskView } from '../runtime-client.ts';
-import { taskTryOf, type Run } from '../record/record.ts';
+import { taskTryOf, turnTryOf, type Run } from '../record/record.ts';
 import { holdsOf, type ParentRun, type Wait } from '../wait/wait.ts';
 import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
 import type { Assessment } from '../tick/assess.ts';
@@ -64,6 +64,7 @@ export function wordFeed(
       denials: denialsOf(run, r),
       acts: actsOf(run),
       faults: faultsOf(run, r),
+      closeouts: closeoutsOf(run, r),
       ...(run.hold ? { held: run.hold.at } : {}),
       ...(lifted !== undefined ? { lifted } : {}),
     },
@@ -151,6 +152,24 @@ function denialsOf(run: Run, r: PassReads): FeedDenial[] {
     const tried = taskTryOf(run, step.name);
     for (const attempt of view?.state.attempts ?? [])
       for (const denial of attempt.denials ?? []) out.push({ step: step.name, try: tried, call: denialText(denial) });
+  }
+  return out;
+}
+
+/**
+ * The closeout each of `run`'s steps gave on its task's current turn, as the pass read their views (`closeoutTold`): the step, the try the
+ * turn was given (`turnTryOf`), what came back and what the run read of it — a closeout, or `parseCloseout`'s error. A step whose turn
+ * gave none has none here.
+ *
+ * It is every closeout standing, not what is new: the feed's own lines say which have been written already (`oncePast`, under the step and
+ * its try), so the pass carries nothing between passes and a restarted daemon logs a closeout neither again nor never. A try's turn gives
+ * one closeout, and the pass that reads it before the step moves on is the pass that files what comes next, so none is passed over.
+ */
+function closeoutsOf(run: Run, r: PassReads): FeedCloseout[] {
+  const out: FeedCloseout[] = [];
+  for (const step of r.steps) {
+    const told = closeoutTold(r.views, run, step.name);
+    if (told) out.push({ step: step.name, try: turnTryOf(run, step.name), ...told });
   }
   return out;
 }

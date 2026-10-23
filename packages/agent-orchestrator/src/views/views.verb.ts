@@ -535,9 +535,33 @@ export function closeoutOf(views: ReadonlyMap<string, TaskView>, run: Run, stepN
 
 /** The closing statement a task's current turn made (`currentTurn`), parsed; undefined where it made none. */
 function closeoutSaid(views: ReadonlyMap<string, TaskView>, taskId: string): Closeout | { error: string } | undefined {
+  return closeoutGiven(views, taskId)?.read;
+}
+
+/**
+ * The closing statement a task's current turn made, as it came back (`said`) and as the run read it (`read`, `parseCloseout`): what the
+ * feed's `closed out` line is logged with, an unreadable one's error beside what came back. Undefined where the turn made none.
+ */
+function closeoutGiven(
+  views: ReadonlyMap<string, TaskView>,
+  taskId: string,
+): { said: unknown; read: Closeout | { error: string } } | undefined {
   const state = views.get(taskId)?.state;
   const said = state ? currentTurn(state).at(-1)?.closeout : undefined;
-  return said === undefined ? undefined : parseCloseout(said);
+  return said === undefined ? undefined : { said, read: parseCloseout(said) };
+}
+
+/**
+ * The closing statement the current turn of a step's task made, as it came back and as the run read it (`closeoutGiven`); undefined for a
+ * step with no task, and for a turn that made none. What a pass words a step's `closed out` one-shot from (`closeoutsOf`).
+ */
+export function closeoutTold(
+  views: ReadonlyMap<string, TaskView>,
+  run: Run,
+  stepName: string,
+): { said: unknown; read: Closeout | { error: string } } | undefined {
+  const taskId = run.steps[stepName]?.taskId;
+  return taskId ? closeoutGiven(views, taskId) : undefined;
 }
 
 /** A task's closing statement (`closeoutSaid`), well-formed only: what `nemia stats` reads a try's tallies off. */

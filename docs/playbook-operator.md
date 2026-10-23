@@ -92,7 +92,7 @@ Around these four sit two more, which are not the factory's:
 - *Load the `effect` skill before touching code that imports `effect`.* The knowledge is the **factory's** skill
   (`.claude/skills/effect/`). Its attachment is on the **steps** that design, build and review (`skills:` in `workflows/build/*.md`).
   It is not on the agents.
-- *Read with Read, Grep and Glob, never `cat`, `grep` or `ls` in Bash.* This is the **agent's** craft, true anywhere. Iris's
+- *Read with Read, Grep and Glob, never `grep` or `cd` in Bash; `cat`, `head`, `tail`, `wc`, `cut` and `ls` only inside the workspace.* This is the **agent's** craft, true anywhere. Iris's
   vendored skill does not say it, so it goes in her body.
 - *Argus reads the inbox's cards.* This is the janitor **step's** `reads: [inbox]`, a mount held by machinery, not a sentence.
 - *Restart the daemon after a landing that changed its code.* This is the **factory's**: it holds for Nemia building Nemia, until release

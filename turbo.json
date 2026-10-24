@@ -53,6 +53,8 @@
         "$TURBO_ROOT$/apps/*/src/*.test.ts*",
         "$TURBO_ROOT$/apps/*/src/*/*.test.ts*",
         "$TURBO_ROOT$/apps/*/tsconfig.json",
+        "$TURBO_ROOT$/apps/*/src/**",
+        "$TURBO_ROOT$/apps/*/glossary.json",
         "$TURBO_ROOT$/apps/docs/src/content/docs/**",
         "$TURBO_ROOT$/CLAUDE.md",
         "$TURBO_ROOT$/apps/*/CLAUDE.md",
@@ -107,6 +109,7 @@
         "$TURBO_ROOT$/lint/**",
         "$TURBO_ROOT$/apps/*/src/**",
         "$TURBO_ROOT$/apps/*/test/**",
+        "$TURBO_ROOT$/apps/*/glossary.json",
         "$TURBO_ROOT$/packages/**",
         "!$TURBO_ROOT$/packages/*/.turbo/**",
         "$TURBO_ROOT$/docs/**",
@@ -118,7 +121,14 @@
     "docs#build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**"],
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/packages/*/README.md", "$TURBO_ROOT$/packages/*/docs/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/packages/*/README.md",
+        "$TURBO_ROOT$/packages/*/docs/**",
+        "$TURBO_ROOT$/packages/*/glossary.json",
+        "$TURBO_ROOT$/packages/*/src/*/glossary.json",
+        "$TURBO_ROOT$/apps/*/glossary.json"
+      ]
     },
     "build": {
       "dependsOn": ["^build"],

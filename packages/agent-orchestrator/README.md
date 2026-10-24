@@ -32,10 +32,10 @@ wf say r-xyz implement "Widen the scope to apps/api too."   # tell a running ste
 wf stats --by agent  # what the runs add up to: the last 14 days against the 14 before, a row per day and per step
 ```
 
-**Nemia ships no workflows, agents or skills.** A repository writes its own, one folder each under `<repo>/workflows/`, and a
+**Nemia has no builtin workflows, agents or skills.** A repository writes its own, one folder each under `<repo>/workflows/`, and a
 person theirs under `~/.agent-workflows/workflows/`; the board's builder and its Agents page write both. The names above —
 `dev`, `dev-planned` — are a repository's own folders, not ones this package brings. The tests run the machinery on a small team
-of their own, `test/fixtures/team/`, which is never shipped.
+of their own, `test/fixtures/team/`, which is never built in.
 
 ## Following it: `nemia watch` and `ae watch`
 
@@ -3095,7 +3095,7 @@ Nemia watches every factory of the store for the person: a long-lived session, w
 recommendation, recaps what moved, carries their answer back as a `nemia` verb, and does the rest on her own judgement. She is the person's switch, never a run:
 
 - **`nemia level`** says where she is — her level, her session's phase, how to reach it (`claude attach <id>` in a terminal, then
-  her web link once its bridge is up, from a phone too, or why it is not), and what a person allowed her at a prompt beyond what ships.
+  her web link once its bridge is up, from a phone too, or why it is not), and what a person allowed her at a prompt beyond what is built in.
 - **`nemia level semi-auto`** puts her on: the daemon's keeper files her session in `$WF_ROOT/nemia/` and subscribes it to the feed
   (the subscription `nemia`, hers alone). Only what waits on the person prompts: an answer to it — `approve`, `round`, `accept`,
   a `retry` of a step at its gate, on its question, out of rounds or at its cap, any `--budget` — is asked of the person by her
@@ -3111,20 +3111,20 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   conditions over the run's state: `recommends` (the step signed `done`, and each question it asks carries a recommendation),
   `checked` (its check exited 0: a step with no check does not meet it), `accepted` (no loop asks for another round, and none was
   accepted by a person over what it found), `withinBudget` (no step past its budget) and `nothingOpen` (no question, nothing the
-  closeout needs, and no other step waiting on a person). The rule that
-  ships, "decide when all agree", approves when all five hold; it is in force until the person confirms a list, which replaces it,
+  closeout needs, and no other step waiting on a person). The builtin
+  rule, "decide when all agree", approves when all five hold; it is in force until the person confirms a list, which replaces it,
   seeded with it, marked Default. **`nemia auto <agent>`** reads the list in force, the agent's proposal and the custom instruction;
   **`nemia auto propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
   generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia auto confirm <agent> <id> --words
   '<words>'`** and **`nemia auto drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
   calls them. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
   under that id reads otherwise. A rule nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that
-  does not read allows nothing. Auto holds in a session of hers filed since it shipped (`--auto` on her admission): one kept from before
+  does not read allows nothing. Auto holds in a session of hers filed since auto was built (`--auto` on her admission): one kept from before
   asks every answer until it is filed again.
 - **`nemia memory [<fact>]`** reads what she keeps, one fact a file in `$WF_ROOT/nemia/memory/`. She alone writes it: to prune it, ask
   her.
 
-What she is ships in this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
+What she is is built into this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
 for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`, written with `nemia agents custom nemia` or on the
 board's Settings, though no place names her), read as her session is filed; a write or a clear while she is kept is told to her open
 session at the keeper's next beat, through the runtime's `say`, with no restart, then recorded in her filed instruction; a factory's rules are its
@@ -3942,7 +3942,7 @@ holding a concurrency slot forever.
 | `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`; off the disk alone as the step signs off, `filesLacked`; those there for the step after, `filesHanded`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
 | `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflow`), refused where it is no place the board lists (`workflowPlaceRefusal`) |
 | `src/skills/skills.store.ts` | what the board's skill picker and skill page write: a skill copied from another folder of skills (`copySkill`), and a skill made or changed (`writeSkill`), refused as `Missing`, `Conflict` or `Invalid` |
-| `src/skills/read.store.ts` | the skills read: where a workflow's agents and skills are looked for (`lookupRoots`), each skill an agent may give (`skillsFor`, with the place skills the package ships, `PLACE_SKILLS`), a skill's rules (`readSkillRules`), its version (`skillVersion`), an agent card's entries (`cardSkills`) and whether a skill is told whole (`preloads`); at the bottom of the store's tree |
+| `src/skills/read.store.ts` | the skills read: where a workflow's agents and skills are looked for (`lookupRoots`), each skill an agent may give (`skillsFor`, with the package's builtin place skills, `PLACE_SKILLS`), a skill's rules (`readSkillRules`), its version (`skillVersion`), an agent card's entries (`cardSkills`) and whether a skill is told whole (`preloads`); at the bottom of the store's tree |
 | `src/plan/plan.store.ts` | a plan folder's cards read from disk (`readPlan`) |
 | `src/config/config.store.ts` | the `WF_` environment, each variable an Effect `Config` with its default, read by a plain reader that refuses a value the variable does not take by name, exit 2 (`wfRoot`, `maxConcurrent`, `maxRuns`, `verifiesRest`); at the bottom of the store's tree, and reads no disk |
 | `src/inbox/inbox.store.ts` | the inbox's cards read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`) through `runStore.inbox`, and a path named as a card (`inboxNameAt`, which asks `runStore.inbox.nameAt`) |

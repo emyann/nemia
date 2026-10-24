@@ -15,7 +15,7 @@ import type { Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
 import type { Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
-import type { Shipped } from '../decide/decide.ts';
+import type { Landed } from '../decide/decide.ts';
 import type { BranchStood } from '../place/place.ts';
 
 /**
@@ -23,7 +23,7 @@ import type { BranchStood } from '../place/place.ts';
  * repository's own checkout (`workspace: main`), the steps it waits on instead. Pure.
  *
  * An ending step has no branch of its own: it works on the base branch, and what it acts on is the work of the steps before it. Read as
- * the result, its `main` would be the run's own branch, and every question about the run's result — has it shipped, what did it touch,
+ * the result, its `main` would be the run's own branch, and every question about the run's result — has it landed, what did it touch,
  * what is there to decide — would be asked of the base branch and answered yes.
  */
 export function resultSteps(steps: readonly Workflow[]): Workflow[] {
@@ -43,7 +43,7 @@ export function workChecks(steps: readonly Workflow[]): string[] {
 
 /**
  * The branches whose tips this pass records (`tipsSeen`): a stopped run's result branches — succeeded, failed or waiting on a person, so
- * neither running nor cancelled — when it cut worktrees and did not work on its base branch itself. What `nemia decide` offers to ship.
+ * neither running nor cancelled — when it cut worktrees and did not work on its base branch itself. What `nemia decide` offers to land.
  * None for any other run, so git is not asked about it.
  */
 export function tipBranches(run: Run, steps: readonly Workflow[], status: Assessment['status']): string[] {
@@ -95,7 +95,7 @@ export function resultTips(
  * its base — `true` with work past its run's base, `'unchanged'` with none or where git could not tell — and false otherwise, or where
  * nothing was read. Pure.
  */
-export const shippedOver = (stood: BranchStood | undefined): Shipped =>
+export const landedOver = (stood: BranchStood | undefined): Landed =>
   stood?.onBase !== 'yes' ? false : stood.pastBase === true ? true : 'unchanged';
 
 /**

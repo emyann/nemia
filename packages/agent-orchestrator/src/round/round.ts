@@ -223,7 +223,7 @@ function roundWaits(run: Run, looping: Workflow, asks: readonly RoundAsk[], over
  * take on; one over budget only because a round would file it again has not stopped. A step of the loop at its gate is moved by a
  * person's word, not a round. A loop that is over, with an ending held at its gate before it is filed (`waitsAtGate`) waiting on it, is
  * offered that approval and the send-back of the work (`sendBackTo`); with an ending that stopped on the base branch (`endingStopped`),
- * the send-back of the looping step, whose `again: true` is the round, or the ending's ship again.
+ * the send-back of the looping step, whose `again: true` is the round, or the ending's try to land again.
  *
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a loop whose step is over its budget.
  * @param budget The cap `nemia round --budget` raises the loop's steps over their budget to.
@@ -359,7 +359,7 @@ export function roundAsk(
       return no(
         `${ended}, and ${stopped.name} stopped on the base branch (${ownStatus(stopped, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)}) without doing what it was approved for: ` +
           `a round would file the work again with nothing said of why. Send it back, with what to change — ${looping.name} is filed again with your objection and what ${stopped.name} said, and its \`again: true\` is the round: ` +
-          `nemia retry ${run.id} ${looping.name} --message "<objection>". Or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${stopped.name}.`,
+          `nemia retry ${run.id} ${looping.name} --message "<objection>". Or land again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${stopped.name}.`,
       );
     }
     return no(`${overNow} and there is nothing to go round again. What waits on it has been filed: nemia ls ${run.id}.`);
@@ -537,7 +537,7 @@ const noMoreRounds = (pruned: Pruned): string => `no round more, since the run w
 
 /**
  * Where a verb would be offered on a held run, what is said instead, with what the person who put the hold said of it: `held until a-1x2y
- * ships (why: merge conflicts; by operator); its approval is asked once the hold lifts`. Every verb that would release work is refused
+ * lands (why: merge conflicts; by operator); its approval is asked once the hold lifts`. Every verb that would release work is refused
  * while the hold stands (`heldRefusal`), and a note never offers a refused verb.
  */
 export const heldLater = (hold: Hold, what: string): string =>

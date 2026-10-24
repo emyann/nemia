@@ -466,7 +466,7 @@ export const repoFor = (name: string | undefined, named: string | undefined, fal
 /**
  * Starts a run of `opts.workflowDir`'s steps, and returns its record, written. Requires nothing: it reads no engine.
  *
- * `after` names the runs this one waits on (`nemia start --after`): refused before anything is written when one could never ship onto
+ * `after` names the runs this one waits on (`nemia start --after`): refused before anything is written when one could never land on
  * this run's base, or when the run is a folder run, which has no branch to wait for (`afterRefusal`), and frozen on the record. Left out,
  * the record has no `after`.
  *

@@ -402,7 +402,7 @@ test('a gated step with `check:` is checked before it is held', async (t) => {
   });
 });
 
-test('a parent whose last step waits at its gate has not shipped, though a person merged its branch, until it is approved', async (t) => {
+test('a parent whose last step waits at its gate has not landed, though a person merged its branch, until it is approved', async (t) => {
   const s = story(t);
   const repo = aRepo();
   const b = stage.board();
@@ -421,9 +421,9 @@ test('a parent whose last step waits at its gate has not shipped, though a perso
     stage.place().world.stage(repo, readRun(parent).steps.implement.branch!);
     stage.place().world.commit(repo, 'merge the parent');
   });
-  await s.test('REFUSED: merged, and at its gate, it has not shipped; a run `--after` it files nothing, pass after pass', async () => {
+  await s.test('REFUSED: merged, and at its gate, it has not landed; a run `--after` it files nothing, pass after pass', async () => {
     child = (await runPlaced(startRun({ brief: 'the child', repo, workflowDir: planned(), isolate: false, after: [parent] }))).id;
-    assert.equal((await runWith(b.e, parentNow(parent))).shipped, false);
+    assert.equal((await runWith(b.e, parentNow(parent))).landed, false);
     for (let pass = 1; pass <= 2; pass++) assert.deepEqual((await tick(b.e, child)).filed, [], `pass ${pass}`);
   });
   await s.test('`nemia ls` of the child says it is waiting on the parent', async () => {
@@ -431,7 +431,7 @@ test('a parent whose last step waits at its gate has not shipped, though a perso
     assert.deepEqual((await runWith(b.e, list(b.e, readRun(child)))).steps[0].status, `waiting on ${parent}`);
   });
   await s.test(
-    "approved by a person's file, with words, composed on read: it has shipped, and the child's next tick files its roots",
+    "approved by a person's file, with words, composed on read: it has landed, and the child's next tick files its roots",
     async () => {
       approveByHand(parent, 'implement', 1, { at: '2026-09-16T23:10:00.000Z', message: 'the second reading' });
       assert.deepEqual(
@@ -443,7 +443,7 @@ test('a parent whose last step waits at its gate has not shipped, though a perso
           message: 'the second reading',
         },
       );
-      assert.equal((await runWith(b.e, parentNow(parent))).shipped, true);
+      assert.equal((await runWith(b.e, parentNow(parent))).landed, true);
       assert.deepEqual((await tick(b.e, child)).filed, ['plan']);
     },
   );
@@ -459,7 +459,7 @@ test('a parent whose last step waits at its gate has not shipped, though a perso
     assert.ok(!fs.existsSync(path.join(asksDir(parent), 'retry-implement-2')), 'no ask written');
     const [first, second] = [await tick(b.e, parent), await tick(b.e, parent)];
     assert.deepEqual(first.filed.concat(second.tried), []);
-    assert.equal((await runWith(b.e, parentNow(parent))).shipped, true, 'still shipped');
+    assert.equal((await runWith(b.e, parentNow(parent))).landed, true, 'still landed');
   });
 });
 

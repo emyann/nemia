@@ -31,7 +31,7 @@ import { idRefusal } from '../forget/forget.ts';
 export const PLAN_HELP = `nemia plan <folder> [--repo .] [--factory <name>]
 
 Start a plan: one run per card in the folder, parents first, each waiting on the runs of the cards it names.
-That is the record nemia start --after writes, so the tick files a card's run once its parents have shipped, and
+That is the record nemia start --after writes, so the tick files a card's run once its parents have landed, and
 every card is a decision at its own nemia decide. Nothing else is written: the runs and their after are the plan.
 It prints a line per card: the card, its run, its workflow, and what it waits on. Every run is started in
 --factory, else the factory whose repository holds --repo, else the folder nemia plan is typed in, when one
@@ -41,7 +41,7 @@ A card is one markdown file, <card>.md, and README.md beside the cards says what
 
     ---
     workflow: dev     # a workflow under <repo>/workflows/, or a path from the plan folder
-    after: b, c       # the cards whose runs ship first; without it, the card starts at once
+    after: b, c       # the cards whose runs land first; without it, the card starts at once
     ---
     Put the flag on the settings page, now that it is parsed and stored.
 
@@ -140,8 +140,8 @@ const START_SPEC: Spec = {
 /**
  * A run started, and, for an inbox card, the card, why its `queued:` line is still on it when it could not be taken off, and a `repo:` the
  * start did not take; the store's
- * pause as it stood once the run was written (`pausedRead`), while one stands; and `shipped`, the runs it is handed as context that had
- * shipped when it started.
+ * pause as it stood once the run was written (`pausedRead`), while one stands; and `landed`, the runs it is handed as context that had
+ * landed when it started.
  */
 type Started = {
   id: string;
@@ -150,7 +150,7 @@ type Started = {
   queueLeft?: string;
   ignoredRepo?: string;
   paused?: Paused;
-  shipped?: readonly string[];
+  landed?: readonly string[];
 };
 
 /**
@@ -209,7 +209,7 @@ const fromLines = ({ run, card, queueLeft }: Started): string[] =>
 
 /**
  * What `nemia start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, and
- * what it waits on, what it reads as context, shipped or in flight, and ends at; while the store is paused (`pausedWords`), that nothing of
+ * what it waits on, what it reads as context, landed or in flight, and ends at; while the store is paused (`pausedWords`), that nothing of
  * it is filed until it resumes; and a card's `repo:` not taken.
  */
 function startedLines(started: Started): string[] {
@@ -223,9 +223,9 @@ function startedLines(started: Started): string[] {
     `workspace: ${run.workspace}${isRepositoryRun(run) ? '' : ' — a folder per step, made as each is filed, with no git repository'}`,
     ...(run.inputs?.length ? [`inputs: ${run.inputs.join(', ')} — copied into ${inputsDir(run)}`] : []),
     ...(run.after?.length
-      ? [`waits on: ${run.after.join(', ')} — nothing is filed until nemia decide says each has shipped onto ${run.branch}`]
+      ? [`waits on: ${run.after.join(', ')} — nothing is filed until nemia decide says each has landed on ${run.branch}`]
       : []),
-    ...contextLines(run.context ?? [], (id) => started.shipped?.includes(id) === true),
+    ...contextLines(run.context ?? [], (id) => started.landed?.includes(id) === true),
     ...gateLines(run),
     `run 'nemia tick' (or 'nemia up') to start it`,
     ...(started.paused ? [`${pausedWords(started.paused)}: nothing of this run is filed until then`] : []),
@@ -276,12 +276,12 @@ export const START: Command<Started> = {
     '<brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]',
   help: [
     '--after <runId>: file nothing of this run until nemia decide says that',
-    'run has shipped — finished, and its result branch on the base',
+    'run has landed — finished, and its result branch on the base',
     'branch — and start from the base as it is then; once per run.',
     '--from <runId>: hand this run what that run concluded, as context,',
-    'and wait on nothing: shipped or still in flight, it is read once,',
-    "when this run's steps are filed, and said not shipped, not judged",
-    'until it has shipped; once per run.',
+    'and wait on nothing: landed or still in flight, it is read once,',
+    "when this run's steps are filed, and said not landed, not judged",
+    'until it has landed; once per run.',
     "--gate <step>: that step's closeout waits for nemia approve before",
     "anything after it is filed, as a step's own gate: true does; once",
     "per step. An inbox card's gate: <step> is one more",
@@ -320,21 +320,21 @@ export const START: Command<Started> = {
   handler: Effect.fnUntraced(function* (args: Args) {
     const started = yield* startOf(args);
     const paused = yield* pausedRead();
-    const shipped: string[] = [];
+    const landed: string[] = [];
     const context = started.run.context ?? [];
     const git = context.length ? yield* standingLive([started.run]) : undefined;
-    for (const id of context) if (git && (yield* parentRead(id, git)).shipped) shipped.push(id);
-    return { ...started, ...(paused.pause ? { paused } : {}), ...(started.run.context?.length ? { shipped } : {}) };
+    for (const id of context) if (git && (yield* parentRead(id, git)).landed) landed.push(id);
+    return { ...started, ...(paused.pause ? { paused } : {}), ...(started.run.context?.length ? { landed } : {}) };
   }),
   print: startedLines,
 };
 
-/** What `nemia concluded` answers: the run, whether it has shipped, and the section a root handed it as context would be handed now. */
-type Concluded = { run: string; shipped: boolean; section: string };
+/** What `nemia concluded` answers: the run, whether it has landed, and the section a root handed it as context would be handed now. */
+type Concluded = { run: string; landed: boolean; section: string };
 
 /**
  * `nemia concluded <run>`: what a run started now with `--from <run>` would be handed of it — the `## From run <id>` section its roots
- * would read, made as the tick makes it (`parentCloseouts`, `contextSection`), labelled shipped or not shipped, not judged, as `parentOf`
+ * would read, made as the tick makes it (`parentCloseouts`, `contextSection`), labelled landed or not landed, not judged, as `parentOf`
  * reads it now. The board's preview of a run picked as context. Refused with `Invalid` for an id that is not a run's (`idRefusal`), before
  * the store is read, and with `Missing` for a run the store does not have.
  */
@@ -359,7 +359,7 @@ export const CONCLUDED: Command<Concluded> = {
       throw new Missing({ message: `nemia concluded ${id}: the store has no run ${id}. It takes a run by its id — nemia ls lists them.` });
     const git = yield* standingLive([yield* tried(() => runStore.runs.read(id))]);
     const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read', git);
-    return { run: id, shipped: parent.shipped, section: contextSection(parent) };
+    return { run: id, landed: parent.landed, section: contextSection(parent) };
   }),
   print: ({ section }) => [section.replace(/^\n+/, '')],
 };
@@ -397,7 +397,7 @@ const PLAN_REFUSES: Readonly<Record<string, string>> = {
   '--gate':
     "nemia plan does not take --gate: a plan's cards are gated by their workflows' own gate: true. To gate one card's run at a step, start that card by hand: nemia start <card.md> --workflows <dir> --gate <step>.",
   '--no-worktree':
-    'nemia plan does not take --no-worktree: a card another waits on ships a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
+    'nemia plan does not take --no-worktree: a card another waits on lands through a result branch, and a run that works on its base branch has none, so every card after it would wait for ever.',
 };
 
 /** `nemia plan`'s spec: the folder, then `--repo <r>` and `--factory <name>`, once each; `nemia start`'s others refused by name. */

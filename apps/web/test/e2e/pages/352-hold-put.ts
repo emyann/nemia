@@ -15,7 +15,7 @@ const WHY = 'its parser conflicts with the flag';
 export default {
   /**
    * A hold put on the board, as `nemia hold <run> --until <run> --why <words>` puts it (`POST /api/runs/:id/hold`): Hold… in GATED's
-   * header opens a form offering the runs of its repository that may still ship, HELD among them and GATED not; HELD ticked through its
+   * header opens a form offering the runs of its repository that may still land, HELD among them and GATED not; HELD ticked through its
    * label and a why given, Hold writes the hold's file with the api's user as `by`, and the page says it in its Held section, offering Lift
    * and no Hold…; GATED's card on the Factory says it whole too. The hold is then lifted from the page, as the `lift` page lifts it. What
    * the api refuses is the `hold-put-refused` page's, and its own tests' (`apps/api/test/hold.test.ts`).
@@ -26,7 +26,7 @@ export default {
     const { id, gated } = GATED;
     const until = HELD.id;
     const hold = path.join(store!, 'runs', `${id}.hold`);
-    const word = `held until ${unreadName(until)} ships (why: ${WHY}; by ${os.userInfo().username})`;
+    const word = `held until ${unreadName(until)} lands (why: ${WHY}; by ${os.userInfo().username})`;
     const theme = await themeOf(page);
     const section = page.locator('section[aria-label="Held"]');
     await expectCount(section, 0, `before the hold, ${id}'s page says no hold`);

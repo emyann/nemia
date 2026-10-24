@@ -8,7 +8,7 @@ import { contextLines, contextRefusal } from './context.ts';
 const store = new Set(['a-1', 'b-2']);
 const exists = (id: string) => store.has(id);
 
-test('a context run the store has, shipped or in flight, is taken', () => {
+test('a context run the store has, landed or in flight, is taken', () => {
   assert.equal(contextRefusal(['a-1', 'b-2'], [], exists, 'c-3'), null);
 });
 
@@ -50,8 +50,8 @@ test("a card's refusal names its from: key", () => {
   assert.match(contextRefusal(['x-9'], [], exists, undefined, 'from:')!.message, /^from: x-9: the store has no run x-9/);
 });
 
-test('a start says a context run in flight is handed not shipped, not judged, and a shipped one is not waited on', () => {
+test('a start says a context run in flight is handed not landed, not judged, and a landed one is not waited on', () => {
   const lines = contextLines(['a-1', 'b-2'], (id) => id === 'a-1');
   assert.match(lines[0], /^reads: a-1 — .*not waited on/);
-  assert.match(lines[1], /^reads: b-2, still in flight — .*not shipped, not judged/);
+  assert.match(lines[1], /^reads: b-2, still in flight — .*not landed, not judged/);
 });

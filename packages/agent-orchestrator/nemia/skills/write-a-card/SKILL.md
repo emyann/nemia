@@ -23,7 +23,7 @@ when it is done and how to show it. Write every part below; a part you cannot fi
    cost. Over it, propose the cut: two cards, each a whole slice, and what each proves.
    The person's line is the `cost-line` fact in your memory, or their custom instruction; with neither, ask it now, once, and keep it
    (your instruction's *What you learn of the person*).
-7. **Where it goes**: the factory and the workflow; `--after <run>` where it builds on a run not yet shipped; and the runs in flight it
+7. **Where it goes**: the factory and the workflow; `--after <run>` where it builds on a run not yet landed; and the runs in flight it
    would collide with (`nemia ls`): the same files, the same feature, or a run that changes what it reads.
 
 Keep it short: each part a line or a short list. A card is a brief, not a design: the workflow's own steps design and build it.

@@ -246,7 +246,7 @@ function slotWaitOf(run: Run, filed: ReadonlyMap<string, string>): SlotWait | nu
  * filing times it is handed (`filed`). Null while nothing of the run is filed, and for a run none of whose tasks has one. Pure.
  *
  * Not the record's `createdAt`: a run started `--after` runs, or held for a run slot, is created long before anything of it is filed. And
- * not when its parents shipped, which nothing writes down: the tick files the roots on the pass that reads them shipped.
+ * not when its parents landed, which nothing writes down: the tick files the roots on the pass that reads them landed.
  */
 export function firstFiledAt(run: Run, filed: ReadonlyMap<string, string>): string | null {
   const tasks = Object.values(run.steps).flatMap((record) => [

@@ -374,7 +374,7 @@ test('nemia ls reads where branches stand off standing.json and starts no proces
   const { lines, spawned: none } = await spawned();
   assert.equal(none, 0, 'no snapshot, and still no process');
   assert.match(lines, /where branches stand: not read/);
-  for (const verdict of ['shipped', ' is on ', 'ahead of', 'is gone']) assert.ok(!lines.includes(verdict), `nemia ls says ${verdict}`);
+  for (const verdict of ['landed', ' is on ', 'ahead of', 'is gone']) assert.ok(!lines.includes(verdict), `nemia ls says ${verdict}`);
 });
 
 test("a run's asks are listed once a read, and each file in them read once", async () => {
@@ -477,7 +477,7 @@ test('a pass asks one standing for each repository, place and base branch: a run
   assert.equal(after.kinds.place.spawned, before.kinds.place.spawned + 1, 'one process more, for the second base');
 });
 
-test('REFUSED: a run waits on one whose standing is unread, though it has shipped, says why, and is filed once standing answers', async () => {
+test('REFUSED: a run waits on one whose standing is unread, though it has landed, says why, and is filed once standing answers', async () => {
   const { b, repo } = await theStore();
   const parent = await atTheGate(b, repo);
   const child = await runPlaced(startRun({ brief: 'after it', repo, workflowDir: oneStep, after: [parent.id] }));
@@ -491,7 +491,7 @@ test('REFUSED: a run waits on one whose standing is unread, though it has shippe
   const places = readStanding()?.places ?? [];
   assert.ok(places.length > 0 && places.every((p) => 'unread' in p), JSON.stringify(places));
   await runWith(b.e, tickRun({ memo: freshRestMemo() }));
-  assert.ok(readRun(child.id).steps.implement.taskId, 'filed once its parent reads shipped');
+  assert.ok(readRun(child.id).steps.implement.taskId, 'filed once its parent reads landed');
   assert.equal(readRun(child.id).baseRef, git(repo, 'rev-parse', 'main').trim(), 'cut from the base as the pass read it, the merge on it');
 });
 
@@ -531,7 +531,7 @@ test('a step that left its work uncommitted is handed off on the pass that finis
   assert.deepEqual(readRun(run.id).tips, { [work.branch!]: tip }, 'the tip kept is the one git has after the hand-off');
 });
 
-test('REFUSED: a run filed on a pass whose standing read no head of its base keeps the base it was started on, its parent read shipped', async () => {
+test('REFUSED: a run filed on a pass whose standing read no head of its base keeps the base it was started on, its parent read landed', async () => {
   const { b, repo } = await theStore();
   const parent = await atTheGate(b, repo);
   const child = await runPlaced(startRun({ brief: 'after it, no head', repo, workflowDir: oneStep, after: [parent.id] }));
@@ -547,7 +547,7 @@ test('REFUSED: a run filed on a pass whose standing read no head of its base kee
     }),
   );
   await runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(headless)));
-  assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads shipped');
+  assert.ok(readRun(child.id).steps.implement.taskId, 'filed: its parent reads landed');
   assert.notEqual(git(repo, 'rev-parse', 'main').trim(), child.baseRef, 'the base moved past where the child was started');
   assert.equal(readRun(child.id).baseRef, child.baseRef, 'and the child keeps the base it was started on: the pass read no head of it');
 });

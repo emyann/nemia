@@ -15,16 +15,16 @@ const WIDE = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
 
 /**
- * The run the page writes on the diamond's repository: it waits on DIAMOND's `running`, which has not shipped, and reads FAKE, in flight,
- * and DIAMOND's `shipped` as context. Its one step is hired from an agent, so its run page draws what it was told by layer.
+ * The run the page writes on the diamond's repository: it waits on DIAMOND's `running`, which has not landed, and reads FAKE, in flight,
+ * and DIAMOND's `landed` as context. Its one step is hired from an agent, so its run page draws what it was told by layer.
  */
 const READER = {
   id: 'reads-what-others-concluded-e2e52',
   title: 'Read what others concluded',
-  context: [FAKE.id, DIAMOND.shipped.id],
+  context: [FAKE.id, DIAMOND.landed.id],
   instructions: 'You are the implementer: you change the code a brief asks for.',
   /** What its card's chip says on hover, a line a run: its id and its title. */
-  reads: [`${FAKE.id} — ${FAKE.title}`, `${DIAMOND.shipped.id} — ${DIAMOND.shipped.title}`],
+  reads: [`${FAKE.id} — ${FAKE.title}`, `${DIAMOND.landed.id} — ${DIAMOND.landed.title}`],
 } as const;
 
 const goto = async (page: Page, to: string): Promise<void> => {
@@ -49,7 +49,7 @@ const TASK = [
   '',
   `## From run ${DIAMOND.top.id}`,
   '',
-  `This run waited on ${DIAMOND.top.id} (\`--after\`) and started once it shipped, so its work is in this workspace.`,
+  `This run waited on ${DIAMOND.top.id} (\`--after\`) and started once it landed, so its work is in this workspace.`,
   '',
   'What it was asked, the first line:',
   '',
@@ -60,7 +60,7 @@ const TASK = [
   `## From run ${FAKE.id}`,
   '',
   `This run was handed ${FAKE.id} as context (\`--from\`); it did not wait on it.`,
-  `Not shipped, not judged: ${FAKE.id} was still in flight (or did not ship) when this run's steps were filed.`,
+  `Not landed, not judged: ${FAKE.id} was still in flight (or did not land) when this run's steps were filed.`,
   '',
   'What it was asked, the first line:',
   '',
@@ -68,21 +68,21 @@ const TASK = [
   FAKE.title,
   '```',
   '',
-  `## From run ${DIAMOND.shipped.id}`,
+  `## From run ${DIAMOND.landed.id}`,
   '',
-  `This run was handed ${DIAMOND.shipped.id} as context (\`--from\`); it did not wait on it.`,
-  'It shipped: a person read this account beside its change before it went onto the base.',
+  `This run was handed ${DIAMOND.landed.id} as context (\`--from\`); it did not wait on it.`,
+  'It landed: a person read this account beside its change before it went onto the base.',
   '',
   'What it was asked, the first line:',
   '',
   '```text',
-  DIAMOND.shipped.title,
+  DIAMOND.landed.title,
   '```',
 ].join('\n');
 
 /**
  * READER's record, as `wf start --after --from` freezes it, from DIAMOND's `bottom`'s: waiting on `running` with nothing filed; or,
- * `filed`, after the diamond's top, which shipped, its step filed with TASK, its journal and its line on the engine's feed written as the
+ * `filed`, after the diamond's top, which landed, its step filed with TASK, its journal and its line on the engine's feed written as the
  * runtime writes them. Each file it writes is returned, to be taken back.
  */
 function written(filed: boolean): string[] {
@@ -118,7 +118,7 @@ function written(filed: boolean): string[] {
 
 /**
  * The Factory: READER's card says it reads two runs in a chip, each by its id and title on hover, and draws no line of them at rest; its
- * wait on `running` is drawn. Hovered, a faint line comes from FAKE, the one on the floor; with the finished shown, from `shipped` too.
+ * wait on `running` is drawn. Hovered, a faint line comes from FAKE, the one on the floor; with the finished shown, from `landed` too.
  */
 async function onTheFactory(page: Page): Promise<void> {
   await goto(page, '/factories/default');
@@ -130,7 +130,7 @@ async function onTheFactory(page: Page): Promise<void> {
     throw new Refused(`the chip says each run on hover, by id and title — it says ${JSON.stringify(title)}`);
   const reads = page.locator('.react-flow__edge.context-edge');
   const wait = page.locator(`.react-flow__edge[data-id="after:${DIAMOND.running.id}->${READER.id}"]`);
-  await expectCount(wait, 1, `the wait on ${DIAMOND.running.id}, which has not shipped, is drawn`);
+  await expectCount(wait, 1, `the wait on ${DIAMOND.running.id}, which has not landed, is drawn`);
   await page.mouse.move(1, 1);
   await expectCount(reads, 0, 'no line of what a card reads while no card is hovered');
   const floor = page.locator('.react-flow').first();
@@ -144,7 +144,7 @@ async function onTheFactory(page: Page): Promise<void> {
   await expectCount(reads, 0, 'its lines gone once the pointer leaves');
   await showFinished(page);
   await card.hover();
-  await expectCount(reads, 2, `with the finished shown, a line from ${DIAMOND.shipped.id} too`);
+  await expectCount(reads, 2, `with the finished shown, a line from ${DIAMOND.landed.id} too`);
   await shoot(page, floor, 'hovered-finished');
   await page.mouse.move(1, 1);
 }
@@ -168,22 +168,22 @@ async function quotedOf(page: Page, id: string): Promise<string[]> {
   return quoted.filter(Boolean);
 }
 
-/** The start form's Reads list: a run picked shows what it would hand, badged where it has not shipped. */
+/** The start form's Reads list: a run picked shows what it would hand, badged where it has not landed. */
 async function onTheStartForm(page: Page, what: string): Promise<void> {
   const form = page.locator(`article[aria-label="Workflow ${WORKFLOWS.good.name}"] [data-context-picker]`);
-  for (const id of [DIAMOND.running.id, DIAMOND.shipped.id]) {
+  for (const id of [DIAMOND.running.id, DIAMOND.landed.id]) {
     const box = form.locator(`li[data-run="${id}"] input[type="checkbox"]`);
     if (!(await box.isChecked())) await form.locator(`li[data-run="${id}"] label`).click();
   }
   const running = form.locator(`section[data-concluded="${DIAMOND.running.id}"]`);
-  const shipped = form.locator(`section[data-concluded="${DIAMOND.shipped.id}"]`);
+  const landed = form.locator(`section[data-concluded="${DIAMOND.landed.id}"]`);
   await expectVisible(running.locator('[data-markdown]'), `what ${DIAMOND.running.id} would hand, drawn`);
-  await expectVisible(running.locator('[data-not-shipped]', { hasText: 'not shipped, not judged' }), 'badged: it has not shipped');
-  await expectVisible(shipped.locator('[data-markdown]'), `what ${DIAMOND.shipped.id} would hand, drawn`);
-  await expectCount(shipped.locator('[data-not-shipped]'), 0, 'unbadged: it shipped');
+  await expectVisible(running.locator('[data-not-landed]', { hasText: 'not landed, not judged' }), 'badged: it has not landed');
+  await expectVisible(landed.locator('[data-markdown]'), `what ${DIAMOND.landed.id} would hand, drawn`);
+  await expectCount(landed.locator('[data-not-landed]'), 0, 'unbadged: it landed');
   for (const [id, preview] of [
     [DIAMOND.running.id, running],
-    [DIAMOND.shipped.id, shipped],
+    [DIAMOND.landed.id, landed],
   ] as const) {
     for (const line of await quotedOf(page, id))
       await expectVisible(preview.locator('[data-markdown]', { hasText: line }), `${id}'s preview says what its section quotes: ${line}`);
@@ -192,18 +192,18 @@ async function onTheStartForm(page: Page, what: string): Promise<void> {
   await shoot(page, form, `picker-${what}`);
 }
 
-/** The inbox's bare card: no run read, then `shipped` picked through Change and written, photographed as `what`, and taken back off. */
+/** The inbox's bare card: no run read, then `landed` picked through Change and written, photographed as `what`, and taken back off. */
 async function onTheCard(page: Page, what: string): Promise<void> {
   const name = CARDS.bare.name;
   const item = page.locator(`li[data-card="${name}"]`);
   const from = item.locator('[data-card-from]');
   await expectVisible(from.getByText('reads no run as context'), 'the card reads no run');
   await from.getByRole('button', { name: 'Change' }).click();
-  const row = from.locator(`li[data-run="${DIAMOND.shipped.id}"] label`);
+  const row = from.locator(`li[data-run="${DIAMOND.landed.id}"] label`);
   const pathname = `/api/inbox/${name}/from`;
   await Promise.all([answered(page, 'PUT', pathname), row.click()]);
-  await expectVisible(from.locator(`[data-from="${DIAMOND.shipped.id}"]`), `the card reads ${DIAMOND.shipped.id}, as its file says`);
-  await expectVisible(from.locator(`section[data-concluded="${DIAMOND.shipped.id}"] [data-markdown]`), 'and what it would hand');
+  await expectVisible(from.locator(`[data-from="${DIAMOND.landed.id}"]`), `the card reads ${DIAMOND.landed.id}, as its file says`);
+  await expectVisible(from.locator(`section[data-concluded="${DIAMOND.landed.id}"] [data-markdown]`), 'and what it would hand');
   await from.scrollIntoViewIfNeeded();
   await shoot(page, item, `card-${what}`);
   await Promise.all([answered(page, 'DELETE', pathname), row.click()]);
@@ -220,10 +220,10 @@ async function onTheRunPage(page: Page, what: string): Promise<void> {
   await expectCount(blocks, 3, 'a block for each run it was handed');
   const hows = await blocks.evaluateAll((all) => all.map((el) => el.getAttribute('data-how')));
   if (hows.join() !== 'waited,read,read') throw new Refused(`the blocks are headed waited, read, read — they are ${hows.join(', ')}`);
-  await expectVisible(blocks.nth(0).locator('h5', { hasText: `Waited on, shipped · ${DIAMOND.top.title}` }), 'the wait, headed by how');
+  await expectVisible(blocks.nth(0).locator('h5', { hasText: `Waited on, landed · ${DIAMOND.top.title}` }), 'the wait, headed by how');
   await expectVisible(blocks.nth(1).locator('h5', { hasText: `Read as context · ${FAKE.title}` }), 'what it read, headed by how');
   await expectVisible(blocks.nth(1).locator(`a[href="/runs/${FAKE.id}"]`), 'linked to its run');
-  await expectVisible(blocks.nth(1).getByText('Not shipped, not judged', { exact: false }), 'and labelled not shipped');
+  await expectVisible(blocks.nth(1).getByText('Not landed, not judged', { exact: false }), 'and labelled not landed');
   await fold.locator('[data-layer="task"]').scrollIntoViewIfNeeded();
   await shoot(page, fold.locator('[data-layer="task"]'), `blocks-${what}`);
 }
@@ -244,7 +244,7 @@ export default {
   /**
    * Context is no wait, on the board. A run that waits on a run still in flight and reads two others: its card says so in a chip, each run
    * by id and title on hover, and draws the faint line of what it reads only while hovered, from a run on the floor; the start form's
-   * Reads list shows what each pick would hand, badged where it has not shipped; an inbox card's `from:` is changed through the same list
+   * Reads list shows what each pick would hand, badged where it has not landed; an inbox card's `from:` is changed through the same list
    * and taken back; and once its step is filed, its run page draws its task in parts, each run handed a block headed by how. The page
    * writes READER and takes it back, its journal and its feed line with it, so each visit reads the store as seeded.
    */

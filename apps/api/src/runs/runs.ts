@@ -111,7 +111,7 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
  *   the list was read. A waiting row carries `stepCosts` besides, the cost of each of its steps, and `waitingSince`, the instant its
  *   present wait on a person began: the end of the waiting step's last try (the gate reached, the question asked) or the placing of a
  *   hold only a person lifts, the earliest where several are open; null where a task does not read or the record does not date the wait,
- *   as for a run that waits on one which never ships. A row in flight has neither of those two keys.
+ *   as for a run that waits on one which never lands. A row in flight has neither of those two keys.
  *   `?ofFactory=` keeps the runs of one factory, `default` those whose record names none, compared as strings: a name no run carries
  *   answers empty lists and zero counts. Read off the same memo as `GET /api/runs`, with the journals of the waiting runs and of the runs
  *   in flight read for their breakdowns: it does not grow with the finished runs, and warm it costs no record of one.
@@ -133,7 +133,7 @@ const CONCLUDED = COMMANDS.find((c) => c.name === 'concluded')!;
  *   on the page's poll, since it runs `git diff`. Refused as the run's page is: a 404 with no such run, and a 502 when a task it reads does
  *   not, in the words the list says it with (`RunSummary.unreadable`).
  * - `GET /api/runs/:runId/concluded` — what a run started now with `--from <runId>` would be handed of it (`nemia concluded`): the run,
- *   whether it has shipped and its `## From run` section, made by the package as the tick makes it. A 404 with no such run, the package's
+ *   whether it has landed and its `## From run` section, made by the package as the tick makes it. A 404 with no such run, the package's
  *   `Missing`, answered by `app.onError`.
  */
 

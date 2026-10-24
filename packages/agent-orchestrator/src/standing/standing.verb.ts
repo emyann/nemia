@@ -4,7 +4,7 @@
  * it and writes it to `standing.json` (`passStanding`); a read off the tick — `nemia ls`, the board — decodes that file, with no process
  * (`standingSnapshot`); a person's one-off verb asks it live and writes nothing (`standingNow`, `standingLive`). One reader answers off any
  * of them (`standingReader`): a question none asked is unread, never asked of git as it goes. A reading the place refused or did not
- * answer is unread too: nothing on it has shipped, and the reader says why.
+ * answer is unread too: nothing on it has landed, and the reader says why.
  */
 import path from 'node:path';
 import { Effect } from 'effect';
@@ -15,7 +15,7 @@ import { within } from '../meter/tally.store.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
 import { hasStarted, waitedOn } from '../wait/wait.ts';
 import { resultBranches, type BranchReader } from '../branches/branches.store.ts';
-import { shippedOver } from '../branches/index.ts';
+import { landedOver } from '../branches/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { readStanding, writeStanding, type StandingFile, type StoodRead } from './standing.store.ts';
 
@@ -317,7 +317,7 @@ const repoHeads = (standing: PassStanding, repo: string): Readonly<Record<string
 /**
  * The `BranchReader` that answers off what was read (`PassStanding`), with no process of its own. A question nobody asked — a run whose
  * repository, place and base were not read, a branch not asked of — and one on a reading that is unread are unread (`unread` says why):
- * not shipped, never gone, ahead by none. Whether git has a branch is read off any answered reading of its repository.
+ * not landed, never gone, ahead by none. Whether git has a branch is read off any answered reading of its repository.
  */
 export function standingReader(standing: PassStanding): BranchReader {
   const unasked = standing.unasked ?? 'not asked on this read';
@@ -326,7 +326,7 @@ export function standingReader(standing: PassStanding): BranchReader {
     return stood && 'answer' in stood ? stood.answer.branches.find((b) => b.branch === branch) : undefined;
   };
   return {
-    shipped: (run, branch) => shippedOver(stoodBranch(run, branch)),
+    landed: (run, branch) => landedOver(stoodBranch(run, branch)),
     has: (repo, branch) => {
       const heads = repoHeads(standing, repo);
       return heads ? Object.hasOwn(heads, branch) : true;

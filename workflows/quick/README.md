@@ -81,7 +81,7 @@ one: the review reads implement's pictures in light and dark, and a page or a st
 back through the review's loop with what refused it (`nemia decide <run>` prints the land step's `blocked`): `nemia retry <run> review
 --message "<what failed>"` files the review again with those words, and it sends the work round implement or passes it, which files
 land again. Where it was the fast-forward that was declined, or anything else that was not the work, a person brings the checkout onto
-`origin/<base>` and ships again as it stands, `nemia retry <run> land`, the line the refusal printed. Whoever operates the factory sends it back, by instruction (`NEMIA.md`): no step is filed by
+`origin/<base>` and lands again as it stands, `nemia retry <run> land`, the line the refusal printed. Whoever operates the factory sends it back, by instruction (`NEMIA.md`): no step is filed by
 itself — but an ending its review routes is filed by the tick, with no person in between.
 
 ## The closeouts

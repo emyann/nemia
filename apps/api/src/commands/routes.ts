@@ -293,13 +293,13 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   false`. Refuses words that are missing or empty (`acceptWordsRefusal`) with 422 before the run is read, and a loop that may not be
  *   accepted (`acceptAsk`) with 409 after — a step with no `loop:`, a round the run files itself or one already asked for, a loop that
  *   ended `again: false`, a try already accepted, a run called off.
- * - `POST /api/runs/:id/hold` — a run held until other runs ship, as `nemia hold <run> --until <run>…` holds it (`hold`), its body
+ * - `POST /api/runs/:id/hold` — a run held until other runs land, as `nemia hold <run> --until <run>…` holds it (`hold`), its body
  *   `{ until, why?, by? }`, `until` a list as `--until` given many times, and `by` the user the api runs as where it is left out. Its route
  *   sets `off` false, so no body lifts through it, and a key it does not take, `off` among them, is a 400 naming each. Refuses what
  *   `nemia hold` refuses of its arguments (`check`) with 422 — no run to wait on, a `why` or `by` blank or over its cap — before the run
  *   is read; a run the store does not have with 404; and what `hold` refuses after (`holdRefusal`) with 409 (`Conflict`): a run already
  *   held, cancelled, pruned, finished or a folder run's, and of each run named one the store does not have, the run itself, one on
- *   another repository or base branch, one that never ships, and one that already waits on it. Its 200 is `{ id, lifted: false, hold }`,
+ *   another repository or base branch, one that never lands, and one that already waits on it. Its 200 is `{ id, lifted: false, hold }`,
  *   the hold as written. No feed line: the board reads the run again.
  * - `DELETE /api/runs/:id/hold` — a person's hold lifted, as `nemia hold <run> --off` lifts it (`unhold`): its route sets `off`, and it
  *   reads no body. Its file removed, the run goes on at the next tick, what its steps asked while

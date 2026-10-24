@@ -26,9 +26,16 @@ const forms = <const K extends string, A extends Brand.Brand<K>, S extends Schem
   OnRead: base.pipe(Schema.brand<K>(name as never)).annotate({ identifier: name }),
 });
 
-/** An id this layer mints: `pattern` is its writer's own constant, imported rather than copied. */
-export const brandedId = <const K extends string>(name: K, pattern: RegExp) =>
-  forms<K, Id<K>, typeof Schema.String>(name, Schema.String, [Schema.isPattern(pattern, { expected: `a ${name}` })]);
+/**
+ * An id this layer mints. `rule` is its writer's own: the pattern constant, or the refusal function that returns what is wrong with
+ * a value (and nothing for a good one), imported rather than copied, so the model and the writer cannot disagree.
+ */
+export const brandedId = <const K extends string>(name: K, rule: RegExp | ((value: string) => string | null | undefined)) =>
+  forms<K, Id<K>, typeof Schema.String>(name, Schema.String, [
+    rule instanceof RegExp
+      ? Schema.isPattern(rule, { expected: `a ${name}` })
+      : Schema.makeFilter<string>((value) => rule(value) ?? true, { expected: `a ${name}` }),
+  ]);
 
 /** A whole number at least `minimum`. */
 export const brandedCount = <const K extends string>(name: K, minimum: number) =>

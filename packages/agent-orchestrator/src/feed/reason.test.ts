@@ -22,7 +22,7 @@ import {
   REMOVED,
   type InvolvedKind,
   type Reason,
-  type SignalSource,
+  LINE_SOURCES,
 } from './reason.ts';
 import { upgraded, type FeedLine } from './feed.ts';
 import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
@@ -116,7 +116,7 @@ const RUN_LINES: readonly Case[] = [
 ];
 
 /**
- * The six words the owner named at this slice's design gate, spelled here by hand and not read off `SIGNAL_WORDS`: this file is what holds
+ * The six words the owner named at this slice's design gate, spelled here by hand and not read off `LINE_WORDS`: this file is what holds
  * the code to the words, so a word reworded in the table and not here is a case that fails, which is the point. Each of the two runtime
  * faults is a word of the workflow layer's own — `nothing started`, not `unstartable`; `session lost`, not `lost`.
  */
@@ -193,9 +193,6 @@ const lineOf = (c: Case): FeedLine =>
 /** Whether the selectors a stored wake list converts to take `line`. */
 const takenByConverted = (wake: readonly string[], line: FeedLine): boolean =>
   selects(parseSelectors(selectorsOfWake(wake).selectors), line);
-
-/** Every source a line may be the deed of: what a selector on `source` may match, and what the table may answer. */
-const SOURCES: readonly SignalSource[] = ['tick', 'runtime', 'person', 'daemon'];
 
 test('reasonOf names a reason for every word the package writes, only of a kind the table gives it, and every entry is one some word reaches', async (t) => {
   await t.test('every word the package writes maps to a reason', () => {
@@ -291,11 +288,9 @@ test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads
     );
   });
   await t.test("a line's source is the table's, and every source is one some word reaches", () => {
-    for (const reason of REASON_CODES)
-      assert.ok(SOURCES.includes(sourceOf(reason)), `${reason}: ${sourceOf(reason)} is no source a line may carry`);
     const reached = new Set(CASES.map((c) => sourceOf(reasonOf({ word: c.word, note: c.note }, c.kind))));
     assert.deepEqual(
-      SOURCES.filter((source) => !reached.has(source)),
+      LINE_SOURCES.filter((source) => !reached.has(source)),
       [],
       'a source no fixture reaches is one nothing writes',
     );

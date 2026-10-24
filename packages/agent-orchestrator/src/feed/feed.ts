@@ -39,18 +39,18 @@ import {
   messageOf,
   reasonOf,
   REMOVED,
-  SIGNAL_WORDS,
+  LINE_WORDS,
   sourceOf,
   typeOf,
   waitsOf,
   type InvolvedKind,
   type Reason,
-  type SignalSource,
-  type SignalType,
+  type LineSource,
+  type LineType,
 } from './reason.ts';
 
-export { DAEMON_STARTED, REMOVED, SIGNAL_WORDS };
-export type { InvolvedKind, Reason, SignalSource, SignalType };
+export { DAEMON_STARTED, REMOVED, LINE_WORDS };
+export type { InvolvedKind, Reason, LineSource, LineType };
 
 /** The version every line this `nemia` writes is stamped with; a line with none is upgraded on read (`upgraded`). */
 export const FEED_VERSION = 'nemia/v1';
@@ -74,14 +74,14 @@ export type FeedLabels = { run?: string; factory?: string; workflow?: string; st
  * Every one is optional on the type, because a line read off a feed written by an older `nemia` has none: `upgraded` is the one door
  * that fills them in, and every reader downstream of it sees them all.
  */
-type Signal = {
+type Line = {
   apiVersion?: typeof FEED_VERSION;
   involved?: Involved;
   labels?: FeedLabels;
   reason?: Reason;
-  type?: SignalType;
+  type?: LineType;
   waits?: 'person';
-  source?: SignalSource;
+  source?: LineSource;
   message?: string;
   call?: string;
   try?: number;
@@ -89,12 +89,12 @@ type Signal = {
 
 /**
  * A run's line of the feed: when, which run, which step of it (none for the run's own line), the word the tick judged, and the note beside
- * it — and what a v1 line signs it with (`Signal`).
+ * it — and what a v1 line signs it with (`Line`).
  */
-export type RunLine = { at: string; run: string; step?: string; word: string; note?: string } & Signal;
+export type RunLine = { at: string; run: string; step?: string; word: string; note?: string } & Line;
 
 /** A daemon's line of the feed: when, its pid, that it started, and how the daemon before it ended. */
-export type DaemonLine = { at: string; daemon: number; word: typeof DAEMON_STARTED; note?: string } & Signal;
+export type DaemonLine = { at: string; daemon: number; word: typeof DAEMON_STARTED; note?: string } & Line;
 
 /**
  * The one name a line of the store carries (`involved {kind: 'Store', name: 'store'}`): the feed is one store's, so there is one store to
@@ -107,7 +107,7 @@ export const STORE = 'store';
  * moment the pause was put. Of no run, so it carries no run's labels, and a subscription scoped to a factory is handed it as it is handed a
  * daemon's.
  */
-export type StoreLine = { at: string; store: string; word: string; note?: string } & Signal;
+export type StoreLine = { at: string; store: string; word: string; note?: string } & Line;
 
 /** One line of the feed: a run's (`RunLine`), a daemon's (`DaemonLine`), or the store's (`StoreLine`). */
 export type FeedLine = RunLine | DaemonLine | StoreLine;
@@ -308,7 +308,7 @@ const saidKeys = (said: FeedSaid): { word: string; note?: string } => ({
  * What identifies one occurrence is its reason, what it is of, its try and its note (`onceKey`) — and, where several share all four, its
  * place among them: nothing in the runtime's journal stamps a denial, and two attempts of one try lost are told apart only by being two.
  */
-export type Once = { step?: string; word: string; note?: string; call?: string; try?: number; source?: SignalSource };
+export type Once = { step?: string; word: string; note?: string; call?: string; try?: number; source?: LineSource };
 
 /** What a one-shot offered is about: the run it is of, or its step, as `onceInvolved` says it — or the store, for `storeOnce`'s. */
 type About = (o: Once) => Involved;
@@ -366,15 +366,15 @@ function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted:
   const lifting = lifted === undefined ? undefined : holdSince(lifted);
   const since = standing ?? lifting;
   const out: Once[] = [
-    ...(since !== undefined ? [{ word: SIGNAL_WORDS.HoldPut, note: since }] : []),
-    ...(lifting !== undefined ? [{ word: SIGNAL_WORDS.HoldLifted, note: lifting, source: 'tick' as const }] : []),
+    ...(since !== undefined ? [{ word: LINE_WORDS.HoldPut, note: since }] : []),
+    ...(lifting !== undefined ? [{ word: LINE_WORDS.HoldLifted, note: lifting, source: 'tick' as const }] : []),
   ];
   const puts = onceKey(involved, 'HoldPut', undefined, '');
   for (const key of fold.shots.keys()) {
     if (!key.startsWith(puts)) continue;
     const note = key.slice(puts.length);
     if (note === standing || note === lifting) continue;
-    out.push({ word: SIGNAL_WORDS.HoldLifted, note });
+    out.push({ word: LINE_WORDS.HoldLifted, note });
   }
   return out;
 }
@@ -400,12 +400,12 @@ export type FeedPause = { at: string } | null;
  */
 function storeOnce(fold: FeedFold, pause: FeedPause): Once[] {
   const standing = pause === null ? undefined : holdSince(pause.at);
-  const out: Once[] = standing !== undefined ? [{ word: SIGNAL_WORDS.StorePaused, note: standing }] : [];
+  const out: Once[] = standing !== undefined ? [{ word: LINE_WORDS.StorePaused, note: standing }] : [];
   const puts = onceKey(STORE_INVOLVED, 'StorePaused', undefined, '');
   for (const key of fold.shots.keys()) {
     if (!key.startsWith(puts)) continue;
     const note = key.slice(puts.length);
-    if (note !== standing) out.push({ word: SIGNAL_WORDS.StoreResumed, note });
+    if (note !== standing) out.push({ word: LINE_WORDS.StoreResumed, note });
   }
   return out;
 }
@@ -439,7 +439,7 @@ const denialOnce = (d: FeedDenial): Once => ({
  */
 const closeoutOnce = (c: FeedCloseout): Once => ({
   step: c.step,
-  word: SIGNAL_WORDS.ClosedOut,
+  word: LINE_WORDS.ClosedOut,
   note: `try ${c.try}`,
   try: c.try,
 });

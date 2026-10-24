@@ -6,7 +6,7 @@
  * what the pass already read — the engine's views, the run's record, the person's answers — and asks the runtime nothing of its own.
  */
 import { listing } from '../list/list.ts';
-import { feedPhase, feedWords, SIGNAL_WORDS, type FeedCloseout, type FeedDenial, type FeedWords, type Once } from './index.ts';
+import { feedPhase, feedWords, LINE_WORDS, type FeedCloseout, type FeedDenial, type FeedWords, type Once } from './index.ts';
 import { closeoutOf, closeoutTold, saidCount, waitingOf } from '../views/views.verb.ts';
 import { engineWord } from '../views/views-words.ts';
 import { runStore } from '../record/files.store.ts';
@@ -87,18 +87,18 @@ function actsOf(run: Run): Once[] {
   return [
     ...(run.approvals ?? []).map((a): Once => ({
       step: a.step,
-      word: SIGNAL_WORDS.Approved,
+      word: LINE_WORDS.Approved,
       note: `try ${a.try} · at ${a.at}`,
       try: a.try,
     })),
-    ...(run.cancelledAt !== undefined ? [{ word: SIGNAL_WORDS.CancelAsked, note: `at ${run.cancelledAt}` }] : []),
+    ...(run.cancelledAt !== undefined ? [{ word: LINE_WORDS.CancelAsked, note: `at ${run.cancelledAt}` }] : []),
   ];
 }
 
 /**
  * The two ends of the runtime's that are the workflow layer's news, in the workflow layer's own words: a spawn its harness refused, so
  * nothing started, and a session the runtime lost. **This table is the only place in the package's feed code that names either of the
- * runtime's words** — nothing is passed through, and the words above it are the owner's (`SIGNAL_WORDS`).
+ * runtime's words** — nothing is passed through, and the words above it are the owner's (`LINE_WORDS`).
  *
  * The rest of an attempt's ends are no news of their own: what they came to is the step's own word, which the feed already says.
  *
@@ -110,8 +110,8 @@ function actsOf(run: Run): Once[] {
 type AttemptEnd = NonNullable<TaskView['state']['attempts'][number]['reason']>;
 
 const FAULTS: Partial<Record<AttemptEnd, string>> = {
-  unstartable: SIGNAL_WORDS.SpawnFailed,
-  lost: SIGNAL_WORDS.SessionLost,
+  unstartable: LINE_WORDS.SpawnFailed,
+  lost: LINE_WORDS.SessionLost,
 };
 
 /**

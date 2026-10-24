@@ -602,8 +602,9 @@ export function publishedOf({ lines, before, after, leading }: FeedAppended): Fe
 
 /**
  * A word the feed keeps, and the note beside it, when there is one: what one line of it says of a run or of a step. And, where the pass
- * judged it (`feedWords`), the `reason` its line names, with its `on` or `via`: the code the listing set beside the word (`Listing`'s `reason`, `runCodes`), never
- * read back off it. A word folded off the feed carries none: two words are the same by their word and note (`same`).
+ * judged it (`feedWords`), the `reason` its line names, with its `on` or `via`: the code the listing set beside the word (`Listing`'s
+ * `reason`, `runCodes`), never read back off it. A word folded off the feed carries none: two words are the same by their word and
+ * note (`same`).
  */
 export type FeedSaid = { word: string; note?: string; reason?: Reason; on?: WaitOn; via?: AnswerVia };
 

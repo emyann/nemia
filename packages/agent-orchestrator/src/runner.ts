@@ -220,11 +220,8 @@ export type {
   TemplateStatus,
 } from './factory/factory.ts';
 export {
-  ANSWER_VIA,
   ENGINE_REASON,
   feedLineWords,
-  formerHints,
-  PERSON_WAITS,
   PHASE_OF,
   REASON_CODES,
   REASON_OF,
@@ -236,7 +233,6 @@ export {
   runCodes,
   STEP_PHASES,
   STEP_REASONS,
-  WAIT_ON,
 } from './feed/index.ts';
 export type { AnswerVia, Reason, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './feed/index.ts';
 export type { FeedLine, FeedPublished } from './feed/index.ts';

@@ -128,7 +128,7 @@ test('what a watch takes and prints of a line: `-l waits=person` in place of the
   });
   await t.test('a former reason and the qualifiers are taken by -l, and select', () => {
     for (const selector of ['reason=WaitingForSlot', 'on=limit', 'via=closeout'])
-      assert.equal(WATCH.check!({ selector: [selector] } as never), null, selector);
+      assert.equal(WATCH.check!({ selector: [selector] }), null, selector);
     assert.deepEqual(
       WAKES.filter((l) => selects(parseSelectors(['via=closeout']), l)),
       [WAKES[3]],

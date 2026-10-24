@@ -210,11 +210,10 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
   await t.test('a reason is only named of a kind the table gives it', () => {
     for (const c of CASES) assert.ok(kindsOf(c.reason).includes(c.kind), `${c.reason} is not a reason of a ${c.kind}`);
   });
-  await t.test('every entry of the table is one some word reaches', () => {
+  await t.test("every entry of the table is one some word reaches, or a run's first waiting step's reason (`runCodes`)", () => {
     const reached = new Set(
       CASES.map((c) => `${reasonOf({ word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) }, c.kind)}/${c.kind}`),
     );
-    // A run a person's word stops is written with its first waiting step's reason (`runCodes`), which no word of a run says.
     for (const reason of STEP_REASONS.filter((r) => PHASE_OF[r] === 'waiting'))
       reached.add(
         `${runCodes('blocked', false, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
@@ -230,7 +229,8 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
   });
 });
 
-/** The reasons that wait on a person, by the card that split a wait on a person from a wait on a thing: phase `waiting`, and a step broke. */
+/** The reasons that wait on a person, by the card that split a wait on a person from a wait on a thing: phase `waiting`, and a step
+ * broke. */
 const PERSON = [
   'AwaitingApproval',
   'AwaitingAnswer',
@@ -245,11 +245,11 @@ const PERSON = [
 
 /** Whether `line` was woken by the retired wake words through its note alone: what no selector reads, and no code says. */
 const wokenByNoteAlone = (line: FeedLine): boolean =>
-  wokenByFormerWake(line, FORMER_DEFAULT_WAKE) && !wokenByFormerWake({ ...line, note: undefined } as FeedLine, FORMER_DEFAULT_WAKE);
+  wokenByFormerWake(line, FORMER_DEFAULT_WAKE) && !wokenByFormerWake({ ...line, note: undefined }, FORMER_DEFAULT_WAKE);
 
 test('waitsOf: the lines that wait on a person are those of the Awaiting reasons, the stops beside them and a step broke, never a note', async (t) => {
   await t.test('waits is true of exactly the reasons of phase waiting, and Failed and CheckFailed', () => {
-    assert.deepEqual([...REASON_CODES.filter(waitsOf)].sort(), [...PERSON].sort());
+    assert.deepEqual(REASON_CODES.filter(waitsOf).sort(), [...PERSON].sort());
   });
   await t.test('a note that says a person is waited on makes no line wait: only its reason does', () => {
     const line = upgraded({ at: '2026-10-16T04:00:00.000Z', run: 'r-1', step: 'plan', word: 'running', note: 'waiting on you: plan' });
@@ -412,7 +412,6 @@ test('a signed line on disk under a former reason reads back under its current o
 });
 
 test('a selector naming a former reason selects the lines that code was written for, current or former', async (t) => {
-  /** Every current line a former code reads as, and a line of a reason none of them is. */
   const lines: FeedLine[] = [
     ...CONVERTED.map(([, kind, now]) => signed(kind, now)),
     signed('Step', { reason: 'Running' }),

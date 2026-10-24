@@ -261,5 +261,5 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
 export function runCodes(status: RunStatus, held: boolean, steps: readonly CodedStep[] = []): CodedRun {
   const stop = status === 'blocked' ? steps.find((s) => s.phase === 'waiting') : undefined;
   const q: QualifiedRun = status === 'running' && held ? { reason: 'Waiting', on: 'run' } : stop ? stoppedOn(stop) : RUN_REASON_OF[status];
-  return { ...q, phase: RUN_PHASE_OF[q.reason] } as CodedRun;
+  return { ...q, phase: RUN_PHASE_OF[q.reason] };
 }

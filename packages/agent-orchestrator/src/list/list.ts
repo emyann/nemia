@@ -192,8 +192,8 @@ export interface ListingInput {
   /**
    * What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): the row's `waits` beside
    * the engine's `needs-human`. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly, here and in
-   * `harnessBlocked` (views.verb.ts), and a row says it as its reason (`AwaitingAnswer`, `via: 'session'`), which the api and the board compare; the status stays
-   * the engine's bare word, and only what `nemia ls` prints gains the harness's (`shownStatus`).
+   * `harnessBlocked` (views.verb.ts), and a row says it as its reason (`AwaitingAnswer`, `via: 'session'`), which the api and the board
+   * compare; the status stays the engine's bare word, and only what `nemia ls` prints gains the harness's (`shownStatus`).
    */
   readonly waitingOf?: (taskId: string) => string | undefined;
   /**
@@ -426,10 +426,10 @@ const coded = codedStep;
 
 /**
  * The reason of a step's word where nothing narrower is known of it: `AwaitingAnswer` by the closeout where its closeout `c` signed off
- * blocked, whatever the word; else the engine's word for its task (`ENGINE_REASON`), or the status it is shown by where it has no task or no word of the
- * engine's counts (`REASON_OF`) — and, for a word that names no reason of its own (`unverified`, and the engine's `input-required`,
- * `idle` and `restarting`), what its closeout says: done, or unreadable. `unknown`, a task the engine has no record of, stays `Unknown`
- * whatever its closeout, as the feed has always read it.
+ * blocked, whatever the word; else the engine's word for its task (`ENGINE_REASON`), or the status it is shown by where it has no task
+ * or no word of the engine's counts (`REASON_OF`) — and, for a word that names no reason of its own (`unverified`, and the engine's
+ * `input-required`, `idle` and `restarting`), what its closeout says: done, or unreadable. `unknown`, a task the engine has no record
+ * of, stays `Unknown` whatever its closeout, as the feed has always read it.
  */
 function saidReason(word: StepStatus | ListedPhase, c: Closeout | { error: string } | undefined): QualifiedStep {
   if (c && !('error' in c) && c.outcome === 'blocked') return { reason: 'AwaitingAnswer', via: 'closeout' };

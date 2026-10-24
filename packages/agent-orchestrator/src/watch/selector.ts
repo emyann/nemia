@@ -220,16 +220,15 @@ const named = (clause: Clause): readonly string[] =>
 /**
  * Whether `clause` holds of `line`, whose keys are `on`: a clause on `reason` naming a former code is held of the line's current reason and
  * its former one together — one of them listed for `=` and `in`, neither for `!=` and `notin`; every other clause of the key it names.
+ * The line's codes are read as its writer wrote them, which a newer `nemia` may have written outside the table: `formerOf` matches only
+ * the codes it knows.
  */
 function holdsOf(clause: Clause, line: FeedLine, on: Readonly<Record<string, string>>): boolean {
   const value = on[clause.key];
   if (clause.key !== 'reason' || !named(clause).some(isFormerReason)) return holds(clause, value);
-  // A signed line's values, which a newer nemia may have written outside the table: formerOf matches only the codes it knows.
-  const codes = { reason: value, on: on.on, via: on.via } as Codes;
-  const former = value === undefined ? undefined : formerOf(codes, involvedOf(line).kind);
-  const values = [value, former].filter((v): v is string => v !== undefined);
-  const listed = values.some((v) => named(clause).includes(v));
-  return clause.op === '=' || clause.op === 'in' ? listed : clause.op === 'exists' ? value !== undefined : !listed;
+  const former = value === undefined ? undefined : formerOf({ reason: value, on: on.on, via: on.via } as Codes, involvedOf(line).kind);
+  const listed = [value, former].some((v) => v !== undefined && named(clause).includes(v));
+  return clause.op === '=' || clause.op === 'in' ? listed : !listed;
 }
 
 /**

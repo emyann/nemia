@@ -44,7 +44,7 @@ stand on.
 
 To measure what a finding turns on, such as the errors a compiler flag would raise, run the compiler and the linter with any options
 that write nothing, each bare and one command per call, `--noEmit` first:
-`npx tsc --noEmit -p packages/agent-runtime --noUncheckedIndexedAccess`, `npx oxlint -D no-unused-vars packages/agent-runtime/src`.
+`npx tsc --noEmit -p packages/agent-orchestrator --noUncheckedIndexedAccess`, `npx oxlint -D no-unused-vars packages/agent-orchestrator/src`.
 Your fence refuses what would write or watch: a `tsc` whose first option is not `--noEmit`, and its `--build`, `--incremental`,
 `--init`, `--tsBuildInfoFile`, `--generateTrace`, `--generateCpuProfile` and `--watch`, an option set `false` and a file of options
 (`@<file>`); `oxlint`'s `--fix`, `--init`, `--lsp`, and a `-c` or `--config`, whose script would run. `tsc` reads an option's name in

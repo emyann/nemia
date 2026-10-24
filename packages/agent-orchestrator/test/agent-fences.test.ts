@@ -2646,7 +2646,7 @@ const OXLINT_ALLOW = 'Bash(npx oxlint:*)';
 /** The compiler and the linter run to measure, with options that write nothing: what design and review may run. */
 const MEASURES: Call[] = [
   'npx tsc --noEmit',
-  'npx tsc --noEmit -p packages/agent-runtime --noUncheckedIndexedAccess',
+  'npx tsc --noEmit -p packages/agent-orchestrator --noUncheckedIndexedAccess',
   'npx tsc --noEmit -p apps/web --exactOptionalPropertyTypes --isolatedDeclarations --target es2024',
   'npx tsc --noEmit --project apps/api --strict --listFilesOnly',
   'timeout 300 npx tsc --noEmit -p packages/agent-orchestrator',

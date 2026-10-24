@@ -170,7 +170,12 @@ const engineOf = (
   };
   const e = promised({ tick: () => state.tick(), admit: async () => [] });
   return Object.defineProperties(e, {
-    passes: { get: () => state.passes, set: (n: number) => void (state.passes = n) },
+    passes: {
+      get: () => state.passes,
+      set: (n: number) => {
+        state.passes = n;
+      },
+    },
     setTick: { value: (tick: () => Promise<TickReport>) => void (state.tick = tick) },
   }) as Engine & { passes: number; setTick: (tick: () => Promise<TickReport>) => void };
 };

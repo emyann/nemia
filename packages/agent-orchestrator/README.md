@@ -13,7 +13,7 @@ wf plan ./plans/flag --repo ~/code/myapp               # a folder of cards: a ru
 wf start ./plans/flag/d.md --repo ~/code/myapp --after r-b --after r-c   # one card by hand: its body is the brief
 wf inbox add "Cache the views between passes" --repo ~/code/myapp   # park an idea as a card, to start later
 wf inbox                                               # the cards parked, name and first line each
-wf start ~/.agent-workflows/inbox/cache-the-views-between-pass-k2q9.md --workflows dev   # start one: it leaves the inbox
+wf start ~/.agent-workflows/inbox/cache-the-views-between-pass-k2q9.md --workflows dev   # start one: it stays, listed as started
 wf inbox rm cache-the-views-between-pass-k2q9          # or drop one unstarted
 wf up                # the daemon on a machine with no board; npm start in apps/api is the daemon that serves one
 wf ls
@@ -2754,7 +2754,7 @@ start one: wf start /home/me/.agent-workflows/inbox/<name>.md [--workflows <w>] 
 $ wf start ~/.agent-workflows/inbox/show-what-a-step-cost-on-the-c3cw.md --repo ~/code/myapp --workflows dev \
     --brief "Show each step's cost beside its status on the run page, in dollars."
 show-each-step-s-cost-beside-42g6  2 step(s): implement → review
-from inbox card show-what-a-step-cost-on-the-c3cw — removed from the inbox
+from inbox card show-what-a-step-cost-on-the-c3cw — kept in the inbox, listed as started
 workspace: /home/me/code/myapp
 run 'wf tick' (or 'wf up') to start it
 ```
@@ -2810,10 +2810,14 @@ run 'wf tick' (or 'wf up') to start it
   - the repository is `--repo`, else the card's `repo:`, else the factory's one repository, else `.` — chosen before the card's
     `workflow:` is found in it;
   - `--after`, `--from`, `--input` and `--no-worktree` are `wf start`'s, as for any brief; `--from` adds to the card's `from:`.
-- **The record is written first, then the card is removed.** The record carries `from: { inbox: <name> }`, and `wf decide`
-  prints `from inbox card <name>` under the run's line. A removal that fails leaves a card `wf inbox` lists as
-  `started as <runId>` — never a run with no trace of its card — and `wf start` refuses that card, naming its run, until
-  `wf inbox rm` drops it. A plan's card started with `wf start` is never removed.
+- **The card is kept: it has a life of its own.** The record carries `from: { inbox: <name> }`, and `wf decide` prints
+  `from inbox card <name>` under the run's line. The card stays in the inbox, and `wf inbox` lists it as `started as <runId>`.
+  Its state is one closed word, `CardState` — `filed`, `queued`, `refused` (queued, and its start as it stands refused) or
+  `started` — computed once by the listing (`cardState`) from its file, the records that name it and the tick's tries, and sent
+  on the wire as is: the board reads it and never rebuilds it. A card is started once: `wf start` and `wf inbox queue` refuse a
+  started card, naming its run; to run the idea again, file it again. A queued card's `queued:` line is taken off at its start,
+  so the tick never starts it again, even once its run is forgotten (it then reads `filed`, and a person may start it).
+  `wf inbox rm` drops a card. A plan's card started with `wf start` stays where it is too.
 - **Refused by name**, exit 2, with the fix, before anything is written:
   - a key an inbox card does not have, `after:` among them, with where what it waits on is said instead: for a file
     `wf inbox add` is given, delete the line, file the idea, and give `--after` when starting the card;
@@ -3231,11 +3235,12 @@ up — every 4000ms, ^C to stop
   (`queueRepo`). Its base is its base branch as it is at that
   moment, and its brief is frozen then. One card a pass: its run has nothing filed, and the next pass counts it against the cap
   before another card is started. `--after` stays for cards that depend on one another.
-- **Started, the card leaves the inbox** as any start removes it, and `wf up` and `wf tick` log `started <card> as <runId>`. A
-  removal that fails leaves a card `wf inbox` lists as `started as <runId>`, which neither a pass nor a person starts again.
+- **Started, the card stays in the inbox**, listed as started, its `queued:` line taken off, and `wf up` and `wf tick` log
+  `started <card> as <runId>`. A line that cannot be taken off is said on that log line; the card's record keeps it out of the
+  queue all the same (`queueOrder` leaves out a `started` card), and neither a pass nor a person starts it again.
 - **A start the package refuses is written down, not tried again.** The workflow gone, the repository gone, whatever
   `startFromInbox` refuses by name (exit 2): `wf up`'s line names it, `wf inbox` says `not started at <time>: <why>` beside
-  the card's place, and the card is left as it is. The tick keeps the refusal in `$WF_ROOT/queue/<name>.json` with the card's
+  the card's place, and the card is left as it is. The tick keeps the refusal, a `MissedStart`, in `$WF_ROOT/queue/<name>.json` with the card's
   text and the repository it was tried on, and passes over the card while both are the same: one try, no hot loop, and the card
   behind it has its turn. Edit the card, or take it back and queue it again — or, for a card whose repository neither its
   `repo:` nor its factory names, run `wf up` in another repository — and the next pass tries it again.

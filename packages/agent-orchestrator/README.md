@@ -486,8 +486,10 @@ there is refused listing the agents there are. A link in `agents/` is refused as
 workflow — the listings skip it, and a workflow named `agents` is refused by name.
 
 At `wf start` each node is resolved and frozen on the run, and resolved afresh while the run has filed nothing — a run
-waiting `--after` takes the folder as it stands at its first filing — or when a person types `nemia refresh`, which takes the newest
-revision of every kind for every filing after it. Between those a run never reads `agents/` again, from a worktree or
+waiting `--after` takes the folder as it stands at its first filing — and after that as its factory's `revisions` says: `follow`
+resolves it on every pass, so each new filing (a step, a retry, a round) takes the revisions the files hold then, with no step added or
+removed; `pinned`, the default, keeps it until a person types `nemia refresh`, which takes the newest revision of every kind for every
+filing after it. Between those a pinned run never reads `agents/` again, from a worktree or
 anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
 adds to it (*Five layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's

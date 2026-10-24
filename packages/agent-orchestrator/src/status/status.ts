@@ -307,9 +307,9 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  * **`unsigned` before any check.** A step that was asked for a closeout and gave none has not said it
  * finished, so the run does not say it for it, and does not spend a suite on work nobody signed. The
  * runtime ends a session that goes quiet, or that its harness ends `done`, without it as its harness
- * ended it, and says so — `stated: false` — and settles the task `succeeded`; this layer judges it
- * (`closeoutAsked`) and nudges it once a round (`retriesDue`). A task the runtime ended `failed` with
- * reason `unsigned` is this word too: read as `failed`, the run would be called failed rather than
+ * ended it, and says so — `closedOut: false` — and settles the task `succeeded`; this layer judges it
+ * (`closeoutAsked`) and nudges it once a round (`retriesDue`). A task an old journal ended `failed`
+ * for it, read back as `former: 'unsigned'`, is this word too: read as `failed`, the run would be called failed rather than
  * waiting on you, and a nudged try told its session broke rather than that it gave no closeout. Only
  * a `failed` task — one a person stopped is `stopped`. A task that settled `succeeded` with nothing
  * said is `unsigned` too. An unreadable closeout counts as none: the run cannot read that the work is
@@ -788,7 +788,7 @@ export const roundSpans = (steps: readonly Workflow[], rounds: readonly Round[])
  * figure, and `apiMs` and `toolMs` the time it counted waiting on the model and running tools — each read once a session has ended.
  */
 export type Consumed = {
-  turns?: number;
+  responses?: number;
   toolCalls?: number;
   inputTokens?: number;
   outputTokens?: number;
@@ -817,7 +817,7 @@ export type Consumed = {
 };
 
 const FIELDS = [
-  'turns',
+  'responses',
   'toolCalls',
   'inputTokens',
   'outputTokens',
@@ -960,7 +960,7 @@ export function usedLines(u: Consumed | undefined): string[] {
   const timed = u.apiMs !== undefined || u.toolMs !== undefined ? [took(u.apiMs, 'api'), took(u.toolMs, 'tools')] : [];
   return [
     `used  ${[
-      said(u.turns, 'turns', 'turns'),
+      said(u.responses, 'responses', 'responses'),
       said(u.toolCalls, 'tool calls', 'tool calls'),
       said(u.inputTokens, 'in', 'tokens in'),
       said(u.outputTokens, 'out', 'tokens out'),

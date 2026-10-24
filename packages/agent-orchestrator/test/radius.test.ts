@@ -290,21 +290,21 @@ test('the files in full: the heading says why, then the diff — or none, said �
 
 test('a step with no usage says used not measured, and cost never prints a number no runner measured', () => {
   assert.deepEqual(usedLines(undefined), ['used  not measured', 'cost  not measured']);
-  assert.deepEqual(usedLines({ turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000 }), [
-    'used  29 turns · 93 tool calls · 6.35M in · 112k out',
+  assert.deepEqual(usedLines({ responses: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000 }), [
+    'used  29 responses · 93 tool calls · 6.35M in · 112k out',
     'cost  not measured',
   ]);
   assert.deepEqual(
-    usedLines({ turns: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 }),
-    ['used  0 turns · 0 tool calls · 0 in · 0 out', 'cost  not measured'],
+    usedLines({ responses: 0, toolCalls: 0, inputTokens: 0, outputTokens: 0 }),
+    ['used  0 responses · 0 tool calls · 0 in · 0 out', 'cost  not measured'],
     'a measured zero is a zero',
   );
   assert.deepEqual(
     usedLines({ toolCalls: 4, inputTokens: 20_400 }),
-    ['used  turns not measured · 4 tool calls · 20.4k in · tokens out not measured', 'cost  not measured'],
-    "an unmeasured count is not one: codex's stream has no turns",
+    ['used  responses not measured · 4 tool calls · 20.4k in · tokens out not measured', 'cost  not measured'],
+    "an unmeasured count is not one: codex's stream has no responses",
   );
-  for (const u of [undefined, {}, { turns: 1, toolCalls: 1, inputTokens: 1, outputTokens: 1 }]) {
+  for (const u of [undefined, {}, { responses: 1, toolCalls: 1, inputTokens: 1, outputTokens: 1 }]) {
     assert.doesNotMatch(usedLines(u)[1], /\d/, JSON.stringify(u));
   }
   assert.equal(
@@ -317,13 +317,13 @@ test('a step with no usage says used not measured, and cost never prints a numbe
 test('attempts sum only what every one of them measured', () => {
   assert.deepEqual(
     sumUsage([
-      { turns: 3, inputTokens: 100, costUsd: 0.5 },
-      { turns: 4, inputTokens: 50 },
+      { responses: 3, inputTokens: 100, costUsd: 0.5 },
+      { responses: 4, inputTokens: 50 },
     ]),
-    { turns: 7, inputTokens: 150 },
+    { responses: 7, inputTokens: 150 },
   );
   assert.equal(
-    sumUsage([{ turns: 3, toolCalls: 2, inputTokens: 100, outputTokens: 9 }, null]),
+    sumUsage([{ responses: 3, toolCalls: 2, inputTokens: 100, outputTokens: 9 }, null]),
     undefined,
     'an attempt nobody measured leaves every count unmeasured',
   );
@@ -439,25 +439,33 @@ test('the screen reads the result branches, or — before a terminal step has on
 
 test('what a session used, with the api and tool time its harness counted — beside the counts once either is measured — and its cost to the cent, three figures under one', () => {
   assert.deepEqual(
-    usedLines({ turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000, costUsd: 3.012, apiMs: 486_000, toolMs: 2_400 }),
-    ['used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s', 'cost  $3.01'],
+    usedLines({
+      responses: 29,
+      toolCalls: 93,
+      inputTokens: 6_350_000,
+      outputTokens: 112_000,
+      costUsd: 3.012,
+      apiMs: 486_000,
+      toolMs: 2_400,
+    }),
+    ['used  29 responses · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s', 'cost  $3.01'],
   );
   assert.deepEqual(
     usedLines({ costUsd: 4.2, apiMs: 61_000 }),
     [
-      'used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured · api 1m01s · tools not measured',
+      'used  responses not measured · tool calls not measured · tokens in not measured · tokens out not measured · api 1m01s · tools not measured',
       'cost  $4.20',
     ],
     'claude-detached counts api time and cost, and nothing else',
   );
   assert.equal(
-    usedLines({ turns: 3, toolMs: 400 })[0],
-    'used  3 turns · tool calls not measured · tokens in not measured · tokens out not measured · api not measured · tools <1s',
+    usedLines({ responses: 3, toolMs: 400 })[0],
+    'used  3 responses · tool calls not measured · tokens in not measured · tokens out not measured · api not measured · tools <1s',
     'a measured moment is not 0s',
   );
   assert.equal(
-    usedLines({ turns: 3 })[0],
-    'used  3 turns · tool calls not measured · tokens in not measured · tokens out not measured',
+    usedLines({ responses: 3 })[0],
+    'used  3 responses · tool calls not measured · tokens in not measured · tokens out not measured',
     'nothing timed it: said as before',
   );
   assert.deepEqual(
@@ -493,7 +501,7 @@ test('what a session read, by price: its classes add up, its peak is the largest
 
   assert.equal(readWords(sumUsage([a, b])), 'read 21.4M · wrote 400k · peak 167k');
   assert.equal(
-    readWords({ turns: 3, inputTokens: 1_000, outputTokens: 20, costUsd: 1 }),
+    readWords({ responses: 3, inputTokens: 1_000, outputTokens: 20, costUsd: 1 }),
     '',
     'a journal from before the classes: nothing, not 0',
   );
@@ -504,7 +512,7 @@ test('what a session read, by price: its classes add up, its peak is the largest
     'claude -p and codex: classes, no peak',
   );
   assert.deepEqual(usedLines({ costUsd: 4.87, ...a }), [
-    'used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured',
+    'used  responses not measured · tool calls not measured · tokens in not measured · tokens out not measured',
     'cost  $4.87 · read 20M · wrote 300k · peak 150k',
   ]);
 });
@@ -529,7 +537,7 @@ test("a peak is marked where it reached a step's context: cap, or passed 200k wi
   assert.equal(readWords({ peakContextTokens: 150_000, compactions: 1 }), 'peak 150k, compacted');
   assert.equal(readWords({ compactions: 1 }, 100_000), 'compacted at its 100k cap');
   assert.equal(sumUsage([{ compactions: 2 }, {}, { compactions: 1 }])!.compactions, 3, 'none seen is none: added where there were some');
-  assert.equal('compactions' in sumUsage([{ turns: 1 }, { turns: 2 }])!, false);
+  assert.equal('compactions' in sumUsage([{ responses: 1 }, { responses: 2 }])!, false);
   assert.equal(peakMark({ peakContextTokens: 440_000 }, 500_000), null, 'under a larger cap, past 200k is what was asked for');
   assert.equal(peakMark({ peakContextTokens: 200_001 }, undefined), 'large');
   assert.equal(peakMark({ peakContextTokens: 200_000 }, undefined), null);

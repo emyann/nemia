@@ -152,7 +152,7 @@ What it leaves:
   have*, below: the engine's `mcp` adds servers beside `.mcp.json`, and cannot take that file's servers away.
 - **Codex steps do not have it.** Codex reads no `.mcp.json`. The engine hands a task's `mcp` to Codex as
   one `-c mcp_servers=…` override, so a Codex browser waits on the same `mcp:` key.
-- **Two browser builds.** No `@playwright/mcp` release pins the e2e's playwright 1.62.1 (Chromium 1234),
+- **Two browser builds.** No `@playwright/mcp` release pins the e2e's playwright 1.64.1 (Chromium 1248),
   so 0.0.80 brings its own 1.63.0 alpha (Chromium 1243). Each is installed once per machine; CLAUDE.md
   gives both commands.
 

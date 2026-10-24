@@ -14,7 +14,7 @@
  *   runs, so a new agent is refused with no edit here. Refused in every package's `src`. A name that is plain English (`PLAIN_NAMES`)
  *   counts only as a quoted literal or a path segment.
  *
- * A word is matched whole and in any case, comments included (`wordsIn`): a hyphen or a dot ends it, so `claude-detached` and
+ * A word is matched whole and in any case, comments included (`wordsIn`): a hyphen or a dot ends it, so `claude-code` and
  * `CLAUDE.md` say it, and a longer name (`claudeArgs`, `$claude`) does not. Tests, the board's vendored components and its generated
  * route tree are not read.
  *
@@ -179,8 +179,8 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/artifacts/artifacts.store.ts': { count: 2, card: 'slice-2' },
   'packages/agent-orchestrator/src/artifacts/artifacts.ts': { count: 3, card: 'slice-2' },
   'packages/agent-orchestrator/src/branches/branches.ts': { count: 4, ...MOVES.checkout },
-  'packages/agent-orchestrator/src/cap/cap.ts': { count: 6, card: 'slice-3' },
-  'packages/agent-orchestrator/src/cli/flags.ts': { count: 9, card: 'slice-4' },
+  'packages/agent-orchestrator/src/cap/cap.ts': { count: 4, card: 'slice-3' },
+  'packages/agent-orchestrator/src/cli/flags.ts': { count: 7, card: 'slice-4' },
   'packages/agent-orchestrator/src/closeout/closeout.ts': { count: 5, ...MOVES.render },
   'packages/agent-orchestrator/src/daemon/daemon.store.ts': { count: 1, card: 'slice-3' },
   'packages/agent-orchestrator/src/decide/decide.verb.ts': { count: 4, ...MOVES.wait },
@@ -188,31 +188,31 @@ const HARNESS_WORDS: Baseline = {
   'packages/agent-orchestrator/src/folder/folder.store.ts': { count: 2, ...MOVES.knobs },
   'packages/agent-orchestrator/src/folder/write.store.ts': { count: 4, ...MOVES.knobs },
   'packages/agent-orchestrator/src/former/former.ts': { count: 32, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/harness/harness.ts': { count: 9, ...MOVES.defaults },
+  'packages/agent-orchestrator/src/harness/harness.ts': { count: 6, ...MOVES.defaults },
   'packages/agent-orchestrator/src/keys/filed-as.ts': { count: 1, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/keys/keys.ts': { count: 39, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/keys/keys.ts': { count: 35, ...MOVES.knobs },
   'packages/agent-orchestrator/src/keys/tools.ts': { count: 15, ...MOVES.knobs },
   'packages/agent-orchestrator/src/list/list.ts': { count: 9, ...MOVES.wait },
   'packages/agent-orchestrator/src/record/places.store.ts': { count: 1, card: 'slice-2' },
   'packages/agent-orchestrator/src/record/record.store.ts': { count: 2, ...MOVES.wait },
   'packages/agent-orchestrator/src/record/record.ts': { count: 1, card: 'u42s' },
   'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/try/try.ts': { count: 15, ...MOVES.reach },
+  'packages/agent-orchestrator/src/try/try.ts': { count: 13, ...MOVES.reach },
   'packages/agent-orchestrator/src/try/try.verb.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/yours/yours.ts': { count: 1, ...MOVES.checkout },
   'packages/agent-orchestrator/src/runner.ts': { count: 1, ...MOVES.wait },
-  'packages/agent-orchestrator/src/runtime-client.ts': { count: 7, ...MOVES.defaults },
+  'packages/agent-orchestrator/src/runtime-client.ts': { count: 5, ...MOVES.defaults },
   'packages/agent-orchestrator/src/skills/read.store.ts': { count: 9, ...MOVES.checkout },
   'packages/agent-orchestrator/src/skills/skills.ts': { count: 11, ...MOVES.render },
-  'packages/agent-orchestrator/src/stats/discipline.ts': { count: 10, card: 'u42s' },
-  'packages/agent-orchestrator/src/status/status.ts': { count: 11, card: 'u42s' },
-  'packages/agent-orchestrator/src/step/step.ts': { count: 78, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/stats/discipline.ts': { count: 6, card: 'u42s' },
+  'packages/agent-orchestrator/src/status/status.ts': { count: 8, card: 'u42s' },
+  'packages/agent-orchestrator/src/step/step.ts': { count: 59, ...MOVES.knobs },
   'packages/agent-orchestrator/src/tick/told.verb.ts': { count: 15, ...MOVES.render },
   'packages/agent-orchestrator/src/views/views.verb.ts': { count: 2, ...MOVES.wait },
   'packages/agent-orchestrator/src/workflow.ts': { count: 1, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workflow/fence.ts': { count: 1, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workflow/step-file.ts': { count: 13, ...MOVES.knobs },
-  'packages/agent-orchestrator/src/workflow/validate.ts': { count: 22, ...MOVES.knobs },
+  'packages/agent-orchestrator/src/workflow/validate.ts': { count: 3, ...MOVES.knobs },
   'packages/agent-orchestrator/src/workspace/workspace.ts': { count: 3, card: 'slice-2' },
 };
 

@@ -45,12 +45,11 @@ export const approvalOf = (run: Run, step: string): Approval | undefined =>
   run.approvals?.find((a) => a.step === step && a.try === tryOf(run, step));
 
 /**
- * Whether a step's sessions are filed held open (the runtime's `holdOpen`): a Claude Code job — `claude`, without `background: true`, the
- * one harness the runtime's held task is proven on (agent-runtime's open issue 28). A codex step, a `claude-detached` one and a
- * background session are filed to settle when they sign, and a person's word to them is a try of its own. Never a check.
+ * Whether a step's sessions are filed held open (the runtime's `holdOpen`): a Claude Code job — `claude`, the one harness the runtime's
+ * held task is proven on (agent-runtime's open issue 28). A codex step is filed to settle when it signs, and a person's word to it is a
+ * try of its own. Never a check.
  */
-export const holdsOpenOn = (step: Pick<Workflow, 'harness' | 'background'>): boolean =>
-  (step.harness ?? 'claude') === 'claude' && !step.background;
+export const holdsOpenOn = (step: Pick<Workflow, 'harness'>): boolean => (step.harness ?? 'claude') === 'claude';
 
 /**
  * The approvals a later try of their step has spent: each names a try the step is past. The tick consumes these, as it does a spent ask.
@@ -513,8 +512,7 @@ const unaccepted = (step: Workflow, run: Run, steps: readonly Workflow[], said: 
 /**
  * What sessions cost, as the engine measured them: the dollars of the attempts that ended with a cost on them, how many did (`measured`),
  * and how many ended with none (`unmeasured`) — killed before its harness wrote one, or on a model it could not price. An attempt still
- * running is in neither: a `claude --bg` session writes its cost only as its process exits, and a job as it prints its result
- * (agent-runtime's open issue 18).
+ * running is in neither: a job writes its cost as it prints its result (agent-runtime's open issue 18).
  */
 export type Spend = { usd: number; measured: number; unmeasured: number };
 
@@ -607,7 +605,7 @@ export const spentWord = (s: Spend): string => `${s.unmeasured ? '≥' : ''}${do
  * The `budgetUsd` a step is filed with: what is left of the cap in force once its tries' cost is taken off, so the harness holds the tries
  * together to the cap, and not each session to a whole cap of its own. A resume is charged its own spend (agent-runtime's open issue 28,
  * M2), and a cap caps a resume's own spend (M5), so the remainder is what the next try may spend. Which harness keeps a cap is the
- * runtime's to judge: it refuses one on codex and on a background session, at `nemia start` and `nemia retry` (`configRefusal`).
+ * runtime's to judge: it refuses one on codex, at `nemia start` and `nemia retry` (`configRefusal`).
  *
  * To the millionth of a dollar, rounded up, so the harness is handed digits and never `0`, which the engine refuses: a step with nothing
  * left is `over budget`, and filed nothing (`overBudget`). The engine starts no attempt again on its own, so each try is handed what is
@@ -946,7 +944,7 @@ export function durationWord(ms: number): string {
  * that means "nobody counted" reads as "cost nothing". Cost prints a number only where the engine measured
  * one: the harness's own figure, read once a session has ended (agent-runtime's README, *What an attempt consumed*).
  * The api and tool time go beside the counts once either was measured, and each says not measured where the
- * other was — `claude-detached` counts api time and no tool time — and neither is said where nothing timed it. A measured time under a
+ * other was, and neither is said where nothing timed it. A measured time under a
  * second reads `<1s`, never `0s`.
  */
 export function usedLines(u: Consumed | undefined): string[] {

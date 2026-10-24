@@ -5,6 +5,12 @@ the tests run the machinery on `test/fixtures/team/`. The sections below that na
 kept as they were written. So is a record's path to a file since removed with what it held; a record whose subject moved keeps the
 old path with "(now …)" beside it, and a line that says how things are now names today's file.
 
+Since 2026-10-24 every Claude Code session runs on the Agent SDK: a step's and an agent's `background:` and the harness
+`claude-detached` are gone, each refused at load by name with its fix — delete the line, and the step runs as a job on the Agent SDK
+(`REFUSED` in `src/step/step.ts`, `harnessOf` in `src/keys/keys.ts`). `remote:` stays, on any `claude` step; a run frozen with
+`background:` still reads (`FrozenStepSchema`); Nemia is long-lived by `restartPolicy: 'Always'` alone. The sections below that name
+`background:`, `--bg`, `claude -p` or `claude-detached` are records of what shipped then.
+
 The features agent-orchestrator is still missing, in the order I would take them. Each says what exists
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-runtime/docs/open-issues.md](../../agent-runtime/docs/open-issues.md).

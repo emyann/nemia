@@ -226,11 +226,11 @@ test("a workflow's README and its files that are no .md or .yaml are carried wit
 test('a key a template has no place for is refused by name, and nothing is written', () => {
   const repo = repoWithTeam();
   const review = path.join(repo, 'workflows', 'dev', 'review.md');
-  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 20', 'budget: 20\nbackground: true\nslot: night'));
+  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 20', 'budget: 20\nremote: true\nslot: night'));
   const dir = target();
   assert.throws(
     () => exportTemplate({ dir, from: repo }),
-    refusedWith('Invalid', 'review.md: `background:` has no place', 'review.md: `slot:` has no place'),
+    refusedWith('Invalid', 'review.md: `remote:` has no place', 'review.md: `slot:` has no place'),
   );
   assert.equal(fs.existsSync(dir), false);
   assert.deepEqual(fs.readdirSync(path.dirname(dir)), [], 'no staging folder is left beside it');

@@ -137,9 +137,7 @@ test('holdsOpenOn', async (t) => {
   for (const [row, given, expected] of [
     ['the default harness, claude', {}, true],
     ['claude', { harness: 'claude' }, true],
-    ['REFUSED a background session', { harness: 'claude', background: true }, false],
     ['REFUSED a codex step', { harness: 'codex' }, false],
-    ['REFUSED a claude-detached step', { harness: 'claude-detached' }, false],
   ] as Array<[string, Parameters<typeof holdsOpenOn>[0], boolean]>) {
     await t.test(row, () => assert.equal(holdsOpenOn(given), expected));
   }

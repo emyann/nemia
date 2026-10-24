@@ -69,7 +69,7 @@ function toDecideOf(run: Run, t: ToDecide | undefined, steps: readonly Workflow[
 /**
  * What sessions cost, as the package adds it up off the engine's `usage.costUsd` (`Spend`: `stepSpend`, `runSpend`): the dollars of the
  * attempts that ended with a cost on them, how many did (`measured`), and how many ended with none (`unmeasured`) — a session's cost is
- * known only once it ends, a job's with its result and a background session's with its attempt, and one killed first, or on a
+ * known only once it ends, a job's with its result, and one killed first, or on a
  * model its harness could not price, has none. An attempt still running is in neither. `said` is the package's word for it (`spentWord`):
  * `$4.20`, and `≥$4.20` where an ended attempt has no cost on it, so a part never reads as the whole. Null wherever no attempt was
  * measured: a cost nobody measured is not $0.
@@ -139,7 +139,7 @@ export type RunHolding = {
  * `denied` is what the harness denied the step's current try, off the engine's record of each ended attempt (`deniedOf`, the same views):
  * `calls`, each as a permission rule names it (`Skill(look)`, `Bash(pytest)`), once each in the order first denied, and `words`, the line
  * `nemia ls` and `nemia decide` say (`deniedWords`: five named, the rest counted). Beside the status, never in it: the status is the word
- * the board's chip compares. Null for a step denied nothing — and for one whose harness cannot say, as a `background: true` session cannot.
+ * the board's chip compares. Null for a step denied nothing — and for one whose harness cannot say.
  *
  * `sessionUnread` is why the runtime could not read the step's session alone, in its words (`unreadOf`, off its view): the step is
  * neither working nor gone, and its status says nothing of it. Null for a step whose session was read — on the first request whose look

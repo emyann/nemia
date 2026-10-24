@@ -664,9 +664,7 @@ test("a step's session is given its plugin's copies of its skills and no other, 
     ['none for an agent rendered with no skill', resolved('---\n---\nYou build.\n', files), []],
     ['none for a step whose rendered folder is gone: its brief tells them whole', unrendered(step), []],
     ["none for a step that continues another's session", { ...step, resume: 'before' }, []],
-    ["the harness's own for a background session, which no closed list reaches", { ...step, background: true }, 'default'],
-    ["the harness's own on a harness besides the default", { ...step, harness: 'claude-detached' }, 'default'],
-    ['and on codex', { ...step, harness: 'codex' }, 'default'],
+    ["the harness's own on a harness besides the default, codex", { ...step, harness: 'codex' }, 'default'],
   ];
   for (const [name, given, skills] of rows) await t.test(name, () => assert.deepEqual(enabledSkillsOf(given), skills));
 });

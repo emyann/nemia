@@ -52,8 +52,8 @@ export const answersIn = (view: TaskView | undefined): number => (view?.state.ho
 
 /**
  * The engine a pass's `advance` reads, whose `view` of a task the runtime's pass reported is that report's (`TickReport.views`): a view
- * built off the pass's one observation, where `e.view` would observe the task's harness again — a `claude agents` call for a background
- * session, on every pass, for every step in flight.
+ * built off the pass's one observation, where `e.view` would observe the task's harness again, on every pass, for every step in
+ * flight.
  *
  * A task the report does not carry is read with `e.view`, and that asks no harness in the common case. The report carries every task the
  * runtime's pass left unsettled, so what it lacks is a task settled — read off its record, and found by name where its record lacks its
@@ -327,8 +327,8 @@ export const bridgeOf =
 /**
  * What a task's sessions were denied, off views already read: every call the harness refused on an attempt, a running one's so far, as
  * a permission rule names it (`denialText`: `Skill(look)`, `Bash(pytest)`), each text once, in the order first denied. Empty for a task
- * nobody read, one whose attempts denied nothing, and one whose harness cannot say — a `background: true` session records none (the
- * runtime's `Attempt.denials`) — so an empty list is not a claim that nothing was denied. Costs no observation of its own: the denials
+ * nobody read, one whose attempts denied nothing, and one whose harness cannot say — a codex session records none (the runtime's
+ * `Attempt.denials`) — so an empty list is not a claim that nothing was denied. Costs no observation of its own: the denials
  * are on the engine's journal.
  *
  * Every attempt of the task, not only its last: an attempt the engine started again within one filing is the same try, and what the first

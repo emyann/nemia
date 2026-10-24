@@ -18,15 +18,14 @@
  * every shipped step given the `look` skill names `playwright`, itself or by its agent.
  *
  * The last test runs against the real harness — skipped unless `AE_LIVE=1`, because it spends money. It files a task at shipped defaults:
- * the engine's built-in harnesses, `claude` first, asked for a background session, with no `mcp` on the task, so the only servers it can
- * have are the ones the checkout's `.mcp.json` names. A settled session stays in the harness's registry, so the test stops and removes
- * its own after, as far as `claude` lets it.
+ * the engine's built-in harnesses, `claude` first, a job on the Agent SDK, with no `mcp` on the task, so the only servers it can have
+ * are the ones the checkout's `.mcp.json` names.
  *
  *   AE_LIVE=1 node --test test/mcp-config.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { TaskView } from 'agent-runtime';
@@ -412,8 +411,8 @@ test("a session of an agent that names one of its checkout's servers is started 
 });
 
 /**
- * The one MCP config named on `args`, parsed: the Agent SDK hands a job's servers inline, as the JSON of the config itself, where a
- * `claude -p` command line named a file; both are read, so this says what the session loads on either road.
+ * The one MCP config named on `args`, parsed: the Agent SDK hands a job's servers inline, as the JSON of the config itself, and a file
+ * named there is read as well, so this says what the session loads whichever it is given.
  */
 const loadedConfig = (args: string[]): { mcpServers: Record<string, unknown> } => {
   const configs = mcpConfigsOf(args);
@@ -472,7 +471,7 @@ const CLOSEOUT = {
 };
 
 test(
-  "a --bg task filed in this repository has Playwright's browser_navigate and none of the operator's servers",
+  "a job filed in this repository has Playwright's browser_navigate and none of the operator's servers",
   {
     skip: live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)',
     timeout: 12 * 60_000,
@@ -485,38 +484,29 @@ test(
         cwd: REPO,
         closeoutSchema: CLOSEOUT,
         deadlineSeconds: 480,
-        config: { effort: 'low', background: true },
+        config: { effort: 'low' },
       }),
     );
     let view: TaskView | undefined;
-    try {
-      await until(
-        t,
-        async () => {
-          await Effect.runPromise(engine.tick());
-          view = await Effect.runPromise(engine.view(id));
-          return view.state.settled;
-        },
-        `${id} settled on Claude Code`,
-        { everyMs: 5_000 },
-      );
-      assert.equal(view?.state.settled, 'succeeded', `settled: ${view?.phase}`);
-      const said = view.state.attempts.at(-1)?.closeout as { mcpServers?: string[]; mcpTools?: string[] } | undefined;
-      assert.deepEqual(said?.mcpServers, ['playwright'], `the repository's server and only that; it said ${JSON.stringify(said)}`);
-      assert.ok(said?.mcpTools?.includes('mcp__playwright__browser_navigate'), `the browser's tools; it said ${JSON.stringify(said)}`);
-      assert.deepEqual(
-        said?.mcpTools?.filter((t) => !t.startsWith('mcp__playwright__')),
-        [],
-        "no tool from any of the operator's servers",
-      );
-    } finally {
-      const short = view?.sessionId?.split('-')[0];
-      for (const verb of short ? ['stop', 'rm'] : []) {
-        try {
-          execFileSync('claude', [verb, short!], { stdio: 'ignore', timeout: 30_000 });
-        } catch {}
-      }
-    }
+    await until(
+      t,
+      async () => {
+        await Effect.runPromise(engine.tick());
+        view = await Effect.runPromise(engine.view(id));
+        return view.state.settled;
+      },
+      `${id} settled on Claude Code`,
+      { everyMs: 5_000 },
+    );
+    assert.equal(view?.state.settled, 'succeeded', `settled: ${view?.phase}`);
+    const said = view.state.attempts.at(-1)?.closeout as { mcpServers?: string[]; mcpTools?: string[] } | undefined;
+    assert.deepEqual(said?.mcpServers, ['playwright'], `the repository's server and only that; it said ${JSON.stringify(said)}`);
+    assert.ok(said?.mcpTools?.includes('mcp__playwright__browser_navigate'), `the browser's tools; it said ${JSON.stringify(said)}`);
+    assert.deepEqual(
+      said?.mcpTools?.filter((t) => !t.startsWith('mcp__playwright__')),
+      [],
+      "no tool from any of the operator's servers",
+    );
   },
 );
 

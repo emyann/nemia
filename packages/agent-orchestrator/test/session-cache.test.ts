@@ -7,8 +7,8 @@
  *
  * And its context window (`contextTokens`), which is not part of the cached prompt — a resume given another window, or none, reads the
  * whole prompt from the cache (agent-runtime open issue 26) — but which a resumed session keeps only when it is given it again: Claude
- * Code's copy of a `--bg` session keeps the flags it was started with and no others, so a continuation filed without the window runs on the
- * model's whole window, and one filed with another compacts where the session it continues did not.
+ * Code's copy of a resumed session keeps the flags it was started with and no others, so a continuation filed without the window runs on
+ * the model's whole window, and one filed with another compacts where the session it continues did not.
  *
  * Walked at shipped defaults, over the tests' team's `dev` (`team.ts`), whose review loops back to implement: a first try, a nudge, an
  * answer to a blocked step (`nemia retry --message`), a round 2 and a round 3 — and over a folder whose loop's target declares an `output:`

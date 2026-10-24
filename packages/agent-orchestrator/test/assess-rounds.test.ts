@@ -931,8 +931,8 @@ test('a step blocked under its cap takes a `--budget` above it, not past its cap
 });
 
 test('a step its harness ended at its budget reads budget exhausted, with the amounts', async (t) => {
-  const DETACHED: Workflow[] = [
-    { ...step('implement'), harness: 'claude-detached', check: 'npm test', retries: 2, budget: 3 },
+  const CAPPED: Workflow[] = [
+    { ...step('implement'), harness: 'claude', check: 'npm test', retries: 2, budget: 3 },
     step('review', ['implement']),
   ];
   const r = run({ implement: 't1', review: null });
@@ -940,25 +940,25 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
   const ended = spends({ t1: 3.02 }, ['t1']);
   const nothingSaid = () => undefined;
   await t.test("the harness's cut, failed or done; read with nothing measured, failed; stopped by a person, stopped", () => {
-    assert.equal(stepStatus(DETACHED[0], r, p, nothingSaid, asked, DETACHED, ended), 'budget exhausted');
-    assert.equal(stepStatus(DETACHED[0], r, p, nothingSaid, asked, DETACHED), 'failed');
-    assert.equal(stepStatus(DETACHED[0], r, phases({ t1: 'succeeded' }), nothingSaid, asked, DETACHED, ended), 'budget exhausted');
-    assert.equal(ownStatus(DETACHED[0], r, phases({ t1: 'stopped' }), nothingSaid, asked, DETACHED, ended), 'stopped');
+    assert.equal(stepStatus(CAPPED[0], r, p, nothingSaid, asked, CAPPED, ended), 'budget exhausted');
+    assert.equal(stepStatus(CAPPED[0], r, p, nothingSaid, asked, CAPPED), 'failed');
+    assert.equal(stepStatus(CAPPED[0], r, phases({ t1: 'succeeded' }), nothingSaid, asked, CAPPED, ended), 'budget exhausted');
+    assert.equal(ownStatus(CAPPED[0], r, phases({ t1: 'stopped' }), nothingSaid, asked, CAPPED, ended), 'stopped');
   });
   await t.test('never tried by `retries:`, waited on by a person, offered `--budget`', () => {
-    const a = assessed(DETACHED, r, p, nothingSaid, { spent: ended });
+    const a = assessed(CAPPED, r, p, nothingSaid, { spent: ended });
     assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'blocked']);
-    const l = listed(DETACHED, r, shown({ t1: 'failed' }), signedOff({}), { spent: ended });
+    const l = listed(CAPPED, r, shown({ t1: 'failed' }), signedOff({}), { spent: ended });
     assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['budget exhausted $3.02 of $3', ['implement']]);
-    const d = decided(DETACHED, r, p, nothingSaid, { spent: ended });
+    const d = decided(CAPPED, r, p, nothingSaid, { spent: ended });
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.budgetExhausted, d.failed], ['blocked', ['implement'], []]);
-    assert.deepEqual(retryLines(DETACHED, r, d, p, nothingSaid, asked, ended), [
+    assert.deepEqual(retryLines(CAPPED, r, d, p, nothingSaid, asked, ended), [
       'implement: budget exhausted, $3.02 of $3. Raise its cap above $3.02 and continue its session:  nemia retry r-1 implement --budget <amount>  (--fresh, or --model <m>, for a new session; retries: 2, 0 spent)',
     ]);
   });
   await t.test('retryable: the raise it needs; none with no `budget:`', () => {
     assert.deepEqual(
-      retryable(DETACHED[0], r, p, nothingSaid, asked, DETACHED, () => false, ended),
+      retryable(CAPPED[0], r, p, nothingSaid, asked, CAPPED, () => false, ended),
       {
         status: 'budget exhausted',
         modes: ['nudge', 'fresh'],
@@ -974,7 +974,7 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
   });
   const refusal = (how: RetryHow, of: SpendOf = ended) =>
     retryRefusal(
-      DETACHED,
+      CAPPED,
       r,
       'implement',
       how,
@@ -1011,7 +1011,7 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
     );
     assert.equal(refusal({ mode: 'fresh', budget: 5 }, unmeasured), null);
     assert.equal(
-      listed(DETACHED, r, shown({ t1: 'failed' }), signedOff({}), { spent: unmeasured }).steps[0].status,
+      listed(CAPPED, r, shown({ t1: 'failed' }), signedOff({}), { spent: unmeasured }).steps[0].status,
       'budget exhausted at $3',
     );
   });

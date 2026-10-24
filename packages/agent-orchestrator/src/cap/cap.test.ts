@@ -168,7 +168,7 @@ test('`slotWord`: a run the cap holds, with the count in flight', () => {
 test('`ceilingLines`: sessions at work per pool, and runs in flight — `no cap` when none', async (t) => {
   await t.test('no cap on runs', () =>
     assert.deepEqual(ceilingLines({ sessions: 4, runs: 0 }), [
-      'sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
+      'sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
       'runs in flight: no cap (WF_MAX_RUNS)',
     ]),
   );

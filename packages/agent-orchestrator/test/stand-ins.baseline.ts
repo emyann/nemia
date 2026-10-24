@@ -72,7 +72,6 @@ export const REAL_REACH: Baseline = {
   'packages/agent-orchestrator/test/local-paths.test.ts': ['git', 'process'],
   'packages/agent-orchestrator/test/mcp-config.test.ts': ['process', 'engine'],
   'packages/agent-orchestrator/test/names.test.ts': ['git', 'process'],
-  'packages/agent-orchestrator/test/nemia-told.test.ts': ['process', 'engine'],
   'packages/agent-orchestrator/test/observe.test.ts': ['engine'],
   'packages/agent-orchestrator/test/others.test.ts': ['git', 'process'],
   'packages/agent-orchestrator/test/pictures.test.ts': ['git', 'process'],

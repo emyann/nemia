@@ -308,7 +308,6 @@ const frozenStepFields = {
   disallowedTools: Schema.optionalKey(Strings),
   allowedTools: Schema.optionalKey(Strings),
   denials: Schema.optionalKey(Schema.Literal('fail')),
-  background: Schema.optionalKey(Schema.Boolean),
   remote: Schema.optionalKey(Schema.Boolean),
   deadlineSeconds: Schema.optionalKey(Schema.Finite),
   budget: Schema.optionalKey(Schema.Finite),
@@ -336,9 +335,20 @@ const frozenStepFields = {
 const formerStepFields = { disallow: frozenStepFields.disallowedTools, allow: frozenStepFields.allowedTools };
 
 /**
- * A step as the run froze it at `nemia start`: the parser's output (`Workflow`), each key of `STEP_KEYS`, and each under its former name
- * (`FORMER_KEYS`), checked for the type the parser gives it. It checks the shape, not the vocabulary: a harness, a model or a mode is any
- * text, a count any number, judged when the step is filed, so a word retired since the run started does not lose the run. Every key it
- * does not name is kept, as a record a newer `nemia` wrote keeps it. Read under the names its keys have now by `asNamed`.
+ * A field of each key a step no longer has, still read off a run frozen with it, as it was typed: `background`, which ran a step's sessions
+ * as background sessions before every session ran on the Agent SDK. Kept, and read only by the stats (`deniesRecorded`), which count no
+ * denial of such a session: the step is filed as a job.
  */
-export const FrozenStepSchema = Schema.StructWithRest(Schema.Struct({ ...frozenStepFields, ...formerStepFields }), Rest);
+const retiredStepFields = { background: Schema.optionalKey(Schema.Boolean) };
+
+/**
+ * A step as the run froze it at `nemia start`: the parser's output (`Workflow`), each key of `STEP_KEYS`, each under its former name
+ * (`FORMER_KEYS`), and each key retired since (`retiredStepFields`), checked for the type the parser gives it. It checks the shape, not
+ * the vocabulary: a harness, a model or a mode is any text, a count any number, judged when the step is filed, so a word retired since
+ * the run started does not lose the run. Every key it does not name is kept, as a record a newer `nemia` wrote keeps it. Read under the
+ * names its keys have now by `asNamed`.
+ */
+export const FrozenStepSchema = Schema.StructWithRest(
+  Schema.Struct({ ...frozenStepFields, ...formerStepFields, ...retiredStepFields }),
+  Rest,
+);

@@ -344,7 +344,7 @@ test('a place whose report is not heard: `nemia decide` says what the run change
 });
 
 test("`nemia decide` and `nemia ls` say nothing of a run's momentum, its admission or a step's Remote Control: the same screens, line for line, whether the engine's record carries the admission and the `claude.remoteControl` the run's filings were made with or not", async (t) => {
-  const { run, e, carries, filed } = await awaiting('background: true\nremote: true\n');
+  const { run, e, carries, filed } = await awaiting('remote: true\n');
   const ids = [`${run.id}-implement`, `${run.id}-implement-check`, `${run.id}-review`];
   assert.deepEqual(
     ids.map((id) => [filed(id)?.priority, filed(id)?.config?.claude?.remoteControl]),

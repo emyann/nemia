@@ -470,7 +470,7 @@ test('REFUSED at shipped defaults: a `writable:` folder on a harness that cannot
   assert.ok(runtime.startsWith(`code: \`writable: ${path.basename(repos[1])}\` (filed as \`mounts\`): `), said);
   assert.ok(runtime.includes(`gives the session ${repos[1]} writable`), said);
   assert.ok(runtime.includes('the `codex` harness cannot hold a writable mount'), said);
-  assert.ok(runtime.includes('`claude` or `claude-detached`'), said);
+  assert.ok(runtime.includes('`claude`'), said);
   assert.ok(factory.startsWith("That folder is the factory trio's"), said);
   assert.ok(factory.includes('coded/code names it in `writable:`'), said);
   assert.ok(factory.includes('nemia factory hire trio <agent> --step coded/code'), said);

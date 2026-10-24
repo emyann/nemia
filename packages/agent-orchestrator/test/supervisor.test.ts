@@ -46,7 +46,7 @@ const folderOf = (steps: Record<string, string>): string => {
 
 /** A watcher's workflow: its one step in the repository's own checkout, outside the cap on runs, bridged, on a window of its own. */
 const FOLDER = folderOf({
-  supervise: 'workspace: main\nslot: none\nharness: claude\ncontext: 200k\nbackground: true\nremote: true\npermissionMode: dontAsk',
+  supervise: 'workspace: main\nslot: none\nharness: claude\ncontext: 200k\nremote: true\npermissionMode: dontAsk',
 });
 
 /**

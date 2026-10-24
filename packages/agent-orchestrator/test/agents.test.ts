@@ -98,7 +98,6 @@ test('REFUSED at shipped defaults: every wiring key in an agent file, by name, s
     'reads',
     'slot',
     'denials',
-    'background',
     'check',
     'retries',
     'gate',
@@ -144,6 +143,10 @@ test('REFUSED at shipped defaults: `agent:` inside an agent file, a key no agent
     attempts,
   );
   assert.ok(attempts.includes('`nemia retry <run> <step>`'), attempts);
+
+  const background = refusal(() => agent('reviewer', '---\nbackground: true\n---\nReview it.\n'));
+  assert.ok(background.startsWith('agents/reviewer.md: an agent may not set `background`'), background);
+  assert.ok(background.includes('Agent SDK'), background);
 
   const context = refusal(() => agent('reviewer', '---\ncontext: loud\n---\nReview it.\n'));
   assert.ok(context.startsWith('agents/reviewer.md: `context: loud` is not a number of tokens'), context);

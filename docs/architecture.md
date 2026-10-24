@@ -8,7 +8,7 @@ broken. This page says what the tests hold; the tests are the rules.
 
 | Layer | Owns | Public contract |
 |---|---|---|
-| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'` with `background: true`, the runtime's README, *A long-lived session*). How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/testing` → `src/testing.ts`, the engine's stand-in and the wait a test makes on its event (`until`, `bell`, `WAITED`), for test files alone. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`), the first character of a path a harness's permission rule cannot carry (`unruledIn`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
+| `packages/agent-runtime` | Agent sessions on a harness, durably: a job that runs to its end, and a long-lived session that runs until stopped (`restartPolicy: 'Always'`, attached, the runtime's README, *A long-lived session*). How a session runs: its command, mounts, restart and spend, the journal, the attempts, the harnesses' vocabulary. The `ae` command. | `agent-runtime` → `src/index.ts`, the runtime in Effect. `agent-runtime/testing` → `src/testing.ts`, the engine's stand-in and the wait a test makes on its event (`until`, `bell`, `WAITED`), for test files alone. `agent-runtime/vocabulary` → `src/vocabulary.ts`, the harnesses' words, what their fence words reach (`fenceReach`), the first character of a path a harness's permission rule cannot carry (`unruledIn`) and the folders a harness reads as its own configuration in a mounted folder (`configFolderIn`), pure. `decide` is exported by none. |
 | `packages/agent-orchestrator` | A folder of markdown as a workflow, and a run of its steps: which task to file next, what a person must decide, what the run's record says. The revisions of each kind a run resolves — a ledger of (number, hash, when) per kind and name under `revisions/<kind>/<name>.json`, and the numbers pinned on the run and on each filed step. The `wf` command, to become `nemia`. | `agent-orchestrator` → `src/runner.ts`: the controllers, everything that reads or writes the disk, and the refusals by kind, `Missing`, `Conflict` and `Invalid`, re-exported by name. `agent-orchestrator/run` → `src/run.ts`: `assess` (`src/tick/assess.ts`), and the words a run is described in, re-exported by name. `agent-orchestrator/workflow` → `src/workflow.ts`: the format, pure. `agent-orchestrator/testing` → `place/memory/index.ts`, the test place (`testPlace`), for test files alone. |
 | `apps/api` | The workflows behind HTTP, and the feed as a stream, read through the orchestrator's live reader (`followFeed`) on the hub its daemon publishes to. | Its routes. |
 | `apps/web` | The board people look at. It talks to the api over HTTP, decodes each answer it reads with a schema of its own (`effect`), imports none of our packages, names no store path, and builds no command of its own: a command or a store folder it shows is text the api answered (`STORE_PATHS` and `COMMAND_TEXT` in `apps/web/test/structure.test.ts`, both empty). | Its pages. |
@@ -40,17 +40,18 @@ runtime's.
 inbox, factories, stats, agent definitions.
 
 **A long-lived Claude Code session runs attached, by the runtime's own rule** (`attachedLongLived`,
-`agent-runtime/src/harness/claude/code.ts`): a task filed `restartPolicy: 'Always'` with `background: true` is spawned on the Agent
-SDK's streaming input while a holder of this store holds its sessions, and on `claude --bg` only where none does. Nothing above the
+`agent-runtime/src/harness/claude/code.ts`): a task filed `restartPolicy: 'Always'` is spawned on the Agent SDK's streaming input
+while a holder of this store holds its sessions, and where none does its spawn is refused, `unstartable`, naming the holder to start
+(`LONG_LIVED_UNHELD`). Every other Claude Code session is a job on the Agent SDK too (`bin/ae-claude-job.ts`). Nothing above the
 runtime asks for it, and no field says it: the policy is the Pod spec's, and how the session is run is the runtime's. A turn's end is
 not that session's end — its run file says `idle`, its input stays open, and an `is_error` result (an interrupted turn's
 `error_during_execution` among them) fails nothing — so the sighting of such a session is `input-required`, which `decide` reads as
 idle (`idleOf`), with `held` and the holder's `pid` on it.
 
-**The claude.ai bridge of an attached session is the runtime's**, opened through the Agent SDK's own control request on the `query()`
-object (`enableBridge`, `src/harness/claude/attached-bridge.ts`), its facts kept on the run file and its link answered on the sighting;
-a session whose SDK carries no such request runs on without one and says why. Remote Control of a `--bg` session stays what it was
-(`claudeBridge`).
+**The claude.ai bridge of any Claude Code session is the runtime's**, opened through the Agent SDK's own control request on the
+`query()` object at the session's `system`/`init` message (`enableBridge`, `bridgeDue`, `src/harness/claude/attached-bridge.ts`), for
+a job and a held session alike; its facts kept on the run file (a job's on the bridge file beside its run) and its link answered on the
+sighting. A job's bridge closes with it. A session whose SDK carries no such request runs on without one and says why.
 
 **Ending the turn a session is in is an engine verb**, `interrupt` (`src/service/interrupt.ts`): the turn of the attempt in flight
 ended through its harness, the session left open to hear the next words, journalled nowhere — the next pass reads the session's state as
@@ -239,7 +240,7 @@ words the board's answer. Both sides hand a handler only what its one spec gives
 - the rules about a harness's knobs the runtime cannot refuse (`tools:` on codex, `skills:` and `harnessPrompt:` on codex or a remote
   agent, `sandbox:` on Claude Code: `src/keys/`). The words each harness takes are the runtime's, asked at `wf start` (`configRefused`
   in `src/start/start.verb.ts`), and what they reach — how two fence words compare, the mode a session is held to its directory in,
-  the modes a background session runs in unasked, the models that drop `auto` — is the runtime's answer, read at load through its
+  the modes a session nobody attends runs in unasked, the models that drop `auto` — is the runtime's answer, read at load through its
   pure door (`fenceReach` from `agent-runtime/vocabulary`, in `src/workflow/fence.ts`, `src/workflow/validate.ts` and
   `src/workflow/step-file.ts`); the refusals' words stay the orchestrator's. The board's form offers the runtime's own words per key
   and harness, `HARNESS_CHOICES` from the same door, which the root entry re-exports for the api;

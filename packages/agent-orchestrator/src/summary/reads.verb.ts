@@ -30,7 +30,7 @@ export type Unreadable = ReadonlyMap<string, string>;
  * The engine's view of every task a run's current tries have filed — each step's, and each check's — and each earlier try's session, for
  * its decision: what a step's tries have cost together is every try's session (`stepSpend`), as the tick reads them (`taskPhasesRead` in
  * views.verb.ts). A `view` of a settled task reads its journal and asks no harness; one of a task in flight observes its harness
- * — a scan of the detached runs' files for a job, a list of its sessions for a background session. Read through `reader`, a request's own
+ * — a scan of its runs' files. Read through `reader`, a request's own
  * (`viewsFor`), a task two runs read is viewed once.
  */
 export const viewsOf = Effect.fn('viewsOf')(function* (run: Run, reader: Engine) {
@@ -77,7 +77,7 @@ export const judgedUnlessUnreadable = Effect.fn('judgedUnlessUnreadable')(functi
 /**
  * The views a request judges `runs` by, and the engine it hands `parentRead` for the runs they wait on: the tasks of those runs and of the
  * runs they wait on or are held until, found among `store`, over one look at the harnesses (`list(taskIds)`), which reads their journals
- * and no other and asks a harness for its sessions only for a background session in flight among them — once, however many. A task of a
+ * and no other and observes the harness of each in flight among them — once, however many. A task of a
  * run waited on that the views do not hold, filed since, is viewed (`seenBy`).
  *
  * A task whose journal does not read is in `unreadable` and in no view, as the runtime leaves it out: one entry no runtime wrote costs the

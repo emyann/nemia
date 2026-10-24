@@ -1,13 +1,15 @@
 /**
  * A checked template rendered into a factory's own folder, in today's format (`renderFactory`): the inverse of `nemia template export`'s
  * `draftOf`. Each workflow's steps become step files (`renderStep`), each agent an agent file (`renderAgent`) with its output schema
- * beside it, each skill's folder is carried as it is, and the manifest's hires and the workflows become the factory's wiring
- * (`factory.json`), its instruction `NEMIA.md`, its rules `RULES.md`. The tree is laid out as yours is: `workflows/<workflow>/`,
- * `workflows/agents/` and `workflows/skills/`, so today's readers load it unchanged. Pure: the store reads the folder and the files a
- * document names, and writes what comes back. A key today's format has no place for is refused by name, never dropped.
+ * beside it, each skill's folder is carried as it is, and the manifest's hires, its revisions policy and the workflows become the
+ * factory's wiring (`factory.json`), its instruction `NEMIA.md`, its rules `RULES.md`. The tree is laid out as yours is:
+ * `workflows/<workflow>/`, `workflows/agents/` and `workflows/skills/`, so today's readers load it unchanged. Pure: the store reads the
+ * folder and the files a document names, and writes what comes back. A key today's format has no place for is refused by name, never
+ * dropped.
  */
 import { renderAgent, type AgentDraft } from '../agents/agents.ts';
 import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
 import { FACTORY_RULES_FILE, factoryRulesRefusal } from '../rules/rules.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { isMap, type ReadFolder } from '../template/index.ts';
@@ -17,8 +19,11 @@ import { substitute, type Params } from './params.ts';
 /** A checked template as the store hands it in: its folder as read, and the text of one of its files by its path. */
 export type TemplateRead = { folder: ReadFolder; text: (file: string) => string };
 
-/** The wiring a factory made from a template is given: every workflow it holds, by name, and who fills each `<workflow>/<step>`. */
-export type Wiring = { workflows: string[]; hires: Record<string, string> };
+/**
+ * The wiring a factory made from a template is given: every workflow it holds, by name, who fills each `<workflow>/<step>`, and whether
+ * its runs follow merged revisions, where the manifest says (`spec.revisions`).
+ */
+export type Wiring = { workflows: string[]; hires: Record<string, string>; revisions?: RevisionsPolicy };
 
 /**
  * A rendered factory: each file to write, by its path in the tree; each file of the template carried as it is (`from`) to `path`; its
@@ -206,15 +211,17 @@ function renderRules(rules: string | undefined, out: Rendered): void {
 /**
  * The template `read`, which passes its check, rendered with `params` into the files of a factory's tree: each workflow's steps, each
  * agent, each skill carried whole (a `skill.yaml` left behind: what it fetches is refused by the check), `factory.json` holding every
- * workflow and the manifest's hires, `NEMIA.md` from the manifest's instruction or the template's own, and `RULES.md` from its rules, as
- * `renderRules` writes them. Refused, each by name, nothing to write: what `renderStep`, `renderAgent` or `renderRules` refuses, a harness
- * block's `options`, and a block of a harness the step or agent does not run on.
+ * workflow, the manifest's hires and its revisions policy, `NEMIA.md` from the manifest's instruction or the template's own, and
+ * `RULES.md` from its rules, as `renderRules` writes them. Refused, each by name, nothing to write: what `renderStep`, `renderAgent` or
+ * `renderRules` refuses, a harness block's `options`, and a block of a harness the step or agent does not run on.
  */
 export function renderFactory(read: TemplateRead, params: Params): Rendered {
   const manifest = specAt(read, 'nemia.yaml', params);
   const hires = Object.fromEntries(Object.entries(isMap(manifest.hires) ? manifest.hires : {}).map(([k, v]) => [k, String(v)]));
   const workflows = namesOf(read, WORKFLOWS, 'workflow.yaml');
-  const out: Rendered = { files: [], copies: [], wiring: { workflows, hires }, refusals: [] };
+  const revisions = REVISIONS_POLICIES.find((p) => p === manifest.revisions);
+  const wiring: Wiring = { workflows, hires, ...(revisions === undefined ? {} : { revisions }) };
+  const out: Rendered = { files: [], copies: [], wiring, refusals: [] };
   const agents = new Map(namesOf(read, 'agents', 'agent.yaml').map((name) => [name, specAt(read, `agents/${name}/agent.yaml`, params)]));
   const substituted: TemplateRead = {
     text: read.text,

@@ -23,6 +23,10 @@
  * retired them (a wait on a person said by the `Awaiting*` codes, a wait on a thing by `Waiting` and `on`): each a key of
  * `FORMER_REASONS` in `reason.ts`, which reads a line on disk and a stored selector that still names one. They stay while a feed or a
  * subscription on disk may hold them.
+ *
+ * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
+ * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
+ * `options.ts`). They stay while a caller may still write them.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   needshuman: {
@@ -75,5 +79,11 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-runtime/src/core/engine/journal.ts': 1,
     'packages/agent-runtime/src/core/event-schema.ts': 1,
     'packages/agent-runtime/src/harness/args.ts': 1,
+  },
+  'claude-detached': {
+    'packages/agent-runtime/src/service/harness-refusal.ts': 3,
+  },
+  'claude-bg': {
+    'packages/agent-runtime/src/service/options.ts': 3,
   },
 };

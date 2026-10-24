@@ -4,8 +4,7 @@
  * read the graph the `after` edges draw.
  */
 import { LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } from '../step/step.ts';
-import { fenceReach, type FenceReach } from 'agent-runtime/vocabulary';
-import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
+import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
 
@@ -63,7 +62,6 @@ export function validate(steps: readonly Workflow[]): void {
   }
 
   validateFolder(steps);
-  validateFolderMode(steps);
   validateMainWorkspace(steps);
   validateSlot(steps);
 
@@ -149,54 +147,6 @@ function validateFolder(steps: readonly Workflow[]): void {
   throw new WorkflowError(
     `${folder.join(', ')} ${folder.length > 1 ? 'say' : 'says'} \`place: folder\`, and ${not.join(', ')} ${not.length > 1 ? 'work' : 'works'} on a repository, as \`place: git\` — every step of a team says \`place: folder\`, or none does.` +
       ` A run works in folders it makes, with no git repository, or on branches of one: it cannot do both. Write \`place: folder\` on ${not.join(', ')}, or \`place: git\` on ${folder.join(', ')}.`,
-  );
-}
-
-/**
- * The modes a step's background session is judged by: its harness's reach (`fenceReach`), or the default harness's on one that ranks no
- * modes, since only Claude Code runs a background session and `background: true` elsewhere is refused at `nemia start`.
- */
-const backgroundReach = (harness: string = DEFAULT_HARNESS): FenceReach => {
-  const reach = fenceReach(harness);
-  return reach?.by === 'mode' ? reach : fenceReach(DEFAULT_HARNESS)!;
-};
-
-/**
- * The way a step of a folder team cannot be run: as a background session in a permission mode that can stop and ask.
- *
- * On Claude Code 2.1.278, in a folder no settings file names, a fenced `--bg` session that reaches outside its own directory — the run's
- * artifacts beside it, or the store — is asked to approve it, and nobody is there: `claude agents` reads it `blocked`, `waitingFor:
- * 'permission prompt'`, and it waits for ever, in `acceptEdits` and in `auto` alike. In `dontAsk` the same call is denied with no
- * prompt, the session is told so, and it carries on.
- *
- * A job waits on nobody, in any mode (agent-runtime's open issue 28, M1, Claude Code 2.1.280): `claude -p` in `auto`, `dontAsk`,
- * `default` and `acceptEdits` is denied each call it cannot make, carries on and exits on its own. So a step run as a job — every `claude`
- * step without `background: true`, every `claude-detached` one — is not judged on this, and neither is a codex step: `codex exec` has one
- * shell, fenced by the sandbox its `sandbox:` names, and asks nobody in any of them. So the modes that ask nobody are Claude Code's, and
- * the runtime's to say (`backgroundReach`): Codex has no permission mode to judge (`permissionMode:` is refused there), and `background:
- * true` is refused on any harness but claude. What is judged is the one way left to ask: a `background: true` step.
- *
- * A repository run's steps work in a checkout a person has opened and trusted, with settings of its own; a folder run's do not, and there
- * is nobody to answer. So this is refused for folder teams only, at load, where every start — a brief, an inbox card, a queued card, the
- * api — passes. It costs the step what `dontAsk` denies, which is everything not allowed: that is what `allowedTools:` gives back, scoped
- * to the step's own folder (`Edit(**)`).
- */
-function validateFolderMode(steps: readonly Workflow[]): void {
-  if (!isFolderTeam(steps)) return;
-  const asking = steps.find((s) => {
-    const { given, unasking } = backgroundReach(s.harness);
-    return s.background && !unasking.includes(s.permissionMode ?? given);
-  });
-  if (!asking) return;
-  const { given, unasking } = backgroundReach(asking.harness);
-  const mode = asking.permissionMode
-    ? `\`permissionMode: ${asking.permissionMode}\` can stop and ask a person to approve something`
-    : `it sets no \`permissionMode:\`, so it runs on the engine's default, \`${given}\`, which can stop and ask a person to approve something`;
-  throw new WorkflowError(
-    `${asking.name}: \`place: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and ${mode}` +
-      ' — a read or a write outside the folder can, and an unattended background session then waits for ever on a prompt nobody answers.' +
-      ` Delete \`background: true\`, and the step runs as a job, which asks nobody in any mode; or write \`permissionMode: ${unasking[0]}\`, which denies such a call with no prompt and lets the session carry on.` +
-      " A step in `dontAsk` that must write its own work needs `allowedTools: Edit(**)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit(…)` is the rule every file-editing tool is matched against.",
   );
 }
 

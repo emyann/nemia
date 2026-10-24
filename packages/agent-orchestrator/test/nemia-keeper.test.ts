@@ -224,7 +224,8 @@ test("Nemia kept and let go: trusted late, filed long-lived in auto with the dae
       assert.equal(spec.restartPolicy, 'Always');
       const shipped = readNemia();
       assert.equal(spec.config.permissionMode, 'auto');
-      assert.equal(spec.config.background, true);
+      assert.equal('background' in spec.config, false, 'a long-lived session is its restart policy, on the Agent SDK');
+      assert.equal(spec.config.mayAsk, true);
       assert.deepEqual(spec.config.disallowedTools, shipped.disallowedTools);
       assert.deepEqual(spec.config.mounts, [{ path: repo, readOnly: true }], "every factory's folders, read-only");
       assert.equal('closeoutSchema' in spec || 'closeoutSchema' in spec.config, false, 'no closeout: she never ends');

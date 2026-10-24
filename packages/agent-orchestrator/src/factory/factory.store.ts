@@ -2,7 +2,8 @@
  * The factories on disk: `$WF_ROOT/factories/<name>.json`, one file per factory, holding `{ "repos": [...], "workflows": [...], "hires":
  * {...} }` — read (`readFactories`, `readFactory`), filed (`addFactory`), given workflows and relieved of them (`attachWorkflow`,
  * `detachWorkflow`), hired into and fired from (`hireAgent`, `fireAgent`), told where its instruction is kept (`setInstruction`) and
- * removed (`removeFactory`). A person's verbs are their one writer; the judgement is `factory.ts`'s.
+ * whether its runs follow merged revisions (`setRevisions`), and removed (`removeFactory`). A person's verbs are their one writer; the
+ * judgement is `factory.ts`'s.
  *
  * Beneath the controllers, beside `record.store.ts`, the one store file it imports; `runner.ts` re-exports what the package exports of it.
  */
@@ -22,6 +23,7 @@ import {
   instructionPathRefusal,
   noFactoryLine,
   noFactoryRefusal,
+  REVISIONS_POLICIES,
   unattachedHireRefusal,
   workflowNameRefusal,
   type Factory,
@@ -29,6 +31,7 @@ import {
   type FactoryTemplate,
   type FactoryWrite,
   type InstructionAt,
+  type RevisionsPolicy,
   type Schedule,
 } from './factory.ts';
 import { firesOf } from '../schedule/schedule.store.ts';
@@ -55,8 +58,9 @@ const ScheduleSchema = Schema.StructWithRest(
 /**
  * A factory's file: at least one repository, each a string; the workflows attached to it, each by its folder's name, its hires, a
  * step's `<workflow>/<step>` to an agent's name, and its schedules, by workflow, when it has any, and where its instruction is kept, a path
- * or the store, when it says; and the template it was made from, when it was (`nemia factory apply`): its folder, its version and the
- * parameters given. A key a later `nemia` writes beside them is kept, not refused.
+ * or the store, when it says; whether its runs follow merged revisions, `follow` or `pinned`, when it says (a templated factory says it
+ * in its tree's wiring, and this key is not read); and the template it was made from, when it was (`nemia factory apply`): its folder,
+ * its version and the parameters given. A key a later `nemia` writes beside them is kept, not refused.
  */
 const FactoryFileSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -65,6 +69,7 @@ const FactoryFileSchema = Schema.StructWithRest(
     hires: Schema.optionalKey(Schema.Record(Schema.String, Schema.String)),
     schedules: Schema.optionalKey(Schema.Record(Schema.String, ScheduleSchema)),
     instruction: Schema.optionalKey(Schema.Union([Schema.Struct({ path: Schema.String }), Schema.Struct({ store: Schema.Literal(true) })])),
+    revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
     template: Schema.optionalKey(
       Schema.StructWithRest(
         Schema.Struct({
@@ -111,21 +116,27 @@ function factoryFile(name: string): FileRead {
   return { file, error: `does not read as a factory: ${field} ${words}. nemia factory rm ${name}, then add it again.` };
 }
 
-/** The workflows and hires of a templated factory `name`: its tree's, none while the tree is not rendered, or why they do not read. */
-function treeWiringOf(name: string): Pick<Factory, 'workflows' | 'hires'> | { error: string } {
+/**
+ * The workflows, hires and revisions policy of a templated factory `name`: its tree's, none while the tree is not rendered, or why they
+ * do not read.
+ */
+function treeWiringOf(name: string): Pick<Factory, 'workflows' | 'hires' | 'revisions'> | { error: string } {
   const read = readTreeWiring(name);
   if ('absent' in read) return { workflows: [], hires: {} };
-  return 'error' in read ? read : { workflows: read.wiring.workflows, hires: read.wiring.hires };
+  if ('error' in read) return read;
+  const { workflows, hires, revisions } = read.wiring;
+  return { workflows, hires, ...(revisions === undefined ? {} : { revisions }) };
 }
 
 /**
  * The factory `name` its file's `content` says: none attached, hired or scheduled when the file names none, and where its instruction is
- * kept only when the file says. A factory made from a template reads its workflows and hires from its tree (`tree`), or why they do not
- * read; its schedules, from its file.
+ * kept and whether its runs follow merged revisions only when the file says. A factory made from a template reads its workflows, hires
+ * and revisions policy from its tree (`tree`), or why they do not read; its schedules, from its file.
  */
 function factoryOf(name: string, content: FactoryFile): Factory | { error: string } {
   const template = content.template;
-  const wiring = template === undefined ? { workflows: content.workflows ?? [], hires: content.hires ?? {} } : treeWiringOf(name);
+  const own = content.revisions === undefined ? {} : { revisions: content.revisions };
+  const wiring = template === undefined ? { workflows: content.workflows ?? [], hires: content.hires ?? {}, ...own } : treeWiringOf(name);
   if ('error' in wiring) return wiring;
   return {
     name,
@@ -352,6 +363,7 @@ const DONE = {
   fire: 'fired',
   instruction: 'changed',
   instruct: 'written',
+  revisions: 'changed',
   schedule: 'scheduled',
   unschedule: 'unscheduled',
   upgrade: 'upgraded',
@@ -554,6 +566,29 @@ export function setInstruction(opts: { factory: string; at: InstructionAt | unde
   const kept = at === undefined ? undefined : 'path' in at ? { path: path.normalize(at.path) } : { store: true as const };
   writeWhole(file, kept === undefined ? rest : { ...rest, instruction: kept });
   return { file };
+}
+
+/**
+ * `nemia factory revisions`: whether the runs of the factory `factory` follow merged revisions (`follow`) or keep what they resolved
+ * until `nemia refresh` (`pinned`), written into its file, every other key kept; or, made from a template, into its tree's wiring
+ * (`factory.json`), which is the person's once seeded, as its hires are. Read by every pass after, so a run in flight takes it at its
+ * next filing. Refused before anything is written: the factory (`fileToChange`); a templated one whose tree is not rendered yet
+ * (`Conflict`, naming the daemon) or whose wiring does not read (`Invalid`).
+ */
+export function setRevisions(opts: { factory: string; revisions: RevisionsPolicy }): { file: string; was: RevisionsPolicy | undefined } {
+  const { file, content } = fileToChange(opts.factory, 'revisions');
+  if (content.template === undefined) {
+    writeWhole(file, { ...content, revisions: opts.revisions });
+    return { file, was: content.revisions };
+  }
+  const read = readTreeWiring(opts.factory);
+  if ('absent' in read)
+    throw new Conflict({
+      message: `${opts.factory} is made from a template, and its tree is not rendered yet, at ${treeDir(opts.factory)}: start the daemon, nemia up, and try again once nemia factory ls shows it applied. Nothing was changed.`,
+    });
+  if ('error' in read) throw new Invalid({ message: `the factory ${opts.factory}: ${read.error} Nothing was changed.` });
+  writeTreeWiring(opts.factory, { ...read.wiring, revisions: opts.revisions });
+  return { file: path.join(treeDir(opts.factory), 'factory.json'), was: read.wiring.revisions };
 }
 
 /**

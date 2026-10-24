@@ -16,7 +16,6 @@ export type FiledStep = Pick<
   | 'tools'
   | 'disallowedTools'
   | 'allowedTools'
-  | 'background'
   | 'budget'
   | 'remote'
   | 'writable'
@@ -39,7 +38,6 @@ export const FILED_AS: Readonly<Record<string, (step: FiledStep) => string | und
   tools: (s) => s.tools && `tools: ${s.tools.join(', ')}`,
   disallowedTools: (s) => s.disallowedTools && `disallowedTools: ${s.disallowedTools.join(', ')}`,
   allowedTools: (s) => s.allowedTools && `allowedTools: ${s.allowedTools.join(', ')}`,
-  background: (s) => (s.background === undefined ? undefined : `background: ${s.background}`),
   budgetUsd: (s) => (s.budget === undefined ? undefined : `budget: ${s.budget}`),
   claude: (s) => (s.remote ? 'remote: true' : undefined),
   mounts: (s) => {

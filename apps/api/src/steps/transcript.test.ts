@@ -2,25 +2,21 @@
  * A step's conversation over HTTP: GET …/transcript, and …/transcript/stream as server-sent events.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, reading a transcript file where Claude Code keeps
- * one (CLAUDE_CONFIG_DIR). What the routes give is held to what the engine gives for the same task. The harness's fake `claude`
- * (test/harness.ts) is first on PATH, so the registry of the sessions on this machine is never asked: it lists what a test says is running,
- * and notes every call, so a test can count what the stream costs. The store and CLAUDE_CONFIG_DIR are the harness's
- * scratch ones (`root`, `config`).
+ * one (CLAUDE_CONFIG_DIR). What the routes give is held to what the engine gives for the same task. The store and CLAUDE_CONFIG_DIR are
+ * the harness's scratch ones (`root`, `config`). A live step followed as its session writes, and the stream let go once its reader
+ * leaves, are `following.test.ts`'s.
  */
-import { config, observations, registry, root } from '../../test/harness.ts';
-import { test, type TestContext } from 'node:test';
+import { config, root } from '../../test/harness.ts';
+import { test } from 'node:test';
 import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
-import { Effect, Layer, Logger } from 'effect';
+import { Effect } from 'effect';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { setTimeout as sleep } from 'node:timers/promises';
-import { STEP_BEAT_MS, type StepTranscript } from './steps.ts';
-import { app, appOf, liveOf } from '../app.ts';
-import { Beats } from '../layer.ts';
-import { Engine } from '../store.ts';
-import { emitFeed, engine } from 'agent-orchestrator';
+import type { StepTranscript } from './steps.ts';
+import { app } from '../app.ts';
+import { engine } from 'agent-orchestrator';
 
 const T0 = Date.parse('2026-09-13T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
@@ -96,21 +92,8 @@ const settledTask = (taskId: string, lines = conversation) => {
   return sessionId;
 };
 
-/** A task whose attempt runs: journalled as spawned, and listed working by `claude agents`. Returns the session's id. */
-const runningTask = (taskId: string) => {
-  const sessionId = randomUUID();
-  journal(taskId, started);
-  const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as object[];
-  rows.push({ name: `ae/${taskId}/1`, sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: T0 });
-  fs.writeFileSync(registry, JSON.stringify(rows));
-  return sessionId;
-};
-
-/** The row `claude agents` lists for the attempt of `taskId`, changed by `change`. */
-const listed = (taskId: string, change: object) => {
-  const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as { name: string }[];
-  fs.writeFileSync(registry, JSON.stringify(rows.map((r) => (r.name === `ae/${taskId}/1` ? { ...r, ...change } : r))));
-};
+/** A task whose attempt runs: journalled as spawned, and not ended. */
+const runningTask = (taskId: string) => journal(taskId, started);
 
 const RUN = 'r-talk';
 fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
@@ -126,9 +109,11 @@ fs.writeFileSync(
     brief: 'Talk it through',
     workflowDir: path.join(root, 'no-such-workflow'),
     createdAt: at(0),
-    workflow: ['implement', 'held', 'closed', 'answered', 'resumed', 'live', 'gone', 'broken', 'unpushed', 'unread', 'lost', 'review'].map(
-      (name) => ({ name, after: [], body: `${name} it.` }),
-    ),
+    workflow: ['implement', 'held', 'closed', 'answered', 'resumed', 'broken', 'unread', 'lost', 'review'].map((name) => ({
+      name,
+      after: [],
+      body: `${name} it.`,
+    })),
     steps: {
       implement: { taskId: 't-implement' },
       /** `held`, `closed` and `answered`: held open, their one turn signed, and waiting on a person's word, closed on it, and answered. */
@@ -136,10 +121,7 @@ fs.writeFileSync(
       closed: { taskId: 't-closed' },
       answered: { taskId: 't-answered' },
       resumed: { taskId: 't-resumed' },
-      live: { taskId: 't-live' },
-      gone: { taskId: 't-gone' },
       broken: { taskId: 't-broken' },
-      unpushed: { taskId: 't-unpushed' },
       unread: { taskId: 't-unread' },
       /** Filed, and the engine has no record of its task. */
       lost: { taskId: 't-lost' },
@@ -233,8 +215,7 @@ test("REFUSED: a step's conversation, read or streamed — a cursor no read gave
   });
   await t.test(
     'a live task whose journal cannot be read is a 502 on the read and on the stream, which says where the same record is read',
-    async (t) => {
-      const app = unstreamedApp(t);
+    async () => {
       runningTask('t-unread');
       fs.rmSync(journalFile('t-unread'));
       fs.mkdirSync(journalFile('t-unread'));
@@ -321,7 +302,7 @@ test("A person reads a step's conversation through its task's life: nothing befo
 });
 
 test(
-  "A board follows a step's conversation: a settled task's events then `settled`, a reconnect from Last-Event-ID, a live session pushed as it writes, and the engine let go once the reader leaves",
+  "A board follows a settled step's conversation: its task's events then `settled`, and a reconnect from Last-Event-ID",
   { timeout: 30_000 },
   async (t) => {
     const s = story(t);
@@ -361,62 +342,6 @@ test(
       assert.equal(said.filter((b) => b.id).at(-1)?.id, whole.cursor);
       assert.equal(said.at(-1)?.event, 'settled');
     });
-    await s.test(
-      'the stream of a live background session follows it, pushed: what the session writes next is sent as it is written, once each, and `settled` once its task settles',
-      async () => {
-        const sessionId = runningTask('t-live');
-        const lines = conversation(sessionId);
-        writeTranscript(sessionId, lines.slice(0, 4));
-
-        const res = await app.request(streamUrl('live'));
-        assert.equal(res.status, 200);
-        const reader = res.body!.getReader();
-        const text = { value: '' };
-        const early = await readUntil(reader, text, (said) => eventsIn(said).length >= 3);
-        assert.deepEqual(
-          early[0],
-          { event: 'following', data: JSON.stringify({ streamed: true }) },
-          'first, that a background session is pushed: followed from its transcript, not read again every second',
-        );
-        assert.deepEqual(
-          eventsIn(early).map((e) => e.id),
-          ['u-1:0', 'a-1:0', 'a-2:0'],
-          'what was written when it connected',
-        );
-        assert.ok(!early.some((b) => b.event === 'settled'), 'and the task has not settled');
-
-        writeTranscript(sessionId, lines.slice(4));
-        await readUntil(reader, text, (said) => eventsIn(said).length >= 8);
-        journal('t-live', ending('t-live', sessionId));
-        listed('t-live', { state: 'done', status: 'idle' });
-        await Effect.runPromise(
-          emitFeed(new Map([[RUN, { run: { word: 'running' }, steps: [{ name: 'live', word: 'succeeded' }] }]])).pipe(
-            Effect.provide(Logger.layer([])),
-          ),
-        );
-
-        const said = await readUntil(reader, text, () => false);
-        const whole = await Effect.runPromise(engine().transcript('t-live'));
-        assert.deepEqual(eventsIn(said), whole.events, 'every event, once each');
-        assert.equal(said.at(-1)?.event, 'settled', 'and then settled, and the stream closed');
-      },
-    );
-    await s.test('the stream stops asking the engine once its reader goes away', async () => {
-      const sessionId = runningTask('t-gone');
-      writeTranscript(sessionId, conversation(sessionId).slice(0, 2));
-      const res = await app.request(streamUrl('gone'));
-      const reader = res.body!.getReader();
-      await readUntil(reader, { value: '' }, (said) => eventsIn(said).length >= 1);
-      await reader.cancel();
-      await sleep(1_500);
-      const before = observations();
-      await sleep(3_000);
-      assert.equal(
-        observations(),
-        before,
-        'no `claude agents` call once the reader has gone, past a read already under way when it left: the task is still live, and nobody is reading',
-      );
-    });
   },
 );
 
@@ -435,80 +360,3 @@ async function readUntil(
     text.value += decoder.decode(value, { stream: true });
   }
 }
-
-/** The beat the unstreamed app's streams read again on (`Beats.step`), shorter than the shipped `STEP_BEAT_MS`. */
-const BEAT_MS = 100;
-
-/**
- * An app over the api's own engine but for `follow`, refused as a harness that does not stream its sessions refuses it, until `streams`
- * says yes — a harness that starts pushing its sessions under a reader. Its runtime is let go once the test `t` ends.
- */
-function unstreamedApp(t: TestContext, streams: { yes: boolean } = { yes: false }) {
-  const real = engine();
-  const unstreamed = {
-    ...real,
-    follow: (taskId: string) =>
-      streams.yes ? real.follow(taskId) : Effect.fail({ _tag: 'FollowRefused', message: 'the `x` harness does not stream its sessions' }),
-  } as unknown as ReturnType<typeof engine>;
-  const own = appOf(
-    Layer.mergeAll(liveOf(), Layer.succeed(Engine)(unstreamed), Layer.succeed(Beats)({ ...Beats.defaultValue(), step: BEAT_MS })),
-  );
-  t.after(() => own.runtime.dispose());
-  return own.app;
-}
-
-const UNPUSHED =
-  "Step 'unpushed' of run 'r-talk' runs a session its harness does not push as it is written: what it said so far is sent, and it is read again every few seconds.";
-
-test(
-  'the stream of a live step whose session is not pushed sends `following` false and what it has said, then `unreadable` retrying: it stays open, reads the conversation again on a beat, and takes to the live relay once the harness starts pushing it',
-  { timeout: 60_000 },
-  async (t) => {
-    const streams = { yes: false };
-    assert.ok(BEAT_MS < STEP_BEAT_MS, 'read again on a beat shorter than shipped, never longer');
-    const app = unstreamedApp(t, streams);
-    const sessionId = runningTask('t-unpushed');
-    const lines = conversation(sessionId);
-    writeTranscript(sessionId, lines.slice(0, 4));
-    const res = await app.request(streamUrl('unpushed'));
-    const reader = res.body!.getReader();
-    const text = { value: '' };
-    const said = await readUntil(reader, text, (got) => got.some((b) => b.event === 'unreadable'));
-    assert.deepEqual(said[0], { event: 'following', data: JSON.stringify({ streamed: false }) }, 'not pushed');
-    assert.deepEqual(eventsIn(said), (await Effect.runPromise(engine().transcript('t-unpushed'))).events, 'what it has said, once each');
-    assert.deepEqual(
-      JSON.parse(said.at(-1)!.data!),
-      { error: UNPUSHED, retrying: true },
-      'it says why it cannot be streamed, and that it reads it again',
-    );
-    assert.ok(!said.some((b) => b.event === 'settled'), 'and the stream is not ended');
-
-    writeTranscript(sessionId, lines.slice(4));
-    const whole = (await Effect.runPromise(engine().transcript('t-unpushed'))).events;
-    const after = await readUntil(reader, text, (got) => eventsIn(got).length >= whole.length);
-    assert.deepEqual(
-      eventsIn(after).map((e) => e.id),
-      whole.map((e) => e.id),
-      'what the session said after the give-up used to be arrives on the same stream, one beat later',
-    );
-    assert.equal(after.filter((b) => b.event === 'unreadable').length, 1, 'said once, not once a beat');
-
-    streams.yes = true;
-    const live = await readUntil(reader, text, (got) => got.some((b) => b.event === 'readable'));
-    assert.deepEqual(
-      live.filter((b) => b.event === 'following').at(-1),
-      { event: 'following', data: JSON.stringify({ streamed: true }) },
-      'a harness that starts pushing its session is followed live on the next beat',
-    );
-
-    journal('t-unpushed', ending('t-unpushed', sessionId));
-    listed('t-unpushed', { state: 'done', status: 'idle' });
-    await Effect.runPromise(
-      emitFeed(new Map([[RUN, { run: { word: 'running' }, steps: [{ name: 'unpushed', word: 'succeeded' }] }]])).pipe(
-        Effect.provide(Logger.layer([])),
-      ),
-    );
-    const over = await readUntil(reader, text, () => false);
-    assert.equal(over.at(-1)?.event, 'settled', 'and the beat does not hold the stream open past the task settling');
-  },
-);

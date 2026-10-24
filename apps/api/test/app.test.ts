@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { until } from './waits.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
 import {
@@ -21,8 +22,8 @@ import {
   type RunSummary,
 } from 'agent-orchestrator';
 import { runWith } from './shipped-place.ts';
-import { claudeDetached, claudeOps } from 'agent-runtime';
-import { Effect } from 'effect';
+import { Engine } from 'agent-runtime';
+import { Context, Effect, Exit, Layer, Scope } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
 import { PRECEDENCE } from 'agent-orchestrator/run';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
@@ -2019,63 +2020,13 @@ test("a step's check read on the board: its command, and once it refused its exi
   );
 });
 
-test('the list of runs observes the engine at most once, however many runs and steps are filed, and not at all with nothing in flight', async (t) => {
-  const bin = scratch('nemia-api-bin-');
-  const calls = path.join(bin, 'calls');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
-  const before = process.env.PATH;
-  process.env.PATH = `${bin}${path.delimiter}${before}`;
-  t.after(() => {
-    process.env.PATH = before;
-  });
-  const observations = () =>
-    (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '').split('\n').filter((line) => line.startsWith('agents')).length;
-
-  for (const n of [11, 12, 13]) {
-    queuedTask(`t-${n}`);
-    writeRun({ ...r2, id: `r-${n}`, steps: { implement: { taskId: `t-${n}`, branch: `wf/r-${n}/implement` }, review: { taskId: null } } });
-  }
-  const res = await app.request('/api/runs');
-  assert.equal(res.status, 200);
-  const runs = (await res.json()) as RunSummary[];
-  assert.ok(
-    runs.flatMap((r) => r.steps).filter((s) => s.taskId).length >= 3,
-    'filed steps, each of which a view per step would observe once',
-  );
-  assert.ok(
-    runs.flatMap((r) => r.steps).some((s) => s.status === 'failed ✗ check (exit 1)'),
-    'a refused check, worded with its exit code, is on the list',
-  );
-  assert.equal(
-    observations(),
-    0,
-    "queued, settled and refused, none of them in flight: no harness is looked at (list(taskIds)); once for any number in flight is asks.test.ts's",
-  );
-});
-
-/**
- * A `claude` ahead of the real one on PATH for the length of the test, which notes each call and sees no sessions of ours: how
- * many times a request observed the harnesses.
- */
-function countingObservations(t: { after: (fn: () => void) => void }): () => number {
-  const bin = scratch('nemia-api-bin-');
-  const calls = path.join(bin, 'calls');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
-  const before = process.env.PATH;
-  process.env.PATH = `${bin}${path.delimiter}${before}`;
-  t.after(() => {
-    process.env.PATH = before;
-  });
-  return () => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '').split('\n').filter((line) => line.startsWith('agents')).length;
-}
-
 const gone = path.join(NOWHERE, 'no-such-workflow');
 
 test("a step's tries and its closeout: every try of a looped step off one observation, each declared field's schema as the run froze it, and a statement that could not be read as it came", async (t) => {
   const s = story(t);
   await s.test(
     'a step on its third try, in the second round of its loop, carries every try: its round, what replaced it, its task, check and closeout — off one observation',
-    async (t) => {
+    async () => {
       const findings = [
         { file: 'src/cache.ts', line: 12, finding: 'The cache never expires.' },
         { file: 'src/cache.ts', line: 40, finding: 'A miss is counted twice.' },
@@ -2142,13 +2093,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         },
       });
 
-      const observations = countingObservations(t);
       const run = await detailOf('r-50');
-      assert.equal(
-        observations(),
-        0,
-        "eight tasks, implement's three and their checks and review's two, all settled and no refused check of the current try: no look at the harnesses (list(taskIds))",
-      );
 
       const once = { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } };
       const closeout = (raw: { summary: string }, more: object = {}) => ({
@@ -2452,7 +2397,6 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
       const cases: Array<[id: string, spec: { harness: string; permissionMode?: string; tools?: string[] }, runsIn: object]> = [
         ['r-54-claude', { harness: 'claude' }, { mode: 'auto', by: 'default' }],
         ['r-54-claude-mode', { harness: 'claude', permissionMode: 'dontAsk' }, { mode: 'dontAsk', by: 'filed' }],
-        ['r-54-detached', { harness: 'claude-detached' }, { mode: 'auto', by: 'default' }],
         ['r-54-codex', { harness: 'codex' }, { mode: 'workspace-write', by: 'default' }],
         ['r-54-codex-writes', { harness: 'codex', tools: ['Read', 'Bash'] }, { mode: 'workspace-write', by: 'default' }],
         ['r-54-codex-reads', { harness: 'codex', tools: ['Read', 'Grep'] }, { mode: 'read-only', by: 'tools' }],
@@ -2475,7 +2419,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
     },
   );
   await s.test(
-    "the mode the api says a Claude Code task runs in is the one the engine's `claude` spawns it with, as a job and as a background session",
+    "the mode the api says a Claude Code task runs in is the one the engine's `claude` spawns it with, a job on the Agent SDK",
     async (t) => {
       const said = new Map<string, string>();
       for (const [id, permissionMode] of [
@@ -2506,48 +2450,40 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
         said.set(id, filed.runsIn.mode);
       }
 
-      const bin = scratch('nemia-api-claude-');
-      const argsFile = path.join(bin, 'args');
-      fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
-      const before = process.env.PATH;
-      process.env.PATH = `${bin}${path.delimiter}${before}`;
-      t.after(() => {
-        process.env.PATH = before;
-      });
       const spawnedWith = async (permissionMode: string | undefined) => {
-        await Effect.runPromise(
-          claudeOps({ root: scratch('nemia-api-engine-') }).spawn({
-            name: 'ae/t/1',
-            brief: 'the prompt',
-            cwd: bin,
-            ...(permissionMode ? { config: { permissionMode } } : {}),
-          }),
+        const dir = scratch('nemia-api-claude-');
+        const argsFile = path.join(dir, 'args');
+        const recorder = path.join(dir, 'claude.mjs');
+        fs.writeFileSync(
+          recorder,
+          `import fs from 'node:fs';\nfs.writeFileSync(${JSON.stringify(argsFile)}, process.argv.slice(2).join('\\n'));\nprocess.exit(1);\n`,
         );
-        const args = fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n');
-        return args[args.indexOf('--permission-mode') + 1];
+        const scope = Scope.makeUnsafe();
+        t.after(() => Effect.runPromise(Scope.close(scope, Exit.void)));
+        const e = await Effect.runPromise(
+          Layer.build(Engine.layer({ root: path.join(dir, 'engine'), harnesses: { claude: 'claude' }, claudeExecutable: recorder })).pipe(
+            Effect.map((context) => Context.get(context, Engine)),
+            Effect.provideService(Scope.Scope, scope),
+          ),
+        );
+        await Effect.runPromise(
+          e.file({ brief: 'the prompt', cwd: dir, harness: 'claude', ...(permissionMode ? { config: { permissionMode } } : {}) }),
+        );
+        await Effect.runPromise(e.tick());
+        const argv = await until(t, () => fs.existsSync(argsFile) && fs.readFileSync(argsFile, 'utf8'), 'the session spawned', {
+          everyMs: 50,
+        });
+        return argv
+          .split('\n')
+          .find((arg) => arg.startsWith('--permission-mode='))
+          ?.slice('--permission-mode='.length);
       };
       assert.equal(
         said.get('r-59-claude'),
         await spawnedWith(undefined),
-        'filed with no mode: the argv the background runner hands a fake claude on PATH',
+        "filed with no mode: the argv the engine's job on the Agent SDK hands the Claude Code it runs",
       );
       assert.equal(said.get('r-59-claude-mode'), await spawnedWith('dontAsk'), 'filed with one');
-
-      const jobWith = (permissionMode: string | undefined) => {
-        const { args } = claudeDetached.command({
-          name: 'ae/t/1',
-          brief: 'the prompt',
-          cwd: bin,
-          ...(permissionMode ? { config: { permissionMode } } : {}),
-        });
-        return args[args.indexOf('--permission-mode') + 1];
-      };
-      assert.equal(
-        said.get('r-59-claude'),
-        jobWith(undefined),
-        'a job filed with no mode: the flags of claude -p, which a job and claude-detached share (claudePrintFlags)',
-      );
-      assert.equal(said.get('r-59-claude-mode'), jobWith('dontAsk'), 'a job filed with one');
     },
   );
   await s.test(
@@ -2817,7 +2753,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
   const s = story(t);
   await s.test(
     "the detail carries where each step's time went — per try and per check, filed off the engine's feed — and the run's, in the package's words",
-    async (t) => {
+    async () => {
       const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 9, m, s)).toISOString();
       const feed = path.join(root, 'engine', 'feed.jsonl');
       const fileOnFeed = (taskId: string, at: string) =>
@@ -2861,13 +2797,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
       };
       writeRun(record);
 
-      const observations = countingObservations(t);
       const run = await detailOf('r-60');
-      assert.equal(
-        observations(),
-        0,
-        'the feed is a read of the store: the detail observes no harness for it, and none for tasks all settled',
-      );
       const [implement, review] = run.steps;
       const words = (
         s: { at: string; filedAt: string | null; spawnedAt: string | null; endedAt: string | null; queued: string; ran: string } | null,

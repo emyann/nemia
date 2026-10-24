@@ -88,8 +88,8 @@ class Unread extends Error {
  *
  * Live is read first. A task that settles between the two reads reads as live once more, and its last lines are read on the
  * next pass; read the other way round, it could read as settled before them. A read costs an observation of every harness
- * (`view`, a `claude agents` call among them) and, while the attempt runs, one of the task's own harness (`transcript` finds the
- * session through it); after the attempt has ended, `transcript` reads by the session's id on the record.
+ * (`view`) and, while the attempt runs, one of the task's own harness (`transcript` finds the session through it — an attached
+ * session's run file); after the attempt has ended, `transcript` reads by the session's id on the record.
  *
  * Throws `Unread`: 502 when the task or its conversation could not be read; 404 for a task the engine has no record of, or a harness
  * that keeps no conversation it can read; 400 for a cursor none of the engine's reads gave. The engine refuses the last two alike, so a

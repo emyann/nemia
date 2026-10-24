@@ -217,7 +217,9 @@ test('listing at a gate', async (t) => {
   });
   await t.test('any other step waiting on you is named by its name', () => {
     const l = {
-      steps: [{ name: 'implement', status: 'succeeded · BLOCKED', reason: 'Blocked' as const, branch: null }],
+      steps: [
+        { name: 'implement', status: 'succeeded · BLOCKED', reason: 'AwaitingAnswer' as const, via: 'closeout' as const, branch: null },
+      ],
       waitingOnYou: ['implement'],
     };
     assert.deepEqual(onYouWords(l), ['implement']);

@@ -192,7 +192,7 @@ export interface ListingInput {
   /**
    * What the harness says a blocked session waits for, in its own words (`TaskView.waitingFor`): the row's `waits` beside
    * the engine's `needs-human`. **Beside the word, never in it.** `phaseOf` is compared for `needs-human` exactly, here and in
-   * `harnessBlocked` (views.verb.ts), and a row says it as its reason (`NeedsHuman`), which the api and the board compare; the status stays
+   * `harnessBlocked` (views.verb.ts), and a row says it as its reason (`AwaitingAnswer`, `via: 'session'`), which the api and the board compare; the status stays
    * the engine's bare word, and only what `nemia ls` prints gains the harness's (`shownStatus`).
    */
   readonly waitingOf?: (taskId: string) => string | undefined;

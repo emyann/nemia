@@ -654,7 +654,6 @@ test('nemia start freezes the resolved steps on the run: an agent edited after t
     given: { harness: 'claude', model: 'opus', effort: 'high', context: '200k', disallowedTools: 'SendMessage' },
     instructions: 'Implement what you are asked.',
     mcp: [],
-    offSkills: ['git'],
   });
   assert.equal(
     fs.readFileSync(path.join(agentFilesDir(run, 'build'), 'prompt.md'), 'utf8'),

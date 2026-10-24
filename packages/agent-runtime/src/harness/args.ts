@@ -150,6 +150,14 @@ export type HarnessArgs = {
    * (`harnessRefusalOf`), and unless true or false.
    */
   mayAsk?: boolean;
+  /**
+   * The skills the session is given, by the harness's name for each — a skill's own name, or `<plugin>:<name>` for a plugin's:
+   * exactly those, every other skill hidden from the session and refused when it is called, whatever its source (the harness's
+   * built-in ones, the user's, the project's, a plugin's). `'default'`, or absent: the harness's own set. Claude Code holds a list
+   * only through its SDK (`Options.skills`), so a session the runtime runs on its CLI refuses one, and so does any harness that cannot
+   * close its set of skills (`HarnessSpec.enabledSkills`). Refused unless `'default'` or a list of names, none twice.
+   */
+  enabledSkills?: string[] | 'default';
 };
 
 /**
@@ -182,6 +190,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   mounts: true,
   callAdmission: true,
   mayAsk: true,
+  enabledSkills: true,
 };
 export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs>;
 
@@ -335,7 +344,19 @@ const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
   checkoutMcpRefusalOf(config) ??
   mountsRefusalOf(config.mounts) ??
   admissionRefusalOf(config.callAdmission) ??
-  mayAskRefusalOf(config);
+  mayAskRefusalOf(config) ??
+  enabledSkillsRefusalOf(config);
+
+/** Why a task's `enabledSkills` names no set of skills — or `undefined`: neither `'default'` nor a list of names, or a name twice. */
+const enabledSkillsRefusalOf = ({ enabledSkills }: HarnessArgs): string | undefined => {
+  if (enabledSkills === undefined || enabledSkills === 'default') return undefined;
+  const names: unknown = enabledSkills;
+  if (!(Array.isArray(names) && names.every((n) => typeof n === 'string' && /^[\w.-]+(:[\w.-]+)?$/.test(n)))) {
+    return `\`enabledSkills: ${JSON.stringify(names)}\` is not a set of skills. Give the names of the skills the session is given, like ["my-plugin:review"], [] for none, or "default" for the harness's own set.`;
+  }
+  const twice = enabledSkills.find((n, i) => enabledSkills.indexOf(n) !== i);
+  return twice === undefined ? undefined : `\`enabledSkills\` names \`${twice}\` twice. Name each skill once.`;
+};
 
 /** Why a task's `mayAsk` is not whether a person can be asked through its session — or `undefined`: anything but true or false. */
 const mayAskRefusalOf = ({ mayAsk }: HarnessArgs): string | undefined =>

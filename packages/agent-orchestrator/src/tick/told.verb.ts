@@ -17,7 +17,7 @@ import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { skillsFor } from '../skills/read.store.ts';
-import { renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
+import { enabledSkillsOf, renderedFlags, rendersAgent, unrendered } from '../agents/agents.ts';
 import type { LandingWords } from '../check/check.ts';
 import { landingWords, placeSay } from '../place/landing.store.ts';
 import type { Place } from '../place/place.store.ts';
@@ -39,16 +39,20 @@ import { inboxDir } from '../record/files.store.ts';
  * first among its others (`claude.remoteControl`). A codex step of a repository run is filed with its repository's real path as the
  * directory Codex's trust extends from (`codex.trustFrom`), so a `--repo` given through a symlink names what the operator's Codex config
  * lists; a folder run has no repository, and a step on another harness takes no Codex arguments, so either is filed with none, as is one
- * whose repository is no longer there to resolve (`realRepoOf`). Both are the harness's own arguments (`own`), which the first filing, a
- * try and a round each spread into its `config`.
+ * whose repository is no longer there to resolve (`realRepoOf`). And the skills its session is given, and no other (`enabledSkillsOf`),
+ * off the step as it is told: one whose rendered folder is gone holds none, and is told them in its brief. All are the harness's own
+ * arguments (`own`), which the first filing, a try and a round each spread into its `config`.
  */
-export function toldOf(run: Run, step: Workflow): { step: Workflow; own: { claude?: ClaudeFlags; codex?: CodexArgs } } {
+export function toldOf(
+  run: Run,
+  step: Workflow,
+): { step: Workflow; own: { claude?: ClaudeFlags; codex?: CodexArgs; enabledSkills: string[] | 'default' } } {
   const dir = agentFilesDir(run, step.name);
   const told =
     rendersAgent(step) && !renderedIn(dir, step)
       ? unrendered(step, step.agent?.skills?.length ? skillsAgain(step, skillsFor(run.workflowDir, placesOf(run.repo))) : [])
       : step;
-  return { step: told, own: ownOf(told, renderedFlags(told, dir), () => realRepoOf(run)) };
+  return { step: told, own: { ...ownOf(told, renderedFlags(told, dir), () => realRepoOf(run)), enabledSkills: enabledSkillsOf(told) } };
 }
 
 /**

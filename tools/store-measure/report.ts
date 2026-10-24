@@ -23,9 +23,10 @@
  *   came, then let go.
  *
  * Beside the numbers: the runs, finished and open, the runtime's tasks and their journals' bytes, the runs whose tasks did not read
- * and the pass's unreadable lines, and `invariantRefusals`, the records the Run model refuses (`invariantRefusals`). A markdown table on stdout; with `--json`, the report as JSON with the machine, the commit and the date; with `--compare`,
- * each number beside the baseline's and their ratio. It refuses itself, exit 1 and no JSON, where the fence refused anything; exit 2 for
- * a call it cannot run. The copy is removed at the end. No threshold is fixed: the numbers are the owner's to judge.
+ * and the pass's unreadable lines, and `invariantRefusals`, the records the Run model refuses. A markdown table on stdout; with
+ * `--json`, the report as JSON with the machine, the commit and the date; with `--compare`, each number beside the baseline's and
+ * their ratio. It refuses itself, exit 1 and no JSON, where the fence refused anything; exit 2 for a call it cannot run. The copy is
+ * removed at the end. No threshold is fixed: the numbers are the owner's to judge.
  */
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';

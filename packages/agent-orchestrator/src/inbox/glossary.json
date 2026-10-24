@@ -9,8 +9,17 @@
   "terms": [
     {
       "term": "Card",
-      "meaning": "a piece of work written as a short markdown brief, started as a run.",
+      "meaning": "an idea on its way to a run: a short markdown brief in the inbox, started as a run, and kept there after it starts.",
       "type": "Card",
+      "see": {
+        "label": "From a card to a landing",
+        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+      }
+    },
+    {
+      "term": "Card state",
+      "meaning": "where a card is in its life — filed, queued, refused or started — computed once by the inbox's listing and sent on the wire as is.",
+      "type": "CardState",
       "see": {
         "label": "From a card to a landing",
         "href": "/how-a-run-lives/#from-a-card-to-a-landing"
@@ -23,6 +32,21 @@
         "label": "From a card to a landing",
         "href": "/how-a-run-lives/#from-a-card-to-a-landing"
       }
+    },
+    {
+      "term": "Missed start",
+      "meaning": "the tick's start of a queued card that did not happen, as it writes it down: when, on which repository, why, and whether it was a refusal.",
+      "type": "MissedStart",
+      "see": {
+        "label": "From a card to a landing",
+        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+      },
+      "retired": [
+        {
+          "spelling": "QueueTry",
+          "card": "A card keeps its identity after it starts"
+        }
+      ]
     }
   ]
 }

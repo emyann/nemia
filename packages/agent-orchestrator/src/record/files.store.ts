@@ -9,7 +9,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
 import { pauseFile, readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
-import { inboxNameOf, type QueueTry } from '../inbox/index.ts';
+import { inboxNameOf, type MissedStart } from '../inbox/index.ts';
 import type { AskKey, AskKind, AsksRead, AskWritten, PersonAsk, Pruned, Run, RunStore } from './record.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';
@@ -271,9 +271,9 @@ const writePruned = (id: string, marker: Pruned | undefined): void =>
 export const inboxDir = (): string => path.join(HOME, 'inbox');
 
 /**
- * Where the tick writes down a queued card's start it tried and did not make (`QueueTry`): `$WF_ROOT/queue/<name>.json`, outside the inbox,
- * which is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is not queued
- * as it was — started, taken back, dropped or edited.
+ * Where the tick writes down a queued card's start it tried and did not make (`MissedStart`): `$WF_ROOT/queue/<name>.json`, outside the
+ * inbox, which is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is not
+ * queued as it was — started, taken back, dropped or edited.
  */
 const queueDir = (): string => path.join(HOME, 'queue');
 
@@ -346,14 +346,14 @@ function dropCard(file: string): boolean {
   return true;
 }
 
-/** A try as the tick writes it (`QueueTry`); any key beside these is left unread. */
-const isQueueTry = Schema.is(
+/** A try as the tick writes it (`MissedStart`); any key beside these is left unread. */
+const isMissedStart = Schema.is(
   Schema.Struct({ at: Schema.String, text: Schema.String, repo: Schema.String, why: Schema.String, refused: Schema.Boolean }),
 );
 
 /** The tries the tick has written down, by card name; a file that does not read as one is none. */
-function queueTries(): Map<string, QueueTry> {
-  const tries = new Map<string, QueueTry>();
+function queueTries(): Map<string, MissedStart> {
+  const tries = new Map<string, MissedStart>();
   let names: string[];
   try {
     names = fs.readdirSync(queueDir()).filter((n) => n.endsWith('.json'));
@@ -363,7 +363,7 @@ function queueTries(): Map<string, QueueTry> {
   for (const file of names) {
     try {
       const r: unknown = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8'));
-      if (isQueueTry(r))
+      if (isMissedStart(r))
         tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
     } catch {}
   }
@@ -371,7 +371,7 @@ function queueTries(): Map<string, QueueTry> {
 }
 
 /** The tick's try of the card `name` written whole, the queue's folder made first. */
-function putTry(name: string, tried: QueueTry): void {
+function putTry(name: string, tried: MissedStart): void {
   fs.mkdirSync(queueDir(), { recursive: true });
   fs.writeFileSync(path.join(queueDir(), `${name}.json`), JSON.stringify(tried, null, 2));
 }

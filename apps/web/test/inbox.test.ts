@@ -29,6 +29,7 @@ import {
   queueOf,
   startPlace,
   triedLine,
+  triedShown,
   unassigned,
   unreadWorkflows,
   workflowKey,
@@ -44,6 +45,7 @@ const entry = (name: string, filedAt: string | null, extra: Partial<InboxEntry> 
   factory: null,
   from: [],
   startedAs: [],
+  state: 'filed',
   error: null,
   body: name,
   filedAt,
@@ -121,11 +123,11 @@ test('newestCardsFirst, hasPage, namedElsewhere: the cards in order, a refusal o
       const newest = entry('newest-c3d4', '2026-09-16T09:00:00.000Z');
       const middle = entry('dropped-k2q9', '2026-09-15T12:00:00.000Z');
       const oldest = entry('oldest-a1b2', '2026-09-15T10:00:00.000Z');
-      const kept = entry('started-e5f6', '2026-09-14T10:00:00.000Z', { startedAs: ['started-run-e5f6'] });
+      const kept = entry('started-e5f6', '2026-09-14T10:00:00.000Z', { startedAs: ['started-run-e5f6'], state: 'started' });
       const refusals: CardRefusal[] = [
         { entry: middle, action: 'start', message: 'no card dropped-k2q9 in the inbox.' },
         { entry: oldest, action: 'remove', message: 'no card oldest-a1b2 in the inbox.' },
-        { entry: { ...kept, startedAs: [] }, action: 'start', message: 'this card was started as started-run-e5f6.' },
+        { entry: { ...kept, startedAs: [], state: 'filed' }, action: 'start', message: 'this card was started as started-run-e5f6.' },
       ];
       const line = (l: ReturnType<typeof cardLines>[number]) => [l.entry.name, l.gone ? 'gone' : 'listed', l.refusal?.action ?? null];
 
@@ -401,9 +403,9 @@ test('fileCard, dropCard, startRun, queueCard: what the board sends the api for 
     },
   );
   await t.test(
-    'a card is started through POST /api/runs with `card` beside the workflow and the brief, and resolves with whether it left the inbox, and why not',
+    'a card is started through POST /api/runs with `card` beside the workflow and the brief, and resolves with the run alone: the card stays',
     async (t) => {
-      let answer = answered(201, { id: 'show-each-step-s-cost-42g6', card: 'show-what-a-step-cost-c3cw', removed: true }, 'Created');
+      let answer = answered(201, { id: 'show-each-step-s-cost-42g6', card: 'show-what-a-step-cost-c3cw' }, 'Created');
       const sent = sending(t, () => answer);
       const asked = {
         workflow: 'dev',
@@ -412,20 +414,11 @@ test('fileCard, dropCard, startRun, queueCard: what the board sends the api for 
         after: ['p-1'],
         card: 'show-what-a-step-cost-c3cw',
       };
-      assert.deepEqual(await startRun(asked), { id: 'show-each-step-s-cost-42g6', removed: true });
+      assert.deepEqual(await startRun(asked), { id: 'show-each-step-s-cost-42g6' });
       assert.deepEqual(JSON.parse(String(sent[0].init?.body)), asked);
 
-      answer = answered(201, {
-        id: 'show-each-step-s-cost-42g6',
-        card: 'show-what-a-step-cost-c3cw',
-        removed: false,
-        why: '/store/inbox/show.md could not be removed — EACCES',
-      });
-      assert.deepEqual(await startRun(asked), {
-        id: 'show-each-step-s-cost-42g6',
-        removed: false,
-        why: '/store/inbox/show.md could not be removed — EACCES',
-      });
+      answer = answered(201, { id: 'show-each-step-s-cost-42g6', removed: false, why: 'an older api' }, 'Created');
+      assert.deepEqual(await startRun(asked), { id: 'show-each-step-s-cost-42g6' }, 'a removal an older api answers is not read');
 
       const refusal =
         'no card show-what-a-step-cost-c3cw in the inbox. The inbox is empty. Start one of those — wf start /store/inbox/<name>.md — or park the idea first: wf inbox add "<idea>".';
@@ -473,7 +466,7 @@ test('fileCard, dropCard, startRun, queueCard: what the board sends the api for 
   await t.test(
     'a card in a factory starts there: in the /api/runs request, the factory and its repository go in the query and the body is as before',
     async (t) => {
-      const sent = sending(t, () => answered(201, { id: 'r', card: 'c', removed: true }, 'Created'));
+      const sent = sending(t, () => answered(201, { id: 'r', card: 'c' }, 'Created'));
       const asked = { workflow: 'good', from: 'repo' as const, brief: 'Hire', card: 'c' };
       await startRun(asked, { factory: 'hiring', repo: '/r/x' });
       assert.equal(sent[0].url, '/api/runs?factory=hiring&repo=%2Fr%2Fx');
@@ -518,12 +511,13 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
     () => {
       const at = '2026-09-16T10:00:00.000Z';
       const cards = [
-        entry('a-third', at, { workflow: 'dev', queued: { at, place: 3 } }),
+        entry('a-third', at, { workflow: 'dev', state: 'queued', queued: { at, place: 3 } }),
         entry('b-parked', at, { workflow: 'dev' }),
-        entry('c-first', at, { workflow: 'dev', queued: { at, place: 1 } }),
-        entry('d-started', at, { workflow: 'dev', queued: { at, place: null }, startedAs: ['r-1'] }),
+        entry('c-first', at, { workflow: 'dev', state: 'queued', queued: { at, place: 1 } }),
+        entry('d-started', at, { workflow: 'dev', state: 'started', queued: { at, place: null }, startedAs: ['r-1'] }),
         entry('e-refused', at, {
           workflow: 'gone',
+          state: 'refused',
           queued: { at, place: 2 },
           tried: { at, repo: '/code/app', why: 'no workflow gone.', refused: true },
         }),
@@ -535,8 +529,21 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
       assert.deepEqual(queueOf([]), []);
     },
   );
+  await t.test('REFUSED: a try is shown on a queued or refused card that carries one, never on a started one, whatever it carries', () => {
+    const at = '2026-09-16T10:00:00.000Z';
+    const tried = { at, repo: '/code/app', why: 'no workflow gone.', refused: true };
+    assert.equal(triedShown(entry('refused', at, { state: 'refused', queued: { at, place: 1 }, tried })), true);
+    assert.equal(triedShown(entry('failed', at, { state: 'queued', queued: { at, place: 1 }, tried: { ...tried, refused: false } })), true);
+    assert.equal(triedShown(entry('queued', at, { state: 'queued', queued: { at, place: 1 } })), false, 'no try');
+    assert.equal(triedShown(entry('started', at, { state: 'started', startedAs: ['r-1'], queued: { at, place: null }, tried })), false);
+  });
   await t.test('Queue is offered on a card that names a factory and a workflow, reads, is not queued and was not started', () => {
     assert.equal(queueable(entry('named', null, { factory: 'solo', workflow: 'dev' })), true);
+    assert.equal(
+      queueable(entry('named', null, { factory: 'solo', workflow: 'dev', startedAs: ['r-1'] })),
+      true,
+      "its state says filed: the runs it names are links, never what decides it (the orchestrator's `state`)",
+    );
     assert.equal(queueNeedsFactory(entry('named', null, { factory: 'solo', workflow: 'dev' })), false);
   });
   await t.test(
@@ -548,8 +555,12 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
         assert.equal(queueable(loose('loose', { workflow: 'dev' })), false, String(factory));
         assert.equal(queueNeedsFactory(loose('loose', { workflow: 'dev' })), true, String(factory));
         assert.equal(queueNeedsFactory(loose('bare')), false, 'no workflow: Start gives it both');
-        assert.equal(queueNeedsFactory(loose('queued', { workflow: 'dev', queued: { at, place: 1 } })), false, 'queued: Unqueue');
-        assert.equal(queueNeedsFactory(loose('started', { workflow: 'dev', startedAs: ['r-1'] })), false, 'started');
+        assert.equal(
+          queueNeedsFactory(loose('queued', { workflow: 'dev', state: 'queued', queued: { at, place: 1 } })),
+          false,
+          'queued: Unqueue',
+        );
+        assert.equal(queueNeedsFactory(loose('started', { workflow: 'dev', state: 'started', startedAs: ['r-1'] })), false, 'started');
         assert.equal(queueNeedsFactory(loose('broken', { workflow: 'dev', error: 'broken.md: not a card.' })), false, 'unread');
       }
     },
@@ -560,8 +571,10 @@ test('ordinal, queueOf, queueable, triedLine, capLine: the queue as the page and
       const at = '2026-09-16T10:00:00.000Z';
       const solo = (name: string, extra: Partial<InboxEntry> = {}) => entry(name, null, { factory: 'solo', ...extra });
       assert.equal(queueable(solo('bare')), false, 'no workflow');
-      assert.equal(queueable(solo('queued', { workflow: 'dev', queued: { at, place: 1 } })), false, 'queued already');
-      assert.equal(queueable(solo('started', { workflow: 'dev', startedAs: ['r-1'] })), false, 'started');
+      assert.equal(queueable(solo('queued', { workflow: 'dev', state: 'queued', queued: { at, place: 1 } })), false, 'queued already');
+      assert.equal(queueable(solo('started', { workflow: 'dev', state: 'started', startedAs: ['r-1'] })), false, 'started');
+      assert.equal(queueable(solo('started', { workflow: 'dev', state: 'started' })), false, 'started, read off its state alone');
+      assert.equal(queueable(solo('refused', { workflow: 'dev', state: 'refused' })), false, 'refused, read off its state alone');
       assert.equal(
         queueable(solo('broken', { workflow: 'dev', error: 'broken.md: `after` is not a key an inbox card has.' })),
         false,
@@ -708,8 +721,9 @@ test("cardPlace, cardFiling, factoriesOffered, notStarted: a card's factory and 
     () => {
       const cards = [
         entry('waits-a1', null, { factory: 'nemia' }),
-        entry('queued-b2', null, { factory: 'nemia', queued: { at: '2026-10-01T00:00:00.000Z', place: 1 } }),
-        entry('started-c3', null, { factory: 'nemia', startedAs: ['r-1'] }),
+        entry('queued-b2', null, { factory: 'nemia', state: 'queued', queued: { at: '2026-10-01T00:00:00.000Z', place: 1 } }),
+        entry('started-c3', null, { factory: 'nemia', state: 'started', startedAs: ['r-1'] }),
+        entry('started-g7', null, { factory: 'nemia', state: 'started' }),
         entry('broken-d4', null, { factory: 'nemia', error: 'the card has no front matter' }),
         entry('hiring-e5', null, { factory: 'hiring' }),
         entry('default-f6', null),

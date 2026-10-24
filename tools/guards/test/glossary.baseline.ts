@@ -22,7 +22,7 @@
  * `shipped` and `ships`, on the day decision 13a retired them (`Landed` in the run core's, the api's and the board's tables): the run's
  * sense, a run's result on its base, says `landed` everywhere since that card. Every count left is the product's sense, what comes with
  * Nemia (its git place, the skills, servers and rules it lists, a default it is given with), which decision 13b renames to `builtin`
- * (the run core's `Builtin` row) and drives to zero. No old spelling is kept on purpose: nothing on disk or on the wire as input said it.
+ * (the run core's row of that word) and drives to zero. No old spelling is kept on purpose: nothing on disk or on the wire as input said it.
  *
  * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
  * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,

@@ -33,7 +33,7 @@ const { engineOf } = await import('../src/runtime-client.ts');
 const { readRun, stepsOf } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
 const { ledgerOf, topsOf } = await import('../src/revisions/revisions.store.ts');
-const { passRevisions, pinPass, resolvedNow } = await import('../src/revisions/pin.verb.ts');
+const { followPass, passRevisions, pinPass, resolvedNow } = await import('../src/revisions/pin.verb.ts');
 const { refreshRun } = await import('../src/revisions/pin.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
 const { writeRules } = await import('../src/rules/rules.store.ts');
@@ -196,21 +196,45 @@ test('a filed run in a factory that follows takes the folder edited after its fi
   await runWith(b.e, advanceRun(readRun(run.id)));
   b.settle(`${run.id}-build`, 'failed');
   const ledger = ledgerOf('agent', t.agent).length;
-  assert.equal(pinPass(readRun(run.id), new Date().toISOString()).wrote, false, 'a pass with no edit writes nothing');
+  assert.equal(followPass(readRun(run.id), new Date().toISOString(), true).wrote, false, 'a filing due with no edit re-pins nothing');
   assert.equal(ledgerOf('agent', t.agent).length, ledger, 'and numbers nothing new');
 
   fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nYou follow the files.\n`);
   fs.writeFileSync(path.join(t.dir, 'extra.md'), `---\nplace: git\nagent: ${t.agent}\n---\nA step added since.\n`);
   await assert.rejects(runPlaced(refreshRun(run.id)), (err: Error & { _tag?: string }) => err._tag === 'Conflict');
   await runWith(b.e, retryRun(run.id, 'build', { mode: 'fresh' }));
-  await runWith(b.e, advanceRun(readRun(run.id)));
+  const repinned = await runWith(b.e, advanceRun(readRun(run.id)));
+  assert.deepEqual(repinned.tried, [], 'the pass that re-pins files nothing');
+  assert.equal(pinOf(readRun(run.id).pinned, 'agent', t.agent)!.n, 2, 'the run takes the edited agent with no refresh asked');
+  const filed = await runWith(b.e, advanceRun(readRun(run.id)));
+  assert.deepEqual(filed.tried, ['build'], 'and the next pass files the retry');
 
   const after = readRun(run.id);
-  assert.equal(pinOf(after.pinned, 'agent', t.agent)!.n, 2, 'the run takes the edited agent with no refresh asked');
   assert.equal(after.steps.build?.pinned?.[0].n, 2, 'and the retry is filed on it');
   assert.match(promptOf(run.id, 'build'), /You follow the files/, 'its prompt rendered again');
   assert.deepEqual(Object.keys(after.steps), ['build'], 'the step added to the folder is not added to the run');
   assert.equal(fs.existsSync(path.join(ROOT, 'runs', `${run.id}.refresh`)), false, 'and no refresh ask was written');
+});
+
+test('a finished run in a factory that follows keeps its pins, its workflow and its prompts through a full pass after an edit', async () => {
+  const t = team();
+  const repo = aRepo();
+  const factory = `follows-done-${t.name}`;
+  addFactory({ name: factory, repos: [repo] });
+  attachWorkflow({ factory, workflow: t.name });
+  setRevisions({ factory, revisions: 'follow' });
+  const run = await started(t.dir, repo, { factory });
+  const b = board();
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  b.settle(`${run.id}-build`, 'succeeded', { closeout: SIGNED });
+  assert.equal((await runWith(b.e, advanceRun(readRun(run.id)))).status, 'succeeded', 'the run is finished');
+  const { pinned, workflow } = readRun(run.id);
+  const prompt = promptOf(run.id, 'build');
+
+  fs.writeFileSync(t.agentFile, `---\nskills: ${t.skill}\n---\nWritten after it finished.\n`);
+  await runWith(b.e, advanceRun(readRun(run.id)));
+  assert.deepEqual([readRun(run.id).pinned, readRun(run.id).workflow], [pinned, workflow], 'its pins and workflow are the ones it ran on');
+  assert.equal(promptOf(run.id, 'build'), prompt, 'and so is the prompt its step was given');
 });
 
 test('the ledger appends only where the digest moved, and a content it already holds keeps the number it was given', async () => {

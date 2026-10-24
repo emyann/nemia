@@ -26,9 +26,9 @@ test("configRefusal: what each harness refuses of a task's configuration, and wh
     assert.match(refused('claude', { contextTokens: 5 }), /`contextTokens: 5` is outside the windows the `claude` harness takes/);
     assert.match(refused('codex', { contextTokens: 200_000 }), /the `codex` harness has no such knob/);
   });
-  await t.test('configRefusal refuses a background session on Codex, and a spend cap on a Claude Code background session', () => {
-    assert.match(refused('codex', { background: true }), /`background: true` asks for a Claude Code background session/);
-    assert.match(refused('claude', { background: true, budgetUsd: 5 }), /a `claude --bg` session does not keep one/);
+  await t.test('configRefusal refuses `background` on every harness, naming the field, and `claude-detached`, naming `claude`', () => {
+    for (const harness of ['claude', 'codex']) assert.ok(refused(harness, { background: true } as never).includes('`background`'), harness);
+    assert.ok(refused('claude-detached', {}).includes('`claude`'));
   });
   await t.test("configRefusal refuses on Codex a spend cap, a deny list, an allow list and Claude Code's flags", () => {
     assert.match(refused('codex', { budgetUsd: 5 }), /`budgetUsd: 5` is a spend cap in dollars, and `codex exec` has none/);

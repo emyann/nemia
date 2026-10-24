@@ -4,7 +4,7 @@ import path from 'node:path';
 import type { Locator, Page } from 'playwright';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled, WAIT_MS, watch } from './checks.ts';
 import { instantWhole, instantWords } from '../../src/lib/instant.ts';
-import { DIAMOND, REGISTRY } from './seed.ts';
+import { attachedFiles, attachedRun, DIAMOND } from './seed.ts';
 import { measure } from './contrast.ts';
 import { API, measuring, photographing, store } from './world.ts';
 
@@ -534,7 +534,7 @@ export type HerAsk = { id: string; questions: readonly HerQuestion[]; answers?: 
 /** What a page plants of her: her level, where her session is, her transcript, the read mark, the person's outbox, and her asks. */
 export type HerChat = {
   level?: 'manual' | 'semi-auto' | 'auto';
-  /** Her session as `claude agents` lists it: answering a turn, up and waiting for words, or none filed at all. */
+  /** Her session as its holder's run file says it: answering a turn, up and waiting for words, or none filed at all. */
   session?: 'answering' | 'up' | 'none';
   /** Her transcript, oldest first: her words are `m:1:e<i>` in the chat, a tool call `t:1:e<i>`, by its line's place here. */
   said?: readonly HerLine[];
@@ -557,14 +557,12 @@ export type HerChat = {
  */
 export const herEvent = (said: readonly HerLine[], i: number): string => ('text' in said[i] ? `m:1:e${i}:0` : `t:1:e${i}`);
 
-/** Her session in a turn, as the fake `claude agents` lists it: the engine reads it running, and her phase answering. */
-const ANSWERING = { state: 'working', status: 'busy', pid: 424242 };
-
 /**
- * Her session held by Claude Code, its turn over: the engine reads it `input-required` with nothing waited for, so her phase is idle,
- * which `idleOf` grants a long-lived session alone.
+ * Her session's run file (`attachedRun`): in a turn the engine reads it `working`, and her phase answering; its turn over it is `idle`,
+ * which the engine reads `input-required` with nothing waited for, so her phase is idle, which `idleOf` grants a long-lived session
+ * alone.
  */
-const WAITING = { state: 'done', status: 'idle', pid: 424242 };
+const herRun = (state: 'working' | 'idle', startedAt: string) => attachedRun(`ae/${NEMIA_TASK}/1`, NEMIA_SESSION, state, startedAt);
 
 /** One line of her transcript as Claude Code writes it, `seconds` before now. */
 const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => string): object[] => {
@@ -596,10 +594,10 @@ const herTranscriptLine = (line: HerLine, i: number, at: (seconds: number) => st
 
 /**
  * Plants Nemia's chat in the store the worker serves: her level file naming her task, her task journalled filed and spawned, her
- * session's row for the fake `claude agents` (`REGISTRY`), her session's transcript, the person's outbox and their read mark. Each file
+ * session's run file as its holder writes one (`herRun`), her session's transcript, the person's outbox and their read mark. Each file
  * is written as the keeper, the api and the runtime write theirs — a key they leave out absent, never null.
  *
- * Answers what takes it back: every file it made removed, and the registry put back as the seed left it. A page calls it in a `try` and
+ * Answers what takes it back: every file it made removed. A page calls it in a `try` and
  * the take-back in its `finally`, so no page after it reads her.
  */
 export function herChat(what: HerChat): () => void {
@@ -609,9 +607,8 @@ export function herChat(what: HerChat): () => void {
   const level = what.level ?? 'semi-auto';
   const nemiaDir = path.join(root, 'nemia');
   const journal = path.join(root, 'engine', 'tasks', `${NEMIA_TASK}.jsonl`);
-  const registry = path.join(root, REGISTRY);
+  const { run: herRunFile } = attachedFiles(root, `ae/${NEMIA_TASK}/1`);
   const transcript = path.join(root, 'claude', 'projects', NEMIA_PROJECT, `${NEMIA_SESSION}.jsonl`);
-  const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as object[];
   const lines = (entries: readonly object[]) => entries.map((entry) => `${JSON.stringify(entry)}\n`).join('');
 
   fs.mkdirSync(nemiaDir, { recursive: true });
@@ -637,14 +634,8 @@ export function herChat(what: HerChat): () => void {
   );
   const session = what.session ?? 'answering';
   if (session !== 'none') {
-    const row = session === 'answering' ? ANSWERING : WAITING;
-    fs.writeFileSync(
-      registry,
-      JSON.stringify([
-        ...rows,
-        { name: `ae/${NEMIA_TASK}/1`, sessionId: NEMIA_SESSION, kind: 'background', ...row, startedAt: now - 600_000 },
-      ]),
-    );
+    fs.mkdirSync(path.dirname(herRunFile), { recursive: true });
+    fs.writeFileSync(herRunFile, herRun(session === 'answering' ? 'working' : 'idle', new Date(now - 600_000).toISOString()));
   }
   const said = what.said ?? [];
   fs.mkdirSync(path.dirname(transcript), { recursive: true });
@@ -686,7 +677,7 @@ export function herChat(what: HerChat): () => void {
     fs.rmSync(nemiaDir, { recursive: true, force: true });
     fs.rmSync(journal, { force: true });
     fs.rmSync(path.join(root, 'claude', 'projects', NEMIA_PROJECT), { recursive: true, force: true });
-    fs.writeFileSync(registry, JSON.stringify(rows));
+    fs.rmSync(herRunFile, { force: true });
   };
 }
 
@@ -710,14 +701,12 @@ export function herChatUnreadable(): () => void {
 }
 
 /**
- * Her turn over, as Claude Code lists it once a turn of a session it holds has ended: her row rewritten to the one the engine reads
- * `input-required` (`WAITING`), so her presence says she is no longer answering. Taken back with the rest by `herChat`'s take-back,
- * which writes the registry as the seed left it.
+ * Her turn over, as her holder writes it once a turn of the session it holds has ended: her run file `idle`, which the engine reads
+ * `input-required`, so her presence says she is no longer answering. Taken back with the rest by `herChat`'s take-back.
  */
 export function herTurnOver(): void {
-  const registry = path.join(store!, REGISTRY);
-  const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as { name?: string }[];
-  fs.writeFileSync(registry, JSON.stringify(rows.map((row) => (row.name === `ae/${NEMIA_TASK}/1` ? { ...row, ...WAITING } : row))));
+  const { run } = attachedFiles(store!, `ae/${NEMIA_TASK}/1`);
+  fs.writeFileSync(run, JSON.stringify({ ...(JSON.parse(fs.readFileSync(run, 'utf8')) as object), state: 'idle' }));
 }
 
 /**

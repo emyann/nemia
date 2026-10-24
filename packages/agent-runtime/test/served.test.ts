@@ -23,6 +23,7 @@ import { holderAgentRefusal, holderRefusal, holderSeamOf } from '../src/a2a/hold
 import { heldHarnessesOf, optionsRefusalOf } from '../src/service/options.ts';
 import { Engine } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
+import { codex } from '../src/harness/codex/codex.ts';
 import { scratch } from './scratch.ts';
 import { story } from './checkpoints.ts';
 import { RunnerError, type Followed, type RunnerOps } from '../src/harness/seam.ts';
@@ -368,19 +369,18 @@ test('the harnesses a holder serves: the literal `claude` and no other, by defau
       heldHarnessesOf({
         claude: 'claude',
         second: 'claude',
-        bg: 'claude-bg',
         reviewer: { url: 'https://a.example' },
         made: { name: 'made', command: () => ({ cmd: 'echo', args: [] }) },
         stand: handOps(),
       }),
       ['claude', 'second'],
-      'a `claude-bg`, a remote agent’s, a detached one’s and a runner brought as its own are none of them held',
+      'a remote agent’s, a detached one’s and a runner brought as its own are none of them held',
     );
     assert.deepEqual(heldHarnessesOf({}), [], 'and a configuration with none holds none');
   });
 
   await t.test('an engine with no `claude` harness serves nothing: its `hold()` answers null', async () => {
-    const engine = builtEngine(Engine.layer({ root: scratch('ae-holds-none-'), harnesses: { bg: 'claude-bg', stand: handOps() } }));
+    const engine = builtEngine(Engine.layer({ root: scratch('ae-holds-none-'), harnesses: { codex, stand: handOps() } }));
     const held = await Effect.runPromise(Effect.scoped(engine.hold()));
     assert.equal(held, null, 'there is nothing one process holds attached, so there is no port to serve');
   });

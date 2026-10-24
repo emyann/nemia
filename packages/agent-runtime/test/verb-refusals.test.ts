@@ -487,21 +487,22 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
     });
   }
   await t.test('output refuses a task whose harness keeps no whole streams, naming logs', async () => {
-    await Effect.runPromise(built.file({ brief: 'mixed', cwd: '/r', id: 'mixed', harness: 'claude', queued: true }));
-    const tagged = await failure(effect((e) => e.output('mixed', 'stdout')));
+    const mixed: AsyncRunner = { spawn: async () => {}, observe: async () => new Map(), stop: async () => {}, logs: async () => '' };
+    const own = builtEngine(
+      Engine.layer({ root: scratch('ae-verbs-'), journal: asyncStore(memoryJournal()), harnesses: { mixed: asyncOps(mixed) } }),
+    );
+    await Effect.runPromise(own.file({ brief: 'mixed', cwd: '/r', id: 'mixed', harness: 'mixed', queued: true }));
+    const tagged = await failure(Effect.runPromise(own.output('mixed', 'stdout')));
     assert.equal(tagged._tag, 'OutputRefused');
     assert.equal(
       tagged.message,
-      'the `claude` harness keeps no whole streams: it mixes them in one log. `logs` gives what its session printed.',
+      'the `mixed` harness keeps no whole streams: it mixes them in one log. `logs` gives what its session printed.',
     );
   });
   await t.test('nothing refused was journalled', async () => {
     assert.deepEqual(
       (await Effect.runPromise(built.feed(0))).entries.map((e) => [e.taskId, e.event.kind]),
-      [
-        ['one', 'filed'],
-        ['mixed', 'filed'],
-      ],
+      [['one', 'filed']],
       'nothing refused was journalled',
     );
   });

@@ -18,6 +18,10 @@
  * `stated`, `unsigned` and `checkoutMcp`, on the day the runtime retired them: each a stored key or literal an older runtime's journal
  * holds, read by `upgrade` and named in its doc (`journal.ts`), the stored schema (`event-schema.ts`) and the filing door's
  * `RENAMED_ARGS` (`args.ts`). They stay while a journal on disk may hold them.
+ *
+ * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
+ * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
+ * `options.ts`). They stay while a caller may still write them.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   wf: {
@@ -52,5 +56,11 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-runtime/src/core/engine/journal.ts': 1,
     'packages/agent-runtime/src/core/event-schema.ts': 1,
     'packages/agent-runtime/src/harness/args.ts': 1,
+  },
+  'claude-detached': {
+    'packages/agent-runtime/src/service/harness-refusal.ts': 3,
+  },
+  'claude-bg': {
+    'packages/agent-runtime/src/service/options.ts': 3,
   },
 };

@@ -1,13 +1,13 @@
 /**
- * What a detached session's output says, as a spec's `readOutput` reads it: `claude -p`'s one result, and `claude -p`'s stream
+ * What a detached session's output says, as a spec's `readOutput` reads it: a Claude Code session's one result line, and its stream
  * of events — its closeout, what it consumed and cost, whether it spent its budget, what it was denied, and, off the stream,
- * the skills it loaded and the files it touched. Pure functions of the lines `printedLinesOf` (`harness/claude/print.ts`) decodes:
+ * the skills it loaded and the files it touched. Pure functions of the lines `printedLinesOf` (`harness/claude/stream.ts`) decodes:
  * an output it refuses is thrown in its words, never read as saying nothing. Codex's `exec --json` stream is read by `codexOutput`
  * (`harness/codex/stream.ts`).
  */
 import path from 'node:path';
 import { firstPiece, type Denial, type Usage } from '../../core/index.ts';
-import { partialMarksOf, printedKindOf, printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/print.ts';
+import { partialMarksOf, printedKindOf, printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/stream.ts';
 import type { HarnessOutput } from './detached.ts';
 import type { PartialMark } from './follow.ts';
 
@@ -22,8 +22,10 @@ const decoded = (output: string, kinds: readonly PrintedKind[]): PrintedLine[] =
 type DeniedEntry = { tool_name: string; tool_use_id?: string; tool_input?: unknown };
 
 /**
- * What `claude -p --output-format json` says in its one `result` object. The last result line is taken and every other
- * line skipped — the worker captures stderr beside it.
+ * What a Claude Code session's `result` line says, read alone — the reading of the result a job's stream ends with
+ * (`claudeStreamOutput`), and of the one object `claude -p --output-format json` printed for a run a former runtime stored. No shipped
+ * harness reads its output with it now; it is kept as that reading's own door, and pinned among the shipped readers
+ * (`SAID_VERSION`). The last result line is taken and every other line skipped — the worker captures stderr beside it.
  *
  * The final answer is its `structured_output`, which Claude Code fills when it was given `--json-schema` and the session
  * answered in that shape. No result, a result without the field, or one whose field is `null`, is no answer.
@@ -222,8 +224,9 @@ const gather = (facts: StreamFacts, printed: PrintedLine): void => {
 };
 
 /**
- * What `claude -p --output-format stream-json --verbose` says: every event of the session, one JSON object a line, the
- * last of them its `result` — read by `claudeResultOutput`, as the one line of `--output-format json` is.
+ * What a job's stream says (`bin/ae-claude-job.ts`, the SDK's messages one JSON object a line, as
+ * `claude -p --output-format stream-json --verbose` printed them): every event of the session, the last of them its `result` — read
+ * as `claudeResultOutput` reads it.
  *
  * What it was denied is read off the stream as well as the result, so a session killed before its result still says
  * it: each `{"type":"system","subtype":"permission_denied","tool_name","tool_use_id",…}` event, which names no input —
@@ -305,7 +308,7 @@ const assistantKept = (line: Printed<'assistant'>, denied: ReadonlySet<string>):
 };
 
 /**
- * What a `claude -p --output-format stream-json --verbose` capture keeps once its session has ended: what the shipped readers read of
+ * What a job's stream capture keeps once its session has ended: what the shipped readers read of
  * it, and nothing of the conversation they do not, in the order printed. Kept whole: a line that is no JSON object (stderr, the
  * worker's own words, a line torn mid-write), and each line of a kind `claudeStreamOutput` reads whole — its `result`, its `system`
  * `init` and `permission_denied` lines. An `assistant` line is cut to its `tool_use` blocks, each its id, its tool and its input:
@@ -336,9 +339,9 @@ const lineKept = (text: string, denied: ReadonlySet<string>): string | undefined
 };
 
 /**
- * What `claude -p --include-partial-messages` says of the text it is writing, in `output`'s whole lines after `before` lines: a
- * message begun, a piece of a text block, a block written whole (`PartialMark`); every other line passes. Or why it is refused
- * (`wrong`), naming the line as numbered in the whole output, when a `stream_event` line does not decode (`printedLinesOf`).
+ * What a job's stream says of the text it is writing (the SDK's `includePartialMessages`), in `output`'s whole lines after `before` lines:
+ * a message begun, a piece of a text block, a block written whole (`PartialMark`); every other line passes. Or why it is refused (`wrong`),
+ * naming the line as numbered in the whole output, when a `stream_event` line does not decode (`printedLinesOf`).
  */
 export const claudePartials = (output: string, before: number): { marks: PartialMark[] } | { wrong: string } => {
   const read = printedLinesOf('\n'.repeat(before) + output, ['stream_event']);

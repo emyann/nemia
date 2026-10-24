@@ -17,7 +17,7 @@ runtime's entries exports a name of it.
 
 ## Two kinds of agent
 
-- **A harness on this machine** (`claude`, `codex`, `claude-detached`, `command`) is an A2A agent that runs in the runtime's own
+- **A harness on this machine** (`claude`, `codex`, `command`) is an A2A agent that runs in the runtime's own
   process. The runtime reaches it through the A2A client with no network between them (`packages/agent-runtime/src/a2a/client.ts`).
   The agent that answers (`packages/agent-runtime/src/a2a/handler.ts`) holds nothing: every answer is read again from the harness and
   the journal, so a runtime restarted mid-session answers for a session it never started.
@@ -57,14 +57,13 @@ artifact update, until the session settles.
 
 Not every harness can be followed this way:
 
-| Harness                    | Streamed | What a follower is handed                                                                                                            |
-| -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `claude`, a job            | yes      | its state, each message's text in pieces as it is written, and each event of its transcript once                                     |
-| `claude` in the background | yes      | its state, and each line of its transcript once, across its turns and restarts                                                       |
-| `codex`                    | yes      | its state, and each event once and in order, each message whole                                                                      |
-| `claude-detached`          | no       | nothing while it runs; its transcript once it has ended                                                                              |
-| `command`                  | no       | nothing: a process keeps no conversation, only its output                                                                            |
-| a remote agent             | yes      | its Task's own stream where its card offers one; else its Task read every second (`packages/agent-runtime/src/a2a/remote-follow.ts`) |
+| Harness                 | Streamed | What a follower is handed                                                                                                            |
+| ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `claude`, a job         | yes      | its state, each message's text in pieces as it is written, and each event of its transcript once                                     |
+| `claude`, held attached | yes      | its state, the pieces of the text it is writing, and each event of its transcript once, across its turns and its holders             |
+| `codex`                 | yes      | its state, and each event once and in order, each message whole                                                                      |
+| `command`               | no       | nothing: a process keeps no conversation, only its output                                                                            |
+| a remote agent          | yes      | its Task's own stream where its card offers one; else its Task read every second (`packages/agent-runtime/src/a2a/remote-follow.ts`) |
 
 This subscription is A2A's, to one session. It is not the feed subscription whose selectors wake [Nemia](/nemia/#her-subscription), which is
 the orchestrator's.

@@ -32,12 +32,18 @@ State as of 2026-10-23 (the docs audit of that day): 2 and the Codex line's 36 a
 *Answered or overtaken*. The claude.ai bridge and the interrupt's receipt, written down on 2026-10-16 as a second 36 and a
 second 37, are 39 and 40.
 
+State as of 2026-10-24: every Claude Code session runs on the Agent SDK — a job, or a session held attached, a long-lived one there
+alone — and the `claude -p` road (`claude-detached`) and the `claude --bg` road (`config.background`, `'claude-bg'`, `claude agents`)
+are removed. Issues 3, 4, 11 to 14, 16 to 18 and 28, whose subject was one of the two, are closed and moved under *Closed since
+2026-09-16*; 35 loses the gaps only `--bg` had; the claude.ai bridge opens at a session's `init` for a job too (39, measured).
+
 ## Bugs
 
 ### 39. The claude.ai bridge is an undeclared control request, and two things about it are unmeasured
 
 **Where.** `src/harness/claude/attached-bridge.ts`, the one door; `src/harness/claude/attached-session.ts`, which opens the bridge
-after the first turn of a request that asked for it.
+of a held session on its `system`/`init` message, and `bin/ae-claude-job.ts`, which opens a job's there too and writes its facts on a
+file beside the run (`bridgeDue`).
 
 **What is known.** `@anthropic-ai/claude-agent-sdk` declares no `enableRemoteControl` on its `Query` type — not on 0.3.270, and not
 on 0.3.308, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method (re-read 2026-10-22 at the bump) — yet the object
@@ -48,6 +54,13 @@ messages (`ready`, then `connected`) onto the session's stream. Probed live on 2
 design's step. Because it is undeclared, it is read off the object here and nowhere else, decoded by a schema of its own, and refused
 in words on the run file where it is absent: the session runs on with no bridge (`src/harness/claude/attached-bridge.test.ts` makes each refusal).
 An SDK update that renames or drops it breaks no session; it takes the bridge away, and the run file says so.
+
+**Measured 2026-10-24** (Agent SDK 0.3.308, Claude Code 2.1.308, haiku; the probe's scripts are the run's): called on `init`, a job's
+`enableRemoteControl(true, name, { keepSessionOnExit: false })` answered the bridge's facts 0.5 s later (init at 1.0 s, the answer and
+`bridge_state: ready` at 1.5 s, `connected` at 1.7 s), long before its result at 21.1 s, during a tool call: the answer is not queued
+behind the turn. A streaming-input session asked at init with `keepSessionOnExit: true` answered the same way (init 2.8 s, answer 3.3 s,
+connected 3.4 s), and **a second process resuming it with `reattachSessionId` set to the first `bridge_session_id` was answered the same
+`bridge_session_id` and `session_url`, connected 0.5 s after its init: the re-attach across processes holds** at the protocol's level.
 
 **Unmeasured.** (i) Whether a claude.ai session re-attaches as the same conversation on a phone after the daemon restarted and the
 runtime passed the kept `bridgeSessionId` back as `reattachSessionId` — the stand-in answers the id it is given, so the request is
@@ -101,46 +114,6 @@ workaround (2026-10-19), and **the code is unchanged**: nothing rounds, and noth
 is ever lowered, or the runtime is ever run on another libuv or another kernel that keeps a coarser time, these are the comparisons
 where it shows, and the six tests above are what names it.
 
-### 3. A worktree task's Claude session stays in the registry
-
-A `--bg` session is released once its attempt's end, or its task's settling, is on the record (engine
-`7200295`, and two fixes from review in the table below): stopped if `claude agents` still has it
-running, then removed. One kind is left there, stopped: a task that asked for a `worktree`, because
-`claude rm` deletes the worktree the harness cut and the task's work is in it. Removing it safely would
-need that work somewhere else first. A session whose task a person or a deadline settled before the
-`settled` entry carried its id stays listed too, since `ae logs` could not read it once removed.
-
-### 4. `claude-detached` measures its cost and tokens, and no turns, tool calls, peak context or tool time
-
-`agent-runtime/src/harness/detached/output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
-`total_cost_usd` and `duration_api_ms` (engine `9d075f7`), from the one `result` object `claude -p --output-format json`
-prints. Its tokens are read from the same object's `usage`, in their three classes, since 2026-09-19: on 2.1.278 that `usage`
-is the process's own — a `--resume` printed 10 uncached, 21,392 written and 0 read, where its `modelUsage` carried its parent's
-counts on. On 2.1.272 the same `usage` had counted 0 input and 0 output tokens in a run whose `modelUsage` counted thousands,
-so a `usage` whose input sums to 0 gives no tokens. Since 2026-10-22 its tokens are its `modelUsage`'s, every model of the
-session together, subagents included, where every model gives every class: `usage` counts the main thread alone, which put a
-step done by subagents at a quarter of its reads (`rewrite-six-of-the-orchestra-uv7v`'s implement: 22.3M against 91.1M). A
-resume of a spec with `resumeCostCarried` has its parent's taken off as its cost does (`tokensLess`), and falls back to its own
-`usage` where the parent's were not kept; `usage` alone stays the reading where `modelUsage` is missing or partial. It has no peak context (`usage.iterations` holds the last response
-alone), no count of turns or tool calls, and no tool time.
-
-**A resumed `claude -p`'s cost is carried on, on 2.1.278 — fixed for `claude-detached` 2026-10-22 (engine `48b3c8e`).** The
-same `--resume` printed a `total_cost_usd` of $0.0900: its parent's $0.0471 and its own $0.0430 together, and its `modelUsage`
-carried its parent's counts on too. Its own share cannot be read off the result alone, so `claudeDetached` now says so
-(`resumeCostCarried`), as a job's spec does: the runner takes off the cost, API time and whole-session tokens the parent run
-printed, kept on the resume's run file at spawn (`carried`) or found among the run files. Proven on h4sj's implement tries
-(`test/session-results.ts`), through the shipped spec: try 2 counts its own 4.2M cache reads and $1.33, not the 89.6M and
-$43.54 its result carries (`test/detached.test.ts`). Its edge is the job's: a resume whose parent is no `claude-detached` run
-— a job's or a `--bg` session's id resumed on it — records no cost or API time, and its tokens fall back to its own `usage`,
-an undercount and never an overcount. An attempt journalled before the fix keeps what it recorded.
-
-**Narrowed for a job on `claude`** (stage 2 part 1). Measured again on 2.1.280 (issue 28, M2): a `-p --resume` printed
-$0.0257 over a parent's $0.0210, and a second resume $0.0284 — and its `duration_api_ms` is carried on the same way. So the
-job's spec says so (`resumeCostCarried`), and the worker's registry takes off the cost and API time its parent printed: the
-parent is the run under the id it resumed that started last before it. What is left: a job whose parent is no run of the
-worker's — a `--bg` session, or a session another tool started — records no cost and no API time, since what it printed
-cannot be told apart from what its parent spent. `claude-detached` does the same since 2026-10-22, above.
-
 ### 6. The bare `file` refuses no harness's words
 
 **Where.** `file` in `agent-runtime/src/core/engine/filing.ts` refuses what the task says of itself; the refusals in a harness's
@@ -172,15 +145,14 @@ fails with it out of either (a runner built with `Runner.of` through `file`, and
 **What is left.** Through the bare `file`, still journalled: a `harness` the runner does not have — which `composite`
 runs on its fallback without a word — a permission mode or an effort the harness rejects, which waits out the grace
 window and ends the attempt `lost`; a `contextTokens` outside the harness's range, or on one with no window setting;
-`claude.remoteControl`, and every other flag under `claude`, on `codex` or a `check` (Claude Code's own `-p` specs refuse
-the bridge there since 2026-09-25, `claudePrintRefuses`); `budgetUsd` on `claude --bg` or `codex`. `test/refusal.test.ts` pins
+`claude.remoteControl`, and every other flag under `claude`, on `codex` or a `check`; `budgetUsd` on `codex`. `test/refusal.test.ts` pins
 that an unknown harness and a bad mode are still journalled there, so the day this moves, that test says so.
 
 The issue used to say `RunnerOps` has no verb for this, and so it would be a value passed to `file`. The first half is
 wrong: `RunnerOps` already has optional verbs (`find`, `release`, `transcript`, `say`), and an optional `refuses`
 would not move the line its four required ones hold. What it costs is elsewhere: `file` would need `Runner` beside
 `Journal`, a change to every Effect consumer's `file`; `composite` would need to refuse an unknown harness where it
-falls back today; and the refusals that name another harness — *file the task on `claude-detached`*, the windowed and
+falls back today; and the refusals that name another harness — the windowed and
 the bridged harnesses listed by name — need the whole map of harness configs, which only the engine's options hold, where
 the composite sees opaque ops. A value passed to `file` instead would be opt-in: it repeats what the consumer's runner
 layer already knows, and by default refuses nothing. Either is more than a small change, so it was left; nothing in the
@@ -213,7 +185,7 @@ session spawned strict still had Claude in Chrome connecting: a user setting swi
 config names it. hkb closed the same hole with `strictMcpConfig` (its ADR-013).
 
 **Fixed for Claude Code** (engine `5340772`, `945bf46`): every `claude` and `claude-detached` spawn is
-`--strict-mcp-config --no-chrome`, and names the checkout's `.mcp.json` and the task's `mcp`.
+`--strict-mcp-config --no-chrome` (since 2026-10-24 every Claude Code session is on the Agent SDK, `strictMcpConfig`), and names the checkout's `.mcp.json` and the task's `mcp`.
 
 **Open for Codex.** `codex exec` is given a task's `mcp` as one `-c mcp_servers={…}` override, and the
 override is merged into the table `~/.codex/config.toml` has, not put in its place: with
@@ -230,64 +202,6 @@ name. Not done: the names would have to come from `config.toml`, a profile, and 
 layers in, and a list that misses one is a fence that looks closed. The machine this was measured on
 has no Codex servers configured.
 
-### 11. A `claude-detached` session's conversation cannot be followed while it runs
-
-`transcript` reads the transcript `claude --bg` would write, by the session id the worker keeps. `claude
--p --output-format json` prints that id in the one object it prints at exit, so until then there are no
-events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
-(`claudeResultOutput` in `agent-runtime/src/harness/detached/output.ts`). Low priority, like issue 4: this
-harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox, and it is not
-followed live: its runner has no `follow`, its card says `streaming: false`, and a subscription is refused.
-
-**Closed for a job on `claude`** (stage 2 part 1): its spec prints `stream-json`, whose first line names the session, so the
-worker has its id while it runs and `transcript` reads it by the job's name then (`claudeStreamOutput`). `claude-detached`
-keeps the json form, and this issue, as the harness there to compare against.
-
-### 12. `said` means the words were handed to the inbox, not that the session read them
-
-**Where.** `claudeOps.say` in `agent-runtime/src/harness/claude/bg.ts`: a line posted to the session's inbox socket, which
-writes nothing back (measured: the connection closes in a few milliseconds, with no bytes).
-
-**Effect.** Words Claude Code sets aside are journalled all the same: a `crossSessionInbound` of `hold` or
-`refuse` in the operator's user, project or managed settings; a burst past the inbox's rate limit; the same
-words twice inside its repeat window (said twice, journalled twice, perhaps delivered once); a full queue. Only
-`bypassPermissions`, the one hold the engine can see coming from the task, is refused up front.
-
-**Possible fix.** Claude Code tells a sender what became of a message — held, delivered, refused, dropped — as
-a `peer_message_status` line to the reply address the message carries in `from`, when that address is a `uds:`
-socket in its own sockets directory and the sender's pid is verified. The engine would have to listen on such a
-socket for the length of a `say`, and the status of a held message can arrive minutes later. Not done: it is
-Claude Code's peer protocol, not the documented script path.
-
-### 13. The channel rests on Claude Code's session registration, as measured on 2.1.270
-
-The inbox socket and its line are documented ("The session's inbox socket", code.claude.com
-cross-session-messaging). Where a session's socket is, for a process that is not its child, is not: the runner
-reads `messagingSocketPath` from `~/.claude/sessions/<pid>.json`, found by the pid `claude agents --json` lists.
-A release can move either, and only `AE_LIVE=1` would notice; the fake-registration tests pin the engine's
-reading, not Claude Code's. On native Windows the inbox is a named pipe and needs the session's token, which the
-engine does not read, so every `say` there rejects (not a socket). The other way in, attaching to the session's
-terminal over the background daemon's control socket and typing, was not taken: it is a terminal path, and it
-would type into whatever prompt the session has open.
-
-`find` rests on the same files (§6 item 17): a registration's `name`, `kind`, `pid` and `procStart`, as 2.1.270 and
-2.1.271 write them. A release that renames or moves them makes `find` find nothing, and every read that used it observes
-instead — slower, not wrong. One that kept the files but let a registration name a session other than the one `claude
-agents` lists for it would make `transcript` of an attempt in flight read the wrong conversation: the one read that takes
-a registration's word over the registry's. On this machine every live registration agreed with the registry on both. And
-without `/proc` (macOS) a pid another process has taken since is not caught, since `procStart` is checked only where the
-system says when a process started.
-
-### 14. Words said to a quiet session race the pass that ends it
-
-A quiet session is no longer reported `done` (bug 1, fixed): the runner says how long it has been quiet and leaves it
-`working`, so `say` reaches it, and an idle session's inbox starts a turn — the "nudge it past a stall" case this issue
-was about. What is left is a race. A pass that observes the session between the words being posted and its first write,
-or its going busy, still reads it quiet and ends the attempt — `done`, with `closedOut: false` for a task that asked for a
-statement (`unsigned` until stage 4a) — and releases the session with the words unread. The window is that one moment against a pass every few
-seconds; it was not measured. `find` changes nothing here: `say` needs the session's state and its process, and still
-observes.
-
 ### 15. Words delivered and not journalled, if the process dies between the two
 
 `Engine.say` delivers, then appends `said`. A process killed in between has handed a session words with no
@@ -298,100 +212,6 @@ other order was refused because it would record words that may never have arrive
 A layer above that reconciles its own deliveries against `state.said` reads the same window the other way: the orchestrator's chat
 (`deliverOutbox`, `src/chat/deliver.verb.ts` there) finds no `said` for words the harness took, and says them again. For it the gap
 is a repeat, never a loss; it closes only with this one.
-
-### 16. Words said to a session blocked on a permission prompt wait with it, and are lost when it is continued
-
-**Measured** (2026-09-14, Claude Code 2.1.270, `--model haiku`, by hand; `say-blocked-probe.log` in the
-steering-channel run's artifacts). A `--bg` session in `default` mode stopped on the prompt for a `touch`, listed
-`blocked`/`waiting`. A line posted to its inbox was queued — a `queue-operation` `enqueue` line in its
-transcript — and not read: 45 seconds later it was still blocked, and nothing more was written. `claude stop` left
-it unread. Then `claude --bg --resume <id>`, as B8's Continue and `wf retry` continue a session, started one under a
-new id whose conversation held the first's up to the interrupted call, and not the words.
-
-**Effect.** `say` accepts a `blocked` session, so such words are journalled `said` to attempt N and reach no model.
-Once that attempt is stopped and continued, the next one has not heard them, and the record says only that attempt
-N was told. Found in review, which asked whether "it reads the words once it moves again" had been measured; it had
-not.
-
-**Why it is not refused.** The harness lists a session `blocked` for its own stalls too, and a session stalled on a
-login refresh moved on when a cross-session message reached it (2026-09-13, the section on a closeout not read,
-below: 22:47:40Z). That is the "nudge it past a stall" case `say` exists for, and `claude agents` does not say which
-kind of wait a session is in. Not measured: whether a session approved through `claude attach` then reads the words
-queued while it waited, and a login-refresh stall nudged by `say` rather than by a peer's `SendMessage`.
-
-**Possible fix.** Whatever continues a blocked attempt carries what was said to it — `state.said` for that
-attempt — into the continuation's brief, as `wf retry --message` carries an answer. That is the upper layer's.
-
-### 17. A `claude --bg` session keeps no spend cap
-
-**Measured** (2026-09-15, Claude Code 2.1.272, by hand). Sent: `claude --bg --name ae-probe/budget-… --tools Read
---permission-mode acceptEdits --strict-mcp-config --no-chrome --model haiku --max-budget-usd 0.01 "Read the file NOTES.txt
-with your Read tool. Then read it again. Keep reading it, one Read call at a time, at least 40 times, and say nothing in
-between. Then reply done."`, in a directory holding a 200-line `NOTES.txt`. The session took the flag without a word, made
-42 tool calls, replied `done`, and was listed `done`, idle, with its process; nothing in `claude agents`, its registration
-file or its transcript named a budget. Stopped, it wrote its cost: $0.1925. The flag's help says it "only works with
---print". The same brief as `claude -p … --output-format json --max-budget-usd 0.01` stopped after two responses: exit 1,
-`subtype: error_max_budget_usd`, $0.018. `test/live.test.ts` measured it again under the engine (Verified live, below).
-
-**Not a cap the upper layer can keep from the view either.** The view of a running `--bg` attempt carries no `costUsd`. The
-runner reads the transcript's last `cost-state` at or after the attempt's start on every observe of a session that is not
-busy, but Claude Code writes none until the process exits (issue 18): a session listed `done`, idle, had none, and two once
-`claude stop` returned. So a layer that stops a `--bg` session once `costUsd` passes a cap, reading it each pass, never
-sees a cost while the session runs, and sees one only after the engine has let it go.
-
-**Effect.** `file()` refuses `budgetUsd` beside `background: true` (engine `26020c1`, and stage 2 part 1), so nothing bounds
-what a `--bg` session spends. A job on `claude` keeps a cap (`claude -p --max-budget-usd`), and since stage 2 part 1 a job is
-what `claude` runs by default. Since stage 2 part 2 (2026-09-23) agent-orchestrator files every step on `claude` as a job,
-and its `budget:` as the job's cap; a step that says `background: true` — the shipped supervisor alone — runs `--bg`, and the
-orchestrator refuses a `budget:` beside it, so no step has a cap it does not keep.
-
-**Why the engine does not keep it instead.** A `--bg` session's cost is written only as its process exits (issue 18), so no
-read of a running session says what it has spent. Pricing its transcript's tokens here would be a price list of the
-engine's, not the harness's figure, and wrong the day a price changes. An engine-kept cap needs Claude Code to say what a
-running session has spent — in `claude agents`, its registration file, or a `cost-state` per turn — and 2.1.272 says it in
-none of them.
-
-**Since stage 4b (2026-09-25) the runtime keeps no budget at all.** The cap is a harness argument (`config.budgetUsd`),
-handed to a harness that keeps one as its own flag, and a cut it reports is carried on the attempt as `limit: 'budget'`,
-unjudged; whether a run went over its budget is the orchestrator's (`taskSpend`, `ownStatus` in agent-orchestrator's
-`status/status.ts`). That judgement reads what the runtime reported, and no harness reports a running session's spend — not `--bg`
-(above), not `claude -p`, whose one `result` is printed at its end, not `codex exec`, which reports no cost. So the
-orchestrator can say a run is over its budget only after an attempt has ended, and cannot stop a session mid-spend: the
-one live bound is still the harness's own cap, on a `claude` job alone. A harness that streamed its spend would let the
-orchestrator stop the session itself, through `stop`, with nothing in the runtime changed.
-
-**Measured again on 2.1.288** (2026-10-02, by hand, the slice 1c probe): still no `cost-state` per turn, and nothing naming cost,
-usage or tokens in a `claude agents --json` row or `~/.claude/sessions/<pid>.json`. What a running session has used is in its
-transcript's responses alone, as tokens. So a long-lived attempt's counts are journalled as they grow (a `counted` entry, issue
-18), and its cost still only at its end: a cap on its cost is a cap on tokens, or waits for its end.
-
-### 18. A `--bg` attempt's cost is read only once its session is let go
-
-Claude Code writes a `cost-state` pair as a session's process exits, and never per turn: every `--bg` transcript on this
-machine from 2.1.246 to 2.1.272 holds one pair per process, and a session stopped by hand had none until `claude stop`
-returned. So the Claude runner reads an attempt's cost after its end is written: its release stops the session and reads the
-transcript, and the pass journals a `measured` entry (engine `9d075f7`). What that leaves:
-
-- **A crash between the read and the entry** loses the cost when the same release removed the session: no later pass
-  observes it. A worktree task's session, stopped and left listed, is read again by the next pass, and measured from that.
-- **A session its release did not stop** — one that had already exited, or that a person or a deadline stopped before its
-  task settled — is measured from the sighting the pass made. One removed before this change never is.
-- **No cost at all** for a session killed so hard it wrote no `cost-state`, and for a continuation whose count was carried on
-  from a total its transcript does not show — a parent killed that way: absent, not a guess.
-- **An attempt in flight has no cost** in `view` or `ae ls`: nothing has been written yet. A long-lived attempt's (`restartPolicy:
-  Always`) turns and tokens are journalled as they grow instead — a `counted` entry each time a pass reads more than the record
-  (`countedFacts`), the attempt's usage replaced whole — and its view shows those; a job's are read at its end, as before. A busy
-  session's sighting carries no usage, so its counts wait for it to go idle.
-- **A respawn's cost is not the attempt's** (the slice 1c probe, 2026-10-02, 2.1.288): a process killed with `kill -9` writes no
-  `cost-state`, and the process Claude Code respawns on the same session counts afresh, under its own `startTime`, its own turns
-  alone. A long-lived attempt is counted from the start its journal gives it (`ExpectedSession.since`), across every process, and a
-  `cost-state` whose count began more than `COST_START_SLACK_MS` after the attempt's first line gives no cost, API or tool time: its
-  tokens are the attempt's, its cost absent rather than too low. A process that started late — a slow spawn, a crash between the
-  journal's start and the spawn — keeps its cost, its count beginning a moment before its first line. A compacted attempt counted
-  that way has no tokens either: they come from the `cost-state` alone.
-- **The resumed reading rests on one shape**: a continuation writes into the same transcript, after its parent's pair, under
-  its parent's `startTime` (one session continued twice, 2026-09-15). Its cost is its total less its parent's. No resumed
-  session has been measured end to end under the engine.
 
 ### 23. `claude.remoteControl` bridges a session, and nothing reads whether it was bridged
 
@@ -417,19 +237,20 @@ task's view carries `bridge` — `{ url }` asked and up, `{ url: null, why }` as
 off, no process seen, an id not of the form `session_…`), and nothing for a task that did not ask (`bridgeOfTask`,
 `test/bridge.test.ts`). The link's form, and when it appears, measured on 2.1.291: `CLAUDE.md`, *Claude Code, as a harness*.
 
+**What changed again** (2026-10-24). The `--bg` road is gone, and with it `--remote-control` and `harness/claude/bridge.ts`'s
+registration read. The bridge is opened on the Agent SDK's `enableRemoteControl` at the session's `system`/`init` message, for a job
+and a session held attached alike (`bridgeDue`, `harness/claude/attached-bridge.ts`; issue 39, measured), its facts on a held
+session's run file or a job's bridge file, which each look reads into the sighting. A `HarnessSpec` still refuses it.
+
 **What is left.**
 
 - **Driven outside the record.** Whatever a person types into a bridged session from the web, and every prompt they answer
   there, reaches it without `say`, so none of it is journalled: `state.said` is not the whole of what such a session was
   told.
-- **A session let go.** The engine stops and removes a session once its end is written (`release`); whether the agents view
-  drops a released session at once was not looked at.
 - **The bare `file` refuses no harness's words** (issue 6; `Engine`'s `file` does): it refuses a `claude.remoteControl` the bag refuses of any flag
-  (`false`, `''`), and one on `claude-detached` (since 2026-09-25); one that reaches `codex` or a `check` through it is dropped without a word.
+  (`false`, `''`); one that reaches `codex` or a `check` through it is dropped without a word.
 - **Not a brief key.** agent-orchestrator files it for a step that says `remote: true` (features.md §2).
-- **Rests on a measurement, not a document.** The flag's help says it starts "an interactive session with Remote Control";
-  that it bridges a `--bg` session is measured on 2.1.273 and 2.1.274, as `--json-schema` under `--bg` is. `test/live.test.ts`
-  fails the day the control is bridged without it, or the flagged session is not.
+- **Rests on a measurement, not a document.** The control request is undeclared on the SDK's `Query` (issue 39).
 
 ### 26. A session's context window: `--autocompact` works on `--bg`, and a small one can stall a session
 
@@ -481,8 +302,8 @@ does anything to a background session, since workers run on the model's whole wi
   rather than a count missing its compactions (`transcriptUsage` in `src/harness/claude/transcript.ts`). The `claude -p` session's transcript
   then read 1,327,896 input tokens, what its result's `modelUsage` said.
 
-**What the engine does with it.** A task's `contextTokens` is handed to both Claude runners as `--autocompact <digits>` on
-every attempt, refused at `file()` outside 100000 to 1000000 — the CLI refuses any other value while it parses, so a spawn
+**What the engine does with it.** A task's `contextTokens` is handed to every Claude Code session as `autoCompactWindow` in its
+settings (`--autocompact <digits>` where `claude.settings` is a file's path) on every attempt, refused at `file()` outside 100000 to 1000000 — the CLI refuses any other value while it parses, so a spawn
 would fail on every pass — and on a harness with no such knob (`codex`, a `HarnessSpec` that declares no `contextTokens`
 range). A window small enough to thrash is the task's author's to avoid: the engine sees only a `blocked` session.
 
@@ -490,7 +311,7 @@ range). A window small enough to thrash is the task's author's to avoid: the eng
 refills 200k in three turns — several large reads in parallel in one turn could. This repository's agents each carry
 `context: 200k` on the strength of the unattended run above, and build's implement widens it to `context: 400k`
 (`401762605`, 2026-10-10); a step that stalls `blocked` on a thrash is the sign to widen it. What the summarising call costs
-next to the reading it saves. A `claude -p` attempt's tokens across a compaction under the engine.
+next to the reading it saves. A job's tokens across a compaction under the engine.
 
 ### 27. The A2A seam carries every call to a session, the transcript as an extension method
 
@@ -512,15 +333,14 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
   first event is the Task, which this agent answers with a listing: a cost on every read that the read never needed.
   `GetTask`'s `history` has no cursor either (`historyLength` is the last N). A cursor was not the blocker: the SDK does
   carry request-scoped values, a service parameter into `ServerCallContext.state`. `SubscribeToTask` streams a session
-  live beside it, not instead (`a2a/follow.ts`): where a harness's runner follows a session — a `claude` job, a `--bg`
+  live beside it, not instead (`a2a/follow.ts`): where a harness's runner follows a session — a `claude` job or held
   session, a Codex session, a remote agent — its card says `streaming: true` and a subscription is answered with the Task,
-  then each moment; where it does not — `claude-detached`, `command` — its card says `false`, and a subscription is refused.
+  then each moment; where it does not — `command` — its card says `false`, and a subscription is refused.
   The api relays what the runtime streams and reads no session again on a timer (`apps/api/src/steps/reread.test.ts`).
   `sendMessageStream` stays `UnsupportedOperationError`.
 - **A Task's context is the conversation, not the runtime's task.** Its `contextId` is the sighting's `nativeId`, or the
   attempt's off the journal, and empty while none is known — a job's until its first `stream-json` line. So a listing by
-  context is every attempt that continued one conversation: a job keeps its id on `-p --resume` (M12), a `claude --bg`
-  resume does not (issue 16), and a retry started cold is a new context. A spawn carries the session it continues as its
+  context is every attempt that continued one conversation: a job keeps its id on a resume (M12), and a retry started cold is a new context. A spawn carries the session it continues as its
   message's `contextId`, which is `resumeFrom` to the harness; a follow-up sends none or its session's, and any other is
   refused in words that name the one to send.
 - **The closeout is the Task's one Artifact, `closeout`**: one `data` part, or `text/plain` for a string (Codex's prose),
@@ -549,7 +369,7 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
 - **Each `say` costs one more `observe`**: the engine's `say` lists the harness to find the session and refuse a settled one, and
   the agent, holding nothing, lists again for the id it hands the driver and to refuse a session that has ended. Words are
   said by a person, rarely.
-- **A runner an Effect program provides is direct unless it asks otherwise.** `Runner.layer`, `Runner.claude` and `Runner.test` hand the
+- **A runner an Effect program provides is direct unless it asks otherwise.** `Runner.layer` and `Runner.test` hand the
   engine the driver as they did; `a2aRunner(ops)`, which needs the program's `Journal`, is the same seam `Engine.layer`
   takes. Its `Runner.transcript` is keyed by session id, as it always was, and goes through the seam by that id
   (`sessionTranscript` takes a name or an id, never both); the `Engine` service asks by name (`transcriptOf`).
@@ -563,112 +383,6 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
   Stops are rare — an operator's, a deadline, before a continue.
 - **Nothing is served by URL.** The handler is the SDK's `A2ARequestHandler`, so its HTTP transports can serve it later
   (stage 6), unchanged.
-
-### 28. Claude Code as a job: what was measured, and what a job gives up
-
-Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `claude -p --output-format stream-json
---verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
-`config.background: true` (`src/harness/claude/code.ts`); since part 2a (the same day) a job reads its brief, and the words
-said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
-`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M12, and M14).
-
-**These are the `claude -p` road's measurements.** Since 2026-10-21 (`45824a1f2`) a job on `claude` runs its session on the
-Agent SDK's `query()`, in a process of its own, and not as `claude -p`: what the SDK road was measured to do is in
-`docs/harness.md`. `claude-detached` is the one harness left on `claude -p` (*`claude-detached` still spells `claude -p`*, at
-the end).
-
-- **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
-  and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
-  fetch a page: all eight exited 0 on their own, with a result. A call that would have asked was denied and the session
-  carried on. Each denial is said twice: a `{type: system, subtype: permission_denied, tool_name, tool_use_id,
-  decision_reason_type, decision_reason?, message}` line as it happens, and a `{tool_name, tool_use_id, tool_input}` entry of
-  the result's `permission_denials`, the same calls. The reason differs by flag — `workingDir`, `other` or none without
-  `--permission-prompts none`, `asyncAgent` (*"no approval surface in this session"*) with it, `mode` in `dontAsk` either
-  way — and the outcome does not. A Skill was not denied in any mode. The job is given the flag so a later default cannot
-  make it wait.
-- **`auto` on haiku runs as `default`.** Its `init` line said `permissionMode: default` in both `auto` runs on haiku; on
-  sonnet it said `auto`, and denied nothing the same brief asked. So a haiku step filed in `auto` is fenced as `default`.
-  Nothing refuses it: the mode is Claude Code's to choose per model.
-- **M2: a resume's cost and API time are its session's.** Issue 4, narrowed.
-- **M3: `claude -p --resume` continues a `--bg` session**, under the same id, and remembered what it was told (a session
-  stopped first). So a job may continue a background session, and the new attempt's mode is the job's.
-- **M4: a job stopped mid-turn can be resumed.** SIGTERM while a `sleep 40` ran: exit 143 within a second, a result
-  printed. SIGINT: exit 0, a result of `error_during_execution`. Resumed with `-p --resume`, each remembered its word and
-  knew its command had not finished. The engine stops a job as it stops any detached run: SIGTERM to the worker, which
-  sends SIGTERM to the harness's process group (`bin/ae-worker.ts`).
-- **M5: a budget caps a resume's own spend**, not its session's: a resume capped at half of what its session had spent
-  finished (`success`), and one capped below one response ended `error_max_budget_usd`.
-- **M6, for `wf say`: a job can be told something, over its stdin.** A `claude -p --input-format stream-json
-  --output-format stream-json --verbose` given a second user message on stdin while a turn ran a `sleep 20` answered with
-  the word from that message in the same turn's one result (`num_turns: 2`). So words can reach a running job, if its stdin
-  is kept open, and since part 2a the worker keeps it open until the job's first result (the plan's option (d); issue 29).
-  The control, SIGINT and then `-p --resume` with the words, is M4.
-- **M7: a resume is not charged its parent's denials.** Asked in review after the rest, and measured by hand the same
-  way: a job denied a write outside its folder, then `claude -p --resume` of it told to call nothing, printed
-  `permission_denials: []` and no `permission_denied` line, under the same session id — where its cost (M2) is carried on.
-  So a resumed job's result is read for denials as a first job's is, and a round, a retry or a gate's answer resumed from
-  a denied attempt says only what it was itself denied. Were a later version to carry them, M7 fails.
-- **M8, M9, M10: a job given its brief on its stdin is the job given it as a prompt.** Measured before part 2a was built,
-  one live test on 2.1.280, haiku, each a pair — `claude -p <brief>` beside `claude -p --input-format stream-json` with the
-  brief as the first user message on a stdin held open — six jobs at once. M8: `--json-schema` gave the same
-  `structured_output` (`{"finished":true}`), exit 0 both. M9: `--max-budget-usd 0.01` ended both `error_max_budget_usd`,
-  exit 1, at $0.0291 and $0.0292. M10: `auto` with `--permission-prompts none` and no allow rule — on haiku, so `default` —
-  told to write outside, run `curl` and fetch a page: both denied `Write`, `Bash` and `WebFetch`, a `permission_denied` line for each, gave their closeout, and wrote nothing
-  outside. And one thing only the stream shows: a job reading its stdin does not exit at its result — it was still running
-  five seconds after it in each streamed pair — and exits once its stdin ends, so the worker ends it. The result line's
-  `type` is printed near its end, not first (`{"duration_api_ms":…`, both ways), so the worker parses each line for its
-  `type` rather than matching its start. (This record said M10 ran in `dontAsk` until stage 2 part 2 read the test again:
-  `test/live.test.ts` gives both jobs `--permission-mode auto --permission-prompts none`. `dontAsk` under a job is M1's, and
-  M11's.)
-- **M11: a job in `dontAsk` is fenced by its checkout's settings as a `--bg` session is.** Asked at stage 2 part 2's plan
-  gate, before the orchestrator filed its steps as jobs, since the planner and the reviewers run `dontAsk` with no allow rule
-  of their own and this repository's `.claude/settings.json` as their only list. Under the engine, on 2.1.280, haiku, a job
-  and a `--bg` session, each `dontAsk` with `tools: ['Bash']`, in a checkout inside this package whose settings allow
-  `Bash(npm run build)` alone, told to run `npm run build` and then `npm run e2e`: both ran the build, neither ran the e2e,
-  both closed saying `npm run e2e` was denied, and the job's attempt carries the one denial, `Bash(npm)` (a denial names a
-  command by its first word). Were a job to read no project settings, the build would be denied too and M11 fails. But
-  `build` is a name a person's own `~/.claude/settings.json` may allow, and that allow alone would run it with no project
-  settings read (this machine's lists no `npm run`, so the first reading stands). So M11 names its two scripts afresh on
-  every run (`m11-allowed-<nonce>`, `m11-unlisted-<nonce>`), on no list but the checkout's; measured again so, on 2.1.280,
-  the same day: the same result, the allowed one ran in both and the unlisted one was denied in both.
-- **M12: a job held open waits with nothing running, and an answer resumes it.** Stage 2 part 4a (R1), on **2.1.281**,
-  haiku, `dontAsk`, a store under `/tmp`: a task filed `holdOpen: true` whose brief gives a code word signed, and read
-  `input-required` with no process of its name in `ps` and nothing started by two more passes. Answered — *give the code
-  word I gave you*, `--budget 0.3` — the next pass resumed the session that signed (attempt 2's `resumeFrom` its first's id,
-  and its own id the same), the job was spawned with `--max-budget-usd 0.3`, and it answered the code word, which only that
-  session was told; it read 8,020 tokens from the prompt cache. It signed, waited again, and a close settled it `succeeded`,
-  note `closed`. Measured first by hand through `ae start`, `ae answer` and `ae close` (the same shape: an animal it picked,
-  and that animal back with `-again`), then as M12. A held task on `codex` is M13 (issue 31). Not measured: a held task on a `--bg` session
-  (`claude-bg`, or `background: true`), whose released session is stopped and, without a worktree, removed from
-  `claude agents` before an answer resumes it — which `--resume` survives for a settled task (the live test of a settled
-  `--bg` session) and was not tried for a held one; and a wait longer than the prompt cache lives, whose resume re-reads the
-  conversation at full price. A failed later turn is not retried since stage 4a part 2 — it settles its task `failed` — but
-  a caller that files it again with `resumeFrom` meets what the retry met: since `-p --resume` keeps the id, the turn's failed
-  attempt ends with the id the turn continued, and a continuation resumes a conversation that holds the failure. Where the
-  turn began would be kept by resuming each turn with `--fork-session`, a new id per turn and the signed session left as it
-  was: not built, a change to the runner's arguments for one harness.
-- **M14: a job's denial reaches its capture before its result.** On **2.1.289**, haiku, `dontAsk` with only `Bash(sleep:*)`
-  allowed, told to run `curl` (expected to be denied) and then `sleep 40`: the `permission_denied` line was in the job's
-  capture about 4 s in, its result about 50 s in. So a sighting of the working job names the denial, and since then the
-  engine journals it as a `denied` entry on the attempt in flight (`deniedFacts`, `src/core/engine/denied.ts`); the end's
-  `permission_denials` still replace the list. Measured first by hand on the raw stream, then as M14, twice. A `ls` was not
-  denied in `dontAsk` (a read-only command), and a brief that does not say the denial is expected ends on it.
-
-What a job gives up, or what is not done:
-
-- **A job is told on its stdin, until its result** (issue 29). A person who means to attach to a step, or bridge it to
-  claude.ai, still files it with `background: true`.
-- **A background session's denials are read nowhere, neither while it works nor at its end.** M1's two shapes are
-  `claude -p`'s output, which a `--bg` session does not print; what its transcript writes for a denied call was not measured,
-  and the attempt of a `--bg` session carries no `denials`. Since stage 2 part 2 every orchestrator step is a job, and its
-  attempt carries its denials, live since M14, but for a step that says `background: true` and the system agent's own
-  long-lived session, in `dontAsk`, whose calls off its `allowedTools:` list are denied unread. The candidate source is the
-  transcript's refused `tool_result` for the call, to be measured on its own before a reader is built. `claude-detached`,
-  Codex and a remote agent report no denial while they work either.
-- **A session journalled on `claude` before part 1 is a `--bg` session with no `background` in its config.** It is still
-  observed, stopped, released and settled by its id's shape, and `say` reaches it the same way: `say` reads the mode off the
-  running session's id, as the runner does, and off the config only when nothing runs (`test/say.test.ts`).
-- **A job resumed from a `--bg` session records no cost** (issue 4).
 
 ### 29. A job's stdin: words at most once, and none after its result
 
@@ -729,8 +443,8 @@ What `codex exec` cannot do, said and not faked:
 - **No spend cap.** A budget is refused at `file` and at `answer`.
 - **No text as it is written.** `exec --json` prints each message whole, in its `item.completed`, so a Codex session is
   followed live at message level: its state, then each event of its rollout once and in order as Codex writes it, its
-  stdout decoded as it comes (`codexPartials`, `test/codex-follow.test.ts`). Claude Code's job (`claude -p`) is followed to
-  the text it is writing, a background one (`--bg`) at message level.
+  stdout decoded as it comes (`codexPartials`, `test/codex-follow.test.ts`). Claude Code's job is followed to
+  the text it is writing.
 
 And one window, found by the check's parallel run: **the engine waits before the harness has let go.** The engine ends an
 attempt on its statement once one is on disk and the session is not busy (`endedOnStatement` in `src/core/engine/engine.ts`), and Codex writes
@@ -740,7 +454,7 @@ itself, and the test pins both sides of it with a fake that holds its exit (`tes
 two together; were something to, the handler would read the journal for a listed `working` session too, one more journal
 read per read of a running session.
 
-The `claude -p` job, which shares the worker, is stage 2's and unchanged here: its stdin (issue 29) is what Codex lacks.
+The Claude Code job, which shares the worker, is unchanged here: its stdin (issue 29) is what Codex lacks.
 
 ### 32. A run file removed is a stop (2026-09-23)
 
@@ -820,7 +534,7 @@ the agent made runs on, and nothing here knows its id to read it or cancel it. T
 - **A stop of a send another process makes** does nothing here: that process's send is its own. The stop is asked again on
   later passes, and a Task the send brings back is then cancelled; the deadline bounds the rest.
 
-### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day; per session for a transcript or an output 2026-10-06, eight gaps left)
+### 35. A failed observe was read as nothing observed (2026-09-25; fixed for the pass the same day; per session for a transcript or an output 2026-10-06, eight gaps left; four closed with the `--bg` road 2026-10-24)
 
 The composite's `observeAll` and Claude Code's `observeFor` turned a registry that could not be read into an empty map, and the
 pass read an empty map as every expected session gone: the tick memo dropped a settled task from what it looks for, so a `--bg`
@@ -874,14 +588,14 @@ What is left:
   for a `--bg` session only a read gives, and the composite routes a stop by the owner a read learned, so a stop by name alone would go
   to the fallback harness; and waiting for a read past the deadline takes away the one bound on a harness never read again, which the
   gap above already leaves too wide. Found in review of the run that made a failed observe say so.
-- **A busy or blocked `--bg` session whose transcript cannot be read never ends.** `endedOf` (`harness/claude/bg.ts`) ends only a
+- **Closed 2026-10-24 with the `--bg` road.** **A busy or blocked `--bg` session whose transcript cannot be read never ends.** `endedOf` (`harness/claude/bg.ts`) ends only a
   session listed finished, or `working` and not busy; one listed `blocked` (waiting on a prompt, or idle under `--remote-control`,
   which lists `blocked`, `idle`, with no `waitingFor`) or busy is unread on every pass while its transcript stays unreadable. Its
   deadline still ends it; with none, its task waits for ever, as on a harness never read again (above).
-- **A stop asked while a `--bg` session is unread sends no `claude stop`.** In `stopping`, `UNREAD` does nothing until the deadline
+- **Closed 2026-10-24 with the `--bg` road.** **A stop asked while a `--bg` session is unread sends no `claude stop`.** In `stopping`, `UNREAD` does nothing until the deadline
   (`decide`), so the stop waits until the session reads as ended — then `failed`, and released (`claude stop`, `claude rm`) — or
   until the deadline cuts it. A blocked or busy session that stays unread (the gap above) is never stopped, with no deadline.
-- **A long-lived session whose transcript stays unreadable is either restarted on and on, or unread for ever.** Nemia's own
+- **Closed 2026-10-24 with the `--bg` road**, which this one's listing was: a long-lived session is held attached now, its end read off its run file. **A long-lived session whose transcript stays unreadable is either restarted on and on, or unread for ever.** Nemia's own
   long-lived session (`restartPolicy: 'Always'`) is the one at risk, and which of the two it meets depends on how it lists. Listed
   finished, or `working` and idle, once its transcript has been cold for the floor it reads as `failed`, and `restartOf`
   (`core/domain.ts`) restarts it after the backoff, continuing the same session; if the restarted session's transcript cannot be
@@ -895,7 +609,7 @@ What is left:
   the log stats and its read then fails (`EACCES`, `EIO`), so the run reads as having said nothing rather than unread, as a `--bg`
   transcript now does (`TranscriptUnread`). The end is read off the run file, so this never makes an attempt `LOST`, but its usage
   and statement are missing.
-- **`release` still reads a transcript that cannot be read as no usage.** `releaseFrom` (`harness/claude/bg.ts`) reads what a
+- **Closed 2026-10-24 with the `--bg` road.** **`release` still reads a transcript that cannot be read as no usage.** `releaseFrom` (`harness/claude/bg.ts`) reads what a
   session consumed after `claude stop` and answers nothing for any failure, a refused decode or a failed read. The end is on record
   by then, so this never makes a statement absent or an attempt `LOST`, but the end's cost is missing. Retrying the read means
   deciding whether a release whose stop is already done runs again.
@@ -924,6 +638,9 @@ The size itself is the lever not taken: a feed rotated on a size or an age, its 
 keep the disk and those reads bounded. Not changed with the reads, so a store's format stays as it is.
 
 ## Verified live, once
+
+An entry below on `--bg`, `claude -p` or `claude-detached` is the record of a road removed on 2026-10-24, kept for what it
+measured of Claude Code.
 
 - **`--tools` under `--bg`** (engine `060a41d`). `test/live.test.ts` on Claude Code 2.1.270,
   2026-09-13: a session with `tools: Read, Grep, Glob`, told to write a file, wrote none and still gave
@@ -1009,6 +726,9 @@ keep the disk and those reads bounded. Not changed with the reads, so a store's 
   process killed does not (*A Claude Code killed outright loses what its process spent*, at the end).
 
 ## Verified by tests, not by a live run
+
+An entry below on `--bg`, `claude -p` or `claude-detached` is the record of a road removed on 2026-10-24, kept for what it
+measured of Claude Code.
 
 - **`say`'s refusals and the inbox's guards.** A fake `claude` that keeps a registry, a real Unix socket as
   the inbox, and registration files the test writes, at shipped defaults (`test/say.test.ts`). Every refusal
@@ -1117,8 +837,8 @@ keep the disk and those reads bounded. Not changed with the reads, so a store's 
 2. **Why a Claude session stays `working` instead of reaching `done`.** Twenty-plus sessions measured:
    not resume, not duration, not the two together. It is the reason the quiescence floor exists. **Never answered, and
    overtaken**: since thin runtime stage 2 part 1 (2026-09-23) a step runs as a job, which ends at its result and not on a state
-   `claude agents` lists, and since 2026-10-21 (`45824a1f2`) on the Agent SDK. Only a session run as `claude --bg` is still read
-   off the registry, and the quiescence floor stays for it (`harness/claude/bg.ts`).
+   `claude agents` lists, and since 2026-10-21 (`45824a1f2`) on the Agent SDK. Since 2026-10-24 no session runs as `claude --bg`,
+   and no registry is read at all.
 3. **`wf ls` choices merged as implemented** (`7f07b71`), open to revisit: an extra "waiting on you"
    line for a run with a blocked step; `closeout unreadable` for an answer that cannot be parsed; no
    such line for a cancelled run. The reasons are in `RESPONSE.md` on
@@ -1143,6 +863,10 @@ every pool, and `priority` carried again, a whole number in int32, which the orc
 2 and 36 moved here on 2026-10-23, each as it was written with the line that closed it: 2 was fixed on 2026-09-13 by
 `1465268a6`, and 36 on 2026-10-06 by `73c1ebc08`. Each has its row in *Fixed*.
 
+3, 4, 11 to 14, 16 to 18 and 28 moved here on 2026-10-24, each as it was written with the line that closed it: every Claude Code
+session runs on the Agent SDK, and the `claude -p` road (`claude-detached`) and the `claude --bg` road (`config.background`, the
+`'claude-bg'` harness, `claude agents`) were removed that day. Each has its row in *Fixed*.
+
 ### 2. `advance` hands off only steps that succeeded (fixed 2026-09-13)
 
 **Where.** `agent-orchestrator/src/runner.ts:318` commits a finished step's leftover work only when its
@@ -1161,6 +885,216 @@ follows; this only keeps its work on its branch.
 **Fixed** the next day, in `1465268a6` ("The run checks a signed step before filing what follows it"): every finished step is
 handed off, failed and stopped included, and none once its check is filed, so a suite's litter is not committed under the
 step's name.
+
+### 3. A worktree task's Claude session stays in the registry
+
+**Closed 2026-10-24 with the `--bg` road**: no Claude Code session is listed in `claude agents` or released by `claude rm` now; a job's worktree is its own, and a held session's is its holder's.
+
+A `--bg` session is released once its attempt's end, or its task's settling, is on the record (engine
+`7200295`, and two fixes from review in the table below): stopped if `claude agents` still has it
+running, then removed. One kind is left there, stopped: a task that asked for a `worktree`, because
+`claude rm` deletes the worktree the harness cut and the task's work is in it. Removing it safely would
+need that work somewhere else first. A session whose task a person or a deadline settled before the
+`settled` entry carried its id stays listed too, since `ae logs` could not read it once removed.
+
+### 4. `claude-detached` measures its cost and tokens, and no turns, tool calls, peak context or tool time
+
+**Closed 2026-10-24 with `claude-detached`**: the harness is gone. A job's cost, API time and tokens are read off its stream's `result`, a resume's less its parent's (`resumeCostCarried`), as below; a job has no peak context, which the README's *What an attempt consumed* says.
+
+`agent-runtime/src/harness/detached/output.ts`. Its closeout is read (engine `3e44ab6`), and so are its cost and API time,
+`total_cost_usd` and `duration_api_ms` (engine `9d075f7`), from the one `result` object `claude -p --output-format json`
+prints. Its tokens are read from the same object's `usage`, in their three classes, since 2026-09-19: on 2.1.278 that `usage`
+is the process's own — a `--resume` printed 10 uncached, 21,392 written and 0 read, where its `modelUsage` carried its parent's
+counts on. On 2.1.272 the same `usage` had counted 0 input and 0 output tokens in a run whose `modelUsage` counted thousands,
+so a `usage` whose input sums to 0 gives no tokens. Since 2026-10-22 its tokens are its `modelUsage`'s, every model of the
+session together, subagents included, where every model gives every class: `usage` counts the main thread alone, which put a
+step done by subagents at a quarter of its reads (`rewrite-six-of-the-orchestra-uv7v`'s implement: 22.3M against 91.1M). A
+resume of a spec with `resumeCostCarried` has its parent's taken off as its cost does (`tokensLess`), and falls back to its own
+`usage` where the parent's were not kept; `usage` alone stays the reading where `modelUsage` is missing or partial. It has no peak context (`usage.iterations` holds the last response
+alone), no count of turns or tool calls, and no tool time.
+
+**A resumed `claude -p`'s cost is carried on, on 2.1.278 — fixed for `claude-detached` 2026-10-22 (engine `48b3c8e`).** The
+same `--resume` printed a `total_cost_usd` of $0.0900: its parent's $0.0471 and its own $0.0430 together, and its `modelUsage`
+carried its parent's counts on too. Its own share cannot be read off the result alone, so `claudeDetached` now says so
+(`resumeCostCarried`), as a job's spec does: the runner takes off the cost, API time and whole-session tokens the parent run
+printed, kept on the resume's run file at spawn (`carried`) or found among the run files. Proven on h4sj's implement tries
+(`test/session-results.ts`), through the shipped spec: try 2 counts its own 4.2M cache reads and $1.33, not the 89.6M and
+$43.54 its result carries (`test/detached.test.ts`). Its edge is the job's: a resume whose parent is no `claude-detached` run
+— a job's or a `--bg` session's id resumed on it — records no cost or API time, and its tokens fall back to its own `usage`,
+an undercount and never an overcount. An attempt journalled before the fix keeps what it recorded.
+
+**Narrowed for a job on `claude`** (stage 2 part 1). Measured again on 2.1.280 (issue 28, M2): a `-p --resume` printed
+$0.0257 over a parent's $0.0210, and a second resume $0.0284 — and its `duration_api_ms` is carried on the same way. So the
+job's spec says so (`resumeCostCarried`), and the worker's registry takes off the cost and API time its parent printed: the
+parent is the run under the id it resumed that started last before it. What is left: a job whose parent is no run of the
+worker's — a `--bg` session, or a session another tool started — records no cost and no API time, since what it printed
+cannot be told apart from what its parent spent. `claude-detached` does the same since 2026-10-22, above.
+
+### 11. A `claude-detached` session's conversation cannot be followed while it runs
+
+**Closed 2026-10-24 with `claude-detached`**: the harness is gone, and a job prints `stream-json`, whose first line names the session.
+
+`transcript` reads the transcript `claude --bg` would write, by the session id the worker keeps. `claude
+-p --output-format json` prints that id in the one object it prints at exit, so until then there are no
+events. `--output-format stream-json` prints the id first, but the closeout is read from the json form
+(`claudeResultOutput` in `agent-runtime/src/harness/detached/output.ts`). Low priority, like issue 4: this
+harness exists for comparison. For the same reason `say` refuses its tasks, though `claude -p` binds an inbox, and it is not
+followed live: its runner has no `follow`, its card says `streaming: false`, and a subscription is refused.
+
+**Closed for a job on `claude`** (stage 2 part 1): its spec prints `stream-json`, whose first line names the session, so the
+worker has its id while it runs and `transcript` reads it by the job's name then (`claudeStreamOutput`). `claude-detached`
+keeps the json form, and this issue, as the harness there to compare against.
+
+### 12. `said` means the words were handed to the inbox, not that the session read them
+
+**Closed 2026-10-24 with the `--bg` road**: `bg.ts` and its inbox socket are gone. A job is told on its stdin (issue 29), and a held session beside its run file, which its holder reads.
+
+**Where.** `claudeOps.say` in `agent-runtime/src/harness/claude/bg.ts`: a line posted to the session's inbox socket, which
+writes nothing back (measured: the connection closes in a few milliseconds, with no bytes).
+
+**Effect.** Words Claude Code sets aside are journalled all the same: a `crossSessionInbound` of `hold` or
+`refuse` in the operator's user, project or managed settings; a burst past the inbox's rate limit; the same
+words twice inside its repeat window (said twice, journalled twice, perhaps delivered once); a full queue. Only
+`bypassPermissions`, the one hold the engine can see coming from the task, is refused up front.
+
+**Possible fix.** Claude Code tells a sender what became of a message — held, delivered, refused, dropped — as
+a `peer_message_status` line to the reply address the message carries in `from`, when that address is a `uds:`
+socket in its own sockets directory and the sender's pid is verified. The engine would have to listen on such a
+socket for the length of a `say`, and the status of a held message can arrive minutes later. Not done: it is
+Claude Code's peer protocol, not the documented script path.
+
+### 13. The channel rests on Claude Code's session registration, as measured on 2.1.270
+
+**Closed 2026-10-24 with the `--bg` road**: no code reads `~/.claude/sessions/` or `claude agents` now. `find` reads a job's run file, or the holder's own map.
+
+The inbox socket and its line are documented ("The session's inbox socket", code.claude.com
+cross-session-messaging). Where a session's socket is, for a process that is not its child, is not: the runner
+reads `messagingSocketPath` from `~/.claude/sessions/<pid>.json`, found by the pid `claude agents --json` lists.
+A release can move either, and only `AE_LIVE=1` would notice; the fake-registration tests pin the engine's
+reading, not Claude Code's. On native Windows the inbox is a named pipe and needs the session's token, which the
+engine does not read, so every `say` there rejects (not a socket). The other way in, attaching to the session's
+terminal over the background daemon's control socket and typing, was not taken: it is a terminal path, and it
+would type into whatever prompt the session has open.
+
+`find` rests on the same files (§6 item 17): a registration's `name`, `kind`, `pid` and `procStart`, as 2.1.270 and
+2.1.271 write them. A release that renames or moves them makes `find` find nothing, and every read that used it observes
+instead — slower, not wrong. One that kept the files but let a registration name a session other than the one `claude
+agents` lists for it would make `transcript` of an attempt in flight read the wrong conversation: the one read that takes
+a registration's word over the registry's. On this machine every live registration agreed with the registry on both. And
+without `/proc` (macOS) a pid another process has taken since is not caught, since `procStart` is checked only where the
+system says when a process started.
+
+### 14. Words said to a quiet session race the pass that ends it
+
+**Closed 2026-10-24 with the `--bg` road**: no shipped runner reports a session quiet now; a job ends at its exit, a held session at its result.
+
+A quiet session is no longer reported `done` (bug 1, fixed): the runner says how long it has been quiet and leaves it
+`working`, so `say` reaches it, and an idle session's inbox starts a turn — the "nudge it past a stall" case this issue
+was about. What is left is a race. A pass that observes the session between the words being posted and its first write,
+or its going busy, still reads it quiet and ends the attempt — `done`, with `closedOut: false` for a task that asked for a
+statement (`unsigned` until stage 4a) — and releases the session with the words unread. The window is that one moment against a pass every few
+seconds; it was not measured. `find` changes nothing here: `say` needs the session's state and its process, and still
+observes.
+
+### 16. Words said to a session blocked on a permission prompt wait with it, and are lost when it is continued
+
+**Closed 2026-10-24 with the `--bg` road**: a job waits on no prompt (`permissionPrompts: 'none'`), and a held session's call that would ask is answered in the holder (`canUseTool`); no session is `blocked` on a prompt nobody sees. Carrying `state.said` into a continuation stays the upper layer's choice.
+
+**Measured** (2026-09-14, Claude Code 2.1.270, `--model haiku`, by hand; `say-blocked-probe.log` in the
+steering-channel run's artifacts). A `--bg` session in `default` mode stopped on the prompt for a `touch`, listed
+`blocked`/`waiting`. A line posted to its inbox was queued — a `queue-operation` `enqueue` line in its
+transcript — and not read: 45 seconds later it was still blocked, and nothing more was written. `claude stop` left
+it unread. Then `claude --bg --resume <id>`, as B8's Continue and `wf retry` continue a session, started one under a
+new id whose conversation held the first's up to the interrupted call, and not the words.
+
+**Effect.** `say` accepts a `blocked` session, so such words are journalled `said` to attempt N and reach no model.
+Once that attempt is stopped and continued, the next one has not heard them, and the record says only that attempt
+N was told. Found in review, which asked whether "it reads the words once it moves again" had been measured; it had
+not.
+
+**Why it is not refused.** The harness lists a session `blocked` for its own stalls too, and a session stalled on a
+login refresh moved on when a cross-session message reached it (2026-09-13, the section on a closeout not read,
+below: 22:47:40Z). That is the "nudge it past a stall" case `say` exists for, and `claude agents` does not say which
+kind of wait a session is in. Not measured: whether a session approved through `claude attach` then reads the words
+queued while it waited, and a login-refresh stall nudged by `say` rather than by a peer's `SendMessage`.
+
+**Possible fix.** Whatever continues a blocked attempt carries what was said to it — `state.said` for that
+attempt — into the continuation's brief, as `wf retry --message` carries an answer. That is the upper layer's.
+
+### 17. A `claude --bg` session keeps no spend cap
+
+**Closed 2026-10-24 with the `--bg` road**: every Claude Code session runs on the Agent SDK, which keeps `maxBudgetUsd`; `config.background` is refused at `file()` (`TAKEN_ARGS`). What a held session's cap does not hold across processes is *A Claude Code killed outright loses what its process spent*, at the end.
+
+**Measured** (2026-09-15, Claude Code 2.1.272, by hand). Sent: `claude --bg --name ae-probe/budget-… --tools Read
+--permission-mode acceptEdits --strict-mcp-config --no-chrome --model haiku --max-budget-usd 0.01 "Read the file NOTES.txt
+with your Read tool. Then read it again. Keep reading it, one Read call at a time, at least 40 times, and say nothing in
+between. Then reply done."`, in a directory holding a 200-line `NOTES.txt`. The session took the flag without a word, made
+42 tool calls, replied `done`, and was listed `done`, idle, with its process; nothing in `claude agents`, its registration
+file or its transcript named a budget. Stopped, it wrote its cost: $0.1925. The flag's help says it "only works with
+--print". The same brief as `claude -p … --output-format json --max-budget-usd 0.01` stopped after two responses: exit 1,
+`subtype: error_max_budget_usd`, $0.018. `test/live.test.ts` measured it again under the engine (Verified live, below).
+
+**Not a cap the upper layer can keep from the view either.** The view of a running `--bg` attempt carries no `costUsd`. The
+runner reads the transcript's last `cost-state` at or after the attempt's start on every observe of a session that is not
+busy, but Claude Code writes none until the process exits (issue 18): a session listed `done`, idle, had none, and two once
+`claude stop` returned. So a layer that stops a `--bg` session once `costUsd` passes a cap, reading it each pass, never
+sees a cost while the session runs, and sees one only after the engine has let it go.
+
+**Effect.** `file()` refuses `budgetUsd` beside `background: true` (engine `26020c1`, and stage 2 part 1), so nothing bounds
+what a `--bg` session spends. A job on `claude` keeps a cap (`claude -p --max-budget-usd`), and since stage 2 part 1 a job is
+what `claude` runs by default. Since stage 2 part 2 (2026-09-23) agent-orchestrator files every step on `claude` as a job,
+and its `budget:` as the job's cap; a step that says `background: true` — the shipped supervisor alone — runs `--bg`, and the
+orchestrator refuses a `budget:` beside it, so no step has a cap it does not keep.
+
+**Why the engine does not keep it instead.** A `--bg` session's cost is written only as its process exits (issue 18), so no
+read of a running session says what it has spent. Pricing its transcript's tokens here would be a price list of the
+engine's, not the harness's figure, and wrong the day a price changes. An engine-kept cap needs Claude Code to say what a
+running session has spent — in `claude agents`, its registration file, or a `cost-state` per turn — and 2.1.272 says it in
+none of them.
+
+**Since stage 4b (2026-09-25) the runtime keeps no budget at all.** The cap is a harness argument (`config.budgetUsd`),
+handed to a harness that keeps one as its own flag, and a cut it reports is carried on the attempt as `limit: 'budget'`,
+unjudged; whether a run went over its budget is the orchestrator's (`taskSpend`, `ownStatus` in agent-orchestrator's
+`status/status.ts`). That judgement reads what the runtime reported, and no harness reports a running session's spend — not `--bg`
+(above), not `claude -p`, whose one `result` is printed at its end, not `codex exec`, which reports no cost. So the
+orchestrator can say a run is over its budget only after an attempt has ended, and cannot stop a session mid-spend: the
+one live bound is still the harness's own cap, on a `claude` job alone. A harness that streamed its spend would let the
+orchestrator stop the session itself, through `stop`, with nothing in the runtime changed.
+
+**Measured again on 2.1.288** (2026-10-02, by hand, the slice 1c probe): still no `cost-state` per turn, and nothing naming cost,
+usage or tokens in a `claude agents --json` row or `~/.claude/sessions/<pid>.json`. What a running session has used is in its
+transcript's responses alone, as tokens. So a long-lived attempt's counts are journalled as they grow (a `counted` entry, issue
+18), and its cost still only at its end: a cap on its cost is a cap on tokens, or waits for its end.
+
+### 18. A `--bg` attempt's cost is read only once its session is let go
+
+**Closed 2026-10-24 with the `--bg` road**: no attempt's cost is read off a `cost-state` at release now. A job's cost is on its `result`, and a held session's on its capture's last result, carried across a resume (*A Claude Code killed outright loses what its process spent*, at the end).
+
+Claude Code writes a `cost-state` pair as a session's process exits, and never per turn: every `--bg` transcript on this
+machine from 2.1.246 to 2.1.272 holds one pair per process, and a session stopped by hand had none until `claude stop`
+returned. So the Claude runner reads an attempt's cost after its end is written: its release stops the session and reads the
+transcript, and the pass journals a `measured` entry (engine `9d075f7`). What that leaves:
+
+- **A crash between the read and the entry** loses the cost when the same release removed the session: no later pass
+  observes it. A worktree task's session, stopped and left listed, is read again by the next pass, and measured from that.
+- **A session its release did not stop** — one that had already exited, or that a person or a deadline stopped before its
+  task settled — is measured from the sighting the pass made. One removed before this change never is.
+- **No cost at all** for a session killed so hard it wrote no `cost-state`, and for a continuation whose count was carried on
+  from a total its transcript does not show — a parent killed that way: absent, not a guess.
+- **An attempt in flight has no cost** in `view` or `ae ls`: nothing has been written yet. A long-lived attempt's (`restartPolicy:
+  Always`) turns and tokens are journalled as they grow instead — a `counted` entry each time a pass reads more than the record
+  (`countedFacts`), the attempt's usage replaced whole — and its view shows those; a job's are read at its end, as before. A busy
+  session's sighting carries no usage, so its counts wait for it to go idle.
+- **A respawn's cost is not the attempt's** (the slice 1c probe, 2026-10-02, 2.1.288): a process killed with `kill -9` writes no
+  `cost-state`, and the process Claude Code respawns on the same session counts afresh, under its own `startTime`, its own turns
+  alone. A long-lived attempt is counted from the start its journal gives it (`ExpectedSession.since`), across every process, and a
+  `cost-state` whose count began more than `COST_START_SLACK_MS` after the attempt's first line gives no cost, API or tool time: its
+  tokens are the attempt's, its cost absent rather than too low. A process that started late — a slow spawn, a crash between the
+  journal's start and the spawn — keeps its cost, its count beginning a moment before its first line. A compacted attempt counted
+  that way has no tokens either: they come from the `cost-state` alone.
+- **The resumed reading rests on one shape**: a continuation writes into the same transcript, after its parent's pair, under
+  its parent's `startTime` (one session continued twice, 2026-09-15). Its cost is its total less its parent's. No resumed
+  session has been measured end to end under the engine.
 
 ### 19. A `blocked` session holds no slot, on reasoning rather than a measurement (moved to the orchestrator)
 
@@ -1302,6 +1236,115 @@ person. The harness's `[structured-output-enforce]` message, seen on a step with
 `the-queue-on-the-board-queue-ppu1`), did get a call; whether a step without a schema is given that enforcement is not
 known.
 
+### 28. Claude Code as a job: what was measured, and what a job gives up
+
+**Closed 2026-10-24: every Claude Code session runs on the Agent SDK.** The `claude -p` road (`claude-detached`) and the `claude --bg`
+road (`config.background`, the `'claude-bg'` harness) are gone, so what follows is the record of a road this runtime no longer runs.
+
+Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `claude -p --output-format stream-json
+--verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says
+`config.background: true` (`src/harness/claude/code.ts`); since part 2a (the same day) a job reads its brief, and the words
+said to it, on its stdin (`--input-format stream-json`). Measured by hand on **Claude Code 2.1.280**, haiku, in folders under
+`/tmp`, before it was built; `test/live.test.ts` keeps each measurable (`AE_LIVE=1`, the tests named M1 to M12, and M14).
+
+**These are the `claude -p` road's measurements.** Since 2026-10-21 (`45824a1f2`) a job on `claude` runs its session on the
+Agent SDK's `query()`, in a process of its own, and not as `claude -p`: what the SDK road was measured to do is in
+`docs/harness.md`. `claude-detached` is the one harness left on `claude -p` (*`claude-detached` still spells `claude -p`*, at
+the end).
+
+- **M1: a job waits on nobody.** `claude -p` in `auto`, `dontAsk` (with `--allowedTools 'Edit(**),Bash(npm test)'`), `default`
+  and `acceptEdits`, each with and without `--permission-prompts none`, told to write outside its folder, run a command and
+  fetch a page: all eight exited 0 on their own, with a result. A call that would have asked was denied and the session
+  carried on. Each denial is said twice: a `{type: system, subtype: permission_denied, tool_name, tool_use_id,
+  decision_reason_type, decision_reason?, message}` line as it happens, and a `{tool_name, tool_use_id, tool_input}` entry of
+  the result's `permission_denials`, the same calls. The reason differs by flag — `workingDir`, `other` or none without
+  `--permission-prompts none`, `asyncAgent` (*"no approval surface in this session"*) with it, `mode` in `dontAsk` either
+  way — and the outcome does not. A Skill was not denied in any mode. The job is given the flag so a later default cannot
+  make it wait.
+- **`auto` on haiku runs as `default`.** Its `init` line said `permissionMode: default` in both `auto` runs on haiku; on
+  sonnet it said `auto`, and denied nothing the same brief asked. So a haiku step filed in `auto` is fenced as `default`.
+  Nothing refuses it: the mode is Claude Code's to choose per model.
+- **M2: a resume's cost and API time are its session's.** Issue 4, narrowed.
+- **M3: `claude -p --resume` continues a `--bg` session**, under the same id, and remembered what it was told (a session
+  stopped first). So a job may continue a background session, and the new attempt's mode is the job's.
+- **M4: a job stopped mid-turn can be resumed.** SIGTERM while a `sleep 40` ran: exit 143 within a second, a result
+  printed. SIGINT: exit 0, a result of `error_during_execution`. Resumed with `-p --resume`, each remembered its word and
+  knew its command had not finished. The engine stops a job as it stops any detached run: SIGTERM to the worker, which
+  sends SIGTERM to the harness's process group (`bin/ae-worker.ts`).
+- **M5: a budget caps a resume's own spend**, not its session's: a resume capped at half of what its session had spent
+  finished (`success`), and one capped below one response ended `error_max_budget_usd`.
+- **M6, for `wf say`: a job can be told something, over its stdin.** A `claude -p --input-format stream-json
+  --output-format stream-json --verbose` given a second user message on stdin while a turn ran a `sleep 20` answered with
+  the word from that message in the same turn's one result (`num_turns: 2`). So words can reach a running job, if its stdin
+  is kept open, and since part 2a the worker keeps it open until the job's first result (the plan's option (d); issue 29).
+  The control, SIGINT and then `-p --resume` with the words, is M4.
+- **M7: a resume is not charged its parent's denials.** Asked in review after the rest, and measured by hand the same
+  way: a job denied a write outside its folder, then `claude -p --resume` of it told to call nothing, printed
+  `permission_denials: []` and no `permission_denied` line, under the same session id — where its cost (M2) is carried on.
+  So a resumed job's result is read for denials as a first job's is, and a round, a retry or a gate's answer resumed from
+  a denied attempt says only what it was itself denied. Were a later version to carry them, M7 fails.
+- **M8, M9, M10: a job given its brief on its stdin is the job given it as a prompt.** Measured before part 2a was built,
+  one live test on 2.1.280, haiku, each a pair — `claude -p <brief>` beside `claude -p --input-format stream-json` with the
+  brief as the first user message on a stdin held open — six jobs at once. M8: `--json-schema` gave the same
+  `structured_output` (`{"finished":true}`), exit 0 both. M9: `--max-budget-usd 0.01` ended both `error_max_budget_usd`,
+  exit 1, at $0.0291 and $0.0292. M10: `auto` with `--permission-prompts none` and no allow rule — on haiku, so `default` —
+  told to write outside, run `curl` and fetch a page: both denied `Write`, `Bash` and `WebFetch`, a `permission_denied` line for each, gave their closeout, and wrote nothing
+  outside. And one thing only the stream shows: a job reading its stdin does not exit at its result — it was still running
+  five seconds after it in each streamed pair — and exits once its stdin ends, so the worker ends it. The result line's
+  `type` is printed near its end, not first (`{"duration_api_ms":…`, both ways), so the worker parses each line for its
+  `type` rather than matching its start. (This record said M10 ran in `dontAsk` until stage 2 part 2 read the test again:
+  `test/live.test.ts` gives both jobs `--permission-mode auto --permission-prompts none`. `dontAsk` under a job is M1's, and
+  M11's.)
+- **M11: a job in `dontAsk` is fenced by its checkout's settings as a `--bg` session is.** Asked at stage 2 part 2's plan
+  gate, before the orchestrator filed its steps as jobs, since the planner and the reviewers run `dontAsk` with no allow rule
+  of their own and this repository's `.claude/settings.json` as their only list. Under the engine, on 2.1.280, haiku, a job
+  and a `--bg` session, each `dontAsk` with `tools: ['Bash']`, in a checkout inside this package whose settings allow
+  `Bash(npm run build)` alone, told to run `npm run build` and then `npm run e2e`: both ran the build, neither ran the e2e,
+  both closed saying `npm run e2e` was denied, and the job's attempt carries the one denial, `Bash(npm)` (a denial names a
+  command by its first word). Were a job to read no project settings, the build would be denied too and M11 fails. But
+  `build` is a name a person's own `~/.claude/settings.json` may allow, and that allow alone would run it with no project
+  settings read (this machine's lists no `npm run`, so the first reading stands). So M11 names its two scripts afresh on
+  every run (`m11-allowed-<nonce>`, `m11-unlisted-<nonce>`), on no list but the checkout's; measured again so, on 2.1.280,
+  the same day: the same result, the allowed one ran in both and the unlisted one was denied in both.
+- **M12: a job held open waits with nothing running, and an answer resumes it.** Stage 2 part 4a (R1), on **2.1.281**,
+  haiku, `dontAsk`, a store under `/tmp`: a task filed `holdOpen: true` whose brief gives a code word signed, and read
+  `input-required` with no process of its name in `ps` and nothing started by two more passes. Answered — *give the code
+  word I gave you*, `--budget 0.3` — the next pass resumed the session that signed (attempt 2's `resumeFrom` its first's id,
+  and its own id the same), the job was spawned with `--max-budget-usd 0.3`, and it answered the code word, which only that
+  session was told; it read 8,020 tokens from the prompt cache. It signed, waited again, and a close settled it `succeeded`,
+  note `closed`. Measured first by hand through `ae start`, `ae answer` and `ae close` (the same shape: an animal it picked,
+  and that animal back with `-again`), then as M12. A held task on `codex` is M13 (issue 31). Not measured: a held task on a `--bg` session
+  (`claude-bg`, or `background: true`), whose released session is stopped and, without a worktree, removed from
+  `claude agents` before an answer resumes it — which `--resume` survives for a settled task (the live test of a settled
+  `--bg` session) and was not tried for a held one; and a wait longer than the prompt cache lives, whose resume re-reads the
+  conversation at full price. A failed later turn is not retried since stage 4a part 2 — it settles its task `failed` — but
+  a caller that files it again with `resumeFrom` meets what the retry met: since `-p --resume` keeps the id, the turn's failed
+  attempt ends with the id the turn continued, and a continuation resumes a conversation that holds the failure. Where the
+  turn began would be kept by resuming each turn with `--fork-session`, a new id per turn and the signed session left as it
+  was: not built, a change to the runner's arguments for one harness.
+- **M14: a job's denial reaches its capture before its result.** On **2.1.289**, haiku, `dontAsk` with only `Bash(sleep:*)`
+  allowed, told to run `curl` (expected to be denied) and then `sleep 40`: the `permission_denied` line was in the job's
+  capture about 4 s in, its result about 50 s in. So a sighting of the working job names the denial, and since then the
+  engine journals it as a `denied` entry on the attempt in flight (`deniedFacts`, `src/core/engine/denied.ts`); the end's
+  `permission_denials` still replace the list. Measured first by hand on the raw stream, then as M14, twice. A `ls` was not
+  denied in `dontAsk` (a read-only command), and a brief that does not say the denial is expected ends on it.
+
+What a job gives up, or what is not done:
+
+- **A job is told on its stdin, until its result** (issue 29). A person who means to attach to a step, or bridge it to
+  claude.ai, still files it with `background: true`.
+- **A background session's denials are read nowhere, neither while it works nor at its end.** M1's two shapes are
+  `claude -p`'s output, which a `--bg` session does not print; what its transcript writes for a denied call was not measured,
+  and the attempt of a `--bg` session carries no `denials`. Since stage 2 part 2 every orchestrator step is a job, and its
+  attempt carries its denials, live since M14, but for a step that says `background: true` and the system agent's own
+  long-lived session, in `dontAsk`, whose calls off its `allowedTools:` list are denied unread. The candidate source is the
+  transcript's refused `tool_result` for the call, to be measured on its own before a reader is built. `claude-detached`,
+  Codex and a remote agent report no denial while they work either.
+- **A session journalled on `claude` before part 1 is a `--bg` session with no `background` in its config.** It is still
+  observed, stopped, released and settled by its id's shape, and `say` reaches it the same way: `say` reads the mode off the
+  running session's id, as the runner does, and off the config only when nothing runs (`test/say.test.ts`).
+- **A job resumed from a `--bg` session records no cost** (issue 4).
+
 ### 30. A cancel before the worker's pid is on disk was answered `CANCELED` and sent nothing (fixed)
 
 A detached run's file is written with `pid: 0` before the worker is spawned, and the worker writes its own pid as it starts
@@ -1392,6 +1435,7 @@ once it has ended, its harness's others read, and why said on every look (`lookO
 | a check that exited 0 at 607 s of a 600 s deadline settled `failed`, `deadline exceeded`: the pass that recorded its `done` end read it again past the deadline, and the deadline settled first | an end on record is judged by that end; past the deadline, `decide` still stops a live session, cuts an open attempt, settles one the deadline cut, and starts no other attempt | engine, 2026-09-24 |
 | a Codex line that does not decode left every Codex session unread until its run went, and none could be forgotten (issue 36); a `--bg` transcript that could not be read did the same to every background session (issue 35) | the session whose output or transcript cannot be read is unread alone while it may still run, its harness's others read; once ended it reads `failed`, as a refused start does, why said on every look, so its task settles and `stop`, `release` and `forget` reach it | runtime, 2026-10-06: `73c1ebc08`, `827457f48` |
 | a pass read every idle or blocked `--bg` session's transcript whole twice, for its closeout and for its usage, though nothing had written it: 3.07 MB a pass from 15 sessions on this machine (issue 38) | a closeout and a usage read are kept by the transcript's mtime in every state, and one read a look serves both; the mtime is a stat (`transcriptWrittenAt`), not the SDK's `getSessionInfo`. On a 2,010,438-byte transcript (`test/transcript.test.ts`), a look read 4,020,876 bytes before and 2,010,438 after, five looks with nothing written 20,104,810 before and 430 after, the SDK's head and tail reads (64 KiB each, 128 KiB a look) uncounted before. An idle session's mtime moves with no byte written: an interactive one (2.1.290, idle) had its transcript's mtime set 60 min 26 s after the last, its size unchanged, so a kept read is read again on such a touch | runtime, 2026-10-06 |
+| Claude Code ran on three roads — a job on the Agent SDK, `claude -p` (`claude-detached`) and `claude --bg` (`config.background`, `'claude-bg'`) — and the two command lines carried a registry read, a quiet rule, an inbox socket, a cost read at release and a spend cap one of them did not keep (issues 3, 4, 11 to 14, 16 to 18, 28) | every Claude Code session runs on the Agent SDK: a job (`bin/ae-claude-job.ts`, or attached while a holder holds), and a long-lived session attached alone, `unstartable` with no holder; the bridge opens at `init` for either (issue 39); `config.background` is refused at `file()` and dropped by `upgrade`, and the orchestrator refuses `background:` and `harness: claude-detached` at load | runtime and orchestrator, 2026-10-24 |
 
 ## A closeout given ten seconds before the session ended was not read (2026-09-13, fixed in engine `00e301b`)
 
@@ -1526,7 +1570,9 @@ asking for a version the card does not declare is served all the same. And a vie
 (`remote-follow.ts`). Neither is wrong today — the port is reached over loopback by a process the layer above handed the token to — and
 both wait for the slice that needs them.
 
-## `file()` refuses a long-lived Claude Code task's `env`, though an attached session would take it
+## `file()` refuses a long-lived Claude Code task's `env`, though an attached session would take it (closed 2026-10-24)
+
+**Closed with the `--bg` road**: `config.background` is refused, a long-lived task runs attached alone, and the refusal of its `env` went with the pre-spawned process it was about.
 
 A task filed on the `claude` harness with `restartPolicy: 'Always'` and `config.background: true` is refused its `config.env`, in
 words saying the session "runs in a pre-spawned process and ignores its asker's environment" (`fileRefusal`). True of a `--bg`
@@ -1552,7 +1598,9 @@ The step's spend cap does not hold across those processes either: the SDK's `max
 call started (`sdk.d.ts:6034-6037`), and `adopt` resumes with the task's whole `config.budgetUsd`, so every restart of the holder
 hands the session its whole cap again. Left to an intent of its own by the person's answer at the design gate (2026-10-23).
 
-## `claude-detached` still spells `claude -p`, and is the only road that does
+## `claude-detached` still spells `claude -p`, and is the only road that does (closed 2026-10-24)
+
+**Closed**: the harness is retired, in the intent this section asked for. A step or factory naming `harness: claude-detached` is refused at load, naming the fix (delete the line: the step runs as a job on the Agent SDK); a task already filed on the name reads off its journal, and its spawn is refused, the engine having no such harness.
 
 The job's `-p` path went in the run of 2026-10-21 (`workflows/build`, `every-claude-code-job-runs-o-6kfb`); `claude-detached` did
 not, by the person's answer at the design gate: keep it, retire it in its own intent. So `claudePrintArgs`, `claudePrintFlags`,
@@ -1572,4 +1620,5 @@ lines across a dozen files under `packages/agent-orchestrator/src` and `apps/api
 `validate.ts`, `step.ts`, `discipline.ts`, `reach.ts`, `detail.ts` among them; counted 2026-10-23). None of it is read by the
 machinery — it is prose, and it dates from when a job was a command line. It is worth a sweep, and the sweep that retires
 `claude-detached` is the moment for it, since the two readings have to be told apart line by line: the harness that still
-spells `-p`, and the job that no longer does.
+spells `-p`, and the job that no longer does. Since 2026-10-24 there is no harness that spells `-p`, so any `claude -p` left in that
+prose is a former shape: what a job was before 2026-10-21, or a measurement's provenance.

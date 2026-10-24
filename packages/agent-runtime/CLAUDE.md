@@ -27,7 +27,7 @@ above it. Most of its rules are said in a comment at the code they hold: read th
   field and assign it.
 - **A flag only Claude Code has goes under `config.claude`**, never a named argument; a key moved there is refused at its old place
   (`FORMER_ARGS`) and read there off a journal by `upgrade`. Pin the argv before a move and compare after.
-- **What the runtime reads from a store or a harness is decoded by its schema first** (`event-schema.ts`, `RegistryRowSchema`,
+- **What the runtime reads from a store or a harness is decoded by its schema first** (`event-schema.ts`,
   `PRINTED`, `LINES`, `CodexEventSchema`, `ROLLOUT`, `CardSchema`): a field the runtime starts reading is added to the schema, and what
   does not decode is unread, never absent. A former journal shape is accepted by the schema, rewritten by `upgrade`, and read by a test.
 - **A feed is read through `readFeed`, never as plain lines, and written under `withFeedLock`.**

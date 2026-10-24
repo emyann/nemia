@@ -16,14 +16,12 @@
  * unique by construction — so two harnesses can never claim the same name. `decide` does not change, and does not learn
  * that harnesses exist. That is the test of whether the seam was drawn in the right place.
  *
- * `RunnerError` is in `error.ts`, beneath this file and Claude Code's `--bg` runner (`claudeOps`, in `claude/bg.ts`):
- * `Runner.claude` needs that runner as a value, and the runner builds the error, so each would import the other.
+ * `RunnerError` is in `error.ts`, beneath this file and every runner that builds one, so no runner imports the seam for it.
  */
 import { Context, Effect, Layer, type Stream } from 'effect';
 import type { SessionState, Sighting, Usage } from '../core/index.ts';
 import { own } from '../core/own.ts';
 import { argsRefusalOf, type HarnessArgs } from './args.ts';
-import { claudeOps, type ClaudeOptions } from './claude/bg.ts';
 import { causeWords, RunnerError } from './error.ts';
 import type { Telemetry } from './telemetry.ts';
 
@@ -371,8 +369,6 @@ export class Runner extends Context.Service<Runner, RunnerOps>()('engine/Runner'
         refuses: (task) => argsRefusalOf(task) ?? ops.refuses?.(task),
       }),
     );
-
-  static claude = (options: ClaudeOptions) => Runner.layer(claudeOps(options));
 
   static test = (control?: { sessions: Map<string, Sighting>; spawned?: SpawnRequest[] }) => Runner.layer(testOps(control));
 }

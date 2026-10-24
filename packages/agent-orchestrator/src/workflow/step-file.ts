@@ -20,7 +20,6 @@ import { fenceReach } from 'agent-runtime/vocabulary';
 import { renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { DEFAULT_HARNESS, isRemoteHarness, remoteRefusal } from '../harness/harness.ts';
 import {
-  backgroundOf,
   budgetOf,
   checkOf,
   bareSkillOf,
@@ -336,7 +335,6 @@ export function stepFrom(
   if (meta.resume && !after.includes(meta.resume)) after.push(meta.resume);
   const harness = harnessOf(name, meta.harness);
   if (harness !== undefined && isRemoteHarness(harness)) remoteRefusal(name, meta, harness);
-  const background = backgroundOf(name, meta.background);
   const output = merged ?? outputOf(name, meta.output, read);
   if (meta.model?.trim() === 'inherit') {
     refuse(
@@ -366,8 +364,7 @@ export function stepFrom(
     tools: toolsOf(name, meta.tools, harness),
     disallowedTools: rulesOf(name, 'disallowedTools', meta.disallowedTools, spelled.disallowedTools),
     allowedTools: rulesOf(name, 'allowedTools', meta.allowedTools, spelled.allowedTools),
-    denials: denialsOf(name, meta.denials, harness, background),
-    background,
+    denials: denialsOf(name, meta.denials, harness),
     remote: remoteOf(name, meta.remote),
     deadlineSeconds: countOf(name, 'deadlineSeconds', meta.deadlineSeconds),
     budget: budgetOf(name, meta.budget),

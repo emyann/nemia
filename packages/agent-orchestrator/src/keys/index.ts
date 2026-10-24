@@ -1,6 +1,5 @@
 /** The face of `keys/`: the readers of a step's keys and its tool rules, re-exported by name. */
 export {
-  backgroundOf,
   BUDGET_EXAMPLE,
   budgetOf,
   checkOf,

@@ -54,7 +54,6 @@ export const UNSET: Readonly<WorkflowStepSpec> = {
   disallowedTools: [],
   allowedTools: [],
   denials: null,
-  background: null,
   remote: null,
   deadlineSeconds: null,
   budget: null,

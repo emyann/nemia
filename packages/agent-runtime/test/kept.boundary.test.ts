@@ -2,7 +2,7 @@
  * `Engine.kept` on the files store and a real harness folder: what a task keeps on the disk, in bytes as the file system counts
  * them — its journal, the bodies it is first to name, its harness's files and the harness's own record of each session its
  * journal names — and what it never counts: a person's own session in the same folder, a body twice, a forgotten task's record.
- * The harness is Claude Code's detached one, whose folder is `CLAUDE_CONFIG_DIR`, set before `src` loads; no session is started.
+ * The harness is Claude Code's job, whose folder is `CLAUDE_CONFIG_DIR`, set before `src` loads; no session is started.
  *
  * Told as one story over a store that grows a task at a time, then a table of what is not counted or not read, and one of what
  * each kind of harness names of a session.
@@ -18,12 +18,13 @@ import { story } from './checkpoints.ts';
 
 const config = scratch('ae-kept-config-');
 process.env.CLAUDE_CONFIG_DIR = config;
-const { Engine, Journal, RunnerError, claudeDetached } = await import('../src/index.ts');
+const { Engine, Journal, RunnerError } = await import('../src/index.ts');
+const { claudeJob } = await import('../src/harness/claude/code.ts');
 const { diskBytesOf, ioCounts } = await import('../src/core/engine/index.ts');
 const { asyncOps } = await import('./promise-runner.ts');
 const { builtEngine } = await import('./engine.ts');
 
-const HARNESS = 'claude-detached';
+const HARNESS = 'claude';
 const at = '2026-10-12T10:00:00.000Z';
 
 /** The bytes `file` takes on the disk, read by the test itself. */
@@ -76,7 +77,7 @@ const journalled = async (
 
 /** A real engine over the files store under `root`, with the shipped harnesses and `more`. */
 const engineOn = (root: string, more: Record<string, RunnerOps> = {}) =>
-  builtEngine(Engine.layer({ root, harnesses: { [HARNESS]: claudeDetached, ...more }, defaultHarness: HARNESS }));
+  builtEngine(Engine.layer({ root, harnesses: { [HARNESS]: claudeJob, ...more }, defaultHarness: HARNESS }));
 
 /** What `kept` answers of the task `taskId`. */
 const keptOf = async (engine: ReturnType<typeof engineOn>, taskId: string) =>
@@ -299,14 +300,14 @@ test('REFUSED: what kept does not count, or cannot read, is said and stops no ot
   });
 });
 
-test("kept: what each harness names of a session — Claude Code's either mode, a remote agent's entry, none, its own, or a failure", async (t) => {
+test("kept: what each harness names of a session — Claude Code's job, a remote agent's entry, none, its own, or a failure", async (t) => {
   await t.test(
-    "Claude Code's harness names what either mode keeps of a session once: a job's run file, a background session's file, the transcript",
+    "Claude Code's harness names what a job keeps of a session once: its run's streams and files, and the transcript",
     async () => {
       const root = scratch('ae-kept-root-');
       await journalled(root, 'c1', { harness: 'claude', nativeId: 'sess-c1' });
       const job = plant(path.join(root, 'runs', 'claude', 'ae_c1_1.stdout'), 4096);
-      const parent = plant(path.join(root, 'parent', 'ae_c1_1.json'), 12000);
+      const run = plant(path.join(root, 'runs', 'claude', 'ae_c1_1.json'), 12000);
       const transcript = plant(transcriptAt('-r', 'sess-c1'), 20000);
       const engine = builtEngine(Engine.layer({ root, harnesses: { claude: 'claude' }, defaultHarness: 'claude' }));
       assert.deepEqual(await keptOf(engine, 'c1'), {
@@ -315,7 +316,7 @@ test("kept: what each harness names of a session — Claude Code's either mode, 
         journal: blocksOf(path.join(root, 'tasks', 'c1.jsonl')),
         bodies: 0,
         output: blocksOf(job),
-        files: blocksOf(parent),
+        files: blocksOf(run),
         records: blocksOf(transcript),
       });
     },

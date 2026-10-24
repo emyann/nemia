@@ -13,7 +13,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { detachedOps, type HarnessOutput, type HarnessSpec } from '../src/harness/detached/detached.ts';
 import { claudeResultOutput, claudeStreamKept, claudeStreamOutput, READ_INPUT_KEYS, STREAM_KINDS } from '../src/harness/detached/output.ts';
-import { printedKindOf } from '../src/harness/claude/print.ts';
+import { printedKindOf } from '../src/harness/claude/stream.ts';
 import { SAID_DIGEST, SAID_EXTENDED, SAID_VERSION } from '../src/harness/detached/said.ts';
 import { codexOutput } from '../src/harness/codex/stream.ts';
 import { ioCounts } from '../src/core/engine/tally.ts';

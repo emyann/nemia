@@ -361,7 +361,7 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       );
       assert.match(codex, /Only an agent on Claude Code is tried here/);
       await refused(tryIt('faraway', { brief: 'Do it there.' }), 422, /is a remote agent \(`harness: a2a:faraway`\)/);
-      await refused(tryIt('bridged', { brief: 'Do it.' }), 422, /says `remote: true`.*a try runs as a job/);
+      await refused(tryIt('bridged', { brief: 'Do it.' }), 422, /says `remote: true`/);
       for (const name of ['coder', 'faraway', 'bridged'])
         assert.equal(fs.existsSync(path.join(TRIES, name)), false, `no try folder for ${name}`);
     },

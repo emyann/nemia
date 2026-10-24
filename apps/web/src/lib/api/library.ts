@@ -134,8 +134,6 @@ export type WorkflowStepSpec = {
   allowedTools: string[];
   /** `denials: fail` as written: null where the step has no line, and what the harness denied it decides nothing. */
   denials: 'fail' | null;
-  /** `background:` as written: null where the step has no line, and runs as a job. */
-  background: boolean | null;
   /** `remote:` as written: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
@@ -183,7 +181,6 @@ export const StepKeySchema = decodes<StepKey>()(
     'disallowedTools',
     'allowedTools',
     'denials',
-    'background',
     'remote',
     'deadlineSeconds',
     'budget',
@@ -221,7 +218,6 @@ export const WorkflowStepSpecSchema = decodes<WorkflowStepSpec>()(
     disallowedTools: Strings,
     allowedTools: Strings,
     denials: Schema.NullOr(Schema.Literal('fail')),
-    background: Schema.NullOr(Schema.Boolean),
     remote: Schema.NullOr(Schema.Boolean),
     deadlineSeconds: Schema.NullOr(Schema.Number),
     budget: Schema.NullOr(Schema.Number),

@@ -12,7 +12,7 @@
  * `a-shipped`'s and `x-gone`'s filings are not on it, as in a store whose feed does not record them. A pass has read where their branches
  * stand (`passStanding`), which the list reads off `standing.json`.
  */
-import { observations, root } from './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import { story } from './checkpoints.ts';
 import assert from 'node:assert/strict';
@@ -307,21 +307,6 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
         assert.equal(detail.startedAt, runs.get(id)!.startedAt, id);
       }
-    },
-  );
-  await s.test(
-    'reading the runs a run waits on observes no harness again: the list and the detail observe once, a shipped parent among them',
-    async () => {
-      const before = observations();
-      await listedRuns();
-      assert.equal(
-        observations() - before,
-        0,
-        "the list: a-shipped's tasks, read to ask its nemia decide as its branch is on main, come off the views the request already read; the tasks in flight are Codex's, and only the harnesses of the runs' own tasks are looked at, Claude Code's registry never",
-      );
-      const again = observations();
-      assert.equal((await app.request('/api/runs/d-waits')).status, 200);
-      assert.equal(observations() - again, 0, 'the detail');
     },
   );
   await s.test('the decision of a run waiting on runs is `waiting`, and nothing else: what `nemia decide` prints for it', async () => {

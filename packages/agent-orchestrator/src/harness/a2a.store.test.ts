@@ -263,7 +263,6 @@ const LOCAL_ONLY: Record<string, string> = {
   model: 'opus',
   effort: 'high',
   context: '200k',
-  background: 'true',
   remote: 'true',
   permissionMode: 'plan',
   sandbox: 'read-only',

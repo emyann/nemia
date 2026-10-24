@@ -1,18 +1,16 @@
 /**
  * MCP servers, at shipped defaults: what a session is given and — the point — what it is not.
  *
- * Spawned with no MCP flags, a Claude Code session loads every server the operator has: user scope (`~/.claude.json`) and
- * their claude.ai connectors — mail, calendar, drive — beside the checkout's `.mcp.json`, as the `init` event of `claude -p`
- * lists. Strict is not the whole fence: Claude in Chrome, which a user setting switches on, connects in a `--bg` session
- * spawned strict. A job reads its prompt on its stdin, where no `--mcp-config` list can take it; `claude-detached` takes it as
- * `-p`'s value, and `claude --bg` last, after the list. A checkout's `.mcp.json` that is not JSON is refused before anything
- * runs: named on the command line, it stops Claude Code before a session exists, and waiting out the grace window to call
+ * Spawned with no MCP settings, a Claude Code session loads every server the operator has: user scope (`~/.claude.json`) and
+ * their claude.ai connectors — mail, calendar, drive — beside the checkout's `.mcp.json`. Every Claude Code session runs on the
+ * Agent SDK, so its servers are a value (`Options.mcpServers`, strict, Chrome left off), read here off the options its own process
+ * builds (`attachedOptions`); a `HarnessSpec` handed a config file is given one written owner-only under the engine's root, outside
+ * the workspace. A checkout's `.mcp.json` that is not JSON is refused before anything runs: waiting out the grace window to call
  * that `lost` would only hide the reason.
  *
- * The story and the refusals go through the engine's own harnesses with a fake `claude` and `codex` on PATH, each writing down
- * the argv it was given, so what is checked is what the engine really runs. The last table is of `everyMcpServer` and
- * `mcpServerOf` alone, the same servers as a value rather than a file: what an attached session rides on `Options.mcpServers`,
- * whose own spawn is pinned in `attached.boundary.test.ts`.
+ * Codex goes through the engine's own harness with a fake `codex` on PATH writing down the argv it was given, so what is checked
+ * is what the engine really runs. The last table is of `everyMcpServer` and `mcpServerOf` alone, the same servers as a value: what
+ * an attached session rides on `Options.mcpServers`, whose own spawn is pinned in `attached.boundary.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +19,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { McpServer, TaskSpec } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
-import { claudeOps } from '../src/harness/claude/bg.ts';
 import { attachedOptions } from '../src/harness/claude/attached-options.ts';
 import { detachedOps, type HarnessIO, type HarnessSpec } from '../src/harness/detached/detached.ts';
 import { codex } from '../src/harness/codex/codex.ts';
@@ -36,14 +33,13 @@ const tmp = (label: string) => scratch(`ae-mcp-${label}-`);
 
 /**
  * A fake `claude` and `codex`: each writes its argv, one line per argument, to `<bin>/<name>.argv` — written, then moved, so
- * no reader sees half. `claude agents` answers an empty registry: nobody is running.
+ * no reader sees half.
  */
 const fakeBin = () => {
   const bin = tmp('bin');
   for (const name of ['claude', 'codex']) {
     const out = path.join(bin, `${name}.argv`);
-    const agents = name === 'claude' ? `if [ "$1" = agents ]; then echo '[]'; exit 0; fi\n` : '';
-    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\n${agents}printf '%s\\n' "$@" > '${out}.tmp' && mv '${out}.tmp' '${out}'\n`, {
+    fs.writeFileSync(path.join(bin, name), `#!/bin/sh\nprintf '%s\\n' "$@" > '${out}.tmp' && mv '${out}.tmp' '${out}'\n`, {
       mode: 0o755,
     });
   }
@@ -88,20 +84,11 @@ const spawnAtDefaults = (t: Waiter, task: Omit<TaskSpec, 'brief'>, codexHome = t
   });
 };
 
-/** The configs `--mcp-config` names — every argument after it up to the next flag — and that flag. */
-const mcpConfigsOf = (args: string[]) => {
-  const at = args.indexOf('--mcp-config');
-  if (at === -1) return { configs: [], next: undefined };
-  const rest = args.slice(at + 1);
-  const end = rest.findIndex((a) => a.startsWith('-'));
-  return { configs: end === -1 ? rest : rest.slice(0, end), next: end === -1 ? undefined : rest[end] };
-};
-
 /** MCP configs the runners wrote under the engine's root. */
 const configsUnder = (root: string) =>
   (fs.readdirSync(root, { recursive: true }) as string[]).filter((f) => f.endsWith('.mcp.json') || f.split(path.sep)[0] === 'mcp');
 
-const CLAUDES = ['claude', 'claude-detached'] as const;
+const CLAUDES = ['claude'] as const;
 
 /**
  * The servers a job is given, and how, read off the options its own process builds from its spawn request (`attachedOptions`):
@@ -145,107 +132,39 @@ const RECORDED: RemoteMcpServer = {
 test("a task's MCP servers reach each runner strictly, the checkout's and the task's own and never the operator's", WAITED, async (t) => {
   const s = story(t);
 
-  await s.test("no mcp and no .mcp.json: Claude Code is spawned strict, with no config — none of the operator's servers", async () => {
-    const cwd = tmp('bare');
-    const { args, root } = await spawnAtDefaults(t, { cwd, harness: 'claude-detached' });
-    assert.ok(args, 'claude-detached was spawned');
-    assert.ok(args.includes('--strict-mcp-config'), 'strict, so user scope and claude.ai connectors stay unloaded');
-    assert.ok(args.includes('--no-chrome'), "nor the operator's Chrome, which no config names and strict leaves on");
-    assert.equal(args.includes('--mcp-config'), false, 'and no server is named in their place');
-    assert.deepEqual(configsUnder(root), [], 'nothing written for a task that named no servers');
-    assert.equal(args[args.indexOf('-p') + 1], 'the prompt', 'the prompt survives');
-
-    const job = jobServers(cwd);
-    assert.equal(job.servers, undefined, 'a job: no server is given in their place');
-    assert.ok(job.strict, 'a job: strict all the same');
-    assert.equal(job.chrome, false, "a job: and not the operator's Chrome");
+  await s.test("no mcp and no .mcp.json: Claude Code is given no server, strict — none of the operator's servers", () => {
+    const job = jobServers(tmp('bare'));
+    assert.equal(job.servers, undefined, 'no server is given in their place');
+    assert.ok(job.strict, 'strict, so user scope and claude.ai connectors stay unloaded');
+    assert.equal(job.chrome, false, "nor the operator's Chrome, which no config names and strict leaves on");
   });
 
-  await s.test(".mcp.json in the checkout: named, so strict keeps the repository's servers — and only those", async () => {
+  await s.test(".mcp.json in the checkout: given, so strict keeps the repository's servers — and only those", () => {
     const cwd = tmp('checkout');
     fs.writeFileSync(path.join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { repo: { command: 'repo-server' } } }));
-    const { args } = await spawnAtDefaults(t, { cwd, harness: 'claude-detached' });
-    assert.ok(args, 'claude-detached was spawned');
-    const { configs, next } = mcpConfigsOf(args);
-    assert.deepEqual(configs, [path.join(cwd, '.mcp.json')], "the checkout's file, and nothing else");
-    assert.equal(next, '--strict-mcp-config', 'still strict, and the variadic list is ended by it, not by the prompt');
-    assert.ok(args.includes('--no-chrome'), 'and still no Chrome');
-    assert.equal((await spawnAtDefaults(t, { cwd, harness: 'claude', config: { background: true } })).args?.at(-1), 'the prompt');
-
     const job = jobServers(cwd);
-    assert.deepEqual(job.servers, { repo: { command: 'repo-server' } }, "a job: the checkout's servers, as a value");
-    assert.ok(job.strict && !job.chrome, 'a job: still strict, still no Chrome');
+    assert.deepEqual(job.servers, { repo: { command: 'repo-server' } }, "the checkout's servers, as a value");
+    assert.ok(job.strict && !job.chrome, 'still strict, still no Chrome');
   });
 
-  await s.test(
-    "a task's mcp is written outside the workspace and named after the checkout's — still strict, so nothing of the operator's",
-    async () => {
-      const cwd = tmp('checkout');
-      fs.writeFileSync(path.join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { repo: { command: 'repo-server' } } }));
-      const harness = 'claude-detached';
-      const { args } = await spawnAtDefaults(t, { cwd, harness, config: { mcp: MCP } });
-      assert.ok(args, `${harness} was spawned`);
-      const { configs, next } = mcpConfigsOf(args);
-      assert.equal(configs.length, 2, `${harness}: ${JSON.stringify(configs)}`);
-      assert.equal(configs[0], path.join(cwd, '.mcp.json'), `${harness}: the repository's servers first`);
-      assert.deepEqual(
-        JSON.parse(fs.readFileSync(configs[1], 'utf8')),
-        { mcpServers: MCP },
-        `${harness}: the task's servers, exactly, and no other`,
-      );
-      assert.ok(path.relative(cwd, configs[1]).startsWith('..'), `${harness}: written outside the workspace`);
-      assert.equal(fs.statSync(configs[1]).mode & 0o077, 0, `${harness}: readable by its owner only — an env or a header may be a secret`);
-      assert.equal(next, '--strict-mcp-config', harness);
-      assert.ok(args.includes('--no-chrome'), `${harness}: a task's servers do not bring the operator's Chrome back`);
+  await s.test("a task's mcp is laid over the checkout's — still strict, so nothing of the operator's, and nothing in the checkout", () => {
+    const cwd = tmp('checkout');
+    fs.writeFileSync(path.join(cwd, '.mcp.json'), JSON.stringify({ mcpServers: { repo: { command: 'repo-server' } } }));
+    const job = jobServers(cwd, { mcp: MCP });
+    assert.deepEqual(job.servers, { repo: { command: 'repo-server' }, ...MCP }, "the checkout's and the task's, as one value");
+    assert.ok(job.strict && !job.chrome, "a task's servers do not bring the operator's Chrome back");
+    assert.deepEqual(fs.readdirSync(cwd), ['.mcp.json'], 'nothing landed in the checkout');
+  });
 
-      const job = jobServers(cwd, { mcp: MCP });
-      assert.deepEqual(job.servers, { repo: { command: 'repo-server' }, ...MCP }, "a job: the checkout's and the task's, as one value");
-      assert.ok(job.strict && !job.chrome, 'a job: still strict, still no Chrome');
-      assert.deepEqual(fs.readdirSync(cwd), ['.mcp.json'], 'nothing landed in the checkout');
-    },
-  );
+  await s.test("projectMcp: [] leaves the checkout's .mcp.json out, still strict", () => {
+    const job = jobServers(checkoutOf(), { projectMcp: [] });
+    assert.equal(job.servers, undefined, "the checkout's servers are not given");
+    assert.ok(job.strict && !job.chrome, 'and nothing else loads in their place');
+  });
 
-  await s.test(
-    "projectMcp: [] leaves the checkout's .mcp.json out: no config named, still strict, as a job, detached and --bg",
-    async () => {
-      const cwd = checkoutOf();
-      for (const task of [{ harness: 'claude-detached' }, { harness: 'claude', config: { background: true } }]) {
-        const label = JSON.stringify(task);
-        const { args, root } = await spawnAtDefaults(t, { cwd, ...task, config: { ...task.config, projectMcp: [] } });
-        assert.ok(args, `${label} was spawned`);
-        assert.equal(args.includes('--mcp-config'), false, `${label}: the checkout's servers are not named`);
-        assert.ok(args.includes('--strict-mcp-config') && args.includes('--no-chrome'), `${label}: and nothing else loads in their place`);
-        assert.deepEqual(configsUnder(root), [], `${label}: nothing written`);
-      }
-      const job = jobServers(cwd, { projectMcp: [] });
-      assert.equal(job.servers, undefined, "a job: the checkout's servers are not given");
-      assert.ok(job.strict && !job.chrome, 'a job: and nothing else loads in their place');
-    },
-  );
-
-  await s.test("projectMcp: names loads those entries alone, as the file gives them, from the task's own 0600 config", async () => {
-    const cwd = checkoutOf();
+  await s.test("projectMcp: names gives those entries alone, as the file gives them, with the task's own", () => {
     const own = { mine: { command: 'x' } };
-    for (const task of [{ harness: 'claude-detached' }, { harness: 'claude', config: { background: true } }]) {
-      const label = JSON.stringify(task);
-      const { args } = await spawnAtDefaults(t, { cwd, ...task, config: { ...task.config, projectMcp: ['a'], mcp: own } });
-      assert.ok(args, `${label} was spawned`);
-      const { configs, next } = mcpConfigsOf(args);
-      assert.equal(configs.length, 1, `${label}: ${JSON.stringify(configs)}`);
-      assert.notEqual(configs[0], path.join(cwd, '.mcp.json'), `${label}: not the checkout's file, which names b too`);
-      assert.deepEqual(
-        JSON.parse(fs.readFileSync(configs[0], 'utf8')),
-        { mcpServers: { a: TWO.a, ...own } },
-        `${label}: a verbatim, and the task's`,
-      );
-      assert.equal(fs.statSync(configs[0]).mode & 0o077, 0, `${label}: owner-only`);
-      assert.equal(next, '--strict-mcp-config', label);
-    }
-    assert.deepEqual(
-      jobServers(cwd, { projectMcp: ['a'], mcp: own }).servers,
-      { a: TWO.a, ...own },
-      "a job: a verbatim, and the task's, given as a value and written to no file",
-    );
+    assert.deepEqual(jobServers(checkoutOf(), { projectMcp: ['a'], mcp: own }).servers, { a: TWO.a, ...own }, 'a verbatim, b left out');
   });
 
   await s.test(
@@ -257,8 +176,7 @@ test("a task's MCP servers reach each runner strictly, the checkout's and the ta
       const id = await Effect.runPromise(engine.file({ brief: 'b', cwd, harness: 'claude', config: { projectMcp: ['a'] } }));
       const again = builtEngine(Engine.layer({ root }));
       assert.deepEqual((await Effect.runPromise(again.view(id))).state.config?.projectMcp, ['a']);
-      const { args } = await spawnAtDefaults(t, { cwd, harness: 'claude-detached' });
-      assert.deepEqual(mcpConfigsOf(args!).configs, [path.join(cwd, '.mcp.json')]);
+      assert.deepEqual(jobServers(cwd).servers, TWO, 'filed without, the whole file again');
     },
   );
 
@@ -452,8 +370,7 @@ const REFUSALS: readonly Refusal[] = [
 const TAKEN: readonly { name: string; taken: (t: Waiter) => Promise<boolean> | boolean }[] = [
   {
     name: 'projectMcp: [] reads no file: a checkout with none starts',
-    taken: async (t) =>
-      (await spawnAtDefaults(t, { cwd: tmp('bare'), harness: 'claude-detached', config: { projectMcp: [] } })).args !== undefined,
+    taken: () => jobServers(tmp('bare'), { projectMcp: [] }).servers === undefined,
   },
   {
     name: "codex: a name the operator's config does not use is given to codex",
@@ -486,20 +403,7 @@ test(
   },
 );
 
-test('a spawn whose task names no servers clears a config left under its name — no servers it was not given', async () => {
-  const root = tmp('root');
-  const cwd = tmp('bare');
-  const bin = fakeBin();
-  await onPath(bin, async () => {
-    const ops = claudeOps({ root });
-    await Effect.runPromise(ops.spawn({ name: 'ae/t/1', brief: 'the prompt', cwd, config: { mcp: { a: { command: 'x' } } } }));
-    const [written] = mcpConfigsOf(argvIn(path.join(bin, 'claude.argv'))).configs;
-    assert.ok(written && fs.existsSync(written), 'written the first time');
-    await Effect.runPromise(ops.spawn({ name: 'ae/t/1', brief: 'the prompt', cwd }));
-    assert.equal(fs.existsSync(written), false, 'claude --bg: cleared');
-    assert.equal(argvIn(path.join(bin, 'claude.argv')).includes('--mcp-config'), false);
-  });
-
+test("a spec's config file: the task's servers written owner-only outside the workspace, by an absolute path, and cleared when none", async (t) => {
   let given: HarnessIO | undefined;
   const spy: HarnessSpec = {
     name: 'sh',
@@ -508,34 +412,44 @@ test('a spawn whose task names no servers clears a config left under its name �
       return { cmd: 'sh', args: ['-c', 'exit 0'] };
     },
   };
-  const detached = detachedOps(spy, root);
-  await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd, config: { mcp: { a: { command: 'x' } } } }));
-  const written = given?.mcpConfigFile;
-  assert.ok(written && fs.existsSync(written), 'written the first time');
-  await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd }));
-  assert.equal(given?.mcpConfigFile, undefined);
-  assert.equal(fs.existsSync(written), false, 'detached: cleared');
-});
 
-test('a relative cwd or root still names each config by an absolute path — Claude resolves the flag inside the cwd', async () => {
-  const was = process.cwd();
-  const bin = fakeBin();
-  process.chdir(tmp('parent'));
-  try {
-    const here = process.cwd();
-    fs.mkdirSync('repo');
-    fs.writeFileSync(path.join('repo', '.mcp.json'), '{"mcpServers":{}}');
-    await onPath(bin, () =>
-      Effect.runPromise(
-        claudeOps({ root: 'board' }).spawn({ name: 'ae/t/1', brief: 'the prompt', cwd: 'repo', config: { mcp: { a: { command: 'x' } } } }),
-      ),
-    );
-    const { configs } = mcpConfigsOf(argvIn(path.join(bin, 'claude.argv')));
-    assert.deepEqual(configs, [path.join(here, 'repo', '.mcp.json'), path.join(here, 'board', 'mcp', 'ae_t_1.json')]);
-    for (const c of configs) assert.ok(fs.existsSync(path.resolve(here, 'repo', c)), `${c} is found from inside repo`);
-  } finally {
-    process.chdir(was);
-  }
+  await t.test(
+    "written with the picked entries and the task's own, owner-only, outside the workspace; cleared on a spawn without",
+    async () => {
+      const root = tmp('root');
+      const cwd = checkoutOf();
+      const detached = detachedOps(spy, root);
+      const own = { mine: { command: 'x' } };
+      await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd, config: { projectMcp: ['a'], mcp: own } }));
+      const written = given?.mcpConfigFile;
+      assert.ok(written && fs.existsSync(written), 'written the first time');
+      assert.deepEqual(JSON.parse(fs.readFileSync(written, 'utf8')), { mcpServers: { a: TWO.a, ...own } }, "a verbatim, and the task's");
+      assert.ok(path.relative(cwd, written).startsWith('..'), 'written outside the workspace');
+      assert.equal(fs.statSync(written).mode & 0o077, 0, 'readable by its owner only — an env or a header may be a secret');
+      assert.deepEqual(configsUnder(root).length, 1, 'one config, under the engine’s root');
+      await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd }));
+      assert.equal(given?.mcpConfigFile, undefined);
+      assert.equal(fs.existsSync(written), false, 'cleared: no servers it was not given');
+    },
+  );
+
+  await t.test('a relative root still names the config by an absolute path — a harness resolves the flag inside the cwd', async () => {
+    const was = process.cwd();
+    process.chdir(tmp('parent'));
+    try {
+      const here = process.cwd();
+      fs.mkdirSync('repo');
+      await Effect.runPromise(
+        detachedOps(spy, 'board').spawn({ name: 'ae/t/1', brief: 'x', cwd: 'repo', config: { mcp: { a: { command: 'x' } } } }),
+      );
+      const written = given?.mcpConfigFile;
+      assert.ok(written && path.isAbsolute(written), `absolute: ${written}`);
+      assert.ok(written.startsWith(path.join(here, 'board') + path.sep), `under the root: ${written}`);
+      assert.ok(fs.existsSync(path.resolve(here, 'repo', written)), `${written} is found from inside repo`);
+    } finally {
+      process.chdir(was);
+    }
+  });
 });
 
 test("Codex's MCP config: a task's servers written as one TOML value, and the operator's server names read back", async (t) => {

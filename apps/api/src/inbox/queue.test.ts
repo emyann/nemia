@@ -5,7 +5,7 @@
  * ran with and the runs it counts and holds, held to the package's `runSlots` — in the harness's scratch store (`root`) and a scratch
  * repository; and the shell's `WF_MAX_RUNS` is dropped, so no cap comes from it.
  */
-import { observations, root } from '../../test/harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -449,12 +449,10 @@ const PASS = {
 
 test("a person reads the ceilings: no cap, then the cap of the daemon's last pass and the runs it holds, and what the pass cost", async (t) => {
   const s = story(t);
-  await s.test('with no pass written and no cap: `no cap`, and nothing read, no run, no harness', async () => {
+  await s.test('with no pass written and no cap: `no cap`, and nothing read, no run', async () => {
     clear();
     seedRuns();
-    const before = observations();
     assert.deepEqual(await ceilings(), { last: null, cap: 0, inFlight: null, held: [], pass: null });
-    assert.equal(observations(), before, 'no observation of the harness with no cap');
   });
 
   await s.test(
@@ -463,13 +461,7 @@ test("a person reads the ceilings: no cap, then the cap of the daemon's last pas
       clear();
       seedRuns();
       tickWrote({ sessions: 2, runs: 1 });
-      let before = observations();
       const one = await ceilings();
-      assert.equal(
-        observations() - before,
-        0,
-        'no `claude agents`: one list of the runs’ tasks, which asks a harness only of a background session among them, and there is none',
-      );
       assert.deepEqual(
         one,
         {
@@ -505,9 +497,7 @@ test("a person reads the ceilings: no cap, then the cap of the daemon's last pas
 
       pending('t-also');
       writeRun('0-also-flying', 5, { taskId: 't-also' });
-      before = observations();
       assert.deepEqual((await ceilings()).inFlight, ['a-flying', '0-also-flying'], 'two in flight, oldest first by createdAt, then id');
-      assert.equal(observations() - before, 0);
     },
   );
 

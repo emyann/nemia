@@ -33,7 +33,7 @@ const SUBSCRIBE_SELECTOR_TAKES = `nemia subscribe -l takes a selector of the fee
 export type Subscribed = { name: string; subscription: Subscription };
 
 /** How a long-lived task is filed for a subscription, as the refusal of any other says it; Nemia's own is filed by her keeper. */
-const FILE_IT = 'file it long-lived: AE_ROOT=$WF_ROOT/engine ae file, with restartPolicy: Always and background: true';
+const FILE_IT = 'file it long-lived: AE_ROOT=$WF_ROOT/engine ae file, with restartPolicy: Always';
 
 /**
  * The refusal (`Conflict`) of a subscription named `name` given or taken away by hand where the name is Nemia's, which her keeper alone

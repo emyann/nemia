@@ -51,7 +51,6 @@ export const filedConfig = <Own extends object>(
   tools: step.tools,
   disallowedTools: filedDenies(step, run, t.landingDenied),
   allowedTools: filedAllows(step, t.runArtifacts),
-  background: step.background,
   budgetUsd: t.budgetUsd,
   ...mountsOf([...(stepMounts(step, run.mounts) ?? []), ...folders(filedFolders(step, steps, t))]),
   ...serversOf(step, t.servers),
@@ -65,12 +64,10 @@ export const filedConfig = <Own extends object>(
  */
 export const STEP_FILES = 'WF_STEP_FILES';
 
-/**
- * A step's session's own environment: its files directory under `runArtifacts` as `STEP_FILES`. None for a background session, whose
- * process ignores its asker's environment and is refused one.
- */
-const stepFilesEnv = (step: Pick<Workflow, 'name' | 'background'>, runArtifacts: string): { env?: Record<string, string> } =>
-  step.background ? {} : { env: { [STEP_FILES]: path.join(runArtifacts, step.name) } };
+/** A step's session's own environment: its files directory under `runArtifacts` as `STEP_FILES`. */
+const stepFilesEnv = (step: Pick<Workflow, 'name'>, runArtifacts: string): { env: Record<string, string> } => ({
+  env: { [STEP_FILES]: path.join(runArtifacts, step.name) },
+});
 
 /**
  * The folders a step is filed with beyond its factory's, each read-only: those the steps before it handed over, then the store's, then

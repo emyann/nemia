@@ -5,6 +5,12 @@ the tests run the machinery on `test/fixtures/team/`. The sections below that na
 kept as they were written. So is a record's path to a file since removed with what it held; a record whose subject moved keeps the
 old path with "(now …)" beside it, and a line that says how things are now names today's file.
 
+Since 2026-10-24 every Claude Code session runs on the Agent SDK: a step's and an agent's `background:` and the harness
+`claude-detached` are gone, each refused at load by name with its fix — delete the line, and the step runs as a job on the Agent SDK
+(`REFUSED` in `src/step/step.ts`, `harnessOf` in `src/keys/keys.ts`). `remote:` stays, on any `claude` step; a run frozen with
+`background:` still reads (`FrozenStepSchema`); Nemia is long-lived by `restartPolicy: 'Always'` alone. The sections below that name
+`background:`, `--bg`, `claude -p` or `claude-detached` are records of what shipped then.
+
 The features agent-orchestrator is still missing, in the order I would take them. Each says what exists
 today, what the feature has to settle, and what earlier work already taught about it. Bugs and open
 questions live in [agent-runtime/docs/open-issues.md](../../agent-runtime/docs/open-issues.md).
@@ -5553,11 +5559,14 @@ before 2026-10-23.
   engine's `file()` does (only `'claude-bg'` bridged then; since thin runtime stage 2 part 2, `claude` with `background: true`,
   and a `claude` step without it is refused in the engine's words too). Its sentence is a copy, since `start` is synchronous and `file()` is not; a store
   test asks an engine built on the same `HARNESSES` and fails when the two differ. Not at load, as a codex `budget:` is: the request put it at
-  start, and the runtime client (`runtime-client.ts`) holds the engine's harness map.
+  start, and the runtime client (`runtime-client.ts`) holds the engine's harness map. *Since 2026-10-24 any `claude` step is bridged,
+  a job too, at its session's `init` on the Agent SDK; `claude-detached` and `background:` are refused at load, so `codex` is what is
+  left to refuse at start.*
 - **Nothing new on a screen.** `wf ls` and `wf decide` print the same lines whether the engine's record carries `remoteControl` or not,
   and a test holds them so. `wf --help`'s sentence on the keys names `remote` among the rest.
 - **Left**: nothing. *Since: the supervisor shipped as §9 (2026-09-17); whether a session was in fact bridged is read off its
-  registration onto its task's view (`TaskView.bridge`, runtime open issue 23), and a step's detail answers it (`StepFiled.bridge`),
+  registration onto its task's view (`TaskView.bridge`, runtime open issue 23; since 2026-10-24 off the session's run file or a job's
+  bridge file), and a step's detail answers it (`StepFiled.bridge`),
   drawn as a *Reach* row in the step's facts on the run page and its inspector (2026-10-06).*
 
 ## 3. The queue: a cap on runs in flight, and cards that start themselves

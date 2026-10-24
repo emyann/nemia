@@ -1,6 +1,6 @@
 /**
  * The step's files directory in its session's environment: every local step is filed `STEP_FILES` naming the run's artifacts folder
- * of that step, and a background step, whose process ignores its asker's environment, is filed no `env`.
+ * of that step.
  *
  * And the MCP servers it is filed: a name the factory records rides the task's own `mcp`, as the servers themselves, and is left out of
  * `projectMcp`, which is what keeps the runtime's "one would hide the other" refusal untripped.
@@ -31,12 +31,6 @@ const filed = (step: Workflow, servers?: FactoryServers) =>
 test("a step's session is filed its files directory, the run's artifacts folder of that step, as WF_STEP_FILES", () => {
   assert.equal(STEP_FILES, 'WF_STEP_FILES');
   assert.deepEqual(filed(stepOf()).env, { WF_STEP_FILES: '/runs/r/artifacts/look' });
-});
-
-test("a background step is filed no env: its session runs in a process that ignores its asker's environment", () => {
-  const step = stepOf('background: true\npermissionMode: auto\n');
-  assert.equal(step.background, true);
-  assert.equal(Object.hasOwn(filed(step), 'env'), false);
 });
 
 /** An agent on the step, with the `mcp:` names it was frozen with. */

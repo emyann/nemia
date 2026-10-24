@@ -175,7 +175,7 @@ test('trustFolder: what a folder is given, what a file that cannot take the key 
       check: () => {
         const dir = scratch('ae-trust-');
         inConfigDir(dir, () => {
-          assert.equal(trustFolder('claude-detached', '/srv/mine')?.file, path.join(dir, '.claude.json'));
+          assert.equal(trustFolder('claude', '/srv/mine')?.file, path.join(dir, '.claude.json'));
           assert.equal(trustedFolder('claude', '/srv/mine'), true);
         });
         assert.equal(held(path.join(dir, '.claude.json')).projects['/srv/mine'].hasTrustDialogAccepted, true);

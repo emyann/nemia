@@ -54,6 +54,7 @@ import {
 } from './attached-file.ts';
 import { gone, hear, interruptTurn, killGroup, startSession, type Held, type Live } from './attached-session.ts';
 import { pushesOf, type Pushes } from './attached-follow.ts';
+import { bridgeOf } from './attached-bridge.ts';
 
 /**
  * The attached sessions of one engine: the runner's verbs, `hold`, which makes this process their holder for a scope, and
@@ -98,7 +99,7 @@ const waitedOut = (over: () => boolean, ms: number): Effect.Effect<boolean> =>
     Effect.map(Option.isSome),
   );
 
-/** What the capture of the session under `name` says, as `claude -p`'s stream is read. */
+/** What the capture of the session under `name` says, as a job's stream is read. */
 const saidBy = (root: string, name: string) => {
   try {
     return claudeStreamOutput(fs.readFileSync(filesOf(root, name).out, 'utf8'));
@@ -117,14 +118,6 @@ const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun[
     .filter((r) => r.sessionId === resumeFrom)
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
   return carriedOf(parent && saidBy(root, parent.name));
-};
-
-/** The bridge a run file kept, as a sighting says it: the link where one was opened, else why there is none. */
-const bridgeOf = (run: AttachedRun): Pick<Sighting, 'bridge'> => {
-  const bridge = run.bridge;
-  if (bridge === undefined) return {};
-  if (bridge.url !== undefined) return { bridge: { url: bridge.url } };
-  return bridge.why === undefined ? {} : { bridge: { url: null, why: bridge.why } };
 };
 
 /**
@@ -148,7 +141,7 @@ const sightingOf = (root: string, run: AttachedRun): Sighting => {
     ...(denials?.length ? { denials } : {}),
     ...(held === undefined ? {} : { held }),
     ...(held === true ? { pid: run.owner } : {}),
-    ...bridgeOf(run),
+    ...bridgeOf(run.bridge),
     ...(run.calling && run.state === 'working' ? { calling: run.calling } : {}),
     ...asksOf(root, run),
   };

@@ -1,8 +1,8 @@
 /**
- * A session's telemetry: an engine given a collector (`telemetry`) hands each spawn the collector, the task's labels with its id, and
- * the trace context of the span that filed it; Claude Code's job reads them in its environment and its background session in its
- * `--settings`; and no child of the engine inherits the engine's own telemetry, so a command exports nothing. Against the real worker,
- * a scratch collector and a stub `claude` on PATH that posts what a session would; no real session runs.
+ * A session's telemetry: an engine given a collector (`telemetry`) hands each spawn the collector, the task's labels with its id, and the
+ * trace context of the span that filed it; Claude Code's job reads them in its environment; and no child of the engine inherits the
+ * engine's own telemetry, so a command exports nothing. Against the real worker, a scratch collector and a stub `claude` on PATH that posts
+ * what a session would; no real session runs.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,11 +13,10 @@ import path from 'node:path';
 import { Engine as EngineService, type HarnessConfig, type TaskView } from '../src/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
 import { traceparentOf, withoutTelemetry, type Telemetry } from '../src/harness/telemetry.ts';
-import { claudeTelemetryEnv, telemeteredFlags } from '../src/harness/claude/telemetry.ts';
-import { CLAUDE_JOB_ENV, claudeDetached, claudeJob, claudeJobSpec } from '../src/harness/claude/code.ts';
+import { claudeTelemetryEnv } from '../src/harness/claude/telemetry.ts';
+import { CLAUDE_JOB_ENV, claudeJob, claudeJobSpec } from '../src/harness/claude/code.ts';
 import { attachedOptions } from '../src/harness/claude/attached-options.ts';
 import { STAND_IN } from './attached-held.ts';
-import { claudeArgv, claudeOps } from '../src/harness/claude/bg.ts';
 import { commandHarness } from '../src/harness/command/command.ts';
 import { asyncOps } from './promise-runner.ts';
 import { scratch } from './scratch.ts';
@@ -210,52 +209,10 @@ test('telemetry handed to each spawn: what a session is told to export, by runne
     },
   );
 
-  await t.test(
-    "a background session is handed its telemetry in its --settings' env, over the settings it was given, and nothing when told nowhere",
-    () => {
-      const settingsOf = (r: SpawnRequest) => {
-        const argv = claudeArgv(r, []);
-        const at = argv.indexOf('--settings');
-        return at < 0 ? undefined : JSON.parse(argv[at + 1]);
-      };
-      const given = { ...told, config: { claude: { settings: JSON.stringify({ env: { PATH: '/x', TRACEPARENT: 'mine' }, model: 'm' }) } } };
-      const off = { autoMemoryEnabled: false };
-      assert.deepEqual(settingsOf(given), { env: { PATH: '/x', ...claudeTelemetryEnv(told) }, model: 'm', ...off });
-      assert.deepEqual(settingsOf({ ...given, telemetry: undefined }), { env: { PATH: '/x', TRACEPARENT: 'mine' }, model: 'm', ...off });
-      assert.deepEqual(settingsOf({ ...told, telemetry: undefined }), off, "no settings given: the session's auto-memory off alone");
-      assert.deepEqual(
-        telemeteredFlags({ settings: '/a/settings.json' }, told),
-        { settings: '/a/settings.json' },
-        'a file is not rewritten',
-      );
-    },
-  );
-
   await t.test("a Claude Code session told to say its tools' details is handed OTEL_LOG_TOOL_DETAILS, the one variable more", () => {
     assert.deepEqual(claudeTelemetryEnv(detailed), { ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' });
     assert.equal(Object.keys(claudeTelemetryEnv(detailed)).length, Object.keys(claudeTelemetryEnv(told)).length + 1);
     assert.equal(attachedOptions(detailed).env?.OTEL_LOG_TOOL_DETAILS, '1', "a job's session is handed it too");
-  });
-
-  await t.test("a background session told to say its tools' details is handed OTEL_LOG_TOOL_DETAILS in its --settings' env", () => {
-    const given = { ...detailed, config: { claude: { settings: JSON.stringify({ env: { PATH: '/x' }, model: 'm' }) } } };
-    const argv = claudeArgv(given, []);
-    assert.deepEqual(JSON.parse(argv[argv.indexOf('--settings') + 1]), {
-      env: { PATH: '/x', ...claudeTelemetryEnv(told), OTEL_LOG_TOOL_DETAILS: '1' },
-      model: 'm',
-      autoMemoryEnabled: false,
-    });
-    assert.deepEqual(
-      telemeteredFlags({ settings: '/a/settings.json' }, detailed),
-      { settings: '/a/settings.json' },
-      'a file is not rewritten',
-    );
-  });
-
-  await t.test("a claude-detached task's own env reaches its command, laid under the job's", () => {
-    const env = claudeDetached.command({ ...told, config: { env: { X: '1', CLAUDE_CODE_DISABLE_BACKGROUND_TASKS: '0' } } }).env;
-    assert.equal(env?.X, '1');
-    assert.equal(env?.CLAUDE_CODE_DISABLE_BACKGROUND_TASKS, '1');
   });
 
   await t.test("a span's trace context is W3C's, and a span whose ids are not trace context's has none", () => {
@@ -366,29 +323,6 @@ test("an engine told a collector: each spawn is handed it, a job exports to it l
       );
       assert.equal((await settled(engine, id)).state.settled, 'succeeded');
       assert.equal(await Effect.runPromise(engine.output(id, 'stdout')), 'OTEL_OWN=mine\n');
-    },
-  );
-
-  await s.test(
-    "a background session's claude inherits none of the engine's telemetry: what it exports, its --settings' env alone says",
-    async () => {
-      withEnv(t, { SPAWN_OWN: 'mine' });
-      const bin = scratch('ae-telemetry-bin-');
-      const seen = path.join(bin, 'env');
-      fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nif [ "$1" = agents ]; then echo '[]'; exit 0; fi\nenv > '${seen}'\n`, {
-        mode: 0o755,
-      });
-      withEnv(t, { PATH: `${bin}:${process.env.PATH}` });
-      await Effect.runPromise(claudeOps({ root: scratch('ae-telemetry-') }).spawn({ ...told, cwd: scratch('ae-telemetry-cwd-') }));
-      const keys = fs
-        .readFileSync(seen, 'utf8')
-        .split('\n')
-        .map((line) => line.slice(0, line.indexOf('=')));
-      assert.ok(keys.includes('SPAWN_OWN'), "the engine's own environment still reaches it");
-      assert.deepEqual(
-        keys.filter((k) => k in ENGINE_OWN),
-        [],
-      );
     },
   );
 });

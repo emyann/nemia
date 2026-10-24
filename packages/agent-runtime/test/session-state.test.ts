@@ -20,7 +20,6 @@ import { Effect } from 'effect';
 import { decide, fold, nameFor, observe, type Action, type Sighting } from '../src/core/domain.ts';
 import { endOf, formerStateOf, isSessionState, SESSION_STATES, type SessionState, type TaskPhase } from '../src/core/session.ts';
 import { viewOfState } from '../src/core/engine/engine.ts';
-import { AUTH_WAIT, claudeStateOf } from '../src/harness/claude/registry.ts';
 import { detachedStateOf } from '../src/harness/detached/detached.ts';
 import { Engine } from '../src/index.ts';
 import { at, corpusOf, ended, filed, S, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';
@@ -67,21 +66,15 @@ const translated = (by: (s: FormerSighting) => SessionState | undefined) =>
   ) as Record<string, Omit<Sighting, 'sessionId'> | undefined>;
 
 test('the corpus recorded before the words changed: decided as it was through each translation of the former words, and missed through a wrong one', async (t) => {
-  await t.test(
-    "the corpus as it stood before the words changed, translated, decides every case as it did then, by `formerStateOf` and by Claude Code's registry table, which says these very words",
-    () => {
-      const ways: Array<[string, (s: FormerSighting) => SessionState | undefined]> = [
-        ['formerStateOf', (s) => formerStateOf(s.state)],
-        ['claudeStateOf', (s) => claudeStateOf(s.state, s.waitingFor)],
-      ];
-      for (const [way, by] of ways) {
-        const cases = corpusOf(translated(by));
-        assert.deepEqual(cases.map((c) => c.name).sort(), Object.keys(RECORDED).sort(), `${way}: every recorded case, and no other`);
-        assert.equal(cases.length, 2132, `${way}: every journal shape, deadline, sighting and time`);
-        for (const c of cases) assert.deepEqual(asJson(read(c)), asJson(RECORDED[c.name]), `${way}: ${c.name}`);
-      }
-    },
-  );
+  await t.test('the corpus as it stood before the words changed, translated, decides every case as it did then, by `formerStateOf`', () => {
+    const ways: Array<[string, (s: FormerSighting) => SessionState | undefined]> = [['formerStateOf', (s) => formerStateOf(s.state)]];
+    for (const [way, by] of ways) {
+      const cases = corpusOf(translated(by));
+      assert.deepEqual(cases.map((c) => c.name).sort(), Object.keys(RECORDED).sort(), `${way}: every recorded case, and no other`);
+      assert.equal(cases.length, 2132, `${way}: every journal shape, deadline, sighting and time`);
+      for (const c of cases) assert.deepEqual(asJson(read(c)), asJson(RECORDED[c.name]), `${way}: ${c.name}`);
+    }
+  });
 
   await t.test(
     "REFUSED: the recorded corpus is not matched by a translation that reads a word wrong, so the proof above has the fixture's grip",
@@ -150,7 +143,7 @@ test("every name over the corpus: the three that joined decide as the one they j
   );
 });
 
-test("a session's words, name by name: its journal and view words, the former words read, Claude Code's registry and its waits, the detached worker's run file, and what a view prints", async (t) => {
+test("a session's words, name by name: its journal and view words, the former words read, the detached worker's run file, and what a view prints", async (t) => {
   await t.test('formerStateOf reads the five former words, and nothing else', () => {
     assert.deepEqual(['working', 'blocked', 'done', 'failed', 'stopped'].map(formerStateOf), [
       'working',
@@ -165,58 +158,6 @@ test("a session's words, name by name: its journal and view words, the former wo
     assert.equal(isSessionState('blocked'), false);
     assert.equal(isSessionState('constructor'), false);
     for (const state of SESSION_STATES) assert.equal(isSessionState(state), true, state);
-  });
-
-  await t.test(
-    "Claude Code's registry words: each is one name, a blocked session's wait says which, and a word it has no reading of is failed",
-    () => {
-      const rows: Array<[string, string | undefined, SessionState]> = [
-        ['working', undefined, 'working'],
-        ['done', undefined, 'completed'],
-        ['failed', undefined, 'failed'],
-        ['stopped', undefined, 'canceled'],
-        ['blocked', undefined, 'input-required'],
-        ['blocked', 'permission prompt', 'input-required'],
-        ['blocked', 'workspace trust dialog', 'input-required'],
-        ['idle', undefined, 'failed'],
-        ['completed', undefined, 'failed'],
-        ['constructor', undefined, 'failed'],
-        ['', undefined, 'failed'],
-      ];
-      for (const [word, waitingFor, state] of rows) assert.equal(claudeStateOf(word, waitingFor), state, `${word} / ${waitingFor}`);
-    },
-  );
-
-  await t.test('AUTH_WAIT: a wait that names signing in is auth-required, and one that only contains the letters is not', () => {
-    for (const wait of [
-      'authentication',
-      'auth',
-      'AUTH token',
-      'login',
-      'log in',
-      'log-in',
-      'Sign-in',
-      'sign in to continue',
-      'authenticating',
-      'authenticate',
-    ]) {
-      assert.equal(claudeStateOf('blocked', wait), 'auth-required', wait);
-      assert.match(wait, AUTH_WAIT);
-    }
-    for (const wait of [
-      'permission prompt',
-      'the author',
-      'authority check',
-      'authorize this tool',
-      'authorization',
-      'oauth-proxy settings',
-      'blogin',
-      'signing',
-      'logins',
-    ]) {
-      assert.equal(claudeStateOf('blocked', wait), 'input-required', wait);
-    }
-    assert.equal(claudeStateOf('working', 'login'), 'working', "only a blocked session's wait: a working one that names login is at work");
   });
 
   await t.test(

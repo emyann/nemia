@@ -347,7 +347,7 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * What the run copies into a folder step's folder as it makes it, and the names its brief calls those copies by — one function, read by
  * both, so the brief never names a path the fence denies.
  *
- * A folder team's steps run in `dontAsk` (`validateFolderMode` in workflow/validate.ts): a call outside the step's own directory is denied
+ * A folder team's steps run as jobs, which ask nobody in any mode: a call outside the step's own directory is denied
  * with no prompt, the session reads the refusal and carries on, and nothing says so to anyone. So the run's `inputs/`, and the folders of
  * the steps this one waits on but did not continue, are copied in: a read inside the session's own directory needs no permission of any
  * harness. `artifactsContract`'s folder branch goes the same way round.

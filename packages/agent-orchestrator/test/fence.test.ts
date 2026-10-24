@@ -1,14 +1,14 @@
 /**
  * Fences only tighten: a step that names an agent, or is hired one, may narrow the agent's `tools:`, `allowedTools:`, `permissionMode:`
- * and `sandbox:`, and never widen them, nor set `background: true` over an agent an allow rule would widen (`fenceRefusal`); its
- * `disallowedTools:` adds to the agent's (`deniesWith`), so it can lift none. One refusing fixture per key, each beside what still loads.
+ * and `sandbox:`, and never widen them (`fenceRefusal`); its `disallowedTools:` adds to the agent's (`deniesWith`), so it can lift none.
+ * One refusing fixture per key, each beside what still loads.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseAgent, parseWorkflow, WorkflowError, type Agents, type Workflow } from '../src/workflow.ts';
-import { CLAUDE_PERMISSION_MODES, fenceReach } from 'agent-runtime/vocabulary';
+import { fenceReach } from 'agent-runtime/vocabulary';
 import { Engine } from 'agent-runtime';
 import { directoryFence } from '../src/workflow/fence.ts';
 import { scratch } from './scratch.ts';
@@ -214,11 +214,6 @@ test('REFUSED at shipped defaults: a step that runs a fenced agent on the other 
   assert.ok(said.includes('agents/implementer.md') && said.includes('claude'), said);
   assert.ok(refusal(() => stepOf(agents, 'agent: reviewer\nharness: claude\npermissionMode: plan')).startsWith('build: `harness: claude`'));
   assert.equal(stepOf(agents, 'agent: open\nharness: codex\nsandbox: read-only').sandbox, 'read-only', 'an unfenced agent moves');
-  assert.equal(
-    stepOf(agents, 'agent: implementer\nharness: claude-detached\npermissionMode: plan').permissionMode,
-    'plan',
-    'claude-detached reads the same fence as claude',
-  );
 });
 
 test('REFUSED at shipped defaults: the same widening on an agent a factory hires, and through writeWorkflow, which writes nothing', () => {
@@ -244,56 +239,6 @@ test('REFUSED at shipped defaults: the same widening on an agent a factory hires
     }),
   );
   holds(written, 'build', 'tools: Read, Bash', '`Bash`', 'ada');
-  assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nplace: git\nagent: ada\n---\n', 'nothing written');
-});
-
-test("REFUSED at shipped defaults: `background: true` over an agent in any mode but the widest, which the person's own allow rules would widen", () => {
-  const widest = 'bypassPermissions';
-  const modes = CLAUDE_PERMISSION_MODES.filter((mode) => mode !== widest);
-  const agents = agentsOf({
-    ...Object.fromEntries(modes.map((mode) => [mode, `---\npermissionMode: ${mode}\nallowedTools: Bash(npm test)\n---\nWork.\n`])),
-    open: '---\n---\nWork.\n',
-    wide: `---\npermissionMode: ${widest}\n---\nWork.\n`,
-  });
-  for (const agent of [...modes, 'open']) {
-    const said = refusal(() => stepOf(agents, `agent: ${agent}\nbackground: true`));
-    holds(said, 'build', 'background: true', `\`${agent === 'open' ? 'auto' : agent}\``, agent);
-    assert.ok(said.includes(`\`${widest}\``), `names the mode it may run in: ${said}`);
-  }
-  assert.equal(stepOf(agents, 'agent: wide\nbackground: true').background, true, 'the widest mode is widened by no allow rule');
-  assert.equal(
-    stepOf(agents, 'agent: wide\npermissionMode: dontAsk\nbackground: true').background,
-    true,
-    "judged against the agent's mode, not the step's narrower one",
-  );
-  assert.equal(stepOf(agents, 'agent: dontAsk\nbackground: false').background, false, 'a job reads only the checkout');
-  assert.equal(
-    parseWorkflow('build', '---\nplace: git\nbackground: true\n---\nDo it.\n').background,
-    true,
-    'a step with no agent has no fence to widen',
-  );
-
-  const hired = refusal(() =>
-    parseWorkflow('build', '---\nplace: git\nbackground: true\n---\nDo it.\n', undefined, agents, undefined, {
-      agent: 'dontAsk',
-      factory: 'nemia',
-      step: 'dev/build',
-    }),
-  );
-  holds(hired, 'build', 'background: true', '`dontAsk`', 'dontAsk');
-
-  const dir = fs.mkdtempSync(path.join(ROOT, 'workflows-'));
-  fs.mkdirSync(path.join(dir, 'agents'));
-  fs.mkdirSync(path.join(dir, 'dev'));
-  fs.writeFileSync(path.join(dir, 'agents', 'ada.md'), '---\npermissionMode: dontAsk\n---\nWork.\n');
-  fs.writeFileSync(path.join(dir, 'dev', 'build.md'), '---\nplace: git\nagent: ada\n---\n');
-  const folder = path.join(dir, 'dev');
-  const written = refusal(() =>
-    writeWorkflow(folder, [{ name: 'build', after: [], place: 'git', agent: 'ada', background: true, body: '' }], undefined, {
-      anywhere: true,
-    }),
-  );
-  holds(written, 'build', 'background: true', '`dontAsk`', 'ada');
   assert.equal(fs.readFileSync(path.join(folder, 'build.md'), 'utf8'), '---\nplace: git\nagent: ada\n---\n', 'nothing written');
 });
 

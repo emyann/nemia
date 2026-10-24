@@ -5,7 +5,7 @@
  * On the stand-ins: the runtime's test engine, its tasks filed and moved by hand, and the test place, under the run records this file
  * seeds. One engine for the file, since its runs are seeded as it loads and its tests read them in turn. The tasks: `t-implement`, at
  * work; `t-settled`, ran once and signed off; and `t-cancelled`, the cancelled run's step, at work: only the run's mark refuses it. What
- * the harness does with the words — the session's inbox, and the 502 when it cannot be given them — is `say.boundary.test.ts`'s.
+ * the harness does with the words is the runtime's to prove.
  *
  * One table of what the route refuses, nothing said and nothing written — each 409 equal to what `sayRun` says itself — then the story
  * of a person's words handed to a working session and read back on the step.

@@ -10,9 +10,8 @@
  * Each step is read at shipped defaults, as `wf start` freezes it (`loadWorkflows`). A step in `auto` — the engine's default — runs
  * whatever no deny names, so its own `disallowedTools` must name each call. A step in `dontAsk` runs only what an allow reaches, so
  * no rule of its `allowedTools`, of the settings' allow or of a skill's `allowed-tools` may reach one. A step that reads settings the
- * repository does not ship — a background session reads the person's user settings, and a job in the checkout itself that checkout's
- * working-tree `.claude/settings.json`, which a person may have edited — may be allowed anything there, so it too must name each call
- * itself. A step on codex is fenced by a
+ * repository does not ship — a job in the checkout itself reads that checkout's working-tree `.claude/settings.json`, which a person
+ * may have edited — may be allowed anything there, so it too must name each call itself. A step on codex is fenced by a
  * read-only sandbox. The matcher is Claude Code's rule shapes this suite relies on, and throws on a wildcard it does not model, so an
  * allow it cannot read fails the test rather than passing it. A command is matched part by part, as Claude Code matches it (`partsOf`):
  * a deny of any part refuses the whole, and a dontAsk step runs it only when an allow reaches every part.
@@ -52,8 +51,8 @@
  * address (`LIVE_BOARD`) and name the two commands that serve a board of the change (`BOARD_CHECKS`), which the settings allow. Agent
  * and step alike deny a `filename` to each browser tool that takes one (`NAMED_FILES`): a file named could be the workspace's.
  *
- * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs in the background, reading the person's user
- * settings: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
+ * Nemia, the store's own agent, ships outside any workflow folder (`nemia/nemia.md`) and runs long-lived, outside any checkout this
+ * suite reads: she is held to the same fence by her own deny, and to `git merge` and a pull request merged by `gh` besides; a mode but
  * `auto` is refused her (`readNemia`). Her rules are those her keeper files (`herRules`): the fence derived from the table's classes
  * (`nemiaFence`) asks every write that prompts and every write form of a command that reads bare, denies her what is out of her reach,
  * and lets the rest through (`misjudged`); her admission asks every answer to what waits on the person, whatever the person allows
@@ -375,12 +374,10 @@ function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FEN
   const harness = step.harness ?? 'claude';
   if (harness === 'codex')
     return step.sandbox === 'read-only' ? [] : [`${step.name}: on codex in sandbox ${step.sandbox ?? 'workspace-write'}, not read-only`];
-  if (harness !== 'claude' && harness !== 'claude-detached')
-    return [`${step.name}: on ${harness}, which this test does not know how to fence`];
+  if (harness !== 'claude') return [`${step.name}: on ${harness}, which this test does not know how to fence`];
   const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
   const allows = granting([...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants]);
-  const unshipped = step.background === true || step.workspace === 'main';
-  const dontAsk = step.permissionMode === 'dontAsk' && !unshipped;
+  const dontAsk = step.permissionMode === 'dontAsk' && step.workspace !== 'main';
   return calls
     .filter((call) => {
       if (deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
@@ -786,7 +783,7 @@ test("REFUSED: a watcher's step without its own deny of the forced delete is ope
   const supervise = loadWorkflows(
     folderOf({
       supervise:
-        'workspace: main\nslot: none\nharness: claude\nbackground: true\npermissionMode: dontAsk\n' +
+        'workspace: main\nslot: none\nharness: claude\npermissionMode: dontAsk\n' +
         'disallowedTools: Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), ' +
         'Bash(pkill:*), Bash(killall:*), ' +
         'mcp__playwright__browser_run_code_unsafe',
@@ -794,24 +791,19 @@ test("REFUSED: a watcher's step without its own deny of the forced delete is ope
   ).find((s) => s.name === 'supervise')!;
   assert.deepEqual(unfenced(supervise), [], 'fenced by its own list');
   assert.equal(supervise.permissionMode, 'dontAsk');
-  assert.equal(supervise.background, true, "a background session, which reads the person's user settings as well as the checkout's");
   const bare = {
     ...supervise,
     disallowedTools: supervise.disallowedTools?.filter((rule) => !rule.startsWith('Bash(git branch')),
   };
-  assert.deepEqual(unfenced(bare), [
-    'supervise: Bash(git branch -D wf/r-1/implement)',
-    'supervise: Bash(git branch --delete --force wf/r-1/implement)',
-  ]);
   assert.deepEqual(
-    unfenced({ ...bare, background: undefined, workspace: undefined, place: 'folder' }),
-    [],
-    'the same step as a job in a folder the run made reads only the settings shipped here, where no allow reaches a forced delete',
-  );
-  assert.deepEqual(
-    unfenced({ ...bare, background: undefined }),
+    unfenced(bare),
     ['supervise: Bash(git branch -D wf/r-1/implement)', 'supervise: Bash(git branch --delete --force wf/r-1/implement)'],
     "a job in the checkout itself reads that checkout's working-tree settings.json, which a person may have edited",
+  );
+  assert.deepEqual(
+    unfenced({ ...bare, workspace: undefined, place: 'folder' }),
+    [],
+    'the same step as a job in a folder the run made reads only the settings shipped here, where no allow reaches a forced delete',
   );
 });
 
@@ -981,7 +973,7 @@ const ACTS: Call[] = [...['npx nemia', 'nemia', 'npx wf', 'wf'].flatMap(actsBy),
  * own denies; any other step runs every call no deny names.
  */
 function acting(step: Step): string[] {
-  if (step.permissionMode !== 'dontAsk' || step.background === true || step.workspace === 'main')
+  if (step.permissionMode !== 'dontAsk' || step.workspace === 'main')
     return [`${step.name}: not a dontAsk job, so every call no deny names runs`];
   const allows = [...(step.allowedTools ?? []), ...(SETTINGS.permissions?.allow ?? []), ...SKILL_GRANTS];
   return ACTS.filter(
@@ -1656,7 +1648,7 @@ function unbreakable(step: Step, rules: readonly SkillRule[]): string[] {
 }
 
 /** Whether a step is a dontAsk job, which runs only what an allow reaches: what a denial of its is recorded for. */
-const dontAskJob = (step: Step): boolean => step.permissionMode === 'dontAsk' && step.background !== true && step.workspace !== 'main';
+const dontAskJob = (step: Step): boolean => step.permissionMode === 'dontAsk' && step.workspace !== 'main';
 
 test("every shipped skill's rules.json reads, and every call that breaks one of its rules is refused to each dontAsk step given it", () => {
   assert.ok(SHIPPED_RULES.length > 0, 'a skill ships its rules');
@@ -3264,8 +3256,8 @@ test("a step on a sandboxed or a remote harness, and a folder team's, is filed n
   assert.deepEqual(inputsMounts({ harness: 'claude' }, repo, undefined), [], 'a run given none');
 });
 
-/** Nemia as her keeper files her: her shipped definition, in the background. */
-const nemia = (file?: string): Step => ({ ...readNemia(file), name: 'nemia', background: true });
+/** Nemia as her keeper files her: her shipped definition, long-lived. */
+const nemia = (file?: string): Step => ({ ...readNemia(file), name: 'nemia' });
 
 test("Nemia is refused git push, a forced branch delete, a kill by name, browser_run_code_unsafe, a merge and gh's merge by her own deny", () => {
   const her = nemia();

@@ -78,7 +78,6 @@ test('a step with every key the parser types, its agent and its output reads as 
     disallowedTools: ['Bash'],
     allowedTools: ['Edit(**)'],
     denials: 'fail',
-    background: true,
     remote: false,
     deadlineSeconds: 600,
     budget: 2.5,
@@ -114,7 +113,6 @@ test('a step with every key the parser types, its agent and its output reads as 
 
   for (const [key, value] of [
     ['context', '1M'],
-    ['background', 'true'],
     ['slot', 'all'],
     ['denials', 'warn'],
     ['after', 'implement'],
@@ -132,6 +130,16 @@ test('a step with every key the parser types, its agent and its output reads as 
       `${JSON.stringify(agent)} is refused: a harness prompt outside HARNESS_PROMPTS, or a former one outside its three words`,
     );
   }
+});
+
+test('a step frozen with `background:`, a key no step has now, still decodes, and a value that is no boolean is refused', () => {
+  for (const background of [true, false]) {
+    const record = { name: 'supervise', after: [], body: 'Watch.', remote: true, background };
+    const decoded = decode(record);
+    assert.ok(Result.isSuccess(decoded), Result.isFailure(decoded) ? String(decoded.failure) : '');
+    assert.deepEqual(decoded.success, record);
+  }
+  assert.ok(Result.isFailure(decode({ name: 'supervise', after: [], body: 'Watch.', background: 'true' })));
 });
 
 test('a step frozen before the rename, its agent on `systemPrompt:`, is read as `harnessPrompt:` and filed with the flag it was filed with', () => {

@@ -10,7 +10,7 @@ export default {
   /**
    * A run that worked in folders, with no repository: its facts say where its work is, copyable; the Decide section says what `wf decide`
    * says of such a run, and offers the one command it offers; every step says the mode it ran in, unmarked, since every step of a folder
-   * team runs in dontAsk (`validateFolderMode`); each step lists every file its folder holds, each with its size, served as text and never
+   * team runs in dontAsk; each step lists every file its folder holds, each with its size, served as text and never
    * cached, and says its place (`place: folder`). Nowhere on the page is there a word about git: the run's brief, summaries and verdict say
    * none either (`seedFolder`), so a word found there comes from the board.
    */

@@ -4,10 +4,10 @@
  * is read as the module loads, so it is set before the import; `WF_VERIFY_REST=1` judges in full every run a pass answers from its memo
  * of runs at rest, and a difference throws (`verifyRest` in tick.verb.ts).
  *
- * A fake `claude` and `codex` first on PATH run until the test opens their gate — a file named for the task's id, which is its brief — and
- * `claude agents` prints a registry and counts itself. The tasks are filed straight through the client, with no run record, so `advance`
- * views none of them: every `claude agents` call a pass makes is the runtime's observe, which asks it only for a session expected that
- * is not a job (`agents-calls.boundary.test.ts` has a run's steps, a background session and a restart).
+ * A fake `claude` (`gatedJob`, the job's Claude Code) and `codex` first on PATH run until the test opens their gate — a file named for
+ * the task's id, which is its brief — and `claude agents` prints a registry and counts itself. The tasks are filed straight through the
+ * client, with no run record, so `advance` views none of them: every `claude agents` call a pass makes is the runtime's observe, and a
+ * Claude Code session is a job, which it reads off its run file (`agents-calls.boundary.test.ts` has a run's steps and a restart).
  *
  * Told as one story on `story(t)`, its checkpoints the four things a pool does, each leaving the board drained for the next. Not on
  * `staged`: the stand-in engine admits into no pool, so this keeps the client's real `engine()` and the fakes. An admitted task starts
@@ -20,6 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkArgv } from '../src/check/check.ts';
 import { scratch } from './scratch.ts';
+import { gatedJob } from './gated-job.ts';
 import { until, WAITED, type Waiter } from 'agent-runtime/testing';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
@@ -48,33 +49,14 @@ const gate = require('node:path').join(${JSON.stringify(gates)}, ${prompt});
 const wait = () => (fs.existsSync(gate) ? process.exit(0) : setTimeout(wait, 50));
 wait();
 `;
-  fs.writeFileSync(
-    path.join(bin, 'claude'),
-    `#!${process.execPath}
-const fs = require('node:fs');
-const args = process.argv.slice(2);
-if (args[0] === 'agents') {
+  gatedJob(
+    bin,
+    gates,
+    `if (args[0] === 'agents') {
   fs.appendFileSync(${JSON.stringify(counter)}, 'agents\\n');
   process.stdout.write(fs.readFileSync(${JSON.stringify(registry)}, 'utf8'));
   process.exit(0);
-}
-// A job reads its brief as the first line on its stdin; \`claude-detached\` takes it as \`-p\`'s value.
-if (args.includes('--input-format')) {
-  let got = '';
-  process.stdin.on('data', (c) => {
-    got += c;
-    const nl = got.indexOf('\\n');
-    if (nl === -1) return;
-    process.stdin.pause();
-    const prompt = JSON.parse(got.slice(0, nl)).message.content;
-    ${runUntilGate('prompt')}
-  });
-} else {
-  const prompt = args[args.indexOf('-p') + 1];
-  ${runUntilGate('prompt')}
-}
-`,
-    { mode: 0o755 },
+}`,
   );
   fs.writeFileSync(
     path.join(bin, 'codex'),
@@ -166,11 +148,11 @@ test(
   async (top) => {
     const s = story(top);
     await s.test(
-      "REFUSED at shipped defaults: a claude-detached session counts against claude's ceiling, the third claude task waits, and codex keeps its own",
+      "REFUSED at shipped defaults: two claude sessions fill claude's pool, the third claude task waits, and codex keeps its own",
       async (t) => {
         try {
           await fileInOrder(t, [
-            ['a1', 'claude-detached'],
+            ['a1', 'claude'],
             ['a2', 'claude'],
           ]);
           await runWith(e, tickRun());
@@ -184,15 +166,15 @@ test(
 
           await fileInOrder(t, [
             ['b1', 'claude'],
-            ['b2', 'claude-detached'],
+            ['b2', 'claude'],
             ['c1', 'codex'],
             ['c2', 'codex'],
             ['c3', 'codex'],
           ]);
           await runWith(e, tickRun());
           await runWith(e, tickRun());
-          assert.equal(await attempts('b1'), 0, 'a claude task waits: one claude and one claude-detached session fill the pool');
-          assert.equal(await attempts('b2'), 0, 'and so does a claude-detached one');
+          assert.equal(await attempts('b1'), 0, 'a claude task waits: two claude sessions fill the pool');
+          assert.equal(await attempts('b2'), 0, 'and so does the next');
           assert.equal((await Effect.runPromise(e.view('b1'))).admission, 'queued');
           assert.equal((await attempts('c1')) + (await attempts('c2')), 2, 'codex is not counted in that pool');
           assert.equal(await attempts('c3'), 0, 'and has a ceiling of its own');
@@ -204,7 +186,7 @@ test(
           assert.equal(
             (await Effect.runPromise(e.view('b1'))).admission,
             'admitted',
-            "the claude-detached session ended, and the slot it freed is the pool's: b1, filed first, is admitted into it",
+            "a claude session ended, and the slot it freed is the pool's: b1, filed first, is admitted into it",
           );
           assert.equal(await attempts('b1'), 0, 'and starts a pass later');
           await runWith(e, tickRun());
@@ -223,14 +205,14 @@ test(
         try {
           await fileInOrder(t, [
             ['p1', 'claude'],
-            ['p2', 'claude-detached'],
+            ['p2', 'claude'],
           ]);
           await runWith(e, tickRun());
           await runWith(e, tickRun());
           await reached(t, ['p1', 'p2'], 'working');
 
           await fileInOrder(t, [
-            ['q1', 'claude-detached'],
+            ['q1', 'claude'],
             ['d1', 'check'],
             ['d2', 'check'],
             ['d3', 'check'],

@@ -23,7 +23,7 @@ import { RunnerError } from '../error.ts';
 import type { Followed, TranscriptCursor, TranscriptEvent } from '../seam.ts';
 import { readTranscript } from '../transcript.ts';
 import { marked, type PartialAt } from '../detached/follow.ts';
-import { partialMarksOf } from './print.ts';
+import { partialMarksOf } from './stream.ts';
 import { attachedStateOf, filesOf, heldHere, isOpen, readRun, type AttachedRun } from './attached-file.ts';
 import { claudeTranscriptEvents, claudeTranscriptFile } from './transcript.ts';
 

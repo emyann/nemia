@@ -1,35 +1,18 @@
 /**
- * The api's tests observe the harness `test/harness.ts` installs, and never this machine's registry: the test script loads it with
+ * The api's tests observe the harness `test/harness.ts` installs, and never this machine's Claude Code: the test script loads it with
  * `--import` before every test file, under `test/` or beside the code in `src/`, every test file imports it first too, and the `claude` the
  * api's engine runs is the harness's.
  */
-import {
-  askEnded,
-  asks,
-  away,
-  bin,
-  calls,
-  engineRoot,
-  observations,
-  recorded,
-  realHome,
-  registry,
-  root,
-  scriptUnharnessed,
-  unharnessed,
-  usageAnswer,
-} from './harness.ts';
+import { askEnded, asks, away, bin, engineRoot, recorded, realHome, root, scriptUnharnessed, unharnessed, usageAnswer } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Effect } from 'effect';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import ts from 'typescript';
 import { machineTempDir, scratch } from './scratch.ts';
-import { app, runtime } from '../src/app.ts';
-import { Engine } from '../src/store.ts';
+import { app } from '../src/app.ts';
 import { engine, tickRun } from 'agent-orchestrator';
 import { runWith } from './shipped-place.ts';
 
@@ -80,20 +63,14 @@ test('REFUSED: a test file whose first import is not the harness — a builtin, 
     assert.ok(said !== null && why.test(said) && said.includes("Make `import './harness.ts'` first"), `${JSON.stringify(text)} → ${said}`);
   };
   refused("import { test } from 'node:test';\nimport './harness.ts';\n", /^its first import is node:test\./);
-  refused(
-    "import { app } from '../src/app.ts';\nimport { observations } from './harness.ts';\n",
-    /^its first import is \.\.\/src\/app\.ts\./,
-  );
+  refused("import { app } from '../src/app.ts';\nimport { calls } from './harness.ts';\n", /^its first import is \.\.\/src\/app\.ts\./);
   refused(
     "const { app } = await import('../src/app.ts');\nimport './harness.ts';\n",
     /^it imports a module with import\(\) before any static import\./,
   );
   refused('const one = 1;\n', /^it imports no harness\./);
   assert.equal(unharnessed("import './harness.ts';\nimport { test } from 'node:test';\n"), null);
-  assert.equal(
-    unharnessed("import {\n  observations,\n  registry,\n} from './harness.ts';\nconst { app } = await import('../src/app.ts');\n"),
-    null,
-  );
+  assert.equal(unharnessed("import {\n  calls,\n  root,\n} from './harness.ts';\nconst { app } = await import('../src/app.ts');\n"), null);
   assert.equal(
     unharnessed("import './harness.ts';\nimport { test } from 'node:test';\n", '../../test/harness.ts'),
     "its first import is ./harness.ts. Make `import '../../test/harness.ts'` first, above it.",
@@ -236,32 +213,6 @@ test('REFUSED: a file that loads the api or the package with import() is named; 
   assert.deepEqual(importCalls("type Run = import('agent-orchestrator').Run;\nconst said = \"await import('x')\";\n"), []);
 });
 
-test("the `claude` the api's engine runs is the harness's: it resolves there, answers with the harness's registry, and each observation is noted", async () => {
-  assert.equal(execFileSync('sh', ['-c', 'command -v claude'], { encoding: 'utf8' }).trim(), path.join(bin, 'claude'));
-  fs.writeFileSync(
-    registry,
-    JSON.stringify([
-      { name: 'ae/t-harness/1', sessionId: 'a-session', kind: 'background', state: 'working', status: 'busy', startedAt: 0 },
-    ]),
-  );
-  const listed = execFileSync('claude', ['agents', '--all', '--json'], { encoding: 'utf8' });
-  assert.deepEqual(JSON.parse(listed), JSON.parse(fs.readFileSync(registry, 'utf8')));
-  fs.writeFileSync(registry, '[]');
-
-  const e = engine();
-  await Effect.runPromise(e.file({ id: 't-harness', brief: 'Read me.', cwd: scratch('nemia-api-cwd-'), harness: 'claude' }));
-  let before = observations();
-  await Effect.runPromise(e.list());
-  assert.ok(
-    observations() > before,
-    "the package's engine, listing a task filed on its Claude harness, observed the harness's `claude`: a list observes every harness, where a view of a task with no attempt in flight reads its record alone",
-  );
-  before = observations();
-  await Effect.runPromise((await runtime.runPromise(Engine.useSync((e) => e))).list());
-  assert.ok(observations() > before, "and so did the api's");
-  assert.match(fs.readFileSync(calls, 'utf8'), /^agents --all --json$/m);
-});
-
 /**
  * The flags the Agent SDK starts Claude Code with for an ask of the usage, read off one (0.3.308, the version
  * `packages/agent-runtime/test/sdk-pin.ts` pins): no `-p` among them. The fake is spawned with them so this test's start looks like
@@ -285,6 +236,11 @@ type Answered = { type: string; response: { request_id: string; subtype: string;
 const requested = (id: string, request: object): string => `${JSON.stringify({ type: 'control_request', request_id: id, request })}\n`;
 
 test("the harness's `claude` answers the SDK's control requests under each request's own id, and ends only once its stdin is closed", async () => {
+  assert.equal(
+    execFileSync('sh', ['-c', 'command -v claude'], { encoding: 'utf8' }).trim(),
+    path.join(bin, 'claude'),
+    "the `claude` on PATH, which the engine's harness runs, is the harness's",
+  );
   const child = spawn('claude', SDK_FLAGS, { stdio: ['pipe', 'pipe', 'ignore'] });
   const lines: string[] = [];
   let out = '';

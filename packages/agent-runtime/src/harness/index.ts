@@ -2,7 +2,7 @@
  * The face of the seam: `Runner` and what a harness is asked in, the arguments every harness shares, the transcript reader and
  * the Agent SDK's runner, as the A2A seam and the doors take them. A file of `core/` imports `seam.ts` and `args.ts` by their own path.
  */
-export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './args.ts';
+export { HARNESS_ARGS, TAKEN_ARGS, TURN_ARGS, argsRefusalOf } from './args.ts';
 export type { CodexArgs, HarnessArgs } from './args.ts';
 export type { Mount } from './mounts.ts';
 export type { Admission, AdmissionAnswer, AdmissionCall } from './admission.ts';

@@ -131,7 +131,6 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   disallowedTools: ['Bash(git push:*)'],
   allowedTools: [],
   denials: 'fail',
-  background: false,
   remote: null,
   deadlineSeconds: 900,
   budget: 5,

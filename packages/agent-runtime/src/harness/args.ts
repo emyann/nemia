@@ -61,44 +61,35 @@ export type HarnessArgs = {
   projectMcp?: string[];
   /**
    * The context window the session is given, in tokens — `200000`. Given to Claude Code as `--autocompact`: past about it
-   * the session compacts its conversation, a summary in place of what it read, and carries on, on `claude --bg` and
-   * `claude -p` alike. Every attempt gets the same window, a continuation included. Absent: the harness's own, which is the
+   * the session compacts its conversation, a summary in place of what it read, and carries on, a job and a long-lived session
+   * alike. Every attempt gets the same window, a continuation included. Absent: the harness's own, which is the
    * model's whole window. Refused unless a whole number of tokens in the range the harness takes (`CLAUDE_CONTEXT_TOKENS`:
    * 100000 to 1000000 on Claude Code), and on a harness with no such knob: `codex`, and a `HarnessSpec` that declares no
    * `contextTokens` range. A harness brought as a `RunnerOps` is handed it, and asked only its own `refuses`.
    */
   contextTokens?: number;
   /**
-   * How Claude Code runs the session on the `claude` harness. Absent or false: as a job — `claude -p`, which runs its
-   * brief to the end and exits, prints every event as it goes, says what it was denied (`Sighting.denials`), and takes
-   * words said to it on its stdin until its result. True: as a background session — `claude --bg`, listed in
-   * `claude agents`, which a person can attach to, say words to while it runs, and bridge to claude.ai (`claude.remoteControl`,
-   * which asks for it). Refused unless true or false, and `true` on any
-   * other harness, none of which has two ways to run.
-   */
-  background?: boolean;
-  /**
    * The most one attempt's session may spend, in dollars — `0.25`, `5` — as its harness keeps a cap natively: Claude Code
-   * is given it as `--max-budget-usd`, and `claude -p` ends the session once a response takes it past, printing so in its
+   * is given it on the Agent SDK's `maxBudgetUsd`, and ends the session once a response takes it past, printing so in its
    * result (`Sighting.limit`: `budget`). The harness counts one process's spend, so a cap is per attempt. A harness
    * feature carried as one of its arguments, and no policy of the runtime's: nothing here compares a cost with it, and
    * whether a step is over its budget is the caller's judgement (agent-orchestrator's `budget:`). Refused unless dollars
-   * above 0, and on a harness that keeps no cap: `claude --bg`, which spends past one, and `codex`, which has none.
+   * above 0, and on a harness that keeps no cap: `codex`, which has none.
    * A later turn of a task held open may give its own (`TURN_ARGS`).
    */
   budgetUsd?: number;
   /**
    * Flags handed to Claude Code as they are — `{ appendSystemPromptFile: 'prompt.md', pluginDir: ['nemia-note'] }` — on a
-   * job and a background session alike, directly before its `--permission-mode` (`ClaudeFlags`, `claudeFlagsOf`). A flag
+   * job and a long-lived session alike, on the Agent SDK's `extraArgs` (`ClaudeFlags`, `attachedOptions`). A flag
    * the runtime gives itself is refused (`CLAUDE_OWNED_FLAGS`), and so is the bag on a harness that is not Claude Code,
    * which would start its session without them. A flag the CLI does not have fails the attempt as the CLI fails it, its
    * words in the attempt's logs. Refused unless an object whose keys are flags in camelCase and whose values are `true`,
    * a string, a number, or a list of strings.
    *
-   * A flag of Claude Code's alone is given here, never as a harness argument of its own: `remoteControl: true` bridges a
-   * background session to claude.ai (`--remote-control`), and is refused on a job and on any harness but Claude Code. What stays
+   * A flag of Claude Code's alone is given here, never as a harness argument of its own: `remoteControl: true` bridges the
+   * session to claude.ai, a job's and a long-lived session's alike, and is refused on any harness but Claude Code. What stays
    * named above is what another harness translates (`worktree`, the fence, `effort`), what a `HarnessSpec` may declare
-   * (`contextTokens`), what chooses the runtime's own process (`background`), or what a caller judges (`budgetUsd`).
+   * (`contextTokens`), or what a caller judges (`budgetUsd`).
    */
   claude?: ClaudeFlags;
   /**
@@ -116,8 +107,8 @@ export type HarnessArgs = {
   /**
    * What the session's process holds in its environment on top of the worker's own, as a Pod's container gives its `env`:
    * `{ "CI": "1" }`. Read by every harness that spawns the session as a process of its own — a `HarnessSpec` with `commandArgs` or
-   * `env`, and Claude Code's job — and laid under the harness's own variables, which it never overrides. Refused on a background
-   * session, whose process is spawned before it and ignores its asker's environment, and on a remote agent. Journalled with the
+   * `env`, and Claude Code, a job and a long-lived session alike — and laid under the harness's own variables, which it never
+   * overrides. Refused on a remote agent. Journalled with the
    * task, so it carries no secret. Refused unless an object whose keys are variable names and whose values are strings with no
    * NUL in them.
    */
@@ -179,7 +170,6 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   mcp: true,
   projectMcp: true,
   contextTokens: true,
-  background: true,
   worktree: true,
   budgetUsd: true,
   claude: true,
@@ -207,6 +197,17 @@ export const FORMER_ARGS: Readonly<Record<string, string>> = { remoteControl: 'r
  * today's (`upgrade` in `journal.ts`).
  */
 export const RENAMED_ARGS: Readonly<Record<string, keyof HarnessArgs>> = { checkoutMcp: 'projectMcp' };
+
+/**
+ * Each harness argument taken away with nothing in its place, by its key, and what to do instead: filed under `config` or beside
+ * it, whatever its value, it is refused in those words (`argsRefusalOf`), and dropped from a journal an older runtime wrote
+ * (`upgrade` in `journal.ts`). `background` ran a Claude Code session as `claude --bg`, which this runtime no longer runs: every
+ * Claude Code session runs on the Agent SDK, and one meant to stay open is long-lived.
+ */
+export const TAKEN_ARGS: Readonly<Record<string, string>> = {
+  background:
+    "`background` ran a Claude Code session as `claude --bg`, which this runtime no longer runs: every Claude Code session runs on the Agent SDK. Drop the field: a session that stays open until it is stopped is filed `restartPolicy: 'Always'`, and a task with no `restartPolicy` runs as a job.",
+};
 
 /**
  * The harness arguments a later turn of a task held open may give for itself (`answer`), on top of the task's own. A turn
@@ -279,10 +280,10 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
  *
  * In order:
  *
- * 1. An argument filed under a former name (`RENAMED_ARGS`), wherever it was filed, with a sentence naming today's, and a
- *    former argument that Claude Code's flags replace (`FORMER_ARGS`), wherever it was filed, with a sentence naming where
- *    it went. Each is refused as an own key, whatever its value, `false` and `undefined` included, so a caller still writing
- *    it is told where it went.
+ * 1. An argument filed under a former name (`RENAMED_ARGS`), wherever it was filed, with a sentence naming today's; a
+ *    former argument that Claude Code's flags replace (`FORMER_ARGS`), with a sentence naming where it went; and one taken
+ *    away with nothing in its place (`TAKEN_ARGS`), with a sentence naming what to do instead. Each is refused as an own key,
+ *    whatever its value, `false` and `undefined` included, so a caller still writing it is told.
  * 2. A harness argument filed beside `config` rather than in it: an untyped caller would otherwise have it journalled
  *    nowhere and its session started without it.
  * 3. `config` itself, then each of its arguments.
@@ -321,9 +322,6 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
   }
   const mcp = config.mcp === undefined ? undefined : mcpRefuses(config.mcp);
   if (mcp) return mcp;
-  if (config.background !== undefined && typeof config.background !== 'boolean') {
-    return `\`background: ${JSON.stringify(config.background)}\` is not true or false. Give true to run the session as \`claude --bg\`, or leave it out to run it as a job.`;
-  }
   if (
     config.contextTokens !== undefined &&
     !(typeof config.contextTokens === 'number' && Number.isSafeInteger(config.contextTokens) && config.contextTokens > 0)
@@ -338,8 +336,8 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
 
 /**
  * Why a filing gives an argument where it no longer is — or `undefined`: under a former name (`RENAMED_ARGS`), naming today's, or
- * one that Claude Code's flags replace (`FORMER_ARGS`), naming where it went. Each an own key, under `config` or beside it,
- * whatever its value.
+ * one that Claude Code's flags replace (`FORMER_ARGS`), naming where it went, or one taken away (`TAKEN_ARGS`), naming what to do
+ * instead. Each an own key, under `config` or beside it, whatever its value.
  */
 const movedRefusalOf = (spec: object): string | undefined => {
   const filed = (spec as { config?: unknown }).config;
@@ -350,9 +348,11 @@ const movedRefusalOf = (spec: object): string | undefined => {
     return `\`${key}\` is the former name of \`config.${name}\`: file it as \`config: { ${name}: … }\`, or leave it out.`;
   }
   const former = Object.entries(FORMER_ARGS).find(([key]) => at(spec, key) || at(filed, key));
-  if (!former) return undefined;
-  const [key, flag] = former;
-  return `\`${key}\` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as \`config: { claude: { ${flag}: true } }\`, or leave it out.`;
+  if (former) {
+    const [key, flag] = former;
+    return `\`${key}\` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as \`config: { claude: { ${flag}: true } }\`, or leave it out.`;
+  }
+  return Object.entries(TAKEN_ARGS).find(([key]) => at(spec, key) || at(filed, key))?.[1];
 };
 
 /**

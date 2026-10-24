@@ -214,13 +214,13 @@ test("choicesOf, ROLE_KEYS, deniedWithoutSkill: an agent's keys, their choices, 
       const form = {
         defaultHarness: 'claude',
         keys: [
-          { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex', 'claude-detached'], byHarness: null },
+          { key: 'harness', meaning: '', kind: 'choice', choices: ['claude', 'codex'], byHarness: null },
           {
             key: 'permissionMode',
             meaning: '',
             kind: 'harness-word',
             choices: null,
-            byHarness: { claude: ['dontAsk'], 'claude-detached': ['dontAsk'] },
+            byHarness: { claude: ['dontAsk'] },
           },
           { key: 'sandbox', meaning: '', kind: 'harness-word', choices: null, byHarness: { codex: ['read-only', 'workspace-write'] } },
           { key: 'remote', meaning: '', kind: 'choice', choices: ['true', 'false'], byHarness: null },
@@ -234,7 +234,6 @@ test("choicesOf, ROLE_KEYS, deniedWithoutSkill: an agent's keys, their choices, 
         [false, true],
         'an agent that names no harness runs on the default, Claude Code',
       );
-      assert.deepEqual([hasKey(form, 'sandbox', 'claude-detached'), hasKey(form, 'permissionMode', 'claude-detached')], [false, true]);
       assert.equal(hasKey(form, 'remote', 'codex'), true, "a key that is not a harness word is every harness's");
       assert.equal(hasKey(form, 'sandbox', 'nowhere'), true, 'a harness the form does not know is judged on save, not here');
       assert.equal(hasKey(undefined, 'sandbox', 'claude'), true, 'and nothing is hidden before the form is read');

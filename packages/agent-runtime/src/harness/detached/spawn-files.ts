@@ -11,6 +11,8 @@ import type { HarnessIO, HarnessSpec, RunInput } from './detached.ts';
 
 /** Where each of a run's files goes, by what it holds: the names `detachedOps` keeps for the run. */
 export type SpawnAt = {
+  /** A file beside the run's own under an end (`besideRun`), for what the spec prepares. */
+  beside: (end: string) => string;
   schema: string;
   answer: string;
   mcp: string;
@@ -40,7 +42,7 @@ export const spawnFiles = (spec: HarnessSpec, r: SpawnRequest, at: SpawnAt): Har
   const mcp = sessionMcp(r.cwd, r.config);
   const mcpConfigFile = writeMcpConfig(at.mcp, spec.needsRequest ? undefined : mcp);
   if (mcpConfigFile) io = { ...io, mcpConfigFile };
-  io = { ...io, ...spec.prepare?.(r) };
+  io = { ...io, ...spec.prepare?.(r, at.beside) };
   if (!spec.needsRequest) return io;
   fs.writeFileSync(at.request, JSON.stringify({ request: r, io }), { mode: 0o600 });
   return { ...io, requestFile: at.request };

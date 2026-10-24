@@ -653,7 +653,7 @@ test('the ways an attempt fails: a spawn refused, a harness failure, a session l
     'a spawn the harness refuses ends the attempt, unstartable, in its words — and the pass goes on to the task behind it',
     async () => {
       await b.run(file({ ...spec, brief: 'refuse', id: 'a-bad' }));
-      await b.run(file({ ...spec, brief: 'refuse', id: 'a-long', restartPolicy: 'Always', config: { background: true } }));
+      await b.run(file({ ...spec, brief: 'refuse', id: 'a-long', restartPolicy: 'Always' }));
       await b.run(file({ ...spec, id: 'b-good' }));
       await b.run(tick());
       const v = await b.run(view('a-bad', new Map()));
@@ -793,7 +793,7 @@ test('a long-lived session beside a job: its spend counted as it grows, left ope
   await s.test(
     'what the long-lived session consumed is journalled as it grows — once per reading however many passes see it — where the job with the same sightings is journalled none',
     async () => {
-      await run(file({ ...spec, id: open, restartPolicy: 'Always', config: { background: true } }));
+      await run(file({ ...spec, id: open, restartPolicy: 'Always' }));
       await run(file({ ...spec, id: job }));
       await run(tick());
       sight({ responses: 1, outputTokens: 10 });
@@ -902,7 +902,7 @@ test('long-lived: what a daemon reads off the record of a long-lived task — wh
       });
       const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) =>
         Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(journal, runner, tickMemoLayer({ verify: true })))));
-      const open = await run(file({ ...spec, id: 'open', restartPolicy: 'Always', config: { background: true } }));
+      const open = await run(file({ ...spec, id: 'open', restartPolicy: 'Always' }));
       const job = await run(file({ ...spec, id: 'job' }));
       await run(tick());
       await run(tick());
@@ -936,7 +936,7 @@ test('long-lived: what a daemon reads off the record of a long-lived task — wh
         Effect.runPromise(e.pipe(Effect.provide(Layer.mergeAll(journal, runner))));
       const memo = tickMemoLayer({ verify: true });
       const pass = () => Effect.runPromise(tick().pipe(Effect.provide(Layer.mergeAll(journal, runner, memo))));
-      const open = await run(file({ ...spec, id: 'open', restartPolicy: 'Always', config: { background: true } }));
+      const open = await run(file({ ...spec, id: 'open', restartPolicy: 'Always' }));
       await pass();
       await run(requestStop(open));
       await pass();
@@ -964,7 +964,7 @@ test('long-lived: what a daemon reads off the record of a long-lived task — wh
     async () => {
       const r = recording();
       const run = r.daemon();
-      const id = await run(file({ ...spec, restartPolicy: 'Always', config: { background: true } }));
+      const id = await run(file({ ...spec, restartPolicy: 'Always' }));
       await run(
         journalAgo(
           id,
@@ -988,7 +988,7 @@ test('long-lived: what a daemon reads off the record of a long-lived task — wh
     async () => {
       const r = recording();
       const run = r.daemon();
-      const id = await run(file({ ...spec, restartPolicy: 'Always', config: { background: true } }));
+      const id = await run(file({ ...spec, restartPolicy: 'Always' }));
       await run(
         journalAgo(
           id,
@@ -1582,7 +1582,7 @@ test('the release: a finished session is let go and looked for no more, what it 
       const ops = testOps({ sessions });
       const runner = Runner.layer({
         ...ops,
-        /** Lists only what it is told to look for, as Claude Code does for a background session. */
+        /** Lists only what it is told to look for, as a harness that reads only the sessions it is told of does. */
         observeFor: (expected) =>
           Effect.sync(() => {
             told.push(expected.map((e) => e.name));

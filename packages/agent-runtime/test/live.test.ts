@@ -3,14 +3,14 @@
  * kind of guard that is silently inert, so each is proven by a session that runs, beside a control identical but for the one
  * field, which must do what the fenced one cannot: without the control, a session that never ran would pass too.
  *
- * - `--tools`: a `--bg` session told to write a file with no tool that can, and which still gives its closing statement.
- * - `--disallowedTools`, on `--bg` and not only `-p`: a session told to run `npm run build` and `npm run e2e`, in `dontAsk`, in a
- *   checkout whose `.claude/settings.json` allows both; the control must run both. Claude Code gives a `--bg` session in a
- *   directory it does not trust none of the directory's settings, so the checkouts are made inside this package, and the test
- *   is run from a checkout Claude Code trusts.
+ * - `--tools`: a job told to write a file with no tool that can, and which still gives its closing statement.
+ * - `--disallowedTools`: a job told to run `npm run build` and `npm run e2e`, in `dontAsk`, in a checkout whose
+ *   `.claude/settings.json` allows both; the control must run both. Claude Code gives a session in a directory it does not trust
+ *   none of the directory's settings, so the checkouts are made inside this package, and the test is run from a checkout Claude
+ *   Code trusts.
  * - The MCP fence: a session filed with no `mcp`, in an empty directory, on a machine whose operator has servers, claude.ai
  *   connectors and Claude in Chrome, reports no MCP server and no MCP tool; the control, given one server, reports that server
- *   and its tool. Servers connect after a `--bg` session starts, so the brief waits for them.
+ *   and its tool. Servers connect after a session starts, so the brief waits for them.
  * - An attached session's typed options, which only the real Claude Code can answer for (the stand-in pins the SDK's protocol, not
  *   Claude Code's behaviour): a session held on `query()` with its servers on `Options.mcpServers`, its agent prompt on
  *   `Options.systemPrompt`'s `append` and auto-memory off in `Options.settings` reports the one server it was given, the word only
@@ -21,62 +21,37 @@
  * - An attached session's cost across its processes: a resumed query's first result carries on the total its parent saved as it
  *   exited, and a session cut by its holder's let-go prints the turn it was cut in, saves its total, and its resume carries it on
  *   (`docs/harness.md`). What it read is said as diagnostics; what the let-go rests on is asserted.
- * - The release of a settled session: `claude rm` could take the transcript with it, so a session told a word settles and is
- *   released, then `ae logs` still reads it and a second task resuming it still says the word.
- * - `say`, whose inbox answers nothing: a session told to wait for a message naming a file is told a name, and writes that file
- *   and closes with its name; an identical session never told writes nothing.
- * - A budget: `claude -p` stops at its cap after its first response or two; a `--bg` session spends past it, which is why
- *   `file()` refuses a budget beside a background session, so that test files through the Effect door, which refuses no
- *   harness's words.
- * - A session that ends its turn without its closing statement: told to answer in plain text and give none, it is never recorded
- *   as ended with none unless its end says so — `closedOut: false`, the fact the orchestrator reads as unsigned. Whether Claude
- *   Code nudges such a session itself, or ends it on its own, is what the diagnostic says.
- * - `claude.remoteControl`, under the engine: Claude Code registers a session filed with it under `sessions/` with a
- *   `bridgeSessionId`, a file the engine never reads; the control has none, read again as long after, so a bridge it gets a
- *   moment after it registers is seen too. Both have no tools, so a session anyone on the account can drive from claude.ai for
- *   the minute it lives can do nothing.
- * - A long-lived session, `restartPolicy: 'Always'`: a `--bg` session under Remote Control that answers its brief stays open,
- *   read `idle`, past 90 s of silence and across a second engine over the same store; `say` starts a turn on that session,
- *   which answers and reads `idle` again under the same attempt; and it settles `stopped` on a stop alone. Its control, the
- *   same task filed as a job, settles `succeeded` on its turn's end. Both have no tools.
- * - Claude Code as a job (M1 to M12 and M14, docs/open-issues.md, *Claude Code as a job*): `claude` runs a step as a job (`claude -p`),
- *   and a `--bg` session only when asked; these keep what that rests on measurable on each Claude Code. `--allowedTools` takes
- *   every word after it, so M1 gives the prompt first, and runs its eight jobs at once, each in a folder of its own. A resume's
- *   result prints the whole session's cost, and a job resumed from a `--bg` session carries that session's spend on with no run
- *   file that holds it, so its cost is dropped, never overcounted. Told only to run a sleep, haiku can decline it as pointless,
- *   so M4 says why it asks; M4 is M6's control too: a job without a stdin to read still has `-p --resume` to be told with. A
- *   job's words come on its stdin (`--input-format stream-json`) so that a person's can follow them, and M8 to M10 hold a job
- *   given its brief so to the closeout, the spend cap and the denials of a job given a plain prompt.
+ * - `say`: a job told to wait for a message naming a file is told a name on its stdin, and writes that file and closes with its
+ *   name; an identical job never told writes nothing.
+ * - A budget: a job stops at its cap after its first response or two.
+ * - Claude Code as a job (M1, M2, M3, M5, M7, M11, M12 and M14, docs/open-issues.md, *Claude Code as a job*): every Claude Code
+ *   session runs on the Agent SDK, a step as a job; these keep what that rests on measurable on each Claude Code. A resume's result
+ *   prints the whole session's cost, and the job takes its parent's off. The bridge a job or a long-lived session opens at init
+ *   (`claude.remoteControl`) was measured once by the probe of `docs/harness.md`, and is held by the stand-in's boundary tests.
  * - Codex as an A2A agent (M13, only where `codex` is on PATH): a held Codex task is an A2A context, which rests on a claim no
  *   fake can make — that `codex exec resume <thread>` goes on under the same thread id and in the same rollout, rather than
  *   forking a thread of its own. A task told a word signs, waits with no worker, is answered, and says the word under the
  *   thread id it signed with.
  *
- * Every session a test starts is stopped and removed at its end, whatever happened: a `claude stop` or `claude rm` that fails,
- * on a session released already, is passed over.
+ * Every session a test starts is stopped at its end, whatever happened.
  *
  *   AE_LIVE=1 node --test test/live.test.ts
  */
-import { test, type TestContext } from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync, spawn } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
-import { Effect, Exit, Layer, Scope } from 'effect';
+import { Effect, Exit, Scope } from 'effect';
 import { nameFor, type EngineShape, type Said, type TaskView } from '../src/index.ts';
 import { Engine as EngineService } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
-import { file } from '../src/core/engine/filing.ts';
-import { tick, view } from '../src/core/engine/engine.ts';
 import { Journal } from '../src/core/engine/journal.ts';
-import { Runner, type TranscriptEvent } from '../src/harness/seam.ts';
 import { TaskState } from '@a2a-js/sdk';
 import { clientOf } from '../src/a2a/client.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 import { codexRolloutFile } from '../src/harness/codex/transcript.ts';
-import { parentFileOf } from '../src/harness/claude/parent.ts';
 import { claudeTranscriptFile } from '../src/harness/claude/transcript.ts';
 import { detachedOps } from '../src/harness/detached/detached.ts';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
@@ -144,7 +119,7 @@ const CLOSEOUT = {
 };
 
 test(
-  'a --bg session with tools: Read, Grep, Glob cannot write a file; the same brief without them does',
+  'a job with tools: Read, Grep, Glob cannot write a file; the same brief without them does',
   {
     skip,
     timeout: 12 * 60_000,
@@ -153,7 +128,7 @@ test(
     const engine = builtEngine(EngineService.layer({ root: tmp('board') }));
     const fenced = tmp('fenced');
     const open = tmp('open');
-    const common = { brief: BRIEF, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } };
+    const common = { brief: BRIEF, closeoutSchema: CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low' } };
     const ids = {
       fenced: await Effect.runPromise(
         engine.file({ ...common, cwd: fenced, config: { ...common.config, tools: ['Read', 'Grep', 'Glob'] } }),
@@ -204,7 +179,7 @@ const allowingCheckout = (label: string) => {
 };
 
 test(
-  'a --bg session in dontAsk, in a checkout whose settings allow npm run build and npm run e2e, runs neither when disallowedTools names both; the same session without it runs both',
+  'a job in dontAsk, in a checkout whose settings allow npm run build and npm run e2e, runs neither when disallowedTools names both; the same session without it runs both',
   {
     skip,
     timeout: 12 * 60_000,
@@ -217,7 +192,7 @@ test(
       brief: DENY_BRIEF,
       closeoutSchema: DENY_CLOSEOUT,
       deadlineSeconds: 480,
-      config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Bash'], background: true },
+      config: { model: 'haiku', permissionMode: 'dontAsk', tools: ['Bash'] },
     };
     try {
       const ids = {
@@ -292,7 +267,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
 `;
 
 test(
-  "a --bg session filed with no mcp, in an empty directory, has no MCP tools — not the operator's; one given a server has its tool",
+  "a job filed with no mcp, in an empty directory, has no MCP tools — not the operator's; one given a server has its tool",
   {
     skip,
     timeout: 12 * 60_000,
@@ -301,7 +276,7 @@ test(
     const engine = builtEngine(EngineService.layer({ root: tmp('mcp-board') }));
     const server = path.join(tmp('mcp-server'), 'server.mjs');
     fs.writeFileSync(server, PROBE_SERVER);
-    const common = { brief: MCP_BRIEF, closeoutSchema: MCP_CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low', background: true } };
+    const common = { brief: MCP_BRIEF, closeoutSchema: MCP_CLOSEOUT, deadlineSeconds: 480, config: { effort: 'low' } };
     const ids = {
       bare: await Effect.runPromise(engine.file({ ...common, cwd: tmp('mcp-bare') })),
       given: await Effect.runPromise(
@@ -346,19 +321,16 @@ const NAME_CLOSEOUT = {
 };
 
 /**
- * Told a file name while it works, a session writes that file; the same session never told writes none. A `--bg` session
- * is told through Claude Code's inbox, and a job (`claude -p`) on its stdin, by its worker. Both are filed at shipped defaults,
- * with Bash to wait with and Write to answer with.
+ * Told a file name while it works, a session writes that file; the same session never told writes none. A job is told
+ * on its stdin, by its worker. Both are filed at shipped defaults, with Bash to wait with and Write to answer with.
  *
  * - The told session is told once it is seen at work, listed running in its sleep loop, inside `settleThenCheck`, so a `say`
  *   that rejects still leaves no session behind.
  * - Its own record then carries the words once, as the transcript reader gives them to a board, never as the model's mention
- *   of the file's name, which would pass with the reader of words sent in broken: a job's as the person's words, since Claude
- *   Code keeps a user message said on its stdin while it works as an attachment the reader gives as the user's, as the brief
- *   is; a `--bg` session's as a system event whose text is the words, or Claude Code's sentence around them with the words on
- *   a line of their own.
+ *   of the file's name, which would pass with the reader of words sent in broken: as the person's words, since Claude Code keeps a
+ *   user message said on its stdin while it works as an attachment the reader gives as the user's, as the brief is.
  */
-const sayReaches = (background: boolean) => async (t: TestContext) => {
+const sayReaches = async () => {
   const engine = builtEngine(EngineService.layer({ root: tmp('say-board') }));
   const told = tmp('say-told');
   const control = tmp('say-control');
@@ -366,7 +338,7 @@ const sayReaches = (background: boolean) => async (t: TestContext) => {
     brief: SAY_BRIEF,
     closeoutSchema: NAME_CLOSEOUT,
     deadlineSeconds: 600,
-    config: { effort: 'low', tools: ['Bash', 'Write'], ...(background ? { background } : {}) },
+    config: { effort: 'low', tools: ['Bash', 'Write'] },
   };
   const ids = {
     told: await Effect.runPromise(engine.file({ ...common, cwd: told })),
@@ -407,34 +379,13 @@ const sayReaches = (background: boolean) => async (t: TestContext) => {
   );
 
   const { events } = await Effect.runPromise(engine.transcript(ids.told));
-  if (!background) {
-    const arrived = events.filter((e) => e.role === 'user' && e.kind === 'text' && e.text === words);
-    assert.equal(
-      arrived.length,
-      1,
-      `the told job's transcript carries the words once, as the person's: ${JSON.stringify(events.filter((e) => e.role === 'user'))}`,
-    );
-    return;
-  }
-  const arrived = events.filter((e) => e.role === 'system' && e.kind === 'system' && e.text?.split('\n').includes(words));
+  const arrived = events.filter((e) => e.role === 'user' && e.kind === 'text' && e.text === words);
   assert.equal(
     arrived.length,
     1,
-    `the told session's transcript carries the words once, as a system event: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`,
-  );
-  t.diagnostic(
-    `the words arrived ${arrived[0].text === words ? 'while the session worked (an attachment line)' : 'while it was idle (the line that starts a turn)'}`,
+    `the told job's transcript carries the words once, as the person's: ${JSON.stringify(events.filter((e) => e.role === 'user'))}`,
   );
 };
-
-test(
-  'say reaches a working --bg session: told a file name, it writes that file; the same session never told writes none — and the journal has what was said',
-  {
-    skip,
-    timeout: 15 * 60_000,
-  },
-  sayReaches(true),
-);
 
 test(
   'say reaches a working job on its stdin: told a file name, it writes that file; the same job never told writes none — and the journal has what was said',
@@ -442,7 +393,7 @@ test(
     skip,
     timeout: 15 * 60_000,
   },
-  sayReaches(false),
+  sayReaches,
 );
 
 const WORD_CLOSEOUT = {
@@ -451,88 +402,6 @@ const WORD_CLOSEOUT = {
   required: ['word'],
   additionalProperties: false,
 };
-
-test(
-  'a settled --bg session is stopped and removed from claude agents — and ae logs still reads it, and --resume still continues it',
-  {
-    skip,
-    timeout: 25 * 60_000,
-  },
-  async () => {
-    const root = tmp('release-board');
-    const engine = builtEngine(EngineService.layer({ root }));
-    const cwd = trusted('release');
-    const word = `ae${randomUUID().slice(0, 8)}`;
-    const agents = () =>
-      JSON.parse(execFileSync('claude', ['agents', '--all', '--json'], { encoding: 'utf8', timeout: 60_000 })) as Array<{
-        sessionId?: string;
-      }>;
-    const settled = async (id: string) => {
-      const until = Date.now() + 10 * 60_000;
-      while (Date.now() < until) {
-        await Effect.runPromise(engine.tick());
-        const v = await Effect.runPromise(engine.view(id));
-        if (v.state.settled) return v;
-        await new Promise((r) => setTimeout(r, 5_000));
-      }
-      return Effect.runPromise(engine.view(id));
-    };
-    const sessions = new Set<string>();
-    const common = { cwd, deadlineSeconds: 480, config: { model: 'haiku', background: true }, closeoutSchema: WORD_CLOSEOUT };
-    try {
-      const firstId = await Effect.runPromise(
-        engine.file({
-          ...common,
-          brief: `The code word is ${word}. Remember it, and do nothing else. Then give your closing statement, with word set to ok.`,
-        }),
-      );
-      const first = await settled(firstId);
-      if (first.sessionId) sessions.add(first.sessionId);
-      const id = first.state.attempts.at(-1)?.nativeId ?? undefined;
-      assert.equal(first.state.settled, 'succeeded', `first settled: ${first.phase}`);
-      assert.ok(id, 'its session id is on the record');
-      assert.equal(
-        agents().some((r) => r.sessionId === id),
-        false,
-        'released in the pass that settled it: not in claude agents',
-      );
-      assert.match(await Effect.runPromise(engine.logs(firstId)), new RegExp(word), 'ae logs still reads the removed session');
-
-      const secondId = await Effect.runPromise(
-        engine.file({
-          ...common,
-          resumeFrom: id,
-          brief: 'What was the code word you were given? Give it as word in your closing statement.',
-        }),
-      );
-      const second = await settled(secondId);
-      if (second.sessionId) sessions.add(second.sessionId);
-      assert.equal(second.state.settled, 'succeeded', `resumed settled: ${second.phase}`);
-      assert.deepEqual(second.state.attempts.at(-1)?.closeout, { word }, 'the removed session was resumed, and remembered its word');
-      const parent = JSON.parse(fs.readFileSync(parentFileOf(root, nameFor(secondId, 1)), 'utf8')) as { lastCall: unknown };
-      assert.equal(typeof parent.lastCall, 'string', "its spawn recorded its parent's last StructuredOutput call");
-      const resumed = claudeTranscriptFile(second.state.attempts.at(-1)?.nativeId ?? '');
-      assert.ok(
-        resumed && fs.readFileSync(resumed, 'utf8').includes(`"id":"${String(parent.lastCall)}"`),
-        'and the resumed transcript carries that call under the same id: whose statement it is, is told by it',
-      );
-      assert.equal(
-        agents().some((r) => r.sessionId === second.sessionId),
-        false,
-        'and the resumed one was released too',
-      );
-    } finally {
-      for (const s of sessions) {
-        for (const verb of ['stop', 'rm']) {
-          try {
-            execFileSync('claude', [verb, s.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
-          } catch {}
-        }
-      }
-      fs.rmSync(cwd, { recursive: true, force: true });
-    }
-  },
-);
 
 const NOTES = Array.from(
   { length: 2000 },
@@ -554,7 +423,7 @@ const notesIn = (label: string) => {
 };
 
 test(
-  'claude -p given a $0.01 budget stops at it: the attempt ends failed at the limit `budget`, with what it cost — and its task settles failed, with no attempt 2',
+  'a job given a $0.01 budget stops at it: the attempt ends failed at the limit `budget`, with what it cost — and its task settles failed, with no attempt 2',
   {
     skip,
     timeout: 12 * 60_000,
@@ -566,7 +435,7 @@ test(
         engine.file({
           brief: LOOP_BRIEF,
           cwd: notesIn('budget-p'),
-          harness: 'claude-detached',
+          harness: 'claude',
           config: { model: 'haiku', tools: ['Read'], budgetUsd: 0.01 },
           deadlineSeconds: 480,
         }),
@@ -590,327 +459,6 @@ test(
   },
 );
 
-test(
-  'a claude --bg session given --max-budget-usd 0.01 spends past it and ends on its own — why file() refuses a budget beside background: true — and what it spent is measured once it is let go',
-  {
-    skip,
-    timeout: 12 * 60_000,
-  },
-  async (t) => {
-    const root = tmp('bg-budget-board');
-    const layer = Layer.mergeAll(Journal.layer(Journal.filesOps(root)), Runner.claude({ root }));
-    const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
-    const id = await run(
-      file({
-        brief: LOOP_BRIEF,
-        cwd: notesIn('bg-budget'),
-        config: { model: 'haiku', tools: ['Read'], budgetUsd: 0.01 },
-        deadlineSeconds: 480,
-      }),
-    );
-    let v = await run(view(id, new Map()));
-    try {
-      const until = Date.now() + 10 * 60_000;
-      while (!v.state.settled && Date.now() < until) {
-        await run(tick());
-        v = await run(view(id, new Map()));
-        if (!v.state.settled) await new Promise((r) => setTimeout(r, 5_000));
-      }
-      const [a] = v.state.attempts;
-      t.diagnostic(`settled ${v.state.settled}, attempt 1 ended ${a?.ended} (${a?.reason}), usage ${JSON.stringify(a?.usage)}`);
-      assert.equal(v.state.settled, 'succeeded', 'Claude Code ended it on its own terms, not at a cap');
-      assert.ok(
-        (a?.usage?.toolCalls ?? 0) >= 5,
-        `it kept reading past the cap: ${a?.usage?.toolCalls} tool calls. If it stopped early, Claude Code may keep --max-budget-usd under --bg now: measure it, and lift the refusals in claudeBgRefuses and claudeCodeRefuses`,
-      );
-      assert.ok(
-        (a?.usage?.costUsd ?? 0) > 0.03,
-        `and what it spent, past the cap, was read once its release stopped it: ${a?.usage?.costUsd}`,
-      );
-    } finally {
-      const session = v.sessionId ?? v.state.attempts.at(-1)?.nativeId;
-      if (session) {
-        for (const verb of ['stop', 'rm']) {
-          try {
-            execFileSync('claude', [verb, session.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
-          } catch {}
-        }
-      }
-    }
-  },
-);
-
-const UNSIGNED_BRIEF = [
-  'Reply with the single word ok, as plain text, and end your turn.',
-  'Call no tool, and give no closing statement, even when you are asked for one.',
-].join(' ');
-
-test(
-  'a --bg session asked for a closing statement that ends its turn without one is never recorded as ending without one unsaid',
-  {
-    skip,
-    timeout: 15 * 60_000,
-  },
-  async (t) => {
-    const engine = builtEngine(EngineService.layer({ root: tmp('unsigned-board') }));
-    const ids = {
-      unsigned: await Effect.runPromise(
-        engine.file({
-          brief: UNSIGNED_BRIEF,
-          cwd: tmp('unsigned'),
-          closeoutSchema: WORD_CLOSEOUT,
-          deadlineSeconds: 480,
-          config: { model: 'haiku', background: true },
-        }),
-      ),
-    };
-
-    await settleThenCheck(engine, ids, (views) => {
-      const v = views.unsigned;
-      const [a] = v.state.attempts;
-      t.diagnostic(
-        `attempt 1 ended ${a?.ended} (${a?.reason}), closedOut ${a?.closedOut}, closeout ${JSON.stringify(a?.closeout)}, task ${v.state.settled ?? v.phase}`,
-      );
-      assert.ok(v.state.settled, `settled: ${v.phase}`);
-      assert.ok(
-        a?.closeout !== undefined || a?.closedOut === false || a?.ended !== 'succeeded',
-        `recorded done with nothing said and not saying so, ended ${a?.ended} (${a?.reason}), closedOut ${a?.closedOut}: bug 1, which the orchestrator could then not read as unsigned`,
-      );
-    });
-  },
-);
-
-/**
- * The registration Claude Code wrote for the background session named `name`, under `sessions/` — or `undefined` while there is
- * none. A file gone since the directory was read, or read mid-write, is passed over.
- */
-const registrationOf = (name: string): Record<string, unknown> | undefined => {
-  const dir = path.join(process.env.CLAUDE_CONFIG_DIR ?? path.join(os.homedir(), '.claude'), 'sessions');
-  for (const f of fs.readdirSync(dir).filter((f) => /^\d+\.json$/.test(f))) {
-    try {
-      const r = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8')) as Record<string, unknown> | null;
-      if (r?.name === name && r.kind === 'bg') return r;
-    } catch {}
-  }
-  return undefined;
-};
-
-test(
-  'a --bg session filed with claude.remoteControl is bridged — its registration carries a bridgeSessionId — and the same session filed without it is not',
-  {
-    skip,
-    timeout: 6 * 60_000,
-  },
-  async (t) => {
-    const engine = builtEngine(EngineService.layer({ root: tmp('remote-board') }));
-    const common = {
-      brief: 'Reply with the single word ok, and nothing else.',
-      config: { model: 'haiku', tools: [] as string[], background: true },
-    };
-    const ids = {
-      bridged: await Effect.runPromise(
-        engine.file({ ...common, cwd: tmp('remote'), config: { ...common.config, claude: { remoteControl: true } } }),
-      ),
-      control: await Effect.runPromise(engine.file({ ...common, cwd: tmp('remote-none') })),
-    };
-    const found: Record<string, Record<string, unknown> | undefined> = {};
-    const read = () => {
-      for (const [k, id] of Object.entries(ids)) found[k] = registrationOf(nameFor(id, 1));
-    };
-    try {
-      await Effect.runPromise(engine.tick());
-      const until = Date.now() + 2 * 60_000;
-      while (!(found.bridged?.bridgeSessionId && found.control) && Date.now() < until) {
-        await new Promise((r) => setTimeout(r, 2_000));
-        read();
-      }
-      await new Promise((r) => setTimeout(r, 15_000));
-      read();
-      const shown = (r: Record<string, unknown> | undefined) =>
-        r ? `${r.version} ${r.sessionId}, bridgeSessionId ${r.bridgeSessionId ?? 'none'}` : 'not registered';
-      t.diagnostic(`bridged: ${shown(found.bridged)}; control: ${shown(found.control)}`);
-      assert.ok(found.bridged, 'the session filed with claude.remoteControl registered');
-      assert.equal(typeof found.bridged.bridgeSessionId, 'string', 'and is bridged: the agents view lists it');
-      assert.ok(found.control, 'the control registered');
-      assert.equal(
-        found.control.bridgeSessionId,
-        undefined,
-        'the control is bridged too: Claude Code bridges background sessions on its own again, so the flag is not what did it. Measure it, and say so in the README',
-      );
-    } finally {
-      const sessions = new Set<string>();
-      for (const r of Object.values(found)) if (typeof r?.sessionId === 'string') sessions.add(r.sessionId);
-      for (const id of Object.values(ids)) {
-        try {
-          const v = await Effect.runPromise(engine.view(id));
-          if (v.sessionId) sessions.add(v.sessionId);
-        } catch {}
-      }
-      for (const s of sessions) {
-        for (const verb of ['stop', 'rm']) {
-          try {
-            execFileSync('claude', [verb, s.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
-          } catch {}
-        }
-      }
-    }
-  },
-);
-
-test(
-  "a long-lived --bg session stays open while idle — past 90 s of silence, and across a second engine over its store — takes a turn on words said to it, and ends on a stop alone; the same task filed as a job settles on its turn's end",
-  {
-    skip,
-    timeout: 12 * 60_000,
-  },
-  async (t) => {
-    const root = tmp('long-lived-board');
-    const engine = builtEngine(EngineService.layer({ root }));
-    const common = {
-      brief: 'Reply with the single word ok, and nothing else.',
-      config: { model: 'haiku', tools: [] as string[], background: true, claude: { remoteControl: true as const } },
-    };
-    const dirs = { open: trusted('long-lived'), job: trusted('long-lived-job') };
-    const ids = {
-      open: await Effect.runPromise(engine.file({ ...common, cwd: dirs.open, restartPolicy: 'Always' })),
-      job: await Effect.runPromise(engine.file({ ...common, cwd: dirs.job })),
-    };
-    const views: Record<string, TaskView> = {};
-    const pass = async (e: EngineShape) => {
-      await Effect.runPromise(e.tick());
-      for (const [k, id] of Object.entries(ids)) views[k] = await Effect.runPromise(e.view(id));
-    };
-    try {
-      const until = Date.now() + 5 * 60_000;
-      while (!(views.open?.phase === 'idle' && views.job?.state.settled) && Date.now() < until) {
-        await pass(engine);
-        await new Promise((r) => setTimeout(r, 5_000));
-      }
-      assert.equal(views.open?.phase, 'idle', `the long-lived session reads idle once its turn ends: ${views.open?.phase}`);
-      assert.equal(views.job?.state.settled, 'succeeded', `the job settles on its turn's end: ${views.job?.phase}`);
-
-      const restarted = builtEngine(EngineService.layer({ root }));
-      const quiet = Date.now() + 100_000;
-      while (Date.now() < quiet) {
-        await pass(restarted);
-        assert.equal(views.open?.phase, 'idle', `still idle, ${Math.round((quiet - Date.now()) / 1000)} s before the end of the wait`);
-        await new Promise((r) => setTimeout(r, 10_000));
-      }
-      assert.deepEqual(
-        views.open?.state.attempts.map((a) => a.ended),
-        [null],
-        'one attempt, never ended: no pass recorded an end, and none started a second',
-      );
-
-      const sessionId = views.open?.sessionId;
-      const word = `again-${randomUUID().slice(0, 8)}`;
-      const words = `Reply with the single word ${word}, and nothing else.`;
-      await Effect.runPromise(restarted.say(ids.open, words));
-      const told = (events: TranscriptEvent[]) => events.findIndex((e) => e.kind === 'system' && e.text?.split('\n').includes(words));
-      const answered = (events: TranscriptEvent[]) =>
-        told(events) >= 0 && events.slice(told(events)).some((e) => e.role === 'assistant' && e.kind === 'text' && e.text?.includes(word));
-      const turn = Date.now() + 3 * 60_000;
-      let events: TranscriptEvent[] = [];
-      while (!(answered(events) && views.open?.phase === 'idle') && Date.now() < turn) {
-        await new Promise((r) => setTimeout(r, 5_000));
-        await pass(restarted);
-        events = (await Effect.runPromise(restarted.transcript(ids.open))).events;
-      }
-      assert.ok(
-        told(events) >= 0,
-        `the idle session's transcript carries the words: ${JSON.stringify(events.filter((e) => e.kind === 'system'))}`,
-      );
-      assert.ok(answered(events), 'and a turn they started answers them');
-      assert.equal(views.open?.phase, 'idle', `idle again once that turn ends: ${views.open?.phase}`);
-      assert.deepEqual(
-        [views.open?.sessionId, views.open?.state.attempts.map((a) => a.ended)],
-        [sessionId, [null]],
-        'the same session took the turn: no end recorded, no second attempt',
-      );
-
-      await Effect.runPromise(restarted.stop(ids.open));
-      const stopping = Date.now() + 2 * 60_000;
-      while (!views.open?.state.settled && Date.now() < stopping) {
-        await pass(restarted);
-        await new Promise((r) => setTimeout(r, 5_000));
-      }
-      assert.equal(views.open?.state.settled, 'stopped', `a stop ends it: ${views.open?.phase}`);
-      t.diagnostic(
-        `the long-lived session's end: ${views.open?.state.attempts.at(-1)?.ended} (${views.open?.state.attempts.at(-1)?.reason})`,
-      );
-    } finally {
-      for (const v of Object.values(views)) {
-        if (!v.sessionId) continue;
-        for (const verb of ['stop', 'rm']) {
-          try {
-            execFileSync('claude', [verb, v.sessionId.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
-          } catch {}
-        }
-      }
-      for (const dir of Object.values(dirs)) fs.rmSync(dir, { recursive: true, force: true });
-    }
-  },
-);
-
-/** One `claude -p` line of its stream: what the runner reads, parsed as the reader parses it. */
-type StreamLine = Record<string, unknown> & { type?: string; subtype?: string; session_id?: string };
-const streamOf = (text: string): StreamLine[] =>
-  text.split('\n').flatMap((l) => {
-    try {
-      return [JSON.parse(l) as StreamLine];
-    } catch {
-      return [];
-    }
-  });
-const resultOf = (lines: StreamLine[]) => lines.filter((l) => l.type === 'result').at(-1);
-const sessionOf = (lines: StreamLine[]) => lines.find((l) => l.type === 'system' && l.subtype === 'init')?.session_id;
-const toolCalled = (lines: StreamLine[]) =>
-  lines.some(
-    (l) =>
-      l.type === 'assistant' &&
-      ((l.message as { content?: Array<{ type?: string }> } | undefined)?.content ?? []).some((c) => c.type === 'tool_use'),
-  );
-const PRINT = ['-p', '--model', 'haiku', '--output-format', 'stream-json', '--verbose'];
-
-/** `claude -p` run to its end under a bound, its stdin closed: the exit, and the stream it printed. */
-const printed = (args: string[], cwd: string, bound = 240_000): { exit: number | null; lines: StreamLine[] } => {
-  try {
-    return {
-      exit: 0,
-      lines: streamOf(
-        execFileSync('claude', [...PRINT, ...args], { cwd, encoding: 'utf8', timeout: bound, stdio: ['ignore', 'pipe', 'pipe'] }),
-      ),
-    };
-  } catch (e) {
-    const err = e as { status?: number | null; stdout?: string };
-    return { exit: err.status ?? null, lines: streamOf(err.stdout ?? '') };
-  }
-};
-
-/** A `claude -p` left running: its stream as it grows, and a wait for its exit bounded by `ms`. */
-const started = (args: string[], cwd: string, stdin: 'ignore' | 'pipe' = 'ignore') => {
-  const child = spawn('claude', [...PRINT, ...args], { cwd, stdio: [stdin, 'pipe', 'ignore'] });
-  let out = '';
-  child.stdout!.on('data', (d) => {
-    out += d;
-  });
-  child.stdin?.on('error', () => {});
-  const exited = new Promise<number | null>((r) =>
-    child.on('exit', (code, signal) => r(code ?? (signal ? 128 + (os.constants.signals[signal] ?? 0) : null))),
-  );
-  return {
-    child,
-    raw: () => out,
-    lines: () => streamOf(out),
-    exit: (ms: number) => Promise.race([exited, new Promise<'running'>((r) => setTimeout(() => r('running'), ms))]),
-  };
-};
-const until = async (ok: () => boolean, ms: number) => {
-  const end = Date.now() + ms;
-  while (!ok() && Date.now() < end) await new Promise((r) => setTimeout(r, 500));
-  return ok();
-};
-
 const DENIED_BRIEF = (outside: string) =>
   [
     'Do these three things, in order, each exactly once, even if one fails, then give your closing statement with finished set to true:',
@@ -924,49 +472,6 @@ const FINISHED_CLOSEOUT = {
   required: ['finished'],
   additionalProperties: false,
 };
-
-test(
-  'M1: claude -p waits on nobody in any mode, with or without --permission-prompts none — a call it may not make is denied, and said twice: a permission_denied line as it happens and permission_denials on its result',
-  {
-    skip,
-    timeout: 20 * 60_000,
-  },
-  async (t) => {
-    const probe = tmp('m1');
-    const runs = ['auto', 'dontAsk', 'default', 'acceptEdits'].flatMap((mode) =>
-      [false, true].map(async (none) => {
-        const label = `${mode}${none ? '-none' : ''}`;
-        const cwd = path.join(probe, `w-${label}`);
-        fs.mkdirSync(cwd);
-        const allow = mode === 'dontAsk' ? ['--allowedTools', 'Edit(**),Bash(npm test)'] : [];
-        const brief = DENIED_BRIEF(path.join(probe, `outside-${label}`)).replace(' with finished set to true', ', the word FINISHED');
-        const { exit, lines } = printed(
-          [brief, '--permission-mode', mode, ...allow, ...(none ? ['--permission-prompts', 'none'] : [])],
-          cwd,
-        );
-        return { label, exit, lines, outside: fs.existsSync(path.join(probe, `outside-${label}`, 'x.txt')) };
-      }),
-    );
-    for (const { label, exit, lines, outside } of await Promise.all(runs)) {
-      const result = resultOf(lines);
-      const events = lines.filter((l) => l.type === 'system' && l.subtype === 'permission_denied');
-      const denials = (result?.permission_denials ?? []) as Array<{ tool_name?: string; tool_use_id?: string }>;
-      const mode = lines.find((l) => l.subtype === 'init')?.permissionMode;
-      t.diagnostic(
-        `${label}: exit ${exit}, ran as ${mode}, result ${result?.subtype}, denied ${denials.map((d) => d.tool_name).join(', ') || 'nothing'}; events ${events.map((e) => `${e.tool_name}/${e.decision_reason_type ?? '-'}`).join(', ')}`,
-      );
-      assert.equal(exit, 0, `${label}: it ended on its own inside four minutes — it waited on nobody`);
-      assert.ok(result, `${label}: it printed its result`);
-      assert.equal(outside, false, `${label}: nothing was written outside its folder`);
-      assert.ok(denials.length > 0, `${label}: its result says what it was denied`);
-      assert.deepEqual(
-        events.map((e) => e.tool_use_id),
-        denials.map((d) => d.tool_use_id),
-        `${label}: one permission_denied line for each denial, the same calls`,
-      );
-    }
-  },
-);
 
 test(
   'M1 under the engine: a job on claude at shipped defaults settles on its own and its attempt carries what it was denied; a job asked for nothing it may not do carries no denials',
@@ -1004,7 +509,7 @@ test(
         `denied: ${views.denied.state.settled}, ${JSON.stringify(denied?.denials)}; control: ${views.control.state.settled}, ${JSON.stringify(control?.denials)}`,
       );
       assert.equal(views.denied.state.settled, 'succeeded', `the denied job finished its work: ${views.denied.phase}`);
-      assert.equal(denied?.exitCode, 0, "it ran as a job: a process of the engine's, which exited — a background session has no exit code");
+      assert.equal(denied?.exitCode, 0, "it ran as a job: a process of the engine's, which exited");
       assert.ok(
         (denied?.denials ?? []).some((d) => d.tool === 'Write'),
         'its attempt says the write outside its folder was denied',
@@ -1086,7 +591,7 @@ test(
 );
 
 test(
-  "M2, M3, M5: a job resumed from a --bg session remembers it; a job resumed from a job is charged its own spend, not its parent's again; a budget on a resume caps its own spend",
+  "M3, M5: a job resumed from a job remembers it and is charged its own spend, not its parent's again; a budget on a resume caps its own spend",
   {
     skip,
     timeout: 40 * 60_000,
@@ -1109,26 +614,6 @@ test(
       `The code word is ${word}. Remember it, and do nothing else. Then give your closing statement, with word set to ok.`;
     const ask = 'What was the code word you were given? Give it as word in your closing statement.';
     const last = (v: TaskView) => v.state.attempts.at(-1);
-
-    const bgWord = `ae${randomUUID().slice(0, 8)}`;
-    const bg = await settled(
-      await Effect.runPromise(engine.file({ ...common, config: { model: 'haiku', background: true }, brief: tell(bgWord) })),
-    );
-    assert.equal(bg.state.settled, 'succeeded', `the background session settled: ${bg.phase}`);
-    const parent = last(bg)?.nativeId ?? undefined;
-    assert.ok(parent, 'its Claude Code id is on the record');
-    const fromBg = await settled(
-      await Effect.runPromise(engine.file({ ...common, config: { model: 'haiku' }, resumeFrom: parent, brief: ask })),
-    );
-    t.diagnostic(`a job resumed from a background session: ${fromBg.state.settled}, ${JSON.stringify(last(fromBg)?.usage)}`);
-    assert.equal(fromBg.state.settled, 'succeeded', `the job resumed from it settled: ${fromBg.phase}`);
-    assert.deepEqual(last(fromBg)?.closeout, { word: bgWord }, 'and remembered the word');
-    assert.equal(last(fromBg)?.nativeId, parent, 'in the same session');
-    assert.equal(
-      last(fromBg)?.usage?.costUsd,
-      undefined,
-      'a job whose parent was a background session records no cost it cannot tell apart',
-    );
 
     const word = `ae${randomUUID().slice(0, 8)}`;
     const first = await settled(await Effect.runPromise(engine.file({ ...common, config: { model: 'haiku' }, brief: tell(word) })));
@@ -1204,211 +689,8 @@ test(
   },
 );
 
-test(
-  'M4: claude -p stopped mid-turn by SIGTERM or SIGINT can be resumed, and remembers what it was told',
-  {
-    skip,
-    timeout: 15 * 60_000,
-  },
-  async (t) => {
-    for (const signal of ['SIGTERM', 'SIGINT'] as const) {
-      const cwd = tmp(`m4-${signal}`);
-      const word = `ae${randomUUID().slice(0, 8)}`;
-      const job = started(
-        [
-          `I am testing how my build tool handles a slow step. Remember the code word ${word}. Please run exactly this Bash command, which is safe and expected: sleep 40 && echo SLEPT . Then reply DONE.`,
-          '--permission-mode',
-          'dontAsk',
-          '--allowedTools',
-          'Bash(sleep *)',
-        ],
-        cwd,
-      );
-      try {
-        assert.ok(
-          await until(() => toolCalled(job.lines()), 90_000),
-          `${signal}: it called its tool — it printed ${JSON.stringify(job.lines().map((l) => (l.type === 'assistant' ? l.message : l.type))).slice(0, 2000)}`,
-        );
-        await new Promise((r) => setTimeout(r, 3_000));
-        job.child.kill(signal);
-        const exit = await job.exit(20_000);
-        const session = sessionOf(job.lines());
-        t.diagnostic(`${signal}: exit ${exit}, result ${resultOf(job.lines())?.subtype ?? 'none'}`);
-        assert.notEqual(exit, 'running', `${signal}: it ended within twenty seconds`);
-        assert.ok(session, `${signal}: its first line named its session`);
-        const resumed = printed(
-          ['--resume', session, '--permission-mode', 'dontAsk', 'What was the code word I told you? Reply with it alone.'],
-          cwd,
-        );
-        assert.equal(resumed.exit, 0, `${signal}: the resume ran`);
-        assert.match(String(resultOf(resumed.lines)?.result ?? ''), new RegExp(word), `${signal}: and remembered the word`);
-      } finally {
-        job.child.kill('SIGKILL');
-      }
-    }
-  },
-);
-
-test(
-  'M6, for wf say: a claude -p reading stream-json on its stdin takes a second message into the turn it is working',
-  {
-    skip,
-    timeout: 10 * 60_000,
-  },
-  async (t) => {
-    const cwd = tmp('m6');
-    const word = `ae${randomUUID().slice(0, 8)}`;
-    const job = started(['--input-format', 'stream-json', '--permission-mode', 'dontAsk', '--allowedTools', 'Bash(sleep *)'], cwd, 'pipe');
-    const say = (text: string) => job.child.stdin!.write(`${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`);
-    try {
-      say(
-        'Run the Bash command `sleep 20`. When it finishes, tell me every code word I have given you so far (maybe none), and nothing else.',
-      );
-      assert.ok(await until(() => toolCalled(job.lines()), 90_000), 'it started its sleep');
-      await new Promise((r) => setTimeout(r, 2_000));
-      say(`The code word is ${word}.`);
-      await until(() => job.lines().some((l) => l.type === 'result'), 150_000);
-      job.child.stdin!.end();
-      await job.exit(30_000);
-      const results = job.lines().filter((l) => l.type === 'result');
-      t.diagnostic(`results: ${JSON.stringify(results.map((r) => ({ subtype: r.subtype, result: r.result, turns: r.num_turns })))}`);
-      assert.ok(results.length >= 1, 'it answered');
-      assert.match(
-        String(results[0].result ?? ''),
-        new RegExp(word),
-        'its first answer — the turn that was running — has the word said while it slept',
-      );
-    } finally {
-      job.child.kill('SIGKILL');
-    }
-  },
-);
-
-/** One line of stream-json input: a user message, as M6 wrote them. */
-const userLine = (text: string) => `${JSON.stringify({ type: 'user', message: { role: 'user', content: text } })}\n`;
-
-/** A `claude -p` given its brief as a prompt, run to its end: its exit, its stream, and whether its stream ended on a result line. */
-const plainJob = async (brief: string, args: string[], cwd: string, bound = 300_000) => {
-  const job = started([brief, ...args], cwd);
-  const exit = await job.exit(bound);
-  if (exit === 'running') job.child.kill('SIGKILL');
-  return { exit, lines: job.lines(), raw: job.raw() };
-};
-
 /**
- * A `claude -p --input-format stream-json` run as the worker runs it: the brief its first stdin line, stdin held open until
- * the first result, then ended. Also whether it exited on its own, stdin still open, within five seconds of its result. The
- * result is found by parsing each line and reading its `type`: Claude Code prints `type` far down a result line's object, so
- * no line starts `{"type":"result"`.
- */
-const streamedJob = async (brief: string, args: string[], cwd: string, bound = 300_000) => {
-  const job = started(['--input-format', 'stream-json', ...args], cwd, 'pipe');
-  job.child.stdin!.write(userLine(brief));
-  const resulted = await until(() => job.lines().some((l) => l.type === 'result'), bound);
-  const onItsOwn = resulted ? await job.exit(5_000) : 'running';
-  job.child.stdin!.end();
-  const exit = await job.exit(30_000);
-  if (exit === 'running') job.child.kill('SIGKILL');
-  return { exit, onItsOwn, lines: job.lines(), raw: job.raw(), resulted };
-};
-
-test(
-  'M8, M9, M10: a job reading its brief from stream-json on its stdin keeps its closeout, its spend cap and its denials as a job given the brief as a prompt does',
-  {
-    skip,
-    timeout: 20 * 60_000,
-  },
-  async (t) => {
-    const version = execFileSync('claude', ['--version'], { encoding: 'utf8' }).trim();
-    t.diagnostic(`claude --version: ${version}`);
-    const probe = tmp('m8');
-    const dir = (label: string) => {
-      const d = path.join(probe, label);
-      fs.mkdirSync(d);
-      return d;
-    };
-    const notes = (label: string) => {
-      const d = dir(label);
-      fs.writeFileSync(path.join(d, 'NOTES.txt'), NOTES);
-      return d;
-    };
-    const schema = ['--json-schema', JSON.stringify(FINISHED_CLOSEOUT)];
-    const CLOSE = 'Give your closing statement, with finished set to true. Call no tool first.';
-    const budget = ['--tools', 'Read', '--max-budget-usd', '0.01'];
-    const denied = (label: string): [string, string[]] => [
-      DENIED_BRIEF(path.join(probe, `outside-${label}`)),
-      [...schema, '--permission-mode', 'auto', '--permission-prompts', 'none'],
-    ];
-    const [m8p, m8s, m9p, m9s, m10p, m10s] = await Promise.all([
-      plainJob(CLOSE, schema, dir('m8-plain')),
-      streamedJob(CLOSE, schema, dir('m8-streamed')),
-      plainJob(LOOP_BRIEF, budget, notes('m9-plain')),
-      streamedJob(LOOP_BRIEF, budget, notes('m9-streamed')),
-      plainJob(...denied('m10-plain'), dir('m10-plain')),
-      streamedJob(...denied('m10-streamed'), dir('m10-streamed')),
-    ]);
-    const shown = (r: { exit: number | null | 'running'; lines: StreamLine[] } & { onItsOwn?: unknown }) => {
-      const result = resultOf(r.lines);
-      return `exit ${r.exit}${r.onItsOwn !== undefined ? ` (on its own, stdin open: ${r.onItsOwn})` : ''}, results ${r.lines.filter((l) => l.type === 'result').length}, subtype ${result?.subtype}, structured_output ${JSON.stringify(result?.structured_output)}, cost ${result?.total_cost_usd}, denied ${JSON.stringify(((result?.permission_denials ?? []) as Array<{ tool_name?: string }>).map((d) => d.tool_name))}`;
-    };
-    for (const [label, r] of Object.entries({ m8p, m8s, m9p, m9s, m10p, m10s })) t.diagnostic(`${label}: ${shown(r)}`);
-    const firstKey = (raw: string) =>
-      raw
-        .split('\n')
-        .find((l) => {
-          try {
-            return JSON.parse(l).type === 'result';
-          } catch {
-            return false;
-          }
-        })
-        ?.slice(0, 24);
-    t.diagnostic(`a result line starts ${firstKey(m8s.raw)} streamed, ${firstKey(m8p.raw)} prompted`);
-
-    for (const s of [m8s, m9s, m10s]) {
-      assert.ok(s.resulted, 'each streamed job printed a result line — the line the worker ends stdin at');
-      assert.equal(
-        s.onItsOwn,
-        'running',
-        'and was still running five seconds after it, its stdin open: ending stdin is what lets a job exit',
-      );
-      assert.equal(s.lines.filter((l) => l.type === 'result').length, 1, 'and one result: the brief is one turn');
-    }
-    assert.deepEqual(resultOf(m8p.lines)?.structured_output, { finished: true }, 'M8 control: a prompted job gives its structured_output');
-    assert.deepEqual(resultOf(m8s.lines)?.structured_output, { finished: true }, 'M8: a streamed job gives its structured_output');
-    assert.equal(m8s.exit, m8p.exit, 'M8: and exits as the prompted job did, once its stdin is ended');
-    assert.equal(resultOf(m9p.lines)?.subtype, 'error_max_budget_usd', 'M9 control: a prompted job stops at its cap');
-    assert.equal(resultOf(m9s.lines)?.subtype, 'error_max_budget_usd', 'M9: a streamed job stops at its cap');
-    assert.equal(m9s.exit, m9p.exit, 'M9: and exits with the code the prompted job did');
-    assert.ok(
-      Number(resultOf(m9s.lines)?.total_cost_usd) < 0.05,
-      `M9: having spent about its cap, not run past it: ${resultOf(m9s.lines)?.total_cost_usd}`,
-    );
-    for (const [label, r] of [
-      ['M10 control', m10p],
-      ['M10', m10s],
-    ] as const) {
-      const result = resultOf(r.lines);
-      const denials = (result?.permission_denials ?? []) as Array<{ tool_name?: string; tool_use_id?: string }>;
-      const events = r.lines.filter((l) => l.type === 'system' && l.subtype === 'permission_denied');
-      assert.ok(
-        denials.some((d) => d.tool_name === 'Write'),
-        `${label}: the result says the write outside was denied`,
-      );
-      assert.deepEqual(
-        events.map((e) => e.tool_use_id),
-        denials.map((d) => d.tool_use_id),
-        `${label}: a permission_denied line for each denial`,
-      );
-      assert.deepEqual(result?.structured_output, { finished: true }, `${label}: and it carried on to its closeout`);
-    }
-    assert.equal(m10s.exit, m10p.exit, 'M10: the streamed job exits as the prompted one did');
-    assert.equal(fs.existsSync(path.join(probe, 'outside-m10-streamed', 'x.txt')), false, 'M10: nothing was written outside its folder');
-  },
-);
-
-/**
- * M11 measures a job's fence against a background session's: the planner and the reviewers run `dontAsk` with no allow list of
+ * M11 measures a job's fence: the planner and the reviewers run `dontAsk` with no allow list of
  * their own, fenced by the checkout's `.claude/settings.json` alone, so a job that read no project settings would be denied every
  * command they run. A denial names a command by its first word (`denialOf`), so the two are told apart by count.
  *
@@ -1441,7 +723,7 @@ const oneAllowedCheckout = (label: string) => {
 };
 
 test(
-  "M11: a job in dontAsk honours the checkout's settings as a --bg session does — the allowed command runs, the unlisted one is denied, and the job records the denial",
+  "M11: a job in dontAsk honours the checkout's settings — the allowed command runs, the unlisted one is denied, and the job records the denial",
   {
     skip,
     timeout: 15 * 60_000,
@@ -1451,7 +733,6 @@ test(
     t.diagnostic(`claude --version: ${version}`);
     const engine = builtEngine(EngineService.layer({ root: tmp('m11-board') }));
     const job = oneAllowedCheckout('m11-job');
-    const bg = oneAllowedCheckout('m11-bg');
     t.diagnostic(`allowed: npm run ${M11_ALLOWED}; unlisted: npm run ${M11_UNLISTED}`);
     const common = {
       brief: M11_BRIEF,
@@ -1462,22 +743,12 @@ test(
     try {
       const ids = {
         job: await Effect.runPromise(engine.file({ ...common, cwd: job })),
-        bg: await Effect.runPromise(engine.file({ ...common, cwd: bg, config: { ...common.config, background: true } })),
       };
       await settleThenCheck(engine, ids, (views) => {
         const last = (k: string) => views[k]?.state.attempts.at(-1);
-        for (const k of ['job', 'bg']) {
-          t.diagnostic(
-            `${k}: ${views[k]?.state.settled}, exit ${last(k)?.exitCode}, said ${JSON.stringify(last(k)?.closeout)}, denied ${JSON.stringify(last(k)?.denials)}, wrote ${M11_WRITTEN.filter((f) => fs.existsSync(path.join(k === 'job' ? job : bg, f)))}`,
-          );
-        }
-        assert.equal(views.bg?.state.settled, 'succeeded', `the background session settled: ${views.bg?.phase}`);
-        assert.deepEqual(
-          M11_WRITTEN.filter((f) => fs.existsSync(path.join(bg, f))),
-          ['ALLOWED'],
-          'control: the background session ran the allowed command and not the unlisted one — refused, run this from a checkout Claude Code trusts',
+        t.diagnostic(
+          `job: ${views.job?.state.settled}, exit ${last('job')?.exitCode}, said ${JSON.stringify(last('job')?.closeout)}, denied ${JSON.stringify(last('job')?.denials)}, wrote ${M11_WRITTEN.filter((f) => fs.existsSync(path.join(job, f)))}`,
         );
-
         assert.equal(views.job?.state.settled, 'succeeded', `the job settled: ${views.job?.phase}`);
         assert.equal(typeof last('job')?.exitCode, 'number', 'it ran as a job: a process that exited');
         assert.deepEqual(
@@ -1492,7 +763,7 @@ test(
         );
       });
     } finally {
-      for (const dir of [job, bg]) fs.rmSync(dir, { recursive: true, force: true });
+      for (const dir of [job]) fs.rmSync(dir, { recursive: true, force: true });
     }
   },
 );

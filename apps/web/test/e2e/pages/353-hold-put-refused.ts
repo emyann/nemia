@@ -65,7 +65,7 @@ export default {
       const left = fs.existsSync(circle);
       fs.rmSync(circle, { force: true });
       fs.rmSync(hold, { force: true });
-      fed(until, HELD.blocked, 'needs-human');
+      fed(until, HELD.blocked, 'running');
       if (left) await idle(page);
     }
   },

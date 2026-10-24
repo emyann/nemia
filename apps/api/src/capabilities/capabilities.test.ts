@@ -1132,25 +1132,19 @@ test('the ask list is permissions.ask in .claude/settings.json, in its order —
 });
 
 /**
- * A checkout whose settings may ask: review in dontAsk with Bash, implement in no mode with Bash — a job, as every step is but one that
- * says `background: true` — and watch, a background session in no mode with Bash, the one of the three a call that asks is put to a person
- * on.
+ * A checkout whose settings may ask: review in dontAsk with Bash, and implement in no mode with Bash — a job on the Agent SDK, as every
+ * Claude Code step is, which asks nobody.
  */
 const askingRepo = (permissions: object) =>
   repoWith({
     '.claude/settings.json': { permissions },
     'workflows/dev/review.md': '---\nplace: git\nharness: claude\ntools: Read, Bash\npermissionMode: dontAsk\n---\nReview it.\n',
     'workflows/dev/implement.md': '---\nplace: git\nharness: claude\ntools: Read, Bash\n---\nImplement it.\n',
-    'workflows/dev/watch.md': '---\nplace: git\nharness: claude\ntools: Read, Bash\nbackground: true\n---\nWatch it.\n',
   });
 
-test('REFUSED: an ask rule that covers a read-only command makes it ask — denied on a dontAsk step and on a job, asking on a background session — and a deny over it is still the deny', async () => {
+test('REFUSED: an ask rule that covers a read-only command makes it ask — denied on a dontAsk step and on a job — and a deny over it is still the deny', async () => {
   const cat = { rule: 'Bash(cat:*)', source: SETTINGS };
-  const {
-    'dev/review': review,
-    'dev/implement': implement,
-    'dev/watch': watch,
-  } = await claudeStepsOf(askingRepo({ ask: ['Bash(cat:*)'] }));
+  const { 'dev/review': review, 'dev/implement': implement } = await claudeStepsOf(askingRepo({ ask: ['Bash(cat:*)'] }));
   const of = (step: { readOnly: Array<{ command: string }> }, command: string) => step.readOnly.find((c) => c.command === command);
   assert.deepEqual(
     of(review, 'cat'),
@@ -1160,16 +1154,11 @@ test('REFUSED: an ask rule that covers a read-only command makes it ask — deni
   assert.deepEqual(
     of(implement, 'cat'),
     { command: 'cat', measured: true, denied: cat, asks: cat },
-    'a job asks nobody: claude -p denies what would ask and carries on',
+    'a job asks nobody: its session denies what would ask and carries on',
   );
-  assert.deepEqual([review.allowed.askDenier, implement.allowed.askDenier, watch.allowed.askDenier], ['dontAsk', 'a job', null]);
-  assert.deepEqual(
-    of(watch, 'cat'),
-    { command: 'cat', measured: true, denied: null, asks: cat },
-    'a background session in no mode asks a person: there cat asks, and is not denied',
-  );
+  assert.deepEqual([review.allowed.askDenier, implement.allowed.askDenier], ['dontAsk', 'a job']);
   assert.deepEqual(review.asked, [cat]);
-  for (const step of [review, implement, watch]) {
+  for (const step of [review, implement]) {
     assert.deepEqual(
       step.readOnly.filter((c: { command: string }) => c.command !== 'cat'),
       readOnlyAll().filter((c) => c.command !== 'cat'),
@@ -1203,21 +1192,18 @@ test('REFUSED: an ask rule that covers a read-only command makes it ask — deni
   );
 });
 
-test('what asks is denied without a prompt in dontAsk, and on a job in each mode a job was measured in; it prompts on a background session in another mode, and a job in bypassPermissions is claimed neither way', () => {
-  const cases: Array<[harness: string, permissionMode: string | null, background: boolean | null, denier: string | null]> = [
-    ['claude', 'dontAsk', true, 'dontAsk'],
-    ['claude', 'dontAsk', null, 'dontAsk'],
-    ['claude', null, null, 'a job'],
-    ['claude', 'auto', false, 'a job'],
-    ['claude', 'default', null, 'a job'],
-    ['claude', 'acceptEdits', null, 'a job'],
-    ['claude-detached', 'auto', null, 'a job'],
-    ['claude', 'auto', true, null],
-    ['claude', null, true, null],
-    ['claude', 'bypassPermissions', null, null],
+test('what asks is denied without a prompt in dontAsk, and on a job — every claude step — in each mode a job was measured in; a job in bypassPermissions is claimed neither way, and a harness no longer run is no job', () => {
+  const cases: Array<[harness: string, permissionMode: string | null, denier: string | null]> = [
+    ['claude', 'dontAsk', 'dontAsk'],
+    ['claude', null, 'a job'],
+    ['claude', 'auto', 'a job'],
+    ['claude', 'default', 'a job'],
+    ['claude', 'acceptEdits', 'a job'],
+    ['claude', 'bypassPermissions', null],
+    ['claude-detached', 'auto', null],
   ];
-  for (const [harness, permissionMode, background, denier] of cases) {
-    assert.equal(askDenierOf(harness, { permissionMode, background }), denier, `${harness} ${permissionMode} background: ${background}`);
+  for (const [harness, permissionMode, denier] of cases) {
+    assert.equal(askDenierOf(harness, { permissionMode }), denier, `${harness} ${permissionMode}`);
   }
 });
 

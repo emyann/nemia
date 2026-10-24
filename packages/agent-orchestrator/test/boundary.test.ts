@@ -438,7 +438,7 @@ const isBuiltin = (m: string): boolean => m.startsWith('node:') || builtinModule
 const PLACE_REACHES = ['src/place/place.ts', 'src/place/place.store.ts'];
 
 /** The one file of `src` that imports a place's code, and gives it to whoever composes a program. */
-const PLACE_DOOR = 'src/place/shipped.store.ts';
+const PLACE_DOOR = 'src/place/builtin.store.ts';
 
 /** The one place the door gives: the shipped program is handed no other, and no test place. */
 const DOOR_GIVES = 'place/git/';

@@ -150,6 +150,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     assert.equal(path.dirname(proposedFile(ROOT, 'nemia')), path.dirname(confirmedFile(ROOT, 'nemia')));
     const list = policyListOf(ROOT, 'nemia');
     assert.equal(list.isDefault, true);
+    assert.equal(list.builtin.id, 'default', 'the builtin rule is offered to be confirmed again');
     assert.deepEqual(
       list.rules.map((r) => r.id),
       ['default'],

@@ -345,11 +345,11 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  *   app or a repository of the factory's (409, `Conflict`, in `hireRefusalOf`'s words). Its 200 is `{ file, replaced }`, the agent the
  *   hire replaced or null.
  * - `POST /api/agents/yours/copy` — an agent file copied into your library, as `nemia agents copy` copies it (`copyAgent`), its body
- *   `{ file, as?, keep? }`, `keep` a list as `--keep` given many times: the agent, its schema and every skill it gives but the place skills
- *   Nemia ships, each part your library holds as it is reused, and the record of where it came from. Refused in the package's words, before
- *   anything is written: a file that is not there (404, `Missing`), a part your library holds otherwise (409, `Conflict`, naming each and
- *   its fix, `as` or `keep`), and a file the store would not run, a key another harness's agent file has among them (422, `Invalid`). A
- *   key it does not take is a 400. Its 200 is `{ name, copied, reused, record }`.
+ *   `{ file, as?, keep? }`, `keep` a list as `--keep` given many times: the agent, its schema and every skill it gives but the builtin
+ *   place skills, each part your library holds as it is reused, and the record of where it came from. Refused in the package's words,
+ *   before anything is written: a file that is not there (404, `Missing`), a part your library holds otherwise (409, `Conflict`, naming
+ *   each and its fix, `as` or `keep`), and a file the store would not run, a key another harness's agent file has among them (422,
+ *   `Invalid`). A key it does not take is a 400. Its 200 is `{ name, copied, reused, record }`.
  * - `DELETE /api/factories/:factory/hires/:step` — a step's hire taken back, as `nemia factory fire` takes it (`fireAgent`); it reads no
  *   body. A step the factory hires no one into is a 404 (`Missing`). Its 200 is `{ file, fired }`.
  */

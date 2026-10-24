@@ -21,7 +21,7 @@ import type { RunDecision } from './decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();

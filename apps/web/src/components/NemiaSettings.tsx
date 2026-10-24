@@ -354,7 +354,7 @@ function ReachPart({ reach, bridge }: { reach: readonly string[]; bridge: Bridge
   );
 }
 
-/** What her ended sessions cost, once one is filed, and the allow rules a person gave her at a prompt, beyond what ships. */
+/** What her ended sessions cost, once one is filed, and the allow rules a person gave her at a prompt, beyond what is built in. */
 function SpendPart({ nemia }: { nemia: NemiaLevel }) {
   if (nemia.spend === null && !nemia.allows.length) return null;
   return (
@@ -366,7 +366,9 @@ function SpendPart({ nemia }: { nemia: NemiaLevel }) {
       )}
       {nemia.allows.length > 0 && (
         <div data-nemia-allows className="flex flex-col gap-1">
-          <p className="text-body-small text-muted-foreground">Allowed at a prompt, beyond what ships (her folder's local settings):</p>
+          <p className="text-body-small text-muted-foreground">
+            Allowed at a prompt, beyond what is built in (her folder's local settings):
+          </p>
           <span className="flex flex-wrap gap-1">
             {nemia.allows.map((rule) => (
               <code key={rule} className="rounded bg-muted px-1.5 py-0.5 font-mono text-body-small">

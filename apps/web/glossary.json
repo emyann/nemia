@@ -15,6 +15,21 @@
       }
     },
     {
+      "term": "Builtin",
+      "meaning": "what comes with Nemia, as the board says it: the place `builtin` of a skill, drawn 'Built into Nemia', the builtin servers above a factory's list and an agent's builtin auto rule. The former address `/agents/skills/shipped/<skill>` opens the builtin skill through the api's redirect.",
+      "type": "SkillSource",
+      "retired": [
+        {
+          "spelling": "shipped",
+          "card": "decision 13b: 'builtin' for what comes with the product"
+        },
+        {
+          "spelling": "ships",
+          "card": "decision 13b: 'builtin' for what comes with the product"
+        }
+      ]
+    },
+    {
       "term": "Landed",
       "meaning": "a run's result is on its base, as the board says it: a hold or a start that waits until a run lands, a context run not landed, the decision's `land it`.",
       "retired": [

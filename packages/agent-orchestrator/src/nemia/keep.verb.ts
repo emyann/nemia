@@ -3,7 +3,7 @@
  * what is owed done (`nemiaDue`) — her task filed long-lived while any factory is above `manual`, her subscription put once it is open with
  * her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so; and while she is kept, the
  * person's custom words said to her open task (`sayCustom`) once they are not those she was last filed or told with (`customChanged`),
- * which are recorded, and her instruction written, only after she was told: a change to her shipped instruction alone tells her nothing;
+ * which are recorded, and her instruction written, only after she was told: a change to her builtin instruction alone tells her nothing;
  * and while she is kept and her session live, the person's chat words said to her (`sayOutbox`), the questions her session holds open
  * written down (`recordAsks`) and the person's answers to them carried to her (`answersDue`). Level-triggered: it carries nothing between
  * beats, so a restart owes what the files and the engine say. A task stopped from outside is never filed again.

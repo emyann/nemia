@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Pruning } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
 import { engine, prune, prunedKept, prunedWords, runStore, type RunSummary } from 'agent-orchestrator';

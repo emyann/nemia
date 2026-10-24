@@ -11,7 +11,7 @@ import { customInstructionsRefusal } from './agents.ts';
 import { agentsFor, customInstructionsFile, notAFileRefusal, readCustomInstructions } from './read.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 
-/** The store's own agent, Nemia, whom no place names: she ships in this package, and her custom instruction is the person's. */
+/** The store's own agent, Nemia, whom no place names: she is built into this package, and her custom instruction is the person's. */
 const STORE_AGENT = 'nemia';
 
 /** Whether `name` is the store's own agent (`STORE_AGENT`), whose open session is told her custom instructions, never frozen at a start. */

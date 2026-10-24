@@ -38,7 +38,7 @@ const {
   startRun,
   runWith: runEngine,
   gitPlaceLayer,
-  shippedGitPlace,
+  builtinGitPlace,
 } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
@@ -243,7 +243,7 @@ test("a file `artifacts` names from the workspace root is collected into the ste
   );
   assert.equal(fs.readFileSync(path.join(files, 'RESPONSE.md'), 'utf8'), '# response, amended\n');
   assert.equal(fs.readFileSync(path.join(files, 'trace.zip'), 'utf8'), 'zip', 'an absolute path in the directory, where it is');
-  assert.deepEqual(missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(named)), []);
+  assert.deepEqual(missingArtifacts(builtinGitPlace, readRun(run.id), 'implement', declaring(named)), []);
   assert.deepEqual(
     artifactFiles(run, 'implement')
       .map((f) => path.relative(files, f.path))
@@ -362,7 +362,7 @@ test('REFUSED at shipped defaults: a copy is never written through a link a step
     'handed off, the files are on the branch',
   );
   assert.deepEqual(
-    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(named)),
+    missingArtifacts(builtinGitPlace, readRun(run.id), 'implement', declaring(named)),
     [
       { path: 'shots/shot.png', why: 'not collected' },
       { path: 'report.md', why: 'not collected' },
@@ -396,7 +396,7 @@ test('REFUSED before, now read as it was: a run from before collection — its s
   );
   assert.ok(fs.existsSync(path.join(run.repo, 'docs', 'RESPONSE.md')), 'the worktree is still there');
   assert.deepEqual(
-    missingArtifacts(shippedGitPlace, readRun(run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
+    missingArtifacts(builtinGitPlace, readRun(run.id), 'implement', declaring(['docs/RESPONSE.md', '.e2e/shot.png'])),
     [{ path: '.e2e/shot.png', why: 'not collected' }],
     'RESPONSE.md is on the branch; an ignored file is on none',
   );

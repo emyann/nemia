@@ -200,7 +200,7 @@ export type FactoryServer = Holds<Same<Board.FactoryServer, ServerOf>>;
 export type FactoryServers = Holds<
   Same<Board.FactoryServers, Omit<servers.FactoryServersRead, 'servers'> & { servers: readonly ServerOf[] }>
 >;
-export type ShippedServer = Holds<Same<Board.ShippedServer, servers.FactoryServersRead['shipped'][number]>>;
+export type BuiltinServer = Holds<Same<Board.BuiltinServer, servers.FactoryServersRead['builtin'][number]>>;
 
 export type RunGraph = Holds<Same<Board.RunGraph, runs.RunPage['graph']>>;
 export type GraphEdge = Holds<Same<Board.GraphEdge, runs.RunPage['graph']['edges'][number]>>;

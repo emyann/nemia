@@ -13,7 +13,7 @@ import { givenSkillOf } from '../keys/index.ts';
 import { yourSkillsDir, yoursOf } from '../yours/yours.ts';
 import { agentDraftOf, agentNameRefusal, renderAgent, type AgentDraft } from '../agents/agents.ts';
 import { copyRecordFile, readCopyRecord, sourceSkills, sourceVersion, type CopyRecord } from '../agents/read.store.ts';
-import { isShippedPlace, skillVersion } from '../skills/read.store.ts';
+import { isBuiltinPlace, skillVersion } from '../skills/read.store.ts';
 
 /**
  * One part of a copy: what it is called in a refusal and `--keep`, whether the library holds a file at its place, whether it holds it as
@@ -67,7 +67,7 @@ export function readSource(file: string, as: string | undefined): Source {
 }
 
 /**
- * The skills the agent of `source` gives, by name and the folder each is found in; a place skill Nemia ships is left out, and so is one
+ * The skills the agent of `source` gives, by name and the folder each is found in; a builtin place skill is left out, and so is one
  * named with its folder (`givenSkillOf`), a repository's own, which the agent names and the library never holds.
  */
 export function skillsOf(source: Source, home: string): SourceSkill[] {
@@ -84,7 +84,7 @@ export function skillsOf(source: Source, home: string): SourceSkill[] {
         message: `${source.file} gives the skill ${name}, found in none of ${found.looked.join(', ')}: put it beside the agent, in <folder>/skills/${name}, and copy again.`,
       });
     if (typeof dir !== 'string') throw new Invalid({ message: `${dir.message} ${deleteFix(source.file)}` });
-    return isShippedPlace(dir) ? [] : [{ name, dir }];
+    return isBuiltinPlace(dir) ? [] : [{ name, dir }];
   });
 }
 

@@ -13,7 +13,7 @@ runs it.
 condition in the workflow.
 
 **It is reached through** the folder itself. A repository keeps its workflows checked in, one folder each under `workflows/` at its
-root, as it keeps its CI; your own sit under `~/.agent-workflows/workflows/` (`WF_ROOT`). Nemia ships no workflow: a factory's are
+root, as it keeps its CI; your own sit under `~/.agent-workflows/workflows/` (`WF_ROOT`). Nemia has no builtin workflow: a factory's are
 its own, written by the people who run it.
 
 ## A step
@@ -141,7 +141,7 @@ cost is what the harness priced each attempt at, read by the runtime once the at
 This repository's own team is a workflow, `workflows/build/`: design, then implement, then review looping back on implement, then
 land. Its steps are `workflows/build/design.md` (gated), `workflows/build/implement.md` (with a check that runs the whole suite),
 `workflows/build/review.md` (`loop: implement`, three rounds) and `workflows/build/land.md` (gated, in the checkout). It is this
-repository's, not something Nemia ships.
+repository's, not something built into Nemia.
 
 ## Sources
 

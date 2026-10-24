@@ -298,7 +298,7 @@ function refRefusals(folder: ReadFolder, held: Held): Refusal[] {
 /**
  * Every problem of the template `folder`, by file in order: the layout's and each document's (`layout.ts`), a hire, skill, sibling step,
  * parameter or file named that the folder lacks, a step's words, and each harness's block against the runtime's knobs for it.
- * `placeSkills`: the place skills nemia ships, each a skill the folder need not carry. None for a template that passes.
+ * `placeSkills`: nemia's builtin place skills, each a skill the folder need not carry. None for a template that passes.
  */
 export function checkTemplate(folder: ReadFolder, placeSkills: readonly string[]): Refusal[] {
   const held = heldOf(folder, placeSkills);

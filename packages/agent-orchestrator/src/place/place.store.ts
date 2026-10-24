@@ -58,7 +58,7 @@ function emptied(pgid: number, graceMs: number): boolean {
 
 /**
  * Stop what is left of the process group `pgid` leads: SIGTERM, on which git takes its locks away; then, when a process of it is still
- * there after `graceMs` (`STOP_GRACE_MS` shipped), SIGKILL, and wait as long again for it to be gone. Returns whether it had to kill.
+ * there after `graceMs` (`STOP_GRACE_MS` by default), SIGKILL, and wait as long again for it to be gone. Returns whether it had to kill.
  * Never throws.
  */
 export function stopGroup(pgid: number, graceMs: number = STOP_GRACE_MS): boolean {
@@ -105,7 +105,7 @@ export const unreadNow = (verb: PlaceVerb, said: string): { readonly unread: Unr
 /**
  * What an ask may say beside its request, in milliseconds: another deadline than the verb's own (`PLACE_DEADLINE_MS`), and another grace
  * than `STOP_GRACE_MS` for what a command stopped at it started to end on SIGTERM before it is killed (`graceMs`), which a test shortens
- * rather than wait the shipped one out.
+ * rather than wait the default one out.
  */
 export type AskOptions = { readonly deadlineMs?: number; readonly graceMs?: number };
 
@@ -202,7 +202,7 @@ const emptiedLater = (pgid: number, graceMs: number): Effect.Effect<boolean> =>
 
 /**
  * A child that has not ended stopped, with what it started: the group it leads sent SIGTERM, then SIGKILL when a process of it outlives
- * `graceMs` (`STOP_GRACE_MS` shipped), and its pipes closed. Answers whether it had to kill.
+ * `graceMs` (`STOP_GRACE_MS` by default), and its pipes closed. Answers whether it had to kill.
  */
 export const stopChild = (child: ChildProcessWithoutNullStreams, graceMs: number = STOP_GRACE_MS): Effect.Effect<boolean> =>
   Effect.gen(function* () {

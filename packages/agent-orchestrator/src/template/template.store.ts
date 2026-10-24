@@ -17,7 +17,7 @@ import { placesOf } from '../folder/lookup.store.ts';
 import { readKeys } from '../former/former.ts';
 import { givenSkillOf, SKILL_NAME } from '../keys/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { copySkillFiles, entriesOf, isShippedPlace, lookupRoots, PLACE_SKILLS, skillsFor } from '../skills/read.store.ts';
+import { copySkillFiles, entriesOf, isBuiltinPlace, lookupRoots, PLACE_SKILLS, skillsFor } from '../skills/read.store.ts';
 import { splitFrontmatter } from '../step/step.ts';
 import { ARCHIVE_LIMIT, contentDigest, packArchive, pathRefusals, unpackArchive, type TreeFile } from '../archive/archive.ts';
 import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source, type StepSource } from './index.ts';
@@ -125,7 +125,7 @@ export function readTemplate(source: string, name = path.basename(path.resolve(s
   return { name, files, digest: long.length ? undefined : contentDigest(name, files), problems };
 }
 
-/** The names of the place skills nemia ships, each present to a template that names it. */
+/** The names of nemia's builtin place skills, each present to a template that names it. */
 const placeSkillNames = (): string[] => entriesOf(PLACE_SKILLS).filter((name) => fs.existsSync(path.join(PLACE_SKILLS, name, 'SKILL.md')));
 
 /** A problem as a person reads it: `<file>:<line>:<col>: <words>`, or `<file>: <words>` where it has no line. */
@@ -239,7 +239,7 @@ function lookups(root: string, from: string): Pick<Source, 'agent' | 'skill'> {
       if (dir === undefined) return undefined;
       if (dir instanceof Error) return { refused: dir.message };
       if (givenSkillOf(name)?.folder !== undefined) return { named: dir };
-      return isShippedPlace(dir) ? 'place' : { dir };
+      return isBuiltinPlace(dir) ? 'place' : { dir };
     },
   };
 }

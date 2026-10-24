@@ -140,7 +140,8 @@ const readEvery = (
  * the first Task it reads is the transcript's), subscribed to where the agent streams (`streams`) and read every `readEveryMs`
  * otherwise (`readEvery`). Each round reads the Task whole, but the first, then subscribes; a round ends once the turn is over or the
  * agent no longer has the Task, and is dropped otherwise. Drops are counted in a row (`drops`): a subscription that gives something
- * new starts the count again, the Task read after a drop does not. After `RESUBSCRIBES` in a row, the Task is read every
+ * new starts the count again, the Task read after a drop does not. They are counted by hand, since `Stream.retry` starts its
+ * schedule again at an attempt's first output, an empty array included. After `RESUBSCRIBES` in a row, the Task is read every
  * `readEveryMs` from where the follow stands.
  */
 const followTask = (d: FollowDeps, e: Entry, taskId: string, given: boolean, streams: boolean): Stream.Stream<Followed, RunnerError> => {

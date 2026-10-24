@@ -76,11 +76,13 @@ the orchestrator's code holds a fact today, it is named beside it.
 - **A session under `~/.claude/` cannot write there in any mode**: put a probe store elsewhere.
 - **A path a fenced step's brief names is inside its own folder**; a rule offered for the next run names no path of this one (in the
   orchestrator today: `givenPlan`, `folderPlace.make`, `allowRuleOf`, `disallowedBy`).
-- **A job runs with background tasks off and a call's default timeout at 10 minutes** (`CLAUDE_JOB_ENV`, `src/harness/claude/code.ts`),
+- **A job runs with background tasks off and a call's default timeout at 10 minutes** (`CLAUDE_JOB_ENV`, `src/harness/claude/job-env.ts`),
   a task's `env` laid under it and the telemetry, never over (`test/telemetry.test.ts`):
   measured on 2.1.289, `run_in_background` is ignored and the call runs in the foreground, a bare 130 s call completes (cut at 120 s
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
-- **A job (`claude -p`) exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`**;
+- **A job (`claude -p`) exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`** — an
+  environment `attachedOptions` composes onto `Options.env` inside the job's bin, since the SDK replaces the child's environment
+  entirely (`sdk.d.ts:1694`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's;
   a `--bg` session runs in a pre-spawned process, ignores the asker's environment and `TRACEPARENT`, and exports only what `--settings`'
   `env` says; a job's Bash tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06; `claudeTelemetryEnv`, `telemeteredFlags`).
   Whether a `--bg` session's Bash tool inherits that `env`'s telemetry is unmeasured: its `env.PATH` reaches it, so a `claude -p` run
@@ -115,8 +117,38 @@ the orchestrator's code holds a fact today, it is named beside it.
   argv now read it through a `sdkArgValue` that takes either form and refuses an absent flag (`test/sdk-argv.ts`).
 - **Fork subagents are on by default in an SDK session from 0.3.302, as in the terminal**, so a step's `Agent` call forks the parent's
   context rather than starting fresh, and costs tokens the run's budgets were measured without. The factory keeps the SDK's default, by
-  the operator's decision at this bump; `CLAUDE_CODE_FORK_SUBAGENT=0` in `CLAUDE_JOB_ENV` (`harness/claude/code.ts`) turns it off, and
+  the operator's decision at this bump; `CLAUDE_CODE_FORK_SUBAGENT=0` in `CLAUDE_JOB_ENV` (`harness/claude/job-env.ts`) turns it off, and
   no test here watches it — the first evidence is the spend after the daemon restarts.
+
+- **A dontAsk session allowed `cat`, `head`, `tail`, `wc`, `cut` or `ls` is refused it on a path outside its working folders, by
+  Claude Code's own check before any rule** (2.1.308, 2026-10-22: `/etc/…`, `../…`, `~`, `$HOME`, `<`, a link out), and not on the paths
+  `wc --files0-from=<list>` reads (`CLAUDE_KEEPS_INSIDE` in `agent-orchestrator/test/agent-fences.test.ts`).
+- **Under a mode that refuses what no allow rule reaches, only `Read`, `Grep`, `Glob` and `Skill` run with no rule**
+  (`CLAUDE_UNFENCED`, `CLAUDE_REFUSING_MODES`): `Read` was measured (2.1.289, the added-folder line above); the other three are read
+  off the shipped team, whose `dontAsk` steps grep the checkout and load their skills with no allow naming either, while the only calls
+  their feeds show refused are the ones no rule named. `Bash` is not among them: a built-in read-only set runs unruled, which does not
+  make the tool unruled — a `node -e` was refused.
+- **`acceptEdits` refuses by its rules too, granting only a write in the session's directory** (`CLAUDE_GRANTED`): a job given
+  `--permission-mode acceptEdits` wrote a file with no allow rule, where the same job in `dontAsk` was denied it
+  (`docs/spike-2026-09-25-agents-skills.md` at the repository's root, F10, rows m2 and m3). `Write` is what was measured; the rest of
+  the Edit tool's family rides on it, since a write is matched against `Edit` rules alone; `npm test` is not approved
+  (`agent-orchestrator/README.md`, *Permission modes, the hard-won part*).
+- **A checkout's own `.claude/settings.json` allow rules reach a job's session in a worktree of it**: 89 `WebFetch` calls of `dontAsk`
+  steps succeeded on the checkout's `WebFetch` allow from 2026-10-09, while the same agents were refused every fetch in a repository
+  whose settings allow none. So what a step may call depends on the repository the run lands in (`projectAllows`,
+  `src/harness/settings.ts`; `unallowedRefusal` in the orchestrator counts them).
+- **A `PreToolUse` hook is handed a Bash call's command exactly as typed, and its `deny` stands in a `dontAsk` job** (2.1.308,
+  2026-10-22): a `--bg` session in `dontAsk` typed `git … diff --out''put=<file> HEAD`, `Bash(git:*)` allowed in `--settings`; the
+  hook's `tool_input.command` held the two quotes as typed, its deny refused the call, and no file was written. So a hook can read a
+  line as the shell would; a permission rule only matches the text.
+- **A detached session's first stdout line names its id** (2026-10-06): `codex exec --json` (0.154.0) prints `thread.started` first;
+  `claude -p` (2.1.291) prints `system`/`init` first under `--output-format stream-json --verbose`, and one `result` line under
+  `--output-format json`; a job's bin prints the SDK's messages in order, whose first is that same `system`/`init` (`readers`,
+  `bin/ae-worker.ts`).
+- **Words pushed into a long-lived attached session while the model writes run as a turn of their own; words pushed while a tool call
+  runs are folded into the turn in flight and answered by its one result** (SDK 0.3.270, CLI 2.1.301, 2026-10-16): so a turn is
+  answered by the `user_message_uuids` on its result (`answered`, `harness/claude/attached-session.ts`), never by counting;
+  `queued_turn_count` was 0 on a result a second turn followed, so nothing reads it.
 
 ## The MCP sign-in affordances
 

@@ -142,7 +142,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
         <Facts
           rows={[
             ...(tries.length > 1 ? ([['try', tryLabel(current, tries)]] satisfies Array<[string, string]>) : []),
-            ['attempts', attempts.count],
+            ['sessions', attempts.count],
             ['latest began', latest && when(latest.startedAt)],
             [
               'latest ended',

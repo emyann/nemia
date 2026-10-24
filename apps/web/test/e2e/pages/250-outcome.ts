@@ -222,7 +222,7 @@ function writeRun(root: string): string[] {
         createdAt: ago(10),
         steps: {
           ...Object.fromEntries(steps.map((step) => [step.name, { taskId: `${id}-${step.name}` }])),
-          quiet: { taskId: `${id}-quiet`, tries: [{ taskId: `${id}-quiet-first`, then: 'signoff' }] },
+          quiet: { taskId: `${id}-quiet`, tries: [{ taskId: `${id}-quiet-first`, cause: 'signoff' }] },
         },
       },
       null,

@@ -195,14 +195,14 @@ export const StepAttemptsSchema = Schema.Struct({
 }) satisfies Schema.Schema<StepAttempts>;
 
 /**
- * Mirrors `StepTry` in apps/api/src/detail/tries.ts: one try of a step, earliest first. `then` is what replaced it, null on the current
+ * Mirrors `StepTry` in apps/api/src/detail/tries.ts: one try of a step, earliest first. `cause` is what replaced it, null on the current
  * try, which `current` marks; `note` how it was reached, in the CLI `ls`'s words. `status` is the step's word on the current try, and
  * the engine's word for the task on an earlier one.
  */
 export type StepTry = {
   try: number;
   round: number;
-  then: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | 'merge' | 'signoff' | 'back' | null;
+  cause: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | 'merge' | 'signoff' | 'back' | null;
   current: boolean;
   taskId: string | null;
   note: string | null;
@@ -220,7 +220,7 @@ export type StepTry = {
 export const StepTrySchema = Schema.Struct({
   try: Schema.Number,
   round: Schema.Number,
-  then: Schema.NullOr(Schema.Literals(['retries', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'signoff', 'back'])),
+  cause: Schema.NullOr(Schema.Literals(['retries', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'signoff', 'back'])),
   current: Schema.Boolean,
   taskId: Schema.NullOr(Schema.String),
   note: Schema.NullOr(Schema.String),

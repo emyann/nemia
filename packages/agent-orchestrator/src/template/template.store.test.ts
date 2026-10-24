@@ -24,6 +24,7 @@ process.env.WF_ROOT = ROOT;
 const { checkTemplateAt, exportTemplate, packTemplate, problemLine, readTemplate, unpackTemplate } = await import('./template.store.ts');
 const { addFactory, attachWorkflow, hireAgent } = await import('../runner.ts');
 const { writeRules } = await import('../rules/rules.store.ts');
+const { setRevisions } = await import('../factory/factory.store.ts');
 const { main } = await import('../cli/main.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
@@ -226,11 +227,11 @@ test("a workflow's README and its files that are no .md or .yaml are carried wit
 test('a key a template has no place for is refused by name, and nothing is written', () => {
   const repo = repoWithTeam();
   const review = path.join(repo, 'workflows', 'dev', 'review.md');
-  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 20', 'budget: 20\nbackground: true\nslot: night'));
+  fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 20', 'budget: 20\nremote: true\nslot: night'));
   const dir = target();
   assert.throws(
     () => exportTemplate({ dir, from: repo }),
-    refusedWith('Invalid', 'review.md: `background:` has no place', 'review.md: `slot:` has no place'),
+    refusedWith('Invalid', 'review.md: `remote:` has no place', 'review.md: `slot:` has no place'),
   );
   assert.equal(fs.existsSync(dir), false);
   assert.deepEqual(fs.readdirSync(path.dirname(dir)), [], 'no staging folder is left beside it');
@@ -274,14 +275,15 @@ function factoryOnTeam(name: string): string {
   return repo;
 }
 
-test("with --factory, the draft holds that factory's attached workflows only, its hires and its instruction", () => {
+test("with --factory, the draft holds that factory's attached workflows only, its hires, its revisions policy and its instruction", () => {
   const repo = factoryOnTeam('crew');
+  setRevisions({ factory: 'crew', revisions: 'follow' });
   fs.writeFileSync(path.join(repo, 'NEMIA.md'), 'Run the crew.\n');
   const dir = target();
   const { from } = exportTemplate({ dir, from: repo, factory: asked('crew') });
   assert.deepEqual(checkTemplateAt(dir), []);
   assert.deepEqual(fs.readdirSync(path.join(dir, 'workflows')), ['solo']);
-  assert.deepEqual(readBack(dir, 'nemia.yaml').spec, { version: '0.1.0', hires: { 'solo/work': 'implementer' } });
+  assert.deepEqual(readBack(dir, 'nemia.yaml').spec, { version: '0.1.0', hires: { 'solo/work': 'implementer' }, revisions: 'follow' });
   assert.equal(fs.readFileSync(path.join(dir, 'NEMIA.md'), 'utf8'), 'Run the crew.\n');
   const said = new Map(from.map(({ part, from: at }) => [part, at]));
   assert.equal(said.get('NEMIA.md'), path.join(repo, 'NEMIA.md'));

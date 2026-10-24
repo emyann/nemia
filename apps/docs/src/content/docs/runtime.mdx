@@ -35,8 +35,8 @@ to continue. In a workflow, the orchestrator does that.
 
 ## A harness
 
-A harness is the program a session runs in. The runtime has four of its own, chosen per task: `claude` (Claude Code), `codex`,
-`claude-detached`, and `command`, a plain process. A remote agent at an address is a fifth kind. Every one of them is reached the same
+A harness is the program a session runs in. The runtime has three of its own, chosen per task: `claude` (Claude Code, every
+session on the Agent SDK), `codex`, and `command`, a plain process. A remote agent at an address is a fourth kind. Every one of them is reached the same
 way, over A2A (see [A2A](/a2a/)). A harness of your own is declared with a `HarnessSpec`.
 
 ## The engine
@@ -50,8 +50,8 @@ The two are joined by a name the runtime chooses, `ae/<task>/<attempt>`, which e
 engine reads both, asks one pure function, `decide` (`packages/agent-runtime/src/core/domain.ts`), for the one thing to do, and does
 it. Nothing else is decided anywhere: `decide` is the runtime's whole judgement.
 
-**The engine never holds a session.** A job runs in a process the engine detaches, and a long-lived session is handed to the harness.
-Either way the session outlives the engine, so the engine can be stopped, upgraded or restarted in the middle of a three-hour session
+**The engine never holds a session.** A job runs in a process the engine detaches, and a long-lived session is held by the daemon's
+holder, which a later holder takes up by resume. Either way the session outlives the engine, so the engine can be stopped, upgraded or restarted in the middle of a three-hour session
 and pick it up on its next pass.
 
 **It is level-triggered.** A pass reads the world, decides and acts, and carries nothing to the next pass. `tick` is one pass, and
@@ -62,8 +62,8 @@ and pick it up on its next pass.
 
 A task is a **job** by default: its session runs to its end, and the task settles on that end. A workflow's steps are jobs.
 
-A task filed with `restartPolicy` set to `Always`, and `background` in its `config`, is a **long-lived session**: it stays open between
-turns, and only a stop ends it. Between turns it is idle (`idleOf`): nothing is done and nobody is asked anything. `say` gives it its
+A task filed with `restartPolicy` set to `Always` is a **long-lived session**: it stays open between turns, and only a stop ends it.
+On Claude Code it runs attached, in the process that holds the runtime's sessions (the daemon); with none, it cannot start. Between turns it is idle (`idleOf`): nothing is done and nobody is asked anything. `say` gives it its
 next words. If it ends when no one asked it to stop, it is started again on the same conversation, after a back-off of 10 seconds,
 doubled for each end in a row, at most 300 seconds. [Nemia](/nemia/) runs this way.
 

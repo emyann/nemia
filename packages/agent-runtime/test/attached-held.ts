@@ -33,7 +33,7 @@ export const place = (plan: object, config: SpawnRequest['config'] = {}) => {
 };
 
 /**
- * The same, long-lived: the request carries `restartPolicy: 'Always'` with `background: true`, which is what makes it run attached, and
+ * The same, long-lived: the request carries `restartPolicy: 'Always'`, which is what makes it run attached, and
  * its stand-in works every turn its input brings (`turns: 'many'`). `config` is laid over the request's own.
  */
 export const kept = (plan: object, config: Record<string, unknown> = {}) => {
@@ -44,7 +44,7 @@ export const kept = (plan: object, config: Record<string, unknown> = {}) => {
     request: {
       ...request,
       restartPolicy: 'Always' as const,
-      config: { background: true, ...config, ...request.config },
+      config: { ...config, ...request.config },
     } satisfies SpawnRequest,
   };
 };

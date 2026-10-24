@@ -21,7 +21,7 @@ test('filedAllows', async (t) => {
     "a step in the checkout is filed with a read of its run's artifacts after its own rules, on the default harness and on each one fenced by permission rules",
     () => {
       assert.deepEqual(filedAllows({ workspace: 'main' }, ARTIFACTS), [READ]);
-      assert.deepEqual(filedAllows({ workspace: 'main', harness: 'claude-detached', allowedTools: ['Bash(git status)'] }, ARTIFACTS), [
+      assert.deepEqual(filedAllows({ workspace: 'main', harness: 'claude', allowedTools: ['Bash(git status)'] }, ARTIFACTS), [
         'Bash(git status)',
         READ,
       ]);

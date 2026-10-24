@@ -369,7 +369,7 @@
     {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
-        "complexity": ["error", { "max": 22 }]
+        "complexity": ["error", { "max": 21 }]
       }
     },
     {
@@ -758,21 +758,15 @@
     {
       "files": ["packages/agent-runtime/src/service/harness-refusal.ts"],
       "rules": {
-        "complexity": ["error", { "max": 25 }],
-        "sonarjs/cognitive-complexity": ["error", 27]
+        "complexity": ["error", { "max": 22 }],
+        "sonarjs/cognitive-complexity": ["error", 22]
       }
     },
     {
       "files": ["packages/agent-runtime/src/harness/args.ts"],
       "rules": {
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 27]
-      }
-    },
-    {
-      "files": ["packages/agent-runtime/src/harness/claude/code.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 23 }]
+        "complexity": ["error", { "max": 28 }],
+        "sonarjs/cognitive-complexity": ["error", 25]
       }
     },
     {
@@ -799,13 +793,6 @@
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 150, "skipBlankLines": true, "skipComments": true }]
-      }
-    },
-    {
-      "files": ["packages/agent-runtime/src/service/say.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 25 }],
-        "sonarjs/cognitive-complexity": ["error", 21]
       }
     }
   ],

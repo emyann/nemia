@@ -324,7 +324,7 @@ const board = () => {
           said: said.get(id) ?? [],
           /**
            * An attempt given a reason ended `failed` with it, as the engine records a session that went quiet unsigned, or broke. What it
-           * consumed is on it once it has settled, and not before: a `--bg` session writes its cost as its process exits. Given several
+           * consumed is on it once it has settled, and not before: a job writes its cost as it prints its result. Given several
            * reasons, one attempt ended with each, in order, and the last carries what the task settled with. `budget` is no end the
            * runtime judges: its harness's cut is carried on a failed end as `limit`, as the runtime records it.
            */
@@ -1122,16 +1122,17 @@ test("a round files its target with the target's tools, deny list and effort, an
   );
 });
 
-test('a step with `background: true` and `remote: true` reaches `e.file` with both — on its first filing, a try `retries:` files, and a try `nemia retry` asks for — and its check, and a step without the lines, with neither', async () => {
-  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nbackground: true\nremote: true', 'failed', 1);
-  const both = (id: string) => [tasks.get(id)!.spec.config?.background, tasks.get(id)!.spec.config?.claude?.remoteControl];
-  assert.deepEqual(both(`${run.id}-implement`), [true, true], 'the first filing');
+test('a step with `remote: true` reaches `e.file` bridged, as a job — on its first filing, a try `retries:` files, and a try `nemia retry` asks for — and its check, and a step without the line, unbridged', async () => {
+  const { run, e, tasks, settle } = await throughCheck('check: npm test\nretries: 1\nremote: true', 'failed', 1);
+  const bridged = (id: string) => tasks.get(id)!.spec.config?.claude?.remoteControl;
+  assert.equal(bridged(`${run.id}-implement`), true, 'the first filing');
+  assert.equal('background' in (tasks.get(`${run.id}-implement`)!.spec.config ?? {}), false, 'a job: no step files a background session');
 
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, ['implement']);
   const nudged = tasks.get(`${run.id}-implement-try2`)!.spec;
   assert.deepEqual(
-    [nudged.config?.background, nudged.config?.claude?.remoteControl, nudged.resumeFrom],
-    [true, true, `native-${run.id}-implement`],
+    [nudged.config?.claude?.remoteControl, nudged.resumeFrom],
+    [true, `native-${run.id}-implement`],
     'the try `retries:` files, continuing the session',
   );
 
@@ -1140,26 +1141,22 @@ test('a step with `background: true` and `remote: true` reaches `e.file` with bo
   settle(`${run.id}-implement-try2-check`, 'failed', undefined, 1);
   await runWith(e, retryRun(run.id, 'implement', { mode: 'fresh' }));
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, ['implement']);
-  assert.deepEqual(both(`${run.id}-implement-try3`), [true, true], 'a new session, bridged the same');
+  assert.equal(bridged(`${run.id}-implement-try3`), true, 'a new session, bridged the same');
 
   assert.deepEqual(
-    [tasks.get(`${run.id}-implement-check`)!.spec.harness, ...both(`${run.id}-implement-check`)],
-    ['check', undefined, undefined],
+    [tasks.get(`${run.id}-implement-check`)!.spec.harness, bridged(`${run.id}-implement-check`)],
+    ['check', undefined],
     "the check is the run's own, on a harness the engine refuses a bridge for",
   );
   settle(`${run.id}-implement-try3`, 'succeeded', SIGNED);
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement-try3-check`, 'succeeded', undefined, 0);
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).filed, ['review']);
-  assert.deepEqual(
-    both(`${run.id}-review`),
-    [undefined, undefined],
-    'review never said the word, and it is never a default: a job, unbridged',
-  );
+  assert.equal(bridged(`${run.id}-review`), undefined, 'review never said the word, and it is never a default: unbridged');
 });
 
 test('a round files its target bridged as the target says, and the looping step — a new session each round — as it says', async () => {
-  const run = await started(looped('background: true\nremote: true\n'));
+  const run = await started(looped('remote: true\n'));
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
   assert.equal(b.tasks.get(`${run.id}-implement`)!.spec.config?.claude?.remoteControl, undefined);
@@ -1170,7 +1167,7 @@ test('a round files its target bridged as the target says, and the looping step 
   await toReview(b, run.id, 2, false);
   assert.equal(b.tasks.get(`${run.id}-review-try2`)!.spec.config?.claude?.remoteControl, true, "round 2's review");
 
-  const other = await started(looped('', 'background: true\nremote: true\n'));
+  const other = await started(looped('', 'remote: true\n'));
   const c = board();
   await runWith(c.e, advanceRun(readRun(other.id)));
   await toReview(c, other.id, 1, true);
@@ -1181,11 +1178,6 @@ test('a round files its target bridged as the target says, and the looping step 
       c.tasks.get(`${other.id}-review`)!.spec.config?.claude?.remoteControl,
     ],
     [true, undefined],
-  );
-  assert.deepEqual(
-    [c.tasks.get(`${other.id}-implement-try2`)!.spec.config?.background, c.tasks.get(`${other.id}-review`)!.spec.config?.background],
-    [true, undefined],
-    'and run as the target says, a round being a session of it: a background session again, and review a job',
   );
 });
 

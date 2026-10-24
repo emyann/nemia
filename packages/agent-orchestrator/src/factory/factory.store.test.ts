@@ -554,3 +554,36 @@ test('a factory file that does not read: listed with why, the others still liste
       assert.throws(() => readFactory('nope'), refused('Missing', 'nope', 'bent'));
     });
 });
+
+test("a factory's revisions: pinned when its file says nothing, written by `nemia factory revisions`, and a third value refused", async (t) => {
+  const { revisionsOf } = await import('./factory.ts');
+  await t.test('absent reads pinned; the verb writes follow, every other key kept, and ls prints it', async (sub) => {
+    pipao('build');
+    assert.equal(revisionsOf(readFactory('pipao')), 'pinned', 'a factory that says nothing keeps its runs pinned');
+    await main(['factory', 'revisions', 'pipao', 'follow'], noEngine());
+    assert.deepEqual(
+      [fileOf('pipao').revisions, fileOf('pipao').workflows, revisionsOf(readFactory('pipao'))],
+      ['follow', ['build'], 'follow'],
+    );
+    names((await printedBy(sub, 'factory', 'ls')).join('\n'), 'revisions: follow');
+  });
+
+  await t.test('a file whose `revisions` is neither follow nor pinned does not read, naming the key', () => {
+    fresh();
+    fs.mkdirSync(FACTORIES, { recursive: true });
+    fs.writeFileSync(path.join(FACTORIES, 'bent.json'), '{"repos": ["/x"], "revisions": "always"}\n');
+    assert.throws(() => readFactory('bent'), refused('Invalid', 'bent', '`revisions`'));
+  });
+
+  for (const [row, argv, tag] of [
+    ['the default factory is a Conflict', ['factory', 'revisions', 'default', 'follow'], 'Conflict'],
+    ['a policy that is neither is refused before the file is read', ['factory', 'revisions', 'pipao', 'always'], 'Invalid'],
+    ['no such factory is Missing', ['factory', 'revisions', 'nope', 'follow'], 'Missing'],
+  ] as const)
+    await t.test(`REFUSED: ${row}, nothing written`, async () => {
+      pipao();
+      const before = bytesOf('pipao');
+      await assert.rejects(main([...argv], noEngine()), refused(tag));
+      assert.deepEqual(bytesOf('pipao'), before);
+    });
+});

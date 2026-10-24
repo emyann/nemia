@@ -5,7 +5,16 @@
  */
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { bridgeable, bridgeFailed, bridgeStateOf, bridgeUnread, enableBridge, BRIDGE_ABSENT } from './attached-bridge.ts';
+import {
+  bridgeable,
+  bridgeDue,
+  bridgeFailed,
+  bridgeOf,
+  bridgeStateOf,
+  bridgeUnread,
+  enableBridge,
+  BRIDGE_ABSENT,
+} from './attached-bridge.ts';
 
 /** The facts the SDK's bridge answers with, whole. */
 const ANSWER = {
@@ -30,6 +39,9 @@ const queryOf = (answer: unknown) => {
   };
 };
 
+/** How a job's bridge is asked: its claude.ai session ends with it. */
+const JOB = { keepSessionOnExit: false };
+
 /** The words `bridgeUnread` opens with, whatever the decoder said: what tells this refusal from the other two. */
 const UNREAD = bridgeUnread('').split('(')[0];
 
@@ -39,7 +51,7 @@ const ROWS: { name: string; run: () => Promise<void> | void }[] = [
     run: async () => {
       const { q, asked } = queryOf(ANSWER);
       assert.equal(bridgeable(q), true);
-      const bridge = await enableBridge(q, 'ae/t1/1', 'cse_earlier');
+      const bridge = await enableBridge(q, 'ae/t1/1', { keepSessionOnExit: true, reattach: 'cse_earlier' });
       assert.deepEqual(bridge, {
         url: ANSWER.session_url,
         connectUrl: ANSWER.connect_url,
@@ -51,19 +63,27 @@ const ROWS: { name: string; run: () => Promise<void> | void }[] = [
     },
   },
   {
+    name: "a job's bridge is asked to end with it, and re-attaches nothing",
+    run: async () => {
+      const { q, asked } = queryOf(ANSWER);
+      assert.equal((await enableBridge(q, 'ae/t1/1', { keepSessionOnExit: false })).url, ANSWER.session_url);
+      assert.deepEqual(asked, [{ enabled: true, name: 'ae/t1/1', options: { keepSessionOnExit: false } }]);
+    },
+  },
+  {
     name: 'REFUSED: a query object with no such method leaves the session running, with why there is no bridge and no throw',
     run: async () => {
       assert.equal(bridgeable({}), false);
-      assert.deepEqual(await enableBridge({}, 'ae/t1/1'), { why: BRIDGE_ABSENT });
-      assert.deepEqual(await enableBridge(undefined, 'ae/t1/1'), { why: BRIDGE_ABSENT });
-      assert.deepEqual(await enableBridge({ enableRemoteControl: 'not a function' }, 'ae/t1/1'), { why: BRIDGE_ABSENT });
+      assert.deepEqual(await enableBridge({}, 'ae/t1/1', JOB), { why: BRIDGE_ABSENT });
+      assert.deepEqual(await enableBridge(undefined, 'ae/t1/1', JOB), { why: BRIDGE_ABSENT });
+      assert.deepEqual(await enableBridge({ enableRemoteControl: 'not a function' }, 'ae/t1/1', JOB), { why: BRIDGE_ABSENT });
     },
   },
   {
     name: 'REFUSED: an answer missing a field this runtime reads is no bridge, and says so rather than writing half of one',
     run: async () => {
       const { bridge_session_id: _, ...short } = ANSWER;
-      const refused = await enableBridge(queryOf(short).q, 'ae/t1/1');
+      const refused = await enableBridge(queryOf(short).q, 'ae/t1/1', JOB);
       assert.deepEqual(Object.keys(refused), ['why'], 'nothing of a bridge is written from it');
       assert.ok(refused.why?.startsWith(UNREAD), refused.why);
       assert.match(refused.why ?? '', /bridge_session_id/, 'naming the field it lacks');
@@ -73,7 +93,7 @@ const ROWS: { name: string; run: () => Promise<void> | void }[] = [
     name: 'REFUSED: a control request that failed is no bridge, and the session runs on',
     run: async () => {
       const q = { enableRemoteControl: () => Promise.reject(new Error('the bridge is unavailable')) };
-      const refused = await enableBridge(q, 'ae/t1/1');
+      const refused = await enableBridge(q, 'ae/t1/1', JOB);
       assert.deepEqual(refused, { why: bridgeFailed('the bridge is unavailable') });
       assert.match(refused.why ?? '', /the bridge is unavailable/, 'naming why the request failed');
     },
@@ -86,6 +106,30 @@ const ROWS: { name: string; run: () => Promise<void> | void }[] = [
       assert.equal(bridgeStateOf({ type: 'result' }), undefined);
       assert.equal(bridgeStateOf({ type: 'system', subtype: 'bridge_state', state: 7 }), undefined, 'a state that is no word says none');
       assert.equal(bridgeStateOf(null), undefined);
+    },
+  },
+  {
+    name: "the bridge is due on the session's system init message, and on no other",
+    run: () => {
+      assert.equal(bridgeDue({ type: 'system', subtype: 'init', session_id: 's-1' }), true);
+      assert.equal(bridgeDue({ type: 'system', subtype: 'bridge_state', state: 'connected' }), false);
+      assert.equal(bridgeDue({ type: 'system', subtype: 'permission_denied' }), false);
+      assert.equal(bridgeDue({ type: 'result', subtype: 'init' }), false, 'a result is no init, whatever its subtype says');
+      assert.equal(bridgeDue({ type: 'assistant' }), false);
+      assert.equal(bridgeDue(null), false);
+      assert.equal(bridgeDue(undefined), false);
+      assert.equal(bridgeDue('system'), false);
+    },
+  },
+  {
+    name: 'a sighting says the link where one was opened, why there is none where none was, and nothing where nothing was kept',
+    run: () => {
+      assert.deepEqual(bridgeOf({ url: 'https://claude.ai/s/1', state: 'connected', bridgeSessionId: 'cse_1' }), {
+        bridge: { url: 'https://claude.ai/s/1' },
+      });
+      assert.deepEqual(bridgeOf({ why: BRIDGE_ABSENT }), { bridge: { url: null, why: BRIDGE_ABSENT } });
+      assert.deepEqual(bridgeOf(undefined), {});
+      assert.deepEqual(bridgeOf({ state: 'connected' }), {}, 'a state with no link and no why says nothing');
     },
   },
 ];

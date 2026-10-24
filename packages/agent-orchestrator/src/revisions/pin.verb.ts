@@ -4,7 +4,8 @@
  * `pinsOf` reads the four kinds a run resolves — its workflow folder, each step's agent, each skill those agents are given, and its
  * factory's rules — digests each as the package already digests it, gives each its number in the ledger (`appendRevision`) and answers with
  * the run's pins. `resolvedNow` does that for a run that has filed nothing, reading the folder again so an edit made while the run waited
- * reaches its first step; `refreshedNow` does it for a run that has filed, keeping the step set it already names. `refreshRun` is
+ * reaches its first step; `refreshedNow` does it for a run that has filed, keeping the step set it already names — on a person's ask, or
+ * where the run's factory follows revisions (`revisions: follow`) and a filing is due (`followPass`). `refreshRun` is
  * `nemia refresh <run>`: it writes a person's ask that the next pass re-pins on.
  *
  * A controller: it gathers digests from four stores, which only a controller may do (`CONTROLLER` in `test/boundary.test.ts`).
@@ -22,7 +23,7 @@ import { agentVersion } from '../agents/read.store.ts';
 import { writeAgentFiles } from '../agents/agents.store.ts';
 import { workflowVersion } from '../folder/version.store.ts';
 import { factoryFills, rulesVersion } from '../rules/rules.store.ts';
-import { DEFAULT_FACTORY, type Factory } from '../factory/factory.ts';
+import { DEFAULT_FACTORY, revisionsOf, type Factory } from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { within } from '../meter/tally.store.ts';
@@ -254,8 +255,9 @@ const NOTHING: PinnedPass = { wrote: false, notes: [], lift: false };
  *
  * Level-triggered, and read from the world on every pass: a run that has filed nothing — one waiting `--after`, which may sit for hours —
  * takes the workflow folder as it stands now, step set and all, so an edit made while it waited reaches its first step; a run that has
- * filed keeps its frozen workflow, and re-pins only where a person asked (`nemia refresh`), which never adds or removes a step. Nothing is
- * carried between passes: what has moved is the digests against the run's own pins.
+ * filed keeps its frozen workflow, and re-pins only where a person asked (`nemia refresh`) — or, its factory following revisions, once
+ * the pass has a filing due (`followPass`) — neither of which adds or removes a step. Nothing is carried between passes: what has moved
+ * is the digests against the run's own pins.
  *
  * Writes nothing where no digest moved, so a run resolved twice with no edit leaves the record alone and the ledger empty of a second
  * entry. A run a person called off is left alone: it files nothing, so there is nothing for a revision to reach. The steps' agent files are
@@ -310,11 +312,25 @@ function firstResolve(run: Run, at: string, read: PassRevisions): PinnedPass {
 }
 
 /**
+ * Whether the run's factory follows revisions (`revisions: follow`), read through the pass's memo of it. A factory that no longer reads —
+ * its file removed or broken since the run started — follows nothing: the run keeps what it resolved, as a pinned run does, and the
+ * factory's refusal is the start's and the verbs' to say, not every pass's.
+ */
+function follows(run: Run, read: PassRevisions): boolean {
+  try {
+    return revisionsOf(read.factory(run)) === 'follow';
+  } catch {
+    return false;
+  }
+}
+
+/**
  * The run's steps and pins taken again on a person's ask (`nemia refresh`), for a run that has filed: the ask is spent either way. The ask
  * is read off its own file every pass (`runStore.refresh.stands`), never off the record, which never holds it. A filed run nobody asked
- * resolves nothing: a resolve is every `.md` of the folder and a digest of every agent and skill file it names, which a pass may not pay
- * per run for a number nothing files on. So an edit after a filing is numbered when something resolves that content — another run's first
- * filing, or this run's `nemia refresh`, which resolves to answer.
+ * resolves nothing here: a resolve is every `.md` of the folder and a digest of every agent and skill file it names, which a pass may not
+ * pay per run for a number nothing files on. A run whose factory follows revisions is resolved by `followPass`, once the pass knows it
+ * has something to file. So a pinned run's edit after a filing is numbered when something resolves that content — another run's filing,
+ * or this run's `nemia refresh`, which resolves to answer.
  */
 function refreshDue(run: Run, at: string, read: PassRevisions): PinnedPass {
   if (!runStore.refresh.stands(run.id)) return NOTHING;
@@ -332,13 +348,40 @@ function refreshDue(run: Run, at: string, read: PassRevisions): PinnedPass {
 }
 
 /**
+ * Follow (`revisions: follow`): a filed run whose pass has a filing due — a step, a retry, a round (`filing`) — takes its kinds as the
+ * files hold them now, as `nemia refresh` would, before anything of it is filed. The pass that re-pins files nothing, and the next one,
+ * which the record's write wakes, files on the new pins, its brief and prompt read from them; so every filing is filed on the files as
+ * they stood when it was due, and what was already filed is not run again.
+ *
+ * A run with nothing due is never resolved: a finished run, or one stopped on a person, keeps the pins and the prompts its steps were
+ * given, whatever reaches it a full pass (a restarted daemon, a stamp moved), and a run at rest acts on no pass a memo would have
+ * skipped. Level-triggered: it reads the factory, the files and the run's pins on the pass, and writes only where the pins moved, so a
+ * due filing with no edit is filed on that pass. A folder that does not load, and a factory that no longer reads (`follows`), leave the
+ * run what it had, unsaid, since it would be said on every pass.
+ */
+export function followPass(run: Run, at: string, filing: boolean, read: PassRevisions = passRevisions()): PinnedPass {
+  if (!filing || run.cancelledAt || run.pruned || !hasStarted(run) || !follows(run, read)) return NOTHING;
+  try {
+    const resolved = refreshedNow(run, at, read);
+    if (!resolved || isDeepStrictEqual([...(run.pinned ?? [])], resolved.pins)) return NOTHING;
+    renderAgain(run, resolved.steps, read);
+    run.workflow = resolved.steps;
+    run.pinned = resolved.pins;
+    return { wrote: true, notes: ['the factory follows revisions: the next pass files on the new ones'], lift: false };
+  } catch (err) {
+    return unread(err, false);
+  }
+}
+
+/**
  * `nemia refresh <run>`: write down that a person asked this run to take the new revisions, so every filing after it — a new step, a retry,
  * a round — is filed on them, and answers with the drift it was asked on.
  *
  * It resolves the kinds now to answer, which is what gives an edit its number in the ledger: a content nobody has resolved yet has no
  * entry, so the drift cannot be read off the ledger alone.
  *
- * Refused (`Conflict`): a run that has filed nothing, which resolves its kinds afresh at its first filing anyway; a run whose pins are
+ * Refused (`Conflict`): a run that has filed nothing, which resolves its kinds afresh at its first filing anyway; a run whose factory
+ * follows revisions, whose every filing takes what the files hold with no ask; a run whose pins are
  * already the newest of every kind, since nothing would be taken, and an ask nothing acts on is an ask the tick reads for ever; and a run
  * whose folder does not load, which has no revision to take. A run with no record is refused `Missing` by the store's read.
  */
@@ -350,7 +393,14 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
         message: `run ${id} has filed nothing yet: it resolves its kinds afresh at its first filing, so an edit made while it waits reaches its first step with no refresh. Nothing was written.`,
       }),
     );
-  const resolved = yield* tried(() => refreshedNow(run, new Date().toISOString()));
+  const read = passRevisions();
+  if (follows(run, read))
+    return yield* Effect.fail(
+      new Conflict({
+        message: `run ${id} is in the factory ${run.factory}, which follows revisions: its every filing takes what the files hold, so there is nothing to refresh. To keep a run's revisions until a refresh, nemia factory revisions ${run.factory} pinned. Nothing was written.`,
+      }),
+    );
+  const resolved = yield* tried(() => refreshedNow(run, new Date().toISOString(), read));
   if (!resolved)
     return yield* Effect.fail(
       new Conflict({

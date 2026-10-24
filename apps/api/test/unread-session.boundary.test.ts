@@ -1,15 +1,14 @@
 /**
  * Why one step's session alone could not be read, on its run's detail (`sessionUnread`): at shipped defaults, the api's own
- * engine over a store this file seeds, a background session the harness's fake `claude` lists at work, and its transcript where Claude
- * Code keeps one (`config`), with a line that does not decode. The words are the runtime's, read afresh on every request. A boundary
- * test: the transcript is Claude Code's own file, which the test engine has no model of.
+ * engine over a store this file seeds, a Claude Code job at work — its run file as its worker writes it, held by this process — and
+ * the capture its own process prints the Agent SDK's messages to, with a line that does not decode. The words are the runtime's, read
+ * afresh on every request. A boundary test: the run file and the capture are the job's own files, which the test engine has no model of.
  */
-import { config, registry, root } from './harness.ts';
+import { root } from './harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { randomUUID } from 'node:crypto';
 import { app } from '../src/app.ts';
 import { Effect } from 'effect';
 import { engine } from 'agent-orchestrator';
@@ -24,40 +23,29 @@ const write = (file: string, text: string): void => {
   fs.writeFileSync(file, text);
 };
 
-/** A background task spawned once and not ended, listed working and idle by `claude agents`. Returns its session's id. */
-const atWork = (taskId: string): string => {
-  const sessionId = randomUUID();
+/** Where the job of `taskId`'s first attempt keeps its files, as its runner names them: its run file and its capture beside it. */
+const jobOf = (taskId: string) => path.join(root, 'engine', 'runs', 'claude', `ae_${taskId.replace(/[^a-zA-Z0-9]+/g, '_')}_1`);
+
+/** A task filed on `claude`, spawned once and not ended: a job at work, its run file held by this process, its capture `said`. */
+const atWork = (taskId: string, said: object[]): void => {
   write(
     path.join(root, 'engine', 'tasks', `${taskId}.jsonl`),
     jsonl([
-      { kind: 'filed', at: at(-9), brief: 'Build it.', cwd: '/code/app', maxAttempts: 1, harness: 'claude', config: { background: true } },
+      { kind: 'filed', at: at(-9), brief: 'Build it.', cwd: '/code/app', maxAttempts: 1, harness: 'claude' },
       { kind: 'starting', at: at(-8), attempt: 1 },
       { kind: 'spawned', at: at(-8), attempt: 1 },
     ]),
   );
-  const rows = JSON.parse(fs.readFileSync(registry, 'utf8')) as object[];
-  rows.push({ name: `ae/${taskId}/1`, sessionId, kind: 'background', state: 'working', status: 'idle', startedAt: NOW - 8000 });
-  fs.writeFileSync(registry, JSON.stringify(rows));
-  return sessionId;
+  const job = jobOf(taskId);
+  write(
+    `${job}.json`,
+    JSON.stringify({ name: `ae/${taskId}/1`, state: 'working', pid: process.pid, logFile: `${job}.log`, heartbeatAt: at(0) }),
+  );
+  write(`${job}.log`, jsonl(said));
 };
 
-/** A session's transcript, as Claude Code writes one: the prompt and an answer, the answer's `timestamp` as given. */
-const transcript = (sessionId: string, timestamp: string): void => {
-  const line = { sessionId, isSidechain: false, userType: 'external', cwd: '/code/app', version: '2.1.291', gitBranch: 'main' };
-  write(
-    path.join(config, 'projects', '-code-app', `${sessionId}.jsonl`),
-    jsonl([
-      { ...line, type: 'user', uuid: 'u-1', timestamp: at(-7), message: { role: 'user', content: 'Build it.' } },
-      {
-        ...line,
-        type: 'assistant',
-        uuid: 'a-1',
-        timestamp,
-        message: { role: 'assistant', content: [{ type: 'text', text: 'Building.' }] },
-      },
-    ]),
-  );
-};
+/** A `result` line, as the job's process prints the SDK's: its cost as given. */
+const result = (cost: unknown) => ({ type: 'result', subtype: 'success', total_cost_usd: cost });
 
 const RUN = 'r-unread';
 write(
@@ -81,21 +69,16 @@ const stepsOf = async (): Promise<Map<string, RunDetail['steps'][number]>> => {
 };
 
 test("REFUSED: a run's detail says why one step's session alone could not be read, in the runtime's words, and nothing once a request reads it", async () => {
-  const build = atWork('t-build');
-  const review = atWork('t-review');
-  transcript(build, 'yesterday');
-  transcript(review, at(-1));
+  atWork('t-build', [result('yesterday')]);
+  atWork('t-review', [result(0.01)]);
 
   const unread = await stepsOf();
   const words = unread.get('build')?.sessionUnread;
-  assert.ok(words?.includes("`ae/t-build/1`'s transcript cannot be read"), `the runtime's words: ${words}`);
+  assert.ok(words?.includes('`ae/t-build/1`'), `the runtime's words, naming the session: ${words}`);
   assert.ok(words?.includes('"yesterday"'), `naming what did not decode: ${words}`);
   assert.equal(unread.get('review')?.sessionUnread, null, 'the step read beside it says nothing');
   assert.equal((await Effect.runPromise(engine().view('t-build'))).unreadWhy, words, "the engine's own words");
 
-  transcript(build, at(-1));
-  const file = path.join(config, 'projects', '-code-app', `${build}.jsonl`);
-  const later = new Date(fs.statSync(file).mtimeMs + 5_000);
-  fs.utimesSync(file, later, later);
+  write(`${jobOf('t-build')}.log`, jsonl([result(0.02)]));
   assert.equal((await stepsOf()).get('build')?.sessionUnread, null, 'the first request whose look reads it says nothing: none is kept');
 });

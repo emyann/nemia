@@ -140,12 +140,11 @@ export const SLOT_WAIT = 'waiting for a run slot';
 export const slotWord = (slot: RunSlot): string => `${SLOT_WAIT} (${slot.inFlight} of ${slot.cap} in flight)`;
 
 /**
- * The daemon's two ceilings, as it says them when it starts: sessions at work per pool (`WF_MAX_CONCURRENT`; `claude` with
- * `claude-detached`, `codex` and checks each a pool, a blocked session holding no slot), and runs in flight (`WF_MAX_RUNS`) — `no cap` when
- * none.
+ * The daemon's two ceilings, as it says them when it starts: sessions at work per pool (`WF_MAX_CONCURRENT`; `claude`, `codex` and checks
+ * each a pool, a blocked session holding no slot), and runs in flight (`WF_MAX_RUNS`) — `no cap` when none.
  */
 export const ceilingLines = (c: { sessions: number; runs: number }): string[] => [
-  `sessions at work per pool: at most ${c.sessions} at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)`,
+  `sessions at work per pool: at most ${c.sessions} at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)`,
   `runs in flight: ${c.runs > 0 ? `at most ${c.runs} at once — a run with nothing filed waits for a slot, oldest first` : 'no cap'} (WF_MAX_RUNS)`,
 ];
 

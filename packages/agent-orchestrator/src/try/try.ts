@@ -78,7 +78,7 @@ export function tryNameRefusal(name: string, home: string): string | null {
 }
 
 /** The harnesses a try's fence is written for: Claude Code's `permissionMode:`, which no other takes. No `harness:` line is `claude`. */
-const FENCED_HARNESSES: readonly string[] = ['claude', 'claude-detached'];
+const FENCED_HARNESSES: readonly string[] = ['claude'];
 
 /**
  * Why an agent cannot be tried, and the command that makes it one that can when a copy does (the repository's), or null when nothing here
@@ -128,13 +128,13 @@ export function untriedOf(agent: TriedAgent, home: string): Untried | null {
   }
   if (harness !== undefined && !FENCED_HARNESSES.includes(harness)) {
     return {
-      why: `${agent.name} runs on \`${harness}\`, and a try is fenced by Claude Code's permission mode — \`dontAsk\` with \`Edit(**)\`, in a folder of its own — which ${harness} does not take. Only an agent on Claude Code is tried here: no \`harness:\` line, \`claude\` or \`claude-detached\`.`,
+      why: `${agent.name} runs on \`${harness}\`, and a try is fenced by Claude Code's permission mode — \`dontAsk\` with \`Edit(**)\`, in a folder of its own — which ${harness} does not take. Only an agent on Claude Code is tried here: no \`harness:\` line, or \`claude\`.`,
       copy: null,
     };
   }
   if (agent.keys.remote === 'true') {
     return {
-      why: `${agent.name} says \`remote: true\`, which bridges a background session to claude.ai, and a try runs as a job, which is never bridged. Delete \`remote: true\` to try it.`,
+      why: `${agent.name} says \`remote: true\`, which bridges its sessions to claude.ai, where anyone signed in to the account can drive them, and a try is a session fenced in a folder of its own, for nobody to drive. Delete \`remote: true\` to try it.`,
       copy: null,
     };
   }

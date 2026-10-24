@@ -39,7 +39,6 @@ const REMOTE_REFUSED: Partial<Record<StepKey, string>> = {
   model: RUNS_AS_CONFIGURED,
   effort: RUNS_AS_CONFIGURED,
   context: RUNS_AS_CONFIGURED,
-  background: 'chooses how Claude Code runs the session, and a remote agent is not Claude Code',
   remote: 'bridges a Claude Code session to claude.ai, and a remote agent is not Claude Code',
   permissionMode: FENCED_THERE,
   sandbox: FENCED_THERE,
@@ -105,4 +104,4 @@ export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string
  * `check` is not on the list. That harness is the run's own: it executes a step's `check:`
  * command, and no step runs on it.
  */
-export const HARNESSES: readonly string[] = ['claude', 'codex', 'claude-detached'];
+export const HARNESSES: readonly string[] = ['claude', 'codex'];

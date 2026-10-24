@@ -239,17 +239,16 @@ wf stats --json                            # what GET /api/stats answers
   its deadline or less say nothing. `--line` ends with how many of the last 14 days there were, where
   any.
 - **A refused call counts where the harness records it**: every call each ended attempt of a try's
-  own session was denied, one per call, on a step that runs `claude -p` (`claude` or
-  `claude-detached`). `denied` is their mean per measured try (`0.5/try`); a step's row sums them,
+  own session was denied, one per call, on a step that runs as a job on `claude`. `denied` is their mean per measured try (`0.5/try`); a step's row sums them,
   says how many of its tries were measured where not all (`3 (2 of 4)`), and names each call with its
-  count. A try on codex, on a remote agent or with `background: true` records none, and a recheck's try
+  count. A try on codex, on a remote agent or of a run frozen with the retired `background: true` records none, and a recheck's try
   ran no session: none is measured, so a day of only those reads `—`. Nor is a session filed before
   2026-09-23 19:04:31 UTC (`JOBS_SINCE`), when `claude` steps began to run as jobs: until then each ran
   as `claude --bg`, which records no denial, and its journal does not say which it was.
 - **A skill load counts where every end of the try's own session says what it loaded**: the runtime
   writes `skills` on an attempt's end where its harness can say (a `claude` job), `[]` for none, one
   entry per load. A try is measured when each ended attempt of its own session carries the key; one end
-  without it (an older journal, a `lost` end, codex, a remote agent, `background: true`), no ended
+  without it (an older journal, a `lost` end, codex, a remote agent), no ended
   attempt, or no session of its own (a recheck) leaves the try unmeasured, never 0. `skills` is the mean
   loads per measured try; a step's row sums them, says how many of its tries were measured where not
   all (`3 (2 of 4)`), and names each skill with its count, most first, then by name, and the measured
@@ -330,7 +329,7 @@ slip in with an example. For now a person reads `PLAN.md` and starts a run per p
 
 ```md
 ---
-harness: codex             # claude (default) | codex | claude-detached | a2a:<name>, a remote agent
+harness: codex             # claude (default) | codex | a2a:<name>, a remote agent
 after: implement           # what must finish first: verified, or unverified if it has no check
 sandbox: read-only         # Codex's sandbox; a Claude Code step's fence is permissionMode:
 output: review.schema.json # what its closeout declares for a later step: a JSON Schema beside it
@@ -407,7 +406,7 @@ keyed alphabetically, still reads in the order its steps run in `wf ls` and `wf 
 reads as it was written.
 
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
-`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `background`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
+`permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
 `gate`, `output`, `tally`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
 it cannot use (`src/workflow/step-file.ts`). `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
 the runtime's own: the runtime makes one attempt at a session, and trying again is the run's — `retries:` and `wf retry`
@@ -486,8 +485,10 @@ there is refused listing the agents there are. A link in `agents/` is refused as
 workflow — the listings skip it, and a workflow named `agents` is refused by name.
 
 At `wf start` each node is resolved and frozen on the run, and resolved afresh while the run has filed nothing — a run
-waiting `--after` takes the folder as it stands at its first filing — or when a person types `nemia refresh`, which takes the newest
-revision of every kind for every filing after it. Between those a run never reads `agents/` again, from a worktree or
+waiting `--after` takes the folder as it stands at its first filing — and after that as its factory's `revisions` says: `follow`
+resolves it on every pass, so each new filing (a step, a retry, a round) takes the revisions the files hold then, with no step added or
+removed; `pinned`, the default, keeps it until a person types `nemia refresh`, which takes the newest revision of every kind for every
+filing after it. Between those a pinned run never reads `agents/` again, from a worktree or
 anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
 adds to it (*Five layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
@@ -575,10 +576,7 @@ its agent's rules allow. Its `permissionMode:` or `sandbox:` may be no wider tha
 agent's, or than its harness's default when the agent names none: from narrowest, `plan`; `dontAsk`, `default` and `manual`;
 `acceptEdits`; `auto`; `bypassPermissions` — and on codex `read-only`; `workspace-write`; `danger-full-access`. And it may not run a
 fenced agent on the other harness, whose fence cannot be compared. Its `writable:` widens where its writes reach and never what it may
-do, so it is refused over a fence that writes nothing (*A factory's other folders*, below). Nor may it set `background: true` over an agent in any mode but
-`bypassPermissions`: a background session also reads the person's user settings and the checkout's `settings.local.json`, where each
-"don't ask again" writes an allow rule, and every other mode runs more of what such a rule allows. Delete the line, and the step runs as
-a job, or attach an agent in `bypassPermissions` that denies by name what it must never do. One rule covers another when it is the
+do, so it is refused over a fence that writes nothing (*A factory's other folders*, below). One rule covers another when it is the
 same rule, a bare tool, a command prefix (`Bash(npm:*)` covers `Bash(npm test)`, never a command joined to another, `Bash(npm test &&
 git push)`) or a path ending in `**` (`Edit(**)` covers `Edit(notes/**)`); anything else counts as wider. An agent's mode grants what it does unasked: from
 `acceptEdits` up, an `Edit` inside its directory, and under `bypassPermissions` every rule. The board's try (`apps/api`) holds an
@@ -684,9 +682,8 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
   names turned off: Claude Code, given it through the Agent SDK (`Options.skills`), hides every other skill from the session and refuses
   it at the `Skill` tool — its own bundled ones, the repository's `.claude/skills/<name>`, a nested folder's, one another step of the
   same folder names, and any plugin's. A step whose agent renders no skill is given none, and so is one whose rendered folder is gone,
-  which is told its skills whole in its brief. A step run as a background session (`background: true`) or on `claude-detached` holds no
-  closed list, since Claude Code's CLI has no flag or settings key for one: it is given Claude Code's own skills (`'default'`), and no
-  name is turned off. An agent's body or a skill's that says *load `look`* still reaches the copy: told so, a session calls
+  which is told its skills whole in its brief. A step on a harness besides the default holds no closed list: it is given that
+  harness's own skills (`'default'`), and no name is turned off. An agent's body or a skill's that says *load `look`* still reaches the copy: told so, a session calls
   `nemia-<agent>:look`, the one it is listed.
 - `mcp:` — the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them, comma-separated: `mcp: playwright`.
   A session loads the servers its agent and its step name and no other: where neither has a line it loads none, and neither does a
@@ -707,7 +704,7 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
 Rendered or not, a step's job reads its checkout's settings and never the operator's. The runtime spawns every job with `--setting-sources
 project` (the runtime's README, *Settings: the checkout's, never the operator's*). So what a step needs is said where the run
 carries it. A rule goes in the repository's `.claude/settings.json` or on the step (`allowedTools:`). A rule in a checkout's
-`.claude/settings.local.json`, where "don't ask again" writes, reaches no step's job, only a background session. A step in the checkout
+`.claude/settings.local.json`, where "don't ask again" writes, reaches no step's session. A step in the checkout
 itself (`workspace: main`) is given one rule by the run: a read of its own run's artifacts folder, where the steps before it left their
 files, and of no other run's (`filedAllows`). Every step on a harness fenced by a permission mode is filed the artifacts folder of each
 step it comes after, through `after:` and on, mounted read-only (`handedMounts`): it reads what they handed over, a picture included,
@@ -890,29 +887,18 @@ rule a step would be filed cannot carry — an ending's read of its run's artifa
 the store's own words, naming `WF_ROOT` and the fix (`storeRootRefusal`); which characters a rule cannot carry is the runtime's
 answer (`unruledIn`, through `agent-runtime/vocabulary`).
 
-### A job, or a session that stays: `background:`
+### Every step a job
 
-```md
----
-background: true   # a Claude Code background session (`claude --bg`), which a person can attach to and bridge
----
-Watch this repository's runs.
-```
+A step on `claude` runs as a **job** on the Agent SDK, which works its brief to the end and exits. Its end is its result, it keeps a
+spend cap (`budget:`, below), and it asks nobody in any mode — a call its mode would ask about is denied, recorded on the attempt, and
+the session carries on (agent-runtime's issue 28, M1). A person can still tell it something while it works: `wf say` writes to it
+until its result (issue 29), and `remote: true` bridges it to claude.ai (below). A session that must outlive a brief is the runtime's
+long-lived task, `restartPolicy: 'Always'`, which no step files: Nemia's keeper files hers.
 
-A step on `claude` runs as a **job**: `claude -p`, which works its brief to the end and exits. Its end is its result, it keeps a spend
-cap (`budget:`, below), and it asks nobody in any mode — a call its mode would ask about is denied, recorded on the attempt, and the
-session carries on (agent-runtime's open issue 28, M1). A person can still tell it something while it works: `wf say` writes to its
-stdin until its result (issue 29).
-
-`background: true` runs every session of the step — the first, each try and each round — as a **background session** instead,
-`claude --bg`, filed with the engine's `config.background`: one a person can attach to, and bridge to claude.ai (`remote:`, below). It
-keeps no spend cap, and its denials are not read (issue 17, issue 28). A supervisor is the kind of step that says it: it does not
-end, and is answered from a phone (*A supervisor*, below). Most steps are jobs; until thin runtime stage 2 part 2 (2026-09-23) every
-step ran `--bg`.
-
-Refused at load: any word but `true` or `false`; and, on a folder team, a background step in a mode that can ask (below). Refused at
-`wf start`, in the runtime's words: `true` on `codex` or `claude-detached`, which have no such mode, and a `budget:` beside
-`background: true`, since a background session keeps no cap.
+`background:`, which once ran a step's sessions as Claude Code background sessions, is refused at load by name, in a step's file, an
+agent's and a factory's alike: delete the line, and the step runs as a job on the Agent SDK. So is `harness: claude-detached`, the
+`claude -p` road, by the same fix. A run frozen with `background: true` still reads (`FrozenStepSchema`), and its step is filed as a
+job.
 
 ### When a denied call stops a step: `denials:`
 
@@ -941,8 +927,8 @@ the next run's step works in a worktree named by its own id; any other absolute 
 as `*`. A call the step's own `disallowedTools:` may have denied is offered no rule, since a deny beats every allow: the offer names
 the deny rule instead. There is no verb that widens `allowedTools:` on a live run.
 
-Refused at load: any word but `fail`; the key on `codex`, which records no denials (its fence is the sandbox); and the key
-beside `background: true`, whose denials are not read. On any of them the line would never stop anything.
+Refused at load: any word but `fail`, and the key on `codex`, which records no denials (its fence is the sandbox): there the line
+would never stop anything.
 
 ### Who may drive a step's session: `remote:`
 
@@ -954,15 +940,14 @@ Implement what was asked, in this repository.
 ```
 
 `remote: true` is carried on every filing of the step — the first, each try and each round — as Claude Code's own flag, `config.claude.remoteControl`
-(a harness argument of its own, `remoteControl`, until 2026-09-25), so Claude Code's background session is started with `--remote-control` and listed in the web's agents view (agent-runtime's README, *Reachable
+(a harness argument of its own, `remoteControl`, until 2026-09-25), so the runtime opens Remote Control on the job's session as it starts and it is listed in the web's agents view (agent-runtime's README, *Reachable
 from a phone*). There anyone signed in to the account can **drive** it — type into it, answer its prompts, stop it — from a browser or a
 phone, and not only watch it. So it is a deliberate setting, never a default: a step without the line, or with `remote: false`, is not
 bridged, and a step's check never is.
 
 Refused at load: any word but `true` or `false` — `remote: yes` is refused by name — an empty value, and the line twice. Refused at
 `wf start`, with nothing written, on a harness the runtime refuses `claude.remoteControl` for, in the runtime's words after the
-`remote: true` line (`configRefused`): `codex` and `claude-detached` run a prompt and exit, and only a Claude Code background session,
-`claude` with `background: true`, is bridged; and on a `claude` step without `background: true`, since a job opens no bridge. `wf ls`
+`remote: true` line (`configRefused`): `codex` runs a prompt and exits, and only a Claude Code session, on `claude`, is bridged. `wf ls`
 and `wf decide` say nothing of it yet; the board's facts of the step draw its web link, or why it is not up, read off its task's view
 (`bridgeOf`).
 
@@ -988,9 +973,7 @@ attempt consumed*). What the key does turns on what the harness can keep:
 
 | harness | while a try runs | once a try has ended |
 |---|---|---|
-| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `config.budgetUsd` on every filing — a harness argument the runtime judges nothing of — so `claude -p --max-budget-usd` ends the session once the tries together reach the cap, past it by up to the response that crosses it: the runtime settles the task as its harness ended it, carrying the cut as `limit: 'budget'` on the attempt, and the run reads the step as `budget exhausted` (`taskSpend`, `ownStatus`). | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
-| `claude`, `background: true` | refused at `wf start`: a `--bg` session keeps no `--max-budget-usd`, and writes its cost only as its process exits (agent-runtime's open issues 17 and 18) | — |
-| `claude-detached` | as a job on `claude` | as on `claude` |
+| `claude`, a job | what is left of the cap in force — the cap less what the step's tries have cost — goes to the engine as `config.budgetUsd` on every filing — a harness argument the runtime judges nothing of — so the harness ends the session once the tries together reach the cap, past it by up to the response that crosses it: the runtime settles the task as its harness ended it, carrying the cut as `limit: 'budget'` on the attempt, and the run reads the step as `budget exhausted` (`taskSpend`, `ownStatus`). | the run adds up what the step's tries cost, and past the cap files nothing more for the step on its own word |
 | `codex` | refused at `wf start` | — |
 
 A step reads **`over budget`** — `over budget $4.20 of $3` in `wf ls` — when its ended tries have together cost the cap in force or
@@ -1018,12 +1001,12 @@ loop asks for a round that would file it again.
   and a person raised it. Being over budget is why nothing was filed, not what the session has to fix.
 
 Only what the engine measured counts, so a step with a budget whose tries have no cost on them reads as it would without one. The rule is
-the same on both Claude harnesses — the tries together, against the cap — and the harness keeps it too, each session handed what is left.
+the same on every Claude Code step — the tries together, against the cap — and the harness keeps it too, each session handed what is left.
 
 **A resumed session is charged its own spend.** A try, a round or a gate's answer that continues a session is a new task filed with
-`resumeFrom` — `claude -p --resume` — and handed what is left of the cap. `claude -p --resume` caps the resume's own spend, not its
-session's (M5), and prints its parent's cost on in its own (M2): the engine takes the parent's off, so each attempt's cost is what that
-session spent, and the tries add up to the step's spend once (agent-runtime's open issue 4). A resume of a session that was not a job of
+`resumeFrom` — a resumed job on the Agent SDK — and handed what is left of the cap. A resume's cap bounds its own spend, not its
+session's (M5), and it prints its parent's cost on in its own (M2): the engine takes the parent's off, so each attempt's cost is what that
+session spent, and the tries add up to the step's spend once (agent-runtime's issue 4). A resume of a session that was not a job of
 the engine's — a `--bg` try from before stage 2 part 2 — records no cost, and the step's spend reads `≥` that far.
 
 ## What one step knows of another
@@ -1510,7 +1493,7 @@ gated ship runs the line whole on the merged tree.
 | `awaiting approval` | signed off at its gate — verified first, where it has a check — and the try it is on is not approved ([below](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)); or a gated ending step (`workspace: main`) whose work is done, held before it is filed ([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)) — never an ungated one, which its workflow files | **never runs** — until a person approves it: `wf approve`; or sends the work back: `wf retry --message` |
 | `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, or accepts the work as it stands, below |
 | `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `wf round --budget` |
-| `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (a job: `claude`, `claude-detached`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
+| `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (a job: `claude`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
 | `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** — unless it is tried again, below |
 | `failed`, `stopped` | the engine's verdict on the step's own task | **never runs** |
 
@@ -1534,7 +1517,7 @@ and `≥$3.01` where an ended attempt has no cost on it — and on the run's lin
 shows the step's own spend, `over budget $4.20 of $3`, has nothing beside it. A looping step held on another step's
 budget, `over budget — implement $4.25 of $3`, has its own cost beside it.
 
-Every harness hands the closeout schema on: `claude`, `codex`, and `claude-detached` since engine `3e44ab6`.
+Every harness hands the closeout schema on: `claude` and `codex`.
 
 ### Trying again: `retries:` and `wf retry`
 
@@ -1605,7 +1588,7 @@ retries: 1
   its own session failed or was stopped. `--recheck` only applies where a check did not pass. Each refusal
   says what to do instead: a step still running or checking, a verified step, a cancelled run, a try already
   asked for, a step the run is about to try again itself.
-- **A session its harness blocked is tried again the same way.** A `--bg` session can stop on the harness's own
+- **A session its harness blocked is tried again the same way.** A session can stop on the harness's own
   trouble, such as "Could not refresh your login because another Claude Code process is refreshing it". The
   engine then says `needs-human`, and the step has no closeout. `wf retry` takes such a step with `--nudge` or
   `--fresh`, and refuses `--recheck`. The ask is written as any other. The next tick asks the engine to stop the
@@ -1625,7 +1608,7 @@ retries: 1
   that stops waiting stops carrying it, with nothing left over. **Beside the phase, never in it** — everything
   that judges a blocked step compares the engine's `needs-human` exactly (`harnessBlocked`, the api's `needsOf`,
   the board's chip), so only what `wf ls` prints gains the word. A harness that says nothing — codex,
-  `claude-detached`, neither of which reports a blocked session at all — leaves the line as it was.
+  which reports no blocked session at all — leaves the line as it was.
 - **An ask is a file, like a cancellation.** `wf retry` writes `runs/<id>.asks/retry-<step>-<n>`, whole and
   exclusively, and never writes the run's json. Every pass reads the directory. The next pass files try `n`,
   writes the record, then moves the ask into `done/`. The ask names its try, and a try's ids are derived
@@ -1650,7 +1633,7 @@ retries: 1
 - **A step at its gate is sent back with `--message`.** A gated step that signed off, and waits for a person's approval — or
   was approved and nothing after it is filed yet — takes `--nudge` or `--fresh` with the objection, and is refused without
   words or with `--recheck` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)).
-- **An answer to a Claude Code job is its task's next turn.** A `claude` step (not `background: true`) is filed held open: when it
+- **An answer to a Claude Code job is its task's next turn.** A `claude` step is filed held open: when it
   signs, the engine's task waits for a word with nothing running, and `wf ls` prints the engine's `input-required` beside the run's
   word (`input-required · BLOCKED`). A `--nudge` that answers a blocked sign-off, or sends back a step at its gate, is the tick's
   `answer` to that task — the same task id, in the session that signed, with what is left of the step's cap — and the record gains
@@ -1694,13 +1677,14 @@ its own, and everything below reads the words back off the engine's view of the 
 - **Refused**, exit code 2 and nothing said, in the package's words first: a step the run does not have, a cancelled run,
   a step not filed yet, and one whose task has settled — words for it go into its next try's brief, with
   `wf retry --message`. Then the engine's own, verbatim (`say: …`): empty words, an attempt not started, a harness with no
-  way in (`codex`, `claude-detached`), a task in `bypassPermissions`, a session its harness does not list running. Words
+  way in (`codex`), a task in `bypassPermissions`, a session its harness does not list running. Words
   its harness did not take reject with no exit code: nothing was journalled, so say them again.
 - **`wf ls`** notes a step whose current try was told something, after the try it is on: `said to 2×`.
 - **`wf decide`** prints each thing said under the step, before its closeout — `said to try 1, at <time>:`, then the
   words in a fence, as data — for every try of the step, so the person who lands the work reads what the step was told.
-- **A try that continues the session is handed them again.** Taken is not read: a session blocked on a permission
-  prompt keeps the words queued, and loses them when it is stopped and continued (agent-runtime's open issue 16). So a
+- **A try that continues the session is handed them again.** Taken is not read: words said in the moment before a job's
+  result are journalled and never reach it (agent-runtime's issue 29), and a `--bg` session blocked on a prompt kept them
+  queued and lost them when it was continued (issue 16, closed with that road). So a
   try or a round that continues the session — `wf retry --nudge`, `retries:`, a round, the board's Continue — carries
   what was said to the last try's task as `## Said to your session`, inside `## Try <n>` or `## Round <n>`: each
   message with its time, fenced, before `## Your answer`. A new session (`--fresh`, or a nudge with nothing to
@@ -2245,8 +2229,7 @@ agent: note-writer
   as declared output (`input:`), collected artifacts, and the copies below.
 - **What a step is told to read is in its own folder: `given/`.** A folder team's steps run as jobs, fenced to their
   directory: a read outside it that their mode would ask about is denied with no prompt, and the session carries on none the
-  wiser. A background step (`background: true`) would wait on that prompt for ever instead, so on a folder team it must run
-  `dontAsk` or `bypassPermissions` (`validateFolderMode`). So the run copies in what its brief names, as it makes the folder — the files given with
+  wiser. So the run copies in what its brief names, as it makes the folder — the files given with
   `wf start --input` into `given/inputs`, and each folder this step waits on but did not continue into
   `given/from/<step>` — and the brief names those, by their path from the folder, and nothing under the store. Each is a
   copy taken as the step was filed: what a step does to one reaches nobody. A symlink is not copied through, nor a parent's
@@ -2297,7 +2280,7 @@ Read the note and say whether it is right.
   `acme-internal`: `WF_A2A_ACME_INTERNAL_TOKEN` is both) are refused together, since a card the other party writes could otherwise be
   handed the other's secret. The api names a step's agent and its address, origin and path only: a query string can carry a key.
 - **What such a step may not say.** The keys that tell a harness of ours how to run a session are refused at load, from the step and
-  from the agent it names, each with why: `model`, `effort`, `context`, `background`, `remote`, `permissionMode`, `sandbox`, `tools`,
+  from the agent it names, each with why: `model`, `effort`, `context`, `remote`, `permissionMode`, `sandbox`, `tools`,
   `disallowedTools`, `allowedTools`, `denials`, `budget`, `output`, `loop`, `resume` and `check` — and `workspace: main`, an agent's
   skills and harness prompt, and being a loop's target. The agent runs as its operator configured it, under their fence, and nothing
   here would hold it. The board's form leaves those keys off such a step (`KeyForm.remote`).
@@ -2435,7 +2418,7 @@ and `git pull`, which merges too, then `checkout`, `switch`, `restore`, `rebase`
 commands, not every way git can write. The refusal has to live on the step. `.claude/settings.json` denies no git, since a person's
 own session in the checkout may be asked to push, and it could not hold `git merge`: `ship.md` runs in the same checkout,
 and merging is its whole job. It denies a forced `git branch -D` and `browser_run_code_unsafe` by name as well, though it runs
-`dontAsk`: a `--bg` session reads the person's own user and local settings, where an allow may reach them. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
+`dontAsk`: a job in the checkout itself reads that checkout's working-tree `.claude/settings.json`, which a person may have edited, where an allow may reach them. What the supervisor's bookkeeping needs — `git add <path>`, `git commit <path>`,
 `git status`, `git log`, `git diff` — is not denied. A deny is a prefix, not a sandbox (`git -C <dir> merge`
 is not `git merge`): it stops a command that should not have been typed. `agent-fences.test.ts` holds the push, the forced delete, a kill by name
 (`pkill`, `killall`, in any part of a compound command) and the unsafe browser tool on any step a repository ships, and on a watcher step it writes itself; the other git denies are
@@ -3153,12 +3136,12 @@ words when it starts:
 ```text
 $ WF_MAX_CONCURRENT=4 WF_MAX_RUNS=2 wf up
 up — every 4000ms, ^C to stop
-   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)
+   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)
    runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)
 ```
 
 - **`WF_MAX_CONCURRENT`, 2 unless set, counts sessions at work, not runs.** It is the tick's own ceiling, per pool, and the only one (thin runtime stage 4c;
-  the engine's `maxConcurrent` until part 1, retired from the engine in part 2, which now refuses it): `claude` and `claude-detached` share one, since they share one subscription; `codex` has its
+  the engine's `maxConcurrent` until part 1, retired from the engine in part 2, which now refuses it): `claude` has one; `codex` has its
   own; and a step's check runs on the `check` harness, a pool of its own, so a suite never waits behind a session (`POOLS` in
   `src/cap/cap.ts`). Both steps of `dev` are on `claude`, so one run's review competes with another run's implement for the same slots.
   A task holds a slot while its session works, while it is starting, and once it is admitted until it starts; a session its harness lists
@@ -3219,7 +3202,7 @@ cache-the-engine-s-views-bet-9prl  queued at 2026-09-16T10:00:00.000Z, 1 of 1  w
 the tick starts it on its own once its turn comes and a run slot is free — take it back with wf inbox queue cache-the-engine-s-views-bet-9prl --off
 $ wf up
 up — every 4000ms, ^C to stop
-   sessions at work per pool: at most 2 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)
+   sessions at work per pool: at most 2 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)
    runs in flight: no cap (WF_MAX_RUNS)
 10:00:04  started cache-the-engine-s-views-bet-9prl as cache-the-engine-s-views-bet-k2q9
 10:00:09  cache-the-engine-s-views-bet-k2q9  filed implement
@@ -3784,7 +3767,7 @@ first time — is marked with the later time, and every worktree either prune re
 
 ## Choosing the model per step
 
-Verified against the transcripts: `claude --bg --model haiku` really does run Haiku
+Verified against the transcripts (then on `claude --bg`): `--model haiku` really does run Haiku
 (`claude-haiku-4-5-20251001`), while the default was `claude-opus-5`. So `model:` on a step works,
 and the transcript records what actually ran.
 
@@ -3866,13 +3849,12 @@ wants to run its own tests stops and waits for someone who, in a fleet, is not t
 asking — which fails quietly rather than visibly, and is right only when you have enumerated the
 tools a step may use. Set `permissionMode:` on a step to choose.
 
-Since thin runtime stage 2 part 2 (2026-09-23) a step runs as a job, `claude -p`, and **a job waits on
+Since thin runtime stage 2 part 2 (2026-09-23) a step runs as a job, on the Agent SDK since 2026-10-21, and **a job waits on
 nobody in any mode**: a call that would ask is denied, the session carries on, and the attempt records
-what was denied (agent-runtime's open issue 28, M1). So a mode no longer decides whether a step stalls,
+what was denied (agent-runtime's issue 28, M1). So a mode no longer decides whether a step stalls,
 only what it may do. Choose by role: a step that only reads — a planner, a reviewer — runs `dontAsk`,
-fenced by the checkout's `.claude/settings.json` allow list, which a job honours as a `--bg` session
-does (M11); a step that edits and runs its own tests runs `auto`; and a background session runs `dontAsk`
-with an `allowedTools:` of its own, since a `--bg` session in a mode that asks would wait.
+fenced by the checkout's `.claude/settings.json` allow list, which a job honours (M11); a step that edits and runs its own tests
+runs `auto`; and a long-lived session runs `dontAsk` with an `allowedTools:` of its own.
 
 Whichever you pick, the engine makes the consequence visible rather than mysterious: a session
 waiting on a person is reported as `needs-human`, and a step's `deadlineSeconds` is what stops one

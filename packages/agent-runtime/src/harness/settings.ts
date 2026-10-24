@@ -14,7 +14,7 @@ import { CLAUDE_CONFIG_FOLDERS } from './claude/vocabulary.ts';
 const claudeProjectFile = (dir: string): string => path.join(dir, CLAUDE_CONFIG_FOLDERS[0], 'settings.json');
 
 /** Whether `harness` reads a project configuration of its own in the directory a session is started in. */
-const readsProject = (harness: string): boolean => harness === 'claude' || harness === 'claude-detached';
+const readsProject = (harness: string): boolean => harness === 'claude';
 
 /** The strings of `value` where it is an array, `[]` for anything else: a file's own JSON, which arrives as it is. */
 const stringsOf = (value: unknown): string[] => (Array.isArray(value) ? value.filter((rule) => typeof rule === 'string') : []);

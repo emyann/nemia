@@ -16,7 +16,6 @@ import { Journal } from '../src/core/engine/journal.ts';
 import { Runner } from '../src/harness/seam.ts';
 import { file, type Filing } from '../src/core/engine/filing.ts';
 import {
-  claudeDetached,
   codex,
   type EngineOptions,
   type Event,
@@ -27,7 +26,8 @@ import {
   type TaskView,
 } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
-import { claudeBgRefuses, claudeCodeRefuses } from '../src/harness/claude/vocabulary.ts';
+import { claudeCodeRefuses } from '../src/harness/claude/vocabulary.ts';
+import { claudeJob } from '../src/harness/claude/code.ts';
 import { scratch } from './scratch.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
@@ -88,7 +88,7 @@ const ok: Filing = { brief: 'b', cwd: '/r' };
 const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ brief: '  ' }, /^`brief` is empty\. Say what the session should do\.$/],
   [{ cwd: '' }, /^`cwd` is empty\./],
-  ...['claude', 'codex', 'claude-detached'].map((harness): [Record<string, unknown>, RegExp] => [
+  ...['claude', 'codex'].map((harness): [Record<string, unknown>, RegExp] => [
     { cwd: 'repo', harness },
     new RegExp(`^\`cwd: repo\` is not an absolute path.*from here that is ${path.resolve('repo')}\\.$`),
   ]),
@@ -164,7 +164,7 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ config: { budgetUsd: Infinity } }, /^`budgetUsd: Infinity` is not an amount of dollars\./],
   [{ config: { budgetUsd: '5' } }, /^`budgetUsd: "5"` is not an amount of dollars\./],
   ...[0, -1, Number.NaN, Infinity, '5'].map((budgetUsd): [Record<string, unknown>, RegExp] => [
-    { harness: 'claude-detached', config: { budgetUsd } },
+    { harness: 'claude', config: { budgetUsd } },
     /is not an amount of dollars\. Give dollars above 0/,
   ]),
   [
@@ -175,7 +175,7 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ priority: Number.NaN }, /^`priority: NaN` is not a priority\./],
   [{ priority: '1' }, /^`priority: "1"` is not a priority\./],
   [{ priority: null }, /^`priority: null` is not a priority\./],
-  ...['claude', 'codex', 'claude-detached', 'check'].flatMap((harness) =>
+  ...['claude', 'codex', 'check'].flatMap((harness) =>
     [1.5, '1', 2 ** 31, -(2 ** 31) - 1, Number.NaN, null, Infinity].map((priority): [Record<string, unknown>, RegExp] => [
       { harness, priority },
       /^`priority: .*` is not a priority\. Give a whole number from -2147483648 to 2147483647, higher first, or leave it out for 0\./,
@@ -188,11 +188,10 @@ const REFUSALS: Array<[Record<string, unknown>, RegExp]> = [
   [{ config: { remoteControl: 'true' } }, /^`remoteControl` is Claude Code's own flag/],
   [{ config: { remoteControl: false } }, /^`remoteControl` is Claude Code's own flag/],
   [{ remoteControl: true }, /^`remoteControl` is Claude Code's own flag/],
-  [
-    { config: { background: 'yes' } },
-    /^`background: "yes"` is not true or false\. Give true to run the session as `claude --bg`, or leave it out to run it as a job\.$/,
-  ],
-  [{ config: { background: 1 } }, /^`background: 1` is not true or false\./],
+  ...[true, false, 'yes', 1].flatMap((background): [Record<string, unknown>, RegExp][] => [
+    [{ config: { background } }, /^`background`.*`restartPolicy: 'Always'`/],
+    [{ background }, /^`background`.*`restartPolicy: 'Always'`/],
+  ]),
   [{ config: { contextTokens: 0 } }, /^`contextTokens: 0` is not a number of tokens\./],
   [{ config: { contextTokens: 150000.5 } }, /^`contextTokens: 150000\.5` is not a number of tokens\./],
   [{ config: { contextTokens: '200k' } }, /^`contextTokens: "200k"` is not a number of tokens\./],
@@ -305,8 +304,7 @@ const harnessDoors = () => {
   const runner: AsyncRunner = { spawn: async () => {}, observe: async () => new Map(), stop: async () => {}, logs: async () => '' };
   return {
     shipped: over(),
-    flags: over({ claude: 'claude-bg', codex, 'claude-detached': claudeDetached, check }),
-    bgOnly: over({ claude: 'claude-bg' }),
+    flags: over({ claude: 'claude', codex, bare, check }),
     codexOnly: over({ codex }),
     brought: over({ picky, fake: asyncOps(fakeHarness(new Map())) }, 'picky'),
     own: over({ own }, 'own'),
@@ -325,7 +323,7 @@ const HARNESS_REFUSALS: Array<{ name: string; door: keyof Doors; spec: Record<st
     name: 'a harness the engine does not have, rather than run the task on the fallback',
     door: 'shipped',
     spec: { harness: 'banana' },
-    says: /`harness: banana` is not a harness this engine has.*claude, codex, claude-detached/,
+    says: /`harness: banana` is not a harness this engine has.*claude, codex, command/,
   },
   {
     name: "a permission mode outside Claude Code's own words",
@@ -334,10 +332,16 @@ const HARNESS_REFUSALS: Array<{ name: string; door: keyof Doors; spec: Record<st
     says: /`permissionMode: yolo` is not a mode Claude Code has/,
   },
   {
-    name: "Codex's sandbox on claude-detached",
+    name: "Codex's sandbox on claude",
     door: 'shipped',
-    spec: { harness: 'claude-detached', config: { permissionMode: 'read-only' } },
+    spec: { harness: 'claude', config: { permissionMode: 'read-only' } },
     says: /not a mode Claude Code has/,
+  },
+  {
+    name: '`claude-detached`, whose `claude -p` this runtime no longer runs, naming the harness that runs the same session',
+    door: 'shipped',
+    spec: { harness: 'claude-detached' },
+    says: /`claude-detached`.*`claude`/,
   },
   {
     name: "Claude Code's mode on codex",
@@ -376,52 +380,24 @@ const HARNESS_REFUSALS: Array<{ name: string; door: keyof Doors; spec: Record<st
     says: /`mcp.docs` is an SSE server, and Codex connects only to stdio and streamable HTTP/,
   },
   {
-    name: 'a spend cap on a background session, which keeps none',
-    door: 'shipped',
-    spec: { config: { budgetUsd: 5, background: true } },
-    says: /`budgetUsd: 5` is a spend cap, and a `claude --bg` session does not keep one.*Leave `config\.background` off to run the task as a job, which ends the session at its cap/,
-  },
-  {
     name: 'a spend cap on codex',
     door: 'shipped',
     spec: { harness: 'codex', config: { budgetUsd: 5 } },
     says: /`budgetUsd: 5` is a spend cap in dollars, and `codex exec` has none/,
   },
-  ...['codex', 'claude-detached', 'check'].map((harness) => ({
-    name: `claude.remoteControl on ${harness}, which has no such flag, ahead of the bag's own refusal`,
+  ...['codex', 'bare', 'check'].map((harness) => ({
+    name: `claude.remoteControl on ${harness}, a process of its own no control request reaches, ahead of the bag's own refusal`,
     door: 'flags' as const,
     spec: { harness, config: { claude: { remoteControl: true } } },
-    says: new RegExp(
-      `^\`claude\\.remoteControl\` asks for a session bridged to claude\\.ai, and the \`${harness}\` harness has no such flag.*File the task on \`claude\`, or leave \`claude\\.remoteControl\` off`,
-    ),
+    says: new RegExp(`^\`claude\\.remoteControl\`.*\`${harness}\`.*File the task on \`claude\`, or leave \`claude\\.remoteControl\` off`),
   })),
   {
     name: 'claude.remoteControl on an engine none of whose harnesses bridges a session',
     door: 'codexOnly',
     spec: { config: { claude: { remoteControl: true } } },
-    says: /the `codex` harness has no such flag.*Leave `claude\.remoteControl` off: none of this engine's harnesses bridges a session/,
+    says: /the `codex` harness.*Leave `claude\.remoteControl` off: none of this engine's harnesses bridges a session/,
   },
-  {
-    name: 'claude.remoteControl on a job, which a task at shipped defaults is unless it asks for a background session',
-    door: 'shipped',
-    spec: { config: { claude: { remoteControl: true } } },
-    says: /^`claude\.remoteControl` bridges a session to claude\.ai, and only a background session \(`claude --bg`\) can be bridged.*Give `config\.background: true` as well, or leave `claude\.remoteControl` off/,
-  },
-  ...['codex', 'claude-detached'].map((harness) => ({
-    name: `background on ${harness}, which has no such mode`,
-    door: 'shipped' as const,
-    spec: { harness, config: { background: true } },
-    says: new RegExp(
-      `\`background: true\` asks for a Claude Code background session, and the \`${harness}\` harness has no such mode\\. File the task on \`claude\`, or leave \`background\` off`,
-    ),
-  })),
-  {
-    name: 'background on a claude-bg harness, every session of which is one already',
-    door: 'bgOnly',
-    spec: { config: { background: true } },
-    says: /the `claude` harness has no such mode: every session of it is one already\. Leave `background` off/,
-  },
-  ...['claude', 'claude-detached'].flatMap((harness) =>
+  ...['claude'].flatMap((harness) =>
     [99_999, 1_000_001, 1_000].map((contextTokens) => ({
       name: `contextTokens: ${contextTokens} on ${harness}, outside what Claude Code takes — it refuses one as it parses its arguments, so a spawn would fail on every pass`,
       door: 'shipped' as const,
@@ -435,7 +411,7 @@ const HARNESS_REFUSALS: Array<{ name: string; door: keyof Doors; spec: Record<st
     name: 'contextTokens on codex',
     door: 'shipped',
     spec: { harness: 'codex', config: { contextTokens: 200000 } },
-    says: /`contextTokens: 200000` sets the session's context window, and the `codex` harness has no such knob.*File the task on `claude` or `claude-detached`/,
+    says: /`contextTokens: 200000` sets the session's context window, and the `codex` harness has no such knob.*File the task on `claude`/,
   },
   {
     name: 'contextTokens on a HarnessSpec that declares no windows',
@@ -519,7 +495,7 @@ const TAKEN: Array<{
         'claude',
         { allowedTools: ['Write(**)', 'Edit(**)', 'Bash(npm test)', 'mcp__playwright__browser_navigate', `Bash(git commit -m 'wip')`] },
       ],
-      ['claude-detached', { mcp: { docs: { type: 'sse', url: 'https://h/sse' } } }],
+      ['claude', { mcp: { docs: { type: 'sse', url: 'https://h/sse' } } }],
       [
         'claude',
         {
@@ -529,9 +505,7 @@ const TAKEN: Array<{
           },
         },
       ],
-      ['claude', { background: true }],
-      ['claude', { background: true, claude: { remoteControl: true } }],
-      ['claude', { background: false }],
+      ['claude', { claude: { remoteControl: true } }],
     ] as Array<[string, HarnessArgs]>
   ).map(([harness, config]) => ({
     name: `${harness} journals ${JSON.stringify(config)} on the record, for the runner`,
@@ -539,8 +513,8 @@ const TAKEN: Array<{
     spec: { harness, config },
     holds: (filed: Extract<Event, { kind: 'filed' }>) => assert.deepEqual(filed.config, config),
   })),
-  ...(['claude-detached', 'claude'] as const).map((harness) => ({
-    name: `a job keeps its spend cap on ${harness}, under config and nowhere else: \`claude -p\` ends the session at it`,
+  ...(['claude'] as const).map((harness) => ({
+    name: `a job keeps its spend cap on ${harness}, under config and nowhere else: the SDK ends the session at it`,
     door: 'shipped' as const,
     spec: { harness, config: { budgetUsd: 0.25 } },
     holds: (filed: Extract<Event, { kind: 'filed' }>, view: TaskView) => {
@@ -555,6 +529,25 @@ const TAKEN: Array<{
     spec: { harness: 'codex', priority },
     holds: (_: unknown, view: TaskView) => assert.equal(view.state.priority, priority),
   })),
+  ...([undefined, 'Always'] as const).map((restartPolicy) => ({
+    name: `claude.remoteControl on a Claude Code ${restartPolicy ? 'long-lived session' : 'job'}, on the record and read back: the bridge opens at init on either`,
+    door: 'shipped' as const,
+    spec: { config: { claude: { remoteControl: true } }, ...(restartPolicy ? { restartPolicy } : {}) },
+    holds: (filed: Extract<Event, { kind: 'filed' }>, view: TaskView) => {
+      assert.deepEqual(filed.config, { claude: { remoteControl: true } }, 'on the record, for the runner');
+      assert.equal(view.state.config?.claude?.remoteControl, true);
+      assert.equal(filed.restartPolicy, restartPolicy);
+    },
+  })),
+  {
+    name: "restartPolicy: 'Always' on claude with no other field: a long-lived session, no `background` asked",
+    door: 'shipped',
+    spec: { restartPolicy: 'Always' },
+    holds: (filed) => {
+      assert.equal(filed.restartPolicy, 'Always');
+      assert.equal(filed.config, undefined);
+    },
+  },
   {
     name: 'claude.remoteControl on claude, on the record and read back',
     door: 'flags',
@@ -567,7 +560,7 @@ const TAKEN: Array<{
   ...(
     [
       ['claude', 200000],
-      ['claude-detached', 100000],
+      ['claude', 100000],
       ['claude', 1000000],
     ] as const
   ).map(([harness, contextTokens]) => ({
@@ -641,7 +634,6 @@ test('file journals what it takes: on the record for the runner, under config an
         disallowedTools: ['SendMessage', 'Bash(npm run build)'],
         allowedTools: ['Edit(**)'],
         mcp: { web: { command: 'npx', args: ['web'] } },
-        background: true,
         contextTokens: 200000,
         claude: { remoteControl: true },
       },
@@ -651,7 +643,7 @@ test('file journals what it takes: on the record for the runner, under config an
   });
   await t.test('the core `file` journals a long-lived filing with its restart policy, and a filing without one as a job', async () => {
     const effect = coreDoor();
-    const always = await effect.run(file({ ...ok, restartPolicy: 'Always', queued: true, config: { background: true } }));
+    const always = await effect.run(file({ ...ok, restartPolicy: 'Always', queued: true }));
     const job = await effect.run(file(ok));
     const filedIn = (id: string) => effect.run(Effect.flatMap(Journal, (j) => j.read(id))).then((es) => es[0]);
     const filed = await filedIn(always);
@@ -685,9 +677,7 @@ test("REFUSED at shipped defaults: Codex's arguments on a harness that is not Co
     journal: asyncStore(memoryStore()),
     harnesses: {
       claude: 'claude',
-      bg: 'claude-bg',
       codex,
-      'claude-detached': claudeDetached,
       remote: { url: 'https://a.example' },
       mine: asyncOps(mine),
     },
@@ -695,7 +685,7 @@ test("REFUSED at shipped defaults: Codex's arguments on a harness that is not Co
   const engine = builtEngine(Engine.layer(options));
   const refused = (spec: Filing) => Effect.runPromise(Effect.flip(engine.file(spec)));
   const config = { codex: { trustFrom: '/repo' } };
-  for (const harness of ['claude', 'bg', 'claude-detached', 'remote']) {
+  for (const harness of ['claude', 'remote']) {
     const says = `\`codex\` gives Codex arguments of its own, and the \`${harness}\` harness is not Codex: its session would start without them. File the task on \`codex\`, or leave \`codex\` off.`;
     const err = await refused({ ...ok, harness, config });
     assert.equal(err._tag, 'FileRefused', harness);
@@ -728,62 +718,35 @@ test('REFUSED at shipped defaults: a long-lived task on a harness that ends its 
   const options: EngineOptions = {
     root: scratch('ae-long-lived-'),
     journal: asyncStore(memoryStore()),
-    harnesses: {
-      claude: 'claude',
-      bg: 'claude-bg',
-      codex,
-      'claude-detached': claudeDetached,
-      remote: { url: 'https://a.example' },
-      mine: asyncOps(mine),
-    },
+    harnesses: { claude: 'claude', hers: 'claude', codex, remote: { url: 'https://a.example' }, mine: asyncOps(mine) },
   };
   const engine = builtEngine(Engine.layer(options));
   const refused = (spec: Filing) => Effect.runPromise(Effect.flip(engine.file(spec)));
-  const open = 'File the task on `claude` with `config.background: true` or `bg`, or leave `restartPolicy` off.';
-  const cases: Array<[string, string]> = [
-    ['claude', 'the `claude` harness runs this task as a job, which ends its session with its turn.'],
-    ['codex', 'the `codex` harness ends its session with its turn.'],
-    ['claude-detached', 'the `claude-detached` harness ends its session with its turn.'],
-    ['remote', 'the `remote` harness ends its session with its turn.'],
-  ];
-  for (const [harness, why] of cases) {
-    const says = `\`restartPolicy: 'Always'\` keeps a session open until it is stopped, and ${why} ${open}`;
+  for (const harness of ['codex', 'remote']) {
     const err = await refused({ ...ok, harness, restartPolicy: 'Always' });
     assert.equal(err._tag, 'FileRefused', harness);
-    assert.equal(err.message, says, harness);
+    for (const name of [`\`${harness}\``, '`claude` or `hers`']) assert.ok(err.message.includes(name), `${name} in: ${err.message}`);
   }
-  assert.ok(
-    await Effect.runPromise(engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true } })),
-    'claude --bg keeps it open',
-  );
-  assert.ok(await Effect.runPromise(engine.file({ ...ok, harness: 'bg', restartPolicy: 'Always' })), 'so does the claude-bg harness');
+  for (const harness of ['claude', 'hers'])
+    assert.ok(
+      await Effect.runPromise(engine.file({ ...ok, harness, restartPolicy: 'Always' })),
+      `a harness configured \`'claude'\` keeps it open, attached, with no other field: ${harness}`,
+    );
   assert.ok(
     await Effect.runPromise(engine.file({ ...ok, harness: 'mine', restartPolicy: 'Always' })),
     'a runner brought as its own is asked nothing',
   );
-  const lone = builtEngine(
-    Engine.layer({ root: scratch('ae-long-lived-'), journal: asyncStore(memoryStore()), harnesses: { claude: 'claude' } }),
-  );
-  await assert.rejects(
-    Effect.runPromise(lone.file({ ...ok, harness: 'claude', config: { background: false }, restartPolicy: 'Always' })),
-    (e: Error) =>
-      e.message ===
-      "`restartPolicy: 'Always'` keeps a session open until it is stopped, and the `claude` harness runs this task as a job, which ends its session with its turn. File the task on `claude` with `config.background: true`, or leave `restartPolicy` off.",
-  );
   const jobs = builtEngine(Engine.layer({ root: scratch('ae-long-lived-'), journal: asyncStore(memoryStore()), harnesses: { codex } }));
-  await assert.rejects(
-    Effect.runPromise(jobs.file({ ...ok, harness: 'codex', restartPolicy: 'Always' })),
-    (e: Error) =>
-      e.message ===
-      "`restartPolicy: 'Always'` keeps a session open until it is stopped, and the `codex` harness ends its session with its turn. Leave `restartPolicy` off: none of this engine's harnesses keeps a session open.",
-  );
+  const none = await Effect.runPromise(Effect.flip(jobs.file({ ...ok, harness: 'codex', restartPolicy: 'Always' })));
+  assert.equal(none._tag, 'FileRefused');
+  assert.ok(none.message.includes('Leave `restartPolicy` off'), none.message);
 });
 
 test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, and taken on the one it does', async () => {
   const options = {
     root: scratch('ae-may-ask-'),
     journal: asyncStore(memoryStore()),
-    harnesses: { claude: 'claude' as const, hers: 'claude' as const, bg: 'claude-bg' as const, codex },
+    harnesses: { claude: 'claude' as const, hers: 'claude' as const, codex },
   };
   const engine = builtEngine(Engine.layer(options));
   const refused = (spec: Filing) => Effect.runPromise(Effect.flip(engine.file(spec)));
@@ -796,18 +759,12 @@ test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, 
   );
   const elsewhere = await refused({ ...asked, harness: 'codex' });
   assert.match(elsewhere.message, /the `codex` harness has no session this runtime holds attached/);
-  const detached = await refused({ ...asked, harness: 'bg', restartPolicy: 'Always' });
-  assert.match(
-    detached.message,
-    /the `bg` harness has no session this runtime holds attached/,
-    'a `claude --bg` session is driven by no `query()` of ours, so no call of it is caught at a hook: a long-lived filing does not make it hold one',
-  );
   assert.ok(
-    await Effect.runPromise(engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { background: true, mayAsk: true } })),
+    await Effect.runPromise(engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { mayAsk: true } })),
     'the long-lived `claude` session this runtime holds attached holds a call open, so it takes it',
   );
   assert.ok(
-    await Effect.runPromise(engine.file({ ...ok, harness: 'hers', restartPolicy: 'Always', config: { background: true, mayAsk: true } })),
+    await Effect.runPromise(engine.file({ ...ok, harness: 'hers', restartPolicy: 'Always', config: { mayAsk: true } })),
     'which harnesses hold a call is read off their configuration (`heldHarnessesOf`), never off the name: a harness named anything and configured `claude` holds one',
   );
   assert.match(
@@ -818,20 +775,16 @@ test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, 
 });
 
 test("REFUSED: a list in `enabledSkills` on a road that cannot close a session's skills, and taken on Claude Code's SDK roads", async () => {
+  const bare: HarnessSpec = { name: 'bare', command: () => ({ cmd: 'true', args: [] }) };
   const options = {
     root: scratch('ae-enabled-skills-'),
     journal: asyncStore(memoryStore()),
-    harnesses: { claude: 'claude' as const, bg: 'claude-bg' as const, 'claude-detached': claudeDetached, codex },
+    harnesses: { claude: 'claude' as const, bare, codex },
   };
   const engine = builtEngine(Engine.layer(options));
   const listed = { ...ok, config: { enabledSkills: ['my-plugin:review'] } };
   const roads: Array<[string, Filing]> = [
-    ['`claude --bg`, as a harness', { ...listed, harness: 'bg' }],
-    [
-      '`claude --bg`, as a background session of `claude` that is no long-lived one',
-      { ...ok, harness: 'claude', config: { ...listed.config, background: true } },
-    ],
-    ['`claude -p`, a spec that does not declare `enabledSkills`', { ...listed, harness: 'claude-detached' }],
+    ['a spec that does not declare `enabledSkills`', { ...listed, harness: 'bare' }],
     ['Codex', { ...listed, harness: 'codex' }],
   ];
   for (const [road, spec] of roads) {
@@ -843,15 +796,12 @@ test("REFUSED: a list in `enabledSkills` on a road that cannot close a session's
     'a job of `claude` runs on the Agent SDK, which takes the list',
   );
   assert.ok(
-    await Effect.runPromise(
-      engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { ...listed.config, background: true } }),
-    ),
+    await Effect.runPromise(engine.file({ ...listed, harness: 'claude', restartPolicy: 'Always' })),
     'a long-lived `claude` session runs attached, on the Agent SDK',
   );
-  for (const harness of ['bg', 'claude-detached', 'codex']) {
+  for (const harness of ['bare', 'codex']) {
     assert.ok(await Effect.runPromise(engine.file({ ...ok, harness, config: { enabledSkills: 'default' } })), `'default' on ${harness}`);
   }
-  assert.ok(claudeBgRefuses(listed), 'a bare `claude --bg` runner refuses the list too');
   assert.equal(claudeCodeRefuses(listed), undefined, "and Claude Code's job takes it");
 });
 
@@ -860,7 +810,6 @@ test("Claude Code's own runners refuse Codex's arguments, so a runner reached wi
   const says =
     '`codex: {"trustFrom":"/repo"}` gives Codex arguments of its own, and Claude Code is not Codex. Leave `codex` off a Claude Code task.';
   assert.equal(claudeCodeRefuses(task), says);
-  assert.equal(claudeBgRefuses(task), says);
-  assert.equal(claudeDetached.refuses!(task), says);
+  assert.equal(claudeJob.refuses!(task), says);
   assert.equal(codex.refuses!(task), undefined);
 });

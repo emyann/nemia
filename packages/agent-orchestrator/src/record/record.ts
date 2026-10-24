@@ -305,7 +305,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
  *                    for one, a step of its loop is. Never a step of a loop whose round is due: `nemia round --budget` raised the cap
  *                    (`roundSpans`)
- *   budget exhausted its harness ended its session at the step's `budget:` (a `claude -p` job: the runtime's `limit: 'budget'` on the
+ *   budget exhausted its harness ended its session at the step's `budget:` (a `claude` job: the runtime's `limit: 'budget'` on the
  *                    attempt)
  *   denied           it signed off, and its harness denied its try a call, on a step that says `denials: fail`: nothing after it is
  *                    filed and no check is run on work done without the tool; `retries:` never files a try of it, since the try would run

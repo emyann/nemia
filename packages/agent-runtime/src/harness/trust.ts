@@ -24,7 +24,7 @@ export type FolderTrust = {
 export type FolderTrusted = FolderTrust & { readonly wrote: boolean; readonly refused: string | null };
 
 /** Whether `harness` is one that keeps Claude Code's trust of a folder. */
-const keepsTrust = (harness: string): boolean => harness === 'claude' || harness === 'claude-detached';
+const keepsTrust = (harness: string): boolean => harness === 'claude';
 
 /**
  * What harness `harness` says of its trust of the folder `dir`, read off the harness's own file (`file`, its default when absent):

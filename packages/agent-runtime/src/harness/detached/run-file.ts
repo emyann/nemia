@@ -30,7 +30,7 @@ export const STALE_MS = 30_000;
 type WorkerState = 'working' | 'done' | 'failed' | 'stopped';
 
 /**
- * A run file's state in A2A's names — the one place this runner translates, since codex, the check and claude-detached all
+ * A run file's state in A2A's names — the one place this runner translates, since codex, the check and a Claude Code job all
  * run under the worker:
  *
  *   working, heartbeat fresh  → working    the worker is at work
@@ -67,8 +67,8 @@ export const overNow = (run: Beaten): boolean => detachedStateOf(run, instantNow
  * `ae-worker.ts` writes: `detachedStateOf` translates it, and reads a word no worker writes as `failed`, so the schema takes
  * any text there. **Never `blocked`**: these harnesses run a process and watch it exit, and a process that is waiting on
  * somebody is, from out here, a process that is running. So no detached session reaches the engine's `needs-human`, and
- * none carries a `Sighting.waitingFor`: there is nothing to carry, not something dropped. Only a harness with a registry
- * that says a session is waiting, and says what for — Claude Code's `claude agents --json` — can fill that field.
+ * none carries a `Sighting.waitingFor`: there is nothing to carry, not something dropped. Only a harness that says a session
+ * is waiting, and says what for — a remote A2A agent's Task — can fill that field.
  *
  * The file is the session: `stop` finds the worker by it. Removed, alone or with the store it is in, the worker takes it
  * for a stop, ends its harness and exits, and never writes the file again.

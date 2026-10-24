@@ -23,6 +23,10 @@
  * sense, a run's result on its base, says `landed` everywhere since that card. Every count left is the product's sense, what comes with
  * Nemia (its git place, the skills, servers and rules it lists, a default it is given with), which decision 13b renames to `builtin`
  * (the run core's `Builtin` row) and drives to zero. No old spelling is kept on purpose: nothing on disk or on the wire as input said it.
+ *
+ * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
+ * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
+ * `options.ts`). They stay while a caller may still write them.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   wf: {
@@ -142,5 +146,11 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-runtime/src/core/engine/journal.ts': 1,
     'packages/agent-runtime/src/core/event-schema.ts': 1,
     'packages/agent-runtime/src/harness/args.ts': 1,
+  },
+  'claude-detached': {
+    'packages/agent-runtime/src/service/harness-refusal.ts': 3,
+  },
+  'claude-bg': {
+    'packages/agent-runtime/src/service/options.ts': 3,
   },
 };

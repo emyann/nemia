@@ -1,14 +1,5 @@
 /**
  * The format, and the two ways a folder of markdown is not a workflow.
- *
- * What the tests of a folder team's permission modes hold, beyond their names:
- * - A background session (`claude --bg`) in `acceptEdits` or `auto` sits on its first call outside its folder waiting on a permission
- *   prompt nobody answers; `dontAsk` denies instead and `bypassPermissions` allows instead. Every other mode is refused by the name of
- *   the step in it, and the fixture puts that step second, so a rule that only reads the first step fails.
- * - A job waits on nobody in any mode: a job in a folder is denied each call it cannot make and exits on its own, and so a claude
- *   step with no `background: true` passes in every mode, as `claude-detached` does, the same session by another road. `codex exec`
- *   is not interactive and has one shell fenced by its `sandbox:`, so a codex folder team is never judged on Claude Code's words,
- *   which would tell it to write a `permissionMode: dontAsk` codex does not take.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +12,7 @@ import { CLOSEOUT_FIELDS, DEFAULT_ROUNDS, loopSpan, outputFields, STEP_KEY_MEANI
 import { agentsDir, parseFolder, renderStep, sessionContext, stepNameRefusal, type StepDraft } from '../src/workflow.ts';
 import { skillsFor } from '../src/skills/read.store.ts';
 import { loadAgents } from '../src/agents/read.store.ts';
-import { allowRuleOf, disallowedBy, DENIALS, HARNESSES } from '../src/workflow.ts';
+import { allowRuleOf, disallowedBy, DENIALS } from '../src/workflow.ts';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
 import {
   asNamed,
@@ -497,14 +488,14 @@ const placed = (lines: string): string => (/^(place:|workspace: folder)/m.test(l
 const fm = (name: string, lines: string) => parseWorkflow(name, `---\n${placed(lines)}\n---\nDo the work.\n`);
 
 test('every key a step has is read — none is accepted and then dropped', () => {
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'background' | 'sandbox'>, string> = {
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox'>, string> = {
     after: 'implement',
     resume: 'implement',
     input: 'implement',
     place: 'folder',
     writable: 'web, docs',
     reads: 'inbox',
-    harness: 'claude-detached',
+    harness: 'claude',
     model: 'opus',
     effort: 'xhigh',
     context: '150000',
@@ -545,8 +536,6 @@ test('every key a step has is read — none is accepted and then dropped', () =>
   );
   assert.deepEqual(attached.skills, ['look'], 'skills: is read on a step with an agent, and test/step-skills.test.ts reads it too');
   assert.deepEqual(attached.mcp, ['docs'], 'mcp: is read on a step with an agent, and test/agent-mcp.test.ts reads it too');
-  const session = fm('supervise', 'background: true');
-  assert.equal(session.background, true, "background: is read on a step of its own: it is Claude Code's alone, and keeps no budget:");
   const fenced = fm('review', 'harness: codex\nsandbox: read-only');
   assert.equal(fenced.sandbox, 'read-only', "sandbox: is read on a step of its own: it is Codex's, and the step above runs on Claude Code");
   const all = {
@@ -556,7 +545,6 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     agent: attached.agent,
     skills: attached.skills,
     mcp: attached.mcp,
-    background: session.background,
     sandbox: fenced.sandbox,
   };
   for (const key of STEP_KEYS) assert.notEqual(all[key], undefined, `${key} is on the list and never read`);
@@ -613,7 +601,7 @@ test('REFUSED: a table of meanings with a key missing, one out of order, an extr
 
 test('a key a step does not have is refused by name, with the keys it does have', () => {
   const list =
-    "A step's keys are: after, resume, input, place, workspace, writable, reads, slot, agent, skills, mcp, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, background, remote, deadlineSeconds, budget, check, retries, gate, output, tally, loop, rounds.";
+    "A step's keys are: after, resume, input, place, workspace, writable, reads, slot, agent, skills, mcp, harness, model, effort, context, permissionMode, sandbox, tools, disallowedTools, allowedTools, denials, remote, deadlineSeconds, budget, check, retries, gate, output, tally, loop, rounds.";
   assert.throws(
     () => fm('review', 'colour: red'),
     (e: unknown) => {
@@ -641,19 +629,25 @@ test('guide is refused by name, never silently dropped', () => {
   assert.throws(() => fm('implement', 'guide: CLAUDE.md'), refusedNaming('implement: ', '`guide`', 'CLAUDE.md'));
 });
 
-test("REFUSED: `maxAttempts`, retired with the runtime's own — at 1, what it was at by default, and at any count — pointing at `retries:` and `nemia retry`", () => {
-  for (const value of ['1', '2']) {
-    assert.throws(
-      () => fm('implement', `maxAttempts: ${value}`),
-      (e: unknown) => {
-        assert.ok(e instanceof WorkflowError);
-        assert.equal(e.exitCode, 2);
-        names(e.message, 'implement: ', '`maxAttempts`', '`retries: N`', '`nemia retry <run> <step>`', 'Delete the line');
-        return true;
-      },
-    );
+test("REFUSED: a key retired with no new name — `maxAttempts` with the runtime's own, `background` once every Claude Code session ran on the Agent SDK — at any value, naming the line to delete", () => {
+  for (const [key, values, words] of [
+    ['maxAttempts', ['1', '2'], ['`retries: N`', '`nemia retry <run> <step>`']],
+    ['background', ['true', 'false'], ['Agent SDK']],
+  ] as const) {
+    for (const value of values) {
+      assert.throws(
+        () => fm('implement', `${key}: ${value}`),
+        (e: unknown) => {
+          assert.ok(e instanceof WorkflowError);
+          assert.equal(e.exitCode, 2);
+          names(e.message, 'implement: ', `\`${key}\``, ...words, 'Delete the line');
+          return true;
+        },
+        `${key}: ${value}`,
+      );
+    }
+    assert.equal((STEP_KEYS as readonly string[]).includes(key), false, `${key} is no longer a step's key`);
   }
-  assert.equal((STEP_KEYS as readonly string[]).includes('maxAttempts'), false, "no longer a step's key");
 });
 
 /** Refused with exit 2 and a message that matches `pattern` — the message itself, not `String(err)`. */
@@ -679,7 +673,7 @@ test('context: is read once into tokens — thousands with `k`, millions with `m
   ] as const) {
     assert.equal(fm('implement', `context: ${written}`).context, tokens, written);
   }
-  assert.equal(fm('x', 'harness: claude-detached\ncontext: 300k').context, 300_000);
+  assert.equal(fm('x', 'harness: claude\ncontext: 300k').context, 300_000);
   assert.equal(fm('implement', 'harness: claude').context, undefined, "absent: the model's whole window");
 });
 
@@ -712,7 +706,7 @@ test('REFUSED: a context: that is not a number of tokens, by name, saying what t
   assert.throws(() => parseWorkflow('implement', '---\nplace: git\ncontext:\n---\nDo it.\n'), refusedWith(/`context` has no value/));
   for (const [line, tokens] of [
     ['context: 50k', 50_000],
-    ['harness: claude-detached\ncontext: 2M', 2_000_000],
+    ['harness: claude\ncontext: 2M', 2_000_000],
     ['context: 200', 200],
     ['harness: codex\ncontext: 200k', 200_000],
   ] as const)
@@ -799,7 +793,7 @@ test('REFUSED: tools: on a codex step, naming the sandbox sandbox: sets instead'
     refusedWith(/codex has none/),
     'wherever the harness line is, and beside the sandbox too',
   );
-  for (const h of ['claude', 'claude-detached']) assert.deepEqual(fm('review', `harness: ${h}\ntools: Read`).tools, ['Read'], h);
+  assert.deepEqual(fm('review', 'harness: claude\ntools: Read').tools, ['Read']);
 });
 
 test('disallowedTools: is the rules the harness is given to deny, one rule per entry, trimmed — and absent, nothing is denied', () => {
@@ -827,8 +821,7 @@ test('disallowedTools: is the rules the harness is given to deny, one rule per e
     );
   }
   assert.equal(fm('review', 'harness: claude').disallowedTools, undefined, 'absent: nothing denied beyond the settings');
-  for (const h of ['claude', 'claude-detached'])
-    assert.deepEqual(fm('review', `harness: ${h}\ndisallowedTools: SendMessage`).disallowedTools, ['SendMessage'], h);
+  assert.deepEqual(fm('review', 'harness: claude\ndisallowedTools: SendMessage').disallowedTools, ['SendMessage']);
 });
 
 test('REFUSED: an empty disallowedTools: — blank, or only commas — which denies nothing and reads as a fence', () => {
@@ -889,8 +882,7 @@ test('allowedTools: is the rules the harness is given to allow without asking, o
   const w = fm('write', 'permissionMode: dontAsk\nallowedTools: Edit(**) ,  Bash(npm test), Read,');
   assert.deepEqual(w.allowedTools, ['Edit(**)', 'Bash(npm test)', 'Read'], 'a space inside a rule stays in it; a trailing comma adds none');
   assert.equal(fm('review', 'harness: claude').allowedTools, undefined, 'absent: only what the permission mode allows by itself');
-  for (const h of ['claude', 'claude-detached'])
-    assert.deepEqual(fm('write', `harness: ${h}\nallowedTools: Edit(**)`).allowedTools, ['Edit(**)'], h);
+  assert.deepEqual(fm('write', 'harness: claude\nallowedTools: Edit(**)').allowedTools, ['Edit(**)']);
   assert.deepEqual(
     fm('write', 'allowedTools: Edit(**)\ndisallowedTools: SendMessage').allowedTools,
     ['Edit(**)'],
@@ -935,13 +927,10 @@ test('REFUSED: a rule on a file-editing tool that is not Edit, in either list, w
     refusedNaming('write: ', '`NotebookEdit(notes/**)`', 'Write `Edit(notes/**)` instead'),
     'wherever in the list it sits, and whatever the path',
   );
-  for (const h of ['claude', 'claude-detached']) {
-    assert.throws(
-      () => fm('write', `harness: ${h}\nallowedTools: Write(src/**)`),
-      refusedWith(/Claude Code matches a file write against `Edit` rules alone/),
-      h,
-    );
-  }
+  assert.throws(
+    () => fm('write', 'harness: claude\nallowedTools: Write(src/**)'),
+    refusedWith(/Claude Code matches a file write against `Edit` rules alone/),
+  );
   assert.throws(
     () => fm('write', 'disallowedTools: Write(**)'),
     refusedNaming('write: ', '`disallowedTools: Write(**)`', '`Write(**)`', 'allows the write', 'Write `Edit(**)` instead'),
@@ -1196,7 +1185,7 @@ test("an effort loads as written: which efforts a step's harness takes is the ru
   assert.equal(fm('implement', 'effort: extreme').effort, 'extreme');
   assert.equal(fm('review', 'harness: codex\neffort: ultra').effort, 'ultra');
   assert.equal(fm('review', 'harness: codex\neffort: minimal').effort, 'minimal');
-  assert.equal(fm('x', 'harness: claude-detached\neffort: max').effort, 'max');
+  assert.equal(fm('x', 'harness: claude\neffort: max').effort, 'max');
 });
 
 test('an empty check is refused, and so is one that reads as "no check" but runs as a command', () => {
@@ -1226,7 +1215,7 @@ test('budget: is dollars — a whole amount or one with cents — frozen as a nu
   assert.equal(fm('implement', 'budget: 5').budget, 5);
   assert.equal(fm('implement', 'budget: 2.50').budget, 2.5);
   assert.equal(fm('implement', 'budget: 0.25').budget, 0.25);
-  assert.equal(fm('implement', 'harness: claude-detached\nbudget: 3').budget, 3);
+  assert.equal(fm('implement', 'harness: claude\nbudget: 3').budget, 3);
   assert.equal(fm('implement', 'check: npm test').budget, undefined);
 });
 
@@ -1263,11 +1252,16 @@ test('retries is a whole count, and may be 0, which is what absent means', () =>
 test("harness: banana is refused with the harnesses there are; harness: check is the run's own", () => {
   assert.throws(
     () => fm('review', 'harness: banana'),
-    refusedNaming('review: ', '`harness: banana`', 'claude, codex, claude-detached', '`a2a:<name>`', '`a2a-agents.json`'),
+    refusedNaming('review: ', '`harness: banana`', 'claude, codex', '`a2a:<name>`', '`a2a-agents.json`'),
   );
   assert.throws(() => fm('review', 'harness: check'), refusedNaming('review: ', '`harness: check`', '`check:`'));
   assert.throws(() => fm('review', 'harness: Codex'), /not a harness a step can run on/, 'names are exact');
-  for (const h of ['claude', 'codex', 'claude-detached']) assert.equal(fm('x', `harness: ${h}`).harness, h);
+  assert.throws(
+    () => fm('review', 'harness: claude-detached'),
+    refusedNaming('review: ', '`harness: claude-detached`', 'Delete the line', 'Agent SDK'),
+    'the retired harness is refused by its name, with the fix',
+  );
+  for (const h of ['claude', 'codex']) assert.equal(fm('x', `harness: ${h}`).harness, h);
 });
 
 test("a permission mode, and a codex step's sandbox, load as written: which words a step's harness takes is the runtime's to judge, at `nemia start` (`start-config.test.ts`)", () => {
@@ -1275,7 +1269,7 @@ test("a permission mode, and a codex step's sandbox, load as written: which word
   assert.equal(fm('implement', 'permissionMode: read-only').permissionMode, 'read-only');
   assert.equal(fm('review', 'harness: codex\nsandbox: yolo').sandbox, 'yolo');
   assert.equal(fm('review', 'harness: codex\nsandbox: read-only').sandbox, 'read-only');
-  assert.equal(fm('x', 'harness: claude-detached\npermissionMode: bypassPermissions').permissionMode, 'bypassPermissions');
+  assert.equal(fm('x', 'harness: claude\npermissionMode: bypassPermissions').permissionMode, 'bypassPermissions');
   assert.equal(fm('x', 'permissionMode: auto').permissionMode, 'auto');
   assert.equal(fm('x', 'permissionMode: manual').permissionMode, 'manual', "the engine's word, Claude Code's manual, is a mode");
 });
@@ -1293,7 +1287,6 @@ test("REFUSED: `sandbox:` on a Claude Code step, the orchestrator's own rule —
   for (const [harness, line, where] of [
     ['claude', '', ' (there is no `harness:` line, so the step runs on claude)'],
     ['claude', 'harness: claude\n', ''],
-    ['claude-detached', 'harness: claude-detached\n', ''],
   ] as const) {
     for (const sandbox of CODEX_SANDBOXES) {
       assert.throws(
@@ -1897,108 +1890,8 @@ test('`workspace: folder` is read as its former spelling, `place: folder`, and n
   );
 });
 
-test("REFUSED at load: a background step of a folder team in a permission mode that can stop and ask — including no mode at all, which is the engine's `auto`; a job, on claude or claude-detached, and a codex step pass in every mode their harness takes", () => {
-  const team = (...modes: Array<string | undefined>): Workflow[] =>
-    modes.map((permissionMode, i) => ({
-      name: `s${i}`,
-      after: i ? [`s${i - 1}`] : [],
-      body: 'x',
-      place: 'folder',
-      background: true,
-      ...(permissionMode ? { permissionMode } : {}),
-    }));
-  const refused = (steps: Workflow[], pattern: RegExp) =>
-    assert.throws(
-      () => validate(steps),
-      (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message),
-      pattern.source,
-    );
-
-  assert.doesNotThrow(
-    () => validate(team('dontAsk', 'bypassPermissions')),
-    'the two modes that never ask: dontAsk, which denies instead, and bypassPermissions, which allows instead',
-  );
-  for (const mode of ['default', 'acceptEdits', 'plan', 'manual', 'auto']) {
-    refused(
-      team('dontAsk', mode),
-      new RegExp(
-        `^s1: \`place: folder\` works in a folder nobody has opened, \`background: true\` runs the step as a background session, and \`permissionMode: ${mode}\` can stop and ask a person to approve something — a read or a write outside the folder can`,
-      ),
-    );
-  }
-  refused(
-    team('dontAsk', undefined),
-    /^s1: `place: folder` works in a folder nobody has opened, `background: true` runs the step as a background session, and it sets no `permissionMode:`, so it runs on the engine's default, `auto`, which can stop and ask a person to approve something/,
-  );
-  refused(
-    team(undefined),
-    /Delete `background: true`, and the step runs as a job, which asks nobody in any mode; or write `permissionMode: dontAsk`, which denies such a call with no prompt and lets the session carry on\. A step in `dontAsk` that must write its own work needs `allowedTools: Edit\(\*\*\)` beside it: `dontAsk` asks nobody, so it allows nothing, not even a write in the step's own folder, and `Edit\(…\)` is the rule every file-editing tool is matched against\.$/,
-  );
-
-  const on = (harness: string | undefined, background: boolean | undefined, ...modes: Array<string | undefined>): Workflow[] =>
-    modes.map((mode, i) => ({
-      name: `s${i}`,
-      after: i ? [`s${i - 1}`] : [],
-      body: 'x',
-      place: 'folder',
-      ...(harness ? { harness } : {}),
-      ...(background !== undefined ? { background } : {}),
-      ...(mode ? { [harness === 'codex' ? 'sandbox' : 'permissionMode']: mode } : {}),
-    }));
-  for (const harness of HARNESSES) {
-    for (const mode of [...(harness === 'codex' ? CODEX_SANDBOXES : CLAUDE_PERMISSION_MODES), undefined]) {
-      assert.doesNotThrow(() => validate(on(harness, undefined, mode)), `${harness} ${mode ?? 'with no mode'}, a job`);
-      if (harness !== 'codex')
-        assert.doesNotThrow(() => validate(on(harness, false, mode)), `${harness} ${mode ?? 'with no mode'}, \`background: false\``);
-    }
-  }
-  assert.doesNotThrow(() => validate(on(undefined, undefined, 'acceptEdits', 'auto', undefined)), 'claude by default, a job');
-  assert.doesNotThrow(
-    () => parseFolder([['write', '---\nworkspace: folder\nharness: codex\nsandbox: workspace-write\n---\nWrite.\n']]),
-    'as a person writes one',
-  );
-  assert.doesNotThrow(
-    () => parseFolder([['write', '---\nworkspace: folder\nharness: codex\npermissionMode: workspace-write\n---\nWrite.\n']]),
-    'and as one was written before 2026-09-23',
-  );
-  assert.doesNotThrow(
-    () => parseFolder([['write', '---\nworkspace: folder\n---\nWrite.\n']]),
-    'and a claude step that names no mode, which a job runs in `auto`',
-  );
-
-  assert.doesNotThrow(
-    () => validate([{ name: 'implement', after: [], body: 'x', background: true, permissionMode: 'acceptEdits' }]),
-    "a team that is not a folder team is not judged on this: a repository run's steps work in a checkout a person opened, with its settings",
-  );
-
-  assert.throws(
-    () => parseFolder([['write', '---\nworkspace: folder\nbackground: true\npermissionMode: acceptEdits\n---\nWrite.\n']]),
-    refusedNaming('write: ', '`place: folder`', '`background: true`', '`permissionMode: acceptEdits`'),
-    'at load, from files: the same refusal reaches a person writing a folder of markdown',
-  );
-});
-
-test('`background: true` runs a claude step as a background session, `background: false` and no line as a job; REFUSED at load: another word, no value, the line twice; on another harness, or beside a `budget:`, it loads, and the runtime judges it at `nemia start` (`start-config.test.ts`)', () => {
-  assert.equal(fm('supervise', 'background: true').background, true);
-  assert.equal(fm('supervise', 'harness: claude\nbackground: true').background, true);
-  assert.equal(fm('supervise', 'background: false').background, false);
-  assert.equal(fm('supervise', '').background, undefined);
-  assert.equal(fm('supervise', 'background: false\nbudget: 2').budget, 2, 'a job keeps a cap');
-  const refusedWith = (pattern: RegExp) => (e: WorkflowError) => e.exitCode === 2 && pattern.test(e.message);
-  assert.throws(() => fm('supervise', 'background: yes'), refusedWith(/^supervise: `background: yes` is not `true` or `false`\./));
-  assert.throws(() => fm('supervise', 'background:'), refusedNaming('supervise: ', '`background` has no value', 'Delete the line'));
-  assert.throws(() => fm('supervise', 'background: true\nbackground: true'), refusedWith(/background/));
-  for (const harness of ['codex', 'claude-detached']) {
-    assert.equal(fm('supervise', `harness: ${harness}\nbackground: true`).background, true, harness);
-    assert.equal(fm('supervise', `harness: ${harness}\nbackground: false`).background, false, harness);
-  }
-  assert.equal(fm('supervise', 'background: true\nbudget: 2').budget, 2, 'a cap beside a background session');
-});
-
-test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a step without the line has none; REFUSED at load: another word, no value, the line twice, on codex, and beside `background: true` — where no denial is ever read', () => {
+test('`denials: fail` is read on a job of `claude`, and a step without the line has none; REFUSED at load: another word, no value, the line twice, and on codex — where no denial is ever read', () => {
   assert.equal(fm('review', 'denials: fail').denials, 'fail', 'at shipped defaults: harness claude, a job');
-  assert.equal(fm('review', 'harness: claude-detached\ndenials: fail').denials, 'fail');
-  assert.equal(fm('review', 'background: false\ndenials: fail').denials, 'fail', 'a job says what it was denied');
   assert.equal(fm('review', '').denials, undefined);
   assert.deepEqual(DENIALS, ['fail']);
   for (const word of ['true', 'stop', 'Fail', 'record']) {
@@ -2018,22 +1911,11 @@ test('`denials: fail` is read on a job of `claude` and `claude-detached`, and a 
     () => fm('review', 'harness: codex\ndenials: fail'),
     refusedNaming('review: ', '`denials: fail`', '`codex exec` records none', 'delete `harness: codex`', 'delete `denials: fail`'),
   );
-  assert.throws(
-    () => fm('supervise', 'background: true\ndenials: fail'),
-    refusedNaming(
-      'supervise: ',
-      '`denials: fail`',
-      '`claude --bg`',
-      'open issue 28',
-      'Delete `background: true`',
-      'delete `denials: fail`',
-    ),
-  );
   const step = fm('review', 'denials: fail\nallowedTools: Edit(**)');
   assert.equal(
     renderStep(step),
     ['---', 'place: git', 'allowedTools: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'),
-    'written back after allowedTools, before background',
+    'written back after allowedTools, before remote',
   );
   assert.deepEqual(parseWorkflow('review', renderStep(step)), step, 'and read back as the step');
 });
@@ -2293,9 +2175,9 @@ test("REFUSED at load: a `check:` on a gated step in the repository's checkout t
     'an ending on codex that runs its own check still loads',
   );
   assert.equal(
-    fm('ship', 'workspace: main\ngate: true\ncheck: npm test\nharness: claude-detached').check,
+    fm('ship', 'workspace: main\ngate: true\ncheck: npm test\nharness: claude').check,
     'npm test',
-    'claude -p takes the deny list',
+    'a claude job takes the deny list',
   );
 });
 
@@ -2531,14 +2413,14 @@ test('`renderStep` is the parser run backwards: every step of every folder there
 
 test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS` order, each as the parser reads it — and it reads back as the step', () => {
   const read = (file: string) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined);
-  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'background' | 'sandbox'>, string> = {
+  const values: Record<Exclude<StepKey, 'workspace' | 'slot' | 'agent' | 'skills' | 'mcp' | 'sandbox'>, string> = {
     after: 'implement',
     resume: 'implement',
     input: 'implement',
     place: 'folder',
     writable: 'web, docs',
     reads: 'inbox',
-    harness: 'claude-detached',
+    harness: 'claude',
     model: 'opus',
     effort: 'xhigh',
     context: '200000',
@@ -2567,11 +2449,11 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     read,
   );
   for (const key of STEP_KEYS)
-    if (!['workspace', 'slot', 'agent', 'skills', 'mcp', 'background', 'sandbox'].includes(key))
+    if (!['workspace', 'slot', 'agent', 'skills', 'mcp', 'sandbox'].includes(key))
       assert.notEqual(
         step[key],
         undefined,
-        `${key}: every key is set but workspace, slot, background and sandbox, each rendered below, agent, in test/agents.test.ts, skills, which needs an agent, in test/step-skills.test.ts, and mcp, which needs one too, in test/agent-mcp.test.ts`,
+        `${key}: every key is set but workspace, slot and sandbox, each rendered below, agent, in test/agents.test.ts, skills, which needs an agent, in test/step-skills.test.ts, and mcp, which needs one too, in test/agent-mcp.test.ts`,
       );
   const text = renderStep(step);
   assert.equal(
@@ -2584,7 +2466,7 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
       'place: folder',
       'writable: web, docs',
       'reads: inbox',
-      'harness: claude-detached',
+      'harness: claude',
       'model: opus',
       'effort: xhigh',
       'context: 200k',
@@ -2634,16 +2516,6 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     'slot: none, which only a workflow of one step sets, is written after workspace, before harness',
   );
   assert.deepEqual(parseWorkflow('supervise', watched), watching);
-
-  const session = parseWorkflow('supervise', '---\nplace: git\nremote: true\nbackground: true\nallowedTools: Read\n---\nWatch the runs.\n');
-  const kept = renderStep(session);
-  assert.equal(
-    kept,
-    ['---', 'place: git', 'allowedTools: Read', 'background: true', 'remote: true', '---', 'Watch the runs.', ''].join('\n'),
-    'background: true, which keeps no budget:, is written after allowedTools, before remote',
-  );
-  assert.deepEqual(parseWorkflow('supervise', kept), session);
-  assert.match(renderStep({ ...session, background: false }), /^background: false$/m, 'background: false is written too');
 
   const fenced = parseWorkflow('review', '---\nplace: git\nsandbox: read-only\neffort: high\nharness: codex\n---\nReview it.\n');
   const fence = renderStep(fenced);
@@ -2949,7 +2821,7 @@ test('REFUSED: a date, a card, a finding or a measured version in the words a pe
     autoDropped('claude', 'haiku', undefined)!,
     said(() => renderStep({ name: 'write', after: [], body: 'Write.', disallow: ['SendMessage'] } as unknown as StepDraft)),
     said(() => fm('review', 'harness: codex\npermissionMode: read-only\nsandbox: read-only')),
-    said(() => parseFolder([['write', '---\nworkspace: folder\nbackground: true\n---\nWrite.\n']])),
+    said(() => fm('write', 'background: true')),
     said(() => parseAgent('builder', '---\nskills: write-a-note\ntools: Read, Write\n---\nx\n')),
     said(() =>
       parseFolder(

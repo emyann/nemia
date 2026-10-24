@@ -21,7 +21,7 @@ import {
   type FormerReason,
   type StoredEvent,
 } from '../event-schema.ts';
-import { FORMER_ARGS, HARNESS_ARGS, RENAMED_ARGS, type HarnessArgs } from '../../harness/args.ts';
+import { FORMER_ARGS, HARNESS_ARGS, RENAMED_ARGS, TAKEN_ARGS, type HarnessArgs } from '../../harness/args.ts';
 import { countRead, countWrite } from './tally.ts';
 import { FEED_LOCK_WAIT_MS, feedLinesOf, readFeed, rotateFeed, withFeedLock, type ForgottenFeed } from './feed.ts';
 import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, type BodyRef, type Resolved } from './bodies.ts';
@@ -302,6 +302,9 @@ const renamed = (config: Record<string, unknown>): Record<string, unknown> => {
  *   claude.ai), under `config` or at a `filed` event's top level: moved into `config.claude` — `true` as the flag, where a
  *   flag already in `claude` is kept, and `false`, which asked for nothing, dropped. So a task filed bridged is bridged
  *   again on its next attempt.
+ * - A harness argument taken away with nothing in its place (`TAKEN_ARGS`: `background`, which ran a session as `claude --bg`),
+ *   under `config` or at a `filed` event's top level: dropped, so the task's next attempt runs as this runtime runs it — a job,
+ *   or, filed `restartPolicy: 'Always'`, a long-lived session held attached. The schema still reads it (`event-schema.ts`).
  * - A `filed` event's `priority` that is not a whole number — `null`, as JSON writes a `NaN` an older runtime took: left out,
  *   so the task waits at 0.
  * - An end's `stated`, the former name of whether the closing statement its task asked for came: read as `closedOut`, where
@@ -337,9 +340,10 @@ const upgradedInput = (event: Extract<Resolved, { kind: 'input' }>): Event => {
 const upgradedFiled = (event: Extract<Resolved, { kind: 'filed' }>): Event => {
   const filed = weighed(event);
   const legacy: Record<string, unknown> = filed;
-  const moved = [...HARNESS_ARGS, ...Object.keys(FORMER_ARGS), ...Object.keys(RENAMED_ARGS)].filter((key) => Object.hasOwn(legacy, key));
+  const formerKeys = [...Object.keys(FORMER_ARGS), ...Object.keys(RENAMED_ARGS), ...Object.keys(TAKEN_ARGS)];
+  const moved = [...HARNESS_ARGS, ...formerKeys].filter((key) => Object.hasOwn(legacy, key));
   const given: Record<string, unknown> = filed.config ?? {};
-  const former = [...Object.keys(FORMER_ARGS), ...Object.keys(RENAMED_ARGS)].filter((key) => Object.hasOwn(given, key));
+  const former = formerKeys.filter((key) => Object.hasOwn(given, key));
   if (!moved.length && !former.length) return filed;
   const lifted: Record<string, unknown> = {};
   const { config: _, ...rest } = filed;
@@ -348,14 +352,23 @@ const upgradedFiled = (event: Extract<Resolved, { kind: 'filed' }>): Event => {
     if (legacy[key] !== undefined) lifted[key] = legacy[key];
     delete left[key];
   }
-  const config: Record<string, unknown> = { ...renamed(lifted), ...renamed(given) };
+  const config = formerArgsOut({ ...renamed(lifted), ...renamed(given) }, filed.config?.claude);
+  return { ...rest, ...(Object.keys(config).length ? { config: argsOf(config) } : {}) };
+};
+
+/**
+ * `config` with its former arguments out (`upgrade`): each that a flag of Claude Code's replaces moved into `claude` (`FORMER_ARGS`),
+ * where a flag already in `claude` is kept, and each taken away with nothing in its place dropped (`TAKEN_ARGS`).
+ */
+const formerArgsOut = (config: Record<string, unknown>, claude: object | undefined): Record<string, unknown> => {
   const flags: Record<string, unknown> = {};
   for (const [key, flag] of Object.entries(FORMER_ARGS)) {
     if (config[key] === true) flags[flag] = true;
     delete config[key];
   }
-  if (Object.keys(flags).length) config.claude = { ...flags, ...filed.config?.claude };
-  return { ...rest, ...(Object.keys(config).length ? { config: argsOf(config) } : {}) };
+  for (const key of Object.keys(TAKEN_ARGS)) delete config[key];
+  if (Object.keys(flags).length) config.claude = { ...flags, ...claude };
+  return config;
 };
 
 /** A line as its JSON, or as its text where it is none — a write cut short — for the decoder to refuse by place. */

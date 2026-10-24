@@ -23,8 +23,7 @@ import { Effect, Exit, Scope } from 'effect';
 import { attachedSessions } from '../src/harness/claude/attached.ts';
 import { Engine } from '../src/index.ts';
 import { builtEngine } from './engine.ts';
-import { alive, appendAsk, crashNote, filesOf, openAsks, readRun, writeRun } from '../src/harness/claude/attached-file.ts';
-import { processStart } from '../src/harness/claude/inbox.ts';
+import { alive, appendAsk, crashNote, filesOf, openAsks, processStart, readRun, writeRun } from '../src/harness/claude/attached-file.ts';
 import { ASK_ANSWERED, ASK_CUT, askHookOutput, DENIED_HERE } from '../src/harness/claude/attached-session.ts';
 import type { AskQuestion } from '../src/core/index.ts';
 import type { SpawnRequest } from '../src/harness/seam.ts';
@@ -48,7 +47,7 @@ const ONE: AskQuestion = {
 
 /**
  * A store, the stand-in's folder and a long-lived spawn whose session works there on `plan`, `config` laid over the request's own: the
- * shape a session she is runs in (`restartPolicy: 'Always'` with `background: true`).
+ * shape a session she is runs in (`restartPolicy: 'Always'`).
  */
 const place = (plan: object, config: Record<string, unknown> = {}) => {
   const root = scratch('ae-asks-');
@@ -59,7 +58,7 @@ const place = (plan: object, config: Record<string, unknown> = {}) => {
     brief: 'do the work',
     cwd: dir,
     restartPolicy: 'Always',
-    config: { background: true, ...config, env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify({ turns: 'many', ...plan }) } },
+    config: { ...config, env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify({ turns: 'many', ...plan }) } },
   };
   return { root, dir, request };
 };
@@ -336,7 +335,7 @@ test(
         cwd: dir,
         harness: 'claude',
         restartPolicy: 'Always',
-        config: { background: true, mayAsk: true },
+        config: { mayAsk: true },
       }),
     );
     const ask = await until(

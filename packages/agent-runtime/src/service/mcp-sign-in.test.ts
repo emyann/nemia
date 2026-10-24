@@ -15,6 +15,7 @@ import type { HarnessConfig } from './options.ts';
 import type { McpCli, McpSignInAsk, SignInSettled } from '../harness/mcp-sign-in.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 import { scratch } from '../../test/scratch.ts';
+import { codex } from '../harness/codex/codex.ts';
 
 const CLAUDE: Record<string, HarnessConfig> = { claude: 'claude' };
 const GITHUB: RemoteMcpServer = {
@@ -199,12 +200,12 @@ test('mcpSignInVerbsOf: what is refused, and what a refusal leaves behind', asyn
     'REFUSED: an engine with no Claude Code harness signs in and out of nothing, naming its harnesses, and spawns nothing',
     async () => {
       const s = seams();
-      const v = mcpSignInVerbsOf({ bg: 'claude-bg' }, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
+      const v = mcpSignInVerbsOf({ coder: codex }, scratch('ae-sign-in-'), undefined, { cli: s.run, ask: s.ask });
       for (const verb of [v.mcpSignIn('github', GITHUB, 'secret'), v.mcpSignOut('github', GITHUB)]) {
         const err = await refusalOf<unknown>(verb);
         assert.deepEqual([err._tag, err.held], ['McpSignInRefused', false]);
         assert.ok(err.message.includes('no Claude Code harness'), err.message);
-        assert.ok(err.message.includes('bg'), err.message);
+        assert.ok(err.message.includes('coder'), err.message);
       }
       assert.deepEqual([s.cli, s.sessions.length], [[], 0]);
     },

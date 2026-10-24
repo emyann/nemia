@@ -1510,20 +1510,20 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
   );
 });
 
-test("a claude-detached step's cap, shared by its tries and raised by a person", async (t) => {
+test("a claude job's cap, shared by its tries and raised by a person", async (t) => {
   const s = story(t);
   const b = stage.board();
   await s.test(
     'its `budget:` goes to the engine as `budgetUsd`; `retries:` files the next try with what is left of it — at the cap, none',
     async () => {
       const run = await throughCheck(
-        ['harness: claude-detached', 'check: npm test', 'retries: 2', 'budget: 3'],
+        ['harness: claude', 'check: npm test', 'retries: 2', 'budget: 3'],
         'failed',
         { exitCode: 1 },
         { closeout: SIGNED, usage: { costUsd: 2.9 } },
       );
       const implement = `${run.id}-implement`;
-      assert.deepEqual([b.tasks.get(implement)!.spec.harness, b.tasks.get(implement)!.spec.config?.budgetUsd], ['claude-detached', 3]);
+      assert.deepEqual([b.tasks.get(implement)!.spec.harness, b.tasks.get(implement)!.spec.config?.budgetUsd], ['claude', 3]);
       assert.deepEqual((await tick(run.id)).tried, ['implement'], '$2.90 of $3: `retries:` tries it');
       const try2 = `${implement}-try2`;
       assert.equal(b.tasks.get(try2)!.spec.config?.budgetUsd, 0.1, 'what is left of $3 after $2.90');
@@ -1542,7 +1542,7 @@ test("a claude-detached step's cap, shared by its tries and raised by a person",
   let id = '';
   const implement = () => `${id}-implement`;
   await s.test('a session its harness ended at the cap reads budget exhausted, and is not tried by `retries:`', async () => {
-    const run = await startedRun(implementThenReview(['harness: claude-detached', 'check: npm test', 'retries: 2', 'budget: 3']));
+    const run = await startedRun(implementThenReview(['harness: claude', 'check: npm test', 'retries: 2', 'budget: 3']));
     id = run.id;
     await tick(id);
     ended(implement(), 'failed', { exitCode: 1, reason: 'harness', limit: 'budget', usage: { costUsd: 3.02 } });
@@ -1585,11 +1585,11 @@ test("a claude-detached step's cap, shared by its tries and raised by a person",
     await stage.runWith(b.e, retryRun(id, 'implement', { mode: 'fresh', budget: 8 }));
     assert.deepEqual((await tick(id)).tried, ['implement']);
     const spec = b.tasks.get(`${implement()}-try2`)!.spec;
-    assert.deepEqual([spec.harness, spec.config?.budgetUsd, spec.resumeFrom], ['claude-detached', 4.98, undefined]);
+    assert.deepEqual([spec.harness, spec.config?.budgetUsd, spec.resumeFrom], ['claude', 4.98, undefined]);
     assert.match(spec.brief, /The last try's session was ended by its harness at this step's budget, before it signed off\./);
   });
   await s.test('a step blocked under its cap, asking for more, takes a `--budget` above the cap and not one at or under it', async () => {
-    const run = await startedRun(implementThenReview(['harness: claude-detached', 'budget: 20']));
+    const run = await startedRun(implementThenReview(['harness: claude', 'budget: 20']));
     const blocked = `${run.id}-implement`;
     await tick(run.id);
     const asked = { outcome: 'blocked', summary: 'ran out of room', artifacts: [], needs: 'a try with a larger budget, about $15–25' };
@@ -1616,7 +1616,7 @@ test("a claude-detached step's cap, shared by its tries and raised by a person",
     assert.deepEqual((await tick(run.id)).tried, ['implement']);
     assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: blocked, cause: 'nudge', budget: 40 }]);
     const spec = b.tasks.get(`${blocked}-try2`)!.spec;
-    assert.deepEqual([spec.harness, spec.config?.budgetUsd], ['claude-detached', 20.73], 'what is left of $40 after $19.27');
+    assert.deepEqual([spec.harness, spec.config?.budgetUsd], ['claude', 20.73], 'what is left of $40 after $19.27');
     assert.match(spec.brief, /A person asked for this try: `nemia retry --nudge --budget 40`, raising this step's budget to \$40\./);
     assert.doesNotMatch(spec.brief, /had together cost its budget or more/);
   });
@@ -1804,7 +1804,7 @@ test("REFUSED at `nemia start`: a step named for what a run cuts under a step's 
     });
 });
 
-test('what the run files held open: a Claude Code job, and never a codex step, a background session or a check', async (t) => {
+test('what the run files held open: a Claude Code job, and never a codex step or a check', async (t) => {
   const b = stage.board();
   const filedOf = (id: string) => b.specs.find((x) => x.id === id)!;
   await t.test('a Claude Code job is filed held open, and its check is not', async () => {
@@ -1812,10 +1812,9 @@ test('what the run files held open: a Claude Code job, and never a codex step, a
     assert.equal(filedOf(`${run.id}-implement`).holdOpen, true);
     assert.equal(Object.hasOwn(filedOf(`${run.id}-implement-check`), 'holdOpen'), false, "a check is the run's own, never held open");
   });
-  for (const lines of [['harness: codex'], ['background: true', 'permissionMode: dontAsk']])
-    await t.test(`${lines[0]}: not held open`, async () => {
-      const run = await startedRun(implementThenReview(lines));
-      assert.deepEqual((await tick(run.id)).filed, ['implement']);
-      assert.equal(Object.hasOwn(filedOf(`${run.id}-implement`), 'holdOpen'), false);
-    });
+  await t.test('harness: codex: not held open', async () => {
+    const run = await startedRun(implementThenReview(['harness: codex']));
+    assert.deepEqual((await tick(run.id)).filed, ['implement']);
+    assert.equal(Object.hasOwn(filedOf(`${run.id}-implement`), 'holdOpen'), false);
+  });
 });

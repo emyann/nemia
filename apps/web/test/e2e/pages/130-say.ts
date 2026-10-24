@@ -4,20 +4,20 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, sidebar, themeOf } from '../board.ts';
 import { expectCount, expectNone, expectVisible, Refused, settled, WAIT_MS, watch } from '../checks.ts';
-import { DRAFT_TRANSCRIPT, REGISTRY, SAYING } from '../seed.ts';
+import { attachedFiles, DRAFT_TRANSCRIPT, SAYING } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { apiEnv, heard, OUT, REPO, store } from '../world.ts';
 
 export default {
   /**
-   * The steering channel: words said to draft's running session from its page go through the api to the session's inbox and onto its
+   * The steering channel: words said to draft's running session from its page go through the api to the session's say file and onto its
    * record, where the step's detail and wf decide read them back. In a page of its own whose one refusal is the point, words sent after the
    * session ended while the page still shows it running are refused in the package's words under the composer, which keeps them to send
    * again, and nothing is said or journalled. The page follows a live session, whose stream never finishes (`follows`). It takes its
    * writes back, draft's task journal,
-   * the engine's feed, its conversation and `claude agents` as seeded, at work and told nothing, so each page after it, in either theme,
+   * the engine's feed, its conversation and its run file as seeded, at work and told nothing, so each page after it, in either theme,
    * reads the store as it was: the session's end goes on the feed as the runtime writes it, and the feed cut back empties the api's memo of
-   * runs at rest; `claude agents` lists it done, its process gone, which ends its follow, and the workflow feed says the step settled.
+   * runs at rest; its run file says it completed, which ends its follow, and the workflow feed says the step settled.
    */
   name: 'say',
   route: `/runs/${SAYING.run}/steps/${SAYING.step}`,
@@ -31,8 +31,8 @@ export default {
     const seeded = fs.readFileSync(journal, 'utf8');
     const conversation = path.join(store!, DRAFT_TRANSCRIPT);
     const seededConversation = fs.readFileSync(conversation, 'utf8');
-    const registry = path.join(store!, REGISTRY);
-    const listed = fs.readFileSync(registry, 'utf8');
+    const { run: runFile } = attachedFiles(store!, `ae/${taskId}/1`);
+    const listed = fs.readFileSync(runFile, 'utf8');
     const sayRoute = `/api/runs/${SAYING.run}/steps/${SAYING.step}/say`;
     const said = (r: { request: () => { method: () => string }; url: () => string }) =>
       r.request().method() === 'POST' && new URL(r.url()).pathname === sayRoute;
@@ -68,13 +68,13 @@ export default {
           `the api answers with the engine's entry, { at, attempt, text, after }, after the seeded conversation's last event — it answered ${JSON.stringify(entry)}`,
         );
       }
-      const inbox = JSON.stringify({ type: 'user', session_id: SAYING.sessionId, message: { role: 'user', content: SAYING.words } });
+      const inbox = JSON.stringify({ text: SAYING.words });
       await expectNone(
         async () => (heard.length === before ? `it heard ${JSON.stringify(heard.slice(before))}` : null),
-        "the words reached the session's inbox once, as given",
+        "the words reached the session's say file once, as given",
       );
       if (heard.length !== before + 1 || JSON.stringify(heard.at(-1)) !== inbox) {
-        throw new Refused(`the words reached the session's inbox once, as given — it heard ${JSON.stringify(heard.slice(before))}`);
+        throw new Refused(`the words reached the session's say file once, as given — it heard ${JSON.stringify(heard.slice(before))}`);
       }
       const detail = (await (await page.request.get(new URL(`/api/runs/${SAYING.run}`, page.url()).href)).json()) as {
         steps: Array<{ name: string; said?: unknown }>;
@@ -147,9 +147,7 @@ export default {
         ];
         fs.appendFileSync(journal, ended.map((event) => `${JSON.stringify(event)}\n`).join(''));
         fs.appendFileSync(engineFeed, ended.map((event) => `${JSON.stringify({ taskId, event })}\n`).join(''));
-        const rows = JSON.parse(listed) as Array<{ name: string; pid?: number }>;
-        const done = ({ pid: _gone, ...row }: (typeof rows)[number]) => ({ ...row, state: 'done', status: 'idle' });
-        fs.writeFileSync(registry, JSON.stringify(rows.map((row) => (row.name === `ae/${taskId}/1` ? done(row) : row))));
+        fs.writeFileSync(runFile, JSON.stringify({ ...(JSON.parse(listed) as object), state: 'completed' }));
         fed(SAYING.run, SAYING.step, 'succeeded');
         const journalled = fs.readFileSync(journal, 'utf8');
         const heardBefore = heard.length;
@@ -171,7 +169,7 @@ export default {
         if ((await fieldOf(refused).inputValue()) !== SAYING.words)
           throw new Refused('the words stay in the box after a refusal, to send again');
         if (heard.length !== heardBefore)
-          throw new Refused(`nothing reaches the inbox on a refusal — it heard ${JSON.stringify(heard.slice(heardBefore))}`);
+          throw new Refused(`nothing reaches the say file on a refusal — it heard ${JSON.stringify(heard.slice(heardBefore))}`);
         if (fs.readFileSync(journal, 'utf8') !== journalled) throw new Refused(`nothing is journalled on a refusal — ${journal} changed`);
         await settled(refused);
         await photograph(refused, path.join(OUT, `say-refused-${await themeOf(refused)}.png`), { fullPage: true });
@@ -196,7 +194,8 @@ export default {
       fs.writeFileSync(journal, seeded);
       fs.writeFileSync(engineFeed, feedBefore);
       fs.writeFileSync(conversation, seededConversation);
-      fs.writeFileSync(registry, listed);
+      fs.writeFileSync(runFile, listed);
+      fs.rmSync(attachedFiles(store!, `ae/${taskId}/1`).say, { force: true });
       fed(SAYING.run, SAYING.step, 'running');
     }
     await expectVisible(

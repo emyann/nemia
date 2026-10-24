@@ -7,12 +7,11 @@ import assert from 'node:assert/strict';
 import { fenceReach, unruledIn } from '../src/harness/reach.ts';
 import { CLAUDE_PERMISSION_MODES } from '../src/harness/claude/vocabulary.ts';
 import { CODEX_SANDBOXES } from '../src/harness/codex/vocabulary.ts';
-import { claudeDetached } from '../src/harness/claude/code.ts';
 import { attachedOptions } from '../src/harness/claude/attached-options.ts';
-import { claudeArgv } from '../src/harness/claude/bg.ts';
 import { codex } from '../src/harness/codex/codex.ts';
 
-const CLAUDES = ['claude', 'claude-detached'];
+/** The harness names that run Claude Code; `claude-detached`, the `claude -p` road, is no longer one, and reaches nothing. */
+const CLAUDES = ['claude'];
 
 /** The word after `flag` in `args`. */
 const after = (args: readonly string[], flag: string): string | undefined => args[args.indexOf(flag) + 1];
@@ -28,7 +27,7 @@ test('Claude Code drops auto on a listed model, named or with a suffix, and on n
 });
 
 test("fenceReach: each harness's ranks, the word a task naming none runs in, and no reach where no fence is", async (t) => {
-  await t.test('every permission mode Claude Code takes has a rank, and no other word does, on either of its harnesses', () => {
+  await t.test('every permission mode Claude Code takes has a rank, and no other word does', () => {
     for (const harness of CLAUDES) {
       assert.deepEqual(Object.keys(fenceReach(harness)!.rank).sort(), [...CLAUDE_PERMISSION_MODES].sort(), harness);
     }
@@ -42,21 +41,16 @@ test("fenceReach: each harness's ranks, the word a task naming none runs in, and
       CODEX_SANDBOXES.map((_, i) => i),
     );
   });
-  await t.test(
-    'the word a task naming none runs in is what the runner gives it: a job and a background session of Claude Code, and Codex',
-    () => {
-      const task = { name: 'ae/t/1', brief: 'b', cwd: '/r' };
-      for (const harness of CLAUDES) {
-        assert.equal(fenceReach(harness)!.by, 'mode');
-        assert.equal(attachedOptions(task).permissionMode, fenceReach(harness)!.given, `${harness}, a job on the SDK`);
-        assert.equal(after(claudeDetached.command(task).args, '--permission-mode'), fenceReach(harness)!.given, `${harness}, claude -p`);
-        assert.equal(after(claudeArgv(task, []), '--permission-mode'), fenceReach(harness)!.given, `${harness}, a background session`);
-      }
-      assert.equal(after(codex.command(task).args, '-s'), fenceReach('codex')!.given);
-    },
-  );
+  await t.test('the word a task naming none runs in is what the runner gives it: a session of Claude Code, and Codex', () => {
+    const task = { name: 'ae/t/1', brief: 'b', cwd: '/r' };
+    for (const harness of CLAUDES) {
+      assert.equal(fenceReach(harness)!.by, 'mode');
+      assert.equal(attachedOptions(task).permissionMode, fenceReach(harness)!.given, `${harness}, a job on the SDK`);
+    }
+    assert.equal(after(codex.command(task).args, '-s'), fenceReach('codex')!.given);
+  });
   await t.test('a harness fenced by neither a mode nor a sandbox has no reach', () => {
-    for (const harness of ['command', 'a2a:x', 'nope', '']) assert.equal(fenceReach(harness), undefined, harness);
+    for (const harness of ['command', 'a2a:x', 'nope', '', 'claude-detached']) assert.equal(fenceReach(harness), undefined, harness);
   });
 });
 

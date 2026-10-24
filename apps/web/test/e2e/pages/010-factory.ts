@@ -36,7 +36,6 @@ import {
   FAKE,
   FOLDER,
   GATED,
-  HELD,
   LOOPING,
   NEIGHBOUR,
   PASS,
@@ -101,8 +100,8 @@ async function expectDiamond(page: Page, when: string): Promise<void> {
 }
 
 /**
- * The runs in flight against the cap, as the package counts them in the seeded store: NEIGHBOUR's session at work, HELD's the harness
- * blocked, and the diamond's running side — not its bottom, which waits on runs and has filed nothing, though the Factory has it on the
+ * The runs in flight against the cap, as the package counts them in the seeded store: NEIGHBOUR's session at work, HELD's at
+ * work, and the diamond's running side — not its bottom, which waits on runs and has filed nothing, though the Factory has it on the
  * floor.
  */
 const IN_FLIGHT_BY_CAP = 3;
@@ -201,12 +200,6 @@ export default {
       `a failed run whose session still runs is in flight: its card is on the Factory by default (${NEIGHBOUR.id})`,
     );
     await expectVisible(beside.getByText(/ at work$/), 'its card counts its time at work, as a card in flight does');
-    await expectVisible(
-      page.locator(`.react-flow__node[data-id="${HELD.id}"] [data-need="harness"][data-step="${HELD.blocked}"]`, {
-        hasText: new RegExp(`^${HELD.blocked} is blocked by the harness: ${HELD.wait}$`),
-      }),
-      `the card of a run whose session the harness blocked says so, and what the harness waits for — not needs-human alone, and not what the session said last, which only the run's page reads (${HELD.id})`,
-    );
     await settled(page);
     await expectClearOfPanels(page, 'on first load');
 

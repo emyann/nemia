@@ -48,5 +48,5 @@ export const names = (said: string | null | undefined, ...facts: string[]): void
  */
 export const signedOffOnce = (r: Run): Run => ({
   ...r,
-  steps: { ...r.steps, implement: { ...r.steps.implement, tries: [{ taskId: 't0', then: 'signoff' }] } },
+  steps: { ...r.steps, implement: { ...r.steps.implement, tries: [{ taskId: 't0', cause: 'signoff' }] } },
 });

@@ -779,9 +779,9 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
               workspace: '/repo',
               branch: 'main',
               tries: [
-                { taskId: 't0', then: 'nudge' },
-                { taskId: 't0b', then: 'nudge' },
-                { taskId: 't0c', then: 'nudge' },
+                { taskId: 't0', cause: 'nudge' },
+                { taskId: 't0b', cause: 'nudge' },
+                { taskId: 't0c', cause: 'nudge' },
               ],
             },
           },

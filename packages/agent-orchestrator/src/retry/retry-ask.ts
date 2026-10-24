@@ -33,12 +33,54 @@ export const continuesFrom = (
 };
 
 /**
+ * Why a try was moved behind the one that replaced it (`EarlierTry.cause`): the run's word, a person's mode, a round, a merge, a sending
+ * back.
+ */
+export type TryCause = 'retries' | 'signoff' | RetryMode | 'round' | 'merge' | 'back';
+
+/** Every `TryCause`, as the record's schema reads one. */
+export const TRY_CAUSES = [
+  'retries',
+  'signoff',
+  'nudge',
+  'fresh',
+  'recheck',
+  'round',
+  'merge',
+  'back',
+] as const satisfies readonly TryCause[];
+
+/**
+ * A run record's tries under the name their cause has now: a try an older tick wrote with `then` holds it as `cause`, and no `then`, so
+ * the record is written back with `cause` alone (`readRun`, before its schema reads it). Pure: a new value, `raw` untouched; what is not a
+ * try is left as it is, for the schema to refuse.
+ */
+export const upgradeTries = (raw: unknown): unknown => {
+  const steps: unknown = isObject(raw) ? Reflect.get(raw, 'steps') : undefined;
+  if (!isObject(steps) || Array.isArray(steps)) return raw;
+  const upgraded = Object.entries(steps).map(([name, step]) => {
+    const tries: unknown = isObject(step) ? Reflect.get(step, 'tries') : undefined;
+    return [name, Array.isArray(tries) ? { ...(step as object), tries: tries.map(upgradeTry) } : step];
+  });
+  return { ...(raw as object), steps: Object.fromEntries(upgraded) };
+};
+
+const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null;
+
+/** One try under `cause`: its former `then` moved there, where it holds no `cause` of its own, and dropped. */
+const upgradeTry = (t: unknown): unknown => {
+  if (!isObject(t) || !Object.hasOwn(t, 'then')) return t;
+  const { then, ...rest } = t as { then: unknown };
+  return Object.hasOwn(rest, 'cause') ? rest : { ...rest, cause: then };
+};
+
+/**
  * A try that is over, kept on the step's record behind the one that replaced it.
  *
- * `then` is what replaced it: `retries`, the run re-filing the step itself after its check refused — a
- * nudge on the workflow's word — or `signoff`, the run continuing a session that ended without its closeout, once a
- * round, before it waits on a person (`retriesDue`) — or the mode a person asked for, with the model a `--model` named. A
- * recheck replaces only the check, so the try after one has the same `taskId`. Or `round`: the step's loop
+ * `cause` is what replaced it (`TryCause`; a record written before it said `then`, read as `cause`, `upgradeTries`): `retries`, the
+ * run re-filing the step itself after its check refused — a nudge on the workflow's word — or `signoff`, the run continuing a session
+ * that ended without its closeout, once a round, before it waits on a person (`retriesDue`) — or the mode a person asked for, with the
+ * model a `--model` named. A recheck replaces only the check, so the try after one has the same `taskId`. Or `round`: the step's loop
  * went round again (`roundFiled`), and the try after it is the next round's. Or `merge`: the loop was filed again on the round it is on,
  * for its target to merge the base (`nemia merge`), which no round counts (`roundIn`). Or `back`: an ending that stopped on the base
  * branch, sent back with its work (`sentBack`), whose next try is filed on a new approval.
@@ -46,9 +88,9 @@ export const continuesFrom = (
 export type EarlierTry = {
   taskId: string;
   check?: { taskId: string };
-  then: 'retries' | 'signoff' | RetryMode | 'round' | 'merge' | 'back';
+  cause: TryCause;
   model?: string;
-  /** The pause filed the try after this one (`nemia pause --now` stopped it, and the resume tried it again): `then` stays its mode. */
+  /** The pause filed the try after this one (`nemia pause --now` stopped it, and the resume tried it again): `cause` stays its mode. */
   paused?: true;
   /** The cap a person raised the step's `budget:` to for the try after this one (`--budget`): in force from it on (`budgetOf`). */
   budget?: number;
@@ -123,7 +165,7 @@ export function messageRefusal(how: RetryHow, command = 'nemia retry <runId> <st
 }
 
 /** Whether a try moved behind starts the step's count of tries afresh: a round, a merge, an ending sent back. */
-const anew = (t: EarlierTry): boolean => t.then === 'round' || t.then === 'merge' || t.then === 'back';
+const anew = (t: EarlierTry): boolean => t.cause === 'round' || t.cause === 'merge' || t.cause === 'back';
 
 /**
  * The tries `retries:` has filed for a step in the round it is on. A person's do not count: `retries` is what the run may spend on its
@@ -131,7 +173,7 @@ const anew = (t: EarlierTry): boolean => t.then === 'round' || t.then === 'merge
  */
 export const retriesSpent = (record: StepRecord | undefined): number => {
   let spent = 0;
-  for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.then === 'retries' ? 1 : 0);
+  for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.cause === 'retries' ? 1 : 0);
   return spent;
 };
 
@@ -141,7 +183,7 @@ export const retriesSpent = (record: StepRecord | undefined): number => {
  */
 export const signoffsSpent = (record: StepRecord | undefined): number => {
   let spent = 0;
-  for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.then === 'signoff' ? 1 : 0);
+  for (const t of record?.tries ?? []) spent = anew(t) ? 0 : spent + (t.cause === 'signoff' ? 1 : 0);
   return spent;
 };
 
@@ -178,7 +220,7 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
   const over: EarlierTry = {
     taskId: record.taskId!,
     ...(check ? { check } : {}),
-    then: retry.by === 'ask' || retry.by === 'pause' ? retry.mode : retry.by,
+    cause: retry.by === 'ask' || retry.by === 'pause' ? retry.mode : retry.by,
     ...(retry.by === 'pause' ? { paused: true as const } : {}),
     ...(retry.model ? { model: retry.model } : {}),
     ...(retry.budget !== undefined ? { budget: retry.budget } : {}),
@@ -195,8 +237,8 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
  */
 export function sessionModel(step: Workflow, record: StepRecord | undefined): string | undefined {
   for (const t of [...(record?.tries ?? [])].reverse()) {
-    if (t.then === 'recheck') continue;
-    if (t.then === 'fresh') return t.model ?? step.model;
+    if (t.cause === 'recheck') continue;
+    if (t.cause === 'fresh') return t.model ?? step.model;
   }
   return step.model;
 }
@@ -208,7 +250,7 @@ export function sessionModel(step: Workflow, record: StepRecord | undefined): st
  * writing down is found (`adoptTries`).
  */
 export const turnsOf = (record: StepRecord | undefined): number =>
-  (record?.tries ?? []).filter((t) => t.taskId === record?.taskId && t.then !== 'recheck').length;
+  (record?.tries ?? []).filter((t) => t.taskId === record?.taskId && t.cause !== 'recheck').length;
 
 /** The asks a record already answers — each names a try its step has reached. The tick consumes these. */
 export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => asks.filter((a) => a.try <= tryOf(run, a.step));
@@ -248,5 +290,5 @@ export function answerOf(run: Run, step: string, answers: readonly RetryAsk[]): 
   const last = run.steps[step]?.tries?.at(-1);
   if (!last) return undefined;
   const n = tryOf(run, step);
-  return answers.find((a) => a.step === step && a.try === n && a.message !== undefined && a.mode === last.then && a.model === last.model);
+  return answers.find((a) => a.step === step && a.try === n && a.message !== undefined && a.mode === last.cause && a.model === last.model);
 }

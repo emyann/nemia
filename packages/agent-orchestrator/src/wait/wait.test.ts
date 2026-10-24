@@ -70,7 +70,7 @@ test('readiness under `after`: a run is ready once every parent shipped, and a r
     const { asked, shipped } = shippedOnly();
     assert.equal(runReady(run({ implement: 't1', review: null }, { after: ['a-1'] }), shipped), true);
     const between = run({ implement: null, review: null }, { after: ['a-1'] });
-    between.steps.implement = { taskId: null, tries: [{ taskId: 't1', then: 'round' }] };
+    between.steps.implement = { taskId: null, tries: [{ taskId: 't1', cause: 'round' }] };
     assert.equal(hasStarted(between), true, 'between a round and the pass that files it again, no step has a task, and it has started');
     assert.equal(runReady(between, shipped), true);
     assert.deepEqual(asked, []);

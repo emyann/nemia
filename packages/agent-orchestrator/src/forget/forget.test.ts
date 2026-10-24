@@ -79,7 +79,7 @@ const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
-      then: 'round' as const,
+      cause: 'round' as const,
     }));
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   return run(
@@ -213,7 +213,7 @@ test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other 
       'rm /wf/runs/r-1.asks/round-review-2',
     );
 
-    const tried = run({}, { steps: { implement: { taskId: 't1', tries: [{ taskId: 't0', then: 'nudge' }] }, review: { taskId: 't2' } } });
+    const tried = run({}, { steps: { implement: { taskId: 't1', tries: [{ taskId: 't0', cause: 'nudge' }] }, review: { taskId: 't2' } } });
     assert.equal(forgetRefusal(STEPS, tried, DONE, [], signedDone, asked, undefined, [askFor(2)]), null, 'spent: the record holds try 2');
     assert.equal(
       forgetRefusal(loop, inRound(2), ALL_SUCCEEDED, [], saidIn(2, false), asked, undefined, [], [roundAskFor(2)]),

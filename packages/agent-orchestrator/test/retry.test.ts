@@ -98,7 +98,7 @@ test('a person tries a failed step again, fresh, on another model', async (t) =>
     const record = readRun(id).steps.implement;
     assert.equal(record.taskId, `${id}-implement-try2`);
     assert.deepEqual(
-      record.tries?.map((x) => [x.taskId, x.then, x.model]),
+      record.tries?.map((x) => [x.taskId, x.cause, x.model]),
       [[`${id}-implement`, 'fresh', 'sonnet']],
     );
   });
@@ -540,7 +540,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
         taskId: try2(),
         workspace: run.repo,
         branch: run.branch,
-        tries: [{ taskId: `${id()}-implement`, check: { taskId: check1() }, then: 'retries' }],
+        tries: [{ taskId: `${id()}-implement`, check: { taskId: check1() }, cause: 'retries' }],
       });
       assert.match(spec.brief, /^## Try 2\n/);
       assert.deepEqual(JSON.parse(/\n```json\n([\s\S]*?)\n```/.exec(spec.brief)![1]), {
@@ -702,12 +702,13 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
     assert.deepEqual([pass.tried, pass.checked, pass.filed], [['implement'], ['implement'], []]);
     assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no step');
     assert.equal(b.tasks.get(check2())!.spec.harness, 'check');
+    const rechecked = [{ taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck' }];
     assert.deepEqual(filedAs(readRun(run.id).steps.implement), {
       taskId: `${run.id}-implement`,
       workspace: run.repo,
       branch: run.branch,
       check: { taskId: check2() },
-      tries: [{ taskId: `${run.id}-implement`, check: { taskId: check1() }, then: 'recheck' }],
+      tries: rechecked,
     });
   });
   await s.test('the check exits 0: the work passed as it stood, and the follower is filed', async () => {
@@ -756,7 +757,7 @@ test("`nemia retry` writes a person's ask, and the tick honours it once, consumi
       assert.deepEqual([third.tried, retryAsks(run.id)], [[], []]);
       assert.equal(b.filings.filter((f) => f === try2()).length, 1);
       assert.deepEqual(
-        readRun(run.id).steps.implement?.tries?.map((x) => [x.then, x.model]),
+        readRun(run.id).steps.implement?.tries?.map((x) => [x.cause, x.model]),
         [['fresh', 'opus']],
       );
     },
@@ -1030,7 +1031,7 @@ test('a blocked step answered with `nemia retry --message`', async (t) => {
     const brief = b.tasks.get(try2())!.spec.brief;
     assert.match(brief, /^## Try 2\n\nThe last try signed off `blocked`\./, 'its session continued, told why it is back');
     assert.ok(brief.includes(`\n\n## Your answer\n\n\`\`\`text\n${answer}\n\`\`\``), brief);
-    assert.equal(readRun(run.id).steps.implement?.tries?.[0]?.then, 'nudge');
+    assert.equal(readRun(run.id).steps.implement?.tries?.[0]?.cause, 'nudge');
     assert.ok(!recordText(run.id).includes('say so in the README'), 'the record keeps no message');
     assert.deepEqual(retryAsks(run.id), [], 'consumed');
   });
@@ -1097,7 +1098,7 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
       spec.brief,
       /^## Try 2\n\nThe last try's session was stopped before it signed off\.\nA person asked for this try: `nemia retry --nudge`\./,
     );
-    assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: taskId(), then: 'nudge' }]);
+    assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: taskId(), cause: 'nudge' }]);
     assert.deepEqual(retryAsks(run.id), [], 'consumed');
     const after = await tick(run.id);
     assert.deepEqual([after.tried, b.stopped, b.filings.filter((f) => f === try2()).length], [[], [taskId()], 1]);
@@ -1465,7 +1466,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
     assert.deepEqual(pass.tried, ['implement']);
     assert.ok(pass.notes.includes('implement: try 2 — nemia retry --nudge --budget 10'), pass.notes.join('\n'));
     assert.deepEqual(readRun(run.id).steps.implement?.tries, [
-      { taskId: implement(), check: { taskId: `${implement()}-check` }, then: 'nudge', budget: 10 },
+      { taskId: implement(), check: { taskId: `${implement()}-check` }, cause: 'nudge', budget: 10 },
     ]);
     const spec = b.tasks.get(try2())!.spec;
     assert.deepEqual([spec.resumeFrom, spec.config?.budgetUsd], [`native-${implement()}`, 5.75], 'a resume is charged its own spend');
@@ -1607,7 +1608,7 @@ test("a claude-detached step's cap, shared by its tries and raised by a person",
     assert.deepEqual(retryAsks(run.id), []);
     await stage.runWith(b.e, retryRun(run.id, 'implement', { mode: 'nudge', budget: 40 }));
     assert.deepEqual((await tick(run.id)).tried, ['implement']);
-    assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: blocked, then: 'nudge', budget: 40 }]);
+    assert.deepEqual(readRun(run.id).steps.implement?.tries, [{ taskId: blocked, cause: 'nudge', budget: 40 }]);
     const spec = b.tasks.get(`${blocked}-try2`)!.spec;
     assert.deepEqual([spec.harness, spec.config?.budgetUsd], ['claude-detached', 20.73], 'what is left of $40 after $19.27');
     assert.match(spec.brief, /A person asked for this try: `nemia retry --nudge --budget 40`, raising this step's budget to \$40\./);
@@ -1682,7 +1683,7 @@ test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nem
       ended(taskId, 'failed', endOf(reasons[1]));
       if (reasons[1] === 'unsigned') {
         assert.deepEqual((await tick(run.id)).tried, ['implement'], 'the run nudges it to sign off, itself');
-        assert.equal(readRun(run.id).steps.implement?.tries?.at(-1)?.then, 'signoff');
+        assert.equal(readRun(run.id).steps.implement?.tries?.at(-1)?.cause, 'signoff');
         ended(`${taskId}-try2`, 'failed', endOf('unsigned'));
       }
       const views = new Map([[taskId, await Effect.runPromise(b.e.view(taskId))]]);

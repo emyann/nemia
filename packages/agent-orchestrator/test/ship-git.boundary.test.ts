@@ -832,7 +832,7 @@ test("a merge of work that merges cleanly but whose landing check refused the me
   assert.equal(roundOf(run, 'review'), before, 'the round stays as it is');
   assert.equal(run.baseRef, base, "the run's base is the commit merged");
   assert.deepEqual(
-    run.steps.ship.tries?.map((t) => t.then),
+    run.steps.ship.tries?.map((t) => t.cause),
     ['back'],
   );
   assert.equal(run.steps.ship.landed, undefined, 'the ending sent back keeps no landing, and so lets no merge through a second time');

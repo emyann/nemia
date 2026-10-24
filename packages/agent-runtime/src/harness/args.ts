@@ -199,7 +199,7 @@ export const FORMER_ARGS: Readonly<Record<string, string>> = { remoteControl: 'r
  */
 export const TAKEN_ARGS: Readonly<Record<string, string>> = {
   background:
-    "`background` ran a Claude Code session as `claude --bg`, which this runtime no longer runs: every Claude Code session runs on the Agent SDK. Drop the field: a session that stays open until it is stopped is filed `restartPolicy: 'Always'`, and a step runs as a job.",
+    "`background` ran a Claude Code session as `claude --bg`, which this runtime no longer runs: every Claude Code session runs on the Agent SDK. Drop the field: a session that stays open until it is stopped is filed `restartPolicy: 'Always'`, and a task with no `restartPolicy` runs as a job.",
 };
 
 /**

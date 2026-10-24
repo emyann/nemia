@@ -318,7 +318,7 @@ const ceilingRefusalOf = (maxConcurrent: unknown): string | undefined =>
  */
 const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefined => {
   if ((h as unknown) === 'claude-bg') {
-    return `the \`${name}\` harness is \`'claude-bg'\`, Claude Code's \`--bg\` sessions, which this runtime no longer runs: every Claude Code session runs on the Agent SDK. Configure it as \`'claude'\`, and file a session meant to stay open with \`restartPolicy: 'Always'\`, which runs attached while a process holds the sessions (\`nemia up\`).`;
+    return `the \`${name}\` harness is \`'claude-bg'\`, Claude Code's \`--bg\` sessions, which this runtime no longer runs: every Claude Code session runs on the Agent SDK. Configure it as \`'claude'\`, and file a session meant to stay open with \`restartPolicy: 'Always'\`, which runs attached while a daemon holds the sessions.`;
   }
   if (typeof h !== 'object' && h !== 'claude') {
     return `the \`${name}\` harness is ${JSON.stringify(h) ?? String(h)}, which is no harness: give \`'claude'\`, a \`HarnessSpec\`, a remote agent or a \`RunnerOps\`.`;

@@ -201,7 +201,7 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
     /**
      * What is left of Claude Code's command line: `config.claude`'s own flags, and the two the Agent SDK 0.3.308 has no `Options`
      * for — `--no-chrome`, because Claude in Chrome, switched on by a user setting (`claudeInChromeDefaultEnabled`), connects even in
-     * a strict session, and a step that needs a browser names one in `mcp` or its checkout's `.mcp.json`; and `--worktree`. Looked
+     * a strict session, and a session that needs a browser names one in `mcp` or its checkout's `.mcp.json`; and `--worktree`. Looked
      * for in `sdk.d.ts` and not there; everything else a task gives here is a flag only Claude Code has. Look for an `Options`
      * before adding another, and say in this note when there is none.
      *

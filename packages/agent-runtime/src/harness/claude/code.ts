@@ -1,5 +1,5 @@
 /**
- * Claude Code as the engine runs it: every session on the Agent SDK. A step is a job, and a long-lived session
+ * Claude Code as the engine runs it: every session on the Agent SDK. A task is a job, and a long-lived session
  * (`restartPolicy: 'Always'`) is held attached.
  *
  * A job is one session on the Agent SDK, in a process of its own (`bin/ae-claude-job.ts`), detached by the engine's worker
@@ -8,7 +8,7 @@
  * keeps. Nobody is there to ask (`permissionPrompts: 'none'`); a call it may not make is denied and the session carries on, and the
  * result says what was denied. It reads its brief on its stdin, and words a person says while it works after it, until its result.
  *
- * A long-lived session runs attached, in the process that holds the sessions (`nemia up`), and nowhere else: with no holder its spawn
+ * A long-lived session runs attached, in the process that holds the sessions (a daemon), and nowhere else: with no holder its spawn
  * is refused, `unstartable`, in words naming the holder to start (`LONG_LIVED_UNHELD`).
  *
  * Either is bridged to claude.ai where its task asks (`claude.remoteControl`), on its first message (`attached-bridge.ts`): a held
@@ -76,7 +76,7 @@ export const claudePrepare = (r: SpawnRequest, beside?: (end: string) => string)
 export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'bin', 'ae-claude-job.ts');
 
 /**
- * A step run as a job: one session on the Agent SDK, run by a process of ours (`CLAUDE_JOB_BIN`) that the worker detaches as it
+ * A task run as a job: one session on the Agent SDK, run by a process of ours (`CLAUDE_JOB_BIN`) that the worker detaches as it
  * detaches any harness. The bin reads the spawn request the runner wrote for it (`needsRequest`), builds the session's options
  * with `attachedOptions` — the same translation a held session is given, fact for fact — and prints each of the SDK's messages as
  * one JSON line, the stream every reader of a job reads, and every run already stored. Nothing on this road builds a Claude Code
@@ -154,7 +154,7 @@ export const claudeJob: HarnessSpec = claudeJobSpec();
  * holder, and nowhere else. A `RunnerError` with `refused`, so the attempt ends `unstartable` in these words and is not restarted.
  */
 export const LONG_LIVED_UNHELD = (name: string): string =>
-  `\`${name}\` is a long-lived Claude Code session (\`restartPolicy: 'Always'\`), which runs attached in the process that holds this runtime's sessions, and no process holds them now: start the holder (\`nemia up\`), then file the task again — or leave \`restartPolicy\` off to run it as a job.`;
+  `\`${name}\` is a long-lived Claude Code session (\`restartPolicy: 'Always'\`), which runs attached in the process that holds this runtime's sessions, and no process holds them now: start the daemon that holds them, then file the task again — or leave \`restartPolicy\` off to run it as a job.`;
 
 /**
  * The bridge a job's process wrote beside its run under `name` (`HarnessIO.bridgeFile`), decoded (`BridgeFactsSchema`): nothing where

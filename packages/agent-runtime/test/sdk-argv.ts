@@ -10,7 +10,7 @@
  * SDK's argv reads it here, in both forms, and is refused where the flag is not there at all. Which flag goes which way is read off
  * the installed `sdk.mjs`, where the SDK's two argument builders are.
  *
- * For the argv the SDK wrote alone. The argv **we** write — `claudePrintFlags`' `claude -p` spec, `ae`'s own command line, an MCP
+ * For the argv the SDK wrote alone. The argv **we** write — `ae`'s own command line, an MCP
  * server's `args` from a config — is ours to spell, and a test of one reads it as it is written there.
  */
 

@@ -377,7 +377,7 @@ const sayingUnread = <A, E>(look: Effect.Effect<{ value: A; warnings: readonly s
     Effect.map(({ value }) => value),
   );
 
-/** The ends of the JSON files beside a run's that are not run files: its closeout, its schema, its MCP config, its spawn request. */
+/** The ends of the JSON files beside a run's that are not run files: its closing statement, its schema, its MCP config, its spawn request. */
 const NO_RUN_FILES = ['.closeout.json', '.schema.json', '.mcp.json', '.request.json'];
 
 const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.json`);

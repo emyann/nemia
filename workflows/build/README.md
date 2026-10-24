@@ -12,7 +12,8 @@ Implement pushes its branch and opens the pull request through `pull-request.ts`
 run's own branch, never another and never the base and never forced, and opens or updates the one pull request of the branch, never a
 draft, printing the address that goes on Grace's closeout as an artifact value. Her check pushes again through the same script and refuses
 unless the pull request's head is the commit it judges — GitHub moves that head a moment after the push, so it is read again for up to
-30 s before the refusal — then waits on the `ci` context (1800 s for it to start, 2400 s whole): CI runs
+30 s before the refusal — then, unless GitHub says the pull request conflicts with its base (refused at once, naming the merge of the
+base, since GitHub runs no `ci` on a conflicting head), waits on the `ci` context (1800 s for it to start, 2400 s whole): CI runs
 the suite, the types, the lint, the whole e2e and the build on that commit, and a red, cancelled or missing `ci` is the check's refusal,
 with the Actions URL, the failing jobs and a bounded tail of their log — no agent of this team may type `gh`, so the script reads it for
 them.

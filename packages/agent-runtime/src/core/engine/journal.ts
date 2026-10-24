@@ -13,13 +13,15 @@ import path from 'node:path';
 import type { Event } from '../domain.ts';
 import {
   entryWords,
+  FORMER_REASONS,
   HarnessArgsSchema,
   StoredEventSchema,
   StoredEventsSchema,
   StoredFeedEntrySchema,
+  type FormerReason,
   type StoredEvent,
 } from '../event-schema.ts';
-import { FORMER_ARGS, HARNESS_ARGS, type HarnessArgs } from '../../harness/args.ts';
+import { FORMER_ARGS, HARNESS_ARGS, RENAMED_ARGS, type HarnessArgs } from '../../harness/args.ts';
 import { countRead, countWrite } from './tally.ts';
 import { FEED_LOCK_WAIT_MS, feedLinesOf, readFeed, rotateFeed, withFeedLock, type ForgottenFeed } from './feed.ts';
 import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, type BodyRef, type Resolved } from './bodies.ts';
@@ -239,11 +241,46 @@ const weighed = (event: Extract<Resolved, { kind: 'filed' }>) => {
   return typeof priority === 'number' && Number.isInteger(priority) ? { ...unweighed, priority } : unweighed;
 };
 
-/** A stored end in the shape the runtime reads: a former `done` as `succeeded`, a former `budget` reason as the harness's end at it. */
+/** A stored usage in the shape the runtime reads: its responses by today's name, where one given by it is kept. */
+const usageOf = <U extends { turns?: number; responses?: number }>(usage: U): Omit<U, 'turns'> => {
+  const { turns, ...rest } = usage;
+  return turns === undefined || rest.responses !== undefined ? rest : { ...rest, responses: turns };
+};
+
+/**
+ * A stored end in the shape the runtime reads: a former `done` as `succeeded`, a former `budget` reason as the harness's end at it,
+ * a former reason (`FORMER_REASONS`) as the harness's end with no statement, whether it closed out by today's name, and its usage's
+ * responses by today's.
+ */
 const upgradedEnd = (event: Extract<Resolved, { kind: 'ended' }>): Event => {
+  const { stated, usage, ...rest } = event;
   const observed = event.observed === 'done' ? 'succeeded' : event.observed;
-  if (event.reason !== 'budget') return { ...event, observed, reason: event.reason };
-  return { ...event, observed, reason: 'harness', limit: 'budget' };
+  const closedOut = rest.closedOut ?? stated;
+  const end = {
+    ...rest,
+    observed,
+    ...(closedOut === undefined ? {} : { closedOut }),
+    ...(usage === undefined ? {} : { usage: usageOf(usage) }),
+  };
+  if (end.reason === 'budget') return { ...end, reason: 'harness', limit: 'budget' };
+  if (isFormer(end.reason)) return { ...end, reason: 'harness', closedOut: false, former: end.reason };
+  return { ...end, reason: end.reason };
+};
+
+/** Whether `reason` is one an older runtime gave an end that today's are no word for (`FORMER_REASONS`). */
+const isFormer = (reason: string): reason is FormerReason => (FORMER_REASONS as readonly string[]).includes(reason);
+
+/** Harness arguments with each filed under a former name (`RENAMED_ARGS`) under today's, where one given by it is kept. */
+const renamed = (config: Record<string, unknown>): Record<string, unknown> => {
+  const was = Object.keys(RENAMED_ARGS).filter((key) => Object.hasOwn(config, key));
+  if (!was.length) return config;
+  const out = { ...config };
+  for (const key of was) {
+    const name = RENAMED_ARGS[key];
+    if (name !== undefined && out[name] === undefined && out[key] !== undefined) out[name] = out[key];
+    delete out[key];
+  }
+  return out;
 };
 
 /**
@@ -267,20 +304,42 @@ const upgradedEnd = (event: Extract<Resolved, { kind: 'ended' }>): Event => {
  *   again on its next attempt.
  * - A `filed` event's `priority` that is not a whole number — `null`, as JSON writes a `NaN` an older runtime took: left out,
  *   so the task waits at 0.
+ * - An end's `stated`, the former name of whether the closing statement its task asked for came: read as `closedOut`, where
+ *   one already there is kept, since it is the newer word.
+ * - An end's reason the runtime once judged by itself (`FORMER_REASONS`: `unsigned`, a session that ended with no closing
+ *   statement where its task asked for one): read as the harness's end, `reason: 'harness'` with `closedOut: false`, its
+ *   outcome as written and that reason kept as `former`, so the layer above still tells such an end apart.
+ * - A usage's `turns`, on an `ended`, a `measured` or a `counted` event: read as `responses`, the model's responses it counted.
+ * - A harness argument filed under a former name (`RENAMED_ARGS`: `checkoutMcp`, the servers of the checkout's `.mcp.json` the
+ *   session loads), under a `filed` or an `input` event's `config` or at a `filed` event's top level: read by today's name,
+ *   `projectMcp`, where a value already given by it is kept.
  */
 export const upgrade = (event: Resolved): Event => {
-  if (event.kind === 'input') {
-    const { budgetUsd, ...rest } = event;
-    if (budgetUsd === undefined) return rest;
-    return { ...rest, config: { budgetUsd, ...rest.config } };
-  }
+  if (event.kind === 'input') return upgradedInput(event);
   if (event.kind === 'ended') return upgradedEnd(event);
+  if (event.kind === 'measured' || event.kind === 'counted') {
+    return 'turns' in event.usage ? { ...event, usage: usageOf(event.usage) } : event;
+  }
   if (event.kind !== 'filed') return event;
+  return upgradedFiled(event);
+};
+
+/** A stored answer in the shape the runtime reads: its arguments by today's names, and a cap beside its `config` under it. */
+const upgradedInput = (event: Extract<Resolved, { kind: 'input' }>): Event => {
+  const { budgetUsd, ...rest } = event;
+  const config = rest.config && renamed(rest.config);
+  const input = config === undefined || config === rest.config ? rest : { ...rest, config: argsOf(config) };
+  if (budgetUsd === undefined) return input;
+  return { ...input, config: { budgetUsd, ...input.config } };
+};
+
+/** A stored filing in the shape the runtime reads: its arguments under `config` by today's names, and a former one moved. */
+const upgradedFiled = (event: Extract<Resolved, { kind: 'filed' }>): Event => {
   const filed = weighed(event);
   const legacy: Record<string, unknown> = filed;
-  const moved = [...HARNESS_ARGS, ...Object.keys(FORMER_ARGS)].filter((key) => Object.hasOwn(legacy, key));
+  const moved = [...HARNESS_ARGS, ...Object.keys(FORMER_ARGS), ...Object.keys(RENAMED_ARGS)].filter((key) => Object.hasOwn(legacy, key));
   const given: Record<string, unknown> = filed.config ?? {};
-  const former = Object.keys(FORMER_ARGS).filter((key) => Object.hasOwn(given, key));
+  const former = [...Object.keys(FORMER_ARGS), ...Object.keys(RENAMED_ARGS)].filter((key) => Object.hasOwn(given, key));
   if (!moved.length && !former.length) return filed;
   const lifted: Record<string, unknown> = {};
   const { config: _, ...rest } = filed;
@@ -289,7 +348,7 @@ export const upgrade = (event: Resolved): Event => {
     if (legacy[key] !== undefined) lifted[key] = legacy[key];
     delete left[key];
   }
-  const config: Record<string, unknown> = { ...lifted, ...given };
+  const config: Record<string, unknown> = { ...renamed(lifted), ...renamed(given) };
   const flags: Record<string, unknown> = {};
   for (const [key, flag] of Object.entries(FORMER_ARGS)) {
     if (config[key] === true) flags[flag] = true;

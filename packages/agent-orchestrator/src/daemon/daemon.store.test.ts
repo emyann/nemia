@@ -823,7 +823,7 @@ test('`nemia tick` says every move its one pass refused', async (t) => {
 
 test('`nemia up` says a task the runtime left out once while it lasts, and again once it clears and comes back; `nemia tick` says each its pass left out', async (t) => {
   clear();
-  const bad = "t-bad's journal (/store/tasks/t-bad.jsonl), entry 2 is a `measured` event, and its `usage.turns` is not a number";
+  const bad = "t-bad's journal (/store/tasks/t-bad.jsonl), entry 2 is a `measured` event, and its `usage.responses` is not a number";
   const feed = 'the feed (/store/feed.jsonl), entry 3 read from cursor 148 is no event this runtime writes';
   const byPass = [[bad], [bad, feed], [bad], [], [bad]];
   const e = engineOf();

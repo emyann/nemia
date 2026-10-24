@@ -19,7 +19,7 @@
  *
  *   `Runner.claude()`  durable. The harness owns the session; the engine may die at any point.
  *                      Telemetry is coarse: a state, and the transcript after the fact.
- *   `sdkRunner()`      rich. This process owns the session; cost, turns and tool calls arrive
+ *   `sdkRunner()`      rich. This process owns the session; cost, responses and tool calls arrive
  *                      live, and a gate can refuse a tool call. NOT durable.
  *
  * The engine does not change between them — only what is true after a crash does. That is the
@@ -88,7 +88,7 @@ export const sdkRunner = () => {
               sessionId: m.session_id,
               state: m.is_error ? 'failed' : 'completed',
               usage: {
-                turns: m.num_turns,
+                responses: m.num_turns,
                 toolCalls: live.get(name)?.toolCalls ?? 0,
                 ...(typeof u?.input_tokens === 'number' && typeof u.output_tokens === 'number'
                   ? {

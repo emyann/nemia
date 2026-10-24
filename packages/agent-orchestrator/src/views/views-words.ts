@@ -29,10 +29,16 @@ export type EnginePhase =
   | 'stopped';
 
 /**
- * An attempt as the words read it: its clock (`AttemptClock`), how it ended, whether the statement its task asked for came (`stated`),
- * and the closeout it carries, as the engine's `Attempt` keeps them.
+ * An attempt as the words read it: its clock (`AttemptClock`), how it ended, whether the statement its task asked for came
+ * (`closedOut`), the reason an old journal ended it with that is no end the runtime records today (`former`, `'unsigned'`), and the
+ * closeout it carries, as the engine's `Attempt` keeps them.
  */
-export type WordAttempt = AttemptClock & { ended: EngineOutcome | null; stated?: boolean; closeout?: unknown };
+export type WordAttempt = AttemptClock & {
+  ended: EngineOutcome | null;
+  closedOut?: boolean;
+  former?: 'unsigned';
+  closeout?: unknown;
+};
 
 /**
  * A task as the words read it off the engine's view: its word, its brief, how it settled, its attempts, the answers it was given, whether
@@ -86,20 +92,21 @@ export const waitsForWord =
 
 /**
  * Whether a task's attempt ended without the closing statement its task asked for — the orchestrator's judgement, off what the runtime
- * reports: its harness let the session go `succeeded` with `stated: false`; or the runtime's own verdict `reason: 'unsigned'`, which a
- * journal may hold (an attempt it ended `failed`). An end with no `stated` key is not read as a missing statement: a `succeeded` with no
- * closeout on a journal that says nothing of `stated` is not unsigned, and is never nudged.
+ * reports: its harness let the session go `succeeded` with `closedOut: false`; or an old journal ended it `failed` for that, which the
+ * runtime reads back as `former: 'unsigned'`. A `failed` end with `closedOut: false` and no `former` is a session that broke, not a
+ * missing statement, and is never nudged; nor is an end with no `closedOut` key: a `succeeded` with no closeout on a journal that says
+ * nothing of it is not unsigned.
  */
 export const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined): boolean =>
   state.closeoutSchema !== undefined &&
   a !== undefined &&
   a.closeout === undefined &&
-  (a.reason === 'unsigned' || (a.ended === 'succeeded' && a.stated === false));
+  (a.former === 'unsigned' || (a.ended === 'succeeded' && a.closedOut === false));
 
 /**
  * How an attempt ended, in the words a person reads for it: an attempt its harness cut at its spend cap is `failed`, `budget` — off the
  * runtime's `limit: 'budget'`, a fact it carries and not an end it judges — one that ended without the statement its task asked for is
- * `failed`, `unsigned` — the orchestrator's word, off the runtime's `stated: false` (`unsignedEnd`) — and any other is as the runtime
+ * `failed`, `unsigned` — the orchestrator's word, off the runtime's `closedOut: false` (`unsignedEnd`) — and any other is as the runtime
  * recorded it. The one writer of those words for a surface that shows an attempt's end, so every surface says the same: never read an
  * attempt's raw `reason` for `unsigned` or `budget`.
  */

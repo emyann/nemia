@@ -18,7 +18,7 @@ export const spawned = (n: number, ms = S): Event => ({ kind: 'spawned', at: at(
 export const ended = (
   n: number,
   observed: Outcome,
-  reason: 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadline' | 'unsigned' = 'harness',
+  reason: 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadline' = 'harness',
   nativeId?: string,
 ): Event => ({ kind: 'ended', at: at(2 * S), attempt: n, sessionId: `s${n}`, observed, reason, ...(nativeId ? { nativeId } : {}) });
 export const signed = (n: number) => ended(n, 'succeeded', 'harness', `native-${n}`);
@@ -42,7 +42,6 @@ export const JOURNALS: Record<string, Event[]> = {
   'ended stopped': [filed(), starting(1), spawned(1), ended(1, 'stopped')],
   'ended lost': [filed(), starting(1), spawned(1), ended(1, 'failed', 'lost')],
   'ended unstartable': [filed(), starting(1), ended(1, 'failed', 'unstartable')],
-  'ended unsigned, before stage 4a': [filed(), starting(1), spawned(1), ended(1, 'succeeded', 'unsigned')],
   'ended at the deadline': [filed(), starting(1), spawned(1), ended(1, 'failed', 'deadline')],
   'held open, filed': [filed({ holdOpen: true })],
   'held open, intent, no spawn': [filed({ holdOpen: true }), starting(1)],

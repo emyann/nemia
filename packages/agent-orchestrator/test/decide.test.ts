@@ -88,6 +88,12 @@ const branchOff = (repo: string, branch: string, change: () => void) => {
   git(repo, 'checkout', '-q', 'main');
 };
 
+/** How a settled attempt ended, beside `harness`: the reason it ended for, and the facts the runtime records with it. */
+type Ended = { reason?: string; closedOut?: boolean; former?: 'unsigned' };
+
+/** An end an old journal wrote `failed`, `unsigned`, as the runtime reads it back. */
+const FORMER_UNSIGNED: Ended = { reason: 'harness', closedOut: false, former: 'unsigned' };
+
 /**
  * A board a test settles by hand. A settled attempt carries the usage it is given, as the engine records it. The n-th task filed is filed
  * 10n minutes after the board's midnight, its attempt started 5 s and spawned 12 s after that, and ended 5 minutes after filing once it
@@ -99,7 +105,7 @@ const board = () => {
   type Filed = { id: string; priority?: number; closeoutSchema?: object; config?: { claude?: { remoteControl?: true | string } } };
   const tasks = new Map<
     string,
-    { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; reason?: string; exitCode?: number; filedAt: number }
+    { spec: Filed; phase: TaskPhase; closeout?: unknown; usage?: object; end?: Ended; exitCode?: number; filedAt: number }
   >();
   const T0 = Date.parse('2026-09-13T00:00:00Z');
   const iso = (ms: number) => new Date(ms).toISOString();
@@ -133,7 +139,7 @@ const board = () => {
                     startedAt: iso(t.filedAt + 5_000),
                     spawnedAt: iso(t.filedAt + 12_000),
                     endedAt: settled ? iso(t.filedAt + 300_000) : null,
-                    reason: settled ? (t.reason ?? 'harness') : null,
+                    ...(settled ? { reason: 'harness', ...t.end } : { reason: null }),
                     nativeId: `native-${id}`,
                     closeout: t.closeout,
                     usage: t.usage ?? null,
@@ -155,14 +161,14 @@ const board = () => {
     logs: async (id: string) => logs.get(id) ?? '(no output yet)',
     output: async () => undefined,
   });
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object, reason?: string, exitCode?: number) =>
-    Object.assign(tasks.get(id)!, { phase, closeout, usage, reason, exitCode });
+  const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object, end?: Ended, exitCode?: number) =>
+    Object.assign(tasks.get(id)!, { phase, closeout, usage, end, exitCode });
   const filed = (id: string): Filed | undefined => tasks.get(id)?.spec;
   return { e, settle, logs, viewed, carries, filed, fed };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
-const USAGE = { turns: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000 };
+const USAGE = { responses: 29, toolCalls: 93, inputTokens: 6_350_000, outputTokens: 112_000 };
 
 /**
  * `implement`, checked by `npm test` and with whatever other keys it is given, each ending with a newline, then `review`, with no check.
@@ -281,7 +287,7 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   const check = indexOf(lines, /^    check  npm test  →/);
   assert.deepEqual(
     lines.slice(check + 1, check + 3),
-    ['    used  29 turns · 93 tool calls · 6.35M in · 112k out', '    cost  not measured'],
+    ['    used  29 responses · 93 tool calls · 6.35M in · 112k out', '    cost  not measured'],
     'what each step consumed, beside its check',
   );
   const review = indexOf(lines, '  review');
@@ -300,7 +306,7 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
   assert.deepEqual(
     lines.slice(check + 3, check + 5),
     [
-      '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out',
+      '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 responses · 93 tool calls · 6.35M in · 112k out',
       '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
     ],
     'where the time went, after what each step used: its session and its check, each filed, spawned and ended, queued and ran',
@@ -490,11 +496,11 @@ test("the lesson line reads the base's workspaces: a package's docs/ is a lesson
 test('what a step consumed is summed over its attempts — one that never started left out, the one in flight read off the view', () => {
   const views: Record<string, unknown> = {
     t1: {
-      usage: { turns: 1, toolCalls: 1, inputTokens: 5, outputTokens: 1 },
+      usage: { responses: 1, toolCalls: 1, inputTokens: 5, outputTokens: 1 },
       state: {
         attempts: [
           { reason: 'unstartable', endedAt: '2026-09-13T00:00:00Z', usage: null },
-          { reason: 'harness', endedAt: '2026-09-13T00:01:00Z', usage: { turns: 2, toolCalls: 3, inputTokens: 10, outputTokens: 1 } },
+          { reason: 'harness', endedAt: '2026-09-13T00:01:00Z', usage: { responses: 2, toolCalls: 3, inputTokens: 10, outputTokens: 1 } },
           { reason: null, endedAt: null, usage: null },
         ],
       },
@@ -504,7 +510,7 @@ test('what a step consumed is summed over its attempts — one that never starte
   const run = { steps: { implement: { taskId: 't1' }, review: { taskId: 't2' }, respond: {} } } as unknown as Run;
   assert.deepEqual(
     consumption(new Map(Object.entries(views)) as unknown as Parameters<typeof consumption>[0], run),
-    { implement: { turns: 3, toolCalls: 4, inputTokens: 15, outputTokens: 2 }, review: undefined },
+    { implement: { responses: 3, toolCalls: 4, inputTokens: 15, outputTokens: 2 }, review: undefined },
     'review, whose session was lost before its runner measured anything, sums nothing: nobody counted',
   );
 });
@@ -565,16 +571,16 @@ test("a measured cost on both screens: `nemia decide` prints each step's beside 
   const lines = await screen(t, e, run.id);
   const check = indexOf(lines, /^    check  npm test  →/);
   assert.deepEqual(lines.slice(check + 1, check + 3), [
-    '    used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s',
+    '    used  29 responses · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s',
     '    cost  $3.01',
   ]);
   assert.match(
     lines[check + 3],
-    /^    timeline  try 1 .*  used 29 turns · 93 tool calls · 6\.35M in · 112k out · api 8m06s · tools 2s  cost \$3\.01$/,
+    /^    timeline  try 1 .*  used 29 responses · 93 tool calls · 6\.35M in · 112k out · api 8m06s · tools 2s  cost \$3\.01$/,
   );
   const review = indexOf(lines, '  review');
   assert.deepEqual(lines.slice(review + 1, review + 3), [
-    '    used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured',
+    '    used  responses not measured · tool calls not measured · tokens in not measured · tokens out not measured',
     '    cost  $0.50',
   ]);
   const total = indexOf(lines, '  cost  run $3.51');
@@ -650,13 +656,13 @@ test("UNSIGNED after the run's own nudge: `nemia decide` and `nemia ls` say the 
   const run = await runPlaced(startRun({ brief: 'add sub, unsigned', repo: aRepo(), workflowDir: folder(), isolate: false }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
-  settle(`${run.id}-implement`, 'failed', undefined, undefined, 'unsigned');
+  settle(`${run.id}-implement`, 'failed', undefined, undefined, FORMER_UNSIGNED);
   assert.deepEqual(
     (await runWith(e, advanceRun(readRun(run.id)))).notes.filter((n) => n.startsWith('implement:')),
     ['implement: try 2 — a nudge to sign off, once a round'],
     'a session that ended without calling StructuredOutput, as the engine records it: failed, its last attempt unsigned',
   );
-  settle(`${run.id}-implement-try2`, 'failed', undefined, undefined, 'unsigned');
+  settle(`${run.id}-implement-try2`, 'failed', undefined, undefined, FORMER_UNSIGNED);
   await runWith(e, advanceRun(readRun(run.id)));
   const lines = await screen(t, e, run.id);
   indexOf(
@@ -1111,9 +1117,9 @@ test('the whole screen of a run waiting on you: verdicts, touched, lesson, in fu
     '',
     '  implement',
     '    check  npm test  →  exit 0 ✓',
-    '    used  29 turns · 93 tool calls · 6.35M in · 112k out',
+    '    used  29 responses · 93 tool calls · 6.35M in · 112k out',
     '    cost  not measured',
-    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out',
+    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 responses · 93 tool calls · 6.35M in · 112k out',
     '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
     '    did it',
     '',
@@ -1154,9 +1160,9 @@ test('the whole screen of a run waiting on you: verdicts, touched, lesson, in fu
     '',
     '  implement',
     '    check  npm test  →  exit 0 ✓',
-    '    used  29 turns · 93 tool calls · 6.35M in · 112k out',
+    '    used  29 responses · 93 tool calls · 6.35M in · 112k out',
     '    cost  not measured',
-    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 turns · 93 tool calls · 6.35M in · 112k out',
+    '    timeline  try 1        filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used 29 responses · 93 tool calls · 6.35M in · 112k out',
     '              try 1 check  filed 00:10:00Z  spawned 00:10:12Z  ended 00:15:00Z  queued 12s  ran 4m48s',
     '    did it',
     '',

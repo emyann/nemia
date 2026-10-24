@@ -8,9 +8,56 @@
   ],
   "terms": [
     {
+      "term": "At least",
+      "meaning": "the lowest factory level whose lines a subscription carries, and the level a factory is at least at for an agent's call to act on it (admission's scope).",
+      "type": "Level",
+      "see": {
+        "label": "Her subscription",
+        "href": "/nemia/#her-subscription"
+      }
+    },
+    {
       "term": "Feed",
       "meaning": "the store's stream of what happened, written by the daemon alone, which the board and Nemia follow.",
       "type": "FeedLine",
+      "see": {
+        "label": "Who writes what",
+        "href": "/how-a-run-lives/#who-writes-what"
+      }
+    },
+    {
+      "term": "Line",
+      "meaning": "one judged change of a run, a step, a daemon or the store, written on the feed: a report, never an input.",
+      "type": "FeedLine",
+      "retired": [
+        {
+          "spelling": "SignalType",
+          "card": "Generic tables stop speaking one agent's words"
+        },
+        {
+          "spelling": "SIGNAL_WORDS",
+          "card": "Generic tables stop speaking one agent's words"
+        },
+        {
+          "spelling": "SIGNAL_KEYS",
+          "card": "Generic tables stop speaking one agent's words"
+        }
+      ],
+      "see": {
+        "label": "Who writes what",
+        "href": "/how-a-run-lives/#who-writes-what"
+      }
+    },
+    {
+      "term": "Line source",
+      "meaning": "whose deed a line is: the tick's, the runtime's, a person's or a daemon's.",
+      "type": "LineSource",
+      "retired": [
+        {
+          "spelling": "SignalSource",
+          "card": "Generic tables stop speaking one agent's words"
+        }
+      ],
       "see": {
         "label": "Who writes what",
         "href": "/how-a-run-lives/#who-writes-what"

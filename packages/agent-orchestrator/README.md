@@ -3107,7 +3107,7 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   a `retry` of a step at its gate, on its question, out of rounds or at its cap, any `--budget` — is asked of the person by her
   admission (`nemia admit`, a hook asked before each of her shell calls), and so is a write that cannot be undone or changes their
   settings or a factory (`cancel`, `rm`, `factory add`, `level semi-auto`); the rest — a read, `start`, `hold`, `say`, `inbox add`, a
-  retry that waits on no one — is hers. Each command's class in the table decides (`nemia` on its entry, `src/admission/class.ts`), and
+  retry that waits on no one — is hers. Each command's class in the table decides (`class` on its entry, `src/admission/class.ts`), and
   a "don't ask again" never widens what waits. The harness must trust her folder first, once, by hand: the
   refusal names the command. **`nemia level manual`** puts her off: the keeper stops her session and drops her subscription. A
   session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.

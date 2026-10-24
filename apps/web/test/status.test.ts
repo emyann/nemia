@@ -10,7 +10,6 @@ import path from 'node:path';
 import {
   brokenMeanings,
   classOf,
-  isGate,
   satisfiesAfter,
   stateClass,
   stateDrawn,
@@ -19,6 +18,8 @@ import {
   stepState,
   type Drawn,
   type StepState,
+  waitsAtGate,
+  waitsOnPerson,
 } from '../src/lib/status.ts';
 import { STEP_REASONS, type StepCodes, type StepPhase, type StepReason } from '../src/lib/api/reasons.ts';
 import { container, meaningOf } from '../src/lib/meaning.ts';
@@ -109,7 +110,7 @@ test('stepState: each reason the api carries, read as the state a person acts on
   });
 });
 
-test('stepState, satisfiesAfter, isGate: what is work done, what waits on a person, and what a hold stops', async (t) => {
+test('stepState, satisfiesAfter, waitsOnPerson, waitsAtGate: what is work done, what waits on a person, and what a hold stops', async (t) => {
   await t.test('only verified and unverified are work done; a refused check, a failed session and an unsigned step are not', () => {
     const notDone: Named[] = [
       'CheckFailed',
@@ -166,34 +167,20 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
     },
   );
   await t.test(
-    'a human gate is a step a person decides: signed off blocked, a loop out of rounds, or a step past its budget — and on a cancelled run, none',
+    'of the states that wait on a person, a human gate is one a person decides — signed off blocked, at its gate, a loop out of rounds, past its budget — and on a cancelled run, none waits',
     () => {
-      for (const reason of ['AwaitingAnswer via closeout', 'AwaitingRound', 'OverBudget', 'BudgetExhausted'] as const) {
-        assert.equal(isGate(stateAt(reason), false), true, reason);
-        assert.equal(isGate(stateAt(reason, true), true), false, `${reason}, on a cancelled run: nobody waits for the answer`);
-      }
-      const notGates: Named[] = [
-        'CheckFailed',
-        'Unsigned',
-        'Denied',
-        'CheckPassed',
-        'Succeeded',
-        'Checking',
-        'Running',
-        'AwaitingAnswer via session',
-        'Failed',
-        'Stopped',
-        'Waiting on run',
-        'UnreadableCloseout',
-        'Unknown',
-      ];
-      for (const reason of notGates)
-        assert.equal(
-          isGate(stateAt(reason), false),
-          false,
-          `${reason}: work to try again, not a decision, or a state that waits on nobody`,
-        );
-      assert.equal(isGate(stepState(plain('failed', 'Unknown'), false, false), false), false, 'unreadable');
+      const states = Object.keys(stateDrawn) as StepState[];
+      const gates = ['blocked', 'awaiting-approval', 'exhausted', 'over-budget', 'budget-exhausted'];
+      assert.deepEqual(
+        states.filter((s) => waitsAtGate(s, false)),
+        gates,
+      );
+      assert.deepEqual(
+        states.filter((s) => waitsOnPerson(s, false)),
+        ['needs-human', ...gates, 'unsigned', 'denied'],
+        'and beside the gates, a session asking through its harness and work to try again that only a person sends',
+      );
+      assert.equal(states.filter((s) => waitsOnPerson(s, true) || waitsAtGate(s, true)).length, 0);
     },
   );
   await t.test(
@@ -211,8 +198,6 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
         'nothing after it may be filed on it until a person says so, as `satisfiesAfter` in the package says',
       );
       assert.equal(stateClass['awaiting-approval'], stateClass.blocked);
-      assert.equal(isGate('awaiting-approval', false), true);
-      assert.equal(isGate('awaiting-approval', true), false, 'nobody waits for an approval on a run called off');
     },
   );
   await t.test(
@@ -222,7 +207,6 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
       assert.equal(state, 'waiting-for-slot');
       assert.equal(isLive(state), false, 'no session of it is at work');
       assert.equal(movingInto(state), false, 'nothing moves into it');
-      assert.equal(isGate(state, false), false, 'nobody is asked');
       assert.equal(satisfiesAfter(state), false, 'not work done');
       assert.equal(stateAt('Waiting on limit', true), 'cancelled', 'on a run called off');
       assert.equal(stateAt('Waiting on limit', false, true), 'held', 'on a run a person holds');
@@ -246,7 +230,7 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
       for (const reason of held) {
         assert.equal(stateAt(reason, false, true), 'held', reason);
         assert.equal(
-          isGate(stateAt(reason, false, true), false),
+          waitsOnPerson(stateAt(reason, false, true), false),
           false,
           `${reason}: nobody is asked while the hold stands, and every verb that would answer the gate is refused`,
         );
@@ -329,7 +313,7 @@ test("the meanings of a state's colour: one thing each, read from the look's rol
     () => {
       assert.equal(brokenMeanings(stateDrawn).length, 0, brokenMeanings(stateDrawn).join('; '));
       const states = Object.keys(stateDrawn) as StepState[];
-      for (const state of states.filter((s) => isGate(s, false))) assert.equal(meaningOf(stateDrawn[state].hue), 'yours', state);
+      for (const state of states.filter((s) => waitsOnPerson(s, false))) assert.equal(meaningOf(stateDrawn[state].hue), 'yours', state);
       assert.deepEqual(
         states.filter((s) => meaningOf(stateDrawn[s].hue) === 'failure'),
         ['failed', 'failed-check', 'unreadable'],

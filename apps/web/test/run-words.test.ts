@@ -54,7 +54,7 @@ const waiting = {
 /** One row of the light answer per kind of wait, the sentence it says, and the words of its card's button. */
 const ROWS: Record<WaitKind, { row: RunSummary; says: string; opens: string }> = {
   approve: { row: landing('awaiting approval'), says: 'Three steps are done. Land waits for your approval.', opens: 'Read the land' },
-  blocked: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.', opens: 'Read the question' },
+  answer: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.', opens: 'Read the question' },
   check: {
     row: landing('failed ✗ check (exit 1)'),
     says: 'Land failed its check. Try it again or call the run off.',
@@ -238,7 +238,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
   });
   await t.test("a waiting card's tag names the step where the person acts on one, and says a wait the board has no kind for", () => {
     assert.equal(waitTag(ROWS.approve.row), 'approve land');
-    assert.equal(waitTag(ROWS.blocked.row), 'answer land');
+    assert.equal(waitTag(ROWS.answer.row), 'answer land');
     assert.equal(waitTag(summary([['plan', 'running']], { waitingOnYou: ['plan'] })), PERSON['awaiting-approval'].rail);
   });
 });

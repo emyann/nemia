@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node --import=../../tools/test-costs/probe.ts --test --test-concurrency=2 --test-timeout=120000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../../tools/test-costs/reporter.ts --test-reporter-destination=stderr 'test/*.test.ts' 'src/**/*.test.ts'",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test"
   },
   "keywords": [],
   "author": "",

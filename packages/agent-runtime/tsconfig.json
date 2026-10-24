@@ -10,5 +10,6 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["src", "bin", "test"]
+  "include": ["src", "bin"],
+  "exclude": ["src/**/*.test.ts"]
 }

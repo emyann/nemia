@@ -186,7 +186,7 @@ test("get, the Factory's and the inbox's reads: each decodes what the api gives,
   await t.test(
     'each read of the Factory and the inbox decodes an answer the api gives, as it gave it, each union in its every shape',
     async (t) => {
-      const bare = without(inboxEntry({ name: 'bare', startedAs: [] }), 'queued', 'tried');
+      const bare = without(inboxEntry({ name: 'bare', startedAs: [], state: 'filed' }), 'queued', 'tried');
       const odd = inboxEntry({
         name: 'notes.txt',
         title: null,

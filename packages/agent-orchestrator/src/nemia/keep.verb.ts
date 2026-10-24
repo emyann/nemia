@@ -94,8 +94,8 @@ export const quotaCall = (quota: string): string => `curl -s ${quota}`;
 const nemiaBrief = (quota: string | undefined): string =>
   [
     'You are on. Read your memory, then wait: the feed is said to you when it needs the person, and the person may open you.',
-    "At auto, `nemia auto nemia` lists the answers the person's confirmed rules let you give unasked; propose rules from their custom",
-    'instruction with `nemia auto propose nemia --file -`.',
+    "At auto, `nemia policy nemia` lists the answers the person's confirmed rules let you give unasked; propose rules from their custom",
+    'instruction with `nemia policy propose nemia --file -`.',
     ...(quota === undefined ? [] : [`The quota and its pace: \`${quotaCall(quota)}\`.`]),
   ].join(' ');
 

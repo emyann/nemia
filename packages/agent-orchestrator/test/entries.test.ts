@@ -15,7 +15,7 @@ const PINNED: Record<string, string[]> = {
     'A2A_AGENTS_FILE',
     'AGENT_FACING',
     'AGENTS_CUSTOM',
-    'AUTO_PROPOSE',
+    'POLICY_PROPOSE',
     'BOOKMARK_EVERY',
     'BY_CAP',
     'BY_KEYS',

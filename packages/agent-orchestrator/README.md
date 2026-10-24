@@ -3113,11 +3113,12 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   accepted by a person over what it found), `withinBudget` (no step past its budget) and `nothingOpen` (no question, nothing the
   closeout needs, and no other step waiting on a person). The rule that
   ships, "decide when all agree", approves when all five hold; it is in force until the person confirms a list, which replaces it,
-  seeded with it, marked Default. **`nemia auto <agent>`** reads the list in force, the agent's proposal and the custom instruction;
-  **`nemia auto propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
-  generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia auto confirm <agent> <id> --words
-  '<words>'`** and **`nemia auto drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
-  calls them. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
+  seeded with it, marked Default. **`nemia policy <agent>`** reads the list in force, the agent's proposal and the custom instruction;
+  **`nemia policy propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
+  generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia policy confirm <agent> <id> --words
+  '<words>'`** and **`nemia policy drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
+  calls them. `nemia auto …`, the group's former name, still runs as `nemia policy …`, with a hint on stderr naming it, and admission
+  reads it as the new name; the store's folder `auto/` keeps its name, so no confirmed rule is orphaned. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
   under that id reads otherwise. A rule nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that
   does not read allows nothing. Auto holds in a session of hers filed since it shipped (`--auto` on her admission): one kept from before
   asks every answer until it is filed again.

@@ -17,5 +17,5 @@ export const PENDING: readonly { readonly name: string; readonly decision: 8 }[]
   { name: 'skills read', decision: 8 },
   { name: 'workflows list', decision: 8 },
   { name: 'workflows remove', decision: 8 },
-  { name: 'auto drop', decision: 8 },
+  { name: 'policy drop', decision: 8 },
 ];

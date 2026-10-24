@@ -125,6 +125,18 @@ test('wf, the alias, writes its one hint line on stderr before the help, and not
   assert.match(WF_HINT, new RegExp(`\\b${CLI} <args>`), 'the hint names what to type next');
 });
 
+test('nemia auto, a renamed group, runs as nemia policy, with one hint line on stderr naming it, and stdout the same', async (t) => {
+  const { e } = board();
+  const hints: string[] = [];
+  t.mock.method(process.stderr, 'write', (chunk: string) => hints.push(chunk) > 0);
+  const now = await typed(t, e, 'policy', 'nemia');
+  assert.deepEqual(hints, [], 'the new name gives no hint');
+  const was = await typed(t, e, 'auto', 'nemia');
+  assert.deepEqual(was.out, now.out, 'the former name prints what the new one prints');
+  assert.equal(hints.length, 1, 'one hint line');
+  assert.match(hints[0], new RegExp(`\`${CLI} policy nemia\``), 'the hint names what to type now');
+});
+
 test('a read is run against the root the process names when it is typed, not one a module pinned as it loaded', async (t) => {
   const { e } = board();
   const other = scratch('wf-main-other-');

@@ -64,9 +64,10 @@ import {
   liveDemandHost,
   type DemandHost,
 } from '../runner.ts';
+import { renamedIn } from '../command/command.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
-import { admitRun, agentsCustomRun, autoProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
+import { admitRun, agentsCustomRun, policyProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
 import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
 import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
 
@@ -353,7 +354,7 @@ export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide'
 /**
  * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `nemia plan`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
- * `nemia agents custom`, `nemia factory instruct`, `nemia auto propose`, `nemia agents write`, `nemia skills write` and
+ * `nemia agents custom`, `nemia factory instruct`, `nemia policy propose`, `nemia agents write`, `nemia skills write` and
  * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; and `nemia admit`, whose
  * runner reads the call on stdin: handed its arguments once read and checked.
  */
@@ -370,7 +371,7 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => 
   ['agents custom', agentsCustomRun],
   ['factory instruct', factoryInstructRun],
   ['factory rules', factoryRulesRun],
-  ['auto propose', autoProposeRun],
+  ['policy propose', policyProposeRun],
   ['agents write', agentsWriteRun],
   ['skills write', skillsWriteRun],
   ['workflows write', workflowsWriteRun],
@@ -423,7 +424,9 @@ export async function main(
   demand: () => DemandHost = liveDemandHost,
   place: Place = shippedGitPlace,
 ): Promise<void> {
-  const named = namedIn(argv);
+  const renamed = renamedIn(argv);
+  if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);
+  const named = namedIn(renamed.words);
   if (named === undefined) return console.log(HELP);
   const exempt = named.name === 'version' || named.rest.includes('--help');
   const trial = exempt ? null : trialRefusal(runningRelease(), currentRelease(), HOME, process.env);

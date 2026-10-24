@@ -5,7 +5,7 @@
  * they name (`namedIn`). Pure: the caller reads the state (`admit.verb.ts`).
  */
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
-import { parseArgv, type Spec } from '../command/command.ts';
+import { parseArgv, renamedIn, type Spec } from '../command/command.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { atLeast, type Level } from '../level/level.ts';
 import { allowedBy, AUTO_ANSWERS, NO_FACTS, type AutoRule, type Facts } from '../auto/index.ts';
@@ -40,7 +40,8 @@ const PROGRAMS = ['nemia', 'wf'];
 
 /**
  * Each command of `table` typed on the shell line `line`, in order: a word naming the program (`nemia`, by any path, or `wf`), anywhere
- * on the line, then the longest name of a command the command line serves, word for word, and the words after it up to the command's end.
+ * on the line, then the longest name of a command the command line serves, word for word, a renamed group read as its new name
+ * (`renamedIn`), and the words after it up to the command's end.
  */
 export function typedIn(line: string, table: readonly Entry[]): Typed[] {
   const parts = line.match(PARTS) ?? [];
@@ -49,7 +50,7 @@ export function typedIn(line: string, table: readonly Entry[]): Typed[] {
   parts.forEach((part, at) => {
     if (!PROGRAMS.includes(part.slice(part.lastIndexOf('/') + 1))) return;
     const rest = parts.slice(at + 1);
-    const words = rest.slice(0, rest.findIndex(ends) === -1 ? rest.length : rest.findIndex(ends));
+    const words = renamedIn(rest.slice(0, rest.findIndex(ends) === -1 ? rest.length : rest.findIndex(ends))).words;
     const named = served.filter((s) => s.words.every((w, i) => words[i] === w)).sort((a, b) => b.words.length - a.words.length)[0];
     if (named) typed.push({ name: named.entry.name, class: named.entry.class, args: words.slice(named.words.length) });
   });

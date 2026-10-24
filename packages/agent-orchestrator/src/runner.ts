@@ -470,7 +470,7 @@ export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.v
 export type { FactoryRules } from './rules/rules.verb.ts';
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
-export { AUTO_PROPOSE } from './auto/auto.verb.ts';
+export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';

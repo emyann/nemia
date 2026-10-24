@@ -13,8 +13,8 @@ const LEVEL = COMMANDS.find((c) => c.name === 'level')!;
 /** `nemia memory`'s entry of the package's table. */
 const MEMORY = COMMANDS.find((c) => c.name === 'memory')!;
 
-/** `nemia auto`'s entry of the package's table. */
-const AUTO = COMMANDS.find((c) => c.name === 'auto')!;
+/** `nemia policy`'s entry of the package's table. */
+const POLICY = COMMANDS.find((c) => c.name === 'policy')!;
 
 /**
  * - `GET /api/level` — where Nemia is, as `nemia level --json` prints it:
@@ -28,9 +28,11 @@ const AUTO = COMMANDS.find((c) => c.name === 'auto')!;
  * - `GET /api/nemia/memory` — the facts she keeps, `{ dir, facts, fact: null }`, by name.
  * - `GET /api/nemia/memory/:fact` — one fact's words, `{ dir, facts, fact: { name, text } }`; 404 for a fact she does not keep, naming
  *   those she does.
- * - `GET /api/auto/:name` — an agent's rules for auto: `{ agent, file, isDefault, rules, proposed, instruction }`, each rule with its
+ * - `GET /api/policy/:name` — an agent's rules for auto: `{ agent, file, isDefault, rules, proposed, instruction }`, each rule with its
  *   words, `proposed` null where it proposed none, else `{ file, at, rules, guidance, stale }`; 400 for a name that is no agent's, 422 for
- *   a file of rules that does not read. Its writes, `PUT` and `DELETE /api/auto/:name/rules/:id`, confirm a rule and drop one.
+ *   a file of rules that does not read. Its writes, `PUT` and `DELETE /api/policy/:name/rules/:id`, confirm a rule and drop one.
+ * - `/api/auto/…`, the routes' former spelling, as `nemia auto` was the commands': a 308 to the same path under `/api/policy/`, which
+ *   keeps the method and the body, its `Location` naming the route to call now.
  */
 export const nemia = new Hono<ApiEnv>()
   .get('/api/level', (c) => served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, LEVEL.handler({})))))
@@ -38,10 +40,14 @@ export const nemia = new Hono<ApiEnv>()
   .get('/api/nemia/memory/:fact', (c) =>
     served(c, async ({ e, placeService }) => c.json(await runPlaced(placeService, e, MEMORY.handler({ fact: c.req.param('fact') })))),
   )
-  .get('/api/auto/:name', (c) =>
+  .get('/api/policy/:name', (c) =>
     served(c, async ({ e, placeService, home }) => {
-      const wrong = AUTO.check?.({ name: c.req.param('name') });
+      const wrong = POLICY.check?.({ name: c.req.param('name') });
       if (wrong) return c.json({ error: wrong }, 400);
-      return c.json(await runPlaced(placeService, e, AUTO.handler({ name: c.req.param('name') }, undefined, home)));
+      return c.json(await runPlaced(placeService, e, POLICY.handler({ name: c.req.param('name') }, undefined, home)));
     }),
-  );
+  )
+  .all('/api/auto/*', (c) => {
+    const url = new URL(c.req.url);
+    return c.redirect(`${url.pathname.replace(/^\/api\/auto\//, '/api/policy/')}${url.search}`, 308);
+  });

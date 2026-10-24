@@ -1,8 +1,8 @@
 /**
  * An agent's rules for `auto` on disk, two files under `<store>/auto/`, each with one writer: the person's confirmed list,
- * `<agent>.json`, written by `nemia auto confirm` and `nemia auto drop` alone (`confirmRule`, `dropRule`); and what the agent proposes,
- * `<agent>.proposed.json`, written by `nemia auto propose` alone (`writeProposed`). Each read and written whole, through a hidden file
- * renamed over it, and composed on read by `nemia auto` and admission.
+ * `<agent>.json`, written by `nemia policy confirm` and `nemia policy drop` alone (`confirmRule`, `dropRule`); and what the agent proposes,
+ * `<agent>.proposed.json`, written by `nemia policy propose` alone (`writeProposed`). Each read and written whole, through a hidden file
+ * renamed over it, and composed on read by `nemia policy` and admission.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
@@ -109,7 +109,7 @@ function writeWhole(file: string, value: unknown): void {
  */
 export function readConfirmed(home: string, agent: string): Confirmed | undefined {
   const file = confirmedFile(home, agent);
-  const fix = `it is yours, written by nemia auto confirm and nemia auto drop alone: move it aside, and confirm the rules again`;
+  const fix = `it is yours, written by nemia policy confirm and nemia policy drop alone: move it aside, and confirm the rules again`;
   const raw = jsonIn(file, fix);
   if (raw === undefined) return undefined;
   const read = Schema.decodeUnknownResult(ConfirmedSchema)(raw);
@@ -119,7 +119,7 @@ export function readConfirmed(home: string, agent: string): Confirmed | undefine
 
 /** What `agent` proposed in the store `home`, or undefined where it proposed nothing. Refused (`Invalid`) where the file does not read. */
 export function readProposed(home: string, agent: string): Proposed | undefined {
-  const fix = `propose again with nemia auto propose ${agent} --file <path>`;
+  const fix = `propose again with nemia policy propose ${agent} --file <path>`;
   const file = proposedFile(home, agent);
   const raw = jsonIn(file, fix);
   if (raw === undefined) return undefined;
@@ -129,7 +129,7 @@ export function readProposed(home: string, agent: string): Proposed | undefined 
   return { at, rules: rules.map(ruleOf), guidance: [...guidance], digest };
 }
 
-/** Writes what `agent` proposes in the store `home`, whole, over what it proposed before: `nemia auto propose`'s, alone. */
+/** Writes what `agent` proposes in the store `home`, whole, over what it proposed before: `nemia policy propose`'s, alone. */
 export function writeProposed(home: string, agent: string, proposed: Proposed): void {
   writeWhole(proposedFile(home, agent), proposed);
 }
@@ -144,15 +144,17 @@ export function confirmRule(home: string, agent: string, id: string, words: stri
   const rule = id === DEFAULT_ID ? DEFAULT_AUTO : readProposed(home, agent)?.rules.find((r) => r.id === id);
   if (rule === undefined)
     throw new Missing({
-      message: `${agent} proposed no rule ${id}: see what it proposed with nemia auto ${agent}, or ask it to propose again.`,
+      message: `${agent} proposed no rule ${id}: see what it proposed with nemia policy ${agent}, or ask it to propose again.`,
     });
   if (ruleWords(rule) !== words)
     throw new Conflict({
-      message: `${agent}'s rule ${id} now reads "${ruleWords(rule)}", not the words you confirmed: read it again with nemia auto ${agent}, and confirm what it says.`,
+      message: `${agent}'s rule ${id} now reads "${ruleWords(rule)}", not the words you confirmed: read it again with nemia policy ${agent}, and confirm what it says.`,
     });
   const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_AUTO];
   if (rules.some((r) => r.id === id))
-    throw new Conflict({ message: `the rule ${id} is in force already for ${agent}: drop it first with nemia auto drop ${agent} ${id}.` });
+    throw new Conflict({
+      message: `the rule ${id} is in force already for ${agent}: drop it first with nemia policy drop ${agent} ${id}.`,
+    });
   const confirmed = { since: now.toISOString(), rules: [...rules, id === DEFAULT_ID ? rule : { ...rule, from: 'proposed' as const }] };
   writeWhole(confirmedFile(home, agent), confirmed);
   return confirmed;
@@ -166,7 +168,7 @@ export function dropRule(home: string, agent: string, id: string, now: Date): Co
   const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_AUTO];
   if (!rules.some((r) => r.id === id))
     throw new Missing({
-      message: `no rule ${id} is in force for ${agent}: the rules in force are ${rules.map((r) => r.id).join(', ') || 'none'} (nemia auto ${agent}).`,
+      message: `no rule ${id} is in force for ${agent}: the rules in force are ${rules.map((r) => r.id).join(', ') || 'none'} (nemia policy ${agent}).`,
     });
   const confirmed = { since: now.toISOString(), rules: rules.filter((r) => r.id !== id) };
   writeWhole(confirmedFile(home, agent), confirmed);

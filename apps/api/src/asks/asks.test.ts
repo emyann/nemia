@@ -41,7 +41,12 @@ const write = (file: string, text: string) => {
 };
 
 /** A task filed on `harness` and left in `phase`, with `end` laid over its attempt. */
-const task = (taskId: string, harness: string, phase: Parameters<ReturnType<typeof testEngine>['settle']>[1], end?: { exitCode?: number; closeout?: object }) => {
+const task = (
+  taskId: string,
+  harness: string,
+  phase: Parameters<ReturnType<typeof testEngine>['settle']>[1],
+  end?: { exitCode?: number; closeout?: object },
+) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness }));
   standIn().settle(taskId, phase, end);
 };

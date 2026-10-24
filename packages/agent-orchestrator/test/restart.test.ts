@@ -135,7 +135,7 @@ const solo = (() => {
   fs.writeFileSync(path.join(dir, 'solo.md'), '---\nplace: git\nretries: 1\n---\ndo it\n');
   return dir;
 })();
-const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: string; then: 'retries' }> }) => {
+const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: string; cause: 'retries' }> }) => {
   const repo = scratch('wf-restart-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'restart', repo, workflowDir: solo, isolate: false }));
@@ -171,7 +171,7 @@ for (const [id, s] of [
 ] as const) {
   failed(`${id}-was`, 2);
   pending(id, s, { priority: 1 });
-  await runNaming({ taskId: id, tries: [{ taskId: `${id}-was`, then: 'retries' }] });
+  await runNaming({ taskId: id, tries: [{ taskId: `${id}-was`, cause: 'retries' }] });
 }
 pending('orphan', 5);
 pending('root-new', 10);

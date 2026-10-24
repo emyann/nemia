@@ -300,7 +300,7 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
     const p = await pass(id);
     assert.deepEqual([p.tried, p.filed], [['implement'], []]);
     const nudge = readRun(id).steps.implement;
-    assert.equal(nudge.tries?.at(-1)?.then, 'signoff');
+    assert.equal(nudge.tries?.at(-1)?.cause, 'signoff');
     const spec = taskOf(nudge.taskId!).spec;
     assert.equal(spec.resumeFrom, `native-${first()}`, 'the session that ended unsigned is continued');
     assert.ok(spec.brief.includes(SIGNOFF), spec.brief);
@@ -393,7 +393,7 @@ test('files a closeout names', async (t) => {
       assert.deepEqual(p.tried, ['implement'], 'the run nudges the step itself');
       assert.equal(stage.board().tasks.has(`${task}-check`), false);
       const record = readRun(id).steps.implement;
-      assert.equal(record.tries?.at(-1)?.then, 'signoff');
+      assert.equal(record.tries?.at(-1)?.cause, 'signoff');
       assert.equal(record.taskId, `${task}-try2`);
       assert.equal(readRun(id).steps.review?.taskId ?? null, null, 'nothing that waits on it is filed');
       const brief = briefOf(`${task}-try2`);
@@ -539,7 +539,7 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
       stage.board().settle(task, 'succeeded', signedV1('done', 'Did it.', 'a person should look'));
       const p = await pass(id);
       assert.deepEqual([p.checked, p.tried], [[], ['implement']], 'no check, and the run nudges the step');
-      assert.equal(readRun(id).steps.implement.tries?.at(-1)?.then, 'signoff');
+      assert.equal(readRun(id).steps.implement.tries?.at(-1)?.cause, 'signoff');
       assert.equal(readRun(id).steps.review?.taskId ?? null, null, 'nothing that waits on it is filed');
       assert.ok(briefOf(`${task}-try2`).includes('`needs` is set on a `done` closeout'));
       stage.board().settle(`${task}-try2`, 'succeeded', signedV1('done', 'Did it.', 'still'));

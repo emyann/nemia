@@ -34,6 +34,14 @@
       ]
     },
     {
+      "term": "Session",
+      "meaning": "the board's word for each start of a try's task, which the runtime calls an attempt: a try counts its sessions, one a start. Not the runtime's Session, an agent's conversation, which a try may continue.",
+      "see": {
+        "label": "An attempt",
+        "href": "/runtime/#an-attempt"
+      }
+    },
+    {
       "term": "Step kind",
       "meaning": "which of the board's five groups a step is drawn in (work, gate, done, to come, failed), taken from its phase and whether it ran (`kindOf`).",
       "type": "StepKind",
@@ -59,6 +67,14 @@
       "see": {
         "label": "The board",
         "href": "/map/#the-board"
+      }
+    },
+    {
+      "term": "Try",
+      "meaning": "one filing of a step, as the api serves it, with its cause; the board says try and never attempt.",
+      "see": {
+        "label": "Trying again",
+        "href": "/workflows/#trying-again"
       }
     }
   ]

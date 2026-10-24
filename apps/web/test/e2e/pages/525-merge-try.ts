@@ -9,7 +9,7 @@ import { OUT, store } from '../world.ts';
 export default {
   /**
    * A try a merge replaced (`nemia merge`), on the loop's page: LOOPING's record is written as the tick writes a merge filed — implement's
-   * second try moved behind with `then: 'merge'`, never `round` — and implement's Details list its third try as a merge, on the round it
+   * second try moved behind with `cause: 'merge'`, never `round` — and implement's Details list its third try as a merge, on the round it
    * was on. The record is put back as seeded before the page ends, said on the feed, so every page after it reads the store as seeded.
    */
   name: 'merge-try',
@@ -18,8 +18,8 @@ export default {
     const { id, target } = LOOPING;
     const recordFile = path.join(store!, 'runs', `${id}.json`);
     const seeded = fs.readFileSync(recordFile, 'utf8');
-    const record = JSON.parse(seeded) as { steps: Record<string, { tries: Array<{ taskId: string; then: string }> }> };
-    record.steps[target].tries[1].then = 'merge';
+    const record = JSON.parse(seeded) as { steps: Record<string, { tries: Array<{ taskId: string; cause: string }> }> };
+    record.steps[target].tries[1].cause = 'merge';
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     try {
       fs.writeFileSync(recordFile, JSON.stringify(record, null, 2));

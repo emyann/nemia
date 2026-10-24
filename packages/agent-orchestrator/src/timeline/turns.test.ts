@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import type { Run } from '../record/record.ts';
 import { timeline, type AttemptClock, type TaskClock } from './timeline.ts';
 import { answerWaitOf, turnOf, turnSpanOf, type TurnTry } from './turns.ts';
+import type { TryCause } from '../retry/index.ts';
 
 const MIN = 60_000;
 
@@ -27,8 +28,8 @@ const attempt = (turn: number, spawned: string, ended: string | null, closeout?:
   ...(closeout ? { closeout } : {}),
 });
 
-/** Tries on task `T`, each replaced as `thens` says, then the current try on `current`. */
-const tries = (thens: string[], current = 'T'): TurnTry[] => [...thens.map((then) => ({ taskId: 'T', then })), { taskId: current }];
+/** Tries on task `T`, each replaced as `causes` says, then the current try on `current`. */
+const tries = (causes: TryCause[], current = 'T'): TurnTry[] => [...causes.map((cause) => ({ taskId: 'T', cause })), { taskId: current }];
 
 test('a try that answers an earlier try on its task is that many turns in', () => {
   assert.equal(turnOf(tries(['nudge']), 1), 1);
@@ -84,8 +85,8 @@ test('a session that signed off blocked twice and was answered twice: what it ra
       ask: {
         taskId: 'T',
         tries: [
-          { taskId: 'T', then: 'nudge' },
-          { taskId: 'T', then: 'nudge' },
+          { taskId: 'T', cause: 'nudge' },
+          { taskId: 'T', cause: 'nudge' },
         ],
       },
     },

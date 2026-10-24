@@ -194,7 +194,7 @@ function runWith(note: string | null): RunDetail {
           {
             try: 1,
             round: 1,
-            then: null,
+            cause: null,
             current: true,
             taskId: 't-1',
             note,
@@ -1130,7 +1130,7 @@ const unset: WorkflowStepSpec = {
 const unescaped = (text: string) =>
   text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
 
-test("a workflow's step is drawn in the spec mode: what it runs on, its check, effort, tools, mode and loop — and no status chip, no attempt", async () => {
+test("a workflow's step is drawn in the spec mode: what it runs on, its check, effort, tools, mode and loop — and no status chip, no session", async () => {
   const html = await specMarkup({
     ...unset,
     harness: 'claude',
@@ -1163,9 +1163,9 @@ test("a workflow's step is drawn in the spec mode: what it runs on, its check, e
   assert.doesNotMatch(
     html,
     /data-state=/,
-    `nothing has happened to it: no chip, no attempt, no gate, no spinner — none of what a run's step shows below its head: ${html}`,
+    `nothing has happened to it: no chip, no session, no gate, no spinner — none of what a run's step shows below its head: ${html}`,
   );
-  assert.doesNotMatch(html, /no attempt yet|>#\d/, html);
+  assert.doesNotMatch(html, /no session yet|>#\d/, html);
   assert.equal(gateDrawn(html), false, html);
   assert.doesNotMatch(html, /running now/, html);
 
@@ -1495,7 +1495,7 @@ test('the Decide section copies its commands and runs none: a button per command
   );
 });
 
-test("the inspector's Details say what a step used and what it cost beside its attempts — `not measured`, never 0", () => {
+test("the inspector's Details say what a step used and what it cost beside its sessions — `not measured`, never 0", () => {
   const run = runWith(null);
   const rows = (step: RunDetail['steps'][number]) =>
     [...renderToStaticMarkup(createElement(StepTabs, { run, step })).matchAll(/<dt[^>]*>([^<]+)<\/dt>\s*<dd[^>]*>(.*?)<\/dd>/g)].map(
@@ -1530,7 +1530,7 @@ test("the inspector's Details say what a step used and what it cost beside its a
   const unfiledStep = { ...run.steps[0], taskId: null, used: null };
   const unfiled = Object.fromEntries(rows(unfiledStep));
   assert.deepEqual(
-    [unfiled.attempts, unfiled.used, unfiled.cost, unfiled.task],
+    [unfiled.sessions, unfiled.used, unfiled.cost, unfiled.task],
     [undefined, undefined, undefined, undefined],
     'a step not filed has run nothing: never a table of dashes',
   );
@@ -1597,7 +1597,7 @@ const threeTries: StepTry[] = [
   {
     try: 1,
     round: 1,
-    then: 'retries',
+    cause: 'retries',
     current: false,
     taskId: 'r-1-implement',
     note: null,
@@ -1619,7 +1619,7 @@ const threeTries: StepTry[] = [
   {
     try: 2,
     round: 1,
-    then: 'round',
+    cause: 'round',
     current: false,
     taskId: 'r-1-implement-try2',
     note: 'try 2, by retries: 1',
@@ -1636,7 +1636,7 @@ const threeTries: StepTry[] = [
   {
     try: 3,
     round: 2,
-    then: null,
+    cause: null,
     current: true,
     taskId: 'r-1-implement-try3',
     note: 'round 2 of 3',
@@ -1661,7 +1661,7 @@ test("REFUSED: a step's session alone unread draws an `unread` fact, the runtime
   assert.deepEqual(unreadRows(null), [], 'a step whose session was read: no row');
 });
 
-test("the inspector's Details list a step's rounds, a row a try: its round and how it was reached, its task, attempts and verdict, and a link that selects it", () => {
+test("the inspector's Details list a step's rounds, a row a try: its round and how it was reached, its task, sessions and verdict, and a link that selects it", () => {
   const run = runWith('round 2 of 3');
   const step = { ...run.steps[0], name: 'implement', ...coded('running (working)'), attempts: threeTries[2].attempts, tries: threeTries };
   const html = renderToStaticMarkup(createElement(StepTabs, { run, step }));
@@ -1679,7 +1679,7 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
       ['2', false, ['round 1 · try 2 (retries)', 'closeout', 'r-1-implement-try2', '#1 · 12m 30s', 'check', 'passed']],
       ['3', true, ['round 2 · try 3 (round)', '· current', 'closeout', 'r-1-implement-try3', '#2 · running', 'check', 'not filed']],
     ],
-    'the current try is selected until another is: filed, its attempt still running, its check not filed yet',
+    'the current try is selected until another is: filed, its session still running, its check not filed yet',
   );
   assert.deepEqual(
     [...section.matchAll(/<button type="button" aria-label="([^"]+)"/g)].map((m) => m[1]),
@@ -1694,29 +1694,14 @@ test("the inspector's Details list a step's rounds, a row a try: its round and h
     facts.slice(0, 2),
     [
       ['try', 'round 2 · try 3 (round)'],
-      ['attempts', '2'],
+      ['sessions', '2'],
     ],
-    "the attempts above it are the current try's, and say which try that is",
+    "the sessions above it are the current try's, and say which try that is",
   );
 
   const once = renderToStaticMarkup(createElement(StepTabs, { run, step: run.steps[0] }));
-  assert.doesNotMatch(once, /aria-label="Rounds"|>try<\/dt>/, 'one try: no Rounds, and no `try` above the attempts');
-  assert.match(once, />attempts<\/dt>/);
-});
-
-test('a try a merge replaced decodes as the api serves it and reads as a merge, on the round it was on: the board says merge, never round', async () => {
-  const { Schema } = await import('effect');
-  const { StepTrySchema } = await import('../src/lib/api/tries.ts');
-  const merged = [
-    threeTries[0],
-    Schema.decodeUnknownSync(StepTrySchema)({ ...threeTries[1], then: 'merge', note: 'try 2, by retries: 1' }),
-    { ...threeTries[2], round: 1, note: 'try 3, merged the base, on your word (nemia merge), the round unchanged' },
-  ];
-  const run = runWith('round 1 of 3');
-  const step = { ...run.steps[0], name: 'implement', ...coded('running (working)'), attempts: merged[2].attempts, tries: merged };
-  const html = renderToStaticMarkup(createElement(StepTabs, { run, step }));
-  assert.ok(html.includes('round 1 · try 3 (merge)'), html);
-  assert.ok(!html.includes('(round)'), html);
+  assert.doesNotMatch(once, /aria-label="Rounds"|>try<\/dt>/, 'one try: no Rounds, and no `try` above the sessions');
+  assert.match(once, />sessions<\/dt>/);
 });
 
 test("the Output tab opens on the outcome and who said it, then draws each field by its shape — findings a table, replies with badges, a yes or no with what it means, anything else JSON — and every other try's folded beneath it", () => {
@@ -2903,7 +2888,7 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
   const spec = { ...atGate().steps[0].spec, workspace: 'main' } as RunDetail['steps'][number]['spec'];
   const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } }));
   assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/, 'an ending not filed runs');
-  assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no attempt yet`');
+  assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no session yet`');
   assert.doesNotMatch(html, /running now/, 'no spinner: nobody runs a step at its gate');
   assert.equal(gateDrawn(nodeMarkup(atGate({ approve: null }, { waitingOnYou: [], onYou: [], cancelledAt: at }))), false);
 });
@@ -3790,7 +3775,7 @@ test("the timeline has a cost column: what each session cost, `not measured` whe
   ]);
   assert.match(
     html,
-    /<td data-cell="cost" title="What the run&#x27;s tries cost, as its harness priced each session: 1 attempt measured; 1 ended attempt had no cost on it, so it cost at least this. An attempt still running is priced once it ends."/,
+    /<td data-cell="cost" title="What the run&#x27;s tries cost, as its harness priced each session: 1 session measured; 1 ended session had no cost on it, so it cost at least this. A session still running is priced once it ends."/,
     'what a `≥` leaves out, on hover',
   );
 });
@@ -3804,7 +3789,7 @@ test("the Decide section says why a step past its budget is held — `wf decide`
     sensitive: [],
     used: {},
     total: UNMEASURED,
-    cost: 'run $6.35 measured · 2 attempts not measured',
+    cost: 'run $6.35 measured · 2 sessions not measured',
     overBudget: line,
     collisions: null,
     commands: [],
@@ -3816,7 +3801,7 @@ test("the Decide section says why a step past its budget is held — `wf decide`
     /<p data-over-budget="true" class="[^"]*">OVER BUDGET, waiting on you: tokens \(\$4\.25 of \$3\) {2}— the run files nothing more for it on its own; nothing after it ran<\/p>/,
   );
   assert.ok(drawnYours(/<p data-over-budget="true" class="([^"]*)"/.exec(html)![1]), 'a step held on its budget waits on a person: yours');
-  assert.match(html, /<dt[^>]*>every try<\/dt><dd[^>]*>run \$6\.35 measured · 2 attempts not measured<\/dd>/);
+  assert.match(html, /<dt[^>]*>every try<\/dt><dd[^>]*>run \$6\.35 measured · 2 sessions not measured<\/dd>/);
   const none = renderToStaticMarkup(
     createElement(DecideSection, { runId: 'r-1', decision: { ...decision, overBudget: null, cost: null } }),
   );

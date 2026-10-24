@@ -271,15 +271,15 @@ export function costLine(step: Workflow | undefined, run: Run, name: string, use
 }
 
 /**
- * The run's `cost` on `nemia decide`, after its steps: every step's tries together (`runSpend`), with how many ended attempts have no cost
- * on them — or `not measured`. Pure. None before any attempt has ended.
+ * The run's `cost` on `nemia decide`, after its steps: every step's tries together (`runSpend`), with how many ended sessions have no cost
+ * on them — or `not measured`. Pure. None before any session has ended.
  */
 export function runCostLines(run: Run, spendOf: SpendOf): string[] {
   const spent = runSpend(run, spendOf);
   if (!spent.measured && !spent.unmeasured) return [];
   if (!spent.measured) return ['cost  run not measured'];
   return [
-    `cost  run ${dollars(spent.usd)}${spent.unmeasured ? ` measured · ${spent.unmeasured} attempt${spent.unmeasured > 1 ? 's' : ''} not measured` : ''}`,
+    `cost  run ${dollars(spent.usd)}${spent.unmeasured ? ` measured · ${spent.unmeasured} session${spent.unmeasured > 1 ? 's' : ''} not measured` : ''}`,
   ];
 }
 

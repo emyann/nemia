@@ -403,7 +403,7 @@ test('decodes takes a schema that decodes its type, and the compiler refuses one
 const aTry: BoardTry = {
   try: 1,
   round: 1,
-  then: null,
+  cause: null,
   current: true,
   taskId: 't-1',
   note: null,

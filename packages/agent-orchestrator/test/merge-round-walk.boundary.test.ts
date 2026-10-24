@@ -201,14 +201,14 @@ test("a merge send-back leaves the round count unchanged: the loop's target merg
   );
   const run = readRun(id);
   assert.deepEqual(
-    run.steps.implement.tries?.map((t) => t.then),
+    run.steps.implement.tries?.map((t) => t.cause),
     ['merge'],
     'filed as a merge, never as a round',
   );
   assert.equal(roundOf(run, 'review'), before, 'the round stays as it is');
   assert.equal(run.baseRef, sha, "the run's base moves to the commit merged");
   assert.deepEqual(
-    run.steps.ship.tries?.map((t) => t.then),
+    run.steps.ship.tries?.map((t) => t.cause),
     ['back'],
     'the stopped ending is moved behind, to wait for the work',
   );

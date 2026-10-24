@@ -222,7 +222,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     {
       try: 1,
       round: 1,
-      then: 'nudge',
+      cause: 'nudge',
       current: false,
       taskId: 't-1',
       note: null,
@@ -239,7 +239,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     {
       try: 2,
       round: 1,
-      then: null,
+      cause: null,
       current: true,
       taskId: 't-2',
       note: 'nudged',

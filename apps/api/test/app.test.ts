@@ -149,7 +149,7 @@ const firstTry = (step: {
   {
     try: 1,
     round: 1,
-    then: null,
+    cause: null,
     current: true,
     note: null,
     taskId: step.taskId,
@@ -1385,7 +1385,7 @@ function seedLoop(id: string, round: number, again: boolean) {
   for (const name of ['implement', 'review']) {
     steps[name] = {
       taskId: `t-${id}-${name}-${round}`,
-      tries: Array.from({ length: round - 1 }, (_, i) => ({ taskId: `t-${id}-${name}-${i + 1}`, then: 'round' })),
+      tries: Array.from({ length: round - 1 }, (_, i) => ({ taskId: `t-${id}-${name}-${i + 1}`, cause: 'round' })),
     };
   }
   const replies = [{ finding: 'src/flag.ts:12', answer: 'fixed', why: 'parsed before it is read' }];
@@ -1899,7 +1899,7 @@ test("a step's check read on the board: its command, and once it refused its exi
         implement: {
           taskId: 'r-73-implement-try2',
           check: { taskId: 'r-73-implement-try2-check' },
-          tries: [{ taskId: 'r-73-implement', check: { taskId: 'r-73-implement-check' }, then: 'retries' }],
+          tries: [{ taskId: 'r-73-implement', check: { taskId: 'r-73-implement-check' }, cause: 'retries' }],
         },
       },
     });
@@ -2105,11 +2105,11 @@ test("a step's tries and its closeout: every try of a looped step off one observ
             taskId: 'r-50-implement-try3',
             check: { taskId: 'r-50-implement-try3-check' },
             tries: [
-              { taskId: 'r-50-implement', check: { taskId: 'r-50-implement-check' }, then: 'retries' },
-              { taskId: 'r-50-implement-try2', check: { taskId: 'r-50-implement-try2-check' }, then: 'round' },
+              { taskId: 'r-50-implement', check: { taskId: 'r-50-implement-check' }, cause: 'retries' },
+              { taskId: 'r-50-implement-try2', check: { taskId: 'r-50-implement-try2-check' }, cause: 'round' },
             ],
           },
-          review: { taskId: 'r-50-review-try2', tries: [{ taskId: 'r-50-review', then: 'round' }] },
+          review: { taskId: 'r-50-review-try2', tries: [{ taskId: 'r-50-review', cause: 'round' }] },
         },
       });
 
@@ -2148,7 +2148,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           {
             try: 1,
             round: 1,
-            then: 'retries',
+            cause: 'retries',
             current: false,
             taskId: 'r-50-implement',
             note: null,
@@ -2171,7 +2171,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           {
             try: 2,
             round: 1,
-            then: 'round',
+            cause: 'round',
             current: false,
             taskId: 'r-50-implement-try2',
             note: 'try 2, by retries: 1',
@@ -2188,7 +2188,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           {
             try: 3,
             round: 2,
-            then: null,
+            cause: null,
             current: true,
             taskId: 'r-50-implement-try3',
             note: 'round 2 of 3',
@@ -2215,7 +2215,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         {
           try: 1,
           round: 1,
-          then: 'round',
+          cause: 'round',
           current: false,
           taskId: 'r-50-review',
           note: null,
@@ -2236,7 +2236,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         {
           try: 2,
           round: 2,
-          then: null,
+          cause: null,
           current: true,
           taskId: 'r-50-review-try2',
           note: 'round 2 of 3',
@@ -2523,12 +2523,12 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
           config: { model: 'sonnet' },
         }),
       );
-      const asked = { taskId: 'r-55-implement', then: 'fresh', model: 'sonnet' };
+      const asked = { taskId: 'r-55-implement', cause: 'fresh', model: 'sonnet' };
       const cases: Array<[id: string, tries: object[], askedModel: string | null]> = [
         ['r-55', [asked], 'sonnet'],
-        ['r-56', [asked, { taskId: 'r-55-implement-try2', then: 'recheck' }], 'sonnet'],
-        ['r-57', [{ taskId: 'r-55-implement', then: 'nudge' }], null],
-        ['r-58', [{ taskId: 'r-55-implement', then: 'retries' }], null],
+        ['r-56', [asked, { taskId: 'r-55-implement-try2', cause: 'recheck' }], 'sonnet'],
+        ['r-57', [{ taskId: 'r-55-implement', cause: 'nudge' }], null],
+        ['r-58', [{ taskId: 'r-55-implement', cause: 'retries' }], null],
       ];
       for (const [id, tries, askedModel] of cases) {
         writeRun({
@@ -2815,7 +2815,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
           implement: {
             taskId: 'r-60-implement-try2',
             check: { taskId: 'r-60-implement-try2-check' },
-            tries: [{ taskId: 'r-60-implement', check: { taskId: 'r-60-implement-check' }, then: 'retries' }],
+            tries: [{ taskId: 'r-60-implement', check: { taskId: 'r-60-implement-check' }, cause: 'retries' }],
           },
           review: { taskId: null },
         },
@@ -2912,7 +2912,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
             taskId: 'r-60-implement-try3',
             tries: [
               ...record.steps.implement.tries,
-              { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, then: 'nudge' },
+              { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, cause: 'nudge' },
             ],
           },
         },

@@ -151,7 +151,7 @@ export function StepTiles({
           const need = needOf(step, onYou, cancelled);
           const read = details.get(name);
           const attempt = read
-            ? (attemptLine(read.attempts, isLive(state), now) ?? (read.taskId === null ? 'not filed yet' : 'no attempt yet'))
+            ? (attemptLine(read.attempts, isLive(state), now) ?? (read.taskId === null ? 'not filed yet' : 'no session yet'))
             : null;
           const cost = read ? costText(read) : null;
           const gated = onYou && isGate(state, cancelled);

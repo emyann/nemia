@@ -766,7 +766,7 @@ function filedOf(record: StepRecord | undefined, views: Views): StepFiled | null
  */
 function askedModelOf(record: StepRecord | undefined): string | null {
   const tries = record?.tries ?? [];
-  return [...tries].reverse().find((t) => t.then !== 'recheck')?.model ?? null;
+  return [...tries].reverse().find((t) => t.cause !== 'recheck')?.model ?? null;
 }
 
 /**

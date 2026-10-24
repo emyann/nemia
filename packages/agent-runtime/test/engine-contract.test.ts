@@ -81,14 +81,17 @@ test('REFUSED: a verb with no walk — one added to the engine, and one whose wa
   );
 });
 
+/** A verb kept under its old name beside its new one, which the stand-in's refusal names: adding the new one keeps both. */
+const RENAMED: Partial<Record<string, string>> = { start: 'up' };
+
 for (const verb of UNKEPT)
-  test(`a verb the stand-in does not keep dies naming itself and its file: ${verb}`, async () => {
+  test(`a verb the stand-in does not keep dies naming itself (or, for an old name, its new one) and its file: ${verb}`, async () => {
     const unkept = standIn().engine[verb] as () => Answer;
     const exit = await Effect.runPromiseExit(unkept());
     assert.ok(Exit.isFailure(exit) && Cause.hasDies(exit.cause), `${verb} did not die`);
     assert.equal(
       (Cause.squash(exit.cause) as Error).message,
-      `the test engine keeps no \`${verb}\`: add it to src/service/test-engine.ts, with its walk in test/engine-walks.ts`,
+      `the test engine keeps no \`${RENAMED[verb] ?? verb}\`: add it to src/service/test-engine.ts, with its walk in test/engine-walks.ts`,
     );
   });
 

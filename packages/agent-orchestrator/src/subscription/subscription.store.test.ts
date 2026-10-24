@@ -196,10 +196,10 @@ test('listSubscriptions leaves out each record that does not read, saying it, co
     const { said, say } = saying();
     assert.deepEqual(
       listSubscriptions(say).map((s) => s.subscription.selectors),
-      [['reason=Blocked']],
+      [['reason=AwaitingAnswer']],
     );
     assert.equal(said.length, 1);
-    names(said[0], 'the subscription partly', '"verified"', 'reason=Blocked alone');
+    names(said[0], 'the subscription partly', '"verified"', 'reason=AwaitingAnswer alone');
     fs.rmSync(subscriptionFile('partly'));
   });
   await t.test(

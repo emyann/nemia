@@ -864,6 +864,8 @@ test("REFUSED at shipped defaults: nemia watch's selectors, its cursor file, and
     'agent',
     'kind',
     'reason',
+    'on',
+    'via',
     'type',
     'waits',
     'source',

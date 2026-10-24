@@ -33,13 +33,13 @@ import type { Closeout } from '../closeout/index.ts';
 import { holdWord } from '../wait/wait.ts';
 import { SLOT_WAIT } from '../cap/cap.ts';
 import { runCodes, type AnswerVia, type WaitOn } from '../phase/phase.ts';
-import { currentOf } from './former-reason.ts';
 import { takeoverLine, type DaemonStanding } from '../daemon/daemon.ts';
 import {
   DAEMON_STARTED,
   DENIED,
   isOnce,
   codesOf,
+  currentOf,
   messageOf,
   reasonOf,
   REMOVED,

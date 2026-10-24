@@ -1070,7 +1070,7 @@ test("`nemia ls`' costs: each step's tries' beside its word once measured, and t
           note: 'try 3 due — retries: 2, 1 spent',
           cost: '$2.25',
         },
-        { name: 'review', status: 'waiting', reason: 'Waiting', phase: 'pending', branch: null },
+        { name: 'review', status: 'waiting', reason: 'Pending', phase: 'pending', branch: null },
         '$2.25',
       ],
     );

@@ -6,6 +6,7 @@
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { SKILL_NAME } from '../keys/index.ts';
+import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
 
 /** The schema every document of a template is written in. */
 export const API_VERSION = 'nemia.dev/v1alpha1';
@@ -50,8 +51,8 @@ export type Metadata = { name: string; description?: string };
 export type Document<K extends string, S> = { apiVersion: typeof API_VERSION; kind: K; metadata: Metadata; spec: S };
 
 /**
- * The manifest's spec: the content's version, the factory's instruction and its rules, its parameters and who fills each
- * `<workflow>/<step>`.
+ * The manifest's spec: the content's version, the factory's instruction and its rules, its parameters, who fills each
+ * `<workflow>/<step>`, and whether its runs follow merged revisions (`RevisionsPolicy`, pinned when it says nothing).
  */
 export type FactorySpec = {
   version: string;
@@ -59,6 +60,7 @@ export type FactorySpec = {
   rules?: Text;
   parameters?: Readonly<Record<string, Parameter>>;
   hires: Readonly<Record<string, string>>;
+  revisions?: RevisionsPolicy;
 };
 
 /** An agent's spec: its portable part, and one block per harness under the harness's name (`Profile`). */
@@ -180,7 +182,7 @@ export function layoutRefusals(folder: Pick<ReadFolder, 'files'>, named: Readonl
 }
 
 /** A value's leaf kinds: what it must be, a `{ param }` allowed for `words` and `count`, and `not-yet` for a git or url source. */
-type Leaf = 'string' | 'number' | 'boolean' | 'strings' | 'text' | 'words' | 'count' | 'option' | 'any' | 'not-yet';
+type Leaf = 'string' | 'number' | 'boolean' | 'strings' | 'text' | 'words' | 'count' | 'option' | 'revisions' | 'any' | 'not-yet';
 
 /** A document's shape: a leaf, a list of one shape, or named fields, some required, and the shape of any other key (`rest`). */
 type Shape =
@@ -255,6 +257,7 @@ const SPECS: Readonly<Record<Exclude<DocumentFile['kind'], 'Lock'>, Shape>> = {
         rest: { fields: { type: 'string', description: 'string', default: 'any' }, required: ['type', 'description'] },
       },
       hires: { fields: {}, rest: 'string' },
+      revisions: 'revisions',
       imports: { list: 'not-yet' },
     },
     required: ['version', 'hires'],
@@ -321,6 +324,7 @@ const LEAVES: Readonly<Record<string, [(value: unknown) => boolean, string]>> = 
   words: [(v) => typeof v === 'string' || isParam(v), 'a string or {param: <name>}'],
   count: [(v) => typeof v === 'number' || isParam(v), 'a number or {param: <name>}'],
   option: [(v) => ['string', 'number'].includes(typeof v) || v === true || isStrings(v), 'a string, a number, true or a list of strings'],
+  revisions: [(v) => REVISIONS_POLICIES.some((p) => p === v), REVISIONS_POLICIES.join(' or ')],
   any: [() => true, 'anything'],
 };
 

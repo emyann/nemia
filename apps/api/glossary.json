@@ -29,11 +29,29 @@
       }
     },
     {
+      "term": "Phase / reason / message",
+      "meaning": "what each step and each try carries at the api: its `phase` and its `reason`, the codes a reader groups and compares, and its `message`, the sentence a person reads and nothing compares; `status` is the message under its old name, kept for one card.",
+      "type": "RunDetail",
+      "see": {
+        "label": "The api",
+        "href": "/map/#the-api"
+      }
+    },
+    {
       "term": "Try cause",
       "meaning": "a try's `cause` on a run's detail (`StepTry.cause`): why the try was moved behind, one of the run core's `TryCause`, and null on the current try.",
       "see": {
         "label": "Trying again",
         "href": "/workflows/#trying-again"
+      }
+    },
+    {
+      "term": "Verdict",
+      "meaning": "a check's verdict at the api, as codes, its `result` and its `exit`, on a step and on its `StepCheck`, null where no check judged it; the word a person reads for it is the board's to draw.",
+      "type": "StepCheck",
+      "see": {
+        "label": "The api",
+        "href": "/map/#the-api"
       }
     }
   ]

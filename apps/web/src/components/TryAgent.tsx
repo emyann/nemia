@@ -126,7 +126,9 @@ export function TryRun({ id }: { id: string }) {
     <div data-try={id} className="space-y-2 rounded border border-outline-variant px-3 py-2">
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground">
         <span>The latest try, {link}:</span>
-        {step && <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />}
+        {step && (
+          <StatusChip phase={step.phase} reason={step.reason} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
+        )}
         <span data-try-status>{run.status}</span>
         {spent && (
           <span data-try-spent>

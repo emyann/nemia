@@ -309,20 +309,39 @@ test('wait polls the ci context until it has a verdict, and passes on a green on
   assert.equal(tip(at.bare!, at.branch), null, 'the wait pushes nothing');
 });
 
-test('REFUSED: a red ci, with the Actions URL, the failing jobs, a tail of the failing log and the retry line', () => {
+/** `lines` as a job's log GitHub serves: each line stamped with the time it was printed. */
+const stamped = (lines: string[]): string => lines.map((line) => `2026-10-24T09:00:00.0000000Z ${line}`).join('\n');
+
+test("REFUSED: a red ci, with the Actions URL, the failing jobs, each job's failing tests and their diffs, and the retry line", () => {
   const at = placed();
-  const log = ['a.test.ts', 'not ok 1 - a thing', 'the end'].join('\n');
+  const TESTS_URL = CI_URL.replace('/job/5678', '/job/9012');
+  const tests = stamped([
+    ...Array.from({ length: 50 }, (_, i) => `agent-orchestrator:test: ✔ a passing test ${i} (1ms)`),
+    'agent-orchestrator:test: ✖ the export is pinned (2ms)',
+    'agent-orchestrator:test: ✔ a later pass (1ms)',
+    'agent-orchestrator:test: ℹ fail 1',
+    'agent-orchestrator:test: ✖ failing tests:',
+    'agent-orchestrator:test: test at test/a.test.ts:3:1',
+    'agent-orchestrator:test: ✖ the export is pinned (2ms)',
+    'agent-orchestrator:test:   AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:',
+    'agent-orchestrator:test:   + actual - expected',
+    "agent-orchestrator:test:   + 'pinned'",
+    "agent-orchestrator:test:   - 'moved'",
+    'agent-orchestrator:test:       at TestContext.<anonymous> (file:///a.test.ts:3:33)',
+  ]);
+  const gathered = stamped(['Every job succeeded', 'test: failure', 'Process completed with exit code 1.']);
   at.gh.answers([
     ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
     {
       when: 'pr view',
       out: rollup(
         { status: 'COMPLETED', conclusion: 'FAILURE' },
-        { name: 'test agent-orchestrator on node 22', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: CI_URL },
+        { name: 'test agent-orchestrator on node 22', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: TESTS_URL },
         { name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: CI_URL },
       ),
     },
-    { when: 'run view', out: log },
+    { when: 'actions/jobs/9012/logs', out: tests },
+    { when: 'actions/jobs/5678/logs', out: gathered },
   ]);
   const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0', WF_STEP: 'implement' });
   assert.equal(r.code, 1, r.out);
@@ -331,10 +350,22 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, a tail of the f
   assert.match(r.err, /the jobs that did not pass:/);
   assert.match(r.err, /test agent-orchestrator on node 22: FAILURE/);
   assert.ok(!r.err.includes('  lint: '), `a job that passed is not named:\n${r.err}`);
-  assert.match(r.err, /gh run view 1234 --log-failed/);
-  assert.match(r.err, /not ok 1 - a thing/);
+  assert.match(r.err, /test agent-orchestrator on node 22 \(job 9012\)/, "the job's lines are headed by its name");
+  for (const told of ['✖ the export is pinned', 'AssertionError [ERR_ASSERTION]', '+ actual - expected', "+ 'pinned'", "- 'moved'"])
+    assert.ok(r.err.includes(told), `the failure and its diff: ${told}\n${r.err}`);
+  assert.ok(!r.err.includes('✔'), `no pass is handed on:\n${r.err}`);
+  assert.ok(!r.err.includes('2026-10-24T09'), `GitHub's stamps are stripped:\n${r.err}`);
+  assert.equal(r.err.split('✖ the export is pinned').length - 1, 1, 'a failure repeated in the summary is told once');
+  assert.match(r.err, /Process completed with exit code 1\./, 'a job that names no failing test gives its tail');
   assert.ok(r.err.includes(RETRY), r.err);
-  assert.deepEqual(asked(r.calls, 'run', 'view')[0].argv, ['run', 'view', '1234', '--log-failed']);
+  assert.deepEqual(
+    asked(r.calls, 'api').map((call) => call.argv),
+    [
+      ['api', 'repos/{owner}/{repo}/actions/jobs/9012/logs'],
+      ['api', 'repos/{owner}/{repo}/actions/jobs/5678/logs'],
+    ],
+    'each failing job is read by its id, the gathering `ci` last',
+  );
 
   for (const conclusion of ['CANCELLED', 'SKIPPED', 'TIMED_OUT']) {
     const other = placed();
@@ -355,7 +386,7 @@ test('the retry line a red ci prints names the step the check is of, which the b
     at.gh.answers([
       ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
       { when: 'pr view', out: rollup({ status: 'COMPLETED', conclusion: 'FAILURE' }) },
-      { when: 'run view', out: 'boom' },
+      { when: 'actions/jobs', out: 'boom' },
     ]);
     const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0', ...more });
     assert.equal(r.code, 1, r.out);

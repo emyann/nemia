@@ -574,6 +574,9 @@ const WATCH: Ran = {
     'cursor of its own every 30 seconds while the feed is still. With no -l,',
     'every line; -l waits=person takes the lines that wait on a person. A',
     'step with no agent carries agent: none, which -l agent!=none leaves out.',
+    "A line's reason is a step's code as the api gives the step (reason);",
+    'its word and message are for people: select on the reason, never on',
+    'the words.',
   ],
   spec: {
     positionals: [{ key: 'cursor', takes: 'optional', kind: 'text' }],

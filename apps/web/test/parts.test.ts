@@ -8,6 +8,7 @@ import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createMemoryHistory, createRootRoute, createRouter, RouterContextProvider } from '@tanstack/react-router';
 import './tsx.ts';
+import { coded } from './run-fixtures.ts';
 
 const { CutFrame } = await import('../src/components/look/CutFrame.tsx');
 const { CutCue } = await import('../src/components/look/CutCue.tsx');
@@ -36,10 +37,10 @@ function tagWith(html: string, mark: string): string {
 }
 
 const STEPS = [
-  { name: 'design', status: 'verified ✓' },
-  { name: 'implement', status: 'running (working)' },
-  { name: 'review', status: 'failed ✗ check (exit 1)' },
-  { name: 'land', status: 'awaiting approval' },
+  { name: 'design', ...coded('verified ✓') },
+  { name: 'implement', ...coded('running (working)') },
+  { name: 'review', ...coded('failed ✗ check (exit 1)') },
+  { name: 'land', ...coded('awaiting approval') },
 ];
 
 /** The canvas's barcode of each plate: an inked bar and a gap in turn, in pixels. */
@@ -277,9 +278,9 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
     'a step done is filled in the rail whether a check says so or its own word does, and a step to come stays hollow',
     async () => {
       const steps = [
-        { name: 'design', status: 'unverified' },
-        { name: 'implement', status: 'verified ✓' },
-        { name: 'review', status: 'waiting' },
+        { name: 'design', ...coded('unverified') },
+        { name: 'implement', ...coded('verified ✓') },
+        { name: 'review', ...coded('waiting') },
       ];
       const html = await drawn(createElement(RunSteps, { steps, cancelled: false, held: false }));
       const classOf = (step: string) => tagWith(html, `data-step="${step}"`).match(/class="([^"]*)"/)?.[1];

@@ -21,6 +21,8 @@ import { inFlight } from '../cap/cap.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Workflow } from '../step/step.ts';
+import type { CheckVerdict } from '../check/check.ts';
+import { runCodes, type RunPhase, type RunReason, type StepPhase, type StepReason } from '../phase/phase.ts';
 import { bare, judgedSteps, type Views } from './reads.verb.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
@@ -138,8 +140,9 @@ export type RunHolding = {
  *
  * `denied` is what the harness denied the step's current try, off the engine's record of each ended attempt (`deniedOf`, the same views):
  * `calls`, each as a permission rule names it (`Skill(look)`, `Bash(pytest)`), once each in the order first denied, and `words`, the line
- * `nemia ls` and `nemia decide` say (`deniedWords`: five named, the rest counted). Beside the status, never in it: the status is the word
- * the board's chip compares. Null for a step denied nothing — and for one whose harness cannot say, as a `background: true` session cannot.
+ * `nemia ls` and `nemia decide` say (`deniedWords`: five named, the rest counted). Beside the status, never in it: the status is the
+ * sentence a person reads, and its codes (`StepCodes`) what a screen compares. Null for a step denied nothing — and for one whose harness
+ * cannot say, as a `background: true` session cannot.
  *
  * `sessionUnread` is why the runtime could not read the step's session alone, in its words (`unreadOf`, off its view): the step is
  * neither working nor gone, and its status says nothing of it. Null for a step whose session was read — on the first request whose look
@@ -211,11 +214,36 @@ export const wordOf =
     wordOfView(views.get(taskId));
 
 /**
+ * Where a step stands as codes, as the listing judged it (`Listing`'s `phase`, `reason` and `verdict`): its check's verdict null where it
+ * was not judged by one.
+ */
+export type StepCodes = { phase: StepPhase; reason: StepReason; verdict: CheckVerdict | null };
+
+/** A run's word and codes as a door says them (`RunSummary`): `assess`'s status, and its phase and reason (`runCodes`). */
+export const runSaid = (judged: Pick<Judged, 'status' | 'phase' | 'reason'>): Pick<Judged, 'status' | 'phase' | 'reason'> => ({
+  status: judged.status,
+  phase: judged.phase,
+  reason: judged.reason,
+});
+
+/**
+ * A step's word and codes as a door says them (`RunSummary`'s steps): its codes (`StepCodes`), its word as `message`, and as `status`,
+ * the name `message` had, kept for one card.
+ */
+export const stepSaid = (judged: Pick<Judged, 'codes' | 'words'>, name: string): StepCodes & { message: string; status: string } => {
+  const { phase, reason, verdict } = judged.codes.get(name)!;
+  const word = judged.words.get(name)!;
+  return { phase, reason, message: word, verdict, status: word };
+};
+
+/**
  * What the run established, over one read of its tasks: each step's word and note, who is waited on, where the run stands, and whether it
  * still moves.
  */
 type Judged = {
   words: ReadonlyMap<string, string>;
+  /** Each step's codes (`StepCodes`), beside its word: what a door carries and compares, the word being what a person reads. */
+  codes: ReadonlyMap<string, StepCodes>;
   notes: ReadonlyMap<string, string | null>;
   /** The looping steps whose next round is due (`Listing`'s `roundDue`). */
   roundDue: ReadonlySet<string>;
@@ -231,6 +259,9 @@ type Judged = {
   toDecide: RunToDecide | null;
   /** The run in one word, as `assess` judged it: `failed` where a step broke, `awaiting approval` or `blocked` where a person stops it. */
   status: RunStatus;
+  /** Where the run is in its life, and why, as codes (`runCodes`): `Held` for a running run a person holds (`holding`). */
+  phase: RunPhase;
+  reason: RunReason;
   /**
    * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file — a
    * check, a try, a round due once a loop's looping step settled, or roots `assess` makes ready. Roots of a run waiting on runs are filed
@@ -362,11 +393,12 @@ export type JudgeHow = {
  * run (`runReading`), which `nemia ls` answers from too, over the views the request already has.
  *
  * The words are `listing`'s — `verified ✓`, `checking`, `unverified · done`, `failed ✗ check (exit 1)`, `unsigned`, `succeeded · BLOCKED`,
- * `rounds exhausted`, the engine's bare word while a step runs (`needs-human`, which the board's chip and `needsOf` compare exactly), and
+ * `rounds exhausted`, the engine's bare word while a step runs (`needs-human`), and
  * `unknown` for a task it has no record of — and so are the notes beside them; what the harness says a session waits for and what it was
  * denied are fields of the reading the board does not show here (`needsOf` says them). A step the page shows and the tick does not judge —
  * one a record names that has no frozen workflow and whose folder lacks it — is worded as a `bare` step, and has no say in the run's
- * status. A refused check's verdict is its exit off the engine's record (`exitVerdicts`), never a read of its logs on a poll.
+ * status. A refused check's verdict is its exit off the engine's record (`exitVerdicts`), never a read of its logs on a poll. Beside each
+ * word, its codes (`codes`): what the board and `needsOf` compare, never the word itself.
  *
  * The runs its roots wait on and the runs a person holds it until are each read once, through the request's reader: a root of a run
  * waiting on runs says `waiting on <run>`, and the run moves while each may still ship — the tick files the roots when they do — and not
@@ -396,6 +428,7 @@ export const judge = Effect.fn('judge')(function* (
   const waitingOnYou = names.filter((name) => read.waitingOnYou.includes(name));
   return {
     words: new Map(read.steps.map((s) => [s.name, s.status])),
+    codes: new Map(read.steps.map((s) => [s.name, { phase: s.phase, reason: s.reason, verdict: s.verdict ?? null }])),
     notes: new Map(read.steps.map((s) => [s.name, s.note ?? null])),
     roundDue: new Set(read.steps.filter((s) => s.roundDue).map((s) => s.name)),
     beside: new Map(read.steps.map(({ name, waits, denied }) => [name, { waits, denied }])),
@@ -403,6 +436,7 @@ export const judge = Effect.fn('judge')(function* (
     onYou: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),
     status,
+    ...runCodes(status, holding !== null),
     moving:
       inFlight(run, read.phaseOf).length > 0 ||
       (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
@@ -423,11 +457,11 @@ export const judge = Effect.fn('judge')(function* (
  * (`nameFor`). What its try was denied is the reading's words too (`denied`), with each call off the views (`deniedOf`), and why its
  * session alone was unread the runtime's (`unreadOf`).
  */
-export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'words' | 'waitingOnYou' | 'beside'>): StepNeeds {
+export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'codes' | 'waitingOnYou' | 'beside'>): StepNeeds {
   const view = run.steps[name]?.taskId ? views.get(run.steps[name].taskId) : undefined;
   const said = view ? closeoutOf(views, run, name) : undefined;
-  const status = judged.words.get(name)!;
-  const atGate = status === 'awaiting approval' && judged.waitingOnYou.includes(name);
+  const reason = judged.codes.get(name)!.reason;
+  const atGate = reason === 'AwaitingApproval' && judged.waitingOnYou.includes(name);
   const blockedByHarness = view?.phase === 'needs-human' && said === undefined;
   const { waits, denied } = judged.beside.get(name) ?? {};
   const words = blockedByHarness ? waits : undefined;
@@ -444,7 +478,7 @@ export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judge
           ),
         }
       : null,
-    approve: atGate ? onYouWords({ steps: [{ name, status, branch: null }], waitingOnYou: [name] })[0] : null,
+    approve: atGate ? onYouWords({ steps: [{ name, reason }], waitingOnYou: [name] })[0] : null,
     denied: denied && view ? { words: denied, calls: deniedOf(views)(run.steps[name].taskId!) } : null,
     sessionUnread: unreadOf(view),
   };

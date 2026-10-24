@@ -42,6 +42,34 @@
       }
     },
     {
+      "term": "Step kind",
+      "meaning": "which of the board's five groups a step is drawn in (work, gate, done, to come, failed), taken from its phase and whether it ran (`kindOf`).",
+      "type": "StepKind",
+      "see": {
+        "label": "The board",
+        "href": "/map/#the-board"
+      }
+    },
+    {
+      "term": "Step state",
+      "meaning": "the board's state of a step, drawn from its reason by one total table in `apps/web/src/lib/status.ts`, never from the words of its message.",
+      "type": "StepState",
+      "retired": [
+        {
+          "spelling": "wordState",
+          "card": "A step's state crosses the wire as a code, not a sentence"
+        },
+        {
+          "spelling": "pauseHolds",
+          "card": "A step's state crosses the wire as a code, not a sentence"
+        }
+      ],
+      "see": {
+        "label": "The board",
+        "href": "/map/#the-board"
+      }
+    },
+    {
       "term": "Try",
       "meaning": "one filing of a step, as the api serves it, with its cause; the board says try and never attempt.",
       "see": {

@@ -16,7 +16,7 @@ import {
   touchedSummary,
 } from '../src/lib/decide.ts';
 import { decisionQuery, type Decidable, type Radius, type RunStatus, type Touched } from '../src/lib/api.ts';
-import { decidable } from './run-fixtures.ts';
+import { coded, decidable, type Word } from './run-fixtures.ts';
 
 const group = (name: string, files: number, added: number, removed: number, binary = 0) => ({ name, files, added, removed, binary });
 
@@ -128,13 +128,19 @@ test("touchedSummary, barOf, mostLines: the Factory card's line of what a run ch
 });
 
 /** A fan-out as the api gives it: implement signed off blocked, and tokens in `tokens`' word. The run `assess` calls failed. */
-const fanOut = (tokens: string, over: { status?: RunStatus; waitingOnYou?: string[]; tokensTask?: string | null } = {}) => ({
+const fanOut = (tokens: Word, over: { status?: RunStatus; waitingOnYou?: string[]; tokensTask?: string | null } = {}) => ({
   status: over.status ?? 'failed',
   cancelledAt: null,
   waitingOnYou: over.waitingOnYou ?? ['implement'],
   steps: [
-    { name: 'implement', taskId: 't-1', branch: 'wf/r/implement', status: 'succeeded · BLOCKED', note: null },
-    { name: 'tokens', taskId: over.tokensTask === undefined ? 't-2' : over.tokensTask, branch: 'wf/r/tokens', status: tokens, note: null },
+    { name: 'implement', taskId: 't-1', branch: 'wf/r/implement', ...coded('succeeded · BLOCKED'), note: null },
+    {
+      name: 'tokens',
+      taskId: over.tokensTask === undefined ? 't-2' : over.tokensTask,
+      branch: 'wf/r/tokens',
+      ...coded(tokens),
+      note: null,
+    },
   ],
 });
 
@@ -191,7 +197,7 @@ test("decidableRun, decisionStamp: when a run's decision is asked for and read a
         stamp,
         "the detail's steps carry more: the stamp reads what both have",
       );
-      for (const settled of ['checking', 'unverified · done', 'succeeded · BLOCKED', 'failed', 'unsigned']) {
+      for (const settled of ['checking', 'unverified · done', 'succeeded · BLOCKED', 'failed', 'unsigned'] as const) {
         assert.notEqual(decisionStamp(fanOut(settled)), stamp, `tokens signed off or ended: ${settled}`);
       }
       assert.notEqual(decisionStamp(fanOut('checking')), decisionStamp(fanOut('verified ✓')), 'a check settled');
@@ -220,7 +226,7 @@ test("decidableRun, decisionStamp: when a run's decision is asked for and read a
   );
   await t.test("a decision is not read again while a live step's engine word moves and nothing it says has", () => {
     const stamp = decisionStamp(fanOut('running (working)'));
-    for (const word of ['working (quiescent)', 'starting', 'between attempts', 'needs-human', 'pending', 'running (working)']) {
+    for (const word of ['working (quiescent)', 'starting', 'between attempts', 'needs-human', 'pending', 'running (working)'] as const) {
       assert.equal(decisionStamp(fanOut(word)), stamp, `tokens' engine word: ${word}`);
     }
   });

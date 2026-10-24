@@ -10,12 +10,17 @@ export default meta;
 /** The instant the stories' answer was read at. */
 const AS_OF = new Date('2026-10-12T17:11:00.000Z');
 
-/** A step of `RUN`, by its name and its status, with nothing a person is asked. */
-const step = (name: string, status: string, i: number): WaitingRun['steps'][number] => ({
+/** The codes and the words of a step verified by its check, and of one at its gate. */
+const VERIFIED = { phase: 'succeeded', reason: 'CheckPassed', message: 'verified ✓', verdict: { result: 'passed', exit: 0 } } as const;
+const APPROVAL = { phase: 'waiting', reason: 'AwaitingApproval', message: 'awaiting approval', verdict: null } as const;
+
+/** A step of `RUN`, by its name and its codes, with nothing a person is asked. */
+const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL, i: number): WaitingRun['steps'][number] => ({
   name,
   taskId: `t-${i}`,
   branch: null,
-  status,
+  ...codes,
+  status: codes.message,
   note: null,
   roundDue: false,
   agent: null,
@@ -49,16 +54,13 @@ const RUN: WaitingRun = {
   heldUntil: [],
   holding: null,
   status: 'awaiting approval',
+  phase: 'waiting',
+  reason: 'AwaitingApproval',
   moving: false,
   cost: null,
   atWork: null,
   tokens: null,
-  steps: [
-    ['design', 'verified ✓'],
-    ['implement', 'verified ✓'],
-    ['review', 'verified ✓'],
-    ['land', 'awaiting approval'],
-  ].map(([name, status], i) => step(name, status, i)),
+  steps: [step('design', VERIFIED, 0), step('implement', VERIFIED, 1), step('review', VERIFIED, 2), step('land', APPROVAL, 3)],
   graph: { roots: [], edges: [] },
   waitingOnYou: ['land'],
   onYou: ['approve land'],

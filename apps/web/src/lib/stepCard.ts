@@ -4,6 +4,7 @@
  * action, `Read and approve` at an approval's gate. Pure, so that each state is proven without a browser; `StepCard` draws it.
  */
 import type { AgentListing } from './api/agents.ts';
+import type { StepPhase } from './api/reasons.ts';
 import type { RunDetail } from './api/detail.ts';
 import type { RunSummary } from './api/runs.ts';
 import { meaningOf } from './meaning.ts';
@@ -66,19 +67,22 @@ const TAGS: Record<StepKind, Omit<CardTag, 'word'>> = {
   failed: { color: 'error', variant: 'tonal' },
 };
 
-/** The states of a step not started, or stopped before it started. */
-const NOT_STARTED: ReadonlySet<StepState> = new Set(['waiting', 'waiting-for-slot', 'held', 'cancelled', 'unknown']);
+/** The kind of each phase that says it alone; a step to come or stopped is done where a session of it ran, else to come. */
+const KIND_OF: Record<Exclude<StepPhase, 'pending' | 'stopped'>, StepKind> = {
+  running: 'work',
+  waiting: 'gate',
+  succeeded: 'done',
+  failed: 'failed',
+};
 
 /**
- * A state's kind, by the meaning its drawing gives it (`stateDrawn`): at work for `alive`, at a gate for what waits on a person, failed
- * for a failure, to come for a step not started where no session of it ran, and done for the rest.
+ * A step's kind, by its phase (`KIND_OF`): at work while it or its check runs, at a gate while it waits on a person, done, failed, and
+ * for a step to come or stopped, done where a session of it ran, else to come. A step a person's hold of the run stops (`held`) asks
+ * nothing of anyone while the hold stands: no gate, as a step to come.
  */
-export function kindOf(state: StepState, ran: boolean): StepKind {
-  const meaning = meaningOf(stateDrawn[state].hue);
-  if (meaning === 'alive') return 'work';
-  if (meaning === 'yours') return 'gate';
-  if (meaning === 'failure') return 'failed';
-  return NOT_STARTED.has(state) && !ran ? 'come' : 'done';
+export function kindOf(phase: StepPhase, state: StepState, ran: boolean): StepKind {
+  if (phase === 'pending' || phase === 'stopped' || state === 'held') return ran ? 'done' : 'come';
+  return KIND_OF[phase];
 }
 
 /** The frame's hue for a state, its drawing's own: `alive` at work, `yours` where it waits on a person, and none for every other. */
@@ -207,19 +211,23 @@ function agentOf(name: string | null, agents: StepCardInput['agents']): StepCard
   return { name, initial: name.charAt(0).toUpperCase(), role };
 }
 
+/** The codes of a step the run's row does not list: one the engine has no record of, to come. */
+const UNLISTED = { phase: 'pending', reason: 'Unknown' } as const;
+
 /**
  * The card of the step `step` of `run`: what the run's row knows at once (its state, its agent), and once the run's own answer is read,
  * its tries, time, facts, spend and note.
  */
 export function stepCardOf({ run, step, detail, agents, now }: StepCardInput): StepCardFacts {
   const row = run.steps.find((s) => s.name === step);
-  const state = stepState(row?.status ?? '', run.cancelledAt !== null, run.holding != null);
+  const { phase, reason } = row ?? UNLISTED;
+  const state = stepState(phase, reason, run.cancelledAt !== null, run.holding != null);
   const own = detail?.steps.find((s) => s.name === step);
-  const kind = kindOf(state, Boolean(own && own.tries.length > 0));
+  const kind = kindOf(phase, state, Boolean(own && own.tries.length > 0));
   return {
     kind,
     hue: hueOf(state),
-    tag: { word: stateWordsOf(state, row?.status ?? '').rail, ...TAGS[kind] },
+    tag: { word: stateWordsOf(state, reason).rail, ...TAGS[kind] },
     agent: agentOf(row?.agent ?? null, agents),
     step,
     place: own && detail ? placeOf(own, detail.steps, kind) : null,

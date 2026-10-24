@@ -67,7 +67,9 @@ template keeps it in its tree, where a template carries it and an upgrade merges
 - Every step of every run started in the factory is told them, after the agent's custom instructions and before the step's own policy:
   the fourth of an agent's [instruction layers](/agents/#what-an-agent-is-told-five-layers), which the step's own policy outranks. A
   step on a remote agent is told none.
-- A run reads them once, when it starts, and freezes them (`StepAgent.factoryRules`): an edit reaches only the runs started after it.
+- A run reads them when it starts and keeps them (`StepAgent.factoryRules`), as it keeps every revision it resolved: an edit reaches the
+  runs started after it, and a run in flight only where the factory follows revisions or a person refreshes it ([its
+  revisions](#its-revisions)).
 - They only add words. A frontmatter block is refused (`factoryRulesRefusal`): they set no key, give no tool and widen no fence.
 - A factory with none tells nothing, and the default factory keeps none.
 
@@ -83,9 +85,27 @@ or keep the words in your store instead, for a repository you would rather not w
   one repository in the files the harness reads there, `CLAUDE.md` or `AGENTS.md`: the fourth and the third of an agent's
   [instruction layers](/agents/#what-an-agent-is-told-five-layers).
 
+## Its revisions
+
+A run keeps the workflow, agents, skills and rules it resolved: a fix merged while it runs does not reach it by itself. A factory says
+whether it should, with one key, `revisions`, in its file, as a Pod's `imagePullPolicy` says whether a container takes a newer image:
+
+- `pinned`, the default, as `IfNotPresent`: a run keeps what it resolved at its first filing until a person refreshes it, with
+  `nemia refresh <run>`.
+- `follow`, as `Always`: every new filing of a run, a step, a retry or a round, is filed on the revisions the files hold then, as
+  `nemia refresh` would take them. What was already filed is not run again, and the run's steps are neither added nor removed.
+  `nemia refresh` is refused of such a run, since there is nothing to ask for.
+
+A run that has filed nothing takes the files afresh at its first filing either way.
+
+- `nemia factory revisions <name> follow` (or `pinned`) writes it, and `nemia factory ls` prints it under the factory.
+- A factory made from a template says it in its manifest, as `spec.revisions`, which the render writes into its tree's wiring;
+  `nemia factory revisions` writes the wiring after.
+- Every pass of the daemon reads it, so a run in flight takes a change of it at its next filing.
+
 ## Sources
 
 This page is written from `packages/agent-orchestrator/README.md` (_Factories: a named grouping in the store_ and its sections through
 _A factory's instruction_, and _Five layers_), and from `packages/agent-orchestrator/src/factory/factory.ts`,
-`packages/agent-orchestrator/src/factory/factory.store.ts`, `packages/agent-orchestrator/src/factory/instruction.store.ts` and
-`packages/agent-orchestrator/src/rules/rules.store.ts`.
+`packages/agent-orchestrator/src/factory/factory.store.ts`, `packages/agent-orchestrator/src/factory/instruction.store.ts`,
+`packages/agent-orchestrator/src/revisions/pin.verb.ts` and `packages/agent-orchestrator/src/rules/rules.store.ts`.

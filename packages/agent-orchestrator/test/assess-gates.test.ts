@@ -16,7 +16,6 @@ import {
   decision,
   forgetRefusal,
   gateLines,
-  listing,
   onYouWords,
   retriesDue,
   retryable,
@@ -36,7 +35,7 @@ import {
 import { PRECEDENCE } from '../src/brief/index.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 import type { OutputSchema, Workflow } from '../src/workflow.ts';
-import { names, phases, run, step, STEPS } from './assessed.ts';
+import { listing, names, phases, run, step, STEPS } from './assessed.ts';
 import type { RetryAsk, RetryHow } from '../src/retry/retry-ask.ts';
 
 /** `plan → implement → review`, as dev-planned is. */
@@ -209,13 +208,18 @@ test('listing at a gate', async (t) => {
     assert.deepEqual(l.steps[0], {
       name: 'plan',
       status: 'awaiting approval',
+      reason: 'AwaitingApproval',
+      phase: 'waiting',
       branch: null,
       note: 'approve it: nemia approve r-1 plan — or send it back: nemia retry r-1 plan --message "<objection>"',
     });
     assert.deepEqual([l.waitingOnYou, onYouWords(l)], [['plan'], ['approve plan']]);
   });
   await t.test('any other step waiting on you is named by its name', () => {
-    const l = { steps: [{ name: 'implement', status: 'succeeded · BLOCKED', branch: null }], waitingOnYou: ['implement'] };
+    const l = {
+      steps: [{ name: 'implement', status: 'succeeded · BLOCKED', reason: 'Blocked' as const, branch: null }],
+      waitingOnYou: ['implement'],
+    };
     assert.deepEqual(onYouWords(l), ['implement']);
   });
   await t.test('approved, it reads its own word again and waits on nobody', () => {

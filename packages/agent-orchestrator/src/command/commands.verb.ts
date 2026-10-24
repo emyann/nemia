@@ -244,7 +244,9 @@ const REFRESH: Command<{ drift: readonly Drift[] }> = {
     'a round — is filed on them. What has already been filed is not re-run,',
     'and the steps the run has are neither added to nor removed. Refused of',
     'a run that has filed nothing, which resolves afresh at its first filing',
-    'anyway, and of one already on the newest revision of every kind',
+    'anyway, of one already on the newest revision of every kind, and of one',
+    'whose factory follows revisions (nemia factory revisions), whose every',
+    'filing takes them with no refresh',
   ],
   spec: {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],

@@ -7,6 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
+import { coded, type Word } from './run-fixtures.ts';
 import {
   byAge,
   clockCounts,
@@ -48,7 +49,7 @@ import type { Point } from '../src/lib/layout.ts';
  * A run with one step per status, filed unless it is still waiting, and `status` and `moving` as the api put them; its `onYou`,
  * `wf ls`'s words for who it waits on, is the steps `waitingOnYou` names unless `extra` gives it.
  */
-const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunSummary => ({
+const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSummary => ({
   id: 'r-1',
   repo: '/code/app',
   factory: null,
@@ -63,6 +64,8 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   cancelledAt: null,
   pruned: null,
   status: 'running',
+  phase: 'running',
+  reason: 'Running',
   moving: false,
   cost: null,
   atWork: null,
@@ -71,7 +74,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
     name: `step-${i}`,
     taskId: status === 'waiting' ? null : `t-${i}`,
     branch: null,
-    status,
+    ...coded(status),
     note: null,
     roundDue: false,
     agent: null,
@@ -1359,7 +1362,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         toDecide: null,
         createdAt: at(2),
       }),
-      run(['failed · check refused'], { id: 'refused', status: 'failed', toDecide: null, createdAt: at(3) }),
+      run(['failed ✗ check (exit 1)'], { id: 'refused', status: 'failed', toDecide: null, createdAt: at(3) }),
     ];
     assert.deepEqual(
       floorRuns(runs, false).map((r) => r.id),

@@ -49,3 +49,16 @@ export type {
 } from './feed.ts';
 export { DENIED, isOnce, kindsOf, messageOf, reasonOf, REASONS, REASON_CODES, sourceOf, typeOf, waitsOf } from './reason.ts';
 export type { Said } from './reason.ts';
+export {
+  ENGINE_REASON,
+  PHASE_OF,
+  REASON_OF,
+  RUN_PHASE_OF,
+  RUN_PHASES,
+  RUN_REASON_OF,
+  RUN_REASONS,
+  runCodes,
+  STEP_PHASES,
+  STEP_REASONS,
+} from '../phase/phase.ts';
+export type { RunPhase, RunReason, StepPhase, StepReason } from '../phase/phase.ts';

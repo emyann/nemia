@@ -11,6 +11,17 @@ import type { RetryMode, Said } from './asks.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
 import { BridgeSchema, type Bridge } from './bridge.ts';
+import {
+  CheckVerdictSchema,
+  RunPhaseSchema,
+  RunReasonSchema,
+  StepCodesFields,
+  type CheckVerdict,
+  type RunPhase,
+  type RunReason,
+  type StepPhase,
+  type StepReason,
+} from './reasons.ts';
 import { StepLayersSchema, TaskPartSchema, type StepLayers, type TaskPart } from './layers.ts';
 import {
   AtWorkSchema,
@@ -345,6 +356,10 @@ export type RunDetail = {
   /** As on `RunSummary`. */
   holding: RunHolding | null;
   status: RunStatus;
+  /** As on `RunSummary`. */
+  phase: RunPhase;
+  /** As on `RunSummary`. */
+  reason: RunReason;
   moving: boolean;
   /** As on `RunSummary`. */
   cost: Spent | null;
@@ -393,6 +408,13 @@ export type RunDetail = {
     /** Why that list is empty when the folder is there and could not be read; null where the list is what the folder holds. */
     filesError: string | null;
     branch: string | null;
+    /** As on `RunSummary`: where the step stands, as codes, and the sentence a person reads, never compared. */
+    phase: StepPhase;
+    reason: StepReason;
+    message: string;
+    /** As on `RunSummary`: its check's verdict as codes, null for a step its check did not judge. */
+    verdict: CheckVerdict | null;
+    /** @deprecated As on `RunSummary`: `message` under its old name, which the board reads nowhere. */
     status: string;
     /** As on `RunSummary`. */
     note: string | null;
@@ -571,6 +593,8 @@ const DetailStepSchema = decodes<RunDetail['steps'][number]>()(
     files: Schema.mutable(Schema.Array(StepArtifactSchema)),
     filesError: Schema.NullOr(Schema.String),
     branch: Schema.NullOr(Schema.String),
+    ...StepCodesFields,
+    verdict: Schema.NullOr(CheckVerdictSchema),
     status: Schema.String,
     note: Schema.NullOr(Schema.String),
     roundDue: Schema.Boolean,
@@ -631,6 +655,8 @@ const RunDetailSchema = decodes<RunDetail>()(
     heldUntil: StringsSchema,
     holding: Schema.NullOr(RunHoldingSchema),
     status: RunStatusSchema,
+    phase: RunPhaseSchema,
+    reason: RunReasonSchema,
     moving: Schema.Boolean,
     cost: Schema.NullOr(SpentSchema),
     atWork: Schema.NullOr(AtWorkSchema),

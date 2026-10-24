@@ -23,6 +23,15 @@
       }
     },
     {
+      "term": "Check verdict",
+      "meaning": "what a step's check came to, as codes: its `result` (passed, failed, unfinished, running or unknown) and the `exit` it ended with, null where it has none, read off the task by `checkVerdictOf`.",
+      "type": "CheckVerdict",
+      "see": {
+        "label": "The check",
+        "href": "/workflows/#the-check"
+      }
+    },
+    {
       "term": "Closeout",
       "meaning": "how a step signs off: its outcome, its summary, and the fields its workflow asks of it.",
       "type": "Closeout",
@@ -79,6 +88,24 @@
       }
     },
     {
+      "term": "Phase",
+      "meaning": "where a step stands, in one closed set (pending, running, waiting, succeeded, failed, stopped), and a run in the same with cancelled (`RunPhase`), read off its reason by `PHASE_OF`; phase waiting is a step that waits on a person, never reason `Waiting`, which is a step not filed yet and so phase pending.",
+      "type": "StepPhase",
+      "see": {
+        "label": "A step",
+        "href": "/workflows/#a-step"
+      }
+    },
+    {
+      "term": "Reason",
+      "meaning": "why a step stands where it does, as the feed's closed code (`Reason`), set where the listing builds the step's row and never parsed back out of its sentence; a run's is a `RunReason`.",
+      "type": "StepReason",
+      "see": {
+        "label": "A step",
+        "href": "/workflows/#a-step"
+      }
+    },
+    {
       "term": "Round",
       "meaning": "one more try of a loop's steps, when a reviewer asks for more.",
       "type": "Round",
@@ -105,6 +132,15 @@
       "term": "Step",
       "meaning": "one markdown file of a workflow: who does it, what it may do, and what must finish first.",
       "type": "Step",
+      "see": {
+        "label": "A step",
+        "href": "/workflows/#a-step"
+      }
+    },
+    {
+      "term": "Step status",
+      "meaning": "the record's own word for a step, inside the orchestrator alone: `REASON_OF` maps each to a reason, and it crosses no door.",
+      "type": "StepStatus",
       "see": {
         "label": "A step",
         "href": "/workflows/#a-step"

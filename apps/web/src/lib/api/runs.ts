@@ -7,6 +7,17 @@ import { get, send } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
 import {
+  CheckVerdictSchema,
+  RunPhaseSchema,
+  RunReasonSchema,
+  StepCodesFields,
+  type CheckVerdict,
+  type RunPhase,
+  type RunReason,
+  type StepPhase,
+  type StepReason,
+} from './reasons.ts';
+import {
   AtWorkSchema,
   PlaceKindSchema,
   RunHoldingSchema,
@@ -75,6 +86,10 @@ export type RunSummary = {
    * where a step waits on an answer.
    */
   status: RunStatus;
+  /** Where the run is in its life (`RunPhase`), as a code. */
+  phase: RunPhase;
+  /** Why it is in that phase (`RunReason`): `Held` for a running run a person holds. */
+  reason: RunReason;
   /**
    * Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file — the roots of a
    * run waiting on runs that may still ship among them, and not those of one waiting on a run that never ships without a person.
@@ -90,13 +105,20 @@ export type RunSummary = {
    * `note` is what the CLI's `ls` prints beside the status — the try or round a step is on, or the one due — and null where it prints
    * nothing. `roundDue`: whether a looping step's next round is due, which the note words. `agent`: the agent the step is given, null for
    * none; `since`: when its task at work started, null while none runs. `needs` and `blockedByHarness` are what a person has to know to
-   * act on it (`StepNeeds`).
+   * act on it (`StepNeeds`). `phase` and `reason` are where the step stands, as codes, which the board groups and colours by; `message`
+   * is what the CLI's `ls` prints for it, shown and never compared; `verdict` its check's, as codes, null for a step its check did not
+   * judge. `status` is `message` under its old name, which the api still sends and the board reads nowhere.
    */
   steps: Array<
     {
       name: string;
       taskId: string | null;
       branch: string | null;
+      phase: StepPhase;
+      reason: StepReason;
+      message: string;
+      verdict: CheckVerdict | null;
+      /** @deprecated `message` under its old name: read `message`. */
       status: string;
       note: string | null;
       roundDue: boolean;
@@ -147,6 +169,8 @@ const RunSummarySchema = decodes<RunSummary>()(
     heldUntil: StringsSchema,
     holding: Schema.NullOr(RunHoldingSchema),
     status: RunStatusSchema,
+    phase: RunPhaseSchema,
+    reason: RunReasonSchema,
     moving: Schema.Boolean,
     cost: Schema.NullOr(SpentSchema),
     atWork: Schema.NullOr(AtWorkSchema),
@@ -157,6 +181,8 @@ const RunSummarySchema = decodes<RunSummary>()(
           name: Schema.String,
           taskId: Schema.NullOr(Schema.String),
           branch: Schema.NullOr(Schema.String),
+          ...StepCodesFields,
+          verdict: Schema.NullOr(CheckVerdictSchema),
           status: Schema.String,
           note: Schema.NullOr(Schema.String),
           roundDue: Schema.Boolean,

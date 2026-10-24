@@ -365,7 +365,7 @@ export const advancePass = Effect.fn('advancePass')(
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(run, reads, closer);
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
-    const feed = wordFeed(run, reads, assessed, admission, checkout, lift.lifted, behindNow(run, revisions));
+    const feed = wordFeed(run, reads, assessed, admission, checkout, lift.lifted, behindNow(run, assessed.status === 'succeeded', revisions));
     const { followed, pinned, ...due } = followedDue(run, took, assessed, admission, revisions);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];

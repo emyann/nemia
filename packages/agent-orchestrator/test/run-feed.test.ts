@@ -678,6 +678,20 @@ test('a pinned run whose files moved past its pins says `revisions behind` once 
       assert.ok(notes.every((n) => n.startsWith(`workflow ${name}: rev 1, now 2 (`)));
     },
   );
+  await s.test('a succeeded run, which files nothing again, never raises it', async () => {
+    const done = await started('done', dir);
+    await tick();
+    settle(task(done, 'plan'), 'succeeded', SIGNED);
+    await ticks(2);
+    assert.deepEqual(
+      words(done.id).filter((w) => w === 'succeeded'),
+      ['succeeded'],
+    );
+    fs.writeFileSync(step, `${first}An edit after it shipped.\n`);
+    await ticks(3);
+    assert.deepEqual(behind(done), []);
+    fs.writeFileSync(step, first);
+  });
   await s.test('a run in a factory that follows revisions never raises it', async () => {
     const repo = aRepo();
     const factory = 'follows';

@@ -295,10 +295,11 @@ export type Behind = Drift & { hash: string };
  * The run's own pins its next filing would not take (`driftNow`'s, without the steps that already ran), for a run whose factory keeps its
  * revisions until a refresh: what the feed says as `revisions behind` (`behindOf`). Each carries the digest of what the files hold, since
  * two edits nobody has resolved read as the one next number. `[]` for a run that follows revisions, whose next filing takes the files
- * whatever they hold, and for a run called off or pruned, which files nothing. Read every pass, never written.
+ * whatever they hold, and for a run that will file nothing again — one that succeeded (`succeeded`, the pass's own judgement), one called
+ * off, one pruned. A run that failed or waits at a gate keeps it: a retry or an approval files again. Read every pass, never written.
  */
-export function behindNow(run: Run, read: PassRevisions = passRevisions()): Behind[] {
-  if (run.cancelledAt || run.pruned || !hasStarted(run) || follows(run, read)) return [];
+export function behindNow(run: Run, succeeded: boolean, read: PassRevisions = passRevisions()): Behind[] {
+  if (succeeded || run.cancelledAt || run.pruned || !hasStarted(run) || follows(run, read)) return [];
   const now = pinsNow(run, read);
   return kindsDrift(run.pinned, now).flatMap((d) => {
     const at = now.find((p) => p.kind === d.kind && p.name === d.name);

@@ -132,7 +132,8 @@ other bytes at its next filing than its pins, every pass offers a one-shot line 
 `type: "Warning"`, `revisions behind  · agent coder: rev 5, now 6 (3f2a…)` — each kind and name behind in the note, with the first
 characters of the digest the files hold, since `kind` is a selector's own key and two edits nobody has resolved read as the one next
 number. The note is what tells one drift from another, so a second pass writes nothing and a new edit one more line; it waits on
-nobody, and a run whose factory follows revisions, a run called off and a pruned run never raise it. A run at rest is answered from its
+nobody, and a run whose factory follows revisions, a run that succeeded, a run called off and a pruned run never raise it: none of
+them files again. A run at rest is answered from its
 memo, so an edit reaches its line when something else brings the run back to a full pass.
 
 **The cursor is the engine's**: a byte offset, 0 or the number a `cursor:` line printed, that never

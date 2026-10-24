@@ -64,6 +64,11 @@
       }
     },
     {
+      "term": "Revisions behind",
+      "meaning": "a Warning line about a run, `RevisionsBehind`, written while a pinned run's next filing would take other revisions than its pins: its note names each kind and name behind, and it is written once per drift.",
+      "type": "Reason"
+    },
+    {
       "term": "Subscription",
       "meaning": "Nemia's subscription, `nemia`, is the orchestrator's own: it wakes her on the lines of the store's feed its selectors take.",
       "type": "Subscription",

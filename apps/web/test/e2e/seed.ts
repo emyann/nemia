@@ -63,13 +63,14 @@ export const FAKE = {
   /** Who a person has to act for: the step that signed off blocked, and the one whose check refused. */
   waitingOnYou: ['implement', 'theme'],
   /**
-   * The revisions the run resolved, and what the ledger holds now: its agent and its skill have both moved since, and `tokens` ran on
-   * an older revision of the agent than the run is pinned to. The board draws one line per kind, the step's saying it already ran.
+   * The revisions the run resolved, and the ones its next filing would take from the files as they are now (`driftNow`): its agent and
+   * its skill have both moved since, and `theme` ran on an older revision of the agent than the run is pinned to. The board draws one
+   * line per kind, the step's saying it already ran.
    */
   behind: {
-    agent: 'agent coder: rev 5, ledger at 6',
-    skill: 'skill look: rev 1, ledger at 2',
-    ran: 'agent coder: tokens ran on rev 4, ledger at 6',
+    agent: 'agent coder: rev 5, files at rev 7',
+    skill: 'skill look: rev 1, files at rev 3',
+    ran: 'agent coder: theme ran on rev 4, files at rev 7',
     kinds: 3,
   },
   /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */
@@ -1074,7 +1075,11 @@ const STEPS = [
   },
   {
     file: 'theme.md',
-    text: `---\nplace: git\nharness: claude\nafter: tokens\ncheck: ${FAKE.check}\n---\nApply them to every page.\n`,
+    /**
+     * The one step that names an agent, `coder`, which gives the skill `look` its session loaded (`seed`): on claude, since codex is handed
+     * no skill of an agent's.
+     */
+    text: `---\nplace: git\nharness: claude\nafter: tokens\nagent: coder\ncheck: ${FAKE.check}\n---\nApply them to every page.\n`,
     frozen: { name: 'theme', after: ['tokens'], body: 'Apply them to every page.', harness: 'claude', check: FAKE.check },
   },
 ];
@@ -2092,12 +2097,18 @@ export function writeRegated(root: string, now: number): void {
  * nothing: it reports its input's reads from the cache and writes none, so its usage has the classes and no peak. From round 2,
  * implement gives its answers to the findings it was handed. palette signed off blocked, having spent more than its cap to get there: a
  * question for a person, and a budget to raise with the answer.
+ *
+ * FAKE's folder has `theme`'s agent, `coder`, and the skill it gives, `look`, beside it, where a step's agent is looked for first
+ * (`lookupRoots`): their bytes are none of the hashes their ledgers and the run's pins hold, so the run page's band says each behind,
+ * at the number its next filing would take (`driftNow`), the last of its ledger plus one.
  */
 export function seed(root: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = FAKE;
   const workflowDir = path.join(root, FAKE.workflow);
   for (const step of STEPS) write(path.join(workflowDir, step.file), step.text);
+  write(path.join(root, 'agents', 'coder.md'), '---\nskills: look\n---\nWrite the code.\n');
+  write(path.join(root, 'skills', 'look', 'SKILL.md'), '---\nname: look\ndescription: Look at the board as a person would.\n---\nLook.\n');
 
   const workspace = path.join(root, 'worktrees', id, 'implement');
   const branch = `wf/${id}/implement`;
@@ -2144,9 +2155,14 @@ export function seed(root: string, now = Date.now()): void {
             taskId: `${id}-tokens`,
             workspace: lane,
             branch: laneBranch,
+          },
+          theme: {
+            taskId: `${id}-theme`,
+            workspace: lane,
+            branch: laneBranch,
+            check: { taskId: check },
             pinned: [{ kind: 'agent', name: 'coder', n: 4, hash: 'coder4'.padEnd(16, '0') }],
           },
-          theme: { taskId: `${id}-theme`, workspace: lane, branch: laneBranch, check: { taskId: check } },
         },
       },
       null,

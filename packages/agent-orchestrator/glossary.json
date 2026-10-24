@@ -75,12 +75,36 @@
       }
     },
     {
+      "term": "Diff",
+      "meaning": "what an upgrade of a templated factory would merge, each conflict named, nothing written: `nemia factory diff`, as kubectl's diff previews an apply. `nemia factory plan`, its former name, still runs with a hint.",
+      "retired": [
+        {
+          "spelling": "factory plan",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
+    },
+    {
       "term": "Gate",
       "meaning": "a property of a step: nothing after it is started until a person approves.",
       "see": {
         "label": "A gate",
         "href": "/workflows/#a-gate"
       }
+    },
+    {
+      "term": "Group list",
+      "meaning": "the list of a group of commands is the group's bare name: `nemia agents`, `nemia inbox`, and the api's `skills` and `workflows`; `ls` is the runs'.",
+      "retired": [
+        {
+          "spelling": "skills list",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        },
+        {
+          "spelling": "workflows list",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
     },
     {
       "term": "Hold",
@@ -110,6 +134,16 @@
         "label": "The landing",
         "href": "/workflows/#the-landing"
       }
+    },
+    {
+      "term": "Lint",
+      "meaning": "a template's folder judged against the layout's rules, every problem at its line: `nemia template lint`, as helm's lint, so that a check stays a step's. `nemia template check`, its former name, still runs with a hint.",
+      "retired": [
+        {
+          "spelling": "template check",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
     },
     {
       "term": "Loop",
@@ -200,6 +234,24 @@
       }
     },
     {
+      "term": "Rm",
+      "meaning": "the one spelling of a removal: `nemia rm` of a run, `agents rm`, `workflows rm`, `policy rm`, `inbox rm`, `factory rm`; the api answers each on DELETE. `agents remove`, `workflows remove` and `policy drop`, their former names, still run with a hint.",
+      "retired": [
+        {
+          "spelling": "agents remove",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        },
+        {
+          "spelling": "workflows remove",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        },
+        {
+          "spelling": "policy drop",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
+    },
+    {
       "term": "Round",
       "meaning": "one more try of a loop's steps, when a reviewer asks for more, or a person past its last (`nemia retry --round`).",
       "type": "Round",
@@ -218,9 +270,39 @@
       }
     },
     {
+      "term": "Run an agent",
+      "meaning": "a one-off of an agent of yours on a brief, with no repository: `nemia agents run`, as kubectl's run. `nemia agents try`, its former name, still runs with a hint.",
+      "retired": [
+        {
+          "spelling": "agents try",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
+    },
+    {
       "term": "RunId",
       "meaning": "a run's id, as `nemia start` mints it from the brief: lowercase letters, digits and dashes.",
       "type": "RunId"
+    },
+    {
+      "term": "Show",
+      "meaning": "the one spelling of a read of one thing: `nemia show` of a run, the api's `skills show` and `inbox show`.",
+      "retired": [
+        {
+          "spelling": "skills read",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
+    },
+    {
+      "term": "Start",
+      "meaning": "a run of a brief, a card, or a folder of cards (a plan, a run per card, parents first): `nemia start`. `nemia plan <folder>`, its former name, still runs with a hint.",
+      "retired": [
+        {
+          "spelling": "nemia plan",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
     },
     {
       "term": "Step",

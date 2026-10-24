@@ -4,7 +4,7 @@
  *
  * `workflow.ts` and the folders it re-exports are the format as data — the keys, their parsing and checking, and a step or an agent
  * written back — and read nothing; this file is what reads a folder and hands its text to them. A store file two levels above the bottom
- * of the tree beneath the controllers: of the store it imports only the agents read (`agents/read.store.ts`) and the skills read
+ * of the tree beneath the controllers: of the store it imports only the agents read (`agents/read.store.ts`) and the skill reads
  * (`skills/read.store.ts`, `test/boundary.test.ts`), and is exported from the package's root, not from `agent-orchestrator/workflow`
  * (`docs/architecture.md`). It keeps `agentUsers`, which reads step files through `workflowsIn`, not agents.
  */

@@ -14,9 +14,9 @@ export const CLI = 'nemia';
 /**
  * Each command renamed, by its former name of one word or two: `nemia auto …` is `nemia policy …`, and a verb another absorbed is that verb
  * with the flag that says it — `nemia round` is `nemia retry --round`, `nemia merge` is `nemia refresh --base`, `nemia accept` is `nemia
- * approve` (decision 7). Decision 8 gives a list, a read of one thing and a removal one spelling each: `agents remove` is `agents rm`,
- * `policy drop` is `policy rm`, `agents try` is `agents run` (a one-off, as kubectl's), `template check` is `template lint`, so a check
- * stays a step's, `factory plan` is `factory diff`, and `plan <folder>` is `start <folder>`. A command line that opens with a former name
+ * approve` (decision 7). Decision 8 gives a list, a read of one thing and a removal one spelling each, the rows of two words below: a
+ * removal is `rm`, a one-off of an agent `agents run` (kubectl's run), a template's judgement `template lint` (so a check stays a step's),
+ * an upgrade's preview `factory diff`, and a folder of cards `start <folder>`. A command line that opens with a former name
  * is still run, as the name it became, and admission reads it as that name too, so the old spelling reaches no rule the new one would not;
  * and no entry of the table is named by a former name (`commandBreaks`), which no line would ever reach.
  */
@@ -55,8 +55,8 @@ function formerAt(words: readonly string[], used: ReadonlySet<string>): { key: s
 
 /**
  * `words`, a command line's words after the program, its name put to the name it became where it opens with a former one (`RENAMED`, the
- * longest that matches, then again on what it became, each former name once, so `auto drop` is `policy drop` and then `policy rm`), the
- * flag that says an absorbed verb added before its other flags, and each former flag of the command put to its new spelling
+ * longest that matches, then again on what it became, each former name once, so `auto drop` is put to `policy …` and then to `policy rm`),
+ * the flag that says an absorbed verb added before its other flags, and each former flag of the command put to its new spelling
  * (`RENAMED_FLAGS`); with the hint naming what was typed and what to type now, or `words` as given and no hint.
  */
 export function renamedIn(words: readonly string[]): { words: string[]; hint?: string } {

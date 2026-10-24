@@ -1,5 +1,5 @@
 /**
- * The skills read from disk: where a workflow's agents and skills are looked for beside its own folder (`lookupRoots`), each skill an
+ * The skill reads from disk: where a workflow's agents and skills are looked for beside its own folder (`lookupRoots`), each skill an
  * agent may give (`skillsFor`), its rules, its version, its card's entries and whether it is told whole. And the one rule for a link in a
  * skill's folder, which every reader asks (`skillFiles`): a skill of a checkout's own skills (`REPOSITORY_HOLDER`) is read through a
  * link that stays inside the checkout's folder, by real path, and any other link, there or in any other folder of skills, is refused by

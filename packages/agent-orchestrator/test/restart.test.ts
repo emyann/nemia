@@ -48,12 +48,13 @@ const TASKS = path.join(ROOT, 'engine', 'tasks');
 const T0 = Date.parse('2026-09-25T08:00:00.000Z');
 const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 
-/** A fake `claude` and `codex` on PATH: sessions that run until their gate opens, and a registry the test writes. */
+/**
+ * A fake `claude` and `codex` on PATH, sessions that run until their gate opens, and the run files of the two jobs the old engine
+ * started, which the test writes as their workers write them.
+ */
 const fakes = () => {
   const bin = scratch('wf-restart-bin-');
   const gates = scratch('wf-restart-gates-');
-  const registry = path.join(bin, 'registry.json');
-  fs.writeFileSync(registry, '[]');
   const runUntilGate = (prompt: string) => `
 const gate = require('node:path').join(${JSON.stringify(gates)}, ${prompt});
 const wait = () => (fs.existsSync(gate) ? process.exit(0) : setTimeout(wait, 50));
@@ -64,22 +65,15 @@ wait();
     `#!${process.execPath}
 const fs = require('node:fs');
 const args = process.argv.slice(2);
-if (args[0] === 'agents') { process.stdout.write(fs.readFileSync(${JSON.stringify(registry)}, 'utf8')); process.exit(0); }
-if (args[0] === 'stop' || args[0] === 'rm') process.exit(0);
-if (args.includes('--input-format')) {
-  let got = '';
-  process.stdin.on('data', (c) => {
-    got += c;
-    const nl = got.indexOf('\\n');
-    if (nl === -1) return;
-    process.stdin.pause();
-    const prompt = JSON.parse(got.slice(0, nl)).message.content;
-    ${runUntilGate('prompt')}
-  });
-} else {
-  const prompt = args[args.indexOf('-p') + 1];
+let got = '';
+process.stdin.on('data', (c) => {
+  got += c;
+  const nl = got.indexOf('\\n');
+  if (nl === -1) return;
+  process.stdin.pause();
+  const prompt = JSON.parse(got.slice(0, nl)).message.content;
   ${runUntilGate('prompt')}
-}
+});
 `,
     { mode: 0o755 },
   );
@@ -94,19 +88,20 @@ ${runUntilGate('args.at(-1)')}
   );
   process.env.PATH = `${bin}:${process.env.PATH}`;
   process.env.CODEX_HOME = scratch('wf-restart-codex-home-');
-  const rows = (list: Array<{ name: string; state: string }>) =>
-    fs.writeFileSync(
-      registry,
-      JSON.stringify(
-        list.map((r, i) => ({
-          ...r,
-          sessionId: `0000000${i}-0000-4000-8000-000000000000`,
-          status: r.state === 'working' ? 'busy' : 'idle',
-          kind: 'background',
-          startedAt: T0,
-        })),
-      ),
-    );
+  const runs = path.join(ROOT, 'engine', 'runs', 'claude');
+  let at: Array<{ id: string; state: 'working' | 'done' }> = [];
+  /** The jobs at work, as their workers write their run files: each beaten now, so its lease holds for the pass that reads it. */
+  const rows = (list: typeof at = at) => {
+    at = list;
+    fs.mkdirSync(runs, { recursive: true });
+    for (const { id, state } of list) {
+      const name = sessionName(id).replace(/[^a-zA-Z0-9]+/g, '_');
+      const logFile = path.join(runs, `${name}.log`);
+      fs.writeFileSync(logFile, '');
+      const run = { name: sessionName(id), state, pid: process.pid, heartbeatAt: new Date().toISOString(), logFile };
+      fs.writeFileSync(path.join(runs, `${name}.json`), JSON.stringify(state === 'done' ? { ...run, exitCode: 0 } : run));
+    }
+  };
   return { rows };
 };
 const fake = fakes();
@@ -120,13 +115,9 @@ const cwd = scratch('wf-restart-cwd-');
 const filed = (id: string, s: number, extra: object = {}) => ({ kind: 'filed', at: at(s), brief: id, cwd, harness: 'claude', ...extra });
 /** Pending, as the old engine left a task it had not started: filed and nothing else. */
 const pending = (id: string, s: number, extra: object = {}) => journal(id, [filed(id, s, extra)]);
-/** A background session the old engine started, which the registry lists at work. */
+/** A job the old engine started, its worker at work. */
 const atWork = (id: string, s: number) =>
-  journal(id, [
-    filed(id, s, { config: { background: true } }),
-    { kind: 'starting', at: at(s + 1), attempt: 1 },
-    { kind: 'spawned', at: at(s + 2), attempt: 1 },
-  ]);
+  journal(id, [filed(id, s), { kind: 'starting', at: at(s + 1), attempt: 1 }, { kind: 'spawned', at: at(s + 2), attempt: 1 }]);
 const sessionName = (id: string) => nameFor(id, 1);
 
 /** A one-step team, and a run of it for real over a fresh repository, its step then named as the old tick filed it. */
@@ -155,14 +146,19 @@ const failed = (id: string, s: number) =>
 let e = engine();
 const admission = async (id: string) => (await Effect.runPromise(e.view(id))).admission;
 const attempts = async (id: string) => (await Effect.runPromise(e.view(id))).state.attempts.length;
+/** One pass of the restarted daemon, the jobs at work beaten first as their workers beat every 5 s. */
+const pass = () => {
+  fake.rows();
+  return runWith(e, tickRun());
+};
 const CLAUDE = ['try-b', 'try-a', 'try-c', 'orphan', 'root-new', 'root-old'];
 const CODEX = ['x1', 'x2', 'x3', 'x4', 'x5', 'x6'];
 
 atWork('w1', 0);
 atWork('w2', 1);
 fake.rows([
-  { name: sessionName('w1'), state: 'working' },
-  { name: sessionName('w2'), state: 'working' },
+  { id: 'w1', state: 'working' },
+  { id: 'w2', state: 'working' },
 ]);
 for (const [id, s] of [
   ['try-b', 20],
@@ -181,14 +177,14 @@ await runNaming({ taskId: 'root-old' });
 CODEX.forEach((id, i) => pending(id, 40 + i, { harness: 'codex' }));
 
 test("REFUSED at shipped defaults: the two sessions at work fill claude's pool, so the restarted daemon admits no claude task and starts none; codex takes its own two", async () => {
-  await runWith(e, tickRun());
+  await pass();
   for (const id of [...CLAUDE, ...CODEX]) assert.equal(await attempts(id), 0, `${id} started on the pass that admitted it`);
   assert.deepEqual(
     await Promise.all(CLAUDE.map(admission)),
     CLAUDE.map(() => 'queued'),
   );
   assert.deepEqual(await Promise.all(CODEX.map(admission)), ['admitted', 'admitted', 'queued', 'queued', 'queued', 'queued']);
-  await runWith(e, tickRun());
+  await pass();
   for (const id of CLAUDE) {
     assert.equal(await admission(id), 'queued', `${id} still waits`);
     assert.equal(await attempts(id), 0);
@@ -199,7 +195,7 @@ test("REFUSED at shipped defaults: the two sessions at work fill claude's pool, 
 test('restarted under a raised ceiling, a fresh engine admits in the old order — priority, filing, id — a pass before it starts, and one more per session ended', async () => {
   process.env.WF_MAX_CONCURRENT = '5';
   e = engine();
-  await runWith(e, tickRun());
+  await pass();
   for (const id of CLAUDE) assert.equal(await attempts(id), 0, `${id} started on the pass that admitted it`);
   assert.deepEqual(
     await Promise.all(CLAUDE.map(admission)),
@@ -212,24 +208,24 @@ test('restarted under a raised ceiling, a fresh engine admits in the old order �
     'codex up to its own five, beside the two at work since the first case: an admission is spent on the start it let through, so theirs reads as none',
   );
 
-  await runWith(e, tickRun());
+  await pass();
   for (const id of ['try-a', 'try-b', 'try-c', 'x1', 'x2', 'x3', 'x4', 'x5'])
     assert.equal(await attempts(id), 1, `${id} started on the second pass`);
   for (const id of ['orphan', 'root-new', 'root-old', 'x6'])
     assert.equal(await admission(id), 'queued', `${id} waits: the second pass admits nothing more, the pools are full`);
 
   fake.rows([
-    { name: sessionName('w1'), state: 'done' },
-    { name: sessionName('w2'), state: 'working' },
+    { id: 'w1', state: 'done' },
+    { id: 'w2', state: 'working' },
   ]);
-  await runWith(e, tickRun());
+  await pass();
   assert.equal((await Effect.runPromise(e.view('w1'))).state.settled, 'succeeded');
   assert.deepEqual(
     await Promise.all(['orphan', 'root-new', 'root-old'].map(admission)),
     ['admitted', 'queued', 'queued'],
     'one session ended: the next pass admits exactly one more, the earliest filing of those with none, which no run names',
   );
-  await runWith(e, tickRun());
+  await pass();
   assert.equal(await attempts('orphan'), 1, 'the pass after starts it');
   assert.equal(await attempts('root-new'), 0);
 });

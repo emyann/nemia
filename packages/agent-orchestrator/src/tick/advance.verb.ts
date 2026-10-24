@@ -22,7 +22,7 @@ import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
-import { followPass, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
+import { behindNow, followPass, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
 import { handOffDue } from '../workspace/workspace.ts';
 import { filesDue } from '../artifacts/artifacts.ts';
 import { inParts } from '../brief/index.ts';
@@ -340,7 +340,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
 export const advancePass = Effect.fn('advancePass')(
   function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
     yield* Effect.annotateCurrentSpan({ run: run.id });
-    const took = pinPass(run, new Date().toISOString(), pass?.revisions);
+    const revisions = pass?.revisions;
+    const took = pinPass(run, new Date().toISOString(), revisions);
     const { reads, askNotes } = yield* readPass(e, run);
     const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
     const adopted = yield* adoptAll(e, run, reads);
@@ -364,8 +365,8 @@ export const advancePass = Effect.fn('advancePass')(
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(run, reads, closer);
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
-    const feed = wordFeed(run, reads, assessed, admission, checkout, lift.lifted);
-    const { followed, pinned, ...due } = followedDue(run, took, assessed, admission, pass?.revisions);
+    const feed = wordFeed(run, reads, assessed, admission, checkout, lift.lifted, behindNow(run, revisions));
+    const { followed, pinned, ...due } = followedDue(run, took, assessed, admission, revisions);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);

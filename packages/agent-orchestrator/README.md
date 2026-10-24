@@ -127,6 +127,14 @@ closeout's `outcome`, at Info for `done` and Warning for `blocked`. One the run 
 came back (`said`) and the `error` that refused it. The feed's file holds the line alone, never the closeout: a blocked closeout of
 one run is `{service_name="nemia"} | json | run="<run-id>" | outcome="blocked"` in Loki. A recheck of the same turn says none again.
 
+**A pinned run behind its files says so once per drift**: while a filed run whose factory keeps its revisions (`pinned`) would take
+other bytes at its next filing than its pins, every pass offers a one-shot line about the run, `reason: "RevisionsBehind"`,
+`type: "Warning"`, `revisions behind  · agent coder: rev 5, now 6 (3f2a…)` — each kind and name behind in the note, with the first
+characters of the digest the files hold, since `kind` is a selector's own key and two edits nobody has resolved read as the one next
+number. The note is what tells one drift from another, so a second pass writes nothing and a new edit one more line; it waits on
+nobody, and a run whose factory follows revisions, a run called off and a pruned run never raise it. A run at rest is answered from its
+memo, so an edit reaches its line when something else brings the run back to a full pass.
+
 **The cursor is the engine's**: a byte offset, 0 or the number a `cursor:` line printed, that never
 expires. A read stops at the last newline, so it never passes a line half written, and one after
 it goes on from that line's start. A cursor inside a line, or past the end, is refused by name
@@ -489,8 +497,9 @@ At `wf start` each node is resolved and frozen on the run, and resolved afresh w
 waiting `--after` takes the folder as it stands at its first filing — and after that as its factory's `revisions` says: `follow`
 resolves it on every pass, so each new filing (a step, a retry, a round) takes the revisions the files hold then, with no step added or
 removed; `pinned`, the default, keeps it until a person types `nemia refresh`, which takes the newest revision of every kind for every
-filing after it. Between those a pinned run never reads `agents/` again, from a worktree or
-anywhere: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
+filing after it. Between those a pinned run never takes `agents/` again, from a worktree or
+anywhere — it reads the files only to say how far it is behind them (`driftNow`: the run page's band, and the feed's `revisions
+behind`), compared by digest with its pins and numbered without a write to the ledger: the agent's keys are the defaults, a key the step writes wins — a fence key only narrows the agent's, and `disallowedTools:`
 adds to it (*Five layers*, below) —
 and the refusals that depend on the harness read the merged keys and name the step. On codex, and on a step that continues another's
 session (`resume:`), the brief is the agent's instructions, then your custom instructions for it, then the rules of the run's factory

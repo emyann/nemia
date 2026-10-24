@@ -33,7 +33,9 @@ process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const {
+  addFactory,
   approveRun,
+  attachWorkflow,
   cancelRun,
   hold,
   unhold,
@@ -53,6 +55,7 @@ const { tryOf } = await import('../src/record/record.ts');
 const { freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { runLabels, stepLabels } = await import('../src/telemetry/telemetry.ts');
 const { DEFAULT_FACTORY } = await import('../src/factory/factory.ts');
+const { setRevisions } = await import('../src/factory/factory.store.ts');
 const { main, watchPrinted } = await import('../src/cli/main.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const stage = staged({ runWith: runEngine, main, engineOf });
@@ -628,6 +631,65 @@ test("a person's acts and the runtime's faults on a run, each said once off the 
       "`nemia rm` removes the record, and the feed keeps the run's lines: the next pass says it is gone, once",
     );
     assert.deepEqual(recordFeed(judged(await tick()), { memo: freshFeedMemo() }).lines, [], 'a restarted daemon reads it as gone');
+  });
+});
+
+test('a pinned run whose files moved past its pins says `revisions behind` once per drift, the kinds in its note; a following run never', async (t) => {
+  const s = story(t);
+  emptyStore();
+  const name = 'behind';
+  const dir = path.join(ROOT, 'workflows', name);
+  const step = path.join(dir, 'plan.md');
+  const first = '---\nplace: git\nagent: planner\n---\nplan it\n';
+  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(path.join(ROOT, 'workflows', 'agents'), { recursive: true });
+  fs.writeFileSync(path.join(ROOT, 'workflows', 'agents', 'planner.md'), '---\ndescription: plans\n---\nYou plan.\n');
+  fs.writeFileSync(step, first);
+  const behind = (run: Run) => said(run.id, 'RevisionsBehind');
+  let run: Run;
+  await s.test('a filed run whose step file is edited raises one Warning line about the run, which waits on nobody', async () => {
+    run = await started('behind', dir);
+    await tick();
+    assert.deepEqual(behind(run), [], 'nothing is behind before an edit');
+    fs.writeFileSync(step, `${first}An edit.\n`);
+    await ticks(3);
+    assert.deepEqual(
+      behind(run).map((l) => [l.step, l.word, l.type, l.source, l.waits]),
+      [[undefined, 'revisions behind', 'Warning', 'tick', undefined]],
+    );
+    assert.match(
+      behind(run)[0].note ?? '',
+      new RegExp(`^workflow ${name}: rev 1, now 2 \\([0-9a-f]{8}\\)$`),
+      'the kind behind, in the note',
+    );
+  });
+  await s.test(
+    'a second pass adds nothing; a new edit is a new drift and one more line; the files back on the pins raise none',
+    async () => {
+      await ticks(2);
+      assert.equal(behind(run).length, 1, 'the drift is said once');
+      fs.writeFileSync(step, `${first}Another edit.\n`);
+      await ticks(2);
+      fs.writeFileSync(step, first);
+      await ticks(2);
+      const notes = behind(run).map((l) => l.note ?? '');
+      assert.equal(notes.length, 2, notes.join(' | '));
+      assert.notEqual(notes[0], notes[1], 'two edits nobody resolved read as one number, and the digest tells them apart');
+      assert.ok(notes.every((n) => n.startsWith(`workflow ${name}: rev 1, now 2 (`)));
+    },
+  );
+  await s.test('a run in a factory that follows revisions never raises it', async () => {
+    const repo = aRepo();
+    const factory = 'follows';
+    addFactory({ name: factory, repos: [repo] });
+    attachWorkflow({ factory, workflow: name });
+    setRevisions({ factory, revisions: 'follow' });
+    const follows = await stage.runPlaced(startRun({ brief: 'follows', repo, workflowDir: dir, isolate: false, factory }));
+    await tick();
+    fs.writeFileSync(step, `${first}An edit it follows.\n`);
+    await ticks(3);
+    assert.deepEqual(behind(follows), []);
+    fs.writeFileSync(step, first);
   });
 });
 

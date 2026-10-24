@@ -6,7 +6,9 @@
  * the run's pins. `resolvedNow` does that for a run that has filed nothing, reading the folder again so an edit made while the run waited
  * reaches its first step; `refreshedNow` does it for a run that has filed, keeping the step set it already names — on a person's ask, or
  * where the run's factory follows revisions (`revisions: follow`) and a filing is due (`followPass`). `refreshRun` is
- * `nemia refresh <run>`: it writes a person's ask that the next pass re-pins on.
+ * `nemia refresh <run>`: it writes a person's ask that the next pass re-pins on. `driftNow` is what the run's next filing would take,
+ * against its pins, read and numbered without a write: the board's band, and, for a pinned run, the feed's `revisions behind`
+ * (`behindNow`).
  *
  * A controller: it gathers digests from four stores, which only a controller may do (`CONTROLLER` in `test/boundary.test.ts`).
  */
@@ -33,8 +35,8 @@ import { Conflict } from '../refusal/refusal.ts';
 import type { SkillsFound } from '../agents/agents.ts';
 import type { Run } from '../record/record.ts';
 import { repoAllows, type Allows } from '../trust/allows.verb.ts';
-import { appendRevision } from './revisions.store.ts';
-import { kindsDrift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
+import { appendRevision, ledgerOf } from './revisions.store.ts';
+import { kindsDrift, revisionNow, stepsDrift, type Drift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
 
 /** What a run resolved on a pass: the steps it now holds, and the revision of each kind they were read at. */
 export type Resolved = { steps: Workflow[]; pins: Pin[] };
@@ -130,8 +132,8 @@ function once<A extends unknown[], T>(f: (...args: A) => T, key: (...args: A) =>
 /**
  * What one pass reads once for every run whose kinds it resolves: the factory a run is in, its workflow folder loaded, the skills found
  * beside that folder, the allow rules that folder's repository grants a session, the digest of one kind and name, and a kind's entry in
- * the ledger. Ten runs waiting on one folder read and digest
- * that folder once a pass between them, not ten times, and the reads are charged to the `revisions` phase.
+ * the ledger — appended where the content is new (`revision`), or only read (`looked`), which writes nothing. Ten runs waiting on one
+ * folder read and digest that folder once a pass between them, not ten times, and the reads are charged to the `revisions` phase.
  *
  * It shares a read of the world, never a judgement: what stays per run is judged per run — `stepSetRefusal` on the run's own `isolate`,
  * `refreshedNow`'s intersection with the step set the run already names, the `rules` kind named by the run's own factory, and the steps
@@ -147,8 +149,15 @@ export type PassRevisions = {
   readonly steps: (run: FolderRun) => Workflow[];
   readonly allows: (run: FolderRun) => Allows;
   readonly digest: (of: KindName, run: FolderRun) => string | null;
-  readonly revision: (kind: RevisionKind, name: string, hash: string, at: string) => Revision;
+  readonly revision: Numbering;
+  readonly looked: Numbering;
 };
+
+/** How a digest is given its number in the ledger: appended where it is new (`appendRevision`), or read only (`revisionNow`). */
+type Numbering = (kind: RevisionKind, name: string, hash: string, at: string) => Revision;
+
+/** The number `hash` stands at for `kind` and `name`, read off the ledger and never appended: the next number for a content it lacks. */
+const lookedUp: Numbering = (kind, name, hash, at) => revisionNow(ledgerOf(kind, name), hash, at);
 
 /** A pass's one reader of what a resolve reads (`PassRevisions`), holding nothing yet. */
 export function passRevisions(): PassRevisions {
@@ -175,18 +184,26 @@ export function passRevisions(): PassRevisions {
     (of, run) => JSON.stringify([of.kind, of.name, ...where(run)]),
   );
   const revision = once(appendRevision, (kind, name, hash) => JSON.stringify([kind, name, hash]));
-  return { factory, skills, steps, allows, digest, revision };
+  const looked = once(lookedUp, (kind, name, hash) => JSON.stringify([kind, name, hash]));
+  return { factory, skills, steps, allows, digest, revision, looked };
 }
 
 /**
- * The pins of `steps` as the world holds them now, each given its number in the ledger (`appendRevision`), which appends only where the
- * digest has moved. A kind that is not there is left out: a pin says what was resolved, and nothing was.
+ * The pins of `steps` as the world holds them now, each given its number in the ledger by `number`: appended where the digest has moved
+ * (`read.revision`, the default), or only read (`read.looked`). A kind that is not there is left out: a pin says what was resolved, and
+ * nothing was.
  */
-export function pinsOf(run: FolderRun, steps: readonly Workflow[], at: string, read: PassRevisions = passRevisions()): Pin[] {
+export function pinsOf(
+  run: FolderRun,
+  steps: readonly Workflow[],
+  at: string,
+  read: PassRevisions = passRevisions(),
+  number: Numbering = read.revision,
+): Pin[] {
   return kindsIn(run, steps).flatMap((of) => {
     const hash = read.digest(of, run);
     if (hash === null) return [];
-    const { n } = read.revision(of.kind, of.name, hash, at);
+    const { n } = number(of.kind, of.name, hash, at);
     return [{ kind: of.kind, name: of.name, n, hash }];
   });
 }
@@ -233,11 +250,60 @@ export function resolvedNow(
  * new step set. Undefined where the folder does not load, so the run keeps what it froze and its pins.
  */
 export function refreshedNow(run: Run, at: string, read: PassRevisions = passRevisions()): Resolved | undefined {
+  const steps = refreshedSteps(run, read);
+  return steps && { steps, pins: pinsOf(run, steps, at, read) };
+}
+
+/** The steps a filed run's next filing would take (`refreshedNow`'s): undefined where the folder does not load. */
+function refreshedSteps(run: Run, read: PassRevisions): Workflow[] | undefined {
   const found = folderNow(run, read);
   if (!found) return undefined;
   const byName = new Map(found.map((s) => [s.name, s]));
-  const steps = stepsOf(run).map((s) => byName.get(s.name) ?? s);
-  return { steps, pins: pinsOf(run, steps, at, read) };
+  return stepsOf(run).map((s) => byName.get(s.name) ?? s);
+}
+
+/**
+ * What the run's next filing would take that its pins and its filed steps' pins are not (`kindsDrift`, `stepsDrift`): the kinds resolved
+ * as `refreshedNow` resolves them, compared by digest, and numbered off the ledger without a write (`read.looked`) — a content nobody has
+ * resolved reads as the next number, and the ledger stays as it was. So an edit later reverted is no drift, and a revert to an older
+ * content is, its `now` that older number.
+ *
+ * `[]` for a run that has filed nothing, which takes the folder afresh at its first filing anyway; for a record that pinned nothing; and
+ * where the folder does not load or a kind does not read, since there is then nothing a filing would take.
+ */
+export function driftNow(run: Run, read: PassRevisions = passRevisions()): Drift[] {
+  const now = pinsNow(run, read);
+  const ran = Object.entries(run.steps).map(([name, record]) => [name, record.pinned] as const);
+  return [...kindsDrift(run.pinned, now), ...stepsDrift(ran, run.pinned, now)];
+}
+
+/** The pins the run's next filing would take, numbered without a write (`driftNow`'s): none where nothing would be filed or read. */
+function pinsNow(run: Run, read: PassRevisions): Pin[] {
+  if (!hasStarted(run) || !run.pinned?.length) return [];
+  try {
+    const steps = refreshedSteps(run, read);
+    return steps ? pinsOf(run, steps, new Date().toISOString(), read, read.looked) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** One kind a pinned run is behind on (`behindNow`): its drift, and the digest of what the files hold now, which tells two edits apart. */
+export type Behind = Drift & { hash: string };
+
+/**
+ * The run's own pins its next filing would not take (`driftNow`'s, without the steps that already ran), for a run whose factory keeps its
+ * revisions until a refresh: what the feed says as `revisions behind` (`behindOf`). Each carries the digest of what the files hold, since
+ * two edits nobody has resolved read as the one next number. `[]` for a run that follows revisions, whose next filing takes the files
+ * whatever they hold, and for a run called off or pruned, which files nothing. Read every pass, never written.
+ */
+export function behindNow(run: Run, read: PassRevisions = passRevisions()): Behind[] {
+  if (run.cancelledAt || run.pruned || !hasStarted(run) || follows(run, read)) return [];
+  const now = pinsNow(run, read);
+  return kindsDrift(run.pinned, now).flatMap((d) => {
+    const at = now.find((p) => p.kind === d.kind && p.name === d.name);
+    return at ? [{ ...d, hash: at.hash }] : [];
+  });
 }
 
 /** Render the steps' agent files again (`writeAgentFiles`), so a pin the run took reaches the prompt its next filing is given. */
@@ -377,8 +443,8 @@ export function followPass(run: Run, at: string, filing: boolean, read: PassRevi
  * `nemia refresh <run>`: write down that a person asked this run to take the new revisions, so every filing after it — a new step, a retry,
  * a round — is filed on them, and answers with the drift it was asked on.
  *
- * It resolves the kinds now to answer, which is what gives an edit its number in the ledger: a content nobody has resolved yet has no
- * entry, so the drift cannot be read off the ledger alone.
+ * It resolves the kinds now to answer, which is what gives an edit its number in the ledger, and compares by digest, as the board's band
+ * does (`driftNow`).
  *
  * Refused (`Conflict`): a run that has filed nothing, which resolves its kinds afresh at its first filing anyway; a run whose factory
  * follows revisions, whose every filing takes what the files hold with no ask; a run whose pins are
@@ -411,7 +477,7 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
   if (!drift.length)
     return yield* Effect.fail(
       new Conflict({
-        message: `run ${id} is already on the newest revision of every kind it resolved: there is nothing to take, whatever the board's band says — it reads the ledger, which holds a number for every content anything resolved, this run's included. Edit a workflow, an agent, a skill or the factory's rules, and nemia refresh ${id} again. Nothing was written.`,
+        message: `run ${id} is already on the newest revision of every kind it resolved: there is nothing to take. Edit a workflow, an agent, a skill or the factory's rules, and nemia refresh ${id} again. Nothing was written.`,
       }),
     );
   if (!runStore.refresh.put(id))

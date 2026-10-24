@@ -17,12 +17,17 @@ import { runLabels, stepLabels } from '../telemetry/telemetry.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { CheckoutHold, RunSlot } from '../cap/cap.ts';
 import type { PassReads } from '../tick/file.verb.ts';
+import { driftWords } from '../revisions/revisions.ts';
+import type { Behind } from '../revisions/pin.verb.ts';
 
 /** What `wordFeed` reads of the pass's admission (`Admission` in advance.verb.ts): who the run waits on, the slot that holds it, and the
  * runs it is held until. */
 type Admitted = { waiting: Wait[]; held: RunSlot | undefined; parent: (id: string) => ParentRun };
 
-/** The feed's words for the run and each step (`feedWords`), off what the pass read before it filed anything. */
+/**
+ * The feed's words for the run and each step (`feedWords`), off what the pass read before it filed anything: `behind` is what the pass
+ * read of a pinned run's next filing against its pins (`behindNow`), offered as a one-shot (`behindOf`).
+ */
 export function wordFeed(
   run: Run,
   r: PassReads,
@@ -30,6 +35,7 @@ export function wordFeed(
   admission: Admitted,
   checkout: CheckoutHold | undefined,
   lifted?: string,
+  behind: readonly Behind[] = [],
 ): FeedWords {
   const { views, steps } = r;
   return feedWords(
@@ -62,7 +68,7 @@ export function wordFeed(
         return step ? stepLabels(run, step) : { run: run.id, step: name };
       },
       denials: denialsOf(run, r),
-      acts: actsOf(run),
+      acts: [...actsOf(run), ...behindOf(behind)],
       faults: faultsOf(run, r),
       closeouts: closeoutsOf(run, r),
       ...(run.hold ? { held: run.hold.at } : {}),
@@ -94,6 +100,20 @@ function actsOf(run: Run): Once[] {
     ...(run.cancelledAt !== undefined ? [{ word: LINE_WORDS.CancelAsked, note: `at ${run.cancelledAt}` }] : []),
   ];
 }
+
+/**
+ * A pinned run whose next filing would take other revisions than its pins, said as one line about the run (`revisions behind`), offered on
+ * every pass that reads it so: which kinds are behind are in the note (`driftWords`, with the first characters of the content's digest),
+ * since `kind` is a selector's own key. The note is what tells one drift from another (`oncePast`), so the line is written once per
+ * drift, and a new edit writes one more, though two edits nobody resolved read as the one next number. None where nothing is behind.
+ */
+function behindOf(behind: readonly Behind[]): Once[] {
+  const note = behind.map((b) => `${driftWords(b)} (${b.hash.slice(0, BEHIND_DIGEST)})`).join(' · ');
+  return behind.length ? [{ word: LINE_WORDS.RevisionsBehind, note }] : [];
+}
+
+/** How many characters of a content's digest a `revisions behind` note carries: enough to tell two edits of one kind apart. */
+const BEHIND_DIGEST = 8;
 
 /**
  * The two ends of the runtime's that are the workflow layer's news, in the workflow layer's own words: a spawn its harness refused, so

@@ -10,7 +10,7 @@
  * the feed was signed, and a one-shot offered by its word — and `feed.test.ts` and `test/assessed.ts` hold the codes the listing sets
  * to what it reads off the same word.
  *
- * **The codes are the owner's.** The 41 entries below — 11 of a run, 27 of a step, 1 of a daemon, 2 of the store, 36 distinct codes,
+ * **The codes are the owner's.** The 42 entries below — 12 of a run, 27 of a step, 1 of a daemon, 2 of the store, 37 distinct codes,
  * five of them shared between a run and a step — were named at their slices' design gates, and a rename breaks every selector and every
  * stored subscription that quotes one.
  *
@@ -64,9 +64,9 @@ export const DAEMON_STARTED = 'daemon started';
 export const DENIED = 'denied: ';
 
 /**
- * The word each of a person's acts, each of the two runtime faults and a step's closeout read says, the one place it is spelled: the owner
- * named the first six at their slice's design gate and `closed out` on its card, and `reason.test.ts` holds each literally beside the rule
- * below that reads it back.
+ * The word each of a person's acts, each of the two runtime faults, a step's closeout read and a pinned run behind its files say, the one
+ * place it is spelled: the owner named the first six at their slice's design gate, `closed out` on its card and `revisions behind` at
+ * its design's, and `reason.test.ts` holds each literally beside the rule below that reads it back.
  *
  * **None of them may carry a word a subscriber was woken by.** The prose match is retired, but `reason.test.ts` still holds `waitsOf`
  * identical to it over every word the package writes (`FORMER_DEFAULT_WAKE`, and the selectors `selectorsOfWake` converts it to): that
@@ -83,6 +83,7 @@ export const LINE_WORDS = {
   ClosedOut: 'closed out',
   StorePaused: 'store paused',
   StoreResumed: 'store resumed',
+  RevisionsBehind: 'revisions behind',
 } as const satisfies Partial<Record<keyof typeof REASONS, string>>;
 
 /**
@@ -123,6 +124,7 @@ export const REASONS = {
   SpawnFailed: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
   SessionLost: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
   ClosedOut: { kinds: ['Step'], type: 'Normal', once: true },
+  RevisionsBehind: { kinds: ['Run'], type: 'Warning', once: true },
   Unknown: { kinds: ['Step'], type: 'Warning' },
   DaemonStarted: { kinds: ['Daemon'], type: 'Normal', source: 'daemon' },
   StorePaused: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
@@ -186,6 +188,7 @@ const RUN_WORDS: readonly Rule[] = [
   { is: LINE_WORDS.CancelAsked, reason: 'CancelAsked' },
   { is: LINE_WORDS.HoldPut, reason: 'HoldPut' },
   { is: LINE_WORDS.HoldLifted, reason: 'HoldLifted' },
+  { is: LINE_WORDS.RevisionsBehind, reason: 'RevisionsBehind' },
   { starts: 'failed', reason: 'Failed' },
 ];
 

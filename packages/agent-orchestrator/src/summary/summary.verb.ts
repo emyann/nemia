@@ -17,6 +17,8 @@ import type { BranchReader } from '../branches/branches.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { type RestingMemo, restingRead } from '../rest/resting.verb.ts';
 import { type RunGraph, runGraph } from './graph.ts';
+import type { RunPhase, RunReason, StepPhase, StepReason } from '../feed/index.ts';
+import type { CheckVerdict } from '../check/check.ts';
 import {
   filedTimes,
   type Filings,
@@ -95,6 +97,10 @@ export type RunSummary = {
    * broke; `awaiting approval` for one stopped at its gates alone; `blocked` for one a person's word stops otherwise.
    */
   status: RunStatus;
+  /** Where the run is in its life (`RunPhase`), from its reason (`runCodes`): the code a screen groups it by, never parsed from `status`. */
+  phase: RunPhase;
+  /** Why it is in that phase: the feed's code for its status, `Held` for a running run a person holds (`runCodes`). */
+  reason: RunReason;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
    * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
@@ -122,6 +128,12 @@ export type RunSummary = {
    */
   tokens: RunTokens | null;
   /**
+   * `phase` and `reason` are where the step stands, as codes (`StepPhase`, the feed's `StepReason`), computed where the listing judges
+   * it (`lineOf`) and never parsed from a sentence; a screen groups and colours by them. `message` is what `nemia ls` prints for the step,
+   * shown to a person and never compared. `verdict` is its check's, as codes (`CheckVerdict`), for a step judged by its check — passed,
+   * failed with its exit, unfinished, running — and null for any other. `status` is `message` under its old name, kept for one card so a
+   * reader of it keeps working, and compared by nothing: read `message`.
+   *
    * `status` is what `nemia ls` prints for the step — see `judge` for the one word it corrects. `note` is what `nemia ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
    * `round 2 of 3`, `round 3 asked (nemia round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
@@ -134,6 +146,11 @@ export type RunSummary = {
       name: string;
       taskId: string | null;
       branch: string | null;
+      phase: StepPhase;
+      reason: StepReason;
+      message: string;
+      verdict: CheckVerdict | null;
+      /** @deprecated `message` under its old name, kept for one card: read `message`. */
       status: string;
       note: string | null;
       roundDue: boolean;

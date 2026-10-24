@@ -1,5 +1,5 @@
 /** A step's session output and its check's, as the board is given them: the end of each, and what a refused check said. */
-import { attemptVerdict, phaseOfView, verdictWord, type Views } from 'agent-orchestrator';
+import { attemptVerdict, phaseOfView, verdictWord, type CheckVerdict, type Views } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { engineRead, type Engine } from '../store.ts';
@@ -16,10 +16,10 @@ export type StepCheck = {
   /** The check's task, once the run has filed it. */
   taskId: string | null;
   /**
-   * What the check said of the work: `passed`, `exit 1`, `unfinished` for one that did not finish, `checking` while it runs,
-   * and `unknown` for a task the engine has no record of. Null until the run files it.
+   * What the check said of the work, as codes (`CheckVerdict`): `passed` (exit 0), `failed` with its exit code, `unfinished` for one that
+   * did not finish, `running` while it runs, and `unknown` for a task the engine has no record of. Null until the run files it.
    */
-  verdict: string | null;
+  verdict: CheckVerdict | null;
   refused: {
     exit: string;
     /** Null on an earlier try's check: the page reads the current try's stdout alone, and every try's stderr. */

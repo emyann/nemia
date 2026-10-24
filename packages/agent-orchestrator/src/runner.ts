@@ -29,7 +29,8 @@
  * and load as a tree: the bottom, beneath `record.store.ts`, beneath `worktree.store.ts` and `write.store.ts`, beneath the rest, so no
  * cycle can form (`test/boundary.test.ts`).
  */
-export { attemptVerdict, verdictWord } from './check/check.ts';
+export { attemptVerdict, CHECK_RESULTS, checkVerdictOf, verdictWord } from './check/check.ts';
+export type { CheckResult, CheckVerdict } from './check/check.ts';
 export { VERSION } from './version/version.ts';
 export { leaseRelease, trialRefusal, type Running } from './release/release.ts';
 export { currentRelease } from './release/release.store.ts';
@@ -218,7 +219,22 @@ export type {
   Schedule,
   TemplateStatus,
 } from './factory/factory.ts';
-export { feedLineWords, REMOVED } from './feed/index.ts';
+export {
+  ENGINE_REASON,
+  feedLineWords,
+  PHASE_OF,
+  REASON_CODES,
+  REASON_OF,
+  REMOVED,
+  RUN_PHASE_OF,
+  RUN_PHASES,
+  RUN_REASON_OF,
+  RUN_REASONS,
+  runCodes,
+  STEP_PHASES,
+  STEP_REASONS,
+} from './feed/index.ts';
+export type { Reason, RunPhase, RunReason, StepPhase, StepReason } from './feed/index.ts';
 export type { FeedLine, FeedPublished } from './feed/index.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_SELECTORS, subscriptionNameRefusal, watchedLine } from './subscription/index.ts';

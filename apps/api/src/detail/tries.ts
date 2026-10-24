@@ -15,6 +15,7 @@ import {
   type Views,
   wordOf,
 } from 'agent-orchestrator';
+import type { StepPhase, StepReason } from 'agent-orchestrator';
 import {
   answerOf,
   type Asked,
@@ -94,6 +95,14 @@ export type StepTry = {
   current: boolean;
   taskId: string | null;
   note: string | null;
+  /**
+   * Where the try stands, as codes: the step's own on the current try, and on an earlier one the codes of its task's engine word
+   * (`ENGINE_REASON`, `PHASE_OF`). `message` is the try's word, shown and never compared.
+   */
+  phase: StepPhase;
+  reason: StepReason;
+  message: string;
+  /** @deprecated `message` under its old name, kept for one card. */
   status: string;
   attempts: StepAttempts;
   check: StepCheck | null;

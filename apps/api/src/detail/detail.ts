@@ -71,6 +71,7 @@ import {
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
 import { type RunGraph, runGraph } from 'agent-orchestrator';
+import type { CheckVerdict, RunPhase, RunReason, StepPhase, StepReason } from 'agent-orchestrator';
 
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
 import { engineRead, type Engine, judgedOn, workFolderOf } from '../store.ts';
@@ -274,6 +275,10 @@ export type RunDetail = {
   /** As on `RunSummary`: the list's word, `awaiting approval` or `blocked` for a run a person alone stops, never `failed`. */
   status: RunStatus;
   /** As on `RunSummary`. */
+  phase: RunPhase;
+  /** As on `RunSummary`. */
+  reason: RunReason;
+  /** As on `RunSummary`. */
   moving: boolean;
   /** As on `RunSummary`. */
   cost: Spent | null;
@@ -339,6 +344,13 @@ export type RunDetail = {
      */
     filesError: string | null;
     branch: string | null;
+    /** As on `RunSummary`: where the step stands, as codes, and the sentence a person reads, never compared. */
+    phase: StepPhase;
+    reason: StepReason;
+    message: string;
+    /** As on `RunSummary`: its check's verdict as codes, null for a step not judged by its check. */
+    verdict: CheckVerdict | null;
+    /** @deprecated As on `RunSummary`: `message` under its old name, kept for one card. */
     status: string;
     /** As on `RunSummary`. */
     note: string | null;

@@ -163,7 +163,7 @@ export const FACTORY_PLAN: Command<Planned> = {
   spec: PLAN_SPEC,
   check: (args) => leftOut(PLAN_SPEC, args),
   writes: false,
-  nemia: 'read',
+  class: 'read',
   only: HERE,
   handler: (args) =>
     tried(() => {
@@ -199,7 +199,7 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
   check: (args) => leftOut(UPGRADE_SPEC, args),
   writes: true,
   ticks: true,
-  nemia: 'prompts',
+  class: 'ask',
   asksAlways: true,
   only: HERE,
   handler: (args) =>
@@ -305,7 +305,7 @@ export const FACTORY_RESOLVE: Command<Resolved> = {
     (args.ours === true || args.theirs === true || args.file !== undefined ? null : (RESOLVE_SPEC.oneWay ?? null)),
   writes: true,
   ticks: true,
-  nemia: 'prompts',
+  class: 'ask',
   asksAlways: true,
   only: HERE,
   handler: (args) => tried(() => resolved(args)),

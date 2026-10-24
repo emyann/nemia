@@ -255,7 +255,7 @@ export const LEVEL: Command<NemiaLevel> = {
   },
   check: (args) => (typeof args.level === 'string' ? levelRefusal(args.level) : undefined) ?? factoryArgsRefusal(args),
   writes: true,
-  nemia: { bare: 'read', sets: 'prompts', setsBy: [...LEVELS, '--factory', '--for', '--end'] },
+  class: { bare: 'read', sets: 'ask', setsBy: [...LEVELS, '--factory', '--for', '--end'] },
   route: [
     {
       method: 'GET',

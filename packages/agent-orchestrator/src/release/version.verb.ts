@@ -64,7 +64,7 @@ const VERSION: Command<Versions> = {
     unknown: (arg) => `nemia version does not take ${arg}: nemia version [--json].`,
   },
   writes: false,
-  nemia: 'read',
+  class: 'read',
   only: { side: 'cli', why: 'it says which code the command runs from; the api answers its own at GET /api/version' },
   handler: () => versions(),
   print: (data, args) => {

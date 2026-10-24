@@ -98,14 +98,14 @@ export type Route =
 
 /**
  * A command, as data: its `name`, its `usage` after the name and its `help` lines, as `nemia`'s help prints them; its `spec`; `check`, the
- * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; `nemia`, who
+ * refusal of its arguments before anything is read, the same on both sides, or null; `writes`, a write the api guards; `class`, who
  * answers for it when an agent calls it (`CommandClass`); its `route` on the
  * api — a write is posted and accepted (202), a read is got (200), and one command may be served on more than one — or `only`, the side
  * it is served on alone and why; and `apiTakes`, the keys of a body the api folds into its arguments, which the command line has no flag
  * for; `manual`, the long help `nemia <name> --help` prints in place of running it, where it has one; `ticks`, that what it files waits on
  * the daemon's next pass, so the command line starts the daemon where none ticks the store (`ensureDaemon`); `asksAlways`, that an agent's
  * call of it is asked of the person every time, whatever its session was allowed at a prompt or by a rule (`admissionOf`), on a command
- * classed `prompts` alone (`classBreaks`).
+ * classed `ask` alone (`classBreaks`).
  */
 export type CommandSpec = {
   readonly name: string;
@@ -114,7 +114,7 @@ export type CommandSpec = {
   readonly spec: Spec;
   readonly check?: (args: Args) => string | null;
   readonly writes: boolean;
-  readonly nemia: CommandClass;
+  readonly class: CommandClass;
   readonly route?: Route | readonly Route[];
   readonly only?: { readonly side: 'cli' | 'api'; readonly why: string };
   readonly apiTakes?: readonly string[];

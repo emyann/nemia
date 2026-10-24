@@ -3352,9 +3352,9 @@ const editVerdictOf = (rules: Rules, file: string): Verdict =>
 function owedOf(table: readonly (typeof TABLE)[number][]): [string, Verdict][] {
   return table
     .filter((entry) => entry.only?.side !== 'api')
-    .flatMap(({ name, nemia: c }): [string, Verdict][] => {
+    .flatMap(({ name, class: c }): [string, Verdict][] => {
       const forms = [`nemia ${name}`, `nemia ${name} r-1`];
-      if (c === 'out' || c === 'prompts') return forms.map((form) => [form, c === 'out' ? 'deny' : 'ask']);
+      if (c === 'none' || c === 'ask') return forms.map((form) => [form, c === 'none' ? 'deny' : 'ask']);
       if (typeof c !== 'object') return forms.map((form) => [form, 'allow']);
       const set = (s: string) => (s.startsWith('-') ? [`nemia ${name} r-1 ${s} v`, `nemia ${name} ${s} v r-1`] : [`nemia ${name} ${s}`]);
       return [
@@ -3406,7 +3406,7 @@ test('her fence asks every write that prompts and every write form of a command 
 
 test('REFUSED: a command of the fence reclassed, an ask rule of the fence taken away, and a deny taken away are each named', () => {
   const rules = herRules(herStore());
-  const reclassed = TABLE.map((entry) => (entry.name === 'cancel' ? { ...entry, nemia: 'hers' as const } : entry));
+  const reclassed = TABLE.map((entry) => (entry.name === 'cancel' ? { ...entry, class: 'act' as const } : entry));
   assert.deepEqual(misjudged(rules, reclassed), ['nemia cancel: ask', 'nemia cancel r-1: ask']);
   const cut = { ...rules, ask: rules.ask.filter((rule) => rule !== 'Bash(nemia rm:*)') };
   assert.deepEqual(misjudged(cut), ['nemia rm: unmatched', 'nemia rm r-1: unmatched']);

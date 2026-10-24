@@ -125,7 +125,7 @@ export const AUTO: Command<AutoList> = {
   spec: agentSpec('auto'),
   check: (args) => agentNameRefusal(agentIn(args)) ?? null,
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: { method: 'GET', path: '/api/auto/:name', status: 200 },
   handler: (args, _env, home = HOME) => tried(() => autoListOf(home, agentIn(args))),
   print: listLines,
@@ -190,7 +190,7 @@ export const AUTO_PROPOSE: Command<AutoList> = {
     agentNameRefusal(agentIn(args)) ??
     (typeof args.file === 'string' ? null : 'nemia auto propose takes the proposal in --file <path>, or --file - for stdin.'),
   writes: true,
-  nemia: 'hers',
+  class: 'act',
   only: { side: 'cli', why: 'the agent proposes from its own session; the board shows the proposal and confirms its rules' },
   handler: (args, _env, home = HOME) =>
     tried(() => {
@@ -238,7 +238,7 @@ export const AUTO_CONFIRM: Command<AutoList> = {
       ? null
       : `nemia auto confirm takes the rule's words as you read them, so what is confirmed is what you read: --words '<words>', printed by nemia auto ${agentIn(args) || '<agent>'}.`),
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   asksAlways: true,
   route: { method: 'PUT', path: '/api/auto/:name/rules/:id', status: 200 },
   handler: (args, _env, home = HOME) =>
@@ -257,7 +257,7 @@ export const AUTO_DROP: Command<AutoList> = {
   spec: ruleSpec('auto drop'),
   check: (args) => agentNameRefusal(agentIn(args)) ?? null,
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   asksAlways: true,
   route: { method: 'DELETE', path: '/api/auto/:name/rules/:id', status: 200 },
   handler: (args, _env, home = HOME) =>

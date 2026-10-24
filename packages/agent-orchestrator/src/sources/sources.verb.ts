@@ -26,7 +26,7 @@ export const AGENTS_SOURCES: Command<{ sources: AgentSource[] }> = {
     unknown: (arg) => `nemia agents sources takes no ${arg}: nemia agents sources [--path <folder>]`,
   },
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: {
     method: 'GET',
     path: '/api/agents/sources',

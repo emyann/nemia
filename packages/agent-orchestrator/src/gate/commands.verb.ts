@@ -50,7 +50,7 @@ export const APPROVE: Command<{ try: number; at: string; message: string | null;
   check: (args) => approvalWordsRefusal(textOf(args, 'message'), commandLine(APPROVE, args)),
   writes: true,
   ticks: true,
-  nemia: 'answers',
+  class: 'answer',
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
   apiTakes: ['answers'],
   apiKeys: ['try', 'at', 'message', 'file'],

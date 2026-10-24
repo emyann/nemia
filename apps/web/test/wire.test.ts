@@ -106,9 +106,9 @@ export type AgentRoleKey = Holds<Same<Board.AgentRoleKey, keyof agents.AgentList
 export type Said = Holds<Same<Board.Said, SaidHeld>>;
 export type QuestionAnswer = Holds<Same<Board.QuestionAnswer, answers.Answer>>;
 
-export type AutoList = Holds<Same<Board.AutoList, nemia.AutoAnswer>>;
-export type AutoRule = Holds<Same<Board.AutoRule, nemia.AutoAnswer['rules'][number]>>;
-export type Condition = Holds<Same<Board.Condition, nemia.AutoAnswer['rules'][number]['when'][number]>>;
+export type PolicyList = Holds<Same<Board.PolicyList, nemia.PolicyAnswer>>;
+export type AutoRule = Holds<Same<Board.AutoRule, nemia.PolicyAnswer['rules'][number]>>;
+export type Condition = Holds<Same<Board.Condition, nemia.PolicyAnswer['rules'][number]['when'][number]>>;
 
 export type Bridge = Holds<Same<Board.Bridge, NonNullable<detail.StepFiled['bridge']>>>;
 
@@ -139,7 +139,7 @@ export type ChatHistory = Holds<Same<Board.ChatHistory, chat.ChatHistoryAnswer>>
 export type ChatEvent = Holds<Same<Board.ChatEvent, ChatEventOf>>;
 export type ChatPresence = Holds<Same<Board.ChatPresence, chat.ChatHistoryAnswer['presence']>>;
 export type ChatFrom = Holds<Same<Board.ChatFrom, Extract<ChatEventOf, { kind: 'message' }>['from']>>;
-export type ChatStepState = Holds<Same<Board.ChatStepState, Extract<ChatEventOf, { kind: 'step' }>['state']>>;
+export type ChatCallState = Holds<Same<Board.ChatCallState, Extract<ChatEventOf, { kind: 'call' }>['state']>>;
 export type AskQuestion = Holds<Same<Board.AskQuestion, AskOf['questions'][number]>>;
 export type AskOption = Holds<Same<Board.AskOption, AskOf['questions'][number]['options'][number]>>;
 export type AskPick = Holds<Same<Board.AskPick, chat.ChatAnswerBody['picks'][number]>>;

@@ -49,7 +49,7 @@ export type ConversationLink = { words: string; href: string };
  * One block of a conversation, as the family's list draws it. `said` is a bubble — `who` and `at` over it, `yours` for the person's
  * own at the right, `markdown` for words drawn as markdown rather than as they stand, and `links` for the buttons under them; `note`
  * is one quiet line, `what` saying which; `work` is a turn, open while one of its lines is at work and folded into `turnWords` once
- * none is; and `own` is the family's one escape hatch, carrying whatever the caller draws itself (`Own`).
+ * none is, its lines counted as `counts`; and `own` is the family's one escape hatch, carrying whatever the caller draws itself (`Own`).
  */
 export type ConversationItem<Own = never> =
   | {
@@ -63,7 +63,7 @@ export type ConversationItem<Own = never> =
       links: readonly ConversationLink[];
     }
   | { kind: 'note'; id: string; what: string; words: string }
-  | { kind: 'work'; id: string; lines: readonly ConversationLine[]; running: boolean; ms: number }
+  | { kind: 'work'; id: string; lines: readonly ConversationLine[]; running: boolean; ms: number; counts: Counted }
   | { kind: 'own'; id: string; own: Own };
 
 /**
@@ -83,8 +83,15 @@ export const mark = (prefix: string, what: string, value?: string): Record<strin
 export const drawnCount = (items: readonly ConversationItem<unknown>[]): number =>
   items.reduce((drawn, item) => drawn + (item.kind === 'work' ? item.lines.length : 1), 0);
 
-/** The one line a folded turn says: `Worked for 2m 14s · 9 steps`, over `ms` and how many `lines` it holds. */
-export const turnWords = (ms: number, lines: number): string => `Worked for ${duration(ms)} · ${lines === 1 ? '1 step' : `${lines} steps`}`;
+/**
+ * What a turn's lines are, which its folded line counts them as: `call` where every line is a tool call (her chat), `step` where a line
+ * may be a call, a thought or the harness's own (a step's session).
+ */
+export type Counted = 'call' | 'step';
+
+/** The one line a folded turn says: `Worked for 2m 14s · 9 calls`, over `ms` and how many `lines` it holds, counted as `counts`. */
+export const turnWords = (ms: number, lines: number, counts: Counted): string =>
+  `Worked for ${duration(ms)} · ${lines === 1 ? `1 ${counts}` : `${lines} ${counts}s`}`;
 
 /** The words the line between what was read and what is new says: `2 new`. */
 export const newWords = (unread: number): string => (unread === 1 ? '1 new' : `${unread} new`);

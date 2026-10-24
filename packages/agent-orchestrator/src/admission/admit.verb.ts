@@ -34,7 +34,7 @@ export const ADMIT: Ran = {
     'ask where it answers what waits on you;',
     '--at-least: deny a call acting on a run or a factory below the level;',
     "--auto: let through, for a run of a factory at auto, an answer the agent's",
-    'rules you confirmed allow in the run as it stands (nemia auto <agent>)',
+    'rules you confirmed allow in the run as it stands (nemia policy <agent>)',
   ],
   spec: {
     positionals: [],

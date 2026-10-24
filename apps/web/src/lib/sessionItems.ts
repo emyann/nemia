@@ -83,6 +83,7 @@ const workOf = (key: string, turns: readonly FoldedTurn[], running: boolean): Co
   lines: linesOf(turns, running),
   running: running && turns.some((turn) => turn.kind === 'tool' && turn.call.result === null),
   ms: spanOf(turns),
+  counts: 'step',
 });
 
 /**

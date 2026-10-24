@@ -12,6 +12,25 @@ import type { CommandClass } from '../admission/index.ts';
 export const CLI = 'nemia';
 
 /**
+ * Each command group renamed, by its former first word: `nemia auto …` is `nemia policy …`. A command line that opens with a former word
+ * is still run, as the name it became, and admission reads it as that name too, so the old spelling reaches no rule the new one would not.
+ */
+export const RENAMED: ReadonlyMap<string, string> = new Map([['auto', 'policy']]);
+
+/**
+ * `words`, a command line's words after the program, its first word put to the name it became where it is a former one (`RENAMED`), and
+ * the hint naming what to type now; else `words` as given and no hint.
+ */
+export function renamedIn(words: readonly string[]): { words: string[]; hint?: string } {
+  const now = words[0] === undefined ? undefined : RENAMED.get(words[0]);
+  if (now === undefined) return { words: [...words] };
+  return {
+    words: [now, ...words.slice(1)],
+    hint: `${CLI} ${words[0]} is now ${CLI} ${now}: type \`${[CLI, now, ...words.slice(1)].join(' ')}\`; ${words[0]} stays accepted until a later release removes it.`,
+  };
+}
+
+/**
  * What a command is handed: each argument by its key — text, dollars for an amount, true for a switch that has a key, every value in order
  * for a flag given once for each — and nothing for one not given.
  */

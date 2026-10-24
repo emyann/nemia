@@ -9,8 +9,8 @@
  *
  * On the stand-ins: the runtime's test engine, each step's task filed and left where this file says by hand, and the test place,
  * under the run records this file seeds. The table runs first: the story writes asks beside the run, and they stay.
- * A session the harness blocked is a task left `needs-human`; what its harness says it waits for, and its last words, are
- * `asks.boundary.test.ts`'s.
+ * A session the harness blocked is a task left `needs-human`, its last words planted where the engine's `transcript` reads them; what a
+ * harness says such a session waits for is `test/remote.test.ts`'s.
  */
 import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
@@ -205,6 +205,59 @@ test('POST …/retry: what it refuses — a message it will not carry, a step no
     assert.match(await refusedWith(await ask('deploy', { mode: 'nudge' }), 404, 'no step'), new RegExp(`^Run '${R}' has no step 'deploy'`));
     nothingWritten('a body that is not an ask');
   });
+});
+
+/** One event of a session's transcript, as the engine's `transcript` answers it. */
+const event = (id: string, s: number, role: 'user' | 'assistant' | 'system', kind: 'text' | 'tool_use' | 'system', text?: string) => ({
+  id,
+  at: at(s),
+  role,
+  kind,
+  ...(text === undefined ? {} : { text }),
+});
+
+test("a blocked session's last line is what it said last — its last `text` or `system` event, trimmed, never what it was told — read on a run's detail alone, and followed from where the last read stopped", async () => {
+  const login = 'Could not refresh your login · Try again in a minute';
+  const held = [
+    event('u-1', 2, 'user', 'text', 'Hold on.'),
+    event('a-1', 3, 'assistant', 'text', 'Reading the tests first.'),
+    event('a-2', 4, 'assistant', 'tool_use'),
+    event('a-3', 6, 'assistant', 'text', login),
+  ];
+  standIn().plantTranscript('t-held', 1, held);
+  standIn().plantTranscript('t-idle', 1, [
+    event('u-1', 2, 'user', 'text', 'Idle on.'),
+    event('s-1', 3, 'system', 'system', '  Session idle\n'),
+    event('a-1', 4, 'assistant', 'tool_use'),
+  ]);
+  const lastLines = async () =>
+    Object.fromEntries((await detail()).steps.filter((step) => step.blockedByHarness).map((step) => [step.name, step.lastLine]));
+  assert.deepEqual(
+    await lastLines(),
+    { held: login, idle: 'Session idle', silent: null },
+    "held's last text, past the call before it; idle's system line, trimmed, past the call after it; silent, with nothing said, none",
+  );
+  assert.equal(
+    (await summary()).steps.some((step) => Object.hasOwn(step, 'lastLine')),
+    false,
+    'the list carries no last line: it reads no conversation',
+  );
+
+  const since = [...held, event('a-4', 7, 'assistant', 'tool_use')];
+  standIn().plantTranscript('t-held', 1, since);
+  assert.equal((await lastLines()).held, login, 'a call alone moves nothing: read from where the last read stopped, it says nothing');
+  standIn().plantTranscript('t-held', 1, [...since, event('a-5', 8, 'assistant', 'text', 'Logged in again; carrying on.')]);
+  assert.equal((await lastLines()).held, 'Logged in again; carrying on.', 'words written since are read');
+  standIn().plantTranscript('t-held', 1, [
+    ...since,
+    event('a-5', 8, 'assistant', 'text', 'Logged in again; carrying on.'),
+    event('u-3', 9, 'user', 'text', 'Log in and carry on.'),
+  ]);
+  assert.equal(
+    (await lastLines()).held,
+    'Logged in again; carrying on.',
+    "what the session said, never what it was told: a brief, a `nemia say` and every tool result are `user` events, and the board would otherwise read a person's own words back at them",
+  );
 });
 
 test('a person answers a blocked step, rechecks a refused check and continues the sessions the harness blocked — each the package’s ask, read on the list and the detail — and reads the answer on its try once the tick took it', async (t) => {

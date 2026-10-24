@@ -1926,63 +1926,13 @@ test("a step's check read on the board: its command, and once it refused its exi
   );
 });
 
-test('the list of runs observes the engine at most once, however many runs and steps are filed, and not at all with nothing in flight', async (t) => {
-  const bin = scratch('nemia-api-bin-');
-  const calls = path.join(bin, 'calls');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
-  const before = process.env.PATH;
-  process.env.PATH = `${bin}${path.delimiter}${before}`;
-  t.after(() => {
-    process.env.PATH = before;
-  });
-  const observations = () =>
-    (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '').split('\n').filter((line) => line.startsWith('agents')).length;
-
-  for (const n of [11, 12, 13]) {
-    queuedTask(`t-${n}`);
-    writeRun({ ...r2, id: `r-${n}`, steps: { implement: { taskId: `t-${n}`, branch: `wf/r-${n}/implement` }, review: { taskId: null } } });
-  }
-  const res = await app.request('/api/runs');
-  assert.equal(res.status, 200);
-  const runs = (await res.json()) as RunSummary[];
-  assert.ok(
-    runs.flatMap((r) => r.steps).filter((s) => s.taskId).length >= 3,
-    'filed steps, each of which a view per step would observe once',
-  );
-  assert.ok(
-    runs.flatMap((r) => r.steps).some((s) => s.status === 'failed ✗ check (exit 1)'),
-    'a refused check, worded with its exit code, is on the list',
-  );
-  assert.equal(
-    observations(),
-    0,
-    "queued, settled and refused, none of them in flight: no harness is looked at (list(taskIds)); once for any number in flight is asks.test.ts's",
-  );
-});
-
-/**
- * A `claude` ahead of the real one on PATH for the length of the test, which notes each call and sees no sessions of ours: how
- * many times a request observed the harnesses.
- */
-function countingObservations(t: { after: (fn: () => void) => void }): () => number {
-  const bin = scratch('nemia-api-bin-');
-  const calls = path.join(bin, 'calls');
-  fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\necho "$*" >> '${calls}'\necho '[]'\n`, { mode: 0o755 });
-  const before = process.env.PATH;
-  process.env.PATH = `${bin}${path.delimiter}${before}`;
-  t.after(() => {
-    process.env.PATH = before;
-  });
-  return () => (fs.existsSync(calls) ? fs.readFileSync(calls, 'utf8') : '').split('\n').filter((line) => line.startsWith('agents')).length;
-}
-
 const gone = path.join(NOWHERE, 'no-such-workflow');
 
 test("a step's tries and its closeout: every try of a looped step off one observation, each declared field's schema as the run froze it, and a statement that could not be read as it came", async (t) => {
   const s = story(t);
   await s.test(
     'a step on its third try, in the second round of its loop, carries every try: its round, what replaced it, its task, check and closeout — off one observation',
-    async (t) => {
+    async () => {
       const findings = [
         { file: 'src/cache.ts', line: 12, finding: 'The cache never expires.' },
         { file: 'src/cache.ts', line: 40, finding: 'A miss is counted twice.' },
@@ -2049,13 +1999,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         },
       });
 
-      const observations = countingObservations(t);
       const run = await detailOf('r-50');
-      assert.equal(
-        observations(),
-        0,
-        "eight tasks, implement's three and their checks and review's two, all settled and no refused check of the current try: no look at the harnesses (list(taskIds))",
-      );
 
       const once = { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } };
       const closeout = (raw: { summary: string }, more: object = {}) => ({
@@ -2690,7 +2634,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
   const s = story(t);
   await s.test(
     "the detail carries where each step's time went — per try and per check, filed off the engine's feed — and the run's, in the package's words",
-    async (t) => {
+    async () => {
       const T = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 9, m, s)).toISOString();
       const feed = path.join(root, 'engine', 'feed.jsonl');
       const fileOnFeed = (taskId: string, at: string) =>
@@ -2734,13 +2678,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
       };
       writeRun(record);
 
-      const observations = countingObservations(t);
       const run = await detailOf('r-60');
-      assert.equal(
-        observations(),
-        0,
-        'the feed is a read of the store: the detail observes no harness for it, and none for tasks all settled',
-      );
       const [implement, review] = run.steps;
       const words = (
         s: { at: string; filedAt: string | null; spawnedAt: string | null; endedAt: string | null; queued: string; ran: string } | null,

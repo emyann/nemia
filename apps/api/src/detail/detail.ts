@@ -549,8 +549,8 @@ export type LastSaid = Map<string, { cursor: string; line: string | null }>;
  * `user` events (`TranscriptEvent`), and reading a person's own words back to them says nothing about why the harness stopped.
  *
  * Each read costs an observation of the task's harness: the attempt of a session the harness blocked has not ended, so its session's id
- * is on no record, and the engine asks the registry for it (one `claude agents` call). Read on a run's detail, as a refused check's output
- * is, and never on the list.
+ * is on no record, and the engine asks the harness for it. Read on a run's detail, as a refused check's output is, and never on the
+ * list.
  *
  * Read from where the last read of the same attempt stopped, so a page polled every five seconds reads what the session wrote since,
  * not its whole conversation again (`said`); a cursor the engine refuses, of a transcript replaced since, is read again from the start. A

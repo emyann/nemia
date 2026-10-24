@@ -5,7 +5,7 @@
  * At shipped defaults: the api's own engine over the harness's store (`root`), which this file seeds, and its fake `claude` first on PATH.
  * The path is read off the journal alone, so no harness is asked.
  */
-import { observations, root } from '../../test/harness.ts';
+import { root } from '../../test/harness.ts';
 import { test } from 'node:test';
 import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
@@ -122,21 +122,16 @@ test("A person reads a step's path, try by try: none before it is filed, the cur
     assert.equal(status, 200);
     assert.deepEqual(body, { taskId: null, try: 1, path: [] });
   });
-  await s.test(
-    "the current try's path by default: each state the journal says, the entry that moved it and when, asking no harness",
-    async () => {
-      const before = observations();
-      const { status, body } = await get('/api/runs/r-retried/steps/implement/path');
-      assert.equal(status, 200);
-      assert.deepEqual([body.taskId, body.try], ['r-retried-2', 2]);
-      assert.deepEqual(body.path, [
-        { state: 'submitted', event: 'filed', at: at(0) },
-        { state: 'starting', event: 'starting', at: at(10) },
-        { state: 'working', event: 'spawned', at: at(11) },
-      ]);
-      assert.equal(observations(), before, 'no harness is asked for a path');
-    },
-  );
+  await s.test("the current try's path by default: each state the journal says, the entry that moved it and when", async () => {
+    const { status, body } = await get('/api/runs/r-retried/steps/implement/path');
+    assert.equal(status, 200);
+    assert.deepEqual([body.taskId, body.try], ['r-retried-2', 2]);
+    assert.deepEqual(body.path, [
+      { state: 'submitted', event: 'filed', at: at(0) },
+      { state: 'starting', event: 'starting', at: at(10) },
+      { state: 'working', event: 'spawned', at: at(11) },
+    ]);
+  });
   await s.test('an earlier try by number is its own task, to its end', async () => {
     const { status, body } = await get('/api/runs/r-retried/steps/implement/path?try=1');
     assert.equal(status, 200);

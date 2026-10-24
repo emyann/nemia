@@ -3,6 +3,7 @@
  * every key of a step, and a key's row on a card's or a step's page — each type with the schema `get` decodes it with.
  */
 import { Schema, Struct } from 'effect';
+import { decodes } from './decodes.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
 const Strings = Schema.mutable(Schema.Array(Schema.String));
@@ -22,21 +23,23 @@ export type AgentSkill = {
 };
 
 /** Decodes an `AgentSkill`: a key it leaves out stays out. */
-export const AgentSkillSchema = Schema.Struct({
-  id: Schema.String,
-  name: Schema.String,
-  description: Schema.String,
-  tags: Strings,
-  examples: Schema.optionalKey(Strings),
-  inputModes: Schema.optionalKey(Strings),
-  outputModes: Schema.optionalKey(Strings),
-}) satisfies Schema.Schema<AgentSkill>;
+export const AgentSkillSchema = decodes<AgentSkill>()(
+  Schema.Struct({
+    id: Schema.String,
+    name: Schema.String,
+    description: Schema.String,
+    tags: Strings,
+    examples: Schema.optionalKey(Strings),
+    inputModes: Schema.optionalKey(Strings),
+    outputModes: Schema.optionalKey(Strings),
+  }),
+);
 
 /** Where a skill is: your library (the store's `workflows/skills/`), the repository the board serves, or what Nemia ships. */
 export type SkillSource = 'yours' | 'repo' | 'shipped';
 
 /** Decodes a `SkillSource`. */
-export const SkillSourceSchema = Schema.Literals(['yours', 'repo', 'shipped']) satisfies Schema.Schema<SkillSource>;
+export const SkillSourceSchema = decodes<SkillSource>()(Schema.Literals(['yours', 'repo', 'shipped']));
 
 /**
  * Mirrors `SkillCost` in the package: what a skill costs a turn, about, at four characters a token. Named, a turn carries its listing (its
@@ -45,12 +48,14 @@ export const SkillSourceSchema = Schema.Literals(['yours', 'repo', 'shipped']) s
 export type SkillCost = { preload: boolean; listed: number; body: number; perTurn: number };
 
 /** Decodes a `SkillCost`. */
-export const SkillCostSchema = Schema.Struct({
-  preload: Schema.Boolean,
-  listed: Schema.Number,
-  body: Schema.Number,
-  perTurn: Schema.Number,
-}) satisfies Schema.Schema<SkillCost>;
+export const SkillCostSchema = decodes<SkillCost>()(
+  Schema.Struct({
+    preload: Schema.Boolean,
+    listed: Schema.Number,
+    body: Schema.Number,
+    perTurn: Schema.Number,
+  }),
+);
 
 /**
  * Mirrors `GivenSkill`: a skill an agent gives, named as its line writes it, where a start finds it and what it costs — or why none is
@@ -68,21 +73,23 @@ export type GivenSkill = {
 };
 
 /** Decodes a `GivenSkill`. */
-export const GivenSkillSchema = Schema.Struct({
-  name: Schema.String,
-  from: Schema.NullOr(SkillSourceSchema),
-  foundIn: Schema.NullOr(Schema.String),
-  entry: Schema.NullOr(AgentSkillSchema),
-  error: Schema.NullOr(Schema.String),
-  preload: Schema.Boolean,
-  cost: Schema.NullOr(SkillCostSchema),
-}) satisfies Schema.Schema<GivenSkill>;
+export const GivenSkillSchema = decodes<GivenSkill>()(
+  Schema.Struct({
+    name: Schema.String,
+    from: Schema.NullOr(SkillSourceSchema),
+    foundIn: Schema.NullOr(Schema.String),
+    entry: Schema.NullOr(AgentSkillSchema),
+    error: Schema.NullOr(Schema.String),
+    preload: Schema.Boolean,
+    cost: Schema.NullOr(SkillCostSchema),
+  }),
+);
 
 /** A schema pasted for a step's `output:`, written beside the steps by the save that carries it; an agent's, beside the agent. */
 export type SchemaFile = { file: string; text: string };
 
 /** Decodes a `SchemaFile`. */
-export const SchemaFileSchema = Schema.Struct({ file: Schema.String, text: Schema.String }) satisfies Schema.Schema<SchemaFile>;
+export const SchemaFileSchema = decodes<SchemaFile>()(Schema.Struct({ file: Schema.String, text: Schema.String }));
 
 /** Mirrors `WorkflowStepSpec` in apps/api/src/workflows/workflows.ts: every key a step of a workflow sets, before any run froze it. */
 export type WorkflowStepSpec = {
@@ -150,84 +157,86 @@ export type WorkflowStepSpec = {
 export type StepKey = keyof WorkflowStepSpec;
 
 /**
- * Decodes a `StepKey`, in `STEP_KEYS`' order: a key the package adds is refused here until the board learns it. `read-library.test.ts`
- * holds this list to the keys of `WorkflowStepSpecSchema`.
+ * Decodes a `StepKey`, in `STEP_KEYS`' order: a key the package adds is refused here until the board learns it. `decodes` holds
+ * this list to the keys of `WorkflowStepSpec`, and `test/wire.test.ts` those to the api's.
  */
-export const StepKeySchema = Schema.Literals([
-  'after',
-  'resume',
-  'input',
-  'place',
-  'workspace',
-  'writable',
-  'reads',
-  'slot',
-  'agent',
-  'skills',
-  'mcp',
-  'harness',
-  'model',
-  'effort',
-  'context',
-  'permissionMode',
-  'sandbox',
-  'tools',
-  'disallowedTools',
-  'allowedTools',
-  'denials',
-  'background',
-  'remote',
-  'deadlineSeconds',
-  'budget',
-  'check',
-  'retries',
-  'gate',
-  'output',
-  'tally',
-  'loop',
-  'rounds',
-]) satisfies Schema.Schema<StepKey>;
+export const StepKeySchema = decodes<StepKey>()(
+  Schema.Literals([
+    'after',
+    'resume',
+    'input',
+    'place',
+    'workspace',
+    'writable',
+    'reads',
+    'slot',
+    'agent',
+    'skills',
+    'mcp',
+    'harness',
+    'model',
+    'effort',
+    'context',
+    'permissionMode',
+    'sandbox',
+    'tools',
+    'disallowedTools',
+    'allowedTools',
+    'denials',
+    'background',
+    'remote',
+    'deadlineSeconds',
+    'budget',
+    'check',
+    'retries',
+    'gate',
+    'output',
+    'tally',
+    'loop',
+    'rounds',
+  ]),
+);
 
 /** Decodes a `WorkflowStepSpec`: every key a step sets, of its type and words. */
-export const WorkflowStepSpecSchema = Schema.Struct({
-  harness: Schema.NullOr(Schema.String),
-  model: Schema.NullOr(Schema.String),
-  effort: Schema.NullOr(Schema.String),
-  context: Schema.NullOr(Schema.Number),
-  after: Strings,
-  resume: Schema.NullOr(Schema.String),
-  input: Strings,
-  place: Schema.NullOr(Schema.Literals(['git', 'folder'])),
-  workspace: Schema.NullOr(Schema.Literal('main')),
-  writable: Strings,
-  reads: Strings,
-  slot: Schema.NullOr(Schema.Literal('none')),
-  agent: Schema.NullOr(Schema.String),
-  skills: Strings,
-  mcp: Strings,
-  permissionMode: Schema.NullOr(Schema.String),
-  sandbox: Schema.NullOr(Schema.String),
-  tools: Schema.NullOr(Strings),
-  disallowedTools: Strings,
-  allowedTools: Strings,
-  denials: Schema.NullOr(Schema.Literal('fail')),
-  background: Schema.NullOr(Schema.Boolean),
-  remote: Schema.NullOr(Schema.Boolean),
-  deadlineSeconds: Schema.NullOr(Schema.Number),
-  budget: Schema.NullOr(Schema.Number),
-  check: Schema.NullOr(Schema.String),
-  retries: Schema.NullOr(Schema.Number),
-  gate: Schema.NullOr(Schema.Literal(true)),
-  output: Schema.NullOr(Schema.String),
-  tally: Strings,
-  loop: Schema.NullOr(Schema.String),
-  rounds: Schema.NullOr(Schema.Number),
-}) satisfies Schema.Schema<WorkflowStepSpec>;
+export const WorkflowStepSpecSchema = decodes<WorkflowStepSpec>()(
+  Schema.Struct({
+    harness: Schema.NullOr(Schema.String),
+    model: Schema.NullOr(Schema.String),
+    effort: Schema.NullOr(Schema.String),
+    context: Schema.NullOr(Schema.Number),
+    after: Strings,
+    resume: Schema.NullOr(Schema.String),
+    input: Strings,
+    place: Schema.NullOr(Schema.Literals(['git', 'folder'])),
+    workspace: Schema.NullOr(Schema.Literal('main')),
+    writable: Strings,
+    reads: Strings,
+    slot: Schema.NullOr(Schema.Literal('none')),
+    agent: Schema.NullOr(Schema.String),
+    skills: Strings,
+    mcp: Strings,
+    permissionMode: Schema.NullOr(Schema.String),
+    sandbox: Schema.NullOr(Schema.String),
+    tools: Schema.NullOr(Strings),
+    disallowedTools: Strings,
+    allowedTools: Strings,
+    denials: Schema.NullOr(Schema.Literal('fail')),
+    background: Schema.NullOr(Schema.Boolean),
+    remote: Schema.NullOr(Schema.Boolean),
+    deadlineSeconds: Schema.NullOr(Schema.Number),
+    budget: Schema.NullOr(Schema.Number),
+    check: Schema.NullOr(Schema.String),
+    retries: Schema.NullOr(Schema.Number),
+    gate: Schema.NullOr(Schema.Literal(true)),
+    output: Schema.NullOr(Schema.String),
+    tally: Strings,
+    loop: Schema.NullOr(Schema.String),
+    rounds: Schema.NullOr(Schema.Number),
+  }),
+);
 
 /** Decodes the keys a step takes from an agent, each only where the agent sets it (`KeyForm.agents`). */
-export const StepSpecPartSchema = WorkflowStepSpecSchema.mapFields(Struct.map(Schema.optionalKey)) satisfies Schema.Schema<
-  Partial<WorkflowStepSpec>
->;
+export const StepSpecPartSchema = decodes<Partial<WorkflowStepSpec>>()(WorkflowStepSpecSchema.mapFields(Struct.map(Schema.optionalKey)));
 
 /**
  * Mirrors `KeyRow` in apps/api/src/workflows/workflows.ts: one key of a card or a step, as its page lays them out — the key, its value as
@@ -236,8 +245,10 @@ export const StepSpecPartSchema = WorkflowStepSpecSchema.mapFields(Struct.map(Sc
 export type KeyRow = { key: string; value: string | null; meaning: string };
 
 /** Decodes a `KeyRow`. */
-export const KeyRowSchema = Schema.Struct({
-  key: Schema.String,
-  value: Schema.NullOr(Schema.String),
-  meaning: Schema.String,
-}) satisfies Schema.Schema<KeyRow>;
+export const KeyRowSchema = decodes<KeyRow>()(
+  Schema.Struct({
+    key: Schema.String,
+    value: Schema.NullOr(Schema.String),
+    meaning: Schema.String,
+  }),
+);

@@ -5,6 +5,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get, send } from './read.ts';
 
 /** Mirrors the package's `Pause`: since when (ISO), by whom, and why, when a reason was given. Empty where its file no longer says. */
@@ -30,8 +31,8 @@ export type Finishing = {
   calling?: string;
 };
 
-/** Mirrors the package's `Interrupt`: `run`'s `step`, its session at work or its check, which a pause at once stops. */
-export type Interrupt = { run: string; step: string; kind: 'session' | 'check' };
+/** Mirrors the package's `Interrupt`: `run`'s `step`, its session at work or its check, which a pause at once stops, and its task. */
+export type Interrupt = { run: string; step: string; kind: 'session' | 'check'; taskId: string };
 
 /** What `GET /api/pause/now` answers: each task a pause at once would stop, and what an interrupted step costs, in the package's words. */
 export type PauseNowRead = { interrupts: readonly Interrupt[]; cost: string };
@@ -51,48 +52,59 @@ export type Paused = {
 };
 
 /** Decodes a `Pause`. */
-const PauseSchema = Schema.Struct({
-  at: Schema.String,
-  by: Schema.String,
-  why: Schema.optional(Schema.String),
-}) satisfies Schema.Schema<Pause>;
+const PauseSchema = decodes<Pause>()(
+  Schema.Struct({
+    at: Schema.String,
+    by: Schema.String,
+    why: Schema.optional(Schema.String),
+  }),
+);
 
 /** Decodes a `Paused`. */
-const PausedSchema = Schema.Struct({
-  pause: Schema.NullOr(PauseSchema),
-  finishing: Schema.Array(
-    Schema.Struct({
-      run: Schema.String,
-      step: Schema.String,
-      kind: Schema.Literals(['session', 'check', 'landing']),
-      stopping: Schema.optional(Schema.Literal(true)),
-      resumed: Schema.optional(Schema.Literal(true)),
-      calling: Schema.optional(Schema.String),
-    }),
-  ),
-  staged: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String, repo: Schema.String })),
-  held: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String })),
-}) satisfies Schema.Schema<Paused>;
+const PausedSchema = decodes<Paused>()(
+  Schema.Struct({
+    pause: Schema.NullOr(PauseSchema),
+    finishing: Schema.Array(
+      Schema.Struct({
+        run: Schema.String,
+        step: Schema.String,
+        kind: Schema.Literals(['session', 'check', 'landing']),
+        stopping: Schema.optional(Schema.Literal(true)),
+        resumed: Schema.optional(Schema.Literal(true)),
+        calling: Schema.optional(Schema.String),
+      }),
+    ),
+    staged: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String, repo: Schema.String })),
+    held: Schema.Array(Schema.Struct({ run: Schema.String, step: Schema.String })),
+  }),
+);
 
 /** Decodes an `Interrupt`. */
-const InterruptSchema = Schema.Struct({
-  run: Schema.String,
-  step: Schema.String,
-  kind: Schema.Literals(['session', 'check']),
-}) satisfies Schema.Schema<Interrupt>;
+const InterruptSchema = decodes<Interrupt>()(
+  Schema.Struct({
+    run: Schema.String,
+    step: Schema.String,
+    kind: Schema.Literals(['session', 'check']),
+    taskId: Schema.String,
+  }),
+);
 
 /** Decodes a `PauseNowRead`. */
-const PauseNowSchema = Schema.Struct({
-  interrupts: Schema.Array(InterruptSchema),
-  cost: Schema.String,
-}) satisfies Schema.Schema<PauseNowRead>;
+const PauseNowSchema = decodes<PauseNowRead>()(
+  Schema.Struct({
+    interrupts: Schema.Array(InterruptSchema),
+    cost: Schema.String,
+  }),
+);
 
 /** Decodes a `PauseAnswer`. */
-const PauseAnswerSchema = Schema.Struct({
-  pause: PauseSchema,
-  kept: Schema.optional(Schema.Boolean),
-  interrupted: Schema.optional(Schema.Array(InterruptSchema)),
-}) satisfies Schema.Schema<PauseAnswer>;
+const PauseAnswerSchema = decodes<PauseAnswer>()(
+  Schema.Struct({
+    pause: PauseSchema,
+    kept: Schema.optional(Schema.Boolean),
+    interrupted: Schema.optional(Schema.Array(InterruptSchema)),
+  }),
+);
 
 /**
  * Whether the store is paused, and what finishes under it: read again on the feed's `store` event, the pause put or lifted (`keysOf`), and

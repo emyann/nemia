@@ -7,18 +7,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {
-  behind,
-  coded,
-  detail as detailOf,
-  EXIT_1,
-  listed,
-  PASSED,
-  summary,
-  triedAs,
-  unpinned,
-  type Word,
-} from './run-fixtures.ts';
+import { behind, coded, detail as detailOf, EXIT_1, listed, PASSED, summary, triedAs, unpinned, type Word } from './run-fixtures.ts';
 import './tsx.ts';
 
 const { createElement } = await import('react');

@@ -108,3 +108,24 @@ const FORMER = {
 } as const satisfies Record<PhaseWord, SessionState>;
 
 export type Outcome = 'succeeded' | 'failed' | 'stopped';
+
+/**
+ * Where a task stands for a reader, from its record and one observation (`viewOfState`): a closed set of literals, never a
+ * sentence. The harness's own state of the attempt in flight is beside it, as `TaskView.session`, never folded in.
+ */
+export const TASK_PHASES = [
+  'pending',
+  'starting',
+  'working',
+  'quiescent',
+  'needs-human',
+  'input-required',
+  'idle',
+  'restarting',
+  'between-attempts',
+  'ending',
+  'succeeded',
+  'failed',
+  'stopped',
+] as const;
+export type TaskPhase = (typeof TASK_PHASES)[number];

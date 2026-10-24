@@ -147,7 +147,8 @@ export { a2aRunner } from './a2a/index.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input, Bridge } from './core/index.ts';
 export type { AskOption, AskQuestion, SessionAsk } from './core/index.ts';
-export type { SessionState, Ended, Outcome } from './core/index.ts';
+export type { SessionState, Ended, Outcome, TaskPhase } from './core/index.ts';
+export { TASK_PHASES } from './core/index.ts';
 /**
  * The task's lifecycle as plain data — states, edges, first and final states, and the verbs written from outside it — for a board to
  * draw; never the machine or its move.

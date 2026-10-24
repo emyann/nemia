@@ -47,7 +47,11 @@ const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 /** Plan on its second try, sent back from its first. */
 const onTry2 = (approvals: ReturnType<typeof approval>[]) =>
   atPlan({
-    steps: { plan: { taskId: 't1-try2', tries: [{ taskId: 't1', then: 'nudge' }] }, implement: { taskId: null }, review: { taskId: null } },
+    steps: {
+      plan: { taskId: 't1-try2', tries: [{ taskId: 't1', cause: 'nudge' }] },
+      implement: { taskId: null },
+      review: { taskId: null },
+    },
     approvals,
   });
 

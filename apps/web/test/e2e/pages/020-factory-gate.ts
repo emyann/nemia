@@ -135,7 +135,7 @@ export default {
       inspector.locator('[data-unfiled]', { hasText: 'not filed yet: it waits at its gate' }),
       `${ending} is not filed, and its inspector says so`,
     );
-    await expectCount(inspector.locator('dt', { hasText: /^attempts$/ }), 0, 'rather than a table of dashes');
+    await expectCount(inspector.locator('dt', { hasText: /^sessions$/ }), 0, 'rather than a table of dashes');
     await expectVisible(asked.getByRole('button', { name: 'Approve', exact: true }), "the inspector answers it too, the run page's gate");
     await settled(page);
     await photograph(page, path.join(OUT, `factory-gate-inspector-${await themeOf(page)}.png`), { fullPage: true });

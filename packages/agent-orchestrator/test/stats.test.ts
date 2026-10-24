@@ -142,7 +142,7 @@ writeRun(
     build: {
       taskId: 'checked-build-2',
       check: { taskId: 'checked-build-2-check' },
-      tries: [{ taskId: 'checked-build', then: 'retries', check: { taskId: 'checked-build-check' } }],
+      tries: [{ taskId: 'checked-build', cause: 'retries', check: { taskId: 'checked-build-check' } }],
     },
   },
   { factory: 'other', repo: '/repos/two', workspace: '/repos/two' },
@@ -254,8 +254,8 @@ writeRun(
       taskId: 'denied-write-2',
       check: { taskId: 'denied-write-2-check-2' },
       tries: [
-        { taskId: 'denied-write', then: 'retries' },
-        { taskId: 'denied-write-2', then: 'retries', check: { taskId: 'denied-write-2-check' } },
+        { taskId: 'denied-write', cause: 'retries' },
+        { taskId: 'denied-write-2', cause: 'retries', check: { taskId: 'denied-write-2-check' } },
       ],
     },
     codex: { taskId: 'denied-codex' },
@@ -287,8 +287,8 @@ writeRun(
       taskId: 'skills-spec-2',
       check: { taskId: 'skills-spec-2-check-2' },
       tries: [
-        { taskId: 'skills-spec', then: 'retries' },
-        { taskId: 'skills-spec-2', then: 'retries', check: { taskId: 'skills-spec-2-check' } },
+        { taskId: 'skills-spec', cause: 'retries' },
+        { taskId: 'skills-spec-2', cause: 'retries', check: { taskId: 'skills-spec-2-check' } },
       ],
     },
     quiet: { taskId: 'skills-quiet' },
@@ -312,7 +312,7 @@ for (const [name, applies] of [
 writeRun(
   'touched',
   [{ name: 'design', after: [], body: 'Design it.', agent: { ...agent('seldon'), skills: ['change-the-board', 'shadcn', 'app:y'] } }],
-  { design: { taskId: 'touched-design-2', tries: [{ taskId: 'touched-design', then: 'retries' }] } },
+  { design: { taskId: 'touched-design-2', tries: [{ taskId: 'touched-design', cause: 'retries' }] } },
   { factory: 'touched', createdAt: `${TOUCHED_DAY}T00:00:00.000Z` },
 );
 

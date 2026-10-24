@@ -126,7 +126,7 @@ function unstartedStep(name: string): RunDetail['steps'][number] {
       {
         try: 1,
         round: 1,
-        then: null,
+        cause: null,
         current: true,
         taskId: null,
         note: null,

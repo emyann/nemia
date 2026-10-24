@@ -32,7 +32,7 @@ const awaiting = (more: Partial<Extract<Decision, { kind: 'awaiting' }>> = {}): 
   outcome: 'blocked',
   branches: ['wf/r-1/implement'],
   failed: [],
-  stuck: [],
+  awaitingAnswer: [],
   failedCheck: [],
   unfinishedCheck: [],
   unsigned: [],

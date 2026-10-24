@@ -257,10 +257,10 @@ export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' 
   endsOnBase(step) && step.check !== undefined;
 
 /**
- * Whether the checkout holds this step back on a pass: it works in the repository's own checkout (`workspace: main`), and another run's
+ * Whether this step waits on the checkout on a pass: it works in the repository's own checkout (`workspace: main`), and another run's
  * step is in that one directory (`heldCheckouts`). Pure. Nothing of it is filed while that is so — a first session, or another try.
  */
-export const heldByCheckout = (steps: readonly Workflow[], name: string, checkout: CheckoutHold | undefined): boolean =>
+export const waitsOnCheckout = (steps: readonly Workflow[], name: string, checkout: CheckoutHold | undefined): boolean =>
   Boolean(checkout) && steps.some((s) => s.name === name && s.workspace === 'main');
 
 /**

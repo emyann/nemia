@@ -313,7 +313,7 @@ function statusRefusal(c: Judged): string {
 
 /** `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted. */
 function modeRefusal(c: Judged): string | undefined {
-  const { step, run, name, how, command, phaseOf, verdictOf, modes, status, blockedByHarness, sendsBack } = c;
+  const { step, run, name, how, command, phaseOf, verdictOf, modes, status, via, sendsBack } = c;
   if (modes.includes(how.mode)) return undefined;
   if (landsOnCheck(step, run) && status === 'failed (check)') {
     const why = refusedCheck(run.steps[name]?.check ? phaseOf(run.steps[name].check.taskId) : 'unknown', verdictOf(name))
@@ -321,11 +321,12 @@ function modeRefusal(c: Judged): string | undefined {
       : 'did not finish';
     return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
   }
-  const is = blockedByHarness
-    ? 'is running, its session blocked by its harness with nothing signed off'
-    : status === 'denied'
-      ? 'was denied a call by its harness, and its check was never run'
-      : `is ${status}`;
+  const is =
+    via === 'session'
+      ? 'is running, its session blocked by its harness with nothing signed off'
+      : status === 'denied'
+        ? 'was denied a call by its harness, and its check was never run'
+        : `is ${status}`;
   return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. ${
     sendsBack
       ? `To send it back from its gate, say what to change: nemia retry ${run.id} ${name} --message "<objection>".`

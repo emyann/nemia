@@ -381,7 +381,7 @@ test('a run held until another lands: said by every screen with why and who, not
       const filings = [...b.filings];
       const pass = await tick(b, asking.id);
       assert.deepEqual(
-        [pass.blocked, pass.tried, b.filings],
+        [pass.unreachable, pass.tried, b.filings],
         [['review'], [], filings],
         'a try written by hand beside the hold is no try due: nothing is filed, and what the blocked step stops is still read as stopped',
       );

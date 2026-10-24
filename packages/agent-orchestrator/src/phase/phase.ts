@@ -247,6 +247,18 @@ export const PERSON_WAITS: ReadonlySet<Reason> = new Set<Reason>([
   'CheckFailed',
 ]);
 
+/**
+ * Whether a step in `status` holds its run until someone acts, the person or Nemia: its reason waits on a person (`PERSON_WAITS`) and is
+ * no `Failed`, the engine ending a step on its own. So a step at its gate, on its question, out of rounds, at its cap, unsigned, denied a
+ * call under `denials: fail`, or on a check that refused or did not finish holds its run; `failed` and `stopped` do not. `nemia ls` says
+ * such a step waits on you (`listing`), and a run with nothing in flight and such a step is not finished to `nemia cancel` (`cancelPlan`).
+ * A try or a round the run has due moves such a step on, and its readers read that first. Pure.
+ */
+export const holdsTheRun = (status: StepStatus): boolean => {
+  const { reason } = REASON_OF[status];
+  return reason !== 'Failed' && PERSON_WAITS.has(reason);
+};
+
 /** What a run stopped on `step` says: the step's reason, and its `via` where it is an answer's. */
 const stoppedOn = (step: CodedStep): QualifiedRun =>
   step.reason === 'AwaitingAnswer'
@@ -259,8 +271,9 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
  * not a gate, so a gate before it does not say why; every such reason is a run's too; `AwaitingAnswer` with no `via` where none is.
  * Every other status is `RUN_REASON_OF`'s. Pure.
  */
-export function runCodes(status: RunStatus, held: boolean, steps: readonly CodedStep[] = []): CodedRun {
+export function runCodes(status: RunStatus, holding: boolean, steps: readonly CodedStep[] = []): CodedRun {
   const stop = status === 'blocked' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
-  const q: QualifiedRun = status === 'running' && held ? { reason: 'Waiting', on: 'run' } : stop ? stoppedOn(stop) : RUN_REASON_OF[status];
+  const q: QualifiedRun =
+    status === 'running' && holding ? { reason: 'Waiting', on: 'run' } : stop ? stoppedOn(stop) : RUN_REASON_OF[status];
   return { ...q, phase: RUN_PHASE_OF[q.reason] };
 }

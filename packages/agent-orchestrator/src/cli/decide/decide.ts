@@ -313,7 +313,7 @@ function printRefusals(run: Decided['run'], decision: Awaiting): void {
  */
 function printStops({ run, overBudgetLine, offers }: Decided, decision: Awaiting, heldOut: string): void {
   const onYou = run.pruned ? '' : ', waiting on you';
-  if (decision.stuck.length) console.log(`  BLOCKED${onYou}: ${decision.stuck.join(', ')}`);
+  if (decision.awaitingAnswer.length) console.log(`  BLOCKED${onYou}: ${decision.awaitingAnswer.join(', ')}`);
   if (decision.exhausted.length)
     console.log(
       `  ROUNDS EXHAUSTED${onYou}: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`,

@@ -193,7 +193,7 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
     b.settle(`${id}-plan`, 'succeeded', { ...SIGNED, summary: 'Go ahead and implement it: nothing here needs a person.' });
     for (let pass = 1; pass <= 3; pass++) {
       const after = await tick(b.e, id);
-      assert.deepEqual([after.filed, after.blocked, after.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
+      assert.deepEqual([after.filed, after.unreachable, after.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
     }
   });
   await s.test('`nemia ls` says awaiting approval and `waiting on you: approve plan`', async () => {

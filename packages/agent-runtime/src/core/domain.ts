@@ -4,7 +4,7 @@
  * Two states, one join key:
  *
  *   DESIRED   what I asked for            -> the journal, append-only JSONL      (ours)
- *   OBSERVED  what the machine is doing   -> `claude agents --json`, run files   (the harness's)
+ *   OBSERVED  what the machine is doing   -> run files, an A2A Task's state      (the harness's)
  *   join key  a NAME we choose before spawning and pass as `--name`
  *
  * The name is the whole trick, and it is Kubernetes' label selector: because we decide it rather
@@ -97,8 +97,8 @@ export type Sighting = {
    */
   quietMs?: number;
   /**
-   * What the harness says this session is waiting for, in the harness's own words — `permission prompt`, as
-   * `claude agents --json` prints it beside `state: 'blocked'`. Absent from a harness that says nothing, and from
+   * What the harness says this session is waiting for, in the harness's own words — `authentication`, as a remote
+   * A2A agent's Task says it beside `state: 'blocked'`. Absent from a harness that says nothing, and from
    * a session that is not waiting on anybody.
    *
    * **Its words are carried, never judged.** The engine owns no vocabulary for it and no enum of it: it is a container's

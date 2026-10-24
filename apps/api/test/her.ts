@@ -1,12 +1,11 @@
 /**
- * Nemia's session as an api test plants it: her task journalled filed long-lived and spawned, its session listed working by the
- * harness's `claude agents`, its transcript written where Claude Code keeps one, and her level file naming it (`withHer`); `said`
- * appends to a session's transcript afterwards. Her chat's own files are planted by none of it.
+ * Nemia's session as an api test plants it: her task journalled filed and spawned, its session an attached one at work — its run file
+ * written as its holder writes one, held by this process — its transcript written where Claude Code keeps one, and her level file naming
+ * it (`withHer`); `said` appends to a session's transcript afterwards. Her chat's own files are planted by none of it.
  *
- * Read by the tests of her chat on the api (`nemia-chat.test.ts`, `nemia-chat-stop.boundary.test.ts`), which share one fixture so her
- * record is planted one way.
+ * Read by the tests of her chat on the api (`nemia-chat.test.ts`).
  */
-import { config, registry, root } from './harness.ts';
+import { config, root } from './harness.ts';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -40,8 +39,8 @@ export const said = (sessionId: string, words: string[], from = 0): void => {
 };
 
 /**
- * Her task at work: journalled as filed long-lived and spawned, its session listed working by `claude agents`, its transcript `words`,
- * and her level file naming it; her chat's files none.
+ * Her task at work: journalled as filed and spawned, its session's run file (`<engine>/runs/attached/ae_<task>_1.json`) saying it is at
+ * work under this process and naming her session's id, its transcript `words`, and her level file naming it; her chat's files none.
  */
 export function withHer(words: string[]): { task: string; sessionId: string } {
   const task = `nemia-${randomUUID().slice(0, 8)}`;
@@ -50,9 +49,12 @@ export function withHer(words: string[]): { task: string; sessionId: string } {
   fs.mkdirSync(path.dirname(journal), { recursive: true });
   const filed = { kind: 'filed', at: at(0), brief: 'Be there.', cwd: '/code/app', maxAttempts: 1, harness: 'claude' };
   fs.writeFileSync(journal, jsonl([filed, { kind: 'starting', at: at(0), attempt: 1 }, { kind: 'spawned', at: at(0), attempt: 1 }]));
-  const rows = fs.existsSync(registry) ? (JSON.parse(fs.readFileSync(registry, 'utf8')) as object[]) : [];
-  rows.push({ name: `ae/${task}/1`, sessionId, kind: 'background', state: 'working', status: 'busy', startedAt: T0 });
-  fs.writeFileSync(registry, JSON.stringify(rows));
+  const run = path.join(root, 'engine', 'runs', 'attached', `ae_${task}_1.json`);
+  fs.mkdirSync(path.dirname(run), { recursive: true });
+  fs.writeFileSync(
+    run,
+    JSON.stringify({ name: `ae/${task}/1`, state: 'working', owner: process.pid, startedAt: at(0), sessionId, request: {} }),
+  );
   said(sessionId, words);
   fs.mkdirSync(path.join(root, 'nemia'), { recursive: true });
   fs.writeFileSync(path.join(root, 'nemia', 'level.json'), JSON.stringify({ level: 'semi-auto', since: at(0), task }));

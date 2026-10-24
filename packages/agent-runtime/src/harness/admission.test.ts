@@ -6,9 +6,7 @@ import { Effect } from 'effect';
 import { Engine } from '../index.ts';
 import { codex } from './codex/codex.ts';
 import { commandHarness } from './command/command.ts';
-import { claudeDetached } from './claude/code.ts';
 import { attachedOptions } from './claude/attached-options.ts';
-import { claudeArgv } from './claude/bg.ts';
 import { claudeRefuses } from './claude/vocabulary.ts';
 import { admitCall, type AdmissionRun } from './claude/admission.ts';
 import type { SpawnRequest } from './seam.ts';
@@ -79,27 +77,14 @@ const FILE_REFUSALS: readonly { name: string; config: unknown; harness?: string;
 ];
 
 /**
- * The settings each Claude Code spawn gives `config`, read back: a job, as the SDK's own `Options.settings` carries them
- * (`attachedOptions`), and `claude-detached` and a background session, off the one `--settings` of their argv.
+ * The settings a Claude Code session is given for `config`, read back as the SDK's own `Options.settings` carries them
+ * (`attachedOptions`): a job's and a held session's alike.
  */
-const settingsGiven = (config: SpawnRequest['config']): [string, Record<string, unknown>][] => {
-  const job: [string, Record<string, unknown>] = [
-    'a job',
-    attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r', config }).settings as Record<string, unknown>,
-  ];
-  const argv = (
-    [
-      ['claude-detached', claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config }).args],
-      ['a background session', claudeArgv({ name: 'ae/t/1', brief: 'b', cwd: '/r', config }, [])],
-    ] as const
-  ).map(([what, args]): [string, Record<string, unknown>] => {
-    assert.equal(args.filter((a) => a === '--settings').length, 1, `${what}: one --settings`);
-    return [what, JSON.parse(args[args.indexOf('--settings') + 1]) as Record<string, unknown>];
-  });
-  return [job, ...argv];
-};
+const settingsGiven = (config: SpawnRequest['config']): [string, Record<string, unknown>][] => [
+  ['a session', attachedOptions({ name: 'ae/t/1', brief: 'b', cwd: '/r', config }).settings as Record<string, unknown>],
+];
 
-test("admission is a PreToolUse hook merged into the caller's --settings, matched to its tools alone, running `ae admission -- <command>` — on a job, on claude-detached and on a background session", () => {
+test("admission is a PreToolUse hook merged into the caller's settings, matched to its tools alone, running `ae admission -- <command>`", () => {
   const ae = path.join(import.meta.dirname, '..', '..', 'bin', 'ae.ts');
   const before = { matcher: 'Edit', hooks: [{ type: 'command', command: 'mine' }] };
   const claude = { settings: JSON.stringify({ env: { CI: '1' }, hooks: { PreToolUse: [before] } }) };

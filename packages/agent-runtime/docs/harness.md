@@ -1,8 +1,12 @@
 # Claude Code, as a harness
 
 What Claude Code does as the steps meet it, measured at the version each line names: its fences and how a rule is matched, what a job
-has that a background session has not, trust, the bridge to claude.ai, and what it exports. A measurement here is a floor read on a
+has, trust, the bridge to claude.ai, and what it exports. A measurement here is a floor read on a
 release, never a promise of the next one — re-measure before you lean on it, and name the version and the day beside what you read.
+
+Since 2026-10-24 every Claude Code session of this runtime runs on the Agent SDK: a step as a job, a long-lived session attached while
+a process holds it (`nemia up`). A line below about `claude -p` or a `--bg` session is the record of a road this runtime no longer runs,
+kept for what it measured of Claude Code itself.
 
 `CLAUDE.md`, *Claude Code, as a harness*, forwards here, and the five documents that point at that heading resolve through it. Where
 the orchestrator's code holds a fact today, it is named beside it.
@@ -16,18 +20,12 @@ the orchestrator's code holds a fact today, it is named beside it.
   `Bash(*:4318*)` in `--settings`' `permissions.deny`): `echo http://localhost:4318` and `X=http://localhost:4318 true` were each
   refused, and `true` ran. An allow is still read against the part with its wrappers stripped (`deniedPartsOfCall` in
   `agent-orchestrator/test/agent-fences.test.ts`).
-- **An idle `--remote-control` session lists `blocked`, `idle`, with a `pid` and no `waitingFor`; a `stopped` row lists no `pid`**:
-  `held` is the `pid` (`ourRow`). `--bg` needs a trusted `cwd`, and words `say` sends reach the model framed as a peer's, not
-  the person's.
-- **Claude Code respawns a `--bg` process that died, on the same session, ~10 s later; a `--resume` given flags forks a new
-  session.** Never resume a session it is respawning: a long-lived restart waits for the old one's end and release
-  (`restartOf`, `src/core/long-lived.test.ts`); its listing in the gap is `blocked` with no `pid` (`respawning`). Whether the fork's
-  copies of its parent's lines keep their uuids is unmeasured (2026-10-07: no probe resumes); nothing reads either way on it: a follow
-  starts at the transcript's end (`bgFollowOf`), and a `moved` starts the board's conversation afresh.
-- **A job (`claude -p`) never waits on a prompt; a background session in a folder nobody opened blocks in any mode that can ask**:
-  the modes that ask nobody are this package's answer (`unasking` in `fenceReach`, `src/harness/reach.ts`), and the orchestrator's
-  `validateFolderMode` refuses a `background: true` step of a folder team in any other.
-- **A job reads neither user settings nor `settings.local.json`** (`--setting-sources project`): what a step needs goes on the step, its
+- **A `--resume` given flags forks a new session** (measured on `--bg`); whether the fork's copies of its parent's lines keep their
+  uuids is unmeasured (2026-10-07), and nothing reads either way on it: a `moved` starts the board's conversation afresh.
+- **A job never waits on a prompt** (`permissionPrompts: 'none'`, measured on `claude -p`, M1); a `--bg` session in a folder nobody
+  opened blocked in any mode that can ask, and the modes that ask nobody are this package's answer (`unasking` in `fenceReach`,
+  `src/harness/reach.ts`).
+- **A session reads neither user settings nor `settings.local.json`** (`settingSources: ['project']`): what a step needs goes on the step, its
   agent or the checkout's `.claude/settings.json`.
 - **A tool's error is exact in the log events, not the spans** (2.1.296, 2026-10-11): `tool_result` with `success="false"` carries
   `tool_name`; the errored `claude_code.tool.execution` span carries none, and Tempo's join to its parent found 68 of 174. A skill whose
@@ -51,14 +49,7 @@ the orchestrator's code holds a fact today, it is named beside it.
 - **A project's allow rules are dropped in a directory Claude Code has not trusted**: measure a rule in a trusted checkout.
 - **`--bg` in a folder nobody opened is refused at spawn** ("Workspace not trusted. Run `claude` in <dir> once…", 2.1.289); trust is
   kept per path in `.claude.json` (`src/harness/claude/trust.ts`): read by `trustedFolder`, written by `trustFolder` alone, one key,
-  under the main checkout's root the caller names, never by a session. A `--bg` permission prompt
-  under `--remote-control` lists `blocked`, `waitingFor: "permission prompt"`, and is answered from the claude.ai link (2026-10-05).
-- **A `--bg` session without `--remote-control`, blocked at a permission prompt, lists `blocked`, `waitingFor: "permission prompt"`**
-  (2.1.291, 2026-10-06, an `ask` rule in `--settings`): a step reads its probe with `claude agents --json`, reaching no phone.
-- **A `--bg --remote-control` session's link is `https://claude.ai/code/<bridgeSessionId>`**, the id `session_…` in its registration
-  `<pid>.json`, never in `claude agents --json` (`claudeBridge`, `harness/claude/bridge.ts`): written ≤ 4.3 s after the start (2.1.291,
-  2026-10-06). A SIGTERM sent to its pid ends it: `done` in `claude agents`, its file removed, no respawn within 45 s, and a later
-  `claude stop <id>` still answers `stopped`. Whether a respawn or a restart changes the id, and the link on a phone: unmeasured.
+  under the main checkout's root the caller names, never by a session.
 - **A `--bg` session stays in `--permission-mode auto`, and an `ask` rule in `--settings` outranks its classifier** (2.1.289,
   2026-10-05): `Bash(x:*)` prompts ("Ask rule … overrides auto mode"), listed `waitingFor: "permission prompt"`; `Edit(//<file>)`
   prompts the Write tool, unruled it writes unasked. No `Edit` or `Write` ask reaches a Bash `>` there: the classifier judges it.
@@ -80,13 +71,10 @@ the orchestrator's code holds a fact today, it is named beside it.
   a task's `env` laid under it and the telemetry, never over (`test/telemetry.test.ts`):
   measured on 2.1.289, `run_in_background` is ignored and the call runs in the foreground, a bare 130 s call completes (cut at 120 s
   with background tasks off alone, moved to the background with neither), and a shell `&` still detaches, its `$!` alive to `kill -0`.
-- **A job (`claude -p`) exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`** — an
+- **A job exports logs, metrics and traces from its environment over `http/json`, flushed at exit, and joins `TRACEPARENT`** — an
   environment `attachedOptions` composes onto `Options.env` inside the job's bin, since the SDK replaces the child's environment
-  entirely (`sdk.d.ts:1694`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's;
-  a `--bg` session runs in a pre-spawned process, ignores the asker's environment and `TRACEPARENT`, and exports only what `--settings`'
-  `env` says; a job's Bash tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06; `claudeTelemetryEnv`, `telemeteredFlags`).
-  Whether a `--bg` session's Bash tool inherits that `env`'s telemetry is unmeasured: its `env.PATH` reaches it, so a `claude -p` run
-  there may export under the session's labels.
+  entirely (`sdk.d.ts:1694`), so the engine's own telemetry is off the bin's process and the session's is on the CLI's; a job's Bash
+  tool sees no `OTEL_*`, but `TRACEPARENT` (2.1.291, 2026-10-06, then `claude -p`; `claudeTelemetryEnv`).
 - **`OTEL_LOG_TOOL_DETAILS=1` puts a tool's inputs on its `claude_code.tool` span (`full_command`, `file_path`) and on the
   `tool_decision` and `tool_result` events (`tool_parameters`, `tool_input`, `error`)** (2.1.293, 2026-10-07, `claude -p`): without it no
   command, path or error text is exported, only `bash_argv0`, `bash_command_class` and an error's class (`toolDetails`, `claudeTelemetryEnv`).
@@ -150,11 +138,23 @@ the orchestrator's code holds a fact today, it is named beside it.
   listed that skill alone in its transcript's `skill_listing` (`skillCount: 1`), and its control, identical but on `'default'`, is
   listed it and the 14 built-in ones (`skillCount: 15`). Read the `skill_listing`, not `init`'s `skills`, which lists every skill
   either way. No flag or settings key of the CLI closes the list: `skillOverrides` turns off the names it holds and
-  `disableBundledSkills` the bundled ones alone, so a task's `enabledSkills` list is refused on `claude --bg` and `claude-detached`.
+  `disableBundledSkills` the bundled ones alone, so the list is the SDK's alone, which every Claude Code session of this runtime runs on.
 - **Words pushed into a long-lived attached session while the model writes run as a turn of their own; words pushed while a tool call
   runs are folded into the turn in flight and answered by its one result** (SDK 0.3.270, CLI 2.1.301, 2026-10-16): so a turn is
   answered by the `user_message_uuids` on its result (`answered`, `harness/claude/attached-session.ts`), never by counting;
   `queued_turn_count` was 0 on a result a second turn followed, so nothing reads it.
+
+## The claude.ai bridge
+
+**Any Claude Code session's bridge to claude.ai is opened on its `system`/`init` message, through the Agent SDK** (SDK 0.3.308,
+Claude Code 2.1.308, 2026-10-24): `enableRemoteControl(true, name, { keepSessionOnExit })`, undeclared on `Query`, read off the object
+in `harness/claude/attached-bridge.ts` alone (`bridgeDue`, `enableBridge`). A job asked at init (`keepSessionOnExit: false`) was answered
+its facts 0.5 s later — `bridge_state: ready` and the answer at 1.5 s, `connected` at 1.7 s — long before its result at 21.1 s, during
+a tool call: the answer is not queued behind the turn, and the bridge closes with the job. A long-lived session asked at init
+(`keepSessionOnExit: true`) was answered the same way (init 2.8 s, answer 3.3 s, connected 3.4 s), and a second process resuming it
+with `reattachSessionId` set to the first `bridge_session_id` was answered the same id and link, connected 0.5 s after its init. A
+held session keeps the facts on its run file, a job's process on `<name>.bridge` beside its run; both are read by a look.
+Measured on haiku, by a throwaway probe kept outside the repository.
 
 ## The MCP sign-in affordances
 

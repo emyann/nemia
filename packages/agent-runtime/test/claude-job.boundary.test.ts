@@ -6,8 +6,8 @@
  *
  * What it holds: the job completes; its closeout, its usage and its denials are read off the capture its own process printed;
  * `say` reaches the session mid-turn; `follow` gives the text in pieces as it is written; `transcript` reads the conversation;
- * and **no `claude -p` is spawned** — a `claude` on PATH that records every call is never called. That last assertion is the
- * card's proof: restore the old `claudePrintArgs` command on the job's spec and it fails.
+ * and **no `claude` on PATH is called** — one that records every call is never called: the job is no Claude Code command line. A
+ * job that asked for the claude.ai bridge opens it at init, its own process writing the bridge's facts beside its run.
  *
  * A boundary test: a real store, a real detached worker, a second real process running the SDK, and a real child CLI.
  */
@@ -32,15 +32,10 @@ const { STAND_IN } = await import('./attached-held.ts');
 const JOB_ID = '5e551011-0000-4000-8000-00000000000c';
 
 /**
- * A `claude` on PATH that records every call and answers an empty registry: nothing of this engine's may run it, since a job no
- * longer is a Claude Code command line. `claude agents` is the one call the runner makes of it, for the `--bg` sessions.
+ * A `claude` on PATH that records every call: nothing of this engine's may run it, since a job is no Claude Code command line.
  */
 const watchedPath = (dir: string) => {
-  fs.writeFileSync(
-    path.join(dir, 'claude'),
-    ['#!/bin/sh', `echo "$@" >> '${dir}/claude-calls'`, `if [ "$1" = agents ]; then echo '[]'; fi`, ''].join('\n'),
-    { mode: 0o755 },
-  );
+  fs.writeFileSync(path.join(dir, 'claude'), ['#!/bin/sh', `echo "$@" >> '${dir}/claude-calls'`, ''].join('\n'), { mode: 0o755 });
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
   return () => {
@@ -61,7 +56,7 @@ const wrote = (dir: string, file: string): unknown[] => {
   }
 };
 
-test('an engine with no holder runs a Claude Code job to its end on the Agent SDK, and spawns no `claude -p`', WAITED, async (t) => {
+test('an engine with no holder runs a Claude Code job to its end on the Agent SDK, and calls no `claude` on PATH', WAITED, async (t) => {
   const s = story(t);
   const root = scratch('ae-job-');
   const dir = path.join(root, 'work');
@@ -161,10 +156,50 @@ test('an engine with no holder runs a Claude Code job to its end on the Agent SD
     const called = fs.existsSync(path.join(dir, 'claude-calls'))
       ? fs.readFileSync(path.join(dir, 'claude-calls'), 'utf8').split('\n').filter(Boolean)
       : [];
-    assert.deepEqual(
-      called.filter((call) => !call.startsWith('agents ')),
-      [],
-      `no \`claude\` command line was spawned for the job — \`claude agents\`, which lists the --bg sessions, is all that may be asked: ${called.join(' ')}`,
-    );
+    assert.deepEqual(called, [], 'no `claude` command line was called, `claude agents` included: there is no `--bg` session to list');
   });
 });
+
+test(
+  'a job with no holder that asked for the bridge opens it at init: its own process writes the facts beside its run, and a look reads the link',
+  WAITED,
+  async (t) => {
+    const root = scratch('ae-job-bridge-');
+    const dir = path.join(root, 'work');
+    fs.mkdirSync(dir, { recursive: true });
+    const engine = builtEngine(Engine.layer({ root, harnesses: { claude: 'claude' }, claudeExecutable: STAND_IN }));
+    const plan = { id: JOB_ID, hold: true, output: { outcome: 'done' } };
+    const taskId = await Effect.runPromise(
+      engine.file({
+        brief: 'say it',
+        cwd: dir,
+        harness: 'claude',
+        config: { claude: { remoteControl: true }, env: { STANDIN_DIR: dir, STANDIN_PLAN: JSON.stringify(plan) } },
+      }),
+    );
+    t.after(() => {
+      fs.writeFileSync(path.join(dir, 'end'), '');
+      return Effect.runPromise(Effect.ignore(engine.stop(taskId)));
+    });
+    await Effect.runPromise(engine.tick());
+    const view = await until(
+      t,
+      async () => {
+        const v = await Effect.runPromise(engine.view(taskId));
+        return v.bridge?.url ? v : undefined;
+      },
+      'the link read off the bridge file',
+      { everyMs: 100 },
+    );
+    assert.equal(view.bridge?.url, `https://claude.ai/s/cse_${JOB_ID}`);
+    assert.equal(view.state.settled, null, 'opened at init, while its one turn is still held: before its result');
+    const asks = wrote(dir, 'taken.jsonl').filter((r) => (r as { subtype?: string }).subtype === 'remote_control');
+    assert.equal(asks.length, 1, 'one bridge control request');
+    assert.equal((asks[0] as { keep_session_on_exit?: boolean }).keep_session_on_exit, false, "a job's claude.ai session closes with it");
+    const files = fs.readdirSync(path.join(root, 'runs', 'claude'));
+    assert.ok(
+      files.some((f) => f.endsWith('.bridge')),
+      `the facts on a file beside the run, not only in a process's memory: ${files}`,
+    );
+  },
+);

@@ -52,7 +52,6 @@ test('parseBrief: what a brief reads as — every key reaching the spec, `true o
         effort: ['high', 'high'],
         budgetUsd: ['0.25', 0.25],
         contextTokens: ['200000', 200000],
-        background: ['true', true],
         holdOpen: ['true', true],
         queued: ['true', true],
         restartPolicy: ['Always', 'Always'],
@@ -74,9 +73,8 @@ test('parseBrief: what a brief reads as — every key reaching the spec, `true o
     },
   );
 
-  await t.test('`background: false` is a job, said out loud; absent, the harness default, a job', () => {
-    assert.equal(parse(brief('background: false')).config?.background, false, 'false is a job, said out loud');
-    assert.equal(parse(brief('model: opus')).config?.background, undefined, 'absent: the harness default, a job');
+  await t.test('REFUSED: `background:`, true or false, is a key no brief has now, refused naming itself, exit 2', () => {
+    for (const v of ['true', 'false']) refuses(brief(`background: ${v}`), /`background`/);
   });
 
   await t.test('`queued: false` is written; absent, the task starts on the next tick', () => {
@@ -156,11 +154,6 @@ const SCHEMAS = (() => {
  */
 const BRIEF_REFUSALS: Array<[string, string, RegExp]> = [
   ['an unknown key, by name', brief('afer: implement'), /`afer` is not a key a brief has/],
-  ...['yes', 'True', '1', 'bg'].map((bad): [string, string, RegExp] => [
-    `background: ${bad}`,
-    brief(`background: ${bad}`),
-    /is not true or false\. Write `background: true` to run the session as `claude --bg`, which a person can attach to, or leave it out to run it as a job/,
-  ]),
   ...['yes', 'True', '1', 'held'].map((bad): [string, string, RegExp] => [
     `queued: ${bad}`,
     brief(`queued: ${bad}`),
@@ -178,11 +171,6 @@ const BRIEF_REFUSALS: Array<[string, string, RegExp]> = [
       `^brief: \`restartPolicy: ${bad}\` is not a restart policy\\. Write \`restartPolicy: Always\` to keep the session open until \`ae stop\`, or leave it out to run the task to its end\\.$`,
     ),
   ]),
-  [
-    'background: yes, in its own whole sentence',
-    brief('background: yes'),
-    /^brief: `background: yes` is not true or false\. Write `background: true` to run the session as `claude --bg`, which a person can attach to, or leave it out to run it as a job\.$/,
-  ],
   [
     'queued: yes, in its own whole sentence',
     brief('queued: yes'),
@@ -253,7 +241,6 @@ test('parseBrief: what it refuses, exit code 2 and the sentence — never a raw 
         'deadlineSeconds: 5m',
         'budgetUsd: $5',
         'contextTokens: 200k',
-        'background: yes',
         'queued: yes',
         'holdOpen: yes',
         'restartPolicy: always',
@@ -305,6 +292,17 @@ test("`ae` refuses at exit 2 with the sentence and files nothing: a brief `ae fi
     const r = spawnSync(process.execPath, [ae, 'file', file], { env: { ...process.env, AE_ROOT: dir }, encoding: 'utf8' });
     assert.equal(r.status, 2);
     assert.match(r.stderr, /^brief: `afer` is not a key a brief has/);
+    assert.equal(fs.existsSync(path.join(dir, 'tasks')), false);
+  });
+
+  await t.test('`ae file` on a brief that says `background:` exits 2 naming the key, not a stack trace, and files nothing', () => {
+    const dir = tmp();
+    const file = path.join(dir, 'brief.md');
+    fs.writeFileSync(file, brief('background: true'));
+    const r = spawnSync(process.execPath, [ae, 'file', file], { env: { ...process.env, AE_ROOT: dir }, encoding: 'utf8' });
+    assert.equal(r.status, 2, r.stderr);
+    assert.ok(r.stderr.includes('`background`'), r.stderr);
+    assert.doesNotMatch(r.stderr, /\n\s+at /, 'no stack trace');
     assert.equal(fs.existsSync(path.join(dir, 'tasks')), false);
   });
 

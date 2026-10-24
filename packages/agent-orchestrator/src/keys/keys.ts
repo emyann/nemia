@@ -12,8 +12,17 @@ import { expandShapes, SHAPE_KEY } from '../question/index.ts';
 import type { HarnessPrompt } from '../agents/agents.ts';
 import { bareSkillOf, GIVEN_SKILL_FORMS, givenSkillOf, ONE_BARE_NAME, sameBareIn } from './given-skill.ts';
 
+/**
+ * `harness:` as written: one of `HARNESSES`, or `a2a:<name>`, or refused. `claude-detached`, retired, is refused by its name: every session
+ * of ours runs on the Agent SDK, as the default harness.
+ */
 export function harnessOf(step: string, harness: string | undefined): string | undefined {
   if (harness === undefined || HARNESSES.includes(harness)) return harness;
+  if (harness === 'claude-detached') {
+    refuse(
+      `${step}: \`harness: claude-detached\` is retired: every session of ours runs on the Agent SDK now, as the default harness. Delete the line: the step runs as a job on the Agent SDK.`,
+    );
+  }
   if (isRemoteHarness(harness)) {
     const name = remoteNameOf(harness)!;
     if (REMOTE_NAME.test(name)) return harness;
@@ -65,20 +74,6 @@ export function remoteOf(step: string, remote: string | undefined): boolean | un
   return refuse(
     `${step}: \`remote: ${remote}\` is not \`true\` or \`false\`. \`remote: true\` bridges every session of the step to claude.ai, where anyone signed in to the account can drive it from a browser or a phone; \`remote: false\`, or no line, does not. Write one of the two, or delete the line.`,
   );
-}
-
-/**
- * `background:` as written: `true` or `false`, or refused, for `remote:`'s reasons. Which harnesses run a background session is the
- * runtime's to say, so `true` on another is refused at `nemia start` (`configRefused` in start.verb.ts).
- */
-export function backgroundOf(step: string, background: string | undefined): boolean | undefined {
-  if (background === undefined) return undefined;
-  if (background !== 'true' && background !== 'false') {
-    refuse(
-      `${step}: \`background: ${background}\` is not \`true\` or \`false\`. \`background: true\` runs every session of the step as a Claude Code background session (\`claude --bg\`); \`background: false\`, or no line, runs it as a job, on the Agent SDK. Write one of the two, or delete the line.`,
-    );
-  }
-  return background === 'true';
 }
 
 /**
@@ -289,15 +284,9 @@ export const DENIALS: readonly string[] = ['fail'];
 
 /**
  * `denials:` as written: `fail`, or refused — and refused where the run would never read a denial, rather than accepted and never met: on
- * codex, whose `codex exec` records none, and beside `background: true`, whose `claude --bg` session records none (agent-runtime's open
- * issue 28). Only a job — on the Agent SDK for `claude`, `claude -p` for `claude-detached` — says what it was denied.
+ * codex, whose `codex exec` records none. A `claude` job, on the Agent SDK, says what it was denied.
  */
-export function denialsOf(
-  step: string,
-  denials: string | undefined,
-  harness: string | undefined,
-  background: boolean | undefined,
-): 'fail' | undefined {
+export function denialsOf(step: string, denials: string | undefined, harness: string | undefined): 'fail' | undefined {
   if (denials === undefined) return undefined;
   if (denials !== 'fail') {
     refuse(
@@ -307,11 +296,6 @@ export function denialsOf(
   if ((harness ?? DEFAULT_HARNESS) === 'codex') {
     refuse(
       `${step}: \`denials: fail\` stops the step on a call the harness denied, and \`codex exec\` records none: its fence is the sandbox, and a call it refuses is said nowhere the run reads — so the line would never stop anything. Run the step on claude — delete \`harness: codex\` — or delete \`denials: fail\`.`,
-    );
-  }
-  if (background) {
-    refuse(
-      `${step}: \`denials: fail\` stops the step on a call the harness denied, and \`background: true\` runs it as a Claude Code background session (\`claude --bg\`), whose denials are not read (agent-runtime's open issue 28) — so the line would never stop anything. Delete \`background: true\` to run the step as a job, which records each call it was denied, or delete \`denials: fail\`.`,
     );
   }
   return 'fail';

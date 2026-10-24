@@ -30,7 +30,7 @@ const ROWS: readonly Row[] = [
   {
     name: "a directory's own project settings grant the allow rules they name, in the order they are written",
     settings: ALLOWS,
-    harnesses: ['claude', 'claude-detached'],
+    harnesses: ['claude'],
     allows: ['WebSearch', 'Bash(git log:*)'],
   },
   { name: 'a directory with no settings file grants nothing', settings: undefined, harnesses: ['claude'], allows: [] },

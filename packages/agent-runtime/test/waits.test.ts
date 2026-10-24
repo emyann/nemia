@@ -238,7 +238,6 @@ type Allowance = { count: number; not: string };
  */
 const DEADLINES: Readonly<Record<string, Allowance>> = {
   'test/scratch.ts': { count: 1, not: "the reaper's bound on a test run's leftover processes, after its end" },
-  'test/transcript.test.ts': { count: 2, not: "a mocked clock's shift, wall and monotonic" },
   'test/remote-agent.test.ts': { count: 1, not: "a send's `until` a minute ahead, written into a run file" },
   'test/detached.test.ts': {
     count: 2,
@@ -246,7 +245,7 @@ const DEADLINES: Readonly<Record<string, Allowance>> = {
       'a synchronous hold inside a patched `writeFileSync`, where no promise waits and no timeout fires; and an assertion that a run ' +
       'ended within ten seconds, after its wait on the event, so not when a child holding its pipe let go thirty seconds on',
   },
-  'test/live.test.ts': { count: 15, not: "AE_LIVE only: a real harness's turns, which spend money" },
+  'test/live.test.ts': { count: 7, not: "AE_LIVE only: a real harness's turns, which spend money" },
 };
 
 /**
@@ -303,6 +302,6 @@ test('REFUSED: a deadline written into a test is over its allowance, and an allo
     ]);
     counts.set('src/core/clock.test.ts', 0);
   }
-  counts.set('test/transcript.test.ts', 1);
-  assert.deepEqual(deadlineBreaks(counts, DEADLINES), ['test/transcript.test.ts is allowed 2 but has 1: lower its count in DEADLINES']);
+  counts.set('test/live.test.ts', 6);
+  assert.deepEqual(deadlineBreaks(counts, DEADLINES), ['test/live.test.ts is allowed 7 but has 6: lower its count in DEADLINES']);
 });

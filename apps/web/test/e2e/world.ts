@@ -52,7 +52,7 @@ export let measuring = false;
 export function setMeasuring(to: boolean): void {
   measuring = to;
 }
-/** Every line draft's stand-in inbox (SAYING, INBOX) has been sent, in order: what the `say` page holds its words to. */
+/** Every line said to draft's session (SAYING), off its say file, in order: what the `say` page holds its words to. */
 export const heard: unknown[] = [];
 
 /** A pass's read of where the store's branches stand, as the tick's pass reads it and writes it down (`passStanding`). */

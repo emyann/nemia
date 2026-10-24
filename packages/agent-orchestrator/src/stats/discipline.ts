@@ -15,21 +15,19 @@ import { appliesMatch, type SkillRule } from '../skills/skills.ts';
 import type { Workflow } from '../step/step.ts';
 import type { TaskSpan } from '../timeline/index.ts';
 
-/** The harnesses whose sessions say what they were denied: a job, `claude -p`, on either. */
-const RECORDING = ['claude', 'claude-detached'];
-
 /**
- * Whether a step's sessions record what they were denied, read off its frozen `harness:` (`DEFAULT_HARNESS` where it names none) and
- * `background:`: true on `claude` and `claude-detached`. False on `codex`, whose sandbox refuses a call nowhere the run reads, on a remote
- * agent (`a2a:<name>`), which reports none, and beside `background: true`, whose `claude --bg` session records none — the same harnesses
- * `denialsOf` refuses `denials: fail` on.
+ * Whether a step's sessions record what they were denied, read off its frozen `harness:` (`DEFAULT_HARNESS` where it names none): true on
+ * `claude`, a job on the Agent SDK. False on `codex`, whose sandbox refuses a call nowhere the run reads, and on a remote agent
+ * (`a2a:<name>`), which reports none — the harnesses `denialsOf` refuses `denials: fail` on. False too for a step a run froze with
+ * `background: true`, a key no step has now, which a record keeps (`FrozenStepSchema`): its sessions ran as Claude Code background
+ * sessions, which recorded none.
  */
-export const deniesRecorded = (step: Pick<Workflow, 'harness' | 'background'>): boolean =>
-  RECORDING.includes(step.harness ?? DEFAULT_HARNESS) && step.background !== true;
+export const deniesRecorded = (step: Pick<Workflow, 'harness'> & { readonly background?: unknown }): boolean =>
+  (step.harness ?? DEFAULT_HARNESS) === 'claude' && step.background !== true;
 
 /**
- * The moment a `claude` step's sessions began to run as jobs (`claude -p`), which record what they were denied: a session filed before it
- * ran as a background session (`claude --bg`), which records none, and its journal says nothing that tells the two apart.
+ * The moment a `claude` step's sessions began to run as jobs, which record what they were denied: a session filed before it ran as a
+ * Claude Code background session, which recorded none, and its journal says nothing that tells the two apart.
  */
 export const JOBS_SINCE = '2026-09-23T19:04:31.000Z';
 

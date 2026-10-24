@@ -11,7 +11,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
 import type { AskQuestion, SessionAsk, SessionState } from '../../core/index.ts';
-import { processStart } from './inbox.ts';
+import { BridgeFactsSchema } from './attached-bridge.ts';
 import { CarriedSchema } from '../detached/run-file.ts';
 import type { SpawnRequest } from '../seam.ts';
 
@@ -22,23 +22,22 @@ import type { SpawnRequest } from '../seam.ts';
  */
 export type AttachedState = 'working' | 'idle' | 'parked' | 'completed' | 'failed' | 'canceled';
 
-/**
- * What a session's claude.ai bridge came to, as the SDK's control request answered it (`attached-bridge.ts`): its link and the facts a
- * resume re-attaches with, and `state` as the stream's `bridge_state` messages last said it. Or `why` alone, where the SDK this
- * runtime runs on has no such control request: the session runs on with no bridge.
- */
-const BridgeFactsSchema = Schema.Struct({
-  url: Schema.optional(Schema.String),
-  connectUrl: Schema.optional(Schema.String),
-  environmentId: Schema.optional(Schema.String),
-  epoch: Schema.optional(Schema.Finite),
-  bridgeSessionId: Schema.optional(Schema.String),
-  state: Schema.optional(Schema.String),
-  why: Schema.optional(Schema.String),
-});
+export type { AttachedBridge } from './attached-bridge.ts';
 
-/** A session's bridge as its run file keeps it. */
-export type AttachedBridge = typeof BridgeFactsSchema.Type;
+/**
+ * When a process started, as `/proc/<pid>/stat` counts it (its 22nd field): what a run file names its holder and its Claude Code by,
+ * so a pid another process has taken since is not read as either. `undefined` where there is no `/proc`. The second field is the
+ * command's name in parentheses, which may hold spaces and parentheses, so the fields are counted from the last `)`.
+ */
+export const processStart = (pid: number): string | undefined => {
+  let stat: string;
+  try {
+    stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+  } catch {
+    return undefined;
+  }
+  return stat.slice(stat.lastIndexOf(')') + 2).split(' ')[19];
+};
 
 const RunFileSchema = Schema.StructWithRest(
   Schema.Struct({

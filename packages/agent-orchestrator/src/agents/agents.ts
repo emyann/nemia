@@ -57,10 +57,9 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * the skills it is given (`skills:`), which are also what its card says it can do; what becomes of Claude Code's own prompt
  * (`harnessPrompt:`); the MCP servers of the checkout its sessions load, by name (`mcp:`); and who does the work and how. A step that names
  * the agent (`agent:`) takes the last of those as its own defaults, and a key it sets itself wins, but its `disallowedTools:` adds to the
- * agent's, and the other fence keys (`tools`, `allowedTools`, `permissionMode`, `sandbox`) may only narrow the agent's, and `background:
- * true` is refused over an agent in any mode but the widest (`fenceRefusal`). Everything else a step sets is wiring — where the step sits
- * in its workflow, what it reads, how it is judged and for how long — and belongs on the step: an agent file that sets one is refused by
- * name.
+ * agent's, and the other fence keys (`tools`, `allowedTools`, `permissionMode`, `sandbox`) may only narrow the agent's (`fenceRefusal`).
+ * Everything else a step sets is wiring — where the step sits in its workflow, what it reads, how it is judged and for how long — and
+ * belongs on the step: an agent file that sets one is refused by name.
  */
 export const AGENT_KEYS = [
   'role',
@@ -591,8 +590,8 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  * its start, and a brief without the instructions would tell it nothing of them. Nor without its skills: the instructions say to load
  * them, or that they follow, and with no plugin there is nothing to load, so each is told whole after the instructions, under the
  * name its `skills:` line writes, with no plugin before it — or why it could not be read (`skills`, read again by the tick: an edit
- * made since `nemia start` reaches it). Nor with its off-list: with no plugin to load from, a session told to turn off every skill the
- * run could see could load none at all, so the off-list goes with the skills it was there to hide.
+ * made since `nemia start` reaches it). Its session is given no skill to load (`enabledSkillsOf` answers `[]` for a step it no longer
+ * renders): what its skills say is in its brief, and every other skill stays hidden from it, as from a rendered step.
  */
 export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {
   if (!step.agent) return step;
@@ -687,11 +686,11 @@ function sessionSettings(agent: StepAgent): string | undefined {
  * session loads it, `nemia-<agent>:<bare name>` — its agent's and those its `skills:` line adds — so every other skill, the harness's
  * built-in ones, the person's, the repository's and another plugin's, is hidden from it and refused. `[]` for a step whose agent is not
  * rendered (`rendersAgent`): one with no agent or no skill, one that continues another's session, and one whose rendered folder is gone
- * and is told its skills whole in its brief (`unrendered`). A session run as a background one or on a harness the run names besides the
- * default holds no closed list, and is given the harness's own skills (`'default'`), with no list of names turned off. Pure.
+ * and is told its skills whole in its brief (`unrendered`). A session on a harness the run names besides the default holds no closed
+ * list, and is given the harness's own skills (`'default'`), with no list of names turned off. Pure.
  */
 export const enabledSkillsOf = (step: Workflow): string[] | 'default' => {
-  if (step.background || (step.harness ?? DEFAULT_HARNESS) !== DEFAULT_HARNESS) return 'default';
+  if ((step.harness ?? DEFAULT_HARNESS) !== DEFAULT_HARNESS) return 'default';
   if (!rendersAgent(step)) return [];
   const plugin = pluginOf(step.agent!.name);
   return [...new Set((step.agent!.skills ?? []).map((name) => `${plugin}:${bareSkillOf(name)}`))];

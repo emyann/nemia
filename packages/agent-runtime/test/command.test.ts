@@ -146,9 +146,10 @@ test(
 );
 
 test('a niceness puts `nice -n` before the command, and `ionice -c3` after it only where prepare found the idle class runs', () => {
+  const beside = (end: string) => `/runs/n.${end}`;
   const asked = (niceness: number) => ({ name: 'ae/n/1', brief: 'b', cwd: '/', config: { command: ['npm', 'test'], niceness } });
-  assert.deepEqual(commandHarness.prepare!(asked(10)), idleRuns() ? { idleIo: true } : {});
-  assert.deepEqual(commandHarness.prepare!(asked(0)), {}, "a command at the worker's own priority keeps its IO class");
+  assert.deepEqual(commandHarness.prepare!(asked(10), beside), idleRuns() ? { idleIo: true } : {});
+  assert.deepEqual(commandHarness.prepare!(asked(0), beside), {}, "a command at the worker's own priority keeps its IO class");
   assert.deepEqual(commandHarness.command(asked(10), { idleIo: true }), {
     cmd: 'nice',
     args: ['-n', '10', 'ionice', '-c3', 'npm', 'test'],
@@ -190,7 +191,6 @@ test('file(): command, niceness, env and projectMcp go to the harnesses that tak
   const harnesses = {
     codex,
     claude: 'claude',
-    bg: 'claude-bg',
     remote: { url: 'https://agent.example' },
     command: commandHarness,
   } as const;
@@ -242,26 +242,19 @@ test('file(): command, niceness, env and projectMcp go to the harnesses that tak
     const env = { CI: '1' };
     assert.equal((await filed('codex', { env })).tag, 'filed');
     assert.equal((await filed('claude', { env })).tag, 'filed');
+    assert.equal((await filed('claude', { env }, { restartPolicy: 'Always' })).tag, 'filed', 'a long-lived Claude Code session too');
     assert.equal((await filed('command', { command: ['true'], env })).tag, 'filed');
   });
 
-  for (const [harness, config, runs] of [
-    ['claude', { env: { CI: '1' }, background: true }, 'background session'],
-    ['bg', { env: { CI: '1' } }, 'background session'],
-    ['remote', { env: { CI: '1' } }, 'spawns none of its own'],
-  ] as const)
-    await t.test(
-      `env is refused on ${harness}, which ${runs === 'background session' ? 'runs a background session' : 'spawns no process'}, naming the harnesses that take it`,
-      async () => {
-        refusedNaming(
-          await filed(harness, config),
-          '`env`',
-          `the \`${harness}\` harness`,
-          runs,
-          '`codex` or `claude` as a job or `command`',
-        );
-      },
+  await t.test('env is refused on a remote agent, which spawns no process, naming the harnesses that take it', async () => {
+    refusedNaming(
+      await filed('remote', { env: { CI: '1' } }),
+      '`env`',
+      'the `remote` harness',
+      'spawns none of its own',
+      '`codex` or `claude` or `command`',
     );
+  });
 
   await t.test("a Codex task's env reaches the command that runs its session", () => {
     const r = { name: 'ae/t/1', brief: 'b', cwd: '/r' };

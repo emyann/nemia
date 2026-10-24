@@ -74,6 +74,10 @@
     {
       "term": "Harness",
       "meaning": "the program a session runs in: Claude Code, Codex, a plain command, or a remote A2A agent.",
+      "retired": [
+        { "spelling": "claude-detached", "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed" },
+        { "spelling": "claude-bg", "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed" }
+      ],
       "see": {
         "label": "A harness",
         "href": "/runtime/#a-harness"

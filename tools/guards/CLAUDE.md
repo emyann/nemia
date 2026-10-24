@@ -10,8 +10,8 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
   under the folder of a workspace package the guards depend on (`agent-orchestrator`, and through it `agent-runtime`). It fails
   closed: an event with no range, a branch's first push and a range git cannot resolve are due. An input of a shape it does not read
   (`{a,b}`, `**/x`, `?`, `[`) is refused, so a new path a guard reads goes in those `inputs` in a shape it reads — turbo's cache and
-  CI's filter are one list, and `test/due.test.ts` reads the real one. The apps' whole `src/` and their `glossary.json` are in it, for
-  the glossary guard, so a change to the board's source makes the guards due.
+  CI's filter are one list, and `test/due.test.ts` reads the real one. The apps' whole `src/`, their `.ts` beside their manifest, the
+  board's `.storybook/` and their `glossary.json` are in it, for the glossary guard, so a change to the board's code makes them due.
 - **It reaches the orchestrator only through its three entries** (rule 1, `docs/architecture.md`; `contract.test.ts` holds it, here
   too): `team-words` and `team-portable` take `splitFrontmatter` from `agent-orchestrator/workflow`, which is why `package.json`
   declares `agent-orchestrator`. A config guard that imports the package deeper stays in `packages/agent-orchestrator/test/`:

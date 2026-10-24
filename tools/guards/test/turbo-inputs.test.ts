@@ -43,8 +43,9 @@ const APP_TESTS = ['$TURBO_ROOT$/apps/*/test/**', '$TURBO_ROOT$/apps/*/src/*.tes
 
 /**
  * What the glossary guard reads in the apps (`glossary.test.ts`): each app's table at its root, and every `.ts` and `.tsx` under it —
- * its source, its configuration files beside its manifest, and the board's Storybook — where it counts the spellings a table retires. The guards are due on every change to the board's source for it; the packages' tables and source reach
- * this task through its dependency on `agent-orchestrator`.
+ * its source, its configuration files beside its manifest, and the board's Storybook — where it counts the spellings a table retires.
+ * The guards are due on every change to the board's source for it; the packages' tables and source reach this task through its
+ * dependency on `agent-orchestrator`.
  */
 const APP_SOURCES = [
   '$TURBO_ROOT$/apps/*/src/**',

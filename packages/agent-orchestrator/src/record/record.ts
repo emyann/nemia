@@ -115,7 +115,8 @@ type RunBase = {
   /**
    * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox
    * (`startFromInbox` in inbox.verb.ts), which keeps the card. The inbox's listing reads it to give the card its state, `started` while
-   * this record stands, and `nemia inbox` to say it was `started as` this run, and `nemia decide` names the card under the run's line. Absent on a run started any other way.
+   * this record stands, and `nemia inbox` to say it was `started as` this run, and `nemia decide` names the card under the run's line.
+   * Absent on a run started any other way.
    */
   from?: { inbox: string };
   /**

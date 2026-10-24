@@ -27,6 +27,9 @@ type RunDetail = import('../detail/detail.ts').RunDetail;
 type CardStarted = { id: string; card: string; ignoredRepo?: string };
 type Refused = { error: string };
 
+/** Rows ordered by their first cell, a card's name. */
+const byName = (a: unknown[], b: unknown[]): number => String(a[0]).localeCompare(String(b[0]));
+
 const write = (file: string, text: string): void => {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, text);
@@ -129,11 +132,11 @@ test('a person starts a card: the run carries where it came from, and the card s
         "the workflow the start named, over the card's own: the form's is preset from the card, and changeable",
       );
       assert.deepEqual(
-        (await listed()).map((e) => [e.name, e.state, e.startedAs]).sort(),
+        (await listed()).map((e) => [e.name, e.state, e.startedAs]).sort(byName),
         [
           [card.name, 'started', [answered.id]],
           [other.card.name, 'started', [parent.run.id]],
-        ].sort(),
+        ].sort(byName),
         'both cards kept, each listed as started by the run it became',
       );
 

@@ -383,7 +383,8 @@ export function inboxListing(
 
 /**
  * The queued cards in the order the tick starts them: by when each was queued, then by name — a `started` card left out, since it is never
- * started again, even one whose `queued:` line its start could not take off. Pure. A card whose start was refused keeps its place, and the tick passes over it (`nextQueued`).
+ * started again, even one whose `queued:` line its start could not take off. Pure. A card whose start was refused keeps its place, and the
+ * tick passes over it (`nextQueued`).
  */
 export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
   listing
@@ -432,8 +433,9 @@ export const nextQueued = (
 
 /**
  * What the tick did with the queue on a pass (`startQueued` in inbox.verb.ts): started the next card as a run — and, when its `queued:`
- * line could not be taken off, why (`queueLeft`) — or tried to, and was refused, in the package's words, or failed for another reason: `again` when it failed as it
- * did on the pass before, on the same repository. `on` is the repository it was tried on, for a card that names none.
+ * line could not be taken off, why (`queueLeft`) — or tried to, and was refused, in the package's words, or failed for another reason:
+ * `again` when it failed as it did on the pass before, on the same repository. `on` is the repository it was tried on, for a card that
+ * names none.
  */
 export type QueueStarted =
   | { card: string; run: string; ignoredRepo?: string; queueLeft?: string }

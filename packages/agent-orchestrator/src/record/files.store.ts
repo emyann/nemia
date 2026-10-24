@@ -270,9 +270,9 @@ const writePruned = (id: string, marker: Pruned | undefined): void =>
  */
 export const inboxDir = (): string => path.join(HOME, 'inbox');
 
-/**
- * Where the tick writes down a queued card's start it tried and did not make (`MissedStart`): `$WF_ROOT/queue/<name>.json`, outside the inbox,
- * which is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is not queued
+/**** Where the tick writes down a queued card's start it tried and did not make (`MissedStart`): `$WF_ROOT/queue/<name>.json`, outside the
+/**inbox, which is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is not
+/**queued
  * as it was — started, taken back, dropped or edited.
  */
 const queueDir = (): string => path.join(HOME, 'queue');

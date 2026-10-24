@@ -2,8 +2,8 @@
  * The queue on disk: the cap on runs in flight (`WF_MAX_RUNS`), and inbox cards that start themselves (`nemia inbox queue`), judged by the
  * tick over every run and card in a store of its own — told as a person's stories on `story(t)` and the stage (`staged`): a cap of two
  * runs, a run's momentum, a card that becomes a run at a cap of one, and the queue's failures; and as tables, what the daemon's ceilings
- * refuse and what `nemia inbox queue` refuses. Kept focused: a card started by hand, kept, never started again, a record that does not read as
- * a run, and a try file the tick reads only as it writes it.
+ * refuse and what `nemia inbox queue` refuses. Kept focused: a card started by hand, kept, never started again, a record that does not read
+ * as a run, and a try file the tick reads only as it writes it.
  *
  * What the cap decides is pure, and lives in `src/cap/cap.test.ts`; what a card and the queue's order are, in `src/inbox/inbox.test.ts`;
  * a queued card whose start fails in git's words, in `queue-store.boundary.test.ts`. A file of its own, since `tick` reads every run

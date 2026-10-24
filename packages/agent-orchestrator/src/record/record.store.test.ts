@@ -283,7 +283,22 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
     undefined,
     "a record with no frozen workflow reads, with a retried try, a check, a hand-off and the ship's landing",
   );
-  assert.equal(old.steps.implement.tries![0].then, 'retries');
+  assert.equal(old.steps.implement.tries![0].cause, 'retries', 'a try written with the former `then` reads as its `cause`');
+  assert.equal(Object.hasOwn(old.steps.implement.tries![0], 'then'), false, 'and holds no `then`');
+  rewriteRun(old);
+  const triesWritten = (JSON.parse(fs.readFileSync(runFile('r-old'), 'utf8')) as { steps: { implement: { tries: object[] } } }).steps
+    .implement.tries;
+  assert.equal(Reflect.get(triesWritten[0], 'cause'), 'retries');
+  assert.equal(Object.hasOwn(triesWritten[0], 'then'), false, 'written back under `cause` alone');
+
+  const noCause = aRecord('r-nocause');
+  (noCause.steps as Record<string, Record<string, unknown>>).implement.tries = [{ taskId: 'r-nocause-implement' }];
+  put('r-nocause', noCause);
+  assert.ok(refusalOf('r-nocause').includes('`steps.implement.tries.0.cause`'), refusalOf('r-nocause'));
+  const later = aRecord('r-later');
+  (later.steps as Record<string, Record<string, unknown>>).implement.tries = [{ taskId: 'r-later-implement', cause: 'later' }];
+  put('r-later', later);
+  assert.ok(refusalOf('r-later').includes('`steps.implement.tries.0.cause`'), refusalOf('r-later'));
 
   const renamed = aRecord('r-renamed');
   (renamed.workflow as Array<Record<string, unknown>>)[0].disallow = ['SendMessage'];

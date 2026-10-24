@@ -51,28 +51,28 @@ test("a run's invariants: each refuses its planted breach, and lets through what
     ['a step not yet filed', implement({}), true],
     [
       'a second try under <run>-<step>-try2, the first behind it',
-      implement({ taskId: 'r-1-implement-try2', tries: [{ taskId: 'r-1-implement', then: 'retries' }] }),
+      implement({ taskId: 'r-1-implement-try2', tries: [{ taskId: 'r-1-implement', cause: 'retries' }] }),
       true,
     ],
     [
       'a recheck, which keeps the task of the try before it',
-      implement({ taskId: 'r-1-implement', tries: [{ taskId: 'r-1-implement', then: 'recheck' }] }),
+      implement({ taskId: 'r-1-implement', tries: [{ taskId: 'r-1-implement', cause: 'recheck' }] }),
       true,
     ],
     [
       'a step sent back, its try behind it and none in its place',
-      implement({ taskId: null, tries: [{ taskId: 'r-1-implement', then: 'back' }] }),
+      implement({ taskId: null, tries: [{ taskId: 'r-1-implement', cause: 'back' }] }),
       true,
     ],
     ['REFUSED: a task that is not stepTaskId of its try', implement({ taskId: 'r-1-review' }), false],
     [
       'REFUSED: a gap — the third try behind one, the second missing',
-      implement({ taskId: 'r-1-implement-try3', tries: [{ taskId: 'r-1-implement', then: 'retries' }] }),
+      implement({ taskId: 'r-1-implement-try3', tries: [{ taskId: 'r-1-implement', cause: 'retries' }] }),
       false,
     ],
     [
       'REFUSED: an earlier try under another try’s id',
-      implement({ taskId: 'r-1-implement-try2', tries: [{ taskId: 'r-1-implement-try2', then: 'retries' }] }),
+      implement({ taskId: 'r-1-implement-try2', tries: [{ taskId: 'r-1-implement-try2', cause: 'retries' }] }),
       false,
     ],
     ['REFUSED: a run waiting on itself', run({ implement: null }, { after: ['r-0', 'r-1'] }), false],

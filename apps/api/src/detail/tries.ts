@@ -81,7 +81,7 @@ export type StepUnreadable = { error: string; raw: unknown };
 /**
  * One try of a step, as the run's record keeps it: the tries behind the current one (`StepRecord.tries`), then the current.
  *
- * `try` counts from 1, and `round` is the round of its loop the try was filed in (`roundIn`). `then` is what replaced it —
+ * `try` counts from 1, and `round` is the round of its loop the try was filed in (`roundIn`). `cause` is what replaced it (`TryCause`) —
  * `round`, `merge`, `retries`, or the mode a person asked for — and null on the current try, which `current` marks. `note` is how the
  * try was reached, in `nemia ls`'s words (`tryNote`), and null on the first. `status` on the current try is the step's word, as on
  * the step; on an earlier one, the engine's own word for its task — `succeeded`, `failed` — since `nemia ls` words only the try
@@ -90,7 +90,7 @@ export type StepUnreadable = { error: string; raw: unknown };
 export type StepTry = {
   try: number;
   round: number;
-  then: EarlierTry['then'] | null;
+  cause: EarlierTry['cause'] | null;
   current: boolean;
   taskId: string | null;
   note: string | null;
@@ -192,7 +192,7 @@ function replyOf(item: unknown): StepReply {
  * open and answered keeps each try a person answered under its one id, one turn each; a recheck replaces only the check, on the same turn.
  */
 export const turnOfTry = (earlier: readonly EarlierTry[], i: number): number =>
-  earlier.slice(0, i).filter((t) => t.taskId === earlier[i].taskId && t.then !== 'recheck').length;
+  earlier.slice(0, i).filter((t) => t.taskId === earlier[i].taskId && t.cause !== 'recheck').length;
 
 /**
  * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose word, check,
@@ -227,7 +227,7 @@ export function triesOf(
     ...earlier.map((t, i): StepTry => ({
       try: i + 1,
       round: roundIn({ taskId: null, tries: earlier.slice(0, i) }),
-      then: t.then,
+      cause: t.cause,
       current: false,
       taskId: t.taskId,
       note: noteOf(i + 1),
@@ -241,7 +241,7 @@ export function triesOf(
     {
       try: earlier.length + 1,
       round: roundIn(record),
-      then: null,
+      cause: null,
       current: true,
       taskId: record?.taskId ?? null,
       note: noteOf(earlier.length + 1),

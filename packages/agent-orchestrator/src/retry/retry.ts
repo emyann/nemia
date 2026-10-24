@@ -365,7 +365,7 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   const round = roundIn(record);
   const inRound = looping && round > 1 ? roundWord(round, capOf(looping)) : '';
   const raised = last.budget !== undefined ? `budget ${budgetWord(last.budget)}` : '';
-  if (last.then === 'round') return [inRound, raised].filter(Boolean).join(', ');
+  if (last.cause === 'round') return [inRound, raised].filter(Boolean).join(', ');
   const how = howOf(step, last);
   return [inRound, `try ${record!.tries!.length + 1}, ${how}`, raised, answered ? 'answered' : ''].filter(Boolean).join(', ');
 }
@@ -375,13 +375,13 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
  * merge of the base.
  */
 function howOf(step: Workflow, last: EarlierTry): string {
-  if (last.then === 'retries') return `by retries: ${step.retries ?? 0}`;
-  if (last.then === 'signoff') return 'nudged to sign off by the run';
-  if (last.paused) return `${last.then === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`;
-  if (last.then === 'recheck') return 'rechecked on your word';
-  if (last.then === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
-  if (last.then === 'merge') return 'merged the base, on your word (nemia merge), the round unchanged';
-  return last.then === 'back' ? 'sent back with the work, on your word' : 'nudged on your word';
+  if (last.cause === 'retries') return `by retries: ${step.retries ?? 0}`;
+  if (last.cause === 'signoff') return 'nudged to sign off by the run';
+  if (last.paused) return `${last.cause === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`;
+  if (last.cause === 'recheck') return 'rechecked on your word';
+  if (last.cause === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
+  if (last.cause === 'merge') return 'merged the base, on your word (nemia merge), the round unchanged';
+  return last.cause === 'back' ? 'sent back with the work, on your word' : 'nudged on your word';
 }
 
 /** What a new session of a step over its budget needs, beside an offer that files one: a `--budget` above what its tries have cost. */

@@ -9,6 +9,10 @@ import { stepTaskId } from './record.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { stepNameRefusal } from '../folder/folder.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
+import { TRY_CAUSES, upgradeTries } from '../retry/index.ts';
+
+/** What a stored record is read through before `Run` reads it, as the store does: a try's former `then` read as its `cause`. */
+export { upgradeTries };
 
 /** A run's id, as `runId` mints it (`record.store.ts`) and `idRefusal` takes it. */
 export const RunId = brandedId('RunId', (value) => idRefusal(value));
@@ -33,8 +37,8 @@ export type TaskId = Id<'TaskId'>;
 /** A check of a step's work, a task of its own (`checkTaskId`, record.ts:397). */
 const CheckTask = Schema.Struct({ taskId: TaskId.OnRead });
 
-/** How a try ended and what replaced it, as the store reads `then` (`EarlierTry`, `retry/retry-ask.ts`). */
-const Then = Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'back']);
+/** Why a try was moved behind the next (`TRY_CAUSES`): a record's former `then` is read as it (`upgradeTries`) before this reads it. */
+const TryCause = Schema.Literals(TRY_CAUSES).annotate({ identifier: 'TryCause' });
 
 /**
  * A try behind a step's current one (`EarlierTry`): the task it ran as, its check, how it ended, and what a person gave the try
@@ -43,7 +47,7 @@ const Then = Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck',
 export const Try = Schema.Struct({
   taskId: TaskId.OnRead,
   check: Schema.optional(CheckTask),
-  then: Then,
+  cause: TryCause,
   model: Schema.optional(Schema.String),
   paused: Schema.optional(Schema.Literal(true)),
   budget: Schema.optional(Schema.Number),
@@ -90,7 +94,7 @@ export type Step = typeof Step.Type;
 /**
  * A loop asked round again by a person (`RoundAsk`, read off `runs/<id>.asks/round-<step>-<n>` by `roundAskIn` in record.store.ts):
  * the looping step, the round, the cap `--budget` raised, when, and the merge `nemia merge` asks with it. Beside the record, not in
- * it; a loop's own round is a try that ended `then: 'round'`.
+ * it; a loop's own round is a try moved behind with `cause: 'round'`.
  */
 export const Round = Schema.Struct({
   step: StepName.OnRead,

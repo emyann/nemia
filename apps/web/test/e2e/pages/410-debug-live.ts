@@ -44,7 +44,7 @@ export default {
     try {
       const run = JSON.parse(seeded) as { steps: Record<string, Record<string, unknown>> };
       const was = run.steps[step];
-      run.steps[step] = { ...was, taskId: second, tries: [{ taskId: first, then: 'retries' }] };
+      run.steps[step] = { ...was, taskId: second, tries: [{ taskId: first, cause: 'retries' }] };
       const cwd = typeof was.workspace === 'string' ? was.workspace : store!;
       const at = new Date().toISOString();
       const stopped = [

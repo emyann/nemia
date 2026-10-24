@@ -45,7 +45,15 @@ import {
   type ListedPhase,
 } from '../src/run.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf, declaredOutput, outputLines, REPLIES_SCHEMA, type Closeout } from '../src/closeout/closeout.ts';
-import { nextTry, retriesSpent, type EarlierTry, type RetryAsk, type RetryHow, type RetryMode } from '../src/retry/retry-ask.ts';
+import {
+  nextTry,
+  retriesSpent,
+  type EarlierTry,
+  type RetryAsk,
+  type RetryHow,
+  type RetryMode,
+  type TryCause,
+} from '../src/retry/retry-ask.ts';
 import { tryOf } from '../src/record/record.ts';
 import type { OutputSchema, Workflow } from '../src/workflow.ts';
 import { names, namesFor, phases, run, step, STEPS } from './assessed.ts';
@@ -110,7 +118,7 @@ const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
-      then: 'round' as const,
+      cause: 'round' as const,
     }));
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   const steps = {
@@ -192,7 +200,7 @@ const spends =
 /** implement checked, with `retries: 2` and a $3 budget, on claude; review after it. */
 const BUDGETED: Workflow[] = [{ ...step('implement'), check: 'npm test', retries: 2, budget: 3 }, step('review', ['implement'])];
 /** implement on try 2 — `retries:` filed it — its check refused again. */
-const refusedTwice = () => onTry([{ taskId: 't0', check: { taskId: 'c0' }, then: 'retries' }], 'c1');
+const refusedTwice = () => onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'retries' }], 'c1');
 const REFUSED_TWICE = { t0: 'succeeded', c0: 'failed', t1: 'succeeded', c1: 'failed' } as const;
 /** What the tick and `nemia ls` read beside a step's phases: its verdict, the person's asks and what was spent. */
 type Read = { verdict?: (step: string) => Verdict | undefined; asks?: RetryAsk[]; rounds?: RoundAsk[]; spent?: SpendOf };
@@ -464,7 +472,7 @@ test("UNSIGNED: from round 2 a loop's target owes `replies`, and a looping step'
 });
 
 test('`retries:` counts within a round: a round is new work, and its check may refuse it afresh', async (t) => {
-  const record = (...then: EarlierTry['then'][]) => ({ taskId: 't', tries: then.map((th, k) => ({ taskId: `t${k}`, then: th })) });
+  const record = (...causes: TryCause[]) => ({ taskId: 't', tries: causes.map((cause, k) => ({ taskId: `t${k}`, cause })) });
   for (const [name, tries, spent] of [
     ['two tries by retries: 2 spent', ['retries', 'retries'], 2],
     ['a round after a retry: none spent', ['retries', 'round'], 0],
@@ -767,7 +775,7 @@ test("a step over its budget is tried again only on a person's `--budget` above 
   });
   await t.test('the record keeps the cap, in force from that try; a try past the new cap is held again', () => {
     const raised = nextTry(r.steps.implement, { step: 'implement', try: 3, mode: 'fresh', budget: 10, by: 'ask' }, 't2');
-    assert.deepEqual(raised.tries?.at(-1), { taskId: 't1', check: { taskId: 'c1' }, then: 'fresh', budget: 10 });
+    assert.deepEqual(raised.tries?.at(-1), { taskId: 't1', check: { taskId: 'c1' }, cause: 'fresh', budget: 10 });
     assert.equal(tryNote(BUDGETED[0], raised), 'try 3, fresh, on your word, budget $10');
     const on3: Run = { ...r, steps: { ...r.steps, implement: { ...raised, check: { taskId: 'c2' } } } };
     assert.equal(budgetOf(BUDGETED[0], on3.steps.implement), 10);
@@ -1090,8 +1098,8 @@ test("costLine and runCostLines: a step's cost on `nemia decide`, beside the cap
   const one = run({ implement: 't1' });
   const three = onTry(
     [
-      { taskId: 't-a', then: 'retries' },
-      { taskId: 't-b', then: 'nudge', budget: 10 },
+      { taskId: 't-a', cause: 'retries' },
+      { taskId: 't-b', cause: 'nudge', budget: 10 },
     ],
     null,
   );
@@ -1129,7 +1137,7 @@ test("costLine and runCostLines: a step's cost on `nemia decide`, beside the cap
       () =>
         costLine(
           step('implement'),
-          onTry([{ taskId: 't1', check: { taskId: 'c0' }, then: 'recheck' }], 'c1'),
+          onTry([{ taskId: 't1', check: { taskId: 'c0' }, cause: 'recheck' }], 'c1'),
           'implement',
           { costUsd: 2 },
           spends({ t1: 2 }),
@@ -1156,7 +1164,7 @@ test("costLine and runCostLines: a step's cost on `nemia decide`, beside the cap
   }
   await t.test("runCostLines: the run's, measured, partly, not, and nothing ended", () => {
     assert.deepEqual(runCostLines(three, all), ['cost  run $4.20']);
-    assert.deepEqual(runCostLines(three, partly), ['cost  run $1.50 measured · 1 attempt not measured']);
+    assert.deepEqual(runCostLines(three, partly), ['cost  run $1.50 measured · 1 session not measured']);
     assert.deepEqual(runCostLines(three, spends({}, ['t1'])), ['cost  run not measured']);
     assert.deepEqual(
       runCostLines(three, () => undefined),

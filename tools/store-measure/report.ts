@@ -151,8 +151,9 @@ export const rootAsWritten = (root: string, home = os.homedir()): string =>
 
 /**
  * The records the Run model refuses, among the runs of the copy at `wf`: each `runs/<id>.json` decoded with run-core's `Run`
- * (`packages/agent-orchestrator/src/record/record.model.ts`, its invariants included), a record that is no JSON left to the
- * unreadable count. The model is reached through the package's root, as `RunModel`, and imported after the store is copied, as the rest is.
+ * (`packages/agent-orchestrator/src/record/record.model.ts`, its invariants included) after the store's own upgrade, a record that
+ * is no JSON left to the unreadable count. The model is reached through the package's root, as `RunModel`, and imported after the
+ * store is copied, as the rest is.
  */
 export async function invariantRefusals(wf: string): Promise<number> {
   const { Exit, Schema } = await import('effect');
@@ -166,7 +167,7 @@ export async function invariantRefusals(wf: string): Promise<number> {
     } catch {
       continue;
     }
-    if (Exit.isFailure(decode(record))) refused += 1;
+    if (Exit.isFailure(decode(RunModel.upgradeTries(record)))) refused += 1;
   }
   return refused;
 }

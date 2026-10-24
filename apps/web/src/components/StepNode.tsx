@@ -93,7 +93,7 @@ export function StepNode({
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant px-3 py-1.5">
         <StatusChip status={step.status} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
         <span className="font-mono text-body-small text-muted-foreground">
-          {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no attempt yet')}
+          {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no session yet')}
         </span>
       </div>
 

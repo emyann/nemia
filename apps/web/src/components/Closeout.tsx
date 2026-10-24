@@ -18,12 +18,12 @@ export { Artifacts, bytesWord } from './Artifacts';
  */
 export function tryLabel(t: StepTry, tries: readonly StepTry[]): string {
   const before = tries.find((other) => other.try === t.try - 1);
-  return `round ${t.round} · try ${t.try}${before?.then ? ` (${before.then})` : ''}`;
+  return `round ${t.round} · try ${t.try}${before?.cause ? ` (${before.cause})` : ''}`;
 }
 
-/** A try's attempts as its row says them: how many, and how long the latest took, or that it runs. */
+/** A try's sessions as its row says them: how many, and how long the latest took, or that it runs. */
 export function attemptsWord({ count, latest }: StepAttempts): string {
-  if (!latest) return 'no attempt';
+  if (!latest) return 'no session';
   const took = latest.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : latest.ended ? null : 'running';
   return took ? `#${count} · ${took}` : `#${count}`;
 }

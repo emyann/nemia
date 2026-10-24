@@ -160,7 +160,7 @@ const turnOf = ({ usage }: typeof TurnCompletedSchema.Type): Turn => ({
  * added to `input_tokens` or `output_tokens`: `cached_input_tokens` is read as a part of the first and
  * `reasoning_output_tokens` as a part of the second, not beside them. Whether `input_tokens` counts
  * `cache_write_input_tokens` is not known, so a stream where it is not 0 gives no input count. Tool calls
- * are the call items, counted once by id. No `turns` — it counts model responses, which the stream does not
+ * are the call items, counted once by id. No `responses` — the model responses, which the stream does not
  * report — and no cost.
  *
  * The input's classes follow from the same counts: `cached_input_tokens` read from the cache, the rest of `input_tokens`

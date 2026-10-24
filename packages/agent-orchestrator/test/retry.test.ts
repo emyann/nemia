@@ -1652,6 +1652,9 @@ test("exitVerdicts: a check's verdict is its attempt's exit code, `unfinished` w
 
 test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nemia decide` and the next try's brief", async (t) => {
   const b = stage.board();
+  const endOf = (word: string): TestEnd =>
+    (word === 'unsigned' ? { reason: 'harness', closedOut: false, former: 'unsigned' } : { reason: word }) as TestEnd;
+  const wordOf = (a: { reason: string | null; former?: string }) => a.former ?? a.reason;
   const rows = [
     {
       reasons: ['unsigned', 'lost'],
@@ -1675,19 +1678,16 @@ test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nem
       const run = await startedRun(implementThenReview());
       const taskId = `${run.id}-implement`;
       await tick(run.id);
-      ended(taskId, 'failed', { reason: reasons[0] });
+      ended(taskId, 'failed', endOf(reasons[0]));
       b.restart(taskId);
-      ended(taskId, 'failed', { reason: reasons[1] });
+      ended(taskId, 'failed', endOf(reasons[1]));
       if (reasons[1] === 'unsigned') {
         assert.deepEqual((await tick(run.id)).tried, ['implement'], 'the run nudges it to sign off, itself');
         assert.equal(readRun(run.id).steps.implement?.tries?.at(-1)?.cause, 'signoff');
-        ended(`${taskId}-try2`, 'failed', { reason: 'unsigned' });
+        ended(`${taskId}-try2`, 'failed', endOf('unsigned'));
       }
       const views = new Map([[taskId, await Effect.runPromise(b.e.view(taskId))]]);
-      assert.deepEqual(
-        views.get(taskId)!.state.attempts.map((a) => a.reason),
-        reasons,
-      );
+      assert.deepEqual(views.get(taskId)!.state.attempts.map(wordOf), reasons);
       assert.deepEqual([phaseOfView(views.get(taskId)), closeoutAsked(views)(taskId)], ['failed', asked]);
       const l = await stage.runWith(b.e, list(b.e, readRun(run.id)));
       assert.deepEqual([l.steps[0].status, l.waitingOnYou], [word, onYou]);

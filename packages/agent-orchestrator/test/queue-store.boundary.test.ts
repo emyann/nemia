@@ -28,7 +28,7 @@ process.env.WF_ROOT = ROOT;
 process.env.WF_VERIFY_REST = '1';
 delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
-const { startRun, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
+const { readInbox, startRun, tickRun, runWith: runEngine, gitPlaceLayer } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
@@ -277,7 +277,14 @@ test('a queued card whose start fails without a refusal — its `.worktreeinclud
   fs.rmSync(path.join(broken, '.worktreeinclude'));
   const cleared = await runWith(b.e, tickRun());
   const [run] = fromCard('odd-include-a1b2');
-  assert.deepEqual(cleared.queue, { card: 'odd-include-a1b2', run: run.id, removed: true }, 'the link gone: the next pass starts it');
+  assert.deepEqual(cleared.queue, { card: 'odd-include-a1b2', run: run.id }, 'the link gone: the next pass starts it');
+  const kept = fs.readFileSync(path.join(INBOX, 'odd-include-a1b2.md'), 'utf8');
+  assert.doesNotMatch(kept, /^queued:/m, 'the card is kept, its queued: line taken off');
+  assert.equal(
+    readInbox().find((l) => l.name === 'odd-include-a1b2')?.state,
+    'started',
+    'listed as started, and the pass after starts the card behind it',
+  );
   const behind = await runWith(b.e, tickRun());
   assert.deepEqual(
     [behind.queue && 'run' in behind.queue && behind.queue.card, fs.readdirSync(path.join(ROOT, 'queue'))],

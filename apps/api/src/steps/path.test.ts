@@ -84,7 +84,7 @@ writeRun('r-held', {
 
 writeRun('r-unfiled', {});
 
-journal('r-spoiled-1', [filed(), { kind: 'measured', at: at(1), attempt: 1, usage: { turns: 'three' } }]);
+journal('r-spoiled-1', [filed(), { kind: 'measured', at: at(1), attempt: 1, usage: { responses: 'three' } }]);
 writeRun('r-spoiled', { implement: { taskId: 'r-spoiled-1' } });
 
 const get = async (url: string) => {

@@ -70,7 +70,7 @@ const signedOff = (taskId: string) =>
     ]),
   );
 /** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
-const MISWRITTEN = { kind: 'measured', at, attempt: 1, usage: { turns: 'three' } };
+const MISWRITTEN = { kind: 'measured', at, attempt: 1, usage: { responses: 'three' } };
 const spoil = (taskId: string) => fs.appendFileSync(journal(taskId), jsonl([MISWRITTEN]));
 
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];

@@ -597,7 +597,7 @@ a conversation. A Task's state is the session's, under its own name (`submitted`
 and `AUTH_REQUIRED` are the view's `needs-human`, `waitingFor` `input` or `authentication`, and a state no version of A2A
 this runtime knows is `working`, which a deadline bounds. A registry entry written before 2026-09-25 says how its Task was
 last seen in the runtime's former words, and is read in A2A's names, in `remote/` and in `remote/done/` alike. The closing statement is the data part of the last artifact that has one, read only once the Task has
-completed; a completed Task with none ends `stated: false`, which the orchestrator reads as unsigned, and a remote agent
+completed; a completed Task with none ends `closedOut: false`, which the orchestrator judges, and a remote agent
 is free to ignore the schema it was sent. An agent that answers the message with a Message and makes no Task has given
 the whole session in its reply: it ends at once, its data part the statement, and its logs are its words. `say` reaches a
 Task that asks for input, as a follow-up on it, and is refused while the Task is at work, since A2A gives a running Task
@@ -732,7 +732,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, a retired `maxAttempts` or `resume`, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae file` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `checkoutMcp` that is not a list of server names or is on a harness that loads none (below), an `enabledSkills` that is neither `'default'` nor a list of skill names, or a list on a harness that cannot close a session's skills (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` that is not a whole number from -2147483648 to 2147483647 (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `projectMcp` that is not a list of server names or is on a harness that loads none (below), a `checkoutMcp` (its former name: file `config.projectMcp`), an `enabledSkills` that is neither `'default'` nor a list of skill names, or a list on a harness that cannot close a session's skills (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` that is not a whole number from -2147483648 to 2147483647 (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -860,8 +860,8 @@ runner names:
 | no `mcp`, no `.mcp.json` in its `cwd` | nothing | no MCP server at all |
 | a `.mcp.json` in its `cwd` | `<cwd>/.mcp.json` — strict alone would drop it | the repository's servers |
 | `mcp: { … }` | that, and a file the runner writes under its root | the repository's and the task's |
-| `checkoutMcp: []` | the runner's file alone, when the task has an `mcp` | the task's, and none of the repository's |
-| `checkoutMcp: ["a"]` | the runner's file alone, holding `a` and the task's `mcp` | `a` of the repository's, and the task's |
+| `projectMcp: []` | the runner's file alone, when the task has an `mcp` | the task's, and none of the repository's |
+| `projectMcp: ["a"]` | the runner's file alone, holding `a` and the task's `mcp` | `a` of the repository's, and the task's |
 
 — and in no row the operator's. `mcp` maps a name (letters, digits, `-`, `_`) to a server in a
 `.mcp.json` entry's shape: `{ "command": "npx", "args": [...], "env": {...} }`, or
@@ -915,7 +915,7 @@ Codex has no strict flag. **A Codex task still has the operator's Codex servers*
 refused at spawn, `unstartable`: Codex would merge the two, and run the task's command with the
 operator's args and env.
 
-**`checkoutMcp` says which of the checkout's servers a session loads**, as a Pod's volume gives a
+**`projectMcp` says which of the checkout's servers a session loads**, as a Pod's volume gives a
 ConfigMap's `items`. Absent, the whole `.mcp.json` is named, as above. `[]` leaves the file out. Names
 are read from `<cwd>/.mcp.json` when the session is spawned, each entry as the file gives it, and
 written with the task's own `mcp` into the runner's one file; the checkout's file is then not named.
@@ -926,8 +926,10 @@ the task's `mcp` gives too. Claude Code holds it as a job and as a background se
 handed the picked entries in its one `-c mcp_servers=` with the task's, and refuses at spawn an
 entry in a shape `mcp` does not take, an SSE server, and a name its operator's config has; `[]`
 adds nothing, and the operator's own servers still load. The `command` harness, which loads no
-server, refuses the argument (`HarnessSpec.checkoutMcp`), and a remote agent refuses it with every
-other argument.
+server, refuses the argument (`HarnessSpec.projectMcp`), and a remote agent refuses it with every
+other argument. Its former name, `checkoutMcp`, is refused at `file()`, naming `config.projectMcp`
+(`RENAMED_ARGS`); a journal written under it reads as `projectMcp` (`upgrade`), on a filing and a turn's
+`input` alike.
 
 **`enabledSkills` says which skills a session is given**: a list of the harness's names for them — a skill's own name, or
 `<plugin>:<name>` — and every other skill, the harness's built-in ones, the user's, the project's and a plugin's, is hidden from
@@ -939,7 +941,7 @@ falls back to `--bg`, as no holder holds it, is refused at spawn, `unstartable`,
 `HarnessSpec` takes one where it declares `enabledSkills`; Codex does not, and a remote agent refuses it with every other
 argument. `file()` refuses a value that is neither `'default'` nor a list of names, and a name twice.
 
-`ae file` has no `mcp`, `checkoutMcp` or `enabledSkills` key: a brief's values are one line each, so they are the API's for now.
+`ae file` has no `mcp`, `projectMcp` or `enabledSkills` key: a brief's values are one line each, so they are the API's for now.
 
 ### Settings: the checkout's, never the operator's
 
@@ -1311,21 +1313,24 @@ runner reports how long a session has been quiet, and `decide` records what came
 | the task | quiet — or its harness's `done` — ends the attempt |
 |---|---|
 | asked for no `closeoutSchema` | `done`, reason `harness`: quiet is all such a task has |
-| asked for one, and this attempt gave one | `done`, with the statement, and **`stated: true`** |
-| asked for one, and none came — or only one made before the attempt began | `done`, reason `harness`, and **`stated: false`** |
+| asked for one, and this attempt gave one | `done`, with the statement, and **`closedOut: true`** |
+| asked for one, and none came — or only one made before the attempt began | `done`, reason `harness`, and **`closedOut: false`** |
 
-**`stated` is a fact, and the engine does not judge it** (stage 4a, 2026-09-23). Whether an end without its statement is
+**`closedOut` is a fact, and the engine does not judge it** (stage 4a, 2026-09-23). Whether an end without its statement is
 a failure, and whether its session is told to sign off, is the workload's question, so it is the layer above's: the
-orchestrator reads `stated: false` as `unsigned`, and continues the session once a round with a sign-off nudge
+orchestrator reads `closedOut: false` on a succeeded end as unsigned, and continues the session once a round with a sign-off nudge
 (`closeoutAsked` and `endWords` in `agent-orchestrator/src/views/`, `retriesDue` in its `retry/retry.ts`). The task here settles
 as its harness ended it: it is not retried, not continued, and nobody is nudged. `ae show`
 and `ae feed` print such an end `done (no statement)`. The key is written only on an end read off a sighting of a task
-that asked for a statement; an end with no `stated` key — a journal written before, or a task that asked for nothing — is
-not read as unsigned by anyone.
+that asked for a statement; an end with no `closedOut` key — a journal written before, or a task that asked for nothing — is
+not read as unsigned by anyone. A journal written before the key took its name says it `stated`, which `upgrade` reads as
+`closedOut`.
 
 Until then, the engine judged it itself: such an end was recorded `failed`, reason **`unsigned`**, continued with a
-nudge while attempts remained, and settled `failed` when they ran out. A journal written in that time folds as it was
-written — `fold` reads an end as recorded, never re-derives it — and a task whose last attempt ended `unsigned` settles
+nudge while attempts remained, and settled `failed` when they ran out. That reason is no `EndReason` now: a journal written
+in that time reads such an end as the harness's, `reason: 'harness'` with `closedOut: false`, its `observed` as written and
+the reason it was written with kept as **`former: 'unsigned'`** (`upgrade`, `FORMER_REASONS` in `src/core/event-schema.ts`),
+so the layer above still tells it apart from a crash. A task whose last attempt ended so settles
 `failed` with the note it always had, `N attempt(s), none succeeded: the last ended without the closing statement it was
 asked for`, whatever attempts it has left. It is not continued: the nudge is the orchestrator's now, and a session nudged
 from both layers would be told twice. An attempt started with a nudge keeps it on its `starting` entry, and is spawned
@@ -1334,8 +1339,8 @@ with those words.
 **The harness's `done` is the second door, and it is reported the same way.** A session its harness lists `done` with no
 statement was journalled `done`, reason `harness`, and settled `succeeded` until 2026-09-19, with nothing to say it had
 not signed: of the 344 tasks filed with a schema in this machine's store that day, 5 had ended so. It carries
-`stated: false` now, as a quiet end does — held by `src/core/decide.test.ts`, and a fake `claude` listing the session `done`
-in `test/unsigned.test.ts`.
+`closedOut: false` now, as a quiet end does — held by `src/core/decide.test.ts`, and a fake `claude` listing the session `done`
+in `test/closed-out.test.ts`.
 
 **The nudge names the tool.** It asked for "your closing statement" and named nothing until 2026-09-17, and twice that
 did not get a finished step to sign off: each had done all its work and ended its turn with a prose summary, and each
@@ -1346,7 +1351,7 @@ Quiet is counted from the later of the transcript's last write and the session's
 continuation `--resume`s a transcript that may have been cold for an hour, and measured by the transcript alone it
 would end the moment the registry listed it idle.
 
-**What is not measured.** `test/unsigned.test.ts` holds all of this with a fake `claude`; no live session has gone
+**What is not measured.** `test/closed-out.test.ts` holds all of this with a fake `claude`; no live session has gone
 quiet without its statement under it. On the record on the machine this was written on, 144 Claude Code tasks asked for a closeout,
 and 2 of their attempts ended `done` without one — both the read fixed in `00e301b`, not a session that said nothing —
 so the case has not been seen live either way. Claude Code 2.1.271's bundle has a retry count for structured output
@@ -1364,8 +1369,8 @@ statement it read is recorded as read.
 
 | `reason` | recorded | the attempt |
 |---|---|---|
-| `harness` | the harness's own state | its harness ended it, or it went quiet: `done` with the statement, where one was asked for; `failed` or `stopped` as the harness said; `done` with nothing — `stated: false` where a statement was asked for (above) |
-| `unsigned` | `failed` | only in a journal written before stage 4a: the engine judged an end without its statement (above) |
+| `harness` | the harness's own state | its harness ended it, or it went quiet: `done` with the statement, where one was asked for; `failed` or `stopped` as the harness said; `done` with nothing — `closedOut: false` where a statement was asked for (above) |
+| `unsigned` | `failed` | only in a journal written before stage 4a, and read as `harness` with `closedOut: false` and `former: 'unsigned'`: the engine judged an end without its statement (above) |
 | `lost` | `failed` | vanished, or its worker stopped beating: nobody said anything |
 | `unstartable` | `failed` | its spawn was refused, and nothing ran |
 | `budget` | `failed` | only in a journal written before stage 4b, and read as `harness` with `limit: 'budget'`: the runtime judged its harness's cut at the task's spend cap. A cut is now carried on the attempt, unjudged, and the end is the harness's own |
@@ -1459,7 +1464,7 @@ session, not in the repository.
 It layers UNDER the harness's own answer rather than replacing it. An agent kanban solves the same
 problem with a terminal "complete" tool call, which it can require because every worker is its own.
 Here a structured final answer is the fast path and observation is the floor: a workload
-that never gives one ends by quiet — `stated: false`, where one was asked for (above).
+that never gives one ends by quiet — `closedOut: false`, where one was asked for (above).
 
 **It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the
 engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
@@ -1470,11 +1475,13 @@ and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 
 ## What an attempt consumed
 
-Every attempt records `usage` — `{ turns?, toolCalls?, inputTokens?, uncachedTokens?, cacheWriteTokens?, cacheReadTokens?,
+Every attempt records `usage` — `{ responses?, toolCalls?, inputTokens?, uncachedTokens?, cacheWriteTokens?, cacheReadTokens?,
 peakContextTokens?, firstContextTokens?, firstCacheWriteTokens?, compactions?, outputTokens?, costUsd?, apiMs?, toolMs?, unpricedModel? }` — and `exitCode`, copied from the sighting that ended it, or, for what a harness writes only as its
 session exits, read once the session was let go (`measured`, below). **Each is `null` when nothing measured it,
 never `0`**: a zero that means "nobody counted" reads as "cost nothing". A count its runner could not
-see is absent from `usage` in the same way, and `ae show` names it not measured. `decide` reads neither.
+see is absent from `usage` in the same way, and `ae show` names it not measured. `decide` reads neither. A journal
+written before the model's responses took their name counts them as `turns`, on an `ended`, a `measured` or a `counted`
+entry, which `upgrade` reads as `responses`.
 An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of its `starting` and
 `ended` entries, `endedAt` being `null` while it runs — so how long it took is on the record.
 
@@ -1482,8 +1489,8 @@ An attempt also keeps when it ran — `startedAt` and `endedAt`, the times of it
 |---|---|---|
 | `claude`, a job | as `claude-detached`, from its stream's result, less what its parent printed on a resume | the worker's record of the process |
 | `claude` with `background: true` | from the transcript it already reads: responses, tool calls, tokens in their three classes and the peak context since the session's own start; its cost, API time and tool time from the `cost-state` Claude Code writes as the session's process exits, read once the engine has let it go | `null` — the process is the harness's |
-| `codex` | from its `exec --json` stream, as the worker captured it: tool calls, and tokens and their classes from `turn.completed`; no peak, no turns — a Codex turn is a prompt, not a model response — and no cost: the stream carries none (seventeen runs of codex-cli 0.154.0 read) | the worker's record of the process |
-| `claude-detached` | its cost and API time, from the result `claude -p` prints (`total_cost_usd`, `duration_api_ms`), and its tokens in their classes from the same result's `modelUsage`, every model and subagent together (its `usage` where that is missing or partial); on a resume, less what its parent printed (`resumeCostCarried`); no peak, turns or tool calls ([open issue 4](docs/open-issues.md)) | the worker's record of the process |
+| `codex` | from its `exec --json` stream, as the worker captured it: tool calls, and tokens and their classes from `turn.completed`; no peak, no responses — a Codex turn is a prompt, not a model response — and no cost: the stream carries none (seventeen runs of codex-cli 0.154.0 read) | the worker's record of the process |
+| `claude-detached` | its cost and API time, from the result `claude -p` prints (`total_cost_usd`, `duration_api_ms`), and its tokens in their classes from the same result's `modelUsage`, every model and subagent together (its `usage` where that is missing or partial); on a resume, less what its parent printed (`resumeCostCarried`); no peak, responses or tool calls ([open issue 4](docs/open-issues.md)) | the worker's record of the process |
 | `sdkRunner()` | from the SDK's result message: tokens, their classes when it gives all three, and cost when it gives one; no peak | `null` |
 
 **What a session cost is the harness's figure, never a price worked out here.** Claude Code writes it into a `--bg`
@@ -1508,9 +1515,9 @@ a model the session used — `unpricedModel: true`, since a total too low reads 
 
 **A long-lived attempt's spend is journalled as it grows.** A session that runs for days writes no cost until a process of it
 exits, so each pass that reads more of a long-lived attempt in flight (`restartPolicy: 'Always'`) than its record holds
-journals a **`counted`** entry: its turns, tool calls and tokens, never a cost, which `fold` puts in place of the attempt's
+journals a **`counted`** entry: its responses, tool calls and tokens, never a cost, which `fold` puts in place of the attempt's
 `usage` whole, since a compacted attempt's reading drops tokens the last one had. The same reading on later passes writes
-nothing; a reading with fewer turns than the record is no count of this attempt and writes nothing either; a job's spend is
+nothing; a reading with fewer responses than the record is no count of this attempt and writes nothing either; a job's spend is
 written at its end, as before. Its end keeps what was counted when it carries no usage, and its cost is measured as any
 attempt's is. The pass tells the runner when the attempt began (`ExpectedSession.since`), and `--bg` counts from then across
 every process Claude Code respawned it in; a `cost-state` begun more than a few seconds after the attempt's first line is a
@@ -1564,12 +1571,12 @@ usage rather than a wrong one. A count is kept as the statement is, off the same
 that start, while the transcript is unchanged. So a look at an idle or blocked session, or a long-lived one between turns,
 reads none of its transcript until a turn writes it, and the next look sees what that turn said and spent. `ae show` prints one line per attempt — when it ran, then what it
 consumed, naming what was not measured, and its cost to the cent (`<$0.01` under one: `$0.00` would read as free) — and an
-attempt still running as `running since <start>`. After the cost, what the attempt read by class and its peak context, each named not measured where its runner could not see it. `ae ls` prints the latest attempt's cost beside its turns, `$3.01 · 12t`:
+attempt still running as `running since <start>`. After the cost, what the attempt read by class and its peak context, each named not measured where its runner could not see it. `ae ls` prints the latest attempt's cost beside its responses, `$3.01 · 12r`:
 
 ```
-attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <turns> turns · <calls> tool calls · <in> in · <out> out · $4.87 · read <r> · wrote <w> · uncached <u> · peak <p>
+attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  <responses> responses · <calls> tool calls · <in> in · <out> out · $4.87 · read <r> · wrote <w> · uncached <u> · peak <p>
 attempt 2  failed  09:05:02 → 09:05:40 (38s)  exit 1  usage not measured
-attempt 3  failed (budget)  09:05:41 → 09:05:44 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02
+attempt 3  failed (budget)  09:05:41 → 09:05:44 (3s)  exit 1  responses not measured · tool calls not measured · tokens not measured · $0.02
 ```
 
 Codex's stream is read by the same rule. Tokens are given only when every turn that started completed
@@ -1581,7 +1588,7 @@ them, so whether `input_tokens` counts it is unknown, and a stream where it is n
 count:
 
 ```
-attempt 1  done  09:00:01 → 09:02:10 (2m 09s)  exit 0  turns not measured · <calls> tool calls · <in> in · <out> out · cost not measured · read <r> · wrote 0 · uncached <u> · peak not measured
+attempt 1  done  09:00:01 → 09:02:10 (2m 09s)  exit 0  responses not measured · <calls> tool calls · <in> in · <out> out · cost not measured · read <r> · wrote 0 · uncached <u> · peak not measured
 ```
 
 ## Following a session: `transcript`
@@ -2140,10 +2147,10 @@ reason `Runner` is a seam and not an import.
 | owns the session | the **harness** | **this process** |
 | engine dies mid-session | session runs on, next tick adopts it | session dies with it |
 | run state | `claude agents --json` | an in-memory map |
-| usage | turns, tool calls and tokens from the transcript, once the session is idle; its cost once the engine lets it go, from the `cost-state` Claude Code writes as the process exits | from the SDK's result, cost included |
+| usage | responses, tool calls and tokens from the transcript, once the session is idle; its cost once the engine lets it go, from the `cost-state` Claude Code writes as the process exits | from the SDK's result, cost included |
 | narrow the tools | `tools` → `--tools`: a tool not in the list does not exist for the session; `disallowedTools` → `--disallowedTools` | not wired: it passes only `model` and `permissionMode` |
 | a spend cap | refused: a `--bg` session keeps no `--max-budget-usd` (measured) — `claude-detached` keeps one | not wired |
-| MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json`, or the entries `checkoutMcp` names of it, and the task's `mcp`, never the operator's | not wired |
+| MCP servers | `--strict-mcp-config`: the checkout's `.mcp.json`, or the entries `projectMcp` names of it, and the task's `mcp`, never the operator's | not wired |
 | the conversation as events | `transcript`, from the session's transcript | not wired: no `transcript` |
 | one session by its name | `find`, from the session's registration | not wired: every read observes |
 | telling a running session something | `say`, a line on the session's inbox socket | not wired: no `say` |
@@ -2387,7 +2394,7 @@ of pure code sits beside it.
 | `src/core/decide.test.ts` | every branch of the decision, no harness needed |
 | `test/engine.test.ts` | the crash cases, what a pass reports (`running` per harness) and that it chooses no order, the pass refusing an argument, the fields carried, against a fake harness |
 | `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
-| `test/unsigned.test.ts` | a session gone quiet, or `done`, without the closing statement its task asked for: ended with `stated: false`, and continued by nothing; quiet with none asked for still succeeds with no such key — a fake `claude` that keeps a registry, at shipped defaults |
+| `test/closed-out.test.ts` | a session gone quiet, or `done`, without the closing statement its task asked for: ended with `closedOut: false`, and continued by nothing; quiet with none asked for still succeeds with no such key — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/shell.test.ts` | a session held busy by a background shell it left running: its own closeout as the last word in a cold transcript ends the attempt, an advancing one or no statement does not — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/command.test.ts` | the command harness against the real worker: a long stdout read back whole, stderr apart, the exit code, `env`, `niceness`, a stop, a lingering child, a respawn, and its refusals |

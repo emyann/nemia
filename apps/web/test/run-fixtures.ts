@@ -19,8 +19,8 @@ type Step = RunDetail['steps'][number];
 
 /** What a try's session consumed, measured in part: a count nobody measured is absent. */
 export const used = (extra: Partial<StepUsed> = {}): StepUsed => ({
-  usage: { turns: 12, costUsd: 1.25, inputTokens: 9_000 },
-  used: '12 turns',
+  usage: { responses: 12, costUsd: 1.25, inputTokens: 9_000 },
+  used: '12 responses',
   cost: '$1.25',
   costUsd: 1.25,
   apiMs: 42_000,

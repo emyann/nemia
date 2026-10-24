@@ -414,11 +414,11 @@ test('a folder team as the board finds and files for it, the repository a plain 
 
       const named = await file('a note on the tides, from a card that names a repository', notARepo);
       const res = await startOn(named);
-      const started = (await res.json()) as { id: string; card: string; removed: boolean; ignoredRepo?: string; error?: string };
+      const started = (await res.json()) as { id: string; card: string; ignoredRepo?: string; error?: string };
       assert.equal(res.status, 201, started.error);
       assert.deepEqual(
-        [started.card, started.removed, started.ignoredRepo],
-        [named, true, notARepo],
+        [started.card, started.ignoredRepo],
+        [named, notARepo],
         "the api says what `nemia start` prints and a tick's line carries: the card's `repo:` was not looked at",
       );
       const run = (await (await app().request(`/api/runs/${started.id}`)).json()) as { repo: unknown; place: unknown };

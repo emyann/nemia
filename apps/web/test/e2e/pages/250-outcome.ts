@@ -85,7 +85,7 @@ const write = (file: string, text: string | Buffer) => {
 /**
  * Writes the run, its folder, its engine tasks and its one image into the store at `root`; answers every path written, to take back. Each
  * task ran once and ended with the statement it gave, or none; one asked for a statement says whether it came. `quiet` ends as the runtime
- * records a session that gave none — done, `stated: false`, succeeded — which the orchestrator calls `unsigned` (`endWords`), on its
+ * records a session that gave none — done, `closedOut: false`, succeeded — which the orchestrator calls `unsigned` (`endWords`), on its
  * second try, the run's one nudge behind it, so it waits on a person; `garbled`
  * ends on a statement cut off mid-string: no closeout, and still what the agent said.
  */
@@ -121,7 +121,7 @@ function writeRun(root: string): string[] {
     tasks.push(task);
     return task;
   };
-  const ran = (step: string, end: { observed: string; reason: string; settled: string; stated?: boolean }, closeout?: object | string) =>
+  const ran = (step: string, end: { observed: string; reason: string; settled: string; closedOut?: boolean }, closeout?: object | string) =>
     write(
       taskOf(step),
       lines([
@@ -132,7 +132,7 @@ function writeRun(root: string): string[] {
           cwd: REPO_SAID,
           maxAttempts: 1,
           harness: 'claude',
-          ...(end.stated !== undefined ? { closeoutSchema: { type: 'object' } } : {}),
+          ...(end.closedOut !== undefined ? { closeoutSchema: { type: 'object' } } : {}),
         },
         { kind: 'starting', at: ago(8.9), attempt: 1 },
         { kind: 'spawned', at: ago(8.9), attempt: 1 },
@@ -143,7 +143,7 @@ function writeRun(root: string): string[] {
           sessionId: `ae/${id}-${step}/1`,
           observed: end.observed,
           reason: end.reason,
-          ...(end.stated !== undefined ? { stated: end.stated } : {}),
+          ...(end.closedOut !== undefined ? { closedOut: end.closedOut } : {}),
           ...(closeout !== undefined ? { closeout } : {}),
         },
         { kind: 'settled', at: ago(4), outcome: end.settled },
@@ -184,8 +184,8 @@ function writeRun(root: string): string[] {
   );
   ran('review', signed, said('Three findings, none worth another round.', { findings: OUTCOME.findings, again: false }));
   ran('ask', signed, said('Half of it is drawn.', { needs: OUTCOME.needs }, 'blocked'));
-  ran('quiet', { observed: 'done', reason: 'harness', settled: 'succeeded', stated: false });
-  ran('quiet-first', { observed: 'done', reason: 'harness', settled: 'succeeded', stated: false });
+  ran('quiet', { observed: 'done', reason: 'harness', settled: 'succeeded', closedOut: false });
+  ran('quiet-first', { observed: 'done', reason: 'harness', settled: 'succeeded', closedOut: false });
   ran(
     'odd',
     signed,

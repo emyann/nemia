@@ -341,9 +341,9 @@ const WAITS: ReadonlyMap<TaskState, string> = new Map([
  * `UNSPECIFIED` among them, says nothing has ended, and reads as `working`: the deadline bounds it.
  *
  * The closing statement is the data part of the last Artifact that has one, and only on a Task that `COMPLETED`: an
- * agent may publish an Artifact while it works, and a statement read then would end the attempt early (`closedOut`).
+ * agent may publish an Artifact while it works, and a statement read then would end the attempt early (`endedOnStatement`).
  * It has no time: the Task was made by this attempt's message, so nothing on it was said before the attempt began,
- * and the engine keeps it whatever the clock says. None, and the end is recorded `stated: false`.
+ * and the engine keeps it whatever the clock says. None, and the end is recorded `closedOut: false`.
  */
 export const sightingOfTask = (t: Task): Sighting => {
   const state = t.status?.state ?? TaskState.TASK_STATE_UNSPECIFIED;

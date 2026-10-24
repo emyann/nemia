@@ -9,14 +9,15 @@
  * The shape pinned: an `ended` carries, off the same sighting as `usage` and `exitCode`, `denials` (the tool calls a harness
  * denied the session), `skills` (the skills it loaded), `ranOn` (the model its session really ran on) and `limit` (the limit its
  * harness says it stopped at), and, for a task
- * that asked for a closing statement, `stated`, whether one came; `filed` carries `holdOpen`, and a task held open writes
+ * that asked for a closing statement, `closedOut`, whether one came; `filed` carries `holdOpen`, and a task held open writes
  * `input` and `closed` — the fifth run; the spend cap is one of the harness's arguments, so `filed`, a spawn and an `input`
  * carry it under `config`.
  *
- * A journal an older runtime wrote may have no `denials`, `stated` or `holdOpen` key and no `input` or `closed` event, and
+ * A journal an older runtime wrote may have no `denials`, `closedOut` or `holdOpen` key and no `input` or `closed` event, and
  * folds and decides the same (`decide.test.ts`, HELD OPEN); it may carry `maxAttempts` and `resume` on `filed`, and folds and
  * decides as if it did not (`decide.test.ts`, its old journals); and it may carry `budgetUsd` beside `config`, or
- * `reason: 'budget'` on an `ended`, which `upgrade` in `journal.ts` reads in this shape (`journal.test.ts`).
+ * `reason: 'budget'` on an `ended`, or the words before they took today's names — `stated`, a usage's `turns`, `checkoutMcp`,
+ * a reason of its own engine's judging — which `upgrade` in `journal.ts` reads in this shape (`journal.test.ts`).
  */
 import { Effect } from 'effect';
 import { test } from 'node:test';
@@ -125,7 +126,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
       state: 'completed',
       busy: false,
       closeout: { payload: { outcome: 'done', summary: 'wrote them' }, at: began + 1_000 },
-      usage: { turns: 3, outputTokens: 120, costUsd: 0.25 },
+      usage: { responses: 3, outputTokens: 120, costUsd: 0.25 },
     });
     await Effect.runPromise(b.engine.tick());
     assert.deepEqual(await b.record(id), [
@@ -142,8 +143,8 @@ test("the journal's words, run by run: each written as the engine wrote it befor
         reason: 'harness',
         nativeId: 's-1',
         closeout: { outcome: 'done', summary: 'wrote them' },
-        stated: true,
-        usage: { turns: 3, outputTokens: 120, costUsd: 0.25 },
+        closedOut: true,
+        usage: { responses: 3, outputTokens: 120, costUsd: 0.25 },
         exitCode: undefined,
         denials: undefined,
         skills: undefined,
@@ -170,7 +171,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
   });
 
   await t.test(
-    "a session that ends with no statement where one was asked: ended as its harness said, `stated: false`, settled succeeded — the judging is the layer above's — and an end without the key folds the same",
+    "a session that ends with no statement where one was asked: ended as its harness said, `closedOut: false`, settled succeeded — the judging is the layer above's — and an end without the key folds the same",
     async () => {
       const b = board();
       const id = await Effect.runPromise(b.engine.file(filing));
@@ -192,7 +193,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
           reason: 'harness',
           nativeId: 's-1',
           closeout: undefined,
-          stated: false,
+          closedOut: false,
           usage: undefined,
           exitCode: undefined,
           denials: undefined,
@@ -206,10 +207,10 @@ test("the journal's words, run by run: each written as the engine wrote it befor
       assert.deepEqual(b.asked, [['spawn', spawnAsked]], 'nothing continued, nobody nudged');
 
       const events = (await b.record(id)) as Event[];
-      const without = events.map((e) => (e.kind === 'ended' ? (({ stated: _, ...rest }) => rest)(e) : e)) as Event[];
+      const without = events.map((e) => (e.kind === 'ended' ? (({ closedOut: _, ...rest }) => rest)(e) : e)) as Event[];
       const old = fold(id, without);
-      assert.equal('stated' in old.attempts[0], false, 'a journal from before stage 4a carries no key');
-      assert.deepEqual(fold(id, events), { ...old, attempts: [{ ...old.attempts[0], stated: false }] });
+      assert.equal('closedOut' in old.attempts[0], false, 'a journal from before stage 4a carries no key');
+      assert.deepEqual(fold(id, events), { ...old, attempts: [{ ...old.attempts[0], closedOut: false }] });
     },
   );
 
@@ -319,7 +320,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
         reason: 'harness',
         nativeId: 's-1',
         closeout: undefined,
-        stated: false,
+        closedOut: false,
         usage: undefined,
         exitCode: undefined,
         denials,
@@ -467,7 +468,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
       reason: 'harness',
       nativeId: `s-${n}`,
       closeout: { outcome: 'done', summary },
-      stated: true,
+      closedOut: true,
       usage: undefined,
       exitCode: undefined,
       denials: undefined,

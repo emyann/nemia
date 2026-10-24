@@ -34,7 +34,7 @@ test('pathOf: a journal replayed into its path through the lifecycle, one step p
   });
 
   await t.test('a measured entry keeps the state it finds', () => {
-    const measured: Event = { kind: 'measured', at: at(S + 1), attempt: 1, usage: { turns: 2 } };
+    const measured: Event = { kind: 'measured', at: at(S + 1), attempt: 1, usage: { responses: 2 } };
     assert.deepEqual(words([filed(), starting(1), spawned(1), measured]), [
       'submitted <- filed',
       'starting <- starting',

@@ -319,7 +319,7 @@ const B4 = () => {
     [
       't1',
       task([[clock(0, 5), clock(0, 12), clock(19, 54)]], 'succeeded', {
-        turns: 54,
+        responses: 54,
         toolCalls: 146,
         inputTokens: 17_000_000,
         outputTokens: 210_000,
@@ -381,7 +381,7 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
   assert.equal(first.session!.ranMs, 1_182_000);
   assert.deepEqual(
     first.used,
-    { turns: 54, toolCalls: 146, inputTokens: 17_000_000, outputTokens: 210_000 },
+    { responses: 54, toolCalls: 146, inputTokens: 17_000_000, outputTokens: 210_000 },
     'what each session used, beside it',
   );
   assert.equal(second.used, undefined, 'a try whose session measured nothing has none');
@@ -405,7 +405,7 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
   );
 
   assert.deepEqual(timelineLines(t.steps.implement), [
-    'timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 turns · 146 tool calls · 17M in · 210k out',
+    'timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 responses · 146 tool calls · 17M in · 210k out',
     '          try 1 check  filed 08:19:56Z  spawned 08:19:57Z  ended 08:20:55Z  queued 1s  ran 58s',
     '          try 2        filed 08:21:00Z  spawned 08:21:03Z  ended 08:26:38Z  queued 3s  ran 5m35s  used not measured',
     '          try 2 check  filed 08:26:40Z  spawned 08:26:40Z  ended 08:27:37Z  queued 0s  ran 57s',
@@ -831,9 +831,9 @@ test("REFUSED: a round's total counts only the steps its loop files again — a 
 test('a try on the timeline says what its session cost beside what it used, where the engine measured it', () => {
   const r = run({ implement: 't1' });
   const views = new Map([
-    ['t1', task([[clock(0, 5), clock(0, 12), clock(19, 54)]], 'succeeded', { turns: 54, costUsd: 3.012, apiMs: 486_000 })],
+    ['t1', task([[clock(0, 5), clock(0, 12), clock(19, 54)]], 'succeeded', { responses: 54, costUsd: 3.012, apiMs: 486_000 })],
   ]);
   assert.deepEqual(timelineLines(timeline(r, views, new Map([['t1', clock(0)]])).steps.implement), [
-    'timeline  try 1  filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 turns · tool calls not measured · tokens in not measured · tokens out not measured · api 8m06s · tools not measured  cost $3.01',
+    'timeline  try 1  filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 54 responses · tool calls not measured · tokens in not measured · tokens out not measured · api 8m06s · tools not measured  cost $3.01',
   ]);
 });

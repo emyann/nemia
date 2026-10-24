@@ -75,10 +75,10 @@ const done = (summary: string, more: object = {}) => ({ outcome: 'done', summary
 
 /** What the engine read of each Claude Code session: its cost, and the time it counted waiting on the model and running tools. */
 const USAGE = {
-  implement1: { turns: 20, toolCalls: 40, inputTokens: 900_000, outputTokens: 20_000, costUsd: 1.2, apiMs: 240_000, toolMs: 15_000 },
-  implement2: { turns: 10, toolCalls: 12, inputTokens: 400_000, outputTokens: 8_000, costUsd: 0.9, apiMs: 100_000, toolMs: 4_000 },
-  tokens1: { turns: 14, toolCalls: 31, inputTokens: 600_000, outputTokens: 12_000, costUsd: 1.75, apiMs: 300_000, toolMs: 20_000 },
-  tokens2: { turns: 16, toolCalls: 29, inputTokens: 700_000, outputTokens: 14_000, costUsd: 2.5, apiMs: 420_000, toolMs: 31_000 },
+  implement1: { responses: 20, toolCalls: 40, inputTokens: 900_000, outputTokens: 20_000, costUsd: 1.2, apiMs: 240_000, toolMs: 15_000 },
+  implement2: { responses: 10, toolCalls: 12, inputTokens: 400_000, outputTokens: 8_000, costUsd: 0.9, apiMs: 100_000, toolMs: 4_000 },
+  tokens1: { responses: 14, toolCalls: 31, inputTokens: 600_000, outputTokens: 12_000, costUsd: 1.75, apiMs: 300_000, toolMs: 20_000 },
+  tokens2: { responses: 16, toolCalls: 29, inputTokens: 700_000, outputTokens: 14_000, costUsd: 2.5, apiMs: 420_000, toolMs: 31_000 },
   /** Codex's stream carries no cost: a session nobody priced. */
   review: { toolCalls: 6, inputTokens: 50_000, outputTokens: 2_000 },
 };

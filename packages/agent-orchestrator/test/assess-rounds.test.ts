@@ -1119,7 +1119,7 @@ test("costLine and runCostLines: a step's cost on `nemia decide`, beside the cap
     ],
     [
       'nothing measured, no budget',
-      () => costLine(step('implement'), one, 'implement', { turns: 3 }, () => undefined),
+      () => costLine(step('implement'), one, 'implement', { responses: 3 }, () => undefined),
       'cost  not measured',
     ],
     [

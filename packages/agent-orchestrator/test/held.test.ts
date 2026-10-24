@@ -257,7 +257,7 @@ test('a try of a waiting step that is not an answer — `--fresh`, `--model` —
   assert.equal(readRun(run.id).steps.plan.taskId, `${run.id}-plan-try2`);
 });
 
-test("a held task whose job ended `done` with no statement (`stated: false`) waits as the runtime holds any `done` open, reads `unsigned`, and is closed: the run's sign-off nudge is a `-try2` task, never an answer to it — gated or not", async () => {
+test("a held task whose job ended `done` with no statement (`closedOut: false`) waits as the runtime holds any `done` open, reads `unsigned`, and is closed: the run's sign-off nudge is a `-try2` task, never an answer to it — gated or not", async () => {
   for (const keys of [{}, { plan: 'gate: true' }]) {
     const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: folder(keys), isolate: false }));
     const { e, pass, sessions } = engine();
@@ -268,7 +268,7 @@ test("a held task whose job ended `done` with no statement (`stated: false`) wai
     await Effect.runPromise(e.tick());
     const waiting = await stateOf(e, plan);
     assert.deepEqual(
-      [waiting.phase, waiting.state.attempts.at(-1)?.stated],
+      [waiting.phase, waiting.state.attempts.at(-1)?.closedOut],
       ['input-required', false],
       `${JSON.stringify(keys)}: the job ended done with no closeout, so no statement, and the runtime holds it open all the same`,
     );

@@ -29,7 +29,7 @@
  *   `file()` refuses a budget beside a background session, so that test files through the Effect door, which refuses no
  *   harness's words.
  * - A session that ends its turn without its closing statement: told to answer in plain text and give none, it is never recorded
- *   as ended with none unless its end says so — `stated: false`, the fact the orchestrator reads as unsigned. Whether Claude
+ *   as ended with none unless its end says so — `closedOut: false`, the fact the orchestrator reads as unsigned. Whether Claude
  *   Code nudges such a session itself, or ends it on its own, is what the diagnostic says.
  * - `claude.remoteControl`, under the engine: Claude Code registers a session filed with it under `sessions/` with a
  *   `bridgeSessionId`, a file the engine never reads; the control has none, read again as long after, so a bridge it gets a
@@ -669,12 +669,12 @@ test(
       const v = views.unsigned;
       const [a] = v.state.attempts;
       t.diagnostic(
-        `attempt 1 ended ${a?.ended} (${a?.reason}), stated ${a?.stated}, closeout ${JSON.stringify(a?.closeout)}, task ${v.state.settled ?? v.phase}`,
+        `attempt 1 ended ${a?.ended} (${a?.reason}), closedOut ${a?.closedOut}, closeout ${JSON.stringify(a?.closeout)}, task ${v.state.settled ?? v.phase}`,
       );
       assert.ok(v.state.settled, `settled: ${v.phase}`);
       assert.ok(
-        a?.closeout !== undefined || a?.stated === false || a?.ended !== 'succeeded',
-        `recorded done with nothing said and not saying so, ended ${a?.ended} (${a?.reason}), stated ${a?.stated}: bug 1, which the orchestrator could then not read as unsigned`,
+        a?.closeout !== undefined || a?.closedOut === false || a?.ended !== 'succeeded',
+        `recorded done with nothing said and not saying so, ended ${a?.ended} (${a?.reason}), closedOut ${a?.closedOut}: bug 1, which the orchestrator could then not read as unsigned`,
       );
     });
   },

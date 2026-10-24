@@ -1000,7 +1000,7 @@ test("REFUSED at the door: Claude Code's flags on the wrong mode or harness, a f
       const { CLAUDE_OWNED_FLAGS } = await import('../src/harness/claude/vocabulary.ts');
       const { claudeDetached } = await import('../src/harness/claude/code.ts');
       const request = { name: 'ae/t/1', brief: 'b', cwd: '/r', resumeFrom: BG_ID, closeoutSchema: { type: 'object' }, config: EVERYTHING };
-      const io = { checkoutMcpConfig: '/r/.mcp.json', mcpConfigFile: '/m.json' };
+      const io = { projectMcpConfig: '/r/.mcp.json', mcpConfigFile: '/m.json' };
       const f = fake();
       let bg: string[];
       try {
@@ -1461,7 +1461,7 @@ test(
           lastWord: true,
         }));
         assert.deepEqual(attempt?.closeout, { by: 'child' });
-        assert.notEqual(attempt?.stated, false);
+        assert.notEqual(attempt?.closedOut, false);
       },
     );
     await t.test(
@@ -1475,7 +1475,7 @@ test(
           lastWord: true,
         }));
         assert.equal(attempt?.closeout, undefined);
-        assert.equal(attempt?.stated, false);
+        assert.equal(attempt?.closedOut, false);
       },
     );
   },
@@ -1493,7 +1493,7 @@ const countingOps = (f: ReturnType<typeof fake>, rows: object[], writtenAt?: num
     ...(writtenAt !== undefined ? { transcriptTime: async () => writtenAt } : {}),
     usageFrom: async (sessionId: string, since: number) => {
       asked.push([sessionId, since]);
-      return { turns: asked.length };
+      return { responses: asked.length };
     },
   });
   return { ops, asked };
@@ -1540,7 +1540,7 @@ test(
 
           const seen = await Effect.runPromise(ops.observeFor!([{ name: 'ae/r/2', harness: 'claude', since }]));
           assert.deepEqual(asked, [[BG_ID, since]], 'counted from when the attempt began, across the processes it was respawned in');
-          assert.deepEqual(seen.seen.get('ae/r/2')?.usage, { turns: 1 });
+          assert.deepEqual(seen.seen.get('ae/r/2')?.usage, { responses: 1 });
 
           await Effect.runPromise(ops.observe);
           await Effect.runPromise(ops.release!({ sessionId: BG_ID, state: 'working' }, {}));
@@ -1627,7 +1627,7 @@ test(
             closeoutFrom: async () => undefined,
             usageFrom: async (sessionId: string, since: number) => {
               asked.push([sessionId, since]);
-              return { turns: asked.length, ...(exited ? { costUsd: 0.25 } : {}) };
+              return { responses: asked.length, ...(exited ? { costUsd: 0.25 } : {}) };
             },
           });
           const released: Array<{ asked: Array<[string, number]>; measured: unknown }> = [];
@@ -1729,7 +1729,7 @@ test(
           assert.deepEqual(asked, [[BG_ID, startedAt]], 'an ended session whose transcript is unchanged is read once, and kept');
           const seen = await Effect.runPromise(ops.observeFor!([{ name: 'ae/r/2', harness: 'claude', since }]));
           assert.deepEqual(asked.at(-1), [BG_ID, since]);
-          assert.deepEqual(seen.seen.get('ae/r/2')?.usage, { turns: 2 }, 'the read counted from the start it was told');
+          assert.deepEqual(seen.seen.get('ae/r/2')?.usage, { responses: 2 }, 'the read counted from the start it was told');
         } finally {
           f.restore();
         }

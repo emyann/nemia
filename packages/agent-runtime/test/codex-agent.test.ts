@@ -10,7 +10,7 @@
  * worker's pid is on disk is made to happen on demand in `detached.test.ts`); and a task held open is `INPUT_REQUIRED`
  * between turns, its answer resuming the same thread in the same context.
  *
- * A held attempt ends on its statement (`closedOut`): once Codex has written `-o`, the task waits, though Codex has not yet
+ * A held attempt ends on its statement (`endedOnStatement`): once Codex has written `-o`, the task waits, though Codex has not yet
  * exited and its Task stays working, the harness's word, until the worker writes `done`. Under load the worker reads the
  * thread line off Codex's stdout after Codex has written `-o`, so the run file carries a statement and no thread: an attempt
  * ended then would be recorded with no session, and `answer` would refuse the task that waits on it. The fake makes that

@@ -32,6 +32,28 @@
       }
     },
     {
+      "term": "Closed out",
+      "meaning": "whether an attempt's session gave the closing statement its task asked for, as its end reported it: a fact the runtime records and the layer above judges.",
+      "type": "Attempt",
+      "retired": [
+        {
+          "spelling": "stated",
+          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)"
+        }
+      ]
+    },
+    {
+      "term": "End reason",
+      "meaning": "why an attempt ended, in the only categories the engine can tell apart: `harness`, `lost`, `unstartable`, `operator` or `deadline`. A reason an older runtime judged by itself reads back as the harness's end, kept as `former`.",
+      "type": "EndReason",
+      "retired": [
+        {
+          "spelling": "unsigned",
+          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)"
+        }
+      ]
+    },
+    {
       "term": "Engine",
       "meaning": "the runtime's loop: it compares each task's journal with what the harness lists, and asks `decide` what to do.",
       "see": {
@@ -96,12 +118,34 @@
       ]
     },
     {
+      "term": "Project MCP",
+      "meaning": "the servers of the project's `.mcp.json` a session loads, by name: absent, the whole file; `[]`, none of it.",
+      "type": "HarnessArgs",
+      "retired": [
+        {
+          "spelling": "checkoutMcp",
+          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)"
+        }
+      ]
+    },
+    {
       "term": "Reconcile",
       "meaning": "one task's decide-and-act within a tick.",
       "retired": [
         {
           "spelling": "StepRefused",
           "card": "the runtime says where a task stands in one closed set (decisions 2 and 11 of the language work)"
+        }
+      ]
+    },
+    {
+      "term": "Responses",
+      "meaning": "the model responses an attempt's session made, each counted once, in its usage; absent where its runner could not see them.",
+      "type": "Usage",
+      "retired": [
+        {
+          "spelling": "Usage.turns",
+          "card": "the runtime's journalled words take their new names, and old journals read back (decision 11 of the language work)"
         }
       ]
     },

@@ -53,7 +53,7 @@ const task = (taskId: string, harness: string, usages: object[]) => {
  */
 const USAGE = {
   cold: {
-    turns: 30,
+    responses: 30,
     inputTokens: 4_150_000,
     cacheReadTokens: 4_000_000,
     cacheWriteTokens: 149_990,
@@ -65,7 +65,7 @@ const USAGE = {
     costUsd: 3,
   },
   rebuilt: {
-    turns: 4,
+    responses: 4,
     inputTokens: 605_000,
     cacheReadTokens: 400_000,
     cacheWriteTokens: 204_990,
@@ -77,7 +77,7 @@ const USAGE = {
     costUsd: 2.3,
   },
   review: {
-    turns: 20,
+    responses: 20,
     inputTokens: 3_000_000,
     cacheReadTokens: 2_900_000,
     cacheWriteTokens: 99_995,
@@ -199,7 +199,7 @@ test("a run's page says what its sessions read: each step's classes, peak and re
     "a session that compacted reached its cap, short of it in tokens — and the run's peak says so of its own step's compactions alone",
     async () => {
       const compacted = {
-        turns: 60,
+        responses: 60,
         inputTokens: 6_000_000,
         cacheReadTokens: 5_700_000,
         cacheWriteTokens: 299_990,

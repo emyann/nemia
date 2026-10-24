@@ -50,8 +50,8 @@ function worked(branch: string, shipped = false) {
 }
 
 const at = '2026-09-28T09:00:00.000Z';
-/** What no runtime writes: a `measured` whose turns are a word. */
-const MISWRITTEN = { kind: 'measured', at, attempt: 1, usage: { turns: 'three' } };
+/** What no runtime writes: a `measured` whose responses are a word. */
+const MISWRITTEN = { kind: 'measured', at, attempt: 1, usage: { responses: 'three' } };
 
 const tasks = new Map<string, unknown[]>();
 const signedOff = (taskId: string) =>

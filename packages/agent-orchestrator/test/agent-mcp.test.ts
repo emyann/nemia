@@ -96,7 +96,7 @@ test("a step's mcp: adds to its agent's: the session's servers are the agent's, 
   const both = stepOf(agentOf('mcp: a, b\n'), 'mcp: c, a\n');
   assert.deepEqual(both.agent?.mcp, ['a', 'b', 'c'], "the agent's first, and one both name once");
   assert.deepEqual(both.mcp, ['c', 'a'], "the step's own line, as written");
-  assert.deepEqual(filed(both).checkoutMcp, ['a', 'b', 'c']);
+  assert.deepEqual(filed(both).projectMcp, ['a', 'b', 'c']);
   const read = Schema.decodeUnknownSync(FrozenStepSchema)(JSON.parse(JSON.stringify(both))) as Workflow;
   assert.deepEqual(
     [read.agent?.mcp, read.mcp],
@@ -133,8 +133,8 @@ test("renderStep writes a step's own mcp: line, never its agent's servers, and n
 
 test('naming a server allows none of its tools: a dontAsk step that names one is filed as the same step naming none, but for the servers', () => {
   const agent = agentOf('permissionMode: dontAsk\nallowedTools: Read\n');
-  const { checkoutMcp: named, ...withServer } = filed(stepOf(agent, 'mcp: playwright\n'));
-  const { checkoutMcp: none, ...without } = filed(stepOf(agent));
+  const { projectMcp: named, ...withServer } = filed(stepOf(agent, 'mcp: playwright\n'));
+  const { projectMcp: none, ...without } = filed(stepOf(agent));
   assert.deepEqual([named, none], [['playwright'], []]);
   assert.deepEqual(withServer, without, 'the mode, the allow rules and the deny rules are those of the step that names none');
   assert.equal(withServer.permissionMode, 'dontAsk');
@@ -175,12 +175,12 @@ test("the freeze writes the names on every step with an agent, [] for an agent w
 });
 
 test('a step is filed the names its agent gives, none with no agent, and no key on a record frozen before the line', () => {
-  assert.deepEqual(filed(stepOf(agentOf('mcp: playwright\n'))).checkoutMcp, ['playwright']);
-  assert.deepEqual(filed(stepOf(agentOf(''))).checkoutMcp, [], 'an agent that names none loads none');
-  assert.deepEqual(filed(stepOf(undefined)).checkoutMcp, [], 'nor does a step with no agent');
+  assert.deepEqual(filed(stepOf(agentOf('mcp: playwright\n'))).projectMcp, ['playwright']);
+  assert.deepEqual(filed(stepOf(agentOf(''))).projectMcp, [], 'an agent that names none loads none');
+  assert.deepEqual(filed(stepOf(undefined)).projectMcp, [], 'nor does a step with no agent');
   const { mcp: _, ...before } = stepOf(agentOf('mcp: playwright\n')).agent!;
   const old = filed({ ...stepOf(agentOf('')), agent: before });
-  assert.equal(Object.hasOwn(old, 'checkoutMcp'), false, 'the whole file, as the run was started');
+  assert.equal(Object.hasOwn(old, 'projectMcp'), false, 'the whole file, as the run was started');
 });
 
 test('nemia agents says the servers an agent loads, and nothing for one that names none', () => {

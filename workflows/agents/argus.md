@@ -19,3 +19,7 @@ Bash runs the checks your step names and git's read-only questions, each bare an
 
 Load your skill `read-the-stats` with the Skill tool and follow it. Sign off `done` with your report and one card per correction, each
 with the numbers behind it; your step's check files them in the inbox, where a person decides which to start.
+
+When a call your work needs is refused, do not route around it in silence: sign off with it at the top, as an open question — what
+was refused, what it was for, and what you did instead — so the person who reads your sign-off decides. A risk noted in passing is not
+enough.

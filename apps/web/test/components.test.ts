@@ -59,27 +59,32 @@ const titleOf = (html: string): string | undefined =>
     .replaceAll('&gt;', '>')
     .replaceAll('&amp;', '&');
 
+/** The codes of a loop out of rounds. */
+const ROUND = { phase: 'waiting', reason: 'AwaitingRound', on: null, via: null } as const;
+
 test("a chip shows a person's word for the state, never the status; on hover what it means, then the step's note it was given", () => {
   const withNote = renderToStaticMarkup(
-    createElement(StatusChip, { phase: 'waiting', reason: 'RoundsExhausted', runCancelled: false, runHeld: false, note: exhaustedNote }),
+    createElement(StatusChip, { codes: ROUND, runCancelled: false, runHeld: false, note: exhaustedNote }),
   );
   assert.match(withNote, /data-state="exhausted"/);
   assert.equal(withNote.replace(/<[^>]*>/g, ''), PERSON.exhausted.rail, 'the rail word is the text');
-  assert.doesNotMatch(withNote.replace(/<[^>]*>/g, ''), /rounds exhausted|RoundsExhausted/, 'neither the status nor the code is shown');
+  assert.doesNotMatch(withNote.replace(/<[^>]*>/g, ''), /rounds exhausted|AwaitingRound/, 'neither the status nor the code is shown');
   assert.equal(titleOf(withNote), `${PERSON.exhausted.meaning}\n${exhaustedNote}`);
 
   for (const note of [null, undefined, '']) {
-    const without = renderToStaticMarkup(
-      createElement(StatusChip, { phase: 'waiting', reason: 'RoundsExhausted', runCancelled: false, runHeld: false, note }),
-    );
+    const without = renderToStaticMarkup(createElement(StatusChip, { codes: ROUND, runCancelled: false, runHeld: false, note }));
     assert.equal(titleOf(without), PERSON.exhausted.meaning, String(note));
   }
   const cancelled = renderToStaticMarkup(
-    createElement(StatusChip, { phase: 'stopped', reason: 'Stopped', runCancelled: true, runHeld: false }),
+    createElement(StatusChip, { codes: { phase: 'stopped', reason: 'Stopped', on: null, via: null }, runCancelled: true, runHeld: false }),
   );
   assert.equal(cancelled.replace(/<[^>]*>/g, ''), 'called off');
   const paused = renderToStaticMarkup(
-    createElement(StatusChip, { phase: 'pending', reason: 'WaitingForPause', runCancelled: false, runHeld: false }),
+    createElement(StatusChip, {
+      codes: { phase: 'pending', reason: 'Waiting', on: 'pause', via: null },
+      runCancelled: false,
+      runHeld: false,
+    }),
   );
   assert.match(paused, /data-state="waiting"/);
   assert.notEqual(paused.replace(/<[^>]*>/g, ''), PERSON.waiting.rail, 'a check the pause holds is its own wait, not a step to come');
@@ -142,6 +147,8 @@ function runWith(note: string | null): RunDetail {
     status: 'failed',
     phase: 'failed',
     reason: 'Failed',
+    on: null,
+    via: null,
     moving: false,
     cost: null,
     atWork: null,
@@ -1603,6 +1610,8 @@ const threeTries: StepTry[] = [
     note: null,
     phase: 'succeeded',
     reason: 'Succeeded',
+    on: null,
+    via: null,
     message: 'succeeded',
     status: 'succeeded',
     attempts: ranOnce,
@@ -1625,6 +1634,8 @@ const threeTries: StepTry[] = [
     note: 'try 2, by retries: 1',
     phase: 'succeeded',
     reason: 'Succeeded',
+    on: null,
+    via: null,
     message: 'succeeded',
     status: 'succeeded',
     attempts: ranOnce,
@@ -1642,6 +1653,8 @@ const threeTries: StepTry[] = [
     note: 'round 2 of 3',
     phase: 'running',
     reason: 'Running',
+    on: null,
+    via: null,
     message: 'running (working)',
     status: 'running (working)',
     attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null } },

@@ -11,8 +11,22 @@ export default meta;
 const AS_OF = new Date('2026-10-12T17:11:00.000Z');
 
 /** The codes and the words of a step verified by its check, and of one at its gate. */
-const VERIFIED = { phase: 'succeeded', reason: 'CheckPassed', message: 'verified ✓', verdict: { result: 'passed', exit: 0 } } as const;
-const APPROVAL = { phase: 'waiting', reason: 'AwaitingApproval', message: 'awaiting approval', verdict: null } as const;
+const VERIFIED = {
+  phase: 'succeeded',
+  reason: 'CheckPassed',
+  on: null,
+  via: null,
+  message: 'verified ✓',
+  verdict: { result: 'passed', exit: 0 },
+} as const;
+const APPROVAL = {
+  phase: 'waiting',
+  reason: 'AwaitingApproval',
+  on: null,
+  via: null,
+  message: 'awaiting approval',
+  verdict: null,
+} as const;
 
 /** A step of `RUN`, by its name and its codes, with nothing a person is asked. */
 const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL, i: number): WaitingRun['steps'][number] => ({
@@ -56,6 +70,8 @@ const RUN: WaitingRun = {
   status: 'awaiting approval',
   phase: 'waiting',
   reason: 'AwaitingApproval',
+  on: null,
+  via: null,
   moving: false,
   cost: null,
   atWork: null,

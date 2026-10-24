@@ -1,15 +1,16 @@
 /**
- * A step's state, from the codes the api carries for it (`phase`, `reason`) — what the run established, not only what its task settled —
- * and how each state is drawn. The board never reads a state out of the sentence beside them (`message`), which is shown as it comes.
- * The words a person reads of a state are `words.ts`'s (`PERSON`): this chooses the state and its colour. `cancelled` is a fact about the
- * run rather than the step: a step to come on a run somebody called off never will, and a step the cancellation stopped is `Stopped`.
+ * A step's state, from the codes the api carries for it (`phase`, `reason`, and `on` and `via`, which qualify a wait and a question) —
+ * what the run established, not only what its task settled — and how each state is drawn. The board never reads a state out of the
+ * sentence beside them (`message`), which is shown as it comes. The words a person reads of a state are `words.ts`'s (`PERSON`): this
+ * chooses the state and its colour. `cancelled` is a fact about the run rather than the step: a step to come on a run somebody called
+ * off never will, and a step the cancellation stopped is `Stopped`.
  *
  * `held` is a fact about the run too: a person holds it until other runs ship (the CLI's `hold`), so a step not filed will not be until the
  * hold lifts, and a step at a human gate asks nothing of anyone while it stands — every verb that would answer it is refused. A step at
  * work, asking through its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a
  * verdict.
  */
-import type { StepPhase, StepReason } from './api/reasons.ts';
+import type { StepCodes, StepReason } from './api/reasons.ts';
 import { container, dashed, filled, hairline, meaningOf, paint, ringed, type Hue } from './meaning.ts';
 
 export type StepState =
@@ -39,8 +40,8 @@ export type StepState =
  * (`HELD_BY_A_HOLD`) on a run not called off. `runHeld` has no default, so the compiler names every caller that has to say it: a caller
  * that forgot the hold would draw a held run's gate as asking a person.
  */
-export function stepState(phase: StepPhase, reason: StepReason, runCancelled: boolean, runHeld: boolean): StepState {
-  const state = codeState(phase, reason, runCancelled);
+export function stepState(codes: StepCodes, runCancelled: boolean, runHeld: boolean): StepState {
+  const state = codeState(codes, runCancelled);
   return runHeld && !runCancelled && HELD_BY_A_HOLD.has(state) ? 'held' : state;
 }
 
@@ -56,30 +57,27 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
 ]);
 
 /**
- * The state each reason is drawn as. Total: a reason the api adds fails the typecheck here until it has a state. A step not filed — on
- * another step or run, the checkout, the pause, or nothing yet — is `waiting`, and one the cap on runs in flight holds `waiting-for-slot`;
- * a session that ended on its own word (`Succeeded`) is at most `unverified`; one an operator or a cancel stopped is drawn `cancelled`.
+ * The state each reason is drawn as, before what qualifies it narrows it (`codeState`). Total: a reason the api adds fails the typecheck
+ * here until it has a state. A step not filed — on another step or run, the checkout, the pause, or nothing yet — is `waiting`; a question
+ * is `blocked`, a closeout's; a session that ended on its own word (`Succeeded`) is at most `unverified`; one an operator or a cancel
+ * stopped is drawn `cancelled`.
  */
 export const STATE_OF: Record<StepReason, StepState> = {
   Running: 'working',
-  NeedsHuman: 'needs-human',
   Checking: 'checking',
   CheckPassed: 'verified',
   Succeeded: 'unverified',
-  Blocked: 'blocked',
   AwaitingApproval: 'awaiting-approval',
-  RoundsExhausted: 'exhausted',
+  AwaitingAnswer: 'blocked',
+  AwaitingRound: 'exhausted',
   OverBudget: 'over-budget',
   BudgetExhausted: 'budget-exhausted',
-  CheckDenied: 'denied',
+  Denied: 'denied',
   Unsigned: 'unsigned',
   Failed: 'failed',
   CheckFailed: 'failed-check',
   Pending: 'waiting',
   Waiting: 'waiting',
-  WaitingForCheckout: 'waiting',
-  WaitingForPause: 'waiting',
-  WaitingForSlot: 'waiting-for-slot',
   Stopped: 'cancelled',
   UnreadableCloseout: 'unreadable',
   Unknown: 'unknown',
@@ -87,11 +85,14 @@ export const STATE_OF: Record<StepReason, StepState> = {
 
 /**
  * A step's state from its codes alone, and whether the run was called off: `STATE_OF`, but `unreadable` for a step whose record the api
- * could not judge (`Unknown` in phase `failed`), and `cancelled` for a step to come on a run called off.
+ * could not judge (`Unknown` in phase `failed`), `cancelled` for a step to come on a run called off, `needs-human` for a question its
+ * session asks (`AwaitingAnswer` via `session`), and `waiting-for-slot` for a wait on the limit on runs in flight (`Waiting` on `limit`).
  */
-function codeState(phase: StepPhase, reason: StepReason, runCancelled: boolean): StepState {
+function codeState({ phase, reason, on, via }: StepCodes, runCancelled: boolean): StepState {
   if (phase === 'failed' && reason === 'Unknown') return 'unreadable';
   if (phase === 'pending' && runCancelled) return 'cancelled';
+  if (reason === 'AwaitingAnswer' && via === 'session') return 'needs-human';
+  if (reason === 'Waiting' && on === 'limit') return 'waiting-for-slot';
   return STATE_OF[reason];
 }
 

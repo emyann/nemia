@@ -56,8 +56,10 @@ const row = (extra: object = {}): RunSummary => ({
     onYou: true,
   },
   status: 'running',
-  phase: 'running',
-  reason: 'Held',
+  phase: 'pending',
+  reason: 'Waiting',
+  on: 'run',
+  via: null,
   moving: true,
   cost: { usd: 4.2, measured: 1, unmeasured: 0, said: '$4.20' },
   atWork: { ms: 1_920_000, since: null, endedAt: '2026-09-30T05:40:00.000Z' },
@@ -79,7 +81,9 @@ const row = (extra: object = {}): RunSummary => ({
       taskId: 't-1',
       branch: 'wf/r-1/implement',
       phase: 'waiting',
-      reason: 'Blocked',
+      reason: 'AwaitingAnswer',
+      on: null,
+      via: 'closeout',
       message: 'succeeded · BLOCKED',
       verdict: null,
       status: 'succeeded · BLOCKED',
@@ -201,6 +205,15 @@ test('REFUSED: a step without a key the board reads, and a value quoted to 60 ch
   const { blockedByHarness: _, ...without } = step;
   answering(t, [row({ steps: [without] })]);
   await assert.rejects(readRuns(), unread('[0].steps[0].blockedByHarness', 'is missing'));
+
+  const { via: __, ...unqualified } = step;
+  answering(t, [row({ steps: [unqualified] })]);
+  await assert.rejects(readRuns(), unread('[0].steps[0].via', 'is missing'));
+  const { on: ___, ...runUnqualified } = row();
+  answering(t, [runUnqualified]);
+  await assert.rejects(readRuns(), unread('[0].on', 'is missing'));
+  answering(t, [row({ on: 'slot' })]);
+  await assert.rejects(readRuns(), unread('[0].on', '"slot", where'));
 
   answering(t, [row({ brief: 7 })]);
   await assert.rejects(readRuns(), unread('[0].brief', '7, where'));

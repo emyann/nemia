@@ -42,6 +42,8 @@ const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSum
   status: 'running',
   phase: 'running',
   reason: 'Running',
+  on: null,
+  via: null,
   moving: true,
   cost: null,
   atWork: null,

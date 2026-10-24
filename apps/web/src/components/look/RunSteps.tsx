@@ -1,4 +1,4 @@
-import type { RunSummary, StepReason } from '@/lib/api';
+import type { RunSummary, WaitOn } from '@/lib/api';
 import { Fragment, type CSSProperties, type ReactNode } from 'react';
 import { filled, ink, paint } from '@/lib/meaning';
 import { railSaid, railStates } from '@/lib/runWords';
@@ -60,11 +60,11 @@ export function RunSteps({
   names = false,
   wrap,
 }: {
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason'>>;
+  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via'>>;
   cancelled: boolean;
   held: boolean;
   names?: boolean;
-  wrap?: (bar: ReactNode, step: { name: string; state: StepState; reason: StepReason }) => ReactNode;
+  wrap?: (bar: ReactNode, step: { name: string; state: StepState; on: WaitOn | null }) => ReactNode;
 }) {
   const drawn = railStates(steps, cancelled, held);
   return (

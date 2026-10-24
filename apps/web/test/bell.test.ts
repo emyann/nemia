@@ -28,6 +28,8 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
   status: 'running',
   phase: 'running',
   reason: 'Running',
+  on: null,
+  via: null,
   moving: true,
   cost: null,
   atWork: null,

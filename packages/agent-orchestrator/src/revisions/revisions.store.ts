@@ -1,6 +1,6 @@
 /**
  * The revisions ledger on disk: one file per kind and name, `$WF_ROOT/revisions/<kind>/<name>.json`, holding that content's entries in
- * order (`Revision`). Read (`ledgerOf`, `topsOf`) and appended to (`appendRevision`), this file being its one writer.
+ * order (`Revision`). Read (`ledgerOf`) and appended to (`appendRevision`), this file being its one writer.
  *
  * One file per kind and name on purpose: a hand edit of one agent touches one file, and two passes resolving different kinds never
  * contend. An append is keyed by the digest — a content already in the ledger keeps the number it was given — so two passes resolving the
@@ -9,7 +9,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Schema } from 'effect';
-import { revisionNow, REVISION_KINDS, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
+import { revisionNow, REVISION_KINDS, type Revision, type RevisionKind } from './revisions.ts';
 import { wfRoot } from '../config/config.store.ts';
 
 /** The store whose ledger this is, read once as the package loads, as `record.store.ts` reads its `HOME`. */
@@ -97,13 +97,3 @@ export function appendRevision(kind: RevisionKind, name: string, hash: string, a
   }
   return revisionNow(ledgerOf(kind, name), hash, at);
 }
-
-/**
- * The top of each of `names`'s ledgers, as a pin: the last entry of each, left out for a kind and name whose ledger holds none. One read
- * per name, and nothing written.
- */
-export const topsOf = (names: readonly KindName[]): Pin[] =>
-  names.flatMap(({ kind, name }) => {
-    const top = ledgerOf(kind, name).at(-1);
-    return top ? [{ kind, name, n: top.n, hash: top.hash }] : [];
-  });

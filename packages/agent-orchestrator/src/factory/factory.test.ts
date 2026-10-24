@@ -366,11 +366,11 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
       '         template: /t/team 0.2.0, applied at 0.2.0',
     ]);
     const drifted = { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'The template is at 0.3.0.' } as const;
-    const pending = { type: 'ConflictsPending', status: 'True', reason: 'Merging', message: 'Two files wait.' } as const;
+    const pending = { type: 'ConflictsPending', status: 'True', reason: 'Conflicts', message: 'Two files wait.' } as const;
     assert.deepEqual(factoryLines([{ ...made, status: { applied: '0.2.0', conditions: [drifted, pending] } }]).slice(2, 5), [
       '         template: /t/team 0.2.0, applied at 0.2.0',
       '         Applied False, VersionDrift: The template is at 0.3.0.',
-      '         ConflictsPending True, Merging: Two files wait.',
+      '         ConflictsPending True, Conflicts: Two files wait.',
     ]);
   });
   await t.test(

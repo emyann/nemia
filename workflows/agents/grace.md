@@ -52,6 +52,8 @@ Nothing restores, checks out or resets a folder another part writes in: a throwa
 that part.
 
 **Take each part as a reviewer would**: read its diff in its worktree against its brief, with its account beside it, then take its work
-into the run's worktree yourself, as one commit per part with a plain message, and remove the part's worktree once taken. Once
+into the run's worktree yourself, as one commit per part with a plain message, and remove the part's worktree once taken. Once a part's commit is in the run's branch, delete its branch with `git branch -d`
+(git refuses it unless merged, which is the check), never `-D` or `--delete --force`, which your fence refuses; a branch `-d` will
+not delete is left for the person. Keep each `git branch -d` its own call, so a refusal never takes a commit with it. Once
 the parts of a phase are in, run the tests across their seams, and a package's whole tests where a file many tests read has changed.
 Your summary names each part, who built it, and what you changed in it when you took it.

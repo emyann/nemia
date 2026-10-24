@@ -69,7 +69,7 @@ import {
 } from 'agent-orchestrator/run';
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
-import { type RunGraph, runGraph } from 'agent-orchestrator';
+import { driftNow, type RunGraph, runGraph } from 'agent-orchestrator';
 import type { AnswerVia, CheckVerdict, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from 'agent-orchestrator';
 
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
@@ -79,7 +79,6 @@ import {
   attemptsIn,
   closeoutIn,
   driftOf,
-  kindsOf,
   type StepAttempts,
   type StepCloseout,
   type StepTry,
@@ -306,10 +305,11 @@ export type RunDetail = {
   /** Set when the workflow folder cannot be read, or lacks steps the run started with. */
   warning: string | null;
   /**
-   * The kinds this run is behind the revisions ledger on, in `Drift`'s words: one entry per kind and name whose number the ledger has
-   * moved past since the run resolved it — without `step`, what a filing after this would take (`nemia refresh`); with `step`, what a step
-   * that has already been filed ran on, where the run's own pin has moved past it. `[]` for a run on the newest of every kind, and for a
-   * record written before revisions, which pinned nothing.
+   * The kinds this run is behind the files on, in `Drift`'s words (`driftNow`): what the files hold now, resolved on this read without a
+   * write to the ledger and compared by digest — one entry per kind and name whose bytes differ from what the run resolved, `now` being
+   * the number those bytes have, or would be given, which may be lower than `pinned`. Without `step`, what a filing after this would take
+   * (`nemia refresh`); with `step`, what a step that has already been filed ran on, where the run's own pin has moved past it. `[]` for a
+   * run whose next filing would take its pins, for one that has filed nothing, and for a record written before revisions.
    */
   kinds: readonly Drift[];
   /** The line to type to take the new revisions, built off the table (`refreshLine`): what the board shows beside the drift. */
@@ -679,7 +679,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     toDecide: judged.toDecide,
     gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
-    kinds: kindsOf(run),
+    kinds: driftNow(run),
     refresh: refreshLine(run.id),
     graph: runGraph(steps, names),
     steps: await Promise.all(

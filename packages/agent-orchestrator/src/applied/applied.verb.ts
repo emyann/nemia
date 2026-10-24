@@ -16,7 +16,7 @@ import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts'
 import type { Command } from '../command/entry.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { addFactory, factoryRepos, readFactories } from '../factory/factory.store.ts';
-import type { Factory, FactoryTemplate } from '../factory/factory.ts';
+import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory/factory.ts';
 import { openTemplate, problemLine } from '../template/template.store.ts';
 import type { FactorySpec } from '../template/index.ts';
 import {
@@ -70,7 +70,7 @@ export function renderedAt(source: string, sets: readonly string[]): RenderedAt 
 }
 
 /** A condition, as Kubernetes words one. */
-const condition = (type: string, status: boolean, reason: string, message: string): Condition => ({
+const condition = (type: FactoryConditionType, status: boolean, reason: FactoryConditionReason, message: string): Condition => ({
   type,
   status: status ? 'True' : 'False',
   reason,

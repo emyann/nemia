@@ -28,3 +28,7 @@ code of a layer. A tool beside the layers, not a layer: no package or app import
 - **`test/glossary.baseline.ts` only shrinks**: a change that removes a retired spelling from a file lowers its count there in the same
   commit, and takes the entry off where none is left; a new retired row in a glossary table adds its files' counts the day it lands
   (`test/glossary.test.ts`).
+- **`test/closed-state.baseline.ts` only shrinks**: it holds, by key, each field at a door that says a state or a kind as a `string`
+  (`test/closed-state.test.ts`). A change that closes a field takes its entry off in the same commit, and a rename moves its key with it;
+  a new field at a door is typed as a closed union named in its glossary, never added to the baseline. Today's printout:
+  `node tools/guards/test/closed-state.ts`.

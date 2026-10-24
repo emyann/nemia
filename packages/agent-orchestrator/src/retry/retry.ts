@@ -110,7 +110,6 @@ export function retryable(
   const taskId = run.steps[step.name]?.taskId;
   const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
   const harnessAsks = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
-  const codes: QualifiedStep = harnessAsks ? { reason: 'AwaitingAnswer', via: 'session' } : REASON_OF[status];
   const tried = status === 'over budget' ? own : status;
   const followers = steps.filter((s) => s.after.includes(step.name));
   const noneFiled = followers.length > 0 && !followers.some((s) => run.steps[s.name]?.taskId);
@@ -149,13 +148,17 @@ export function retryable(
     settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
   return {
     status,
-    ...codes,
+    ...codesOf(status, harnessAsks),
     modes,
     ...(sendsBack ? { sendsBack: true as const } : {}),
     ...(sendsBack && back ? { back } : {}),
     ...(raise ? { raise } : {}),
   };
 }
+
+/** A standing's codes: a session its harness asks the person through is `AwaitingAnswer` via `session`, else its status's reason. */
+const codesOf = (status: StepStatus, harnessAsks: boolean): QualifiedStep =>
+  harnessAsks ? { reason: 'AwaitingAnswer', via: 'session' } : REASON_OF[status];
 
 /**
  * Whether a person's ask carries what a try of its step needs, and nothing it cannot take. A recheck files no session, and carries. An ask

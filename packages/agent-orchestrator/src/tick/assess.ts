@@ -59,7 +59,8 @@ export type Assessment = {
   /**
    * What waits on the store's pause (`Run.pause`) on this pass: every step whose session, try, round or check the pass would file, by
    * name (`steps`), and the steps among them whose check is what waits (`checks`). Nothing of them is filed, and the run counts against the
-   * cap on runs in flight for them, as for `waitingOnCheckout`. Absent while the store is not paused, and on a run nothing of waits on the pause.
+   * cap on runs in flight for them, as for `waitingOnCheckout`. Absent while the store is not paused, and on a run nothing of which waits
+   * on the pause.
    */
   waitingOnPause?: { steps: string[]; checks: string[] };
 };
@@ -75,13 +76,13 @@ export type Assessment = {
  * - A step about to be tried again, and a looping step whose loop goes round again, is `running`: what waits on it waits. No step of a
  *   round due is `over budget` (`roundSpans`): the round is what a person raised the cap for.
  * - An ending step that `waitsOnCheckout` is not filed, neither a first session nor a person's try of it, since two sessions trial merging
- *   in one checkout collide: it goes to `waitingOnCheckout`, is filed once the other run's step settles, and a try of it stays `running`, so the run
- *   still counts against the cap on runs in flight.
+ *   in one checkout collide: it goes to `waitingOnCheckout`, is filed once the other run's step settles, and a try of it stays `running`,
+ *   so the run still counts against the cap on runs in flight.
  * - An ending held at its gate on work this pass files again (`unheld`) is `waiting`: its gate holds on what that work says.
  * - A check already filed is never filed twice; a step that waits on one that stops its followers is `unreachable`, never left to hang.
- * - While the store is paused (`Run.pause`) nothing is due — no step, check, try or round, nor one waiting on the checkout — and what would
- *   be goes to `waitingOnPause`; a person's asks are honoured as for any run, so a step asked for again is `running`, and its ask waits on its
- *   file for the lift. What a person decides (`toDecide`) is still asked: a word given is kept for the next pass.
+ * - While the store is paused (`Run.pause`) nothing is due — no step, check, try or round, nor one waiting on the checkout — and what
+ *   would be goes to `waitingOnPause`; a person's asks are honoured as for any run, so a step asked for again is `running`, and its ask
+ *   waits on its file for the lift. What a person decides (`toDecide`) is still asked: a word given is kept for the next pass.
  *
  * @param closeoutOf How each step signed off, when it left a closeout: a session that ends cleanly can still say `outcome: "blocked"`,
  *   which the engine cannot tell from finished work.
@@ -148,16 +149,28 @@ export function assess(
       ? stoppedOnWord(steps.map((s) => ({ status: status.get(s.name)!, own: stood.get(s.name)!.own })))
       : 'running';
 
-  if (run.hold) return { ready: [], check: [], retry: [], round: [], unreachable, waitingOnCheckout: [], status: 'running', heldUntil: run.hold.until };
+  if (run.hold)
+    return { ready: [], check: [], retry: [], round: [], unreachable, waitingOnCheckout: [], status: 'running', heldUntil: run.hold.until };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'waiting', standings);
-  const assessed: Assessment = { ready, check, retry, round, unreachable, waitingOnCheckout, status: overall, ...(decide ? { toDecide: decide } : {}) };
+  const assessed: Assessment = {
+    ready,
+    check,
+    retry,
+    round,
+    unreachable,
+    waitingOnCheckout,
+    status: overall,
+    ...(decide ? { toDecide: decide } : {}),
+  };
   return underPause(run, assessed);
 }
 
 /** The assessment as the store's pause leaves it (`Run.pause`): nothing due, and what was due named in `waitingOnPause`. Pure. */
 function underPause(run: Run, a: Assessment): Assessment {
   if (!run.pause) return a;
-  const steps = [...new Set([...a.ready, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step), ...a.waitingOnCheckout])];
+  const steps = [
+    ...new Set([...a.ready, ...a.check, ...a.retry.map((r) => r.step), ...a.round.map((r) => r.step), ...a.waitingOnCheckout]),
+  ];
   const checks = [...new Set([...a.check, ...a.retry.filter((r) => r.mode === 'recheck').map((r) => r.step)])];
   const waitingOnPause = steps.length ? { waitingOnPause: { steps, checks } } : {};
   return { ...a, ready: [], check: [], retry: [], round: [], waitingOnCheckout: [], ...waitingOnPause };

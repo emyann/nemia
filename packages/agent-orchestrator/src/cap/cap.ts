@@ -83,7 +83,9 @@ export function slotNeed(
 ): { inFlight: boolean; wants: boolean } {
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
-  const due = a.ready.length + a.check.length + a.retry.length + a.round.length + a.waitingOnCheckout.length + (a.waitingOnPause?.steps.length ?? 0) > 0;
+  const due =
+    a.ready.length + a.check.length + a.retry.length + a.round.length + a.waitingOnCheckout.length + (a.waitingOnPause?.steps.length ?? 0) >
+    0;
   return {
     inFlight: inFlight(run, phaseOf).length > 0 || (started && !run.cancelledAt && due),
     wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, landed),

@@ -80,7 +80,11 @@ test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked
   const lines = [gated, asking, broke].map((id) => printed.find((l) => l.startsWith(`${id}  `)));
   assert.deepEqual(
     lines,
-    [`${gated}  awaiting approval  unreachable: implement`, `${asking}  blocked  unreachable: implement`, `${broke}  failed  unreachable: implement`],
+    [
+      `${gated}  awaiting approval  unreachable: implement`,
+      `${asking}  blocked  unreachable: implement`,
+      `${broke}  failed  unreachable: implement`,
+    ],
     printed.join('\n'),
   );
   for (const line of lines.slice(0, 2)) assert.ok(!line?.includes('failed'), line);

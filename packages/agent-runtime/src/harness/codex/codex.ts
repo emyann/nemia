@@ -153,7 +153,7 @@ export const codex: HarnessSpec = {
       sandboxOf(r),
       ...(r.config?.model ? ['-m', r.config?.model] : []),
       ...(r.config?.worktree ? ['--worktree'] : []),
-      ...(io?.closeoutFile ? ['--output-schema', io.closeoutSchemaFile!, '-o', io.closeoutFile] : []),
+      ...(io?.closeoutFile && io.closeoutSchemaFile ? ['--output-schema', io.closeoutSchemaFile, '-o', io.closeoutFile] : []),
       ...(r.config?.effort ? ['-c', `model_reasoning_effort="${r.config?.effort}"`] : []),
       ...codexMcpArgs({ ...io?.pickedMcp, ...r.config?.mcp }),
       ...(io?.trustedDirs ?? []).flatMap((dir) => ['-c', `projects."${dir}".trust_level="trusted"`]),

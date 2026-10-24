@@ -107,11 +107,7 @@ export const mcpServerOf = (server: RemoteMcpServer): RemoteMcpServer => ({
   ...(server.headers === undefined
     ? {}
     : {
-        headers: Object.fromEntries(
-          Object.keys(server.headers)
-            .sort()
-            .map((k) => [k, server.headers![k]]),
-        ),
+        headers: Object.fromEntries(Object.entries(server.headers).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))),
       }),
   ...(server.oauth === undefined
     ? {}
@@ -252,8 +248,9 @@ export const claudeMcpArgs = (configs: ReadonlyArray<string | undefined>): strin
 export const codexMcpServerNames = (toml: string): Set<string> => {
   const names = new Set<string>();
   for (const raw of toml.split('\n')) {
-    const table = /^\[mcp_servers\.(?:"((?:[^"\\]|\\.)*)"|([\w-]+))(?:\.[^\]]*)?\]$/.exec(raw.trim());
-    if (table) names.add(table[1] ?? table[2]);
+    const [, quoted, bare] = /^\[mcp_servers\.(?:"((?:[^"\\]|\\.)*)"|([\w-]+))(?:\.[^\]]*)?\]$/.exec(raw.trim()) ?? [];
+    const name = quoted ?? bare;
+    if (name !== undefined) names.add(name);
   }
   return names;
 };

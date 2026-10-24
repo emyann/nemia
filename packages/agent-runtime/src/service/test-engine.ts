@@ -20,8 +20,7 @@ import type { Attempt, Said, SessionAsk, State } from '../core/index.ts';
 import { JournalError, StopRefused, type TaskView } from '../core/engine/index.ts';
 import {
   attemptRefusal,
-  DrainRefused,
-  drainRefusalOf,
+  drainChecked,
   Engine,
   isTranscriptCursor,
   ListRefused,
@@ -634,9 +633,10 @@ export const testEngine = (): TestEngine => {
       compact: unkept('compact'),
       hold: () => Effect.succeed(null),
       drain: (holder) =>
-        drainRefusalOf(holder) === undefined
-          ? Effect.sync(() => void held.drains.push(holder))
-          : Effect.fail(new DrainRefused({ message: drainRefusalOf(holder)! })),
+        Effect.andThen(
+          drainChecked(holder),
+          Effect.sync(() => void held.drains.push(holder)),
+        ),
     }),
   );
   const settle = (id: string, phase: string, end?: TestEnd): TestTask => {

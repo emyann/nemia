@@ -1,8 +1,8 @@
 /** The engine's `follow` verb, and what refuses it: the session of a task's latest attempt, followed live by its harness. */
+import type { Harnessed } from './harnessed.ts';
 import { Effect, Schema } from 'effect';
 import { fold, nameFor, type Event, type State } from '../core/index.ts';
 import type { JournalError } from '../core/engine/index.ts';
-import type { SeamOps } from '../a2a/index.ts';
 
 /** A session `follow` will not follow, and why: a task the journal has no record of, a harness that does not stream. */
 export class FollowRefused extends Schema.TaggedError<FollowRefused>()('FollowRefused', {
@@ -16,16 +16,15 @@ export class FollowRefused extends Schema.TaggedError<FollowRefused>()('FollowRe
  */
 export const followVerbOf = (
   read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>,
-  runners: Record<string, SeamOps>,
-  harnessOf: (state: State) => string,
+  harnessOf: (state: State) => Harnessed,
 ) =>
   Effect.fn('Engine.follow')(function* (taskId: string) {
     const refuse = (message: string) => Effect.fail(new FollowRefused({ message }));
     const events = yield* read(taskId);
     if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
-    const harness = harnessOf(state);
-    const follow = runners[harness].follow;
+    const { name: harness, runner } = harnessOf(state);
+    const follow = runner.follow;
     if (!follow)
       return yield* refuse(
         `the \`${harness}\` harness does not stream its sessions: read its transcript again (\`transcript\`) for what is new.`,

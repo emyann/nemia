@@ -236,7 +236,7 @@ const argsOf = (config: Record<string, unknown>): HarnessArgs =>
 /** A stored `filed` event with its `priority` kept only when it is a whole number. */
 const weighed = (event: Extract<Resolved, { kind: 'filed' }>) => {
   const { priority, ...unweighed } = event;
-  return Number.isInteger(priority) ? { ...unweighed, priority: priority! } : unweighed;
+  return typeof priority === 'number' && Number.isInteger(priority) ? { ...unweighed, priority } : unweighed;
 };
 
 /**
@@ -285,8 +285,8 @@ export const upgrade = (event: Resolved): Event => {
   }
   const config: Record<string, unknown> = { ...lifted, ...given };
   const flags: Record<string, unknown> = {};
-  for (const key of Object.keys(FORMER_ARGS)) {
-    if (config[key] === true) flags[FORMER_ARGS[key]] = true;
+  for (const [key, flag] of Object.entries(FORMER_ARGS)) {
+    if (config[key] === true) flags[flag] = true;
     delete config[key];
   }
   if (Object.keys(flags).length) config.claude = { ...flags, ...filed.config?.claude };

@@ -2,6 +2,7 @@
  * The engine's `say` verb, and what refuses it: words handed to the running session of a task's attempt in flight through its harness,
  * then journalled as a `said` entry with where the session's transcript stood as they went (`transcriptEndOf`).
  */
+import type { Harnessed } from './harnessed.ts';
 import { Cause, Effect, Schema } from 'effect';
 import {
   fold,
@@ -18,8 +19,7 @@ import {
 import { Journal, type JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
 import { claudeSayRefuses, isClaudeJob } from '../harness/claude/index.ts';
-import type { SeamOps } from '../a2a/index.ts';
-import { isClaude, isRemote, isSpec, type HarnessConfig } from './options.ts';
+import { isClaude, isRemote, isSpec } from './options.ts';
 import { transcriptEndOf } from './transcript-end.ts';
 
 /** Words `say` will not hand to a session, and why, in words that say what to do instead. Nothing was sent or journalled. */
@@ -63,9 +63,7 @@ const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String
 export const sayVerbOf = (
   go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>,
   read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>,
-  runners: Record<string, SeamOps>,
-  harnesses: Record<string, HarnessConfig>,
-  harnessOf: (state: State) => string,
+  harnessOf: (state: State) => Harnessed,
 ) =>
   Effect.fn('Engine.say')(function* (taskId: string, text: string) {
     const refuse = (message: string) => Effect.fail(new SayRefused({ message }));
@@ -74,9 +72,7 @@ export const sayVerbOf = (
     const events = yield* read(taskId);
     if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
-    const harness = harnessOf(state);
-    const runner = runners[harness];
-    const h = harnesses[harness];
+    const { name: harness, runner, config: h } = harnessOf(state);
     const deliver = runner.say;
     if (!deliver) {
       return yield* refuse(

@@ -53,7 +53,9 @@ export type AdmissionRun = { status: number | null; stdout: string; failed: bool
 
 /** Runs admission's command with the call on its stdin, bounded (`ADMISSION_BOUND_MS`). */
 const runAdmission = (command: string[], call: string): AdmissionRun => {
-  const ran = spawnSync(command[0], command.slice(1), {
+  const [program, ...args] = command;
+  if (program === undefined) return { status: null, stdout: '', failed: true };
+  const ran = spawnSync(program, args, {
     input: call,
     encoding: 'utf8',
     timeout: ADMISSION_BOUND_MS,

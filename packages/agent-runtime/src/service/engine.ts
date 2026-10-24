@@ -3,7 +3,7 @@
  * are Effects with typed errors.
  */
 import { Context, Effect, Exit, Fiber, Layer, Schema, type Scope, type Stream } from 'effect';
-import { fold, nameFor, pathOf, type Input, type LifecycleStep, type Said, type Sighting, type State } from '../core/index.ts';
+import { fold, nameFor, own, pathOf, type Input, type LifecycleStep, type Said, type Sighting, type State } from '../core/index.ts';
 import {
   argsRefusalOf,
   Runner,
@@ -70,7 +70,6 @@ import { answerVerbOf, type Answering, type AnswerRefused, type AnswerUnsent, ty
 import {
   handleOf,
   isSpec,
-  isRemote,
   isClaude,
   runnersOf,
   optionsRefusalOf,
@@ -84,6 +83,7 @@ import {
   type TickReport,
 } from './options.ts';
 import { harnessRefusalOf } from './harness-refusal.ts';
+import { harnessedOf, noFallbackRefusal, remoteIn, type Harnessed } from './harnessed.ts';
 import { McpStateRefused, mcpStateVerbOf } from './mcp-state.ts';
 import { McpSignInRefused, mcpSignInVerbsOf, type McpSignInStarted, type McpSignInState } from './mcp-sign-in.ts';
 import { traceparentOf } from '../harness/telemetry.ts';
@@ -148,6 +148,12 @@ export const drainRefusalOf = (holder: unknown): string | undefined =>
   holder === null || (Number.isInteger(holder) && (holder as number) > 0)
     ? undefined
     : `takes the process id of the engine that holds the attached sessions, a whole number from 1, or null to let their calls go; it was handed ${JSON.stringify(holder) ?? 'nothing'}.`;
+
+/** `drain`'s check of its holder: fails with `DrainRefused` for what `drainRefusalOf` refuses, and does nothing otherwise. */
+export const drainChecked = (holder: unknown): Effect.Effect<void, DrainRefused> => {
+  const refused = drainRefusalOf(holder);
+  return refused === undefined ? Effect.void : Effect.fail(new DrainRefused({ message: refused }));
+};
 
 /** Why `list` refuses what it was handed, or `undefined` for nothing or one list of task ids. */
 export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
@@ -616,11 +622,11 @@ const startOf =
     });
 
 /** `logs` of the task `view` reads, asked of its own harness: `(no session yet)` before its harness names one. */
-const logsOf = <E, R>(view: Effect.Effect<TaskView, E, R>, runners: Record<string, SeamOps>, harnessOf: (state: State) => string) =>
+const logsOf = <E, R>(view: Effect.Effect<TaskView, E, R>, harnessOf: (state: State) => Harnessed) =>
   Effect.gen(function* () {
     const v = yield* view;
     if (!v.sessionId) return '(no session yet)';
-    return yield* runners[harnessOf(v.state)].logs(v.sessionId);
+    return yield* harnessOf(v.state).runner.logs(v.sessionId);
   });
 
 /**
@@ -645,9 +651,11 @@ const quotaVerbOf = (runners: Record<string, SeamOps>, fallback: string): Engine
     if (!Object.hasOwn(runners, name)) {
       return yield* refuse(`\`${name}\` is not a harness this engine has. Its harnesses are: ${Object.keys(runners).join(', ')}.`);
     }
-    const ask = runners[name].quota;
+    const ask = own(runners, name)?.quota;
     if (!ask) {
-      const some = Object.keys(runners).filter((h) => runners[h].quota);
+      const some = Object.entries(runners)
+        .filter(([, r]) => r.quota)
+        .map(([h]) => h);
       return yield* refuse(
         `the \`${name}\` harness reports no quota. ${some.length ? `Ask one that does: ${some.join(', ')}.` : 'None of the harnesses this engine has does.'}`,
       );
@@ -757,21 +765,21 @@ const make = (options: EngineOptions) =>
     const attached = attachedSessions(root, claudeExecutable);
     const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, claudeExecutable, sayTimeoutMs);
     const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
+    const byName = harnessedOf(harnesses, runners);
+    const fallen = own(byName, fallback);
+    if (fallen === undefined) return yield* Effect.fail(new EngineRefused({ message: noFallbackRefusal(fallback, harnesses) }));
     const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));
     const read = (taskId: string) => go(Effect.flatMap(Journal, (j) => j.read(taskId)));
 
-    const harnessOf = (state: State) => {
-      const asked = state.harness ?? fallback;
-      return Object.hasOwn(runners, asked) ? asked : fallback;
-    };
+    const harnessOf = (state: State): Harnessed => own(byName, state.harness ?? fallback) ?? fallen;
 
     const viewOf = (taskId: string) =>
       Effect.gen(function* () {
         const events = yield* Effect.flatMap(Journal, (j) => j.read(taskId));
         const state = fold(taskId, events);
         const last = state.attempts.at(-1);
-        const { find, observe, observeFor } = runners[harnessOf(state)];
+        const { find, observe, observeFor } = harnessOf(state).runner;
         const look = observeFor
           ? observeFor(state.attempts.map((a) => ({ name: nameFor(taskId, a.n), harness: state.harness })))
           : observe.pipe(Effect.map((seen): Observation => ({ seen, unread: new Set() })));
@@ -837,13 +845,12 @@ const make = (options: EngineOptions) =>
       if (!events.length)
         return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
       const state = fold(taskId, events);
-      const harness = harnessOf(state);
-      const transcriptOf = runners[harness].transcriptOf;
+      const { name: harness, runner, config: h } = harnessOf(state);
+      const transcriptOf = runner.transcriptOf;
       if (!transcriptOf)
         return yield* refuse(
           `the \`${harness}\` harness keeps no conversation this engine can read. \`logs\` gives what its session printed.`,
         );
-      const h = harnesses[harness];
       if (after !== undefined && (isClaude(h) || isSpec(h)) && !isTranscriptCursor(after)) {
         return yield* refuse(
           `\`${after}\` is not a cursor a transcript read gave. Pass the \`cursor\` the last read returned, or none to read from the start.`,
@@ -868,7 +875,7 @@ const make = (options: EngineOptions) =>
       const state = events.length ? fold(taskId, events) : undefined;
       const refused =
         answerRefusalOf(taskId, state, text, config) ??
-        (state && config ? harnessRefusalOf({ ...filingOf(state, config), harness: harnessOf(state) }, harnesses) : undefined);
+        (state && config ? harnessRefusalOf({ ...filingOf(state, config), harness: harnessOf(state).name }, harnesses) : undefined);
       if (refused) return yield* refuse(refused);
       return yield* go(answer(taskId, text, config));
     });
@@ -883,11 +890,11 @@ const make = (options: EngineOptions) =>
       path: (taskId) => read(taskId).pipe(Effect.map((events) => pathOf(taskId, events))),
       list: listVerb,
       stop: (taskId) => go(requestStop(taskId)),
-      logs: (taskId) => go(logsOf(viewOf(taskId), runners, harnessOf)),
+      logs: (taskId) => go(logsOf(viewOf(taskId), harnessOf)),
       transcript: transcriptVerb,
-      output: outputVerbOf(read, runners, harnessOf),
-      follow: followVerbOf(read, runners, harnessOf),
-      ...writtenVerbsOf(go, read, runners, harnesses, harnessOf),
+      output: outputVerbOf(read, harnessOf),
+      follow: followVerbOf(read, harnessOf),
+      ...writtenVerbsOf(go, read, harnessOf),
       ...askedVerbsOf(runners, fallback, harnesses, root, options.claudeExecutable),
       answer: answerVerb,
       close: (taskId) => go(close(taskId)),
@@ -918,7 +925,7 @@ const seamOf =
       options.holder && Object.hasOwn(options.holder, name) ? options.holder[name] : undefined,
       name,
       options.credentials,
-      counted(name, isRemote(harnesses[name]) ? ops : a2aOps(name, ops, events)),
+      counted(name, remoteIn(harnesses, name) ? ops : a2aOps(name, ops, events)),
     ),
   ];
 
@@ -942,8 +949,7 @@ const attachVerbsOf = (attached: Attached, root: string, serving: ReturnType<typ
       Object.keys(serving.ops).length > 0 ? servedOf({ root, ops: serving.ops, events: serving.events }) : Effect.succeed(null),
     ),
   drain: Effect.fn('Engine.drain')(function* (holder: number | null) {
-    const refused = drainRefusalOf(holder);
-    if (refused) return yield* Effect.fail(new DrainRefused({ message: refused }));
+    yield* drainChecked(holder);
     yield* Effect.sync(() => (holder === null ? liftDrain(root) : putDrain(root, holder)));
   }),
 });

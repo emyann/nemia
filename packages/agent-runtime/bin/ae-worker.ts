@@ -60,7 +60,12 @@ import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { WORKER_BEAT_MS, WORKER_STOP_GRACE_MS } from '../src/harness/detached/worker-bounds.ts';
 
-const runFile = process.argv[2];
+/** The run file the worker is started on, its one argument; a worker started without one says how to start it, and exits 2. */
+const runFile = ((given: string | undefined): string => {
+  if (given !== undefined) return given;
+  process.stderr.write('ae-worker: give the run file to work from, as `node bin/ae-worker.ts <runFile>`\n');
+  process.exit(2);
+})(process.argv[2]);
 const plan = JSON.parse(fs.readFileSync(runFile, 'utf8')) as {
   cmd: string;
   args: string[];
@@ -148,29 +153,29 @@ const vanished = () => {
   clearInterval(inbox);
   stop();
 };
-/** Sends SIGTERM to the harness's process group, or to the harness alone when the group cannot be signalled. */
-const killGroup = () => {
+/**
+ * Sends `signal` to the harness's process group, and whether it could: not for a group that has ended, nor for a harness that never
+ * started, which has no pid and so no group.
+ */
+const signalGroup = (signal: NodeJS.Signals | 0): boolean => {
+  if (child.pid === undefined) return false;
   try {
-    process.kill(-child.pid!, 'SIGTERM');
-  } catch {
-    child.kill('SIGTERM');
-  }
-};
-/** Kills what is left of the harness's process group; a group that has ended on SIGTERM is nothing to kill. */
-const killLeft = () => {
-  try {
-    process.kill(-child.pid!, 'SIGKILL');
-  } catch {}
-};
-/** Whether anything is left in the harness's process group — the harness itself, or what it started. */
-const groupAlive = () => {
-  try {
-    process.kill(-child.pid!, 0);
+    process.kill(-child.pid, signal);
     return true;
   } catch {
     return false;
   }
 };
+/** Sends SIGTERM to the harness's process group, or to the harness alone when the group cannot be signalled. */
+const killGroup = () => {
+  if (!signalGroup('SIGTERM')) child.kill('SIGTERM');
+};
+/** Kills what is left of the harness's process group; a group that has ended on SIGTERM is nothing to kill. */
+const killLeft = () => {
+  signalGroup('SIGKILL');
+};
+/** Whether anything is left in the harness's process group — the harness itself, or what it started. */
+const groupAlive = () => signalGroup(0);
 /**
  * Asks the harness's group to end, and gives it `STOP_GRACE_MS` from the first time it was asked; then kills what is left, for
  * a harness that ignores SIGTERM itself, whose exit `leave` would otherwise wait on.
@@ -229,6 +234,9 @@ const child = spawn(plan.cmd, plan.args, {
   detached: true,
 });
 spawned = true;
+/** The harness's stdout and stderr, piped as the spawn above asks: Node gives both for a piped stream, started or not. */
+const { stdout, stderr } = child;
+if (stdout === null || stderr === null) throw new Error('ae-worker: the harness was spawned with stdout and stderr piped, and has none');
 /**
  * The run's log, which takes the harness's stdout and stderr. Its error — output that arrives after it is closed, from a child
  * still holding a pipe — is heard and dropped: it must not crash the one process that says how the run ended.
@@ -260,7 +268,7 @@ const hand = (bytes: Buffer) => {
   lineAt++;
   readers = readers.filter((read) => read(line, lineAt));
 };
-child.stdout!.on('data', (chunk: Buffer) => {
+stdout.on('data', (chunk: Buffer) => {
   if (!readers.length) return;
   let from = 0;
   for (let nl = chunk.indexOf(0x0a); nl !== -1; nl = chunk.indexOf(0x0a, from)) {
@@ -270,7 +278,7 @@ child.stdout!.on('data', (chunk: Buffer) => {
   }
   if (from < chunk.length) held.push(chunk.subarray(from));
 });
-child.stdout!.on('end', () => {
+stdout.on('end', () => {
   if (held.length && readers.length) hand(Buffer.concat(held));
   held = [];
 });
@@ -305,10 +313,10 @@ const toLog = (chunk: Buffer) => {
 const keep = (file: fs.WriteStream | undefined) => (chunk: Buffer) => {
   if (file && !file.writableEnded) file.write(chunk);
 };
-child.stdout!.on('data', toLog);
-child.stderr!.on('data', toLog);
-child.stdout!.on('data', keep(whole?.stdout));
-child.stderr!.on('data', keep(whole?.stderr));
+stdout.on('data', toLog);
+stderr.on('data', toLog);
+stdout.on('data', keep(whole?.stdout));
+stderr.on('data', keep(whole?.stderr));
 
 const beat = setInterval(() => write(), BEAT_MS);
 beat.unref?.();
@@ -317,7 +325,8 @@ beat.unref?.();
 const INBOX_MS = 500;
 let inbox: NodeJS.Timeout | undefined;
 if (input) {
-  const stdin = child.stdin!;
+  const stdin = child.stdin;
+  if (stdin === null) throw new Error('ae-worker: the harness was spawned with its stdin piped for its input, and has none');
   stdin.on('error', () => {});
   stdin.write(`${input.first}\n`);
   let at = plan.inputAt ?? input.from;
@@ -378,7 +387,7 @@ const closed = (s: NodeJS.ReadableStream & { closed?: boolean }) =>
 child.on('exit', (code) => {
   clearInterval(beat);
   clearInterval(inbox);
-  const drained = Promise.all([closed(child.stdout!), closed(child.stderr!)]);
+  const drained = Promise.all([closed(stdout), closed(stderr)]);
   const bound = new Promise<void>((resolve) => setTimeout(resolve, DRAIN_MS).unref());
   void Promise.race([drained, bound]).then(() =>
     endFiles(() => {

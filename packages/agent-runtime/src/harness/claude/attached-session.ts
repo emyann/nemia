@@ -66,7 +66,7 @@ const inputOf = () => {
     },
     async *[Symbol.asyncIterator](): AsyncGenerator<UserLine> {
       for (;;) {
-        while (items.length) yield items.shift()!;
+        for (let item = items.shift(); item !== undefined; item = items.shift()) yield item;
         if (closed) return;
         await new Promise<void>((r) => (wake = r));
       }

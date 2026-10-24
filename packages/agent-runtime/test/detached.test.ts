@@ -52,7 +52,7 @@ import { H4SJ_IMPLEMENT, H4SJ_IMPLEMENT_TRY2, UV7V_IMPLEMENT } from './session-r
 import { codex, trustedProjects } from '../src/harness/codex/codex.ts';
 import { claudeDetached, claudeJob } from '../src/harness/claude/code.ts';
 import { Engine } from '../src/index.ts';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { composite } from '../src/harness/seam.ts';
 import { RunnerError, testOps, type Observation } from '../src/harness/seam.ts';
 import type { SessionState } from '../src/core/session.ts';
@@ -408,6 +408,12 @@ const isAlive = (pid: number) => {
     return false;
   }
 };
+
+test('a worker started with no run file says how to start it and exits 2, starting nothing', () => {
+  const worker = path.join(import.meta.dirname, '..', 'bin', 'ae-worker.ts');
+  const ran = spawnSync(process.execPath, [worker], { encoding: 'utf8' });
+  assert.equal(ran.status, 2, ran.stderr);
+});
 
 test('a stop that lands before the worker has published its pid is heard: the harness never starts', WAITED, async (t) => {
   const dir = root();

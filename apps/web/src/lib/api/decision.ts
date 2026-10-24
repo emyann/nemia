@@ -106,7 +106,7 @@ const LessonSchema = decodes<Lesson>()(
  * `accept` (`acceptLoop`).
  */
 export type DecideCommand = {
-  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'merge' | 'approve' | 'send back' | 'forget it';
+  label: 'land it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'merge' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
   step: string | null;
@@ -115,7 +115,7 @@ export type DecideCommand = {
 /** Decodes a `DecideCommand`. */
 const DecideCommandSchema = decodes<DecideCommand>()(
   Schema.Struct({
-    label: Schema.Literals(['ship it', 'drop it', 'read it', 'once more', 'accept', 'merge', 'approve', 'send back', 'forget it']),
+    label: Schema.Literals(['land it', 'drop it', 'read it', 'once more', 'accept', 'merge', 'approve', 'send back', 'forget it']),
     command: Schema.String,
     said: Schema.NullOr(Schema.String),
     step: Schema.NullOr(Schema.String),
@@ -289,9 +289,9 @@ const DecidableSchema = decodes<Decidable>()(
 );
 
 /**
- * Mirrors `RunDecision` in apps/api/src/decide/decision.ts: `waiting` for a run whose roots wait on runs not shipped — with `holding`
+ * Mirrors `RunDecision` in apps/api/src/decide/decision.ts: `waiting` for a run whose roots wait on runs not landed — with `holding`
  * beside it for one a person holds too — `holding` alone for a run a person holds (the CLI's `hold`), which offers nothing, `running` while
- * nobody is waited on — with `held` for a run the cap on runs in flight holds — `nothing` for a run called off or shipped.
+ * nobody is waited on — with `held` for a run the cap on runs in flight holds — `nothing` for a run called off or landed.
  */
 export type RunDecision =
   | { waiting: RunWaiting; holding?: RunHolding }

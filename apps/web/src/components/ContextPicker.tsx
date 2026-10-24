@@ -32,8 +32,7 @@ export function ContextPicker({
         {label}
       </legend>
       <p className="text-body-small text-muted-foreground">
-        Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not shipped, not
-        judged.
+        Reads what it concluded: it does not wait. A run still in flight hands what it has when the steps are filed, not landed, not judged.
       </p>
       {runs.error ? (
         <p className="text-body-small text-failure">Could not list the runs to read: {runs.error.message}</p>
@@ -74,8 +73,8 @@ export function ContextPicker({
 }
 
 /**
- * What a picked run would hand, as the api answers it (`concludedQuery`): its section drawn as markdown, under its id, with a `not shipped,
- * not judged` badge for a run that has not shipped; or why it could not be read.
+ * What a picked run would hand, as the api answers it (`concludedQuery`): its section drawn as markdown, under its id, with a `not landed,
+ * not judged` badge for a run that has not landed; or why it could not be read.
  */
 export function ConcludedPreview({ run }: { run: string }) {
   const concluded = useQuery(concludedQuery(run));
@@ -85,9 +84,9 @@ export function ConcludedPreview({ run }: { run: string }) {
         <span>
           What <span className="font-mono">{run}</span> hands
         </span>
-        {concluded.data && !concluded.data.shipped && (
-          <Badge variant="outline" data-not-shipped className="border-dashed border-outline text-on-surface-variant">
-            not shipped, not judged
+        {concluded.data && !concluded.data.landed && (
+          <Badge variant="outline" data-not-landed className="border-dashed border-outline text-on-surface-variant">
+            not landed, not judged
           </Badge>
         )}
       </h4>

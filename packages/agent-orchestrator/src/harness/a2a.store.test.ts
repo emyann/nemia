@@ -526,7 +526,7 @@ test("a remote step after a run (`--after`) is told that run's work stays here a
   const brief = remoteBrief(steps[0], run, steps, undefined, undefined, parents);
   assert.match(
     brief,
-    /## From run r-0\n\nThis run waited on r-0 \(`--after`\) and started once it shipped\. Its work stays on the machine that runs this workflow and is not sent to you: what it was asked\nand what its last steps said when they signed off are summarised below/,
+    /## From run r-0\n\nThis run waited on r-0 \(`--after`\) and started once it landed\. Its work stays on the machine that runs this workflow and is not sent to you: what it was asked\nand what its last steps said when they signed off are summarised below/,
   );
   assert.match(
     brief,

@@ -41,12 +41,12 @@ git(REPO, 'init', '-q', '-b', 'main');
 git(REPO, 'commit', '-q', '--allow-empty', '-m', 'base');
 const BASE = git(REPO, 'rev-parse', 'HEAD');
 
-/** A branch off main with one commit of work on it, merged into main when the run it is the result of has `shipped`. */
-function worked(branch: string, shipped = false) {
+/** A branch off main with one commit of work on it, merged into main when the run it is the result of has `landed`. */
+function worked(branch: string, landed = false) {
   git(REPO, 'checkout', '-q', '-b', branch);
   git(REPO, 'commit', '-q', '--allow-empty', '-m', `the work of ${branch}`);
   git(REPO, 'checkout', '-q', 'main');
-  if (shipped) git(REPO, 'merge', '-q', '--no-ff', '-m', `merge ${branch}`, branch);
+  if (landed) git(REPO, 'merge', '-q', '--no-ff', '-m', `merge ${branch}`, branch);
 }
 
 const at = '2026-09-28T09:00:00.000Z';

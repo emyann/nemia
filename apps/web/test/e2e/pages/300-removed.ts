@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { Page } from 'playwright';
 import { fed, photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, watch } from '../checks.ts';
-import { SHIPPED } from '../seed.ts';
+import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 import { OUT, store } from '../world.ts';
 
@@ -30,7 +30,7 @@ export default {
   name: 'removed',
   route: '/runs',
   expect: async (page) => {
-    const { id, ending } = SHIPPED;
+    const { id, ending } = LANDED;
     const record = path.join(store!, 'runs', `${id}.json`);
     const opened: Page[] = [];
     try {
@@ -46,7 +46,7 @@ export default {
       fs.renameSync(record, record + AWAY);
       fed(id, 'removed');
       const said = new RegExp(
-        `^${SHIPPED.title} is no longer in this store: it was removed while this page was open\\. Runs lists the runs the store has\\.$`,
+        `^${LANDED.title} is no longer in this store: it was removed while this page was open\\. Runs lists the runs the store has\\.$`,
       );
       for (const [{ other }, where] of [
         [run, 'the run page'],

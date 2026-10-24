@@ -392,11 +392,11 @@ const sessionNeeds = (raise: Raise | undefined): string =>
 
 /**
  * The words of the offer to raise a step's cap past what it spent (`retryOffers`): its bare command, from `command`, what comes before it
- * in the sentence, from the step's state (`word`) and whether a ship may run again (`shipAgain`), and what after, ending on `more`.
+ * in the sentence, from the step's state (`word`) and whether an ending may land again (`landAgain`), and what after, ending on `more`.
  */
-const raiseWords = (command: string, word: string, raise: Raise, shipAgain: string, more: string): [string, string, string] => [
+const raiseWords = (command: string, word: string, raise: Raise, landAgain: string, more: string): [string, string, string] => [
   `${command} --budget <amount>`,
-  `${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${shipAgain} Raise its cap above ${aboveWord(raise)} and continue its session`,
+  `${word}, ${spentWord(raise.spent)} of ${budgetWord(raise.cap)}.${landAgain} Raise its cap above ${aboveWord(raise)} and continue its session`,
   `  (--fresh, or --model <m>, for a new session${more})`,
 ];
 
@@ -445,7 +445,8 @@ const abortedWords = (
  *
  * None on a pruned run (`prunedRefusal`), nor on a held one (`heldRefusal`), whose decision is `running` and says so. A step at its gate
  * is offered its approval and its send-back (`gateLines`), never a try with nothing to change. The looping step an ending that stopped
- * on the base branch waits on is offered the send-back, which no gate line offers, and the ending a ship again for what was not the work.
+ * on the base branch waits on is offered the send-back, which no gate line offers, and the ending a try to land again for what was not
+ * the work.
  * An ending that lands on its check, whose merge the run aborted, is offered with why, and one whose check did not finish a merge again,
  * with nothing staged for `--recheck` to judge. Otherwise a check that did not finish is offered `--recheck` first, past a budget or not;
  * a step over budget, the raise, with why it stopped beside the cap, since a person pays for a broken session differently; and a remote
@@ -490,8 +491,8 @@ export function retryOffers(
       continue;
     }
     if (!modes.length || sendsBack) continue;
-    const shipAgain = endingStopped(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)
-      ? ' Ship again, when what stopped it was not the work — a dirty checkout, a flaky test.'
+    const landAgain = endingStopped(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf)
+      ? ' Land again, when what stopped it was not the work — a dirty checkout, a flaky test.'
       : '';
     const spent = step.retries ? `; retries: ${step.retries}, ${retriesSpent(run.steps[step.name])} spent` : '';
     const record = run.steps[step.name];
@@ -502,7 +503,7 @@ export function retryOffers(
           `${command}${raise ? ' --budget <amount>' : ''}`,
           d.unfinishedCheck.includes(step.name),
           raise,
-          `${status} — ${landedWords(run, record.landed)}.${shipAgain}`,
+          `${status} — ${landedWords(run, record.landed)}.${landAgain}`,
         ),
       );
       continue;
@@ -517,11 +518,11 @@ export function retryOffers(
       const recheck = modes.includes('recheck') ? '; --recheck runs its check again, and needs no --budget' : '';
       const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
       const word = status === 'over budget' ? `over budget (${own === 'failed (check)' ? 'check refused' : own})` : status;
-      offer(...raiseWords(command, word, raise, shipAgain, `${spent}${recheck}`));
+      offer(...raiseWords(command, word, raise, landAgain, `${spent}${recheck}`));
     } else if (status === 'denied') {
       offer(
         `${command} --fresh`,
-        `${deniedOffer(spendOf(run.steps[step.name].taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run, landingDenied) }, { cwd: run.steps[step.name].workspace, runId: run.id })}${shipAgain} A new session, told to do without it`,
+        `${deniedOffer(spendOf(run.steps[step.name].taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run, landingDenied) }, { cwd: run.steps[step.name].workspace, runId: run.id })}${landAgain} A new session, told to do without it`,
         `  (or continue its session: ${command})`,
       );
     } else if (isRemoteHarness(step.harness)) {
@@ -529,7 +530,7 @@ export function retryOffers(
     } else {
       offer(
         command,
-        `${status}.${shipAgain} Continue its session, told what happened`,
+        `${status}.${landAgain} Continue its session, told what happened`,
         `  (--fresh, or --model <m>, for a new session${spent})`,
       );
     }

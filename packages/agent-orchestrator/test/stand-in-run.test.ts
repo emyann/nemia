@@ -91,7 +91,7 @@ test('a run from start to landed on the test place: the merge committed after th
   );
   assert.deepEqual(readRun(run.id).steps.ship.landed, { commit: head });
   assert.equal(landed.status, 'succeeded');
-  assert.equal((await runWith(e, decideRun(run.id))).decision.kind, 'shipped');
+  assert.equal((await runWith(e, decideRun(run.id))).decision.kind, 'landed');
   assert.deepEqual(PLANTED.said(), [], 'no git was asked anything');
 });
 

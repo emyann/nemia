@@ -91,7 +91,7 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
 - **A level-triggered ask cannot simply be deleted once acted on**: the verb it would let through refuses the state the deletion makes.
 - **A fake closeout is flat, as a harness writes it** (`parseCloseout` nests fields under `output`); one written by hand carries every
   field its agent's `output:` schema requires.
-- **`wf decide` of a shipped run prints no step's closeout**: a test of a step's artifact lines reads a run still awaiting a decision.
+- **`wf decide` of a landed run prints no step's closeout**: a test of a step's artifact lines reads a run still awaiting a decision.
 - **A seeded finished step with a worktree on disk owes a hand-off until its record says `handedOff`** (`handOffOwed`).
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`
@@ -136,7 +136,7 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
 
 ## Checks and worktrees
 
-- **A `check:` tells the run's check from a hand run by `WF_BASE_REF`**, never `WF_STEP`: the ship's check runs on the merged tree with
+- **A `check:` tells the run's check from a hand run by `WF_BASE_REF`**, never `WF_STEP`: the ending's check runs on the merged tree with
   none.
 - **A check's stdout and stderr are the runtime's, each kept whole**, read through the engine's `output` (`checkStreams` in
   `views/views.verb.ts`): `reported` reads the whole stdout, a person the tail of each; the engine's `logs` is a tail, read only for

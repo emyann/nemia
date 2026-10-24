@@ -289,14 +289,14 @@ test('an approved ending is filed in the checkout, once the pass has read afresh
   assert.deepEqual(gated.counted, { journals: 1, act: 3 }, 'the hand-off of what implement left, written, and the asks');
 
   await runWith(b.e, approveRun(run.id, 'ship', 'Merge it.'));
-  const shipped = await pass(b, run.id);
-  assert.deepEqual(shipped.advanced.filed, ['ship']);
+  const landing = await pass(b, run.id);
+  assert.deepEqual(landing.advanced.filed, ['ship']);
   assert.deepEqual(
-    shipped.calls,
+    landing.calls,
     ['view R-implement', 'view R-implement', 'file R-ship'],
     "the pass's read, the checkout's claim read afresh (`checkoutHold`), and the filing",
   );
-  assert.deepEqual(shipped.counted, { journals: 2, act: 5 });
+  assert.deepEqual(landing.counted, { journals: 2, act: 5 });
 });
 
 test("each question a pass asks its place is one call of its place phase, and each git process the place starts for it is counted once there, no other process started: the standing, a worktree's make, a hand-off", async (t) => {

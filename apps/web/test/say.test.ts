@@ -7,9 +7,10 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Said, TranscriptEvent } from '../src/lib/api.ts';
 import { mergeSaid, sayable, type Sayable } from '../src/lib/say.ts';
+import { coded, type Word } from './run-fixtures.ts';
 import { foldTranscript, heardIn, tailStart, withSaid } from '../src/lib/transcript.ts';
 
-const step = (status: string, taskId: string | null = 't-1') => ({ name: 'implement', taskId, status });
+const step = (word: Word, taskId: string | null = 't-1') => ({ name: 'implement', taskId, ...coded(word) });
 const live = { cancelledAt: null };
 
 test('sayable: the box is open while a session is in flight, and closed, saying why, every other time', async (t) => {
@@ -23,7 +24,7 @@ test('sayable: the box is open while a session is in flight, and closed, saying 
         'between attempts',
         'needs-human',
         'running (blocked)',
-      ]) {
+      ] as const) {
         assert.deepEqual(sayable(live, step(status)), { open: true }, status);
       }
     },
@@ -62,7 +63,7 @@ test('sayable: the box is open while a session is in flight, and closed, saying 
         'failed',
         'stopped',
         'succeeded',
-      ]) {
+      ] as const) {
         assert.equal(why(live, step(status)), ended, status);
       }
     },

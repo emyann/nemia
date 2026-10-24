@@ -211,7 +211,7 @@ test("an ask moves its run's stamp, is read, is consumed once the record holds i
   assert.equal(fs.existsSync(askFile(run.id, 'implement', 2)), true, 'an ask for a try the record does not hold stays');
   const tried = {
     ...run,
-    steps: { ...run.steps, implement: { ...run.steps.implement, tries: [{ taskId: `${run.id}-implement`, then: 'fresh' as const }] } },
+    steps: { ...run.steps, implement: { ...run.steps.implement, tries: [{ taskId: `${run.id}-implement`, cause: 'fresh' as const }] } },
   };
   filesStore.asks.consume(tried, asks, rounds);
   assert.equal(fs.existsSync(askFile(run.id, 'implement', 2)), false);

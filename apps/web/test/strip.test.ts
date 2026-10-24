@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import type { Factory, QuotaWindow, RunSummary } from '../src/lib/api.ts';
-import { summary } from './run-fixtures.ts';
+import { coded, summary } from './run-fixtures.ts';
 import { ceilings } from './factory-fixtures.ts';
 import { dayStartOf, dollars, quotaLineOf, readoutOf, runsOutAt, stripOf } from '../src/lib/strip.ts';
 
@@ -215,7 +215,7 @@ test('stripOf: what counts today, landed, failed, waiting and spent', async (t) 
   });
   await t.test('a step not at work is no row, though its task started: one that asks a person waits on them', () => {
     const asks = atWorkBy(summary([['plan', 'running']], { id: 'r-asks' }), 'plan', 'iris', NOW - 3 * MIN);
-    asks.steps[0].status = 'needs-human';
+    asks.steps[0] = { ...asks.steps[0], ...coded('needs-human') };
     const s = stripOf({ runs: [asks], factories: [], ceilings: undefined, now: NOW, dayStart: DAY });
     assert.deepEqual([s.rows.length, s.agents.count, s.sessions.count], [0, 0, 0]);
   });

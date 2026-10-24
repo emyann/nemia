@@ -142,6 +142,9 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                cursor of its own every 30 seconds while the feed is still. With no -l,
                                every line; -l waits=person takes the lines that wait on a person. A
                                step with no agent carries agent: none, which -l agent!=none leaves out.
+                               A line's reason is a step's code as the api gives the step (reason);
+                               its word and message are for people: select on the reason, never on
+                               the words.
   nemia admit [--at-least <level>] [--auto <agent>]
                                a call's admission: the call a session is about to make, on stdin, answered
                                ask where it answers what waits on you;
@@ -207,7 +210,9 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                a round — is filed on them. What has already been filed is not re-run,
                                and the steps the run has are neither added to nor removed. Refused of
                                a run that has filed nothing, which resolves afresh at its first filing
-                               anyway, and of one already on the newest revision of every kind
+                               anyway, of one already on the newest revision of every kind, and of one
+                               whose factory follows revisions (nemia factory revisions), whose every
+                               filing takes them with no refresh
   nemia merge <runId> [<step>]
                                merge the base: a loop's work that no longer merges cleanly
                                goes back to merge it, once, on the next tick — on the round
@@ -310,6 +315,9 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia factory instruct <name> --file <path>|- | --clear
                                write the instruction the store keeps for a factory (- for stdin), what
                                Nemia is to know of it and no step is told, or remove it with --clear
+  nemia factory revisions <name> follow|pinned
+                               whether a factory's runs follow merged revisions at each filing (follow)
+                               or keep them until nemia refresh (pinned, the default)
   nemia factory trust <name>
                                trust a factory's places for the harnesses its steps run on, so each
                                place's own settings apply to them

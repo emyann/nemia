@@ -404,9 +404,9 @@ test('a person answers a blocked step, rechecks a refused check and continues th
           ],
           steps: {
             /** Signed off blocked, answered with a nudge, and signed off done on the try that answer filed. */
-            implement: { taskId: 't-a-implement-try2', tries: [{ taskId: 't-a-implement', then: 'nudge' }] },
+            implement: { taskId: 't-a-implement-try2', tries: [{ taskId: 't-a-implement', cause: 'nudge' }] },
             /** Tried again fresh on a person's word, with nothing said: no answer. */
-            plan: { taskId: 't-a-plan-try2', tries: [{ taskId: 't-a-plan', then: 'fresh' }] },
+            plan: { taskId: 't-a-plan-try2', tries: [{ taskId: 't-a-plan', cause: 'fresh' }] },
           },
         }),
       );

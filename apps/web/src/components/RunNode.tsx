@@ -86,7 +86,7 @@ export function RunNode({
   const look = lookOf(run, finished, inspected);
   const gate = gateOfSummary(run);
   const needs = needsOf(run).filter((need) => !(need.kind === 'approve' && need.step === gate?.step));
-  const stamp = run.steps.map((step) => `${step.name}:${step.status}`).join('|');
+  const stamp = run.steps.map((step) => `${step.name}:${step.message}`).join('|');
   const [taken, setTaken] = useState<Taken | null>(null);
   if (taken && stamp !== taken.stamp && stamp !== taken.next) setTaken(taken.next === undefined ? { ...taken, next: stamp } : null);
   const said = taken && stamp === (taken.next ?? taken.stamp) ? taken.said : null;

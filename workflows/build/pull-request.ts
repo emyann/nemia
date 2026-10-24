@@ -13,8 +13,8 @@
  *   (`HEAD_SECONDS`) before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
  * - `wait`, which the round's check runs last: it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
  *   for it to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
- *   absent `ci` refuses by name with the Actions URL, the failing jobs, a bounded tail of each failing job's log — the next try reads
- *   why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
+ *   absent `ci` refuses by name with the Actions URL, the failing jobs, and from each failing job's log the tests that failed with their
+ *   diffs, or a bounded tail where no test is named — the next try reads why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
  *   check's own (`WF_STEP`).
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
@@ -59,8 +59,18 @@ const HEAD_SECONDS = 30;
 /** How long the push sleeps between two reads of the head, in seconds; `WF_PR_HEAD_POLL_SECONDS` lowers it for a test. */
 const HEAD_POLL_SECONDS = 3;
 
-/** The most lines of a failing job's log the refusal prints, from its end: enough to read, never a log in a closeout. */
-const LOG_LINES = 40;
+/** The most lines the refusal prints of one failing job's log: enough to read, never a log in a closeout. */
+const JOB_LINES = 60;
+
+/** The most lines the refusal prints of all the failing jobs' logs together. */
+const LOG_LINES = 200;
+
+/** The most lines from the end of a job's log the refusal prints where the log names no failing test: a typecheck, a lint, a build. */
+const TAIL_LINES = 30;
+
+/** How far past a line naming a failing test its assertion is looked for, in lines of the log, and how many of them are kept. */
+const AFTER_LINES = 30;
+const DETAIL_LINES = 14;
 
 /** The most failing jobs the refusal names. */
 const JOBS = 10;
@@ -267,37 +277,98 @@ function sleep(secs: number): void {
   Atomics.wait(held, 0, 0, secs * 1000);
 }
 
-/** The workflow run GitHub's own URLs name in `entries`, as `gh run view` takes it; none where no URL names one. */
-const runIdOf = (entries: readonly Entry[]): string | undefined => {
-  for (const entry of entries) {
-    const found = /\/actions\/runs\/(\d+)/.exec(linkOf(entry));
-    if (found) return found[1];
-  }
-  return undefined;
+/** The job GitHub's own URL names for `entry` (`…/actions/runs/<run>/job/<id>`); none where its URL names no job. */
+const jobIdOf = (entry: Entry): string | undefined => /\/job\/(\d+)/.exec(linkOf(entry))?.[1];
+
+/** The byte order mark GitHub opens a job's log with, built from its code so no raw mark sits in this file. */
+const BOM = String.fromCharCode(0xfeff);
+
+/** A line of a job's log as GitHub serves it, without the timestamp it prefixes each with and the mark it opens the log with. */
+const unstamped = (line: string): string =>
+  line
+    .replace(/\r$/, '')
+    .replace(BOM, '')
+    .replace(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z ?/, '');
+
+/** A line without the prefix a tool gave it (turbo's `pkg:test: `), as `failingLines` in `src/check/check.ts` reads one. */
+const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');
+
+/**
+ * Whether `line` names a failing test, as node's reporters print one: `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
+ * `✖ failing tests:` the spec reporter lists them again under. The rule of `failingLines` (`src/check/check.ts`), copied, since this
+ * script imports nothing of the package.
+ */
+const failing = (line: string): boolean => {
+  const said = /^\s*((?:✖|not ok ).*)$/.exec(bare(line));
+  return said !== null && !said[1].startsWith('✖ failing tests:');
+};
+
+/** Whether `line` ends the lines that tell one failing test: the next test, a pass, a summary, the spec reporter's location line. */
+const ends = (line: string): boolean => /^\s*(?:✔|ℹ|ok |# Subtest|test at )/.test(bare(line)) || failing(line);
+
+/** Whether `line` tells why a test failed: an error's line (`AssertionError …`, `Error: …`) or the diff (`+ actual - expected`, `+`, `-`). */
+const detail = (line: string): boolean => {
+  const said = bare(line).trim();
+  return /^[+-](?:\s|$)/.test(said) || (/error/i.test(said) && !said.startsWith('at '));
 };
 
 /**
- * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL, and a bounded
- * tail of the failing jobs' log (`gh run view <id> --log-failed`). No agent of this team may call `gh`, so this is the whole of what the
- * next try is handed.
+ * What a failing job's log says of why it failed: each line naming a failing test once, in order, with the lines after it that tell why
+ * (`detail`) — the occurrence that tells most, since the spec reporter prints the test bare where it ran and with its error under
+ * `✖ failing tests:` — bounded by `JOB_LINES`. A log that names no failing test gives its last `TAIL_LINES` instead.
+ */
+function failures(log: string): { lines: string[]; tests: boolean } {
+  const all = log.split('\n').map(unstamped);
+  const told = new Map<string, string[]>();
+  all.forEach((line, i) => {
+    if (!failing(line)) return;
+    const after: string[] = [];
+    for (const next of all.slice(i + 1, i + 1 + AFTER_LINES)) {
+      if (ends(next)) break;
+      if (detail(next) && after.length < DETAIL_LINES) after.push(next);
+    }
+    const key = bare(line).trim();
+    if ((told.get(key)?.length ?? -1) <= after.length) told.set(key, [line, ...after]);
+  });
+  if (!told.size) return { lines: all.filter((line) => line.trim()).slice(-TAIL_LINES), tests: false };
+  return { lines: [...told.values()].flat().slice(0, JOB_LINES), tests: true };
+}
+
+/**
+ * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
+ * that names a job, its log read by the job's id (`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs`, which answers where `gh run view
+ * --log-failed` prints nothing), headed by the job's name: the failing tests with their diffs (`failures`), or its tail where it names
+ * none, bounded by `LOG_LINES` in all. The `ci` context itself, which only gathers the others, comes last. No agent of this team may call
+ * `gh`, so this is the whole of what the next try is handed.
  */
 function why(entries: readonly Entry[]): string[] {
   const failed = entries.filter((entry) => !pending(entry) && verdict(entry) !== PASSED);
   const named = failed.slice(0, JOBS).map((entry) => `  ${nameOf(entry)}: ${verdict(entry) || 'no verdict'} ${linkOf(entry)}`.trimEnd());
   const more = failed.length > named.length ? [`  … and ${failed.length - named.length} more`] : [];
-  const id = runIdOf(failed.length ? failed : entries);
-  if (!id) return ['the jobs that did not pass:', ...named, ...more];
-  const log = read('run', 'view', id, '--log-failed');
-  const lines = (log.out || log.err).split('\n').filter(Boolean);
-  const tail = lines.slice(-LOG_LINES).map((line) => `  ${line}`);
-  return [
-    'the jobs that did not pass:',
-    ...named,
-    ...more,
-    ...(tail.length
-      ? [`the last ${tail.length} lines of \`gh run view ${id} --log-failed\`:`, ...tail]
-      : [`\`gh run view ${id} --log-failed\` printed nothing a person may read here`]),
-  ];
+  const jobs = new Map<string, string>();
+  const ordered = [...failed.filter((entry) => nameOf(entry) !== CONTEXT), ...failed.filter((entry) => nameOf(entry) === CONTEXT)];
+  for (const entry of ordered.slice(0, JOBS)) {
+    const id = jobIdOf(entry);
+    if (id && !jobs.has(id)) jobs.set(id, nameOf(entry));
+  }
+  const logs: string[] = [];
+  for (const [id, name] of jobs) {
+    const left = LOG_LINES - logs.length;
+    if (left <= 1) {
+      logs.push(`… the logs of the other jobs are cut: \`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs\` reads each`);
+      break;
+    }
+    const api = `gh api repos/{owner}/{repo}/actions/jobs/${id}/logs`;
+    const log = read('api', `repos/{owner}/{repo}/actions/jobs/${id}/logs`);
+    if (log.status !== 0 || !log.out.trim()) {
+      logs.push(`${name} (job ${id}): \`${api}\` gave no log${log.err ? `: ${log.err.split('\n')[0]}` : ''}`);
+      continue;
+    }
+    const said = failures(log.out);
+    const lines = said.lines.slice(0, left - 1).map((line) => `  ${line}`);
+    logs.push(said.tests ? `${name} (job ${id}), its failing tests:` : `${name} (job ${id}), the last ${lines.length} lines of its log:`, ...lines);
+  }
+  return ['the jobs that did not pass:', ...named, ...more, ...logs];
 }
 
 /** The options of `open`: the title and the file its body is read from. */

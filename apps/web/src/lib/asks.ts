@@ -124,7 +124,7 @@ export const askedIn = (closeout: Pick<StepCloseout, 'questions'> | null | undef
  * to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check              that did not finish past it. With its
  * try — the CLI's `retry --budget`, a nudge or a new session, and for a step that signed off              blocked the answer to its `needs`
  * beside it (`--message`), or its check again, which needs no raise — or with its loop's              round, the CLI's `round --budget`.
- * `status` is its word, with the amounts; `unfinished` whether its check did not finish   continue   the harness blocked its session, with
+ * `message` is its word, with the amounts; `unfinished` whether its check did not finish   continue   the harness blocked its session, with
  * nothing signed: a nudge, with something to say if you like, which the package takes              as the CLI's `retry` does — the tick
  * stops the session, then files the try. The banner offers it, beside what the session said last   asked      a person asked for its next
  * try, which the next tick files: the CLI `ls`'s note says so
@@ -136,7 +136,7 @@ export type Offer =
   | { step: string; kind: 'answer'; needs: string | null; questions: Question[] }
   | { step: string; kind: 'try-again'; recheck: boolean; unfinished: boolean }
   | { step: string; kind: 'denied'; calls: string | null }
-  | ({ step: string; kind: 'raise'; status: string; needs: string | null; unfinished: boolean; questions: Question[] } & NonNullable<
+  | ({ step: string; kind: 'raise'; message: string; needs: string | null; unfinished: boolean; questions: Question[] } & NonNullable<
       RunDetail['steps'][number]['raise']
     >)
   | { step: string; kind: 'continue' }
@@ -162,12 +162,12 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
     if (step.asked) return [{ step: step.name, kind: 'asked', try: step.asked.try, note: step.note }];
     if (step.blockedByHarness) return [{ step: step.name, kind: 'continue' }];
     if (!run.waitingOnYou.includes(step.name)) return [];
-    const unfinished = step.check?.verdict === 'unfinished';
+    const unfinished = step.check?.verdict?.result === 'unfinished';
     if (step.raise) {
       const questions = askedIn(step.closeout);
-      return [{ step: step.name, kind: 'raise', status: step.status, needs: step.needs, unfinished, questions, ...step.raise }];
+      return [{ step: step.name, kind: 'raise', message: step.message, needs: step.needs, unfinished, questions, ...step.raise }];
     }
-    const state = stepState(step.status, false, false);
+    const state = stepState(step.phase, step.reason, false, false);
     if (state === 'blocked') {
       return [{ step: step.name, kind: 'answer', needs: step.needs, questions: askedIn(step.closeout) }];
     }

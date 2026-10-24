@@ -23,13 +23,13 @@ export function costText(step: Priced): string | null {
 export const pastBudget = (step: Pick<Priced, 'budget'>): boolean => step.budget?.over === true;
 
 /**
- * What a cost adds up, on hover: how many ended attempts the harness priced — and for a cost that reads `≥`, how many had no cost on them,
- * so the figure is the least it was; and that an attempt still running is in it only once it ends, when its harness prices it.
+ * What a cost adds up, on hover: how many ended sessions the harness priced — and for a cost that reads `≥`, how many had no cost on them,
+ * so the figure is the least it was; and that a session still running is in it only once it ends, when its harness prices it.
  */
 export function spentTitle(spent: Spent, of: string): string {
   const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
   const missing = spent.unmeasured
-    ? `; ${plural(spent.unmeasured, 'ended attempt')} had no cost on ${spent.unmeasured === 1 ? 'it' : 'them'}, so it cost at least this`
+    ? `; ${plural(spent.unmeasured, 'ended session')} had no cost on ${spent.unmeasured === 1 ? 'it' : 'them'}, so it cost at least this`
     : '';
-  return `What ${of} cost, as its harness priced each session: ${plural(spent.measured, 'attempt')} measured${missing}. An attempt still running is priced once it ends.`;
+  return `What ${of} cost, as its harness priced each session: ${plural(spent.measured, 'session')} measured${missing}. A session still running is priced once it ends.`;
 }

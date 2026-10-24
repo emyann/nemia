@@ -10,6 +10,8 @@ import ts from 'typescript';
 import type * as Board from '../src/lib/api.ts';
 import { Schema } from 'effect';
 import { decodes, type Holds, type Same } from '../src/lib/api/decodes.ts';
+import { get, UnreadAnswer } from '../src/lib/api/read.ts';
+import { StepTrySchema, type StepTry as BoardTry } from '../src/lib/api/tries.ts';
 import type * as agents from '../../api/src/agents/agents.ts';
 import type * as answers from '../../api/src/asks/answers.ts';
 import type * as app from '../../api/src/app.ts';
@@ -210,6 +212,16 @@ export type FromSet = Holds<Same<Board.FromSet, inbox.InboxFromAnswer>>;
 
 export type PlaceKind = Holds<Same<Board.PlaceKind, runs.RunPage['place']>>;
 export type RunStatus = Holds<Same<Board.RunStatus, runs.RunPage['status']>>;
+/** The codes the board groups and colours by, each held to the field the api carries it in. */
+export type RunPhase = Holds<Same<Board.RunPhase, runs.RunPage['phase']>>;
+export type RunReason = Holds<Same<Board.RunReason, runs.RunListing['reason']>>;
+export type StepPhase = Holds<Same<Board.StepPhase, runs.RunListing['steps'][number]['phase']>>;
+export type StepReason = Holds<Same<Board.StepReason, Step['reason']>>;
+export type TryPhase = Holds<Same<Board.StepPhase, tries.StepTry['phase']>>;
+export type TryReason = Holds<Same<Board.StepReason, tries.StepTry['reason']>>;
+export type CheckVerdict = Holds<Same<Board.CheckVerdict, NonNullable<logs.StepCheck['verdict']>>>;
+export type StepVerdict = Holds<Same<Board.CheckVerdict, NonNullable<runs.RunListing['steps'][number]['verdict']>>>;
+export type CheckResult = Holds<Same<Board.CheckResult, NonNullable<logs.StepCheck['verdict']>['result']>>;
 export type RunToDecide = Holds<Same<Board.RunToDecide, NonNullable<runs.RunPage['toDecide']>>>;
 export type Spent = Holds<Same<Board.Spent, NonNullable<runs.RunPage['cost']>>>;
 export type AtWork = Holds<Same<Board.AtWork, NonNullable<runs.RunPage['atWork']>>>;
@@ -385,4 +397,42 @@ test('decodes takes a schema that decodes its type, and the compiler refuses one
   decodes<{ a: string; b: number }>()(Schema.Struct({ a: Schema.String }));
   // @ts-expect-error -- a word of the type left out.
   decodes<{ a: 'x' | 'y' }>()(Schema.Struct({ a: Schema.Literal('x') }));
+});
+
+/** A try as the api answers it, every key the board reads in its words. */
+const aTry: BoardTry = {
+  try: 1,
+  round: 1,
+  cause: null,
+  current: true,
+  taskId: 't-1',
+  note: null,
+  phase: 'waiting',
+  reason: 'Blocked',
+  message: 'succeeded · BLOCKED',
+  status: 'succeeded · BLOCKED',
+  attempts: { count: 1, latest: null },
+  check: { command: 'npm test', taskId: 't-2', verdict: { result: 'failed', exit: 1 }, refused: null },
+  closeout: null,
+  unreadable: null,
+  answer: null,
+};
+
+/** `body` read through `get` with `schema`, off a fetch that answers it, the global one put back after. */
+async function readOf<T>(body: unknown, schema: Parameters<typeof get<T>>[1]): Promise<T> {
+  const real = globalThis.fetch;
+  globalThis.fetch = async () => new Response(JSON.stringify(body), { status: 200 });
+  try {
+    return await get('/api/try', schema);
+  } finally {
+    globalThis.fetch = real;
+  }
+}
+
+test('a step reads its codes, and a reason or a verdict this board does not know is an answer it refuses to read', async () => {
+  assert.deepEqual(await readOf(aTry, StepTrySchema), aTry);
+  await assert.rejects(readOf({ ...aTry, reason: 'NotAReason' }, StepTrySchema), UnreadAnswer);
+  await assert.rejects(readOf({ ...aTry, phase: 'blocked' }, StepTrySchema), UnreadAnswer);
+  await assert.rejects(readOf({ ...aTry, check: { ...aTry.check, verdict: { result: 'exit 1', exit: 1 } } }, StepTrySchema), UnreadAnswer);
+  await assert.rejects(readOf({ ...aTry, check: { ...aTry.check, verdict: 'passed' } }, StepTrySchema), UnreadAnswer);
 });

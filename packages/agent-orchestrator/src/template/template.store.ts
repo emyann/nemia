@@ -265,6 +265,7 @@ function factorySource(ask: FactoryAsk, from: string, refusals: string[]): { sou
       hires: factory.hires,
       instruction: read.words === null ? undefined : { words: read.words, file: read.file },
       rules: rules.words === null ? undefined : { words: rules.words, file: rules.file },
+      ...(factory.revisions === undefined ? {} : { revisions: factory.revisions }),
     },
     workflows: [...factory.workflows],
   };

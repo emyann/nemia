@@ -92,7 +92,7 @@ test('`runAdmitted`: the roots of a run with nothing filed only while fewer runs
         runAdmitted(
           run(
             { implement: null, review: null },
-            { steps: { implement: { taskId: null, tries: [{ taskId: 't1', then: 'round' }] }, review: { taskId: null } } },
+            { steps: { implement: { taskId: null, tries: [{ taskId: 't1', cause: 'round' }] }, review: { taskId: null } } },
           ),
           { inFlight: 2, cap: 2 },
         ),

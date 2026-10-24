@@ -27,8 +27,8 @@ export function pathPoll(read: StepPath | undefined, final: readonly string[], c
  * What keys the current try's path by the step's state in the run's record: its task, how many tries it has had, and its word. The
  * feed's `step` event reads the record again, and a step that moved reads its path again under a key of its own.
  */
-export const pathStamp = (step: { taskId: string | null; tries: readonly unknown[]; status: string }): string =>
-  `${step.taskId ?? '-'}|${step.tries.length}|${step.status}`;
+export const pathStamp = (step: { taskId: string | null; tries: readonly unknown[]; message: string }): string =>
+  `${step.taskId ?? '-'}|${step.tries.length}|${step.message}`;
 
 /** The state lit at step `at` of `path`: the state its journal said once that entry was on it; undefined for an empty path. */
 export const litAt = (path: readonly LifecycleTransition[], at: number): string | undefined => path[Math.min(at, path.length - 1)]?.state;

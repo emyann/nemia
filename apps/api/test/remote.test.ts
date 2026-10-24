@@ -126,7 +126,7 @@ test('needsOf: where a step whose Task waits on its caller is answered, by the h
   });
   const run = oneStep('r-asks', 'a2a:reviewer', 't-asks');
   const judged = {
-    words: new Map([['ask', 'needs-human']]),
+    codes: new Map([['ask', { phase: 'waiting', reason: 'NeedsHuman', verdict: null } as const]]),
     waitingOnYou: [] as string[],
     beside: new Map([['ask', { waits: 'waiting for an input' }]]),
   };

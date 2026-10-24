@@ -159,7 +159,7 @@ const rowOf = async (run: Run, step: string) => {
   const [{ listed }] = (await runWith(h.e, runsListed(run.id))).runs;
   const row = listed.steps.find((s) => s.name === step);
   assert.ok(row, `${run.id} lists ${step}`);
-  return row as { status: string; note?: string };
+  return row as { status: string; note?: string; reason?: string; verdict?: unknown };
 };
 
 /** Passes until `step` of `run` waits at its gate, as `nemia ls` lists it: the state an approval asks before it is taken. */
@@ -270,6 +270,11 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   const waits = await rowOf(checked, 'work');
   assert.notEqual(waits.status, 'checking', 'a check the pause keeps from being filed is not checking');
   assert.equal(waits.status, PAUSE_WAIT);
+  assert.deepEqual(
+    [waits.reason, waits.verdict],
+    ['WaitingForPause', { result: 'running', exit: null }],
+    'its code says the pause holds it, and its check has no verdict yet',
+  );
   assert.match(waits.note ?? '', /its check is filed on nemia resume/);
   assert.equal((await rowOf(landing, 'ship')).status, PAUSE_WAIT, 'nor is the landing whose check it holds');
 

@@ -22,7 +22,7 @@ import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
-import { pinPass, pinsWritten } from '../revisions/pin.verb.ts';
+import { followPass, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
 import { handOffDue } from '../workspace/workspace.ts';
 import { filesDue } from '../artifacts/artifacts.ts';
 import { inParts } from '../brief/index.ts';
@@ -365,21 +365,23 @@ export const advancePass = Effect.fn('advancePass')(
     const closeNotes = yield* closeHeldOpen(run, reads, closer);
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
     const feed = wordFeed(run, reads, assessed, admission, checkout, lift.lifted);
+    const { followed, pinned, ...due } = followedDue(run, took, assessed, admission, pass?.revisions);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);
+    notes.push(...followed.notes);
     const f: Filing = { e: { ...e, file: (spec) => e.file(inParts(spec)) }, run, reads, closer, mayFile: mayFileOf(run), notes, heads };
-    const { tried, rechecked } = yield* fileTries(f, assessed.retry);
-    const looped = yield* fileRounds(f, assessed.round);
+    const { tried, rechecked } = yield* fileTries(f, due.retry);
+    const looped = yield* fileRounds(f, due.round);
     const checked = yield* fileChecks(f, [...assessed.check, ...rechecked]);
-    const filed = yield* fileReady(f, admission.ready, admission.starting, parents.git);
+    const filed = yield* fileReady(f, due.ready, admission.starting, parents.git);
     const heldFirst = holdFirst(f, admission.held, assessed.ready);
     const { tipped, tips } = keepTips(run, steps, assessed.status, heads);
     const wrote =
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
       Boolean(tips || heldFirst || handed.marked || lacking.read || landing.landed || marked.length || timed) ||
       Boolean(settled.marks.settlesCounted);
-    pinsWritten(run, took, wrote);
+    pinsWritten(run, pinned, wrote);
     runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
     const facts = [...settled.facts, ...roundsGranted(run, steps, looped), ...marked, ...(timed ?? [])];
@@ -388,6 +390,24 @@ export const advancePass = Effect.fn('advancePass')(
   },
   (advanced, _e: Engine, run: Run, _slot?: RunSlot, _pass?: PassRead) => advanced.pipe(Effect.annotateLogs({ run: run.id })),
 );
+
+/**
+ * The steps, tries and rounds the pass files, once a following factory's run has taken the files (`followPass`): what is due, or, where
+ * the pass re-pinned, nothing, so the next pass files them on the new pins; and what the pass owes the store of its pins, `took` (the head
+ * of the pass's, `pinPass`) and the follow's together (`pinned`).
+ */
+function followedDue(
+  run: Run,
+  took: PinnedPass,
+  assessed: Assessment,
+  admission: Admission,
+  revisions: PassRead['revisions'] | undefined,
+): { followed: PinnedPass; pinned: PinnedPass; ready: readonly string[]; retry: Assessment['retry']; round: Assessment['round'] } {
+  const due = admission.ready.length + assessed.retry.length + assessed.round.length > 0;
+  const followed = followPass(run, new Date().toISOString(), due, revisions);
+  if (!followed.wrote) return { followed, pinned: took, ready: admission.ready, retry: assessed.retry, round: assessed.round };
+  return { followed, pinned: { ...took, wrote: true }, ready: [], retry: [], round: [] };
+}
 
 /**
  * What the pass hands the metrics of the run's settled tasks (`settledOnce`), off what it read of them, before it files anything over

@@ -3,8 +3,9 @@
  * that a line names its facts. A test file may not import another (it would run its tests there), so they live here.
  */
 import assert from 'node:assert/strict';
-import type { RepositoryRun, Run, TaskPhase } from '../src/run.ts';
+import { listing as listed, type ListedPhase, type RepositoryRun, type Run, type TaskPhase } from '../src/run.ts';
 import type { Workflow } from '../src/workflow.ts';
+import { feedPhase, feedWords, PHASE_OF, reasonOf } from '../src/feed/index.ts';
 
 /** A step of a workflow, waiting on `after`. */
 export const step = (name: string, after: string[] = []): Workflow => ({ name, after, body: `do ${name}` });
@@ -48,5 +49,31 @@ export const names = (said: string | null | undefined, ...facts: string[]): void
  */
 export const signedOffOnce = (r: Run): Run => ({
   ...r,
-  steps: { ...r.steps, implement: { ...r.steps.implement, tries: [{ taskId: 't0', then: 'signoff' }] } },
+  steps: { ...r.steps, implement: { ...r.steps.implement, tries: [{ taskId: 't0', cause: 'signoff' }] } },
 });
+
+/** The engine's word as the feed keeps it (`feedPhase`), as the pass hands it to the listing it words for the feed (`wordFeed`). */
+const fedWord = (word: ListedPhase): ListedPhase => (word === 'running' ? word : feedPhase(word));
+
+/**
+ * `listing`, holding each row's codes to the feed's word for it: a row's `reason` is the reason `reasonOf` reads off the word the feed
+ * writes of the step (`feedWords`, over the listing the pass builds with the engine's words as the feed keeps them), and its `phase` the
+ * phase of that reason (`PHASE_OF`). So a reason carried where the listing judges the step means what the feed's word meant before it was
+ * carried, for every row the tables of `assess` list. The listing `nemia ls` prints is what it answers.
+ */
+export const listing = (input: Parameters<typeof listed>[0]): ReturnType<typeof listed> => {
+  const l = listed(input);
+  const fed = listed({ ...input, phaseOf: (id) => fedWord(input.phaseOf(id)) });
+  const words = feedWords(fed, input.run, { status: 'running' }, input.closeoutOf);
+  fed.steps.forEach((row, i) => {
+    const word = words.steps[i].word;
+    assert.equal(
+      row.reason,
+      reasonOf({ word }, 'Step'),
+      `${row.name}: the row's reason is the one the feed's word ${JSON.stringify(word)} names`,
+    );
+    assert.equal(l.steps[i].reason, row.reason, `${row.name}: the engine's live words come to the reason the feed's word does`);
+    assert.equal(row.phase, PHASE_OF[row.reason], `${row.name}: its phase is its reason's`);
+  });
+  return l;
+};

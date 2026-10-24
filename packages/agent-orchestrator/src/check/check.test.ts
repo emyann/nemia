@@ -104,7 +104,7 @@ test("checkTaskId and stepTaskId: a try's ids derived from its number", async (t
     assert.deepEqual([stepTaskId(first, 'implement'), checkTaskId(first, 'implement')], ['r-1-implement', 'r-1-implement-check']);
   });
   await t.test("try 2's carry its number; the check is the current try's unless another is named", () => {
-    const second = onTry([{ taskId: 't1', check: { taskId: 'c0' }, then: 'retries' }]);
+    const second = onTry([{ taskId: 't1', check: { taskId: 'c0' }, cause: 'retries' }]);
     assert.equal(stepTaskId(second, 'implement', 2), 'r-1-implement-try2');
     assert.equal(checkTaskId(second, 'implement'), 'r-1-implement-try2-check');
     assert.equal(checkTaskId(second, 'implement', 1), 'r-1-implement-check');

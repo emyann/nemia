@@ -107,7 +107,7 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
 /** A step's name, a person's word for its state and what that means, and its note: what hovering over it says. */
 function stepTitle(step: SummaryStep | undefined, name: string, cancelled: boolean, held: boolean): string {
   if (!step) return name;
-  const words = stateWordsOf(stepState(step.status, cancelled, held), step.status);
+  const words = stateWordsOf(stepState(step.phase, step.reason, cancelled, held), step.reason);
   return `${name}: ${words.rail} — ${words.meaning}${step.note ? `\n${step.note}` : ''}`;
 }
 
@@ -135,7 +135,7 @@ export function StepTiles({
   const details = new Map(detail?.steps.map((step) => [step.name, step]));
   const gate = gateOfSummary(run);
   const held = run.holding != null;
-  const live = run.steps.some((step) => isLive(stepState(step.status, cancelled, held)));
+  const live = run.steps.some((step) => isLive(stepState(step.phase, step.reason, cancelled, held)));
   const now = useNow(live ? 1_000 : 30_000);
   return (
     <section aria-label="The run's steps" className="border-l px-3">
@@ -146,12 +146,12 @@ export function StepTiles({
           const name = pill.names[0];
           const step = byName.get(name);
           if (!step) return null;
-          const state = stepState(step.status, cancelled, held);
+          const state = stepState(step.phase, step.reason, cancelled, held);
           const onYou = run.waitingOnYou.includes(name);
           const need = needOf(step, onYou, cancelled);
           const read = details.get(name);
           const attempt = read
-            ? (attemptLine(read.attempts, isLive(state), now) ?? (read.taskId === null ? 'not filed yet' : 'no attempt yet'))
+            ? (attemptLine(read.attempts, isLive(state), now) ?? (read.taskId === null ? 'not filed yet' : 'no session yet'))
             : null;
           const cost = read ? costText(read) : null;
           const gated = onYou && isGate(state, cancelled);
@@ -177,7 +177,7 @@ export function StepTiles({
                 {name}
               </span>
               <span className="flex min-w-0">
-                <StatusChip status={step.status} runCancelled={cancelled} runHeld={held} note={step.note} />
+                <StatusChip phase={step.phase} reason={step.reason} runCancelled={cancelled} runHeld={held} note={step.note} />
               </span>
               <span className="flex min-w-0 gap-1 font-mono text-body-small text-muted-foreground">
                 <span className="truncate">{attempt ?? '…'}</span>

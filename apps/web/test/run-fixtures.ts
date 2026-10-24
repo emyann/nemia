@@ -11,11 +11,83 @@ import type {
   WaitingRun,
   StepPath,
   StepTranscript,
+  StepTry,
   StepUsed,
   TimelineTotal,
 } from '../src/lib/api.ts';
 
 type Step = RunDetail['steps'][number];
+
+/** A step's codes as the api carries them beside its word. */
+type Codes = Pick<Step, 'phase' | 'reason' | 'verdict'>;
+
+/** The codes of a check that passed, runs, refused with exit 1, or did not finish. */
+export const PASSED = { result: 'passed', exit: 0 } as const;
+export const RUNNING = { result: 'running', exit: null } as const;
+export const EXIT_1 = { result: 'failed', exit: 1 } as const;
+export const UNFINISHED = { result: 'unfinished', exit: null } as const;
+
+/**
+ * The codes the api carries beside each word a test names a step by, as the listing sets them where it builds that word
+ * (`agent-orchestrator`'s list.ts): a row is built from its word and these, never the board's reading of the word.
+ */
+export const CODES = {
+  pending: { phase: 'pending', reason: 'Pending', verdict: null },
+  waiting: { phase: 'pending', reason: 'Waiting', verdict: null },
+  'waiting on r-0': { phase: 'pending', reason: 'Waiting', verdict: null },
+  'waiting on r-0 (cancelled)': { phase: 'pending', reason: 'Waiting', verdict: null },
+  'waiting on p': { phase: 'pending', reason: 'Waiting', verdict: null },
+  'waiting on p (cancelled)': { phase: 'pending', reason: 'Waiting', verdict: null },
+  'waiting for a run slot (2 of 2 in flight)': { phase: 'pending', reason: 'WaitingForSlot', verdict: null },
+  'waiting for a run slot': { phase: 'pending', reason: 'WaitingForSlot', verdict: null },
+  'waiting on the pause': { phase: 'pending', reason: 'WaitingForPause', verdict: RUNNING },
+  running: { phase: 'running', reason: 'Running', verdict: null },
+  working: { phase: 'running', reason: 'Running', verdict: null },
+  'running (working)': { phase: 'running', reason: 'Running', verdict: null },
+  'working (quiescent)': { phase: 'running', reason: 'Running', verdict: null },
+  starting: { phase: 'running', reason: 'Running', verdict: null },
+  'between attempts': { phase: 'running', reason: 'Running', verdict: null },
+  'running (blocked)': { phase: 'running', reason: 'Running', verdict: null },
+  checking: { phase: 'running', reason: 'Checking', verdict: RUNNING },
+  'needs-human': { phase: 'waiting', reason: 'NeedsHuman', verdict: null },
+  'awaiting approval': { phase: 'waiting', reason: 'AwaitingApproval', verdict: null },
+  'succeeded · BLOCKED': { phase: 'waiting', reason: 'Blocked', verdict: null },
+  'rounds exhausted': { phase: 'waiting', reason: 'RoundsExhausted', verdict: null },
+  'over budget $4.25 of $3': { phase: 'waiting', reason: 'OverBudget', verdict: null },
+  'over budget $2.10 of $2': { phase: 'waiting', reason: 'OverBudget', verdict: null },
+  'over budget $1.50 of $1': { phase: 'waiting', reason: 'OverBudget', verdict: null },
+  'over budget — implement $2.10 of $2': { phase: 'waiting', reason: 'OverBudget', verdict: null },
+  'budget exhausted': { phase: 'waiting', reason: 'BudgetExhausted', verdict: null },
+  'budget exhausted $3.02 of $3': { phase: 'waiting', reason: 'BudgetExhausted', verdict: null },
+  unsigned: { phase: 'waiting', reason: 'Unsigned', verdict: null },
+  denied: { phase: 'waiting', reason: 'CheckDenied', verdict: null },
+  'verified ✓': { phase: 'succeeded', reason: 'CheckPassed', verdict: PASSED },
+  unverified: { phase: 'succeeded', reason: 'Succeeded', verdict: null },
+  'unverified · done': { phase: 'succeeded', reason: 'Succeeded', verdict: null },
+  succeeded: { phase: 'succeeded', reason: 'Succeeded', verdict: null },
+  failed: { phase: 'failed', reason: 'Failed', verdict: null },
+  'failed ✗ check (exit 1)': { phase: 'failed', reason: 'CheckFailed', verdict: EXIT_1 },
+  'failed ✗ check (exit 137)': { phase: 'failed', reason: 'CheckFailed', verdict: { result: 'failed', exit: 137 } },
+  'failed ✗ check (unfinished)': { phase: 'failed', reason: 'CheckFailed', verdict: UNFINISHED },
+  'unverified · closeout unreadable': { phase: 'failed', reason: 'UnreadableCloseout', verdict: null },
+  stopped: { phase: 'stopped', reason: 'Stopped', verdict: null },
+  unreadable: { phase: 'failed', reason: 'Unknown', verdict: null },
+  unknown: { phase: 'pending', reason: 'Unknown', verdict: null },
+} as const satisfies Record<string, Codes>;
+
+/** A word a test names a step by, whose codes `CODES` holds. */
+export type Word = keyof typeof CODES;
+
+/** A step's codes and its word, as a row of the api carries them: `message`, and `status` its old name, equal to it. */
+export const coded = (word: Word): Codes & { message: string; status: string } => ({ ...CODES[word], message: word, status: word });
+
+/** A try's codes and its word: as `coded`, with no verdict, which a try carries on its check. */
+export const triedAs = (word: Word): Pick<StepTry, 'phase' | 'reason' | 'message' | 'status'> => ({
+  phase: CODES[word].phase,
+  reason: CODES[word].reason,
+  message: word,
+  status: word,
+});
 
 /** What a try's session consumed, measured in part: a count nobody measured is absent. */
 export const used = (extra: Partial<StepUsed> = {}): StepUsed => ({
@@ -87,6 +159,10 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   files: [{ path: 'out/report.md', name: 'report.md', url: '/api/runs/r-1/steps/implement/files/report.md', kind: 'text', size: 12 }],
   filesError: null,
   branch: 'wf/r-1/implement',
+  phase: 'failed',
+  reason: 'CheckFailed',
+  message: 'failed (check)',
+  verdict: EXIT_1,
   status: 'failed (check)',
   note: 'try 2',
   roundDue: false,
@@ -131,7 +207,7 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   check: {
     command: 'npm test',
     taskId: 't-3',
-    verdict: 'exit 1',
+    verdict: EXIT_1,
     refused: { exit: 'exit 1', stdout: null, stderr: { lines: ['boom'], truncated: false }, unreadable: null },
   },
   attempts: {
@@ -146,10 +222,13 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     {
       try: 1,
       round: 1,
-      then: 'nudge',
+      cause: 'nudge',
       current: false,
       taskId: 't-1',
       note: null,
+      phase: 'failed',
+      reason: 'Failed',
+      message: 'failed',
       status: 'failed',
       attempts: { count: 1, latest: null },
       check: null,
@@ -160,13 +239,16 @@ export const step = (extra: Partial<Step> = {}): Step => ({
     {
       try: 2,
       round: 1,
-      then: null,
+      cause: null,
       current: true,
       taskId: 't-2',
       note: 'nudged',
+      phase: 'failed',
+      reason: 'CheckFailed',
+      message: 'failed (check)',
       status: 'failed (check)',
       attempts: { count: 1, latest: null },
-      check: { command: 'npm test', taskId: 't-3', verdict: 'exit 1', refused: null },
+      check: { command: 'npm test', taskId: 't-3', verdict: EXIT_1, refused: null },
       closeout: null,
       unreadable: null,
       answer: null,
@@ -239,6 +321,8 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
     onYou: true,
   },
   status: 'running',
+  phase: 'running',
+  reason: 'Held',
   moving: true,
   cost: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
   atWork: null,
@@ -353,8 +437,8 @@ export const stepPath = (extra: Partial<StepPath> = {}): StepPath => ({
   ...extra,
 });
 
-/** A run's row as a list answers it, in flight, with one step per `[name, status]`, and `extra` over it. */
-export const summary = (steps: ReadonlyArray<readonly [string, string]>, extra: Partial<RunSummary> = {}): RunSummary => ({
+/** A run's row as a list answers it, in flight, with one step per `[name, word]` carrying that word's codes, and `extra` over it. */
+export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Partial<RunSummary> = {}): RunSummary => ({
   id: 'r-1',
   repo: '/code/app',
   factory: null,
@@ -369,15 +453,17 @@ export const summary = (steps: ReadonlyArray<readonly [string, string]>, extra: 
   cancelledAt: null,
   pruned: null,
   status: 'running',
+  phase: 'running',
+  reason: 'Running',
   moving: true,
   cost: null,
   atWork: null,
   tokens: null,
-  steps: steps.map(([name, status], i) => ({
+  steps: steps.map(([name, word], i) => ({
     name,
     taskId: `t-${i}`,
     branch: null,
-    status,
+    ...coded(word),
     note: null,
     roundDue: false,
     agent: null,

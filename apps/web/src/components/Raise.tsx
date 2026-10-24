@@ -110,7 +110,7 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { kind: 'raise' }>;
   return (
     <>
       <p className="break-words">
-        <strong>{offer.step}</strong> <span className="font-mono text-body-small">{offer.status}</span>
+        <strong>{offer.step}</strong> <span className="font-mono text-body-small">{offer.message}</span>
       </p>
       {asks &&
         (offer.needs ? (

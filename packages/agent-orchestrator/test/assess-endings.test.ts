@@ -29,7 +29,6 @@ import {
   handOffDue,
   heldCheckouts,
   landsOnCheck,
-  listing,
   merges,
   onYouWords,
   ownStatus,
@@ -55,7 +54,7 @@ import {
 } from '../src/run.ts';
 import type { RetryAsk } from '../src/retry/retry-ask.ts';
 import { parseAgent, parseWorkflow, type OutputSchema, type Workflow } from '../src/workflow.ts';
-import { names, namesFor, phases, run, step, STEPS } from './assessed.ts';
+import { listing, names, namesFor, phases, run, step, STEPS } from './assessed.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
 
 const DONE = phases({ t1: 'succeeded', t2: 'succeeded' });
@@ -361,6 +360,8 @@ test("`nemia ls`, `nemia rm` and `nemia cancel` at an ending's gate", async (t) 
       assert.deepEqual(l.steps[2], {
         name: 'ship',
         status: 'awaiting approval',
+        reason: 'AwaitingApproval',
+        phase: 'waiting',
         branch: null,
         note: 'approve it: nemia approve r-1 ship — or send it back: nemia retry r-1 review --message "<objection>"',
       });
@@ -779,9 +780,9 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
               workspace: '/repo',
               branch: 'main',
               tries: [
-                { taskId: 't0', then: 'nudge' },
-                { taskId: 't0b', then: 'nudge' },
-                { taskId: 't0c', then: 'nudge' },
+                { taskId: 't0', cause: 'nudge' },
+                { taskId: 't0b', cause: 'nudge' },
+                { taskId: 't0c', cause: 'nudge' },
               ],
             },
           },

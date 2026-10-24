@@ -23,7 +23,7 @@
  *
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
-import { isRepositoryRun, type Run } from '../record/record.ts';
+import { isRepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
 import type { Workflow } from '../step/step.ts';
 
 /**
@@ -165,6 +165,30 @@ export function lastLines(text: string, n = CHECK_TAIL_LINES): string {
 
 /** How a verdict reads on a screen: `exit 1`, or `unfinished`. */
 export const verdictWord = (v: Verdict): string => (v === 'unfinished' ? 'unfinished' : `exit ${v}`);
+
+/** What a check's verdict can be at a door: `passed`, `failed`, `unfinished` (no verdict on the work), `running`, or `unknown`. */
+export const CHECK_RESULTS = ['passed', 'failed', 'unfinished', 'running', 'unknown'] as const;
+
+/** One of `CHECK_RESULTS`. */
+export type CheckResult = (typeof CHECK_RESULTS)[number];
+
+/**
+ * A check's verdict as codes, never as its words (`verdictWord`): its `result`, and the code it exited with beside it — `0` once it
+ * passed, the code it failed with, and null where it has none (unfinished, running, unknown).
+ */
+export type CheckVerdict = { result: CheckResult; exit: number | null };
+
+/**
+ * A check's verdict as codes, off the phase its task stands in and its last attempt's verdict (`attemptVerdict`): `unknown` for a task
+ * the engine has no record of, `passed` once it succeeded, `running` while it has not settled, and once it failed or was stopped, the
+ * code it exited with (`failed`) or `unfinished`. Pure.
+ */
+export function checkVerdictOf(phase: TaskPhase, verdict: Verdict): CheckVerdict {
+  if (phase === 'unknown') return { result: 'unknown', exit: null };
+  if (phase === 'succeeded') return { result: 'passed', exit: 0 };
+  if (phase !== 'failed' && phase !== 'stopped') return { result: 'running', exit: null };
+  return verdict === 'unfinished' ? { result: 'unfinished', exit: null } : { result: 'failed', exit: verdict };
+}
 
 /**
  * The check, told to a step BEFORE it is judged by one. Appended to the brief of every step that has

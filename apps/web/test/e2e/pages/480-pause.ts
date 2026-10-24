@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright';
 import type { Paused } from '../../../src/lib/api/pause.ts';
+import type { RunDetail } from '../../../src/lib/api.ts';
 import { finishingSentence } from '../../../src/lib/pause.ts';
 import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, idle, Refused, settled } from '../checks.ts';
@@ -31,10 +32,23 @@ async function beforeTheGauges(page: Page): Promise<void> {
 const headed = (page: Page, state: string) =>
   expectTexts(popoverOf(page).getByRole('heading'), [state], `the popover's heading is the state, ${state}`);
 
-/** What the package words a step whose check the pause holds, and what it notes beside it. */
-const HELD_WORDS = { status: 'waiting on the pause', note: 'its check is filed on nemia resume' };
+/**
+ * What the package says of a step whose check the pause holds (`judgedRow` in the package's list.ts): its codes, which the board draws
+ * by, and its words, the message and the note beside it, which it only shows. `status` is the message under its old name.
+ */
+const HELD_WORDS = {
+  phase: 'pending',
+  reason: 'WaitingForPause',
+  message: 'waiting on the pause',
+  status: 'waiting on the pause',
+  verdict: { result: 'running', exit: null },
+  note: 'its check is filed on nemia resume',
+} as const satisfies Partial<Step>;
 
-/** The person's word the chip draws for that status (`lib/words.ts`). */
+/** A step of a run's read, as the board decodes it. */
+type Step = RunDetail['steps'][number];
+
+/** The person's word the chip draws for that reason (`lib/words.ts`). */
 const PAUSE_WORD = 'waits on the pause';
 
 /** Whether `url` is the read of FAKE's run, never one of its steps'. */

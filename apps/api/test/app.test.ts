@@ -138,6 +138,9 @@ const blockedCloseout = {
 /** What a step on its first try says of it, as its one entry in `tries`: the current try, reached by nothing. */
 const firstTry = (step: {
   taskId: string | null;
+  phase: string;
+  reason: string;
+  message: string;
   status: string;
   attempts: object;
   check: object | null;
@@ -147,10 +150,13 @@ const firstTry = (step: {
   {
     try: 1,
     round: 1,
-    then: null,
+    cause: null,
     current: true,
     note: null,
     taskId: step.taskId,
+    phase: step.phase,
+    reason: step.reason,
+    message: step.message,
     status: step.status,
     attempts: step.attempts,
     check: step.check,
@@ -336,6 +342,8 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         heldUntil: [],
         holding: null,
         status: 'cancelled',
+        phase: 'cancelled',
+        reason: 'Cancelled',
         moving: false,
         /** Nothing of it was measured: no cost, which is not $0. */
         cost: null,
@@ -349,6 +357,10 @@ test("a store's runs read on the list and on a run's page: each summarized with 
             taskId: 't-1',
             branch: 'wf/r-1/implement',
             /** `t-1` is on the record and not in this engine's store: a fresh `WF_ROOT` has no tasks at all. */
+            phase: 'pending',
+            reason: 'Unknown',
+            message: 'unknown',
+            verdict: null,
             status: 'unknown',
             note: null,
             roundDue: false,
@@ -365,6 +377,10 @@ test("a store's runs read on the list and on a run's page: each summarized with 
             name: 'review',
             taskId: null,
             branch: null,
+            phase: 'pending',
+            reason: 'Waiting',
+            message: 'waiting',
+            verdict: null,
             status: 'waiting',
             note: null,
             roundDue: false,
@@ -425,6 +441,8 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         holding: null,
         /** implement signed off blocked, so review is not filed: the run waits on an answer, and nothing in it failed. */
         status: 'blocked',
+        phase: 'waiting',
+        reason: 'Blocked',
         moving: false,
         cost: null,
         /** implement spawned and ended at the same instant, and nothing else ran: at work for no time, and over. */
@@ -450,6 +468,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
 
     const implementTry = {
       taskId: 't-2',
+      phase: 'waiting',
+      reason: 'Blocked',
+      message: 'succeeded · BLOCKED',
       status: 'succeeded · BLOCKED',
       check: null,
       closeout: blockedCloseout,
@@ -502,6 +523,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       said: [],
       asked: null,
       ...implementTry,
+      verdict: null,
       /** Its journal carries no usage: nobody measured it, which is not 0. */
       used: {
         usage: null,
@@ -523,6 +545,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
 
     const reviewTry = {
       taskId: null,
+      phase: 'pending',
+      reason: 'Waiting',
+      message: 'waiting',
       status: 'waiting',
       check: null,
       closeout: null,
@@ -578,6 +603,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         said: [],
         asked: null,
         ...reviewTry,
+        verdict: null,
         /** Not filed: it consumed nothing, and has no try on the clock. */
         used: null,
         spent: null,
@@ -626,7 +652,14 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         const words = await runWith(e, list(e, runStore.runs.read(id)));
         const run = await listed(id);
         assert.deepEqual(
-          run.steps.map(({ name, status, branch }: { name: string; status: string; branch: string | null }) => ({ name, status, branch })),
+          run.steps.map(({ name, status, branch, phase, reason, verdict }) => ({
+            name,
+            status,
+            reason,
+            phase,
+            ...(verdict ? { verdict } : {}),
+            branch,
+          })),
           words.steps,
           id,
         );
@@ -766,6 +799,9 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
     const [original, review, replacement] = run.steps;
     const originalTry = {
       taskId: 't-6',
+      phase: 'waiting',
+      reason: 'Blocked',
+      message: 'succeeded · BLOCKED',
       status: 'succeeded · BLOCKED',
       check: null,
       closeout: blockedCloseout,
@@ -799,6 +835,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       said: [],
       asked: null,
       ...originalTry,
+      verdict: null,
       used: {
         usage: null,
         used: 'not measured',
@@ -1089,6 +1126,10 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
         'name',
         'taskId',
         'branch',
+        'phase',
+        'reason',
+        'message',
+        'verdict',
         'status',
         'note',
         'roundDue',
@@ -1345,7 +1386,7 @@ function seedLoop(id: string, round: number, again: boolean) {
   for (const name of ['implement', 'review']) {
     steps[name] = {
       taskId: `t-${id}-${name}-${round}`,
-      tries: Array.from({ length: round - 1 }, (_, i) => ({ taskId: `t-${id}-${name}-${i + 1}`, then: 'round' })),
+      tries: Array.from({ length: round - 1 }, (_, i) => ({ taskId: `t-${id}-${name}-${i + 1}`, cause: 'round' })),
     };
   }
   const replies = [{ finding: 'src/flag.ts:12', answer: 'fixed', why: 'parsed before it is read' }];
@@ -1362,12 +1403,18 @@ function askFor(id: string, name: string, ask: object) {
 }
 
 /** A step row as the list and the detail both carry it. */
-type Row = Pick<RunSummary['steps'][number], 'name' | 'status' | 'branch' | 'note' | 'roundDue'>;
+type Row = Pick<RunSummary['steps'][number], 'name' | 'status' | 'branch' | 'note' | 'roundDue' | 'phase' | 'reason' | 'verdict'>;
 
-/** A step row as `list` has it: a note only where it prints one, and `roundDue` only where a round is due. */
-const asListed = ({ name, status, branch, note, roundDue }: Row) => ({
+/**
+ * A step row as `list` has it: its codes, its check's verdict only where it was judged by one, a note only where it prints one, and
+ * `roundDue` only where a round is due.
+ */
+const asListed = ({ name, status, branch, note, roundDue, phase, reason, verdict }: Row) => ({
   name,
   status,
+  reason,
+  phase,
+  ...(verdict ? { verdict } : {}),
   branch,
   ...(note === null ? {} : { note }),
   ...(roundDue ? { roundDue } : {}),
@@ -1447,7 +1494,14 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
         ['detail', detail],
       ] as const) {
         assert.deepEqual(
-          run.steps.map(({ name, status, branch }) => ({ name, status, branch })),
+          run.steps.map(({ name, status, branch, phase, reason, verdict }) => ({
+            name,
+            status,
+            reason,
+            phase,
+            ...(verdict ? { verdict } : {}),
+            branch,
+          })),
           words.steps,
           `${id}, ${where}`,
         );
@@ -1759,12 +1813,22 @@ test("a step's check read on the board: its command, and once it refused its exi
     async () => {
       const run = await detailOf('r-20');
       const checkOf = (name: string) => run.steps.find((s) => s.name === name)?.check;
-      assert.deepEqual(checkOf('build'), { command: 'npm run build', taskId: 'r-20-build-check', verdict: 'passed', refused: null });
-      assert.deepEqual(checkOf('lint'), { command: 'npm run lint', taskId: 'r-20-lint-check', verdict: 'checking', refused: null });
+      assert.deepEqual(checkOf('build'), {
+        command: 'npm run build',
+        taskId: 'r-20-build-check',
+        verdict: { result: 'passed', exit: 0 },
+        refused: null,
+      });
+      assert.deepEqual(checkOf('lint'), {
+        command: 'npm run lint',
+        taskId: 'r-20-lint-check',
+        verdict: { result: 'running', exit: null },
+        refused: null,
+      });
       assert.deepEqual(checkOf('test'), {
         command: 'npm test',
         taskId: 'r-20-test-check',
-        verdict: 'exit 1',
+        verdict: { result: 'failed', exit: 1 },
         refused: {
           exit: 'exit 1',
           stdout: { lines: ['ok 1 - builds', 'not ok 2 - parses a trailing comma', '# fail 1'], truncated: false },
@@ -1777,7 +1841,7 @@ test("a step's check read on the board: its command, and once it refused its exi
         {
           command: 'npm run e2e',
           taskId: 'r-20-e2e-check',
-          verdict: 'unfinished',
+          verdict: { result: 'unfinished', exit: null },
           refused: {
             exit: 'unfinished',
             stdout: { lines: ['(no output yet)'], truncated: false },
@@ -1813,11 +1877,12 @@ test("a step's check read on the board: its command, and once it refused its exi
       });
 
       const { steps } = await detailOf('r-72');
-      const words = Object.fromEntries(steps.map((s) => [s.name, [s.status, s.check?.verdict, s.check?.refused?.exit]]));
+      const words = Object.fromEntries(steps.map((s) => [s.name, [s.status, s.verdict, s.check?.verdict, s.check?.refused?.exit]]));
+      const unfinished = { result: 'unfinished', exit: null };
       assert.deepEqual(words, {
-        deadline: ['failed ✗ check (unfinished)', 'unfinished', 'unfinished'],
-        operator: ['failed ✗ check (unfinished)', 'unfinished', 'unfinished'],
-        harness: ['failed ✗ check (exit 1)', 'exit 1', 'exit 1'],
+        deadline: ['failed ✗ check (unfinished)', unfinished, unfinished, 'unfinished'],
+        operator: ['failed ✗ check (unfinished)', unfinished, unfinished, 'unfinished'],
+        harness: ['failed ✗ check (exit 1)', { result: 'failed', exit: 1 }, { result: 'failed', exit: 1 }, 'exit 1'],
       });
     },
   );
@@ -1835,15 +1900,15 @@ test("a step's check read on the board: its command, and once it refused its exi
         implement: {
           taskId: 'r-73-implement-try2',
           check: { taskId: 'r-73-implement-try2-check' },
-          tries: [{ taskId: 'r-73-implement', check: { taskId: 'r-73-implement-check' }, then: 'retries' }],
+          tries: [{ taskId: 'r-73-implement', check: { taskId: 'r-73-implement-check' }, cause: 'retries' }],
         },
       },
     });
 
     const [implement] = (await detailOf('r-73')).steps;
     const first = implement.tries[0].check;
-    assert.deepEqual([first?.verdict, first?.refused?.exit], ['unfinished', 'unfinished']);
-    assert.equal(implement.tries[1].check?.verdict, 'passed');
+    assert.deepEqual([first?.verdict, first?.refused?.exit], [{ result: 'unfinished', exit: null }, 'unfinished']);
+    assert.deepEqual(implement.tries[1].check?.verdict, { result: 'passed', exit: 0 });
   });
   await s.test('a refused check that kept no stdout is read off its log, as `nemia decide` reads it', async () => {
     settledTask('t-74-e2e', done);
@@ -1991,11 +2056,11 @@ test("a step's tries and its closeout: every try of a looped step off one observ
             taskId: 'r-50-implement-try3',
             check: { taskId: 'r-50-implement-try3-check' },
             tries: [
-              { taskId: 'r-50-implement', check: { taskId: 'r-50-implement-check' }, then: 'retries' },
-              { taskId: 'r-50-implement-try2', check: { taskId: 'r-50-implement-try2-check' }, then: 'round' },
+              { taskId: 'r-50-implement', check: { taskId: 'r-50-implement-check' }, cause: 'retries' },
+              { taskId: 'r-50-implement-try2', check: { taskId: 'r-50-implement-try2-check' }, cause: 'round' },
             ],
           },
-          review: { taskId: 'r-50-review-try2', tries: [{ taskId: 'r-50-review', then: 'round' }] },
+          review: { taskId: 'r-50-review-try2', tries: [{ taskId: 'r-50-review', cause: 'round' }] },
         },
       });
 
@@ -2019,7 +2084,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         raw,
         ...more,
       });
-      const passed = (taskId: string) => ({ command: 'npm test', taskId, verdict: 'passed', refused: null });
+      const passed = (taskId: string) => ({ command: 'npm test', taskId, verdict: { result: 'passed', exit: 0 }, refused: null });
       const [implement, review] = run.steps;
       assert.deepEqual([implement.status, implement.note, implement.attempts], ['verified ✓', 'round 2 of 3', once]);
       assert.deepEqual(
@@ -2028,17 +2093,20 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           {
             try: 1,
             round: 1,
-            then: 'retries',
+            cause: 'retries',
             current: false,
             taskId: 'r-50-implement',
             note: null,
+            phase: 'succeeded',
+            reason: 'Succeeded',
+            message: 'succeeded',
             status: 'succeeded',
             attempts: once,
             /** Its check refused: the verdict, and the stderr the runtime kept. Its stdout is not read for a try that is over. */
             check: {
               command: 'npm test',
               taskId: 'r-50-implement-check',
-              verdict: 'exit 1',
+              verdict: { result: 'failed', exit: 1 },
               refused: { exit: 'exit 1', stdout: null, stderr: { lines: ['npm error Test failed.'], truncated: false }, unreadable: null },
             },
             closeout: closeout(said.implement),
@@ -2048,10 +2116,13 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           {
             try: 2,
             round: 1,
-            then: 'round',
+            cause: 'round',
             current: false,
             taskId: 'r-50-implement-try2',
             note: 'try 2, by retries: 1',
+            phase: 'succeeded',
+            reason: 'Succeeded',
+            message: 'succeeded',
             status: 'succeeded',
             attempts: once,
             check: passed('r-50-implement-try2-check'),
@@ -2062,10 +2133,13 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           {
             try: 3,
             round: 2,
-            then: null,
+            cause: null,
             current: true,
             taskId: 'r-50-implement-try3',
             note: 'round 2 of 3',
+            phase: 'succeeded',
+            reason: 'CheckPassed',
+            message: 'verified ✓',
             status: 'verified ✓',
             attempts: once,
             check: passed('r-50-implement-try3-check'),
@@ -2086,10 +2160,13 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         {
           try: 1,
           round: 1,
-          then: 'round',
+          cause: 'round',
           current: false,
           taskId: 'r-50-review',
           note: null,
+          phase: 'succeeded',
+          reason: 'Succeeded',
+          message: 'succeeded',
           status: 'succeeded',
           attempts: once,
           check: null,
@@ -2104,10 +2181,13 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         {
           try: 2,
           round: 2,
-          then: null,
+          cause: null,
           current: true,
           taskId: 'r-50-review-try2',
           note: 'round 2 of 3',
+          phase: 'succeeded',
+          reason: 'Succeeded',
+          message: review.status,
           status: review.status,
           attempts: once,
           check: null,
@@ -2379,12 +2459,12 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
           config: { model: 'sonnet' },
         }),
       );
-      const asked = { taskId: 'r-55-implement', then: 'fresh', model: 'sonnet' };
+      const asked = { taskId: 'r-55-implement', cause: 'fresh', model: 'sonnet' };
       const cases: Array<[id: string, tries: object[], askedModel: string | null]> = [
         ['r-55', [asked], 'sonnet'],
-        ['r-56', [asked, { taskId: 'r-55-implement-try2', then: 'recheck' }], 'sonnet'],
-        ['r-57', [{ taskId: 'r-55-implement', then: 'nudge' }], null],
-        ['r-58', [{ taskId: 'r-55-implement', then: 'retries' }], null],
+        ['r-56', [asked, { taskId: 'r-55-implement-try2', cause: 'recheck' }], 'sonnet'],
+        ['r-57', [{ taskId: 'r-55-implement', cause: 'nudge' }], null],
+        ['r-58', [{ taskId: 'r-55-implement', cause: 'retries' }], null],
       ];
       for (const [id, tries, askedModel] of cases) {
         writeRun({
@@ -2671,7 +2751,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
           implement: {
             taskId: 'r-60-implement-try2',
             check: { taskId: 'r-60-implement-try2-check' },
-            tries: [{ taskId: 'r-60-implement', check: { taskId: 'r-60-implement-check' }, then: 'retries' }],
+            tries: [{ taskId: 'r-60-implement', check: { taskId: 'r-60-implement-check' }, cause: 'retries' }],
           },
           review: { taskId: null },
         },
@@ -2762,7 +2842,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
             taskId: 'r-60-implement-try3',
             tries: [
               ...record.steps.implement.tries,
-              { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, then: 'nudge' },
+              { taskId: 'r-60-implement-try2', check: { taskId: 'r-60-implement-try2-check' }, cause: 'nudge' },
             ],
           },
         },

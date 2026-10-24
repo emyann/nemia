@@ -6,6 +6,7 @@
  */
 import { format, formatDistanceStrict, isSameDay, isSameYear } from 'date-fns';
 import type { RunOutcome, RunSummary } from './api/runs.ts';
+import type { StepReason } from './api/reasons.ts';
 import type { Hue } from './meaning.ts';
 import { stepState, type StepState } from './status.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
@@ -45,31 +46,30 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
   unknown: null,
 };
 
-/** What the words read of a row of the light answer: of each step its name and its word, and of the run who it waits on. */
-export type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & {
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>;
-};
+/** A step of a row as the words read it: its name, its codes, and its check's verdict. */
+type CodedStep = Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'verdict'>;
+
+/** What the words read of a row of the light answer: of each step its name and its codes, and of the run who it waits on. */
+export type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' | 'waitingOnYou'> & { steps: ReadonlyArray<CodedStep> };
 
 /** A row whose button is worded: a `WaitingRow` that says of each step the task of its work too, none for a step not filed yet. */
-export type OpenedRow = WaitingRow & { steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status' | 'taskId'>> };
+export type OpenedRow = WaitingRow & { steps: ReadonlyArray<CodedStep & Pick<RunSummary['steps'][number], 'taskId'>> };
 
 /** A wait: its kind, the step that waits, none for a wait of the run's own, and how many of the run's steps are done. */
 export type Wait = Waited & { kind: WaitKind };
 
-/** How the api ends the word of a step whose check did not finish: no exit, so no verdict on the work. */
-const UNFINISHED = /\(unfinished\)$/;
-
 /**
- * The kind of wait a step saying `status` is on its row: its state's (`waitKindOf`), but `unfinished` where its check did not finish,
- * which refused nothing.
+ * The kind of wait a step is on its row: its state's (`waitKindOf`), but `unfinished` where its check did not finish (its verdict's
+ * `unfinished`), which refused nothing.
  */
-function kindOn(row: WaitingRow, status: string): WaitKind | null {
-  const kind = waitKindOf[stateOn(row, status)];
-  return kind === 'check' && UNFINISHED.test(status) ? 'unfinished' : kind;
+function kindOn(row: WaitingRow, step: CodedStep): WaitKind | null {
+  const kind = waitKindOf[stateOn(row, step)];
+  return kind === 'check' && step.verdict?.result === 'unfinished' ? 'unfinished' : kind;
 }
 
 /** A step's state on its row (`stepState`). */
-const stateOn = (row: WaitingRow, status: string): StepState => stepState(status, Boolean(row.cancelledAt), row.holding != null);
+const stateOn = (row: WaitingRow, step: CodedStep): StepState =>
+  stepState(step.phase, step.reason, Boolean(row.cancelledAt), row.holding != null);
 
 /**
  * What `row` waits on a person for: a hold only a person lifts first; then the first of its steps, in the run's order, that the api
@@ -77,10 +77,10 @@ const stateOn = (row: WaitingRow, status: string): StepState => stepState(status
  * row that waits on nobody, and for one whose waiting step says a word the board has no kind for.
  */
 export function waitOf(row: WaitingRow): Wait | null {
-  const done = row.steps.filter((step) => ['verified', 'unverified'].includes(stateOn(row, step.status))).length;
+  const done = row.steps.filter((step) => ['verified', 'unverified'].includes(stateOn(row, step))).length;
   if (row.holding?.onYou) return { kind: 'hold', step: null, done };
   for (const step of row.steps) {
-    const kind = kindOn(row, step.status);
+    const kind = kindOn(row, step);
     if (kind && row.waitingOnYou.includes(step.name)) return { kind, step: step.name, done };
   }
   return row.waiting?.onYou ? { kind: 'after', step: null, done } : null;
@@ -123,7 +123,7 @@ function readAt(row: OpenedRow, gated: string | null): string | null {
   const at = row.steps.findIndex((step) => step.name === gated);
   if (at < 0) return null;
   if (row.steps[at].taskId !== null) return row.steps[at].name;
-  const done = row.steps.slice(0, at).filter((step) => PAST.includes(stateOn(row, step.status)));
+  const done = row.steps.slice(0, at).filter((step) => PAST.includes(stateOn(row, step)));
   return done.pop()?.name ?? null;
 }
 
@@ -150,7 +150,7 @@ export function nowOf(row: WaitingRow): Now | null {
   const at = states.findIndex((step) => !PAST.includes(step.state));
   const step = states[at];
   if (!step) return null;
-  return { word: stateWordsOf(step.state, step.status).rail, note: `${step.name} (${at + 1} of ${states.length})` };
+  return { word: stateWordsOf(step.state, step.reason).rail, note: `${step.name} (${at + 1} of ${states.length})` };
 }
 
 /** How a finished run ended, as the page says it: a word, its whole sentence, and the hue it is drawn in. */
@@ -200,25 +200,25 @@ export function agoWords(at: Date, now: Date): string {
 
 /** A run's steps as the rail draws them: each by its name and its state. */
 export const railStates = (
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>,
+  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason'>>,
   cancelled: boolean,
   held: boolean,
-): Array<{ name: string; state: StepState; status: string }> =>
-  steps.map((step) => ({ name: step.name, state: stepState(step.status, cancelled, held), status: step.status }));
+): Array<{ name: string; state: StepState; reason: StepReason }> =>
+  steps.map((step) => ({ name: step.name, state: stepState(step.phase, step.reason, cancelled, held), reason: step.reason }));
 
 /** What the rail says aloud: each step and its word, in the run's order: `design verified, land waits on you`, a step a
  * check verified told from one done on its own word. */
 export const railSaid = (
-  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>,
+  steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason'>>,
   cancelled: boolean,
   held: boolean,
 ): string =>
   railStates(steps, cancelled, held)
-    .map((step) => `${step.name} ${stateWordsOf(step.state, step.status).rail}`)
+    .map((step) => `${step.name} ${stateWordsOf(step.state, step.reason).rail}`)
     .join(', ');
 
 /** A bar of the rail as a button says it: its step's name and the rail's word for its state, `implement, at work`. */
-export const barSaid = (name: string, state: StepState, status: string): string => `${name}, ${stateWordsOf(state, status).rail}`;
+export const barSaid = (name: string, state: StepState, reason: StepReason): string => `${name}, ${stateWordsOf(state, reason).rail}`;
 
 /**
  * The parts of a date as a person reads it in `timeZone`, theirs by default: its year, its month in three letters and its day; each

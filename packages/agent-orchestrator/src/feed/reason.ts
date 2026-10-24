@@ -4,8 +4,11 @@
  *
  * **A machine selects on the reason; a person reads the message.** The words themselves — `awaiting approval`, `failed ✗ check (exit 1)`,
  * `unverified · done` — are composed where each surface says them (`list.ts`, `cap.ts`, `wait.ts`, `ending.ts`, `assess.ts`) and are
- * free to be reworded; the code a watcher matches on is not. So this table is the one place that classifies a word, and every reason it
- * can answer is named here: a selector written against it keeps meaning what it meant when the prose moves.
+ * free to be reworded; the code a watcher matches on is not. Every reason a line can name is named here: a selector written against it
+ * keeps meaning what it meant when the prose moves. A run's and a step's line carry the code the listing judged them by (`Listing`'s
+ * `reason`, `runCodes`), set where the word is built; this classifier reads a word only where no code came with it — a line written before
+ * the feed was signed, and a one-shot offered by its word — and `feed.test.ts` and `test/assessed.ts` hold the codes the listing sets
+ * to what it reads off the same word.
  *
  * **The codes are the owner's.** The 41 entries below — 11 of a run, 27 of a step, 1 of a daemon, 2 of the store, 36 distinct codes,
  * five of them shared between a run and a step — were named at their slices' design gates, and a rename breaks every selector and every
@@ -236,8 +239,10 @@ const matches = (rule: Rule, word: string): boolean => (rule.is !== undefined ? 
 const isHeld = (note: string | undefined): boolean => note !== undefined && note.startsWith('held');
 
 /**
- * The reason `said` names, of a thing of `kind`. Total: a word no rule recognises is `Unknown`, so a status reworded somewhere else in the
- * package costs a selector its meaning and never costs the feed a line. Pure.
+ * The reason `said` names, of a thing of `kind`, read off its word: for a line that carries no reason of its own — a v0 line, upgraded on
+ * read, and a one-shot offered by its word (`oncePast`). A run's and a step's word are never read back here: their line carries the code
+ * the listing set (`feedWords`). Total: a word no rule recognises is `Unknown`, so a word reworded somewhere else in the package costs a
+ * selector its meaning and never costs the feed a line. Pure.
  *
  * A daemon says one word and the type system holds it to that word (`startedLine`), so a daemon's line is `DaemonStarted`.
  */

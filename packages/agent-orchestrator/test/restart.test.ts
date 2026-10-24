@@ -50,7 +50,7 @@ const at = (s: number) => new Date(T0 + s * 1000).toISOString();
 
 /**
  * A fake `claude` and `codex` on PATH, sessions that run until their gate opens, and the run files of the two jobs the old engine
- * started, which the test writes as their workers write them.
+ * started, which the test writes as their workers write them, each beaten again before a pass so its lease holds.
  */
 const fakes = () => {
   const bin = scratch('wf-restart-bin-');
@@ -90,7 +90,6 @@ ${runUntilGate('args.at(-1)')}
   process.env.CODEX_HOME = scratch('wf-restart-codex-home-');
   const runs = path.join(ROOT, 'engine', 'runs', 'claude');
   let at: Array<{ id: string; state: 'working' | 'done' }> = [];
-  /** The jobs at work, as their workers write their run files: each beaten now, so its lease holds for the pass that reads it. */
   const rows = (list: typeof at = at) => {
     at = list;
     fs.mkdirSync(runs, { recursive: true });
@@ -126,7 +125,7 @@ const solo = (() => {
   fs.writeFileSync(path.join(dir, 'solo.md'), '---\nplace: git\nretries: 1\n---\ndo it\n');
   return dir;
 })();
-const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: string; then: 'retries' }> }) => {
+const runNaming = async (record: { taskId: string; tries?: Array<{ taskId: string; cause: 'retries' }> }) => {
   const repo = scratch('wf-restart-repo-');
   stand().world.repository(repo, {});
   const run = await runPlaced(startRun({ brief: 'restart', repo, workflowDir: solo, isolate: false }));
@@ -167,7 +166,7 @@ for (const [id, s] of [
 ] as const) {
   failed(`${id}-was`, 2);
   pending(id, s, { priority: 1 });
-  await runNaming({ taskId: id, tries: [{ taskId: `${id}-was`, then: 'retries' }] });
+  await runNaming({ taskId: id, tries: [{ taskId: `${id}-was`, cause: 'retries' }] });
 }
 pending('orphan', 5);
 pending('root-new', 10);

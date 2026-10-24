@@ -2079,7 +2079,7 @@ export function writeRegated(root: string, now: number): void {
  * session at work (`attachedRun`), its say file read by run.ts, its conversation so far on disk.
  *
  * LOOPING's review loops back to implement, on round 3: each step's place holds its round-3 task and a try behind it for each round
- * before, a task the engine ran once, moved there with `then: 'round'` as the run moves it when it files a round. review's `rounds` is
+ * before, a task the engine ran once, moved there with `cause: 'round'` as the run moves it when it files a round. review's `rounds` is
  * what the parser sets for a loop that does not say. A declared field is a field of the closeout, beside the four every closeout has:
  * implement answers the findings it was handed, as a loop's target owes from round 2, and each review asks for another round.
  *
@@ -2359,7 +2359,7 @@ export function seed(root: string, now = Date.now()): void {
               taskId: roundTask(name, 3),
               workspace: loopWorkspace,
               branch: loopBranch,
-              tries: [1, 2].map((round) => ({ taskId: roundTask(name, round), then: 'round' })),
+              tries: [1, 2].map((round) => ({ taskId: roundTask(name, round), cause: 'round' })),
             },
           ]),
         ),
@@ -2592,20 +2592,20 @@ export function seed(root: string, now = Date.now()): void {
             taskId: cost('implement-2'),
             workspace: costLane,
             branch: `wf/${COSTLY.id}/implement`,
-            tries: [{ taskId: cost('implement-1'), then: 'round' }],
+            tries: [{ taskId: cost('implement-1'), cause: 'round' }],
           },
           review: {
             taskId: cost('review-2'),
             workspace: costLane,
             branch: `wf/${COSTLY.id}/implement`,
-            tries: [{ taskId: cost('review-1'), then: 'round' }],
+            tries: [{ taskId: cost('review-1'), cause: 'round' }],
           },
           tokens: {
             taskId: cost('tokens-try2'),
             workspace: tokensLane,
             branch: `wf/${COSTLY.id}/tokens`,
             check: { taskId: cost('tokens-try2-check') },
-            tries: [{ taskId: cost('tokens'), check: { taskId: cost('tokens-check') }, then: 'nudge' }],
+            tries: [{ taskId: cost('tokens'), check: { taskId: cost('tokens-check') }, cause: 'nudge' }],
           },
           palette: { taskId: cost('palette'), workspace: paletteLane, branch: `wf/${COSTLY.id}/palette` },
         },

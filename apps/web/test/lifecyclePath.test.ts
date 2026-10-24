@@ -67,11 +67,11 @@ test("pathPoll, pathStamp: when a task's path is read again, and the stamp that 
     },
   );
   await t.test('the stamp moves with the step’s task, its tries and its word, and with nothing else', () => {
-    const step = { taskId: 't-1', tries: [{}], status: 'running', note: 'working' };
+    const step = { taskId: 't-1', tries: [{}], message: 'running', note: 'working' };
     const stamp = pathStamp(step);
     const noted = { ...step, note: 'something else' };
     assert.equal(pathStamp(noted), stamp);
-    assert.notEqual(pathStamp({ ...step, status: 'succeeded' }), stamp, 'its word');
+    assert.notEqual(pathStamp({ ...step, message: 'succeeded' }), stamp, 'its word');
     assert.notEqual(pathStamp({ ...step, tries: [{}, {}] }), stamp, 'a try more');
     assert.notEqual(pathStamp({ ...step, taskId: 't-2' }), stamp, 'another task');
     assert.notEqual(pathStamp({ ...step, taskId: null }), stamp, 'no task');

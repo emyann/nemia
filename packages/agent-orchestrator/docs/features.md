@@ -47,14 +47,18 @@ check run by the run, which lands the merge or aborts it; `denials: fail` (§10)
 own task (§11, thin runtime stage 2 part 4b); a step on a remote A2A agent (thin runtime stage 6 part 2); and agents that carry their
 own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked in `docs/eval-thin-runtime.md`.
 
-**What remains, in order.** Of the numbered items, four are open:
+**What remains, in order.** Of the numbered items, three are open:
 
 1. §1, a run that grows steps from a plan.
-2. A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
-   4c, admission, which is done). Rounds and tries are `-try<n>` tasks today (§11).
-3. §13, the cases `test/run.test.ts` still holds: the say cases, to move beside `src/say/`; its timeline cases are fj03 slice 4's.
-4. §14, the former frontmatter form's fallback taken out, once `nemia frontmatter rewrite --check` is clean on the owner's machine:
+2. §13, the cases `test/run.test.ts` still holds: the say cases, to move beside `src/say/`; its timeline cases are fj03 slice 4's.
+3. §14, the former frontmatter form's fallback taken out, once `nemia frontmatter rewrite --check` is clean on the owner's machine:
    carded, waiting in the inbox.
+
+A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
+4c, admission), the second item until 2026-10-24, is closed as decided that day (language work, decision 6): a try stays the
+orchestrator's filing of a step as a new runtime task, the way a Kubernetes Job makes a new Pod, and an attempt stays the runtime's
+restart inside one task, like a container's restart count. Rounds and tries are `-try<n>` tasks (§11), each earlier try kept with its
+`cause` (`TryCause`, which a record's former `then` reads as), and the board says try and never attempt.
 
 Then the *Engine-side work* at the end: waking the tick on a harness registry change rather than a timer; and thin runtime stage 6
 part 3, the gRPC binding, its one part still open (part 4, streaming and subscribe, landed on 2026-10-07: `b342b3da0`, `0c479816f`).
@@ -5618,7 +5622,8 @@ keeps its.
 
 Shipped 2026-09-24 as *Shipped: a gate and a blocked sign-off wait on the step's own task*, above. Its registration, which that record
 quotes, is in this file's history before 2026-10-23. A step's tries and rounds as attempts of one task, called 4c in that registration
-and not the runtime's stage 4c (admission, done 2026-09-25), is still open, as *tries as attempts* (2026-09-28).
+and not the runtime's stage 4c (admission, done 2026-09-25), was open as *tries as attempts* (2026-09-28) and is closed as decided on
+2026-10-24: tries stay new tasks, and attempts the runtime's restarts (*What remains*, above).
 
 ## 12. An agent that carries its own skills, in Claude Code's own format
 

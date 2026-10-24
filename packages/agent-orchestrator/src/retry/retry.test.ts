@@ -59,8 +59,8 @@ const askFor = (n: number, mode: RetryMode = 'nudge', model?: string): RetryAsk 
 });
 /** Two tries `retries: 2` filed. */
 const SPENT: EarlierTry[] = [
-  { taskId: 't-a', check: { taskId: 'c-a' }, then: 'retries' },
-  { taskId: 't-b', check: { taskId: 'c-b' }, then: 'retries' },
+  { taskId: 't-a', check: { taskId: 'c-a' }, cause: 'retries' },
+  { taskId: 't-b', check: { taskId: 'c-b' }, cause: 'retries' },
 ];
 
 test('continuesFrom: the session a try continues (open issue 5)', async (t) => {
@@ -92,24 +92,24 @@ test("sessionModel: a continued try runs on the model its session was started on
   const on = (...tries: EarlierTry[]): StepRecord => ({ taskId: 'now', tries });
   const rows: Array<[string, Workflow, StepRecord | undefined, string | undefined]> = [
     ["the first try: the step's model", OPUS, undefined, 'opus'],
-    ['a step with no model: the harness default, every try', step('implement'), on({ taskId: 'a', then: 'nudge' }), undefined],
-    ["a `--model` try's model", OPUS, on({ taskId: 'a', then: 'fresh', model: 'sonnet' }), 'sonnet'],
+    ['a step with no model: the harness default, every try', step('implement'), on({ taskId: 'a', cause: 'nudge' }), undefined],
+    ["a `--model` try's model", OPUS, on({ taskId: 'a', cause: 'fresh', model: 'sonnet' }), 'sonnet'],
     [
       "a `--model` try's, past nudges, rounds, retries and rechecks",
       OPUS,
       on(
-        { taskId: 'a', then: 'fresh', model: 'sonnet' },
-        { taskId: 'b', then: 'nudge' },
-        { taskId: 'c', then: 'round' },
-        { taskId: 'd', then: 'retries' },
-        { taskId: 'e', then: 'recheck' },
+        { taskId: 'a', cause: 'fresh', model: 'sonnet' },
+        { taskId: 'b', cause: 'nudge' },
+        { taskId: 'c', cause: 'round' },
+        { taskId: 'd', cause: 'retries' },
+        { taskId: 'e', cause: 'recheck' },
       ),
       'sonnet',
     ],
     [
       "a bare `--fresh` after it goes back to the step's",
       OPUS,
-      on({ taskId: 'a', then: 'fresh', model: 'sonnet' }, { taskId: 'b', then: 'fresh' }, { taskId: 'c', then: 'nudge' }),
+      on({ taskId: 'a', cause: 'fresh', model: 'sonnet' }, { taskId: 'b', cause: 'fresh' }, { taskId: 'c', cause: 'nudge' }),
       'opus',
     ],
   ];
@@ -128,7 +128,7 @@ test('nextTry: the try a step moves behind', async (t) => {
       taskId: 'r-1-implement-try2',
       workspace: '/wt',
       branch: 'wf/r-1/implement',
-      tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, then: 'retries' }],
+      tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, cause: 'retries' }],
     });
   });
   await t.test('a recheck keeps its task, and a fresh try after it keeps its model; the record given is not written into', () => {
@@ -137,11 +137,11 @@ test('nextTry: the try a step moves behind', async (t) => {
       taskId: 'r-1-implement',
       workspace: '/wt',
       branch: 'wf/r-1/implement',
-      tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, then: 'recheck' }],
+      tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, cause: 'recheck' }],
     });
     const fresh = nextTry(rechecked, { step: 'implement', try: 3, mode: 'fresh', model: 'opus', by: 'ask' }, 'r-1-implement-try3');
     assert.deepEqual(
-      fresh.tries?.map((x) => [x.then, x.model]),
+      fresh.tries?.map((x) => [x.cause, x.model]),
       [
         ['recheck', undefined],
         ['fresh', 'opus'],
@@ -151,7 +151,7 @@ test('nextTry: the try a step moves behind', async (t) => {
   });
   await t.test('the try a pause filed keeps its mode, is marked paused, and is said as the pause', () => {
     const paused = nextTry(pauseRun('t1').steps.implement, { step: 'implement', try: 2, mode: 'nudge', by: 'pause' }, 't2');
-    assert.deepEqual(paused.tries, [{ taskId: 't1', then: 'nudge', paused: true }]);
+    assert.deepEqual(paused.tries, [{ taskId: 't1', cause: 'nudge', paused: true }]);
     assert.equal(tryNote(IMPLEMENT, paused), 'try 2, continued after nemia pause --now');
   });
 });

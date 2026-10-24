@@ -47,9 +47,9 @@ const RUN = {
     build: {
       taskId: 'build-2',
       check: { taskId: 'build-2-check' },
-      tries: [{ taskId: 'build-1', check: { taskId: 'build-1-check' }, then: 'round' }],
+      tries: [{ taskId: 'build-1', check: { taskId: 'build-1-check' }, cause: 'round' }],
     },
-    review: { taskId: 'review-2', tries: [{ taskId: 'review-1', then: 'round' }] },
+    review: { taskId: 'review-2', tries: [{ taskId: 'review-1', cause: 'round' }] },
   },
   approvals: [{ step: 'plan', try: 1, at: at('10:30') }],
 } as unknown as Run;
@@ -188,7 +188,7 @@ const ANSWERED = {
   id: 'r-3',
   workflowDir: '/w/intake',
   createdAt: at('09:59'),
-  steps: { ask: { taskId: 'ask', tries: [{ taskId: 'ask', then: 'nudge' }] } },
+  steps: { ask: { taskId: 'ask', tries: [{ taskId: 'ask', cause: 'nudge' }] } },
   approvals: [{ step: 'ask', try: 2, at: at('10:29') }],
 } as unknown as Run;
 const turn = (n: number, spawned: string, ended: string, outcome = 'done') => ({

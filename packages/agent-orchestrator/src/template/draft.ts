@@ -10,6 +10,7 @@ import type { Agent } from '../agents/agents.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillNamesOf, toolsOf } from '../keys/index.ts';
 import { FACTORY_RULES_FILE } from '../rules/rules.ts';
+import type { RevisionsPolicy } from '../factory/factory.ts';
 import { API_VERSION, FENCE_KEYS, type Profile, type Step } from './layout.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
@@ -43,6 +44,8 @@ export type FactorySource = {
   hires: Readonly<Record<string, string>>;
   instruction: { words: string; file: string } | undefined;
   rules: { words: string; file: string } | undefined;
+  /** Whether its runs follow merged revisions, where it says: exported as the manifest's `spec.revisions`. */
+  revisions?: RevisionsPolicy;
 };
 
 /** What `draftOf` reads: the template's name, the workflows, a factory's parts, and the loader's answer for an agent and a skill. */
@@ -281,7 +284,8 @@ function gatherSkills(source: Source, into: Gathered): void {
 
 /**
  * The draft of the template `source.template`: each workflow, the agents its steps are filled by, the skills those agents and steps name
- * (a place skill left out), and the manifest with every hire, a factory's and the steps' own; NEMIA.md from the factory's instruction,
+ * (a place skill left out), and the manifest with every hire, a factory's and the steps' own, and the factory's revisions policy where it
+ * says one; NEMIA.md from the factory's instruction,
  * and RULES.md from its rules.
  * Refused, each by name, nothing to write: a key the template has no place for, a step filled twice, an agent or a skill not found.
  */
@@ -291,7 +295,12 @@ export function draftOf(source: Source): Draft {
   for (const workflow of source.workflows) gatherWorkflow(source, workflow, into, hires);
   gatherAgents(source, into);
   gatherSkills(source, into);
-  const manifest = documentOf('FactoryTemplate', source.template, undefined, { version: '0.1.0', hires });
+  const revisions = source.factory?.revisions;
+  const manifest = documentOf('FactoryTemplate', source.template, undefined, {
+    version: '0.1.0',
+    hires,
+    ...(revisions === undefined ? {} : { revisions }),
+  });
   into.files.unshift({ path: 'nemia.yaml', document: manifest });
   into.from.unshift({ part: 'nemia.yaml', from: source.factory?.file ?? 'written here: version 0.1.0, named for its folder' });
   for (const [part, words] of [

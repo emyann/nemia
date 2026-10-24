@@ -37,7 +37,7 @@ export type ChatAnswerAnswer = Effect.Success<ReturnType<typeof chatAnswer>>;
 /** What `POST /api/nemia/chat/read` answers. */
 export type ChatReadAnswer = Effect.Success<ReturnType<typeof chatRead>>;
 
-/** How often a followed chat is read again, shipped: `Beats.chat`'s default (layer.ts). */
+/** How often a followed chat is read again by default: `Beats.chat`'s default (layer.ts). */
 export const CHAT_BEAT_MS = 2000;
 
 const SEND_SHAPE = '`{ "text": "<what you write to Nemia>" }`';

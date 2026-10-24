@@ -18,7 +18,7 @@
  * of which writes the store's `workflows/agents/`, what every step naming the agent is told; and a person's custom instructions for an
  * agent written (`PUT /api/custom-instructions/:name`) or cleared (`DELETE /api/custom-instructions/:name`), custom.ts, each of which
  * writes the store's `custom-instructions/`, what every run started after is told after the agent's instructions; and a skill of yours made
- * — written on the board, or one Nemia ships copied into your library (`POST /api/skills/yours`) — or changed, whole or its `preload:`
+ * — written on the board, or a builtin one copied into your library (`POST /api/skills/yours`) — or changed, whole or its `preload:`
  * alone (`PUT /api/skills/yours/:name`), skills.ts, each of which writes the store's `workflows/skills/`, what every agent giving it is
  * told; and an agent of yours tried on a short brief (`POST /api/agents/yours/:name/try`, agents.ts), which writes its try's folder in the
  * store's `tries/` and a run's record, and a try's run removed (`DELETE /api/runs/:id`, commands/routes.ts, the route of `nemia rm`), which

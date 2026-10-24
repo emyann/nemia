@@ -34,7 +34,7 @@ import {
   verifiesRest,
 } from 'agent-orchestrator';
 import { runTasks } from 'agent-orchestrator/run';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 import { names } from '../../test/named.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */

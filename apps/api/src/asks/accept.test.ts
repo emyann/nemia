@@ -47,13 +47,13 @@ const DONE = { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] };
 const AGAIN = { type: 'object', properties: { again: { type: 'boolean' } }, required: ['again'], additionalProperties: false };
 
 /**
- * A run of `implement ⇄ review`, `rounds: 2`, on round `on` of its loop — the tries before it moved aside with `then: 'round'`, as the run
+ * A run of `implement ⇄ review`, `rounds: 2`, on round `on` of its loop — the tries before it moved aside with `cause: 'round'`, as the run
  * moves them when it files a round — whose review signed off saying `again`. On round 2 with `again: true`, the loop is out of rounds.
  * From round 2 its implement signs off with `replies`: a loop's target owes an answer to the findings it was handed (`owesReplies`), and
  * an empty list is no answer. Returns the record as written.
  */
 const loopingRun = (id: string, on: number, again: boolean): string => {
-  const tries = (name: string) => Array.from({ length: on - 1 }, (_, i) => ({ taskId: `${id}-${name}-${i + 1}`, then: 'round' }));
+  const tries = (name: string) => Array.from({ length: on - 1 }, (_, i) => ({ taskId: `${id}-${name}-${i + 1}`, cause: 'round' }));
   const step = (name: string) => ({
     taskId: `${id}-${name}-${on}`,
     branch: `wf/${id}/implement`,

@@ -312,7 +312,7 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
       );
       assert.equal(
         body.cost,
-        'run $0.004 measured · 1 attempt not measured',
+        'run $0.004 measured · 1 session not measured',
         "the run's cost after its steps, as `nemia decide` prints it: review's session was priced, implement's was not",
       );
       assert.equal(body.overBudget, null, 'no step held on a budget');
@@ -478,7 +478,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
       ];
       settledTask('t-d9-implement-2', done);
       settledTask('t-d9-review-2', { ...done, again: true });
-      const tries = (name: string) => [{ taskId: `t-d9-${name}-1`, then: 'round' }];
+      const tries = (name: string) => [{ taskId: `t-d9-${name}-1`, cause: 'round' }];
       writeRun({
         id: 'r-d9',
         repo,

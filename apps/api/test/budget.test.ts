@@ -117,12 +117,12 @@ write(
       { name: 'tokens', after: [], body: 'Pick the tokens.', harness: 'claude', budget: 3, check: 'npm test' },
     ],
     steps: {
-      implement: { taskId: 't-implement-2', tries: [{ taskId: 't-implement-1', then: 'round' }] },
-      review: { taskId: 't-review-2', tries: [{ taskId: 't-review-1', then: 'round' }] },
+      implement: { taskId: 't-implement-2', tries: [{ taskId: 't-implement-1', cause: 'round' }] },
+      review: { taskId: 't-review-2', tries: [{ taskId: 't-review-1', cause: 'round' }] },
       tokens: {
         taskId: 't-tokens-2',
         check: { taskId: 't-tokens-2-check' },
-        tries: [{ taskId: 't-tokens-1', check: { taskId: 't-tokens-1-check' }, then: 'nudge' }],
+        tries: [{ taskId: 't-tokens-1', check: { taskId: 't-tokens-1-check' }, cause: 'nudge' }],
       },
     },
   }),
@@ -539,7 +539,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
         body.overBudget,
       );
       assert.equal(body.cost, said.runCost[0].replace(/^cost\s+/, ''));
-      assert.equal(body.cost, 'run $6.35 measured · 2 attempts not measured');
+      assert.equal(body.cost, 'run $6.35 measured · 2 sessions not measured');
       const once = body.commands.filter((c) => c.label === 'once more');
       assert.deepEqual(
         once.map((c) => c.said),

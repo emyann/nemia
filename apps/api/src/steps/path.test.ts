@@ -61,7 +61,7 @@ const writeRun = (id: string, steps: Record<string, object>) =>
 
 journal('r-retried-1', [filed(), ...turn(1, 1), { kind: 'settled', at: at(4), outcome: 'failed' }]);
 journal('r-retried-2', [filed(), { kind: 'starting', at: at(10), attempt: 1 }, { kind: 'spawned', at: at(11), attempt: 1 }]);
-writeRun('r-retried', { implement: { taskId: 'r-retried-2', tries: [{ taskId: 'r-retried-1', then: 'retries' }] } });
+writeRun('r-retried', { implement: { taskId: 'r-retried-2', tries: [{ taskId: 'r-retried-1', cause: 'retries' }] } });
 
 journal('r-held-1', [
   filed({ holdOpen: true }),
@@ -75,9 +75,9 @@ writeRun('r-held', {
   implement: {
     taskId: 'r-held-1',
     tries: [
-      { taskId: 'r-held-1', then: 'nudge' },
-      { taskId: 'r-held-1', then: 'recheck' },
-      { taskId: 'r-held-1', then: 'nudge' },
+      { taskId: 'r-held-1', cause: 'nudge' },
+      { taskId: 'r-held-1', cause: 'recheck' },
+      { taskId: 'r-held-1', cause: 'nudge' },
     ],
   },
 });

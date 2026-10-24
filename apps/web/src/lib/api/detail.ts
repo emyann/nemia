@@ -4,6 +4,7 @@
  */
 import { queryOptions, type QueryClient } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
 import { ReadRefusal, get } from './read.ts';
 import type { RetryMode, Said } from './asks.ts';
@@ -49,15 +50,56 @@ import {
 import { RunReadSchema, StepUsedSchema, type RunRead, type StepUsed } from './usage.ts';
 
 /** Decodes a `RetryMode` (asks.ts, which hands out writes and so no schema). */
-const RetryModeSchema = Schema.Literals(['nudge', 'fresh', 'recheck']) satisfies Schema.Schema<RetryMode>;
+const RetryModeSchema = decodes<RetryMode>()(Schema.Literals(['nudge', 'fresh', 'recheck']));
 
 /** Decodes a `Said` (asks.ts). */
-const SaidSchema = Schema.Struct({
-  at: Schema.String,
-  attempt: Schema.Number,
-  text: Schema.String,
-  after: Schema.NullOr(Schema.Struct({ kind: Schema.String, id: Schema.String })),
-}) satisfies Schema.Schema<Said>;
+const SaidSchema = decodes<Said>()(
+  Schema.Struct({
+    at: Schema.String,
+    attempt: Schema.Number,
+    text: Schema.String,
+    after: Schema.NullOr(Schema.Struct({ kind: Schema.String, id: Schema.String })),
+  }),
+);
+
+/** Mirrors `StepStatus` in agent-orchestrator's record/record.ts: a step's word, as the package and the CLI's `ls` say it. */
+export type StepStatus =
+  | 'waiting'
+  | 'running'
+  | 'blocked'
+  | 'unsigned'
+  | 'checking'
+  | 'verified'
+  | 'unverified'
+  | 'awaiting approval'
+  | 'exhausted'
+  | 'over budget'
+  | 'budget exhausted'
+  | 'denied'
+  | 'failed (check)'
+  | 'failed'
+  | 'stopped';
+
+/** Decodes a `StepStatus`. */
+const StepStatusSchema = decodes<StepStatus>()(
+  Schema.Literals([
+    'waiting',
+    'running',
+    'blocked',
+    'unsigned',
+    'checking',
+    'verified',
+    'unverified',
+    'awaiting approval',
+    'exhausted',
+    'over budget',
+    'budget exhausted',
+    'denied',
+    'failed (check)',
+    'failed',
+    'stopped',
+  ]),
+);
 
 /**
  * Mirrors `StepBudget` in apps/api/src/detail/detail.ts: a step's cap in force — the `budget:` the run froze, or what a person raised it to
@@ -67,12 +109,14 @@ const SaidSchema = Schema.Struct({
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
 
 /** Decodes a `StepBudget`. */
-const StepBudgetSchema = Schema.Struct({
-  usd: Schema.Number,
-  said: Schema.String,
-  of: Schema.NullOr(Schema.String),
-  over: Schema.Boolean,
-}) satisfies Schema.Schema<StepBudget>;
+const StepBudgetSchema = decodes<StepBudget>()(
+  Schema.Struct({
+    usd: Schema.Number,
+    said: Schema.String,
+    of: Schema.NullOr(Schema.String),
+    over: Schema.Boolean,
+  }),
+);
 
 /**
  * Mirrors `StepRaise` in apps/api/src/detail/detail.ts: a raise of a step's cap the package takes — with its try (`retry`) or with its
@@ -81,16 +125,18 @@ const StepBudgetSchema = Schema.Struct({
  * (`own`, the package's word: `blocked`, `unsigned`, `failed (check)` …), which its word, `over budget`, does not say. For a round, none,
  * and null.
  */
-export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: string | null };
+export type StepRaise = { by: 'retry' | 'round'; above: number; said: string; modes: RetryMode[]; own: StepStatus | null };
 
 /** Decodes a `StepRaise`. */
-const StepRaiseSchema = Schema.Struct({
-  by: Schema.Literals(['retry', 'round']),
-  above: Schema.Number,
-  said: Schema.String,
-  modes: Schema.mutable(Schema.Array(RetryModeSchema)),
-  own: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<StepRaise>;
+const StepRaiseSchema = decodes<StepRaise>()(
+  Schema.Struct({
+    by: Schema.Literals(['retry', 'round']),
+    above: Schema.Number,
+    said: Schema.String,
+    modes: Schema.mutable(Schema.Array(RetryModeSchema)),
+    own: Schema.NullOr(StepStatusSchema),
+  }),
+);
 
 /**
  * Mirrors `StepApproval` in apps/api/src/detail/detail.ts: a person's approval of the try a gated step is on — when, and the words given
@@ -99,11 +145,13 @@ const StepRaiseSchema = Schema.Struct({
 export type StepApproval = { try: number; at: string; message: string | null };
 
 /** Decodes a `StepApproval`. */
-const StepApprovalSchema = Schema.Struct({
-  try: Schema.Number,
-  at: Schema.String,
-  message: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<StepApproval>;
+const StepApprovalSchema = decodes<StepApproval>()(
+  Schema.Struct({
+    try: Schema.Number,
+    at: Schema.String,
+    message: Schema.NullOr(Schema.String),
+  }),
+);
 
 /**
  * Mirrors `StepGate` in apps/api/src/detail/detail.ts: a gated step's gate. `awaiting` while it waits at it — the CLI `ls`'s `awaiting
@@ -112,20 +160,24 @@ const StepApprovalSchema = Schema.Struct({
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
 /** Decodes a `StepGate`. */
-const StepGateSchema = Schema.Struct({
-  awaiting: Schema.Boolean,
-  approval: Schema.NullOr(StepApprovalSchema),
-}) satisfies Schema.Schema<StepGate>;
+const StepGateSchema = decodes<StepGate>()(
+  Schema.Struct({
+    awaiting: Schema.Boolean,
+    approval: Schema.NullOr(StepApprovalSchema),
+  }),
+);
 
 /** As the api's: a person's acceptance of a loop out of rounds (the CLI's `accept`), on the try its looping step is on. */
 export type StepAcceptance = { try: number; at: string; message: string };
 
 /** Decodes a `StepAcceptance`. */
-const StepAcceptanceSchema = Schema.Struct({
-  try: Schema.Number,
-  at: Schema.String,
-  message: Schema.String,
-}) satisfies Schema.Schema<StepAcceptance>;
+const StepAcceptanceSchema = decodes<StepAcceptance>()(
+  Schema.Struct({
+    try: Schema.Number,
+    at: Schema.String,
+    message: Schema.String,
+  }),
+);
 
 /**
  * Mirrors `StepAsked` in apps/api/src/detail/detail.ts: a try a person asked for, which the next tick files — once it has stopped the
@@ -134,13 +186,15 @@ const StepAcceptanceSchema = Schema.Struct({
 export type StepAsked = { try: number; mode: RetryMode; model: string | null; message: string | null; stopFirst: boolean };
 
 /** Decodes a `StepAsked`. */
-const StepAskedSchema = Schema.Struct({
-  try: Schema.Number,
-  mode: RetryModeSchema,
-  model: Schema.NullOr(Schema.String),
-  message: Schema.NullOr(Schema.String),
-  stopFirst: Schema.Boolean,
-}) satisfies Schema.Schema<StepAsked>;
+const StepAskedSchema = decodes<StepAsked>()(
+  Schema.Struct({
+    try: Schema.Number,
+    mode: RetryModeSchema,
+    model: Schema.NullOr(Schema.String),
+    message: Schema.NullOr(Schema.String),
+    stopFirst: Schema.Boolean,
+  }),
+);
 
 /** Mirrors `StepSpec` in apps/api/src/detail/detail.ts. */
 export type StepSpec = {
@@ -171,22 +225,24 @@ export type StepSpec = {
 };
 
 /** Decodes a `StepSpec`. */
-const StepSpecSchema = Schema.Struct({
-  harness: Schema.NullOr(Schema.String),
-  model: Schema.NullOr(Schema.String),
-  effort: Schema.NullOr(Schema.String),
-  context: Schema.NullOr(Schema.Number),
-  after: StringsSchema,
-  workspace: Schema.NullOr(Schema.String),
-  place: Schema.NullOr(Schema.String),
-  resume: Schema.NullOr(Schema.String),
-  permissionMode: Schema.NullOr(Schema.String),
-  sandbox: Schema.NullOr(Schema.String),
-  tools: Schema.NullOr(StringsSchema),
-  deadlineSeconds: Schema.NullOr(Schema.Number),
-  loop: Schema.NullOr(Schema.String),
-  rounds: Schema.NullOr(Schema.Number),
-}) satisfies Schema.Schema<StepSpec>;
+const StepSpecSchema = decodes<StepSpec>()(
+  Schema.Struct({
+    harness: Schema.NullOr(Schema.String),
+    model: Schema.NullOr(Schema.String),
+    effort: Schema.NullOr(Schema.String),
+    context: Schema.NullOr(Schema.Number),
+    after: StringsSchema,
+    workspace: Schema.NullOr(Schema.String),
+    place: Schema.NullOr(Schema.String),
+    resume: Schema.NullOr(Schema.String),
+    permissionMode: Schema.NullOr(Schema.String),
+    sandbox: Schema.NullOr(Schema.String),
+    tools: Schema.NullOr(StringsSchema),
+    deadlineSeconds: Schema.NullOr(Schema.Number),
+    loop: Schema.NullOr(Schema.String),
+    rounds: Schema.NullOr(Schema.Number),
+  }),
+);
 
 /**
  * Mirrors `StepFiled` in apps/api/src/detail/detail.ts: what the engine filed a step's current try with. Each field is null where the
@@ -223,18 +279,20 @@ export type StepFiled = {
 };
 
 /** Decodes a `StepFiled`. */
-const StepFiledSchema = Schema.Struct({
-  model: Schema.NullOr(Schema.String),
-  askedModel: Schema.NullOr(Schema.String),
-  effort: Schema.NullOr(Schema.String),
-  contextTokens: Schema.NullOr(Schema.Number),
-  permissionMode: Schema.NullOr(Schema.String),
-  runsIn: Schema.NullOr(Schema.Struct({ mode: Schema.String, by: Schema.Literals(['filed', 'default', 'tools']) })),
-  tools: Schema.NullOr(StringsSchema),
-  deadlineSeconds: Schema.NullOr(Schema.Number),
-  remote: Schema.NullOr(Schema.Struct({ name: Schema.String, address: Schema.NullOr(Schema.String) })),
-  bridge: Schema.NullOr(BridgeSchema),
-}) satisfies Schema.Schema<StepFiled>;
+const StepFiledSchema = decodes<StepFiled>()(
+  Schema.Struct({
+    model: Schema.NullOr(Schema.String),
+    askedModel: Schema.NullOr(Schema.String),
+    effort: Schema.NullOr(Schema.String),
+    contextTokens: Schema.NullOr(Schema.Number),
+    permissionMode: Schema.NullOr(Schema.String),
+    runsIn: Schema.NullOr(Schema.Struct({ mode: Schema.String, by: Schema.Literals(['filed', 'default', 'tools']) })),
+    tools: Schema.NullOr(StringsSchema),
+    deadlineSeconds: Schema.NullOr(Schema.Number),
+    remote: Schema.NullOr(Schema.Struct({ name: Schema.String, address: Schema.NullOr(Schema.String) })),
+    bridge: Schema.NullOr(BridgeSchema),
+  }),
+);
 
 /**
  * Mirrors `RunPage` in apps/api/src/runs/runs.ts: a run in full (`RunDetail`, apps/api/src/detail/detail.ts), and its workflow page's
@@ -307,11 +365,11 @@ export type RunDetail = {
   /**
    * The kinds the run is behind the revisions ledger on, as the api reads them: the kind (a workflow folder, an agent, a skill, a
    * factory's rules), its name, the revision the run resolved and the one there is now — and, for a line about a step that has already
-   * been filed, that step's name. Absent on an answer from an api before revisions.
+   * been filed, that step's name.
    */
-  kinds?: Array<{ kind: string; name: string; pinned: number; now: number; step?: string }>;
-  /** The line the api says to type to take the new revisions, so the board spells no command. Absent on an answer from an api before it. */
-  refresh?: string;
+  kinds: Array<{ kind: 'workflow' | 'agent' | 'skill' | 'rules'; name: string; pinned: number; now: number; step?: string }>;
+  /** The line the api says to type to take the new revisions, so the board spells no command. */
+  refresh: string;
   /** The steps as a graph, from the workflow the run froze: what the canvases draw, so none derives it from `after`. */
   graph: RunGraph;
   steps: Array<{
@@ -403,9 +461,15 @@ export type TaskSpan = {
 };
 
 /**
+ * Mirrors `TurnSpan` in agent-orchestrator's timeline/turns.ts: the turn of an earlier try's session a try ran — `asked` where the turn
+ * before it blocked, so this one answers a person — and when the turn before it ended (`heldFrom`), and its own spawn and end.
+ */
+export type TurnSpan = { asked: boolean; heldFrom: string | null; spawnedAt: string | null; endedAt: string | null };
+
+/**
  * Mirrors `StepTimelineTry` in apps/api/src/detail/detail.ts: one try of a step on the clock. `session` is null on a try a recheck reached,
  * whose session is try `sessionOf`'s; `check` null for a try whose check was never filed; `used` what its session consumed, in
- * the CLI `decide`'s words.
+ * the CLI `decide`'s words; `turn` the turn of an earlier try's session it ran, absent for a try on a task of its own.
  */
 export type StepTimelineTry = {
   try: number;
@@ -414,6 +478,7 @@ export type StepTimelineTry = {
   sessionOf: number | null;
   check: TaskSpan | null;
   used: StepUsed | null;
+  turn?: TurnSpan;
 };
 
 /**
@@ -435,145 +500,164 @@ export type TimelineTotal = {
   cost: Spent | null;
 };
 
+/** Decodes a `TurnSpan`. */
+const TurnSpanSchema = decodes<TurnSpan>()(
+  Schema.Struct({
+    asked: Schema.Boolean,
+    heldFrom: Schema.NullOr(Schema.String),
+    spawnedAt: Schema.NullOr(Schema.String),
+    endedAt: Schema.NullOr(Schema.String),
+  }),
+);
+
 /** Decodes a `TaskSpan`. */
-const TaskSpanSchema = Schema.Struct({
-  taskId: Schema.String,
-  at: Schema.Literals(['unknown', 'queued', 'starting', 'running', 'ended', 'unspawned']),
-  filedAt: Schema.NullOr(Schema.String),
-  spawnedAt: Schema.NullOr(Schema.String),
-  endedAt: Schema.NullOr(Schema.String),
-  attempts: Schema.Number,
-  queuedMs: Schema.NullOr(Schema.Number),
-  ranMs: Schema.NullOr(Schema.Number),
-  queued: Schema.String,
-  ran: Schema.String,
-}) satisfies Schema.Schema<TaskSpan>;
+const TaskSpanSchema = decodes<TaskSpan>()(
+  Schema.Struct({
+    taskId: Schema.String,
+    at: Schema.Literals(['unknown', 'queued', 'starting', 'running', 'ended', 'unspawned']),
+    filedAt: Schema.NullOr(Schema.String),
+    spawnedAt: Schema.NullOr(Schema.String),
+    endedAt: Schema.NullOr(Schema.String),
+    attempts: Schema.Number,
+    queuedMs: Schema.NullOr(Schema.Number),
+    ranMs: Schema.NullOr(Schema.Number),
+    queued: Schema.String,
+    ran: Schema.String,
+  }),
+);
 
 /** Decodes a `StepTimelineTry`. */
-const StepTimelineTrySchema = Schema.Struct({
-  try: Schema.Number,
-  round: Schema.Number,
-  session: Schema.NullOr(TaskSpanSchema),
-  sessionOf: Schema.NullOr(Schema.Number),
-  check: Schema.NullOr(TaskSpanSchema),
-  used: Schema.NullOr(StepUsedSchema),
-}) satisfies Schema.Schema<StepTimelineTry>;
+const StepTimelineTrySchema = decodes<StepTimelineTry>()(
+  Schema.Struct({
+    try: Schema.Number,
+    round: Schema.Number,
+    session: Schema.NullOr(TaskSpanSchema),
+    sessionOf: Schema.NullOr(Schema.Number),
+    check: Schema.NullOr(TaskSpanSchema),
+    used: Schema.NullOr(StepUsedSchema),
+    turn: Schema.optionalKey(TurnSpanSchema),
+  }),
+);
 
 /** Decodes a `TimelineTotal`. */
-const TimelineTotalSchema = Schema.Struct({
-  loop: Schema.NullOr(Schema.String),
-  round: Schema.NullOr(Schema.Number),
-  tasks: Schema.Number,
-  inFlight: Schema.Number,
-  queuedMs: Schema.Number,
-  ranMs: Schema.Number,
-  wallMs: Schema.NullOr(Schema.Number),
-  queued: Schema.String,
-  ran: Schema.String,
-  wall: Schema.String,
-  cost: Schema.NullOr(SpentSchema),
-}) satisfies Schema.Schema<TimelineTotal>;
+const TimelineTotalSchema = decodes<TimelineTotal>()(
+  Schema.Struct({
+    loop: Schema.NullOr(Schema.String),
+    round: Schema.NullOr(Schema.Number),
+    tasks: Schema.Number,
+    inFlight: Schema.Number,
+    queuedMs: Schema.Number,
+    ranMs: Schema.Number,
+    wallMs: Schema.NullOr(Schema.Number),
+    queued: Schema.String,
+    ran: Schema.String,
+    wall: Schema.String,
+    cost: Schema.NullOr(SpentSchema),
+  }),
+);
 
 /** Decodes a step of a `RunDetail`. */
-const DetailStepSchema = Schema.Struct({
-  name: Schema.String,
-  spec: Schema.NullOr(StepSpecSchema),
-  filed: Schema.NullOr(StepFiledSchema),
-  body: Schema.NullOr(Schema.String),
-  told: Schema.NullOr(Schema.String),
-  layers: Schema.NullOr(StepLayersSchema),
-  taskParts: Schema.NullOr(Schema.mutable(Schema.Array(TaskPartSchema))),
-  taskId: Schema.NullOr(Schema.String),
-  workspace: Schema.NullOr(Schema.String),
-  files: Schema.mutable(Schema.Array(StepArtifactSchema)),
-  filesError: Schema.NullOr(Schema.String),
-  branch: Schema.NullOr(Schema.String),
-  status: Schema.String,
-  note: Schema.NullOr(Schema.String),
-  roundDue: Schema.Boolean,
-  commands: Schema.Struct({ approve: Schema.String, retry: Schema.String, say: Schema.String }),
-  ...StepNeedsFields,
-  gate: Schema.NullOr(StepGateSchema),
-  accepted: Schema.NullOr(StepAcceptanceSchema),
-  lastLine: Schema.NullOr(Schema.String),
-  said: Schema.mutable(Schema.Array(SaidSchema)),
-  asked: Schema.NullOr(StepAskedSchema),
-  closeout: Schema.NullOr(StepCloseoutSchema),
-  unreadable: Schema.NullOr(StepUnreadableSchema),
-  check: Schema.NullOr(StepCheckSchema),
-  attempts: StepAttemptsSchema,
-  used: Schema.NullOr(StepUsedSchema),
-  spent: Schema.NullOr(SpentSchema),
-  budget: Schema.NullOr(StepBudgetSchema),
-  raise: Schema.NullOr(StepRaiseSchema),
-  tries: Schema.mutable(Schema.Array(StepTrySchema)),
-  timeline: Schema.mutable(Schema.Array(StepTimelineTrySchema)),
-}) satisfies Schema.Schema<RunDetail['steps'][number]>;
+const DetailStepSchema = decodes<RunDetail['steps'][number]>()(
+  Schema.Struct({
+    name: Schema.String,
+    spec: Schema.NullOr(StepSpecSchema),
+    filed: Schema.NullOr(StepFiledSchema),
+    body: Schema.NullOr(Schema.String),
+    told: Schema.NullOr(Schema.String),
+    layers: Schema.NullOr(StepLayersSchema),
+    taskParts: Schema.NullOr(Schema.mutable(Schema.Array(TaskPartSchema))),
+    taskId: Schema.NullOr(Schema.String),
+    workspace: Schema.NullOr(Schema.String),
+    files: Schema.mutable(Schema.Array(StepArtifactSchema)),
+    filesError: Schema.NullOr(Schema.String),
+    branch: Schema.NullOr(Schema.String),
+    status: Schema.String,
+    note: Schema.NullOr(Schema.String),
+    roundDue: Schema.Boolean,
+    commands: Schema.Struct({ approve: Schema.String, retry: Schema.String, say: Schema.String }),
+    ...StepNeedsFields,
+    gate: Schema.NullOr(StepGateSchema),
+    accepted: Schema.NullOr(StepAcceptanceSchema),
+    lastLine: Schema.NullOr(Schema.String),
+    said: Schema.mutable(Schema.Array(SaidSchema)),
+    asked: Schema.NullOr(StepAskedSchema),
+    closeout: Schema.NullOr(StepCloseoutSchema),
+    unreadable: Schema.NullOr(StepUnreadableSchema),
+    check: Schema.NullOr(StepCheckSchema),
+    attempts: StepAttemptsSchema,
+    used: Schema.NullOr(StepUsedSchema),
+    spent: Schema.NullOr(SpentSchema),
+    budget: Schema.NullOr(StepBudgetSchema),
+    raise: Schema.NullOr(StepRaiseSchema),
+    tries: Schema.mutable(Schema.Array(StepTrySchema)),
+    timeline: Schema.mutable(Schema.Array(StepTimelineTrySchema)),
+  }),
+);
 
 /**
  * Decodes a `RunDetail`: each key the run's pages read, of its type and words — its `graph`, each step's gate, tries and timeline, the
  * run's totals — and a key the board does not know dropped.
  */
-const RunDetailSchema = Schema.Struct({
-  id: Schema.String,
-  brief: Schema.String,
-  decide: Schema.String,
-  repo: Schema.NullOr(Schema.String),
-  place: PlaceKindSchema,
-  work: Schema.NullOr(Schema.String),
-  workflowDir: Schema.String,
-  workflowPage: Schema.NullOr(WorkflowPageAddressSchema),
-  try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
-  baseRef: Schema.NullOr(Schema.String),
-  branch: Schema.NullOr(Schema.String),
-  isolate: Schema.NullOr(Schema.Boolean),
-  createdAt: Schema.String,
-  startedAt: Schema.NullOr(Schema.String),
-  cancelledAt: Schema.NullOr(Schema.String),
-  pruned: Schema.NullOr(
-    Schema.Struct({
-      at: Schema.String,
-      worktrees: Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, bytes: Schema.Number }))),
-      artifacts: Schema.NullOr(Schema.Struct({ at: Schema.String, bytes: Schema.Number })),
-    }),
-  ),
-  onDisk: Schema.Struct({ worktrees: Schema.Boolean, files: Schema.Boolean }),
-  after: StringsSchema,
-  context: StringsSchema,
-  from: Schema.optionalKey(Schema.Struct({ inbox: Schema.String })),
-  fromNote: Schema.optionalKey(Schema.String),
-  waiting: Schema.NullOr(RunWaitingSchema),
-  heldUntil: StringsSchema,
-  holding: Schema.NullOr(RunHoldingSchema),
-  status: RunStatusSchema,
-  moving: Schema.Boolean,
-  cost: Schema.NullOr(SpentSchema),
-  atWork: Schema.NullOr(AtWorkSchema),
-  tokens: Schema.NullOr(RunTokensSchema),
-  read: Schema.NullOr(RunReadSchema),
-  waitingOnYou: StringsSchema,
-  onYou: StringsSchema,
-  toDecide: Schema.NullOr(RunToDecideSchema),
-  gates: StringsSchema,
-  warning: Schema.NullOr(Schema.String),
-  kinds: Schema.optional(
-    Schema.mutable(
+const RunDetailSchema = decodes<RunDetail>()(
+  Schema.Struct({
+    id: Schema.String,
+    brief: Schema.String,
+    decide: Schema.String,
+    repo: Schema.NullOr(Schema.String),
+    place: PlaceKindSchema,
+    work: Schema.NullOr(Schema.String),
+    workflowDir: Schema.String,
+    workflowPage: Schema.NullOr(WorkflowPageAddressSchema),
+    try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
+    baseRef: Schema.NullOr(Schema.String),
+    branch: Schema.NullOr(Schema.String),
+    isolate: Schema.NullOr(Schema.Boolean),
+    createdAt: Schema.String,
+    startedAt: Schema.NullOr(Schema.String),
+    cancelledAt: Schema.NullOr(Schema.String),
+    pruned: Schema.NullOr(
+      Schema.Struct({
+        at: Schema.String,
+        worktrees: Schema.mutable(Schema.Array(Schema.Struct({ path: Schema.String, bytes: Schema.Number }))),
+        artifacts: Schema.NullOr(Schema.Struct({ at: Schema.String, bytes: Schema.Number })),
+      }),
+    ),
+    onDisk: Schema.Struct({ worktrees: Schema.Boolean, files: Schema.Boolean }),
+    after: StringsSchema,
+    context: StringsSchema,
+    from: Schema.optionalKey(Schema.Struct({ inbox: Schema.String })),
+    fromNote: Schema.optionalKey(Schema.String),
+    waiting: Schema.NullOr(RunWaitingSchema),
+    heldUntil: StringsSchema,
+    holding: Schema.NullOr(RunHoldingSchema),
+    status: RunStatusSchema,
+    moving: Schema.Boolean,
+    cost: Schema.NullOr(SpentSchema),
+    atWork: Schema.NullOr(AtWorkSchema),
+    tokens: Schema.NullOr(RunTokensSchema),
+    read: Schema.NullOr(RunReadSchema),
+    waitingOnYou: StringsSchema,
+    onYou: StringsSchema,
+    toDecide: Schema.NullOr(RunToDecideSchema),
+    gates: StringsSchema,
+    warning: Schema.NullOr(Schema.String),
+    kinds: Schema.mutable(
       Schema.Array(
         Schema.Struct({
-          kind: Schema.String,
+          kind: Schema.Literals(['workflow', 'agent', 'skill', 'rules']),
           name: Schema.String,
           pinned: Schema.Number,
           now: Schema.Number,
-          step: Schema.optional(Schema.String),
+          step: Schema.optionalKey(Schema.String),
         }),
       ),
     ),
-  ),
-  refresh: Schema.optional(Schema.String),
-  graph: RunGraphSchema,
-  steps: Schema.mutable(Schema.Array(DetailStepSchema)),
-  timeline: Schema.Struct({ rounds: Schema.mutable(Schema.Array(TimelineTotalSchema)), run: TimelineTotalSchema }),
-}) satisfies Schema.Schema<RunDetail>;
+    refresh: Schema.String,
+    graph: RunGraphSchema,
+    steps: Schema.mutable(Schema.Array(DetailStepSchema)),
+    timeline: Schema.Struct({ rounds: Schema.mutable(Schema.Array(TimelineTotalSchema)), run: TimelineTotalSchema }),
+  }),
+);
 
 /**
  * Whether a read of a run's record found no run: the api's 404 (`noSuchRun`), as the CLI's `rm` leaves it. A page open on the run keeps

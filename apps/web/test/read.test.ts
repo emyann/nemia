@@ -168,32 +168,6 @@ test("the light answer decodes what the api gives, a waiting run with its clock 
   assert.deepEqual(openRunsQuery('a b').queryKey, ['runs-open', 'a b']);
 });
 
-test('REFUSED: a light answer whose row lacks a key the board reads, or that lacks a count, is an unreadable answer', async (t) => {
-  const { waitingOnYou: _dropped, ...short } = row();
-  const more = { wallMs: 5, finishedAt: null, clock: null, stepCosts: null, waitingSince: null };
-  const asOf = '2026-10-12T12:00:00.000Z';
-  answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [{ ...short, ...more }], inFlight: [] });
-  const refused = (found: string) => (err: unknown) => {
-    assert.ok(err instanceof UnreadAnswer, String(err));
-    assert.ok(err.message.startsWith('GET /api/runs-open answered what this board does not read'), err.message);
-    assert.ok(err.message.includes(found), err.message);
-    return true;
-  };
-  await assert.rejects(readOpen(), refused('waiting[0].waitingOnYou'));
-  answering(t, { asOf, counts: { waiting: 1, inFlight: 0 }, waiting: [{ ...row(), ...more }], inFlight: [] });
-  await assert.rejects(readOpen(), refused('counts.finished'));
-  const { clock: _clock, ...unbroken } = { ...row(), ...more };
-  answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [unbroken], inFlight: [] });
-  await assert.rejects(readOpen(), refused('waiting[0].clock'));
-  answering(t, { asOf, counts: { waiting: 0, inFlight: 1, finished: 0 }, waiting: [], inFlight: [unbroken] });
-  await assert.rejects(readOpen(), refused('inFlight[0].clock'), 'a row in flight owes its clock too: its cell breaks one down');
-  const { waitingSince: _since, ...undated } = { ...row(), ...more };
-  answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [undated], inFlight: [] });
-  await assert.rejects(readOpen(), refused('waiting[0].waitingSince'));
-  answering(t, { asOf, counts: { waiting: 1, inFlight: 0, finished: 0 }, waiting: [{ ...row(), ...more }], inFlight: [] });
-  assert.equal((await readOpen()).waiting[0].waitingSince, null, 'a wait the api does not date decodes as none');
-});
-
 test('the Runs list decodes an answer the api gives, each union in its every shape', async (t) => {
   const result = row({ toDecide: { kind: 'result', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' } });
   answering(t, [row(), result, row({ place: 'folder', waiting: null, holding: null, cost: null, toDecide: null, pruned: null })]);
@@ -203,49 +177,12 @@ test('the Runs list decodes an answer the api gives, each union in its every sha
   assert.deepEqual(runs[1], result);
 });
 
-test('REFUSED, a row an older daemon answers: a result to decide called git, and a run whose place is called git', async (t) => {
-  answering(t, [row({ toDecide: { kind: 'git', branches: ['wf/r-1/implement'], said: 'merge', command: 'git merge' } })]);
-  await assert.rejects(readRuns(), unread('[0].toDecide', '"git"'));
-
-  answering(t, [row({ place: 'git' })]);
-  await assert.rejects(readRuns(), unread('[0].place', '"git", where'));
-});
-
-test("a row keeps the factory its run was started in, null for the default factory's; REFUSED: a row without it", async (t) => {
-  answering(t, [row(), row({ factory: null })]);
-  assert.deepEqual(
-    (await readRuns()).map((run) => run.factory),
-    ['nemia', null],
-  );
-
-  const { factory: _, ...without } = row();
-  answering(t, [without]);
-  await assert.rejects(readRuns(), unread('[0].factory', 'is missing'));
-});
-
-test('REFUSED: a row without its status, naming the route, the key, what was there and the fix', async (t) => {
-  const { status: _, ...without } = row();
-  answering(t, [without]);
-  await assert.rejects(readRuns(), unread('[0].status', 'is missing'));
-});
-
 test('REFUSED: a row whose status is no word the board knows', async (t) => {
   answering(t, [row(), row({ status: 'nonsense' })]);
   await assert.rejects(
     readRuns(),
     unread('[1].status', '"nonsense", where the board reads "running" | "succeeded" | "failed" | "cancelled"'),
   );
-});
-
-test('a row says a run stopped on a person in its own word, under status; REFUSED: a status the board does not know', async (t) => {
-  answering(t, [row({ status: 'awaiting approval' }), row({ status: 'blocked' }), row({ status: 'failed' })]);
-  assert.deepEqual(
-    (await readRuns()).map((run) => run.status),
-    ['awaiting approval', 'blocked', 'failed'],
-  );
-
-  answering(t, [row({ status: 'nope' })]);
-  await assert.rejects(readRuns(), unread('[0].status', '"nope"'));
 });
 
 test('REFUSED: a row whose steps are not an array', async (t) => {

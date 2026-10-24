@@ -4,6 +4,7 @@
  */
 import { keepPreviousData, queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 
 /**
@@ -19,18 +20,23 @@ export type TranscriptEvent = {
   text?: string;
   tool?: { name: string; input?: unknown };
   result?: { text: string; isError: boolean };
+  /** Where a `user` event's words came from, as the harness said it: `human` where a person wrote them into the session itself. */
+  origin?: { kind: string };
 };
 
 /** Decodes a `TranscriptEvent`: a tool's input is read as it came. */
-const TranscriptEventSchema = Schema.Struct({
-  id: Schema.String,
-  at: Schema.String,
-  role: Schema.Literals(['assistant', 'user', 'system']),
-  kind: Schema.Literals(['text', 'thinking', 'tool_use', 'tool_result', 'system']),
-  text: Schema.optionalKey(Schema.String),
-  tool: Schema.optionalKey(Schema.Struct({ name: Schema.String, input: Schema.optionalKey(Schema.Unknown) })),
-  result: Schema.optionalKey(Schema.Struct({ text: Schema.String, isError: Schema.Boolean })),
-}) satisfies Schema.Schema<TranscriptEvent>;
+const TranscriptEventSchema = decodes<TranscriptEvent>()(
+  Schema.Struct({
+    id: Schema.String,
+    at: Schema.String,
+    role: Schema.Literals(['assistant', 'user', 'system']),
+    kind: Schema.Literals(['text', 'thinking', 'tool_use', 'tool_result', 'system']),
+    text: Schema.optionalKey(Schema.String),
+    tool: Schema.optionalKey(Schema.Struct({ name: Schema.String, input: Schema.optionalKey(Schema.Unknown) })),
+    result: Schema.optionalKey(Schema.Struct({ text: Schema.String, isError: Schema.Boolean })),
+    origin: Schema.optionalKey(Schema.Struct({ kind: Schema.String })),
+  }),
+);
 
 /**
  * Mirrors `StepTranscript` in apps/api/src/steps/steps.ts: the events from a cursor, the cursor to ask again from, whether something of
@@ -40,12 +46,14 @@ const TranscriptEventSchema = Schema.Struct({
 export type StepTranscript = { events: TranscriptEvent[]; cursor: string | null; live: boolean; open: boolean };
 
 /** Decodes a `StepTranscript`. */
-const StepTranscriptSchema = Schema.Struct({
-  events: Schema.mutable(Schema.Array(TranscriptEventSchema)),
-  cursor: Schema.NullOr(Schema.String),
-  live: Schema.Boolean,
-  open: Schema.Boolean,
-}) satisfies Schema.Schema<StepTranscript>;
+const StepTranscriptSchema = decodes<StepTranscript>()(
+  Schema.Struct({
+    events: Schema.mutable(Schema.Array(TranscriptEventSchema)),
+    cursor: Schema.NullOr(Schema.String),
+    live: Schema.Boolean,
+    open: Schema.Boolean,
+  }),
+);
 
 /** A piece of the message being written: its text block's `key`, the text added (`delta`), and whether the block is now whole (`last`). */
 export type StreamPartial = { key: string; delta: string; last: boolean };
@@ -62,10 +70,10 @@ export type StreamData = {
 /** Decodes the data of each event of `StreamData`, by its name. */
 const STREAM_SCHEMAS: { readonly [K in keyof StreamData]: Schema.Decoder<StreamData[K]> } = {
   transcript: TranscriptEventSchema,
-  partial: Schema.Struct({ key: Schema.String, delta: Schema.String, last: Schema.Boolean }) satisfies Schema.Schema<StreamPartial>,
-  moved: Schema.Struct({ taskId: Schema.String }) satisfies Schema.Schema<StreamData['moved']>,
-  following: Schema.Struct({ streamed: Schema.Boolean }) satisfies Schema.Schema<StreamData['following']>,
-  unreadable: Schema.Struct({ error: Schema.String, retrying: Schema.Boolean }) satisfies Schema.Schema<StreamData['unreadable']>,
+  partial: decodes<StreamPartial>()(Schema.Struct({ key: Schema.String, delta: Schema.String, last: Schema.Boolean })),
+  moved: decodes<StreamData['moved']>()(Schema.Struct({ taskId: Schema.String })),
+  following: decodes<StreamData['following']>()(Schema.Struct({ streamed: Schema.Boolean })),
+  unreadable: decodes<StreamData['unreadable']>()(Schema.Struct({ error: Schema.String, retrying: Schema.Boolean })),
 };
 
 /**
@@ -95,21 +103,25 @@ export const readTranscript = (runId: string, step: string, signal?: AbortSignal
 export type LifecycleStep = { state: string; event: string; at: string };
 
 /** Decodes a `LifecycleStep`. */
-const LifecycleStepSchema = Schema.Struct({
-  state: Schema.String,
-  event: Schema.String,
-  at: Schema.String,
-}) satisfies Schema.Schema<LifecycleStep>;
+const LifecycleStepSchema = decodes<LifecycleStep>()(
+  Schema.Struct({
+    state: Schema.String,
+    event: Schema.String,
+    at: Schema.String,
+  }),
+);
 
 /** Mirrors `StepPath` in apps/api/src/steps/path.ts: a try's task, the try's number, and the task's path to the end of that try. */
 export type StepPath = { taskId: string | null; try: number; path: LifecycleStep[] };
 
 /** Decodes a `StepPath`. */
-const StepPathSchema = Schema.Struct({
-  taskId: Schema.NullOr(Schema.String),
-  try: Schema.Number,
-  path: Schema.mutable(Schema.Array(LifecycleStepSchema)),
-}) satisfies Schema.Schema<StepPath>;
+const StepPathSchema = decodes<StepPath>()(
+  Schema.Struct({
+    taskId: Schema.NullOr(Schema.String),
+    try: Schema.Number,
+    path: Schema.mutable(Schema.Array(LifecycleStepSchema)),
+  }),
+);
 
 /**
  * The path of a step's try: the current one for a `tryNumber` of null, keyed by `stamp` (`pathStamp`), so the feed's `step` event, which

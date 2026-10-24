@@ -8,7 +8,7 @@
  * as its codes — `phase`, `reason`, a check's `verdict.result` — and a sentence is only shown; what is counted here compares the
  * sentence instead.
  *
- * 19 calls in 7 files the day the guard was written, before the card that carries the codes took the board's parses and the
+ * 19 calls in 7 files the day the guard was written, and 8 in 2 once the card that carries the codes took the board's parses and the
  * listing's out. Two of them are no state: the service's `word`s are the words of a command line, kept rather than renamed under a
  * card that is not about them. The feed's `reasonOf` stays, for the feed's lines written before the codes, and so do its counts.
  *
@@ -16,11 +16,6 @@
  * left. A count is never raised, nor a file added. Today's counts, printed as entries: `node tools/guards/test/parsed-state.ts`.
  */
 export const PARSED_STATE: Readonly<Record<string, { readonly count: number; readonly card: string }>> = {
-  'apps/web/src/components/Closeout.tsx': { count: 1, card: "A step's state crosses the wire as a code, not a sentence" },
-  'apps/web/src/components/StepInspector.tsx': { count: 1, card: "A step's state crosses the wire as a code, not a sentence" },
-  'apps/web/src/lib/runWords.ts': { count: 1, card: "A step's state crosses the wire as a code, not a sentence" },
-  'apps/web/src/lib/status.ts': { count: 7, card: "A step's state crosses the wire as a code, not a sentence" },
   'packages/agent-orchestrator/src/feed/reason.ts': { count: 6, card: "A step's state crosses the wire as a code, not a sentence" },
-  'packages/agent-orchestrator/src/list/list.ts': { count: 1, card: "A step's state crosses the wire as a code, not a sentence" },
   'packages/agent-orchestrator/src/service/service.ts': { count: 2, card: "A step's state crosses the wire as a code, not a sentence" },
 };

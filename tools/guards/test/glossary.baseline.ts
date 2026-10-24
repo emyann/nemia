@@ -40,11 +40,4 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/workspace/workspace.ts': 6,
     'packages/agent-orchestrator/src/workspace/worktree.store.ts': 3,
   },
-  pauseholds: {
-    'apps/web/src/lib/status.ts': 1,
-    'apps/web/src/lib/words.ts': 2,
-  },
-  wordstate: {
-    'apps/web/src/lib/status.ts': 2,
-  },
 };

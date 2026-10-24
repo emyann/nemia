@@ -38,7 +38,9 @@ const headed = (page: Page, state: string) =>
  */
 const HELD_WORDS = {
   phase: 'pending',
-  reason: 'WaitingForPause',
+  reason: 'Waiting',
+  on: 'pause',
+  via: null,
   message: 'waiting on the pause',
   status: 'waiting on the pause',
   verdict: { result: 'running', exit: null },

@@ -44,6 +44,11 @@
       }
     },
     {
+      "term": "Limit",
+      "meaning": "the most runs in flight; a step a run over it holds back is pending, reason `Waiting`, `on` limit.",
+      "type": "WaitOn"
+    },
+    {
       "term": "Serves",
       "meaning": "what the process holding the lease serves on its own port, the A2A cards by harness, written on the daemon's file beside its url.",
       "retired": [

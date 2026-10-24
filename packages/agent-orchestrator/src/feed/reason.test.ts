@@ -1,6 +1,7 @@
 /**
- * The feed's reason table (`reason.ts`): every word the package writes maps to a reason, the lines that wait on a person are exactly the
- * lines a subscriber was woken by before the selectors and is woken by after them, and every entry of the table is one some word reaches.
+ * The feed's reason table (`reason.ts`): every word the package writes maps to a reason, the lines that wait on a person are those of the
+ * reasons of phase `waiting` and of a step that broke, never a note's, which takes every line a retired wake word woke a subscriber on
+ * but a run's that only its note said waits, and every entry of the table is one some word reaches.
  *
  * The fixtures are built from the code's own constants and word-builders wherever there is one — `SLOT_WAIT`, `slotWord`, `PAUSE_WAIT`,
  * `checkoutWord`, `waitWord`, `holdWord`, `waitingWords`, `REMOVED`, `DENIED` — and the statuses are keyed by their unions
@@ -10,6 +11,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  codesOf,
   DENIED,
   isOnce,
   kindsOf,
@@ -25,6 +27,8 @@ import {
   LINE_SOURCES,
 } from './reason.ts';
 import { upgraded, type FeedLine } from './feed.ts';
+import { FORMER_REASONS } from '../former-reason/former-reason.ts';
+import { codedStep, PHASE_OF, runCodes, STEP_REASONS, type AnswerVia, type QualifiedStep, type WaitOn } from '../phase/phase.ts';
 import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
 import { PAUSE_WAIT, waitingWords } from '../list/list.ts';
 import { checkoutWord } from '../ending/ending.ts';
@@ -34,8 +38,8 @@ import { parseSelectors, selects } from '../watch/selector.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { StepStatus } from '../record/record.ts';
 
-/** One fixture: the kind the line is about, the word and note it carries, and the reason the table must name. */
-type Case = { kind: InvolvedKind; word: string; note?: string; reason: Reason };
+/** One fixture: the kind the line is about, the word and note it carries, and the codes the table must name. */
+type Case = { kind: InvolvedKind; word: string; note?: string; reason: Reason; on?: WaitOn; via?: AnswerVia };
 
 /** Every word `assess` gives a run, with `(pruned)` beside it as `nemia ls` says it. Exhaustive over the status union. */
 const RUN_STATUS = {
@@ -44,27 +48,27 @@ const RUN_STATUS = {
   failed: 'Failed',
   cancelled: 'Cancelled',
   'awaiting approval': 'AwaitingApproval',
-  blocked: 'Blocked',
+  blocked: 'AwaitingAnswer',
 } satisfies Record<Assessment['status'], Reason>;
 
 /** Every status a step stands at, in the word `nemia ls` prints for it. Exhaustive over `StepStatus`. */
 const STEP_STATUS = {
-  waiting: { word: 'waiting', reason: 'Waiting' },
+  waiting: { word: 'waiting', reason: 'Pending' },
   running: { word: 'running', reason: 'Running' },
-  blocked: { word: 'blocked', reason: 'Blocked' },
+  blocked: { word: 'blocked', reason: 'AwaitingAnswer', via: 'closeout' },
   unsigned: { word: 'unsigned', reason: 'Unsigned' },
   checking: { word: 'checking', reason: 'Checking' },
   verified: { word: 'verified ✓', reason: 'CheckPassed' },
   unverified: { word: 'unverified', reason: 'Unknown' },
   'awaiting approval': { word: 'awaiting approval', reason: 'AwaitingApproval' },
-  exhausted: { word: 'rounds exhausted', reason: 'RoundsExhausted' },
+  exhausted: { word: 'rounds exhausted', reason: 'AwaitingRound' },
   'over budget': { word: 'over budget $21.00 of $20', reason: 'OverBudget' },
   'budget exhausted': { word: 'budget exhausted ≥$21.00 of $20', reason: 'BudgetExhausted' },
-  denied: { word: 'denied', reason: 'CheckDenied' },
+  denied: { word: 'denied', reason: 'Denied' },
   'failed (check)': { word: 'failed ✗ check (exit 1)', reason: 'CheckFailed' },
   failed: { word: 'failed', reason: 'Failed' },
   stopped: { word: 'stopped', reason: 'Stopped' },
-} satisfies Record<StepStatus, { word: string; reason: Reason }>;
+} satisfies Record<StepStatus, { word: string; reason: Reason; via?: AnswerVia }>;
 
 /** What the engine's word for a task comes to in the feed (`feedPhase`), and the two words `listing` writes in its place. */
 const PHASE_WORDS: readonly Case[] = [
@@ -74,8 +78,8 @@ const PHASE_WORDS: readonly Case[] = [
   { kind: 'Step', word: 'failed', reason: 'Failed' },
   { kind: 'Step', word: 'stopped', reason: 'Stopped' },
   { kind: 'Step', word: 'unknown', reason: 'Unknown' },
-  { kind: 'Step', word: 'needs-human', reason: 'NeedsHuman' },
-  { kind: 'Step', word: `needs-human: ${waitingWords('permission prompt')}`, reason: 'NeedsHuman' },
+  { kind: 'Step', word: 'needs-human', reason: 'AwaitingAnswer', via: 'session' },
+  { kind: 'Step', word: `needs-human: ${waitingWords('permission prompt')}`, reason: 'AwaitingAnswer', via: 'session' },
   { kind: 'Step', word: 'input-required', reason: 'Unknown' },
   { kind: 'Step', word: 'unverified', reason: 'Unknown' },
 ];
@@ -86,20 +90,20 @@ const SAID_WORDS: readonly Case[] = [
   { kind: 'Step', word: 'unverified · done', reason: 'Succeeded' },
   { kind: 'Step', word: 'input-required · done', reason: 'Succeeded' },
   { kind: 'Step', word: 'unsigned · done', reason: 'Unsigned' },
-  { kind: 'Step', word: 'input-required · BLOCKED', reason: 'Blocked' },
-  { kind: 'Step', word: 'succeeded · BLOCKED', reason: 'Blocked' },
-  { kind: 'Step', word: 'unverified · BLOCKED', note: 'needs: whose call is it', reason: 'Blocked' },
+  { kind: 'Step', word: 'input-required · BLOCKED', reason: 'AwaitingAnswer', via: 'closeout' },
+  { kind: 'Step', word: 'succeeded · BLOCKED', reason: 'AwaitingAnswer', via: 'closeout' },
+  { kind: 'Step', word: 'unverified · BLOCKED', note: 'needs: whose call is it', reason: 'AwaitingAnswer', via: 'closeout' },
   { kind: 'Step', word: 'unverified · closeout unreadable', reason: 'UnreadableCloseout' },
 ];
 
 /** Every wait a step's word says, each from the code that words it. */
 const WAIT_WORDS: readonly Case[] = [
-  { kind: 'Step', word: SLOT_WAIT, reason: 'WaitingForSlot' },
-  { kind: 'Step', word: slotWord({ inFlight: 1, cap: 2 }), reason: 'WaitingForSlot' },
-  { kind: 'Step', word: PAUSE_WAIT, note: 'its check is filed on nemia resume', reason: 'WaitingForPause' },
-  { kind: 'Step', word: checkoutWord({ run: 'r-2', step: 'land' }), reason: 'WaitingForCheckout' },
-  { kind: 'Step', word: waitWord([{ run: 'r-2' }]), reason: 'Waiting' },
-  { kind: 'Step', word: waitWord([{ run: 'r-2' }, { run: 'r-3' }]), reason: 'Waiting' },
+  { kind: 'Step', word: SLOT_WAIT, reason: 'Waiting', on: 'limit' },
+  { kind: 'Step', word: slotWord({ inFlight: 1, cap: 2 }), reason: 'Waiting', on: 'limit' },
+  { kind: 'Step', word: PAUSE_WAIT, note: 'its check is filed on nemia resume', reason: 'Waiting', on: 'pause' },
+  { kind: 'Step', word: checkoutWord({ run: 'r-2', step: 'land' }), reason: 'Waiting', on: 'checkout' },
+  { kind: 'Step', word: waitWord([{ run: 'r-2' }]), reason: 'Waiting', on: 'run' },
+  { kind: 'Step', word: waitWord([{ run: 'r-2' }, { run: 'r-3' }]), reason: 'Waiting', on: 'run' },
 ];
 
 /** A run's own lines: its statuses, pruned and not, a hold, who it waits on, and the word of a run the store no longer has. */
@@ -109,8 +113,8 @@ const RUN_LINES: readonly Case[] = [
     { kind: 'Run', word: `${word} (pruned)`, reason },
   ]),
   { kind: 'Run', word: REMOVED, reason: 'Removed' },
-  { kind: 'Run', word: 'running', note: holdWord([{ run: 'r-2' }]), reason: 'Held' },
-  { kind: 'Run', word: 'running', note: holdWord([], { why: 'the base moved', by: 'operator' }), reason: 'Held' },
+  { kind: 'Run', word: 'running', note: holdWord([{ run: 'r-2' }]), reason: 'Waiting', on: 'run' },
+  { kind: 'Run', word: 'running', note: holdWord([], { why: 'the base moved', by: 'operator' }), reason: 'Waiting', on: 'run' },
   { kind: 'Run', word: 'running', note: 'waiting on you: approve plan', reason: 'Running' },
   { kind: 'Run', word: 'awaiting approval', note: 'waiting on you: approve plan', reason: 'AwaitingApproval' },
 ];
@@ -153,7 +157,7 @@ const STORE_LINES: readonly Case[] = [
 /** Every word the package can write, each with the reason the table must name for it. */
 const CASES: readonly Case[] = [
   ...RUN_LINES,
-  ...Object.values(STEP_STATUS).map(({ word, reason }): Case => ({ kind: 'Step', word, reason })),
+  ...Object.values(STEP_STATUS).map((codes): Case => ({ kind: 'Step', ...codes })),
   ...PHASE_WORDS,
   ...SAID_WORDS,
   ...WAIT_WORDS,
@@ -196,22 +200,28 @@ const takenByConverted = (wake: readonly string[], line: FeedLine): boolean =>
   selects(parseSelectors(selectorsOfWake(wake).selectors), line);
 
 test('reasonOf names a reason for every word the package writes, only of a kind the table gives it, and every entry is one some word reaches', async (t) => {
-  await t.test('every word the package writes maps to a reason', () => {
+  await t.test('every word the package writes maps to a reason, and what qualifies it', () => {
     for (const c of CASES) {
       const said = { word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) };
-      assert.equal(reasonOf(said, c.kind), c.reason, `${c.kind} ${JSON.stringify(c.word)} ${JSON.stringify(c.note ?? '')}`);
+      const codes = { reason: c.reason, ...(c.on ? { on: c.on } : {}), ...(c.via ? { via: c.via } : {}) };
+      assert.deepEqual(codesOf(said, c.kind), codes, `${c.kind} ${JSON.stringify(c.word)} ${JSON.stringify(c.note ?? '')}`);
+      assert.equal(reasonOf(said, c.kind), c.reason);
     }
   });
   await t.test('a reason is only named of a kind the table gives it', () => {
     for (const c of CASES) assert.ok(kindsOf(c.reason).includes(c.kind), `${c.reason} is not a reason of a ${c.kind}`);
   });
-  await t.test('every entry of the table is one some word reaches', () => {
+  await t.test("every entry of the table is one some word reaches, or a run's first waiting step's reason (`runCodes`)", () => {
     const reached = new Set(
       CASES.map((c) => `${reasonOf({ word: c.word, ...(c.note !== undefined ? { note: c.note } : {}) }, c.kind)}/${c.kind}`),
     );
+    for (const reason of STEP_REASONS.filter((r) => PHASE_OF[r] === 'waiting'))
+      reached.add(
+        `${runCodes('blocked', false, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
+      );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
-    assert.equal(entries.length, 42, 'the table the owner named has 42 entries');
-    assert.equal(REASON_CODES.length, 37, 'of 37 distinct codes');
+    assert.equal(entries.length, 43, 'the table the owner named has 43 entries');
+    assert.equal(REASON_CODES.length, 32, 'of 32 distinct codes');
     assert.deepEqual(
       entries.filter((entry) => !reached.has(entry)),
       [],
@@ -220,22 +230,53 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
   });
 });
 
-test('waitsOf: the lines that wait on a person are the ones the retired wake words woke on and the selectors they convert to take, and no runtime fault', async (t) => {
-  await t.test('the waiting set is the one the retired wake words woke on, and the one the selectors they convert to take', () => {
-    for (const c of CASES) {
-      const line = lineOf(c);
-      const waits = waitsOf(c.reason, c.note);
-      const said = `${c.reason}: ${JSON.stringify(c.word)} ${JSON.stringify(c.note ?? '')}`;
-      assert.equal(waits, wokenByFormerWake(line, FORMER_DEFAULT_WAKE), `${said} must wait exactly when the former wake words took it`);
-      assert.equal(waits, takenByConverted(FORMER_DEFAULT_WAKE, line), `${said} must be taken exactly by the selectors they convert to`);
+/** The reasons that wait on a person, by the card that split a wait on a person from a wait on a thing: phase `waiting`, and a step
+ * broke. */
+const PERSON = [
+  'AwaitingApproval',
+  'AwaitingAnswer',
+  'AwaitingRound',
+  'OverBudget',
+  'BudgetExhausted',
+  'Unsigned',
+  'Denied',
+  'Failed',
+  'CheckFailed',
+];
+
+/** Whether `line` was woken by the retired wake words through its note alone: what no selector reads, and no code says. */
+const wokenByNoteAlone = (line: FeedLine): boolean =>
+  wokenByFormerWake(line, FORMER_DEFAULT_WAKE) && !wokenByFormerWake({ ...line, note: undefined }, FORMER_DEFAULT_WAKE);
+
+test('waitsOf: the lines that wait on a person are those of the Awaiting reasons, the stops beside them and a step broke, never a note', async (t) => {
+  await t.test('waits is true of exactly the reasons of phase waiting, and Failed and CheckFailed', () => {
+    assert.deepEqual(REASON_CODES.filter(waitsOf).sort(), [...PERSON].sort());
+  });
+  await t.test('a note that says a person is waited on makes no line wait: only its reason does', () => {
+    const line = upgraded({ at: '2026-10-16T04:00:00.000Z', run: 'r-1', step: 'plan', word: 'running', note: 'waiting on you: plan' });
+    assert.equal(line.reason, 'Running');
+    assert.equal(line.waits, undefined);
+  });
+  await t.test('every former code is gone from the table, and each converts through FORMER_REASONS', () => {
+    const former = [
+      'NeedsHuman',
+      'Blocked',
+      'RoundsExhausted',
+      'WaitingForSlot',
+      'WaitingForCheckout',
+      'WaitingForPause',
+      'Held',
+      'CheckDenied',
+    ];
+    for (const code of former) {
+      assert.ok(!(REASON_CODES as readonly string[]).includes(code), `${code} is no current code`);
+      assert.ok(Object.hasOwn(FORMER_REASONS, code), `${code} is read through FORMER_REASONS`);
     }
   });
   await t.test("Nemia's former wake list converts to selectors that take the waiting lines and a tool denial, and no other line", () => {
     for (const c of CASES) {
-      const line = lineOf(c);
-      const hers = waitsOf(c.reason, c.note) || c.reason === 'ToolDenied';
-      assert.equal(takenByConverted(FORMER_NEMIA_WAKE, line), hers, `${c.reason}: ${JSON.stringify(c.word)}`);
-      assert.equal(wokenByFormerWake(line, FORMER_NEMIA_WAKE), hers, 'which is what her eight words woke on');
+      const hers = waitsOf(c.reason) || c.reason === 'ToolDenied';
+      assert.equal(takenByConverted(FORMER_NEMIA_WAKE, lineOf(c)), hers, `${c.reason}: ${JSON.stringify(c.word)}`);
     }
     assert.ok(
       CASES.some((c) => c.reason === 'ToolDenied'),
@@ -243,39 +284,37 @@ test('waitsOf: the lines that wait on a person are the ones the retired wake wor
     );
   });
   await t.test(
-    'every one of the 256 stored wake lists converts to selectors that take every line it woke on, and the two note words more',
+    'every one of the 256 stored wake lists converts to selectors that take every line it woke on but by a note alone, and more',
     () => {
       const lines = CASES.map(lineOf);
       const subsets = Array.from({ length: 1 << FORMER_NEMIA_WAKE.length }, (_, mask) =>
         FORMER_NEMIA_WAKE.filter((_word, i) => (mask & (1 << i)) !== 0),
       );
       assert.equal(subsets.length, 256);
+      assert.deepEqual(
+        lines.filter((line) => wokenByNoteAlone(line) && !waitsOf(line.reason!)).map((line) => [line.reason, line.note]),
+        [['Running', 'waiting on you: approve plan']],
+        'the one line a note alone woke on and no reason waits for: a run still at work beside a step that waits, whose own line wakes',
+      );
       let wider = 0;
       for (const wake of subsets)
         for (const [i, line] of lines.entries()) {
-          const woken = wokenByFormerWake(line, wake);
+          const woken = wokenByFormerWake(line, wake) && !(wokenByNoteAlone(line) && !waitsOf(line.reason!));
           const taken = takenByConverted(wake, line);
           if (woken) assert.ok(taken, `${JSON.stringify(wake)} woke on ${JSON.stringify(CASES[i].word)} and its selectors do not take it`);
           if (taken && !woken) wider++;
         }
-      assert.ok(
-        wider > 0,
-        'waiting on you: and needs: read a note that no selector reads, so they convert to waits=person: a strict superset, never a narrower one',
-      );
+      assert.ok(wider > 0, 'waits=person takes the stops the wake words never named: a strict superset, never a narrower one');
     },
   );
-  await t.test('neither runtime fault waits on a person, as the owner said, and neither is Normal', () => {
-    for (const reason of ['SpawnFailed', 'SessionLost'] as const) {
-      assert.equal(waitsOf(reason), false, `${reason} must wake nobody on its own`);
-      assert.equal(typeOf(reason), 'Warning', `${reason} is something gone wrong`);
-    }
-  });
 });
 
 test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads of it, and whose deed it is', async (t) => {
   await t.test('a type is the table its reason comes from, and a message is the word and its note', () => {
     assert.equal(typeOf('Failed'), 'Warning');
     assert.equal(typeOf('Running'), 'Normal');
+    assert.equal(typeOf('SpawnFailed'), 'Warning', 'a runtime fault is something gone wrong');
+    assert.equal(typeOf('SessionLost'), 'Warning');
     assert.equal(
       messageOf({ word: 'awaiting approval', note: 'approve it: nemia approve r-1 plan' }),
       'awaiting approval · approve it: nemia approve r-1 plan',
@@ -305,7 +344,7 @@ test('typeOf, messageOf and sourceOf: how serious a line is, what a person reads
     assert.equal(sourceOf('ToolDenied'), 'runtime', 'a call the harness denied is the runtime telling us');
     assert.equal(sourceOf('DaemonStarted'), 'daemon');
     assert.deepEqual(
-      STORE_LINES.map((c) => [sourceOf(c.reason), isOnce(c.reason), typeOf(c.reason), waitsOf(c.reason, c.note)]),
+      STORE_LINES.map((c) => [sourceOf(c.reason), isOnce(c.reason), typeOf(c.reason), waitsOf(c.reason)]),
       [
         ['person', true, 'Normal', false],
         ['person', true, 'Normal', false],

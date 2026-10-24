@@ -167,7 +167,7 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
       const questions = askedIn(step.closeout);
       return [{ step: step.name, kind: 'raise', message: step.message, needs: step.needs, unfinished, questions, ...step.raise }];
     }
-    const state = stepState(step.phase, step.reason, false, false);
+    const state = stepState(step, false, false);
     if (state === 'blocked') {
       return [{ step: step.name, kind: 'answer', needs: step.needs, questions: askedIn(step.closeout) }];
     }

@@ -44,7 +44,7 @@ export function StepTabs({ run, step, className }: { run: RunDetail; step: Step;
   const tab = picked ?? openingTab(step);
   const [chosen, setChosen] = useState<{ step: string; try: number } | null>(null);
   const runCancelled = run.cancelledAt !== null;
-  const state = stepState(step.phase, step.reason, runCancelled, run.holding != null);
+  const state = stepState(step, runCancelled, run.holding != null);
   const current = step.tries.find((t) => t.current) ?? step.tries.at(-1)!;
   const selected = (chosen?.step === step.name && step.tries.find((t) => t.try === chosen.try)) || current;
   const select = (n: number) => {
@@ -131,7 +131,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
     <>
       <Asked run={run} step={step} />
       <div className="space-y-1">
-        <StatusChip phase={step.phase} reason={step.reason} runCancelled={runCancelled} runHeld={run.holding != null} />
+        <StatusChip codes={step} runCancelled={runCancelled} runHeld={run.holding != null} />
         <StepNote note={step.note} />
       </div>
       {step.taskId === null ? (
@@ -217,12 +217,7 @@ const ACTIVITY_TURNS = 30;
  */
 function Activity({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
-  const following = useStepTranscript(
-    run.id,
-    step.name,
-    sessionToRead(step),
-    isGate(stepState(step.phase, step.reason, cancelled, false), cancelled),
-  );
+  const following = useStepTranscript(run.id, step.name, sessionToRead(step), isGate(stepState(step, cancelled, false), cancelled));
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 

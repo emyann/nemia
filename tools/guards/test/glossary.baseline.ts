@@ -19,6 +19,11 @@
  * holds, read by `upgrade` and named in its doc (`journal.ts`), the stored schema (`event-schema.ts`) and the filing door's
  * `RENAMED_ARGS` (`args.ts`). They stay while a journal on disk may hold them.
  *
+ * `NeedsHuman`, `RoundsExhausted`, `WaitingForSlot`, `WaitingForCheckout`, `WaitingForPause` and `CheckDenied`, on the day the feed
+ * retired them (a wait on a person said by the `Awaiting*` codes, a wait on a thing by `Waiting` and `on`): each a key of
+ * `FORMER_REASONS` in `former-reason.ts`, which reads a line on disk and a stored selector that still names one. They stay while a feed
+ * or a subscription on disk may hold them.
+ *
  * `shipped` and `ships`, on the day decision 13a retired them (`Landed` in the run core's, the api's and the board's tables): the run's
  * sense, a run's result on its base, says `landed` everywhere since that card; the product's sense, what comes with Nemia (its git place,
  * the skills, servers and rules it lists), says `builtin` since decision 13b (its Builtin row in the same three tables). The one count left
@@ -30,6 +35,24 @@
  * `options.ts`). They stay while a caller may still write them.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  needshuman: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 2,
+  },
+  roundsexhausted: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  waitingforslot: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  waitingforcheckout: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  waitingforpause: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  checkdenied: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
   wf: {
     'packages/agent-orchestrator/place/git/verbs/handoff.ts': 2,
     'packages/agent-orchestrator/place/git/verbs/make.ts': 2,

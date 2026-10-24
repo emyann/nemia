@@ -118,9 +118,12 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  *
  * Each is 77 more since the frontmatter is YAML: `frontmatter/frontmatter.ts`, the one reader every step, agent and card goes through,
  * and the 76 modules of the `yaml` package it parses with, none of which touches a disk.
+ *
+ * `agent-orchestrator/run` is one more for `former-reason/former-reason.ts`, the pure reading of the feed's former reason codes, kept in
+ * a folder of its own so the card that drops them deletes it whole.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 176, effect: 15 },
+  'agent-orchestrator/run': { all: 177, effect: 15 },
   'agent-orchestrator/workflow': { all: 131, effect: 15 },
 };
 

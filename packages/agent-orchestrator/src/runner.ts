@@ -233,7 +233,8 @@ export {
   STEP_PHASES,
   STEP_REASONS,
 } from './feed/index.ts';
-export type { FeedLine, FeedPublished, Reason, RunPhase, RunReason, StepPhase, StepReason } from './feed/index.ts';
+export type { AnswerVia, FeedLine, FeedPublished, Reason, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './feed/index.ts';
+export { formerHints } from './former-reason/former-reason.ts';
 export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_SELECTORS, subscriptionNameRefusal, watchedLine } from './subscription/index.ts';
 export {
   LABEL_KEYS,

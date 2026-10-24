@@ -82,6 +82,11 @@
         "label": "The api",
         "href": "/map/#the-api"
       }
+    },
+    {
+      "term": "Waiting on you",
+      "meaning": "`waitingOnYou`: the steps of a run that wait on a person, in order.",
+      "type": "RunDetail"
     }
   ]
 }

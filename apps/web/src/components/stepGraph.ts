@@ -51,7 +51,7 @@ export function stepEdges(run: RunDetail, prefix = ''): StateFlowEdge[] {
   const runHeld = run.holding != null;
   const steps = run.steps.map((s) => ({
     name: s.name,
-    state: stepState(s.phase, s.reason, runCancelled, runHeld),
+    state: stepState(s, runCancelled, runHeld),
     note: s.note,
     roundDue: s.roundDue,
   }));

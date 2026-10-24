@@ -530,3 +530,10 @@ export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat
 export type { ChatEvent, ChatFrom, Presence, StepState } from './chat/chat.ts';
 export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';
+
+import * as RunModel from './record/record.model.ts';
+/**
+ * Run-core's model as Schemas (`docs/model.md`): its ids, checked on create and nominal on read, its entities and the run's
+ * invariants, which the Run door (S2) will decode through. One namespace, imported and exported by name.
+ */
+export { RunModel };

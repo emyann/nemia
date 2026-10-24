@@ -9,8 +9,8 @@
   "commit": "5dd708f33d8d763125cb69acb7b71c42756cbff2",
   "date": "2026-10-24T09:18:30.879Z",
   "repeat": 5,
-  "from": "/home/yrnd1/.agent-workflows",
-  "engine": "/home/yrnd1/.agent-engine",
+  "from": "~/.agent-workflows",
+  "engine": "~/.agent-engine",
   "copy": {
     "files": 88711,
     "bytes": 1899439531,

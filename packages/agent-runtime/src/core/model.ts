@@ -9,7 +9,7 @@
 import { Schema } from 'effect';
 import { brandedCount, brandedId, foreignId, type Count, type Id } from './brand.ts';
 import { erDiagram, type ErModel } from './er.ts';
-import { FORMER_REASONS, HarnessArgsSchema, StoredEventSchema, UsageSchema } from './event-schema.ts';
+import { FORMER_REASONS, HarnessArgsSchema, SaidAtEnd, StoredEventSchema, UsageSchema } from './event-schema.ts';
 
 /** The most bytes a file's name may hold on the file systems a store is kept on. */
 const NAME_BYTES = 255;
@@ -17,8 +17,7 @@ const NAME_BYTES = 255;
 /**
  * Why `value` cannot name a task, or `undefined`: a task's id is its journal file's name (`<id>.jsonl`), so it is what a file's name
  * can hold — not empty, no `/`, no control character, not `.` or `..`, at most 255 bytes. It takes every id in use: the runtime's
- * `t-<base36>-<8>` (`file`, `engine/filing.ts`) and the orchestrator's `<runId>-<step>` and `<runId>-<step>-try<n>`, whose step may
- * hold spaces and punctuation.
+ * `t-<base36>-<8>` (`file`, `engine/filing.ts`) and every id a caller gives `file`, which may hold spaces and punctuation.
  */
 export const taskIdRefusal = (value: string): string | undefined => {
   if (value === '') return 'A task id is empty. Give the task an id, or leave `id` out and the runtime mints one.';
@@ -89,7 +88,7 @@ export const Attempt = Schema.Struct({
   nativeId: Schema.NullOr(SessionId.OnRead),
   resumeFrom: Schema.optional(SessionId.OnRead),
   nudge: Schema.optional(Schema.String),
-  closeout: Schema.optional(Schema.Unknown),
+  ...SaidAtEnd,
   closedOut: Schema.optional(Schema.Boolean),
   former: Schema.optional(Schema.Literals(FORMER_REASONS)),
   usage: Schema.NullOr(UsageSchema),

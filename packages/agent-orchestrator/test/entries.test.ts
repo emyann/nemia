@@ -14,6 +14,7 @@ const PINNED: Record<string, string[]> = {
   'agent-orchestrator': [
     'A2A_AGENTS_FILE',
     'AGENT_FACING',
+    'RunModel',
     'AGENTS_CUSTOM',
     'AUTO_PROPOSE',
     'BOOKMARK_EVERY',

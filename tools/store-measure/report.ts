@@ -145,15 +145,19 @@ async function timed(read: () => Promise<unknown>): Promise<Timed> {
 /** The medians of `calls`. */
 const medianOf = (calls: readonly Timed[]): Timed => ({ ms: median(calls.map((c) => c.ms)), heapMb: median(calls.map((c) => c.heapMb)) });
 
+/** A store's root as a report writes it: under the home folder as `~/…`, so a committed baseline names no one's home. */
+export const rootAsWritten = (root: string, home = os.homedir()): string =>
+  root === home || root.startsWith(`${home}${path.sep}`) ? `~${root.slice(home.length)}` : root;
+
 /**
  * The records the Run model refuses, among the runs of the copy at `wf`: each `runs/<id>.json` decoded with run-core's `Run`
  * (`packages/agent-orchestrator/src/record/record.model.ts`, its invariants included), a record that is no JSON left to the
- * unreadable count. The model is imported by its path: no entry of the package reaches a model file (its `test/boundary.test.ts`).
+ * unreadable count. The model is reached through the package's root, as `RunModel`, and imported after the store is copied, as the rest is.
  */
 export async function invariantRefusals(wf: string): Promise<number> {
   const { Exit, Schema } = await import('effect');
-  const { Run } = await import('../../packages/agent-orchestrator/src/record/record.model.ts');
-  const decode = Schema.decodeUnknownExit(Run);
+  const { RunModel } = await import('agent-orchestrator');
+  const decode = Schema.decodeUnknownExit(RunModel.Run);
   let refused = 0;
   for (const name of filesOf(path.join(wf, 'runs'), '.json')) {
     let record: unknown;
@@ -507,7 +511,8 @@ async function reportOn(asked: Asked, root: string, commit: string): Promise<Sto
     const key = `${s.verdict === 'other' ? s.command.split(' ')[0] : s.verdict} (${s.on})`;
     spawned[key] = (spawned[key] ?? 0) + 1;
   }
-  const { repeat, from, engine } = asked;
+  const { repeat } = asked;
+  const [from, engine] = [rootAsWritten(asked.from), rootAsWritten(asked.engine)];
   const date = new Date().toISOString();
   return {
     machine: machineNow(),

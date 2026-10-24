@@ -1,6 +1,6 @@
 /**
- * The runtime's entity-relation printer: an `erDiagram` drawn from the model's schemas, so the picture is the code's. The
- * orchestrator keeps a copy of the same contract (`agent-orchestrator/src/model/er.model.ts`), since it may not import this one.
+ * The runtime's entity-relation printer: an `erDiagram` drawn from the model's schemas, so the picture is the code's. The layer
+ * above keeps a copy of the same contract, since it may not import this one.
  *
  * It prints only the two line forms beautiful-mermaid reads (`node_modules/beautiful-mermaid/src/er/parser.ts`): an attribute,
  * `type name [PK|FK] ["comment"]`, and a relation, `A <card>--<card> B : label`.

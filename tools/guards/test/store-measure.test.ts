@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { argsOf, invariantRefusals, MEASURES, type StoreMeasure } from '../../store-measure/report.ts';
+import { argsOf, invariantRefusals, MEASURES, rootAsWritten, type StoreMeasure } from '../../store-measure/report.ts';
 import { copyStore, destinationRefusal, gitVerdict, installFence, LEFT_OUT, readOnlyPlace } from '../../store-measure/fence.ts';
 import type { Place } from 'agent-orchestrator';
 
@@ -199,4 +199,9 @@ test('the invariant count is the records the Run model refuses, a record that is
   fs.writeFileSync(path.join(wf, 'runs', 'r-shapeless.json'), '{}');
   fs.writeFileSync(path.join(wf, 'runs', 'r-torn.json'), '{"id": "r-to');
   assert.equal(await invariantRefusals(wf), 1);
+});
+
+test('a report writes a store under the home folder as ~/…, and one elsewhere as it is', () => {
+  assert.equal(rootAsWritten(path.join('/u', 'me', '.agent-workflows'), path.join('/u', 'me')), path.join('~', '.agent-workflows'));
+  assert.equal(rootAsWritten(path.join('/u', 'mea', 'x'), path.join('/u', 'me')), path.join('/u', 'mea', 'x'));
 });

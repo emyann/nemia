@@ -889,7 +889,7 @@ answer (`unruledIn`, through `agent-runtime/vocabulary`).
 
 A step on `claude` runs as a **job** on the Agent SDK, which works its brief to the end and exits. Its end is its result, it keeps a
 spend cap (`budget:`, below), and it asks nobody in any mode — a call its mode would ask about is denied, recorded on the attempt, and
-the session carries on (agent-runtime's open issue 28, M1). A person can still tell it something while it works: `wf say` writes to it
+the session carries on (agent-runtime's issue 28, M1). A person can still tell it something while it works: `wf say` writes to it
 until its result (issue 29), and `remote: true` bridges it to claude.ai (below). A session that must outlive a brief is the runtime's
 long-lived task, `restartPolicy: 'Always'`, which no step files: Nemia's keeper files hers.
 
@@ -999,12 +999,12 @@ loop asks for a round that would file it again.
   and a person raised it. Being over budget is why nothing was filed, not what the session has to fix.
 
 Only what the engine measured counts, so a step with a budget whose tries have no cost on them reads as it would without one. The rule is
-the same on both Claude harnesses — the tries together, against the cap — and the harness keeps it too, each session handed what is left.
+the same on every Claude Code step — the tries together, against the cap — and the harness keeps it too, each session handed what is left.
 
 **A resumed session is charged its own spend.** A try, a round or a gate's answer that continues a session is a new task filed with
-`resumeFrom` — `claude -p --resume` — and handed what is left of the cap. `claude -p --resume` caps the resume's own spend, not its
-session's (M5), and prints its parent's cost on in its own (M2): the engine takes the parent's off, so each attempt's cost is what that
-session spent, and the tries add up to the step's spend once (agent-runtime's open issue 4). A resume of a session that was not a job of
+`resumeFrom` — a resumed job on the Agent SDK — and handed what is left of the cap. A resume's cap bounds its own spend, not its
+session's (M5), and it prints its parent's cost on in its own (M2): the engine takes the parent's off, so each attempt's cost is what that
+session spent, and the tries add up to the step's spend once (agent-runtime's issue 4). A resume of a session that was not a job of
 the engine's — a `--bg` try from before stage 2 part 2 — records no cost, and the step's spend reads `≥` that far.
 
 ## What one step knows of another
@@ -1678,8 +1678,9 @@ its own, and everything below reads the words back off the engine's view of the 
 - **`wf ls`** notes a step whose current try was told something, after the try it is on: `said to 2×`.
 - **`wf decide`** prints each thing said under the step, before its closeout — `said to try 1, at <time>:`, then the
   words in a fence, as data — for every try of the step, so the person who ships the work reads what the step was told.
-- **A try that continues the session is handed them again.** Taken is not read: a session blocked on a permission
-  prompt keeps the words queued, and loses them when it is stopped and continued (agent-runtime's open issue 16). So a
+- **A try that continues the session is handed them again.** Taken is not read: words said in the moment before a job's
+  result are journalled and never reach it (agent-runtime's issue 29), and a `--bg` session blocked on a prompt kept them
+  queued and lost them when it was continued (issue 16, closed with that road). So a
   try or a round that continues the session — `wf retry --nudge`, `retries:`, a round, the board's Continue — carries
   what was said to the last try's task as `## Said to your session`, inside `## Try <n>` or `## Round <n>`: each
   message with its time, fenced, before `## Your answer`. A new session (`--fresh`, or a nudge with nothing to
@@ -3762,7 +3763,7 @@ first time — is marked with the later time, and every worktree either prune re
 
 ## Choosing the model per step
 
-Verified against the transcripts: `claude --bg --model haiku` really does run Haiku
+Verified against the transcripts (then on `claude --bg`): `--model haiku` really does run Haiku
 (`claude-haiku-4-5-20251001`), while the default was `claude-opus-5`. So `model:` on a step works,
 and the transcript records what actually ran.
 
@@ -3844,13 +3845,12 @@ wants to run its own tests stops and waits for someone who, in a fleet, is not t
 asking — which fails quietly rather than visibly, and is right only when you have enumerated the
 tools a step may use. Set `permissionMode:` on a step to choose.
 
-Since thin runtime stage 2 part 2 (2026-09-23) a step runs as a job, `claude -p`, and **a job waits on
+Since thin runtime stage 2 part 2 (2026-09-23) a step runs as a job, on the Agent SDK since 2026-10-21, and **a job waits on
 nobody in any mode**: a call that would ask is denied, the session carries on, and the attempt records
-what was denied (agent-runtime's open issue 28, M1). So a mode no longer decides whether a step stalls,
+what was denied (agent-runtime's issue 28, M1). So a mode no longer decides whether a step stalls,
 only what it may do. Choose by role: a step that only reads — a planner, a reviewer — runs `dontAsk`,
-fenced by the checkout's `.claude/settings.json` allow list, which a job honours as a `--bg` session
-does (M11); a step that edits and runs its own tests runs `auto`; and a background session runs `dontAsk`
-with an `allowedTools:` of its own, since a `--bg` session in a mode that asks would wait.
+fenced by the checkout's `.claude/settings.json` allow list, which a job honours (M11); a step that edits and runs its own tests
+runs `auto`; and a long-lived session runs `dontAsk` with an `allowedTools:` of its own.
 
 Whichever you pick, the engine makes the consequence visible rather than mysterious: a session
 waiting on a person is reported as `needs-human`, and a step's `deadlineSeconds` is what stops one

@@ -177,7 +177,7 @@ const RETRY: Command<{
         kind: 'amount',
         key: 'budget',
         takes: "the most the step's tries may cost together, in dollars, above what they have cost",
-        form: 'nemia retry <runId> <step> --budget <amount>',
+        form: 'nemia retry <runId> <step> --budget <amount>, or for a round nemia retry <runId> [<step>] --round --budget <amount>',
         twice: 'nemia retry takes --budget once: the cap to raise the step to, in dollars — nemia retry <runId> <step> --budget <amount>.',
       },
     ],

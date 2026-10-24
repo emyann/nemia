@@ -10,7 +10,7 @@ import { admissionOf, type Auto, type Scope } from './admission.ts';
 import { TABLE } from '../command/commands.verb.ts';
 import { DEFAULT_AUTO, listInForce, type AutoRule, type Facts } from '../auto/index.ts';
 import type { Level } from '../level/level.ts';
-import type { ApproveForm } from '../gate/form.verb.ts';
+import type { ApproveForm } from '../gate/form.ts';
 import { names } from '../../test/assessed.ts';
 
 /** The state the fixtures read: `r`'s step `gate` awaits approval, `check` failed its check, and no other run is there. */

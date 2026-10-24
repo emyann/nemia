@@ -10,7 +10,7 @@ import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { atLeast, type Level } from '../level/level.ts';
 import { allowedBy, AUTO_ANSWERS, NO_FACTS, type AutoRule, type Facts } from '../auto/index.ts';
 import type { CommandClass } from './class.ts';
-import type { ApproveForm } from '../gate/form.verb.ts';
+import type { ApproveForm } from '../gate/form.ts';
 
 /**
  * An entry of the table as admission reads it: its name, its class, whether it is asked every time, the side it is served on, and how its

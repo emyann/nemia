@@ -960,7 +960,7 @@ test('a former word or flag is run as what it became, with a hint, and a line in
     [
       'round, absorbed by retry with --round',
       ['round', 'r1', 'review', '--budget', '5'],
-      ['retry', 'r1', 'review', '--budget', '5', '--round'],
+      ['retry', 'r1', 'review', '--round', '--budget', '5'],
     ],
     ['merge, absorbed by refresh with --base', ['merge', 'r1'], ['refresh', 'r1', '--base']],
     ['accept, absorbed by approve', ['accept', 'r1', 'review', '--message', 'x'], ['approve', 'r1', 'review', '--message', 'x']],

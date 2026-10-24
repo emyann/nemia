@@ -27,15 +27,22 @@ export const RENAMED: ReadonlyMap<string, { readonly to: string; readonly flag?:
 /** Each flag renamed, by the command that takes it and its former spelling: `nemia retry --nudge` is `nemia retry --continue`. */
 export const RENAMED_FLAGS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([['retry', new Map([['--nudge', '--continue']])]]);
 
+/** `rest`, the words after a command's name, with `flag` before the first flag among them, or after them where none is. */
+const withFlag = (rest: readonly string[], flag: string | undefined): string[] => {
+  if (flag === undefined) return [...rest];
+  const at = rest.findIndex((w) => w.startsWith('-'));
+  return at === -1 ? [...rest, flag] : [...rest.slice(0, at), flag, ...rest.slice(at)];
+};
+
 /**
  * `words`, a command line's words after the program, its first word put to the name it became where it is a former one (`RENAMED`), the
- * flag that says the absorbed verb added after the rest, and each former flag of the command put to its new spelling (`RENAMED_FLAGS`);
- * with the hint naming what to type now, or `words` as given and no hint.
+ * flag that says the absorbed verb added before its other flags, and each former flag of the command put to its new spelling
+ * (`RENAMED_FLAGS`); with the hint naming what to type now, or `words` as given and no hint.
  */
 export function renamedIn(words: readonly string[]): { words: string[]; hint?: string } {
   const first = words[0];
   const now = first === undefined ? undefined : RENAMED.get(first);
-  const named = now === undefined ? [...words] : [now.to, ...words.slice(1), ...(now.flag ? [now.flag] : [])];
+  const named = now === undefined ? [...words] : [now.to, ...withFlag(words.slice(1), now.flag)];
   const flags = RENAMED_FLAGS.get(named[0] ?? '');
   const former = flags === undefined ? [] : named.slice(1).filter((w) => flags.has(w));
   if (now === undefined && !former.length) return { words: [...words] };

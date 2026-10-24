@@ -5,7 +5,7 @@
  */
 import { Effect } from 'effect';
 import { commandLine, type Args } from '../command/command.ts';
-import { Conflict } from '../refusal/refusal.ts';
+import { Invalid } from '../refusal/refusal.ts';
 import { acceptWordsRefusal } from '../round/round.ts';
 import { acceptRun } from '../round/round.verb.ts';
 import { approveForm } from './form.verb.ts';
@@ -28,7 +28,8 @@ type Next = 'step' | 'waiting' | 'nothing';
 
 /**
  * The refusal of an approval that ends a loop out of rounds given no words, or answers to questions, which a loop's end does not take: the
- * line that ends it, with the words it needs.
+ * line that ends it, with the words it needs. Refused as what was typed, as `nemia accept` refused it, once the run is there to say which
+ * yes is given; a run that is not there is refused as missing first.
  */
 function loopRefusal(args: Args): string | null {
   const { runId, step } = named(args);
@@ -98,8 +99,8 @@ export const APPROVE: Command<{
     const { runId, step } = named(args);
     const words = textOf(args, 'message');
     if ((yield* approveForm(runId, step)) === 'loop') {
-      const refused = loopRefusal(args);
-      if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
+      const refused = runStore.runs.exists(runId) ? loopRefusal(args) : null;
+      if (refused) return yield* Effect.fail(new Invalid({ message: refused }));
       const { acceptance, file } = yield* acceptRun(runId, step, words);
       const waited = stepsOf(runStore.runs.read(runId)).some((s) => s.after.includes(acceptance.step));
       const { step: looping, try: tryNo, at, message } = acceptance;

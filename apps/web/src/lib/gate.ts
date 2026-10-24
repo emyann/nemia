@@ -117,7 +117,7 @@ export function gateBrief(
 
 /**
  * What the card says once a person's word is taken, until the run is read again and moves: `approved — the next pass files ship`, or
- * `sent back to review — try 2 asked (--nudge, with your answer) — the next tick files it`.
+ * `sent back to review — try 2 asked (--continue, with your answer) — the next tick files it`.
  */
 export const takenLine = (
   taken: { approved: true } | { asked: StepAsked | { try: number; stopFirst: boolean }; to: string },

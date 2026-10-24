@@ -339,7 +339,7 @@ export const LOOPING = {
   /** What `wf ls` prints beside each step: the round it is on, and for the loop out of rounds, the command that takes it once more. */
   notes: {
     implement: 'round 3 of 3',
-    review: 'round 3 of 3, and it asked again — once more: nemia round go-round-again-e2e2 review',
+    review: 'round 3 of 3, and it asked again — once more: nemia retry go-round-again-e2e2 review --round',
   },
   /** What each step said in the rounds before the one it is on: round 1, then round 2. */
   earlier: [

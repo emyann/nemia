@@ -165,11 +165,11 @@ test("edgesOf, loopLabel and edgeState: a run's edges, done, running or to come"
         [null, null, 3, null],
         ['try 2, by retries: 1', null, 3, null],
         ['try 2 due — retries: 1, 0 spent', null, 3, null],
-        ['round 3 of 3, and it asked again — once more: nemia round r-1 review', 'round 3 of 3', 3, 'round 3 of 3'],
+        ['round 3 of 3, and it asked again — once more: nemia retry r-1 review --round', 'round 3 of 3', 3, 'round 3 of 3'],
         ['round 2 of 5 due — review asked again, and the next tick files implement', null, 5, 'round 2 of 5'],
         [null, 'round 2 of 3', 3, 'round 2 of 3'],
         ['round 2 of 3, try 3, by retries: 1', 'round 2 of 3', 3, 'round 2 of 3'],
-        ['round 4 asked (nemia round) — the next tick files implement', 'round 3 of 3', 3, 'round 4 of 3'],
+        ['round 4 asked (nemia retry --round) — the next tick files implement', 'round 3 of 3', 3, 'round 4 of 3'],
         ['round 4, past rounds: 3, on your word', 'round 4, past rounds: 3, on your word', 3, 'round 4 of 3'],
       ];
       for (const [review, implement, rounds, label] of cases) {
@@ -191,13 +191,17 @@ test("edgesOf, loopLabel and edgeState: a run's edges, done, running or to come"
           step('review', 'unverified', review, due),
         ])[0].state;
       assert.equal(loopState('round 2 of 3 due — review asked again, and the next tick files implement', true), 'running', 'asked again');
-      assert.equal(loopState('round 4 asked (nemia round) — the next tick files implement', true), 'running', 'a person sent it round');
+      assert.equal(
+        loopState('round 4 asked (nemia retry --round) — the next tick files implement', true),
+        'running',
+        'a person sent it round',
+      );
       assert.equal(loopState(null, true), 'running', 'the fact, with no note to word it');
       const still: Array<[review: string | null, implement: string | null, implementDue: boolean]> = [
         [null, null, false],
         ['round 2 of 3 due — review asked again, and the next tick files implement', null, false],
-        ['round 4 asked (nemia round) — the next tick files implement', null, false],
-        ['round 3 of 3, and it asked again — once more: nemia round r-1 review', 'round 3 of 3', false],
+        ['round 4 asked (nemia retry --round) — the next tick files implement', null, false],
+        ['round 3 of 3, and it asked again — once more: nemia retry r-1 review --round', 'round 3 of 3', false],
         ['try 2 due — retries: 1, 0 spent', null, false],
         [null, 'round 2 of 3 due — review asked again, and the next tick files implement', true],
       ];

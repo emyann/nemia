@@ -1,6 +1,9 @@
 /**
  * The engine a test drives: the `Engine` service a layer builds, built at the call with no scope to close. Test-only, read by the
  * package's typecheck.
+ *
+ * It imports `src` statically: a test that sets an environment variable read at load (`CLAUDE_CONFIG_DIR`) before a dynamic import of
+ * `src` imports this file dynamically too, or `src` is loaded before the variable is set.
  */
 import { Cause, Context, Effect, Exit, Layer, Scope } from 'effect';
 import { Engine, type EngineShape } from '../src/index.ts';

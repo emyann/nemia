@@ -177,6 +177,8 @@ export type TaskView = {
  *    later, or the harness's own end brings what it printed.
  *
  * The payload is carried, never read. The engine records it on the attempt and does nothing else.
+ *
+ * So the engine can say a task waits before its harness has let the session go: a test asserts both sides, or waits for the Task.
  */
 const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): ReadonlyMap<string, Sighting> => {
   const last = state.attempts.at(-1);

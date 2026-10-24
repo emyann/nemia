@@ -71,6 +71,11 @@ holds what every change needs.
   and stays a screen long. A knob on a workload is a field carried on the task and read by a runner, never a callback into `decide`,
   and no `if` in `engine.ts` belongs in `decide`. What sits in which layer today, and what is a candidate to move, is in
   `docs/architecture.md`, *Who owns what*.
+- **Each context says its words in its glossary table**: a `glossary.json` at its door (a term, its meaning, the closed type that
+  holds it, the spellings it retired, each with its card), which the docs' Glossary page draws one section per context
+  (`apps/docs/src/glossary.ts`). Read the table of the context you change before you name something there. A renamed word keeps its
+  old spelling as `retired` on its row, and `tools/guards/test/glossary.test.ts` counts that spelling in each file under the table's
+  paths, a count that only shrinks (`tools/guards/test/glossary.baseline.ts`).
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.

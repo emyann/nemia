@@ -51,8 +51,7 @@ export {
   touchedLines,
 } from './branches/index.ts';
 export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
-export { isRepositoryRun, placeOf } from './run.ts';
-export { answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
+export { isRepositoryRun, placeOf, answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
  * their step's session waits on them (`harnessWaitLine`). Re-exported because the api cannot import agent-runtime — it is not a
@@ -236,8 +235,7 @@ export {
   STEP_PHASES,
   STEP_REASONS,
 } from './feed/index.ts';
-export type { Reason, RunPhase, RunReason, StepPhase, StepReason } from './feed/index.ts';
-export type { FeedLine, FeedPublished } from './feed/index.ts';
+export type { Reason, RunPhase, RunReason, StepPhase, StepReason, FeedLine, FeedPublished } from './feed/index.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_SELECTORS, subscriptionNameRefusal, watchedLine } from './subscription/index.ts';
 export {

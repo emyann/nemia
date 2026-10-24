@@ -594,7 +594,7 @@ const PINNED: Record<string, string[]> = {
     'harnessWaitLine',
     'hasGate',
     'hasStarted',
-    'heldByCheckout',
+    'waitsOnCheckout',
     'heldCheckouts',
     'heldRefusal',
     'heldRuns',

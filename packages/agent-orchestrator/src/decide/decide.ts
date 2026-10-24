@@ -10,7 +10,7 @@ import type { RetryAsk } from '../retry/index.ts';
 import {
   approvedFirst,
   budgetOf,
-  heldByCheckout,
+  waitsOnCheckout,
   roundSpans,
   runSpend,
   sessionTasks,
@@ -61,8 +61,8 @@ export type Decision =
        * Steps whose task failed or was stopped — over their budget or not, as each list below names a step by how it ended on its own work.
        */
       failed: string[];
-      /** Steps that signed off blocked. */
-      stuck: string[];
+      /** Steps that signed off blocked: each awaits the person's answer (`AwaitingAnswer` via `closeout`). */
+      awaitingAnswer: string[];
       /** Steps whose check refused them: it ran to its end, and did not exit 0. */
       failedCheck: string[];
       /** Steps whose check did not finish — stopped, or killed before it exited (`refusedCheck`). No verdict on the work. */
@@ -110,7 +110,7 @@ export type Landed = boolean | 'unchanged';
  * `running`, and `gateLines` words that window.
  *
  * `running` names what it waits on, each once: a step whose agent or check is still going, one ready, an ending step waiting for the
- * repository's own checkout (`heldByCheckout`), a step the next tick tries again and a loop going round again.
+ * repository's own checkout (`waitsOnCheckout`), a step the next tick tries again and a loop going round again.
  *
  * A run that worked directly on its base branch is never asked whether it landed: git's answer is always yes. Every result branch is
  * asked, not some — a fan-out that ends in two branches has not landed because one did — each once, and none after the first that is
@@ -170,7 +170,7 @@ export function decision(
           (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name].taskId!))),
       )
       .map((s) => s.name);
-    const waitsForCheckout = checkout ? steps.filter((s) => heldByCheckout(steps, s.name, checkout)).map((s) => s.name) : [];
+    const waitsForCheckout = checkout ? steps.filter((s) => waitsOnCheckout(steps, s.name, checkout)).map((s) => s.name) : [];
     return {
       kind: 'running',
       waiting: [...new Set([...live, ...ready, ...waitsForCheckout, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort(),
@@ -204,7 +204,7 @@ export function decision(
       .filter((s) => want.includes(standingOf.get(s.name)!.own))
       .map((s) => s.name)
       .sort();
-  const stuck = named('blocked');
+  const awaitingAnswer = named('blocked');
   const failed = named('failed', 'stopped');
   const checkFailed = named('failed (check)');
   const unfinishedCheck = checkFailed.filter((name) => !refusedCheck(phaseOf(run.steps[name].check!.taskId), verdictOf(name)));
@@ -221,7 +221,7 @@ export function decision(
   const outcome =
     failed.length || checkFailed.length
       ? 'failed'
-      : stuck.length ||
+      : awaitingAnswer.length ||
           unsigned.length ||
           exhausted.length ||
           pastBudget.length ||
@@ -236,7 +236,7 @@ export function decision(
     outcome,
     branches,
     failed,
-    stuck,
+    awaitingAnswer,
     failedCheck,
     unfinishedCheck,
     unsigned,

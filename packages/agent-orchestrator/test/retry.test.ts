@@ -530,7 +530,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
         printed: { stdout: 'ok 1 - builds\nnot ok 2 - parses a trailing comma\n# fail 1\n', stderr: 'npm error Test failed.\n' },
       });
       const pass = await tick(id());
-      assert.deepEqual([pass.tried, pass.filed, pass.blocked, pass.status], [['implement'], [], [], 'running']);
+      assert.deepEqual([pass.tried, pass.filed, pass.unreachable, pass.status], [['implement'], [], [], 'running']);
       const spec = b.tasks.get(try2())!.spec;
       assert.deepEqual(
         { cwd: spec.cwd, resumeFrom: spec.resumeFrom, harness: spec.harness },
@@ -568,7 +568,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
       for (let pass = 1; pass <= 3; pass++) {
         const after = await tick(id());
         assert.deepEqual(
-          [after.tried, after.filed, after.checked, after.blocked, after.status],
+          [after.tried, after.filed, after.checked, after.unreachable, after.status],
           [[], [], [], ['review'], 'failed'],
           `pass ${pass}`,
         );
@@ -684,7 +684,7 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
     run = await throughCheck(['check: npm test', 'retries: 2'], 'stopped');
     for (let pass = 1; pass <= 2; pass++) {
       const after = await tick(run.id);
-      assert.deepEqual([after.tried, after.filed, after.blocked, after.status], [[], [], ['review'], 'failed'], `pass ${pass}`);
+      assert.deepEqual([after.tried, after.filed, after.unreachable, after.status], [[], [], ['review'], 'failed'], `pass ${pass}`);
     }
     assert.equal(readRun(run.id).steps.implement?.tries, undefined, 'no try spent');
   });
@@ -1426,7 +1426,7 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
       for (let pass = 1; pass <= 2; pass++) {
         const after = await tick(run.id);
         assert.deepEqual(
-          [after.tried, after.filed, after.checked, after.blocked, after.status],
+          [after.tried, after.filed, after.checked, after.unreachable, after.status],
           [[], [], [], ['review'], 'failed'],
           `pass ${pass}`,
         );
@@ -1533,7 +1533,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
       ended(`${try2}-check`, 'failed', { exitCode: 1 });
       const pass = await tick(run.id);
       assert.deepEqual(
-        [pass.tried, pass.blocked],
+        [pass.tried, pass.unreachable],
         [[], ['review']],
         '$3.00 of $3: nothing left, and `retries: 2` does not spend the try it has',
       );
@@ -1550,7 +1550,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
     for (let pass = 1; pass <= 2; pass++) {
       const after = await tick(id);
       assert.deepEqual(
-        [after.tried, after.filed, after.checked, after.blocked, after.status],
+        [after.tried, after.filed, after.checked, after.unreachable, after.status],
         [[], [], [], ['review'], 'blocked'],
         `pass ${pass}`,
       );

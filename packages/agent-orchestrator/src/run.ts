@@ -78,7 +78,7 @@ export {
   endingStopped,
   gatesOf,
   hasGate,
-  heldByCheckout,
+  waitsOnCheckout,
   holdsOpenOn,
   landsOnCheck,
   loopOf,

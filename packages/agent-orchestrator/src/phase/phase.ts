@@ -259,8 +259,8 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
  * not a gate, so a gate before it does not say why; every such reason is a run's too; `AwaitingAnswer` with no `via` where none is.
  * Every other status is `RUN_REASON_OF`'s. Pure.
  */
-export function runCodes(status: RunStatus, held: boolean, steps: readonly CodedStep[] = []): CodedRun {
+export function runCodes(status: RunStatus, holding: boolean, steps: readonly CodedStep[] = []): CodedRun {
   const stop = status === 'blocked' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
-  const q: QualifiedRun = status === 'running' && held ? { reason: 'Waiting', on: 'run' } : stop ? stoppedOn(stop) : RUN_REASON_OF[status];
+  const q: QualifiedRun = status === 'running' && holding ? { reason: 'Waiting', on: 'run' } : stop ? stoppedOn(stop) : RUN_REASON_OF[status];
   return { ...q, phase: RUN_PHASE_OF[q.reason] };
 }

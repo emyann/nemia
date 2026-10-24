@@ -20,8 +20,8 @@ import type { Assessment } from '../tick/assess.ts';
 export type RestFacts = {
   run: Pick<Run, 'workflow' | 'pruned' | 'hold'>;
   status: Assessment['status'];
-  /** What the pass found due: a step to file, a check, a try, a round, or one the repository's checkout holds back. */
-  due: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'held'>;
+  /** What the pass found due: a step to file, a check, a try, a round, or one waiting on the repository's checkout. */
+  due: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout'>;
   /** Whether the engine had settled every task of the run the pass read. A task at work, or waiting for a word, moves on its own. */
   settled: boolean;
   /** What the pass did: filed, checked, tried or looped anything, or wrote the record. */
@@ -68,7 +68,7 @@ export function restBlockers(f: RestFacts): string[] {
   if (f.run.hold) out.push('hold');
   if (!f.settled) out.push('settled');
   if (f.acted) out.push('acted');
-  for (const key of ['ready', 'check', 'retry', 'round', 'held'] as const) if (f.due[key].length) out.push(`due.${key}`);
+  for (const key of ['ready', 'check', 'retry', 'round', 'waitingOnCheckout'] as const) if (f.due[key].length) out.push(`due.${key}`);
   if (f.notes.length) out.push('notes');
   if (f.handOffDue.length) out.push('handOffDue');
   if (f.landingOwed) out.push('landingOwed');

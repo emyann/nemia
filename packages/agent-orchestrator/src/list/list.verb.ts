@@ -205,12 +205,12 @@ const resultOf = (run: Run): string[] => (stepsOrNone(run).length ? resultBranch
 type Read = { run: Run; read: RunReading | Unjudged; staged: () => boolean };
 
 /**
- * The checks of `run` the pause keeps from being filed (`paused.checks`, `assess`'s): each landing with its merge staged — an ending that
+ * The checks of `run` the pause keeps from being filed (`waitingOnPause.checks`, `assess`'s): each landing with its merge staged — an ending that
  * lands on its check (`landsOnCheck`) while a merge is staged in the repository's own checkout, or its place could not say, as
  * `holdingReads` read it (`mergeStaged`) — and each other (`held`).
  */
 const heldOf = ({ run, read, staged: merging }: Read): Pick<Paused, 'staged' | 'held'> => {
-  const checks = 'assessed' in read ? (read.assessed.paused?.checks ?? []) : [];
+  const checks = 'assessed' in read ? (read.assessed.waitingOnPause?.checks ?? []) : [];
   const landings = stepsOrNone(run).filter((s) => checks.includes(s.name) && landsOnCheck(s, run));
   const staged: PauseStaged[] =
     landings.length && isRepositoryRun(run) && merging() ? landings.map((s) => ({ run: run.id, step: s.name, repo: run.repo })) : [];

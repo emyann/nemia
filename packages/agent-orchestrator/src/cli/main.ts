@@ -190,9 +190,9 @@ function tickRunLine(r: Pass['runs'][number]): string {
   const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';
   const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';
   const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
-  const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
+  const unreachable = r.unreachable.length ? `  unreachable: ${r.unreachable.join(', ')}` : '';
   const waiting = r.waiting.length ? `  ${waitWord(r.waiting)}` : r.held ? `  ${slotWord(r.held)}` : '';
-  return `${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}${waiting}`;
+  return `${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${unreachable}${waiting}`;
 }
 
 /** What `nemia tick` prints of a run: its line (`tickRunLine`), then its notes, a line each. */

@@ -1,7 +1,7 @@
 /** Which yes `nemia approve` gives: at a step's gate, or to a loop out of rounds, as `nemia accept` gave it. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { approveFormOf, type ApproveForm } from './form.ts';
+import { approveFormOf, type ApproveForm } from './gate.ts';
 import type { Workflow } from '../step/step.ts';
 
 const STEPS = [

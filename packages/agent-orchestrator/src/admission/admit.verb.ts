@@ -22,7 +22,7 @@ import { readConfirmed } from '../auto/auto.store.ts';
 import { admissionOf, answerOf, namedIn, typedIn, type Auto, type Scope } from './admission.ts';
 import { seenOf } from './seen.verb.ts';
 import { approveForm } from '../gate/form.verb.ts';
-import type { ApproveForm } from '../gate/form.ts';
+import type { ApproveForm } from '../gate/gate.ts';
 
 /** The usage the refusals of `nemia admit` end on. */
 const ADMIT_FORM = `nemia admit [--at-least ${LEVELS.join('|')}] [--auto <agent>]`;

@@ -8,7 +8,7 @@ import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { retryable } from '../retry/index.ts';
 import { hasGate } from '../status/status.ts';
-import { approveFormOf } from './form.ts';
+import { approveFormOf } from './gate.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 
 /**

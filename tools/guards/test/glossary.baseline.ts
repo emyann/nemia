@@ -46,7 +46,6 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/command/command.ts': 2,
     'packages/agent-orchestrator/src/decide/decide.ts': 4,
     'packages/agent-orchestrator/src/gate/commands.verb.ts': 3,
-    'packages/agent-orchestrator/src/gate/form.ts': 1,
     'packages/agent-orchestrator/src/gate/form.verb.ts': 1,
     'packages/agent-orchestrator/src/gate/gate.ts': 1,
     'packages/agent-orchestrator/src/nemia/level.verb.ts': 1,

@@ -24,7 +24,8 @@ read, `mergeable`, the `ci` context green at that commit, and no result branch o
 whose subject and body are his (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: GitHub deletes the head
 branch), and fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`). On a refusal he changes nothing and
 signs off `blocked` with the `nemia retry` line it printed. Land's check is then the receipt alone — the pull request `MERGED` with a
-merge commit reachable from HEAD, the checkout clean on the base with no merge in progress, every branch of the run an ancestor of HEAD
+merge commit reachable from HEAD, the checkout clean on the base with no merge in progress, every commit of every branch of the run
+with an equivalent patch on HEAD (`git cherry`, so a part taken as a commit of its own counts as taken)
 — which is what the run needs to record `landed` on the commit that landed. It runs no suite and no e2e: `ci` judged both on the head
 the review read, and the merge commit's first parent is the base.
 

@@ -43,10 +43,25 @@ export type InstructionAt = { path: string } | { store: true };
 export type Schedule = { cron: string; brief: string; repo?: string; tz?: string; since: string };
 
 /**
+ * Whether a factory's runs take what is merged while they run, as a Pod's `imagePullPolicy` says whether a container takes a newer
+ * image: `follow` (Kubernetes' `Always`), every new filing of a run — a step, a retry, a round — is filed on the workflow, agents,
+ * skills and rules as the files hold them then; `pinned` (`IfNotPresent`), a run keeps what it resolved at its first filing until
+ * `nemia refresh`. Pinned when the factory says nothing.
+ */
+export const REVISIONS_POLICIES = ['follow', 'pinned'] as const;
+
+/** A factory's revisions policy: one of `REVISIONS_POLICIES`. */
+export type RevisionsPolicy = (typeof REVISIONS_POLICIES)[number];
+
+/** What a factory says nothing of its revisions means: its runs keep what they resolved. */
+export const DEFAULT_REVISIONS: RevisionsPolicy = 'pinned';
+
+/**
  * A factory as its file says it: its name, the file's minus `.json`, its repositories, each an absolute path to a directory, the workflows
  * attached to it, each by its folder's name, its hires and its schedules, by workflow; none of each when the file names none.
- * `instruction`: where its instruction is kept, when the file says (`instructionAt`). `template` and `tree`: the template it was made
- * from, and the folder it runs from, its workflows, agents, skills, wiring and instruction, when it was made from one.
+ * `instruction`: where its instruction is kept, when the file says (`instructionAt`). `revisions`: whether its runs follow merged
+ * revisions, when it says (`revisionsOf`). `template` and `tree`: the template it was made from, and the folder it runs from, its
+ * workflows, agents, skills, wiring and instruction, when it was made from one.
  */
 export type Factory = {
   name: string;
@@ -55,9 +70,13 @@ export type Factory = {
   hires: Hires;
   schedules: Readonly<Record<string, Schedule>>;
   instruction?: InstructionAt;
+  revisions?: RevisionsPolicy;
   template?: FactoryTemplate;
   tree?: string;
 };
+
+/** The revisions policy of `factory`: what it says, else `pinned`, which is also the default factory's, which says nothing. */
+export const revisionsOf = (factory: Pick<Factory, 'revisions'> | undefined): RevisionsPolicy => factory?.revisions ?? DEFAULT_REVISIONS;
 
 /** The template a factory was made from (`nemia factory apply`): its folder, its version then, and the parameters given, by name. */
 export type FactoryTemplate = { source: string; version: string; params: Readonly<Record<string, string | number | boolean>> };
@@ -155,6 +174,7 @@ export type FactoryWrite =
   | 'fire'
   | 'instruction'
   | 'instruct'
+  | 'revisions'
   | 'rules'
   | 'schedule'
   | 'unschedule'
@@ -170,6 +190,8 @@ const INSTEAD: Record<FactoryWrite, string> = {
   fire: 'It hires no one: fire in a factory nemia factory ls lists.',
   instruction: 'It keeps no instruction: give one to a factory nemia factory ls lists.',
   instruct: 'It keeps no instruction: write one for a factory nemia factory ls lists.',
+  revisions:
+    'Its runs keep what they resolved until nemia refresh: say follow of a factory nemia factory ls lists, and start the run there.',
   rules: 'It keeps no rules, since it hires no one: write them for a factory nemia factory ls lists.',
   schedule: 'It offers every workflow found, and starts none by itself: schedule in a factory nemia factory ls lists.',
   unschedule: 'It schedules nothing: unschedule in a factory nemia factory ls lists.',
@@ -477,6 +499,10 @@ const workflowLine = (workflows: readonly string[], width: number): string[] =>
 const instructionLine = (at: InstructionAt | undefined, width: number): string[] =>
   at === undefined ? [] : [`${' '.repeat(width)}  instruction: ${'store' in at ? 'kept in the store' : at.path}`];
 
+/** Whether a factory's runs follow merged revisions, as `nemia factory ls` lists it under its line, when its file or tree says. */
+const revisionsLine = (revisions: RevisionsPolicy | undefined, width: number): string[] =>
+  revisions === undefined ? [] : [`${' '.repeat(width)}  revisions: ${revisions}`];
+
 /**
  * The template a factory was made from, as `nemia factory ls` lists it under its line: its folder and version, the version applied or that
  * none is yet, and each condition that is not as it should be — `Applied` false, `ConflictsPending` true — with its sentence.
@@ -541,6 +567,7 @@ export function factoryLines(
             ...hireLines(l.hires, width),
             ...scheduleLines(l, listed, width, now),
             ...instructionLine(l.instruction, width),
+            ...revisionsLine(l.revisions, width),
           ]),
     ]),
   ];

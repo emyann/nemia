@@ -211,7 +211,7 @@ const asShipped = (t: { after: (f: () => void) => void }): void => {
 
 /** A watcher's workflow: its one step in the repository's own checkout, outside the cap on runs, bridged, on a window of its own. */
 const WATCHER = folderOf({
-  supervise: 'workspace: main\nslot: none\nharness: claude\ncontext: 200k\nbackground: true\nremote: true\npermissionMode: dontAsk',
+  supervise: 'workspace: main\nslot: none\nharness: claude\ncontext: 200k\nremote: true\npermissionMode: dontAsk',
 });
 
 test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` and `nemia decide` say; the run created first takes a slot a finished or called-off run frees; a watcher and a run waiting on another are not counted; with no cap, nothing waits', async (t) => {
@@ -606,11 +606,11 @@ test("the daemon's ceilings, as `nemia up`, `nemia tick` and `nemia ls` read the
       printed.filter((l) => !startedLines.includes(l)),
       [
         'up — every 4000ms, ^C to stop',
-        '   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
+        '   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
         '   runs in flight: no cap (WF_MAX_RUNS)',
         holds,
         'up — every 1000ms, ^C to stop',
-        '   sessions at work per pool: at most 4 at once — claude with claude-detached, codex, checks each a pool (WF_MAX_CONCURRENT)',
+        '   sessions at work per pool: at most 4 at once — claude, codex, checks each a pool (WF_MAX_CONCURRENT)',
         '   runs in flight: at most 2 at once — a run with nothing filed waits for a slot, oldest first (WF_MAX_RUNS)',
         holds,
       ],

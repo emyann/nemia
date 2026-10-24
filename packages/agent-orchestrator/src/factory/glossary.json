@@ -51,6 +51,15 @@
       }
     },
     {
+      "term": "Revisions policy",
+      "meaning": "whether a factory's runs follow merged revisions, `follow`, each new filing taking the workflow, agents, skills and rules the files hold then, or stay `pinned`, the default, keeping what they resolved until `nemia refresh`.",
+      "type": "RevisionsPolicy",
+      "see": {
+        "label": "Its revisions",
+        "href": "/factories/#its-revisions"
+      }
+    },
+    {
       "term": "Hire",
       "meaning": "a factory's choice of the agent that does one step of a workflow.",
       "type": "Hire",

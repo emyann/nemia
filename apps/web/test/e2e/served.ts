@@ -6,15 +6,13 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import fs from 'node:fs';
-import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import {
   arrivalLine,
+  attachedFiles,
   DRAFT_TRANSCRIPT,
-  INBOX,
   QUOTA,
-  REGISTRY,
   SAYING,
   seed,
   seedCheckout,
@@ -42,33 +40,27 @@ export type Served = { apiPort?: string; base?: string };
 export const servers: Array<{ name: string; child: ChildProcess; output: () => string }> = [];
 
 /**
- * A Unix socket standing in for a session's inbox, as Claude Code's reads one: each connection's lines kept, as JSON where they parse,
- * nothing answered, and its end closed once the sender's is; each line is handed to `onLine` once kept. Unreferenced, so it keeps nothing
- * alive; it goes with the store.
+ * Each line written to the say file `file`, kept as JSON where it parses and handed to `onLine` once kept, as the session's holder reads
+ * the words said to it: polled, and unreferenced, so it keeps nothing alive; it goes with the store.
  */
-export function listen(socket: string, onLine: (line: unknown) => void = () => {}): Promise<void> {
-  const server = net.createServer({ allowHalfOpen: true }, (connection) => {
-    let got = '';
-    connection.setEncoding('utf8');
-    connection.on('data', (chunk) => (got += chunk));
-    connection.on('end', () => {
-      for (const line of got.split('\n').filter((l) => l.trim())) {
-        let read: unknown = line;
-        try {
-          read = JSON.parse(line);
-        } catch {}
-        heard.push(read);
-        onLine(read);
-      }
-      connection.end();
-    });
-  });
-  return new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(socket, () => {
-      server.unref();
-      resolve();
-    });
+export function heardOn(file: string, onLine: (line: unknown) => void = () => {}): void {
+  let read = 0;
+  fs.watchFile(file, { interval: 50, persistent: false }, () => {
+    const text = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
+    if (text.length < read) read = 0;
+    const end = text.lastIndexOf('\n') + 1;
+    for (const line of text
+      .slice(read, end)
+      .split('\n')
+      .filter((l) => l.trim())) {
+      let got: unknown = line;
+      try {
+        got = JSON.parse(line);
+      } catch {}
+      heard.push(got);
+      onLine(got);
+    }
+    read = Math.max(read, end);
   });
 }
 
@@ -158,13 +150,12 @@ export function seedStore(root: string): void {
 }
 
 /**
- * First on the api's PATH is a `claude` that lists the store's sessions (REGISTRY), HELD's blocked: the engine observes claude agents on
- * every list, and the pages are about the store, not about the sessions on this machine. It answers the api's usage control request too
- * (quota.ts), which the runtime asks through the Agent SDK: anything whose first argument is a flag — the SDK's argv, never matched
- * here, since it is the SDK's to change — it hands to the api's own stand-in Claude Code, which answers the SDK as Claude Code does
- * from the store's answer (QUOTA.file) under the request's own id, and waits on its stdin as Claude Code does. With no answer in the
- * store it ends as a claude that cannot answer would, before the stand-in is reached. Another of Claude Code's verbs is a bare word,
- * and ends well having said nothing. Returns the directory it is in.
+ * First on the api's PATH is a `claude` of the store's own, so the pages are about the store, not about the sessions on this
+ * machine. It answers the api's usage control request too (quota.ts), which the runtime asks through the Agent SDK: anything whose
+ * first argument is a flag — the SDK's argv, never matched here, since it is the SDK's to change — it hands to the api's own stand-in
+ * Claude Code, which answers the SDK as Claude Code does from the store's answer (QUOTA.file) under the request's own id, and waits on
+ * its stdin as Claude Code does. With no answer in the store it ends as a claude that cannot answer would, before the stand-in is
+ * reached. Another of Claude Code's verbs is a bare word, and ends well having said nothing. Returns the directory it is in.
  */
 export function fakeClaude(root: string): string {
   const bin = path.join(root, 'bin');
@@ -180,7 +171,6 @@ export function fakeClaude(root: string): string {
     [
       '#!/bin/sh',
       'case "$1" in',
-      `  agents) cat "${path.join(root, REGISTRY)}"; exit 0 ;;`,
       "  -*|'')",
       `    if [ ! -f "${answer}" ]; then echo 'claude: not signed in, the e2e took its answer away' >&2; exit 1; fi`,
       `    STANDIN_ANSWER="${answer}" STANDIN_MODE="${mode}" STANDIN_CALLS="${calls}" exec node "${standIn}" "$@" ;;`,
@@ -261,18 +251,18 @@ export async function startServers(seat: Served, dist?: string): Promise<Require
 }
 
 /**
- * Seeds `root`, an empty directory, and serves it (`startServers`). draft's inbox (SAYING), the socket its registration names, listens
- * before the api can be asked to say anything into it, and writes each arrival into draft's transcript, as a working session does when it
- * reads the words between calls. Before the api starts, a pass reads where the runs' branches stand (`standingPass`), as the tick would.
+ * Seeds `root`, an empty directory, and serves it (`startServers`). draft's say file (SAYING) is read, standing in for its holder,
+ * before the api can be asked to say anything into it, and each arrival is written into draft's transcript, as a working session does
+ * when it reads the words between calls. Before the api starts, a pass reads where the runs' branches stand (`standingPass`), as the
+ * tick would.
  */
 export async function serveStore(root: string, seat: Served, dist?: string): Promise<Required<Served>> {
   seedStore(root);
   const bin = fakeClaude(root);
   const draftTranscript = path.join(root, DRAFT_TRANSCRIPT);
-  await listen(path.join(root, INBOX), (line) => {
-    const { session_id: sessionId, message } = (line ?? {}) as { session_id?: unknown; message?: { content?: unknown } };
-    if (sessionId === SAYING.sessionId && typeof message?.content === 'string')
-      fs.appendFileSync(draftTranscript, arrivalLine(message.content, new Date().toISOString()));
+  heardOn(attachedFiles(root, `ae/${SAYING.run}-${SAYING.step}/1`).say, (line) => {
+    const { text } = (line ?? {}) as { text?: unknown };
+    if (typeof text === 'string') fs.appendFileSync(draftTranscript, arrivalLine(text, new Date().toISOString()));
   });
   setApiEnv(apiEnvOf(root, bin));
   standingPass();

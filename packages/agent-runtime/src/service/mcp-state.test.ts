@@ -14,6 +14,7 @@ import { mcpStateVerbOf } from './mcp-state.ts';
 import type { HarnessConfig } from './options.ts';
 import type { McpStatusAsk } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
+import { codex } from '../harness/codex/codex.ts';
 
 const CLAUDE: Record<string, HarnessConfig> = { claude: 'claude' };
 const RECORD: Record<string, RemoteMcpServer> = { github: { type: 'http', url: 'https://api.githubcopilot.com/mcp/' } };
@@ -64,7 +65,7 @@ test('mcpStateVerbOf: where the verb opens its session, and what it refuses befo
     'REFUSED: an engine that runs no Claude Code harness has nothing to read a state through, and opens no session',
     async () => {
       const { ask, at } = asking();
-      const err = await refusalOf(mcpStateVerbOf({ codex: 'claude-bg' }, '/var/empty/engine-root', undefined, ask)(RECORD));
+      const err = await refusalOf(mcpStateVerbOf({ codex }, '/var/empty/engine-root', undefined, ask)(RECORD));
       assert.equal(err._tag, 'McpStateRefused');
       for (const name of ['no Claude Code harness', 'Its harnesses are: codex']) assert.ok(err.message.includes(name), err.message);
       assert.deepEqual(at, [], 'a refusal opens no session at all');

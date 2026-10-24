@@ -143,24 +143,29 @@ test('the gates `startRun` is given are the gates its refusal is asked of the st
   assert.deepEqual(asked, [['implement']]);
 });
 
-test("REFUSED at `nemia start`: `remote: true` where the runtime bridges no session — codex, claude-detached, a claude job — named by its line, in the runtime's words; taken on a claude background session, and `remote: false` on any", () => {
-  for (const [own, harness] of [
-    ['harness: codex\nremote: true', 'codex'],
-    ['harness: claude-detached\nremote: true', 'claude-detached'],
-    ['remote: true', 'claude'],
-    ['harness: claude\nremote: true', 'claude'],
-  ] as const) {
+test("REFUSED at `nemia start`: `remote: true` where the runtime bridges no session — codex — named by its line, in the runtime's words; taken on a claude job, and `remote: false` on any", () => {
+  const before = runsWritten();
+  assert.throws(
+    () => started(folder('remote-codex', 'harness: codex\nremote: true')),
+    (err: Error) =>
+      err.message === `implement: \`remote: true\` (filed as \`claude\`): ${configRefusal('codex', { claude: { remoteControl: true } })}`,
+  );
+  assert.deepEqual(runsWritten(), before);
+  for (const own of ['remote: true', 'harness: claude\nremote: true']) assert.ok(started(folder(`bridged-${own.length}`, own)), own);
+  assert.ok(started(folder('unbridged', 'harness: codex\nremote: false')));
+});
+
+test('REFUSED at `nemia start`, before a run is written: a factory file that still says `background:` or `harness: claude-detached`, each naming the line to delete', () => {
+  for (const own of ['background: true', 'background: false', 'harness: claude-detached']) {
     const before = runsWritten();
     assert.throws(
-      () => started(folder(`remote-${harness}-${own.length}`, own)),
-      (err: Error) =>
-        err.message === `implement: \`remote: true\` (filed as \`claude\`): ${configRefusal(harness, { claude: { remoteControl: true } })}`,
+      () => started(folder(`retired-${own.replace(/\W+/g, '-')}`, own)),
+      (err: Error & { _tag?: string }) =>
+        err._tag === 'Invalid' && err.message.startsWith('implement: ') && err.message.includes('Delete the line'),
       own,
     );
     assert.deepEqual(runsWritten(), before, own);
   }
-  assert.ok(started(folder('bridged', 'background: true\nremote: true')));
-  assert.ok(started(folder('unbridged', 'harness: codex\nremote: false')));
 });
 
 test("REFUSED at `nemia start`, every word the load once judged by a copy of the runtime's lists, now by the runtime, after the step's line", () => {
@@ -168,12 +173,10 @@ test("REFUSED at `nemia start`, every word the load once judged by a copy of the
     ['effort: ultra', 'claude', 'effort', { effort: 'ultra' }],
     ['harness: codex\neffort: ultra', 'codex', 'effort', { effort: 'ultra' }],
     ['permissionMode: read-only', 'claude', 'permissionMode', { permissionMode: 'read-only' }],
-    ['harness: claude-detached\npermissionMode: yolo', 'claude-detached', 'permissionMode', { permissionMode: 'yolo' }],
+    ['harness: claude\npermissionMode: yolo', 'claude', 'permissionMode', { permissionMode: 'yolo' }],
     ['harness: codex\nsandbox: plan', 'codex', 'permissionMode', { permissionMode: 'plan' }],
     ['context: 50k', 'claude', 'contextTokens', { contextTokens: 50_000 }],
     ['harness: codex\ncontext: 200k', 'codex', 'contextTokens', { contextTokens: 200_000 }],
-    ['harness: codex\nbackground: true', 'codex', 'background', { background: true }],
-    ['harness: claude-detached\nbackground: true', 'claude-detached', 'background', { background: true }],
     ['harness: codex\nbudget: 5', 'codex', 'budgetUsd', { budgetUsd: 5 }],
     ['harness: codex\nallowedTools: Read', 'codex', 'allowedTools', { allowedTools: ['Read'] }],
     ['harness: codex\ndisallowedTools: Bash(git push)', 'codex', 'disallowedTools', { disallowedTools: ['Bash(git push)'] }],
@@ -189,12 +192,6 @@ test("REFUSED at `nemia start`, every word the load once judged by a copy of the
     );
     assert.deepEqual(runsWritten(), before, own);
   }
-  const both = folder('budget-background', 'background: true\nbudget: 5');
-  assert.throws(
-    () => started(both),
-    (err: Error) => err.message === `implement: ${configRefusal('claude', { background: true, budgetUsd: 5 })}`,
-    'a cap beside a background session is refused of the two together, named by the step',
-  );
 });
 
 test("REFUSED at `nemia start`: a codex sandbox written under its former name, `permissionMode:`, is quoted as the file writes it — the step's own line, or its agent's — never as the `sandbox:` it is read as", () => {

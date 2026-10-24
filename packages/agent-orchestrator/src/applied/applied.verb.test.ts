@@ -24,6 +24,7 @@ const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, rea
 const { main: cli } = await import('../cli/main.ts');
 const { reconcile, reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
+const { setRevisions } = await import('../factory/factory.store.ts');
 const { readRun } = await import('../record/record.store.ts');
 const { startDue } = await import('../schedule/schedule.verb.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
@@ -308,11 +309,12 @@ test("parameters changed in the factory's file, or the template's files changed 
   assert.doesNotMatch(review(treeDir('moved')), /^rounds: 5$/m);
 });
 
-test("a templated factory reads its tree's wiring, and attach, hire, fire and detach write the tree; none while it is not rendered", async (t) => {
+test("a templated factory reads its tree's wiring, and attach, hire, fire, detach and revisions write the tree; none while it is not rendered", async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();
   await apply('wired', dir, repo, '--set', 'budget=7');
   await assert.rejects(async () => attachWorkflow({ factory: 'wired', workflow: 'other' }), refusedNaming('Conflict', 'nemia up'));
+  await assert.rejects(async () => setRevisions({ factory: 'wired', revisions: 'follow' }), refusedNaming('Conflict', 'nemia up'));
   reconcileFactory(templated('wired'));
   const own = fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8');
   const wiring = () => JSON.parse(fs.readFileSync(path.join(treeDir('wired'), 'factory.json'), 'utf8'));
@@ -325,6 +327,12 @@ test("a templated factory reads its tree's wiring, and attach, hire, fire and de
   assert.deepEqual(wiring().workflows, ['dev', 'other']);
   detachWorkflow({ factory: 'wired', workflow: 'other' });
   assert.deepEqual(readFactory('wired').workflows, ['dev']);
+  setRevisions({ factory: 'wired', revisions: 'follow' });
+  assert.deepEqual(
+    [wiring().revisions, readFactory('wired').revisions],
+    ['follow', 'follow'],
+    "the policy is the tree wiring's, read back",
+  );
   assert.equal(fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8'), own, "the factory's own file is not written");
 });
 

@@ -5,7 +5,7 @@
  * once and hands the root down (`AE_ROOT_READER`). A second reader is the load-time read that wrote
  * `~/.agent-engine/parent/ae_t_1.json` on the person's own machine while a test ran.
  *
- * And `os.homedir()` is read in six files and no more (`HOMEDIR_ALLOWED`): the CLI's entry, for the store's default, and the five
+ * And `os.homedir()` is read in five files and no more (`HOMEDIR_ALLOWED`): the CLI's entry, for the store's default, and the four
  * that find a harness's own configuration — Claude Code's `~/.claude` and `~/.claude.json`, Codex's `~/.codex`. Those are the
  * harness's home and not the engine's store: a harness really does keep its sessions there, and `CLAUDE_CONFIG_DIR` and `CODEX_HOME`
  * are what move them. A new `os.homedir()` in a store, a service or a core file is refused here, since that is where a silent fallback
@@ -25,12 +25,11 @@ const AE_ROOT_READER = 'cli/main.ts';
 
 /**
  * The modules that may read `os.homedir()`, each with what home it reads: the CLI's entry, for the engine's store, and the five that
- * find a harness's own configuration, which lives in the person's home whatever the engine's root is. Six in all, and the sweep
+ * find a harness's own configuration, which lives in the person's home whatever the engine's root is. Five in all, and the sweep
  * refuses a stale entry, so the count here and the record cannot drift apart unnoticed.
  */
 const HOMEDIR_ALLOWED: Readonly<Record<string, string>> = {
   'cli/main.ts': "the engine's store, AE_ROOT's default",
-  'harness/claude/bg.ts': "Claude Code's own sessions directory, under CLAUDE_CONFIG_DIR or ~/.claude",
   'harness/claude/transcript.ts': "Claude Code's own transcripts, under CLAUDE_CONFIG_DIR or ~/.claude",
   'harness/claude/trust.ts': "Claude Code's own ~/.claude.json, and the home it never keeps a trust for",
   'harness/codex/codex.ts': "Codex's own configuration, under CODEX_HOME or ~/.codex",
@@ -100,8 +99,8 @@ test("src/cli/main.ts is the one module that reads AE_ROOT or names the engine's
 test("os.homedir() is read in the CLI's entry and the harnesses' own homes, and nowhere else", () => {
   assert.equal(
     Object.keys(HOMEDIR_ALLOWED).length,
-    6,
-    "this file's own words say six: a file taken out of the allow-list is said there too",
+    5,
+    "this file's own words say five: a file taken out of the allow-list is said there too",
   );
   const refused = sources()
     .filter((f) => !(f in HOMEDIR_ALLOWED))

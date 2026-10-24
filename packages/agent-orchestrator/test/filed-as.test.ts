@@ -46,9 +46,10 @@ test('a field a retry chose is named by the flag as typed, before the line of th
 });
 
 test('REFUSED with no line: two fields that refuse only together, and a field no line of the step gave', () => {
-  const together = configRefusal('claude', { background: true, budgetUsd: 5 });
-  assert.ok(together);
-  assert.equal(said('claude', { background: true, budget: 5 }, { background: true, budgetUsd: 5 }), `implement: ${together}`);
+  const together = (c: { model?: string; budgetUsd?: number }) =>
+    c.model !== undefined && c.budgetUsd !== undefined ? 'a cap and a model together' : undefined;
+  const config = { model: 'opus', budgetUsd: 5 };
+  assert.equal(filedRefusal(together, 'implement', config, lineOf({ model: 'opus', budget: 5 })), 'implement: a cap and a model together');
   const denied = { disallowedTools: ['Bash(git commit:*)'] };
   assert.equal(said('codex', {}, denied), `implement: ${configRefusal('codex', denied)}`);
 });

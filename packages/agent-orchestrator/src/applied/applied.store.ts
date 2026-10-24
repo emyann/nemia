@@ -12,6 +12,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
 import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_TYPES } from '../factory/factory.ts';
 import { firstRefusal, HOME } from '../record/record.store.ts';
+import { REVISIONS_POLICIES } from '../factory/factory.ts';
 
 /** The folder the store keeps a factory's own files in, beside its `<name>.json`. */
 const folderOf = (name: string): string => path.join(HOME, 'factories', name);
@@ -28,9 +29,16 @@ export const statusFile = (name: string): string => path.join(folderOf(name), 's
 /** One file of a folder to stage: its path in it, its bytes, and its mode where it keeps one (an executable script of a skill). */
 export type Entry = { path: string; bytes: Buffer; mode?: number };
 
-/** The wiring a templated factory's tree holds in `factory.json`: its workflows and its hires; a key a later `nemia` writes is kept. */
+/**
+ * The wiring a templated factory's tree holds in `factory.json`: its workflows, its hires, and whether its runs follow merged revisions
+ * when it says; a key a later `nemia` writes is kept.
+ */
 const TreeWiringSchema = Schema.StructWithRest(
-  Schema.Struct({ workflows: Schema.Array(Schema.String), hires: Schema.Record(Schema.String, Schema.String) }),
+  Schema.Struct({
+    workflows: Schema.Array(Schema.String),
+    hires: Schema.Record(Schema.String, Schema.String),
+    revisions: Schema.optionalKey(Schema.Literals(REVISIONS_POLICIES)),
+  }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 );
 

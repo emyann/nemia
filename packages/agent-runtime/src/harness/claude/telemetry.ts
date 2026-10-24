@@ -1,11 +1,8 @@
 /**
  * A session's telemetry as Claude Code reads it: its own switch, OpenTelemetry's exporter variables, its tools' details when asked, and
- * the W3C trace context (`claudeTelemetryEnv`), handed to a job in its environment and to a background session in its `--settings`
- * (`telemeteredFlags`), since a background session is run by Claude Code's own service and carries none of the environment it was
- * asked from.
+ * the W3C trace context (`claudeTelemetryEnv`), handed to every session on the Agent SDK in its environment (`attachedOptions`).
  */
 import type { SpawnRequest } from '../seam.ts';
-import { settingsObject, type ClaudeFlags } from './vocabulary.ts';
 
 /**
  * `resource` as OpenTelemetry's `OTEL_RESOURCE_ATTRIBUTES`: `key=value` pairs, by key, joined by commas, each value percent-encoded so
@@ -20,7 +17,7 @@ export const resourceAttributes = (resource: Record<string, string>): string =>
 /**
  * The variables a Claude Code session exports its telemetry under, to the collector `r.telemetry` names, or none when it names none:
  * metrics, events and spans, each over OTLP/HTTP as JSON; its resource the spawn's (`r.resource`); and the trace context it joins
- * (`r.traceparent`), which a job reads and a background session does not. The prompts' and their contents' words stay off, and so do
+ * (`r.traceparent`). The prompts' and their contents' words stay off, and so do
  * the tools' inputs — a command's text, a file's path, an error's words — unless the collector asks for them (`toolDetails`).
  */
 export const claudeTelemetryEnv = (r: SpawnRequest): Record<string, string> => {
@@ -37,18 +34,4 @@ export const claudeTelemetryEnv = (r: SpawnRequest): Record<string, string> => {
     ...(r.resource ? { OTEL_RESOURCE_ATTRIBUTES: resourceAttributes(r.resource) } : {}),
     ...(r.traceparent ? { TRACEPARENT: r.traceparent } : {}),
   };
-};
-
-/**
- * `flags` with the session's telemetry (`claudeTelemetryEnv`) laid over the `env` of their `settings`: what a background session is
- * given. The flags as given when `r` exports nothing, and when their settings are a file's path, which the runtime does not rewrite:
- * such a session exports nothing.
- */
-export const telemeteredFlags = (flags: ClaudeFlags | undefined, r: SpawnRequest): ClaudeFlags | undefined => {
-  const telemetry = claudeTelemetryEnv(r);
-  if (!Object.keys(telemetry).length) return flags;
-  const settings = settingsObject(flags?.settings ?? '{}');
-  if (settings === undefined) return flags;
-  const env = typeof settings.env === 'object' && settings.env !== null ? settings.env : {};
-  return { ...flags, settings: JSON.stringify({ ...settings, env: { ...env, ...telemetry } }) };
 };

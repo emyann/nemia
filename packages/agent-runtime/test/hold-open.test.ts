@@ -3,7 +3,7 @@
  * running; an answer is a new attempt that continues the session; a close settles it. Walked through the engine, over a store in
  * memory and over the Effect layers, and each refusal of `answer` and `close` made to refuse, with nothing journalled, in one table.
  *
- * The Effect layers' harness lets a session go as `claude-bg`'s does: a session released is not listed. A process there is the
+ * The Effect layers' harness lets a session go: a session released is not listed. A process there is the
  * file store under a root and that harness, and a restart is a new one on the same two, reading only the store.
  *
  * `decide`'s half is in `decide.test.ts` (HELD OPEN); the words it journals are pinned in `journal-words.test.ts`.
@@ -193,7 +193,7 @@ test('a task held open signs and waits with its session released; answered after
  * The engine over a store in memory a test may write to by hand, and a harness the test moves. Its `write` writes a task's
  * journal by hand: the filing, held open unless said, then `events`.
  */
-const board = (harnesses?: Record<string, 'claude-bg'>) => {
+const board = () => {
   const tasks = new Map<string, Event[]>();
   const journal: AsyncJournal = {
     async append(taskId, event) {
@@ -227,7 +227,7 @@ const board = (harnesses?: Record<string, 'claude-bg'>) => {
     },
   };
   const engine = builtEngine(
-    Engine.layer({ root: scratch('ae-hold-open-root-'), journal: asyncStore(journal), harnesses: harnesses ?? { fake: asyncOps(fake) } }),
+    Engine.layer({ root: scratch('ae-hold-open-root-'), journal: asyncStore(journal), harnesses: { fake: asyncOps(fake) } }),
   );
   const write = (id: string, events: Event[], filed: Partial<Extract<Event, { kind: 'filed' }>> = {}) =>
     tasks.set(id, [
@@ -353,17 +353,6 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
     ],
   ];
   for (const [name, fn, pattern] of answering) await t.test(`answer refuses ${name}`, () => refuses(b, 't-w', fn, pattern));
-
-  await t.test('answer refuses a budget its harness would not keep: a `claude --bg` session keeps none', async () => {
-    const bg = board({ bg: 'claude-bg' });
-    bg.write('t-bg', signedJournal(), { harness: 'bg' });
-    await refuses(
-      bg,
-      't-bg',
-      () => Effect.runPromise(bg.engine.answer('t-bg', 'go', { config: { budgetUsd: 1 } })),
-      /^`budgetUsd: 1` is a spend cap, and a `claude --bg` session does not keep one/,
-    );
-  });
 
   const cases: Array<[string, Event[], Partial<Extract<Event, { kind: 'filed' }>>, RegExp, RegExp]> = [
     [

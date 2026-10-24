@@ -1,9 +1,7 @@
 /**
  * The face of `harness/claude/`: Claude Code's runners and the words it takes, as the doors take them.
  */
-export { claudeOps } from './bg.ts';
-export { claudeCodeOps, claudeDetached, isClaudeJob } from './code.ts';
-export { claudeSayRefuses } from './inbox.ts';
+export { claudeCodeOps, type ClaudeOptions } from './code.ts';
 export { claudeQuota, QUOTA_COMMAND, quotaOfRefusal, quotaOfUsage, QUOTA_TIMEOUT_MS, usageEnv, usageOptions } from './quota.ts';
 export type { OpenUsage, UsageAsk } from './quota.ts';
 export {
@@ -12,7 +10,6 @@ export {
   CLAUDE_EFFORTS,
   CLAUDE_PERMISSION_MODES,
   bridgeAsked,
-  claudeBgRefuses,
   claudeCodeRefuses,
 } from './vocabulary.ts';
 export type { ClaudeFlags } from './vocabulary.ts';

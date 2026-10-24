@@ -67,7 +67,7 @@ the folder's files read by the harness wherever the agent works. Which layer own
 a new instruction goes*, said once in the shipped *Five layers* passage: ask it rather than guess. Fences only tighten: a step may narrow its agent's fence and
 never widen it — a step's `disallowedTools:` adds to its agent's, and the loader refuses a step's `tools:`, `allowedTools:`,
 `permissionMode:` or `sandbox:` that would
-give the agent what its file does not, and a step's `background: true` over an agent in any mode but `bypassPermissions`. So the
+give the agent what its file does not. So the
 instructions say what holds for the role everywhere, and nothing about one workflow or one workspace.
 
 ## Its closeout
@@ -107,13 +107,10 @@ own `skills:`: the session gets the agent's, then the step's, each once. The age
   -D:*)`, `Bash(git branch --delete --force:*)`, `Bash(pkill:*)`, `Bash(killall:*)`, `mcp__playwright__browser_run_code_unsafe`.
 - **A step only tightens it.** A step that needs a tool, an allow or a mode its agent's file does not give needs another agent; a
   step's `disallowedTools:` adds to its agent's: write only the denies the step adds; it can never take one of the agent's away.
-- **A background session** (`background: true`) also reads the person's user and local settings, where "don't ask again" writes allows:
-  it denies those seven itself, whatever its mode. A step may set it only over an agent in `bypassPermissions`, the one mode no allow rule
-  widens; over any other the loader refuses it.
 
 ## Talking with a person
 
-A step is a job (`claude -p`): it cannot wait inside a conversation. To ask, it signs off `blocked` with its questions; the person
+A step is a job on the Agent SDK: it cannot wait inside a conversation. To ask, it signs off `blocked` with its questions; the person
 answers on the board or with `wf retry <run> <step> --message "…"`, and the same session continues with the answers as its next turn.
 Say so in the body of an agent that interviews, and gate the step whose closeout a person must accept (`gate: true`). A job's last
 turn is its sign-off: an agent that runs long commands (the e2e) is told to run them in the foreground or wait on them, never to sign

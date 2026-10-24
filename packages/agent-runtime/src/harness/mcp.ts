@@ -209,8 +209,8 @@ export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Re
 /**
  * A session's servers (`sessionMcp`), written to `file` as an MCP config (`{"mcpServers": …}`) — or `file` cleared when
  * there is none, so a re-spawn never finds servers it was not given. Owner-only: an `env` or
- * `headers` value may be a secret. For the paths that hand Claude Code a `--mcp-config` file of their own — a job,
- * `claude --bg`, `claude-detached`; an attached session hands the servers over as a value (`everyMcpServer`), which the SDK
+ * `headers` value may be a secret. For a harness handed a config file of its own (`HarnessSpec`, a `.mcp.json`'s shape); a Claude
+ * Code session, a job's and a held one's alike, hands the servers over as a value (`everyMcpServer`), which the SDK
  * spells onto the child's argv, so the owner-only file is no part of that path and this warning is not its cover. Returns
  * the file's absolute path, as `projectMcpConfig` does: a `file` given relative is relative to the engine, not to the
  * session's cwd.
@@ -223,21 +223,6 @@ export const writeMcpConfig = (file: string, mcp: Record<string, unknown> | unde
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, JSON.stringify({ mcpServers: mcp }), { mode: 0o600 });
   return path.resolve(file);
-};
-
-/**
- * Claude Code's MCP flags: the configs given, then `--strict-mcp-config` and `--no-chrome`, always.
- *
- * Strict loads those configs and nothing else — but not every server comes from a config. Claude in
- * Chrome, which drives the operator's own browser and whatever they are signed in to there, is
- * switched on by a user setting (`claudeInChromeDefaultEnabled`), and it connects even in a `--bg`
- * session spawned strict. So it is switched off by its own flag; a step that needs a
- * browser names one in `mcp` or its checkout's `.mcp.json`. Strict comes straight after the configs
- * because `--mcp-config` is variadic.
- */
-export const claudeMcpArgs = (configs: ReadonlyArray<string | undefined>): string[] => {
-  const named = configs.filter((c): c is string => c !== undefined);
-  return [...(named.length ? ['--mcp-config', ...named] : []), '--strict-mcp-config', '--no-chrome'];
 };
 
 /**

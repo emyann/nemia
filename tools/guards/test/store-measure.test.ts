@@ -13,7 +13,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
-import { argsOf, MEASURES, type StoreMeasure } from '../../store-measure/report.ts';
+import { argsOf, invariantRefusals, MEASURES, type StoreMeasure } from '../../store-measure/report.ts';
 import { copyStore, destinationRefusal, gitVerdict, installFence, LEFT_OUT, readOnlyPlace } from '../../store-measure/fence.ts';
 import type { Place } from 'agent-orchestrator';
 
@@ -178,7 +178,7 @@ test('on an empty store the report counts no run and holds every measure, the ma
   const written = JSON.parse(fs.readFileSync(json, 'utf8')) as StoreMeasure;
   assert.equal(written.counts.runs, 0);
   assert.equal(written.counts.tasks, 0);
-  assert.equal(written.counts.invariantRefusals, null, 'not wired until the Run model is');
+  assert.equal(written.counts.invariantRefusals, 0);
   assert.deepEqual(Object.keys(written.measures).sort(), [...MEASURES].sort());
   for (const key of ['cpu', 'cores', 'memoryBytes', 'node']) assert.ok(key in written.machine, key);
   assert.match(written.commit, /^[0-9a-f]{40}$/);
@@ -191,4 +191,12 @@ test('on an empty store the report counts no run and holds every measure, the ma
   assert.equal(written.measures.openRun, null, 'no open run to read');
   assert.deepEqual(written.refusals, []);
   assert.deepEqual(fs.readdirSync(from), [], 'the store itself was not written');
+});
+
+test('the invariant count is the records the Run model refuses, a record that is no JSON left to the unreadable count', async () => {
+  const wf = scratch('store-measure-model-');
+  fs.mkdirSync(path.join(wf, 'runs'));
+  fs.writeFileSync(path.join(wf, 'runs', 'r-shapeless.json'), '{}');
+  fs.writeFileSync(path.join(wf, 'runs', 'r-torn.json'), '{"id": "r-to');
+  assert.equal(await invariantRefusals(wf), 1);
 });

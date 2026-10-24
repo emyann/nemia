@@ -70,13 +70,13 @@ test('erDiagram draws each rule of the contract', async (t) => {
   await t.test('a count is an attribute by its name, never a key', () => has('    AttemptNumber n'));
   await t.test('an id of another entity is an FK and a relation to that entity', () => {
     has('    TaskId task FK');
-    has('  Attempt }o--|| Task : task');
+    has('  Task ||--o{ Attempt : task');
     has('    TaskId resumes FK "optional"');
-    has('  Attempt }o--|| Task : resumes');
+    has('  Task ||--o{ Attempt : resumes');
   });
   await t.test('a foreign id is an FK and a relation to a node named by the id, with no block of its own', () => {
     has('    RunId run FK');
-    has('  Task }o--|| RunId : run');
+    has('  RunId ||--o{ Task : run');
     assert.ok(!lines.includes('  RunId {'));
   });
   await t.test('an entity held once is a relation and no attribute; held optionally, zero or one', () => {
@@ -97,15 +97,15 @@ test('erDiagram draws each rule of the contract', async (t) => {
     const firstRelation = lines.findIndex((l) => relations.includes(l));
     assert.ok(lines.slice(firstRelation).every((l) => relations.includes(l)));
     assert.deepEqual(relations, [
-      '  Task }o--|| RunId : run',
+      '  RunId ||--o{ Task : run',
       '  Task ||--o{ Attempt : attempts',
       '  Task ||--o{ Attempt : byTurn',
       '  Task ||--|| Session : session',
       '  Task ||--o| Mount : mount',
       '  Task ||--|| Session : either',
       '  Task ||--|| Mount : either',
-      '  Attempt }o--|| Task : task',
-      '  Attempt }o--|| Task : resumes',
+      '  Task ||--o{ Attempt : task',
+      '  Task ||--o{ Attempt : resumes',
     ]);
   });
 });

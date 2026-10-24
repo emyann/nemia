@@ -9,7 +9,7 @@ import type { ErModel } from '../model/er.model.ts';
 import { RunId, StepName, TaskId, TryNumber } from '../record/record.model.ts';
 import { DAEMON_STARTED } from './reason.ts';
 import { LEVELS } from '../level/level.ts';
-import { subscriptionNameRefusal } from '../subscription/subscription.ts';
+import { subscriptionNameRefusal } from '../subscription/index.ts';
 
 /** A byte offset of complete lines of the feed, 0 or one a read handed out: where a read, or a subscription's news, starts. */
 export const FeedCursor = brandedCount('FeedCursor', 0);

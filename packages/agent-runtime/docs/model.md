@@ -105,12 +105,12 @@ erDiagram
   ExecutionPlace {
     host place
   }
-  Task }o--|| Session : resumeFrom
+  Session ||--o{ Task : resumeFrom
   Task ||--o| HarnessArgs : config
   Task ||--o{ Attempt : attempts
-  Attempt }o--|| Session : nativeId
-  Attempt }o--|| Session : resumeFrom
-  JournalEntry }o--|| Task : taskId
+  Session ||--o{ Attempt : nativeId
+  Session ||--o{ Attempt : resumeFrom
+  Task ||--o{ JournalEntry : taskId
   HarnessArgs ||--o{ Mount : mounts
 ```
 <!-- diagram:runtime-model:end -->

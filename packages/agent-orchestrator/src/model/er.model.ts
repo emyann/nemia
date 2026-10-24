@@ -17,7 +17,7 @@ export interface ErModel {
 }
 
 /** What one field draws: its attribute, when it has one, and the relations it holds. */
-type Drawn = { attribute?: { type: string; key?: 'PK' | 'FK' }; relations: Array<{ card: string; to: string }> };
+type Drawn = { attribute?: { type: string; key?: 'PK' | 'FK' }; relations: Array<{ from?: string; card: string; to: string }> };
 
 /** The entity `ids` names `key` the id of, or `undefined`: a key it does not hold, a prototype's (`toString`) included, is none. */
 const ownerOf = (ids: ErModel['ids'], key: string): string | undefined => (Object.hasOwn(ids, key) ? ids[key] : undefined);
@@ -71,7 +71,7 @@ const drawField = (model: ErModel, holder: string, ast: SchemaAST.AST, optional:
   if (named !== undefined && (ownerOf(model.ids, named) !== undefined || SchemaAST.isString(one))) {
     const owner = ownerOf(model.ids, named);
     if (owner === holder) return { attribute: { type: named, key: 'PK' }, relations: [] };
-    return { attribute: { type: named, key: 'FK' }, relations: [{ card: '}o--||', to: owner ?? named }] };
+    return { attribute: { type: named, key: 'FK' }, relations: [{ from: owner ?? named, card: '||--o{', to: holder }] };
   }
   const many = heldMany(one);
   if (many.length > 0) return { relations: many.map((to) => ({ card: '||--o{', to })) };
@@ -94,7 +94,7 @@ const drawEntity = (model: ErModel, entity: Schema.Top): { block: string[]; rela
       const key = drawn.attribute.key ? ` ${drawn.attribute.key}` : '';
       block.push(`    ${drawn.attribute.type} ${String(field.name)}${key}${optional ? ' "optional"' : ''}`);
     }
-    for (const r of drawn.relations) relations.push(`  ${name} ${r.card} ${r.to} : ${String(field.name)}`);
+    for (const r of drawn.relations) relations.push(`  ${r.from ?? name} ${r.card} ${r.to} : ${String(field.name)}`);
   }
   block.push('  }');
   return { block, relations };
@@ -103,8 +103,8 @@ const drawEntity = (model: ErModel, entity: Schema.Top): { block: string[]; rela
 /**
  * The model's `erDiagram`: a block per entity, in the order given, then every relation, in entity then field order; two-space
  * indents, joined by `\n`, no trailing newline. A field holding an entity draws a relation and no attribute (one, zero or one, or
- * many under an array or a record); one holding an id is the entity's PK, or an FK with a relation to the entity the id names, or
- * to a node named by the id itself when it is another layer's.
+ * many under an array or a record); one holding an id is the entity's PK, or an FK, drawn from the entity the id names, or from
+ * a node named by the id itself when it is another layer's, to the holder (`Owner ||--o{ Holder`: beautiful-mermaid reads no `}o`).
  */
 export const erDiagram = (model: ErModel): string => {
   const drawn = model.entities.map((entity) => drawEntity(model, entity));

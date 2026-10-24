@@ -82,12 +82,127 @@ erDiagram
     string refusedOn "optional"
     string untouched "optional"
   }
+  Inbox {
+    object tries
+  }
+  Card {
+    CardName name PK
+    string file
+    string workflow "optional"
+    string repo "optional"
+    string queued "optional"
+    StepName gate FK "optional"
+    FactoryName factory FK "optional"
+    list from "optional"
+    string body
+  }
+  Factory {
+    FactoryName name PK
+    list repos
+    list workflows
+    object hires
+    object schedules
+    unknown instruction "optional"
+    object template "optional"
+    string tree "optional"
+  }
+  Hire {
+    FactoryName factory FK
+    WorkflowName workflow FK
+    StepName step FK
+    AgentName agent FK
+  }
+  Agent {
+    AgentName name PK
+    string role "optional"
+    string description "optional"
+    list skills "optional"
+    enum harnessPrompt "optional"
+    list mcp "optional"
+    object keys
+    string body
+    string customInstructions "optional"
+  }
+  StepAgent {
+    WorkflowName workflow FK
+    StepName step FK
+    AgentName agent FK
+  }
+  Subscription {
+    SubscriptionName name PK
+    TaskId task FK
+    list selectors
+    number digestEvery
+    FeedCursor from
+    object scope "optional"
+  }
+  RunLine {
+    string at
+    RunId run FK
+    StepName step FK "optional"
+    string word
+    string note "optional"
+    string apiVersion "optional"
+    object involved "optional"
+    object labels "optional"
+    string reason "optional"
+    string type "optional"
+    string waits "optional"
+    string source "optional"
+    string message "optional"
+    string call "optional"
+    TryNumber try FK "optional"
+  }
+  DaemonLine {
+    string at
+    number daemon
+    enum word
+    string note "optional"
+    string apiVersion "optional"
+    object involved "optional"
+    object labels "optional"
+    string reason "optional"
+    string type "optional"
+    string waits "optional"
+    string source "optional"
+    string message "optional"
+    string call "optional"
+  }
+  StoreLine {
+    string at
+    string store
+    string word
+    string note "optional"
+    string apiVersion "optional"
+    object involved "optional"
+    object labels "optional"
+    string reason "optional"
+    string type "optional"
+    string waits "optional"
+    string source "optional"
+    string message "optional"
+    string call "optional"
+  }
   Run ||--o{ Step : steps
-  Step }o--|| TaskId : taskId
+  TaskId ||--o{ Step : taskId
   Step ||--o{ Try : tries
-  Step }o--|| TaskId : handedOff
+  TaskId ||--o{ Step : handedOff
   Step ||--o| Landing : landed
-  Try }o--|| TaskId : taskId
-  Round }o--|| Step : step
+  TaskId ||--o{ Try : taskId
+  Step ||--o{ Round : step
+  Inbox ||--o{ Card : cards
+  Step ||--o{ Card : gate
+  Factory ||--o{ Card : factory
+  Factory ||--o{ Hire : factory
+  Workflow ||--o{ Hire : workflow
+  Step ||--o{ Hire : step
+  Agent ||--o{ Hire : agent
+  Workflow ||--o{ StepAgent : workflow
+  Step ||--o{ StepAgent : step
+  Agent ||--o{ StepAgent : agent
+  TaskId ||--o{ Subscription : task
+  Run ||--o{ RunLine : run
+  Step ||--o{ RunLine : step
+  Try ||--o{ RunLine : try
 ```
 <!-- diagram:orchestrator-model:end -->

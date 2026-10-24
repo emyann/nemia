@@ -93,5 +93,5 @@ test('the diagram names every entity, and the place a session runs as the host',
   }
   assert.ok(lines.includes('    host place'));
   assert.ok(lines.includes('  Task ||--o{ Attempt : attempts'));
-  assert.ok(lines.includes('  JournalEntry }o--|| Task : taskId'));
+  assert.ok(lines.includes('  Task ||--o{ JournalEntry : taskId'));
 });

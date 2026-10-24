@@ -10,5 +10,5 @@ test("the orchestrator's diagram draws every context's entities, and the runtime
   const heads = lines.filter((l) => /^ {2}\w+ \{$/.test(l)).map((l) => l.trim().split(' ')[0]);
   for (const entity of ['Run', 'Step', 'Try', 'Round', 'Landing']) assert.ok(heads.includes(entity), `${entity} has a block`);
   assert.ok(!heads.includes('TaskId'), 'TaskId has no block: it is the runtime’s');
-  assert.ok(lines.includes('  Try }o--|| TaskId : taskId'), lines.join('\n'));
+  assert.ok(lines.includes('  TaskId ||--o{ Try : taskId'), lines.join('\n'));
 });

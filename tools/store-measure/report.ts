@@ -23,8 +23,7 @@
  *   came, then let go.
  *
  * Beside the numbers: the runs, finished and open, the runtime's tasks and their journals' bytes, the runs whose tasks did not read
- * and the pass's unreadable lines, and `invariantRefusals`, the records the Run model refuses (`invariantRefusals`, null until it is
- * wired). A markdown table on stdout; with `--json`, the report as JSON with the machine, the commit and the date; with `--compare`,
+ * and the pass's unreadable lines, and `invariantRefusals`, the records the Run model refuses (`invariantRefusals`). A markdown table on stdout; with `--json`, the report as JSON with the machine, the commit and the date; with `--compare`,
  * each number beside the baseline's and their ratio. It refuses itself, exit 1 and no JSON, where the fence refused anything; exit 2 for
  * a call it cannot run. The copy is removed at the end. No threshold is fixed: the numbers are the owner's to judge.
  */
@@ -78,8 +77,8 @@ export type StoreMeasure = {
     feedLines: number;
     /** Runs the list answered off their record because a task's journal did not read, and the lines the pass said were unreadable. */
     unreadable: { runs: number; passLines: number };
-    /** The records the Run model refuses; null until it is wired (`invariantRefusals`). */
-    invariantRefusals: number | null;
+    /** The records the Run model refuses (`invariantRefusals`). */
+    invariantRefusals: number;
   };
   asked: { finishedRun: string | null; openRun: string | null; feedCursor: number; feedLinesRead: number };
   measures: Record<MeasureKey, Measured | null>;
@@ -146,12 +145,25 @@ async function timed(read: () => Promise<unknown>): Promise<Timed> {
 const medianOf = (calls: readonly Timed[]): Timed => ({ ms: median(calls.map((c) => c.ms)), heapMb: median(calls.map((c) => c.heapMb)) });
 
 /**
- * The records the Run model refuses, among the runs of the copy at `wf`: null until it is wired. Wire it to the `Run` schema of
- * `packages/agent-orchestrator/src/record/record.model.ts` once that file holds it: decode each `runs/<id>.json` under `wf` with the
- * schema (`Schema.decodeUnknownExit(Run)`) and count the failures, the schema reached through an entry of the package's.
+ * The records the Run model refuses, among the runs of the copy at `wf`: each `runs/<id>.json` decoded with run-core's `Run`
+ * (`packages/agent-orchestrator/src/record/record.model.ts`, its invariants included), a record that is no JSON left to the
+ * unreadable count. The model is imported by its path: no entry of the package reaches a model file (its `test/boundary.test.ts`).
  */
-export function invariantRefusals(_wf: string): number | null {
-  return null;
+export async function invariantRefusals(wf: string): Promise<number> {
+  const { Exit, Schema } = await import('effect');
+  const { Run } = await import('../../packages/agent-orchestrator/src/record/record.model.ts');
+  const decode = Schema.decodeUnknownExit(Run);
+  let refused = 0;
+  for (const name of filesOf(path.join(wf, 'runs'), '.json')) {
+    let record: unknown;
+    try {
+      record = JSON.parse(fs.readFileSync(path.join(wf, 'runs', name), 'utf8'));
+    } catch {
+      continue;
+    }
+    if (Exit.isFailure(decode(record))) refused += 1;
+  }
+  return refused;
 }
 
 /** The files of `dir` whose name ends with `suffix`, none where it is not there. */
@@ -356,7 +368,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
       journalBytes: tasks.reduce((sum, name) => sum + fs.statSync(path.join(wf, 'engine', 'tasks', name)).size, 0),
       feedLines: feed.lines,
       unreadable: { runs: listing.filter((r) => r.unreadable !== null).length, passLines: pass?.unreadable?.length ?? 0 },
-      invariantRefusals: invariantRefusals(wf),
+      invariantRefusals: await invariantRefusals(wf),
     },
     asked: { finishedRun, openRun, feedCursor: feed.cursor, feedLinesRead: feed.read },
     measures,
@@ -409,7 +421,7 @@ export function rendered(report: StoreMeasure): string {
   };
   return [
     `store measure of ${report.from} (${report.engine}), copied: ${report.copy.files} files, ${mb(report.copy.bytes)} MB in ${(report.copy.ms / 1000).toFixed(0)} s, without ${report.copy.leftOut.join(', ') || 'nothing'}`,
-    `${counts.runs} runs (${counts.finishedRuns} finished, ${counts.openRuns} open), ${counts.tasks} tasks, ${mb(counts.journalBytes)} MB of journals, ${counts.feedLines} feed lines; unreadable: ${counts.unreadable.runs} runs, ${counts.unreadable.passLines} pass lines; invariant refusals: ${counts.invariantRefusals ?? 'not counted yet'}`,
+    `${counts.runs} runs (${counts.finishedRuns} finished, ${counts.openRuns} open), ${counts.tasks} tasks, ${mb(counts.journalBytes)} MB of journals, ${counts.feedLines} feed lines; unreadable: ${counts.unreadable.runs} runs, ${counts.unreadable.passLines} pass lines; invariant refusals: ${counts.invariantRefusals}`,
     `${report.machine.cpu}, ${report.machine.cores} cores, ${mb(report.machine.memoryBytes)} MB, node ${report.machine.node}; commit ${report.commit.slice(0, 12)}; ${report.date}; median of ${report.repeat}`,
     `runs read: finished ${report.asked.finishedRun ?? '—'}, open ${report.asked.openRun ?? '—'}; feed from byte ${report.asked.feedCursor}, ${report.asked.feedLinesRead} lines`,
     '',

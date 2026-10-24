@@ -215,7 +215,10 @@ function pauseAskRefusal(c: Judged): string | undefined {
   return `try ${next} of ${name} is asked by nemia pause --now (at ${pending.at}), which stopped its ${ran}: it is tried once the store is resumed (nemia resume), or set aside if it ended on its own first. Wait for it: nemia ls ${run.id}.`;
 }
 
-/** An ask already waiting: for this try — one no tick honours, or one it will — or a send-back or a try to land again that takes the same try. */
+/**
+ * An ask already waiting: for this try — one no tick honours, or one it will — or a send-back or a try to land again that takes the same
+ * try.
+ */
 function pendingRefusal(c: Judged): string | undefined {
   const paused = pauseAskRefusal(c);
   if (paused !== undefined) return paused;

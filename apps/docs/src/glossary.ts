@@ -22,7 +22,7 @@ export type Table = { context: string; title: string; about: string; paths: stri
  * What is wrong with the tables or the fence: a table the fence omits, an id of the fence no table has, a term's type no file of its
  * workspace exports. `says` is the fault in words, with its fix.
  */
-export type Fault = { kind: 'omitted' | 'no-table' | 'no-export'; context: string; type?: string; says: string };
+export type Fault = { kind: 'omitted' | 'no-table' | 'twice' | 'no-export'; context: string; type?: string; says: string };
 
 /** Folders no table or source lives in: installed packages, build output and caches. */
 const SKIPPED = new Set(['node_modules', 'dist', 'coverage']);
@@ -61,7 +61,10 @@ export const idsOf = (fence: string): string[] =>
     .map((line) => line.trim())
     .filter(Boolean);
 
-/** A table the fence omits and an id of the fence no table has, each a fault naming the fix. */
+/**
+ * A table the fence omits, an id of the fence no table has, and an id two tables give, of which the page would draw the first alone:
+ * each a fault naming the fix.
+ */
 export const fenceFaults = (tables: Table[], order: string[]): Fault[] => [
   ...tables
     .filter((t) => !order.includes(t.context))
@@ -76,6 +79,14 @@ export const fenceFaults = (tables: Table[], order: string[]): Fault[] => [
       kind: 'no-table',
       context: id,
       says: `the glossary fence lists ${id}, which no glossary.json names as its context: take it off the fence, or give that context its table`,
+    })),
+  ...[...new Set(tables.map((t) => t.context))]
+    .map((id) => tables.filter((t) => t.context === id))
+    .filter((same) => same.length > 1)
+    .map((same): Fault => ({
+      kind: 'twice',
+      context: same[0].context,
+      says: `${same.map((t) => t.file).join(' and ')} each give the context ${same[0].context}: give each table the id of its own context`,
     })),
 ];
 

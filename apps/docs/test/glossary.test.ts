@@ -119,6 +119,11 @@ test('REFUSED: an id of the fence that no table has', () => {
   assert.deepEqual(facts(fenceFaults(tablesIn(root), ['runtime', 'planning', 'nowhere'])), [{ kind: 'no-table', context: 'nowhere' }]);
 });
 
+test('REFUSED: two tables that give one context id, of which the page would draw only the first', () => {
+  const root = repoWith({ ...FIXTURE, 'packages/orch/src/plan/glossary.json': table('planning', 'packages/orch/src/plan', []) });
+  assert.deepEqual(facts(fenceFaults(tablesIn(root), ['runtime', 'planning'])), [{ kind: 'twice', context: 'planning' }]);
+});
+
 test('REFUSED: a type no source of the table’s workspace exports', () => {
   const root = repoWith({
     ...FIXTURE,

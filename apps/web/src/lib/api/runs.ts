@@ -92,7 +92,7 @@ export type RunSummary = {
   reason: RunReason;
   /**
    * Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file — the roots of a
-   * run waiting on runs that may still ship among them, and not those of one waiting on a run that never ships without a person.
+   * run waiting on runs that may still land among them, and not those of one waiting on a run that never lands without a person.
    */
   moving: boolean;
   /** What the run has cost so far, every step's tries together, as the CLI's `ls` adds it up (`Spent`); null until a cost was measured. */
@@ -358,15 +358,15 @@ export const finishedRunsQuery = (factory: string | undefined, page: number) =>
 
 /**
  * What a run started now with this one as context would be handed of it, as the CLI's `concluded` prints it: the run, whether it has
- * shipped, and its section, in the words the run's steps would read.
+ * landed, and its section, in the words the run's steps would read.
  */
-export type Concluded = { run: string; shipped: boolean; section: string };
+export type Concluded = { run: string; landed: boolean; section: string };
 
 /** Decodes a `Concluded`. */
 const ConcludedSchema = decodes<Concluded>()(
   Schema.Struct({
     run: Schema.String,
-    shipped: Schema.Boolean,
+    landed: Schema.Boolean,
     section: Schema.String,
   }),
 );

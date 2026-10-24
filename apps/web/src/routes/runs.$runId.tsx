@@ -432,7 +432,7 @@ function startedRow(run: RunDetail): ReactNode {
 /**
  * What a run started `--after` runs still waits on, as the CLI's `decide` says it for such a run and offers nothing else: the CLI `ls`'s
  * word, what it leaves a person to do, and each run it names, linked to its page where the store has it. In the yours container when one
- * never ships without a person, at rest otherwise.
+ * never lands without a person, at rest otherwise.
  */
 function WaitingOnRuns({ run }: { run: RunDetail }) {
   const { waiting } = run;

@@ -235,7 +235,7 @@ test("decidableRun, decisionStamp: when a run's decision is asked for and read a
     () => {
       const holding = (word: string) => ({ at: '2026-09-23T07:00:00.000Z', runs: [], word, advice: '', onYou: false });
       const unheld = decisionStamp(fanOut('running (working)'));
-      const held = decisionStamp({ ...fanOut('running (working)'), holding: holding('held until a-1 ships') });
+      const held = decisionStamp({ ...fanOut('running (working)'), holding: holding('held until a-1 lands') });
       assert.notEqual(held, unheld, 'a hold written');
       assert.equal(
         decisionStamp({ ...fanOut('running (working)'), holding: null }),
@@ -245,10 +245,10 @@ test("decidableRun, decisionStamp: when a run's decision is asked for and read a
       assert.notEqual(
         decisionStamp({
           ...fanOut('running (working)'),
-          holding: holding('held until a-1 ships — it has shipped, and the next tick lifts the hold'),
+          holding: holding('held until a-1 lands — it has landed, and the next tick lifts the hold'),
         }),
         held,
-        'its run shipped',
+        'its run landed',
       );
     },
   );

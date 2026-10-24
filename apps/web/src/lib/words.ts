@@ -167,7 +167,7 @@ export function verdictWords({ result, exit }: CheckVerdict): string {
 
 /**
  * The words of the waits a run has of its own, which no step's state says: a hold only a person lifts, a run it waits on that never
- * ships without a person, and a check that did not finish, which refused nothing.
+ * lands without a person, and a check that did not finish, which refused nothing.
  */
 export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
   hold: { tag: () => 'held by you', sentence: () => 'You hold this run. It moves once you lift the hold.', open: opens },

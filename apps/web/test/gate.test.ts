@@ -142,7 +142,7 @@ test("gateOfSummary, readLink: the card's gate, what it approves and sends back,
   await t.test(
     'REFUSED: a run a person holds has no gate on its card, whether a to-decide or a step waiting at its gate names it — the package refuses the approval',
     () => {
-      const holding = { at: '2026-09-23T07:00:00.000Z', runs: [], word: 'held until a-1 ships', advice: 'wf hold r --off', onYou: false };
+      const holding = { at: '2026-09-23T07:00:00.000Z', runs: [], word: 'held until a-1 lands', advice: 'wf hold r --off', onYou: false };
       const steps = [step('plan', { approve: 'approve plan' })] as unknown as RunSummary['steps'];
       assert.notEqual(gateOfSummary(summary({ toDecide: ENDING_DECIDE })), null);
       assert.equal(gateOfSummary({ ...summary({ toDecide: ENDING_DECIDE }), holding }), null);

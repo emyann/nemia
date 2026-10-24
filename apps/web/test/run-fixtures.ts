@@ -315,8 +315,8 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
   heldUntil: ['r-0'],
   holding: {
     at: '2026-09-30T05:00:00.000Z',
-    runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], shipped: false }],
-    word: 'held until r-0 ships',
+    runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],
+    word: 'held until r-0 lands',
     advice: 'wf hold r-1 --off',
     onYou: true,
   },
@@ -393,7 +393,7 @@ export const decidable = (extra: Partial<Decidable> = {}): Decidable => ({
   total: used(),
   cost: '$1.25',
   overBudget: null,
-  commands: [{ label: 'ship it', command: 'git merge wf/r-1/b', said: null, step: null }],
+  commands: [{ label: 'land it', command: 'git merge wf/r-1/b', said: null, step: null }],
   awaiting: { branches: ['wf/r-1/b'], direct: false },
   collisions: {
     onto: 'main',

@@ -45,7 +45,7 @@ import {
   QUEUED_IN,
   unfactoredWhy,
   SESSION,
-  SHIPPED,
+  LANDED,
   UNMERGED,
 } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
@@ -79,22 +79,22 @@ async function tookOnTheCard(page: Page): Promise<void> {
  * its sides.
  */
 async function expectDiamond(page: Page, when: string): Promise<void> {
-  const { top, shipped, running, bottom } = DIAMOND;
+  const { top, landed, running, bottom } = DIAMOND;
   await settled(page);
   await expectLeftOf(
     cardOf(page, top.id),
-    cardsOf(page, shipped.id, running.id),
+    cardsOf(page, landed.id, running.id),
     `${when}: the top is left of both sides, which wait on it`,
   );
   await expectLeftOf(
-    cardsOf(page, shipped.id, running.id),
+    cardsOf(page, landed.id, running.id),
     cardOf(page, bottom.id),
     `${when}: both sides are left of the bottom, which waits on them`,
   );
-  await expectApart(cardOf(page, shipped.id), cardOf(page, running.id), `${when}: the two sides are laid out apart`);
+  await expectApart(cardOf(page, landed.id), cardOf(page, running.id), `${when}: the two sides are laid out apart`);
   await expectBetween(
     cardsOf(page, top.id, bottom.id),
-    cardOf(page, shipped.id),
+    cardOf(page, landed.id),
     cardOf(page, running.id),
     `${when}: the top and the bottom are level with the middle of the two sides`,
   );
@@ -210,14 +210,14 @@ export default {
     await settled(page);
     await expectClearOfPanels(page, 'on first load');
 
-    const { top, shipped, running, bottom, cancelled, orphan } = DIAMOND;
+    const { top, landed, running, bottom, cancelled, orphan } = DIAMOND;
     for (const run of [running, bottom])
       await expectVisible(cardOf(page, run.id), `the diamond's card ${run.id} is on the floor by default`);
-    for (const run of [top, shipped])
+    for (const run of [top, landed])
       await expectCount(
         cardOf(page, run.id),
         0,
-        `${run.id}, shipped, is not on the floor by default: nothing still waits on it — ${running.id} has started, and ${bottom.id} waits on ${running.id} alone`,
+        `${run.id}, landed, is not on the floor by default: nothing still waits on it — ${running.id} has started, and ${bottom.id} waits on ${running.id} alone`,
       );
     await expectCount(cardOf(page, cancelled.id), 0, `${cancelled.id} is not on the floor by default: called off, it waits on nobody`);
     await expectVisible(cardOf(page, orphan.id), `${orphan.id} is on the floor by default: it waits on a run called off, so on a person`);
@@ -235,12 +235,12 @@ export default {
     await expectLeftOf(cardOf(page, running.id), cardOf(page, bottom.id), `${running.id} is left of ${bottom.id}, which waits on it`);
     await expectVisible(
       cardOf(page, bottom.id).locator('[data-waiting="on-runs"]', { hasText: DIAMOND.words.bottom }),
-      `the bottom's card says ${DIAMOND.words.bottom}, in wf ls's words: the side that shipped is waited on no more`,
+      `the bottom's card says ${DIAMOND.words.bottom}, in wf ls's words: the side that landed is waited on no more`,
     );
     await expectCount(
       cardOf(page, bottom.id).getByText('waiting on you', { exact: true }),
       0,
-      'and does not wait on you: the side it waits on may still ship',
+      'and does not wait on you: the side it waits on may still land',
     );
     await expectVisible(
       cardOf(page, bottom.id).locator('ul[aria-label="Steps"] [data-step][data-state="waiting"]'),
@@ -365,16 +365,16 @@ export default {
     await expectVisible(unmerged.locator(`p[title="${UNMERGED.said}"]`), "and wf ls's words, the branch and the command, on hover");
     await expectCount(unmerged.getByText('waiting on you', { exact: true }), 0, 'and it waits on nobody: every step of it finished');
     await expectCount(
-      cardOf(page, SHIPPED.id),
+      cardOf(page, LANDED.id),
       0,
-      `a run whose ending merged it is decided: no card on the floor by default (${SHIPPED.id})`,
+      `a run whose ending merged it is decided: no card on the floor by default (${LANDED.id})`,
     );
     await settled(page);
     await photograph(page, path.join(OUT, `factory-to-decide-${await themeOf(page)}.png`), { fullPage: true });
 
     await showFinished(page);
-    for (const run of [top, shipped]) {
-      await expectVisible(cardOf(page, run.id).getByText(/^took .+$/), `${run.id}, shipped, is drawn finished, and says what it took`);
+    for (const run of [top, landed]) {
+      await expectVisible(cardOf(page, run.id).getByText(/^took .+$/), `${run.id}, landed, is drawn finished, and says what it took`);
     }
     await expectDiamond(page, 'with the finished shown');
     await expectCount(
@@ -382,10 +382,10 @@ export default {
       2,
       `with the finished shown, the live waits alone: into ${bottom.id} from ${running.id}, and into ${orphan.id} from ${cancelled.id}`,
     );
-    await expectVisible(cardOf(page, SHIPPED.id), `the shipped run's card, once finished runs are shown (${SHIPPED.id})`);
-    await expectCount(cardOf(page, SHIPPED.id).locator('[data-to-decide]'), 0, 'and it says nothing to decide');
-    await expectVisible(cardOf(page, SHIPPED.id).locator('[data-pruned]', { hasText: /^pruned$/ }), 'and it says it was pruned');
-    const prunedSaid = await cardOf(page, SHIPPED.id).locator('[data-pruned]').getAttribute('title');
+    await expectVisible(cardOf(page, LANDED.id), `the landed run's card, once finished runs are shown (${LANDED.id})`);
+    await expectCount(cardOf(page, LANDED.id).locator('[data-to-decide]'), 0, 'and it says nothing to decide');
+    await expectVisible(cardOf(page, LANDED.id).locator('[data-pruned]', { hasText: /^pruned$/ }), 'and it says it was pruned');
+    const prunedSaid = await cardOf(page, LANDED.id).locator('[data-pruned]').getAttribute('title');
     if (
       !/^pruned at \S+ — its worktrees were removed \(nemia prune\), and its files were removed at .* \(nemia prune --artifacts\); its branches and record are kept$/.test(
         prunedSaid ?? '',
@@ -395,7 +395,7 @@ export default {
         `the pruned mark says what went and what was kept on hover, as wf ls says it — its title is ${JSON.stringify(prunedSaid)}`,
       );
     }
-    await expectCount(page.locator('[data-pruned]'), 1, 'and no other card says pruned: SHIPPED is the one run pruned');
+    await expectCount(page.locator('[data-pruned]'), 1, 'and no other card says pruned: LANDED is the one run pruned');
     await expectCount(
       cardOf(page, FOLDER.id),
       0,

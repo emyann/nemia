@@ -115,7 +115,7 @@ test('factoryBlocks, blockOf, factoriesShown: the machine split into a block a f
   await t.test(
     'a block counts its runs in flight as the floor does, a held one and one at its gate among them, those waiting on you, and its workflows',
     () => {
-      const holding = { at: 'x', runs: [], word: 'held until r-0 ships', advice: 'wait', onYou: false };
+      const holding = { at: 'x', runs: [], word: 'held until r-0 lands', advice: 'wait', onYou: false };
       const runs = [
         run('working', 'nemia', { status: 'running', moving: true }),
         run('held', 'nemia', { status: 'running', holding }),
@@ -158,7 +158,7 @@ test('factoryBlocks, blockOf, factoriesShown: the machine split into a block a f
   await t.test(
     "REFUSED: a factory's bar off its light answer counts every run, those waiting and those in flight by the api's counts",
     () => {
-      const holding = { at: 'x', runs: [], word: 'held until r-0 ships', advice: 'wait', onYou: false };
+      const holding = { at: 'x', runs: [], word: 'held until r-0 lands', advice: 'wait', onYou: false };
       const working = run('working', 'nemia', { status: 'running', moving: true });
       const held = run('held', 'nemia', { status: 'running', holding });
       const gate = run('gate', 'nemia', { status: 'running', waitingOnYou: ['plan'] });

@@ -20,7 +20,7 @@ export const neverApproved = (pruned: Pruned): string => `not approved, and neve
 /**
  * Why a verb that would file work into a pruned run is refused — or null, for a run nobody pruned. Pure. A retry continues in the step's
  * worktree, a round and an approval file what inherits one, and an acceptance files what waits on a loop: every one of them would start a
- * session in a directory `nemia prune` removed. What is left of the run is its branches, which a person ships by hand, and its record. A
+ * session in a directory `nemia prune` removed. What is left of the run is its branches, which a person lands by hand, and its record. A
  * run whose files alone were pruned, its worktrees gone or never cut, is over all the same, and refused in words that name its files.
  */
 export function prunedRefusal(run: Run, what: string): string | null {
@@ -35,7 +35,7 @@ export function prunedRefusal(run: Run, what: string): string | null {
 
 /**
  * Why a verb that would release work on a held run is refused — or null, for a run nobody holds. Pure. The hold is a person's word that
- * nothing more of the run is filed until other runs ship (`Run.hold`); an approval, a try, a round or an acceptance each file work, or
+ * nothing more of the run is filed until other runs land (`Run.hold`); an approval, a try, a round or an acceptance each file work, or
  * release it, and taking one now would be a second word against the first. The question a step asked stays on its record, and is asked
  * again once the hold lifts; a person who wants to answer it now lifts the hold first, which is the one way the refusal names.
  */
@@ -244,13 +244,13 @@ export function freeTurn(candidates: readonly string[], judged: ReadonlySet<stri
 
 /**
  * What the daemon says of a run it judged and did not free — or null, when the refusal is the rule's own boundary and nothing is to be
- * said. Pure. Said: a place that did not answer (`facts` undefined: the judgement got no further), and a finished run — shipped or
+ * said. Pure. Said: a place that did not answer (`facts` undefined: the judgement got no further), and a finished run — landed or
  * cancelled, nothing holding it, no hand-off owed — whose worktree is what refuses, locked, on no branch or holding changes: a person
  * must see to it. Not said: a run not merged or not over, which is kept on purpose.
  */
 export function freeSaid(facts: PruneFacts | undefined, refusal: string): string | null {
   if (!facts) return refusal;
-  const finished = (facts.decided === 'shipped' || facts.decided === 'cancelled') && !facts.held && !facts.owed.length;
+  const finished = (facts.decided === 'landed' || facts.decided === 'cancelled') && !facts.held && !facts.owed.length;
   return finished ? refusal : null;
 }
 

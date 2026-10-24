@@ -38,7 +38,7 @@ export default {
         dialog.getByRole('button', { name: 'Hold', exact: true }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
-      const sentence = `--until ${until}: ${until} already waits on ${id} to ship (${until} held until ${id}), so each would wait on the other for ever. Hold it without --until ${until}.`;
+      const sentence = `--until ${until}: ${until} already waits on ${id} to land (${until} held until ${id}), so each would wait on the other for ever. Hold it without --until ${until}.`;
       if (answered.status() !== 409 || error !== sentence)
         throw new Refused(`the api refuses the hold in nemia hold's words — it answered ${answered.status()}: ${error}`);
       const said = dialog.locator('[role="alert"][data-hold-refused]');

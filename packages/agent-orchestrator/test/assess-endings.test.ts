@@ -5,7 +5,7 @@
  * `forgetRefusal`, `cancelPlan`, `gateLines`). What an ending is told: `workspace: main` is the repository's own checkout
  * (`workspacePlan`), the run's result is the work the ending acts on (`resultSteps`, `tipBranches`, `handOffDue`), and its brief
  * (`composeBrief`) says where that work is, the check it was judged by, the one place its files go, and the approval that filed it.
- * Whether a run has shipped or is a person's to decide: `decision`, which asks git and stores nothing; an ending's gate read against where
+ * Whether a run has landed or is a person's to decide: `decision`, which asks git and stores nothing; an ending's gate read against where
  * its result branch stands (`assess`, `listing`, `approvalRefusal`, `forgetRefusal`); an ending that lands on its check (`landsOnCheck`,
  * `approvedFirst`, `endingSteps`, `endingStopped`, `ownStatus`); and the checkout one run's ending holds (`heldCheckouts`, `branchWord`).
  * The ending's own functions are `src/ending/ending.test.ts`, and a run walked through it on disk `ship.test.ts`.
@@ -168,7 +168,7 @@ const said = (outcome: Closeout['outcome']): Closeout => ({
 });
 
 /** `implement → ship`, ship an ending with a check: approved first, in the repository's checkout (`landsOnCheck`). */
-const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'main', gate: true, check: 'npm test' };
+const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'main', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed. */
 const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
@@ -636,7 +636,7 @@ test("`workspacePlan` and the run's result: an ending works in the repository's 
   await t.test(
     "`workspace: main` is the repository's own checkout, and the run's result is the work the ending step acts on, not its branch",
     () => {
-      const ending: Workflow = { name: 'ship', after: ['review'], body: 'ship it', workspace: 'main', gate: true };
+      const ending: Workflow = { name: 'ship', after: ['review'], body: 'land it', workspace: 'main', gate: true };
       const dev = [step('implement'), step('review', ['implement']), ending];
       assert.deepEqual(workspacePlan(dev, ending), { kind: 'main' }, 'said by the step, not by the shape');
       assert.deepEqual(workspacePlan(dev, dev[1]), { kind: 'inherit', from: 'implement' }, 'and nothing else changes');
@@ -650,7 +650,7 @@ test("`workspacePlan` and the run's result: an ending works in the repository's 
         ['review'],
         'a folder with no ending step is unchanged',
       );
-      const fanIn: Workflow[] = [step('a'), step('b'), { name: 'ship', after: ['a', 'b'], body: 'ship it', workspace: 'main' }];
+      const fanIn: Workflow[] = [step('a'), step('b'), { name: 'ship', after: ['a', 'b'], body: 'land it', workspace: 'main' }];
       assert.deepEqual(
         resultSteps(fanIn).map((s) => s.name),
         ['a', 'b'],
@@ -885,7 +885,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   );
 });
 
-test("decision: shipped is asked of git and never stored, and a finished run is a person's to decide", async (t) => {
+test("decision: landed is asked of git and never stored, and a finished run is a person's to decide", async (t) => {
   await t.test('a run still going has nothing to decide, and says what it is waiting on', () => {
     const d = decision(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'running' }), nothingShipped);
     assert.equal(d.kind, 'running');
@@ -903,12 +903,12 @@ test("decision: shipped is asked of git and never stored, and a finished run is 
     assert.deepEqual(d.kind === 'awaiting' && d.branches, ['wf/r-1/review']);
   });
 
-  await t.test('shipped is asked of git, not stored on the run', () => {
+  await t.test('landed is asked of git, not stored on the run', () => {
     const d = decision(STEPS, finished(), DONE, (b) => b === 'wf/r-1/review');
-    assert.equal(d.kind, 'shipped');
+    assert.equal(d.kind, 'landed');
   });
 
-  await t.test('a fan-out is not shipped because ONE of its branches landed', () => {
+  await t.test('a fan-out is not landed because ONE of its branches landed', () => {
     const fan = [step('implement'), step('docs', ['implement']), step('tests', ['implement'])];
     const r = run(
       { implement: 't1', docs: 't2', tests: 't3' },
@@ -922,7 +922,7 @@ test("decision: shipped is asked of git and never stored, and a finished run is 
     );
     const all = phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' });
     assert.equal(decision(fan, r, all, (b) => b === 'wf/r-1/docs').kind, 'awaiting');
-    assert.equal(decision(fan, r, all, () => true).kind, 'shipped');
+    assert.equal(decision(fan, r, all, () => true).kind, 'landed');
   });
 
   await t.test('a FAILED run is still decided, and names the step that failed', () => {
@@ -946,7 +946,7 @@ test("decision: shipped is asked of git and never stored, and a finished run is 
     assert.equal(
       failed.kind,
       'awaiting',
-      'with --no-worktree every step works on main, and git merge-base --is-ancestor main main is true: asked, git would call a failed run shipped',
+      'with --no-worktree every step works on main, and git merge-base --is-ancestor main main is true: asked, git would call a failed run landed',
     );
     assert.equal(failed.kind === 'awaiting' && failed.outcome, 'failed', 'classified as for any run');
     assert.equal(failed.kind === 'awaiting' && failed.direct, true);
@@ -955,16 +955,16 @@ test("decision: shipped is asked of git and never stored, and a finished run is 
     assert.equal(done.kind, 'awaiting', 'nothing to merge is not the same as merged');
 
     const isolated = decision(STEPS, finished(), DONE, everythingShipped);
-    assert.equal(isolated.kind, 'shipped', 'a worktree run is still asked of git');
+    assert.equal(isolated.kind, 'landed', 'a worktree run is still asked of git');
   });
 
-  await t.test('a run that never filed anything has no branch to ship, and is not "shipped"', () => {
+  await t.test('a run that never filed anything has no branch to land, and is not "landed"', () => {
     const d = decision(STEPS, run({ implement: null, review: null }), phases({}), () => true);
     assert.equal(d.kind, 'running');
   });
 
   await t.test(
-    'REFUSED: a result branch with nothing past the base is shipped only when every step succeeded — failed, blocked, unsigned or refused by its check, the run is decided; work past the base on the base branch is shipped whatever the steps said',
+    'REFUSED: a result branch with nothing past the base is landed only when every step succeeded — failed, blocked, unsigned or refused by its check, the run is decided; work past the base on the base branch is landed whatever the steps said',
     () => {
       const unchanged = () => 'unchanged' as const;
       const says = (outcome: Closeout['outcome']) => (): Closeout => ({ outcome, summary: 's', artifacts: [] });
@@ -1019,17 +1019,17 @@ test("decision: shipped is asked of git and never stored, and a finished run is 
 
       assert.deepEqual(
         decision(STEPS, finished(), DONE, unchanged),
-        { kind: 'shipped', branches: ['wf/r-1/review'] },
-        'every step succeeded, with nothing to commit: shipped',
+        { kind: 'landed', branches: ['wf/r-1/review'] },
+        'every step succeeded, with nothing to commit: landed',
       );
       assert.deepEqual(
         decision(STEPS, finished(), DONE, unchanged, says('done'), () => true),
-        { kind: 'shipped', branches: ['wf/r-1/review'] },
+        { kind: 'landed', branches: ['wf/r-1/review'] },
       );
       assert.deepEqual(
         decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), () => true),
-        { kind: 'shipped', branches: ['wf/r-1/review'] },
-        'work past the base, merged by a person: shipped though a step failed',
+        { kind: 'landed', branches: ['wf/r-1/review'] },
+        'work past the base, merged by a person: landed though a step failed',
       );
 
       const fan = [step('implement'), step('docs', ['implement']), step('tests', ['implement'])];
@@ -1048,10 +1048,10 @@ test("decision: shipped is asked of git and never stored, and a finished run is 
       assert.deepEqual(
         failing.kind === 'awaiting' && [failing.outcome, failing.failed],
         ['failed', ['tests']],
-        'a fan-out ships on its work only when every branch has some on the base; one that never moved leaves a failed run decided',
+        'a fan-out lands on its work only when every branch has some on the base; one that never moved leaves a failed run decided',
       );
-      assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), half).kind, 'shipped');
-      assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), () => true).kind, 'shipped');
+      assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), half).kind, 'landed');
+      assert.equal(decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), () => true).kind, 'landed');
 
       const asked: string[] = [];
       decision(fan, r, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'failed' }), (b) => {
@@ -1065,7 +1065,7 @@ test("decision: shipped is asked of git and never stored, and a finished run is 
 
 test("an ending's gate and git's word: what is to decide, read off where the result branch stands", async (t) => {
   await t.test(
-    "a run at its ending step's gate is not shipped while its result is off the base, and nothing that waits on it starts — but one whose result a person merged by hand has, as git says, and any other gate holds whatever git says",
+    "a run at its ending step's gate is not landed while its result is off the base, and nothing that waits on it starts — but one whose result a person merged by hand has, as git says, and any other gate holds whatever git says",
     () => {
       const merged = () => true as const;
       const ahead = () => false as const;
@@ -1081,14 +1081,14 @@ test("an ending's gate and git's word: what is to decide, read off where the res
 
       const byHand = decision(ENDS, atEnd(), DONE, merged, signedDone, asked);
       assert.deepEqual(
-        [byHand.kind, byHand.kind === 'shipped' ? byHand.branches : []],
-        ['shipped', ['wf/r-1/implement']],
-        'merged by hand before the ending ran: the gate held the merge and nothing else, and git has it: shipped, so a run --after it starts',
+        [byHand.kind, byHand.kind === 'landed' ? byHand.branches : []],
+        ['landed', ['wf/r-1/implement']],
+        'merged by hand before the ending ran: the gate held the merge and nothing else, and git has it: landed, so a run --after it starts',
       );
       assert.equal(
         decision(ENDS, atEnd(), DONE, () => 'unchanged' as const, signedDone, asked).kind,
-        'shipped',
-        "the work committed nothing past the run's base: on the base as the no-ending kind reads it, shipped once every step finished",
+        'landed',
+        "the work committed nothing past the run's base: on the base as the no-ending kind reads it, landed once every step finished",
       );
 
       const accepted: Workflow[] = [step('implement'), { ...step('review', ['implement']), gate: true }];
@@ -1108,11 +1108,11 @@ test("an ending's gate and git's word: what is to decide, read off where the res
         "any other gate is a person's word git cannot give: a gated step that has run and signed off, its branch merged, is still awaiting it",
       );
       const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
-      const shipped = decision(ENDS, ran, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), merged, signedDone, asked);
+      const landed = decision(ENDS, ran, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'succeeded' }), merged, signedDone, asked);
       assert.deepEqual(
-        [shipped.kind, shipped.kind === 'shipped' ? shipped.branches : []],
-        ['shipped', ['wf/r-1/implement']],
-        'approved, filed and done, it ships as any run does: on the branch the ending step merged, never on main',
+        [landed.kind, landed.kind === 'landed' ? landed.branches : []],
+        ['landed', ['wf/r-1/implement']],
+        'approved, filed and done, it lands as any run does: on the branch the ending step merged, never on main',
       );
     },
   );
@@ -1154,7 +1154,7 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       assert.deepEqual([l.toDecide, l.waitingOnYou], [undefined, []]);
       assert.equal(
         l.steps[2].note,
-        'wf/r-1/implement is on main — nothing is left for ship to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel r-1',
+        'wf/r-1/implement is on main — nothing is left for ship to merge: the run has landed as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel r-1',
       );
       assert.equal(
         approvalRefusal(
@@ -1171,7 +1171,7 @@ test("an ending's gate and git's word: what is to decide, read off where the res
           ON,
         ),
         'wf/r-1/implement is on main, so there is nothing left for ship to merge: approving would file it to merge what the base branch already has. ' +
-          'The run has shipped as git reads it — nemia decide r-1 says so, and a run started --after it goes on without ship. Nothing waits on you; if you want the record closed: nemia cancel r-1.',
+          'The run has landed as git reads it — nemia decide r-1 says so, and a run started --after it goes on without ship. Nothing waits on you; if you want the record closed: nemia cancel r-1.',
       );
       assert.equal(
         forgetRefusal(

@@ -24,13 +24,13 @@ type Prunable = Pick<RunDetail, 'id' | 'place' | 'status' | 'moving' | 'onDisk'>
 /**
  * Whether the run finished and nobody has decided it, as the api's decision says it off the package's own (`Decidable['awaiting']`): the
  * reading the CLI's `prune` refuses without `--unmerged` (`pruneRefusal`). Taken from the decision, never worked out here: the run's status
- * says nothing of a failed run whose branch a person merged by hand (shipped, the package says), and the list's `toDecide` is never said of
+ * says nothing of a failed run whose branch a person merged by hand (landed, the package says), and the list's `toDecide` is never said of
  * a run that worked on its base branch itself, which waits on a decision all the same.
  */
 export type Awaiting = NonNullable<Decidable['awaiting']>;
 
 /**
- * The api's decision as the prune reads it: `awaiting` for a run nobody decided, and null for any other answer — a run shipped or called
+ * The api's decision as the prune reads it: `awaiting` for a run nobody decided, and null for any other answer — a run landed or called
  * off (`nothing`), and one still going, waited on or held, which the package refuses in words of its own. A decision without `awaiting` is
  * read as null.
  */

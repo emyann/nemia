@@ -85,7 +85,7 @@ function HoldForm({ id, runs, onClose }: { id: string; runs: RunSummary[]; onClo
     >
       <Heading slot="title" className="font-semibold">{`Hold ${id}`}</Heading>
       <p className="text-body-small text-muted-foreground">
-        Nothing more of it is filed, and nothing is asked of you, until every run ticked has shipped. What runs now finishes.
+        Nothing more of it is filed, and nothing is asked of you, until every run ticked has landed. What runs now finishes.
       </p>
       <WaitFor
         runs={runs}
@@ -143,7 +143,7 @@ function WaitFor({
       <AriaLabel className="text-body-small font-medium">Wait for</AriaLabel>
       {runs.length === 0 ? (
         <Text slot="description" data-hold-none className="block text-body-small text-muted-foreground">
-          No other run of its repository may still ship.
+          No other run of its repository may still land.
         </Text>
       ) : (
         <div className="max-h-56 space-y-1.5 overflow-y-auto pr-1">

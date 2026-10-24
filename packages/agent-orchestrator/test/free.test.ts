@@ -263,7 +263,7 @@ test(
         assert.equal(fs.readFileSync(path.join(ROOT, 'runs', `${id}.json`), 'utf8'), record, 'the sweep wrote nothing on the run record');
         assert.equal(world().tip(repo, branch), tip, 'its branch is kept');
         assert.ok(fs.existsSync(path.join(ROOT, 'runs', id)), 'and its files under runs/<id>/');
-        assert.equal((await stage.runWith(engine(), decideRun(id))).decision.kind, 'shipped');
+        assert.equal((await stage.runWith(engine(), decideRun(id))).decision.kind, 'landed');
         const ls = await printedBy(t, ['ls']);
         assert.ok(
           ls.some((l) => l.startsWith(`${id}  `) && l.includes('(pruned)')),
@@ -622,7 +622,7 @@ test('the rule as data: which answers are candidates, which a sweep takes, and w
   });
 
   await t.test('`freeSaid`: what is said of a run a sweep left — a place unread or a hold of git, never a rule of the run', () => {
-    const facts = { decided: 'shipped' as const, held: null, owed: [], worktrees: [] };
+    const facts = { decided: 'landed' as const, held: null, owed: [], worktrees: [] };
     assert.equal(freeSaid(undefined, 'the place did not answer'), 'the place did not answer');
     assert.equal(freeSaid(facts, 'locked'), 'locked');
     assert.equal(freeSaid({ ...facts, decided: 'cancelled' }, 'locked'), 'locked');

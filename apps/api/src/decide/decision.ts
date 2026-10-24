@@ -130,7 +130,7 @@ export type Decidable = {
 };
 
 /**
- * A run's decision. `waiting` for a run whose roots wait on runs that have not shipped: `nemia decide` says that, and offers nothing else —
+ * A run's decision. `waiting` for a run whose roots wait on runs that have not landed: `nemia decide` says that, and offers nothing else —
  * and the hold beside it, `holding`, for one a person also holds, as `nemia decide` says both. `holding` alone for a run a person holds
  * with `nemia hold`: `nemia decide` says the hold and what lifts it, and offers nothing, since every verb that would release work is
  * refused while it stands (`heldRefusal`). `running` while it runs and nobody is waited on — `nemia decide`'s "nothing to decide yet", with
@@ -209,12 +209,12 @@ const MERGES = COMMANDS.find((c) => c.name === 'merges')!;
  * Where the branches stand is asked of their places at most once, live, as a person's verb asks it (`standingWhen`), the same ask handed to
  * the package's decision, and only where it is read: for the runs it waits on, and for a run judged neither running nor called off without
  * it, then judged over it. First, as the CLI asks it first, off the runs it waits on and is held until, each read once (`parentsRead`): a
- * run whose roots wait on runs that have not shipped is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`,
+ * run whose roots wait on runs that have not landed is `waiting`, and none of its tasks is read. Then a run a person holds is `holding`,
  * and none is read either: what is in flight is on its detail, and nothing is offered. Else the run is judged (`judge`) over those runs. A
  * run still running with nobody waited on (`judge`, the listing's word) is `running`, with the slot the cap holds it for — its
  * `WF_MAX_RUNS` before any pass is `env`'s, the app's environment, as `GET /api/ceilings` reads it — and git is asked nothing more: the
  * page asks while a run is decidable, and the Factory's card only for a run waiting on you, but a request is a request. Called off, or
- * already shipped, is `nothing`.
+ * already landed, is `nothing`.
  *
  * Then the branches the CLI reads (`branchesToRead`) — the result branches, or every branch a step worked on when no terminal step has one,
  * never the base branch of a run that cut worktrees, whose work is not on it — and the result branches' counts, each read from the run's
@@ -297,7 +297,7 @@ async function judgedLive<J extends { status: string; waitingOnYou: readonly unk
 /** What `nemia decide` says of a run with nothing to decide: called off, or its branches already on the base; undefined for any other. */
 function nothingOf(run: Run, d: Decided['decision']): string | undefined {
   if (d.kind === 'cancelled') return `cancelled at ${d.at} — nothing to decide`;
-  if (d.kind === 'shipped') return `shipped — ${d.branches.join(', ')} is already on ${run.branch}`;
+  if (d.kind === 'landed') return `landed — ${d.branches.join(', ')} is already on ${run.branch}`;
   return undefined;
 }
 

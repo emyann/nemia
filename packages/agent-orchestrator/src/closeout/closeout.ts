@@ -278,7 +278,7 @@ export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | fal
     '- `outcome`: `"done"` if you finished the work; `"blocked"` if you cannot honestly finish. A step',
     '  that reports success it did not have is worse than one that stops and says why.',
     '- `apiVersion`: `"nemia/v1"`.',
-    `- \`summary\`: one line of at most ${SUMMARY_MAX} characters on what you did, for the person who decides what ships. A longer`,
+    `- \`summary\`: one line of at most ${SUMMARY_MAX} characters on what you did, for the person who decides what lands. A longer`,
     '  one is cut, and the whole of it leads the body.',
     '- `body`: markdown, everything the summary has no room for; `null` when there is nothing more.',
     ...(inFolder

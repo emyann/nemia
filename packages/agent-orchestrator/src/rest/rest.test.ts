@@ -46,7 +46,7 @@ test('REFUSED: a run still running, or held, rests nowhere', () => {
   assert.equal(
     atRest({ ...RESTING, run: { workflow: [], hold: { at: '2026-09-25T10:00:00.000Z', until: ['other'] } } }),
     false,
-    'held: whether the runs it names shipped is theirs',
+    'held: whether the runs it names landed is theirs',
   );
 });
 

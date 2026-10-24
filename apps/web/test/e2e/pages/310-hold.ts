@@ -10,7 +10,7 @@ import { OUT, store, unreadName } from '../world.ts';
 
 export default {
   /**
-   * A run a person holds until another ships (`wf hold`), on the board, its floor laid out by Reset layout whatever the page before left
+   * A run a person holds until another lands (`wf hold`), on the board, its floor laid out by Reset layout whatever the page before left
    * open: GATED, at plan's gate, held until HELD, a run in flight on the same repository and branch, which `wf hold` takes (`holdRefusal`).
    * Its card says the hold's word where its gate was, with how to lift it on hover, no Approve and not waiting on you; its steps read held;
    * an edge comes into it from HELD's card, drawn as an `--after` edge is. Its page says the hold and how to lift it, links HELD, and
@@ -25,8 +25,8 @@ export default {
     const { id, gated } = GATED;
     const until = HELD.id;
     const hold = path.join(store!, 'runs', `${id}.hold`);
-    const word = `held until ${unreadName(until)} ships`;
-    const advice = `nothing of ${id} is filed, and nothing is asked of you, until nemia decide says ${until} has shipped; to go on before then: nemia hold ${id} --off`;
+    const word = `held until ${unreadName(until)} lands`;
+    const advice = `nothing of ${id} is filed, and nothing is asked of you, until nemia decide says ${until} has landed; to go on before then: nemia hold ${id} --off`;
     await page.getByRole('button', { name: 'Reset layout' }).click();
     await settled(page);
     const card = cardOf(page, id);
@@ -107,8 +107,8 @@ async function heldWithWords(page: Page): Promise<void> {
   const { id, gated } = GATED;
   const hold = path.join(store!, 'runs', `${id}.hold`);
   const why = `merge conflicts in five files with ${HELD.id}'s branch: rebase on it once it lands, then go on`;
-  const word = `held until ${unreadName(HELD.id)} ships (why: ${why}; by operator)`;
-  const noted = `held until ${HELD.id} ships (why: ${why}; by operator); its approval is asked once the hold lifts`;
+  const word = `held until ${unreadName(HELD.id)} lands (why: ${why}; by operator)`;
+  const noted = `held until ${HELD.id} lands (why: ${why}; by operator); its approval is asked once the hold lifts`;
   const whole = new RegExp(`^${literal(word)}$`);
   try {
     if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one with words — ${hold} is there`);

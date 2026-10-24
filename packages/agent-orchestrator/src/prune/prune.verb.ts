@@ -22,7 +22,7 @@ import { runStore } from '../record/files.store.ts';
 import { askRunPlace, PlaceService, type RunPlaceRead } from '../place/place.store.ts';
 import { freedBytes } from './freed.store.ts';
 import { sayFilled, unansweredWords, type Held, type PlaceOutcome } from '../place/place.ts';
-import { shippedOf, standingsOf } from '../branches/branches.store.ts';
+import { landedOf, standingsOf } from '../branches/branches.store.ts';
 import { askCheckoutStatus, checkoutStatus, stagedHere, statusMemo, type StatusMemo } from '../place/landing.store.ts';
 import { headsOver, standingLive } from '../standing/standing.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
@@ -54,7 +54,7 @@ function readsCheckout(run: Run, steps: readonly Workflow[] | undefined): run is
 /**
  * Remove the worktrees of a run that is over, and nothing else — `nemia prune`. Its record, asks, closeouts and costs, its branches, its
  * files directory, its check logs and inputs, and the engine's record of its sessions are kept, so `nemia decide`, `nemia ls` and the board
- * still read it, and a run waiting on it still reads whether it shipped.
+ * still read it, and a run waiting on it still reads whether it landed.
  *
  * With `artifacts` — `nemia prune --artifacts` — its files directory too (`runs/<id>/artifacts/`: the screenshots and logs its steps and
  * checks left, which are on no branch), by far the most of what a run keeps once its worktrees are gone. It is judged exactly as the
@@ -258,8 +258,7 @@ const judgedOf = Effect.fn('prune.judged')(function* (
   const checkout = statusMemo(headsOver(git), placed);
   if (readsCheckout(run, steps)) yield* askCheckoutStatus(run, checkout);
   return {
-    decided: decision(steps, run, phaseOf, shippedOf(run, git), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf)
-      .kind,
+    decided: decision(steps, run, phaseOf, landedOf(run, git), reader, asked, verdictOf, asks, rounds, harnessBlocked(views), spendOf).kind,
     held: forgetRefusal(
       steps,
       run,

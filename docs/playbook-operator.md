@@ -126,7 +126,7 @@ Every gate gets a short formatted section, then one question. The person decides
   the risks the architect names; what is open. Quote the agent where its words carry the decision.
 - **A round (blocked):** the questions exactly as the agent wrote them, each option with what it means, and the agent's recommendation.
   A round arrives as data (`open` in the question shape): print title, body, options and the recommended one.
-- **A landing:** what shipped; the proof (checks, reviewer's verdict); the trial merge; the cost; the reviewer's
+- **A landing:** what landed; the proof (checks, reviewer's verdict); the trial merge; the cost; the reviewer's
   findings in one line each, with whether they are worth a round.
 - **The operator's view:** agree or disagree with the agent's recommendation, and say why in a sentence. Disagree when a rule of the
   person's is at stake (a rule the person stated, the repository's CLAUDE.md, a cost line), never for taste. Agents' cost estimates have

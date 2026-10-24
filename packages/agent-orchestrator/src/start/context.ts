@@ -39,12 +39,12 @@ export function contextRefusal(
 }
 
 /**
- * What a start says of each run it is handed as context: `reads <id>`, and for one that has not shipped (`shipped`), that it is still in
+ * What a start says of each run it is handed as context: `reads <id>`, and for one that has not landed (`landed`), that it is still in
  * flight and what that means for what is handed.
  */
-export const contextLines = (context: readonly string[], shipped: (runId: string) => boolean): string[] =>
+export const contextLines = (context: readonly string[], landed: (runId: string) => boolean): string[] =>
   context.map((id) =>
-    shipped(id)
+    landed(id)
       ? `reads: ${id} — handed what it concluded, as context; not waited on`
-      : `reads: ${id}, still in flight — what it has when this run's steps are filed is handed, not shipped, not judged`,
+      : `reads: ${id}, still in flight — what it has when this run's steps are filed is handed, not landed, not judged`,
   );

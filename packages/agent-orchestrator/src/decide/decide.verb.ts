@@ -23,7 +23,7 @@ import { answerLines, answerOf, overBudgetLine, retriesDue, retryOffers, type Re
 import { timeline, type Timeline } from '../timeline/index.ts';
 import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { shippedOf, standingsOf, type BranchReader } from '../branches/branches.store.ts';
+import { landedOf, standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, NOTHING_READ, standingReader, standingWhen, type StandingAsker } from '../standing/standing.verb.ts';
 import {
   checkReportsRead,
@@ -271,7 +271,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const memo = statusMemo((r) => headsOver(live.read())(r), place);
   const checkout = yield* checkoutHold(e, run, steps, { standing: live.standing }, env, memo);
   const decided = (git: BranchReader) =>
-    decision(steps, run, phaseOf, shippedOf(run, git), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
+    decision(steps, run, phaseOf, landedOf(run, git), reader, asked, verdictOf, asks, rounds, blocked, spendOf, checkout);
   const unasked = decided(standingReader(NOTHING_READ));
   const git = yield* live.when(unasked.kind !== 'running' && unasked.kind !== 'cancelled');
   const d = yield* tried(() => decided(git));

@@ -158,7 +158,7 @@ export type {
   RunSlot,
   Said,
   SaidTo,
-  Shipped,
+  Landed,
   Spend,
   SpendOf,
   TaskSpend,
@@ -350,7 +350,7 @@ export type {
   HandedOff,
   Held,
   Inventory,
-  Landed,
+  PlaceLanded,
   Made,
   Opened,
   PlaceAnswers,
@@ -444,7 +444,7 @@ export { acceptRun, roundRun } from './round/round.verb.ts';
 export { mergeRun } from './merge/merge.verb.ts';
 export { approveRun } from './gate/gate.verb.ts';
 export { askedNow } from './question/asked.verb.ts';
-export { cancelRun } from './cancel/cancel.verb.ts';
+export { cancelRun, type Cancelled } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
 export {
   finishingWords,
@@ -494,7 +494,6 @@ export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Approved } from './gate/gate.verb.ts';
 export type { Asked } from './retry/retry.verb.ts';
-export type { Cancelled } from './cancel/cancel.verb.ts';
 export type { Holding } from './wait/wait.verb.ts';
 export type { Told } from './say/say.verb.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';

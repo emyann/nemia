@@ -180,7 +180,7 @@ export type TaskView = {
  *
  * So the engine can say a task waits before its harness has let the session go: a test asserts both sides, or waits for the Task.
  */
-const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): ReadonlyMap<string, Sighting> => {
+const endedOnStatement = (state: State, observed: ReadonlyMap<string, Sighting>): ReadonlyMap<string, Sighting> => {
   const last = state.attempts.at(-1);
   if (!last || last.ended !== null) return observed;
   const name = nameFor(state.taskId, last.n);
@@ -311,7 +311,7 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
   const move = yield* Lifecycle;
 
   const state = yield* notedFold(taskId, observed);
-  const action = decide(state, closedOut(state, observed), nowFor(unread), move);
+  const action = decide(state, endedOnStatement(state, observed), nowFor(unread), move);
   const at = () => new Date().toISOString();
 
   switch (action.do) {
@@ -361,7 +361,7 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
         reason: action.reason,
         nativeId: action.nativeId,
         closeout: action.closeout,
-        ...(action.stated !== undefined ? { stated: action.stated } : {}),
+        ...(action.closedOut !== undefined ? { closedOut: action.closedOut } : {}),
         ...endFacts(observed.get(nameFor(taskId, action.attempt))),
       });
       break;
@@ -622,7 +622,7 @@ const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
  */
 const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
   const fresh = fold(kept.taskId, yield* (yield* Journal).read(kept.taskId));
-  const decided = decide(fresh, closedOut(fresh, observed), nowFor(unread), yield* Lifecycle);
+  const decided = decide(fresh, endedOnStatement(fresh, observed), nowFor(unread), yield* Lifecycle);
   const why = divergence(kept, fresh, decided);
   if (why) return yield* Effect.fail(new TickMemoDiverged({ taskId: kept.taskId, message: `the pass skipped \`${kept.taskId}\`: ${why}` }));
 });

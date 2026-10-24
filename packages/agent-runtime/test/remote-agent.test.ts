@@ -553,11 +553,11 @@ test('the engine refuses, when it is made or a task is filed, what a remote agen
   });
   await t.test("a task that says which of its checkout's servers it loads, on a remote agent, which loads its operator's", async (t) => {
     const { e } = engineOn(await serve(t));
-    const err = await refusal(() => Effect.runPromise(e.file(task({ config: { checkoutMcp: [] } }))));
+    const err = await refusal(() => Effect.runPromise(e.file(task({ config: { projectMcp: [] } }))));
     assert.equal(err._tag, 'FileRefused', err.message);
     assert.match(
       err.message,
-      /the `remote` harness is a remote A2A agent, .*takes no harness arguments: take `checkoutMcp` out of `config`/,
+      /the `remote` harness is a remote A2A agent, .*takes no harness arguments: take `projectMcp` out of `config`/,
     );
   });
   await t.test('a task that carries harness arguments, on a remote agent, before anything is journalled', async (t) => {
@@ -623,7 +623,7 @@ for (const bindings of BINDINGS) {
       const done = await settled(e, id);
       assert.equal(done.state.settled, 'succeeded');
       assert.deepEqual(done.state.attempts[0].closeout, { painted: 'white' });
-      assert.equal(done.state.attempts[0].stated, true);
+      assert.equal(done.state.attempts[0].closedOut, true);
       assert.equal(done.state.attempts[0].nativeId, s.sent[sent].contextId || done.state.attempts[0].nativeId);
       assert.equal(calls(s, 'sendMessage') - sends, 1);
       everyCallOnFirstBinding();
@@ -681,9 +681,9 @@ for (const bindings of BINDINGS) {
       assert.match(await Effect.runPromise(e.logs(id)), /FAILED — the paint ran out/);
     });
 
-    await c.test('a completion with no data part ends with no statement: stated false', async () => {
+    await c.test('a completion with no data part ends with no statement: closedOut false', async () => {
       const a = await attemptOf(e, { brief: BRIEF.words });
-      assert.equal(a.stated, false);
+      assert.equal(a.closedOut, false);
       assert.equal(a.closeout, undefined);
     });
 
@@ -1178,7 +1178,7 @@ test("a remote statement is kept when the wall clock steps back after the attemp
       const v = await settled(e, id);
       assert.equal(v.state.settled, 'succeeded');
       assert.deepEqual(v.state.attempts[0].closeout, closeout, 'what the agent sent is on the record');
-      assert.notEqual(v.state.attempts[0].stated, false);
+      assert.notEqual(v.state.attempts[0].closedOut, false);
     });
 });
 

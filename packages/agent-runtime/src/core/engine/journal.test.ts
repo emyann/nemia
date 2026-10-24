@@ -505,7 +505,88 @@ test("upgrade: a journal an older runtime wrote, or a consumer's own store holds
       assert.deepEqual(bytesOf(dir), before);
     },
   );
+
+  await t.test(
+    "a journal written before the runtime's words took their names reads in today's — closedOut, responses, projectMcp, a former reason as the harness's end — and no byte on disk changes",
+    async () => {
+      const dir = legacyStore({ 't-words': RENAMED });
+      const before = bytesOf(dir);
+      const events = await run(dir, readOf('t-words'));
+      const [filed, , , quiet, input, , , measured, counted, unstated] = RENAMED;
+      assert.deepEqual(events[0], { ...filed, config: { model: 'haiku', projectMcp: ['repo'] } }, 'the servers kept by their new name');
+      assert.deepEqual(
+        events[3],
+        { ...quiet, reason: 'harness', closedOut: false, former: 'unsigned', usage: { responses: 3 } },
+        "a former reason is the harness's end with no statement, the reason it was written with kept as `former`",
+      );
+      assert.deepEqual(events[4], { ...input, config: { projectMcp: [] } }, "a turn's configuration by its new name too");
+      assert.deepEqual(events[7], { ...measured, usage: { responses: 1, toolCalls: 2 } });
+      assert.deepEqual(events[8], { ...counted, usage: { responses: 2 } });
+      const { stated: _, ...unsaid } = unstated as { stated?: boolean };
+      assert.deepEqual(
+        events[9],
+        { ...unsaid, closedOut: false, usage: { responses: 2 } },
+        'an end with no statement says so by its new name',
+      );
+      const read = JSON.stringify(events);
+      for (const left of ['"checkoutMcp"', '"stated"', '"turns"', '"reason":"unsigned"'])
+        assert.ok(!read.includes(left), `${left} in ${read}`);
+      const { entries } = await run(dir, feedFrom(0));
+      assert.deepEqual(
+        entries.map((e) => e.event),
+        events,
+        'the feed reads the same shape as the task',
+      );
+      assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
+      const { state } = await Effect.runPromise((await engineOver(dir)).view('t-words'));
+      assert.deepEqual(state.config, { model: 'haiku', projectMcp: ['repo'] });
+      assert.deepEqual(
+        state.attempts.map((a) => [a.ended, a.reason, a.closedOut, a.former, a.usage?.responses]),
+        [
+          ['failed', 'harness', false, 'unsigned', 3],
+          ['succeeded', 'harness', false, undefined, 2],
+        ],
+      );
+    },
+  );
 });
+
+/**
+ * A held-open task as a runtime wrote it before its words took their names: the servers of its checkout's `.mcp.json` named
+ * under `checkoutMcp`, on its filing and a turn's; an end the runtime judged by a reason of its own, its usage counted in
+ * `turns`; a measure and a count in `turns`; and an end with no statement written `stated: false`.
+ */
+const RENAMED = [
+  { ...TODAY, holdOpen: true, config: { model: 'haiku', checkoutMcp: ['repo'] } },
+  { kind: 'starting', at: '2026-09-24T00:00:01Z', attempt: 1 },
+  { kind: 'spawned', at: '2026-09-24T00:00:02Z', attempt: 1 },
+  {
+    kind: 'ended',
+    at: '2026-09-24T00:00:03Z',
+    attempt: 1,
+    sessionId: 's-1',
+    observed: 'failed',
+    reason: 'unsigned',
+    nativeId: 'n-1',
+    usage: { turns: 3 },
+  },
+  { kind: 'input', at: '2026-09-24T00:01:00Z', text: 'again', config: { checkoutMcp: [] } },
+  { kind: 'starting', at: '2026-09-24T00:01:01Z', attempt: 2, resumeFrom: 'n-1', nudge: 'again' },
+  { kind: 'spawned', at: '2026-09-24T00:01:02Z', attempt: 2 },
+  { kind: 'measured', at: '2026-09-24T00:01:03Z', attempt: 2, usage: { turns: 1, toolCalls: 2 } },
+  { kind: 'counted', at: '2026-09-24T00:01:04Z', attempt: 2, usage: { turns: 2 } },
+  {
+    kind: 'ended',
+    at: '2026-09-24T00:01:05Z',
+    attempt: 2,
+    sessionId: 's-2',
+    observed: 'succeeded',
+    reason: 'harness',
+    nativeId: 'n-1',
+    stated: false,
+    usage: { turns: 2 },
+  },
+];
 
 const failureOf = <A>(dir: string, e: Effect.Effect<A, JournalError, Journal>) => run(dir, Effect.flip(e));
 
@@ -540,21 +621,21 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
   });
 
   await t.test('a field of the wrong type fails the read, saying what is there and what the runtime writes', async () => {
-    const error = await refusedRead([TODAY, { kind: 'measured', at: '2026-09-24T00:00:01Z', attempt: 1, usage: { turns: 'three' } }]);
-    naming(error.message, 'entry 2 is a `measured` event', '`usage.turns` is "three"', 'writes number');
+    const error = await refusedRead([TODAY, { kind: 'measured', at: '2026-09-24T00:00:01Z', attempt: 1, usage: { responses: 'three' } }]);
+    naming(error.message, 'entry 2 is a `measured` event', '`usage.responses` is "three"', 'writes number');
   });
 
   await t.test(
     'a counted entry is read back as written; one whose usage no runtime wrote fails the read as a measured one does',
     async () => {
-      const usage = { turns: 3, outputTokens: 40 };
+      const usage = { responses: 3, outputTokens: 40 };
       const events = await run(
         legacyStore({ 't-ok': [TODAY, { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage }] }),
         readOf('t-ok'),
       );
       assert.deepEqual(events.at(-1), { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage });
-      const error = await refusedRead([TODAY, { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage: { turns: 'three' } }]);
-      naming(error.message, 'entry 2 is a `counted` event', '`usage.turns` is "three"', 'writes number');
+      const error = await refusedRead([TODAY, { kind: 'counted', at: '2026-09-24T00:00:01Z', attempt: 1, usage: { responses: 'three' } }]);
+      naming(error.message, 'entry 2 is a `counted` event', '`usage.responses` is "three"', 'writes number');
     },
   );
 

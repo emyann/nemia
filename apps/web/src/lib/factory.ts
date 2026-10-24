@@ -16,7 +16,7 @@ import { ENDED } from './words.ts';
  *
  * Nothing here reads a step's words. The status alone is not enough: `assess` reads a fan-out as failed once one step is final without
  * letting its followers run, while a sibling's session still works. A run is finished once it has stopped moving without running:
- * succeeded; failed at a refused check or a step signed off blocked, whose followers read `waiting` and will never be filed; or cancelled,
+ * succeeded; failed at a refused check or a step signed off blocked, whose followers read `pending` and will never be filed; or cancelled,
  * its stop landed. A run such a stop leaves waiting on a person stays on the Factory all the same (`floorRuns`); the rest are under "Show
  * finished", or on Runs.
  *

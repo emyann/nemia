@@ -105,7 +105,7 @@ export type RunSummary = {
   holding: RunHolding | null;
   /**
    * The run in one word, as the feed and `nemia tick` say it: `running`, `succeeded`, `cancelled`; `failed` for a run in which a step
-   * broke; `awaiting approval` for one stopped at its gates alone; `blocked` for one a person's word stops otherwise.
+   * broke; `awaiting approval` for one stopped at its gates alone; `waiting` for one a person's word stops otherwise.
    */
   status: RunStatus;
   /** Where the run is in its life (`RunPhase`), from its reason (`runCodes`): the code a screen groups it by, never parsed from `status`.

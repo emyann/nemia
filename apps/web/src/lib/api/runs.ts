@@ -86,8 +86,8 @@ export type RunSummary = {
   /** The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. */
   holding: RunHolding | null;
   /**
-   * The run in one word, as the CLI's `decide` says it: `failed` where a step broke, `awaiting approval` at its gates alone, `blocked`
-   * where a step waits on an answer.
+   * The run in one word, as the CLI's `decide` says it: `failed` where a step broke, `awaiting approval` at its gates alone, `waiting`
+   * where a step waits on a person otherwise.
    */
   status: RunStatus;
   /** Where the run is in its life (`RunPhase`), as a code. */

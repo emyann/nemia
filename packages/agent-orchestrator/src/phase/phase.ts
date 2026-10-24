@@ -207,7 +207,7 @@ export const codedStep = (q: QualifiedStep): CodedStep => ({ ...q, phase: PHASE_
 type RunStatus = Assessment['status'];
 
 /**
- * The reason each of `assess`'s statuses names. A running run a person holds is `Waiting` on `run`, and a `blocked` run takes its first
+ * The reason each of `assess`'s statuses names. A running run a person holds is `Waiting` on `run`, and a `waiting` run takes its first
  * waiting step's reason, which the caller knows and this does not (`runCodes`).
  */
 export const RUN_REASON_OF: Record<RunStatus, QualifiedRun> = {
@@ -266,8 +266,8 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
     : { reason: step.reason as Exclude<RunReason, 'Waiting' | 'AwaitingAnswer'> };
 
 /**
- * A run's codes. A running run a person holds is `Waiting` on `run`. A `blocked` run carries the reason (and `via`) of its first step,
- * in the order `steps` gives them (the workflow's), whose phase is `waiting` and that is no gate — a run is blocked when some stop is
+ * A run's codes. A running run a person holds is `Waiting` on `run`. A `waiting` run carries the reason (and `via`) of its first step,
+ * in the order `steps` gives them (the workflow's), whose phase is `waiting` and that is no gate — a run is `waiting` when some stop is
  * not a gate, so a gate before it does not say why; every such reason is a run's too; `AwaitingAnswer` with no `via` where none is.
  * Every other status is `RUN_REASON_OF`'s. Pure.
  */

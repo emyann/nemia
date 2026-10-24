@@ -294,7 +294,7 @@ type Judged = {
    * there is nothing.
    */
   toDecide: RunToDecide | null;
-  /** The run in one word, as `assess` judged it: `failed` where a step broke, `awaiting approval` or `blocked` where a person stops it. */
+  /** The run in one word, as `assess` judged it: `failed` where a step broke, `awaiting approval` or `waiting` where a person stops it. */
   status: RunStatus;
   /**
    * Where the run is in its life, and why, as codes (`runCodes`): `Waiting` on `run` for a running run a person holds (`holding`), and

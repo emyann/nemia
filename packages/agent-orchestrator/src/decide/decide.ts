@@ -120,7 +120,7 @@ export type Landed = boolean | 'unchanged';
  *
  * The steps are told apart by how each ended on its own work (`ownStatus`): blocked, a question; failed or stopped, a thing that broke;
  * a check that refused, a thing the run can name; a check that did not finish, one to run again. Being over budget is said beside that,
- * in `overBudget`, never in its place. A loop out of rounds, a cap reached and a call denied broke nothing: each makes the run `blocked`,
+ * in `overBudget`, never in its place. A loop out of rounds, a cap reached and a call denied broke nothing: each makes the run `waiting`,
  * a person's call.
  *
  * @param verdictOf What each step's current check exited with: a refusal and a check that did not finish are told apart.

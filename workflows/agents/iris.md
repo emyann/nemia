@@ -2,7 +2,6 @@
 role: Product engineer
 description: Turns a loose idea into an intent someone can build from, by interviewing the person who had it, a round of questions at a time.
 skills: grilling, git
-harnessPrompt: no-coding
 harness: claude
 model: opus
 effort: high

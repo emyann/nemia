@@ -27,8 +27,8 @@
  * `react-aria`, this
  * repository's vendored skill for the board's own parts, on their `skills:` line and not on a team-portable agent's.
  *
- * And what becomes of Claude Code's own prompt for each agent of the team (`PROMPTS`, `promptsWrong`): `harnessPrompt: no-coding` for the
- * five who write no code, nothing for Ada, who writes it. An agent the table does not name is refused, so a new one says its value.
+ * And what becomes of Claude Code's own prompt for each agent of the team (`PROMPTS`, `promptsWrong`): no `harnessPrompt:` line on any,
+ * so each keeps it whole, coding section included. An agent the table does not name is refused, so a new one says its value.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -361,18 +361,18 @@ function shippedEdited(workflow: string, step: string, edit: (text: string) => s
 }
 
 /**
- * What becomes of Claude Code's own prompt for each agent of this repository's team (`harnessPrompt:`): `no-coding`, which drops its
- * `# Doing tasks` section, for the five who write no code, and none — `keep` — for Ada and Grace, the two who do. A new agent of the team
- * fails `promptsWrong` until it is named here.
+ * What becomes of Claude Code's own prompt for each agent of this repository's team (`harnessPrompt:`): none, which is `keep`, for every
+ * one of them, those who write no code too, since the harness's coding section is worth more to them than going without it. A new agent
+ * of the team fails `promptsWrong` until it is named here.
  */
 const PROMPTS: Readonly<Record<string, string | undefined>> = {
   ada: undefined,
-  agora: 'no-coding',
-  argus: 'no-coding',
+  agora: undefined,
+  argus: undefined,
   grace: undefined,
-  iris: 'no-coding',
-  otto: 'no-coding',
-  seldon: 'no-coding',
+  iris: undefined,
+  otto: undefined,
+  seldon: undefined,
 };
 
 /** The agents of the team in `dir`, each by its file's name, with its frontmatter parsed. */
@@ -407,7 +407,7 @@ function promptsWrong(dir: string): string[] {
     .filter(Boolean);
 }
 
-test("the five of this repository's team who write no code drop Claude Code's coding instructions, and Ada and Grace keep them", () => {
+test("every agent of this repository's team keeps Claude Code's coding instructions, with no `harnessPrompt:` line", () => {
   const dir = path.join(HOLDER, 'agents');
   assert.deepEqual(promptsWrong(dir), [], 'every agent says what PROMPTS says, and none is missing from it');
   assert.deepEqual(
@@ -417,35 +417,20 @@ test("the five of this repository's team who write no code drop Claude Code's co
   );
 });
 
-test('REFUSED: one of the five without `harnessPrompt: no-coding`, or Ada or Grace with it, is named', () => {
-  const edited = (name: string, edit: (text: string) => string): string[] => {
+test('REFUSED: an agent of the team with a `harnessPrompt:` line, `no-coding` or a written `keep`, is named', () => {
+  const edited = (name: string, line: string): string[] => {
     const root = scratch('wf-told-prompts-');
     fs.cpSync(path.join(HOLDER, 'agents'), root, { recursive: true });
     const file = path.join(root, `${name}.md`);
     const text = fs.readFileSync(file, 'utf8');
-    const changed = edit(text);
-    assert.notEqual(changed, text, `${name}.md has what the edit changes`);
-    fs.writeFileSync(file, changed);
+    assert.ok(text.startsWith('---\n'), `${name}.md opens its frontmatter`);
+    fs.writeFileSync(file, `---\n${line}\n${text.slice(4)}`);
     return promptsWrong(root);
   };
-  for (const name of Object.keys(PROMPTS).filter((n) => PROMPTS[n] === 'no-coding')) {
-    assert.deepEqual(
-      edited(name, (text) => text.replace('harnessPrompt: no-coding\n', '')),
-      [`${name}: harnessPrompt none`],
-    );
-    assert.deepEqual(
-      edited(name, (text) => text.replace('harnessPrompt: no-coding', 'harnessPrompt: keep')),
-      [`${name}: harnessPrompt keep`],
-    );
+  for (const name of Object.keys(PROMPTS)) {
+    assert.deepEqual(edited(name, 'harnessPrompt: no-coding'), [`${name}: harnessPrompt no-coding`]);
+    assert.deepEqual(edited(name, 'harnessPrompt: keep'), [`${name}: harnessPrompt keep`], 'no line is `keep`; none is written');
   }
-  for (const name of Object.keys(PROMPTS).filter((n) => PROMPTS[n] === undefined))
-    assert.deepEqual(
-      edited(name, (text) =>
-        text.replace('skills: implement-a-change, git\n', 'skills: implement-a-change, git\nharnessPrompt: no-coding\n'),
-      ),
-      [`${name}: harnessPrompt no-coding`],
-      `${name} writes the code, and keeps the instructions for it`,
-    );
 });
 
 test('each shipped step still says, adds, denies and declares what its agent and its skill said before', () => {

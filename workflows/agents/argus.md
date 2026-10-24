@@ -2,7 +2,6 @@
 role: Janitor
 description: Reads the factory's stats since its last run, writes a report and proposes one correction per card; never starts one.
 skills: read-the-stats, git
-harnessPrompt: no-coding
 harness: claude
 model: opus
 effort: high

@@ -46,7 +46,7 @@ const {
   retryRun,
   runWith: runEngine,
   gitPlaceLayer,
-  shippedGitPlace,
+  builtinGitPlace,
   startRun,
   tickRun,
 } = await import('../src/runner.ts');
@@ -313,7 +313,7 @@ test("a run's own claim on the checkout reads the slot its pass gave it, and the
         slot: undefined,
       },
       process.env,
-      statusMemo(() => undefined, shippedGitPlace),
+      statusMemo(() => undefined, builtinGitPlace),
     ),
   );
   assert.equal(hold, undefined, 'no other run claims the checkout in what the pass listed');
@@ -452,7 +452,7 @@ test('a forget drops the views of the tasks it forgets, and keeps the others the
 });
 
 /** The place the package ships, its `standing` not heard, in `said`. */
-const standingUnread = (said: string) => PlaceService.layer(placeOver(shippedGitPlace, { standing: () => unreadBy('standing', said) }));
+const standingUnread = (said: string) => PlaceService.layer(placeOver(builtinGitPlace, { standing: () => unreadBy('standing', said) }));
 
 test('a pass asks one standing for each repository, place and base branch: a run on a second base branch adds exactly one', async () => {
   const { b, repo } = await theStore();
@@ -537,9 +537,9 @@ test('REFUSED: a run filed on a pass whose standing read no head of its base kee
   const child = await runPlaced(startRun({ brief: 'after it, no head', repo, workflowDir: oneStep, after: [parent.id] }));
   git(repo, 'merge', '-q', '--no-ff', '-m', 'land it', parent.steps.implement.branch!);
   const headless = PlaceService.layer(
-    placeOver(shippedGitPlace, {
+    placeOver(builtinGitPlace, {
       standing: (request) => {
-        const read = shippedGitPlace.askNow('standing', request);
+        const read = builtinGitPlace.askNow('standing', request);
         if (!('answer' in read)) return read;
         const { main: _base, ...heads } = read.answer.heads;
         return { answer: { ...read.answer, heads } };
@@ -560,7 +560,7 @@ test(
     const bin = scratch('wf-pass-reads-hung-');
     fs.writeFileSync(path.join(bin, 'git'), '#!/bin/sh\nexec sleep 600\n', { mode: 0o755 });
     const deaf = gitPlace({ env: { ...process.env, PATH: `${bin}${path.delimiter}${process.env.PATH ?? ''}` } });
-    const hung = PlaceService.layer(placeSplit(shippedGitPlace, deaf, ['standing']));
+    const hung = PlaceService.layer(placeSplit(builtinGitPlace, deaf, ['standing']));
     const clock = steeredClock();
     let ended = false;
     const pass = runWith(b.e, tickRun({ memo: freshRestMemo() }).pipe(Effect.provide(hung), Effect.provide(clock.layer))).then(

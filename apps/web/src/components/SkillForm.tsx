@@ -7,7 +7,7 @@ import { Field } from './AgentForm';
 /**
  * A skill's form: its name — its folder, set once — a title, what it does, its card's tags and examples, and its instructions, the body of
  * its SKILL.md. Nothing is judged here that the package judges on save; a refusal of the last save is shown above the fields in the
- * package's words. `readOnly` draws a skill the board does not write: the repository's, or one Nemia ships. `between` draws what sits
+ * package's words. `readOnly` draws a skill the board does not write: the repository's, or a builtin one. `between` draws what sits
  * between the card and the instructions — the page's switch — told whether the form holds unsaved words, and `onChanged` tells the page the
  * same.
  */

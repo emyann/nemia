@@ -160,7 +160,7 @@ export type RecentRun = { id: string; brief: string; createdAt: string; factory:
  * Mirrors `SkillFrom` in apps/api/src/step/step.ts: a skill a step's layers give, named as its line writes it, and where its page is
  * (`from`), null where it has none; and then where this repository has it (`foundIn`), null for one found nowhere.
  */
-export type SkillFrom = { name: string; from: 'yours' | 'repo' | 'shipped' | null; foundIn: string | null };
+export type SkillFrom = { name: string; from: 'yours' | 'repo' | 'builtin' | null; foundIn: string | null };
 
 /**
  * Mirrors `Hiring` in apps/api/src/step/step.ts: why no agent can be hired into a step in the factory it is read in, null where one can;
@@ -220,7 +220,7 @@ const WorkflowStepPageSchema = decodes<WorkflowStepPage>()(
       Schema.Array(
         Schema.Struct({
           name: Schema.String,
-          from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'shipped'])),
+          from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'builtin'])),
           foundIn: Schema.NullOr(Schema.String),
         }),
       ),

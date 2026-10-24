@@ -17,7 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
 import { COMMANDS, addFactory, engine } from 'agent-orchestrator';
-import { runWith } from './shipped-place.ts';
+import { runWith } from './builtin-place.ts';
 import { appOf, liveOf } from '../src/app.ts';
 import { Engine } from '../src/store.ts';
 

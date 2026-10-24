@@ -29,8 +29,8 @@ export type WorkflowSource = {
 export type AgentSource = { name: string; file: string; agent: Agent; output: string | undefined };
 
 /**
- * Where a skill named is: its folder, the folder of one named with its folder (`named`, which a template never carries), a place skill
- * nemia ships, or why it is not found (a refusal in the loader's words, or none).
+ * Where a skill named is: its folder, the folder of one named with its folder (`named`, which a template never carries), a builtin
+ * place skill, or why it is not found (a refusal in the loader's words, or none).
  */
 export type SkillFound = { dir: string } | { named: string } | 'place' | { refused: string } | undefined;
 
@@ -270,7 +270,7 @@ function gatherAgents(source: Source, into: Gathered): void {
 function gatherSkills(source: Source, into: Gathered): void {
   for (const [name, by] of [...into.skills].sort(([a], [b]) => a.localeCompare(b))) {
     const found = source.skill(name);
-    if (found === 'place') into.from.push({ part: `skills/${name}/`, from: 'left out: a place skill nemia ships' });
+    if (found === 'place') into.from.push({ part: `skills/${name}/`, from: 'left out: a builtin place skill' });
     else if (found !== undefined && 'named' in found)
       into.from.push({ part: name, from: `left out: a skill of the repository's folder, named and not carried, read from ${found.named}` });
     else if (found === undefined || 'refused' in found)

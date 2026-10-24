@@ -19,7 +19,7 @@ const ROOT = scratch('wf-servers-');
 process.env.WF_ROOT = ROOT;
 const { DEFAULT_FACTORY } = await import('../factory/factory.ts');
 const { factoryServerRefusal, factoryServersRefusal, serverNameRefusal, splitServers } = await import('./servers.ts');
-const { factoryServers, factoryServersFile, readFactoryServers, shippedServers, writeFactoryServers } = await import('./servers.store.ts');
+const { factoryServers, factoryServersFile, readFactoryServers, builtinServers, writeFactoryServers } = await import('./servers.store.ts');
 
 /** The hosted GitHub server as a factory records it: a toolset header, and the facts of an OAuth client with no secret. */
 const GITHUB = {
@@ -53,7 +53,7 @@ test('the store writes under the root it is given and no other: two roots, one f
 
 test('the servers Nemia ships: an absent folder is none, a file that does not read is left out, and the rest are offered', () => {
   const dir = path.join(scratch('wf-shipped-'), 'servers');
-  assert.deepEqual(shippedServers(dir), [], 'git commits no empty directory, so an absent folder is no error');
+  assert.deepEqual(builtinServers(dir), [], 'git commits no empty directory, so an absent folder is no error');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'github.json'), JSON.stringify(GITHUB));
   fs.writeFileSync(path.join(dir, 'broken.json'), 'not json');
@@ -61,7 +61,7 @@ test('the servers Nemia ships: an absent folder is none, a file that does not re
   fs.writeFileSync(path.join(dir, 'two words.json'), JSON.stringify(GITHUB));
   fs.writeFileSync(path.join(dir, 'notes.md'), 'read me');
   assert.deepEqual(
-    shippedServers(dir),
+    builtinServers(dir),
     [{ name: 'github', ...GITHUB }],
     'one bad shipped file blanks no form: the broken, the local and the ill-named are left out',
   );

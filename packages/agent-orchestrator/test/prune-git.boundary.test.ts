@@ -26,7 +26,7 @@ const { advanceRun, prune, startRun, runWith: runEngine, gitPlaceLayer } = await
 const { readRun } = await import('../src/record/record.store.ts');
 const { freeingMany, judgingMany } = await import('../src/prune/prune.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
-const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
+const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, gitPlaceLayer);
@@ -136,14 +136,14 @@ test('after a prompt each run is judged again before its removal: one whose work
   const ids = [first.run.id, second.run.id];
   const asked: Array<{ verb: PlaceVerb; request: PlaceRequests[PlaceVerb] }> = [];
   const counting: Place = {
-    declared: shippedGitPlace.declared,
+    declared: builtinGitPlace.declared,
     ask: (verb, request, options) => {
       asked.push({ verb, request });
-      return shippedGitPlace.ask(verb, request, options);
+      return builtinGitPlace.ask(verb, request, options);
     },
     askNow: (verb, request, options) => {
       asked.push({ verb, request });
-      return shippedGitPlace.askNow(verb, request, options);
+      return builtinGitPlace.askNow(verb, request, options);
     },
   };
   const place = PlaceService.layer(counting);

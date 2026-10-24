@@ -11,7 +11,9 @@
  *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`.
  *   GitHub moves a pull request's head a moment after the push it follows, so that head is read again for a bounded few seconds
  *   (`HEAD_SECONDS`) before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
- * - `wait`, which the round's check runs last: it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
+ * - `wait`, which the round's check runs last: it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which
+ *   no `ci` would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says
+ *   `UNKNOWN`, `WF_PR_MERGEABLE_SECONDS`); then it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
  *   for it to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
  *   absent `ci` refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
  *   test with its diff, an e2e page, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
@@ -21,7 +23,8 @@
  * branch per card, and `wf/<run>/<step>` for a fork beside it or a fan-in's merge — and the run it names is what the refusals print.
  * Refuses, exit 1 on stderr with what to do next: a HEAD that is on no such branch or on the remote's default branch; no `origin`; no
  * `gh` on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull
- * request, or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; and a `ci` that is
+ * request, or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request
+ * that conflicts with its base; and a `ci` that is
  * red, cancelled, skipped or never reported.
  */
 import { spawnSync } from 'node:child_process';
@@ -45,6 +48,16 @@ const START_SECONDS = 1800;
  * `pull-request.boundary.test.ts` holds the two numbers against each other.
  */
 const WHOLE_SECONDS = 2400;
+
+/**
+ * How long, in seconds, the wait reads the pull request's `mergeable` again while GitHub answers `UNKNOWN`, which it does while it
+ * computes, before it waits on `ci` all the same; `WF_PR_MERGEABLE_SECONDS` lowers it for a test. A `CONFLICTING` head is refused at
+ * once: GitHub runs no `pull_request` workflow on it, so no `ci` would come.
+ */
+const MERGEABLE_SECONDS = 15;
+
+/** How long the wait sleeps between two reads of `mergeable`, in seconds; `WF_PR_MERGEABLE_POLL_SECONDS` lowers it for a test. */
+const MERGEABLE_POLL_SECONDS = 3;
 
 /** How long the wait sleeps between two polls, in seconds. */
 const POLL_SECONDS = 15;
@@ -103,7 +116,7 @@ type Entry = {
 };
 
 /** A pull request as this script reads one. */
-type Pr = { number: number; url: string; isDraft: boolean; baseRefName: string; headRefOid: string };
+type Pr = { number: number; url: string; isDraft: boolean; baseRefName: string; headRefOid: string; mergeable?: string };
 
 /** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
 type Ran = { status: number | null; out: string; err: string; missing: boolean };
@@ -200,7 +213,7 @@ const head = (): string => git('what commit HEAD is', 'rev-parse', 'HEAD');
 
 /** The open pull requests whose head is `branch`. */
 function pulls(branch: string): Pr[] {
-  const text = gh('pr', 'list', '--head', branch, '--state', 'open', '--json', 'number,url,isDraft,baseRefName,headRefOid');
+  const text = gh('pr', 'list', '--head', branch, '--state', 'open', '--json', 'number,url,isDraft,baseRefName,headRefOid,mergeable');
   return parsed<Pr[]>(`the pull requests of ${branch}`, text);
 }
 
@@ -516,11 +529,37 @@ function unanswered(seen: Seen, pr: Pr, ours: readonly Entry[], entries: readonl
   ].join('\n');
 }
 
+/**
+ * The one open pull request of `branch`, read again while GitHub says its `mergeable` is `UNKNOWN` and the bound is not out; refuses one
+ * GitHub says is `CONFLICTING`, naming the merge that answers it. Any other answer, `UNKNOWN` to the end included, is waited on as before.
+ */
+function unconflicted(branch: string, onto: string): Pr {
+  const whole = seconds('WF_PR_MERGEABLE_SECONDS', MERGEABLE_SECONDS);
+  const poll = seconds('WF_PR_MERGEABLE_POLL_SECONDS', MERGEABLE_POLL_SECONDS);
+  const began = Date.now();
+  for (;;) {
+    const pr = sole(pulls(branch), branch, onto);
+    const said = (pr.mergeable ?? '').toUpperCase();
+    if (said === 'CONFLICTING')
+      throw new Refusal(
+        [
+          `GitHub says #${pr.number} conflicts with its base \`${onto}\`, and it runs no \`pull_request\` workflow on a conflicting ` +
+            `head, so no \`${CONTEXT}\` would come. Merge the base into the run's branch in your session, resolve the conflicts, ` +
+            'commit, and open the round again with the script read from the base:',
+          '  git merge main-worktree/HEAD',
+          `  ${OPEN_LINE}`,
+        ].join('\n'),
+      );
+    if (said !== 'UNKNOWN' || Date.now() - began >= whole * 1000) return pr;
+    sleep(poll);
+  }
+}
+
 /** `wait`: the `ci` context of the pull request's head, waited out and read; its refusal says why CI went red. */
 function wait(): string[] {
   const { branch, run: ofRun, onto } = placed();
-  const pr = sole(pulls(branch), branch, onto);
   const retry = `  Then: nemia retry ${ofRun} ${process.env.WF_STEP || STEP} --recheck`;
+  const pr = unconflicted(branch, onto);
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);

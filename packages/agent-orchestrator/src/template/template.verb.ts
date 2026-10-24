@@ -34,7 +34,7 @@ it. Each .yaml holds one document, of apiVersion nemia.dev/v1alpha1.
   nemia template export writes a new folder from the repository --from: each workflow of its workflows/ —
                  with --factory, only those the factory attaches, and its hires, instruction and rules — the
                  agents their steps name and the skills those agents and steps name, found where a run finds them;
-                 a place skill nemia ships is left out. It prints each part and where it came from, and writes
+                 a builtin place skill is left out. It prints each part and where it came from, and writes
                  nothing while a key has no place in a template, or the draft does not pass its own check.
   nemia template pack   writes a folder that passes its check into one archive, a gzipped tar of the folder
                  any tar opens (tar xzf), at --out, by default <name>-<version>.tgz here; it prints the

@@ -12,7 +12,6 @@ import {
   EMPTY_SKILL_FORM,
   givenRows,
   offerOf,
-  PLACE_LABELS,
   preloadWords,
   reachWords,
   skillEdited,
@@ -32,10 +31,10 @@ const row = (fields: Partial<SkillRow> = {}): SkillRow => ({
   ...fields,
 });
 
-const places = (yours: SkillRow[], repo: SkillRow[] = [], shipped: SkillRow[] = []): SkillPlace[] => [
+const places = (yours: SkillRow[], repo: SkillRow[] = [], builtin: SkillRow[] = []): SkillPlace[] => [
   { from: 'yours', dir: '/store/workflows/skills', skills: yours },
   { from: 'repo', dir: '/repo/.claude/skills', skills: repo },
-  { from: 'shipped', dir: '/hkb/workflows/skills', skills: shipped },
+  { from: 'builtin', dir: '/hkb/workflows/skills', skills: builtin },
 ];
 
 const detail = (fields: Partial<SkillDetail> = {}): SkillDetail => ({
@@ -57,9 +56,6 @@ const detail = (fields: Partial<SkillDetail> = {}): SkillDetail => ({
 });
 
 test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, and what a change reaches', async (t) => {
-  await t.test('the places are named as the picker groups them', () => {
-    assert.deepEqual(PLACE_LABELS, { yours: 'Your library', repo: 'This repository', shipped: 'Shipped with Nemia' });
-  });
   await t.test("a turn's cost is said in words: named, its listing and the body only when loaded; preloaded, all of it every turn", () => {
     assert.equal(
       costWords({ preload: false, listed: 12, body: 1500, perTurn: 12 }),
@@ -95,8 +91,8 @@ test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, 
     'a skill the form gives is shown where an agent of yours finds it now, else as the agent was read, else said missing once the list is read',
     () => {
       const read: GivenSkill[] = [{ name: 'old', from: 'repo', foundIn: null, entry: null, error: 'as read', preload: false, cost: null }];
-      const shipped = row({ name: 'ship-it', from: 'shipped' });
-      const rows = givenRows(['write-a-note', 'old', 'ship-it'], read, places([row()], [], [shipped]));
+      const builtin = row({ name: 'ship-it', from: 'builtin' });
+      const rows = givenRows(['write-a-note', 'old', 'ship-it'], read, places([row()], [], [builtin]));
       assert.deepEqual(
         rows.map((r) => [r.name, r.from]),
         [
@@ -104,7 +100,7 @@ test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, 
           ['old', 'repo'],
           ['ship-it', null],
         ],
-        'a shipped skill is not found by an agent of yours',
+        'a builtin skill is not found by an agent of yours',
       );
       assert.equal(rows[1].error, 'as read');
       assert.match(rows[2].error!, /^Neither your library nor this repository has `ship-it`/);
@@ -125,22 +121,22 @@ test('givenRows, offerOf, costWords, reachWords: skills listed, given, offered, 
       );
     },
   );
-  await t.test('the picker offers Add for a skill of yours or the repository, and copy-and-add for a shipped one found nowhere', () => {
+  await t.test('the picker offers Add for a skill of yours or the repository, and copy-and-add for a builtin one found nowhere', () => {
     assert.deepEqual(offerOf(row(), []), { kind: 'add' });
     assert.deepEqual(offerOf(row({ from: 'repo' }), []), { kind: 'add' });
     assert.deepEqual(offerOf(row(), ['write-a-note']), { kind: 'given' });
-    assert.deepEqual(offerOf(row({ from: 'shipped' }), []), { kind: 'copy' });
+    assert.deepEqual(offerOf(row({ from: 'builtin' }), []), { kind: 'copy' });
   });
   await t.test(
-    "REFUSED: no offer for a skill that does not read, and no copy of a shipped name an agent of yours already finds — it would write over yours or hide the repository's",
+    "REFUSED: no offer for a skill that does not read, and no copy of a builtin name an agent of yours already finds — it would write over yours or hide the repository's",
     () => {
       assert.deepEqual(offerOf(row({ entry: null, error: 'SKILL.md has no frontmatter' }), []), {
         kind: 'refused',
         why: 'SKILL.md has no frontmatter',
       });
-      assert.deepEqual(offerOf(row({ from: 'shipped', entry: null, error: 'a link' }), []), { kind: 'refused', why: 'a link' });
-      assert.deepEqual(offerOf(row({ from: 'shipped', found: 'yours' }), []), { kind: 'found', where: 'yours' });
-      assert.deepEqual(offerOf(row({ from: 'shipped', found: 'repo' }), []), { kind: 'found', where: 'repo' });
+      assert.deepEqual(offerOf(row({ from: 'builtin', entry: null, error: 'a link' }), []), { kind: 'refused', why: 'a link' });
+      assert.deepEqual(offerOf(row({ from: 'builtin', found: 'yours' }), []), { kind: 'found', where: 'yours' });
+      assert.deepEqual(offerOf(row({ from: 'builtin', found: 'repo' }), []), { kind: 'found', where: 'repo' });
     },
   );
   await t.test('a change is said to reach every agent that gives the skill, by name, or none', () => {

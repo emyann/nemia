@@ -6,7 +6,7 @@
  *     const runWith = runOver(() => stand().layer);   // a package program, as `nemia` runs it
  *     const app = () => appOver(engine(), stand());   // the api, as a request reaches it
  *
- * The engine a program or the app reads is the runtime's stand-in wrapped as the shipped engine is (`Engine.over`, `engineOf`), and a
+ * The engine a program or the app reads is the runtime's stand-in wrapped as the real engine is (`Engine.over`, `engineOf`), and a
  * step is moved on it by hand (`engine().settle`). A test that needs the real place or the real engine says so by its name,
  * `<what>.boundary.test.ts`. `eachTest` is a copy of the orchestrator's (`packages/agent-orchestrator/test/placed.ts`), not an import
  * of it: a package's test reaches into no other package's files.
@@ -34,7 +34,7 @@ export const runOver =
   <A, E>(e: Parameters<typeof runEngine>[0], program: Effect.Effect<A, E, EngineService | PlaceService | StoreRoot>): Promise<A> =>
     runEngine(e, program.pipe(Effect.provide(layerOf(given)), Effect.provide(storeRootLayer(process.env))));
 
-/** The engine a package program reads, over the stand-in `engine`: what `engine()` of the package is to a shipped one. */
+/** The engine a package program reads, over the stand-in `engine`: what `engine()` of the package is to the real one. */
 export const engineFor = (engine: TestEngine): ReturnType<typeof engineOf> => engineOf(engine.layer);
 
 /**

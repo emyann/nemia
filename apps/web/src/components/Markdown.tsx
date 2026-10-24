@@ -128,7 +128,7 @@ type MarkdownProps = {
 /**
  * A text written in markdown, as the board shows it: GFM — tables, task lists, strikethrough, autolinks, footnotes — on react-markdown.
  *
- * Raw HTML in the text is shown as the text it is, never as HTML: react-markdown turns it into text as it ships, and nothing here adds
+ * Raw HTML in the text is shown as the text it is, never as HTML: react-markdown turns it into text as it comes, and nothing here adds
  * a plugin that would parse it. A link's address passes react-markdown's own check, which empties a protocol that could run script.
  * Headings stand under the page's: a `#` is an h3, or `level`, and each deeper one follows it, sized by its level in the text. A soft
  * line break joins its lines into one paragraph: nothing here keeps a source's breaks. A text's footnote ids have a prefix of its own, so

@@ -16,9 +16,9 @@ import { story } from '../../test/checkpoints.ts';
 import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import { workflowVersion as versionIn } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 import { listWorkflows } from './workflows.ts';
-import { engine, shippedGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
+import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
 const repo = scratch('nemia-api-repo-');
@@ -714,7 +714,7 @@ test('POST /api/runs: what a start refuses, writing nothing, and the name two pl
       write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
       write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
       assert.equal(
-        (await listWorkflows(engine(), shippedGitPlace, repo, root)).find((w) => w.name === 'clash')?.error,
+        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'clash')?.error,
         null,
         "the loader reads this folder; `nemia start` refuses it, as the run files build's check as `build-check`",
       );

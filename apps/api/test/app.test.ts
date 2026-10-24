@@ -21,7 +21,7 @@ import {
   VERSION,
   type RunSummary,
 } from 'agent-orchestrator';
-import { runWith } from './shipped-place.ts';
+import { runWith } from './builtin-place.ts';
 import { Engine } from 'agent-runtime';
 import { Context, Effect, Exit, Layer, Scope } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';

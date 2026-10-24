@@ -31,7 +31,7 @@ const { startRun } = await import('../runner.ts');
 const { listRuns } = await import('../record/record.store.ts');
 const { tickRun, freshRestMemo } = await import('./tick.verb.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
-const { gitPlaceLayer, shippedGitPlace } = await import('../place/shipped.store.ts');
+const { gitPlaceLayer, builtinGitPlace } = await import('../place/builtin.store.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { PlaceService } = await import('../place/place.store.ts');
@@ -246,14 +246,14 @@ test('two factories on two repositories ask one place, the instance the pass is 
     asked.push({ verb, ...('repo' in request && typeof request.repo === 'string' ? { repo: path.resolve(request.repo) } : {}) });
   };
   const one: Place = {
-    declared: shippedGitPlace.declared,
+    declared: builtinGitPlace.declared,
     ask: (verb, request, options) => {
       noted(verb, request);
-      return shippedGitPlace.ask(verb, request, options);
+      return builtinGitPlace.ask(verb, request, options);
     },
     askNow: (verb, request, options) => {
       noted(verb, request);
-      return shippedGitPlace.askNow(verb, request, options);
+      return builtinGitPlace.askNow(verb, request, options);
     },
   };
   const pass = await runWith(

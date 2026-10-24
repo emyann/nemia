@@ -343,7 +343,7 @@ async function measure(asked: Asked, root: string, fence: Fence) {
   fence.arm('read');
   const orch = await import('agent-orchestrator');
   const api = await import('api/src/app.ts');
-  const place = readOnlyPlace(orch.shippedGitPlace);
+  const place = readOnlyPlace(orch.builtinGitPlace);
   const fresh = () => appOver(api, orch, place);
   const { repeat } = asked;
   const first = await fresh();

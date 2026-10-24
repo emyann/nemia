@@ -1,11 +1,11 @@
 /**
  * A factory's MCP servers on the board: the record the store keeps beside the factory, each server with the state its harness reports
  * now, read through `nemia factory servers`'s entry of the package's command table (`FACTORY_SERVERS`), so the board and the command
- * say the same things in the same words. And the servers Nemia ships, which the add form offers.
+ * say the same things in the same words. And Nemia's builtin servers, which the add form offers.
  *
  * A folder of its own because `src/factories/` holds six source files, the cap, and a limit is met by cutting rather than by raising a
- * ceiling. The state is the runtime's, asked through the package: no file here imports the runtime or a harness SDK. And the shipped
- * folder is read by the package too (`shippedServers`): a reader of the api touches no disk of its own (`test/kinds.test.ts`), so this
+ * ceiling. The state is the runtime's, asked through the package: no file here imports the runtime or a harness SDK. And the builtin
+ * folder is read by the package too (`builtinServers`): a reader of the api touches no disk of its own (`test/kinds.test.ts`), so this
  * file names the folder and the package reads it.
  */
 import path from 'node:path';
@@ -13,9 +13,9 @@ import {
   FACTORY_SERVERS,
   factoryNameRefusal,
   serverNameRefusal,
-  shippedServers,
+  builtinServers,
   type ServersListing,
-  type ShippedServer,
+  type BuiltinServer,
 } from 'agent-orchestrator';
 import { Hono } from 'hono';
 import { valueAt } from '../body.ts';
@@ -25,14 +25,14 @@ import { type ApiEnv, served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
 
 /**
- * `workflows/servers/` of the checkout the api runs from: the MCP servers Nemia ships, each a `<name>.json` a person may add to a
+ * `workflows/servers/` of the checkout the api runs from: Nemia's builtin MCP servers, each a `<name>.json` a person may add to a
  * factory of theirs without typing its address or its client id: GitHub's (`github.json`), signed in to from the board
- * (`sign-in.ts`). A checkout without the folder lists no shipped server, which is no error.
+ * (`sign-in.ts`). A checkout without the folder lists no builtin server, which is no error.
  */
-export const SHIPPED_SERVERS = path.join(HOME_REPO, 'workflows', 'servers');
+export const BUILTIN_SERVERS = path.join(HOME_REPO, 'workflows', 'servers');
 
-/** What the board reads of a factory's servers: its record with each state, and the list Nemia ships for the add form. */
-export type FactoryServersRead = ServersListing & { readonly shipped: readonly ShippedServer[] };
+/** What the board reads of a factory's servers: its record with each state, and Nemia's builtin list for the add form. */
+export type FactoryServersRead = ServersListing & { readonly builtin: readonly BuiltinServer[] };
 
 const ADD_PUT_SHAPE =
   '`{ "url": "https://…", "transport"?: "http" | "sse", "header"?: ["<name>=<value>", …], "clientId"?: "<id>", "callbackPort"?: "<port>" }`';
@@ -91,7 +91,7 @@ export const FACTORY_SERVER_RM_WORDS: RouteWords = {
  * no factory is 404 (`Missing`), by `app.onError`. A state that could not be read is answered, never refused: `state` is null on each
  * server and `unread` says why, since an absence read off a failed look is not an absence.
  *
- * - `GET /api/factories/:factory/servers` — the factory's record, each server with its state, and `shipped`, the servers Nemia ships.
+ * - `GET /api/factories/:factory/servers` — the factory's record, each server with its state, and `builtin`, Nemia's builtin servers.
  *
  * A server is recorded (`PUT …/servers/:server`) and removed (`DELETE …/servers/:server`) on the path under it: routes the table
  * generates from the entries (commands/routes.ts), guarded, each answered as the read.
@@ -105,7 +105,7 @@ export const factoryServers = new Hono<ApiEnv>().get('/api/factories/:factory/se
     const wrong = factoryNameRefusal(factory);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${factory}/servers: ${wrong}` }, 400);
     const listing = await runPlaced(placeService, e, FACTORY_SERVERS.handler({ factory }, undefined, home));
-    return c.json({ ...listing, shipped: shippedServers(SHIPPED_SERVERS) } satisfies FactoryServersRead);
+    return c.json({ ...listing, builtin: builtinServers(BUILTIN_SERVERS) } satisfies FactoryServersRead);
   }),
 );
 

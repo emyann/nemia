@@ -44,7 +44,7 @@ export default {
    * Her rules at Auto on the store's Settings, beside the custom instruction they come from: the default in force, marked Default, since
    * nothing is confirmed; what she proposed, a Confirm on it, and the words kept as guidance. A confirm puts the rule in force beside the
    * default and marks it so among what she proposed, sending the words the person read; a drop of the default leaves the rule alone in
-   * force and offers the default back, which puts it back as it ships. The instruction, the proposal and the person's list are written by
+   * force and offers the default back, which puts the builtin rule back. The instruction, the proposal and the person's list are written by
    * the page and taken back after.
    */
   name: 'auto-rules',
@@ -95,7 +95,7 @@ export default {
       await photograph(part, path.join(OUT, `auto-rules-confirmed-${await themeOf(page)}.png`));
       const back = await wrote(page, inForce.locator('[data-auto-default-back]'), 'PUT', 'the default is put back');
       await expectWordsSent(back, inForce.locator('[data-auto-rule="default"]'), 'a put-back');
-      await expectVisible(inForce.locator('[data-auto-rule="default"] [data-auto-default]'), 'the default is in force again, as it ships');
+      await expectVisible(inForce.locator('[data-auto-rule="default"] [data-auto-default]'), 'the builtin default is in force again');
     } finally {
       fs.rmSync(instruction, { force: true });
       fs.rmSync(auto, { recursive: true, force: true });

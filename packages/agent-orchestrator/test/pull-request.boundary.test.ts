@@ -298,15 +298,31 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   assert.ok(unopened.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), unopened.err);
 });
 
-test('wait polls the ci context until it has a verdict, and passes on a green one', () => {
+test('wait reads mergeable again while GitHub computes it, polls the ci context until it has a verdict, and passes on a green one; REFUSED at once: a conflicting head', () => {
   const at = placed();
+  const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  const computing = (then: string): Rule => ({
+    when: 'pr list',
+    outs: [listed(head, { mergeable: 'UNKNOWN' }), listed(head, { mergeable: then })],
+  });
   const pending: Rule = { when: 'pr view', outs: [rollup({ status: 'QUEUED' }), rollup({ status: 'IN_PROGRESS' }), GREEN] };
-  at.gh.answers([...passing(at.repo).filter((rule) => rule.when !== 'pr view'), pending]);
-  const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0' });
+  const others = passing(at.repo).filter((rule) => rule.when !== 'pr view' && rule.when !== 'pr list');
+  const quick = { WF_CI_POLL_SECONDS: '0', WF_PR_MERGEABLE_POLL_SECONDS: '0' };
+  at.gh.answers([...others, computing('MERGEABLE'), pending]);
+  const r = pr(at, 'wait', [], quick);
   assert.equal(r.code, 0, r.err);
+  assert.equal(asked(r.calls, 'pr', 'list').length, 2, 'an UNKNOWN mergeable is read again until GitHub has computed it');
   assert.equal(asked(r.calls, 'pr', 'view').length, 3, 'it polled until the verdict');
   assert.match(r.out, /wf ci: `ci` passed on/);
   assert.equal(tip(at.bare!, at.branch), null, 'the wait pushes nothing');
+
+  const torn = placed();
+  torn.gh.answers([...others, computing('CONFLICTING'), pending]);
+  const conflicting = pr(torn, 'wait', [], { ...quick, WF_CI_START_SECONDS: '600', WF_CI_WAIT_SECONDS: '600' });
+  assert.equal(conflicting.code, 1, conflicting.out);
+  assert.equal(asked(conflicting.calls, 'pr', 'view').length, 0, 'no ci is waited for on a head that conflicts with its base');
+  assert.ok(conflicting.err.includes('git merge main-worktree/HEAD'), `it names the merge of the base:\n${conflicting.err}`);
+  assert.ok(conflicting.err.includes('node pull-request.ts open --title'), `and the push of the round again:\n${conflicting.err}`);
 });
 
 /** `lines` as a job's log GitHub serves: each line stamped with the time it was printed. */

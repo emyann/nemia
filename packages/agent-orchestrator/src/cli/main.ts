@@ -43,7 +43,7 @@ import {
   runMain,
   tickRun,
   runWith,
-  shippedGitPlace,
+  builtinGitPlace,
   PlaceService,
   storeRootLayer,
   wfRoot,
@@ -425,7 +425,7 @@ export async function main(
   argv: string[],
   given?: Engine,
   demand: () => DemandHost = liveDemandHost,
-  place: Place = shippedGitPlace,
+  place: Place = builtinGitPlace,
 ): Promise<void> {
   const renamed = renamedIn(argv);
   if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);

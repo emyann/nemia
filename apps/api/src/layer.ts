@@ -85,7 +85,7 @@ export class ReadMemo extends Context.Service<
 /**
  * How often the api's streams read again what nothing pushes to them: a step's conversation no live stream can be had of (`step`,
  * `readAgain` in steps/steps.ts), Nemia's chat (`chat`, nemia/chat.ts), and the feed's file for the lines no hub brought (`feed`,
- * `followFeed`). Each left out is the shipped beat its own module names (`STEP_BEAT_MS`, `CHAT_BEAT_MS`, the package's own for the
+ * `followFeed`). Each left out is the default beat its own module names (`STEP_BEAT_MS`, `CHAT_BEAT_MS`, the package's own for the
  * feed), so this file imports none of them; a test gives shorter ones with
  * `appOf(Layer.merge(liveOf(), Layer.succeed(Beats)({ ...Beats.defaultValue(), step: … })))` rather than wait them out.
  */

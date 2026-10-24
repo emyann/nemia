@@ -434,26 +434,37 @@ const keptUnder =
 const spawnUnder =
   (root: string, parentCallFrom: (sessionId: string) => Promise<ParentCall | undefined>): RunnerOps['spawn'] =>
   (r) =>
-    Effect.tryPromise({
-      try: async () => {
-        const mcpArgs = claudeMcpArgs([
-          r.config?.checkoutMcp ? undefined : checkoutMcpConfig(r.cwd),
-          writeMcpConfig(mcpFileOf(root, r.name), sessionMcp(r.cwd, r.config)),
-        ]);
-        await recordParent(parentFileOf(root, r.name), r.resumeFrom, parentCallFrom);
-        clearSighting(quietFileOf(root, r.name));
-        return mcpArgs;
-      },
-      catch: (cause) =>
-        new RunnerError({
-          verb: 'spawn',
-          message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}`,
-          ...(refusedOsError(cause) ? { refused: true } : {}),
-        }),
-    }).pipe(
-      Effect.flatMap((mcpArgs) => sh('claude', claudeArgv(r, mcpArgs), { cwd: r.cwd, verb: 'spawn' })),
-      Effect.asVoid,
-    );
+    Array.isArray(r.config?.enabledSkills)
+      ? Effect.fail(
+          new RunnerError({
+            verb: 'spawn',
+            message: `claude --bg: \`enabledSkills\` gives the session those skills alone, and \`claude --bg\` has no flag or setting that closes a session's skills, so it is not started holding every one: a long-lived task runs attached while this runtime holds it, so start the runtime's holder, or give \`enabledSkills: 'default'\`.`,
+            refused: true,
+          }),
+        )
+      : spawnBg(root, parentCallFrom, r);
+
+const spawnBg = (root: string, parentCallFrom: (sessionId: string) => Promise<ParentCall | undefined>, r: SpawnRequest) =>
+  Effect.tryPromise({
+    try: async () => {
+      const mcpArgs = claudeMcpArgs([
+        r.config?.checkoutMcp ? undefined : checkoutMcpConfig(r.cwd),
+        writeMcpConfig(mcpFileOf(root, r.name), sessionMcp(r.cwd, r.config)),
+      ]);
+      await recordParent(parentFileOf(root, r.name), r.resumeFrom, parentCallFrom);
+      clearSighting(quietFileOf(root, r.name));
+      return mcpArgs;
+    },
+    catch: (cause) =>
+      new RunnerError({
+        verb: 'spawn',
+        message: `claude --bg: ${cause instanceof Error ? cause.message : String(cause)}`,
+        ...(refusedOsError(cause) ? { refused: true } : {}),
+      }),
+  }).pipe(
+    Effect.flatMap((mcpArgs) => sh('claude', claudeArgv(r, mcpArgs), { cwd: r.cwd, verb: 'spawn' })),
+    Effect.asVoid,
+  );
 
 /** Where a task's MCP config is written under `root`, by its name. */
 const mcpFileOf = (root: string, name: string) => path.join(root, 'mcp', `${name.replace(/[^a-zA-Z0-9]+/g, '_')}.json`);

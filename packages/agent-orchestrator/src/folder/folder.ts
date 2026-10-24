@@ -4,7 +4,6 @@
  */
 import path from 'node:path';
 import { AGENTS_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
-import { bareSkillOf } from '../keys/index.ts';
 import { orderSteps, parseWorkflow, validate, type Hire } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
 
@@ -134,35 +133,7 @@ export function parseFolder(
   const byFile = [...files].sort(([a], [b]) => (`${a}.md` < `${b}.md` ? -1 : `${a}.md` > `${b}.md` ? 1 : 0));
   const steps = byFile.map(([name, text]) => parseWorkflow(name, text, read, agents, skills, hireOf(fills, name), fills?.rules));
   validate(steps);
-  const off = offSkills(steps, skills);
-  for (const step of steps) if (step.agent && off.length) step.agent.offSkills = off;
   return orderSteps(steps);
-}
-
-/**
- * The step as its own file alone says it: the folder-wide off-list dropped (`offSkills`), which is no part of the step's text but computed
- * from the folder's other steps and the skills the lookup found. What a reader asks before it holds a step to what one file parses to —
- * `writeWorkflow`, which keeps a file that still reads as its step, and the parser's round trip.
- */
-export function asFileSays(step: Workflow): Workflow {
-  if (!step.agent?.offSkills) return step;
-  const { offSkills: _o, ...agent } = step.agent;
-  return { ...step, agent };
-}
-
-/**
- * Every skill name the folder could see, which each of its steps' sessions is told to turn off so it is listed its own plugin's copies
- * alone (`StepAgent.offSkills`): each bare name the lookup found (`SkillsFound.all`, the roots' skills and the package's place skills),
- * and each name written on any agent's or any step's `skills:` line in the folder — a `folder:name` with its bare form too, since a
- * session loads it by that — deduplicated and sorted, so a record reads the same whatever order the files were parsed in.
- *
- * One list for the folder, not one per step: the kit's skills are written on three of the build's steps alone, and a step that names
- * none must not be listed them either. A name is in the list whether or not the step that must not be listed it is the step that names
- * it, because no override reaches a plugin's skill: the step given it keeps the frozen copy under `nemia-<agent>:<name>`.
- */
-function offSkills(steps: readonly Workflow[], skills: SkillsFound | undefined): string[] {
-  const written = steps.flatMap((step) => step.agent?.skills ?? []);
-  return [...new Set([...(skills?.all.keys() ?? []), ...written.flatMap((name) => [name, bareSkillOf(name)])])].sort();
 }
 
 /**

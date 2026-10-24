@@ -229,6 +229,7 @@ export const claudeJobSpec = (executable?: string): HarnessSpec => ({
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
   checkoutMcp: true,
+  enabledSkills: true,
   env: true,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },

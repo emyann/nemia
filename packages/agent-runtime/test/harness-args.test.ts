@@ -27,9 +27,9 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-test('argsRefusalOf: where a key is and whether it is one — the twenty arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', async (t) => {
+test('argsRefusalOf: where a key is and whether it is one — the twenty-one arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', async (t) => {
   await t.test(
-    "HARNESS_ARGS is the twenty arguments a harness takes — the spend cap, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags",
+    "HARNESS_ARGS is the twenty-one arguments a harness takes — the spend cap, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags",
     () => {
       assert.deepEqual([...HARNESS_ARGS].sort(), [
         'allowedTools',
@@ -43,6 +43,7 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty argumen
         'contextTokens',
         'disallowedTools',
         'effort',
+        'enabledSkills',
         'env',
         'mayAsk',
         'mcp',
@@ -73,7 +74,7 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty argumen
     },
   );
   await t.test(
-    'a harness argument filed beside config is refused, naming where it goes — each of the twenty — and the same value under config is taken',
+    'a harness argument filed beside config is refused, naming where it goes — each of the twenty-one — and the same value under config is taken',
     () => {
       const value: Record<keyof HarnessArgs, unknown> = {
         model: 'opus',
@@ -96,6 +97,7 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty argumen
         mounts: [{ path: '/repo', readOnly: true }],
         callAdmission: { command: ['my-admit'], tools: ['Bash'] },
         mayAsk: true,
+        enabledSkills: ['my-plugin:review'],
       };
       for (const key of HARNESS_ARGS) {
         const says = argsRefusalOf({ ...task, [key]: value[key] } as never);
@@ -274,6 +276,13 @@ test("argsRefusalOf: what each argument's value is — a spend cap, Claude Code'
       assert.equal(argsRefusalOf({ ...task, config: { checkoutMcp: ['a'], mcp: { b: { command: 'x' } } } }), undefined);
     },
   );
+  await t.test("enabledSkills is 'default' or a list of skill names, none twice: anything else is refused", () => {
+    for (const bad of ['all', 'review', [''], ['a', 3], ['a b'], ['a:b:c'], ['a', 'a'], { a: true }, null]) {
+      assert.ok(argsRefusalOf({ ...task, config: { enabledSkills: bad } } as never), JSON.stringify(bad));
+    }
+    const goods: Array<string[] | 'default'> = ['default', [], ['review'], ['my-plugin:review', 'my-plugin:ship']];
+    for (const good of goods) assert.equal(argsRefusalOf({ ...task, config: { enabledSkills: good } }), undefined, JSON.stringify(good));
+  });
 });
 
 test("a turn's configuration: its own spend cap and nothing else, each other key refused, laid over the task's own, which it leaves unchanged", async (t) => {

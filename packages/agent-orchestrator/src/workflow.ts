@@ -119,7 +119,6 @@ export type { StepDraft } from './workflow/index.ts';
 export {
   agentsDir,
   agentsFolderRefusal,
-  asFileSays,
   linkRefusal,
   parseFolder,
   readmeDescription,

@@ -10,7 +10,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { skillNameRefusal, skillTurnCost, tokensAbout } from '../src/workflow.ts';
+import { skillTurnCost, tokensAbout } from '../src/workflow.ts';
 import { preloads, skillsFor } from '../src/skills/read.store.ts';
 import { scratch } from './scratch.ts';
 import { TEAM } from './team.ts';
@@ -104,8 +104,6 @@ test("a copy is refused for a skill the source does not have, and for a name tha
       /is not a skill's name: a skill is a folder in skills\/, named in lowercase words joined by dashes/,
     );
   }
-  assert.equal(skillNameRefusal('write-a-note'), undefined, 'and a name that is one passes');
-  assert.equal(skillNameRefusal('x'.repeat(64)), undefined, 'at 64 characters too');
 });
 
 test('a copy is refused for a skill whose SKILL.md does not read as a card entry: no agent could be given it', () => {

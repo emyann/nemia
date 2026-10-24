@@ -1,0 +1,33 @@
+---
+title: The model
+description: What each layer keeps, entity by entity, and the one id that links the two.
+---
+
+Each layer has its own model: the things it keeps on disk, what each holds, and which id names each. The runtime keeps tasks, their
+attempts and their sessions. The orchestrator keeps runs, their steps, the tries of each step and its rounds, and around them the
+inbox, the factories, the places, the agents and the feed.
+
+## Linked by id alone
+
+The two models never hold each other's entities. Where the orchestrator needs the runtime's work, it holds the id the runtime gave it:
+a try names the task it ran as by its `TaskId`, and nothing more. The orchestrator declares that id as the runtime's, without
+importing the runtime (`packages/agent-orchestrator/src/record/record.model.ts`), so in its diagram the runtime's task is a box known
+by its id alone. To learn what that task did, the orchestrator asks the runtime, through its one client.
+
+## The two models side by side
+
+Each diagram is drawn from its layer's code, which prints it: the runtime's from `packages/agent-runtime/src/core/model.ts`, the
+orchestrator's from `packages/agent-orchestrator/src/model/diagram.model.ts`. A key marked PK is the entity's own id, and one marked FK
+names another entity, here or in the other layer.
+
+<div class="side-by-side">
+
+```mermaid diagram=runtime-model
+
+```
+
+```mermaid diagram=orchestrator-model
+
+```
+
+</div>

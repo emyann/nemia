@@ -18,6 +18,11 @@
       }
     },
     {
+      "term": "Agent name",
+      "meaning": "an agent's name: its file's in the agents' folder, without its extension, by which a step names it.",
+      "type": "AgentName"
+    },
+    {
       "term": "Custom instructions",
       "meaning": "what a person adds to an agent they use, one file per agent in their store, without rewriting it.",
       "see": {
@@ -56,6 +61,16 @@
         "label": "Skills",
         "href": "/agents/#skills"
       }
+    },
+    {
+      "term": "Skill name",
+      "meaning": "the name of a skill's folder: lowercase words joined by dashes, 64 characters at most.",
+      "type": "SkillName"
+    },
+    {
+      "term": "Step's agent",
+      "meaning": "the agent a workflow's step names on its `agent:` line, by name.",
+      "type": "StepAgent"
     },
     {
       "term": "Tools",

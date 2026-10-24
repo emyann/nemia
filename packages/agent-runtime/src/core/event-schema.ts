@@ -158,13 +158,16 @@ export type FormerReason = (typeof FORMER_REASONS)[number];
  * vouched for with, read as `succeeded`, a former reason (`FORMER_REASONS`) the harness's end with no statement, and
  * `closedOut` given by its former name (`upgrade`, each).
  */
+/** What the workload said as an attempt ended, if anything: carried by the end and by the attempt it settles, never read. */
+export const SaidAtEnd = { closeout: Schema.optional(Schema.Unknown) };
+
 const Ended = event('ended', {
   attempt: Schema.Finite,
   sessionId: Schema.String,
   observed: Schema.Literals(['succeeded', 'failed', 'stopped', 'done']),
   reason: Schema.Literals(['harness', 'lost', 'unstartable', 'operator', 'deadline', 'budget', ...FORMER_REASONS]),
   nativeId: Schema.optional(Schema.String),
-  closeout: Schema.optional(Schema.Unknown),
+  ...SaidAtEnd,
   closedOut: Schema.optional(Schema.Boolean),
   stated: Schema.optional(Schema.Boolean),
   former: Schema.optional(Schema.Literals(FORMER_REASONS)),

@@ -21,11 +21,10 @@ test("namesInOrder: a record's steps in the order they run, then any the workflo
   });
 });
 
-test('runId: a run id is readable, and step ids share its prefix', async (t) => {
+test('runId: a run id is readable', async (t) => {
   await t.test('the brief, slugged and cut, then a drawn tail: what a person sees in `claude agents`', () => {
     const id = runId('Add a `split` example workflow to this repository: a step whose job is...');
     assert.match(id, /^add-a-split-example-workflow-[a-z0-9]{4}$/);
-    assert.equal(`${id}-implement`.startsWith(id), true, 'a step id carries its run');
   });
   await t.test('a brief with nothing sluggable still gets an id', () => {
     assert.match(runId('!!!'), /^run-[a-z0-9]{4}$/);

@@ -200,12 +200,13 @@ test('REFUSED: a glossary table whose meaning cites a name the code does not hav
   );
 });
 
-test('the scan reads all eleven pages and the glossary tables, and the many spans they cite', () => {
+test('the scan reads all twelve pages and the glossary tables, and the many spans they cite', () => {
   const pages = scanned();
   assert.deepEqual(
     [
       'index.mdx',
       'map.mdx',
+      'model.mdx',
       'runtime.mdx',
       'a2a.mdx',
       'workflows.mdx',

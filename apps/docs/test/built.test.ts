@@ -14,12 +14,16 @@ import { scratch } from './scratch.ts';
 const page = (figures: string[]): string =>
   `<html><body>${figures.map((words) => `<svg viewBox="0 0 10 10"><title>${words}</title></svg>`).join('')}</body></html>`;
 
-/** A fixture `dist/` as the build writes it: every page, the lifecycle on the runtime's, Nemia's machine on hers, a sequence. */
+/**
+ * A fixture `dist/` as the build writes it: every page, the lifecycle on the runtime's, Nemia's machine on hers, the models on theirs,
+ * a sequence.
+ */
 const built = (figuresOf: Record<string, string[]> = {}): string => {
   const dist = scratch('docs-built-');
   const drawn: Record<string, string[]> = {
     runtime: ['a task waits in input-required'],
     nemia: ['a folder is untrusted'],
+    model: ['a task counts its AttemptNumber', 'a step counts its TryNumber'],
     'how-a-run-lives': ['a run files its first step'],
     ...figuresOf,
   };
@@ -30,7 +34,7 @@ const built = (figuresOf: Record<string, string[]> = {}): string => {
   return dist;
 };
 
-test('REFUSED: a page not built, a figure printing its style, a machine lost and a machine on two pages', () => {
+test('REFUSED: a page not built, a figure printing its style, a machine or a model lost and a machine on two pages', () => {
   assert.deepEqual(faultsOf(built()), [], 'the site as the build writes it');
   const whole = built();
   fs.rmSync(path.join(whole, 'how-a-run-lives'), { recursive: true });
@@ -44,6 +48,9 @@ test('REFUSED: a page not built, a figure printing its style, a machine lost and
   );
   assert.deepEqual(faultsOf(built({ nemia: ['a folder is trusted'] })), ["Nemia's machine is drawn on no page, not on nemia alone"]);
   assert.deepEqual(faultsOf(built({ 'how-a-run-lives': [] })), ['how a run lives draws no sequence']);
+  assert.deepEqual(faultsOf(built({ model: ['a task counts its AttemptNumber'] })), [
+    "the orchestrator's model is drawn on no page, not on model alone",
+  ]);
   const styled = built();
   fs.writeFileSync(path.join(styled, 'map', 'index.html'), '<html><body><figure set:html="<svg/>"></figure></body></html>');
   assert.deepEqual(faultsOf(styled), ["a figure of map prints its style as an attribute: draw it through the site's stylesheet"]);

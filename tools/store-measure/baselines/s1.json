@@ -1,0 +1,113 @@
+{
+  "machine": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "cores": 12,
+    "memoryBytes": 16770084864,
+    "node": "v24.20.0",
+    "platform": "linux",
+    "load": 2.14
+  },
+  "commit": "02b7e095898f39c74a18ea0ae5b318a94a28fcdc",
+  "date": "2026-10-24T12:56:04.626Z",
+  "repeat": 5,
+  "from": "~/.agent-workflows",
+  "engine": "~/.agent-engine",
+  "copy": {
+    "files": 93099,
+    "bytes": 2069837349,
+    "ms": 8210.134784,
+    "leftOut": [
+      "api.log",
+      "daemon.json",
+      "engine/a2a",
+      "wf-up.log",
+      "worktrees"
+    ]
+  },
+  "counts": {
+    "runs": 94,
+    "finishedRuns": 82,
+    "openRuns": 12,
+    "tasks": 7116,
+    "journalBytes": 113626619,
+    "feedLines": 36056,
+    "unreadable": {
+      "runs": 0,
+      "passLines": 0
+    },
+    "invariantRefusals": 0
+  },
+  "asked": {
+    "finishedRun": "main-s-lint-is-red-runner-ts-knuh",
+    "openRun": "builtin-for-what-nemia-ships-vpnb",
+    "feedCursor": 8036435,
+    "feedLinesRead": 1000
+  },
+  "measures": {
+    "runList": {
+      "cold": {
+        "ms": 1493.5957799999996,
+        "heapMb": 131.716888
+      },
+      "warm": {
+        "ms": 106.44663799999762,
+        "heapMb": 1.146064
+      }
+    },
+    "stats": {
+      "cold": {
+        "ms": 4640.006655999998,
+        "heapMb": 50.368376
+      },
+      "warm": {
+        "ms": 333.5892709999971,
+        "heapMb": 0.279376
+      }
+    },
+    "finishedRun": {
+      "cold": {
+        "ms": 1116.6100179999994,
+        "heapMb": 82.256392
+      },
+      "warm": {
+        "ms": 75.09746799999994,
+        "heapMb": 0.503904
+      }
+    },
+    "openRun": {
+      "cold": {
+        "ms": 989.2545009999958,
+        "heapMb": 82.689128
+      },
+      "warm": {
+        "ms": 77.35422799999651,
+        "heapMb": 1.037864
+      }
+    },
+    "feedFromCursor": {
+      "cold": {
+        "ms": 25.959214000002248,
+        "heapMb": 0.169064
+      },
+      "warm": {
+        "ms": 27.97284300001047,
+        "heapMb": 0.086536
+      }
+    },
+    "tickPass": {
+      "cold": {
+        "ms": 856.636129999999,
+        "heapMb": 0.481024
+      },
+      "warm": {
+        "ms": 154.93868599999405,
+        "heapMb": 0.169184
+      }
+    }
+  },
+  "spawned": {
+    "git read (pass)": 11
+  },
+  "placeRefused": {},
+  "refusals": []
+}

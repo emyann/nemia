@@ -26,8 +26,8 @@ wf decide r-xyz      # what it produced, and the choice it leaves you
 wf retry r-xyz implement --recheck   # its check was killed before it finished: run it again
 wf retry r-xyz plan --message "the second reading"   # it signed off blocked with a question: answer it
 wf approve r-xyz plan --message "ship the second reading"   # it waits at its gate: let what follows be filed
-wf round r-xyz       # the review still asks for more after the last round it allows: once more
-wf accept r-xyz --message "the findings are follow-up work"   # or: enough, go on with what is there
+nemia retry r-xyz --round   # the review still asks for more after the last round it allows: once more
+nemia approve r-xyz --message "the findings are follow-up work"   # or: enough, go on with what is there
 wf say r-xyz implement "Widen the scope to apps/api too."   # tell a running step something, on its record
 wf stats --by agent  # what the runs add up to: the last 14 days against the 14 before, a row per day and per step
 ```
@@ -236,7 +236,7 @@ wf stats --json                            # what GET /api/stats answers
   failed or blocked, a loop that asked for another round nobody accepted — has not finished, nor has a
   cancelled one.
 - **Rounds count only a loop that ended accepted**: its reviewer signed `again: false`, or a person
-  ran `wf accept`. A first-try landing is the `workspace: main` step landing on its first try.
+  approved it out of rounds (`nemia approve --message`). A first-try landing is the `workspace: main` step landing on its first try.
 - **A check is passed, refused or unfinished**: refused only when it ran to its end and exited
   non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval; for a try
   that answered an earlier try's session, from the end of that answer's turn (`gateWaitOf`).
@@ -323,8 +323,8 @@ Definition of done — a closed list, so there is a finish line:
 - [x] **declared outputs** — a step's `output:` schema adds fields to its closeout, and a step that
       names it in `input:` is handed those fields as data. The review travels this way, not as a file.
 - [x] **rounds** — `loop:` on a step runs an earlier step again while the step's closeout says
-      `again: true`, at most `rounds:` times, then a person, whose `wf round` is the once more and
-      whose `wf accept` is enough.
+      `again: true`, at most `rounds:` times, then a person, whose `nemia retry --round` is the once more and
+      whose `nemia approve` is enough.
       `after` stays a DAG: a round is one more try of the steps the run already has, counted.
 - [x] **the splitter** — `wf-examples/split` proposes parts that touch disjoint files, and is
       allowed to answer "these cannot be split, run them in sequence".
@@ -994,8 +994,8 @@ loop asks for a round that would file it again.
 - **`retries:` files no try of it, and no round of its loop goes, on the run's word.** Spending past the cap on its own word is what a
   cap forbids. A looping step whose round would file a step over its budget reads `over budget` too, naming that step (`over budget —
   implement $4.20 of $3`), so what waits on the loop is not filed.
-- **A person raises the cap:** `wf retry <run> <step> --budget <amount>` for a try, `wf round <run> [<step>] --budget <amount>` for a
-  round. Each is refused by name without `--budget`, or with one not above what the step has cost. A try takes `--budget` on any step
+- **A person raises the cap:** `wf retry <run> <step> --budget <amount>` for a try, `nemia retry <run> [<step>] --round --budget <amount>`
+  for a round. Each is refused by name without `--budget`, or with one not above what the step has cost. A try takes `--budget` on any step
   with a `budget:` that waits on a person — blocked, failed or stopped as much as over its budget — above its cap in force and what it
   has cost: a raise only ever raises. `--budget` on a step with no `budget:` is refused, which has no cap to raise; so is one on a step
   the run tries again itself, and on `--recheck`, which files no session: a recheck costs nothing and needs none. The raise
@@ -1502,7 +1502,7 @@ gated ship runs the line whole on the merged tree.
 | `unverified · done` | signed off, and declared no `check:` | is filed, on the step's word |
 | `awaiting approval` | signed off at its gate — verified first, where it has a check — and the try it is on is not approved ([below](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)); or a gated ending step (`workspace: main`) whose work is done, held before it is filed ([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)) — never an ungated one, which its workflow files | **never runs** — until a person approves it: `wf approve`; or sends the work back: `wf retry --message` |
 | `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, or accepts the work as it stands, below |
-| `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `wf round --budget` |
+| `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `nemia retry --round --budget` |
 | `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (a job: `claude`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
 | `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** — unless it is tried again, below |
 | `failed`, `stopped` | the engine's verdict on the step's own task | **never runs** |
@@ -1550,7 +1550,7 @@ retries: 1
   stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
   step waits on you, as before. `retries:` spends nothing on a try that failed, was lost or could not start: the
   runtime makes one attempt per start and tries nothing again on its own, so such a try settles `failed` and waits on
-  `wf retry`. A `--nudge` of one whose harness never named its session — it could not start, or was lost — continues the
+  `wf retry`. A `--continue` of one whose harness never named its session — it could not start, or was lost — continues the
   session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
   is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
@@ -1590,17 +1590,18 @@ retries: 1
   `failed` without an exit code (stopped at its deadline, or lost), said nothing about the work. `retries`
   spends no try on it. `wf ls` already says `failed ✗ check (unfinished)`, and `wf decide` says its check did
   not finish and offers `wf retry <run> <step> --recheck`.
-- **`wf retry <run> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"]`** is a person's word for one more
-  try. `--nudge`, the default, continues the step's last session and tells it what happened. `--fresh` starts
+- **`wf retry <run> <step> [--continue | --fresh | --model <m> | --recheck | --round] [--message "<answer>"]`** is a person's word for one more
+  try. `--continue`, the default, continues the step's last session and tells it what happened. `--fresh` starts
   a new session on the same branch, with the whole brief. `--model <m>` does that on `m`. `--recheck` runs the
-  check again on the work as it stands, and files no session. A step may be tried again when it waits on you
+  check again on the work as it stands, and files no session. `--round` asks for a loop's next round instead
+  ([*Going round again*](#going-round-again-loop-and-rounds)). A step may be tried again when it waits on you
   (its check did not pass, it ended unsigned, or it signed off blocked and its session has settled), or when
   its own session failed or was stopped. `--recheck` only applies where a check did not pass. Each refusal
   says what to do instead: a step still running or checking, a verified step, a cancelled run, a try already
   asked for, a step the run is about to try again itself.
 - **A session its harness blocked is tried again the same way.** A session can stop on the harness's own
   trouble, such as "Could not refresh your login because another Claude Code process is refreshing it". The
-  engine then says `needs-human`, and the step has no closeout. `wf retry` takes such a step with `--nudge` or
+  engine then says `needs-human`, and the step has no closeout. `wf retry` takes such a step with `--continue` or
   `--fresh`, and refuses `--recheck`. The ask is written as any other. The next tick asks the engine to stop the
   session and files nothing, and a later pass, once the session has stopped, files the try as it files one for a
   stopped step: a nudge continues the session. A step whose session is still working is refused as before. A
@@ -1626,11 +1627,11 @@ retries: 1
   the next, and a pass that dies before consuming the ask leaves the try on the record, where the ask is
   spent and files nothing. A file at an ask's name that does not read as one (`{}`, a hand edit) is honoured by
   no pass, and `wf ls` shows nothing asked. So `wf retry` refuses to write over it, and the refusal names the
-  file and says to delete it. `wf round` does the same.
+  file and says to delete it. `nemia retry --round` does the same.
 - **A step that asks gets an answer: `--message "<answer>"`.** A session nobody sits beside has no
   AskUserQuestion and no plan mode (plan §4 Q), so a step that needs a person asks the run's way: it signs off
   `blocked`, with the question in `needs`, which ends its session and puts the question on the record. The
-  answer rides on the ask — `message`, in the person's own file — beside `--nudge`, `--fresh` or `--model <m>`,
+  answer rides on the ask — `message`, in the person's own file — beside `--continue`, `--fresh` or `--model <m>`,
   and the next tick carries it into the try's brief inside `## Try <n>`, as `## Your answer`: the text as it was
   written, in a fence longer than any run of backticks in it, so a pasted snippet cannot close the section or
   swallow the contract after it — after on whose word the try is and before what the check said. A step that did not sign off blocked
@@ -1641,11 +1642,11 @@ retries: 1
   and one from before messages reads as it did. The record keeps no message: what `wf ls` and `wf decide` say
   of an answered try is read off the ask file, waiting or in `done/`.
 - **A step at its gate is sent back with `--message`.** A gated step that signed off, and waits for a person's approval — or
-  was approved and nothing after it is filed yet — takes `--nudge` or `--fresh` with the objection, and is refused without
+  was approved and nothing after it is filed yet — takes `--continue` or `--fresh` with the objection, and is refused without
   words or with `--recheck` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)).
 - **An answer to a Claude Code job is its task's next turn.** A `claude` step is filed held open: when it
   signs, the engine's task waits for a word with nothing running, and `wf ls` prints the engine's `input-required` beside the run's
-  word (`input-required · BLOCKED`). A `--nudge` that answers a blocked sign-off, or sends back a step at its gate, is the tick's
+  word (`input-required · BLOCKED`). A `--continue` that answers a blocked sign-off, or sends back a step at its gate, is the tick's
   `answer` to that task — the same task id, in the session that signed, with what is left of the step's cap — and the record gains
   the try as any other. Any other try (`--fresh`, `--model`, `--recheck`, `retries:`, the run's sign-off nudge) closes the waiting
   task and files `-try<n>`. The run closes a task nobody is to answer on the pass that reads it waiting — an ungated step that signed,
@@ -1695,7 +1696,7 @@ its own, and everything below reads the words back off the engine's view of the 
 - **A try that continues the session is handed them again.** Taken is not read: words said in the moment before a job's
   result are journalled and never reach it (agent-runtime's issue 29), and a `--bg` session blocked on a prompt kept them
   queued and lost them when it was continued (issue 16, closed with that road). So a
-  try or a round that continues the session — `wf retry --nudge`, `retries:`, a round, the board's Continue — carries
+  try or a round that continues the session — `wf retry --continue`, `retries:`, a round, the board's Continue — carries
   what was said to the last try's task as `## Said to your session`, inside `## Try <n>` or `## Round <n>`: each
   message with its time, fenced, before `## Your answer`. A new session (`--fresh`, or a nudge with nothing to
   continue) is handed none, as it is handed none of the last one's conversation: say it again with `--message`.
@@ -1746,11 +1747,11 @@ rounds: 3
   handed the round's contract and findings again, off the looping step's try that asked for the round.
 - **At the cap, a person — and they have two answers.** `again: true` on the last round files nothing:
   the step reads `rounds exhausted`, nothing that waits on it runs, and `wf decide` says `ROUNDS
-  EXHAUSTED`, prints the last findings and offers both. **Once more** is `wf round <run>`. Like
-  `wf retry`, it writes an ask, `runs/<id>.asks/round-<step>-<n>`, which the next tick honours once. It
+  EXHAUSTED`, prints the last findings and offers both. **Once more** is `nemia retry <run> --round`. Like
+  any try, it writes an ask, `runs/<id>.asks/round-<step>-<n>`, which the next tick honours once. It
   is refused while a round is running, while the run would go round itself, on a loop that ended with
-  `again: false`, on a step of the loop that stopped (that is `wf retry`'s), and on a cancelled run.
-- **Enough: `wf accept <run> [<step>] --message "<why>"`.** A reviewer that finds anything says `again:
+  `again: false`, on a step of the loop that stopped (that is a try's, without `--round`), and on a cancelled run.
+- **Enough: `nemia approve <run> [<step>] --message "<why>"`**, the approval of a loop out of rounds. A reviewer that finds anything says `again:
   true`, and a large change always has something left to find; a person who has read the findings and
   judged them follow-up work says so, and the steps that wait on the looping step are filed as if it had
   said `again: false` — so a gated ending goes to its gate, `awaiting approval`, and is approved or not
@@ -1767,7 +1768,7 @@ rounds: 3
   that is not one is honoured by no pass, which says so in its notes and leaves the file alone. The board
   accepts through the same function: its `accept` row takes the reason and posts it to the api's
   `POST /api/runs/:id/steps/:step/accept`, which calls `accept()` and shows its refusals in these words.
-- **Taking it back is only a file to delete until a tick has acted on it.** `wf round` on an accepted loop
+- **Taking it back is only a file to delete until a tick has acted on it.** `nemia retry --round` on an accepted loop
   refuses, and what it says depends on that: while nothing waiting on the loop has been filed, nothing has
   been done on the person's word, and the refusal names `accept-<step>-<try>` to delete before asking again.
   Once a tick has filed what waited, deleting that file does not take the step it filed back — it only makes
@@ -1785,7 +1786,7 @@ rounds: 3
   says `round 2 of 3` beside each step of the loop, and `round 2 of 3 due` while the next tick has it
   to file.
 - **A loop past a budget.** A round that would file a step of the loop over its `budget:` is not filed on the looping
-  step's word: both read `over budget`, and `wf round <run> --budget <amount>` raises the cap of each such step for the round —
+  step's word: both read `over budget`, and `nemia retry <run> --round --budget <amount>` raises the cap of each such step for the round —
   refused without it, or with one not above what they have cost. A loop `rounds exhausted` with a step past its budget asks for
   `--budget` with its once more too.
 - **A loop is a chain.** At load the run refuses a `loop:` that names no step this one waits on, a
@@ -2364,7 +2365,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   the try already approved, empty words, and a send-back already asked for, which would spend the approval at once. A file at the
   approval's name that is not one opens no gate: the pass says so, and `wf approve` names it and says to delete it.
 - **Sending back is `wf retry <run> <step> --message "<objection>"`**, as for a step that signed off blocked, on a step at its gate
-  or one approved with nothing after it filed yet — never on an approved step nothing waits on, whose run is over and may be merged. `--nudge` continues its session, told under `## Try <n>` that its handoff waited
+  or one approved with nothing after it filed yet — never on an approved step nothing waits on, whose run is over and may be merged. `--continue` continues its session, told under `## Try <n>` that its handoff waited
   at its gate and was sent back, with the objection as `## Your answer`; `--fresh` starts a new one. It signs off again, and the gate
   holds again. Refused without words, and with `--recheck`: an objection with nothing to change would sign off as it did. The tick
   holds an ask to the same word: a wordless one — taken while the step's harness blocked its session, which then signed off, or
@@ -2378,7 +2379,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   the work does not hold on the base as it is now: review is filed with the objection and what the ending said, and its `again: true` is
   a round on the run's branch, where merging the base in is the work's to do. The ending's try moves behind (`cause: 'back'`) in the same
   write; once the loop settles it waits at its gate, nothing of it run, for a new approval. Refused, naming the fix: no words, a step
-  that is not the loop's, `wf round` of the loop, one way while the other is asked for, and a folder with no loop before its ending.
+  that is not the loop's, `nemia retry --round` of the loop, one way while the other is asked for, and a folder with no loop before its ending.
 - **The tick hands a step's leftovers off once for each try.** What a person leaves in a step's worktree after its hand-off is theirs,
   not committed under the step's name, until the step's next try.
 - **What the steps after it are told.** Every step after an approved gate — the one after it and each after that one, the
@@ -2390,7 +2391,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
 - **The session waits with the gate.** A Claude Code job at its gate is the engine's held task (*Trying again*): nothing runs, a
   send-back is its next turn in the session that signed, and `wf approve` has the tick close it as it files what follows.
 - **`wf cancel` calls a run at its gate off**, as any run: it is not finished, since an approval would file what follows.
-  **`wf rm` refuses a run at its gate**, naming the `wf approve` it waits for, and forgets it once it is called off. `wf round` on a
+  **`wf rm` refuses a run at its gate**, naming the `wf approve` it waits for, and forgets it once it is called off. `nemia retry --round` on a
   loop whose step waits at its gate says to approve it or send it back.
 - **On the board**, a gated step's section on the run page shows what it handed on, with Approve — a box for the words — and Send back,
   the answer box, beside it. The banner and the Factory's card say `approve plan`, and `POST /api/runs/:id/steps/:step/approve` calls
@@ -2574,7 +2575,7 @@ hold lifts. So `wf ls` says `→ held until a-1x2y lands` where it would say `�
 says `held until a-1x2y lands; its approval is asked once the hold lifts` where it would offer `wf approve`.
 `wf decide` says the hold, what is still running, and how to go on before the hold lifts:
 `wf hold <run> --off`. On a run that also waits `--after` a run, it says both, and that `--off` lifts the
-hold and not the wait. `wf say` to a step that has settled offers no `wf retry` while the hold stands. `wf approve`, `wf retry`, `wf round` and `wf accept` refuse a held run and name that
+hold and not the wait. `wf say` to a step that has settled offers no `wf retry` while the hold stands. `wf approve` and `wf retry`, with or without `--round`, refuse a held run and name that
 command, and a pass files nothing on an ask written by hand while the hold stands. A run named that will
 never land without a person (`(cancelled)`, `(no such run)`, `(<branch> gone)`) is said beside the hold,
 with the two ways out: lift the hold, or `wf cancel` the run.
@@ -3097,7 +3098,7 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
 - **`nemia level`** says where she is — her level, her session's phase, how to reach it (`claude attach <id>` in a terminal, then
   her web link once its bridge is up, from a phone too, or why it is not), and what a person allowed her at a prompt beyond what ships.
 - **`nemia level semi-auto`** puts her on: the daemon's keeper files her session in `$WF_ROOT/nemia/` and subscribes it to the feed
-  (the subscription `nemia`, hers alone). Only what waits on the person prompts: an answer to it — `approve`, `round`, `accept`,
+  (the subscription `nemia`, hers alone). Only what waits on the person prompts: an answer to it — `approve` of a gate or of a loop out of rounds, `retry --round`,
   a `retry` of a step at its gate, on its question, out of rounds or at its cap, any `--budget` — is asked of the person by her
   admission (`nemia admit`, a hook asked before each of her shell calls), and so is a write that cannot be undone or changes their
   settings or a factory (`cancel`, `rm`, `factory add`, `level semi-auto`); the rest — a read, `start`, `hold`, `say`, `inbox add`, a
@@ -3107,7 +3108,7 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
 - **`nemia level auto`**, or a factory set or raised to it (`--factory <name> auto`), is Semi-auto with one difference: an answer the
   person's confirmed list allows in the run's current state is given unasked; anything else asks, as at Semi-auto. A rule names the
-  answer (`approve`, `retry`, `accept`), the steps it holds at, a dollar line the run's spend stays under (`under`), and its
+  answer (`approve`, `retry`), the steps it holds at, a dollar line the run's spend stays under (`under`), and its
   conditions over the run's state: `recommends` (the step signed `done`, and each question it asks carries a recommendation),
   `checked` (its check exited 0: a step with no check does not meet it), `accepted` (no loop asks for another round, and none was
   accepted by a person over what it found), `withinBudget` (no step past its budget) and `nothingOpen` (no question, nothing the
@@ -3628,7 +3629,7 @@ merged is kept, and the line says why, unless `--force-unmerged` is given beside
 - **anything a pass would file**: a step ready, a check, a try or a round due, on a run nobody called
   off. A pass may be filing it at that moment, into a worktree about to go. A run waiting on runs
   (`--after`) is held the same way, since it files its roots once they land.
-- **an ask no pass has spent** (`wf retry`, `wf round`), on a run nobody called off. One the next pass
+- **an ask no pass has spent** (`wf retry`, `nemia retry --round`), on a run nobody called off. One the next pass
   files is the case above. One no pass files as the run stands is taken back by deleting its file, which
   the refusal names.
 - **a step waiting at its gate**, on a run nobody called off: an approval would file what waits on it. The refusal names the
@@ -3670,7 +3671,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `runs/<id>.json` | the run's record | `wf start`; the tick, while it exists | removed, first of its files |
 | `runs/<id>.cancelled` | when it was called off | `wf cancel` | removed |
 | `runs/<id>.pruned` | when `wf prune` removed its worktrees, and each with its size | `wf prune` | removed |
-| `runs/<id>.asks/`, `…/done/` | asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent | `wf retry`, `wf round`, `wf approve`, `wf accept`; the tick moves them | removed |
+| `runs/<id>.asks/`, `…/done/` | asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent | `wf retry` (and `--round`), `wf approve`; the tick moves them | removed |
 | `runs/<id>/inputs/` | files given with `wf start --input` | `wf start` | removed |
 | `runs/<id>/work/<step>/given/` | a folder step's copy of the run's inputs and of the folders it waits on | the tick, as it makes the folder | removed with the run |
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
@@ -3769,7 +3770,7 @@ has is refused, not handed off.
 with its size — before it removes anything, so a pass that reads the run mid-prune files nothing into a
 worktree about to go. The mark is a person's fact beside the record, composed on read as a cancellation is.
 `wf ls` prints `(pruned)` beside the run, `wf decide` says when and what it kept, and the board's run page
-has a `pruned` row. `wf retry`, `wf round`, `wf approve` and `wf accept` refuse a pruned run, and neither
+has a `pruned` row. `wf retry` (with or without `--round`) and `wf approve` refuse a pruned run, and neither
 `wf decide`, `wf ls`'s step notes nor the board offer any of them: a step over its budget reads
 `OVER BUDGET: … since the run was pruned at …` with no raise, a loop out of rounds `no round more`, a gate
 `not approved, and never can be`. The run waits on nobody, and the tick files nothing for it, whatever ask
@@ -3894,7 +3895,7 @@ holding a concurrency slot forever.
 | `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`DEFAULT_FACTORY`, `defaultFactoryRefusal`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), the workflows it offers: a workflow's name (`workflowNameRefusal`) and a start of one not attached (`unattachedRefusal`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
 | `src/run.ts` | the entry `agent-orchestrator/run` — pure: each name it exports re-exported by name from the folders below, and nothing else |
 | `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and the run's one word (`status`): `failed` where a step broke, `awaiting approval` or `blocked` where only a person stops it (`stoppedOnWord`) |
-| `src/round/round.ts` | a loop's rounds — pure: those due (`roundsDue`) and the steps once one is filed (`roundFiled`), what `wf round` and `wf accept` ask and refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`) |
+| `src/round/round.ts` | a loop's rounds — pure: those due (`roundsDue`) and the steps once one is filed (`roundFiled`), what `nemia retry --round` and `nemia approve` of a loop ask and refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`) |
 | `src/cancel/cancel.ts` | what cancelling a run has to do, and what to tell the person who asked (`cancelPlan`) — pure |
 | `src/forgetting/forgetting.ts` | what the engine forgot of a run's tasks, pure: each run's share of one answer (`forgettingOf`), whether nothing is left (`forgettingDone`), and its words (`engineWords`, `uncountedWords`) |
 | `src/forget/forget.ts` | `wf rm` from the run's side — pure: **`forgetRefusal`**, whether a run may be forgotten, which worktrees, branches and check logs are its own (`runWorktrees`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`) |

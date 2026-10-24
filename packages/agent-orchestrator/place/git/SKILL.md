@@ -41,7 +41,7 @@ branch changed against the base, file by file.
 
 This section is a step's that writes the repository; a read-only step works from *Read what changed* instead.
 
-A person can send a loop's work back to merge its base branch (`nemia merge <run>`), when the base moved and the work no longer lands.
+A person can send a loop's work back to merge its base branch (`nemia refresh <run> [<step>] --base`), when the base moved and the work no longer lands.
 Your brief names the commit the person's trial merge read: merge that commit, never the base as it stands now, which may have moved again.
 
 - **A textual merge**: the work does not merge onto the base as text. `git merge <commit>`, resolve each conflict, keeping both meanings

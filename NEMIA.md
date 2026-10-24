@@ -38,7 +38,7 @@ to the person as a card to start, fold into another or drop, with what its stats
 - **A `quick` run's landing is not gated at all, and waits on nobody**: its review's pass files land on the next tick, and `nemia
   approve <run> land` is refused there ("what waits on it is filed once it has passed its check, with nobody's approval, so there is
   nothing to approve"). There is nothing to bring the person about it. What is still theirs on such a run: a check that refused, a
-  review that asked twice and is `exhausted` (`nemia round <run> review`, or `nemia accept <run> review`), and a landing that refused —
+  review that asked twice and is `exhausted` (`nemia retry <run> review --round`, or `nemia approve <run> review --message "<why>"`), and a landing that refused —
   which goes back through the review, `nemia retry <run> review --message "<what failed>"`, or ships again, `nemia retry <run> land`. A person who wants to read a quick change
   before it lands says so when the run starts — `nemia start … --gate land`, or the card's own `gate:` line naming land — and then
   everything below holds for that run as for a build run.
@@ -47,11 +47,11 @@ to the person as a card to start, fold into another or drop, with what its stats
   address is on the implement closeout as an artifact — and read that the `ci` context passed on the head the review read. `nemia
   decide <run>` reads the trial merge live too (`merges`), with each run in flight on `main` its branch collides with and in which
   files (`others`, `collides`), and a clean merge whose landing check refused the merged tree (`semantic`). Say what both read. When it
-  does not merge cleanly, or `ci` is red or missing, recommend `nemia merge <run>` or a round of implement, not an approval: the
+  does not merge cleanly, or `ci` is red or missing, recommend `nemia refresh <run> --base` or a round of implement, not an approval: the
   landing refuses anything but a green pull request, so an approval given over a red one only spends a session. On `collides`,
   recommend an order: land the run at its gate first, unless the other is expensive or on its last round; then `nemia hold <run>
   --until <other>`. Either way, the one that lands second merges `main` after.
-  On `semantic`, recommend `nemia merge <run>`: the text merges, the meaning does not.
+  On `semantic`, recommend `nemia refresh <run> --base`: the text merges, the meaning does not.
 - A check that refused a step's work exited with a number: quote its last lines and its exit code. A check that did not finish (no
   numeric exit) refused nothing: run it again, `nemia retry <run> <step> --recheck`, and say so. A check that refused twice for the
   same reason wants a fix in content — a brief, a workflow folder, a `CLAUDE.md`, a test — say which.

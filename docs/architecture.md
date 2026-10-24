@@ -108,7 +108,7 @@ per run*: a run copies no place and its record names none (`test/start-place.bou
 of the process that asks, the release installed, and a change to the place reaches it at the next restart.
 
 **A loop's rounds** are the orchestrator's, counted off the looping step's tries that went `cause: 'round'` (`roundIn`,
-`src/status/status.ts`): a reviewer's `again: true`, and a person's `nemia round`. A merge of the base (`nemia merge`, `src/merge/`) is
+`src/status/status.ts`): a reviewer's `again: true`, and a person's `nemia retry --round`. A merge of the base (`nemia refresh --base`, `src/merge/`) is
 no round: the loop's target is filed again to merge the base at the commit a trial merge read, its try `cause: 'merge'`, the run's
 `baseRef` moves to that commit, and the reviewer after it reads the merge; a finding of it with `again: true` is a round, counted as any
 (`test/merge-round-walk.boundary.test.ts`, *a merge send-back leaves the round count unchanged*). A merge of work that merges cleanly is refused, pointed to
@@ -116,8 +116,8 @@ the landing — its approval, or, where its review routes an ungated one, the ti
 loop, to `nemia retry`. Unless the ending's last landing check refused
 the merge staged on the base as it is now (`Landed`'s `refusedOn`): the conflict is semantic, and the merge is asked, its target handed
 what the check said (`refusedLanding`, `src/merge/merge.ts`; `test/ship.test.ts`, *the conflict is semantic*, and the refusals for a
-base moved since and a check that did not finish). While a merge is asked, `nemia round` and
-`nemia accept` of its loop are refused, since either would drop it; `nemia decide` offers the merge wherever the verb would take it.
+base moved since and a check that did not finish). While a merge is asked, `nemia retry --round` and
+`nemia approve` of its loop out of rounds are refused, since either would drop it; `nemia decide` offers the merge wherever the verb would take it.
 
 **In the runtime since platform slice 3**: session admission and pools. The runtime admits a queued task under the engine's ceiling
 and its harness's pool, the highest priority first (`agent-runtime/src/core/admission.ts`); the orchestrator hands it the ceiling

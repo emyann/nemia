@@ -70,9 +70,9 @@ import { answersOr } from '../question/index.ts';
  * `raise`: a session filed for it has to carry a `--budget` above what it has spent, since spending past the cap on anyone's word but a
  * person's raising it is what a cap forbids. A recheck costs nothing, and needs none. So `raise` is on a settled step over its budget, or
  * ended at it, that may be tried: those two statuses, and a `failed (check)` whose check did not finish past its budget, which is offered
- * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `nemia round`'s. Any other step with a
- * cap that may be tried takes a `--budget` too, above its floor (`raiseOf`), which `carries` and `retryRefusal` read: `raise` marks only
- * the steps a session of which must carry one.
+ * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `nemia retry --round`'s. Any other
+ * step with a cap that may be tried takes a `--budget` too, above its floor (`raiseOf`), which `carries` and `retryRefusal` read: `raise`
+ * marks only the steps a session of which must carry one.
  *
  * And a step whose work the run is parked on at an ending step's gate (`waitsAtGate`), with nothing after it filed: the ending has nothing
  * of its own to object to — it has not run — so a send-back there goes to the work, which is this step (`sendBackTo`).
@@ -233,7 +233,7 @@ export const pauseAsksVoid = (
  * `advance` looks for a try a pass filed and never wrote down whatever became of the run after.
  *
  * A person's ask for a step's next try, when the step may be tried again that way. For a step whose task has not settled, with
- * `stopFirst`, since its session is still there to stop — `--nudge` or `--fresh`, the ways `nemia retry` takes for a session its harness
+ * `stopFirst`, since its session is still there to stop — `--continue` or `--fresh`, the ways `nemia retry` takes for a session its harness
  * blocked (`retryable`), whether or not the harness still says so. An ask can only be written for such a step while its harness blocks
  * the session, and the session can work again before a tick stops it, told something by a peer with no `nemia up` running. Left for its
  * task to settle, such an ask would be neither due nor spent, and the step's next failure would file it at once, ahead of `retries:`. So
@@ -380,7 +380,7 @@ function howOf(step: Workflow, last: EarlierTry): string {
   if (last.paused) return `${last.cause === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`;
   if (last.cause === 'recheck') return 'rechecked on your word';
   if (last.cause === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
-  if (last.cause === 'merge') return 'merged the base, on your word (nemia merge), the round unchanged';
+  if (last.cause === 'merge') return 'merged the base, on your word (nemia refresh --base), the round unchanged';
   return last.cause === 'back' ? 'sent back with the work, on your word' : 'nudged on your word';
 }
 

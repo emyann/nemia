@@ -118,7 +118,7 @@ function mergeAskIn(file: string, step: string, n: number): RoundAsk | string {
   const held = heldIn(file);
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(MergeAskFileSchema, held.read);
-  if ('refused' in read) return read.refused === 'at' ? 'it says no time it was given' : 'it is not an ask nemia merge wrote';
+  if ('refused' in read) return read.refused === 'at' ? 'it says no time it was given' : 'it is not an ask nemia refresh --base wrote';
   const { loop, round, onto, sha, at, landing } = read.read;
   return { step: loop, round, at, merge: { target: step, try: n, onto, sha, ...(landing ? { landing: { ...landing } } : {}) } };
 }
@@ -131,7 +131,7 @@ function readMergeAsks(id: string): { rounds: RoundAsk[]; notes: string[] } {
     const named = /^merge-(.+)-(\d+)$/.exec(name);
     const file = path.join(asksDir(id), name);
     const ask = named ? mergeAskIn(file, named[1], Number(named[2])) : undefined;
-    if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia merge`);
+    if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia refresh --base`);
     else if (ask) rounds.push(ask);
   }
   return { rounds, notes };

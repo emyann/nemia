@@ -6,8 +6,8 @@
  * by hand before its ending ran — the run has landed as git reads it, and a run `--after` it starts — and two runs of one repository at
  * their endings, which never work in its one checkout at once. The work sent back from a run's ending: a send-back at the ending's gate,
  * an ending stopped on its base branch that sends the work back through the loop, a loop out of rounds before its ending, and `nemia
- * merge` of the base into the work — where it conflicts as text, and where the ending's check refused the merged tree (the conflict is
- * semantic).
+ * refresh --base`, the merge of the base into the work — where it conflicts as text, and where the ending's check refused the merged tree
+ * (the conflict is semantic).
  *
  * What a gate means to `assess`, `listing` and `decision` is pure, and lives in `assess-endings.test.ts`. What the test place does not
  * model — git's own words to a landing session, a hook, an octopus, a linked worktree, a `git` planted on the PATH — is in
@@ -48,7 +48,7 @@ const STOPPED = {
 };
 /** The message an ending signs off with, to commit its merge with. */
 const MESSAGE = 'Add sub\n\nadd.ts exports sub beside add.\nThe run, its branch: 1 commit; the check on the merged tree.\n';
-/** Why a person judged the loop's findings later work rather than this run's: what `nemia accept` carries to the shipper. */
+/** Why a person judged the loop's findings later work rather than this run's: what `nemia approve` carries to the shipper. */
 const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not this run.';
 /** What the ship's check printed on the merged tree it refused, as turbo prefixes node's spec reporter: a test failed, listed twice. */
 const FAILING = [
@@ -386,7 +386,7 @@ const waitLine = (holder: string) =>
   `and two endings never do at once; the next tick files ship once ${holder}'s ship has settled`;
 const statusOf = async (id: string, step: string) => (await listed(id)).steps.find((s) => s.name === step)!.status;
 const asks = (id: string) => at.asksOf(id).filter((f) => f.startsWith('merge-'));
-/** A refusal of `nemia merge`: exit 2, naming `facts`, and no merge asked. For `assert.rejects`. */
+/** A refusal of `nemia refresh --base`: exit 2, naming `facts`, and no merge asked. For `assert.rejects`. */
 const mergeRefused =
   (id: string, ...facts: string[]) =>
   (err: Error & { exitCode?: number }): true => {
@@ -1304,7 +1304,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       const l = await listed(second.id);
       assert.deepEqual(
         [l.steps[1].status, l.steps[1].note],
-        ['succeeded · BLOCKED', `try 2 asked (--nudge) — waiting on the checkout (${first.id}'s ship has it)`],
+        ['succeeded · BLOCKED', `try 2 asked (--continue) — waiting on the checkout (${first.id}'s ship has it)`],
       );
       const printed = await at.printedBy(st, ['decide', second.id]);
       assert.ok(
@@ -1328,7 +1328,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       assert.equal(l.toDecide, undefined, 'and there is nothing to decide');
       assert.deepEqual(
         [l.steps[1].status, l.steps[1].note],
-        ['succeeded · BLOCKED', `try 2 asked (--nudge) — waiting on the checkout (${first.id}'s ship has it)`],
+        ['succeeded · BLOCKED', `try 2 asked (--continue) — waiting on the checkout (${first.id}'s ship has it)`],
       );
       const { decision } = await stage.runWith(e(), decideRun(second.id));
       assert.deepEqual([decision.kind, decision.kind === 'running' ? decision.waiting : []], ['running', ['ship']]);
@@ -1553,7 +1553,7 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
   );
 
   await s.test(
-    "REFUSED at shipped defaults: `nemia round` at an ending's gate says the run is at that gate — not that what waits on the loop has been filed",
+    "REFUSED at shipped defaults: `nemia retry --round` at an ending's gate says the run is at that gate — not that what waits on the loop has been filed",
     async () => {
       const { id } = await at.workDone(at.loopingFolder());
       settle(`${id}-review`, 'succeeded', { ...SIGNED, again: false });
@@ -1707,7 +1707,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       const { ask } = await stage.runWith(e(), retryRun(id, 'ship', { mode: 'nudge', message: 'the checkout is clean now' }));
       await assert.rejects(
         stage.runWith(e(), retryRun(id, 'review', { mode: 'nudge', message: 'take main' })),
-        refusedNaming(`try 2 of ship is asked for (--nudge, at ${ask.at})`, 'a send-back would take that try back'),
+        refusedNaming(`try 2 of ship is asked for (--continue, at ${ask.at})`, 'a send-back would take that try back'),
         'the two ways on take the same try of the ending: one asked refuses the other, each way round',
       );
       fs.rmSync(path.join(ROOT, 'runs', `${id}.asks`, 'retry-ship-2'));
@@ -1743,7 +1743,7 @@ test('an ending that stopped on the base branch sends the work back through the 
   );
 
   await s.test(
-    "a send-back composes with `nemia round` in a loop out of rounds, as the incident's was: review's `again: true` reads exhausted, a round takes it once more, and ship waits at its gate for a new approval",
+    "a send-back composes with `nemia retry --round` in a loop out of rounds, as the incident's was: review's `again: true` reads exhausted, a round takes it once more, and ship waits at its gate for a new approval",
     async () => {
       const { id } = await at.stoppedOnBase(at.loopingFolder(1));
       await stage.runWith(e(), retryRun(id, 'review', { mode: 'nudge', message: 'take main' }));
@@ -1804,7 +1804,7 @@ test('an ending that stopped on the base branch sends the work back through the 
   );
 
   await s.test(
-    '`nemia decide` offers the merge where the work conflicts with the base: the bare `nemia merge`, labelled merge — and not once it is asked',
+    '`nemia decide` offers the merge where the work conflicts with the base: the bare `nemia refresh --base`, labelled merge — and not once it is asked',
     async () => {
       stopped = await at.stoppedOnBase();
       const { repo, id } = stopped;
@@ -1817,8 +1817,8 @@ test('an ending that stopped on the base branch sends the work back through the 
         [
           {
             label: 'merge',
-            command: `nemia merge ${id} review`,
-            said: `review: implement's work conflicts with main. Merge main into it — implement continued, then a new review, on round 1, which the merge does not spend:  nemia merge ${id} review`,
+            command: `nemia refresh ${id} review --base`,
+            said: `review: implement's work conflicts with main. Merge main into it — implement continued, then a new review, on round 1, which the merge does not spend:  nemia refresh ${id} review --base`,
             step: 'review',
           },
         ],
@@ -1915,7 +1915,7 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
   );
 
   await s.test(
-    'a loop out of rounds is sent to merge without `nemia round`: the merge spends no round, a round or an acceptance is REFUSED while it is asked, and the reviewer after it hands on to the gate',
+    'a loop out of rounds is sent to merge without `nemia retry --round`: the merge spends no round, a round or an acceptance is REFUSED while it is asked, and the reviewer after it hands on to the gate',
     async () => {
       const { repo, id } = await at.atTheCap();
       const sha = at.mainMoves(repo);
@@ -1934,8 +1934,8 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
         assert.deepEqual(at.asksOf(id), written, 'nothing written');
         return true;
       };
-      await assert.rejects(stage.runWith(e(), roundRun(id, 'review')), waits(`nemia round ${id} review`));
-      await assert.rejects(stage.runWith(e(), acceptRun(id, 'review', ENOUGH)), waits(`nemia accept ${id} review --message "<why>"`));
+      await assert.rejects(stage.runWith(e(), roundRun(id, 'review')), waits(`nemia retry ${id} review --round`));
+      await assert.rejects(stage.runWith(e(), acceptRun(id, 'review', ENOUGH)), waits(`nemia approve ${id} review --message "<why>"`));
       assert.deepEqual((await at.pass(id)).looped, ['review']);
       assert.deepEqual(
         readRun(id).steps.implement.tries?.map((x) => x.cause),
@@ -1953,7 +1953,7 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
   );
 });
 
-test('`nemia merge` of the base into the work: refused where nothing conflicts as text, asked where it does, and asked where the landing check refused the merged tree — the conflict is semantic', async (t) => {
+test('`nemia refresh --base` of the base into the work: refused where nothing conflicts as text, asked where it does, and asked where the landing check refused the merged tree — the conflict is semantic', async (t) => {
   const s = story(t);
   const { tasks, settle } = stage.board();
 
@@ -1968,7 +1968,7 @@ test('`nemia merge` of the base into the work: refused where nothing conflicts a
         fs.mkdirSync(path.join(ROOT, 'runs', `${id}.asks`), { recursive: true });
         await assert.rejects(
           stage.runWith(e(), mergeRun(id)),
-          mergeRefused(id, 'ship has no gate', 'the next tick', 'once review passes', `nemia merge ${id} review.`),
+          mergeRefused(id, 'ship has no gate', 'the next tick', 'once review passes', `nemia refresh ${id} review --base.`),
           `the base ${base}`,
         );
       }
@@ -2051,7 +2051,7 @@ test('`nemia merge` of the base into the work: refused where nothing conflicts a
   );
 
   await s.test(
-    'nemia decide offers the merge of work its landing check refused, saying the conflict is semantic, and `nemia merge` says what it asked',
+    'nemia decide offers the merge of work its landing check refused, saying the conflict is semantic, and `nemia refresh --base` says what it asked; the former `nemia merge` still runs as it, and plain `nemia refresh` asks no merge',
     async (st) => {
       const { id, base } = refused;
       assert.deepEqual(
@@ -2059,19 +2059,32 @@ test('`nemia merge` of the base into the work: refused where nothing conflicts a
         [
           {
             label: 'merge',
-            command: `nemia merge ${id} review`,
-            said: `review: implement's work merges cleanly onto main, but ship's check refused the merged tree at ${base.slice(0, 7)}: the conflict is semantic. Merge main into it and fix what broke — implement continued, then a new review, on round 1, which the merge does not spend:  nemia merge ${id} review`,
+            command: `nemia refresh ${id} review --base`,
+            said: `review: implement's work merges cleanly onto main, but ship's check refused the merged tree at ${base.slice(0, 7)}: the conflict is semantic. Merge main into it and fix what broke — implement continued, then a new review, on round 1, which the merge does not spend:  nemia refresh ${id} review --base`,
             step: 'review',
           },
         ],
       );
-      const printed = await at.printedBy(st, ['merge', id]);
+      const printed = await at.printedBy(st, ['refresh', id, '--base']);
       assert.ok(
         printed[0]?.includes(
           `asked: merge main at ${base.slice(0, 7)} into implement's work, where ship's check refused the merged tree at ${base.slice(0, 7)}: the conflict is semantic — the next tick files it`,
         ),
         printed.join('\n'),
       );
+      assert.equal(asks(id).length, 1, 'the merge ask `nemia merge` wrote');
+      assert.equal(printed[1]?.trim(), path.join(ROOT, 'runs', `${id}.asks`, asks(id)[0]), 'and the file it is in');
+      await assert.rejects(
+        at.printedBy(st, ['merge', id]),
+        refusedNaming("into implement's work is already asked", `nemia ls ${id}`),
+        'the former spelling, typed on purpose: `nemia merge` still runs, as `nemia refresh --base`, which waits on the merge just asked',
+      );
+      await assert.rejects(
+        at.printedBy(st, ['refresh', id]),
+        refusedNaming('already on the newest revision of every kind'),
+        '`nemia refresh` without `--base` still takes the new revisions, of which this run has none',
+      );
+      assert.equal(asks(id).length, 1, 'no second merge is asked');
     },
   );
 

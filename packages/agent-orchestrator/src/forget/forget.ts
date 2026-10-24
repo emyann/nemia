@@ -278,7 +278,9 @@ function dueOf(a: Assessment, steps: readonly Workflow[], waits: boolean): strin
   }
   for (const r of a.round)
     due.push(
-      r.merge ? mergeDueWords(r) : `round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'nemia round'})`,
+      r.merge
+        ? mergeDueWords(r)
+        : `round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'nemia retry --round'})`,
     );
   return due;
 }
@@ -298,7 +300,10 @@ function unheardOf(f: Forgetting, a: Assessment | undefined): AskName[] {
   return unheard;
 }
 
-/** Whether the round due `r` is the one a person's ask asked for: its round on `nemia round`, its target's try on `nemia merge`. */
+/**
+ * Whether the round due `r` is the one a person's ask asked for: its round on `nemia retry --round`, its target's try on `nemia refresh
+ * --base`.
+ */
 const roundHeard = (r: Round, ask: RoundAsk): boolean =>
   ask.merge
     ? r.merge?.target === ask.merge.target && r.merge.try === ask.merge.try
@@ -306,7 +311,7 @@ const roundHeard = (r: Round, ask: RoundAsk): boolean =>
 
 /** A merge due, said: what its target merges, and that it spends no round. */
 const mergeDueWords = (r: Round): string =>
-  `the merge of ${r.merge!.onto} into ${r.target}'s work is due (nemia merge), on round ${r.round} of ${r.step}'s loop`;
+  `the merge of ${r.merge!.onto} into ${r.target}'s work is due (nemia refresh --base), on round ${r.round} of ${r.step}'s loop`;
 
 /** An ask no pass files, named. */
 const askNamed = (u: AskName): string =>

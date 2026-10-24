@@ -150,7 +150,7 @@ type RunBase = {
    */
   approvals?: Approval[];
   /**
-   * What people accepted at a loop out of rounds (`nemia accept`), each in a file of its own beside the approvals —
+   * What people accepted at a loop out of rounds (`nemia approve`), each in a file of its own beside the approvals —
    * `runs/<id>.asks/accept-<step>-<try>` — composed on read like them, and never written into the record. An acceptance ends the loop on a
    * person's word where the looping step asked for another round it has no rounds left for: what waits on it is filed as if it had said
    * `again: false`, with its findings still on the record (`acceptanceOf`). One for an earlier try is spent. Absent when there are none.
@@ -274,7 +274,7 @@ export type PrunedFiles = { at: string; bytes: number };
 export type Approval = { step: string; try: number; at: string; message?: string };
 
 /**
- * A person's word at a loop out of rounds, as its file says it (`nemia accept`): the looping step, the try it accepts, when, and what they
+ * A person's word at a loop out of rounds, as its file says it (`nemia approve`): the looping step, the try it accepts, when, and what they
  * said — the words every step after the loop is handed under `## Accepted`, beside the findings the loop left open (`acceptedSection`).
  *
  * `message` is required, where an approval's is not: an approval says yes to work a step handed on, and an acceptance says yes to work a
@@ -303,8 +303,8 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   over budget      its tries have together cost its `budget:` or more, so nothing is left to spend, and the way on is another session
  *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
  *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
- *                    for one, a step of its loop is. Never a step of a loop whose round is due: `nemia round --budget` raised the cap
- *                    (`roundSpans`)
+ *                    for one, a step of its loop is. Never a step of a loop whose round is due: `nemia retry --round --budget` raised the
+ *                    cap (`roundSpans`)
  *   budget exhausted its harness ended its session at the step's `budget:` (a `claude` job: the runtime's `limit: 'budget'` on the
  *                    attempt)
  *   denied           it signed off, and its harness denied its try a call, on a step that says `denials: fail`: nothing after it is
@@ -474,7 +474,7 @@ export const lackedOf = (record: StepRecord | undefined): LackedFile[] =>
  * What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to
  * commit — and why; or, for an ending that stopped on its own word with nothing staged, nothing at all (`untouched`), written down so that
  * what a person stages in the checkout after it is theirs. An abort of a merge its check refused names the base it was staged on
- * (`refusedOn`), which `nemia merge` reads (`mergeAsk`).
+ * (`refusedOn`), which `nemia refresh --base` reads (`mergeAsk`).
  */
 export type LandingRecord = { commit: string } | { aborted: string; refusedOn?: string } | { untouched: string };
 

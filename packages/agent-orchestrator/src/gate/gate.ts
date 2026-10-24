@@ -155,7 +155,7 @@ export function approvalRefusal(
     failed: `${name} has not signed off: its session failed first, so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
     stopped: `${name} has not signed off: its session was stopped first, so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
     denied: `${name} signed off, and its harness denied its try a call, which \`denials: fail\` does not pass on: there is nothing to approve. See what it was denied: nemia decide ${run.id}.`,
-    exhausted: `${name} has handed nothing on: it asked for another round on the last one \`rounds:\` allows. Go round once more — nemia round ${run.id} ${name} — and approve what a later round hands on, or take the work as it stands and approve that: nemia accept ${run.id} ${name} --message "<why>".`,
+    exhausted: `${name} has handed nothing on: it asked for another round on the last one \`rounds:\` allows. Go round once more — nemia retry ${run.id} ${name} --round — and approve what a later round hands on, or take the work as it stands and approve that: nemia approve ${run.id} ${name} --message "<why>".`,
     verified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
     unverified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
   };

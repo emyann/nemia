@@ -265,7 +265,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
     const ask: RetryAsk = { step: 'review', try: 2, mode: 'nudge', message: 'the flag is not stored', at: '2026-09-17T09:00:00.000Z' };
     assert.equal(
       approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [ask]),
-      'try 2 of review is asked for (--nudge, at 2026-09-17T09:00:00.000Z), and ship acts on what it changes: approving now would take the result that ask objects to. ' +
+      'try 2 of review is asked for (--continue, at 2026-09-17T09:00:00.000Z), and ship acts on what it changes: approving now would take the result that ask objects to. ' +
         "Approve ship once review has signed off again — or, to take the result as it stands, take that ask back first: retry-review-2, in the run's .asks directory.",
     );
   });
@@ -602,7 +602,7 @@ test("an ending's gate does not hold while the work goes round again or is being
       );
       assert.match(
         String(approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [ask])),
-        /^try 2 of review is asked for \(--nudge, at 2026-09-17T09:00:00\.000Z\), and ship acts on what it changes/,
+        /^try 2 of review is asked for \(--continue, at 2026-09-17T09:00:00\.000Z\), and ship acts on what it changes/,
         'nemia approve refuses in the window',
       );
 

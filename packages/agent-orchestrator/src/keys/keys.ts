@@ -151,7 +151,7 @@ export const BUDGET_EXAMPLE = '`budget: 5`, or `budget: 2.50`';
 
 /**
  * Dollars as a person writes them — `5`, `2.50` — or undefined for anything else: digits, and a point with digits after it, above
- * zero. What `budget:` takes, and `nemia retry --budget` and `nemia round --budget` too.
+ * zero. What `budget:` takes, and `nemia retry --budget` and `nemia retry --round --budget` too.
  */
 export function dollarsOf(written: string): number | undefined {
   const value = written.trim();

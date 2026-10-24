@@ -121,7 +121,7 @@ test('landingDue commits, aborts, waits or records', async (t) => {
   const { head: _, ...headless } = STAGED;
   const aborts: Array<[string, () => unknown, object]> = [
     [
-      'a check that refused names the base it was staged on, for `nemia merge`',
+      'a check that refused names the base it was staged on, for `nemia refresh --base`',
       () => due(atLanding(), 'checking', 'succeeded', 'failed', STAGED, 'm', 1),
       { ...abort('its check refused the merge (exit 1)'), refusedOn: 'base000' },
     ],

@@ -202,7 +202,7 @@ test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other 
     inOrder(
       forgetRefusal(STEPS, unsigned, p, [], none, asked, undefined, [askFor(2)]),
       'try 2 of implement is due',
-      '(nemia retry --nudge)',
+      '(nemia retry --continue)',
       'nemia cancel r-1',
     );
     const recheck = forgetRefusal(STEPS, unsigned, p, [], none, asked, undefined, [askFor(2, 'recheck')], [], undefined, at);
@@ -346,13 +346,13 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
     );
   });
 
-  await t.test('a step ready and a check due are one line of what is due; a round asked for is due by `nemia round`', () => {
+  await t.test('a step ready and a check due are one line of what is due; a round asked for is due by `nemia retry --round`', () => {
     const checked = [step('a'), { ...step('b'), check: 'npm test' }];
     inOrder(forgetRefusal(checked, run({ a: null, b: 't2' }), signed, [], signedDone, asked), 'a is ready to be filed', "b's check is due");
     names(
       forgetRefusal(LOOP, inRound(3), ALL_SUCCEEDED, [], saidIn(3, true), asked, undefined, [], [roundAskFor(4)]),
       "round 4 of review's loop is due",
-      '(nemia round)',
+      '(nemia retry --round)',
     );
   });
 

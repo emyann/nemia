@@ -17,22 +17,7 @@ test('the commands whose work waits on the next pass tick, and no read, nor up, 
     TABLE.filter((c) => c.ticks === true)
       .map((c) => c.name)
       .sort(),
-    [
-      'accept',
-      'agents try',
-      'approve',
-      'cancel',
-      'factory resolve',
-      'factory upgrade',
-      'inbox queue',
-      'merge',
-      'plan',
-      'refresh',
-      'resume',
-      'retry',
-      'round',
-      'start',
-    ],
+    ['agents try', 'approve', 'cancel', 'factory resolve', 'factory upgrade', 'inbox queue', 'plan', 'refresh', 'resume', 'retry', 'start'],
   );
   assert.deepEqual(
     TABLE.filter((c) => c.ticks === true && (!c.writes || ['up', 'tick', 'watch'].includes(c.name))).map((c) => c.name),
@@ -118,12 +103,27 @@ test('each command is served on the api where it was before the table, the lift 
       ['template export', 'cli'],
       ['template pack', 'cli'],
       ['template unpack', 'cli'],
-      ['retry', { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 }],
-      ['approve', { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 }],
-      ['round', { method: 'POST', path: '/api/runs/:runId/round', status: 202 }],
-      ['refresh', { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 }],
-      ['accept', { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 }],
-      ['merge', { method: 'POST', path: '/api/runs/:runId/merge', status: 202 }],
+      [
+        'retry',
+        [
+          { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
+          { method: 'POST', path: '/api/runs/:runId/round', status: 202, sets: { round: true, mode: 'nudge' } },
+        ],
+      ],
+      [
+        'approve',
+        [
+          { method: 'POST', path: '/api/runs/:runId/steps/:step/approve', status: 202 },
+          { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
+        ],
+      ],
+      [
+        'refresh',
+        [
+          { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 },
+          { method: 'POST', path: '/api/runs/:runId/merge', status: 202, sets: { base: true } },
+        ],
+      ],
       ['say', { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 }],
       ['ls', 'cli'],
       ['show', 'cli'],

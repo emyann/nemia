@@ -20,7 +20,7 @@ not an account of it.
 ## A merge of main, round 1 of 3
 
 This step closes a loop (`loop: implement`), and this is no new round: implement merged `main` into the change, on a person's
-word (`nemia merge`), at `abc123`. Read the merge, not the change again:
+word (`nemia refresh --base`), at `abc123`. Read the merge, not the change again:
 
 - What the merge resolved: `git show --remerge-diff` of the merge commit (`git log --merges -1`), and what `main` changed in the
   files the change touches.

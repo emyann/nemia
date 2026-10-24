@@ -537,7 +537,7 @@ test('`nemia decide` on a try a person answered: its line says so, and under it 
   assert.ok(!asking.some((l) => /^ {4}your answer: |^ {4}try \d+ needs: |answered\)$/.test(l)), 'nothing answered yet');
 
   await runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', message: 'Keep it.\nThe flag is public.' }));
-  indexOf(await screen(t, e, run.id), '  implement: try 2 asked (--nudge, with your answer) — the next tick files it');
+  indexOf(await screen(t, e, run.id), '  implement: try 2 asked (--continue, with your answer) — the next tick files it');
 
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement-try2`, 'succeeded', blocked('And the README, too?'));
@@ -1227,7 +1227,7 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
     '<id>  add sub',
     '',
     '  still running: implement',
-    '  implement: try 2 asked (--nudge, with your answer) — the next tick files it',
+    '  implement: try 2 asked (--continue, with your answer) — the next tick files it',
     '  nothing to decide yet',
   ]);
   await runWith(e, advanceRun(readRun(run.id)));

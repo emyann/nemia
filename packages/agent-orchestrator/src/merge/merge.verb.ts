@@ -83,8 +83,8 @@ export function mergeOffers(
 }
 
 /**
- * Ask that a loop's target merge the run's base branch, on the round the loop is on — `nemia merge` — by writing the ask, and nothing else.
- * The next tick honours it once, and moves the run's base to the commit merged.
+ * Ask that a loop's target merge the run's base branch, on the round the loop is on — `nemia refresh --base` — by writing the ask, and
+ * nothing else. The next tick honours it once, and moves the run's base to the commit merged.
  *
  * Refused before anything is written, with what to do instead (`mergeAsk`): among them a run whose result step closes no loop, pointed to
  * `nemia retry`, work whose trial merge onto the base is clean, pointed to the landing's approval, and a base whose commit the trial
@@ -96,7 +96,7 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
   if (!(yield* tried(() => runStore.runs.exists(id))))
     return yield* Effect.fail(
       new Missing({
-        message: `no such run: ${id}. nemia merge takes a run by its id, as nemia ls lists it: nemia merge <runId> [<step>].`,
+        message: `no such run: ${id}. nemia refresh --base takes a run by its id, as nemia ls lists it: nemia refresh <runId> [<step>] --base.`,
       }),
     );
   const run = yield* tried(() => runStore.runs.read(id));
@@ -116,7 +116,7 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
     const why =
       'refusal' in now
         ? now.refusal
-        : strayAsk(written.where, written.stray, `a merge into ${ask.merge.target}'s work`, `nemia merge ${id} ${ask.step}`);
+        : strayAsk(written.where, written.stray, `a merge into ${ask.merge.target}'s work`, `nemia refresh ${id} ${ask.step} --base`);
     return yield* Effect.fail(
       new Conflict({ message: why ?? `a merge into ${ask.merge.target}'s work is already asked. Wait for it: nemia ls ${id}.` }),
     );

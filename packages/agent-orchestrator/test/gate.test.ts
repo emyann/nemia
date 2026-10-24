@@ -494,7 +494,7 @@ test("a wordless `nemia retry` asked while a gated step's harness blocked its se
       (...facts: string[]) =>
       (err: Error & { exitCode?: number; _tag?: string }) => {
         assert.deepEqual([err._tag, err.exitCode], ['Conflict', 2]);
-        for (const fact of ['try 2 of plan is asked for', '(--nudge, at ', 'with no words', ...facts])
+        for (const fact of ['try 2 of plan is asked for', '(--continue, at ', 'with no words', ...facts])
           assert.ok(err.message.includes(fact), err.message);
         return true;
       };
@@ -644,7 +644,7 @@ test('`nemia approve`, REFUSED with nothing written', async (t) => {
     await runWith(sentBack.e, retryRun(sentBack.id, 'plan', { mode: 'nudge', message: 'store it first' }));
     await assert.rejects(
       runWith(sentBack.e, approveRun(sentBack.id, 'plan')),
-      refusedAs('Conflict', 'try 2 of plan is already asked for', '(--nudge, at ', 'an approval of try 1'),
+      refusedAs('Conflict', 'try 2 of plan is already asked for', '(--continue, at ', 'an approval of try 1'),
     );
     assert.deepEqual(asksOf(sentBack.id), ['retry-plan-2']);
   });

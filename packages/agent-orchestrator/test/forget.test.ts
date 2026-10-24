@@ -448,7 +448,7 @@ test('`nemia rm` refused, then allowed: each run that holds it named on its line
       assert.ok(!error?.message.includes(over.run.id), 'the run forgotten is not among them');
       names(printed[0], `${running.id}  not forgotten`, 'implement is pending', `nemia cancel ${running.id}`, `nemia ls ${running.id}`);
       names(printed[1], `${readyRun.id}  not forgotten`, 'review is ready to be filed', `nemia cancel ${readyRun.id}`);
-      names(printed[2], `${asked.id}  not forgotten`, 'try 2 of implement is due', 'nemia retry --nudge', `nemia cancel ${asked.id}`);
+      names(printed[2], `${asked.id}  not forgotten`, 'try 2 of implement is due', 'nemia retry --continue', `nemia cancel ${asked.id}`);
       names(printed[3], `${parent.run.id}  not forgotten`, `${child.id} waits on it`, `nemia cancel ${child.id}`);
       names(printed[4], `${over.run.id}  forgotten`, 'removed 1 worktree');
       for (const id of [running.id, readyRun.id, asked.id, parent.run.id])

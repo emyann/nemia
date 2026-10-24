@@ -1728,7 +1728,7 @@ test("REFUSED: cd to Seldon, Agora and Iris, each by a deny of its own, where th
 /** The agents that review and interview, each of which reads Anthropic's documentation by host. */
 const READERS = ['agora', 'iris'];
 
-/** The agent that designs: a spec is only as good as the documents it reads, so Seldon fetches any site (the owner, 2026-10-24). */
+/** The agent that designs: a spec is only as good as the documents it reads, so Seldon fetches any site. */
 const DESIGNER = 'seldon';
 
 /** Anthropic's documentation, by the host a fetch reads: the only hosts the readers open. */

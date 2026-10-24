@@ -10,8 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
+import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory/factory.ts';
 import { firstRefusal, HOME } from '../record/record.store.ts';
-import { REVISIONS_POLICIES } from '../factory/factory.ts';
 
 /** The folder the store keeps a factory's own files in, beside its `<name>.json`. */
 const folderOf = (name: string): string => path.join(HOME, 'factories', name);
@@ -84,9 +84,9 @@ export const writeTreeWiring = (name: string, wiring: TreeWiring): void =>
 
 /** A condition of a templated factory, as Kubernetes words one: its type, `True` or `False`, a reason in one word, and a sentence. */
 const ConditionSchema = Schema.Struct({
-  type: Schema.String,
+  type: Schema.Literals(FACTORY_CONDITION_TYPES),
   status: Schema.Literals(['True', 'False']),
-  reason: Schema.String,
+  reason: Schema.Literals(FACTORY_CONDITION_REASONS),
   message: Schema.String,
 });
 

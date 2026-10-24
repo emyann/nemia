@@ -1,23 +1,10 @@
 /**
  * A step's tries, earliest first, each with its attempts and how it signed off, as the run's record keeps them — and, of the revisions a
  * try ran on, the two drifts the run page shows: how the workflow folder has moved away from the steps the run started with (`driftOf`),
- * a name-level difference said as a warning, and the kinds the run and its filed steps are behind the ledger on (`kindsOf`). And what a
- * person said of the try a step is on: its gate's approval (`gateOf`) and a loop's acceptance (`acceptedOf`).
+ * a name-level difference said as a warning; the kinds behind the files are the orchestrator's (`driftNow`). And what a person
+ * said of the try a step is on: its gate's approval (`gateOf`) and a loop's acceptance (`acceptedOf`).
  */
-import {
-  endWords,
-  kindsDrift,
-  type RetryAsk,
-  bare,
-  stepsDrift,
-  type TaskView,
-  topsOf,
-  type Drift,
-  type Views,
-  wordOf,
-  ENGINE_REASON,
-  PHASE_OF,
-} from 'agent-orchestrator';
+import { endWords, type RetryAsk, bare, type TaskView, type Views, wordOf, ENGINE_REASON, PHASE_OF } from 'agent-orchestrator';
 import type { StepPhase, StepReason } from 'agent-orchestrator';
 import {
   acceptanceOf,
@@ -303,24 +290,6 @@ export function driftOf(run: Run, workflows: readonly Workflow[]): string | null
       : []),
   ];
   return said.length ? `The workflow folder ${run.workflowDir} has changed since this run started: ${said.join('; ')}.` : null;
-}
-
-/**
- * The kinds the run is behind the ledger on (`kindsDrift`, `stepsDrift`): its own pins, and those a filed step ran on that the run has
- * since moved past. The ledger is read once, for the kinds the run names and no others; a run that pinned nothing reads none, and nothing
- * is read for it.
- *
- * The ledger, not a resolve: a number here is one the ledger holds for a content anything resolved, so a kind edited and then reverted to
- * the content the run pins reads as behind the ledger's last number while `nemia refresh` answers that there is nothing to take — the verb
- * resolves to answer (`refreshedNow`), and a page's read does not pay a resolve. The board says these numbers as the ledger's for that
- * reason (`behindWords`).
- */
-export function kindsOf(run: Run): readonly Drift[] {
-  const steps = Object.entries(run.steps).map(([name, record]) => [name, record.pinned] as const);
-  const named = [...(run.pinned ?? []), ...steps.flatMap(([, pins]) => pins ?? [])].map(({ kind, name }) => ({ kind, name }));
-  if (!named.length) return [];
-  const tops = topsOf(named);
-  return [...kindsDrift(run.pinned, tops), ...stepsDrift(steps, run.pinned, tops)];
 }
 
 /**

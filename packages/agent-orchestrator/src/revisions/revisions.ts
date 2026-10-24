@@ -1,5 +1,5 @@
 /**
- * What a revision is, and the drift between what a run resolved and what the ledger holds now. The face of the folder: the ledger on disk
+ * What a revision is, and the drift between what a run resolved and what the files hold now. The face of the folder: the ledger on disk
  * is `revisions.store.ts`'s, and resolving a run's kinds is `pin.verb.ts`'s. Pure.
  *
  * A revision is a number given to the content of one kind and name — a workflow folder, an agent, a skill, a factory's rules — the first
@@ -24,8 +24,9 @@ export type Revision = { n: number; hash: string; at: string };
 export type Pin = KindName & { n: number; hash: string };
 
 /**
- * One kind and name a run or one of its steps is behind the ledger on: what it resolved (`pinned`), what the ledger holds now (`now`), and
- * the step that already ran on it (`step`), absent for the run's own pin, which a filing after this takes.
+ * One kind and name a run or one of its steps is behind the files on: what it resolved (`pinned`), the revision of what the files hold now
+ * (`now`, which may be lower than `pinned` where the files went back to an older content), and the step that already ran on it (`step`),
+ * absent for the run's own pin, which a filing after this takes.
  */
 export type Drift = KindName & { pinned: number; now: number; step?: string };
 
@@ -40,43 +41,48 @@ export const digestOf = (parts: readonly unknown[]): string =>
 export const revisionNow = (entries: readonly Revision[], hash: string, at: string): Revision =>
   entries.find((e) => e.hash === hash) ?? { n: Math.max(0, ...entries.map((e) => e.n)) + 1, hash, at };
 
-/** The entry of `tops` for `of`, or undefined where the ledger holds none. */
-const topFor = (tops: readonly Pin[], of: KindName): Pin | undefined => tops.find((t) => t.kind === of.kind && t.name === of.name);
+/** The pin of `pins` for `of`, or undefined where it holds none. */
+const pinFor = (pins: readonly Pin[], of: KindName): Pin | undefined => pins.find((t) => t.kind === of.kind && t.name === of.name);
 
 /**
- * The kinds `pinned` is behind `tops` on, in `pinned`'s order: one `Drift` per kind and name whose number the ledger has moved past, and
- * `[]` when none has — a run whose pins are the ledger's top, and a record written before this slice, which pinned nothing.
+ * The kinds `pinned` differs from `now` on, in `pinned`'s order: one `Drift` per kind and name whose content `now` holds other bytes of, by
+ * the digest — never by the number, which is only the ledger's reading of a content: a kind edited and reverted is the pin's number again,
+ * and a kind reverted to an older content is that older number, so `now` may be lower than `pinned`. `[]` when nothing differs, a kind
+ * `now` does not hold included, and for a record written before this slice, which pinned nothing.
  */
-export const kindsDrift = (pinned: readonly Pin[] | undefined, tops: readonly Pin[]): Drift[] =>
+export const kindsDrift = (pinned: readonly Pin[] | undefined, now: readonly Pin[]): Drift[] =>
   (pinned ?? []).flatMap((pin) => {
-    const top = topFor(tops, pin);
-    return top && top.n > pin.n ? [{ kind: pin.kind, name: pin.name, pinned: pin.n, now: top.n }] : [];
+    const at = pinFor(now, pin);
+    return at && at.hash !== pin.hash ? [{ kind: pin.kind, name: pin.name, pinned: pin.n, now: at.n }] : [];
   });
 
 /**
- * The kinds a step that has already been filed ran on and the ledger has moved past, beyond the run's own drift: one `Drift` per step, kind
- * and name whose pin differs from what the run resolved — so a refresh, which re-pins the run and leaves a filed step's own pins where they
- * were, is read as "this already ran, and it ran on that revision". A step whose pin is the run's is left out: the run's line says it.
+ * The kinds a step that has already been filed ran on and `now` differs from, beyond the run's own drift: one `Drift` per step, kind and
+ * name whose pin is other bytes than `now`'s and than the run's — so a refresh, which re-pins the run and leaves a filed step's own pins
+ * where they were, is read as "this already ran, and it ran on that revision". A step whose pin is the run's is left out: the run's line
+ * says it. Compared by digest, as `kindsDrift` is.
  *
  * `steps` are the steps' own pins by step name, in the order they run.
  */
 export const stepsDrift = (
   steps: readonly (readonly [string, readonly Pin[] | undefined])[],
   pinned: readonly Pin[] | undefined,
-  tops: readonly Pin[],
+  now: readonly Pin[],
 ): Drift[] =>
   steps.flatMap(([step, pins]) =>
     (pins ?? []).flatMap((pin) => {
-      const top = topFor(tops, pin);
-      const ran = topFor(pinned ?? [], pin);
-      return top && top.n > pin.n && ran?.n !== pin.n ? [{ kind: pin.kind, name: pin.name, pinned: pin.n, now: top.n, step }] : [];
+      const at = pinFor(now, pin);
+      const ran = pinFor(pinned ?? [], pin);
+      return at && at.hash !== pin.hash && ran?.hash !== pin.hash
+        ? [{ kind: pin.kind, name: pin.name, pinned: pin.n, now: at.n, step }]
+        : [];
     }),
   );
 
 /**
  * A drift in words, as `nemia refresh` prints it: `agent coder: rev 5, now 6`, the numbers of a resolve it has just made. Its one caller is
- * the verb's own answer (`REFRESH.print`). The board words the same drift itself, off what the api serves, and says it as the ledger's,
- * since a page's read makes no resolve: changing this line changes the CLI alone.
+ * the verb's own answer (`REFRESH.print`) and the note of a pinned run's `revisions behind` line. The board words the same drift itself,
+ * off what the api serves (`driftNow`): changing this line changes the CLI and the feed's note, never the board.
  */
 export const driftWords = (d: Drift): string =>
   `${d.kind} ${d.name}: ${d.step ? `${d.step} ran on rev ${d.pinned}` : `rev ${d.pinned}`}, now ${d.now}`;

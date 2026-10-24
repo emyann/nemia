@@ -3,7 +3,7 @@
  * stories. One run's ending: a run to its ending's gate, approved, merged and landed on its check, and a run `--after` it; a landing read
  * again after a restart, a pause or a person's hand; a record an older nemia wrote; a place that reads the checkout oddly; and an ending
  * that stops on its own word or whose check refuses the merged tree. The ends of runs that share a repository: a result a person merged
- * by hand before its ending ran — the run has shipped as git reads it, and a run `--after` it starts — and two runs of one repository at
+ * by hand before its ending ran — the run has landed as git reads it, and a run `--after` it starts — and two runs of one repository at
  * their endings, which never work in its one checkout at once. The work sent back from a run's ending: a send-back at the ending's gate,
  * an ending stopped on its base branch that sends the work back through the loop, a loop out of rounds before its ending, and `nemia
  * merge` of the base into the work — where it conflicts as text, and where the ending's check refused the merged tree (the conflict is
@@ -179,8 +179,8 @@ async function endings(stage: Stage, root: string) {
     },
     /** A pass's read of where every run's branches stand, written to `standing.json` as the tick writes it: what `nemia ls` reads. */
     aPass: (e: Engine) => stage.runWith(e, passStanding(runStore.runs.list())),
-    /** Whether `branch` of `r` is shipped, its standing asked now, as a person's verb asks it (`standingLive`). */
-    isShipped: async (r: RepositoryRun, branch: string) => (await stage.runPlaced(standingLive([r]))).shipped(r, branch),
+    /** Whether `branch` of `r` is landed, its standing asked now, as a person's verb asks it (`standingLive`). */
+    isLanded: async (r: RepositoryRun, branch: string) => (await stage.runPlaced(standingLive([r]))).landed(r, branch),
     /** Every branch of a run's repository and its commit, asked of this test's place now (`headsNow`). */
     liveHeads: (r: RepositoryRun) => headsNow(r, stage.place().place),
     /** A run this file started on a repository: a repository run. */
@@ -440,7 +440,7 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
       assert.doesNotMatch(toDecideWords(readRun(id), l.toDecide), /You are/, "the gate says ship.md's note, not its agent's instructions");
       const again = await at.pass(id);
       assert.deepEqual([again.filed, again.checked, again.tried], [[], [], []], 'pass after pass, nothing is spent while the gate holds');
-      assert.equal(await at.isShipped(at.repositoryRun(readRun(id)), branch), false);
+      assert.equal(await at.isLanded(at.repositoryRun(readRun(id)), branch), false);
     },
   );
 
@@ -506,7 +506,7 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
         fs.readFileSync(path.join(dir, 'e2e-pictures.txt'), 'utf8'),
         /removed the 1 picture the check[^]*\n {2}page-light\.png {2}14 B\n/,
       );
-      assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'shipped');
+      assert.equal((await stage.runWith(e, decideRun(id))).decision.kind, 'landed');
     },
   );
 
@@ -514,7 +514,7 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
     "a run --after it is handed what its work said, not what its ending said: the ending's account is of the merge, and it declares nothing",
     async () => {
       const child = await stage.runPlaced(startRun({ brief: 'read the flag', repo, workflowDir: at.oneStep(), after: [id] }));
-      assert.deepEqual((await at.pass(child.id)).filed, ['implement'], 'the parent shipped, so the child is filed');
+      assert.deepEqual((await at.pass(child.id)).filed, ['implement'], 'the parent landed, so the child is filed');
       const brief = tasks.get(`${child.id}-implement`)!.spec.brief;
       assert.match(brief, new RegExp(`## From run ${id}\\n`));
       assert.match(brief, /What implement said when it signed off, its `summary`:\n\n```text\ndid the work\n```/);
@@ -546,7 +546,7 @@ test('a landing a pass reads again — after a restart, under a pause, or with a
         'its note is left',
       );
       assert.equal(world().head(repo), head, 'nothing committed again');
-      assert.equal((await stage.runWith(stage.board().e, decideRun(id))).decision.kind, 'shipped');
+      assert.equal((await stage.runWith(stage.board().e, decideRun(id))).decision.kind, 'landed');
     },
   );
 
@@ -968,7 +968,7 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
       settle(`${id}-ship`, 'succeeded', BLOCKED);
       await at.pass(id);
       assert.equal(at.uncommitted(repo), '', 'nor does the run commit what a step left in that checkout');
-      assert.equal(await at.isShipped(at.repositoryRun(readRun(id)), branch), false);
+      assert.equal(await at.isLanded(at.repositoryRun(readRun(id)), branch), false);
       const { decision } = await stage.runWith(e, decideRun(id));
       assert.equal(decision.kind, 'awaiting');
       if (decision.kind !== 'awaiting') return;
@@ -1059,7 +1059,7 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
   });
 });
 
-test('a result a person merged by hand before its ending ran: the run has shipped as git reads it, a run `--after` it starts, and every screen agrees', async (t) => {
+test('a result a person merged by hand before its ending ran: the run has landed as git reads it, a run `--after` it starts, and every screen agrees', async (t) => {
   const s = story(t);
   const { filings } = stage.board();
   let gate: Awaited<ReturnType<typeof at.atTheGate>>;
@@ -1080,7 +1080,7 @@ test('a result a person merged by hand before its ending ran: the run has shippe
     async (st) => {
       const { repo, id, branch } = gate;
       at.mergedByHand(repo, branch);
-      assert.equal(await at.isShipped(at.repositoryRun(readRun(id)), branch), true, 'a person merged the result, and nobody told the run');
+      assert.equal(await at.isLanded(at.repositoryRun(readRun(id)), branch), true, 'a person merged the result, and nobody told the run');
       await at.aPass(e());
       const l = await listed(id);
       assert.equal(l.toDecide, undefined, 'nothing to decide: git already has the result');
@@ -1090,7 +1090,7 @@ test('a result a person merged by hand before its ending ran: the run has shippe
         [ship.status, ship.note],
         [
           'awaiting approval',
-          `${branch} is on main — nothing is left for ship to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${id}`,
+          `${branch} is on main — nothing is left for ship to merge: the run has landed as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${id}`,
         ],
       );
       const printed = await at.printedBy(st, ['ls', id]);
@@ -1103,16 +1103,16 @@ test('a result a person merged by hand before its ending ran: the run has shippe
   );
 
   await s.test(
-    '`nemia decide` says the same before anybody closes the record: shipped, and no AWAITING APPROVAL above a branch on main',
+    '`nemia decide` says the same before anybody closes the record: landed, and no AWAITING APPROVAL above a branch on main',
     async (st) => {
       const { id, branch } = gate;
       const { decision } = await stage.runWith(e(), decideRun(id));
-      assert.deepEqual([decision.kind, decision.kind === 'shipped' ? decision.branches : []], ['shipped', [branch]]);
+      assert.deepEqual([decision.kind, decision.kind === 'landed' ? decision.branches : []], ['landed', [branch]]);
       const screen = await at.printedBy(st, ['decide', id]);
       assert.ok(
         screen.some((x) =>
           x.endsWith(
-            `\n\n  shipped — ${branch} is already on main\n  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${id}`,
+            `\n\n  landed — ${branch} is already on main\n  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${id}`,
           ),
         ),
         screen.join('\n'),
@@ -1126,7 +1126,7 @@ test('a result a person merged by hand before its ending ran: the run has shippe
     assert.deepEqual(timeless(await decideScreen(st, e(), [id], { '<id>': id, '<repo>': repo, '<root>': ROOT }, stage.place().place)), [
       '<id>  add sub',
       '',
-      '  shipped — wf/<id>/run is already on main',
+      '  landed — wf/<id>/run is already on main',
       '  ship never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel <id>',
     ]);
   });
@@ -1140,7 +1140,7 @@ test('a result a person merged by hand before its ending ran: the run has shippe
     assert.deepEqual(readRun(id).approvals ?? [], [], 'nothing was written');
   });
 
-  await s.test("ship is never filed, pass after pass, and the child starts on git's word: its parent has shipped", async () => {
+  await s.test("ship is never filed, pass after pass, and the child starts on git's word: its parent has landed", async () => {
     const { id } = gate;
     for (const pass of [1, 2]) assert.deepEqual((await at.pass(id)).filed, [], `pass ${pass}: ship is never filed`);
     assert.deepEqual(filings, [`${id}-implement`]);
@@ -1428,7 +1428,7 @@ test('a checkout held by a merge staged and not landed, and claimed by no run th
   );
 
   await s.test(
-    'a run whose ending the pass will not file claims no checkout: one waiting on a run that has not shipped, and one the cap on runs in flight holds, each hold nobody — however old their word',
+    'a run whose ending the pass will not file claims no checkout: one waiting on a run that has not landed, and one the cap on runs in flight holds, each hold nobody — however old their word',
     async () => {
       const repo = at.aRepo();
       const waiting = await at.atTheGate({ repo });
@@ -1465,11 +1465,7 @@ test('a checkout held by a merge staged and not landed, and claimed by no run th
       at.mergedByHand(repo, parent.branch);
       settle(`${parent.id}-ship`, 'succeeded', SIGNED);
       await at.pass(parent.id);
-      assert.equal(
-        await at.isShipped(at.repositoryRun(readRun(parent.id)), parent.branch),
-        true,
-        "the merge-only run's parent has shipped",
-      );
+      assert.equal(await at.isLanded(at.repositoryRun(readRun(parent.id)), parent.branch), true, "the merge-only run's parent has landed");
       const other = await at.atTheGate({ repo });
       fs.writeFileSync((await stage.runWith(e(), approveRun(other.id, 'ship'))).file, JSON.stringify({ at: '2026-09-17T06:00:00.000Z' }));
       const child = await stage.runPlaced(startRun({ brief: 'ship the flag', repo, workflowDir: at.mergeOnly(), after: [parent.id] }));
@@ -1544,7 +1540,7 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
       settle(`${id}-implement-try2`, 'succeeded', SIGNED);
       assert.deepEqual((await at.pass(id)).filed, [], 'and the gate holds the ending again');
       assert.deepEqual((await listed(id)).toDecide?.kind, 'approve');
-      assert.equal(await at.isShipped(at.repositoryRun(readRun(id)), branch), false);
+      assert.equal(await at.isLanded(at.repositoryRun(readRun(id)), branch), false);
     },
   );
 
@@ -1622,7 +1618,7 @@ test('an ending that stopped on the base branch sends the work back through the 
   );
 
   await s.test(
-    '`nemia decide` offers no merge where the work merges cleanly onto the base: a base that merges cleanly is shipped again, never merged',
+    '`nemia decide` offers no merge where the work merges cleanly onto the base: a base that merges cleanly is landed again, never merged',
     async () => {
       assert.deepEqual(
         (await stage.runWith(e(), decideRun(stopped.id))).commands.filter((c) => c.label === 'merge'),
@@ -1813,7 +1809,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       stopped = await at.stoppedOnBase();
       const { repo, id } = stopped;
       const merges = async () => (await stage.runWith(e(), decideRun(id))).commands.filter((c) => c.label === 'merge');
-      assert.deepEqual(await merges(), [], 'a base that merges cleanly is shipped again, never merged');
+      assert.deepEqual(await merges(), [], 'a base that merges cleanly is landed again, never merged');
       at.mainMoves(repo);
       const decided = await stage.runWith(e(), decideRun(id));
       assert.deepEqual(

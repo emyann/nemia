@@ -1,8 +1,8 @@
 /**
  * A run's record, as data: its shape (`Run`, a `RepositoryRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Approval`,
- * `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`, `Landed`), the try it
- * is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's judgement shares (`andList`,
- * `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through (`RunStore`).
+ * `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`, `LandingRecord`), the
+ * try it is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's judgement shares
+ * (`andList`, `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through (`RunStore`).
  * Pure: `record.store.ts` reads and writes the record.
  */
 import type { Verdict } from '../check/check.ts';
@@ -98,7 +98,7 @@ type RunBase = {
   workflow?: Workflow[];
   /**
    * The runs this one waits on (`nemia start --after`), frozen at start like the workflow: none of its steps is filed until
-   * every one of them has shipped (`runReady`). Absent on a run that waits on none.
+   * every one of them has landed (`runReady`). Absent on a run that waits on none.
    */
   after?: string[];
   /**
@@ -189,7 +189,7 @@ type RunBase = {
   runTimed?: boolean;
   /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
-   * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
+   * land. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
    * (the place's `standing`, `standingNow`) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has
    * finished.
    */
@@ -210,11 +210,11 @@ type RunBase = {
    */
   pruned?: Pruned;
   /**
-   * That a person holds the run until other runs ship (`nemia hold <run> --until <run>…`), and since when — composed on read from a file of
+   * That a person holds the run until other runs land (`nemia hold <run> --until <run>…`), and since when — composed on read from a file of
    * its own, `runs/<id>.hold`, as `cancelledAt` is, and never written into the record. While it stands the run files nothing new, and no
    * verb offers or takes an approval, a try, a round or an acceptance (`heldRefusal`): what is in flight runs on, and what a step asks
-   * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has shipped, as `--after` reads
-   * shipped (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
+   * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has landed, as `--after` reads
+   * landed (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
    */
   hold?: Hold;
   /**
@@ -246,7 +246,7 @@ type RunBase = {
 };
 
 /**
- * A person's hold on a run, as its file says it: when it was put, the runs it waits on to ship, in the order they were named, the
+ * A person's hold on a run, as its file says it: when it was put, the runs it waits on to land, in the order they were named, the
  * person's words for why (`why`, absent when none were given) and who put it (`by`, absent on a file older code wrote), each one line.
  */
 export type Hold = { at: string; until: string[]; why?: string; by?: string };
@@ -428,7 +428,7 @@ export type StepRecord = {
    * What the run did with the merge an ending that lands on its check staged (`landingDue`): the commit it made, or why it made none. Once
    * for each try.
    */
-  landed?: Landed;
+  landed?: LandingRecord;
   /**
    * What the run read of the files the closeout of a task of the step named (`FilesRead`): written by the tick on the pass that first
    * read the task signed (`filesDue`), whether or not a file lacked, so the files of a task are read once. The step whose current task
@@ -437,7 +437,7 @@ export type StepRecord = {
    */
   filesRead?: FilesRead;
   /**
-   * The agent and skill revisions the step's current try was filed on (`stepPins`): what a step that has shipped says it ran on, which the
+   * The agent and skill revisions the step's current try was filed on (`stepPins`): what a step that has landed says it ran on, which the
    * board reads beside the run's own pins once a refresh has moved those past it. Written at each filing, so a try filed again says the
    * revisions that try took. Absent on a step nothing has filed, and on a record written before revisions.
    */
@@ -476,7 +476,7 @@ export const lackedOf = (record: StepRecord | undefined): LackedFile[] =>
  * what a person stages in the checkout after it is theirs. An abort of a merge its check refused names the base it was staged on
  * (`refusedOn`), which `nemia merge` reads (`mergeAsk`).
  */
-export type Landed = { commit: string } | { aborted: string; refusedOn?: string } | { untouched: string };
+export type LandingRecord = { commit: string } | { aborted: string; refusedOn?: string } | { untouched: string };
 
 /**
  * Whether a check that did not pass REFUSED the work, rather than not finishing.
@@ -710,7 +710,7 @@ export type RunStore = {
     /** Lift the hold put at `at`, and only while it still stands: false when it is gone or a hold was put since. */
     readonly lift: (id: string, at: string) => boolean;
     /**
-     * Hold the run until the runs `until` ship, with a person's `why` and who they are (`by`) when given: the hold written, or null when
+     * Hold the run until the runs `until` land, with a person's `why` and who they are (`by`) when given: the hold written, or null when
      * one already stands, which is kept.
      */
     readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'>) => Hold | null;

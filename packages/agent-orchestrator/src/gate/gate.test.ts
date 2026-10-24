@@ -189,7 +189,7 @@ test('gateLines', async (t) => {
       'at its gate on a held run: no command, its approval asked once the hold lifts',
       atPlan({ hold: { at: '2026-09-17T01:00:00.000Z', until: ['r-0'] } }),
       PLAN_DONE,
-      { plan: 'awaiting approval:  held until r-0 ships; its approval is asked once the hold lifts' },
+      { plan: 'awaiting approval:  held until r-0 lands; its approval is asked once the hold lifts' },
     ],
     [
       'at its gate on a pruned run: never approved, and no command offered',

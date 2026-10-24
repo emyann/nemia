@@ -231,9 +231,9 @@ export function readPruned(id: string): Pruned | undefined {
 }
 
 /**
- * That a person holds the run until other runs ship (`nemia hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for
+ * That a person holds the run until other runs land (`nemia hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for
  * the reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `nemia hold --off`, by the tick once every run it names has
- * shipped (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within
+ * landed (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within
  * its cap.
  */
 export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
@@ -252,7 +252,7 @@ function readHold(id: string): Hold | undefined {
 }
 
 /**
- * Write down that this run is held until `until` ship, with the person's `why` and who they are (`by`) when given, and answer with the
+ * Write down that this run is held until `until` land, with the person's `why` and who they are (`by`) when given, and answer with the
  * hold written — or null, when a hold already stands. `wx`, so a hold two people put at once is the first one's, whole, and a hold is
  * never edited: changing what it names or says is `--off` and a new hold.
  */
@@ -270,7 +270,7 @@ export const writeHold = (id: string, until: readonly string[], { why, by }: Pic
 
 /**
  * Lift a hold — the one put at `at`, and only while it still stands: false when the file is gone or holds a hold put since. The tick reads
- * the hold, spends seconds asking git and the engine whether its runs shipped, and lifts it; a person who lifted it and held the run again
+ * the hold, spends seconds asking git and the engine whether its runs landed, and lifts it; a person who lifted it and held the run again
  * in those seconds put a hold the tick never read, and it stays.
  */
 export const removeHold = (id: string, at: string): boolean => {

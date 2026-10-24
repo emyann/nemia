@@ -59,7 +59,7 @@ type Asked = {
 
 /**
  * The ask with the step's standing read (`retryable`): the step, its next try, the ask already waiting for it (`pending`), and the ending
- * stopped on the base branch (`stoppedAt`), with the command that ships it again (`again`).
+ * stopped on the base branch (`stoppedAt`), with the command that lands it again (`again`).
  */
 type Judged = Asked &
   ReturnType<typeof retryable> & {
@@ -262,7 +262,7 @@ function nothingToTry(c: Judged): string {
   return stoppedEndingRefusal(c) ?? endingGateRefusal(c) ?? statusRefusal(c);
 }
 
-/** A step whose work an ending stopped on the base branch acted on: sent back through the folder's loop, or shipped again. */
+/** A step whose work an ending stopped on the base branch acted on: sent back through the folder's loop, or landed again. */
 function stoppedEndingRefusal(c: Judged): string | undefined {
   const { steps, run, name, status, stoppedAt, again } = c;
   if (!stoppedAt || !satisfiesAfter(status)) return undefined;

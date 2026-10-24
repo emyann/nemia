@@ -10,7 +10,7 @@ export {
   parseGlobs,
   resultSteps,
   resultTips,
-  shippedOver,
+  landedOver,
   tipBranches,
   tipsSeen,
   touchedLines,

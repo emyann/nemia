@@ -1,7 +1,7 @@
 /**
  * A plan is a folder of cards. That is the whole format, one level up from a workflow.
  *
- * Each file is one card, and a card is one run: its frontmatter says which workflow runs it and which cards' runs must ship before
+ * Each file is one card, and a card is one run: its frontmatter says which workflow runs it and which cards' runs must land before
  * it starts, and its body is the run's brief — in prose, as a person describing the plan would say it.
  *
  *     ---
@@ -32,7 +32,7 @@ export type Card = {
   file: string;
   /** The workflow its run is started on, as written: a name under `<repo>/workflows/`, or a path relative to the plan folder. */
   workflow: string;
-  /** The cards whose runs must ship before this one's roots are filed, as written. `[]` starts at once. */
+  /** The cards whose runs must land before this one's roots are filed, as written. `[]` starts at once. */
   after: string[];
   /** Everything below the frontmatter: the run's brief. */
   body: string;
@@ -111,7 +111,7 @@ function afterOf(file: string, after: string | undefined): string[] {
           .filter(Boolean);
   if (after !== undefined && !names.length) {
     refuse(
-      `${file}: \`after: ${after}\` names no card. List the cards whose runs ship first, comma-separated — \`after: a, b\` — or delete the line, and the card starts at once.`,
+      `${file}: \`after: ${after}\` names no card. List the cards whose runs land first, comma-separated — \`after: a, b\` — or delete the line, and the card starts at once.`,
     );
   }
   const twice = names.find((a, i) => names.indexOf(a) !== i);
@@ -171,7 +171,7 @@ function readCardKeys(file: string, block: string): Partial<Record<CardKey, stri
   return frontmatterKeys(file, block, CARD_KEYS, (key) =>
     key === 'repo'
       ? `${file}: \`repo\` is not a key a plan's card has: a plan works on one repository, the one nemia plan <folder> --repo <r> is given, and a card started by hand works on nemia start's --repo. \`repo:\` is an inbox card's — delete the line, or file the idea in the inbox: nemia inbox add <file> --repo <r>.`
-      : `${file}: \`${key}\` is not a key a card has. A card's keys are: ${CARD_KEYS.join(', ')} — what runs it, and what ships first; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
+      : `${file}: \`${key}\` is not a key a card has. A card's keys are: ${CARD_KEYS.join(', ')} — what runs it, and what lands first; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
   );
 }
 
@@ -217,7 +217,7 @@ export function planOrder(cards: readonly Card[]): Card[] {
     for (const a of card.after) {
       if (a === card.name)
         refuse(
-          `${card.file}: \`after: ${card.after.join(', ')}\` names this card. A card waits on other cards' runs to ship: delete ${a} from the line.`,
+          `${card.file}: \`after: ${card.after.join(', ')}\` names this card. A card waits on other cards' runs to land: delete ${a} from the line.`,
         );
       if (!names.has(a)) {
         const bare =

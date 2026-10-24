@@ -284,7 +284,7 @@ const endingAfter = (steps: readonly Workflow[], looping: Workflow): Workflow | 
 
 /**
  * The landing of the ending after `looping` that its check refused on `sha` (`MergeLanding`): its record says it aborted the merge staged
- * on that commit of the base (`Landed`'s `refusedOn`), and names its check's task — or undefined.
+ * on that commit of the base (`LandingRecord`'s `refusedOn`), and names its check's task — or undefined.
  */
 function refusedLanding(steps: readonly Workflow[], run: Run, looping: Workflow, sha: string): MergeLanding | undefined {
   const ending = endingAfter(steps, looping);
@@ -294,7 +294,7 @@ function refusedLanding(steps: readonly Workflow[], run: Run, looping: Workflow,
 
 /**
  * The task of the check that refused the merge an ending staged on `sha`, a commit of the base, as the ending's `record` says it
- * (`Landed`'s `refusedOn`): undefined when the ending's landing was not aborted on that commit, or names no check.
+ * (`LandingRecord`'s `refusedOn`): undefined when the ending's landing was not aborted on that commit, or names no check.
  */
 export function landingRefusedOn(record: StepRecord | undefined, sha: string): string | undefined {
   const landed = record?.landed;

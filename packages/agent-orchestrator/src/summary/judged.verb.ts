@@ -85,10 +85,10 @@ export const spentOf = (spend: Spend): Spent | null =>
 /**
  * What a run started `--after` still waits on, as `nemia ls` and `nemia decide` say it — never worded here.
  *
- * `runs` are the package's `waitsOf`: each run in `after` that has not shipped, as its own `nemia decide` says it, and, for one that never
+ * `runs` are the package's `waitsOf`: each run in `after` that has not landed, as its own `nemia decide` says it, and, for one that never
  * will without a person, why — the store has no such run (`missing`), it was cancelled, or a result branch it recorded is gone. `word` is
  * what `nemia ls` prints on each root (`waitWord`), and `advice` the line `nemia decide` prints under it (`waitAdvice`). `onYou` is whether
- * a person has to act — some run of `runs` never ships on its own — which is when `nemia ls` prints `→ waiting on you:` before the advice.
+ * a person has to act — some run of `runs` never lands on its own — which is when `nemia ls` prints `→ waiting on you:` before the advice.
  */
 export type RunWaiting = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
@@ -101,18 +101,18 @@ export type RunWaiting = {
  * What a person's hold on a run says (`nemia hold <run> --until <run>`, `Run.hold`), as `nemia ls` and `nemia decide` say it — never worded
  * here.
  *
- * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not shipped,
- * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has shipped and the next
- * tick has not yet lifted the hold, each of them `shipped`. `word` is what `nemia ls` prints under the run (`holdWord`), with the person's
+ * `at` is when the hold was put, as its file says it. `runs` are the package's `holdsOf`: each run the hold names that has not landed,
+ * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has landed and the next
+ * tick has not yet lifted the hold, each of them `landed`. `word` is what `nemia ls` prints under the run (`holdWord`), with the person's
  * why and name when the hold has them, and `advice` the line
  * `nemia decide` prints under it (`holdAdvice`). `onYou` is whether the hold lifts only by a person's hand: it names no run, or a run it
- * names never ships on its own — the rule `nemia ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every
+ * names never lands on its own — the rule `nemia ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every
  * verb a step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`) and
  * nothing is offered.
  */
 export type RunHolding = {
   at: string;
-  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; shipped: boolean }>;
+  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; landed: boolean }>;
   word: string;
   advice: string;
   onYou: boolean;
@@ -158,13 +158,13 @@ export type StepNeeds = {
 };
 
 /**
- * A run waited on that never ships without a person: what `nemia ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to
+ * A run waited on that never lands without a person: what `nemia ls` prints `→ waiting on you:` for, and `waitAdvice` says is yours to
  * resolve.
  *
- * The package decides it (`neverShips` in wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when
- * it may never ship without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `gone`.
+ * The package decides it (`neverLands` in wait/wait.ts) and does not export it. Read here off `Wait`'s own contract — its id and, when
+ * it may never land without a person, why — so any reason it carries counts, not only `missing`, `cancelledAt` and `gone`.
  */
-const neverShips = (w: Wait): boolean => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
+const neverLands = (w: Wait): boolean => Object.entries(w).some(([key, why]) => key !== 'run' && why !== undefined);
 
 /** What a run still waits on (`RunWaiting`), in the package's words; null when it waits on no run. */
 export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | null {
@@ -173,14 +173,14 @@ export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | nul
     runs: waits.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [] })),
     word: waitWord(waits),
     advice: waitAdvice(run, waits),
-    onYou: waits.some(neverShips),
+    onYou: waits.some(neverLands),
   };
 }
 
 /**
- * Whether a held run's hold lifts only by a person's hand: it names no run, or a run it names never ships on its own — no such run, a
- * cancelled one, a result branch gone. As `nemia ls` and `nemia decide` decide it (cli/main.ts). Not `neverShips` above, which reads any
- * reason a `Wait` carries as one it may never ship for: a hold's `shipped` is the opposite.
+ * Whether a held run's hold lifts only by a person's hand: it names no run, or a run it names never lands on its own — no such run, a
+ * cancelled one, a result branch gone. As `nemia ls` and `nemia decide` decide it (cli/main.ts). Not `neverLands` above, which reads any
+ * reason a `Wait` carries as one it may never land for: a hold's `landed` is the opposite.
  */
 const holdNeedsYou = (holds: readonly Wait[]): boolean =>
   !holds.length || holds.some((w) => Boolean(w.missing || w.cancelledAt || w.gone?.length));
@@ -195,7 +195,7 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
       missing: Boolean(w.missing),
       cancelledAt: w.cancelledAt ?? null,
       gone: w.gone ?? [],
-      shipped: Boolean(w.shipped),
+      landed: Boolean(w.landed),
     })),
     word: holdWord(holds, run.hold),
     advice: holdAdvice(run, holds),
@@ -265,7 +265,7 @@ type Judged = {
   /**
    * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file — a
    * check, a try, a round due once a loop's looping step settled, or roots `assess` makes ready. Roots of a run waiting on runs are filed
-   * once those ship (`runReady`), which never happens on its own for one that never ships: the gate is the tick's, and `assess` does not
+   * once those land (`runReady`), which never happens on its own for one that never lands: the gate is the tick's, and `assess` does not
    * know it. A cancelled run files nothing (`assess` makes nothing ready), and moves until its stop lands. A held run's due is what it
    * files once its hold lifts, for a hold that lifts on its own; a hold that lifts only by a person's hand leaves nothing due. A record the
    * tick cannot read — no frozen workflow, its folder gone — has nothing filed for it, whatever its bare steps would make ready: the tick
@@ -313,7 +313,7 @@ const toDecideBranches = (run: Run, steps: readonly Workflow[], status: RunStatu
  * It spares the store's long tail — finished runs whose branches are already on the base — a reading a branch on every poll of the list.
  *
  * The work is what the answer is remembered against, because the other way a branch grows is a person trying a finished run's step again:
- * a run whose branch had nothing on it past its base reads `on` too (`shippedOver`'s `unchanged`), and its next try may commit. A try or a
+ * a run whose branch had nothing on it past its base reads `on` too (`landedOver`'s `unchanged`), and its next try may commit. A try or a
  * round files a task, which the record carries, so the memo is dropped and the branch read afresh. What is left is a person committing
  * to a finished run's branch by hand, which nothing on the board is told of either: `nemia decide` asks where it stands every time, and a
  * fresh process reads it afresh.
@@ -401,9 +401,9 @@ export type JudgeHow = {
  * word, its codes (`codes`): what the board and `needsOf` compare, never the word itself.
  *
  * The runs its roots wait on and the runs a person holds it until are each read once, through the request's reader: a root of a run
- * waiting on runs says `waiting on <run>`, and the run moves while each may still ship — the tick files the roots when they do — and not
+ * waiting on runs says `waiting on <run>`, and the run moves while each may still land — the tick files the roots when they do — and not
  * once one never will without a person. A held run moves as it would unheld while the hold may still lift on its own — the tick lifts it
- * once every run it names has shipped, and files then what is due — and not once it lifts only by a person's hand. No slot is said and no
+ * once every run it names has landed, and files then what is due — and not once it lifts only by a person's hand. No slot is said and no
  * checkout read: the board says the run slots over its Factory.
  *
  * Where the run's result branches stand is asked once the run's status is known (`standings`): left out, no branch is read, only a gate

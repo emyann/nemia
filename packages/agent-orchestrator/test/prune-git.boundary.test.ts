@@ -95,7 +95,7 @@ const detach = (wt: string) => {
   return git(wt, 'rev-parse', 'HEAD');
 };
 
-test("a shipped run's worktree is removed through git with what git ignores, counted without a file main still holds, and nothing a link or a hardlink leads to is touched", async () => {
+test("a landed run's worktree is removed through git with what git ignores, counted without a file main still holds, and nothing a link or a hardlink leads to is touched", async () => {
   const { e, run, repo, wt, outside } = await aFinished();
   const measured = (await runWith(e, prune(run.id))).worktrees[0].bytes;
   assert.ok(measured >= 64 * 1024, `what node_modules holds is counted (${measured})`);

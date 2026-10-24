@@ -14,7 +14,7 @@ import {
   SETTLED,
   TRIED_FROM,
   tryOf,
-  type Landed,
+  type LandingRecord,
   type Run,
   type StepStatus,
   type TaskPhase,
@@ -79,7 +79,7 @@ export type Landing =
   | { act: 'wait'; why: string }
   | { act: 'commit'; message: string }
   | { act: 'abort'; why: string; refusedOn?: string }
-  | { act: 'record'; landed: Landed };
+  | { act: 'record'; landed: LandingRecord };
 
 /**
  * What this pass does with the merge an ending that lands on its check staged in the repository's checkout (`landsOnCheck`), or undefined
@@ -205,13 +205,13 @@ export const landingOpen = (
 };
 
 /**
- * What the run did with an ending's merge — `the run committed its merge onto main as 1a2b3c4`, or why it made no commit — as the tick's
+ * What the run did with an ending's merge — `the run landed on main as 1a2b3c4`, or why it made no commit — as the tick's
  * note says it (the daemon's log), `nemia ls` on the step's line (`listing`, clipped), and `nemia decide` in its offer of a try of a merge
  * the run aborted (`retryLines`).
  */
-export const landedWords = (run: Pick<Run, 'branch'>, landed: Landed): string =>
+export const landedWords = (run: Pick<Run, 'branch'>, landed: LandingRecord): string =>
   'commit' in landed
-    ? `the run committed its merge onto ${run.branch} as ${landed.commit.slice(0, 7)}`
+    ? `the run landed on ${run.branch} as ${landed.commit.slice(0, 7)}`
     : 'aborted' in landed
       ? `nothing landed on ${run.branch}: ${landed.aborted}`
       : `${landed.untouched}: the run left the checkout as it found it`;
@@ -248,11 +248,11 @@ export const checkoutLine = (step: string, hold: CheckoutHold): string =>
 
 /**
  * An ending at its gate whose work git already has on the base branch, beside its line on `nemia ls` where the approval would be: where
- * each branch stands, that nothing is left for the step to merge and the run has shipped as git reads it (`decision`), and the one command
+ * each branch stands, that nothing is left for the step to merge and the run has landed as git reads it (`decision`), and the one command
  * there still is. Pure.
  */
 export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standings: readonly BranchStanding[]): string =>
-  `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge: the run has shipped as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${run.id}`;
+  `${standings.map((s) => branchWord(run, s)).join(', ')} — nothing is left for ${step} to merge: the run has landed as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${run.id}`;
 
 /**
  * What a person has to decide about a run's result — the fifth reason a run waits on one, beside a step blocked, unsigned, over budget or
@@ -323,9 +323,9 @@ export const endingSteps = (steps: readonly Workflow[], run: Pick<Run, 'gates'>)
 export const ownNote = (step: Pick<Workflow, 'body' | 'agent'>): string => (step.agent ? step.agent.body : step.body);
 
 /**
- * What a run waits on a person to decide (`toDecide`): its ending step, which approving runs or accepts — or its result branches, which git
- * ships. `filed` is whether the step has run; `says` is the first line of its own note (`ownNote`), what it would do, and null for a step
- * that has already done it or has no note.
+ * What a run waits on a person to decide (`toDecide`): its ending step, which approving runs or accepts — or its result branches, which a
+ * merge lands. `filed` is whether the step has run; `says` is the first line of its own note (`ownNote`), what it would do, and null for a
+ * step that has already done it or has no note.
  */
 export type ToDecide = { kind: 'approve'; step: string; says: string | null; filed: boolean } | { kind: 'result'; branches: string[] };
 

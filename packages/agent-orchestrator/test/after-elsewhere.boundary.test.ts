@@ -264,13 +264,13 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   );
   await assert.rejects(
     starting(called.run.id),
-    refusal('Invalid', `--after ${called.run.id}:`, 'was cancelled at', 'never ships', `without --after ${called.run.id}`),
+    refusal('Invalid', `--after ${called.run.id}:`, 'was cancelled at', 'never lands', `without --after ${called.run.id}`),
   );
-  await assert.rejects(starting(direct.id), refusedWith(/\(--no-worktree\), so it has no result branch to ship/));
+  await assert.rejects(starting(direct.id), refusedWith(/\(--no-worktree\), so it has no result branch to land/));
   gitIn(repo, 'checkout', '-q', '-b', 'elsewhere');
   await assert.rejects(
     starting(p.run.id),
-    refusedWith(new RegExp(`ships onto ${escaped(p.run.branch)}, and this run would start from elsewhere`)),
+    refusedWith(new RegExp(`lands on ${escaped(p.run.branch)}, and this run would start from elsewhere`)),
   );
   gitIn(repo, 'checkout', '-q', p.run.branch);
   assert.equal(runsWritten(), before, 'no run written');
@@ -305,7 +305,7 @@ test("REFUSED at `nemia start`, before a run is written: --after an unknown run,
   assert.match(
     printed.join('\n'),
     new RegExp(
-      `^waits on: ${escaped(p.run.id)}, ${escaped(second.run.id)} — nothing is filed until nemia decide says each has shipped onto ${escaped(p.run.branch)}$`,
+      `^waits on: ${escaped(p.run.id)}, ${escaped(second.run.id)} — nothing is filed until nemia decide says each has landed on ${escaped(p.run.branch)}$`,
       'm',
     ),
   );

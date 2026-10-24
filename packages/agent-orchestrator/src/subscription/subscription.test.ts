@@ -118,7 +118,7 @@ test("which lines wake a subscriber: the default selector over every line the fe
       for (const line of linesOf(listed(status), { status: 'running' }))
         assert.equal(sorted(line), 'routine', `${JSON.stringify(line)} is routine`);
     assert.equal(sorted(upgraded({ at: AT, run: 'r-1', word: 'succeeded' })), 'routine');
-    assert.equal(sorted(upgraded({ at: AT, run: 'r-1', word: 'running', note: 'held until r-2 ships' })), 'routine');
+    assert.equal(sorted(upgraded({ at: AT, run: 'r-1', word: 'running', note: 'held until r-2 lands' })), 'routine');
     assert.equal(
       sorted(upgraded({ at: AT, run: 'r-1', step: 'build', word: 'running', note: 'said to twice · the needs: of it' })),
       'routine',

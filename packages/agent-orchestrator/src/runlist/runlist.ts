@@ -48,7 +48,7 @@ export const PAGE_SIZE = 9;
 export const PAGE_MAX = 100;
 
 /**
- * Whether a run waits on a person: nobody called it off, and a step of it waits on one, or a run it waits on never ships without one,
+ * Whether a run waits on a person: nobody called it off, and a step of it waits on one, or a run it waits on never lands without one,
  * or a hold on it only a person lifts.
  */
 const waitsOnPerson = (run: Listed): boolean =>

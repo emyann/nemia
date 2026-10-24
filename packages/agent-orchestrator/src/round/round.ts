@@ -537,7 +537,7 @@ const noMoreRounds = (pruned: Pruned): string => `no round more, since the run w
 
 /**
  * Where a verb would be offered on a held run, what is said instead, with what the person who put the hold said of it: `held until a-1x2y
- * ships (why: merge conflicts; by operator); its approval is asked once the hold lifts`. Every verb that would release work is refused
+ * lands (why: merge conflicts; by operator); its approval is asked once the hold lifts`. Every verb that would release work is refused
  * while the hold stands (`heldRefusal`), and a note never offers a refused verb.
  */
 export const heldLater = (hold: Hold, what: string): string =>

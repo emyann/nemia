@@ -15,7 +15,7 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * Where a step's files go, told on its brief beside the closeout contract.
  *
  * A file a step writes into its workspace is committed by the hand-off and rides the branch — a
- * screenshot, under the step's name, into what ships — and a gitignored one never reaches the next
+ * screenshot, under the step's name, into what lands — and a gitignored one never reaches the next
  * step's worktree at all. So the run makes a directory per step, beside the run's record and outside
  * every workspace (`artifactsDir` in record.store.ts), and says where it is. Mechanism, like the closeout: a
  * step does not have to find somewhere, and a workflow author does not have to remember to say where.

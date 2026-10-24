@@ -322,7 +322,7 @@ test('the awaiting screen: what the branch touched, the lesson, and the check fi
 
   assert.deepEqual(
     lines.slice(-2),
-    [`  ship it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`],
+    [`  land it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`],
     'the commands stay as they are',
   );
   assert.equal(git(repo, 'rev-parse', '--abbrev-ref', 'HEAD').trim(), 'main', 'none of the commands is run');
@@ -691,8 +691,8 @@ test("the branch's standing against the base is a fact on every screen — on it
   git(repo, 'merge', '-q', '--no-ff', '--no-edit', branch);
   assert.deepEqual(
     await screen(t, e, run.id),
-    [`${run.id}  add sub`, '', `  shipped — ${branch} is already on main`],
-    'merged by hand, as a person ships a run with no ending step: the run reads shipped, and there is nothing left to decide',
+    [`${run.id}  add sub`, '', `  landed — ${branch} is already on main`],
+    'merged by hand, as a person lands a run with no ending step: the run reads landed, and there is nothing left to decide',
   );
 
   const { run: other, repo: otherRepo, branch: otherBranch, e: otherEngine } = await awaiting();
@@ -739,7 +739,7 @@ test("a folder whose last step is an ending: `nemia decide` says what that step 
     `  approve it    nemia approve ${run.id} ship [--message "<words>"]`,
     `  send it back  nemia retry ${run.id} implement --message "<objection>"`,
   ]);
-  assert.ok(!lines.some((l) => /ship it   git|drop it   git/.test(l)), 'the folder says what shipping is, so nobody is told to type it');
+  assert.ok(!lines.some((l) => /land it   git|drop it   git/.test(l)), 'the folder says what landing is, so nobody is told to type it');
 
   const said = await listed(t, e, run.id);
   indexOf(said, `   → to decide: ${SHIP_IT} — nemia approve ${run.id} ship`);
@@ -866,14 +866,14 @@ test('a gate on the last step of a folder that merges nothing: approving accepts
   indexOf(held, '  to decide  review has signed off and waits for your word:');
   indexOf(held, `  approve it    nemia approve ${run.id} review [--message "<words>"]`);
   assert.ok(!held.some((l) => l.includes('Review the change in this workspace')), "the step's brief is not what happens next");
-  assert.ok(!held.some((l) => /ship it   git/.test(l)), 'the branch is not offered while the gate holds');
+  assert.ok(!held.some((l) => /land it   git/.test(l)), 'the branch is not offered while the gate holds');
   indexOf(await listed(t, e, run.id), `   → to decide: review has signed off at its gate — nemia approve ${run.id} review`);
 
   approveByHand(run.id, 'review', 1);
   const after = await screen(t, e, run.id);
   assert.deepEqual(
     after.slice(-2),
-    [`  ship it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`],
+    [`  land it   git -C ${repo} merge --no-ff ${branch}`, `  drop it   git -C ${repo} branch -D ${branch}`],
     "review, a terminal gated step, approved: the run is over, and the branch nobody has merged is still a person's, with the commands, since no step of this folder merges",
   );
   await aPass(e);
@@ -897,7 +897,7 @@ test('a run that worked on the base branch itself says so, and still says what i
   assert.ok(worked < said, 'the branch facts, then what to decide');
   indexOf(direct, `  approve it    nemia approve ${run.id} review [--message "<words>"]`);
   assert.ok(!direct.some((l) => l.startsWith('  branch    ')), 'no standing: it would read `main is on main`');
-  assert.ok(!direct.some((l) => /ship it   git|drop it   git/.test(l)), 'nor a merge of the branch it is already on');
+  assert.ok(!direct.some((l) => /land it   git|drop it   git/.test(l)), 'nor a merge of the branch it is already on');
 });
 
 test("a run whose one step works in the checkout is not shown the base branch's diff: its work is not on it, and the base moves under it", async (t) => {
@@ -1140,7 +1140,7 @@ test('the whole screen of a run waiting on you: verdicts, touched, lesson, in fu
     '',
     '  branch    wf/<id> is ahead of main by 1 commit',
     '',
-    '  ship it   git -C <repo> merge --no-ff wf/<id>',
+    '  land it   git -C <repo> merge --no-ff wf/<id>',
     '  drop it   git -C <repo> branch -D wf/<id>',
   ]);
   assert.deepEqual(await whole(t, e, run.id, '--sensitive', 'nothing/**'), [
@@ -1183,7 +1183,7 @@ test('the whole screen of a run waiting on you: verdicts, touched, lesson, in fu
     '',
     '  branch    wf/<id> is ahead of main by 1 commit',
     '',
-    '  ship it   git -C <repo> merge --no-ff wf/<id>',
+    '  land it   git -C <repo> merge --no-ff wf/<id>',
     '  drop it   git -C <repo> branch -D wf/<id>',
   ]);
 });
@@ -1334,7 +1334,7 @@ test('the whole screen of a run on two branches, one with a note longer than the
     '  branch    wf/<id>/run is ahead of main by 1 commit',
     '  branch    wf/<id>/implement is ahead of main by 1 commit',
     '',
-    '  ship it   git -C <repo> merge --no-ff wf/<id>/run',
+    '  land it   git -C <repo> merge --no-ff wf/<id>/run',
     '  drop it   git -C <repo> branch -D wf/<id>/run wf/<id>/implement',
   ]);
 });

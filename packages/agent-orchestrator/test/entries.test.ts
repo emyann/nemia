@@ -721,7 +721,6 @@ const PINNED: Record<string, string[]> = {
     'agentsDir',
     'agentsFolderRefusal',
     'allowRuleOf',
-    'asFileSays',
     'asNamed',
     'autoDropped',
     'cardRetired',

@@ -11,7 +11,7 @@ import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
 import { codexModeWritten } from '../former/former.ts';
 import { agentDeniesOf, parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { agentsFolderRefusal, asFileSays, linkRefusal, parseFolder, stepNameRefusal, workflowInUse } from './folder.ts';
+import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal, workflowInUse } from './folder.ts';
 import { agentsFor } from '../agents/read.store.ts';
 import type { Agents } from '../agents/agents.ts';
 import { skillsFor, type Places } from '../skills/read.store.ts';
@@ -115,7 +115,7 @@ export function writeWorkflow(
     const step = parsed.find((s) => s.name === name);
     put(`${name}.md`, text, (there) => {
       try {
-        return isDeepStrictEqual(parseWorkflow(name, there, read, agents), step && asFileSays(step));
+        return isDeepStrictEqual(parseWorkflow(name, there, read, agents), step);
       } catch {
         return false;
       }

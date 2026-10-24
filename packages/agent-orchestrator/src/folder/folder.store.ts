@@ -274,7 +274,6 @@ const StepAgentSchema = Schema.StructWithRest(
     skills: Schema.optionalKey(Strings),
     addedSkills: Schema.optionalKey(Strings),
     agentDenies: Schema.optionalKey(Strings),
-    offSkills: Schema.optionalKey(Strings),
     harnessPrompt: Schema.optionalKey(Schema.Literals(HARNESS_PROMPTS)),
     mcp: Schema.optionalKey(Strings),
     systemPrompt: Schema.optionalKey(Schema.Literals(['default', 'no-coding', 'own'])),

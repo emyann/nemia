@@ -72,8 +72,8 @@ export const CLAUDE_DEFAULT_MODE = 'auto';
 export const CLAUDE_HELD_MODE = 'dontAsk';
 
 /**
- * The permission modes a background session runs in without stopping to ask a person, the held mode first: every other mode can
- * stop on a prompt, which a background session leaves waiting for someone to answer it.
+ * The permission modes a session runs in without stopping to ask a person, the held mode first: every other mode can stop on a
+ * prompt, which a session nobody watches leaves waiting for someone to answer it.
  */
 export const CLAUDE_UNASKING_MODES: readonly string[] = [CLAUDE_HELD_MODE, 'bypassPermissions'];
 
@@ -93,8 +93,8 @@ export const CLAUDE_EFFORTS: readonly string[] = ['low', 'medium', 'high', 'xhig
 
 /**
  * The context windows Claude Code takes, in tokens: `--autocompact`'s range, both ends included. The CLI refuses any other
- * value while it parses its arguments ("It must be 'auto', or between 100k and 1M"), so a `--bg` spawn given one would fail
- * on every pass; `file()` asks first. 100000 and 1000000 are taken, 99999 and 1000001 refused. A value is handed over as its digits, never
+ * value while it parses its arguments ("It must be 'auto', or between 100k and 1M"), so a spawn given one would fail on every
+ * pass; `file()` asks first. 100000 and 1000000 are taken, 99999 and 1000001 refused. A value is handed over as its digits, never
  * `200k` — and never below 1000, which the CLI reads as thousands (`200` is 200k).
  */
 export const CLAUDE_CONTEXT_TOKENS: { least: number; most: number } = { least: 100_000, most: 1_000_000 };
@@ -117,11 +117,12 @@ export type ClaudeFlags = {
   /** Settings for the session alone, as a file or as JSON: `{"outputStyle":"<plugin>:<style>"}`. */
   settings?: string;
   /**
-   * Bridge a background session to claude.ai (`--remote-control`, with a name for it as a string), where anyone signed in to the
-   * account can drive it — type into it, answer its prompts, stop it — from a browser or a phone. Never a default, for that reason.
-   * A journal an older runtime wrote may carry it as a harness argument of its own, which `upgrade` moves here (`FORMER_ARGS`).
-   * Refused on a job — a session held by its own process for one prompt opens no bridge — and on any
-   * harness but Claude Code; a harness brought as a `RunnerOps` is handed it on the spawn, and asked only its own `refuses`.
+   * Bridge the session to claude.ai, where anyone signed in to the account can drive it — type into it, answer its prompts, stop
+   * it — from a browser or a phone. Never a default, for that reason. Opened on the SDK's control request at the session's first
+   * message (`attached-bridge.ts`), never as a flag: a job's bridge ends with the job, a long-lived session's outlives its holder and
+   * is re-attached by the next. A journal an older runtime wrote may carry it as a harness argument of its own, which `upgrade` moves
+   * here (`FORMER_ARGS`). Taken on any `'claude'` task, and refused on a `HarnessSpec`; a harness brought as a `RunnerOps` is handed
+   * it on the spawn, and asked only its own `refuses`.
    */
   remoteControl?: true | string;
   [flag: string]: string | number | true | string[] | undefined;
@@ -132,13 +133,13 @@ export type ClaudeFlags = {
  * a task that gave one there would have it twice, or the session printing what no reader of it expects. Each is given its
  * own way — `model`, `permissionMode`, `tools`, `budgetUsd` and the rest are harness arguments of their own. The argv of
  * every Claude Code spawn is held to this list (`test/claude-code.test.ts`), so a flag the runtime starts giving is added.
- * `settingSources` is given to every job, which reads its checkout's shared settings and neither the operator's nor the
- * checkout's local file (`claudePrintFlags`), and not to a background session.
+ * `settingSources` is given to every session, which reads its checkout's shared settings and neither the operator's nor the
+ * checkout's local file (`attachedOptions`). `print`, `p` and the stream flags stay refused: a session the runtime runs on the
+ * Agent SDK prints its own stream, and a task that named one would ask for another.
  */
 export const CLAUDE_OWNED_FLAGS: readonly string[] = [
   'print',
   'p',
-  'bg',
   'name',
   'inputFormat',
   'outputFormat',
@@ -172,39 +173,16 @@ export const CLAUDE_OWNED_FLAGS: readonly string[] = [
 /** A camelCase key as Claude Code's flag: `appendSystemPromptFile` is `--append-system-prompt-file`. */
 export const claudeFlagName = (key: string): string => `--${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
 
-/** A task's `config.claude` as Claude Code's arguments, in the order written: a flag and its value, or the flag alone for `true`. */
-export const claudeFlagsOf = (flags: ClaudeFlags | undefined): string[] =>
-  Object.entries(flags ?? {}).flatMap(([key, value]) => {
-    const flag = claudeFlagName(key);
-    if (value === undefined) return [];
-    if (value === true) return [flag];
-    if (Array.isArray(value)) return value.flatMap((v) => [flag, v]);
-    return [flag, String(value)];
-  });
-
 /**
- * A task's mounts as Claude Code's arguments: `--add-dir` and every mount's path, or nothing for none. Variadic, so it is placed
- * where a flag follows it, never the brief.
- */
-export const claudeMountArgs = (config: SpawnRequest['config']): string[] =>
-  config?.mounts?.length ? ['--add-dir', ...config.mounts.map((m) => m.path)] : [];
-
-/**
- * What a Claude Code session is denied: the task's `disallowedTools`, and an edit anywhere under each read-only mount,
- * `Edit(//<path>/**)`. `--add-dir` grants writes as well as reads where the mode lets a session write, and a deny beats every
- * allow and every mode: it holds the folder read-only under `dontAsk`, `acceptEdits`, `auto` and `bypassPermissions`, a Bash
- * redirection into it included (measured on Claude Code 2.1.288).
+ * What a Claude Code session is denied: the task's `disallowedTools`, and an edit anywhere under each read-only mount, `Edit(//<path>/**)`.
+ * A mount (`additionalDirectories`, `--add-dir`) grants writes as well as reads where the mode lets a session write, and a deny beats every
+ * allow and every mode: it holds the folder read-only under `dontAsk`, `acceptEdits`, `auto` and `bypassPermissions`, a Bash redirection
+ * into it included (measured on Claude Code 2.1.288).
  */
 export const claudeDenies = (config: SpawnRequest['config']): string[] => [
   ...(config?.disallowedTools ?? []),
   ...(config?.mounts ?? []).filter((m) => m.readOnly).map((m) => `Edit(/${m.path}/**)`),
 ];
-
-/** The `--disallowedTools` flag and its one argument, the session's denies joined by commas (`claudeDenies`), or nothing for none. */
-export const claudeDenyArgs = (config: SpawnRequest['config']): string[] => {
-  const denies = claudeDenies(config);
-  return denies.length ? ['--disallowedTools', denies.join(',')] : [];
-};
 
 /**
  * What a Claude Code session may do without asking: the task's `allowedTools`, and an edit anywhere under each writable mount,
@@ -216,12 +194,6 @@ export const claudeAllows = (config: SpawnRequest['config']): string[] => [
   ...(config?.allowedTools ?? []),
   ...(config?.mounts ?? []).filter((m) => !m.readOnly).map((m) => `Edit(/${m.path}/**)`),
 ];
-
-/** The `--allowedTools` flag and its one argument, the session's allows joined by commas (`claudeAllows`), or nothing for none. */
-export const claudeAllowArgs = (config: SpawnRequest['config']): string[] => {
-  const allows = claudeAllows(config);
-  return allows.length ? ['--allowedTools', allows.join(',')] : [];
-};
 
 /**
  * A character a permission rule cannot carry in a path, `Read(//<path>/**)` or `Edit(//<path>/**)`: a glob's `*`, `?` or `[` widens the
@@ -270,8 +242,8 @@ export const settingsObject = (settings: string): Record<string, unknown> | unde
 };
 
 /**
- * Whether a task asks for its session bridged to claude.ai: Claude Code's `--remote-control`, given in its flags
- * (`config.claude.remoteControl`). Only a background session opens one.
+ * Whether a task asks for its session bridged to claude.ai (`config.claude.remoteControl`): opened on the SDK's control request at the
+ * session's first message, a job's and a long-lived session's alike (`attached-bridge.ts`), and never spelt as a flag.
  */
 export const bridgeAsked = (task: { config?: { claude?: ClaudeFlags } }): boolean => task.config?.claude?.remoteControl !== undefined;
 
@@ -298,50 +270,10 @@ export const claudeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefi
 };
 
 /**
- * What Claude Code run as `claude -p` cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a bridge to claude.ai,
- * which only a background session opens, and which `claudeFlagsOf` would otherwise spell onto a prompt that runs and exits. The
- * engine words it with the harnesses that do bridge (`harnessRefusalOf` in `service/harness-refusal.ts`); this is a bare `Runner`'s.
+ * What Claude Code cannot be asked for as the engine runs it (`'claude'`): what Claude Code cannot (`claudeRefuses`), and nothing
+ * more. A job and a long-lived session alike take a spend cap, a closed list of skills and a bridge to claude.ai, on the Agent SDK.
  */
-export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
-  claudeRefuses(task) ??
-  (bridgeAsked(task)
-    ? '`claude.remoteControl` asks for a session bridged to claude.ai, and a session that runs one prompt and exits is held by its own process, which serves no bridge for anyone to reach: only a Claude Code background session (`claude --bg --remote-control`) is bridged. Leave `claude.remoteControl` off.'
-    : undefined);
-
-/**
- * What a Claude Code background session cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a spend
- * cap. `claude --bg` takes `--max-budget-usd` and keeps nothing of it — its help says the flag "only works with --print",
- * and a `--bg` session given a cap spends past it and ends on its own (`test/live.test.ts`). A cap that caps nothing is refused rather than
- * carried; a job keeps one, on `Options.maxBudgetUsd`, and so does `claude -p`. A closed list of skills (`enabledSkills`) is refused
- * the same way: Claude Code holds one only through the Agent SDK's `Options.skills`, and its CLI has no flag or settings key for it.
- */
-export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
-  claudeRefuses(task) ??
-  (Array.isArray(task.config?.enabledSkills)
-    ? "`enabledSkills` gives the session those skills alone, and a `claude --bg` session has no flag or setting that closes its skills: it would hold every skill it finds. File the task on `claude`, whose jobs are given the list through the Agent SDK, or give `enabledSkills: 'default'`."
-    : undefined) ??
-  (task.config?.budgetUsd === undefined
-    ? undefined
-    : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session spends past a cap it is given. File the task on \`claude\`, whose jobs run one prompt and end at their cap, or on \`claude-detached\`, which runs \`claude -p\` and does the same, or leave \`budgetUsd\` off.`);
-
-/**
- * What Claude Code cannot be asked for as the engine runs it by default, in the mode the task chose. A job (`claude -p`, the
- * default) refuses what Claude Code does, and a bridge to claude.ai, which only a background session can open — so the
- * refusal names the key that makes one. A background session (`config.background: true`) refuses what `claude --bg` does,
- * a spend cap among it, and names the mode that keeps one.
- */
-export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => {
-  const refused = claudeRefuses(task);
-  if (refused) return refused;
-  if (task.config?.background) {
-    return task.config?.budgetUsd === undefined
-      ? undefined
-      : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session spends past a cap it is given. Leave \`config.background\` off to run the task as a job, which ends the session at its cap, or leave \`budgetUsd\` off.`;
-  }
-  return bridgeAsked(task)
-    ? '`claude.remoteControl` bridges a session to claude.ai, and only a background session (`claude --bg`) can be bridged: a job runs one prompt in a process of its own, which opens no bridge. Give `config.background: true` as well, or leave `claude.remoteControl` off.'
-    : undefined;
-};
+export const claudeCodeRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined => claudeRefuses(task);
 
 /**
  * A worktree name for this attempt. Derived from the session name when the task did not pick one,

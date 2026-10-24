@@ -10,7 +10,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
-import { claudeDetached, codex, nameFor, type EngineOptions, type Event, type FeedEntry, type Sighting } from '../src/index.ts';
+import { codex, nameFor, type EngineOptions, type Event, type FeedEntry, type Sighting } from '../src/index.ts';
 import { Engine as EngineService } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
@@ -638,6 +638,26 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
       );
     });
   }
+  const taken = [
+    ['`sayTimeoutMs`, which bounded a `say` to a `--bg` session', { sayTimeoutMs: 500 }, ['`sayTimeoutMs`']],
+    ["a harness configured `'claude-bg'`", { harnesses: { bg: 'claude-bg' } }, ['`bg`', "restartPolicy: 'Always'"]],
+    ['a harness configured by any other word', { harnesses: { bg: 'claude-job' } }, ['`bg`']],
+  ] as const;
+  for (const [name, given, names] of taken) {
+    await t.test(`REFUSED: ${name}, naming it and what to do instead, before anything is built`, () => {
+      assert.throws(
+        () =>
+          builtEngine(
+            EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), ...given } as never),
+          ),
+        (e: Error & { _tag?: string }) => {
+          assert.equal(e._tag, 'EngineRefused', e.message);
+          for (const word of names) assert.ok(e.message.includes(word), `${word} in: ${e.message}`);
+          return true;
+        },
+      );
+    });
+  }
   await t.test('a pool on a spec, a runner and a remote agent is taken', () => {
     assert.doesNotThrow(
       () =>
@@ -647,7 +667,6 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
             journal: asyncStore(memoryJournal()),
             harnesses: {
               codex: { ...codex, pool: 'x' },
-              bg: claudeDetached,
               fake: asyncOps(fakeHarness(sessions)),
               remote: { url: 'https://agent.example', pool: 'x' },
             },

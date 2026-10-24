@@ -37,7 +37,8 @@ second 37, are 39 and 40.
 ### 39. The claude.ai bridge is an undeclared control request, and two things about it are unmeasured
 
 **Where.** `src/harness/claude/attached-bridge.ts`, the one door; `src/harness/claude/attached-session.ts`, which opens the bridge
-after the first turn of a request that asked for it.
+of a held session on its `system`/`init` message, and `bin/ae-claude-job.ts`, which opens a job's there too and writes its facts on a
+file beside the run (`bridgeDue`).
 
 **What is known.** `@anthropic-ai/claude-agent-sdk` declares no `enableRemoteControl` on its `Query` type — not on 0.3.270, and not
 on 0.3.308, where `sdk.d.ts` still has no such name and `sdk.mjs` still carries the method (re-read 2026-10-22 at the bump) — yet the object
@@ -48,6 +49,13 @@ messages (`ready`, then `connected`) onto the session's stream. Probed live on 2
 design's step. Because it is undeclared, it is read off the object here and nowhere else, decoded by a schema of its own, and refused
 in words on the run file where it is absent: the session runs on with no bridge (`src/harness/claude/attached-bridge.test.ts` makes each refusal).
 An SDK update that renames or drops it breaks no session; it takes the bridge away, and the run file says so.
+
+**Measured 2026-10-24** (Agent SDK 0.3.308, Claude Code 2.1.308, haiku; the probe's scripts are the run's): called on `init`, a job's
+`enableRemoteControl(true, name, { keepSessionOnExit: false })` answered the bridge's facts 0.5 s later (init at 1.0 s, the answer and
+`bridge_state: ready` at 1.5 s, `connected` at 1.7 s), long before its result at 21.1 s, during a tool call: the answer is not queued
+behind the turn. A streaming-input session asked at init with `keepSessionOnExit: true` answered the same way (init 2.8 s, answer 3.3 s,
+connected 3.4 s), and **a second process resuming it with `reattachSessionId` set to the first `bridge_session_id` was answered the same
+`bridge_session_id` and `session_url`, connected 0.5 s after its init: the re-attach across processes holds** at the protocol's level.
 
 **Unmeasured.** (i) Whether a claude.ai session re-attaches as the same conversation on a phone after the daemon restarted and the
 runtime passed the kept `bridgeSessionId` back as `reattachSessionId` — the stand-in answers the id it is given, so the request is
@@ -549,7 +557,7 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
 - **Each `say` costs one more `observe`**: the engine's `say` lists the harness to find the session and refuse a settled one, and
   the agent, holding nothing, lists again for the id it hands the driver and to refuse a session that has ended. Words are
   said by a person, rarely.
-- **A runner an Effect program provides is direct unless it asks otherwise.** `Runner.layer`, `Runner.claude` and `Runner.test` hand the
+- **A runner an Effect program provides is direct unless it asks otherwise.** `Runner.layer` and `Runner.test` hand the
   engine the driver as they did; `a2aRunner(ops)`, which needs the program's `Journal`, is the same seam `Engine.layer`
   takes. Its `Runner.transcript` is keyed by session id, as it always was, and goes through the seam by that id
   (`sessionTranscript` takes a name or an id, never both); the `Engine` service asks by name (`transcriptOf`).
@@ -565,6 +573,9 @@ and a held task's signed attempt `INPUT_REQUIRED` on `getTask`. What is still di
   (stage 6), unchanged.
 
 ### 28. Claude Code as a job: what was measured, and what a job gives up
+
+**Closed 2026-10-24: every Claude Code session runs on the Agent SDK.** The `claude -p` road (`claude-detached`) and the `claude --bg`
+road (`config.background`, the `'claude-bg'` harness) are gone, so what follows is the record of a road this runtime no longer runs.
 
 Since thin runtime stage 2 part 1 (2026-09-23), `claude` runs a task as a job, `claude -p --output-format stream-json
 --verbose --permission-prompts none` in the worker the engine detaches, and as `claude --bg` when its task says

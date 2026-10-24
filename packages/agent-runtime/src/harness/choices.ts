@@ -9,8 +9,8 @@ import { CODEX_EFFORTS, CODEX_SANDBOXES } from './codex/vocabulary.ts';
 
 /** Each default harness's words for `effort`, `permissionMode` and `sandbox`, by key, then by harness. */
 export const HARNESS_CHOICES: Readonly<Record<'effort' | 'permissionMode' | 'sandbox', Readonly<Record<string, readonly string[]>>>> = {
-  effort: { claude: CLAUDE_EFFORTS, codex: CODEX_EFFORTS, 'claude-detached': CLAUDE_EFFORTS },
-  permissionMode: { claude: CLAUDE_PERMISSION_MODES, 'claude-detached': CLAUDE_PERMISSION_MODES },
+  effort: { claude: CLAUDE_EFFORTS, codex: CODEX_EFFORTS },
+  permissionMode: { claude: CLAUDE_PERMISSION_MODES },
   sandbox: { codex: CODEX_SANDBOXES },
 };
 
@@ -30,7 +30,7 @@ export type HarnessKnobs = {
   readonly flags: { readonly owned: readonly string[] } | { readonly only: readonly string[] };
 };
 
-/** A Claude Code harness's knobs, a job's or a background session's. */
+/** Claude Code's knobs, a job's or a long-lived session's. */
 const CLAUDE_KNOBS: HarnessKnobs = {
   effort: CLAUDE_EFFORTS,
   fence: { key: 'permissionMode', words: CLAUDE_PERMISSION_MODES, lists: ['tools', 'allowedTools', 'disallowedTools'] },
@@ -47,5 +47,4 @@ export const HARNESS_KNOBS: Readonly<Record<string, HarnessKnobs>> = {
     context: false,
     flags: { only: ['trustFrom'] },
   },
-  'claude-detached': CLAUDE_KNOBS,
 };

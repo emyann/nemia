@@ -8,7 +8,7 @@ import type { HarnessArgs, RunnerOps } from '../harness/index.ts';
 import { Admission, type IoCounts, type ObserveCount, type RefusedMove, type StoreOps, type TaskView } from '../core/engine/index.ts';
 
 export type { ObserveCount } from '../core/engine/index.ts';
-import { claudeOps, claudeCodeOps, type Attached } from '../harness/claude/index.ts';
+import { claudeCodeOps, type Attached } from '../harness/claude/index.ts';
 import { DEFAULT_HARNESSES } from './default-harnesses.ts';
 import { detachedOps, type HarnessSpec } from '../harness/detached/detached.ts';
 import { telemetered, telemetryRefusalOf, type Telemetry } from '../harness/telemetry.ts';
@@ -23,10 +23,10 @@ import {
 } from '../a2a/index.ts';
 
 /**
- * A harness, as one of five things:
- *   `'claude'`      Claude Code as the engine runs it by default: each task a job (`claude -p`, detached by us), or a
- *                   background session (`claude --bg`, its registry Claude Code's) when its `config.background` is true
- *   `'claude-bg'`   Claude Code's own background sessions, every task — it keeps the registry
+ * A harness, as one of four things:
+ *   `'claude'`      Claude Code as the engine runs it, every session on the Agent SDK: each task a job (its own process,
+ *                   detached by us, or attached beside the held sessions while this process holds them), and a long-lived
+ *                   one (`restartPolicy: 'Always'`) held attached
  *   a `HarnessSpec` any CLI that runs a prompt and exits — we keep the registry
  *   a `RemoteAgent` an A2A agent another party runs, by its URL or its card (`a2a/remote.ts`) — we keep the registry of
  *                   what we sent it; its secrets come from `credentials`
@@ -35,7 +35,7 @@ import {
  * Each counts its sessions under the engine's ceiling (`maxConcurrent`) in a pool of its own, named as the harness is; one brought as
  * an object may name a `pool` instead (`Pooled`), so two harnesses under one rate limit share one ceiling.
  */
-export type HarnessConfig = 'claude' | 'claude-bg' | (HarnessSpec & Pooled) | (RemoteAgent & Pooled) | (RunnerOps & Pooled);
+export type HarnessConfig = 'claude' | (HarnessSpec & Pooled) | (RemoteAgent & Pooled) | (RunnerOps & Pooled);
 
 /** The pool a harness brought as an object counts its sessions in, when not its own: a name of one or more characters. */
 export type Pooled = { pool?: string };
@@ -92,17 +92,9 @@ export type EngineOptions = {
    * The Claude Code the attached sessions are run with (`pathToClaudeCodeExecutable`), where it is not the Agent SDK's own bundled
    * CLI: a command of this runtime's own, as a container's is. Read by both roads the SDK runs — a held session (`hold`) and a
    * job's own process (`claudeJobSpec`, as `AE_CLAUDE_EXECUTABLE`) — and by the session a state read opens (`mcpState`), which is
-   * the same road — and by neither road Claude Code runs itself: a `--bg`
-   * session runs the `claude` on the PATH, whatever this says. Absent: the SDK's own.
+   * the same road. Absent: the SDK's own.
    */
   claudeExecutable?: string;
-  /**
-   * How long a `say` to a Claude Code background session's inbox may take before it is read as not taken: the harness's own bound
-   * (`ClaudeOptions.sayTimeoutMs`), reached through here because the inbox answers nothing and only a deadline tells a hung
-   * connection from a busy session. Absent: the shipped `SAY_TIMEOUT_MS`, which is what every caller but a test of a busy inbox
-   * wants (`agent-runtime/test/say.test.ts`).
-   */
-  sayTimeoutMs?: number;
   /**
    * The engines that hold the sessions this one only reads, by the harness each holds: for each, a function asked at every follow
    * of that harness's sessions, answering the card that engine served on its own port (`Served.cards`), as the JSON it answered, or
@@ -169,11 +161,11 @@ export type TaskSpec = {
    */
   queued?: boolean;
   /**
-   * Long-lived, a Pod's `restartPolicy: Always`: the session stays open while idle — the end of a turn, an idle listing and
-   * silence are not its end — and only `stop` ends it; a person can `say` it words, or attach to it, at any time. A session that
-   * ends with no stop asked settles the task `failed`. Taken only by a Claude Code background session (`'claude'` with
-   * `config.background: true`, or `'claude-bg'`) and a `RunnerOps` brought as its own; refused beside `holdOpen`, `deadlineSeconds` or
-   * `closeoutSchema`, and unless `'Always'`.
+   * Long-lived, a Pod's `restartPolicy: Always`: the session stays open while idle — the end of a turn, an idle listing and silence are not
+   * its end — and only `stop` ends it; a person can `say` it words, or attach to it, at any time. A session that ends with no stop asked
+   * settles the task `failed`. Taken only by Claude Code (`'claude'`), whose long-lived session runs attached in the process that holds the
+   * sessions (a spawn with no holder ends `unstartable`), and a `RunnerOps` brought as its own; refused beside `holdOpen`,
+   * `deadlineSeconds` or `closeoutSchema`, and unless `'Always'`.
    */
   restartPolicy?: 'Always';
   /** Choose the id yourself, to keep it in step with a row in your own database. */
@@ -243,8 +235,8 @@ export const handleOf = (events: readonly Event[], attempt: number): string | un
 export const isSpec = (h: HarnessConfig): h is HarnessSpec => typeof h === 'object' && 'command' in h;
 /** A remote A2A agent: an object that is neither a spec (`command`) nor a runner (`spawn`). */
 export const isRemote = (h: HarnessConfig): h is RemoteAgent => typeof h === 'object' && h !== null && !('command' in h) && !('spawn' in h);
-/** Claude Code as the engine runs it itself, in either of the two ways it is brought. */
-export const isClaude = (h: HarnessConfig): h is 'claude' | 'claude-bg' => h === 'claude' || h === 'claude-bg';
+/** Claude Code as the engine runs it itself. */
+export const isClaude = (h: HarnessConfig): h is 'claude' => h === 'claude';
 
 /**
  * Each configured harness as the seam's value, by name: composed into one `Runner`, and asked directly for a task's logs. With
@@ -258,11 +250,10 @@ export const runnersOf = (
   telemetry?: Telemetry,
   attached?: Attached,
   claudeExecutable?: string,
-  sayTimeoutMs?: number,
 ): Record<string, RunnerOps> =>
   Object.fromEntries(
     Object.entries(harnesses).map(([name, h]): [string, RunnerOps] => {
-      const ops = runnerOf(name, h, root, credentials, missingCredential, attached, claudeExecutable, sayTimeoutMs);
+      const ops = runnerOf(name, h, root, credentials, missingCredential, attached, claudeExecutable);
       return [name, telemetry ? telemetered(ops, telemetry) : ops];
     }),
   );
@@ -276,17 +267,14 @@ const runnerOf = (
   missingCredential?: MissingCredential,
   attached?: Attached,
   claudeExecutable?: string,
-  sayTimeoutMs?: number,
 ): RunnerOps =>
   h === 'claude'
-    ? claudeCodeOps({ root, ...(claudeExecutable ? { claudeExecutable } : {}), sayTimeoutMs }, attached)
-    : h === 'claude-bg'
-      ? claudeOps({ root, sayTimeoutMs })
-      : isSpec(h)
-        ? detachedOps(h, root)
-        : isRemote(h)
-          ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
-          : h;
+    ? claudeCodeOps({ root, ...(claudeExecutable ? { claudeExecutable } : {}) }, attached)
+    : isSpec(h)
+      ? detachedOps(h, root)
+      : isRemote(h)
+        ? remoteOps(name, h, root, credentials, undefined, { missingCredential })
+        : h;
 
 /**
  * Which of `harnesses` a holder can hold: the names configured as the literal `'claude'`, and no other. Those are the sessions one
@@ -324,8 +312,17 @@ const ceilingRefusalOf = (maxConcurrent: unknown): string | undefined =>
     ? undefined
     : `\`maxConcurrent: ${typeof maxConcurrent === 'number' ? maxConcurrent : JSON.stringify(maxConcurrent)}\` is not a ceiling. Give the sessions each pool may have at work at once, a whole number from 1, or leave it out for none.`;
 
-/** Why the harness `name` cannot be taken as given, or `undefined`: a `pool` that is not a name, and a remote agent's config. */
+/**
+ * Why the harness `name` cannot be taken as given, or `undefined`: a word other than `'claude'` — `'claude-bg'`, the `claude --bg`
+ * road a former runtime had, named with what replaced it — a `pool` that is not a name, and a remote agent's config.
+ */
 const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefined => {
+  if ((h as unknown) === 'claude-bg') {
+    return `the \`${name}\` harness is \`'claude-bg'\`, Claude Code's \`--bg\` sessions, which this runtime no longer runs: every Claude Code session runs on the Agent SDK. Configure it as \`'claude'\`, and file a session meant to stay open with \`restartPolicy: 'Always'\`, which runs attached while a process holds the sessions (\`nemia up\`).`;
+  }
+  if (typeof h !== 'object' && h !== 'claude') {
+    return `the \`${name}\` harness is ${JSON.stringify(h) ?? String(h)}, which is no harness: give \`'claude'\`, a \`HarnessSpec\`, a remote agent or a \`RunnerOps\`.`;
+  }
   const pooled: Record<string, unknown> = typeof h === 'object' && h !== null ? h : {};
   if (Object.hasOwn(pooled, 'pool') && (typeof pooled.pool !== 'string' || !pooled.pool.trim())) {
     return `the \`${name}\` harness names the \`pool\` ${JSON.stringify(pooled.pool) ?? String(pooled.pool)}, which is not a name. Give the name of the pool its sessions share a ceiling in, or leave it out for a pool of its own.`;
@@ -335,13 +332,16 @@ const harnessConfigRefusalOf = (name: string, h: HarnessConfig): string | undefi
 };
 
 /**
- * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the
- * options as handed in, untyped, and refuses, in this order: a `maxConcurrent` that is not a whole number from 1; a harness
- * brought as an object whose `pool` is not a name; a remote agent's entry `remoteConfigRefusal` refuses, its `pool` aside; a `holder`
- * entry `holderRefusal` refuses; an `unschedulable`, a `credentials` or a `missingCredential` that is not a function; and a
- * `telemetry` that names no collector.
+ * Why an engine cannot be built from these options, in a sentence that says what to do instead — or `undefined`. Asked of the options as
+ * handed in, untyped, and refuses, in this order: a `sayTimeoutMs`, which no harness reads now; a `maxConcurrent` that is not a whole
+ * number from 1; a harness named by a word other than `'claude'`, or brought as an object whose `pool` is not a name; a remote agent's
+ * entry `remoteConfigRefusal` refuses, its `pool` aside; a `holder` entry `holderRefusal` refuses; an `unschedulable`, a `credentials` or a
+ * `missingCredential` that is not a function; and a `telemetry` that names no collector.
  */
 export const optionsRefusalOf = (options: Omit<EngineOptions, 'root'>): string | undefined => {
+  if (Object.hasOwn(options, 'sayTimeoutMs')) {
+    return "`sayTimeoutMs` bounded a `say` to a Claude Code `--bg` session's inbox, and this runtime runs no such session: a job and a held session take words on their own input. Leave `sayTimeoutMs` out.";
+  }
   const ceiling = ceilingRefusalOf(options.maxConcurrent);
   if (ceiling) return ceiling;
   for (const [name, h] of Object.entries(options.harnesses ?? {})) {

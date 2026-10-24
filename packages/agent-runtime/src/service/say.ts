@@ -7,7 +7,6 @@ import { Cause, Effect, Schema } from 'effect';
 import { fold, idleOf, isLive, nameFor, waitsOnPerson, type Attempt, type Event, type Said, type State } from '../core/index.ts';
 import { Journal, type JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
-import { claudeSayRefuses, isClaudeJob } from '../harness/claude/index.ts';
 import { isClaude, isRemote, isSpec } from './options.ts';
 import { transcriptEndOf } from './transcript-end.ts';
 
@@ -68,9 +67,6 @@ export const sayVerbOf = (
         (isSpec(h) ? h.noChannel : undefined) ?? `the \`${harness}\` harness has no channel into a running session. ${resume}`,
       );
     }
-    const bgRefuses = () => claudeSayRefuses(state.config ?? {}, text);
-    const cannot = h === 'claude-bg' || (h === 'claude' && state.config?.background) ? bgRefuses() : undefined;
-    if (cannot) return yield* refuse(cannot);
     const open = openAttemptOf(taskId, state, resume);
     if ('refused' in open) return yield* refuse(open.refused);
     const { last } = open;
@@ -99,8 +95,6 @@ export const sayVerbOf = (
       return yield* refuse(
         `\`${taskId}\`'s attempt ${last.n} is not running yet: its harness lists no \`${name}\`. Ask again once \`ae ls\` shows it running.`,
       );
-    const cannotBg = h === 'claude' && !isClaudeJob(sighting.sessionId) ? bgRefuses() : undefined;
-    if (cannotBg) return yield* refuse(cannotBg);
     if (!isLive(sighting.state) && !idleOf(state, sighting)) {
       return yield* refuse(
         `\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: the next pass writes its end. ${resume}`,

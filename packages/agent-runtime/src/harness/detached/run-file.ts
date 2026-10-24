@@ -30,7 +30,7 @@ export const STALE_MS = 30_000;
 type WorkerState = 'working' | 'done' | 'failed' | 'stopped';
 
 /**
- * A run file's state in A2A's names — the one place this runner translates, since codex, the check and claude-detached all
+ * A run file's state in A2A's names — the one place this runner translates, since codex, the check and a Claude Code job all
  * run under the worker:
  *
  *   working, heartbeat fresh  → working    the worker is at work

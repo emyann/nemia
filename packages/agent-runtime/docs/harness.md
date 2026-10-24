@@ -4,6 +4,10 @@ What Claude Code does as the steps meet it, measured at the version each line na
 has that a background session has not, trust, the bridge to claude.ai, and what it exports. A measurement here is a floor read on a
 release, never a promise of the next one — re-measure before you lean on it, and name the version and the day beside what you read.
 
+Since 2026-10-24 every Claude Code session of this runtime runs on the Agent SDK: a step as a job, a long-lived session attached while
+a process holds it (`nemia up`). A line below about `claude -p` or a `--bg` session is the record of a road this runtime no longer runs,
+kept for what it measured of Claude Code itself.
+
 `CLAUDE.md`, *Claude Code, as a harness*, forwards here, and the five documents that point at that heading resolve through it. Where
 the orchestrator's code holds a fact today, it is named beside it.
 
@@ -55,10 +59,14 @@ the orchestrator's code holds a fact today, it is named beside it.
   under `--remote-control` lists `blocked`, `waitingFor: "permission prompt"`, and is answered from the claude.ai link (2026-10-05).
 - **A `--bg` session without `--remote-control`, blocked at a permission prompt, lists `blocked`, `waitingFor: "permission prompt"`**
   (2.1.291, 2026-10-06, an `ask` rule in `--settings`): a step reads its probe with `claude agents --json`, reaching no phone.
-- **A `--bg --remote-control` session's link is `https://claude.ai/code/<bridgeSessionId>`**, the id `session_…` in its registration
-  `<pid>.json`, never in `claude agents --json` (`claudeBridge`, `harness/claude/bridge.ts`): written ≤ 4.3 s after the start (2.1.291,
-  2026-10-06). A SIGTERM sent to its pid ends it: `done` in `claude agents`, its file removed, no respawn within 45 s, and a later
-  `claude stop <id>` still answers `stopped`. Whether a respawn or a restart changes the id, and the link on a phone: unmeasured.
+- **Any Claude Code session's bridge to claude.ai is opened on its `system`/`init` message, through the Agent SDK** (SDK 0.3.308,
+  Claude Code 2.1.308, 2026-10-24): `enableRemoteControl(true, name, { keepSessionOnExit })`, undeclared on `Query`, read off the object
+  in `harness/claude/attached-bridge.ts` alone (`bridgeDue`, `enableBridge`). A job asked at init (`keepSessionOnExit: false`) was answered
+  its facts 0.5 s later — `bridge_state: ready` and the answer at 1.5 s, `connected` at 1.7 s — long before its result at 21.1 s, during
+  a tool call: the answer is not queued behind the turn, and the bridge closes with the job. A long-lived session asked at init
+  (`keepSessionOnExit: true`) was answered the same way (init 2.8 s, answer 3.3 s, connected 3.4 s), and a second process resuming it
+  with `reattachSessionId` set to the first `bridge_session_id` was answered the same id and link, connected 0.5 s after its init. A
+  held session keeps the facts on its run file, a job's process on `<name>.bridge` beside its run; both are read by a look.
 - **A `--bg` session stays in `--permission-mode auto`, and an `ask` rule in `--settings` outranks its classifier** (2.1.289,
   2026-10-05): `Bash(x:*)` prompts ("Ask rule … overrides auto mode"), listed `waitingFor: "permission prompt"`; `Edit(//<file>)`
   prompts the Write tool, unruled it writes unasked. No `Edit` or `Write` ask reaches a Bash `>` there: the classifier judges it.

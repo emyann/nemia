@@ -1,7 +1,7 @@
 /**
- * The lines the runtime keeps of a Claude Code session, as they enter it: printed by `claude -p` — `--output-format json` and
- * `stream-json` alike — for a `claude-detached` run and for every `-p` run already stored, and by `bin/ae-claude-job.ts` from the
- * Agent SDK's messages for a job, which is the same stream. Each line of a kind the runtime reads is decoded by its schema here
+ * The lines the runtime keeps of a Claude Code session, as they enter it: printed by `bin/ae-claude-job.ts` from the Agent SDK's
+ * messages for a job, and kept by a held session's capture, which is the stream `claude -p --output-format stream-json` printed for
+ * every run a former runtime stored. Each line of a kind the runtime reads is decoded by its schema here
  * (`PRINTED`), where a reader reads it. Only a line that parses as a JSON object of a kind
  * the reader reads is decoded; stderr the worker captures beside it, a line torn mid-write, a line of any other type, and a `system`
  * line of any other subtype pass undecoded.
@@ -73,7 +73,7 @@ const ModelTokensSchema = Schema.Struct({
 });
 
 /**
- * The lines of `claude -p`'s output the runtime reads, by kind — a `type`, and its `subtype` for a `system` line — in what it reads
+ * The lines of a session's stream the runtime reads, by kind — a `type`, and its `subtype` for a `system` line — in what it reads
  * of each; every other key is not checked. A field the runtime starts reading is added here.
  */
 export const PRINTED = {
@@ -126,8 +126,8 @@ const DECODERS = Object.fromEntries(KINDS.map((k) => [k, Schema.decodeUnknownRes
 
 const FIX =
   'An output that holds it is refused, never read as saying nothing: run a Claude Code whose output this runtime reads — the lines' +
-  " `claude -p` prints, which a job's own process prints from the Agent SDK's messages — or a runtime whose schema for the line in" +
-  ' `PRINTED` (`harness/claude/print.ts`) reads this one.';
+  " a job's own process prints from the Agent SDK's messages — or a runtime whose schema for the line in" +
+  ' `PRINTED` (`harness/claude/stream.ts`) reads this one.';
 
 /** The kind of `value` when it is a JSON object of one of `kinds`, or `undefined` for anything else. */
 const kindOf = (value: unknown, kinds: readonly PrintedKind[]): PrintedKind | undefined => {
@@ -168,7 +168,7 @@ const refusal = (at: number, kind: PrintedKind, value: unknown, error: Schema.Sc
 };
 
 /**
- * The lines of `kinds` in what `claude -p` printed, decoded, in the order printed: `{ lines }`; or why the output is refused
+ * The lines of `kinds` in what a session's stream printed, decoded, in the order printed: `{ lines }`; or why the output is refused
  * (`wrong`, a sentence that names the line, its kind, its first wrong field and the fix, and quotes at most 60 characters of what it
  * found there). A line is parsed only when it names one of `kinds`' types.
  */

@@ -530,7 +530,6 @@ not streamed is sent what it has said and told so. What each harness gives:
 | harness | streams | what a follower is handed |
 |---|---|---|
 | `claude`, a job | yes | its state, the text of each message in pieces as it is written (`--include-partial-messages`, `claudePartials`), and each whole event of its transcript once (`followOf`, `test/follow.test.ts`) |
-| `claude`, `--bg` | yes | its state from `claude agents`, read once a second for every follower, and each whole line of its transcript once, across its turns and respawns (`bgFollowOf`, `test/follow-bg.test.ts`) |
 | `codex` | yes | its state, and each event of its rollout once and in order as Codex writes it, its stdout decoded as it comes; no pieces of text: `exec --json` prints each message whole (`followOf`, `codexPartials`, `test/codex-follow.test.ts`) |
 | `claude-detached` | no | nothing while it runs: `claude -p --output-format json` names its session only as it exits; its transcript is read once it has |
 | `command` | no | nothing: a process keeps no conversation; its output is `logs` and `output` |
@@ -1242,14 +1241,6 @@ quiet  ⟸  state = working AND busy AND the last word in its conversation is it
 
 and reports quiet as a fact, `quietMs`, with the state left `working`. What quiet means is `decide`'s (below).
 
-**Quiet is counted on both clocks, and the shorter wins.** The transcript's mtime is stamped on the wall clock, so a wall clock
-stepped forward an hour would make every working session quiet at once. The runner records, per attempt under its root, when it
-first saw the transcript at its current mtime on the monotonic clock (`<root>/quiet/<name>.json`, `{ mtimeMs, boot, ms }`,
-`harness/claude/quiet.ts`), rewritten only when the mtime or the boot differs and cleared at spawn; quiet is the wall-clock age
-bounded by the monotonic time since that sighting. So a forward step cannot report a working session quiet, a backward step only
-delays it, a sighting survives a daemon's restart within its boot, and a mtime first seen — after a reboot, or by a fresh root —
-waits the floor from then. A machine with no boot id has the wall clock alone.
-
 **The second quiet rule is for a session held by something that is not the work.** A step signed off with
 `StructuredOutput`, every commit in, and left a `run_in_background` loop running; its registration read `status: shell`,
 the registry listed it busy, and seventy-seven minutes later nothing had read its closeout — no end, no check, no
@@ -1334,8 +1325,7 @@ with those words.
 **The harness's `done` is the second door, and it is reported the same way.** A session its harness lists `done` with no
 statement was journalled `done`, reason `harness`, and settled `succeeded` until 2026-09-19, with nothing to say it had
 not signed: of the 344 tasks filed with a schema in this machine's store that day, 5 had ended so. It carries
-`stated: false` now, as a quiet end does — held by `src/core/decide.test.ts`, and a fake `claude` listing the session `done`
-in `test/unsigned.test.ts`.
+`stated: false` now, as a quiet end does — held by `src/core/decide.test.ts`.
 
 **The nudge names the tool.** It asked for "your closing statement" and named nothing until 2026-09-17, and twice that
 did not get a finished step to sign off: each had done all its work and ended its turn with a prose summary, and each
@@ -1345,15 +1335,6 @@ nothing (issue 25). The nudge that replaced it, the orchestrator's `SIGNOFF`, na
 Quiet is counted from the later of the transcript's last write and the session's own start in `claude agents`: a
 continuation `--resume`s a transcript that may have been cold for an hour, and measured by the transcript alone it
 would end the moment the registry listed it idle.
-
-**What is not measured.** `test/unsigned.test.ts` holds all of this with a fake `claude`; no live session has gone
-quiet without its statement under it. On the record on the machine this was written on, 144 Claude Code tasks asked for a closeout,
-and 2 of their attempts ended `done` without one — both the read fixed in `00e301b`, not a session that said nothing —
-so the case has not been seen live either way. Claude Code 2.1.271's bundle has a retry count for structured output
-(`MAX_STRUCTURED_OUTPUT_RETRIES`) and an error for running out of it. Whether a `--bg` session is nudged by the harness
-when its turn ends without the call, and whether it then ends itself `done` with nothing said — a way to a success
-without a statement that quiet does not cover — is what `test/live.test.ts` measures (`AE_LIVE=1`), and it has not been
-run.
 
 ### Every ended attempt carries its statement or the reason it has none
 
@@ -1430,25 +1411,8 @@ real runs:
   under its own name, so whatever it reads there its own process wrote. A file's mtime is no
   better than a clock: stepped back about a second every thirty seconds under load, it fell before
   a 1.4 s attempt's start, and the statement was dropped. Leaving out the time skips this check.
-  Claude Code's `--bg` runner, whose resumed transcript holds its parent's calls, tells them by the
-  call's id: a flagged `--bg --resume` starts a copy under a new session id that carries the parent's
-  `tool_use` ids verbatim, and gives each new call a new one (measured on 2.1.288). Its spawn records
-  the parent's last StructuredOutput call id (`harness/claude/parent.ts`) before `claude` runs; a
-  statement with that id is inherited and not reported, and another is the session's own and carries
-  no time. Only a session with no record — spawned before the record was kept, or whose parent's
-  transcript could not be read — or a call with no id still gives a time.
 - **From a busy session, it is not final.** A step once declared itself done, carried on, found it
   could not commit, and revised its verdict eleven seconds later.
-
-Claude Code's runner reads the statement and the usage from the transcript in one read a look, in any state — a busy
-session's once its transcript is cold, above. What it read it keeps for that attempt only — the row's name, its session, and the start `claude agents` gave it — and
-only while the transcript has not been written since, as a turn writes it: its mtime, a stat (`transcriptWrittenAt`), asked
-again, equals the one asked just before that read, and that one was older than the read by `MTIME_SLOP_MS` — an equality, so a write stamped after a wall clock
-stepped back is read again.
-Kept by session id, for good, a read went wrong twice on one step. A `view` saw the session listed
-final at least ten seconds before its — inferred from the pinned usage, not observed — `StructuredOutput`, and "nothing said" was kept. Then a nudged retry,
-which `--resume` runs under the same id, was handed that nothing and its first try's usage, to the
-byte. A resume changes both facts, so neither may live in a daemon's memory (`test/resume.test.ts`).
 
 It replaced a file the workload wrote into its own directory (`doneFile`), and that file is why the
 design looks like this. A file in the workspace travels down a git branch: the next step was cut a
@@ -1460,13 +1424,6 @@ It layers UNDER the harness's own answer rather than replacing it. An agent kanb
 problem with a terminal "complete" tool call, which it can require because every worker is its own.
 Here a structured final answer is the fast path and observation is the floor: a workload
 that never gives one ends by quiet — `stated: false`, where one was asked for (above).
-
-**It lives in the runner, not in `decide`.** `working` and `idle` are one harness's vocabulary; the
-engine's is `working | blocked | done | failed | stopped`, and translating between them is the whole
-job of a runner. What a quiet session means is `decide`'s, since only the journal knows whether a statement was
-asked for. Codex, which ends by exiting, needs none of this and gets
-none of it. And because it is a translation rather than a judgement, it tests with an injected clock
-and an injected transcript (`test/completion.test.ts`) — no harness, no spend.
 
 ## What an attempt consumed
 
@@ -1965,31 +1922,19 @@ next pass that reads it. A harness's `unread` crosses the A2A seam beside its Ta
 something unread is counted (`ObserveCount.unread`, which `wf up --stats` prints). The full `observe`, which views and verbs read, still
 reads an unread harness as nothing.
 
-A session left unread alone — a `--bg` transcript or a detached run's output or start event that does not decode, while it runs — is
+A session left unread alone — a detached run's output or start event that does not decode, while it runs — is
 said why, in its harness's words, on the `Observation` that left it so (`unreadWhy`, by name, across the A2A seam too), and on its task's
 view (`TaskView.unreadWhy`) by its last attempt, off the pass's look, `list`'s and `view`'s. Rebuilt on every look and kept by none:
 the first look that reads the session drops it, and the full `observe` says none. The warning is still logged on every look.
-
-What `claude agents --all --json` prints is decoded where it is read (`registryOf`, `harness/claude/registry.ts`). A row is ours when it
-is an object named `ae/` with a `state` key; another program's row, an interactive session's (no `state`) and an element that is no object
-are skipped unread. Each row of ours is decoded by `RegistryRowSchema`: a non-empty `sessionId` and `state`, and `status`, `waitingFor`,
-`startedAt` and `pid` of their type or absent (`null` is absent). A listing that is no JSON array, or holds one row of ours that does not
-decode, fails `observe` with a `RunnerError` naming the row, the field, at most 60 characters of what it found, and the fix; so every
-background session it would have listed is unread, never gone, and none is ended `lost` or spawned again until the listing decodes.
 
 A Claude Code transcript line is decoded where the runtime reads it (`decodeLine`, `harness/claude/lines.ts`): a `user`, `assistant`,
 `system` or `attachment` line read as the session's conversation, the `StructuredOutput` call read as its statement and the line after
 it, and the `cost-state`, `agent-name`, `compact_boundary` and response lines read as its usage. Only `type`, and `message` on a `user`
 or `assistant` line, must be there; a field that is there has the shape the runtime reads. A line that does not decode fails the read
 with words naming the transcript, the line, the field, at most 60 characters of what it found, and the fix: the `transcript` verb
-refuses, and a `--bg` look leaves that session alone unread, never read as having said nothing, its other background sessions read
-beside it; the refusal is kept while the transcript is unchanged. A transcript found and then not read (`TranscriptUnread`) is read
-the same way, and read again on the next look. Once the session has ended — listed finished, or working and idle, its transcript
-unwritten for the quiet floor, or listed finished with no transcript — it reads as `failed`, as a refused start does, with why said
-as a warning on every look, so its task settles and `stop`, `release` and `forget` reach it (`endedOf`, `harness/claude/bg.ts`). A
-line torn mid-write, one that is no JSON object, and a line of a type the reader does not read pass undecoded.
+refuses, and the refusal is kept while the transcript is unchanged. A line torn mid-write, one that is no JSON object, and a line of a type the reader does not read pass undecoded.
 
-What `claude -p` prints is decoded where the runtime reads it (`printedLinesOf`, `harness/claude/print.ts`): a `result` line, a
+What a Claude Code job prints on the Agent SDK's stream is decoded where the runtime reads it (`printedLinesOf`, `harness/claude/stream.ts`): a `result` line, a
 `system` line of subtype `permission_denied` or `init`, and an `assistant` line with its `tool_use` blocks, each by its schema in
 `PRINTED`. Every field the readers read may be absent, and an absent one means what it always has; a field that is there has the shape
 the runtime reads: a cost or an API time a number of 0 or more, a token count an integer, `permission_denials` a list whose entries name
@@ -2038,16 +1983,17 @@ What a blocked session waits for is the harness's own word, carried and never ju
 on the task as `waitingFor` where the phase is `needs-human`. It is a container's `state.waiting.reason`, not an
 enum of the engine's — `decide` never reads it, and a harness that says nothing leaves it unset. The detached
 harnesses say nothing and cannot: `ae-worker.ts` writes `working | stopped | done | failed` and never `blocked`,
-so a codex or `claude-detached` session never reaches `needs-human` at all.
+so a codex session never reaches `needs-human` at all.
 
-Where a session can be reached from a browser or a phone is the view's `bridge`, carried the same way. Claude Code opens a bridge
-to claude.ai for a `--bg` session filed with `claude.remoteControl`, and writes its id, `bridgeSessionId`, in the registration it
-keeps for the process (`<sessions>/<pid>.json`), which `claude agents --json` does not list; `observe` reads that file for each
-session it lists with a process, under the same guards as `find` (`claudeRegistration`), and puts `{ url }` or `{ url: null, why }`
-on the sighting (`claudeBridge`, `harness/claude/bridge.ts`). The view tells three cases apart (`bridgeOfTask`): a task that
-asked and is up carries `{ url }`; one that asked and is not up carries `{ url: null, why }` — no `bridgeSessionId` yet, a
-registration not taken, an id not of the form `session_…`, no process seen, or a session ended; one that did not ask carries none.
-An absent link is never read as not bridged.
+Where a session can be reached from a browser or a phone is the view's `bridge`, carried the same way. A Claude Code session filed
+with `claude.remoteControl` — a job or a long-lived one, every one of them on the Agent SDK — asks for the bridge to claude.ai on its
+`system`/`init` message (`bridgeDue`), through the SDK's `enableRemoteControl`, the one door to that undeclared control request
+(`harness/claude/attached-bridge.ts`): a long-lived session keeps its claude.ai session past a process and re-attaches it
+(`keepSessionOnExit`, `reattach`), a job's closes with it. A held session keeps the bridge's facts on its run file; a job's own process
+writes them on a file beside its run (`<name>.bridge`), which a look reads — never only in a process's memory. The sighting carries
+`{ url }` or `{ url: null, why }` (`bridgeOf`), and the view tells three cases apart (`bridgeOfTask`): a task that asked and is up
+carries `{ url }`; one that asked and is not up carries `{ url: null, why }` — not answered yet, refused, an SDK with no such method
+(`BRIDGE_ABSENT`), or a session ended; one that did not ask carries none. An absent link is never read as not bridged.
 
 A view of a task with no attempt in flight carries no `usage`: an ended attempt's is on `state.attempts`. Measured on
 a loop of twenty reads each against that machine's board (236 tasks), before and after:
@@ -2296,10 +2242,6 @@ of pure code sits beside it.
 | `src/harness/transcript.ts` | the one transcript reader behind every harness's `transcript`, and its cursor |
 | `src/harness/sdk.ts` | the same four verbs on the Agent SDK, with the tradeoff written down |
 | `src/harness/index.ts` | the face of the seam, as the A2A seam and the face take it; `core/` imports `seam.ts` and `args.ts` by their own path |
-| `src/harness/claude/bg.ts` | Claude Code's `--bg` runner (`claudeOps`), and `sh`, the one way it shells out |
-| `src/harness/claude/bg-follow.ts` | a `--bg` session followed live at message level (`bgFollowOf`): its transcript read on from a byte offset, each whole line once, its state from `claude agents`, read once a second for every follower (`sharedListing`), across its turns and Claude Code's respawns |
-| `src/harness/claude/quiet.ts` | when a working `--bg` session's transcript was first seen at its mtime, on the monotonic clock, per attempt under the root: written by a look only when the mtime or the boot differs, cleared at spawn, read fresh on every look |
-| `src/harness/claude/parent.ts` | what a resumed `--bg` session's spawn records of its parent: the id of the parent's last StructuredOutput call, and whose a statement is by it |
 | `src/harness/claude/trust.ts` | Claude Code's trust of a folder in its `.claude.json` (`claudeConfigFile`, in `CLAUDE_CONFIG_DIR` when set): read by `claudeTrusts`, and one key set by `claudeTrust`, which keeps every other key and a write that lands meanwhile |
 | `src/harness/claude/code.ts` | Claude Code as the engine runs it by default: a step as a job (`claudeJobSpec`, the bin), attached while the process holds (`withAttached`), or a background session (`claude --bg`) when the task asks, each verb routed by the session id's shape and its run file; and `claude -p`'s argv and the `claude-detached` spec |
 | `src/harness/claude/job-env.ts` | the environment a session run to its end is given, a job's or an attached one's (`CLAUDE_JOB_ENV`) |
@@ -2310,11 +2252,8 @@ of pure code sits beside it.
 | `src/harness/claude/attached-file.ts` | an attached session's run file, its stop, the drain, and the two notes a resumed session is told |
 | `src/harness/claude/attached-options.ts` | a task as the SDK's `Options` (`attachedOptions`): the job's fence, folders, servers, model, budget and schema |
 | `src/harness/claude/quota.ts` | Claude Code's quota (`claudeQuota`): the Agent SDK's usage question put to the `claude` on PATH with no prompt, and its answer read (`quotaOfUsage`) or its refusal (`quotaOfRefusal`) |
-| `src/harness/claude/registry.ts` | the rows `claude agents --all --json` prints, decoded: which are ours, and why a listing is refused; a row's state in A2A's names (`claudeStateOf`) |
 | `src/harness/claude/lines.ts` | the transcript lines the runtime reads (`LINES`), each decoded where it is read, and why a line is refused |
-| `src/harness/claude/print.ts` | the lines of `claude -p`'s output the runtime reads (`PRINTED`), decoded, and why an output is refused |
-| `src/harness/claude/inbox.ts` | words said into a running Claude Code session: its inbox, and its registration, read under its guards (`claudeRegistration`) and found by name |
-| `src/harness/claude/bridge.ts` | a `--bg` session's Remote Control link, off its registration's `bridgeSessionId` (`claudeBridge`), or why there is none |
+| `src/harness/claude/stream.ts` | the lines of a Claude Code job's stream the runtime reads (`PRINTED`), decoded, and why an output is refused |
 | `src/harness/claude/transcript.ts` | a Claude Code session's transcript: where it is, its closeout, its lines as events, and its usage and cost |
 | `src/harness/claude/admission.ts` | admission as Claude Code runs it: a `PreToolUse` hook merged into `--settings` (`admittedFlags`), and the adapter `ae admission` runs (`admitCall`, `admissionHook`), which `bin/ae.ts` loads alone, before any engine |
 | `src/harness/claude/memory.ts` | auto-memory off in every session the runtime starts: the setting (`AUTO_MEMORY_OFF`) merged into the settings a task gives, for the SDK (`memorylessSettings`) and in a job's or a background session's flags (`memorylessFlags`) |
@@ -2333,7 +2272,7 @@ of pure code sits beside it.
 | `src/harness/detached/looked.ts` | what a detached look at the names it was told found: each sighting, the names left unread and why each was (`unreadWhy`), and every warning to log |
 | `src/harness/detached/follow.ts` | a detached session followed live (`followOf`): its run file, its whole stdout lines read for the text being written, and its transcript, each read on from where the last read stopped, on a watch's wake or each second |
 | `src/harness/detached/carried.ts` | a resumed session's own share where its harness prints its parent's totals on: the parent's cost, API time and whole session's tokens (`carriedOf`) taken off the resume's, falling back to its own `usage` (`lessCarried`) |
-| `src/harness/detached/output.ts` | what a detached session's output says: `claude -p`'s result and stream, decoded by `print.ts` or refused, read for closeout, usage (every model's, `modelUsage`, else the main thread's), cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
+| `src/harness/detached/output.ts` | what a detached session's output says: a Claude Code job's result and stream, decoded by `stream.ts` or refused, read for closeout, usage (every model's, `modelUsage`, else the main thread's), cost, a spent budget and denials, and the stream for the skills loaded and the files touched |
 | `src/harness/detached/spawn-files.ts` | the files a spawn clears and writes beside a run before the worker is launched, and what they say to the harness (`spawnFiles`, `HarnessIO`): the closeout's schema, the MCP config, what the spec prepares, and the spawn request a spec that reads one is given (`needsRequest`); and the stdin the worker writes (`spawnInput`) |
 | `src/harness/detached/run-file.ts` | a detached run's file as the worker and the spawn write it: its schema (`RunFileSchema`), its read (`runFileIn`), the first one a spawn writes, and its state as a sighting says it, its heartbeat's lease (`STALE_MS`) included |
 | `src/harness/detached/said.ts` | what was read of a finished run's output, kept beside its log keyed by the log's size and mtime and the readers' version — or a former one they only added fields to (`SAID_EXTENDED`) — so each process reads a log once per change of it; and an ended run's capture rewritten there to what its spec keeps (`keepOutput`, `keepCapture`), only when it reads the same |
@@ -2386,10 +2325,6 @@ of pure code sits beside it.
 | `bin/ae-claude-job.ts` | a Claude Code job's own process: one session on the Agent SDK's `query()`, built from the spawn request the runner wrote, printing each message as one line of the stream a job's readers read |
 | `src/core/decide.test.ts` | every branch of the decision, no harness needed |
 | `test/engine.test.ts` | the crash cases, what a pass reports (`running` per harness) and that it chooses no order, the pass refusing an argument, the fields carried, against a fake harness |
-| `test/completion.test.ts` | Claude Code's "done" and "quiet", its argv and its usage, with a fake `claude` on `PATH` |
-| `test/unsigned.test.ts` | a session gone quiet, or `done`, without the closing statement its task asked for: ended with `stated: false`, and continued by nothing; quiet with none asked for still succeeds with no such key — a fake `claude` that keeps a registry, at shipped defaults |
-| `test/shell.test.ts` | a session held busy by a background shell it left running: its own closeout as the last word in a cold transcript ends the attempt, an advancing one or no statement does not — a fake `claude` that keeps a registry, at shipped defaults |
-| `test/resume.test.ts` | a resumed session read as its new attempt's, and a final read taken again once its transcript grows — a fake `claude` that keeps a registry, at shipped defaults |
 | `test/command.test.ts` | the command harness against the real worker: a long stdout read back whole, stderr apart, the exit code, `env`, `niceness`, a stop, a lingering child, a respawn, and its refusals |
 | `test/detached.test.ts` | the worker, the lease, the composite, each spec's argv and refusals — `sh` as the harness |
 | `test/mcp.test.ts` | what each harness is given for MCP, at shipped defaults — fake `claude` and `codex` on `PATH` |
@@ -2399,8 +2334,6 @@ of pure code sits beside it.
 | `test/forget.test.ts` | forgetting settled tasks on the files store: the count and the removal, each guard made to refuse with nothing removed, a forget cut short finished, an append to a forgotten task refused, another engine's pass, `sweep` after it, a detached run's files, and `ae forget` and `ae feed` |
 | `test/kept.boundary.test.ts` | `kept` on the files store and a real harness folder: a task's harness, and its journal, bodies, output, files and records in bytes on disk, a detached session's streams apart, a person's own transcript in the same folder never counted, a body counted once, no body read, the parts no more than a walk of the root, a harness with no `kept`, one that fails, and what a forgotten task leaves |
 | `test/feed-rotation.test.ts` | the feed rotated under its lock: readers parked before it read on, the forgotten counted; a feed with no header; a rotation stopped between its renames, and two racing; a stopped holder failing an append after `FEED_LOCK_WAIT_MS`, a dead one broken; a stopped writer keeping a rotation out; and what an append counts |
-| `test/release.test.ts` | letting a finished Claude Code session go, and reading what it cost once stopped, at shipped defaults — a fake `claude` that keeps a registry and writes a `cost-state` as it stops a session |
-| `test/budget.test.ts` | a spend cap, at shipped defaults — fake `claude`s: a `claude -p` that stops at its cap ends its attempt `failed` with `limit: 'budget'` and settles its task as any failure, the note naming no budget; the flag reaches both Claude runners on every attempt |
 | `test/admit.test.ts` | queued and admitted: the wait, the word, the pass after it, the pre-4c reading, `admit`'s refusals at shipped defaults, and a count proving the word asks no harness |
 | `test/telemetry.test.ts` | what a session is handed to export: the collector, the labels with the task's id and the filing's trace through the engine, Claude Code's variables in a job's environment and a background session's settings, no child inheriting the engine's own, and each refusal — the real worker, a scratch collector and a stub `claude` on `PATH` |
 | `src/core/engine/counted.test.ts` | a long-lived attempt's counts journalled once a reading, none for a job, and how `fold` and the view read them |
@@ -2412,7 +2345,6 @@ of pure code sits beside it.
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
 | `test/hold-open.test.ts` | a task held open, through the engine and the Effect layers: it waits with its session let go, an answer after a restart resumes it, a close settles it, and every refusal of `answer` and `close` |
 | `test/say.test.ts` | telling a running session something, at shipped defaults — a fake `claude` that keeps a registry, a real socket for the inbox: the words and the entry, every refusal, the inbox's guards, `ae say` |
-| `test/follow-bg.test.ts` | a `--bg` session followed live, a fake `claude` on PATH and transcripts the test grows: each line once and every byte read once, the cursor a read gives, turns, a respawn's gap, a `--resume` copy not said again, a listing not read, the end, each refusal, and through A2A |
 | `test/find.test.ts` | finding one session by its name, at shipped defaults — a fake `claude` that counts its `agents` calls, and registration files: found, gone, not registered, and the registry's word taken where the two disagree; a view that asks its task's own harness and no other |
 | `test/a2a.test.ts` | the A2A mappings round-tripped, and a harness driven through the SDK's `Client`: its words, its refusals and its defects reach the engine unchanged |
 | `test/a2a-handler.test.ts` | a harness's A2A agent called directly: every refusal made to refuse with the harness asked nothing, paging, and answers from the journal |

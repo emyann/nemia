@@ -107,8 +107,8 @@ export type TaskView = {
   usage?: Usage;
   /**
    * What the harness says the session is waiting for, in its own words, for a task whose phase is `needs-human`
-   * (`Sighting.waitingFor`) — `permission prompt`, as `claude agents --json` prints it. Absent for every other
-   * phase, and for a harness that says nothing: the detached harnesses (codex, claude-detached) never do.
+   * (`Sighting.waitingFor`) — `permission prompt`, in the harness's words. Absent for every other
+   * phase, and for a harness that says nothing: the detached harnesses (codex, a Claude Code job, a command) never do.
    *
    * Off the same observation the phase was read from, so it costs no extra call, and read afresh every pass: a
    * session that stops waiting loses it on the next.

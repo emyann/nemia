@@ -177,7 +177,7 @@ export const codex: HarnessSpec = {
       return `\`allowedTools: ${JSON.stringify(allowedTools)}\` is an allow list, and Codex has no tool list to allow from: one shell, fenced by its sandbox. The sandbox is \`permissionMode\` — \`workspace-write\` writes in the workspace and asks nobody. Leave \`allowedTools\` off a Codex task, and name the sandbox.`;
     }
     if (task.config?.budgetUsd !== undefined) {
-      return `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap in dollars, and \`codex exec\` has none: it takes no such flag, and reports no cost to cap. Leave \`budgetUsd\` off a Codex task, or file it on \`claude-detached\`, which ends a session at its cap.`;
+      return `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap in dollars, and \`codex exec\` has none: it takes no such flag, and reports no cost to cap. Leave \`budgetUsd\` off a Codex task, or file it on \`claude\`, which ends a session at its cap.`;
     }
     if (task.config?.claude !== undefined) {
       return `\`claude: ${JSON.stringify(task.config.claude)}\` gives Claude Code flags of its own, and \`codex exec\` is not Claude Code. Leave \`claude\` off a Codex task, and say what the session must know in its brief.`;

@@ -114,13 +114,12 @@ export const claudeMcpStatus: McpStatusAsk = async (servers, cwd, executable, st
  * session that will reach no tool of it — read off the harness's name, as its trust of a folder is (`folderTrust`). `undefined` is
  * the default harness, which is one.
  *
- * True for the two that run Claude Code, which files a sign-in under `name|sha256({type,url,headers})[:16]` in its own store and
- * finds it again from any session handed the same bytes. False for every other: nothing of Codex's sign-in has been measured — not
- * whether it has one, not where it would file it — and a remote A2A agent loads the servers its own operator configured. A caller
- * that stops a task on `needs-auth` stops it for the harnesses this answers true for and no other.
+ * True for the one that runs Claude Code (`claude`), which files a sign-in under `name|sha256({type,url,headers})[:16]` in its own store
+ * and finds it again from any session handed the same bytes. False for every other: nothing of Codex's sign-in has been measured — not
+ * whether it has one, not where it would file it — and a remote A2A agent loads the servers its own operator configured. A caller that
+ * stops a task on `needs-auth` stops it for the harnesses this answers true for and no other.
  */
-export const signsInMcp = (harness: string | undefined): boolean =>
-  harness === undefined || harness === 'claude' || harness === 'claude-detached';
+export const signsInMcp = (harness: string | undefined): boolean => harness === undefined || harness === 'claude';
 
 /** `tools` and `error` as a state carries them: each left out where the harness said none, never filled with a 0 that reads as a fact. */
 const saidOf = (s: McpServerStatus): Omit<McpServerState, 'name' | 'status'> => ({

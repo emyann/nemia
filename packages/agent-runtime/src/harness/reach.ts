@@ -79,7 +79,7 @@ const codexReach = (): FenceReach => ({
  * sandbox: a command, an A2A agent, or a name the runtime does not know.
  */
 export const fenceReach = (harness: string, model?: string): FenceReach | undefined => {
-  if (harness === 'claude' || harness === 'claude-detached') return claudeReach(model);
+  if (harness === 'claude') return claudeReach(model);
   if (harness === 'codex') return codexReach();
   return undefined;
 };
@@ -90,4 +90,4 @@ export const fenceReach = (harness: string, model?: string): FenceReach | undefi
  * harness whose fence takes no rule naming a path: Codex, a command, an A2A agent, or a name the runtime does not know.
  */
 export const unruledIn = (harness: string, path: string): string | undefined =>
-  harness === 'claude' || harness === 'claude-detached' ? CLAUDE_UNRULED.exec(path)?.[0] : undefined;
+  harness === 'claude' ? CLAUDE_UNRULED.exec(path)?.[0] : undefined;

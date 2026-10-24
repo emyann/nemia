@@ -465,11 +465,11 @@ test("upgrade: a journal an older runtime wrote, or a consumer's own store holds
       });
       const before = bytesOf(dir);
       const read = async (id: string) => ((await run(dir, readOf(id)))[0] as { config?: unknown }).config;
-      assert.deepEqual(await read('under'), { background: true, claude: { remoteControl: true } });
-      assert.deepEqual(await read('beside'), { background: true, claude: { remoteControl: true } });
+      assert.deepEqual(await read('under'), { claude: { remoteControl: true } });
+      assert.deepEqual(await read('beside'), { claude: { remoteControl: true } });
       assert.deepEqual(
         await read('both'),
-        { background: true, claude: { remoteControl: 'phone', appendSystemPromptFile: 'p.md' } },
+        { claude: { remoteControl: 'phone', appendSystemPromptFile: 'p.md' } },
         'a flag already in config.claude is the newer word, and is kept',
       );
       assert.deepEqual(
@@ -486,7 +486,35 @@ test("upgrade: a journal an older runtime wrote, or a consumer's own store holds
       );
       assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
       const { state } = await Effect.runPromise((await engineOver(dir)).view('under'));
-      assert.deepEqual(state.config, { background: true, claude: { remoteControl: true } });
+      assert.deepEqual(state.config, { claude: { remoteControl: true } });
+    },
+  );
+
+  await t.test(
+    'a filing that asked for `background`, the `claude --bg` road this runtime no longer runs — under config, or beside it — reads without it, the rest of its config kept, and no byte on disk changes',
+    async () => {
+      const dir = legacyStore({
+        on: [{ ...TODAY, config: { background: true, model: 'haiku' } }],
+        off: [{ ...TODAY, config: { background: false } }],
+        beside: [{ ...TODAY, config: { model: 'haiku' }, background: true }],
+        held: [{ ...TODAY, restartPolicy: 'Always', config: { background: true, claude: { remoteControl: true } } }],
+      });
+      const before = bytesOf(dir);
+      const filed = async (id: string) =>
+        (await run(dir, readOf(id)))[0] as { config?: unknown; background?: unknown; restartPolicy?: unknown };
+      assert.deepEqual((await filed('on')).config, { model: 'haiku' });
+      assert.equal((await filed('off')).config, undefined, 'a config that held nothing else is no config');
+      const beside = await filed('beside');
+      assert.deepEqual([beside.config, Object.hasOwn(beside, 'background')], [{ model: 'haiku' }, false], 'beside config: dropped too');
+      const held = await filed('held');
+      assert.deepEqual(
+        [held.restartPolicy, held.config],
+        ['Always', { claude: { remoteControl: true } }],
+        'a long-lived session stays one',
+      );
+      assert.deepEqual(bytesOf(dir), before, 'append-only: a read changes no byte');
+      const { state } = await Effect.runPromise((await engineOver(dir)).view('held'));
+      assert.deepEqual(state.config, { claude: { remoteControl: true } });
     },
   );
 

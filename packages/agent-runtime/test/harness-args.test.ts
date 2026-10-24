@@ -27,13 +27,12 @@ const refusedBy = (ops: RunnerOps, t: Asked) =>
     }).pipe(Effect.provide(Runner.layer(ops))),
   );
 
-test('argsRefusalOf: where a key is and whether it is one — the twenty-one arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', async (t) => {
+test('argsRefusalOf: where a key is and whether it is one — the twenty arguments, each beside `config` refused naming where it goes, a `config` that is no object, a key that is no argument — said before what a value is', async (t) => {
   await t.test(
-    "HARNESS_ARGS is the twenty-one arguments a harness takes — the spend cap, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags",
+    "HARNESS_ARGS is the twenty arguments a harness takes — the spend cap, the mounts, a call's admission, whether a person can be asked, Claude Code's own flags, Codex's and a command's among them, and remoteControl not: it is one of those flags",
     () => {
       assert.deepEqual([...HARNESS_ARGS].sort(), [
         'allowedTools',
-        'background',
         'budgetUsd',
         'callAdmission',
         'checkoutMcp',
@@ -70,11 +69,11 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty-one arg
           'before any other refusal: a caller that files it with a model loose beside config is told about the move first',
         );
       }
-      assert.equal(argsRefusalOf({ ...task, config: { background: true, claude: { remoteControl: true } } }), undefined);
+      assert.equal(argsRefusalOf({ ...task, config: { claude: { remoteControl: true } } }), undefined);
     },
   );
   await t.test(
-    'a harness argument filed beside config is refused, naming where it goes — each of the twenty-one — and the same value under config is taken',
+    'a harness argument filed beside config is refused, naming where it goes — each of the twenty — and the same value under config is taken',
     () => {
       const value: Record<keyof HarnessArgs, unknown> = {
         model: 'opus',
@@ -86,7 +85,6 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty-one arg
         mcp: {},
         checkoutMcp: ['playwright'],
         contextTokens: 200000,
-        background: true,
         worktree: true,
         budgetUsd: 5,
         claude: { appendSystemPromptFile: 'prompt.md' },
@@ -376,6 +374,25 @@ const filedOver = async (runner: Layer.Layer<Runner>, spec: Filing) => {
   const err = await run(Effect.flip(file(spec)));
   return { err, listed: await run(Effect.flatMap(Journal, (j) => j.list)) };
 };
+
+test('REFUSED: `background`, at any value, under `config` or beside it, is refused naming the field and its fix — `restartPolicy` — and nothing is filed', async (t) => {
+  await t.test('argsRefusalOf names the field and the fix, under config and beside it, true or false', () => {
+    for (const value of [true, false])
+      for (const spec of [
+        { ...task, config: { background: value } },
+        { ...task, background: value },
+      ]) {
+        const says = argsRefusalOf(spec as never) ?? '';
+        for (const name of ['`background`', "restartPolicy: 'Always'"]) assert.ok(says.includes(name), `${name} in: ${says}`);
+      }
+  });
+  await t.test('file() refuses it, FileRefused, and journals nothing', async () => {
+    const { err, listed } = await filedOver(sdkRunner(), { ...task, config: { background: true } } as never);
+    assert.equal(err._tag, 'FileRefused', err.message);
+    assert.ok(err.message.includes('`background`') && err.message.includes('restartPolicy'), err.message);
+    assert.deepEqual(listed, []);
+  });
+});
 
 test('the SDK runner is made a Runner by Runner.layer, so it refuses the shared checks as every runner does', () => {
   const refuses = (t: Asked) =>

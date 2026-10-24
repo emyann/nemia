@@ -1,8 +1,8 @@
 /**
- * What an attached Claude Code session is given, as the Agent SDK takes it (`Options`): the same fence, folders, settings, servers,
- * model, budget and closing statement `claude -p` is given for the same task (`claudePrintFlags`), each on the SDK's own option where
- * it has one, and on `extraArgs` where it has none. Pure but for the files it reads — the checkout's `.mcp.json` and the agent's own
- * prompt — and it writes none: the servers ride `Options.mcpServers` and the prompt `Options.systemPrompt`.
+ * What a Claude Code session on the Agent SDK is given, a job's and a held one's alike (`Options`): its fence, folders, settings, servers,
+ * model, budget and closing statement, each on the SDK's own option where it has one, and on `extraArgs` where it has none. Pure but for
+ * the files it reads — the checkout's `.mcp.json` and the agent's own prompt — and it writes none: the servers ride `Options.mcpServers`
+ * and the prompt `Options.systemPrompt`.
  *
  * **`mcpServers` here is the one site that names the SDK's shape for a server, so the one that says where the shape and ours part.** A
  * recorded server carries `oauth: { clientId, callbackPort }` (`mcpServerOf`), and `oauth` is still not declared on the SDK's type
@@ -56,7 +56,7 @@ const extraValueOf = (key: string, value: string | number | true | string[]): st
   const [only, ...more] = value;
   if (only !== undefined && more.length === 0) return only;
   throw new Error(
-    `\`config.claude.${key}\` gives ${value.length} values, and an attached session takes one per flag. Give one, or file the task on \`claude-detached\`.`,
+    `\`config.claude.${key}\` gives ${value.length} values, and an attached session takes one per flag. Give one value, or two keys that each name one.`,
   );
 };
 
@@ -78,21 +78,20 @@ const promptText = (key: string, cwd: string, file: string): string => {
 };
 
 /**
- * The session's system prompt, as `Options.systemPrompt` takes it (`sdk.d.ts:2451-2461`): Claude Code's own preset with the agent's
- * prompt appended to it (`appendSystemPromptFile`), the prompt file's text alone in place of Claude Code's (`systemPromptFile`), or
- * the bare preset where the task names neither — asked for even then, because the SDK sends an empty system prompt when
- * `systemPrompt` is unasked, and a `claude -p` job has Claude Code's own. The prompt reaches the CLI as `appendSystemPrompt` on the
- * `initialize` request, never as `--append-system-prompt-file`. A resumed session keeps the prompt it was recorded with (the option's
- * own `snapshot`, which defaults on, `sdk.d.ts:2350-2461`), so a prompt file edited mid-session reaches no live session until
- * it is compacted.
+ * The session's system prompt, as `Options.systemPrompt` takes it (`sdk.d.ts:2451-2461`): Claude Code's own preset with the agent's prompt
+ * appended to it (`appendSystemPromptFile`), the prompt file's text alone in place of Claude Code's (`systemPromptFile`), or the bare
+ * preset where the task names neither — asked for even then, because the SDK sends an empty system prompt when `systemPrompt` is unasked,
+ * and a session of Claude Code's own has Claude Code's. The prompt reaches the CLI as `appendSystemPrompt` on the `initialize` request,
+ * never as `--append-system-prompt-file`. A resumed session keeps the prompt it was recorded with (the option's own `snapshot`, which
+ * defaults on, `sdk.d.ts:2350-2461`), so a prompt file edited mid-session reaches no live session until it is compacted.
  *
- * Refused, naming both keys and the harness that takes both flags, where a task gives both: the SDK has the one option where the CLI
- * had two flags, and what Claude Code does given both is unmeasured, so the runtime does not choose for the person.
+ * Refused, naming both keys, where a task gives both: the SDK has the one option where the CLI had two flags, and what Claude Code
+ * does given both is unmeasured, so the runtime does not choose for the person.
  */
 const promptOf = (cwd: string, append: string | undefined, replace: string | undefined): Options['systemPrompt'] => {
   if (append !== undefined && replace !== undefined) {
     throw new Error(
-      "`config.claude.appendSystemPromptFile` and `config.claude.systemPromptFile` are both given, and an attached session carries the one `systemPrompt` the Agent SDK takes: a prompt appended to Claude Code's own, or a prompt in place of it, never both. Give one of the two, or file the task on `claude-detached`, which takes both flags.",
+      "`config.claude.appendSystemPromptFile` and `config.claude.systemPromptFile` are both given, and an attached session carries the one `systemPrompt` the Agent SDK takes: a prompt appended to Claude Code's own, or a prompt in place of it, never both. Give one of the two: put the text of the other in it, or leave the other out.",
     );
   }
   if (replace !== undefined) return promptText('systemPromptFile', cwd, replace);
@@ -107,7 +106,8 @@ const promptOf = (cwd: string, append: string | undefined, replace: string | und
  * `config.claude` as `extraArgs` takes it, each flag by its name without `--`, with its plugin folders apart, its settings apart
  * with the session's auto-memory off in them (`memorylessSettings`), as the SDK's own `settings` option takes them (an object, or a
  * file's path as given, which the runtime does not rewrite), and its prompt files apart as the SDK's own `systemPrompt`
- * (`promptOf`), each of those paths taken from `cwd` where it is relative.
+ * (`promptOf`), each of those paths taken from `cwd` where it is relative. `remoteControl` is no flag: the bridge it asks for is opened
+ * on the SDK's control request at the session's first message (`attached-bridge.ts`), so it is left off the command line.
  *
  * The settings go apart because `Options.settings` overwrites a `settings` left on `extraArgs`, and `extraArgs` stringifies its
  * values (`sdk.mjs`): an object left in that bag would reach the CLI as `[object Object]`.
@@ -121,7 +121,7 @@ const extraOf = (
   settings: Options['settings'];
   systemPrompt: Options['systemPrompt'];
 } => {
-  const { pluginDir, settings, appendSystemPromptFile, systemPromptFile, ...rest } = flags ?? {};
+  const { pluginDir, settings, appendSystemPromptFile, systemPromptFile, remoteControl: _bridge, ...rest } = flags ?? {};
   const given = Object.entries(rest).filter((e): e is [string, string | number | true | string[]] => e[1] !== undefined);
   return {
     extra: Object.fromEntries(given.map(([key, value]) => [claudeFlagName(key).slice(2), extraValueOf(key, value)])),
@@ -158,7 +158,7 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
 });
 
 /**
- * `r` as the SDK takes it. In `claudePrintFlags`' order:
+ * `r` as the SDK takes it, in this order:
  *
  * - the tools, denies and allows (`claudeDenies`, `claudeAllows`), the mounts as `additionalDirectories`;
  * - `config.claude` with the admission's hook (`admittedFlags`) on `extraArgs`, its plugin folders as `plugins`, its settings on
@@ -170,7 +170,7 @@ const askedOf = (r: SpawnRequest): AttachedOptions => ({
  *   (`Options.strictMcpConfig`, `sdk.d.ts:2349`) — the SDK spells that map onto the child's argv as inline JSON, and Claude Code
  *   expands a `${NAME:-default}` in a server's arguments there as it does from a config file (measured 2.1.306,
  *   `test/live.test.ts`), so the checkout's own `--output-dir` still resolves — no Chrome; `--setting-sources project`; Claude
- *   Code's own system prompt as the preset `claude_code`, which a `claude -p` job has by default and the SDK leaves empty when
+ *   Code's own system prompt as the preset `claude_code`, which Claude Code has by default and the SDK leaves empty when
  *   unasked, with the agent's own prompt appended to it (`promptOf`) and not to nothing;
  * - the model, the effort, the context window as `Settings.autoCompactWindow` in those same settings (`sdk.d.ts:9304`), the closing
  *   statement's schema (`outputFormat`, handed on as it was given, unread), the session to resume, the worktree, and the spend cap;
@@ -200,7 +200,8 @@ export const attachedOptions = (r: SpawnRequest): AttachedOptions => {
     ...askedOf(r),
     /**
      * What is left of Claude Code's command line: `config.claude`'s own flags, and the two the Agent SDK 0.3.308 has no `Options`
-     * for — `--no-chrome`, because Claude in Chrome connects even in a strict session (`claudeMcpArgs`), and `--worktree`. Looked
+     * for — `--no-chrome`, because Claude in Chrome, switched on by a user setting (`claudeInChromeDefaultEnabled`), connects even in
+     * a strict session, and a step that needs a browser names one in `mcp` or its checkout's `.mcp.json`; and `--worktree`. Looked
      * for in `sdk.d.ts` and not there; everything else a task gives here is a flag only Claude Code has. Look for an `Options`
      * before adding another, and say in this note when there is none.
      *

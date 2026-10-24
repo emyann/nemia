@@ -4,7 +4,7 @@
  *
  * Two stories of a long-lived attached request (`restartPolicy: 'Always'`), which runs here by the runtime's own rule: one session
  * walked through its life — started on Claude Code's own system prompt with the agent's appended as text on the `initialize`
- * request, a turn's end that is not the session's end, the claude.ai bridge opened after its first turn, words that begin a turn of
+ * request, the claude.ai bridge opened at init, a turn's end that is not the session's end, words that begin a turn of
  * their own, an interrupt that never fails it, words said while a turn runs, an interrupt asked by another process honoured on the
  * next look and one that came too late dropped, then let go between turns and resumed by the next holder under the same Claude
  * Code id, its bridge re-attached — and one asked for no bridge, whose words said into a call's turn are folded into it.
@@ -33,13 +33,13 @@ import {
   CARRY_ON,
   filesOf,
   putDrain,
+  processStart,
   thisHolder,
   writeRun,
   type AttachedRun,
 } from '../src/harness/claude/attached-file.ts';
 import { fold, idleOf, type Event, type Sighting } from '../src/core/index.ts';
 import { respawning } from '../src/core/domain.ts';
-import { processStart } from '../src/harness/claude/inbox.ts';
 import { purseOf } from '../src/core/clock.ts';
 import { instantNow } from '../src/core/engine/now.ts';
 import type { Live } from '../src/harness/claude/attached-session.ts';
@@ -75,7 +75,6 @@ const LONG_LIVED: readonly Event[] = [
     cwd: '/r',
     harness: 'claude',
     restartPolicy: 'Always',
-    config: { background: true },
   },
   { kind: 'starting', at: '2026-01-01T00:00:01.000Z', attempt: 1 },
   { kind: 'spawned', at: '2026-01-01T00:00:02.000Z', attempt: 1 },
@@ -89,7 +88,8 @@ const idle = (t: Waiter, root: string, why = 'the session idle between turns') =
   until(t, () => run(root)?.state === 'idle' && run(root)!, why, { everyMs: 50 });
 
 /** The control requests the SDK sent the stand-in, each with what it carried. */
-const taken = (dir: string) => lines(dir, 'taken.jsonl') as { subtype: string | null; reattach_session_id?: string }[];
+const taken = (dir: string) =>
+  lines(dir, 'taken.jsonl') as { subtype: string | null; reattach_session_id?: string; keep_session_on_exit?: boolean }[];
 
 /** How many `interrupt` control requests the SDK sent the stand-in. */
 const interrupts = (dir: string) => taken(dir).filter((r) => r.subtype === 'interrupt').length;
@@ -152,6 +152,28 @@ test(
       assert.ok(!argv.includes('--system-prompt'), "no prompt of ours is spawned: the preset is Claude Code's own");
     });
 
+    await s.test(
+      'the claude.ai bridge it asked for is opened at init, while its first turn still runs, kept past its process, its link sighted',
+      async (st) => {
+        const bridged = await until(st, () => run(root)?.bridge?.url && run(root)!, 'the bridge opened', { everyMs: 50 });
+        assert.equal(bridged.bridge?.bridgeSessionId, 'cse_stand-in-session');
+        assert.equal(bridged.bridge?.url, 'https://claude.ai/s/cse_stand-in-session');
+        assert.equal(bridged.bridge?.environmentId, 'env-stand-in');
+        assert.equal(bridged.bridge?.epoch, 1);
+        bridgeSessionId = bridged.bridge?.bridgeSessionId;
+        await until(st, () => run(root)?.bridge?.state === 'connected', 'the bridge connected, as its stream said', { everyMs: 50 });
+        assert.equal(run(root)?.state, 'working', 'opened at init: its first turn is still held');
+        const asks = taken(dir).filter((r) => r.subtype === 'remote_control');
+        assert.equal(asks.length, 1, 'one bridge control request');
+        assert.equal(asks[0].keep_session_on_exit, true, 'a long-lived session keeps its claude.ai session past a process');
+        assert.deepEqual(
+          (await sighted(first))!.bridge,
+          { url: 'https://claude.ai/s/cse_stand-in-session' },
+          'its sighting carries the link',
+        );
+      },
+    );
+
     await s.test('its first turn ends without ending it: idle, held by this process, read by decide as open between turns', async (st) => {
       end();
       const firstIdle = await idle(st, root);
@@ -164,22 +186,6 @@ test(
         'its sighting says a person is waited on and this process holds it',
       );
       assert.deepEqual(read(seen), { idle: true, respawning: false }, 'and `decide` reads it as a session open between turns');
-    });
-
-    await s.test('the claude.ai bridge it asked for is opened after that first turn, its state kept and its link sighted', async (st) => {
-      const bridged = await until(st, () => run(root)?.bridge?.url && run(root)!, 'the bridge opened', { everyMs: 50 });
-      assert.equal(bridged.bridge?.bridgeSessionId, 'cse_stand-in-session');
-      assert.equal(bridged.bridge?.url, 'https://claude.ai/s/cse_stand-in-session');
-      assert.equal(bridged.bridge?.environmentId, 'env-stand-in');
-      assert.equal(bridged.bridge?.epoch, 1);
-      bridgeSessionId = bridged.bridge?.bridgeSessionId;
-      await until(st, () => run(root)?.bridge?.state === 'connected', 'the bridge connected, as its stream said', { everyMs: 50 });
-      assert.equal(taken(dir).filter((r) => r.subtype === 'remote_control').length, 1, 'one bridge control request, after its first turn');
-      assert.deepEqual(
-        (await sighted(first))!.bridge,
-        { url: 'https://claude.ai/s/cse_stand-in-session' },
-        'its sighting carries the link',
-      );
     });
 
     await s.test('words said begin a turn of their own, written working as they are pushed, on the one Claude Code', async (st) => {
@@ -288,6 +294,25 @@ test(
       });
       assert.equal(again.bridge?.bridgeSessionId, bridgeSessionId, 'the kept claude.ai session is re-attached');
     });
+  },
+);
+
+test(
+  'an attached job that asked for the bridge opens it at init, before its result: one request, closed with the job, its link sighted',
+  WAITED,
+  async (t) => {
+    const { root, dir, request } = place({ hold: true, output: {} }, { claude: { remoteControl: true } });
+    t.after(() => fs.writeFileSync(path.join(dir, 'end'), ''));
+    const h = await holder(root);
+    t.after(h.close);
+    await Effect.runPromise(h.attached.ops.spawn(request));
+    const bridged = await until(t, () => run(root)?.bridge?.url && run(root)!, 'the bridge opened', { everyMs: 50 });
+    assert.equal(bridged.state, 'working', 'before its result: its one turn is still held');
+    const asks = taken(dir).filter((r) => r.subtype === 'remote_control');
+    assert.equal(asks.length, 1, 'one bridge control request');
+    assert.equal(asks[0].keep_session_on_exit, false, "a job's claude.ai session closes with it");
+    assert.equal(asks[0].reattach_session_id, undefined, 'and names none to re-attach');
+    assert.deepEqual((await sighted(h))?.bridge, { url: 'https://claude.ai/s/cse_stand-in-session' }, 'its sighting carries the link');
   },
 );
 

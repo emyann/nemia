@@ -15,7 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { codex } from '../src/harness/codex/codex.ts';
 import { CODEX_START } from '../src/harness/codex/stream.ts';
-import { CLAUDE_INIT_START, CLAUDE_RESULT_START, claudeDetached, claudeJob } from '../src/harness/claude/code.ts';
+import { CLAUDE_INIT_START, claudeJob } from '../src/harness/claude/code.ts';
 import { warned } from './warned.ts';
 import { WAITED, type Waiter } from '../src/waits/index.ts';
 import { resultLine, SESSION, stream } from './reader-streams.ts';
@@ -66,9 +66,9 @@ const ROWS: Row[] = [
   {
     name: 'a start line with no newline after it is read at the end of the stream',
     holds: async (t) => {
-      const { run } = await ran(t, sh(`printf '%s' '${resultLine({})}'`, CLAUDE_RESULT_START));
+      const { run } = await ran(t, sh(`printf '%s' '${threadStarted(THREAD)}'`, CODEX_START));
       assert.equal(run.state, 'done');
-      assert.equal(run.nativeId, SESSION);
+      assert.equal(run.nativeId, THREAD);
     },
   },
   {
@@ -124,7 +124,6 @@ const ROWS: Row[] = [
     holds: () => {
       assert.deepEqual(codex.start, { event: { type: 'thread.started' }, id: 'thread_id' });
       assert.deepEqual(claudeJob.start, { event: { type: 'system', subtype: 'init' }, id: 'session_id' });
-      assert.deepEqual(claudeDetached.start, { event: { type: 'result' }, id: 'session_id' });
       const read = (file: string) => fs.readFileSync(path.join(import.meta.dirname, '..', file), 'utf8');
       for (const file of ['src/harness/detached/detached.ts', 'bin/ae-worker.ts']) {
         const text = read(file);

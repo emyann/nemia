@@ -1,10 +1,9 @@
 /**
  * A runner for any harness that runs a prompt to completion and exits.
  *
- * `Runner.claude()` leans on `claude agents --json` — a registry somebody else maintains. Most
- * harnesses have no such thing: Codex has `codex exec`, which runs in the foreground and exits.
- * So for those we detach a worker per session and maintain the registry ourselves, as a directory
- * of run files (`bin/ae-worker.ts` writes them).
+ * A harness that runs a prompt in the foreground and exits — Codex's `codex exec`, a Claude Code job's own process — has no
+ * registry somebody else maintains. So for those we detach a worker per session and maintain the registry ourselves, as a
+ * directory of run files (`bin/ae-worker.ts` writes them).
  *
  * **What this costs, stated plainly**: a heartbeat. A worker that is killed leaves a run file that
  * says `working` forever, and nothing on disk distinguishes that from a session thinking hard. So
@@ -14,7 +13,7 @@
  *
  * What it buys: this file has no idea what a harness is. It needs a command, a working directory
  * and an exit code — so a new harness is a `HarnessSpec` value, not new code. The three shipped are
- * `codex` (`harness/codex/codex.ts`), `claudeDetached` (`harness/claude/code.ts`) and `commandHarness`
+ * `codex` (`harness/codex/codex.ts`), a Claude Code job (`claudeJobSpec`, `harness/claude/code.ts`) and `commandHarness`
  * (`harness/command/command.ts`).
  */
 import { Effect } from 'effect';
@@ -56,9 +55,11 @@ export type HarnessSpec = {
    * What this harness needs to know about the machine before it runs — read from disk, from git —
    * kept out of `command` so that stays a pure function of what it is given. Merged into the `io`
    * the command receives. A throw refuses the spawn: nothing has run, and the attempt ends
-   * `unstartable` in its words.
+   * `unstartable` in its words. `beside` names a file beside the run's own under the end it is given (`<name>.<end>`), which
+   * the runner keeps with the run's — `forget` removes it, `kept` lists it — for a harness whose process writes a file of its
+   * own there (a job's bridge, `bridgeFile`); an end of `json` is the runner's own, and refused.
    */
-  prepare?: (r: SpawnRequest) => Partial<HarnessIO>;
+  prepare?: (r: SpawnRequest, beside: (end: string) => string) => Partial<HarnessIO>;
   /**
    * The harness is a process of ours that reads the spawn request itself, and the runner writes it one: `<name>.request.json`,
    * holding `{ request, io }` — the request whole and the `io` the runner computed — whose path `command` is given as
@@ -108,7 +109,7 @@ export type HarnessSpec = {
   noChannel?: string;
   /**
    * A harness that reads its messages as lines on its stdin, and so can be told something while it runs: `claudeJob`
-   * (`claude -p --input-format stream-json`). Set, `command` leaves the brief out, and the worker writes it as the first
+   * (`bin/ae-claude-job.ts`, the SDK's streaming input). Set, `command` leaves the brief out, and the worker writes it as the first
    * line on the harness's stdin; each word a person says after it is appended by `say` to the run's inbox — a file of
    * lines beside its run file, the person's, which the worker only reads — and the worker writes it on. At the first line
    * of the harness's output that closes (`closesOn`) the worker ends stdin: a harness that reads its stdin for more waits
@@ -130,7 +131,7 @@ export type HarnessSpec = {
    */
   contextTokens?: { least: number; most: number };
   /**
-   * The harness is Claude Code, and `command` hands a task's `config.claude` to it as flags (`claudeFlagsOf`). Absent: the
+   * The harness is Claude Code, and its process hands a task's `config.claude` to it as flags (`attachedOptions`). Absent: the
    * harness has no such flags, and `file()` refuses a task that carries any rather than start a session without them.
    */
   claudeFlags?: true;
@@ -141,7 +142,7 @@ export type HarnessSpec = {
   codexArgs?: true;
   /**
    * The harness prints a resumed session's cost and API time as totals that carry its parent's on, not as its own:
-   * `claude -p --resume` does. Set, the run file keeps the id it resumed and, read once at its spawn, the parent's printed
+   * a resumed Claude Code job does. Set, the run file keeps the id it resumed and, read once at its spawn, the parent's printed
    * totals (`carried`) — the latest run started before it under that id, as its own output read them — which a look takes
    * off. Where there is no such run, or it printed no total, the attempt carries no cost rather than its parent's too.
    */
@@ -235,6 +236,12 @@ export type HarnessIO = {
    * (`HarnessSpec.needsRequest`). Present only for a spec that asks.
    */
   requestFile?: string;
+  /**
+   * Where a Claude Code job's own process writes what its claude.ai bridge came to (`AttachedBridge`, decoded by
+   * `BridgeFactsSchema`), and each `bridge_state` its stream says after: named by its spec's `prepare` beside the run's own files
+   * where the task asks for a bridge (`claude.remoteControl`), and read into the job's sighting by its runner. Absent: none was asked.
+   */
+  bridgeFile?: string;
 };
 
 /** What a harness's output said, as its spec's `readOutput` found it. Each part absent when it does not say. */
@@ -370,7 +377,21 @@ const sayingUnread = <A, E>(look: Effect.Effect<{ value: A; warnings: readonly s
     Effect.map(({ value }) => value),
   );
 
+/** The ends of the JSON files beside a run's that are not run files: its closeout, its schema, its MCP config, its spawn request. */
+const NO_RUN_FILES = ['.closeout.json', '.schema.json', '.mcp.json', '.request.json'];
+
 const runFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.json`);
+
+/**
+ * A file beside the run of `spec` under `name`, `<name>.<end>`, kept with the run's own: what a spec's `prepare` is given to name one
+ * of its process's (`HarnessSpec.prepare`), and what its runner reads it by. An end of `json` would be listed as a run file, and is
+ * refused.
+ */
+export const besideRun = (spec: Pick<HarnessSpec, 'name'>, root: string, name: string, end: string): string => {
+  if (end === 'json' || end.endsWith('.json') || !/^[a-z][a-z.-]*$/.test(end))
+    throw new Error(`\`${end}\` is no end for a file beside a run: give a lowercase word other than \`json\`, as \`bridge\` is`);
+  return path.join(root, 'runs', spec.name, `${safe(name)}.${end}`);
+};
 const inboxFileOf = (spec: HarnessSpec, root: string, name: string) => path.join(root, 'runs', spec.name, `${safe(name)}.inbox.jsonl`);
 
 /**
@@ -672,7 +693,7 @@ const startWorker = (file: string, cwd: string): void => {
  *   printed no total, or a total that would go below nothing: that measure is dropped, never overcounted.
  *
  * - `spawn`, in order:
- *   1. Resolves the task's `cwd` from the process that launches, as `claude --bg`'s is: relative, the worker would start in
+ *   1. Resolves the task's `cwd` from the process that launches: relative, the worker would start in
  *      it and launch the harness in the same path again, from inside it (`spawn sh ENOENT` for `cwd: 'repo'`). `file`
  *      refuses one; this is for a journal written otherwise, or by hand, and a caller of the runner itself.
  *   2. Refuses a `cwd` that is not a directory, because `spawn` does not throw for it: the child emits the error later,
@@ -749,8 +770,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
     if (!fs.existsSync(dir)) return [];
     const out: Run[] = [];
     for (const f of fs.readdirSync(dir)) {
-      if (!f.endsWith('.json') || f.endsWith('.closeout.json') || f.endsWith('.schema.json') || f.endsWith('.mcp.json')) continue;
-      if (f.endsWith('.request.json')) continue;
+      if (!f.endsWith('.json') || NO_RUN_FILES.some((end) => f.endsWith(end))) continue;
       try {
         const run = runFileIn(readText(path.join(dir, f)));
         if (typeof run !== 'string' && run.name) out.push({ name: run.name, run });
@@ -807,6 +827,7 @@ const runnerOf = (spec: HarnessSpec, root: string, bounds: ReturnType<typeof wor
           const streams = { stdout: streamFileOf(dir, r.name, 'stdout'), stderr: streamFileOf(dir, r.name, 'stderr') };
           outputs.delete(r.name);
           const io = spawnFiles(spec, r, {
+            beside: (end) => besideRun(spec, root, r.name, end),
             schema: schemaFile(r.name),
             answer: closeoutFile(r.name),
             mcp: mcpFile(r.name),

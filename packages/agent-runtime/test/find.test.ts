@@ -153,7 +153,7 @@ test("a background session found by its name: its conversation read with no `cla
   );
 
   await s.test("a view of its attempt in flight observes: its state is the registry's", async () => {
-    assert.equal((await Effect.runPromise(engine.view(id))).phase, 'running (working)', "its state is the registry's");
+    assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working', "its state is the registry's");
     assert.equal(claude.agents(), before + 1, 'a view of an attempt in flight observes');
   });
 
@@ -183,11 +183,11 @@ test("a background session found by its name: its conversation read with no `cla
       assert.deepEqual(await find(listed.name), { sessionId: other }, 'the registration says one runs under the name');
 
       const v = await Effect.runPromise(engine.view(next));
-      assert.equal(v.phase, 'running (stopped)', "its state is the registry's");
+      assert.equal(v.phase, 'ending', "its state is the registry's");
       assert.equal(v.sessionId, listed.sessionId, 'and so is which session it is');
       await assert.rejects(
         Effect.runPromise(engine.say(next, 'hello')),
-        (e: Error & { _tag?: string }) => e._tag === 'SayRefused' && /session is `stopped` on its harness, not running/.test(e.message),
+        (e: Error & { _tag?: string }) => e._tag === 'SayRefused' && /session is `canceled` on its harness, not running/.test(e.message),
       );
 
       await Effect.runPromise(engine.tick());
@@ -334,7 +334,7 @@ test("which harness a read asks: a task's own, by name where it can find and by 
         assert.deepEqual(texts((await Effect.runPromise(engine.transcript(id))).events), ['s-1'], at);
         assert.equal(h.counts.observe, before + (withFind ? 0 : 1), `${at}: a running attempt's session`);
         assert.deepEqual(h.counts.find, withFind ? [`ae/${id}/1`] : [], `${at}: asked by its name`);
-        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'running (working)', at);
+        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working', at);
         assert.equal(h.counts.observe, before + (withFind ? 1 : 2), `${at}: a view of it observes either way`);
 
         h.sessions.set(`ae/${id}/1`, { ...h.sessions.get(`ae/${id}/1`)!, state: 'completed' });
@@ -383,7 +383,7 @@ test("which harness a read asks: a task's own, by name where it can find and by 
       await Effect.runPromise(engine.tick());
 
       const before = { a: a.counts.observe, b: b.counts.observe };
-      assert.equal((await Effect.runPromise(engine.view(running))).phase, 'running (working)', 'an attempt in flight, observed');
+      assert.equal((await Effect.runPromise(engine.view(running))).phase, 'working', 'an attempt in flight, observed');
       assert.equal((await Effect.runPromise(engine.view(settled))).phase, 'succeeded', 'a settled task on a harness that cannot find');
       assert.equal(await Effect.runPromise(engine.logs(running)), 'b logs of b-1');
       assert.equal(a.counts.observe, before.a, "no view of a task on b asks a's registry");

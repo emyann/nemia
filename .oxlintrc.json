@@ -738,8 +738,8 @@
     {
       "files": ["packages/agent-runtime/src/cli/main.ts"],
       "rules": {
-        "complexity": ["error", { "max": 33 }],
-        "sonarjs/cognitive-complexity": ["error", 28]
+        "complexity": ["error", { "max": 32 }],
+        "sonarjs/cognitive-complexity": ["error", 24]
       }
     },
     {
@@ -754,12 +754,6 @@
       "rules": {
         "complexity": ["error", { "max": 30 }],
         "sonarjs/cognitive-complexity": ["error", 52]
-      }
-    },
-    {
-      "files": ["packages/agent-runtime/src/core/engine/journal.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 17]
       }
     },
     {

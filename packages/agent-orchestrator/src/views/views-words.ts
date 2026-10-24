@@ -4,13 +4,35 @@
  * since a pure file imports no runtime.
  */
 import { type TaskPhase } from '../record/record.ts';
-import { signedAndHeld, type AttemptClock, type TaskClock } from '../timeline/index.ts';
+import { signedAndHeld, type AttemptClock, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
+
+export type { EngineOutcome };
+
+/**
+ * The runtime's task phases, written out because a pure file imports no runtime, a type included: the closed set a task's view stands
+ * in. Held equal to the runtime's `TaskPhase` by a type-level check in `runtime-client.ts`, so a word added or dropped there fails the
+ * typecheck here. Named apart from the orchestrator's own `TaskPhase` (`record/record.ts`), which is what a run makes of it.
+ */
+export type EnginePhase =
+  | 'pending'
+  | 'starting'
+  | 'working'
+  | 'quiescent'
+  | 'needs-human'
+  | 'input-required'
+  | 'idle'
+  | 'restarting'
+  | 'between-attempts'
+  | 'ending'
+  | 'succeeded'
+  | 'failed'
+  | 'stopped';
 
 /**
  * An attempt as the words read it: its clock (`AttemptClock`), how it ended, whether the statement its task asked for came (`stated`),
  * and the closeout it carries, as the engine's `Attempt` keeps them.
  */
-export type WordAttempt = AttemptClock & { ended: string | null; stated?: boolean; closeout?: unknown };
+export type WordAttempt = AttemptClock & { ended: EngineOutcome | null; stated?: boolean; closeout?: unknown };
 
 /**
  * A task as the words read it off the engine's view: its word, its brief, how it settled, its attempts, the answers it was given, whether
@@ -18,9 +40,9 @@ export type WordAttempt = AttemptClock & { ended: string | null; stated?: boolea
  * behaviour, a type included.
  */
 export type WordView = TaskClock & {
-  phase: string;
+  phase: EnginePhase;
   state: TaskClock['state'] & {
-    settled: 'succeeded' | 'failed' | 'stopped' | null;
+    settled: EngineOutcome | null;
     attempts: readonly WordAttempt[];
     inputs?: readonly unknown[];
     holdOpen?: boolean;
@@ -64,15 +86,15 @@ export const waitsForWord =
 
 /**
  * Whether a task's attempt ended without the closing statement its task asked for — the orchestrator's judgement, off what the runtime
- * reports: its harness let the session go `done` with `stated: false`; or the runtime's own verdict `reason: 'unsigned'`, which a journal
- * may hold (an attempt it ended `failed`). An end with no `stated` key is not read as a missing statement: a `done` with no closeout on a
- * journal that says nothing of `stated` is not unsigned, and is never nudged.
+ * reports: its harness let the session go `succeeded` with `stated: false`; or the runtime's own verdict `reason: 'unsigned'`, which a
+ * journal may hold (an attempt it ended `failed`). An end with no `stated` key is not read as a missing statement: a `succeeded` with no
+ * closeout on a journal that says nothing of `stated` is not unsigned, and is never nudged.
  */
 export const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined): boolean =>
   state.closeoutSchema !== undefined &&
   a !== undefined &&
   a.closeout === undefined &&
-  (a.reason === 'unsigned' || (a.ended === 'done' && a.stated === false));
+  (a.reason === 'unsigned' || (a.ended === 'succeeded' && a.stated === false));
 
 /**
  * How an attempt ended, in the words a person reads for it: an attempt its harness cut at its spend cap is `failed`, `budget` — off the
@@ -95,13 +117,13 @@ export const endWords = (state: WordView['state'], a: WordAttempt): { ended: str
  */
 export const engineWord =
   (views: ReadonlyMap<string, WordView>) =>
-  (taskId: string): string =>
+  (taskId: string): EnginePhase | 'unknown' =>
     wordOfView(views.get(taskId));
 
 /**
  * The engine's word for one task (`engineWord`) — but `succeeded` for a task held open that was closed after it signed, which the engine
- * calls `between attempts` until its next pass settles it: `phaseOfView` reads it as settled already, and the tick files what follows on
+ * calls `between-attempts` until its next pass settles it: `phaseOfView` reads it as settled already, and the tick files what follows on
  * it, so `nemia ls` and the board saying a session still going would disagree with the run for that pass. Exported for the api's `wordOf`.
  */
-export const wordOfView = (v: WordView | undefined): string =>
+export const wordOfView = (v: WordView | undefined): EnginePhase | 'unknown' =>
   !v?.state.brief ? 'unknown' : v.phase !== 'input-required' && signedAndHeld(v) ? 'succeeded' : v.phase;

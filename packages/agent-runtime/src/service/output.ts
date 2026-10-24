@@ -30,7 +30,7 @@ export const outputVerbOf = (
     if (stream !== 'stdout' && stream !== 'stderr') return yield* refuse(notAStream(stream));
     if (lastBytes !== undefined && !(Number.isSafeInteger(lastBytes) && lastBytes > 0)) return yield* refuse(notACount(lastBytes));
     const events = yield* read(taskId);
-    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
     const { name: harness, runner } = harnessOf(state);
     const output = runner.output;

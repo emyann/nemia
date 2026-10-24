@@ -3,6 +3,12 @@
  */
 import { denialText, type Attempt, type Event, type State, type TaskView, type Usage } from '../index.ts';
 
+/** The sessions a pass left running, by harness, as `ae tick` and `ae up` print them: `claude:2 codex:1`, or empty where none runs. */
+export const runningText = (running: Readonly<Record<string, number>>): string =>
+  Object.entries(running)
+    .map(([h, n]) => `${h}:${n}`)
+    .join(' ');
+
 /** `text` up to its first line break, or the whole of it where there is none. */
 const firstLine = (text: string): string => {
   const at = text.indexOf('\n');
@@ -83,7 +89,7 @@ const ranLine = (a: Attempt): string =>
     : `${a.startedAt.slice(11, 19)} → ${a.endedAt.slice(11, 19)} (${duration(Date.parse(a.endedAt) - Date.parse(a.startedAt))})`;
 
 /**
- * `done (no statement)` for an end whose task asked for a closing statement and was given none (`stated: false`): the fact
+ * `succeeded (no statement)` for an end whose task asked for a closing statement and was given none (`stated: false`): the fact
  * the runtime records. What it means for the work is the layer above's to say; `ae` says only what happened.
  */
 const unstated = (stated: boolean | undefined): string => (stated === false ? ' (no statement)' : '');
@@ -113,11 +119,11 @@ export const attemptLine = (a: Attempt): string => {
  */
 export const taskLine = (v: TaskView) => {
   const turn = v.state.inputs.length;
-  const tries = turn ? `turn ${turn}` : '';
+  const turnText = turn ? `turn ${turn}` : '';
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
   const queued = v.admission === 'queued' ? '  queued' : '';
   const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${meter}  ${firstLine(v.state.brief).slice(0, 44)}`;
+  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${turnText ? ` ${turnText}` : ''}${queued}${meter}  ${firstLine(v.state.brief).slice(0, 44)}`;
 };
 
 /** The word each kind of journal entry is printed with. */

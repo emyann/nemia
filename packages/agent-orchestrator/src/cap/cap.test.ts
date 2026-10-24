@@ -10,7 +10,7 @@ import type { Run, TaskPhase } from '../record/record.ts';
 import type { RepositoryRun } from '../run.ts';
 import type { Workflow } from '../step/step.ts';
 import { assess } from '../tick/assess.ts';
-import { listing } from '../list/list.ts';
+import { listing, type ListedPhase } from '../list/list.ts';
 import { admissionOrder, ceilingLines, heldRuns, runAdmitted, slotNeed, slotWord } from './cap.ts';
 import { phases, run, step, STEPS } from '../../test/assessed.ts';
 
@@ -182,8 +182,11 @@ test('`ceilingLines`: sessions at work per pool, and runs in flight — `no cap`
 
 test('`listing` handed a run slot: the roots of a held run say `waiting for a run slot` where `waiting` would be — never a run that started, was called off or waits on a run', async (t) => {
   const slot = { inFlight: 2, cap: 2 };
-  const shown = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
-  const listed = (r: Run, p: Record<string, string>, waits: Array<{ run: string }> = [], given = true) =>
+  const shown =
+    (m: Record<string, ListedPhase>) =>
+    (id: string): ListedPhase =>
+      m[id] ?? 'unknown';
+  const listed = (r: Run, p: Record<string, ListedPhase>, waits: Array<{ run: string }> = [], given = true) =>
     listing({
       steps: STEPS,
       run: r,

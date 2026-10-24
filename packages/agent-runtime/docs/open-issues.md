@@ -1497,7 +1497,7 @@ retiring them is part 2 of stage 4a.
 **One attempt per start (stage 4a part 2, 2026-09-23).** Retired: `decide` starts one attempt at a task, and any end but
 `done` — failed, lost, unstartable, budget, deadline — settles it `failed`, noting the attempts (`1 attempt, none
 succeeded`; `… of turn N` on a held-open task's later turn). A held turn that fails, is lost or cannot start is not tried
-again inside the task either. `file()` and `ae start` refuse `maxAttempts` and `resume` at any value, the sentence naming
+again inside the task either. `file()` and `ae file` refuse `maxAttempts` and `resume` at any value, the sentence naming
 `resumeFrom`, `retries:` and `wf retry` (`retiredKeyRefusal`, `test/refusal.test.ts`); a journal filed with them still
 folds, and one holding several attempts reads as it did. Trying again is the orchestrator's: `retries:` after a check
 refuses a step, `wf retry` for a try that failed, was lost or could not start, each a new `-tryN` task. Issue 5's case moved

@@ -3,7 +3,7 @@
  * are Effects with typed errors.
  */
 import { Context, Effect, Exit, Fiber, Layer, Schema, type Scope, type Stream } from 'effect';
-import { fold, nameFor, own, pathOf, type Input, type LifecycleStep, type Said, type Sighting, type State } from '../core/index.ts';
+import { fold, nameFor, own, pathOf, type Input, type LifecycleTransition, type Said, type Sighting, type State } from '../core/index.ts';
 import {
   argsRefusalOf,
   Runner,
@@ -169,7 +169,7 @@ export const listRefusalOf = (args: readonly unknown[]): string | undefined => {
  * `SayRefused`, `QuotaRefused`, `StopRefused` for `stop`, `InputRefused` for `answer` and `close`, `BodyRefused` for `sweep` and
  * `removeBody`, `ForgetRefused` for `forget`, `KeptRefused` for `kept`, `CompactRefused` for `compact`, and `DrainRefused` for
  * `drain`. `SayUnsent` is `say`'s failure that is not a refusal; a `JournalError` or a `RunnerError` is the store's or the harness's.
- * `refusalWords(verb)` words a refusal as `ae` says it. `watch`, `io` and `start` succeed at once: `watch` and `start` with a handle
+ * `refusalWords(verb)` words a refusal as `ae` says it. `watch`, `io` and `up` succeed at once: `watch` and `up` with a handle
  * that stops them.
  */
 export type EngineShape = {
@@ -235,12 +235,12 @@ export type EngineShape = {
   readonly view: (taskId: string) => Effect.Effect<TaskView, JournalError>;
   /**
    * The task's path through its lifecycle, replayed off its journal alone: for each entry, from its filing to now, the state the
-   * journal says once the entry is on it, the entry's kind and its `at` (`LifecycleStep`). Writes nothing and asks no harness. A task
+   * journal says once the entry is on it, the entry's kind and its `at` (`LifecycleTransition`). Writes nothing and asks no harness. A task
    * this engine has no record of has an empty path; a journal that does not read fails with its `JournalError`.
    */
-  readonly path: (taskId: string) => Effect.Effect<LifecycleStep[], JournalError>;
+  readonly path: (taskId: string) => Effect.Effect<LifecycleTransition[], JournalError>;
   /**
-   * Every task on the board, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that
+   * Every task in the store, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that
    * order with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which
    * sessions where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none
    * is. A view of a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up
@@ -433,7 +433,7 @@ export type EngineShape = {
   /**
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
-   * the task's next turn: an attempt that continues the session that signed (`--resume`), told `text` in place of the
+   * the task's next turn: an attempt that continues the session that ended (`--resume`), told `text` in place of the
    * brief, with `config` laid over the task's own if given. A turn gives its own spend cap and nothing else
    * (`config: { budgetUsd }`, `TURN_ARGS`): the rest of its configuration is the session's it continues. Nothing is
    * sent to any session: none is running.
@@ -552,14 +552,16 @@ export type EngineShape = {
   readonly drain: (holder: number | null) => Effect.Effect<void, DrainRefused>;
   /**
    * Tick on a timer until stopped. Ticks never overlap: a beat that comes while a tick runs is skipped, so a tick that
-   * outruns the interval is not joined by a second pass over the same board. The timer holds the process open, as a control
+   * outruns the interval is not joined by a second pass over the same store. The timer holds the process open, as a control
    * loop must: `stop()` gives the process back.
    */
-  readonly start: (options?: {
+  readonly up: (options?: {
     intervalMs?: number;
     onTick?: (r: TickReport) => void;
     onError?: (e: unknown) => void;
   }) => Effect.Effect<{ stop: () => void }>;
+  /** @deprecated use up */
+  readonly start: EngineShape['up'];
 };
 
 /** The W3C trace context of the span this runs in (`traceparentOf`): the filing's, for its sessions to join; undefined where none is. */
@@ -592,11 +594,11 @@ const talliedVerb = <A, E, R>(program: Effect.Effect<A, E, R>): Effect.Effect<A,
   });
 
 /**
- * `start` over `tick`, a pass: one pass every `intervalMs` (3 s by default), none while the last still runs, each report handed to
+ * `up` over `tick`, a pass: one pass every `intervalMs` (3 s by default), none while the last still runs, each report handed to
  * `onTick` and each failure to `onError`, until the handle's `stop`.
  */
-const startOf =
-  (tick: EngineShape['tick']): EngineShape['start'] =>
+const upOf =
+  (tick: EngineShape['tick']): EngineShape['up'] =>
   (o = {}) =>
     Effect.sync(() => {
       const every = o.intervalMs ?? 3_000;
@@ -843,7 +845,7 @@ const make = (options: EngineOptions) =>
       const refuse = (message: string) => Effect.fail(new TranscriptRefused({ message }));
       const events = yield* read(taskId);
       if (!events.length)
-        return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+        return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
       const state = fold(taskId, events);
       const { name: harness, runner, config: h } = harnessOf(state);
       const transcriptOf = runner.transcriptOf;
@@ -903,10 +905,16 @@ const make = (options: EngineOptions) =>
       ...keepingVerbsOf(go, journalOps, runners, harnessOf, fallback),
       watch: watchOf(feedVerb, journalOps.subscribe),
       ...ioVerbsOf(observedNow),
-      start: startOf(tickVerb),
+      ...upVerbsOf(tickVerb),
       ...attachVerbsOf(attached, root, servingOf(harnesses, made, events)),
     });
   });
+
+/** `up` over `tick`, and `start`, its old name, the same function. */
+const upVerbsOf = (tick: EngineShape['tick']): Pick<EngineShape, 'up' | 'start'> => {
+  const up = upOf(tick);
+  return { up, start: up };
+};
 
 /**
  * A harness's runner as the engine runs it: through its A2A agent unless it is a remote one already, its observes counted, and its

@@ -88,7 +88,7 @@ version, and the version above must be the pin. An upgrade re-measures the table
 ## Verbs
 
 - Each verb is `Effect.fn('name')(function* (...) { ... })`, which names its span: `file`, `admit` in
-  `src/core/engine/filing.ts`, `step`, `tick` in `src/core/engine/engine.ts`.
+  `src/core/engine/filing.ts`, `reconcile`, `tick` in `src/core/engine/engine.ts`.
 - A verb refuses an argument it no longer takes, never ignores it (`packages/agent-runtime/CLAUDE.md`, *Arguments and doors*):
   `tick` declares no parameter and reads `[...arguments]` into `tickRefusalOf`.
 

@@ -500,10 +500,10 @@ const mcpFileOf = (root: string, name: string) => path.join(root, 'mcp', `${name
  *    `.mcp.json` as well, so that file is named when there is one, beside the task's own `mcp`.
  * 7. `--model` and `--effort`.
  * 8. `--autocompact`, the context window: past it, the session compacts its conversation and carries on, under
- *    `--bg` too, and still signs off. The same window on every attempt: a resumed copy keeps only the flags it is
+ *    `--bg` too, and still ends. The same window on every attempt: a resumed copy keeps only the flags it is
  *    given, so a continuation given none would run on the model's whole window again.
  * 9. `--resume`, which continues that conversation in the background under a name that is still ours and still new,
- *    so a resumed attempt is a row of its own on the board.
+ *    so a resumed attempt is a row of its own in a listing.
  * 10. `--worktree`, ALWAYS with a name (`worktreeName`): its value is optional, so a bare `--worktree` before the
  *    prompt takes the prompt as the worktree's name and the session runs with nothing to do. The harness cuts and
  *    cleans the worktree; the engine only declares that it wants one, as a Pod asks for storage and the kubelet
@@ -869,7 +869,7 @@ const sessionLogs: RunnerOps['logs'] = (sessionId) =>
 
 /**
  * Read from the raw JSONL (`readTranscript`) rather than through `getSessionMessages`, as the closeout is: the SDK's
- * messages carry no timestamp, and a board needs to know when each thing was said.
+ * messages carry no timestamp, and a reader needs to know when each thing was said.
  */
 const sessionTranscript: NonNullable<RunnerOps['transcript']> = (sessionId, after) =>
   Effect.tryPromise({

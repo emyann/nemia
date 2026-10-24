@@ -81,14 +81,17 @@ test('REFUSED: a verb with no walk — one added to the engine, and one whose wa
   );
 });
 
+/** A verb kept under its old name beside its new one, which the stand-in's refusal names: adding the new one keeps both. */
+const RENAMED: Partial<Record<string, string>> = { start: 'up' };
+
 for (const verb of UNKEPT)
-  test(`a verb the stand-in does not keep dies naming itself and its file: ${verb}`, async () => {
+  test(`a verb the stand-in does not keep dies naming itself (or, for an old name, its new one) and its file: ${verb}`, async () => {
     const unkept = standIn().engine[verb] as () => Answer;
     const exit = await Effect.runPromiseExit(unkept());
     assert.ok(Exit.isFailure(exit) && Cause.hasDies(exit.cause), `${verb} did not die`);
     assert.equal(
       (Cause.squash(exit.cause) as Error).message,
-      `the test engine keeps no \`${verb}\`: add it to src/service/test-engine.ts, with its walk in test/engine-walks.ts`,
+      `the test engine keeps no \`${RENAMED[verb] ?? verb}\`: add it to src/service/test-engine.ts, with its walk in test/engine-walks.ts`,
     );
   });
 
@@ -101,7 +104,7 @@ test('two stand-ins share no task, no filing and no word said', async () => {
   const [one, two] = [testEngine(), testEngine()];
   const engine = builtEngine(one.layer);
   await Effect.runPromise(engine.file({ id: 'a', brief: 'do a', cwd: '/r' }));
-  one.settle('a', 'running (working)');
+  one.settle('a', 'working');
   await Effect.runPromise(engine.say('a', 'hello'));
   await Effect.runPromise(engine.stop('a'));
   assert.deepEqual([one.tasks.size, one.filings, one.specs.length, one.said.length, one.stopped], [1, ['a'], 1, 1, ['a']]);
@@ -109,7 +112,7 @@ test('two stand-ins share no task, no filing and no word said', async () => {
   one.refuseSay(1);
   const other = builtEngine(two.layer);
   await Effect.runPromise(other.file({ id: 'a', brief: 'another', cwd: '/r' }));
-  two.settle('a', 'running (working)');
+  two.settle('a', 'working');
   assert.equal((await Effect.runPromise(other.say('a', 'hi'))).text, 'hi', 'a say refused on one is not refused on the other');
   assert.equal(one.tasks.get('a')?.spec.brief, 'do a');
 });
@@ -136,7 +139,7 @@ test('a restart after a settle keeps the attempt as it ended, its usage with it;
     [
       [1, 'failed', 1, usage, null],
       [2, 'failed', null, null, null],
-      [3, 'done', 0, null, 'ae/a/2'],
+      [3, 'succeeded', 0, null, 'ae/a/2'],
     ],
   );
 });
@@ -145,7 +148,7 @@ test('a transcript planted for each attempt reads by its cursor, a restart start
   const made = testEngine();
   const engine = builtEngine(made.layer);
   await Effect.runPromise(engine.file({ id: 'a', brief: 'do a', cwd: '/r' }));
-  made.settle('a', 'running (working)');
+  made.settle('a', 'working');
   const event = (id: string) => ({ id, at: '2026-10-15T00:00:00.000Z', role: 'assistant' as const, kind: 'text' as const, text: id });
   made.plantTranscript('a', 1, [event('one'), event('two')]);
   made.restart('a');

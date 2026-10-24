@@ -196,10 +196,10 @@ export const STEP_FILE: Command<{ folder: string | null; file: Buffer | null }> 
 };
 
 /** One state of a task's path through the runtime's lifecycle, as the engine's `path` answers it. */
-export type LifecycleStep = Effect.Success<ReturnType<Engine['path']>>[number];
+export type LifecycleTransition = Effect.Success<ReturnType<Engine['path']>>[number];
 
 /** The path through the runtime's lifecycle of the task `task` — a try of the step `step` of the run `id`, as the api resolved it. */
-export const STEP_PATH: Command<{ path: LifecycleStep[] }> = {
+export const STEP_PATH: Command<{ path: LifecycleTransition[] }> = {
   name: 'step path',
   usage: '<id> <step>',
   help: ["the path of a step's task through the runtime's lifecycle"],

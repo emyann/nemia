@@ -152,13 +152,13 @@ test("`projectChat`: what the board draws of her sessions, the keeper's words an
   await t.test('a step done carries its duration; the last one open is running, or waits where the task needs the person', () => {
     const done = projectChat(twoSessions()).find((e) => e.kind === 'step');
     assert.equal(done?.kind === 'step' && done.fact, '2.0 s');
-    const open = (phase: string) =>
+    const open = (phase: ChatSources['phase']) =>
       projectChat({
         ...twoSessions(),
         sessions: [{ attempt: 1, startedAt: at(0), events: [use('u9', 1, 'Bash', {}), use('u8', 2, 'Bash', {})] }],
         phase,
       }).map((e) => (e.kind === 'step' ? e.state : ''));
-    assert.deepEqual(open('running (working)'), ['pending', 'running']);
+    assert.deepEqual(open('working'), ['pending', 'running']);
     assert.deepEqual(open('needs-human'), ['pending', 'waits']);
   });
   await t.test("the words the person's text is framed in are the approved sentence, to the letter", () => {
@@ -318,8 +318,8 @@ test('`presenceOf`: down, up and idle, answering, waits on you, and unread after
     assert.deepEqual(presenceOf('succeeded', 0, events, undefined), none, 'settled: down');
     assert.deepEqual(presenceOf('pending', 0, events, undefined), none, 'not started: down');
     assert.deepEqual(presenceOf('idle', 0, events, { through: 'm:2:a2', at: at(40) }), { ...none, up: true, unread: 0 });
-    assert.equal(presenceOf('running (working)', 0, events, undefined).answering, true);
-    assert.equal(presenceOf('working (quiescent)', 0, events, undefined).answering, true);
+    assert.equal(presenceOf('working', 0, events, undefined).answering, true);
+    assert.equal(presenceOf('quiescent', 0, events, undefined).answering, true);
     assert.equal(presenceOf('idle', 0, events, undefined).answering, false);
     assert.equal(presenceOf('idle', 3, events, undefined).waitsOnYou, 3);
     assert.equal(presenceOf('idle', 0, events, { through: 'm:1:a1', at: at(40) }).unread, 1, 'one of hers after the mark');
@@ -360,7 +360,7 @@ test('`presenceOf`: down, up and idle, answering, waits on you, and unread after
   );
   await t.test('presence in several states at once: answering, waits on you and unread', () => {
     const events = projectChat(twoSessions());
-    assert.deepEqual(presenceOf('running (working)', 2, events, { through: 't:1:u1', at: at(40) }), {
+    assert.deepEqual(presenceOf('working', 2, events, { through: 't:1:u1', at: at(40) }), {
       up: true,
       answering: true,
       waitsOnYou: 2,

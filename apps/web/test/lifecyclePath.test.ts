@@ -6,17 +6,17 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { byPerson, centredScroll, litAt, PATH_POLL_MS, pathPoll, pathStamp, takenRoutes } from '../src/lib/lifecyclePath.ts';
 import type { MachineEdge, MachineVerb } from '../src/lib/api/machines.ts';
-import type { LifecycleStep, StepPath } from '../src/lib/api/steps.ts';
+import type { LifecycleTransition, StepPath } from '../src/lib/api/steps.ts';
 
 const FINAL = ['completed', 'failed', 'canceled'];
 
 /** A path through `states`, each moved by the entry named beside it. */
-const pathOf = (...moves: Array<[string, string]>): LifecycleStep[] =>
+const pathOf = (...moves: Array<[string, string]>): LifecycleTransition[] =>
   moves.map(([state, event], i) => ({ state, event, at: new Date(Date.UTC(2026, 8, 29, 8, 0, i)).toISOString() }));
 
 const running = pathOf(['submitted', 'filed'], ['starting', 'starting'], ['working', 'spawned']);
 const settled = [...running, ...pathOf(['ending', 'ended'], ['completed', 'settled'])];
-const read = (path: LifecycleStep[], taskId: string | null = 't-1'): StepPath => ({ taskId, try: 1, path });
+const read = (path: LifecycleTransition[], taskId: string | null = 't-1'): StepPath => ({ taskId, try: 1, path });
 
 /** The lifecycle's edges as the runtime draws them, as much of them as these tests walk. */
 const EDGES: MachineEdge[] = [

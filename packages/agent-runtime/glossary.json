@@ -65,6 +65,47 @@
       }
     },
     {
+      "term": "Lifecycle transition",
+      "meaning": "one move of a task through the lifecycle, as its journal says it: the entry's kind and when.",
+      "type": "LifecycleTransition",
+      "retired": [
+        {
+          "spelling": "LifecycleStep",
+          "card": "the runtime says where a task stands in one closed set (decisions 2 and 11 of the language work)"
+        }
+      ]
+    },
+    {
+      "term": "Outcome",
+      "meaning": "how an attempt ended and how a task settled: one word for both, `succeeded`, `failed` or `stopped`. A journal's former `done` is read as `succeeded`.",
+      "type": "Outcome"
+    },
+    {
+      "term": "Phase",
+      "meaning": "where a task stands for a reader, from its record plus one observation: a closed literal, never a sentence. The harness's own state of the attempt in flight is beside it, as `session` (A2A's names).",
+      "type": "TaskPhase",
+      "retired": [
+        {
+          "spelling": "PhaseWord",
+          "card": "the runtime says where a task stands in one closed set (decisions 2 and 11 of the language work)"
+        },
+        {
+          "spelling": "phaseWordOf",
+          "card": "the runtime says where a task stands in one closed set (decisions 2 and 11 of the language work)"
+        }
+      ]
+    },
+    {
+      "term": "Reconcile",
+      "meaning": "one task's decide-and-act within a tick.",
+      "retired": [
+        {
+          "spelling": "StepRefused",
+          "card": "the runtime says where a task stands in one closed set (decisions 2 and 11 of the language work)"
+        }
+      ]
+    },
+    {
       "term": "Runtime",
       "meaning": "`packages/agent-runtime`, which runs agent sessions on a harness, durably.",
       "see": {
@@ -79,6 +120,16 @@
         "label": "A job and a long-lived session",
         "href": "/runtime/#a-job-and-a-long-lived-session"
       }
+    },
+    {
+      "term": "Store",
+      "meaning": "where the runtime keeps its tasks' journals and feed (`AE_ROOT`).",
+      "retired": [
+        {
+          "spelling": "board",
+          "card": "the runtime says where a task stands in one closed set (decisions 2 and 11 of the language work)"
+        }
+      ]
     },
     {
       "term": "Subscription",

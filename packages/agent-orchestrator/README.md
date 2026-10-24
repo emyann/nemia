@@ -105,8 +105,8 @@ What a pass compares against is the feed itself, folded, not something it rememb
 its fold with the byte it read to, and reads on from there each pass — its own lines and any a
 `wf tick` beside it wrote — and a restarted one reads the feed once from the start. So a restart
 writes nothing for what did not change. Four things are left out of a word so that it moves only
-when the judgement does: the engine's live words (`running (working)`, `running (idle)`,
-`working (quiescent)`, `starting`, `between attempts`) read `running`, a slot wait says no count, no
+when the judgement does: the engine's live phases (`starting`, `working`, `quiescent`,
+`between-attempts`, `ending`) read `running`, a slot wait says no count, no
 cost is said, and no git standing is read (`wf ls`'s `→ to decide` for a finished run with no
 ending step is not in the feed). A step's filing reaches it a pass late, as `pending`: the words
 are read before the pass files anything. A run the pass finds at rest (`atRest`) whose words are
@@ -1501,7 +1501,7 @@ gated ship runs the line whole on the merged tree.
 | `waiting` | not filed yet | — |
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
-| the engine's word: `running (working)`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
+| the engine's phase: `working`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
 | `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`stated: false`; a journal from before stage 4a says `failed`, `unsigned`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares, or its closeout named a file the run does not have | **never runs** — the run nudges it once a round first, below |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |

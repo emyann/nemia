@@ -72,8 +72,8 @@ const stepOf = async (id: string, name: string): Promise<RunSummary['steps'][num
 
 test('a step at work says its agent and when its own task started; one given no agent says none, and one settled no since', async () => {
   const id = await started();
-  engine().settle(`${id}-build`, 'running', { startedAt: AT, spawnedAt: AT });
-  engine().settle(`${id}-notes`, 'running', { startedAt: '2026-10-14T09:00:00.000Z', spawnedAt: '2026-10-14T09:00:00.000Z' });
+  engine().settle(`${id}-build`, 'working', { startedAt: AT, spawnedAt: AT });
+  engine().settle(`${id}-notes`, 'working', { startedAt: '2026-10-14T09:00:00.000Z', spawnedAt: '2026-10-14T09:00:00.000Z' });
 
   const build = await stepOf(id, 'build');
   assert.equal(build.agent, 'ada', 'the agent the step names');

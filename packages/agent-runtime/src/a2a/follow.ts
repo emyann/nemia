@@ -11,7 +11,7 @@ import { Effect, Stream } from 'effect';
 import type { Part, StreamResponse, SubscribeToTaskRequest } from '@a2a-js/sdk';
 import type { ServerCallContext } from '@a2a-js/sdk/server';
 import { UnsupportedOperationError } from '@a2a-js/sdk/errors';
-import { isLive, phaseWordOf, type SessionState } from '../core/index.ts';
+import { isLive, type SessionState } from '../core/index.ts';
 import { RunnerError, type Followed, type RunnerOps } from '../harness/index.ts';
 import { nameOf, sightingOf, stateOf, taskOfSighting } from './map.ts';
 
@@ -137,7 +137,7 @@ export async function* subscription(
       });
     if (!isLive(m.state))
       throw new UnsupportedOperationError(
-        `session \`${params.id}\` has ended (${phaseWordOf(m.state)}): there is nothing to follow. Read its transcript (sessionTranscript).`,
+        `session \`${params.id}\` has ended (${m.state}): there is nothing to follow. Read its transcript (sessionTranscript).`,
       );
     yield { payload: { $case: 'task', value: taskOfSighting(params.id, { sessionId: params.id, state: m.state }) } };
   }

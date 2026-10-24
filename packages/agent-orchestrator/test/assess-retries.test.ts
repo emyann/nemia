@@ -32,6 +32,7 @@ import {
   type Run,
   type SpendOf,
   type TaskPhase,
+  type ListedPhase,
 } from '../src/run.ts';
 import {
   answerOf,
@@ -54,8 +55,11 @@ import { names, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 const nothingShipped = () => false;
-/** The engine's own phase words, which are free text — `running (working)`, `needs-human`. */
-const shown = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
+/** The engine's own phase words — `working`, `needs-human` — or the feed's `running`. */
+const shown =
+  (m: Record<string, ListedPhase>) =>
+  (id: string): ListedPhase =>
+    m[id] ?? 'unknown';
 /** How each step signed off, by name. A step not named left no closeout. */
 const signedOff = (m: Record<string, Closeout | { error: string }>) => (name: string) => m[name];
 const said = (outcome: Closeout['outcome']): Closeout => ({
@@ -269,7 +273,7 @@ test("listing of a step's check: what the run established, not only what the eng
       t1: 'succeeded',
       c1: 'succeeded',
       t2: 'succeeded',
-      c2: 'running (working)',
+      c2: 'working',
       t3: 'succeeded',
       c3: 'failed',
       t4: 'succeeded',
@@ -389,7 +393,7 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
   const r = signedOffOnce(run({ implement: 't1', review: null }));
   const none = () => undefined;
   const failed = phases({ t1: 'failed' });
-  const lsOf = (phase: string, askedCloseout: (id: string) => boolean | 'unsigned') =>
+  const lsOf = (phase: ListedPhase, askedCloseout: (id: string) => boolean | 'unsigned') =>
     listing({ steps: STEPS, run: r, phaseOf: shown({ t1: phase }), closeoutOf: none, askedCloseout }).waitingOnYou;
   await t.test('a journal from before stage 4a part 2: quiet then lost reads failed and is not waited on you', () => {
     const lostLast = closeoutAsked(
@@ -420,7 +424,7 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     ]);
     assert.equal(closeoutAsked(twice)('t1'), 'unsigned', 'quiet twice is quiet');
   });
-  const unstated = { ended: 'done', reason: 'harness', stated: false };
+  const unstated = { ended: 'succeeded', reason: 'harness', stated: false };
   const endingsOf = (v: ReturnType<typeof viewed>) => v.get('t1')!.state.attempts.map((a) => endWords(v.get('t1')!.state, a));
   await t.test('since stage 4a: `done` with `stated: false` reads unsigned, and `failed · unsigned` on endWords', () => {
     const quiet = viewed('succeeded', [unstated]);
@@ -435,14 +439,14 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     assert.deepEqual([closeoutAsked(legacy)('t1'), endingsOf(legacy)], ['unsigned', [{ ended: 'failed', reason: 'unsigned' }]]);
   });
   await t.test('a `done` with no `stated` key, or with a statement, is neither; nor a task asked for no statement', () => {
-    const before = viewed('succeeded', [{ ended: 'done', reason: 'harness' }]);
-    assert.deepEqual([closeoutAsked(before)('t1'), endingsOf(before)], [true, [{ ended: 'done', reason: 'harness' }]]);
+    const before = viewed('succeeded', [{ ended: 'succeeded', reason: 'harness' }]);
+    assert.deepEqual([closeoutAsked(before)('t1'), endingsOf(before)], [true, [{ ended: 'succeeded', reason: 'harness' }]]);
     const signed = viewed('succeeded', [
-      { ended: 'done', reason: 'harness', stated: true, closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } },
+      { ended: 'succeeded', reason: 'harness', stated: true, closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } },
     ]);
-    assert.deepEqual([closeoutAsked(signed)('t1'), endingsOf(signed)], [true, [{ ended: 'done', reason: 'harness' }]]);
+    assert.deepEqual([closeoutAsked(signed)('t1'), endingsOf(signed)], [true, [{ ended: 'succeeded', reason: 'harness' }]]);
     const unasked = viewed('succeeded', [unstated], false);
-    assert.deepEqual([closeoutAsked(unasked)('t1'), endingsOf(unasked)], [false, [{ ended: 'done', reason: 'harness' }]]);
+    assert.deepEqual([closeoutAsked(unasked)('t1'), endingsOf(unasked)], [false, [{ ended: 'succeeded', reason: 'harness' }]]);
   });
   await t.test('a task the views hold no view of — one the engine could not read — was asked nothing, is not blocked, said nothing', () => {
     const none = new Map<string, TaskView>();
@@ -452,7 +456,7 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     assert.equal(closeoutOf(none, r, 'implement'), undefined);
     assert.equal(closeoutOf(viewed('pending', []), r, 'implement'), undefined, 'a view with no attempt has said nothing either');
     const signed = viewed('succeeded', [
-      { ended: 'done', reason: 'harness', stated: true, closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } },
+      { ended: 'succeeded', reason: 'harness', stated: true, closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } },
     ]);
     const closeout = closeoutOf(signed, r, 'implement');
     assert.equal(closeout && 'outcome' in closeout ? closeout.outcome : closeout, 'done', 'and one that signed has');
@@ -469,7 +473,7 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     ],
     [
       'BUDGET: cut while its harness called it done, with no statement — the cap is why, before unsigned',
-      { ended: 'done', reason: 'harness', stated: false, limit: 'budget' },
+      { ended: 'succeeded', reason: 'harness', stated: false, limit: 'budget' },
       { ended: 'failed', reason: 'budget' },
     ],
     ["no limit is the runtime's words", { ended: 'failed', reason: 'harness' }, { ended: 'failed', reason: 'harness' }],
@@ -655,7 +659,7 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
       spendOf,
     );
   const nudged = { ...r, steps: { ...r.steps, implement: nextTry(r.steps.implement, due(r)[0], 't2') } };
-  const lsOf = (x: Run, phase: Record<string, string>) =>
+  const lsOf = (x: Run, phase: Record<string, ListedPhase>) =>
     listing({ steps: STEPS, run: x, phaseOf: shown(phase), closeoutOf: none, askedCloseout: unsignedEnd });
   await t.test('due on its own: the run is moving, waiting on nobody, and says the nudge is due', () => {
     assert.deepEqual(due(r), [{ step: 'implement', try: 2, mode: 'nudge', by: 'signoff' }]);
@@ -883,7 +887,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
     blockedOf: (id: string) => boolean = needsHuman,
     closeout: (s: string) => Closeout | undefined = nothingSigned,
   ) => retryRefusal(STEPS, r, 'implement', how, live, closeout, asked, () => undefined, [], blockedOf);
-  const noteOf = (phase: string, asks: RetryAsk[] = [askFor(2)]) =>
+  const noteOf = (phase: ListedPhase, asks: RetryAsk[] = [askFor(2)]) =>
     listing({
       steps: STEPS,
       run: r,
@@ -1005,11 +1009,11 @@ test("a person's ask on a step whose session its harness blocked, or that works 
     );
     assert.deepEqual(
       [
-        noteOf('running (working)'),
+        noteOf('working'),
         listing({
           steps: STEPS,
           run: r,
-          phaseOf: shown({ t1: 'running (working)' }),
+          phaseOf: shown({ t1: 'working' }),
           closeoutOf: signedOff({}),
           askedCloseout: asked,
           verdictOf: () => undefined,
@@ -1019,7 +1023,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       [
         {
           name: 'implement',
-          status: 'running (working)',
+          status: 'working',
           branch: null,
           note: 'try 2 asked (--nudge) — stopping its session, then the tick files it',
         },
@@ -1066,7 +1070,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
 test("`nemia ls` of a blocked step's harness wait: beside the engine's word, never in it", async (t) => {
   const r = run({ implement: 't1', review: null });
   const waiting = (id: string) => (id === 't1' ? 'permission prompt' : undefined);
-  const lsWith = (phase: string, waitingOf: (id: string) => string | undefined) =>
+  const lsWith = (phase: ListedPhase, waitingOf: (id: string) => string | undefined) =>
     fullListing({ steps: STEPS, run: r, phaseOf: shown({ t1: phase }), waitingOf }).steps[0];
   await t.test('the status keeps the bare word, and `nemia ls` prints the wait beside it', () => {
     const blocked = lsWith('needs-human', waiting);
@@ -1089,7 +1093,7 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
     );
   });
   await t.test('a phase that is not needs-human takes no word, nor a task that settled', () => {
-    assert.deepEqual(lsWith('running (working)', waiting), { name: 'implement', status: 'running (working)', branch: null });
+    assert.deepEqual(lsWith('working', waiting), { name: 'implement', status: 'working', branch: null });
     assert.deepEqual(lsWith('succeeded', waiting), { name: 'implement', status: 'unsigned', branch: null });
   });
   await t.test("the word disturbs nothing judged on it: the blocked step's try is still due, and still stops the session first", () => {
@@ -1264,7 +1268,7 @@ test("`nemia ls` says what a step's current try was denied after its note, never
     fullListing({
       steps: STEPS,
       run: r,
-      phaseOf: shown({ t1: 'succeeded', t2: 'running (working)' }),
+      phaseOf: shown({ t1: 'succeeded', t2: 'working' }),
       closeoutOf: signedOff({ implement: said('done') }),
       deniedOf,
     }).steps;
@@ -1290,7 +1294,7 @@ test("`nemia ls` says what a step's current try was denied after its note, never
     const tried = fullListing({
       steps: RETRIED,
       run: onTry([{ taskId: 't0', then: 'nudge' }], null),
-      phaseOf: shown({ t1: 'running (working)' }),
+      phaseOf: shown({ t1: 'working' }),
       deniedOf: (id) => (id === 't1' ? ['Bash(npm)'] : ['Skill(look)']),
     }).steps[0];
     assert.equal(tried.denied, 'denied: Bash(npm)');
@@ -1511,7 +1515,7 @@ test("retryLines of a denied step: a new session with the bare `--fresh`, and th
 
 test("closeoutOf, deniedOf and closeoutAsked of a task held open: its current turn's, never the last turn's", async (t) => {
   const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artifacts: [], needs: 'which flag: --dry-run or --force?' };
-  const view = (attempts: object[], inputs: number, phase = 'running (working)') =>
+  const view = (attempts: object[], inputs: number, phase = 'working') =>
     ({
       id: 't',
       phase,
@@ -1528,7 +1532,14 @@ test("closeoutOf, deniedOf and closeoutAsked of a task held open: its current tu
         inputs: Array.from({ length: inputs }, () => ({ at: 'x', text: 'go on' })),
       },
     }) as unknown as TaskView;
-  const signed = { n: 1, ended: 'done', reason: 'signed', nativeId: 'n', closeout: BLOCKED, denials: [{ tool: 'Skill', what: 'look' }] };
+  const signed = {
+    n: 1,
+    ended: 'succeeded',
+    reason: 'signed',
+    nativeId: 'n',
+    closeout: BLOCKED,
+    denials: [{ tool: 'Skill', what: 'look' }],
+  };
   const unsigned = { n: 1, ended: 'failed', reason: 'unsigned', nativeId: 'n' };
   const held = { id: 'r', steps: { plan: { taskId: 't' } } } as never;
   const answered = new Map([['t', view([signed], 1)]]);

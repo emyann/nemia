@@ -38,7 +38,7 @@ const write = (file: string, text: string) => {
 /** A step's task filed held open that signed off with `closeout` and was neither answered nor closed: its attempt ended, unsettled. */
 const waiting = (taskId: string, closeout: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'codex', holdOpen: true }));
-  standIn().settle(taskId, 'input-required', { ended: 'done', endedAt: at(9), exitCode: 0, closeout });
+  standIn().settle(taskId, 'input-required', { ended: 'succeeded', endedAt: at(9), exitCode: 0, closeout });
 };
 
 const DONE = { outcome: 'done', summary: 'The plan.', needs: null, artifacts: [] };
@@ -154,7 +154,7 @@ test('a step whose task is held open reads as waiting on a person, never as a se
         ],
       );
       for (const t of plan.tries.slice(0, 2)) {
-        assert.deepEqual([t.attempts.count, t.attempts.latest?.ended, t.closeout?.summary], [1, 'done', DONE.summary], `try ${t.try}`);
+        assert.deepEqual([t.attempts.count, t.attempts.latest?.ended, t.closeout?.summary], [1, 'succeeded', DONE.summary], `try ${t.try}`);
       }
     },
   );

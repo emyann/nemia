@@ -127,7 +127,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.doesNotMatch(brief, /Where to look/, 'nothing is said of a workspace nobody has touched');
   });
   await s.test('while the root works, a pass files nothing, however many times it looks', async () => {
-    stage.board().settle(`${id}-plan`, 'running');
+    stage.board().settle(`${id}-plan`, 'working');
     for (const _ of [1, 2]) assert.deepEqual([(await tick(id)).filed, (await tick(id)).status], [[], 'running']);
     assert.deepEqual(stage.board().filings, [`${id}-plan`]);
   });
@@ -162,7 +162,7 @@ test('a chain runs to success: plan → implement → review, on one line of wor
     assert.match(subjects(line)[0], /^review: hand off/, 'the pass hands review off, then files its check on that tree');
     assert.match(world().changed(line, world().head(line)).join('\n'), /half-reviewed\.txt/);
     fs.writeFileSync(path.join(line, 'coverage.out'), 'litter\n');
-    stage.board().settle(`${id}-review-check`, 'running');
+    stage.board().settle(`${id}-review-check`, 'working');
     await tick(id);
     await tick(id);
     assert.match(uncommitted(line), /coverage\.out/, 'left untracked');
@@ -238,7 +238,7 @@ test('a diamond fans out and in: two roots side by side, and a step after both t
     fs.writeFileSync(path.join(b.workspace!, 'shared.txt'), 'from b\n');
     fs.writeFileSync(path.join(b.workspace!, 'only-b.txt'), 'b alone\n');
     stage.board().settle(`${id}-a`, 'succeeded', SIGNED);
-    stage.board().settle(`${id}-b`, 'running');
+    stage.board().settle(`${id}-b`, 'working');
     assert.deepEqual((await tick(id)).filed, [], 'join waits for BOTH');
   });
   await s.test(
@@ -347,7 +347,7 @@ test('a failed step, then a cancelled run', async (t) => {
     stage.board().settle(`${id}-a`, 'succeeded', SIGNED);
     assert.deepEqual((await tick(id)).checked, ['a']);
     check = `${id}-a-check`;
-    stage.board().settle(check, 'running');
+    stage.board().settle(check, 'working');
   });
   await s.test("`nemia cancel` stops both — the running check and the queued step — and the mark outlives the pass's write", async () => {
     const file = path.join(ROOT, 'runs', `${id}.json`);

@@ -82,7 +82,7 @@ const bytesOf = (file: string): Buffer | null => {
 };
 
 /** How many times `claudeTrust` starts again on a file that changed under it before it gives up. */
-const TRIES = 5;
+const WRITES = 5;
 
 /** `file` made holding the one key for `key`, only where there is still none: false where one appeared meanwhile. */
 function created(file: string, key: string): boolean {
@@ -124,7 +124,7 @@ function replaced(file: string, was: Buffer, text: string, read: (file: string) 
  */
 export function claudeTrust(key: string, file: string = claudeConfigFile(), read: (file: string) => Buffer | null = bytesOf): TrustWritten {
   const byHand = `run Claude Code in ${key} once and accept its prompt`;
-  for (let attempt = 0; attempt < TRIES; attempt += 1) {
+  for (let attempt = 0; attempt < WRITES; attempt += 1) {
     const target = fs.existsSync(file) ? fs.realpathSync(file) : file;
     const was = read(target);
     if (was === null) {
@@ -136,5 +136,5 @@ export function claudeTrust(key: string, file: string = claudeConfigFile(), read
     if ('unread' in next) return { wrote: false, refused: `${target} was left as it is, since ${next.unread}: ${byHand}` };
     if (replaced(target, was, next.text, read)) return { wrote: true, refused: null };
   }
-  return { wrote: false, refused: `${file} changed under each of ${TRIES} writes and was left as it is: ask again, or ${byHand}` };
+  return { wrote: false, refused: `${file} changed under each of ${WRITES} writes and was left as it is: ask again, or ${byHand}` };
 }

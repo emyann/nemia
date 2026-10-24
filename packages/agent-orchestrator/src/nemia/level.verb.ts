@@ -27,6 +27,7 @@ import { levelsNow } from '../level/levels.verb.ts';
 import { EngineService, asked, tried, trustedFolder, type Engine } from '../runtime-client.ts';
 import { dollars, taskSpend, type Spend } from '../status/status.ts';
 import { bridgeOf, type Bridge } from '../views/views.verb.ts';
+import type { EnginePhase } from '../views/views-words.ts';
 import { nemiaDir, promptAllows, readLevel, writeLevel } from './level.store.ts';
 import { LEVEL_FORM, LEVELS, levelRefusal, nemiaTaskId, type Level, type LevelFile } from './nemia.ts';
 
@@ -42,7 +43,7 @@ export type NemiaLevel = {
   level: Level;
   since: string | null;
   task: string | null;
-  phase: string | null;
+  phase: EnginePhase | null;
   sessionId: string | null;
   reach: string[];
   bridge: Bridge | null;

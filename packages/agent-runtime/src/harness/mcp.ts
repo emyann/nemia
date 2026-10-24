@@ -94,7 +94,7 @@ export const mcpRefuses = (mcp: unknown): string | undefined => {
  * **The one producer.** Claude Code files a sign-in under `name|sha256({type,url,headers})[:16]`, so the bytes of a server's wire
  * facts *are* its identity: a session handed a server spelled one way and a state read of it spelled another are two servers to
  * Claude Code, and the second finds no sign-in. Every road that hands a recorded server to a harness goes through here — the
- * session's `Options.mcpServers` and the state read both — so the config the board judged is the config the session runs. Sorting
+ * session's `Options.mcpServers` and the state read both — so the config a page judged is the config the session runs. Sorting
  * the headers makes the record's own key order no part of that identity: a person who reorders two headers in a form keeps their
  * sign-in.
  *
@@ -270,10 +270,10 @@ const tomlStrings = (m: Record<string, string> | undefined) =>
  * The transport is written because a url without one is the half-formed entry `mcpRefuses` exists to prevent: Codex names the
  * transport itself ("invalid transport"), so a remote server that does not say which is one that loads and says nothing.
  *
- * **No oauth table.** A remote server's `oauth` is dropped here, and a recorded server reaches a Codex session unsigned. Nothing of
+ * **No oauth table.** A remote server's `oauth` is dropped here, and a recorded server reaches a Codex session with no sign-in. Nothing of
  * Codex has been measured — not whether it reads such a table, not what it would call the fields, not where it would file a
  * credential — so writing one would be a guess spelled as configuration. A Codex task is shown its servers rather than refused
- * them, and the state a board reads of one is unread, never a false `connected`; Codex's sign-in is measured before it is built.
+ * them, and the state a page reads of one is unread, never a false `connected`; Codex's sign-in is measured before it is built.
  */
 export const codexMcpServers = (mcp: Record<string, McpServer>): string =>
   tomlTable(

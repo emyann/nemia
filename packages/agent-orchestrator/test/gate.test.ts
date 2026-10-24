@@ -18,6 +18,7 @@ import { Effect } from 'effect';
 import type { Engine } from '../src/runtime-client.ts';
 import { scratch } from './scratch.ts';
 import { unasked } from './unasked.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 
 const ROOT = scratch('wf-gate-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -136,7 +137,7 @@ const refusedAs =
 const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
 
 /** `nemia start --gate plan` on `plan → implement → review`, run until plan has signed off and waits at its gate (or as `phase` says). */
-const heldAtGate = async (phase = 'succeeded') => {
+const heldAtGate = async (phase: EnginePhase = 'succeeded') => {
   const run = await runPlaced(startRun({ brief: 'plan the flag', repo: aRepo(), workflowDir: planned(), isolate: false, gates: ['plan'] }));
   const b = stage.board();
   await runWith(b.e, advanceRun(readRun(run.id)));
@@ -384,7 +385,7 @@ test('a gated step with `check:` is checked before it is held', async (t) => {
     },
   );
   await s.test('checking while the check runs, nothing after it', async () => {
-    b.settle(`${run.id}-plan-check`, 'running');
+    b.settle(`${run.id}-plan-check`, 'working');
     assert.equal((await runWith(b.e, list(b.e, readRun(run.id)))).steps[0].status, 'checking');
   });
   await s.test('awaiting approval once it passes, nothing filed', async () => {
@@ -623,7 +624,7 @@ test('`nemia approve`, REFUSED with nothing written', async (t) => {
     );
   });
   await t.test('REFUSED a step not signed off yet: still running', async () => {
-    const running = await heldAtGate('running');
+    const running = await heldAtGate('working');
     await assert.rejects(
       runWith(running.e, approveRun(running.id, 'plan')),
       refusedAs('Conflict', 'plan has not signed off yet', 'still running', 'approve it then'),

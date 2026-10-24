@@ -23,6 +23,7 @@ import type { FeedLine, Reason, RunLine } from '../src/feed/feed.ts';
 import { scratch } from './scratch.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 
 const ROOT = scratch('wf-run-feed-');
 const RUNS = path.join(ROOT, 'runs');
@@ -80,7 +81,7 @@ const ticks = async (n: number) => {
 const task = (run: Run, step: string) => `${run.id}-${step}`;
 
 /** The task `id` on the stand-in, settled `phase` and ending with `closeout`. */
-const settle = (id: string, phase: string, closeout?: unknown) => stage.board().settle(id, phase, closeout);
+const settle = (id: string, phase: EnginePhase, closeout?: unknown) => stage.board().settle(id, phase, closeout);
 
 /**
  * The calls the runtime denied the task `id` on its attempt, at work (`live`) or ended: a task not started yet is started at work. Laid
@@ -88,8 +89,8 @@ const settle = (id: string, phase: string, closeout?: unknown) => stage.board().
  */
 const deny = (id: string, denials: { tool: string; what?: string }[], live = false) => {
   const t = stage.board().tasks.get(id)!;
-  if (!t.attempt) settle(id, 'running (working)');
-  Object.assign(t.attempt!, { denials, ...(live || t.attempt!.endedAt ? {} : { ended: 'done', endedAt: AT }) });
+  if (!t.attempt) settle(id, 'working');
+  Object.assign(t.attempt!, { denials, ...(live || t.attempt!.endedAt ? {} : { ended: 'succeeded', endedAt: AT }) });
 };
 
 /** The attempts of the task `id` that ended before its own, each for the runtime's `reason`: its next attempt is then at work. */
@@ -107,7 +108,7 @@ const ended = (id: string, reasons: readonly string[]) => {
     exitCode: null,
   }));
   t.attempt = null;
-  settle(id, 'running');
+  settle(id, 'working');
 };
 
 /** A store with no runs and no feed. */
@@ -220,10 +221,10 @@ test(
       },
     );
     await s.test("a step's live word moving writes nothing: the feed says running, once", async () => {
-      settle(task(run, 'plan'), 'running (working)');
+      settle(task(run, 'plan'), 'working');
       await tick();
       const once = size();
-      for (const live of ['running (idle)', 'working (quiescent)', 'running (working)', 'between attempts']) {
+      for (const live of ['starting', 'quiescent', 'ending', 'working', 'between-attempts'] as const) {
         settle(task(run, 'plan'), live);
         await tick();
       }
@@ -430,7 +431,7 @@ test(
     await s.test('a line a writer died in the middle of is ended by the next pass, and costs that line alone', async () => {
       const good = lines().length;
       fs.appendFileSync(FEED, '{"at":"2026-09-22T10:00:00.000Z","run":"r-torn","wo');
-      settle(task(run, 'implement'), 'running (working)');
+      settle(task(run, 'implement'), 'working');
       await ticks(2);
       const text = fs.readFileSync(FEED, 'utf8');
       assert.ok(text.endsWith('\n'));
@@ -639,7 +640,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
     async () => {
       const run = await started('the denial');
       await tick();
-      settle(task(run, 'plan'), 'running (working)');
+      settle(task(run, 'plan'), 'working');
       deny(task(run, 'plan'), [
         { tool: 'Bash', what: 'git push' },
         { tool: 'Bash', what: 'git push' },
@@ -669,7 +670,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
   await s.test('a line’s labels are the ones stepLabels and runLabels give, so no second writer decides what a label is', async () => {
     const run = await started('the labels');
     await tick();
-    settle(task(run, 'plan'), 'running (working)');
+    settle(task(run, 'plan'), 'working');
     deny(task(run, 'plan'), [{ tool: 'Bash', what: 'git push' }]);
     await tick();
     const record = readRun(run.id);
@@ -695,7 +696,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
   await s.test('REFUSED: a recheck says no denial again — a one-shot is counted by the try its task was filed for', async () => {
     const run = await started('the recheck');
     await tick();
-    settle(task(run, 'plan'), 'running (working)');
+    settle(task(run, 'plan'), 'working');
     deny(task(run, 'plan'), [{ tool: 'Bash', what: 'git push' }]);
     await tick();
     assert.deepEqual(
@@ -717,7 +718,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
   await s.test('a step at work denied a call says it while its word stands at running, on a pass that reads no rest', async () => {
     const run = await started('the live denial');
     await tick();
-    settle(task(run, 'plan'), 'running (working)');
+    settle(task(run, 'plan'), 'working');
     await ticks(2);
     assert.equal(words(run.id, 'plan').at(-1), 'running', 'the step is at work, and the feed said so');
     deny(task(run, 'plan'), [{ tool: 'Bash', what: 'git push' }]);
@@ -740,7 +741,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
       const run = await started('the live denials');
       await tick();
       const id = task(run, 'plan');
-      settle(id, 'running (working)');
+      settle(id, 'working');
       const [ls, glob] = [{ tool: 'Bash', what: 'ls' }, { tool: 'Glob' }];
       deny(id, [ls], true);
       await tick();

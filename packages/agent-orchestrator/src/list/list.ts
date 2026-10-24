@@ -6,6 +6,7 @@ import { gated, hasStarted, holdAdvice, holdWord, waitAdvice, waitWord, type Wai
 import { slotWord, type CheckoutHold, type RunSlot } from '../cap/cap.ts';
 import { checkoutWord, LANDED_CAP, landedWords, onBaseNote, toDecideWords, type ToDecide } from '../ending/ending.ts';
 import type { Workflow } from '../step/step.ts';
+import type { EnginePhase } from '../views/views-words.ts';
 import {
   DENIED_CAP,
   DENIED_SHOWN,
@@ -132,14 +133,20 @@ export function standingLine(standing: ListedStanding, daemon: DaemonStanding, n
   return `where branches stand: read ${durationWord(age)} ago`;
 }
 
+/**
+ * The engine's word for a task as `listing` reads it: one of its phases (`engineWord`), `unknown` for a task it has no record of, or the
+ * `running` the feed folds a session's live words into (`feedPhase`).
+ */
+export type ListedPhase = EnginePhase | 'unknown' | 'running';
+
 /** What `listing` reads a run's steps off: the run, the engine's words for its tasks, and what people and git said of it. */
 export interface ListingInput {
   /** The run's steps, as the frozen folder names them, in its order. */
   readonly steps: readonly Workflow[];
   /** The run whose steps are listed. */
   readonly run: Run;
-  /** The engine's own word for a task's phase — `running (working)`, `needs-human` — shown as-is. */
-  readonly phaseOf: (taskId: string) => string;
+  /** The engine's own word for a task's phase — `working`, `needs-human` — shown as-is. */
+  readonly phaseOf: (taskId: string) => ListedPhase;
   /** Each step's closeout, or the error that kept it from being read. */
   readonly closeoutOf: (step: string) => Closeout | { error: string } | undefined;
   /** Whether a task was asked its closeout, and what it was asked. */

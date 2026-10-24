@@ -236,7 +236,7 @@ test('LONG-LIVED: a session through its life — idle between turns, a crash loo
       );
       assert.equal(observe(state, new Map(), now(END + RESTART_BACKOFF.initialMs - 1)).type, 'BACKING_OFF');
       assert.equal(decide(state, new Map(), now(END + RESTART_BACKOFF.initialMs - 1)).do, 'nothing');
-      assert.equal(viewOfState(state, new Map()).phase, 'between attempts');
+      assert.equal(viewOfState(state, new Map()).phase, 'between-attempts');
       assert.deepEqual(decide(state, new Map(), now(END + RESTART_BACKOFF.initialMs)), {
         do: 'start',
         attempt: 2,
@@ -296,7 +296,7 @@ test('LONG-LIVED: what each end leads to — restarted after the backoff, resume
       'stopped at its harness',
       { kind: 'ended', at: at(END), attempt: 1, sessionId: 's1', observed: 'stopped', reason: 'harness', nativeId: 'n1' },
     ],
-    ['done', { kind: 'ended', at: at(END), attempt: 1, sessionId: 's1', observed: 'done', reason: 'harness', nativeId: 'n1' }],
+    ['done', { kind: 'ended', at: at(END), attempt: 1, sessionId: 's1', observed: 'succeeded', reason: 'harness', nativeId: 'n1' }],
     ['failed', { kind: 'ended', at: at(END), attempt: 1, sessionId: 's1', observed: 'failed', reason: 'harness', nativeId: 'n1' }],
   ];
   const job: Record<string, string> = { 'stopped at its harness': 'stopped', done: 'succeeded', failed: 'failed' };

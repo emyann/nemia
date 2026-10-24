@@ -113,7 +113,7 @@ const keptAnew = async (t: TestContext): Promise<string> => {
   assert.deepEqual(await beat(), ['file']);
   assert.deepEqual(await beat(), ['subscribe']);
   assert.deepEqual(await beat(), []);
-  stage.board().settle(task, 'running');
+  stage.board().settle(task, 'starting');
   return task;
 };
 
@@ -442,7 +442,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     const told = b.said.length;
     appendOutbox(nemiaDir(), { id: 'kept-o1', at: new Date().toISOString(), text: 'Hi' });
     assert.deepEqual(await beat(), [], 'kept, her session not live: kept for later');
-    b.settle(task, 'running (working)');
+    b.settle(task, 'working');
     assert.deepEqual(await beat(), ['deliver']);
     assert.deepEqual(
       b.said.slice(told).map((one) => [one.taskId, one.text]),

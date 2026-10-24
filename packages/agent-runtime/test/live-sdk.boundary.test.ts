@@ -89,7 +89,7 @@ test(
         OPUS_TODAY,
         `a session asked for \`opus\`, on the Claude Code ${SDK_VERSION} bundles, ran on ${attempt.ranOn}; it ended ${attempt.reason}`,
       );
-      assert.equal(attempt.ended, 'done', `and it ran: ${view?.phase}`);
+      assert.equal(attempt.ended, 'succeeded', `and it ran: ${view?.phase}`);
     } finally {
       const session = view?.sessionId;
       if (session)

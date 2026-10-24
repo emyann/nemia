@@ -25,6 +25,7 @@ import type { Place, PlaceService } from '../src/place/place.store.ts';
 import type { StoreRoot } from '../src/config/root.store.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
 import { steeredClock, type Steered } from './steered.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 
 export { story, type Story, type Teller } from './checkpoints.ts';
 
@@ -42,7 +43,7 @@ type TestEngine = ReturnType<typeof testEngine>;
  * attempt ended with (a reason, a cost, its denials, what it printed), and the controllers' engine over it.
  */
 export type Board = Omit<TestEngine, 'settle'> & {
-  settle: (id: string, phase: string, closeout?: unknown, exitCode?: number) => void;
+  settle: (id: string, phase: EnginePhase, closeout?: unknown, exitCode?: number) => void;
   end: TestEngine['settle'];
   e: Engine;
 };
@@ -71,7 +72,7 @@ export function staged(given: { runWith: RunWith; main: Main; engineOf: typeof e
   const stand = eachTest(testPlace);
   const each = eachTest(() => {
     const made = testEngine();
-    const settle = (id: string, phase: string, closeout?: unknown, exitCode?: number) =>
+    const settle = (id: string, phase: EnginePhase, closeout?: unknown, exitCode?: number) =>
       made.settle(id, phase, { ...(closeout === undefined ? {} : { closeout }), ...(exitCode === undefined ? {} : { exitCode }) });
     const board: Board = { ...made, settle, end: made.settle, e: given.engineOf(made.layer) };
     return { board, clock: undefined as Steered | undefined };

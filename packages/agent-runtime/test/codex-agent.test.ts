@@ -290,7 +290,7 @@ test(
           client.cancelTask({ tenant: '', id: 'ae/c-stop/2', metadata: undefined }),
           (e: Error) =>
             e.constructor.name === 'TaskNotCancelableError' &&
-            e.message === 'session `ae/c-stop/2` has ended (done): there is nothing to stop.',
+            e.message === 'session `ae/c-stop/2` has ended (completed): there is nothing to stop.',
         );
         assert.equal((await get(client, 'ae/c-stop/2')).status!.state, TaskState.TASK_STATE_COMPLETED, 'and it is left as it ended');
 
@@ -414,7 +414,7 @@ test(
 
     fs.writeFileSync(path.join(cwd, 'fake.json'), JSON.stringify({ gate: 'go2' } satisfies Fake));
     await Effect.runPromise(engine.answer(id, 'the words'));
-    await holds(t, () => phase('running (working)'), 'the answer started turn 1');
+    await holds(t, () => phase('working'), 'the answer started turn 1');
     await holds(t, () => argvOf(cwd).length === 2, 'the fake codex run again');
     const running = await get(client, nameFor(id, 2));
     assert.equal(

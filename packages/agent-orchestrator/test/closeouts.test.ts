@@ -20,6 +20,7 @@ import { scratch } from './scratch.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
 import { answerText, type Question } from '../src/question/question.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 
 const ROOT = scratch('wf-closeouts-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -82,7 +83,7 @@ const taskOf = (id: string) => {
 const briefOf = (id: string): string => taskOf(id).spec.brief;
 
 /** The task `id` settled in `phase`, its attempt then ended as `end` says: how the runtime records the session's end. */
-const ended = (id: string, phase: string, end: Record<string, unknown>, closeout?: unknown) => {
+const ended = (id: string, phase: EnginePhase, end: Record<string, unknown>, closeout?: unknown) => {
   stage.board().settle(id, phase, closeout);
   Object.assign(taskOf(id).attempt!, end);
 };

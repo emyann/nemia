@@ -22,7 +22,7 @@ const attempt = (turn: number, spawned: string, ended: string | null, closeout?:
   endedAt: ended ? at(ended) : null,
   reason: null,
   usage: null,
-  ended: ended ? 'done' : null,
+  ended: ended ? 'succeeded' : null,
   turn,
   ...(closeout ? { closeout } : {}),
 });

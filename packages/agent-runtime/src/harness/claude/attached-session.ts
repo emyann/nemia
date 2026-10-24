@@ -147,7 +147,7 @@ export const ASK_CUT =
   'waited. Their answer is said to you as words once they give it, naming the question. Carry on without it.';
 
 /** What the hook says of a call it let through: the person answered it, and their answer is in the call's own input. */
-export const ASK_ANSWERED = 'The person answered this question on the board, and their answer is in the call.';
+export const ASK_ANSWERED = 'The person answered this question where it was shown, and their answer is in the call.';
 
 /** One choice of a question, as the call's input gave it: nothing where it names no label. */
 const optionOf = (raw: unknown): AskOption[] => {

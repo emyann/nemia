@@ -42,6 +42,7 @@ import {
   type SpendOf,
   type StepStatus,
   type TaskPhase,
+  type ListedPhase,
 } from '../src/run.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf, declaredOutput, outputLines, REPLIES_SCHEMA, type Closeout } from '../src/closeout/closeout.ts';
 import { nextTry, retriesSpent, type EarlierTry, type RetryAsk, type RetryHow, type RetryMode } from '../src/retry/retry-ask.ts';
@@ -137,8 +138,11 @@ const ENOUGH = 'the findings are cases no shipped team has: follow-up work, not 
 const acceptedTry = (t: number, message: string = ENOUGH): Partial<RepositoryRun> => ({
   acceptances: [{ step: 'review', try: t, at: '2026-09-20T14:05:00.000Z', message }],
 });
-/** The engine's own phase words, which are free text — `running (working)`. */
-const shown = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
+/** The engine's own phase words — `working` — or the feed's `running`. */
+const shown =
+  (m: Record<string, ListedPhase>) =>
+  (id: string): ListedPhase =>
+    m[id] ?? 'unknown';
 /** The loop on round `n`, listed as `nemia ls` lists it, with `more` of the listing's inputs. */
 const listedInRound = (r: Run, said: (name: string) => Closeout | undefined, more: Partial<Parameters<typeof listing>[0]> = {}) =>
   listing({ steps: LOOP, run: r, phaseOf: ALL_SUCCEEDED, closeoutOf: said, askedCloseout: asked, ...more });
@@ -196,7 +200,7 @@ const assessed = (steps: Workflow[], r: Run, p: (id: string) => TaskPhase, saidO
   assess(steps, r, p, saidOf, asked, o.verdict, o.asks, o.rounds, () => false, o.spent);
 const decided = (steps: Workflow[], r: Run, p: (id: string) => TaskPhase, saidOf: (name: string) => Closeout | undefined, o: Read = {}) =>
   decision(steps, r, p, nothingShipped, saidOf, asked, o.verdict, o.asks, o.rounds, () => false, o.spent);
-const listed = (steps: Workflow[], r: Run, p: (id: string) => string, saidOf: (name: string) => Closeout | undefined, o: Read = {}) =>
+const listed = (steps: Workflow[], r: Run, p: (id: string) => ListedPhase, saidOf: (name: string) => Closeout | undefined, o: Read = {}) =>
   listing({
     steps,
     run: r,
@@ -412,7 +416,7 @@ test('a round moves the loop: round 2 goes as round 1 went', async (t) => {
     const l = listing({
       steps: chain,
       run: next,
-      phaseOf: shown({ 'r-1-implement-try2': 'running (working)' }),
+      phaseOf: shown({ 'r-1-implement-try2': 'working' }),
       closeoutOf: replied,
       askedCloseout: asked,
     });

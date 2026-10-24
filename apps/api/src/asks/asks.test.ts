@@ -41,7 +41,12 @@ const write = (file: string, text: string) => {
 };
 
 /** A task filed on `harness` and left in `phase`, with `end` laid over its attempt. */
-const task = (taskId: string, harness: string, phase: string, end?: { exitCode?: number; closeout?: object }) => {
+const task = (
+  taskId: string,
+  harness: string,
+  phase: Parameters<ReturnType<typeof testEngine>['settle']>[1],
+  end?: { exitCode?: number; closeout?: object },
+) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness }));
   standIn().settle(taskId, phase, end);
 };
@@ -93,7 +98,7 @@ fs.writeFileSync(
       idle: { taskId: 't-idle' },
       /** Blocked, with no conversation on disk. */
       silent: { taskId: 't-silent' },
-      /** A Claude Code task whose session the harness lists as still at work, with nothing signed: the engine's running (working). */
+      /** A Claude Code task whose session the harness lists as still at work, with nothing signed: the engine's `working`. */
       working: { taskId: 't-working' },
       review: { taskId: null },
     },
@@ -109,7 +114,7 @@ beforeEachTest(() => {
   blockedSession('t-held');
   blockedSession('t-idle');
   blockedSession('t-silent');
-  task('t-working', 'claude', 'running (working)');
+  task('t-working', 'claude', 'working');
 });
 
 const record = fs.readFileSync(recordFile, 'utf8');

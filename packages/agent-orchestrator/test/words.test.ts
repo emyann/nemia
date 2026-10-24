@@ -1,11 +1,15 @@
 /**
- * Who may say which word (`docs/architecture.md`, *Who owns what*). Three vocabularies stay in their layer:
+ * Who may say which word (`docs/architecture.md`, *Who owns what*). Four vocabularies stay in their layer:
  *
  * - **A harness's words stay in the runtime** (`HARNESS`): the names Claude Code, Codex and Anthropic, and the runtime's own permission
  *   modes and sandboxes, imported from its public entry, but the plain English ones (`PLAIN_HARNESS`). Refused in the orchestrator's `src`
  *   and `bin`, `apps/api/src` and `apps/web/src`.
  * - **A workflow's words stay above the runtime** (`WORKFLOW`): a workflow, a step, a gate, a factory, a closeout, the orchestrator,
  *   `nemia` and Nemia. Refused in the runtime's `src` and `bin`.
+ * - **The layer above's words for what the runtime has its own for stay above it** (`LAYER_ABOVE`): a session that signs for one that
+ *   ends (`signed`, `signs`, `unsigned`), the board for the store, and a try for an attempt (`tries`, and `A_TRY`'s "the last try").
+ *   Refused in the runtime's `src` and `bin`. A sign-in is no end: `signed` or `signs` before `in`, `out` or `into` is not counted
+ *   (`SIGN_IN`), so "signed in to a server" is said and "the session that signed" is not.
  * - **This repository's team stays out of the packages** (`teamOf`): the name of each agent of `workflows/agents/`, read as the test
  *   runs, so a new agent is refused with no edit here. Refused in every package's `src`. A name that is plain English (`PLAIN_NAMES`)
  *   counts only as a quoted literal or a path segment.
@@ -14,7 +18,8 @@
  * `CLAUDE.md` say it, and a longer name (`claudeArgs`, `$claude`) does not. Tests, the board's vendored components and its generated
  * route tree are not read.
  *
- * Each file that says such a word today is a known exception, counted file by file (`HARNESS_WORDS`, `WORKFLOW_WORDS`, `TEAM_NAMES`),
+ * Each file that says such a word today is a known exception, counted file by file (`HARNESS_WORDS`, `WORKFLOW_WORDS`,
+ * `LAYER_ABOVE_WORDS`, `TEAM_NAMES`),
  * and the count only shrinks. Each entry names the card that removes its words (`CARDS`), else the move in words and where it goes
  * (`MOVES`). `ratchetBreaks` refuses a file no entry holds, a count above the measure or below it, an entry for a file gone or clean, and
  * an entry with no card, an unknown card, or a move with nowhere to go. A change that takes a word out of a file lowers its count in the
@@ -51,6 +56,15 @@ const WORKFLOW = [
   'nemia',
 ];
 
+/** The layer above's words for an end, the store and an attempt, which the runtime says as `ended`, `store` and `attempt`. */
+const LAYER_ABOVE = ['signed', 'signs', 'unsigned', 'board', 'boards', 'tries'];
+
+/** A try as one of a row of attempts — "the last try", "an earlier try" — where `try` alone is the plain verb. */
+const A_TRY = /(?<![\w$])(?:earlier|later|last|next|another) try(?![\w$])/gi;
+
+/** A sign-in, which logs in to a server and ends nothing: `signed` or `signs` before `in`, `out` or `into`. */
+const SIGN_IN = /(?<![\w$])(?:signed|signs)[\s-]+(?:in|out|into)(?![\w$])/gi;
+
 /** The team's names that are plain English, counted only as a quoted literal or a path segment. */
 const PLAIN_NAMES: readonly string[] = ['grace'];
 
@@ -62,6 +76,8 @@ const CARDS: Readonly<Record<string, string>> = {
   'slice-3': 'Nemia platform slice 3 (amend-the-nemia-intent-one-n-y2vp): one daemon per machine, session admission and pools',
   'slice-4':
     "Nemia platform slice 4 (amend-the-nemia-intent-one-n-y2vp): the command table and the rename to nemia; the api answers the web's command text",
+  'intent-2':
+    "the runtime's journalled renames, the second intent of the language work's decisions 2 and 11: `'unsigned'` out of EndReason, `stated` → `closedOut`, `Usage.turns` → `responses`, `checkoutMcp` → `projectMcp`",
 };
 
 type Move = { move: string; to: string };
@@ -101,10 +117,6 @@ const MOVES = {
   closeout: {
     move: "the attempt's closeout, a workflow's word for what a session said as it finished",
     to: "packages/agent-runtime's own word for it, the statement its readers already name",
-  },
-  step: {
-    move: "the engine's step verb and its refusal, a workflow's word for one action on a task",
-    to: "packages/agent-runtime's own word for it, in its export lists",
   },
   reword: {
     move: "a workflow's word in the runtime's prose: its callers' names (`nemia up`, the orchestrator, a step) and the same word in another sense (the SDK's client factory, Claude Code's gate)",
@@ -209,14 +221,12 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/a2a/map.ts': { count: 12, ...MOVES.closeout },
   'packages/agent-runtime/src/a2a/remote.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/core/domain.ts': { count: 14, ...MOVES.closeout },
-  'packages/agent-runtime/src/core/engine/engine.ts': { count: 26, ...MOVES.step },
+  'packages/agent-runtime/src/core/engine/engine.ts': { count: 16, ...MOVES.reword },
   'packages/agent-runtime/src/core/engine/filing.ts': { count: 6, ...MOVES.reword },
-  'packages/agent-runtime/src/core/engine/index.ts': { count: 1, ...MOVES.step },
   'packages/agent-runtime/src/core/engine/journal.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/core/event-schema.ts': { count: 1, ...MOVES.closeout },
   'packages/agent-runtime/src/core/lifecycle.ts': { count: 7, ...MOVES.closeout },
-  'packages/agent-runtime/src/core/path.ts': { count: 2, ...MOVES.reword },
-  'packages/agent-runtime/src/core/session.ts': { count: 3, ...MOVES.reword },
+  'packages/agent-runtime/src/core/path.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/service/options.ts': { count: 4, ...MOVES.reword },
   'packages/agent-runtime/src/harness/args.ts': { count: 3, ...MOVES.reword },
   'packages/agent-runtime/src/harness/claude/bg.ts': { count: 20, ...MOVES.closeout },
@@ -230,8 +240,15 @@ const WORKFLOW_WORDS: Baseline = {
   'packages/agent-runtime/src/harness/detached/said.ts': { count: 1, ...MOVES.closeout },
   'packages/agent-runtime/src/harness/mcp.ts': { count: 1, ...MOVES.reword },
   'packages/agent-runtime/src/harness/sdk.ts': { count: 2, ...MOVES.reword },
-  'packages/agent-runtime/src/index.ts': { count: 3, ...MOVES.reword },
+  'packages/agent-runtime/src/index.ts': { count: 2, ...MOVES.reword },
   'packages/agent-runtime/src/service/say.ts': { count: 1, ...MOVES.reword },
+};
+
+/** Each runtime file that says the layer above's word for an end, the store or an attempt today, its count and what removes them. */
+const LAYER_ABOVE_WORDS: Baseline = {
+  'packages/agent-runtime/src/core/domain.ts': { count: 5, card: 'intent-2' },
+  'packages/agent-runtime/src/core/event-schema.ts': { count: 1, card: 'intent-2' },
+  'packages/agent-runtime/src/core/lifecycle.ts': { count: 2, card: 'intent-2' },
 };
 
 /** Each package file that names an agent of the team today, with its count and what removes them. */
@@ -252,6 +269,12 @@ const WORKFLOW_RULE: Rule = {
   what: 'workflow words',
   dirs: ['packages/agent-runtime/src', 'packages/agent-runtime/bin'],
   fix: 'the runtime runs sessions and knows no workflow: say it in its words, a task, an attempt or a session',
+};
+
+const LAYER_ABOVE_RULE: Rule = {
+  what: "the layer above's words",
+  dirs: WORKFLOW_RULE.dirs,
+  fix: 'the runtime says it in its own words: a session that ended, the store, an attempt',
 };
 
 const TEAM_RULE: Rule = {
@@ -310,9 +333,18 @@ function wordsIn(text: string, words: readonly string[], plain: readonly string[
   return count;
 }
 
+const matches = (text: string, pattern: RegExp): number => [...text.matchAll(pattern)].length;
+
+/** How many times `text` says the layer above's word: `LAYER_ABOVE` whole but a sign-in (`SIGN_IN`), and `A_TRY`. */
+const layerAboveIn = (text: string): number => wordsIn(text, LAYER_ABOVE) - matches(text, SIGN_IN) + matches(text, A_TRY);
+
+/** Each file's count by `count`, for the files that say one at least once. */
+const measuredBy = (texts: ReadonlyMap<string, string>, count: (text: string) => number): Record<string, number> =>
+  Object.fromEntries([...texts].map(([file, text]) => [file, count(text)]).filter(([, n]) => n !== 0));
+
 /** Each file's count of `words`, for the files that say one at least once. */
 const measured = (texts: ReadonlyMap<string, string>, words: readonly string[], plain: readonly string[] = []): Record<string, number> =>
-  Object.fromEntries([...texts].map(([file, text]) => [file, wordsIn(text, words, plain)]).filter(([, count]) => count !== 0));
+  measuredBy(texts, (text) => wordsIn(text, words, plain));
 
 /** What an entry fails to name: a card `CARDS` knows, else a move with where it goes. */
 function namingBreak(file: string, what: string, entry: Entry): string | undefined {
@@ -353,11 +385,12 @@ function ratchetBreaks(rule: Rule, counts: Record<string, number>, baseline: Bas
 
 const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
 
-/** Every breach of the three rules over `texts` of each, against their baselines. */
+/** Every breach of the four rules over `texts` of each, against their baselines; the layer above's words read where a workflow's are. */
 function breaches(texts: { harness: Map<string, string>; workflow: Map<string, string>; team: Map<string, string> }, team: string[]) {
   return [
     ...ratchetBreaks(HARNESS_RULE, measured(texts.harness, HARNESS), HARNESS_WORDS, onDisk),
     ...ratchetBreaks(WORKFLOW_RULE, measured(texts.workflow, WORKFLOW), WORKFLOW_WORDS, onDisk),
+    ...ratchetBreaks(LAYER_ABOVE_RULE, measuredBy(texts.workflow, layerAboveIn), LAYER_ABOVE_WORDS, onDisk),
     ...ratchetBreaks(TEAM_RULE, measured(texts.team, team, PLAIN_NAMES), TEAM_NAMES, onDisk),
   ];
 }
@@ -381,6 +414,14 @@ test('the matcher counts a word whole and in any case, and a plain word only quo
   assert.equal(wordsIn('ask otto', ['otto']), 1, 'a word not plain counts in prose');
 });
 
+test("the layer above's words: an end said as signing, the board, a try in a row — and a sign-in, a longer name and a plain try are not", () => {
+  assert.equal(layerAboveIn('the session that signed; it signs off; an unsigned end; on the board, two boards; three tries'), 6);
+  assert.equal(layerAboveIn('the last try, an earlier try, another try, the next try, a later try'), 5);
+  assert.equal(layerAboveIn('signed in to a server, signs out, signed into it, signed-in'), 0, 'a sign-in is no end');
+  assert.equal(layerAboveIn('signsInMcp, SIGN_IN_STATES, boardId, retries, try again, one try at a rotation'), 0);
+  assert.equal(layerAboveIn('Signed, BOARD, The Last Try'), 3, 'in any case');
+});
+
 test("the lists: the runtime's harness words but the plain ones, every plain one the runtime's, and the team read from its folder", () => {
   for (const w of [...CLAUDE_PERMISSION_MODES, ...CODEX_SANDBOXES])
     assert.equal(HARNESS.includes(w), !PLAIN_HARNESS.includes(w), `${w} is ${PLAIN_HARNESS.includes(w) ? 'plain' : "the harness's"}`);
@@ -398,7 +439,7 @@ test("the lists: the runtime's harness words but the plain ones, every plain one
   );
 });
 
-test('the harness words, the workflow words and the team names are held to their baselines, each entry naming its card or move', () => {
+test("the harness words, the workflow words, the layer above's words and the team names are held to their baselines, each entry naming its card or move", () => {
   assert.deepEqual(breaches(repository(), TEAM), []);
 });
 
@@ -419,6 +460,17 @@ test('REFUSED: a new file in each layer that says a word of another', () => {
   assert.deepEqual(planted('workflow', 'packages/agent-runtime/src/x.ts', '/** A workflow, under nemia. */\nexport const x = 1;\n'), [
     `packages/agent-runtime/src/x.ts holds 2 workflow words: ${WORKFLOW_RULE.fix}; never add them here`,
   ]);
+  const above = LAYER_ABOVE_RULE.fix;
+  const runtimeFile = 'packages/agent-runtime/src/x.ts';
+  assert.deepEqual(planted('workflow', runtimeFile, '/** It signed: the last try. */\n'), [
+    `${runtimeFile} holds 2 the layer above's words: ${above}; never add them here`,
+  ]);
+  const domain = 'packages/agent-runtime/src/core/domain.ts';
+  const said = texts.workflow.get(domain) ?? '';
+  const raised = planted('workflow', domain, `${said}\n/** On the board. */\n`);
+  assert.equal(raised.length, 1, raised.join('\n'));
+  assert.ok(raised[0]?.startsWith(`${domain} holds 6 `), raised[0]);
+  assert.match(raised[0] ?? '', /more than the 5/);
   assert.deepEqual(planted('team', 'packages/agent-runtime/src/x.ts', "export const reviewer = 'seldon';\n"), [
     `packages/agent-runtime/src/x.ts holds 1 team names: ${TEAM_RULE.fix}; never add them here`,
   ]);

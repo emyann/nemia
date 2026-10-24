@@ -4,7 +4,7 @@ import { Button as AriaButton, Slider, SliderThumb, SliderTrack, ToggleButton, T
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import { machineQuery, stepPathQuery, type LifecycleStep, type MachineGraph, type RunDetail, type StepPath } from '@/lib/api';
+import { machineQuery, stepPathQuery, type LifecycleTransition, type MachineGraph, type RunDetail, type StepPath } from '@/lib/api';
 import { byPerson, centredScroll, litAt, pathPoll, pathStamp, takenRoutes } from '@/lib/lifecyclePath';
 import { clockWord } from '@/lib/quota';
 import { useNow } from '@/lib/useNow';
@@ -151,7 +151,7 @@ function WideGraph({
 }: {
   machine: MachineGraph;
   taskId: string;
-  path: readonly LifecycleStep[];
+  path: readonly LifecycleTransition[];
   at: number;
   lit: string | undefined;
   taken: readonly string[];
@@ -212,7 +212,7 @@ function LitInView({ lit, children }: { lit: string | undefined; children: React
 }
 
 /** A slider over the path's entries, and which one it shows of how many. */
-function Scrubber({ path, at, onScrub }: { path: readonly LifecycleStep[]; at: number; onScrub: (i: number) => void }) {
+function Scrubber({ path, at, onScrub }: { path: readonly LifecycleTransition[]; at: number; onScrub: (i: number) => void }) {
   return (
     <div className="space-y-2">
       <Slider
@@ -248,7 +248,7 @@ function Timeline({
   machine,
   onScrub,
 }: {
-  path: readonly LifecycleStep[];
+  path: readonly LifecycleTransition[];
   at: number;
   machine: Pick<MachineGraph, 'edges' | 'verbs'>;
   onScrub: (i: number) => void;

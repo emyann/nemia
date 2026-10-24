@@ -35,7 +35,7 @@ import {
   type VerbName,
 } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
-import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Ended, type Outcome, type SessionState } from './session.ts';
+import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Outcome, type SessionState } from './session.ts';
 
 /** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
 const ENDED_OWN: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'rejected']);
@@ -90,9 +90,9 @@ export type Sighting = {
    * a statement from a busy session — a verdict it may yet revise — which is why quiet, not the statement, is what
    * ends such an attempt.)
    *
-   * A fact about the session, not a verdict on the work: a quiet session has ended, and `decide` records it `done` —
+   * A fact about the session, not a verdict on the work: a quiet session has ended, and `decide` records it `succeeded` —
    * with `stated: false` where its task asked for a closing statement and was told none, which the layer above judges.
-   * Only the journal knows the task, so `decide` reads this, and no runner turns it into `done`.
+   * Only the journal knows the task, so `decide` reads this, and no runner turns it into `succeeded`.
    */
   quietMs?: number;
   /**
@@ -347,7 +347,7 @@ export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'opera
  *   record, so whatever the session wrote of them stands after it in that order; null when it held none or could not be read.
  *   `decide` never reads it: what was said to a session is a fact for whoever reviews the work, not a judgement on it.
  * - `input`: a person's answer to a task held open and waiting (A2A's follow-up message on an `INPUT_REQUIRED` task): the
- *   words its next turn is told, continuing the session that signed, and what that turn's configuration gives for itself
+ *   words its next turn is told, continuing the session that ended, and what that turn's configuration gives for itself
  *   when they gave any — its spend cap. Read by `decide`: an input starts a turn. Refused by `answer` unless the task
  *   waits for one.
  * - `closed`: a person's word that a task held open is finished with: it settles once no attempt of it runs. Read by
@@ -402,9 +402,9 @@ export type Event =
        */
       priority?: number;
       /**
-       * Held open: an attempt that ends signed leaves the task waiting on a person — `input-required`, no process
+       * Held open: an attempt that ends leaves the task waiting on a person — `input-required`, no process
        * running — rather than settled. Their answer (`input`) is a new turn, an attempt continuing the session; a `closed`
-       * settles it. Absent on a task not held open, which settles on its first signed end.
+       * settles it. Absent on a task not held open, which settles on its first end.
        */
       holdOpen?: true;
       /**
@@ -427,7 +427,7 @@ export type Event =
       at: string;
       attempt: number;
       sessionId: string;
-      observed: Ended;
+      observed: Outcome;
       reason: EndReason;
       nativeId?: string;
       closeout?: unknown;
@@ -477,7 +477,7 @@ export type Attempt = {
   spawnedAt: string | null;
   /** The spawn's moment on the monotonic clock, when the engine that journalled it read one. */
   spawnedMono?: Monotonic;
-  ended: Ended | null;
+  ended: Outcome | null;
   /** The `at` of the `ended` entry: when the engine wrote the end down. Null while the attempt runs. */
   endedAt: string | null;
   /** The end's moment on the monotonic clock, when the engine that journalled it read one. */
@@ -553,7 +553,7 @@ export type State = {
   attempts: Attempt[];
   /** What a person said to the task's sessions while they ran, in the order it was said. Carried, never read. */
   said: Said[];
-  /** Filed to be held open: a signed end waits on a person. See the `filed` event. */
+  /** Filed to be held open: an end waits on a person. See the `filed` event. */
   holdOpen?: true;
   /** Filed long-lived: only a stop from outside ends its session. See the `filed` event. */
   restartPolicy?: 'Always';
@@ -720,7 +720,7 @@ export function fold(taskId: string, events: readonly Event[]): State {
 
 /**
  * Turn `n` of a task (the current one by default), by pure arithmetic over the fold, so `decide` reads a turn and not the
- * journal's order: its attempts; the session it continues — for a later turn, the one that signed the turn before it,
+ * journal's order: its attempts; the session it continues — for a later turn, the one that ended the turn before it,
  * and none if its harness recorded none; for the first, what the task was filed against; the words it is told instead of
  * the brief — every answer given since the turn before it started, so two answers that raced are both heard; and what its
  * configuration gives for itself — the last one given with those words, whole, which the engine lays over the filing's
@@ -741,12 +741,14 @@ export function turnOf(state: State, n = state.inputs.length) {
 }
 
 /**
- * A task held open, its current turn ended `done` (with its statement or without), not closed and not settled: it waits on a person's
+ * A task held open, its current turn ended `succeeded` (with its statement or without), not closed and not settled: it waits on a person's
  * answer, with no process running.
  */
 export function waitsForInput(state: State): boolean {
   const last = state.attempts.at(-1);
-  return state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'done' && (last.turn ?? 0) === state.inputs.length;
+  return (
+    state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'succeeded' && (last.turn ?? 0) === state.inputs.length
+  );
 }
 
 /** A task a person may ask to stop (`requestStop`): not settled, and not asked to stop already. */
@@ -792,7 +794,7 @@ export function admissionOf(state: State): 'queued' | 'admitted' | undefined {
 /**
  * The one step `decide` names:
  *
- * - `nothing`: nothing to do. Not an error — the common case on a busy board. `refused` when the lifecycle has no edge for
+ * - `nothing`: nothing to do. Not an error — the common case on a busy store. `refused` when the lifecycle has no edge for
  *   what was seen.
  * - `start`: journal the intent to run attempt N, continuing `resumeFrom`, what its turn continues — told `nudge`, a later
  *   turn's answer, instead of the brief.
@@ -811,7 +813,7 @@ export type Action =
       do: 'record-end';
       attempt: number;
       sessionId: string;
-      observed: Ended;
+      observed: Outcome;
       reason: EndReason;
       nativeId?: string;
       closeout?: unknown;
@@ -947,7 +949,7 @@ export function lifecycleOf(state: State): LifecycleState {
  *
  * 1. `NOTHING_OPEN`, when a person asked it to stop.
  * 2. `CLOSED`, for a task held open and closed: it settles on how its last attempt ended.
- * 3. `AWAITING_INPUT`, for a task held open whose turn signed: it waits on a person for as long as they take — ahead of
+ * 3. `AWAITING_INPUT`, for a task held open whose turn ended: it waits on a person for as long as they take — ahead of
  *    the deadline, which times work, not a person reading it.
  * 4. `DEADLINE_SPENT`, when it is overdue and its last attempt ended at the deadline.
  * 5. For a long-lived task whose attempt ended, no stop asked: its restart (`restartOf`) — unless its harness refused the
@@ -958,7 +960,7 @@ export function lifecycleOf(state: State): LifecycleState {
  * 8. `QUEUED`, while the turn waits for the layer above's word; it is started by the pass after the one that wrote it.
  *    Read after every terminal answer, so a queued task can still settle.
  * 9. `PREVIOUS_LIVE`, when the session the turn continues — for the first turn, what the task was filed against; for a
- *    later one, the session that signed the turn before it — is still held by its harness: it is stopped first.
+ *    later one, the session that ended the turn before it — is still held by its harness: it is stopped first.
  * 10. `READY` otherwise: in a later turn, told the person's answer; else the brief.
  */
 export function observe(state: State, observed: ReadonlyMap<string, Sighting>, now: Now): LifecycleEvent {
@@ -1047,7 +1049,7 @@ function sessionEvent(state: State, last: Attempt, sighting: Sighting, now: Now)
     attempt: last.n,
     sighting,
     asked: state.closeoutSchema !== undefined,
-    holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
+    holds: state.holdOpen === true && !state.closed && ending === 'succeeded' && (last.turn ?? 0) === state.inputs.length,
   };
   if (respawning(state, sighting)) {
     const gap = last.gapSince === undefined ? 0 : elapsedMs({ at: Date.parse(last.gapSince), mono: last.gapMono }, instantOf(now));

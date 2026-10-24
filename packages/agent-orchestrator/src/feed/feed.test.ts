@@ -2,8 +2,8 @@
  * The feed on disk (`nemia watch`), as its writer and its readers make it, in a store of its own: the one-shots `recordFeed` writes
  * once per occurrence across a restart, a cursor that never passes a partial line, the lines `readFeed` reads whatever their shape, the
  * cursor a watch hands each line on with, a watch's races with the file it follows, and what `--help` says of it; and the pure parts —
- * `feedPhase`, `feedWords`, the fold and the diff, and the bytes a line is published at — beside the file, since what matters of them is
- * what the file ends up saying.
+ * `feedWords`, the fold and the diff, and the bytes a line is published at — beside the file, since what matters of them is
+ * what the file ends up saying. `feedPhase` is a total table (`FEED_WORD`), held end to end by `test/run-feed.test.ts`.
  *
  * A run's feed as the tick writes it, pass by pass, and `nemia watch` reading it, is `test/run-feed.test.ts`'s; the hub and its live
  * readers `feed.verb.test.ts`'s. `WF_ROOT` is read as the module loads, so it is set before the import.
@@ -18,7 +18,6 @@ import type { Run } from '../record/record.ts';
 import { listing } from '../list/list.ts';
 import {
   feedChanges,
-  feedPhase,
   feedWords,
   FEED_VERSION,
   foldFeed,
@@ -782,12 +781,6 @@ test('`wf --help` names nemia watch whole, and says which feed is whose', async 
   assert.match(printed, /^ {2}nemia watch \[cursor\] \[--once\] \[-l <selector>\]\.\.\. \[--cursor-file <path>\] \[--json\]$/m);
   assert.match(printed, /nemia watch follows what the workflow decides/);
   assert.match(printed, /ae watch/);
-});
-
-test("feedPhase folds the engine's live words into running, and keeps every word a decision reads", () => {
-  for (const live of ['running (working)', 'running (idle)', 'working (quiescent)', 'starting', 'between attempts'])
-    assert.equal(feedPhase(live), 'running', live);
-  for (const kept of ['pending', 'needs-human', 'succeeded', 'failed', 'stopped', 'unknown']) assert.equal(feedPhase(kept), kept);
 });
 
 test('feedWords says each run and step in the word nemia ls prints, with its prune, its wait on a person and its slot', async (t) => {

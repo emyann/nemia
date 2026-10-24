@@ -1,6 +1,6 @@
 /**
  * A session's state, as a harness reports it and as every view above the runtime says it: A2A's names for a task's
- * state, the end each records, and the word a person reads. `domain.ts` and `lifecycle.ts` both read these; neither is
+ * state, the end each records, and where a task stands for a reader. `domain.ts` and `lifecycle.ts` both read these; neither is
  * read here.
  */
 
@@ -15,7 +15,7 @@
  *   working         at work. With `busy` and `quietMs` beside it, which say whether it computes and how long it is quiet.
  *   input-required  waiting on a person for words — a permission prompt, a question.
  *   auth-required   waiting on a person to sign in: the same wait for the runtime, a different thing for the person.
- *   completed       ended on its own. Its end is recorded `done`.
+ *   completed       ended on its own. Its end is recorded `succeeded`.
  *   failed          ended on its own, and says it failed. Recorded `failed`.
  *   rejected        the agent refused the work once it had it. Recorded `failed`, as any end the harness calls a failure:
  *                   a refusal *at spawn*, before anything started, is `unstartable` and never a sighting.
@@ -37,13 +37,6 @@ export type SessionState = (typeof SESSION_STATES)[number];
 /** Whether a word is one of A2A's names for a session's state. */
 export const isSessionState = (word: unknown): word is SessionState => (SESSION_STATES as readonly unknown[]).includes(word);
 
-/**
- * How an attempt ended, as the journal records it: `ended.observed`, the `record-end` action, `Attempt.ended`. Not A2A's
- * words, and on purpose: every journal keeps them, an older `wf up` folds what a newer one wrote,
- * and the layers above compare them (`ended === 'done'`). A sighting's state becomes one of these through `endOf` alone.
- */
-export type Ended = 'done' | 'failed' | 'stopped';
-
 /** At work, as far as the runtime can act on it. */
 export const RUNNING: ReadonlySet<SessionState> = new Set(['submitted', 'working']);
 /** Waiting on a person — running, but nobody is coming unless the operator is told. */
@@ -57,14 +50,15 @@ export const waitsOnPerson = (s: SessionState | undefined): boolean => s !== und
 export const atWorkState = (s: SessionState | undefined): boolean => s !== undefined && RUNNING.has(s);
 
 /**
- * The end each state records when its harness lets the session go. At work and let go of — quiet, or closed out — is an
- * end the harness vouches for, `done`, as a quiet session is. Waiting on a person has not ended, and has none: no edge
+ * The end each state records when its harness lets the session go, as the journal records it (`ended.observed`, the
+ * `record-end` action, `Attempt.ended`): an `Outcome`. At work and let go of — quiet, or closed out — is an end the harness
+ * vouches for, `succeeded`, as a quiet session is. Waiting on a person has not ended, and has none: no edge
  * records its end off such a sighting (`harnessEnd`).
  */
-const ENDS: Record<SessionState, Ended | undefined> = {
-  submitted: 'done',
-  working: 'done',
-  completed: 'done',
+const ENDS: Record<SessionState, Outcome | undefined> = {
+  submitted: 'succeeded',
+  working: 'succeeded',
+  completed: 'succeeded',
   failed: 'failed',
   rejected: 'failed',
   canceled: 'stopped',
@@ -73,24 +67,7 @@ const ENDS: Record<SessionState, Ended | undefined> = {
 };
 
 /** The end an attempt is recorded with when its harness lets the session go in `state`, or `undefined` for one waiting on a person. */
-export const endOf = (state: SessionState): Ended | undefined => ENDS[state];
-
-/**
- * A session's state in the words every view above the runtime prints: `running (working)` is compared exactly
- * by the orchestrator's admission, and `wf ls`, the board and `phaseOfView` read the rest. A2A's names stop at the runtime.
- */
-export type PhaseWord = 'working' | 'blocked' | 'done' | 'failed' | 'stopped';
-const PHASE_WORDS: Record<SessionState, PhaseWord> = {
-  submitted: 'working',
-  working: 'working',
-  'input-required': 'blocked',
-  'auth-required': 'blocked',
-  completed: 'done',
-  failed: 'failed',
-  rejected: 'failed',
-  canceled: 'stopped',
-};
-export const phaseWordOf = (state: SessionState): PhaseWord => PHASE_WORDS[state];
+export const endOf = (state: SessionState): Outcome | undefined => ENDS[state];
 
 /**
  * A2A's name for one of the runtime's own former words for a session's state — `working`, `blocked`, `done`, `failed`,
@@ -105,6 +82,44 @@ const FORMER = {
   done: 'completed',
   failed: 'failed',
   stopped: 'canceled',
-} as const satisfies Record<PhaseWord, SessionState>;
+} as const satisfies Record<'working' | 'blocked' | 'done' | 'failed' | 'stopped', SessionState>;
 
+/** How an attempt ended and how a task settled: the journal's words for both, and the end a sighting's state records (`endOf`). */
 export type Outcome = 'succeeded' | 'failed' | 'stopped';
+
+/**
+ * Where a task stands for a reader, from its record and one observation (`viewOfState`): a closed set of literals, never a
+ * sentence. The harness's own state of the attempt in flight is beside it, as `TaskView.session`, never folded in.
+ */
+export const TASK_PHASES = [
+  'pending',
+  'starting',
+  'working',
+  'quiescent',
+  'needs-human',
+  'input-required',
+  'idle',
+  'restarting',
+  'between-attempts',
+  'ending',
+  'succeeded',
+  'failed',
+  'stopped',
+] as const;
+export type TaskPhase = (typeof TASK_PHASES)[number];
+
+/**
+ * The phase `viewOfState` gives a live session the look saw, by its state, where neither a respawn, an idle turn nor a wait on a
+ * person said it first: at work, a wait on a person (which `needsHuman` names before this), or ended on the harness and not yet
+ * recorded.
+ */
+export const LIVE_PHASE: Record<SessionState, TaskPhase> = {
+  submitted: 'working',
+  working: 'working',
+  'input-required': 'needs-human',
+  'auth-required': 'needs-human',
+  completed: 'ending',
+  failed: 'ending',
+  rejected: 'ending',
+  canceled: 'ending',
+};

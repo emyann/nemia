@@ -93,7 +93,7 @@ const sessionOf = (task: string, attempt: { n: number; startedAt: string }) =>
     return { attempt: attempt.n, startedAt: attempt.startedAt, events: read.events } satisfies ChatSession;
   });
 
-/** What the chat at `place` is projected from, read now, and its task's phase, undefined where no task is filed. */
+/** What the chat at `place` is projected from, read now, and its task's phase, null where no task is filed. */
 const sourcesOf = (place: ChatPlace) =>
   Effect.gen(function* () {
     const e = yield* EngineService;
@@ -107,7 +107,7 @@ const sourcesOf = (place: ChatPlace) =>
     }));
     const view = place.task === undefined ? undefined : yield* asked('view', e.view(place.task));
     if (place.task === undefined || view === undefined || !view.state.filedAt)
-      return { sessions: [], said: [], ...files, phase: '' } satisfies ChatSources;
+      return { sessions: [], said: [], ...files, phase: null } satisfies ChatSources;
     const task = place.task;
     const sessions = yield* Effect.forEach(view.state.attempts, (a) => sessionOf(task, a), { concurrency: 4 });
     return { sessions, said: view.state.said, ...files, phase: view.phase } satisfies ChatSources;
@@ -130,7 +130,7 @@ const waitingNow = (reads: ChatReads) =>
 const presenceNow = (place: ChatPlace, sources: ChatSources, events: readonly ChatEvent[], reads: ChatReads) =>
   Effect.gen(function* () {
     const mark = yield* tried(() => readReadMark(place.dir));
-    return presenceOf(sources.phase === '' ? undefined : sources.phase, yield* waitingNow(reads), events, mark);
+    return presenceOf(sources.phase ?? undefined, yield* waitingNow(reads), events, mark);
   });
 
 /**

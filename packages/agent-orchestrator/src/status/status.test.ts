@@ -21,7 +21,7 @@ test('taskSpend: what a task cost is the dollars on its attempts that are over',
     usage: costUsd === undefined ? null : { costUsd },
     ...(limit ? { limit } : {}),
   });
-  const view = (settled: string | null, ...attempts: Array<ReturnType<typeof attempt>>): TaskClock => ({
+  const view = (settled: 'succeeded' | 'failed' | 'stopped' | null, ...attempts: Array<ReturnType<typeof attempt>>): TaskClock => ({
     state: { brief: 'filed', settled, attempts },
   });
   await t.test("the ended attempts' dollars, and the harness's cut read off the last attempt's `limit`", () => {

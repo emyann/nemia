@@ -26,6 +26,7 @@ import {
   type Run,
   type SpendOf,
   type StepStatus,
+  type ListedPhase,
 } from '../src/run.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import { declared } from '../place/memory/place.ts';
@@ -37,8 +38,11 @@ import type { Workflow } from '../src/workflow.ts';
 import { phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
-/** The engine's own phase words, which are free text — `running (working)`, `needs-human`. */
-const shown = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
+/** The engine's own phase words — `working`, `needs-human` — or the feed's `running`. */
+const shown =
+  (m: Record<string, ListedPhase>) =>
+  (id: string): ListedPhase =>
+    m[id] ?? 'unknown';
 /** How each step signed off, by name. A step not named left no closeout. */
 const signedOff = (m: Record<string, Closeout | { error: string }>) => (name: string) => m[name];
 const said = (outcome: Closeout['outcome']): Closeout => ({

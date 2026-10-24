@@ -98,12 +98,13 @@ export const readTranscript = (runId: string, step: string, signal?: AbortSignal
   get(transcriptPath(runId, step), StepTranscriptSchema, { signal });
 
 /**
- * Mirrors the runtime's `LifecycleStep`: the lifecycle state a task's journal says once an entry is on it, the entry's kind and its `at`.
+ * Mirrors the runtime's `LifecycleTransition`: the lifecycle state a task's journal says once an entry is on it, the entry's kind and its
+ * `at`.
  */
-export type LifecycleStep = { state: string; event: string; at: string };
+export type LifecycleTransition = { state: string; event: string; at: string };
 
-/** Decodes a `LifecycleStep`. */
-const LifecycleStepSchema = decodes<LifecycleStep>()(
+/** Decodes a `LifecycleTransition`. */
+const LifecycleTransitionSchema = decodes<LifecycleTransition>()(
   Schema.Struct({
     state: Schema.String,
     event: Schema.String,
@@ -112,14 +113,14 @@ const LifecycleStepSchema = decodes<LifecycleStep>()(
 );
 
 /** Mirrors `StepPath` in apps/api/src/steps/path.ts: a try's task, the try's number, and the task's path to the end of that try. */
-export type StepPath = { taskId: string | null; try: number; path: LifecycleStep[] };
+export type StepPath = { taskId: string | null; try: number; path: LifecycleTransition[] };
 
 /** Decodes a `StepPath`. */
 const StepPathSchema = decodes<StepPath>()(
   Schema.Struct({
     taskId: Schema.NullOr(Schema.String),
     try: Schema.Number,
-    path: Schema.mutable(Schema.Array(LifecycleStepSchema)),
+    path: Schema.mutable(Schema.Array(LifecycleTransitionSchema)),
   }),
 );
 

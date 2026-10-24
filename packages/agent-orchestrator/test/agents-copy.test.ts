@@ -396,7 +396,7 @@ test('an agent given a skill named with its folder copies without it: the librar
 
 test('the copy is classed a prompt write, served on its generated route', () => {
   const entry = TABLE.find((c) => c.name === 'agents copy');
-  assert.equal(entry && 'nemia' in entry ? entry.nemia : undefined, 'prompts');
-  assert.equal(AGENTS_COPY.nemia, 'prompts');
+  assert.equal(entry?.class, 'ask');
+  assert.equal(AGENTS_COPY.class, 'ask');
   assert.deepEqual(AGENTS_COPY.route, { method: 'POST', path: '/api/agents/yours/copy', status: 200 });
 });

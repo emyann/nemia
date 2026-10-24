@@ -2005,7 +2005,7 @@ What was built:
 - **Compared against the feed, not memory** (`src/feed/feed.ts`): a process folds the feed as far as it has read it (`foldFeed`), reads on
   from its byte each pass, and writes what differs (`feedChanges`). A fresh process folds from 0, so a restarted daemon writes nothing
   for what did not change; a feed replaced or truncated under it (another inode, a cursor no longer at a line) is folded again from 0.
-- **Words that move only when the judgement does.** The engine's live words fold into `running` (`feedPhase`); a slot wait drops its
+- **Words that move only when the judgement does.** The engine's live phases (`starting`, `working`, `quiescent`, `between-attempts`, `ending`) fold into `running` (`feedPhase`); a slot wait drops its
   count; no cost is said; and a note's change alone, on a run at rest (`atRest`), is not a change. Without these the feed would be
   written on every pass a session went idle, every pass a dollar was spent, and for every finished run once a note is worded anew.
 - **The engine's cursor, refused by name where it cannot be read from**: a read stops at the last newline, never past a partial line;
@@ -2090,7 +2090,7 @@ whether the board follows the feed (`data-feed`). An e2e page that edits the sto
   free a slot or start a queued card. `removed` invalidates `['runs']` and removes the named run's record, `exact: true`. `unreadable`
   with `retrying: false` closes the stream and opens it again with no cursor, then refetches; with `retrying: true` it is said on the
   page until `readable` clears it.
-- **`runsQuery`'s 5 s poll becomes a backstop** of 30–60 s, not nothing: a session's live words (`running (idle)`), cost, a harness's
+- **`runsQuery`'s 5 s poll becomes a backstop** of 30–60 s, not nothing: a session's live phase (`quiescent`), cost, a harness's
   `waitingFor` and a finished run's git standing (`to decide`) are in no feed.
 - **An e2e page of its own** that writes a run's change into the seed's store and sees the Factory move without waiting out a poll; it
   shifts no count (CLAUDE.md), since it writes no run.
@@ -2192,7 +2192,7 @@ in `src/service/`:
   tick, and resumes only the pause it put. A start that never ticks leaves the store paused and says `nemia resume`.
 - **`nemia service uninstall`** stops, disables and removes it; **`nemia service status`** names the unit's state, the checkout it runs,
   who holds the lease, and lingering (`loginctl show-user -p Linger`, read only). All three are the CLI's alone; Nemia's fence asks
-  before install and uninstall (`prompts`) and lets status run (`read`).
+  before install and uninstall (`ask`) and lets status run (`read`).
 
 Tested in `src/service/service.test.ts` (the unit and the plist against golden text, `KillMode=process`, escaping read back, every
 refusal, WSL, the status lines, the landings waited for) and `src/service/service.verb.test.ts` (over a fake machine: install free,
@@ -2217,7 +2217,7 @@ which code served the board. What was built, in `src/release/`:
 - **Refused, changing nothing**: a tag that climbs out of `releases/`, hides, holds a space or is `current` (`Invalid`); a tag the
   repository lacks (`Missing`); a built tag that now names another commit (`Conflict`); no `release:check` script, or a command that
   fails (`Invalid`, naming its log, which is kept). A tag built at the same commit is switched to without a rebuild, so a rollback is
-  an older tag. Class `prompts`, the CLI's alone.
+  an older tag. Class `ask`, the CLI's alone.
 - **`nemia version [--json]`** says this `nemia`'s release (an install's tag and commit, or the checkout), the store's pointer and the
   daemon's (`release` on its lease). Class `read`, the CLI's alone. `/api/version` adds the api's `release`, and the board's footer says
   `v1.0.0 · <tag>` or `v1.0.0 · checkout`, the folder in its title.
@@ -2473,12 +2473,12 @@ the runtime: the words in her live session's inbox, one attempt, never stopped),
 Card A of the third Nemia amendment: every command of the table is classed once by who answers for it when an agent calls it, and her
 fence is derived from the class, with no hand list in `nemia/nemia.md`.
 
-- **The class** (`nemia` on each entry, `src/admission/class.ts`): `read`, `hers`, `prompts` (a write that cannot be undone or changes
-  the person's settings or a factory), `answers` (to what waits: a gate, a step's question, a loop out of rounds, a cap) and `out`
-  (`tick`, `up`); a command that reads bare names the words or flags that set. `classBreaks` refuses a command with none, a read classed
-  as a write and a write as a read, a flag in neither list, and a name a longer one's rule would override (`test/commands.test.ts`).
+- **The class** (`class` on each entry, `src/admission/class.ts`): `read`, `act` (a write run unasked), `ask` (a write that cannot be
+  undone or changes the person's settings or a factory), `answer` (to what waits: a gate, a step's question, a loop out of rounds, a
+  cap) and `none` (`tick`, `up`); a command that reads bare names the words or flags that set. Every entry carries one, as its type
+  requires; `classBreaks` refuses a read classed as a write and a write as a read, a flag in neither list, and a name a longer one's rule would override (`test/commands.test.ts`).
 - **Her fence** (`nemiaFence`, `src/admission/fence.ts`): a read, her own write and an answer allowed; a prompt asked; a setter asked
-  set; `out` denied, with `wf` and `ae` denied by her definition and the store outside her folder denied (`storeDenies`), never asked.
+  set; `none` denied, with `wf` and `ae` denied by her definition and the store outside her folder denied (`storeDenies`), never asked.
   A prompt the person allowed by its own rule in her folder's local settings is asked no more from her next filing (`widened`), and
   `nemia level` lists it: an ask outranks an allow wherever each is written, so the keeper takes the ask out.
 - **Her admission** (`nemia admit`, `src/admission/`), the runtime's hook on her `Bash` calls: an approval, a round, an accept, any
@@ -2525,7 +2525,7 @@ what prompts, prompts; the rest is hers, on her judgement, and said.
 - **Her verbs, generated**: the `verbs` skill (`nemia/skills/verbs/SKILL.md`) is written from the command table and each command's
   class by `verbsSkill` (`src/nemia/verbs.verb.ts`): every verb the CLI serves her, under *Reads*, *Yours*, *Prompts the person* or
   *Answers what waits*, with its usage and help as `nemia --help` prints them; a command that reads bare is a read, with the words that
-  make it prompt; `out` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
+  make it prompt; `none` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
   (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
   table, naming the command that regenerates it:
   `node -e "import('./packages/agent-orchestrator/src/nemia/verbs.verb.ts').then((m) => process.stdout.write(m.verbsSkill()))" > packages/agent-orchestrator/nemia/skills/verbs/SKILL.md`.
@@ -4950,7 +4950,7 @@ next turn: the same task, the same id, in the session that signed.
   (`stepState`), never as one still going. No new field on the api.
 - **Old runs.** A task filed before this has no `holdOpen`: it settles at its sign-off, and a send-back is a `-try2` task, as it was.
 
-**What it leaves.** A closed task reads `between attempts` until the engine's next pass settles it, so `wf ls` can say so for at most
+**What it leaves.** A closed task reads `between-attempts` until the engine's next pass settles it, so `wf ls` can say so for at most
 a pass. The timeline and the said attribution count a turn's session once; `consumption` sums every turn of the task. `wf cancel` calls a
 blocked run off and closes its waiting task (`closeWaitingTasks`), as it does at a gate. Rounds stay
 `-try<n>` tasks, and a step's tries as attempts of one task (4c) wait on the owner. Since 2026-09-28 that item is called *tries as

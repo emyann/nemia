@@ -20,7 +20,7 @@ export const DONE = [
 /** A run at work on its second step. */
 export const AT_WORK = [
   { name: 'design', status: 'verified ✓' },
-  { name: 'implement', status: 'running (working)' },
+  { name: 'implement', status: 'working' },
   { name: 'review', status: 'waiting' },
   { name: 'land', status: 'waiting' },
 ];

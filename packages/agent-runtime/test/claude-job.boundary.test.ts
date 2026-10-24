@@ -139,7 +139,7 @@ test('an engine with no holder runs a Claude Code job to its end on the Agent SD
 
     assert.equal(view.state.settled, 'succeeded', `the job ran to its end: ${JSON.stringify(view.state.attempts.at(-1))}`);
     const attempt = view.state.attempts.at(-1)!;
-    assert.equal(attempt.ended, 'done', 'its own process exited 0 on a result that was no error');
+    assert.equal(attempt.ended, 'succeeded', 'its own process exited 0 on a result that was no error');
     assert.deepEqual(attempt.closeout, { outcome: 'done' }, 'its closeout, read off the capture its own process printed');
     assert.equal(attempt.usage?.costUsd, 0.02, 'and what it cost');
     assert.deepEqual(

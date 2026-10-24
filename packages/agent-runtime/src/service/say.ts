@@ -4,18 +4,7 @@
  */
 import type { Harnessed } from './harnessed.ts';
 import { Cause, Effect, Schema } from 'effect';
-import {
-  fold,
-  idleOf,
-  isLive,
-  nameFor,
-  phaseWordOf,
-  waitsOnPerson,
-  type Attempt,
-  type Event,
-  type Said,
-  type State,
-} from '../core/index.ts';
+import { fold, idleOf, isLive, nameFor, waitsOnPerson, type Attempt, type Event, type Said, type State } from '../core/index.ts';
 import { Journal, type JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
 import { claudeSayRefuses, isClaudeJob } from '../harness/claude/index.ts';
@@ -70,7 +59,7 @@ export const sayVerbOf = (
     const resume = 'Continue its session with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.';
     if (typeof text !== 'string' || !text.trim()) return yield* refuse('`text` is empty. Give the words the session should hear.');
     const events = yield* read(taskId);
-    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
     const { name: harness, runner, config: h } = harnessOf(state);
     const deliver = runner.say;
@@ -114,7 +103,7 @@ export const sayVerbOf = (
     if (cannotBg) return yield* refuse(cannotBg);
     if (!isLive(sighting.state) && !idleOf(state, sighting)) {
       return yield* refuse(
-        `\`${taskId}\`'s session is \`${phaseWordOf(sighting.state)}\` on its harness, not running: the next pass writes its end. ${resume}`,
+        `\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: the next pass writes its end. ${resume}`,
       );
     }
     if (isRemote(h) && !waitsOnPerson(sighting.state)) {

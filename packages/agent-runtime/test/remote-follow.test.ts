@@ -89,7 +89,8 @@ const runningOn = async (t: TestContext, s: RemoteServer) => {
     t,
     async () => {
       await Effect.runPromise(e.tick());
-      return (await Effect.runPromise(e.view(id))).phase.startsWith('running');
+      const { phase } = await Effect.runPromise(e.view(id));
+      return phase === 'working' || phase === 'ending';
     },
     'the session running',
     { everyMs: 20 },

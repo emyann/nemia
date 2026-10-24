@@ -19,6 +19,7 @@ import type { TaskView } from 'agent-runtime';
 import type { TestEnd } from 'agent-runtime/testing';
 import type { Engine } from '../src/runtime-client.ts';
 import type { RepositoryRun, Run, StepRecord } from '../src/run.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 import { scratch } from './scratch.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
@@ -405,12 +406,12 @@ const startedRun = async (workflowDir: string): Promise<RepositoryRun> => {
 const tick = (id: string) => stage.runWith(stage.board().e, advanceRun(readRun(id)));
 
 /** The attempt of `id` ended in `phase` with what `end` says — its closeout, exit code, reason, cost, denials, what it printed. */
-const ended = (id: string, phase: string, end: TestEnd = {}): void => {
+const ended = (id: string, phase: EnginePhase, end: TestEnd = {}): void => {
   stage.board().end(id, phase, end);
 };
 
 /** `nemia start` over `implement` (with `lines`) → `review`, run until implement, signed as `signed` says, has its check settled. */
-const throughCheck = async (lines: string[], phase: string, end: TestEnd = {}, signed: TestEnd = { closeout: SIGNED }) => {
+const throughCheck = async (lines: string[], phase: EnginePhase, end: TestEnd = {}, signed: TestEnd = { closeout: SIGNED }) => {
   const run = await startedRun(implementThenReview(lines));
   await tick(run.id);
   ended(`${run.id}-implement`, 'succeeded', signed);
@@ -793,7 +794,7 @@ test('`nemia retry --model` on a Claude Code step in `auto` (F21): a haiku model
 
 test('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name, and no ask written', async (t) => {
   const b = stage.board();
-  const settledAs = async (lines: string[], phase: string, end: TestEnd = {}) => {
+  const settledAs = async (lines: string[], phase: EnginePhase, end: TestEnd = {}) => {
     const run = await startedRun(implementThenReview(lines));
     await tick(run.id);
     ended(`${run.id}-implement`, phase, end);
@@ -803,7 +804,7 @@ test('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name,
     [
       'a running step, asked through the API',
       async () => {
-        const id = await settledAs(['check: npm test'], 'running');
+        const id = await settledAs(['check: npm test'], 'working');
         return {
           id,
           refused: () => stage.runWith(b.e, retryRun(id, 'implement', { mode: 'nudge' })),
@@ -814,7 +815,7 @@ test('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name,
     [
       'a running step, as typed, naming how to read it and how to call it off',
       async () => {
-        const id = await settledAs([], 'running');
+        const id = await settledAs([], 'working');
         return {
           id,
           refused: () => stage.main(['retry', id, 'implement']),
@@ -825,7 +826,7 @@ test('REFUSED: `nemia retry` on what the run is in — exit 2, by kind and name,
     [
       'a running step, typed with --fresh',
       async () => {
-        const id = await settledAs([], 'running');
+        const id = await settledAs([], 'working');
         return { id, refused: () => stage.main(['retry', id, 'implement', '--fresh']), facts: ['implement is still running'] };
       },
     ],
@@ -1034,7 +1035,7 @@ test('a blocked step answered with `nemia retry --message`', async (t) => {
     assert.deepEqual(retryAsks(run.id), [], 'consumed');
   });
   await s.test('`nemia ls` says the try running was answered, read off the consumed ask; it is honoured once', async () => {
-    ended(try2(), 'running');
+    ended(try2(), 'working');
     assert.equal((await stage.runWith(b.e, list(b.e, readRun(run.id)))).steps[0].note, 'try 2, nudged on your word, answered');
     assert.deepEqual(readAnswers(run.id), [{ ...ask }]);
     await tick(run.id);
@@ -1114,10 +1115,10 @@ test('`nemia retry` on a blocked session that works again before any tick: stopp
     ended(taskId(), 'needs-human');
     await printedBy(sub, ['retry', run.id, 'implement']);
     assert.deepEqual(retryAsks(run.id), ['retry-implement-2']);
-    ended(taskId(), 'running');
+    ended(taskId(), 'working');
     assert.deepEqual((await stage.runWith(b.e, list(b.e, readRun(run.id)))).steps[0], {
       name: 'implement',
-      status: 'running',
+      status: 'working',
       branch: run.branch,
       note: 'try 2 asked (--nudge) — stopping its session, then the tick files it',
     });
@@ -1207,7 +1208,7 @@ test('telling a running step something with `nemia say`, and the try that contin
     async (sub) => {
       run = await startedRun(implementThenReview());
       await tick(run.id);
-      ended(taskId(), 'running');
+      ended(taskId(), 'working');
       record = recordText(run.id);
       beside = fs.readdirSync(path.join(ROOT, 'runs')).sort();
       const printed = await printedBy(sub, ['say', run.id, 'implement', 'Widen', 'the', 'scope', 'to', 'apps/api', 'too.']);
@@ -1228,7 +1229,7 @@ test('telling a running step something with `nemia say`, and the try that contin
   await s.test('`nemia ls` notes the step said to, once and then twice', async () => {
     assert.deepEqual((await stage.runWith(b.e, list(b.e, readRun(run.id)))).steps[0], {
       name: 'implement',
-      status: 'running',
+      status: 'working',
       branch: run.branch,
       note: 'said to 1×',
     });
@@ -1282,7 +1283,7 @@ test('telling a running step something with `nemia say`, and the try that contin
   await s.test('a fresh try of another run told the same is handed none of it', async () => {
     const other = await startedRun(implementThenReview());
     await tick(other.id);
-    ended(`${other.id}-implement`, 'running');
+    ended(`${other.id}-implement`, 'working');
     await stage.runWith(b.e, sayRun(other.id, 'implement', 'Widen the scope to apps/api too.'));
     ended(`${other.id}-implement`, 'succeeded', { closeout: { outcome: 'blocked', summary: 's', artifacts: [], needs: 'which?' } });
     await tick(other.id);
@@ -1293,7 +1294,7 @@ test('telling a running step something with `nemia say`, and the try that contin
   await s.test("`retries:`, the run's own nudge, hands it on too, before what the check said", async () => {
     const checked = await startedRun(implementThenReview(['check: npm test', 'retries: 1']));
     await tick(checked.id);
-    ended(`${checked.id}-implement`, 'running');
+    ended(`${checked.id}-implement`, 'working');
     await stage.runWith(b.e, sayRun(checked.id, 'implement', 'Run the parser tests too.'));
     ended(`${checked.id}-implement`, 'succeeded', { closeout: SIGNED });
     await tick(checked.id);
@@ -1345,7 +1346,7 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
   );
   for (const words of [[''], [' \n '], []])
     await t.test(`by the engine, in its words: empty words, typed ${JSON.stringify(words)}`, async () => {
-      ended(taskId, 'running');
+      ended(taskId, 'working');
       await assert.rejects(
         stage.main(['say', run.id, 'implement', ...words], e),
         refusedAs('Conflict', '`text` is empty', 'Give the words'),
@@ -1364,7 +1365,7 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
       refusedAs('Conflict', 'review has not been filed yet', `nemia ls ${run.id}`),
     ),
   );
-  for (const phase of ['succeeded', 'failed', 'stopped'])
+  for (const phase of ['succeeded', 'failed', 'stopped'] as const)
     await t.test(`by the package: a task settled \`${phase}\`, offering the retry with words`, async () => {
       ended(taskId, phase);
       await assert.rejects(
@@ -1373,7 +1374,7 @@ test('REFUSED: `nemia say` — exit 2, a Conflict, by name; nothing said and not
       );
     });
   await t.test('by the package: a cancelled run, its task still running', async () => {
-    ended(taskId, 'running');
+    ended(taskId, 'working');
     markCancelled(run.id);
     await assert.rejects(
       stage.main(['say', run.id, 'implement', 'Widen the scope.'], e),
@@ -1800,7 +1801,7 @@ test('what the run files held open: a Claude Code job, and never a codex step, a
   const b = stage.board();
   const filedOf = (id: string) => b.specs.find((x) => x.id === id)!;
   await t.test('a Claude Code job is filed held open, and its check is not', async () => {
-    const run = await throughCheck(['check: true'], 'running');
+    const run = await throughCheck(['check: true'], 'working');
     assert.equal(filedOf(`${run.id}-implement`).holdOpen, true);
     assert.equal(Object.hasOwn(filedOf(`${run.id}-implement-check`), 'holdOpen'), false, "a check is the run's own, never held open");
   });

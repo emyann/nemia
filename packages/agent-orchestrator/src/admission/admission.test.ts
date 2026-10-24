@@ -68,8 +68,8 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
     names(answerOf('nemia approve r gate')?.reason, 'nemia approve r gate', 'waits on you', 'yours to give');
     names(answerOf('nemia retry r check --budget 5')?.reason, 'nemia retry r check --budget 5', "a step's cap", 'yours to raise');
   });
-  await t.test('the class decides, not the name: a table that classes approve as hers lets it through', () => {
-    const table = TABLE.map((c) => (c.name === 'approve' ? { ...c, nemia: 'hers' as const } : c));
+  await t.test('the class decides, not the name: a table that classes approve as act lets it through', () => {
+    const table = TABLE.map((c) => (c.name === 'approve' ? { ...c, class: 'act' as const } : c));
     assert.equal(admissionOf({ tool: 'Bash', input: { command: 'nemia approve r gate' }, cwd: '/w' }, table, waitOf), undefined);
   });
   for (const line of [
@@ -92,7 +92,7 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
 
 /** A floor of semi-auto over the store of the fixtures: `r` and `s` in pipao, at manual; `t` in hkb, at semi-auto; `gone` unread. */
 const SCOPE: Scope = {
-  floor: 'semi-auto',
+  atLeast: 'semi-auto',
   runOf: (runId) =>
     runId === 'gone' ? undefined : runId === 't' ? { factory: 'hkb', level: 'semi-auto' } : { factory: 'pipao', level: 'manual' },
   factoryOf: (factory) => (factory === 'hkb' ? 'semi-auto' : 'manual'),
@@ -141,7 +141,7 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
     names(scopedAnswer('nemia hold r')?.reason, 'nemia level semi-auto --factory pipao [--for <duration>]');
   });
   await t.test('every factory at the floor or above: the scope answers as no scope does', () => {
-    const open: Scope = { floor: 'semi-auto', runOf: () => ({ factory: 'hkb', level: 'semi-auto' }), factoryOf: () => 'semi-auto' };
+    const open: Scope = { atLeast: 'semi-auto', runOf: () => ({ factory: 'hkb', level: 'semi-auto' }), factoryOf: () => 'semi-auto' };
     for (const line of ['nemia approve r gate', 'nemia show r', 'nemia retry r check --recheck', 'nemia start x.md --factory hkb', 'ls'])
       assert.deepEqual(scopedAnswer(line, open), answerOf(line), line);
     assert.equal(scopedAnswer('nemia show t'), undefined, 'a run of a factory above the floor is hers to read');

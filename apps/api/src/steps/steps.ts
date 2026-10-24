@@ -9,7 +9,7 @@ import { COMMANDS, LOGS, phaseOfView, type TaskView } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { refusedName, typeOf } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
-import { type LifecycleStep, pathToTurn, type StepPath, tryOfStep } from './path.ts';
+import { type LifecycleTransition, pathToTurn, type StepPath, tryOfStep } from './path.ts';
 import type { Followings, Relayed } from './following.ts';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
 import { engineRead, type Engine, taskOfStep, runPlaced } from '../store.ts';
@@ -444,7 +444,7 @@ export const steps = new Hono<ApiEnv>()
       if (!asked.taskId) return c.json({ taskId: null, try: asked.try, path: [] } satisfies StepPath);
       try {
         const whole = (await runPlaced(placeService, e, PATH.handler({ id: found.run.id, step, task: asked.taskId }))) as {
-          path: LifecycleStep[];
+          path: LifecycleTransition[];
         };
         const path = pathToTurn(whole.path, asked.turn);
         return c.json({ taskId: asked.taskId, try: asked.try, path } satisfies StepPath);

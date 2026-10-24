@@ -34,7 +34,7 @@ const BLOCKED = { outcome: 'blocked', summary: 'Could not.', needs: 'a key', art
 function journalled(taskId: string, from: string, end?: { to: string; closeout: typeof DONE | typeof BLOCKED }): void {
   Effect.runSync(engine().file({ id: taskId, brief: 'Write it.', cwd: root, harness: 'codex' }));
   const begun = { startedAt: from, spawnedAt: from };
-  if (!end) standIn().settle(taskId, 'running (working)', begun);
+  if (!end) standIn().settle(taskId, 'working', begun);
   else
     standIn().settle(taskId, end.closeout.outcome === 'done' ? 'succeeded' : 'failed', {
       ...begun,

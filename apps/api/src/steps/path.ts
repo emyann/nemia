@@ -4,14 +4,14 @@ import type { Run } from 'agent-orchestrator/run';
 import { turnOfTry } from '../detail/tries.ts';
 import type { Engine } from '../store.ts';
 
-/** One step of a task's path: the lifecycle state its journal says once an entry is on it, the entry's kind and its `at`. */
-export type LifecycleStep = Effect.Success<ReturnType<Engine['Service']['path']>>[number];
+/** One transition of a task's path: the lifecycle state its journal says once an entry is on it, the entry's kind and its `at`. */
+export type LifecycleTransition = Effect.Success<ReturnType<Engine['Service']['path']>>[number];
 
 /**
  * The path of one try of a step: its task, the try's number counted from 1 as the step's tries count them (`triesOf`), and the task's
  * path from its filing to the end of that try. A step not filed yet has no task and an empty path.
  */
-export type StepPath = { taskId: string | null; try: number; path: LifecycleStep[] };
+export type StepPath = { taskId: string | null; try: number; path: LifecycleTransition[] };
 
 /**
  * The try of `step` that `asked` names — the current one when it is undefined or empty — with its task, and the turn of that task it
@@ -48,7 +48,7 @@ export function tryOfStep(
  * A task's path cut to the end of its turn `turn`: everything before the `input` entry that opened the turn after it. The whole path for
  * no turn, and for a turn no answer followed.
  */
-export function pathToTurn(path: readonly LifecycleStep[], turn: number | undefined): LifecycleStep[] {
+export function pathToTurn(path: readonly LifecycleTransition[], turn: number | undefined): LifecycleTransition[] {
   if (turn === undefined) return [...path];
   let inputs = 0;
   const end = path.findIndex((s) => s.event === 'input' && ++inputs > turn);

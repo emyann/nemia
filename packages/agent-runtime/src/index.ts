@@ -10,7 +10,7 @@
  *   **The engine runs ONE workload on ONE harness. Anything that knows about a SECOND workload
  *   is the upper layer.**
  *
- * "Implement, then review" knows about two. So does a dependency graph, a board, a column, a
+ * "Implement, then review" knows about two. So does a dependency graph, a page, a column, a
  * pull request. None of them belong here, and none of them need to: a workflow layer files
  * tasks with `file`, watches `feed` for the ones that settle, and files the next. That is the
  * whole contract, and it is three functions wide.
@@ -30,7 +30,7 @@
  * - the feed: how an upper layer reacts without polling a task (`journal.ts`);
  * - the harnesses: bring your own (`Runner`, and each runner the package ships);
  * - the vocabulary (`domain.ts`), with the words each harness takes, as lists: what an upper layer
- *   that checks a task before filing it holds its own copy to, and the lifecycle as plain data for a board to draw.
+ *   that checks a task before filing it holds its own copy to, and the lifecycle as plain data for a page to draw.
  */
 
 export {
@@ -73,8 +73,8 @@ export type { EngineOptions, HarnessConfig, Pooled, TaskSpec, TickReport, Engine
  */
 export { configRefusal } from './service/harnesses.ts';
 
-export { file, FileRefused, requestStop, StopRefused, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/index.ts';
-export { view, viewOfState, tick, TickRefused, step, settleTask, StepRefused, GRACE_MS } from './core/engine/index.ts';
+export { file, FileRefused, StopRefused, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/index.ts';
+export { view, viewOfState, tick, TickRefused, reconcile, settleTask, ReconcileRefused, GRACE_MS } from './core/engine/index.ts';
 export type { Filing } from './core/engine/index.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';
 export { refusedText, retiredKeyRefusal } from './core/engine/index.ts';
@@ -147,13 +147,14 @@ export { a2aRunner } from './a2a/index.ts';
 
 export type { Event, State, Attempt, Sighting, EndReason, Usage, Said, Denial, Input, Bridge } from './core/index.ts';
 export type { AskOption, AskQuestion, SessionAsk } from './core/index.ts';
-export type { SessionState, Ended, Outcome } from './core/index.ts';
+export type { SessionState, Outcome, TaskPhase } from './core/index.ts';
+export { TASK_PHASES } from './core/index.ts';
 /**
- * The task's lifecycle as plain data — states, edges, first and final states, and the verbs written from outside it — for a board to
+ * The task's lifecycle as plain data — states, edges, first and final states, and the verbs written from outside it — for a page to
  * draw; never the machine or its move.
  */
 export { lifecycleGraph } from './core/index.ts';
-export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleStep, LifecycleVerb } from './core/index.ts';
+export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleTransition, LifecycleVerb } from './core/index.ts';
 export { denialText, fold, nameFor } from './core/index.ts';
 export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { fenceReach, unruledIn, type FenceReach } from './harness/reach.ts';

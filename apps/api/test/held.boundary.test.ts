@@ -96,10 +96,10 @@ const summary = async (id: string) => {
   return run;
 };
 
-test("a held step closed and not yet settled reads as it signed, never the engine's `between attempts` for a session still going — as `nemia ls` says", async () => {
+test("a held step closed and not yet settled reads as it signed, never the engine's `between-attempts` for a session still going — as `nemia ls` says", async () => {
   assert.equal(
     (await Effect.runPromise(engine().view('h-closed-plan'))).phase,
-    'between attempts',
+    'between-attempts',
     'the seed: closed, and the engine has not settled it',
   );
   await runWith(engine(), approveRun('h-closed', 'plan'));
@@ -109,7 +109,7 @@ test("a held step closed and not yet settled reads as it signed, never the engin
       run.steps.map((s) => s.status),
       listed.steps.map((s) => s.status),
     );
-    assert.doesNotMatch(run.steps[0].status, /between attempts|running/);
+    assert.doesNotMatch(run.steps[0].status, /between-attempts|working|running/);
   }
 });
 
@@ -126,7 +126,7 @@ test('each try of a held task a person answered is its own turn: the try answere
   const [answered, going] = plan.tries;
   assert.deepEqual(
     [answered.status, answered.attempts.count, answered.attempts.latest?.ended, answered.closeout?.needs],
-    ['succeeded', 1, 'done', BLOCKED.needs],
+    ['succeeded', 1, 'succeeded', BLOCKED.needs],
     'the turn answered, as it signed',
   );
   assert.deepEqual(

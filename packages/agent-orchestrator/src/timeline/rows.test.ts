@@ -197,7 +197,7 @@ const turn = (n: number, spawned: string, ended: string, outcome = 'done') => ({
   endedAt: at(ended),
   reason: null,
   usage: { costUsd: n ? 1 : 3 },
-  ended: 'done',
+  ended: 'succeeded' as const,
   turn: n,
   closeout: { outcome, summary: 'said', artifacts: [], needs: outcome === 'blocked' ? 'which flag?' : null },
 });

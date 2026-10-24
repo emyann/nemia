@@ -17,14 +17,14 @@ import type { CommandClass } from './class.ts';
  */
 type Entry = {
   readonly name: string;
-  readonly nemia: CommandClass;
+  readonly class: CommandClass;
   readonly asksAlways?: true;
   readonly only?: { readonly side: 'cli' | 'api' };
   readonly spec?: Spec;
 };
 
 /** A command of the table typed on a shell line: its name, its class, and the words after its name. */
-export type Typed = { name: string; nemia: CommandClass; args: string[] };
+export type Typed = { name: string; class: CommandClass; args: string[] };
 
 /**
  * A shell line's words and the separators between its commands. A quote splits words and is dropped, so a line run through `bash -c '…'`
@@ -51,7 +51,7 @@ export function typedIn(line: string, table: readonly Entry[]): Typed[] {
     const rest = parts.slice(at + 1);
     const words = rest.slice(0, rest.findIndex(ends) === -1 ? rest.length : rest.findIndex(ends));
     const named = served.filter((s) => s.words.every((w, i) => words[i] === w)).sort((a, b) => b.words.length - a.words.length)[0];
-    if (named) typed.push({ name: named.entry.name, nemia: named.entry.nemia, args: words.slice(named.words.length) });
+    if (named) typed.push({ name: named.entry.name, class: named.entry.class, args: words.slice(named.words.length) });
   });
   return typed;
 }
@@ -102,23 +102,23 @@ export const namedIn = (line: string, table: readonly Entry[]): Array<Typed & Na
   typedIn(line, table).map((typed) => ({ ...typed, ...namedBy(typed, table) }));
 
 /**
- * The floor an agent's calls are scoped by, as a namespace scopes a binding: the level a factory is at least at for a call to act on it
- * (`floor`); the factory and level of a run, undefined where the run does not read (`runOf`); and a factory's level (`factoryOf`).
+ * What an agent's calls are scoped by, as a namespace scopes a binding: the level a factory is at least at for a call to act on it
+ * (`atLeast`); the factory and level of a run, undefined where the run does not read (`runOf`); and a factory's level (`factoryOf`).
  */
 export type Scope = {
-  floor: Level;
+  atLeast: Level;
   runOf: (runId: string) => { factory: string; level: Level } | undefined;
   factoryOf: (factory: string) => Level;
 };
 
 /** How a factory's level is raised, as the refusal says it: the store's for the default factory, else the factory's own. */
-const raiseWords = (factory: string, floor: Level): string =>
-  factory === DEFAULT_FACTORY ? `nemia level ${floor}` : `nemia level ${floor} --factory ${factory} [--for <duration>]`;
+const raiseWords = (factory: string, least: Level): string =>
+  factory === DEFAULT_FACTORY ? `nemia level ${least}` : `nemia level ${least} --factory ${factory} [--for <duration>]`;
 
-/** The denial of `line`, which acts on the factory `factory` at `level`, below `floor`, through `what`. */
-const below = (line: string, what: string, factory: string, level: Level, floor: Level): AdmissionAnswer => ({
+/** The denial of `line`, which acts on the factory `factory` at `level`, below `least`, through `what`. */
+const below = (line: string, what: string, factory: string, level: Level, least: Level): AdmissionAnswer => ({
   decision: 'deny',
-  reason: `${line} acts on ${what}the factory ${factory}, at ${level}: below ${floor}, it is left alone. Raising it is the person's: ${raiseWords(factory, floor)}.`,
+  reason: `${line} acts on ${what}the factory ${factory}, at ${level}: below ${least}, it is left alone. Raising it is the person's: ${raiseWords(factory, least)}.`,
 });
 
 /** Scope's answer for one typed command: a denial where it names a run or factory below the floor, an ask where it cannot be read. */
@@ -130,11 +130,11 @@ function scopedOf(typed: Typed & Named, scope: Scope): AdmissionAnswer | undefin
     const run = scope.runOf(runId);
     if (run === undefined)
       return { decision: 'ask', reason: `${line} names ${runId}, which does not read, so admission cannot read its factory.` };
-    if (!atLeast(run.level, scope.floor)) return below(line, `${runId} of `, run.factory, run.level, scope.floor);
+    if (!atLeast(run.level, scope.atLeast)) return below(line, `${runId} of `, run.factory, run.level, scope.atLeast);
   }
   for (const factory of typed.factories) {
     const level = scope.factoryOf(factory);
-    if (!atLeast(level, scope.floor)) return below(line, '', factory, level, scope.floor);
+    if (!atLeast(level, scope.atLeast)) return below(line, '', factory, level, scope.atLeast);
   }
   return undefined;
 }
@@ -216,7 +216,7 @@ function alwaysAsked(line: string, table: readonly Entry[]): AdmissionAnswer | u
 /**
  * Admission's answer for a call: where `scope` is given, `deny` for a shell line acting on a run or a factory below its floor, and `ask`
  * for one whose runs it cannot read (`scopeOf`); then `ask` where the line types a command asked every time (`asksAlways`), whatever the
- * session was allowed; then `ask`, saying why in the person's words, where the call is a shell line that types an `answers` command of
+ * session was allowed; then `ask`, saying why in the person's words, where the call is a shell line that types an `answer` command of
  * `table` that waits on the person (`askedOf`) and no rule of `auto` lets through (`autoAllows`); else none, and the call meets the
  * session's own rules. `waitOf` says why a step waits on the person — at its gate, on its question, out of rounds, at its cap, or not there
  * to read — or undefined where it waits on no one.
@@ -234,7 +234,7 @@ export function admissionOf(
   if (inScope !== undefined) return inScope;
   const always = alwaysAsked(line, table);
   if (always !== undefined) return always;
-  for (const typed of typedIn(line, table).filter((t) => t.nemia === 'answers')) {
+  for (const typed of typedIn(line, table).filter((t) => t.class === 'answer')) {
     const why = askedOf(typed, waitOf);
     if (why !== undefined && !autoAllows(typed, table, auto)) return { decision: 'ask', reason: why };
   }

@@ -54,7 +54,7 @@ const signedJournal = (): Event[] => [
     at: new Date().toISOString(),
     attempt: 1,
     sessionId: 's-1',
-    observed: 'done',
+    observed: 'succeeded',
     reason: 'harness',
     nativeId: 's-1',
     closeout: { ok: true },
@@ -114,7 +114,7 @@ test('a task held open signs and waits with its session released; answered after
           "under the answer's budget, laid over the rest of the filing's configuration",
         );
         assert.deepEqual(spawned[0].config, { model: 'opus', budgetUsd: 1 }, "the first turn under the filing's");
-        assert.equal(await phase(id), 'running (working)');
+        assert.equal(await phase(id), 'working');
       },
     );
 
@@ -266,7 +266,7 @@ test('over a store in memory, through the engine: signed, it waits; answered wit
     assert.deepEqual(Object.keys(said), ['at', 'text'], 'no configuration given, none journalled');
     assert.deepEqual((await Effect.runPromise(b.engine.view(id))).state.inputs, [said]);
     await Effect.runPromise(b.engine.tick());
-    assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'running (working)');
+    assert.equal((await Effect.runPromise(b.engine.view(id))).phase, 'working');
   });
   await s.test('signed again, a stop settles it stopped, waiting', async () => {
     signed(b.sessions, `ae/${id}/2`, 'again', (await Effect.runPromise(b.engine.view(id))).state.attempts[1].startedAt);
@@ -298,7 +298,7 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
       const id = ((await run(file({ brief: 'b', cwd: '/r' }))) as { success: string }).success;
       await refusedWith(answer(id, 'go on'), /^`t-.*` was not filed to be held open/);
       await refusedWith(close(id), /^`t-.*` was not filed to be held open/);
-      await refusedWith(answer('t-nope', 'go on'), /^`t-nope` is not a task on this board/);
+      await refusedWith(answer('t-nope', 'go on'), /^`t-nope` is not a task in this store/);
       const held = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
       await refusedWith(answer(held, ' '), /^`text` is empty/);
       await refusedWith(answer(held, 'go on'), /has not started an attempt yet/);
@@ -445,7 +445,7 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
         b,
         't-unrecorded',
         () => Effect.runPromise(b.engine.answer('t-unrecorded', 'go')),
-        /^`t-unrecorded`'s attempt 1 signed, but its harness recorded no session for it, so there is no conversation for an answer to continue\. `close` it/,
+        /attempt 1 ended, .*recorded no session for it.*`close` it/,
       );
       assert.equal((await Effect.runPromise(b.engine.view('t-unrecorded'))).phase, 'input-required');
       await Effect.runPromise(b.engine.close('t-unrecorded'));
@@ -453,9 +453,9 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
     },
   );
 
-  await t.test('answer and close refuse a task not on this board', async () => {
-    await refuses(b, 't-nope', () => Effect.runPromise(b.engine.answer('t-nope', 'go')), /^`t-nope` is not a task on this board/);
-    await refuses(b, 't-nope', () => Effect.runPromise(b.engine.close('t-nope')), /^`t-nope` is not a task on this board/);
+  await t.test('answer and close refuse a task not in this store', async () => {
+    await refuses(b, 't-nope', () => Effect.runPromise(b.engine.answer('t-nope', 'go')), /^`t-nope` is not a task in this store/);
+    await refuses(b, 't-nope', () => Effect.runPromise(b.engine.close('t-nope')), /^`t-nope` is not a task in this store/);
   });
 
   await t.test('the control: the same board closes a task that waits', async () => {
@@ -473,9 +473,9 @@ test('ae ls names the turn of a task held open, and counts no attempts: one per 
     { kind: 'input', at, text: 'again' },
     { kind: 'starting', at, attempt: 2 },
   ];
-  const line = (n: number) => taskLine({ id: 't-1', state: fold('t-1', events.slice(0, n)), phase: 'x', sessionId: null });
+  const line = (n: number) => taskLine({ id: 't-1', state: fold('t-1', events.slice(0, n)), phase: 'idle', sessionId: null });
   assert.doesNotMatch(line(4), /turn/, 'turn 0: nothing to name');
-  assert.match(line(5), / x {17} turn 1  /, 'answered: a turn with no attempt yet');
-  assert.match(line(6), / x {17} turn 1  /);
+  assert.match(line(5), / idle {14} turn 1  /, 'answered: a turn with no attempt yet');
+  assert.match(line(6), / idle {14} turn 1  /);
   for (const n of [4, 5, 6]) assert.doesNotMatch(line(n), /\d\/\d/, 'no count of attempts against a maximum');
 });

@@ -96,7 +96,7 @@ test('a consumer runs a task through its whole life in plain async/await, and bu
 
     await s.test('a pass starts it: running, one session', async () => {
       await Effect.runPromise(engine.tick());
-      assert.equal((await Effect.runPromise(engine.view(id))).phase, 'running (working)');
+      assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working');
       assert.equal(sessions.size, 1);
     });
 
@@ -292,13 +292,13 @@ const slowEngine = async () => {
 };
 
 test(
-  'start(): it ticks on a timer and never overlaps, and stop() lets the pass under way finish, report and be the last',
+  'up(): it ticks on a timer and never overlaps, and stop() lets the pass under way finish, report and be the last',
   WAITED,
   async (t) => {
     await t.test('it ticks on a timer and never overlaps', async (row) => {
       const { engine, seen, errors, onError } = await slowEngine();
       const ticks = ticksUntil(3);
-      const loop = Effect.runSync(engine.start({ intervalMs: 20, onTick: ticks.onTick, onError }));
+      const loop = Effect.runSync(engine.up({ intervalMs: 20, onTick: ticks.onTick, onError }));
       try {
         await ticks.wait(row, errors);
       } finally {
@@ -325,7 +325,7 @@ test(
       async (row) => {
         const { engine, seen, begun, errors, onError } = await slowEngine();
         const ticks = ticksUntil(1);
-        const loop = Effect.runSync(engine.start({ intervalMs: 20, onTick: ticks.onTick, onError }));
+        const loop = Effect.runSync(engine.up({ intervalMs: 20, onTick: ticks.onTick, onError }));
         try {
           await until(row, () => seen.inFlight > 0, 'a pass under way', { bell: begun });
         } finally {
@@ -357,7 +357,7 @@ test('a task whose journal holds an entry no runtime wrote is left out of each p
   fs.appendFileSync(journal, MISWRITTEN);
 
   const first = await Effect.runPromise(engine.tick());
-  assert.equal((await Effect.runPromise(engine.view(good))).phase, 'running (working)');
+  assert.equal((await Effect.runPromise(engine.view(good))).phase, 'working');
   assert.deepEqual([...sessions.keys()], [nameFor(good, 1)]);
   assert.equal(first.unreadable.length, 1);
   assert.ok(
@@ -552,8 +552,8 @@ const survives = (body: string) =>
     }, 1_200);
   });
 
-test('start() and watch() keep their host process alive — a loop that lets you exit is not a loop', async (t) => {
-  const started = survives('Effect.runSync(engine.start({ intervalMs: 200 }));');
+test('up() and watch() keep their host process alive — a loop that lets you exit is not a loop', async (t) => {
+  const started = survives('Effect.runSync(engine.up({ intervalMs: 200 }));');
   const watching = survives(`
     const store = {
       append: () => Effect.void, read: () => Effect.succeed([]), list: Effect.succeed([]),
@@ -561,7 +561,7 @@ test('start() and watch() keep their host process alive — a loop that lets you
     };
     Effect.runSync(builtEngine(Engine.layer({ root, journal: store })).watch({ onEntry: () => {} }));
   `);
-  await t.test('start() keeps its host process alive', async () => {
+  await t.test('up() keeps its host process alive', async () => {
     assert.equal(await started, true);
   });
   await t.test('watch() keeps its host process alive, even with a store that cannot push', async () => {
@@ -715,7 +715,7 @@ test('a runner brought as an AsyncRunner, at the pass: handed claude.remoteContr
       assert.equal((await Effect.runPromise(engine.view(maybe))).state.settled, null, 'said nothing: not failed');
 
       await Effect.runPromise(engine.tick());
-      assert.equal((await Effect.runPromise(engine.view(maybe))).phase, 'running (working)', 'and its session is adopted');
+      assert.equal((await Effect.runPromise(engine.view(maybe))).phase, 'working', 'and its session is adopted');
     },
   );
 });

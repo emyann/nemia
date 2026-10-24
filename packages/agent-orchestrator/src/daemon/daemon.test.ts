@@ -14,7 +14,6 @@ import {
   daemonStanding as standingOf,
   holdRefusal,
   holderAgainst,
-  holderOf,
   staleAfterMs,
   takeoverLine,
   type DaemonFile,
@@ -27,6 +26,7 @@ const NOW = Date.parse('2026-09-22T12:00:00.000Z');
 const ago = (minutes: number) => new Date(NOW - minutes * 60_000).toISOString();
 const holder = (over: Partial<DaemonFile> = {}): DaemonFile => ({
   pid: 4242,
+  by: 'up',
   startedAt: ago(60),
   cwd: '/home/me/repo',
   every: 4000,
@@ -239,7 +239,6 @@ test('REFUSED both ways round: an api holding the store refuses a nemia up, nami
   assert.match(second, /serve a board beside it with --no-tick, or start this api again once it has stopped: stop it with kill 4242 — /);
   assert.match(holdRefusal(held(holder()), 'api', '/store', NOW), /^api: \/store is held by the nemia up of pid 4242, started /);
   assert.match(holdRefusal(held(api), 'tick', '/store', NOW), /^nemia tick: \/store is held by the api of pid 4242 at http:/);
-  assert.equal(holderOf({}), 'wf up', 'a record written before the api ticked is a wf up, as it was written');
   assert.equal(
     daemonLine(judged(text(api), live), NOW),
     'api: ticking, pid 4242 at http://127.0.0.1:8787, every 4000ms — last pass 3s ago (2026-09-22T11:59:57.000Z)',

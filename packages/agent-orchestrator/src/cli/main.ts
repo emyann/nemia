@@ -269,7 +269,7 @@ function upVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
       const took = takeoverLine(replaced, store, Date.now());
       if (took) console.log(`   ${took}`);
     });
-  const daemon = up(e, { every, repo: path.resolve('.'), holder: 'wf up', onTaken });
+  const daemon = up(e, { every, repo: path.resolve('.'), holder: 'up', onTaken });
   return runMain(
     daemon.pipe(
       Effect.scoped,

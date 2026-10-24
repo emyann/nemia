@@ -15,7 +15,7 @@ import { PASS_SERIES } from '../meter/meter.verb.ts';
 import { seriesBorn } from '../telemetry/telemetry.store.ts';
 import { heldLines, pausedWords, RESUMED } from '../pause/pause.ts';
 import { refusalLines, tickRun, type Pass } from '../tick/tick.verb.ts';
-import { beat, heldHolder, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
+import { beat, heldServes, heldUrl, passed, releaseStore, stillHeld, takeStore, type TakenStore } from './daemon.store.ts';
 import { takenFromLine, type HolderKind } from './daemon.ts';
 import { deliver } from '../subscription/deliver.verb.ts';
 import { DAEMON_STARTED, startedLine } from '../feed/index.ts';
@@ -256,7 +256,7 @@ const saidStarted = ({ held, replaced }: TakenStore): Effect.Effect<void> =>
  * The daemon: the store's lease taken as `holder` (`takeStore`, refused by name while another daemon of either kind ticks it) and let go
  * as its scope closes, however it ends, so a signal that stops it leaves the store free at once; the engine's attached sessions held
  * (`hold`) inside it, so as the scope closes each is let go between two tool calls, before the lease, and what that hold serves on its own
- * port written onto the lease beside the api's url (`heldHolder`), by this process, which is the one that holds it — so another process on
+ * port written onto the lease beside the api's url (`heldServes`), by this process, which is the one that holds it — so another process on
  * this store can follow one of those sessions live rather than off the files; its series and the caller's (`series`) born at zero and
  * exported so (`DAEMON_SERIES`, `seriesBorn`) before anything counts into them; its line in the feed (`saidStarted`); `onTaken`; then a
  * pass on `e` every interval, each written down (`passed`) and logged (`logPass`), through whatever logger the process provides. It beats
@@ -280,7 +280,7 @@ export const up = (
       ({ held }) => Effect.sync(() => releaseStore(held)),
     );
     const served = yield* e.hold();
-    if (served) yield* Effect.sync(() => heldHolder(served.cards));
+    if (served) yield* Effect.sync(() => heldServes(served.cards));
     yield* seriesBorn([...DAEMON_SERIES, ...series]);
     yield* Effect.forkScoped(Effect.forever(Effect.sleep(every).pipe(Effect.andThen(Effect.sync(() => beat(taken.held))))));
     let reading: Reading = {};

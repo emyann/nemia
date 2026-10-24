@@ -1,5 +1,5 @@
 /**
- * A remote MCP server signed in to, and signed out of, on Claude Code: the harness half of a sign-in a person makes from the board.
+ * A remote MCP server signed in to, and signed out of, on Claude Code: the harness half of a sign-in a person makes from a page.
  *
  * Measured on Claude Code 2.1.308 and the Agent SDK 0.3.308 (`docs/harness.md`, *The MCP sign-in affordances*):
  *

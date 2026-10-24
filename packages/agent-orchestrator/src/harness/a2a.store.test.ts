@@ -24,6 +24,7 @@ import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from '../../test/placed.ts';
+import type { EnginePhase } from '../views/views-words.ts';
 
 const ROOT = scratch('wf-a2a-agents-');
 process.env.WF_ROOT = ROOT;
@@ -401,7 +402,7 @@ test("a loop's target on a remote agent is refused; a step inside the loop may b
 /** The engine stand-in, with what each task is doing and how it signed off settled by hand, and every task's spec as it was filed. */
 const board = () => {
   const held = engine();
-  const settle = (id: string, phase: string, closeout?: unknown) => held.settle(id, phase, closeout === undefined ? {} : { closeout });
+  const settle = (id: string, phase: EnginePhase, closeout?: unknown) => held.settle(id, phase, closeout === undefined ? {} : { closeout });
   return { e: engineOf(held.layer), tasks: held.tasks, settle };
 };
 

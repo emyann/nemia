@@ -105,8 +105,8 @@ What a pass compares against is the feed itself, folded, not something it rememb
 its fold with the byte it read to, and reads on from there each pass — its own lines and any a
 `wf tick` beside it wrote — and a restarted one reads the feed once from the start. So a restart
 writes nothing for what did not change. Four things are left out of a word so that it moves only
-when the judgement does: the engine's live words (`running (working)`, `running (idle)`,
-`working (quiescent)`, `starting`, `between attempts`) read `running`, a slot wait says no count, no
+when the judgement does: the engine's live phases (`starting`, `working`, `quiescent`,
+`between-attempts`, `ending`) read `running`, a slot wait says no count, no
 cost is said, and no git standing is read (`wf ls`'s `→ to decide` for a finished run with no
 ending step is not in the feed). A step's filing reaches it a pass late, as `pending`: the words
 are read before the pass files anything. A run the pass finds at rest (`atRest`) whose words are
@@ -1501,7 +1501,7 @@ gated ship runs the line whole on the merged tree.
 | `waiting` | not filed yet | — |
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
-| the engine's word: `running (working)`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
+| the engine's phase: `working`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
 | `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`stated: false`; a journal from before stage 4a says `failed`, `unsigned`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares, or its closeout named a file the run does not have | **never runs** — the run nudges it once a round first, below |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
@@ -3101,7 +3101,7 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   a `retry` of a step at its gate, on its question, out of rounds or at its cap, any `--budget` — is asked of the person by her
   admission (`nemia admit`, a hook asked before each of her shell calls), and so is a write that cannot be undone or changes their
   settings or a factory (`cancel`, `rm`, `factory add`, `level semi-auto`); the rest — a read, `start`, `hold`, `say`, `inbox add`, a
-  retry that waits on no one — is hers. Each command's class in the table decides (`nemia` on its entry, `src/admission/class.ts`), and
+  retry that waits on no one — is hers. Each command's class in the table decides (`class` on its entry, `src/admission/class.ts`), and
   a "don't ask again" never widens what waits. The harness must trust her folder first, once, by hand: the
   refusal names the command. **`nemia level manual`** puts her off: the keeper stops her session and drops her subscription. A
   session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
@@ -3271,7 +3271,7 @@ task is never refused, however many passes read it.
 The tick keeps one writer per file, and two ticks are two writers. So the store's daemon takes the store for itself, through a file of its
 own, `$WF_ROOT/daemon.json`, which it alone writes. The daemon is the api's process (`npm start` in `apps/api`), which answers the board's
 `/api` as it ticks (the board itself is the web's server, which proxies to it), or `wf up` on a machine that serves none: both run `up` (`src/daemon/up.verb.ts`), which takes the store before anything else,
-and the file names which one holds it (`by`, `"api"` or `"wf up"`, read as `wf up` when absent) and where an api serves (`url`, written
+and the file names which one holds it (`by`, `"api"` or `"up"`; a file written before, with none or `"wf up"`, reads as `up`) and where an api serves (`url`, written
 once it listens). An api started with `--no-tick` answers on 8788, behind the vite dev server, and takes nothing: it ticks no store, so a run filed on it
 moves on the daemon's next pass.
 
@@ -3291,9 +3291,9 @@ not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` f
 (`stalled`), or one `ticking`. The interval is a whole number of milliseconds from 1 to 2147483647 and anything else is refused, exit 2,
 before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
 
-The lease also names what the daemon's own engine holds, `holder`: the cards it serves on its port, by the harness each is for, written
-right after it took the lease and held its engine (`heldHolder`), by that process, which is the one writer of the file — the api's url and
-the holder's cards are both facts of the process that holds it. Another process on this store reads them (`holderOnStore`) to follow one
+The lease also names what the daemon's own engine holds, `serves` (`holder` before, read as `serves`): the cards it serves on its port, by the harness each is for, written
+right after it took the lease and held its engine (`heldServes`), by that process, which is the one writer of the file — the api's url and
+the holder's cards are both facts of the process that holds it. Another process on this store reads them (`servesOnStore`) to follow one
 of those sessions live over that port rather than off the files, and reads them afresh at every follow: a holder's port is ephemeral, and
 a process that read it once would dial a dead port after any restart. Nothing is answered for a lease that stopped, whose process is gone
 or that has gone silent — there is no port to dial — nor for a lease the asking process itself holds, which would be a viewer dialling

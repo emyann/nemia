@@ -271,7 +271,8 @@ const engineOver = async (dir: string) => {
 
 /**
  * A held-open task as a runtime that judged the spend cap journalled one: its cap beside `config`, a turn's cap on its
- * answer, and an end with `reason: 'budget'`, which `upgrade` reads as the harness's end at that limit.
+ * answer, and an end with `reason: 'budget'`, which `upgrade` reads as the harness's end at that limit, and an end
+ * observed `done`, which it reads as `succeeded`.
  */
 const CAPPED = [
   { kind: 'filed', at: '2026-09-24T00:00:00Z', brief: 'b', cwd: '/r', holdOpen: true, budgetUsd: 1, config: { model: 'haiku' } },
@@ -416,7 +417,11 @@ test("upgrade: a journal an older runtime wrote, or a consumer's own store holds
         { ...CAPPED[7], reason: 'harness', limit: 'budget' },
         'the end the runtime judged `budget` is the harness ending it at that limit',
       );
-      assert.deepEqual(events[3], CAPPED[3], 'an end at no limit is as written');
+      assert.deepEqual(
+        events[3],
+        { ...CAPPED[3], observed: 'succeeded' },
+        'an end at no limit is as written, its former `done` read as `succeeded`',
+      );
       assert.deepEqual(events[8], CAPPED[8], 'and what was settled stays settled, in its words');
       const { entries } = await run(dir, feedFrom(0));
       assert.deepEqual(
@@ -431,7 +436,7 @@ test("upgrade: a journal an older runtime wrote, or a consumer's own store holds
       assert.deepEqual(
         state.attempts.map((a) => [a.ended, a.reason, a.limit]),
         [
-          ['done', 'harness', undefined],
+          ['succeeded', 'harness', undefined],
           ['failed', 'harness', 'budget'],
         ],
       );
@@ -572,7 +577,7 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
     at: '2026-09-24T00:00:01Z',
     attempt,
     sessionId: 's',
-    observed: 'done',
+    observed: 'succeeded',
     reason: 'harness',
     ...more,
   });

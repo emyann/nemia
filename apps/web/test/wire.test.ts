@@ -266,8 +266,8 @@ export type SkillDraft = Holds<Same<Board.SkillDraft, NonNullable<skills.SkillDe
 export type TranscriptEvent = Holds<Same<Board.TranscriptEvent, steps.TranscriptEvent>>;
 export type StepTranscript = Holds<Same<Board.StepTranscript, steps.StepTranscript>>;
 /** As a machine's: a step of a task's path is drawn by its state's and its event's words. */
-export type LifecycleStep = Holds<Same<Board.LifecycleStep, Widened<path.LifecycleStep>>>;
-export type StepPath = Holds<Same<Board.StepPath, Omit<path.StepPath, 'path'> & { path: Widened<path.LifecycleStep>[] }>>;
+export type LifecycleTransition = Holds<Same<Board.LifecycleTransition, Widened<path.LifecycleTransition>>>;
+export type StepPath = Holds<Same<Board.StepPath, Omit<path.StepPath, 'path'> & { path: Widened<path.LifecycleTransition>[] }>>;
 
 export type YourStore = Holds<Same<Board.YourStore, yours.YourStore>>;
 

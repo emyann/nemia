@@ -31,6 +31,7 @@ import {
   type RepositoryRun,
   type Run,
   type TaskPhase,
+  type ListedPhase,
 } from '../src/run.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import type { Closeout } from '../src/closeout/closeout.ts';
@@ -61,7 +62,10 @@ const said = (outcome: Closeout['outcome']): Closeout => ({
   needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
 });
 /** The engine's own phase words, which are free text. */
-const shown = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
+const shown =
+  (m: Record<string, ListedPhase>) =>
+  (id: string): ListedPhase =>
+    m[id] ?? 'unknown';
 /** How each step signed off, by name. */
 const signedOff = (m: Record<string, Closeout>) => (name: string) => m[name];
 const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.status);

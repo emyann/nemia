@@ -302,7 +302,7 @@ test('a subscription that fails before its first answer is a JSON-RPC error in a
     );
     const body = (await answered.json()) as { id?: number; error?: { message: string } };
     assert.equal(body.id, 7, JSON.stringify(body));
-    assert.match(body.error!.message, /has ended \(done\)/, `the refusal says why, and what to read instead: ${JSON.stringify(body)}`);
+    assert.match(body.error!.message, /has ended \(completed\)/, `the refusal says why, and what to read instead: ${JSON.stringify(body)}`);
     assert.match(body.error!.message, /sessionTranscript/);
   } finally {
     await close();

@@ -6,7 +6,7 @@
 import { Effect } from 'effect';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Event, FeedEntry, HarnessConfig, Sighting } from '../src/index.ts';
+import type { Event, FeedEntry, HarnessConfig, Sighting, TaskPhase } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
 import { nameFor } from '../src/core/domain.ts';
 import { holdsSlot, ownPool, toAdmit, type AdmissionView } from '../src/core/admission.ts';
@@ -196,26 +196,36 @@ const queued = (id: string, filed: number, harness = 'a', priority?: number): Ad
   admission: 'queued',
   state: { harness, filedAt: at(filed), ...(priority !== undefined ? { priority } : {}) },
 });
-const live = (id: string, phase: string, harness = 'a'): AdmissionView => ({ id, phase, state: { harness, filedAt: at(0) } });
+const live = (id: string, phase: TaskPhase, harness = 'a'): AdmissionView => ({ id, phase, state: { harness, filedAt: at(0) } });
 const under = (ceiling: number, poolOf = ownPool) => ({ ceiling, poolOf });
 const sharing = (harness: string | undefined) => (harness === 'b' ? 'a' : ownPool(harness));
 
 test('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by priority, filing and id, counted at once — and which views hold a slot', async (t) => {
   await t.test(
-    'holdsSlot: a session at work, one starting, and one admitted and not yet started hold a slot; one blocked, held, between attempts or settled none',
+    'holdsSlot: a session at work or quiescent, one starting, and one admitted and not yet started hold a slot; one waiting on a person, held, idle, restarting, between attempts, ending or settled none',
     () => {
-      for (const phase of ['running (working)', 'working (quiescent)', 'starting']) assert.equal(holdsSlot({ phase }), true, phase);
+      for (const phase of ['working', 'quiescent', 'starting'] as const) assert.equal(holdsSlot({ phase }), true, phase);
       assert.equal(holdsSlot({ phase: 'pending', admission: 'admitted' }), true);
       assert.equal(holdsSlot({ phase: 'pending', admission: 'queued' }), false);
       assert.equal(holdsSlot({ phase: 'pending' }), false);
-      for (const phase of ['needs-human', 'input-required', 'between attempts', 'succeeded', 'failed', 'stopped'])
+      for (const phase of [
+        'needs-human',
+        'input-required',
+        'idle',
+        'restarting',
+        'between-attempts',
+        'ending',
+        'succeeded',
+        'failed',
+        'stopped',
+      ] as const)
         assert.equal(holdsSlot({ phase }), false, phase);
     },
   );
   await t.test(
     'toAdmit: a harness that shares a pool counts against its ceiling, listed first so a pool by harness name alone reads two',
     () => {
-      const views = [live('b-1', 'running (working)', 'b'), live('a-1', 'running (working)'), queued('a-2', 1), queued('b-2', 2, 'b')];
+      const views = [live('b-1', 'working', 'b'), live('a-1', 'working'), queued('a-2', 1), queued('b-2', 2, 'b')];
       assert.deepEqual(toAdmit(views, under(2, sharing)), []);
       assert.deepEqual(toAdmit(views, under(3, sharing)), ['a-2']);
       assert.deepEqual(toAdmit(views, under(2)), ['a-2', 'b-2'], 'each its own pool');
@@ -223,9 +233,9 @@ test('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by p
   );
   await t.test('toAdmit: the ceiling is counted per pool, and a task with no harness counts in `default`', () => {
     const views = [
-      live('x-1', 'running (working)', 'x'),
-      live('x-2', 'running (working)', 'x'),
-      live('k-1', 'running (working)', 'k'),
+      live('x-1', 'working', 'x'),
+      live('x-2', 'working', 'x'),
+      live('k-1', 'working', 'k'),
       queued('a-1', 1),
       queued('x-3', 2, 'x'),
       queued('k-2', 3, 'k'),
@@ -235,7 +245,7 @@ test('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by p
     assert.deepEqual(toAdmit(views, under(2)), ['a-1', 'k-2', 'f-1']);
     const bare = (id: string, admission?: 'queued'): AdmissionView => ({
       id,
-      phase: admission ? 'pending' : 'running (working)',
+      phase: admission ? 'pending' : 'working',
       ...(admission ? { admission } : {}),
       state: {},
     });
@@ -251,7 +261,7 @@ test('toAdmit and holdsSlot: which queued tasks a pass admits — per pool, by p
   });
   await t.test('toAdmit: a session blocked on a person holds no slot, and counts again once it works again', () => {
     assert.deepEqual(toAdmit([live('a-1', 'needs-human'), live('a-2', 'input-required'), queued('a-3', 1)], under(1)), ['a-3']);
-    assert.deepEqual(toAdmit([live('a-1', 'running (working)'), live('a-2', 'input-required'), queued('a-3', 1)], under(1)), []);
+    assert.deepEqual(toAdmit([live('a-1', 'working'), live('a-2', 'input-required'), queued('a-3', 1)], under(1)), []);
   });
   await t.test(
     'toAdmit: the higher priority first, then the earlier filing, then the lower id, each against the order it is given in',

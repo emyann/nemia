@@ -26,7 +26,7 @@ import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, 
 import { removeBody, sweep } from './sweep.ts';
 
 /**
- * One entry of the board-wide feed: an event, and which task it happened to.
+ * One entry of the store-wide feed: an event, and which task it happened to.
  *
  * This is the engine's API to whatever is built on top of it. A workflow layer that wants
  * "when task A settles, file task B" reads this and never touches a task journal — which is the
@@ -76,7 +76,7 @@ export type PlainJournalOps = {
   readonly read: (taskId: string) => Effect.Effect<Event[], JournalError>;
   readonly list: Effect.Effect<string[], JournalError>;
   /**
-   * Everything that has happened on this board since `after`, and where to resume.
+   * Everything that has happened in this store since `after`, and where to resume.
    *
    * The cursor never expires: the feed is append-only, so a consumer that was away for a week
    * replays rather than being told to start over. Pass 0 to read the whole history. A cursor at or past the feed's end reads nothing
@@ -239,6 +239,13 @@ const weighed = (event: Extract<Resolved, { kind: 'filed' }>) => {
   return typeof priority === 'number' && Number.isInteger(priority) ? { ...unweighed, priority } : unweighed;
 };
 
+/** A stored end in the shape the runtime reads: a former `done` as `succeeded`, a former `budget` reason as the harness's end at it. */
+const upgradedEnd = (event: Extract<Resolved, { kind: 'ended' }>): Event => {
+  const observed = event.observed === 'done' ? 'succeeded' : event.observed;
+  if (event.reason !== 'budget') return { ...event, observed, reason: event.reason };
+  return { ...event, observed, reason: 'harness', limit: 'budget' };
+};
+
 /**
  * An event in the shape the runtime reads, whatever shape it was written in. Nothing on disk is rewritten: the journal is
  * append-only, and a line is what was said when it was said, so a change to an event's shape is made where it is read.
@@ -252,6 +259,8 @@ const weighed = (event: Extract<Resolved, { kind: 'filed' }>) => {
  *   harness's arguments; on an `input` it is moved under that turn's `config`.
  * - An end's reason `budget`: read as the harness ending the session at a limit its configuration set, `reason:
  *   'harness'` with `limit: 'budget'`.
+ * - An end observed `done`, the word an older runtime recorded an end the harness vouched for with: read as `succeeded`, the
+ *   outcome every end is recorded in now.
  * - A former harness argument that a flag of Claude Code's replaces (`FORMER_ARGS`: `remoteControl`, a bridge to
  *   claude.ai), under `config` or at a `filed` event's top level: moved into `config.claude` — `true` as the flag, where a
  *   flag already in `claude` is kept, and `false`, which asked for nothing, dropped. So a task filed bridged is bridged
@@ -265,10 +274,7 @@ export const upgrade = (event: Resolved): Event => {
     if (budgetUsd === undefined) return rest;
     return { ...rest, config: { budgetUsd, ...rest.config } };
   }
-  if (event.kind === 'ended') {
-    if (event.reason !== 'budget') return { ...event, reason: event.reason };
-    return { ...event, reason: 'harness', limit: 'budget' };
-  }
+  if (event.kind === 'ended') return upgradedEnd(event);
   if (event.kind !== 'filed') return event;
   const filed = weighed(event);
   const legacy: Record<string, unknown> = filed;

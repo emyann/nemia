@@ -21,8 +21,8 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
  * A run without `holding` is stamped as one nobody holds. A step's word is read as on a run nobody holds, so a gate in flight or not
  * is one stamp either way: the hold is stamped on its own.
  *
- * A filed step still in flight is one word, whatever the engine calls it: `running (working)`, `working (quiescent)`,
- * `starting`, `between attempts`, `needs-human` and `pending` flip between polls while nothing the decision says has moved,
+ * A filed step still in flight is one word, whatever the engine calls it: `working`, `quiescent`,
+ * `starting`, `between-attempts`, `needs-human` and `pending` flip between polls while nothing the decision says has moved,
  * and each flip would ask the api — an observation per task, and `git diff` — again. A step that signs off, a check that
  * settles, a try filed (a new task) all move it.
  */

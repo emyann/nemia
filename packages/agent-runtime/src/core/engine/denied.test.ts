@@ -32,7 +32,7 @@ const ended = (denials?: Denial[]): Event => ({
   at: at(30),
   attempt: 1,
   sessionId: 's1',
-  observed: 'done',
+  observed: 'succeeded',
   reason: 'harness',
   ...(denials ? { denials } : {}),
 });

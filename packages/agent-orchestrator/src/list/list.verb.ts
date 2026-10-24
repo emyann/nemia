@@ -140,7 +140,7 @@ export const runReading = Effect.fn('runReading')(function* (e: Engine, run: Run
  * What `nemia ls` shows for one run (`runReading`): where every result branch stands as the tick's last pass read it (`standing`; left
  * out, `standingSnapshot`), with no process, and the run holding the checkout read.
  *
- * The phase beside a step is the engine's own word (`running (working)`, `needs-human`), not the narrowed `TaskPhase` the DAG decides on: a
+ * The phase beside a step is the engine's own word (`working`, `needs-human`), not the narrowed `TaskPhase` the DAG decides on: a
  * person reading the list wants the detail. Where the run's result stands against the base branch is what says a finished run is one
  * nobody has decided; one no pass read is said unread.
  */

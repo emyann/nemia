@@ -16,6 +16,7 @@ import {
   type RepositoryRun,
   type Run,
   type Said,
+  type ListedPhase,
 } from '../src/run.ts';
 import type {} from '../src/place/place.ts';
 import { type Closeout } from '../src/closeout/closeout.ts';
@@ -186,8 +187,11 @@ test('`saidLines`: each thing said to a step, in order, with its time and try �
 });
 
 test("`nemia ls` notes a step whose current try's session a person told something — `said to 2×` — after the try it is on, and nothing for a step nobody told", () => {
-  const word = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
-  const rows = (r: Run, words: Record<string, string>, told: Record<string, number>) =>
+  const word =
+    (m: Record<string, ListedPhase>) =>
+    (id: string): ListedPhase =>
+      m[id] ?? 'unknown';
+  const rows = (r: Run, words: Record<string, ListedPhase>, told: Record<string, number>) =>
     listing({
       steps: STEPS,
       run: r,
@@ -202,19 +206,19 @@ test("`nemia ls` notes a step whose current try's session a person told somethin
       saidTo: (name) => told[name] ?? 0,
     }).steps;
   const live = run({ implement: 't1', review: null });
-  assert.deepEqual(rows(live, { t1: 'running (working)' }, { implement: 2 })[0], {
+  assert.deepEqual(rows(live, { t1: 'working' }, { implement: 2 })[0], {
     name: 'implement',
-    status: 'running (working)',
+    status: 'working',
     branch: null,
     note: 'said to 2×',
   });
   assert.deepEqual(
-    rows(live, { t1: 'running (working)' }, {})[0],
-    { name: 'implement', status: 'running (working)', branch: null },
+    rows(live, { t1: 'working' }, {})[0],
+    { name: 'implement', status: 'working', branch: null },
     'no note for a step nobody told',
   );
   const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge' }] }, review: { taskId: null } } });
-  assert.equal(rows(onTry2, { t2: 'running (working)' }, { implement: 1 })[0].note, 'try 2, nudged on your word · said to 1×');
+  assert.equal(rows(onTry2, { t2: 'working' }, { implement: 1 })[0].note, 'try 2, nudged on your word · said to 1×');
   assert.deepEqual([saidWord(0), saidWord(1), saidWord(3)], ['', 'said to 1×', 'said to 3×']);
 });
 
@@ -279,7 +283,11 @@ const clock = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toI
  * A task's view as the engine has it: one attempt per triple of started, spawned and ended, settled as `settled` says, with `usage` on
  * its last attempt.
  */
-const task = (attempts: Array<[string, string | null, string | null]>, settled: string | null, usage: object | null = null): TaskClock => ({
+const task = (
+  attempts: Array<[string, string | null, string | null]>,
+  settled: 'succeeded' | 'failed' | 'stopped' | null,
+  usage: object | null = null,
+): TaskClock => ({
   state: {
     brief: 'filed',
     settled,
@@ -465,13 +473,13 @@ test("a task held open that signed waits on a person, and nothing runs: it ended
     endedAt: clock(9, 4),
     reason: 'harness',
     usage: null,
-    ended: 'done',
+    ended: 'succeeded' as const,
   };
   const held = (phase: string, extra: object = {}, attempts: object[] = [signedTurn]): TaskClock =>
     ({ phase, state: { brief: 'filed', settled: null, attempts, ...extra } }) as TaskClock;
   for (const [said, view] of [
     ['waiting', held('input-required')],
-    ['closed', held('between attempts', { closed: true })],
+    ['closed', held('between-attempts', { closed: true })],
   ] as const) {
     const t = timeline(r, new Map([['t1', view]]), filed);
     const session = t.steps.implement[0].session!;
@@ -483,9 +491,9 @@ test("a task held open that signed waits on a person, and nothing runs: it ended
     assert.deepEqual([t.run.inFlight, t.run.ran, t.run.wall], [0, '9m00s', '9m04s'], `${said}: nothing of the run in flight`);
   }
   assert.equal(
-    timeline(r, new Map([['t1', held('between attempts')]]), filed).steps.implement[0].session!.at,
+    timeline(r, new Map([['t1', held('between-attempts')]]), filed).steps.implement[0].session!.at,
     'running',
-    'signed and not held open, between attempts: the engine starts another, so it is still running',
+    'signed and not held open, between-attempts: the engine starts another, so it is still running',
   );
 
   const secondTurn = {
@@ -494,7 +502,7 @@ test("a task held open that signed waits on a person, and nothing runs: it ended
     endedAt: clock(605, 3),
     reason: 'harness',
     usage: null,
-    ended: 'done',
+    ended: 'succeeded' as const,
     turn: 1,
   };
   const answered = timeline(
@@ -515,11 +523,7 @@ test("a task held open that signed waits on a person, and nothing runs: it ended
     [14 * 60_000, '14m00s', '10h05m'],
     'a person answered at 18:00, ten hours on, and the second turn ran 5 minutes: ran 9 minutes and 5, not ten hours',
   );
-  const running = timeline(
-    r,
-    new Map([['t1', held('running (working)', {}, [signedTurn, { ...secondTurn, endedAt: null, ended: null }])]]),
-    filed,
-  );
+  const running = timeline(r, new Map([['t1', held('working', {}, [signedTurn, { ...secondTurn, endedAt: null, ended: null }])]]), filed);
   assert.deepEqual(
     [running.steps.implement[0].session!.at, running.run.inFlight],
     ['running', 1],

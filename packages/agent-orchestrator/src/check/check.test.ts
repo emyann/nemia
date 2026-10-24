@@ -345,7 +345,7 @@ test('LIVE: a check that hangs is stopped at its deadline, fails, and reads unfi
   t.mock.timers.enable({ apis: ['Date'], now: Date.now() });
   const { e, file } = rig();
   const hung = await file('hung', 'sleep 60', 1);
-  await reached(t, e, hung, (v) => v.phase === 'running (working)', 'came to work');
+  await reached(t, e, hung, (v) => v.phase === 'working', 'came to work');
   t.mock.timers.tick(5_000);
   const v = await settled(t, e, hung);
   assert.equal(v.state.settled, 'failed', 'a hung suite does not hold the run for ever');

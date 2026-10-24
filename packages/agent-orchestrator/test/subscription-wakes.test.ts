@@ -71,7 +71,7 @@ const engineFor = () => {
 /** A long-lived task at work on the stand-in, as a subscription is put for: filed `restartPolicy: Always`, its attempt started. */
 const longLived = async (id: string): Promise<string> => {
   await Effect.runPromise(stage.board().e.file({ id, brief: `the task ${id}`, cwd: ROOT, restartPolicy: 'Always' }));
-  stage.board().settle(id, 'running (working)');
+  stage.board().settle(id, 'working');
   return id;
 };
 

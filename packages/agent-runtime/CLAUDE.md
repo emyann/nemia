@@ -20,7 +20,7 @@ above it. Most of its rules are said in a comment at the code they hold: read th
 
 ## Arguments and doors
 
-- **A parameter taken away is refused, never ignored** (`Object.hasOwn`, the argument count: `tickRefusalOf`, `StepRefused`).
+- **A parameter taken away is refused, never ignored** (`Object.hasOwn`, the argument count: `tickRefusalOf`, `ReconcileRefused`).
 - **The source is under `noUncheckedIndexedAccess`, and lint refuses a `!`**: say what an absence means (a refusal, the miss the function
   already gives), never a cast or a default the contract does not give; a dictionary read goes through `own` (`src/core/own.ts`).
 - **Node's type stripping refuses a parameter property** (`constructor(private readonly ops)`), which `tsc` lets through: declare the

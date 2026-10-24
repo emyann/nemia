@@ -322,7 +322,7 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
       h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' });
       return h.handler.cancelTask({ tenant: '', id: 'ae/t-1/1', metadata: undefined }, ctx);
     },
-    refusedWith(TaskNotCancelableError, 'session `ae/t-1/1` has ended (done): there is nothing to stop.'),
+    refusedWith(TaskNotCancelableError, 'session `ae/t-1/1` has ended (completed): there is nothing to stop.'),
   ],
   [
     'a stop of a session that failed',
@@ -471,7 +471,7 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
       h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' });
       return h.handler.sendMessage(said(), ctx);
     },
-    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (done): it takes no more words.'),
+    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (completed): it takes no more words.'),
   ],
   [
     'words to a session that failed',
@@ -487,7 +487,7 @@ const REFUSALS: Array<[string, (h: H) => Promise<unknown>, (e: Error) => boolean
       h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'canceled' });
       return h.handler.sendMessage(said(), ctx);
     },
-    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (stopped): it takes no more words.'),
+    refusedWith(UnsupportedOperationError, 'session `ae/t-1/1` has ended (canceled): it takes no more words.'),
   ],
   [
     'a find on a harness that cannot find',
@@ -1019,7 +1019,7 @@ test('getTask and listTasks answer a session as the harness sees it, and else as
       { kind: 'ended', at, attempt: 1, sessionId: '(never started)', observed: 'failed', reason: 'unstartable', error: 'fake: no binary' },
       { kind: 'starting', at, attempt: 2 },
       { kind: 'spawned', at, attempt: 2 },
-      { kind: 'ended', at, attempt: 2, sessionId: 's-2', observed: 'done', reason: 'harness' },
+      { kind: 'ended', at, attempt: 2, sessionId: 's-2', observed: 'succeeded', reason: 'harness' },
       { kind: 'starting', at, attempt: 3 },
       { kind: 'spawned', at, attempt: 3 },
       { kind: 'ended', at, attempt: 3, sessionId: 's-3', observed: 'stopped', reason: 'operator' },
@@ -1156,7 +1156,7 @@ test('getTask and listTasks answer a session as the harness sees it, and else as
           { kind: 'input', at, text: 'go on' },
           { kind: 'starting', at, attempt: 2, resumeFrom: 'conv-h' },
           { kind: 'spawned', at, attempt: 2 },
-          { kind: 'ended', at, attempt: 2, sessionId: 'job-2', observed: 'done', reason: 'harness', nativeId: 'conv-h' },
+          { kind: 'ended', at, attempt: 2, sessionId: 'job-2', observed: 'succeeded', reason: 'harness', nativeId: 'conv-h' },
         ]),
       );
       const states = await Promise.all(['ae/t-h/1', 'ae/t-h/2'].map((id) => h.handler.getTask({ tenant: '', id }, ctx)));
@@ -1182,7 +1182,7 @@ const held = (after: Event[] = []): Event[] => [
     at: '2026-09-23T10:05:00.000Z',
     attempt: 1,
     sessionId: 'job-1',
-    observed: 'done',
+    observed: 'succeeded',
     reason: 'harness',
     nativeId: 'conv-h',
     closeout: { outcome: 'done' },
@@ -1219,7 +1219,7 @@ test('a running session told words and stopped: the harness asked once, with the
       assert.equal((await cancel('ae/t-1/1')).status!.state, TaskState.TASK_STATE_CANCELED);
       await assert.rejects(
         cancel('ae/t-2/1'),
-        refusedWith(TaskNotCancelableError, 'session `ae/t-2/1` has ended (done): there is nothing to stop.'),
+        refusedWith(TaskNotCancelableError, 'session `ae/t-2/1` has ended (completed): there is nothing to stop.'),
       );
       assert.deepEqual(h.acted(), [['stop', 's-1']]);
     },
@@ -1261,7 +1261,7 @@ test('a running session told words and stopped: the harness asked once, with the
       assert.equal(open.status!.state, TaskState.TASK_STATE_COMPLETED, 'answered as the harness lists it');
       await assert.rejects(
         h.handler.sendMessage(said('ae/t-2/1', 'next', { contextId: '' }), ctx),
-        refusedWith(UnsupportedOperationError, 'session `ae/t-2/1` has ended (done): it takes no more words.'),
+        refusedWith(UnsupportedOperationError, 'session `ae/t-2/1` has ended (completed): it takes no more words.'),
       );
       assert.deepEqual(h.acted(), [['say', [{ name: 'ae/t-1/1', sessionId: 's-1' }, 'next']]]);
     },
@@ -1286,7 +1286,7 @@ test('sessionTranscript: read by the id the record names, found or observed in f
         filed,
         { kind: 'starting', at, attempt: 1 },
         { kind: 'spawned', at, attempt: 1 },
-        { kind: 'ended', at, attempt: 1, sessionId: 's-old', observed: 'done', reason: 'harness', nativeId: 's-old' },
+        { kind: 'ended', at, attempt: 1, sessionId: 's-old', observed: 'succeeded', reason: 'harness', nativeId: 's-old' },
       ]);
       h.sessions.set('ae/t-1/1', { sessionId: 's-new', state: 'working' });
       const read = await h.handler.sessionTranscript({ name: 'ae/t-1/1', after: 'c-7' }, ctx);
@@ -1380,7 +1380,7 @@ test('sessionTranscript: read by the id the record names, found or observed in f
         filed,
         { kind: 'starting', at, attempt: 1 },
         { kind: 'spawned', at, attempt: 1 },
-        { kind: 'ended', at, attempt: 1, sessionId: 's-1', observed: 'done', reason: 'harness' },
+        { kind: 'ended', at, attempt: 1, sessionId: 's-1', observed: 'succeeded', reason: 'harness' },
       ]);
       h.sessions.set('ae/t-1/1', { sessionId: 's-1', state: 'completed' });
       assert.equal((await h.handler.sessionTranscript({ name: 'ae/t-1/1' }, ctx))?.cursor, 's-1@0+1');

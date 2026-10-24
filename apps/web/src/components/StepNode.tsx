@@ -349,10 +349,6 @@ function BuildingNode({
   );
 }
 
-/**
- * What a gate's node says after `waiting on you`: what approving does in a line (`approve ship to run it`, `approve plan's hand-off`),
- * whose whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
- */
 /** A gate's band under its node: the rail's word for the state, then what it waits for, whole on hover. */
 function GateBand({ word, need }: { word: string; need: { kind: Need['kind']; said: string } | null }) {
   return (
@@ -367,6 +363,10 @@ function GateBand({ word, need }: { word: string; need: { kind: Need['kind']; sa
   );
 }
 
+/**
+ * What a gate's band says after the rail's word (`waits on you`): what approving does in a line (`approve ship to run it`, `approve
+ * plan's hand-off`), whose whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
+ */
 const nodeNeed = (need: Need, step: StepNodeData['step']): string =>
   need.kind === 'approve'
     ? gateNodeLine({ step: step.name, ends: step.spec?.workspace === 'main' && step.taskId === null })

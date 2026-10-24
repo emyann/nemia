@@ -159,7 +159,7 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
     budgetRefusal(howOf(args), commandLine(RETRY, args)),
   writes: true,
   ticks: true,
-  nemia: 'answers',
+  class: 'answer',
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
   apiTakes: ['answers'],
   handler: Effect.fnUntraced(function* (args: Args, _env, home) {
@@ -213,7 +213,7 @@ const ROUND: Command<{ step: string; round: number; file: string; budget?: numbe
   },
   writes: true,
   ticks: true,
-  nemia: 'answers',
+  class: 'answer',
   route: { method: 'POST', path: '/api/runs/:runId/round', status: 202 },
   apiKeys: ['step', 'round', 'file'],
   handler: Effect.fnUntraced(function* (args: Args) {
@@ -254,7 +254,7 @@ const REFRESH: Command<{ drift: readonly Drift[] }> = {
   },
   writes: true,
   ticks: true,
-  nemia: 'hers',
+  class: 'act',
   route: { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 },
   apiKeys: ['drift'],
   handler: Effect.fnUntraced(function* (args: Args) {
@@ -297,7 +297,7 @@ const ACCEPT: Command<{ step: string; try: number; at: string; message: string; 
   check: (args) => acceptWordsRefusal(textOf(args, 'message'), commandLine(ACCEPT, args)),
   writes: true,
   ticks: true,
-  nemia: 'answers',
+  class: 'answer',
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
   apiKeys: ['step', 'try', 'at', 'message', 'file'],
   handler: Effect.fnUntraced(function* (args: Args) {
@@ -340,7 +340,7 @@ const SAY: Command<{
     unknown: (arg) => `nemia say does not take ${arg}.`,
   },
   writes: true,
-  nemia: 'hers',
+  class: 'act',
   route: { method: 'POST', path: '/api/runs/:runId/steps/:step/say', status: 202 },
   apiKeys: ['at', 'attempt', 'text', 'after'],
   handler: Effect.fnUntraced(function* (args: Args) {
@@ -385,7 +385,7 @@ const LS: Command<RunsListed> = {
     unknown: (arg) => `nemia ls takes one run's id, or none: not ${arg}.`,
   },
   writes: false,
-  nemia: 'read',
+  class: 'read',
   only: {
     side: 'cli',
     why: "its lines are each run's for a person at a terminal; the board reads every run judged into a summary, kept between its polls, off the runs entry",
@@ -404,7 +404,7 @@ const DECIDE: Command<Decided> = {
     unknown: (arg) => `nemia decide does not take ${arg}.`,
   },
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: { method: 'GET', path: '/api/runs/:runId/decision', status: 200 },
   only: {
     side: 'api',
@@ -420,7 +420,7 @@ const CEILINGS: Command<Slots> = {
   help: ['the cap on runs in flight, the runs it counts and the runs it holds'],
   spec: { positionals: [], flags: [], unknown: (arg) => `the ceilings take no ${arg}.` },
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: { method: 'GET', path: '/api/ceilings', status: 200 },
   only: {
     side: 'api',
@@ -479,7 +479,7 @@ const AGENTS: Command<AgentsRead> = {
   spec: agentsSpec([]),
   check: agentsRefusal,
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: { method: 'GET', path: '/api/agents', status: 200 },
   handler: (args, _env, home) => tried(() => agentsRead({ repo: textOf(args, 'repo') ?? '.', ...(home !== undefined && { home }) })),
   print: agentsLines,
@@ -498,7 +498,7 @@ const AGENT_CARD: Command<CardRead> = {
   spec: agentsSpec([{ key: 'name', takes: 'required', kind: 'name' }]),
   check: agentsRefusal,
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: { method: 'GET', path: '/api/agents/:from/:name/card', status: 200 },
   handler: (args, _env, home) =>
     tried(() => {

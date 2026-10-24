@@ -27,6 +27,7 @@ import {
   type Credentials,
   type MissingCredential,
   type RemoteAgent,
+  type TaskPhase,
   Engine as RuntimeEngine,
   refusalWords,
   type EngineShape,
@@ -35,10 +36,23 @@ import { envNameOf, readRemoteAgents, remoteAgentsFile } from './harness/a2a.sto
 import { HOME } from './record/record.store.ts';
 import { maxConcurrent } from './config/config.store.ts';
 import { pauseFile } from './pause/pause.store.ts';
-import { holderOnStore } from './daemon/daemon.store.ts';
+import { servesOnStore } from './daemon/daemon.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 import { exportIntervalRefusalOf, sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
+import type { EnginePhase } from './views/views-words.ts';
+
+/**
+ * Whether two unions hold the same words: `true` only when each is assignable to the other, `false` otherwise, so a `true` annotation
+ * fails the typecheck the moment they part.
+ */
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+/**
+ * The orchestrator's copy of the runtime's phases (`EnginePhase`, written out in a pure file that imports no runtime) held equal to the
+ * runtime's `TaskPhase`: a word added to or dropped from either fails the typecheck here, never a reader at run time.
+ */
+export const enginePhaseHeld: Same<EnginePhase, TaskPhase> = true;
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;
@@ -188,7 +202,7 @@ const engineRoot = (): string => path.join(HOME, 'engine');
 /**
  * The engines holding the sessions this one only reads, as the runtime takes them: one entry per harness a holder can hold
  * (`heldHarnessesOf`), each a function the runtime asks at every follow of that harness's sessions, answering the card the process
- * that holds this store's lease serves for it (`holderOnStore`) or `undefined`.
+ * that holds this store's lease serves for it (`servesOnStore`) or `undefined`.
  *
  * A function, and read afresh in it, because a holder's port is ephemeral while this process builds its engine once: the api serves
  * for days across any number of restarts of the daemon, so the holder is read at the follow and never captured here. A viewer whose
@@ -202,7 +216,7 @@ const holderOption = (): Record<string, () => { card: Record<string, unknown> } 
 
 /** The card the holder of this store serves for `harness`, as the runtime configures an agent with it, or `undefined`. */
 const cardOnStore = (harness: string): { card: Record<string, unknown> } | undefined => {
-  const card = holderOnStore()?.[harness];
+  const card = servesOnStore()?.[harness];
   return card === undefined ? undefined : { card };
 };
 
@@ -341,7 +355,7 @@ export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
 /**
  * The secret a card asks for, by its scheme, asked on every request the runtime makes:
  *
- * - the holder's bearer token (`BEARER`), for a harness the process holding this store's lease serves (`holderOnStore`): read at
+ * - the holder's bearer token (`BEARER`), for a harness the process holding this store's lease serves (`servesOnStore`): read at
  *   each ask off the one 0600 file the holder's own engine minted it into (`holderTokenOf`), under the engine root both processes
  *   share. It is never on the lease, in a log line, in an answer of the api or on the board, and nothing but this branch reads it;
  * - a remote agent's: the environment's `WF_A2A_<NAME>_<SCHEME>` (`envNameOf`), read on every request, so a variable set for a
@@ -352,7 +366,7 @@ export function remoteAgents(): ReadonlyMap<string, RemoteAgent> {
  * holds it. A later slice that lets a card come from elsewhere makes this branch read the url.
  */
 export const credentials: Credentials = (scheme, _agentUrl, harness) => {
-  if (scheme === BEARER && holderOnStore()?.[harness] !== undefined) return holderTokenOf(engineRoot());
+  if (scheme === BEARER && servesOnStore()?.[harness] !== undefined) return holderTokenOf(engineRoot());
   const name = remoteNameOf(harness);
   return name === undefined ? undefined : process.env[envNameOf(name, scheme)] || undefined;
 };

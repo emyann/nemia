@@ -23,6 +23,7 @@ import {
   type RetryBriefing,
   type Run,
   type StepRecord,
+  type ListedPhase,
 } from '../src/run.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import {
@@ -56,8 +57,11 @@ const finished = (extra: Partial<RepositoryRun> = {}) =>
     },
   );
 const DONE = phases({ t1: 'succeeded', t2: 'succeeded' });
-/** The engine's own phase words, which are free text — `running (working)`, `needs-human`. */
-const shown = (m: Record<string, string>) => (id: string) => m[id] ?? 'unknown';
+/** The engine's own phase words — `working`, `needs-human` — or the feed's `running`. */
+const shown =
+  (m: Record<string, ListedPhase>) =>
+  (id: string): ListedPhase =>
+    m[id] ?? 'unknown';
 /** How each step signed off, by name. A step not named left no closeout. */
 const signedOff = (m: Record<string, Closeout | { error: string }>) => (name: string) => m[name];
 const said = (outcome: Closeout['outcome']): Closeout => ({
@@ -232,13 +236,13 @@ test('listing of how a step signed off', async (t) => {
     const live = listing({
       steps: STEPS,
       run: run({ implement: 't1', review: null }),
-      phaseOf: shown({ t1: 'running (working)' }),
+      phaseOf: shown({ t1: 'working' }),
       closeoutOf: signedOff({}),
     });
     assert.deepEqual(
       live.steps,
       [
-        { name: 'implement', status: 'running (working)', branch: null },
+        { name: 'implement', status: 'working', branch: null },
         { name: 'review', status: 'waiting', branch: null },
       ],
       'still running, and never filed',

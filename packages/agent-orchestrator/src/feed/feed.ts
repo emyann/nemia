@@ -25,7 +25,8 @@
  * Pure: the line, the fold, what a pass owes and what it judged of a run in the feed's words (`feedWords`). The file — read, appended to
  * and followed — is `feed.store.ts`'s, and the controllers hand the rest of the package what it needs.
  */
-import { onYouWords, shownStatus, type Listing } from '../list/list.ts';
+import { onYouWords, shownStatus, type ListedPhase, type Listing } from '../list/list.ts';
+import type { EnginePhase } from '../views/views-words.ts';
 import { oneLine, type Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
@@ -39,18 +40,18 @@ import {
   messageOf,
   reasonOf,
   REMOVED,
-  SIGNAL_WORDS,
+  LINE_WORDS,
   sourceOf,
   typeOf,
   waitsOf,
   type InvolvedKind,
   type Reason,
-  type SignalSource,
-  type SignalType,
+  type LineSource,
+  type LineType,
 } from './reason.ts';
 
-export { DAEMON_STARTED, REMOVED, SIGNAL_WORDS };
-export type { InvolvedKind, Reason, SignalSource, SignalType };
+export { DAEMON_STARTED, REMOVED, LINE_WORDS };
+export type { InvolvedKind, Reason, LineSource, LineType };
 
 /** The version every line this `nemia` writes is stamped with; a line with none is upgraded on read (`upgraded`). */
 export const FEED_VERSION = 'nemia/v1';
@@ -74,14 +75,14 @@ export type FeedLabels = { run?: string; factory?: string; workflow?: string; st
  * Every one is optional on the type, because a line read off a feed written by an older `nemia` has none: `upgraded` is the one door
  * that fills them in, and every reader downstream of it sees them all.
  */
-type Signal = {
+type Line = {
   apiVersion?: typeof FEED_VERSION;
   involved?: Involved;
   labels?: FeedLabels;
   reason?: Reason;
-  type?: SignalType;
+  type?: LineType;
   waits?: 'person';
-  source?: SignalSource;
+  source?: LineSource;
   message?: string;
   call?: string;
   try?: number;
@@ -89,12 +90,12 @@ type Signal = {
 
 /**
  * A run's line of the feed: when, which run, which step of it (none for the run's own line), the word the tick judged, and the note beside
- * it — and what a v1 line signs it with (`Signal`).
+ * it — and what a v1 line signs it with (`Line`).
  */
-export type RunLine = { at: string; run: string; step?: string; word: string; note?: string } & Signal;
+export type RunLine = { at: string; run: string; step?: string; word: string; note?: string } & Line;
 
 /** A daemon's line of the feed: when, its pid, that it started, and how the daemon before it ended. */
-export type DaemonLine = { at: string; daemon: number; word: typeof DAEMON_STARTED; note?: string } & Signal;
+export type DaemonLine = { at: string; daemon: number; word: typeof DAEMON_STARTED; note?: string } & Line;
 
 /**
  * The one name a line of the store carries (`involved {kind: 'Store', name: 'store'}`): the feed is one store's, so there is one store to
@@ -107,7 +108,7 @@ export const STORE = 'store';
  * moment the pause was put. Of no run, so it carries no run's labels, and a subscription scoped to a factory is handed it as it is handed a
  * daemon's.
  */
-export type StoreLine = { at: string; store: string; word: string; note?: string } & Signal;
+export type StoreLine = { at: string; store: string; word: string; note?: string } & Line;
 
 /** One line of the feed: a run's (`RunLine`), a daemon's (`DaemonLine`), or the store's (`StoreLine`). */
 export type FeedLine = RunLine | DaemonLine | StoreLine;
@@ -308,7 +309,7 @@ const saidKeys = (said: FeedSaid): { word: string; note?: string } => ({
  * What identifies one occurrence is its reason, what it is of, its try and its note (`onceKey`) — and, where several share all four, its
  * place among them: nothing in the runtime's journal stamps a denial, and two attempts of one try lost are told apart only by being two.
  */
-export type Once = { step?: string; word: string; note?: string; call?: string; try?: number; source?: SignalSource };
+export type Once = { step?: string; word: string; note?: string; call?: string; try?: number; source?: LineSource };
 
 /** What a one-shot offered is about: the run it is of, or its step, as `onceInvolved` says it — or the store, for `storeOnce`'s. */
 type About = (o: Once) => Involved;
@@ -366,15 +367,15 @@ function holdOnce(fold: FeedFold, run: string, held: string | undefined, lifted:
   const lifting = lifted === undefined ? undefined : holdSince(lifted);
   const since = standing ?? lifting;
   const out: Once[] = [
-    ...(since !== undefined ? [{ word: SIGNAL_WORDS.HoldPut, note: since }] : []),
-    ...(lifting !== undefined ? [{ word: SIGNAL_WORDS.HoldLifted, note: lifting, source: 'tick' as const }] : []),
+    ...(since !== undefined ? [{ word: LINE_WORDS.HoldPut, note: since }] : []),
+    ...(lifting !== undefined ? [{ word: LINE_WORDS.HoldLifted, note: lifting, source: 'tick' as const }] : []),
   ];
   const puts = onceKey(involved, 'HoldPut', undefined, '');
   for (const key of fold.shots.keys()) {
     if (!key.startsWith(puts)) continue;
     const note = key.slice(puts.length);
     if (note === standing || note === lifting) continue;
-    out.push({ word: SIGNAL_WORDS.HoldLifted, note });
+    out.push({ word: LINE_WORDS.HoldLifted, note });
   }
   return out;
 }
@@ -400,12 +401,12 @@ export type FeedPause = { at: string } | null;
  */
 function storeOnce(fold: FeedFold, pause: FeedPause): Once[] {
   const standing = pause === null ? undefined : holdSince(pause.at);
-  const out: Once[] = standing !== undefined ? [{ word: SIGNAL_WORDS.StorePaused, note: standing }] : [];
+  const out: Once[] = standing !== undefined ? [{ word: LINE_WORDS.StorePaused, note: standing }] : [];
   const puts = onceKey(STORE_INVOLVED, 'StorePaused', undefined, '');
   for (const key of fold.shots.keys()) {
     if (!key.startsWith(puts)) continue;
     const note = key.slice(puts.length);
-    if (note !== standing) out.push({ word: SIGNAL_WORDS.StoreResumed, note });
+    if (note !== standing) out.push({ word: LINE_WORDS.StoreResumed, note });
   }
   return out;
 }
@@ -439,7 +440,7 @@ const denialOnce = (d: FeedDenial): Once => ({
  */
 const closeoutOnce = (c: FeedCloseout): Once => ({
   step: c.step,
-  word: SIGNAL_WORDS.ClosedOut,
+  word: LINE_WORDS.ClosedOut,
   note: `try ${c.try}`,
   try: c.try,
 });
@@ -603,16 +604,35 @@ export type FeedCloseout = { step: string; try: number; said: unknown; read: Clo
 export type FeedDenial = { step: string; try: number; call: string };
 
 /**
- * The engine's word for a task, as the feed keeps it: every word of a session at work — `running (working)`, `running (idle)`,
- * `working (quiescent)`, `starting`, `between attempts` — is `running`, and every other word is itself. Pure.
+ * The engine's word for a task, as the feed keeps it: every word of a session at work — `starting`, `working`, `quiescent`, `ending`,
+ * `between-attempts` — is `running`, and every other word is itself. Total over the engine's words, so a word the runtime adds fails the
+ * typecheck here until the feed says what it keeps of it.
  *
  * A session's live state moves between those words on its own, many times a step, and nothing of the run's judgement moves with it: a
  * feed that wrote each would write a line every few passes for every step at work, and a watcher waiting for a gate would read through
- * them. `ae watch` is where a session's own life is followed. `pending` (filed, waiting for a session slot), `needs-human` and the settled
- * words are kept: each is something the run decides on.
+ * them. `ae watch` is where a session's own life is followed. `pending` (filed, waiting for a session slot), `needs-human`,
+ * `input-required`, `idle`, `restarting` and the settled words are kept: each is something the run decides on, or a word the feed has
+ * always kept as itself, so no line already in `feed.jsonl` changes meaning.
  */
-export const feedPhase = (word: string): string =>
-  word.startsWith('running (') || word === 'working (quiescent)' || word === 'starting' || word === 'between attempts' ? 'running' : word;
+const FEED_WORD: Record<EnginePhase | 'unknown', ListedPhase> = {
+  pending: 'pending',
+  starting: 'running',
+  working: 'running',
+  quiescent: 'running',
+  'needs-human': 'needs-human',
+  'input-required': 'input-required',
+  idle: 'idle',
+  restarting: 'restarting',
+  'between-attempts': 'running',
+  ending: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  stopped: 'stopped',
+  unknown: 'unknown',
+};
+
+/** The engine's word for a task as the feed keeps it (`FEED_WORD`). Pure. */
+export const feedPhase = (word: EnginePhase | 'unknown'): ListedPhase => FEED_WORD[word];
 
 /**
  * What the feed says of a run as a pass judged it: the listing `nemia ls` prints (`listing`, handed the engine's words through

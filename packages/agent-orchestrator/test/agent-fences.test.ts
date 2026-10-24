@@ -863,7 +863,7 @@ test('REFUSED: Grace and Otto without their deny of gh, read from their files as
 });
 
 /** The two reads of the pull request review's note names, and the settings' allows that reach them and nothing else. */
-const PR_READS = ['gh pr view 7', 'gh pr checks 7'];
+const PR_READS = ['gh pr view <n> --json state,mergeable,headRefOid,title,body,url', 'gh pr checks <n>'];
 const PR_READ_ALLOWS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
 
 test("the two gh reads review's note names are allowed Agora by the settings, and REFUSED with either allow dropped", () => {
@@ -3352,9 +3352,9 @@ const editVerdictOf = (rules: Rules, file: string): Verdict =>
 function owedOf(table: readonly (typeof TABLE)[number][]): [string, Verdict][] {
   return table
     .filter((entry) => entry.only?.side !== 'api')
-    .flatMap(({ name, nemia: c }): [string, Verdict][] => {
+    .flatMap(({ name, class: c }): [string, Verdict][] => {
       const forms = [`nemia ${name}`, `nemia ${name} r-1`];
-      if (c === 'out' || c === 'prompts') return forms.map((form) => [form, c === 'out' ? 'deny' : 'ask']);
+      if (c === 'none' || c === 'ask') return forms.map((form) => [form, c === 'none' ? 'deny' : 'ask']);
       if (typeof c !== 'object') return forms.map((form) => [form, 'allow']);
       const set = (s: string) => (s.startsWith('-') ? [`nemia ${name} r-1 ${s} v`, `nemia ${name} ${s} v r-1`] : [`nemia ${name} ${s}`]);
       return [
@@ -3406,7 +3406,7 @@ test('her fence asks every write that prompts and every write form of a command 
 
 test('REFUSED: a command of the fence reclassed, an ask rule of the fence taken away, and a deny taken away are each named', () => {
   const rules = herRules(herStore());
-  const reclassed = TABLE.map((entry) => (entry.name === 'cancel' ? { ...entry, nemia: 'hers' as const } : entry));
+  const reclassed = TABLE.map((entry) => (entry.name === 'cancel' ? { ...entry, class: 'act' as const } : entry));
   assert.deepEqual(misjudged(rules, reclassed), ['nemia cancel: ask', 'nemia cancel r-1: ask']);
   const cut = { ...rules, ask: rules.ask.filter((rule) => rule !== 'Bash(nemia rm:*)') };
   assert.deepEqual(misjudged(cut), ['nemia rm: unmatched', 'nemia rm r-1: unmatched']);

@@ -12,6 +12,9 @@ import type { Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import { turnOf, turnSpanOf, type TurnSpan, type TurnTry } from './turns.ts';
 
+/** How an attempt ended, or a task settled, as the runtime records it: its `Outcome`, written out because this file imports no runtime. */
+export type EngineOutcome = 'succeeded' | 'failed' | 'stopped';
+
 /**
  * An attempt's clock, and what it consumed, as the engine's `Attempt` keeps them: named here because this file does not import the
  * engine. decide.verb.ts hands `timeline` the engine's views, which have this shape.
@@ -24,10 +27,10 @@ export type AttemptClock = {
   usage: Consumed | null;
   resumeFrom?: string;
   /**
-   * How it ended — `done` once it signed — the turn of a task held open it ran, and the closeout it signed, as the engine's `Attempt`
-   * keeps them.
+   * How it ended — `succeeded` once it ended with its statement made — the turn of a task held open it ran, and the closeout it signed,
+   * as the engine's `Attempt` keeps them.
    */
-  ended?: string | null;
+  ended?: EngineOutcome | null;
   turn?: number;
   closeout?: unknown;
   /** A limit its harness said it ended the session at — `budget`, the step's cap — carried by the runtime and judged here (`taskSpend`). */
@@ -40,7 +43,7 @@ export type AttemptClock = {
  */
 export type TaskClock = {
   phase?: string;
-  state: { brief: string; attempts: readonly AttemptClock[]; settled: string | null; closed?: boolean };
+  state: { brief: string; attempts: readonly AttemptClock[]; settled: EngineOutcome | null; closed?: boolean };
   usage?: Consumed;
 };
 
@@ -50,7 +53,7 @@ export type TaskClock = {
  * `phaseOfView` reads it as the session it signed, and the timeline as a session that ended. Pure, and here because this file is.
  */
 export const signedAndHeld = (v: TaskClock): boolean =>
-  !v.state.settled && (v.phase === 'input-required' || (v.state.closed === true && v.state.attempts.at(-1)?.ended === 'done'));
+  !v.state.settled && (v.phase === 'input-required' || (v.state.closed === true && v.state.attempts.at(-1)?.ended === 'succeeded'));
 
 /**
  * What one task's session consumed, summed over its attempts (`sumUsage`): a settled attempt's usage off the engine's record, the one in

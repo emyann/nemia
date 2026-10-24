@@ -453,7 +453,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       check: null,
       closeout: blockedCloseout,
       unreadable: null,
-      attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+      attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
     };
     assert.deepEqual(implement, {
       name: 'implement',
@@ -769,7 +769,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       check: null,
       closeout: blockedCloseout,
       unreadable: null,
-      attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+      attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
     };
     assert.deepEqual(original, {
       name: 'original',
@@ -1027,7 +1027,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
       (await detailOf('r-8')).steps[0].attempts,
       {
         count: 1,
-        latest: { startedAt: at, ended: 'done', endedAt: later, reason: 'harness' },
+        latest: { startedAt: at, ended: 'succeeded', endedAt: later, reason: 'harness' },
       },
       'an attempt that ran half an hour ends at its ended event, not at its start, so the board can say how long it took',
     );
@@ -2056,7 +2056,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
         "eight tasks, implement's three and their checks and review's two, all settled and no refused check of the current try: no look at the harnesses (list(taskIds))",
       );
 
-      const once = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } };
+      const once = { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } };
       const closeout = (raw: { summary: string }, more: object = {}) => ({
         apiVersion: null,
         outcome: 'done',

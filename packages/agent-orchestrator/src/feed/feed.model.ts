@@ -7,6 +7,7 @@ import { Schema } from 'effect';
 import { brandedCount, brandedId, type Count, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { RunId, StepName, TaskId, TryNumber } from '../record/record.model.ts';
+import { FactoryName } from '../factory/factory.model.ts';
 import { DAEMON_STARTED } from './reason.ts';
 import { LEVELS } from '../level/level.ts';
 import { subscriptionNameRefusal } from '../subscription/index.ts';
@@ -41,7 +42,7 @@ const signed = {
   labels: Schema.optional(
     Schema.Struct({
       run: Schema.optional(Schema.String),
-      factory: Schema.optional(Schema.String),
+      factory: Schema.optional(FactoryName.OnRead),
       workflow: Schema.optional(Schema.String),
       step: Schema.optional(Schema.String),
       agent: Schema.optional(Schema.String),

@@ -33,13 +33,13 @@ erDiagram
     string workspace
     string brief
     string workflowDir
-    list after "optional"
-    list context "optional"
+    list after FK "optional"
+    list context FK "optional"
     list inputs "optional"
     object from "optional"
     object scheduled "optional"
-    list gates "optional"
-    string factory "optional"
+    list gates FK "optional"
+    FactoryName factory FK "optional"
     list mounts "optional"
     object place "optional"
     string repo "optional"
@@ -93,14 +93,14 @@ erDiagram
     string queued "optional"
     StepName gate FK "optional"
     FactoryName factory FK "optional"
-    list from "optional"
+    list from FK "optional"
     string body
   }
   Factory {
     FactoryName name PK
     list repos
-    list workflows
-    object hires
+    list workflows FK
+    object hires FK
     object schedules
     unknown instruction "optional"
     object template "optional"
@@ -183,6 +183,10 @@ erDiagram
     string message "optional"
     string call "optional"
   }
+  Run ||--o{ Run : after
+  Run ||--o{ Run : context
+  Step ||--o{ Run : gates
+  Factory ||--o{ Run : factory
   Run ||--o{ Step : steps
   TaskId ||--o{ Step : taskId
   Step ||--o{ Try : tries
@@ -193,6 +197,9 @@ erDiagram
   Inbox ||--o{ Card : cards
   Step ||--o{ Card : gate
   Factory ||--o{ Card : factory
+  Run ||--o{ Card : from
+  Workflow ||--o{ Factory : workflows
+  Agent ||--o{ Factory : hires
   Factory ||--o{ Hire : factory
   Workflow ||--o{ Hire : workflow
   Step ||--o{ Hire : step

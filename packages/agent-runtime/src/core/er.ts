@@ -33,14 +33,22 @@ const membersOf = (ast: SchemaAST.AST): SchemaAST.AST[] =>
 /** The entity a schema is, by its identifier: a struct that names itself. */
 const entityOf = (ast: SchemaAST.AST): string | undefined => (SchemaAST.isObjects(ast) ? SchemaAST.resolveIdentifier(ast) : undefined);
 
-/** The entities a container holds: an array's elements, a record's values. */
-const heldMany = (ast: SchemaAST.AST): string[] => {
-  const inner = SchemaAST.isArrays(ast)
+/** What a container holds: an array's elements, a record's values; nothing for any other schema. */
+const heldIn = (ast: SchemaAST.AST): SchemaAST.AST[] =>
+  (SchemaAST.isArrays(ast)
     ? [...ast.elements, ...ast.rest]
     : SchemaAST.isObjects(ast) && ast.propertySignatures.length === 0
       ? ast.indexSignatures.map((s) => s.type)
-      : [];
-  return inner.flatMap(membersOf).flatMap((m) => entityOf(m) ?? []);
+      : []
+  ).flatMap(membersOf);
+
+/** The entities a container holds. */
+const heldMany = (ast: SchemaAST.AST): string[] => heldIn(ast).flatMap((m) => entityOf(m) ?? []);
+
+/** The id a schema is: an identifier the model names as an id, or one on a string, which is another layer's id. */
+const idOf = (model: ErModel, ast: SchemaAST.AST): string | undefined => {
+  const named = SchemaAST.resolveIdentifier(ast);
+  return named !== undefined && (own(model.ids, named) !== undefined || SchemaAST.isString(ast)) ? named : undefined;
 };
 
 /** The attribute type of a field that holds no entity and no id. */
@@ -62,16 +70,21 @@ const drawField = (model: ErModel, holder: string, ast: SchemaAST.AST, optional:
   const members = membersOf(ast);
   const only = members.length === 1 ? members[0] : undefined;
   const one = only ?? ast;
-  const named = SchemaAST.resolveIdentifier(one);
+  const named = idOf(model, one);
   const entities = members.flatMap((m) => entityOf(m) ?? []);
   if (entities.length > 0) return { relations: entities.map((to) => ({ card: optional ? '||--o|' : '||--||', to })) };
-  if (named !== undefined && (own(model.ids, named) !== undefined || SchemaAST.isString(one))) {
+  if (named !== undefined) {
     const owner = own(model.ids, named);
     if (owner === holder) return { attribute: { type: named, key: 'PK' }, relations: [] };
     return { attribute: { type: named, key: 'FK' }, relations: [{ from: owner ?? named, card: '||--o{', to: holder }] };
   }
   const many = heldMany(one);
   if (many.length > 0) return { relations: many.map((to) => ({ card: '||--o{', to })) };
+  const ids = heldIn(one).flatMap((m) => idOf(model, m) ?? []);
+  if (ids.length > 0) {
+    const relations = ids.map((id) => ({ from: own(model.ids, id) ?? id, card: '||--o{', to: holder }));
+    return { attribute: { type: typeOf(one), key: 'FK' }, relations };
+  }
   return { attribute: { type: only === undefined && members.length === 0 ? 'unknown' : typeOf(one) }, relations: [] };
 };
 
@@ -102,7 +115,8 @@ const drawEntity = (model: ErModel, entity: Schema.Top): { block: string[]; rela
  * The model's `erDiagram`: a block per entity, in the order given, then every relation, in entity then field order; two-space
  * indents, joined by `\n`, no trailing newline. A field holding an entity draws a relation and no attribute (one, zero or one, or
  * many under an array or a record); one holding an id is the entity's PK, or an FK, drawn from the entity the id names, or from
- * a node named by the id itself when it is another layer's, to the holder (`Owner ||--o{ Holder`: beautiful-mermaid reads no `}o`).
+ * a node named by the id itself when it is another layer's, to the holder (`Owner ||--o{ Holder`: beautiful-mermaid reads no `}o`);
+ * an array or a record of ids is an FK drawn the same way.
  */
 export const erDiagram = (model: ErModel): string => {
   const drawn = model.entities.map((entity) => drawEntity(model, entity));

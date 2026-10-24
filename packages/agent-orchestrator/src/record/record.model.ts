@@ -34,6 +34,13 @@ export type TryNumber = Count<'TryNumber'>;
 export const TaskId = foreignId('TaskId');
 export type TaskId = Id<'TaskId'>;
 
+/**
+ * A factory's name and a card's name, as a run holds them (`factory`, `scheduled.factory`, `from.inbox`): by key, since the factory's
+ * and the inbox's models import this one; the same types as theirs.
+ */
+const FactoryName = foreignId('FactoryName');
+const CardName = foreignId('CardName');
+
 /** A check of a step's work, a task of its own (`checkTaskId`, record.ts:397). */
 const CheckTask = Schema.Struct({ taskId: TaskId.OnRead });
 
@@ -162,10 +169,10 @@ export const Run = Schema.Struct({
   after: Schema.optional(Schema.Array(RunId.OnRead)),
   context: Schema.optional(Schema.Array(RunId.OnRead)),
   inputs: Schema.optional(Schema.Array(Schema.String)),
-  from: Schema.optional(Schema.Struct({ inbox: Schema.String })),
-  scheduled: Schema.optional(Schema.Struct({ factory: Schema.String, workflow: WorkflowName.OnRead, due: Schema.String })),
+  from: Schema.optional(Schema.Struct({ inbox: CardName.OnRead })),
+  scheduled: Schema.optional(Schema.Struct({ factory: FactoryName.OnRead, workflow: WorkflowName.OnRead, due: Schema.String })),
   gates: Schema.optional(Schema.Array(StepName.OnRead)),
-  factory: Schema.optional(Schema.String),
+  factory: Schema.optional(FactoryName.OnRead),
   mounts: Schema.optional(Schema.Array(Schema.Struct({ path: Schema.String, readOnly: Schema.Boolean }))),
   place: Schema.optional(Schema.Struct({ kind: Schema.Literal('folder') })),
   repo: Schema.optional(Schema.String),

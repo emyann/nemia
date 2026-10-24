@@ -33,6 +33,8 @@ const Task = Schema.Struct({
   tags: Schema.Array(Schema.String),
   closeout: Schema.Unknown,
   run: RunId.OnRead,
+  runs: Schema.Array(RunId.OnRead),
+  children: Schema.Record(Schema.String, TaskId.OnRead),
   attempts: Schema.Array(Attempt),
   byTurn: Schema.Record(Schema.String, Attempt),
   session: Session,
@@ -68,6 +70,12 @@ test('erDiagram draws each rule of the contract', async (t) => {
     has('    unknown closeout');
   });
   await t.test('a count is an attribute by its name, never a key', () => has('    AttemptNumber n'));
+  await t.test('an array or a record of ids is an FK, drawn from the entity or the node the ids name', () => {
+    has('    list runs FK');
+    has('  RunId ||--o{ Task : runs');
+    has('    object children FK');
+    has('  Task ||--o{ Task : children');
+  });
   await t.test('an id of another entity is an FK and a relation to that entity', () => {
     has('    TaskId task FK');
     has('  Task ||--o{ Attempt : task');
@@ -98,6 +106,8 @@ test('erDiagram draws each rule of the contract', async (t) => {
     assert.ok(lines.slice(firstRelation).every((l) => relations.includes(l)));
     assert.deepEqual(relations, [
       '  RunId ||--o{ Task : run',
+      '  RunId ||--o{ Task : runs',
+      '  Task ||--o{ Task : children',
       '  Task ||--o{ Attempt : attempts',
       '  Task ||--o{ Attempt : byTurn',
       '  Task ||--|| Session : session',

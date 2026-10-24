@@ -11,7 +11,7 @@ import type { StepStatus } from '../record/record.ts';
 const STATUSES = Object.keys(REASON_OF) as StepStatus[];
 
 test('holdsTheRun', async (t) => {
-  await t.test('what holds a run is what waits on the person and a step stopped on what it was asked', () => {
+  await t.test('what holds a run is what waits on the person and a step stopped on what it was asked, never one the engine ended on its own', () => {
     assert.deepEqual(STATUSES.filter(holdsTheRun), [
       'blocked',
       'unsigned',
@@ -22,8 +22,5 @@ test('holdsTheRun', async (t) => {
       'denied',
       'failed (check)',
     ]);
-  });
-  await t.test('a step the engine ended on its own holds no run: failed, stopped', () => {
-    assert.deepEqual([holdsTheRun('failed'), holdsTheRun('stopped')], [false, false]);
   });
 });

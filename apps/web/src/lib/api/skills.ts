@@ -1,5 +1,5 @@
 /**
- * The skills an agent of yours can be given, a skill Nemia ships copied into your library, one skill on its page, and one of yours written
+ * The skills an agent of yours can be given, a builtin skill copied into your library, one skill on its page, and one of yours written
  * on the board (apps/api/src/agents/skills.ts).
  */
 import { queryOptions } from '@tanstack/react-query';
@@ -24,7 +24,7 @@ export type SkillRow = {
   cost: SkillCost | null;
   /** The agents of yours that give it. */
   usedBy: string[];
-  /** A shipped skill's name, where an agent of yours already finds a skill of it; null elsewhere. */
+  /** A builtin skill's name, where an agent of yours already finds a skill of it; null elsewhere. */
   found: 'yours' | 'repo' | null;
 };
 
@@ -43,7 +43,7 @@ const SkillRowSchema = decodes<SkillRow>()(
   }),
 );
 
-/** Mirrors `SkillPlace`: one place, in the order an agent of yours finds a name, the shipped last. */
+/** Mirrors `SkillPlace`: one place, in the order an agent of yours finds a name, the builtin last. */
 export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
 
 /** Decodes a `SkillPlace`. */
@@ -82,7 +82,7 @@ const refused: SendHow['refused'] = (words, status) => new SkillRefusal(words, s
 /** What a skill's write may have done, and what to look at before writing it again. */
 const WRITTEN = 'The skill may be written: read the skills again before writing it again.';
 
-/** Copy the skill Nemia ships under `name` into your library, a write of its own: an agent of yours can then be given it. */
+/** Copy the builtin skill `name` into your library, a write of its own: an agent of yours can then be given it. */
 export const copySkill = (name: string): Promise<SkillAdded> =>
   send('POST', '/api/skills/yours', SkillAddedSchema, { body: { copy: name }, may: WRITTEN, refused });
 

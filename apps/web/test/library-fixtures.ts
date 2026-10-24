@@ -32,7 +32,7 @@ export const skillEntry = (extra: Partial<AgentSkill> = {}): AgentSkill => ({
 /** A skill as the picker lists it, found and costed. */
 export const skillRow = (extra: Partial<SkillRow> = {}): SkillRow => ({
   name: 'review-a-change',
-  from: 'shipped',
+  from: 'builtin',
   dir: '/work/workflows/skills/review-a-change',
   entry: skillEntry(),
   error: null,
@@ -83,7 +83,7 @@ export const listedAgent = (extra: Partial<AgentListing> = {}, factories = ['nem
 
 /** The skills of one place. */
 export const skillPlace = (extra: Partial<SkillPlace> = {}): SkillPlace => ({
-  from: 'shipped',
+  from: 'builtin',
   dir: '/work/workflows/skills',
   skills: [skillRow()],
   ...extra,

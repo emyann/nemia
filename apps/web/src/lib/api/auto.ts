@@ -15,7 +15,7 @@ export type Condition = 'recommends' | 'checked' | 'accepted' | 'withinBudget' |
 /**
  * Mirrors the package's `WordedRule`: a rule's id, the answer it gives unasked (`approve`, `retry`), the steps it holds at (all where left
  * out), the conditions it asks of the run's state (`when`), the dollar line the run's spend stays under for any answer it gives (`under`,
- * none where left out), where it came from (`from`: the rule that ships, or one the agent proposed), and its words, generated from those
+ * none where left out), where it came from (`from`: the builtin rule, or one the agent proposed), and its words, generated from those
  * fields.
  */
 export type AutoRule = {
@@ -29,8 +29,8 @@ export type AutoRule = {
 };
 
 /**
- * Mirrors the package's `AutoList`: the agent, the file of the person's list, whether the rule that ships is in force for want of one they
- * confirmed (`isDefault`), the rules in force, the rule that ships in its words (`shipped`), what the agent proposed (each rule saying
+ * Mirrors the package's `AutoList`: the agent, the file of the person's list, whether the builtin rule is in force for want of one they
+ * confirmed (`isDefault`), the rules in force, the builtin rule in its words (`builtin`), what the agent proposed (each rule saying
  * whether it is in force, the words kept as guidance, and whether the custom instruction changed since, `stale`) or null, and the custom
  * instruction or null.
  */
@@ -39,7 +39,7 @@ export type AutoList = {
   file: string;
   isDefault: boolean;
   rules: readonly AutoRule[];
-  shipped: AutoRule;
+  builtin: AutoRule;
   proposed: {
     file: string;
     at: string;
@@ -68,7 +68,7 @@ const AutoListSchema = decodes<AutoList>()(
     file: Schema.String,
     isDefault: Schema.Boolean,
     rules: Schema.Array(Schema.Struct(RULE_FIELDS)),
-    shipped: Schema.Struct(RULE_FIELDS),
+    builtin: Schema.Struct(RULE_FIELDS),
     proposed: Schema.NullOr(
       Schema.Struct({
         file: Schema.String,

@@ -10,7 +10,7 @@ import { CustomInstructions, SESSION } from './CustomInstructions';
 /** A write of a rule: `confirm` puts it in force as its `words` read, `drop` takes it out. */
 type RuleAsk = { verb: 'confirm'; id: string; words: string } | { verb: 'drop'; id: string };
 
-/** The id of the rule that ships, which a person puts back after a drop. */
+/** The id of the builtin rule, which a person puts back after a drop. */
 const DEFAULT_ID = 'default';
 
 /**
@@ -122,7 +122,7 @@ function InForce({ list, pending, onAsk }: { list: AutoList; pending: boolean; o
             size="sm"
             data-auto-default-back
             isDisabled={pending}
-            onPress={() => onAsk({ verb: 'confirm', id: DEFAULT_ID, words: list.shipped.words })}
+            onPress={() => onAsk({ verb: 'confirm', id: DEFAULT_ID, words: list.builtin.words })}
           >
             Put the default back
           </Button>

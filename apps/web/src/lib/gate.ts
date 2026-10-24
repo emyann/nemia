@@ -73,7 +73,7 @@ export function gateCardLine(gate: GateAsk): string {
 /**
  * The card's way to what a gate asks a person to approve, which a card has no room to show (it must fit its cell): the words, and where on
  * the run's page it goes. A step that has signed off opens its inspector (`step`), on its Output tab, where its closeout is:
- * `Read the plan` for the step the shipped folders call `plan`, `Read what it handed on` for any other. An ending has handed nothing on and
+ * `Read the plan` for the step this repository's team calls `plan`, `Read what it handed on` for any other. An ending has handed nothing on and
  * has no closeout of its own: its section (`hash`), where what it would act on is drawn beside its gate.
  */
 export const readLink = (gate: Pick<GateAsk, 'step' | 'ends'>): { words: string; step: string } | { words: string; hash: string } =>

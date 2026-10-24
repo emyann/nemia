@@ -4,14 +4,14 @@ import type { GivenSkill, SkillCost, SkillDetail, SkillDraft, SkillPlace, SkillR
 export const PLACE_LABELS: Readonly<Record<SkillSource, string>> = {
   yours: 'Your library',
   repo: 'This repository',
-  shipped: 'Shipped with Nemia',
+  builtin: 'Built into Nemia',
 };
 
 /** A given skill's badge: where an agent of yours finds it. */
 export const SOURCE_BADGES: Readonly<Record<SkillSource, string>> = {
   yours: 'your library',
   repo: 'this repository',
-  shipped: 'shipped with Nemia',
+  builtin: 'built into Nemia',
 };
 
 /**
@@ -29,7 +29,7 @@ export function costWords(cost: SkillCost): string {
  * with where it was found. A name found in neither is said to be missing once the list is read; before, it is only named.
  */
 export function givenRows(names: readonly string[], given: readonly GivenSkill[], places: readonly SkillPlace[] | undefined): GivenSkill[] {
-  const found = (places ?? []).filter((place) => place.from !== 'shipped').flatMap((place) => place.skills);
+  const found = (places ?? []).filter((place) => place.from !== 'builtin').flatMap((place) => place.skills);
   return names.map((name) => {
     const row = found.find((skill) => skill.name === name);
     if (row) return { name, from: row.from, foundIn: null, entry: row.entry, error: row.error, preload: row.preload, cost: row.cost };
@@ -41,8 +41,8 @@ export function givenRows(names: readonly string[], given: readonly GivenSkill[]
 }
 
 /**
- * What the picker offers for a skill: to add it; to copy it into your library and add it, for one Nemia ships that an agent of yours finds
- * nowhere; that it is given already; that an agent of yours finds its name elsewhere — a shipped skill your library or the repository has,
+ * What the picker offers for a skill: to add it; to copy it into your library and add it, for a builtin one that an agent of yours finds
+ * nowhere; that it is given already; that an agent of yours finds its name elsewhere — a builtin skill your library or the repository has,
  * so a copy would write over yours or hide the repository's; or why no agent can be given it, and nothing to press.
  */
 export type SkillOffer =
@@ -54,7 +54,7 @@ export type SkillOffer =
 
 export function offerOf(row: SkillRow, given: readonly string[]): SkillOffer {
   if (row.error !== null || row.entry === null) return { kind: 'refused', why: row.error ?? 'Its SKILL.md does not read.' };
-  if (row.from === 'shipped') return row.found ? { kind: 'found', where: row.found } : { kind: 'copy' };
+  if (row.from === 'builtin') return row.found ? { kind: 'found', where: row.found } : { kind: 'copy' };
   return given.includes(row.name) ? { kind: 'given' } : { kind: 'add' };
 }
 

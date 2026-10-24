@@ -22,7 +22,7 @@ import { container, hairline } from '@/lib/meaning';
 import { CHIP } from './Reach';
 import { ServerSignIn } from './ServerSignIn';
 import { stateDrawn } from '../lib/serverState';
-import { factoryServersQuery, recordServer, removeServer, type FactoryServer, type ShippedServer } from '../lib/api';
+import { factoryServersQuery, recordServer, removeServer, type FactoryServer, type BuiltinServer } from '../lib/api';
 
 /** What a person asks of a factory's record: one server recorded, or one taken off. */
 type Change = { kind: 'record'; server: string; body: Parameters<typeof recordServer>[2] } | { kind: 'remove'; server: string };
@@ -104,16 +104,16 @@ type Draft = { name: string; url: string; transport: string; header: string; cli
 
 const EMPTY: Draft = { name: '', url: '', transport: 'http', header: '', clientId: '', callbackPort: '' };
 
-/** `shipped` as a draft: the facts Nemia ships of it, so a person types neither its address nor its client id. */
-const draftOf = (shipped: ShippedServer): Draft => ({
-  name: shipped.name,
-  url: shipped.url,
-  transport: shipped.type,
-  header: Object.entries(shipped.headers ?? {})
+/** `builtin` as a draft: the facts Nemia holds of it, so a person types neither its address nor its client id. */
+const draftOf = (builtin: BuiltinServer): Draft => ({
+  name: builtin.name,
+  url: builtin.url,
+  transport: builtin.type,
+  header: Object.entries(builtin.headers ?? {})
     .map(([k, v]) => `${k}=${v}`)
     .join(', '),
-  clientId: shipped.oauth?.clientId ?? '',
-  callbackPort: shipped.oauth?.callbackPort === undefined ? '' : String(shipped.oauth.callbackPort),
+  clientId: builtin.oauth?.clientId ?? '',
+  callbackPort: builtin.oauth?.callbackPort === undefined ? '' : String(builtin.oauth.callbackPort),
 });
 
 /** How the form writes one field of its draft: the same handler for each, by the field's key. */
@@ -143,7 +143,7 @@ function SignInFields({ draft, set }: Fills) {
         <FieldLabel htmlFor="server-client-id">OAuth client id</FieldLabel>
         <Input id="server-client-id" name="clientId" value={draft.clientId} onChange={set('clientId')} placeholder="Iv23li…" />
         <FieldDescription>
-          For a server that signs in. No secret: a server Nemia ships signs in with the secret Nemia ships, and the harness reads any
+          For a server that signs in. No secret: a builtin server signs in with the secret built into Nemia, and the harness reads any
           other's from its own store.
         </FieldDescription>
       </Field>
@@ -161,11 +161,11 @@ function SignInFields({ draft, set }: Fills) {
  * stories.
  */
 export function ServerForm({
-  shipped,
+  builtin,
   pending,
   onRecord,
 }: {
-  shipped: readonly ShippedServer[];
+  builtin: readonly BuiltinServer[];
   pending: boolean;
   onRecord: (server: string, body: Parameters<typeof recordServer>[2]) => void;
 }) {
@@ -192,10 +192,10 @@ export function ServerForm({
         send();
       }}
     >
-      {shipped.length > 0 && (
-        <div data-server-shipped className="flex flex-wrap items-center gap-2">
-          <span className="text-body-medium text-muted-foreground">Nemia ships:</span>
-          {shipped.map((one) => (
+      {builtin.length > 0 && (
+        <div data-server-builtin className="flex flex-wrap items-center gap-2">
+          <span className="text-body-medium text-muted-foreground">Built into Nemia:</span>
+          {builtin.map((one) => (
             <Button key={one.name} type="button" variant="outline" size="sm" onClick={() => setDraft(draftOf(one))}>
               {one.name}
             </Button>
@@ -310,7 +310,7 @@ export function FactoryServers({ name }: { name: string }) {
           )}
           <ServerList factory={name} servers={servers} pending={change.isPending} onRemove={(server) => ask({ kind: 'remove', server })} />
           <ServerForm
-            shipped={data.shipped}
+            builtin={data.builtin}
             pending={change.isPending}
             onRecord={(server, body) => ask({ kind: 'record', server, body })}
           />

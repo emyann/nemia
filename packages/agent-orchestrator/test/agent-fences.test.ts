@@ -1725,10 +1725,13 @@ test("REFUSED: cd to Seldon, Agora and Iris, each by a deny of its own, where th
   }
 });
 
-/** The agents that design, review and interview, each of which reads Anthropic's documentation. */
-const READERS = ['seldon', 'agora', 'iris'];
+/** The agents that review and interview, each of which reads Anthropic's documentation by host. */
+const READERS = ['agora', 'iris'];
 
-/** Anthropic's documentation, by the host a fetch reads: the only hosts those agents open. */
+/** The agent that designs: a spec is only as good as the documents it reads, so Seldon fetches any site (the owner, 2026-10-24). */
+const DESIGNER = 'seldon';
+
+/** Anthropic's documentation, by the host a fetch reads: the only hosts the readers open. */
 const DOCUMENTATION: Call[] = ['code.claude.com', 'docs.claude.com', 'platform.claude.com', 'docs.anthropic.com'].map((domain) => ({
   tool: 'WebFetch',
   domain,
@@ -1740,7 +1743,17 @@ const ELSEWHERE: Call[] = ['claude.com', 'code.claude.com.example.test', 'exampl
   domain,
 }));
 
-test("Seldon, Agora and Iris read Anthropic's documentation and search the web by their own allow, each host by name, and no other host", () => {
+test('Seldon fetches any site and searches the web by his own allow, a fetch that names no host included', () => {
+  const step = shippedStepOf(DESIGNER);
+  assert.ok(step.tools?.includes('WebFetch') && step.tools.includes('WebSearch'), 'seldon is given WebFetch and WebSearch');
+  assert.deepEqual(
+    runs(step, [...DOCUMENTATION, ...ELSEWHERE, { tool: 'WebFetch' }, { tool: 'WebSearch' }], {}, []),
+    [...DOCUMENTATION.map(shown), ...ELSEWHERE.map(shown), 'WebFetch', 'WebSearch'],
+    'seldon: by his own allow, no settings read',
+  );
+});
+
+test("Agora and Iris read Anthropic's documentation and search the web by their own allow, each host by name, and no other host", () => {
   for (const agent of READERS) {
     const step = shippedStepOf(agent);
     assert.ok(step.tools?.includes('WebFetch') && step.tools.includes('WebSearch'), `${agent} is given WebFetch and WebSearch`);

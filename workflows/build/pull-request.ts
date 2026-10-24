@@ -108,9 +108,12 @@ type Pr = { number: number; url: string; isDraft: boolean; baseRefName: string; 
 /** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
 type Ran = { status: number | null; out: string; err: string; missing: boolean };
 
+/** The most bytes a command may print before it is cut off: a test job's whole log runs past `spawnSync`'s default of 1 MiB. */
+const OUTPUT_BYTES = 64 * 1024 * 1024;
+
 /** Run `cmd` with `args`, bounded, reading nothing from stdin. */
 function run(cmd: string, args: string[]): Ran {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND });
+  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND, maxBuffer: OUTPUT_BYTES });
   const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
   return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '').trim() || (r.error?.message ?? ''), missing };
 }

@@ -319,9 +319,10 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that 
   const cleanup = [
     'Post job cleanup.',
     '[command]/usr/bin/git version',
-    "Temporarily overriding HOME='/home/runner/work/_temp/x' before making global git config changes",
+    "Temporarily overriding HOME='<runner>/_temp/x' before making global git config changes",
     'Cleaning up orphan processes',
   ];
+  const pastSpawnBuffer = `[w1] visiting page ${'x'.repeat(1024 * 1024)}`;
   const E2E = 'e2e: FAILED — the runs page (/runs) in the dark theme: a row for the run — none seen';
   const checks = stamped([
     "web:typecheck: src/a.ts(3,7): error TS2322: Type 'string' is not assignable to type 'number'.",
@@ -329,6 +330,7 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that 
     '   ,-[src/b.ts:1:7]',
     ' 1 | const b = 1;',
     ...Array.from({ length: 40 }, (_, i) => `[w1] visiting page ${i}`),
+    pastSpawnBuffer,
     `[w1] ${E2E}`,
     E2E,
     'Process completed with exit code 1.',
@@ -380,7 +382,11 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that 
   assert.match(r.err, /Process completed with exit code 1\./, 'a job that names no failing test gives its tail');
   for (const told of ['error TS2322', 'x eslint(no-unused-vars)', ',-[src/b.ts:1:7]'])
     assert.ok(r.err.includes(told), `a type or lint error, with its place: ${told}\n${r.err}`);
-  assert.equal(r.err.split(E2E).length - 1, 1, `the e2e's failed page is told once, with or without its worker:\n${r.err}`);
+  assert.equal(
+    r.err.split(E2E).length - 1,
+    1,
+    `the e2e's failed page is told once, with or without its worker, from a log past spawnSync's default 1 MiB:\n${r.err}`,
+  );
   assert.ok(!r.err.includes('visiting page'), `a job with a failing line gives no tail:\n${r.err}`);
   for (const noise of ['Post job cleanup', '[command]/usr/bin/git', 'Temporarily overriding HOME', 'Cleaning up orphan processes'])
     assert.ok(!r.err.includes(noise), `GitHub's post-job lines are no reason: ${noise}\n${r.err}`);

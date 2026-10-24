@@ -91,7 +91,7 @@ export const AGENTS_CUSTOM: Command<Read | Cleared> = {
       ? 'nemia agents custom takes --file or --clear, not both: --file writes the words, --clear removes them.'
       : leftOut(SPEC, args),
   writes: true,
-  nemia: { bare: 'read', sets: 'prompts', setsBy: ['--file', '--clear'], readsBy: ['--repo'] },
+  class: { bare: 'read', sets: 'ask', setsBy: ['--file', '--clear'], readsBy: ['--repo'] },
   route: [
     {
       method: 'GET',

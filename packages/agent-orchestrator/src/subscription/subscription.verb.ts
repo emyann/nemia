@@ -131,7 +131,7 @@ export const SUBSCRIBE: Command<Subscribed> = {
   },
   check: (args) => subscribeRefusalOf(askedOf(args)) ?? null,
   writes: true,
-  nemia: 'hers',
+  class: 'act',
   route: { method: 'POST', path: '/api/subscriptions/:name', status: 201 },
   handler: subscribe,
   print: ({ name, subscription: s }) => [
@@ -155,7 +155,7 @@ export const UNSUBSCRIBE: Command<{ name: string }> = {
   },
   check: (args) => subscriptionNameRefusal(String(args.name ?? '')) ?? null,
   writes: true,
-  nemia: 'hers',
+  class: 'act',
   route: { method: 'DELETE', path: '/api/subscriptions/:name', status: 200 },
   handler: (args) =>
     tried(() => {

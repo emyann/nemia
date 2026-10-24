@@ -511,10 +511,10 @@ test('status reads the unit back: what it runs, from which checkout, who holds t
 
 test('the service commands are the CLI’s alone; Nemia’s fence asks before install and uninstall and lets status run', () => {
   assert.deepEqual(
-    SERVICES.map((c) => [c.name, c.only?.side, c.nemia]),
+    SERVICES.map((c) => [c.name, c.only?.side, c.class]),
     [
-      ['service install', 'cli', 'prompts'],
-      ['service uninstall', 'cli', 'prompts'],
+      ['service install', 'cli', 'ask'],
+      ['service uninstall', 'cli', 'ask'],
       ['service status', 'cli', 'read'],
     ],
   );
@@ -689,8 +689,8 @@ test('a pause a person put stands through a restart: neither put again nor lifte
 
 test('the restart is the CLI’s alone, and Nemia’s fence asks before it', () => {
   assert.deepEqual(
-    RESTARTS.map((c) => [c.name, c.only?.side, c.nemia]),
-    [['service restart', 'cli', 'prompts']],
+    RESTARTS.map((c) => [c.name, c.only?.side, c.class]),
+    [['service restart', 'cli', 'ask']],
   );
   const fence = nemiaFence(TABLE);
   assert.ok(fence.ask.includes('Bash(nemia service restart:*)'), fence.ask.join('\n'));

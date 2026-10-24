@@ -103,7 +103,7 @@ const RESTART: Command<Restarted> = {
   ],
   spec: { positionals: [], flags: [NAME_FLAG], unknown: (arg) => `${BY} does not take ${arg}: ${SHAPE}.` },
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   only: { side: 'cli', why: "it restarts the person's login service, on the machine the command runs on" },
   handler: (args) => restartService(args),
   print: (data) => data.lines,

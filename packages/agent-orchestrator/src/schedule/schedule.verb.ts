@@ -127,7 +127,7 @@ export const FACTORY_SCHEDULE: Command<Scheduled> = {
   spec: SCHEDULE_SPEC,
   check: scheduleCheck,
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   route: { method: 'PUT', path: '/api/factories/:factory/schedules/:workflow', status: 200 },
   handler: (args) =>
     tried(() => {
@@ -167,7 +167,7 @@ export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }> = 
     flagFirst: true,
   },
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   route: { method: 'DELETE', path: '/api/factories/:factory/schedules/:workflow', status: 200 },
   handler: (args) => tried(() => clearSchedule({ factory: textOf(args, 'factory'), workflow: textOf(args, 'workflow') })),
   print: ({ file, cleared }, args) => [

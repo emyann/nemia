@@ -10,9 +10,9 @@ import { OUT, store } from '../world.ts';
 const MIN = 60_000;
 
 /**
- * A `daemon.json` as a daemon writes it — a `wf up`'s, or the api's (`by`, `url`) — naming the e2e's own process: alive for the whole
- * e2e, and the api's parent, so the api's signal 0 reaches it, with no process start, which the api then cannot compare and reads as
- * holding (`unknown`). Heard from `quiet` ago.
+ * A `daemon.json` as a daemon writes it — a `nemia up`'s, with no `by`, as one written before `up` is read, or the api's (`by`, `url`)
+ * — naming the e2e's own process: alive for the whole e2e, and the api's parent, so the api's signal 0 reaches it, with no process
+ * start, which the api then cannot compare and reads as holding (`unknown`). Heard from `quiet` ago.
  */
 const daemonFile = (quiet: number, holder: Record<string, string> = {}) => {
   const heard = new Date(Date.now() - quiet).toISOString();
@@ -35,7 +35,7 @@ export default {
    * Whether a daemon ticks the store: a dot on the top bar's gauges button, and whole in the machine's gauges it opens. The seeded
    * store has no daemon.json, which is true — the e2e's api runs with `--no-tick` — so the dot is down and the gauges say so and how to
    * start one: the api. Then a daemon heard from just now, said on the feed as a daemon says it on starting (`fedDaemon`): the dot is ok
-   * with no reload, read on that line and not on the fallback a minute later. Then a wf up alive and silent for 20 minutes, past the 15
+   * with no reload, read on that line and not on the fallback a minute later. Then a nemia up alive and silent for 20 minutes, past the 15
    * that are stale at every 4 s: the dot warns, and the gauges say it stalled, with its silence and the command, each card on the floor
    * beside them clear of the one beneath it and of the panels. Then an api holder silent as long: said by its kind. Then each heard from
    * just now: the dot is ok, the gauges say the api's own line and no sentence, and the cap is still over the floor. Then the api's last
@@ -77,18 +77,18 @@ export default {
       await reload(page);
       const stalled = page.locator('[data-daemon="stalled"]', {
         hasText: new RegExp(
-          `^Nothing ticks this store, so no run moves: the wf up of pid ${process.pid} is alive but silent, last heard from 20 min ago\\. ${START} — it takes the store over\\.$`,
+          `^Nothing ticks this store, so no run moves: the nemia up of pid ${process.pid} is alive but silent, last heard from 20 min ago\\. ${START} — it takes the store over\\.$`,
         ),
       });
       await expectVisible(
         stalled,
-        'a wf up alive and silent for 20 minutes is said as stalled, with its silence and the command that takes the store over',
+        'a nemia up alive and silent for 20 minutes is said as stalled, with its silence and the command that takes the store over',
       );
       await expectVisible(stalled.locator('code', { hasText: /^npm start in apps\/api$/ }), "the api's start set apart as code");
       await expectCount(line, 1, 'one line, and no other');
       await dot('stalled', 'warn', "the gauges button's dot warns: the next daemon takes the store over");
       const title = await page.locator('[data-daemon-dot="stalled"]').getAttribute('title');
-      if (!title?.startsWith(`Nothing ticks this store, so no run moves: the wf up of pid ${process.pid} is alive but silent`))
+      if (!title?.startsWith(`Nothing ticks this store, so no run moves: the nemia up of pid ${process.pid} is alive but silent`))
         throw new Refused(`the dot's hover says the gauges' sentence — its title is ${JSON.stringify(title)}`);
       if (!(await stalled.getAttribute('title'))?.startsWith(`nemia up: stalled, pid ${process.pid}`)) {
         throw new Refused(
@@ -123,7 +123,7 @@ export default {
         await expectCount(
           line,
           0,
-          `${what === 'api' ? 'an api' : 'a wf up'} heard from just now is ticking, and no sentence says nothing ticks`,
+          `${what === 'api' ? 'an api' : 'a nemia up'} heard from just now is ticking, and no sentence says nothing ticks`,
         );
         await dot('ticking', 'ok', "the gauges button's dot is ok");
         await expectVisible(

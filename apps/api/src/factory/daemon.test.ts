@@ -17,6 +17,8 @@ const STATS = path.join(root, 'tick-stats.json');
 type Daemon = import('./daemon.ts').Daemon;
 type DaemonFile = import('agent-orchestrator').DaemonFile;
 type PassCostRead = import('agent-orchestrator').PassCostRead;
+/** `daemon.json` as a daemon wrote it: one written before the api held the store names no `by`. */
+type OnDisk = Omit<DaemonFile, 'by'> & Partial<Pick<DaemonFile, 'by'>>;
 
 /** A pid no process has: above any `pid_max` Linux allows (2^22). */
 const NO_PID = 2 ** 30;
@@ -27,7 +29,7 @@ const ago = (ms: number, now = Date.now()) => new Date(now - ms).toISOString();
  * A file as `nemia up` writes it: this test's own process, confirmed by its start, every 4 s, passed and beating `quiet` ago — each stamp
  * off one reading of the clock, so a step between two readings cannot set the pass after the beat.
  */
-const written = (quiet: number, over: Partial<DaemonFile> = {}): DaemonFile => {
+const written = (quiet: number, over: Partial<DaemonFile> = {}): OnDisk => {
   const procStart = procStartOf(process.pid);
   const now = Date.now();
   return {
@@ -42,7 +44,7 @@ const written = (quiet: number, over: Partial<DaemonFile> = {}): DaemonFile => {
   };
 };
 
-const put = (file: DaemonFile | string) => fs.writeFileSync(FILE, typeof file === 'string' ? file : `${JSON.stringify(file, null, 2)}\n`);
+const put = (file: OnDisk | string) => fs.writeFileSync(FILE, typeof file === 'string' ? file : `${JSON.stringify(file, null, 2)}\n`);
 
 /** GET /api/daemon, and the file as it stood before and after: the api writes nothing, whatever it reads. */
 async function get(): Promise<Daemon> {
@@ -103,7 +105,7 @@ test('GET /api/daemon: the standing of each daemon.json, as `nemia ls` judges it
     assert.equal(d.staleAfterMs, STALE_FLOOR_MS);
     assert.equal(d.identity, procStartOf(process.pid) === undefined ? 'unknown' : 'same');
     assert.match(d.line, new RegExp(`^nemia up: ticking, pid ${process.pid}, every 4000ms — last pass `));
-    assert.deepEqual([d.by, d.url], ['wf up', null], 'a file that names no holder is a wf up, as it was written');
+    assert.deepEqual([d.by, d.url], ['nemia up', null], 'a file that names no holder is a nemia up');
   });
   await t.test('a live api holding the store is ticking as the api, at the url it serves the board on', async () => {
     put(written(3_000, { by: 'api', url: 'http://127.0.0.1:8787' }));
@@ -199,6 +201,7 @@ test("daemonOf: the standing as facts, nemia ls's line with them, and what the l
     const now = Date.parse('2026-09-22T10:00:00.000Z');
     const file: DaemonFile = {
       pid: 42,
+      by: 'up',
       startedAt: '2026-09-22T09:00:00.000Z',
       cwd: '/r',
       every: 120_000,
@@ -208,7 +211,7 @@ test("daemonOf: the standing as facts, nemia ls's line with them, and what the l
     const standing = { kind: 'stalled' as const, file, last: Date.parse(file.beatAt!), quiet: 25 * MIN, identity: 'unknown' as const };
     assert.deepEqual(daemonOf(standing, now), {
       kind: 'stalled',
-      by: 'wf up',
+      by: 'nemia up',
       url: null,
       start: 'npm start in apps/api',
       ticking: false,
@@ -239,6 +242,7 @@ test("daemonOf: the standing as facts, nemia ls's line with them, and what the l
     const now = Date.parse('2026-09-22T10:00:00.000Z');
     const file: DaemonFile = {
       pid: 42,
+      by: 'up',
       startedAt: '2026-09-22T09:00:00.000Z',
       cwd: '/r',
       every: 4_000,

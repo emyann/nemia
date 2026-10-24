@@ -167,7 +167,7 @@ export const FRONTMATTER_REWRITE: Command<Rewritten> = {
   ],
   spec: SPEC,
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   asksAlways: true,
   only: { side: 'cli', why: 'it rewrites files on the machine nemia runs on, folders a person names among them' },
   handler: (args, _env, home) =>

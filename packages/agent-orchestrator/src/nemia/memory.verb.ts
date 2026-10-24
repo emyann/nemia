@@ -30,7 +30,7 @@ export const MEMORY: Command<NemiaMemory> = {
     unknown: (arg) => `nemia memory takes one fact's name, not ${arg}: nemia memory [<fact>].`,
   },
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: [
     { method: 'GET', path: '/api/nemia/memory', status: 200 },
     { method: 'GET', path: '/api/nemia/memory/:fact', status: 200 },

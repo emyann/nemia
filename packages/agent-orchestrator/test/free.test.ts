@@ -485,7 +485,7 @@ test(
       const { id } = await merged();
       assert.ok(whole(id));
       const daemon = Effect.runFork(
-        Effect.scoped(up(engine(), { every: 20, repo: ROOT, holder: 'wf up' })).pipe(
+        Effect.scoped(up(engine(), { every: 20, repo: ROOT, holder: 'up' })).pipe(
           Effect.provide(stage.place().layer),
           Effect.provide(storeRootLayer(process.env)),
           Effect.provide(Logger.layer([])),
@@ -504,7 +504,7 @@ test(
         const turn = Effect.promise(() => new Promise<void>((next) => setImmediate(next)));
         const turns = Effect.forEach(Array.from({ length: 200 }), () => turn, { discard: true });
         const daemon = Effect.runFork(
-          Effect.scoped(up(engine(), { every: 20, repo: ROOT, holder: 'wf up', onTaken: () => turns })).pipe(
+          Effect.scoped(up(engine(), { every: 20, repo: ROOT, holder: 'up', onTaken: () => turns })).pipe(
             Effect.provide(stage.place().layer),
             Effect.provide(storeRootLayer(process.env)),
             Effect.provide(Logger.layer([])),

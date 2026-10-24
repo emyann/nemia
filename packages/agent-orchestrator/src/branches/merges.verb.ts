@@ -45,7 +45,7 @@ export const MERGES: Command<Record<string, StandingMerge>> = {
     unknown: (arg) => `the merge check does not take ${arg}.`,
   },
   writes: false,
-  nemia: 'read',
+  class: 'read',
   only: {
     side: 'api',
     why: "the board's decision says whether each branch ahead still merges onto its base; nemia decide leaves a trial merge to the person",

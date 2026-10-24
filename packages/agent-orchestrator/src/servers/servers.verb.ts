@@ -104,7 +104,7 @@ export const FACTORY_SERVERS: Command<ServersListing> = {
     missing: `nemia factory servers takes the factory, as nemia factory ls lists it: nemia factory servers ${LIST_USAGE}.`,
   },
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: { method: 'GET', path: '/api/factories/:factory/servers', status: 200 },
   handler: (args, _env, home) => serversListed(textOf(args, 'factory'), rootGiven(home, 'factory servers')),
   print: ({ factory, servers, unread }) =>
@@ -233,7 +233,7 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
   spec: ADD_SPEC,
   check: addCheck,
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   route: { method: 'PUT', path: '/api/factories/:factory/servers/:server', status: 200 },
   handler: (args, _env, home) =>
     tried(() => {
@@ -285,7 +285,7 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
     flagFirst: true,
   },
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   route: { method: 'DELETE', path: '/api/factories/:factory/servers/:server', status: 200 },
   handler: (args, _env, home) =>
     tried(() => {

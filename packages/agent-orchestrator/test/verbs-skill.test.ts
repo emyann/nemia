@@ -37,7 +37,7 @@ test('the shipped verbs skill is what the command table renders today', () => {
 });
 
 test('REFUSED: a command added to the table without regenerating the skill renders apart from the shipped file, under its class', () => {
-  const planted = { name: 'planted', usage: '<x>', help: ['a planted verb'], nemia: 'hers' as const };
+  const planted = { name: 'planted', usage: '<x>', help: ['a planted verb'], class: 'act' as const };
   const rendered = verbsSkillOf([...TABLE, planted], CLI_VERBS);
   assert.notEqual(rendered, fs.readFileSync(SKILL, 'utf8'));
   assert.ok(lists(sectionOf(rendered, 'Yours'), 'planted'), 'the planted verb is listed under Yours');
@@ -46,7 +46,7 @@ test('REFUSED: a command added to the table without regenerating the skill rende
 
 test('every command the CLI serves her is listed, and none out of her reach nor one the api alone serves but the CLI’s own verbs', () => {
   const text = verbsSkill();
-  const served = TABLE.filter((c) => c.only?.side !== 'api' && c.nemia !== 'out');
+  const served = TABLE.filter((c) => c.only?.side !== 'api' && c.class !== 'none');
   assert.deepEqual(
     served.filter((c) => !lists(text, c.name)).map((c) => c.name),
     [],

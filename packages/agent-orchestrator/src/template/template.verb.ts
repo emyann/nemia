@@ -73,7 +73,7 @@ const TEMPLATE_CHECK: Command<{ folder: string; digest: string | undefined }> = 
   spec: CHECK_SPEC,
   check: (args) => leftOut(CHECK_SPEC, args),
   writes: false,
-  nemia: 'read',
+  class: 'read',
   only: HERE,
   manual: TEMPLATE_HELP,
   handler: (args) =>
@@ -145,7 +145,7 @@ const TEMPLATE_EXPORT: Command<Exported> = {
     leftOut(EXPORT_SPEC, args) ??
     (textOf(args, 'from') === undefined ? 'nemia template export takes the repository to read: --from <repo>.' : null),
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
   handler: (args) =>
@@ -185,7 +185,7 @@ const TEMPLATE_PACK: Command<{ out: string; digest: string }> = {
   spec: PACK_SPEC,
   check: (args) => leftOut(PACK_SPEC, args),
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
   handler: (args) => tried(() => packTemplate({ dir: textOf(args, 'folder') ?? '', out: textOf(args, 'out'), cwd: process.cwd() })),
@@ -211,7 +211,7 @@ const TEMPLATE_UNPACK: Command<{ dir: string; digest: string }> = {
   spec: UNPACK_SPEC,
   check: (args) => leftOut(UNPACK_SPEC, args),
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
   handler: (args) => tried(() => unpackTemplate({ archive: textOf(args, 'archive') ?? '', dir: textOf(args, 'dir') ?? '' })),

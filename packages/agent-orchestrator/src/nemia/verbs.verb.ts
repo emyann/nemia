@@ -14,26 +14,26 @@ export const REGENERATE =
   'packages/agent-orchestrator/nemia/skills/verbs/SKILL.md';
 
 /** An entry as the skill reads it: its name, usage, help, class and the side it is served on alone. */
-type Entry = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only' | 'nemia'>;
+type Entry = Pick<CommandSpec, 'name' | 'usage' | 'help' | 'only' | 'class'>;
 
 /** A verb the CLI runs by a hand of its own: its name, usage and help, its class its table entry's. */
 type CliVerb = Pick<CommandSpec, 'name' | 'usage' | 'help'>;
 
-/** The skill's sections, in order: the class each lists, its heading, and what it tells her of every verb under it; none lists `out`. */
-const SECTIONS: readonly { readonly class: 'read' | 'hers' | 'prompts' | 'answers'; readonly heading: string; readonly says: string }[] = [
+/** The skill's sections, in order: the class each lists, its heading, and what it tells her of every verb under it; none lists `none`. */
+const SECTIONS: readonly { readonly class: 'read' | 'act' | 'ask' | 'answer'; readonly heading: string; readonly says: string }[] = [
   {
     class: 'read',
     heading: 'Reads',
     says: 'They write nothing: run them unasked, as often as you need. One that sets with some words prompts the person given them.',
   },
-  { class: 'hers', heading: 'Yours', says: 'They write, and are yours to run unasked, on your judgement: say what you did.' },
+  { class: 'act', heading: 'Yours', says: 'They write, and are yours to run unasked, on your judgement: say what you did.' },
   {
-    class: 'prompts',
+    class: 'ask',
     heading: 'Prompts the person',
     says: 'Each asks the person at a prompt every time it runs: say what it does before you run it.',
   },
   {
-    class: 'answers',
+    class: 'answer',
     heading: 'Answers what waits',
     says:
       'Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose ' +
@@ -42,29 +42,29 @@ const SECTIONS: readonly { readonly class: 'read' | 'hers' | 'prompts' | 'answer
 ];
 
 /** The section a class is listed under: a command that reads bare and sets with some words is a read. */
-const sectionOf = (nemia: CommandClass): CommandClass => (typeof nemia === 'object' ? 'read' : nemia);
+const sectionOf = (c: CommandClass): CommandClass => (typeof c === 'object' ? 'read' : c);
 
 /** An entry's help, and for a command that reads bare, the words that make it prompt the person. */
 function helpLines(entry: Entry): readonly string[] {
-  if (typeof entry.nemia !== 'object') return entry.help;
-  const words = entry.nemia.setsBy.join(', ');
+  if (typeof entry.class !== 'object') return entry.help;
+  const words = entry.class.setsBy.join(', ');
   return [...entry.help, `reads bare; prompts the person given ${words}`];
 }
 
 /**
  * The text of the `verbs` skill for `table` and `cliVerbs`: its frontmatter, written as YAML (`renderFrontmatter`), the note that it
  * is generated with `REGENERATE`, and a section per class, each the commands of that class as `helpOf` prints them, in the table's order
- * and then the CLI's own verbs. Left out: a command out of her reach (`out`), one the api alone serves, and a verb of the CLI with no
+ * and then the CLI's own verbs. Left out: a command out of her reach (`none`), one the api alone serves, and a verb of the CLI with no
  * entry in `table` to class it.
  */
 export function verbsSkillOf(table: readonly Entry[], cliVerbs: readonly CliVerb[]): string {
   const served = table.filter((c) => c.only?.side !== 'api');
   const own = cliVerbs.flatMap((v) => {
     const entry = table.find((c) => c.name === v.name);
-    return entry === undefined ? [] : [{ ...v, nemia: entry.nemia }];
+    return entry === undefined ? [] : [{ ...v, class: entry.class }];
   });
   const sections = SECTIONS.flatMap((s) => {
-    const under = [...served, ...own].filter((c) => sectionOf(c.nemia) === s.class).map((c) => ({ ...c, help: helpLines(c) }));
+    const under = [...served, ...own].filter((c) => sectionOf(c.class) === s.class).map((c) => ({ ...c, help: helpLines(c) }));
     return under.length === 0 ? [] : [`## ${s.heading}`, '', s.says, '', '```text', helpOf(under), '```', ''];
   });
   return [

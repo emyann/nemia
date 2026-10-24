@@ -308,7 +308,7 @@ export const START: Command<Started> = {
   check: (args) => leftOut(START_SPEC, args),
   writes: true,
   ticks: true,
-  nemia: 'hers',
+  class: 'act',
   route: {
     method: 'POST',
     path: '/api/runs',
@@ -347,7 +347,7 @@ export const CONCLUDED: Command<Concluded> = {
     missing: 'nemia concluded takes the run to read, by its id: nemia concluded <runId> — nemia ls lists them.',
   },
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: { method: 'GET', path: '/api/runs/:runId/concluded', status: 200 },
   handler: Effect.fnUntraced(function* (args: Args) {
     const id = textOf(args, 'runId') ?? '';
@@ -440,7 +440,7 @@ export const PLAN: Ran = {
   check: (args) => leftOut(PLAN_SPEC, args),
   writes: true,
   ticks: true,
-  nemia: 'hers',
+  class: 'act',
   only: {
     side: 'cli',
     why: 'the board starts runs one at a time, and a plan is a folder of cards read from where nemia plan is typed: no api route starts one',

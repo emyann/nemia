@@ -11,6 +11,9 @@ import type { Named, RouteWords } from '../commands/words.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
 
+/** What `GET /api/factories/:factory/rules` answers. */
+export type { FactoryRules };
+
 const RULES_PUT_SHAPE = '`{ "words": "<the factory\'s rules>" }`';
 
 /** The route of a factory's rules `at` names, as a refusal says it: `PUT /api/factories/<name>/rules`. */

@@ -38,7 +38,7 @@ sequenceDiagram
   T->>E: file the step's check
   E-->>T: the check's exit code
   T->>E: file the next step, or the round its loop asks for
-  T-->>P: a gate waits for you
+  T-->>P: a gate waits on you
   P->>T: approve
   T->>E: file the last step, which stages the merge
   E-->>T: the merge staged, and its check passed

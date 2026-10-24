@@ -1,6 +1,7 @@
 /** The inbox: its cards, and a card filed, dropped and queued (apps/api/src/inbox/inbox.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get, send } from './read.ts';
 import { KeyRowSchema, type KeyRow } from './library.ts';
 import type { WorkflowListing } from './workflows.ts';
@@ -29,6 +30,8 @@ export type InboxEntry = {
   factory: string | null;
   /** The runs its run is handed as context (`from:`), read and never waited on: none for a card without the line. */
   from: string[];
+  /** The step its run is gated at, as written; absent on a card with no gate. */
+  gate?: string;
   /** The runs a record says it was started as, each linked from the card: a started card keeps its file, and stays in the inbox. */
   startedAs: string[];
   /** Its life, closed (`CardState`): what the page offers on it and how it draws it. */
@@ -53,7 +56,7 @@ export type InboxEntry = {
   factoryRepo: string | null;
 };
 
-/** The keys of an `InboxEntry`, each decoded: a `queued` or a `tried` the api leaves out stays out. */
+/** The keys of an `InboxEntry`, each decoded: a `gate`, a `queued` or a `tried` the api leaves out stays out. */
 const inboxEntryFields = {
   name: Schema.String,
   file: Schema.String,
@@ -62,6 +65,7 @@ const inboxEntryFields = {
   repo: Schema.NullOr(Schema.String),
   factory: Schema.NullOr(Schema.String),
   from: Schema.mutable(Schema.Array(Schema.String)),
+  gate: Schema.optionalKey(Schema.String),
   startedAs: Schema.mutable(Schema.Array(Schema.String)),
   state: Schema.Literals(['filed', 'queued', 'refused', 'started']),
   error: Schema.NullOr(Schema.String),
@@ -73,7 +77,7 @@ const inboxEntryFields = {
 };
 
 /** Decodes an `InboxEntry`. */
-const InboxEntrySchema = Schema.Struct(inboxEntryFields) satisfies Schema.Schema<InboxEntry>;
+const InboxEntrySchema = decodes<InboxEntry>()(Schema.Struct(inboxEntryFields));
 
 /**
  * The inbox. Not polled: it changes when a person files, drops or starts a card, here or at the command line. Read again on each visit, and
@@ -91,11 +95,13 @@ export const inboxQuery = queryOptions({
 export type InboxCardPage = InboxEntry & { source: string; keys: KeyRow[] | null };
 
 /** Decodes an `InboxCardPage`. */
-const InboxCardPageSchema = Schema.Struct({
-  ...inboxEntryFields,
-  source: Schema.String,
-  keys: Schema.NullOr(Schema.mutable(Schema.Array(KeyRowSchema))),
-}) satisfies Schema.Schema<InboxCardPage>;
+const InboxCardPageSchema = decodes<InboxCardPage>()(
+  Schema.Struct({
+    ...inboxEntryFields,
+    source: Schema.String,
+    keys: Schema.NullOr(Schema.mutable(Schema.Array(KeyRowSchema))),
+  }),
+);
 
 /** A card, for its page. Read again on each visit, as the inbox is. */
 export const cardQuery = (name: string) =>
@@ -151,14 +157,16 @@ export type Queued = {
 };
 
 /** Decodes a `Queued`. */
-const QueuedSchema = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  was: Schema.Literals(['queued', 'taken back', 'not queued']),
-  queued: Schema.NullOr(Schema.String),
-  place: Schema.NullOr(Schema.Number),
-  of: Schema.NullOr(Schema.Number),
-}) satisfies Schema.Schema<Queued>;
+const QueuedSchema = decodes<Queued>()(
+  Schema.Struct({
+    name: Schema.String,
+    file: Schema.String,
+    was: Schema.Literals(['queued', 'taken back', 'not queued']),
+    queued: Schema.NullOr(Schema.String),
+    place: Schema.NullOr(Schema.Number),
+    of: Schema.NullOr(Schema.Number),
+  }),
+);
 
 /**
  * Queue a card to start on its own, as the CLI's `inbox queue <name>` does — or, `off`, take it off the queue, as `--off` does. The tick
@@ -180,12 +188,14 @@ export const queueCard = (name: string, { off = false }: { off?: boolean } = {})
 export type FromSet = { name: string; file: string; from: string[]; was: string[] };
 
 /** Decodes a `FromSet`. */
-const FromSetSchema = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  from: Schema.mutable(Schema.Array(Schema.String)),
-  was: Schema.mutable(Schema.Array(Schema.String)),
-}) satisfies Schema.Schema<FromSet>;
+const FromSetSchema = decodes<FromSet>()(
+  Schema.Struct({
+    name: Schema.String,
+    file: Schema.String,
+    from: Schema.mutable(Schema.Array(Schema.String)),
+    was: Schema.mutable(Schema.Array(Schema.String)),
+  }),
+);
 
 /**
  * Set the runs a card's run is handed as context, as the CLI's `inbox from <name> <run>...` does — or, with none, take its `from:` off, as

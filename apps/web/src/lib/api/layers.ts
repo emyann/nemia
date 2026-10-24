@@ -3,6 +3,7 @@
  * would be told): one schema, which `detail.ts` and `workflows.ts` both decode with.
  */
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 
 /**
  * Mirrors `ToldLayers` (agent-orchestrator/run), the api's `layers`: what a step was told, by layer — its agent, the agent's
@@ -27,19 +28,21 @@ export type StepLayers = {
 };
 
 /** Decodes a `StepLayers`. */
-export const StepLayersSchema = Schema.Struct({
-  agent: Schema.NullOr(Schema.String),
-  instructions: Schema.NullOr(Schema.String),
-  custom: Schema.NullOr(Schema.String),
-  factory: Schema.NullOr(Schema.String),
-  agentSkills: Schema.mutable(Schema.Array(Schema.String)),
-  policy: Schema.String,
-  addedSkills: Schema.mutable(Schema.Array(Schema.String)),
-  fence: Schema.mutable(Schema.Array(Schema.Struct({ key: Schema.String, value: Schema.String }))),
-  folderFiles: Schema.Boolean,
-  task: Schema.NullOr(Schema.String),
-  via: Schema.Literals(['prompt', 'brief']),
-}) satisfies Schema.Schema<StepLayers>;
+export const StepLayersSchema = decodes<StepLayers>()(
+  Schema.Struct({
+    agent: Schema.NullOr(Schema.String),
+    instructions: Schema.NullOr(Schema.String),
+    custom: Schema.NullOr(Schema.String),
+    factory: Schema.NullOr(Schema.String),
+    agentSkills: Schema.mutable(Schema.Array(Schema.String)),
+    policy: Schema.String,
+    addedSkills: Schema.mutable(Schema.Array(Schema.String)),
+    fence: Schema.mutable(Schema.Array(Schema.Struct({ key: Schema.String, value: Schema.String }))),
+    folderFiles: Schema.Boolean,
+    task: Schema.NullOr(Schema.String),
+    via: Schema.Literals(['prompt', 'brief']),
+  }),
+);
 
 /**
  * Mirrors `TaskPart` in apps/api/src/detail/told.ts: a part of a step's task — its own text, or a run it was handed, by its id, the first
@@ -49,13 +52,15 @@ export const StepLayersSchema = Schema.Struct({
 export type TaskPart = { kind: 'from'; run: string; asked: string; body: string; how?: 'waited' | 'read' } | { kind: 'text'; text: string };
 
 /** Decodes a `TaskPart`: the `from` member first, the wider one, so a part is never read as the narrower. */
-export const TaskPartSchema = Schema.Union([
-  Schema.Struct({
-    kind: Schema.Literal('from'),
-    run: Schema.String,
-    asked: Schema.String,
-    body: Schema.String,
-    how: Schema.optionalKey(Schema.Literals(['waited', 'read'])),
-  }),
-  Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String }),
-]) satisfies Schema.Schema<TaskPart>;
+export const TaskPartSchema = decodes<TaskPart>()(
+  Schema.Union([
+    Schema.Struct({
+      kind: Schema.Literal('from'),
+      run: Schema.String,
+      asked: Schema.String,
+      body: Schema.String,
+      how: Schema.optionalKey(Schema.Literals(['waited', 'read'])),
+    }),
+    Schema.Struct({ kind: Schema.Literal('text'), text: Schema.String }),
+  ]),
+);

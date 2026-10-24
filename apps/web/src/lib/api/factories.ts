@@ -7,6 +7,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get, send } from './read.ts';
 
 /** A condition of a factory made from a template, as the daemon wrote it: `Applied` or `ConflictsPending`, its state and why. */
@@ -43,17 +44,19 @@ export type FactorySchedule = {
 };
 
 /** Decodes a `FactorySchedule`. */
-const FactoryScheduleSchema = Schema.Struct({
-  workflow: Schema.String,
-  cron: Schema.String,
-  tz: Schema.NullOr(Schema.String),
-  brief: Schema.String,
-  repo: Schema.NullOr(Schema.String),
-  next: Schema.NullOr(Schema.String),
-  last: Schema.NullOr(Schema.Struct({ run: Schema.String, at: Schema.String })),
-  refused: Schema.NullOr(Schema.String),
-  commands: Schema.Struct({ unschedule: Schema.String }),
-}) satisfies Schema.Schema<FactorySchedule>;
+const FactoryScheduleSchema = decodes<FactorySchedule>()(
+  Schema.Struct({
+    workflow: Schema.String,
+    cron: Schema.String,
+    tz: Schema.NullOr(Schema.String),
+    brief: Schema.String,
+    repo: Schema.NullOr(Schema.String),
+    next: Schema.NullOr(Schema.String),
+    last: Schema.NullOr(Schema.Struct({ run: Schema.String, at: Schema.String })),
+    refused: Schema.NullOr(Schema.String),
+    commands: Schema.Struct({ unschedule: Schema.String }),
+  }),
+);
 
 /**
  * Mirrors `UntrustedAnswer` in apps/api/src/factories/factories.ts: a place of a factory that a harness does not trust now, each word the
@@ -84,45 +87,47 @@ export type Factory = {
 };
 
 /** Decodes a `Factory`. */
-const FactorySchema = Schema.Struct({
-  name: Schema.String,
-  default: Schema.Boolean,
-  repos: Schema.mutable(Schema.Array(Schema.String)),
-  workflows: Schema.NullOr(Schema.mutable(Schema.Array(Schema.String))),
-  hires: Schema.Record(Schema.String, Schema.String),
-  error: Schema.NullOr(Schema.String),
-  schedules: Schema.mutable(Schema.Array(FactoryScheduleSchema)),
-  commands: Schema.Struct({
-    attach: Schema.String,
-    rm: Schema.String,
-    add: Schema.String,
-    schedule: Schema.String,
-    trust: Schema.String,
-  }),
-  untrusted: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({ place: Schema.String, harness: Schema.String, withheld: Schema.String, never: Schema.NullOr(Schema.String) }),
-    ),
-  ),
-  template: Schema.NullOr(
-    Schema.Struct({
-      source: Schema.String,
-      version: Schema.String,
-      params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
-      applied: Schema.NullOr(Schema.String),
-      conditions: Schema.mutable(
-        Schema.Array(
-          Schema.Struct({
-            type: Schema.String,
-            status: Schema.Literals(['True', 'False']),
-            reason: Schema.String,
-            message: Schema.String,
-          }),
-        ),
-      ),
+const FactorySchema = decodes<Factory>()(
+  Schema.Struct({
+    name: Schema.String,
+    default: Schema.Boolean,
+    repos: Schema.mutable(Schema.Array(Schema.String)),
+    workflows: Schema.NullOr(Schema.mutable(Schema.Array(Schema.String))),
+    hires: Schema.Record(Schema.String, Schema.String),
+    error: Schema.NullOr(Schema.String),
+    schedules: Schema.mutable(Schema.Array(FactoryScheduleSchema)),
+    commands: Schema.Struct({
+      attach: Schema.String,
+      rm: Schema.String,
+      add: Schema.String,
+      schedule: Schema.String,
+      trust: Schema.String,
     }),
-  ),
-}) satisfies Schema.Schema<Factory>;
+    untrusted: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({ place: Schema.String, harness: Schema.String, withheld: Schema.String, never: Schema.NullOr(Schema.String) }),
+      ),
+    ),
+    template: Schema.NullOr(
+      Schema.Struct({
+        source: Schema.String,
+        version: Schema.String,
+        params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
+        applied: Schema.NullOr(Schema.String),
+        conditions: Schema.mutable(
+          Schema.Array(
+            Schema.Struct({
+              type: Schema.String,
+              status: Schema.Literals(['True', 'False']),
+              reason: Schema.String,
+              message: Schema.String,
+            }),
+          ),
+        ),
+      }),
+    ),
+  }),
+);
 
 /**
  * The factories: the default factory first, then each in the store. Not polled: a factory changes when a person runs the CLI's `factory`.
@@ -140,12 +145,14 @@ export const factoriesQuery = queryOptions({
 export type FactoryRules = { name: string; file: string; words: string | null; error: string | null };
 
 /** Decodes a `FactoryRules`. */
-const FactoryRulesSchema = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  words: Schema.NullOr(Schema.String),
-  error: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<FactoryRules>;
+const FactoryRulesSchema = decodes<FactoryRules>()(
+  Schema.Struct({
+    name: Schema.String,
+    file: Schema.String,
+    words: Schema.NullOr(Schema.String),
+    error: Schema.NullOr(Schema.String),
+  }),
+);
 
 /** The route of the rules of the factory `name`. */
 const rulesRoute = (name: string): string => `/api/factories/${encodeURIComponent(name)}/rules`;
@@ -189,15 +196,17 @@ export type FactoryInstruction = {
 };
 
 /** Decodes a `FactoryInstruction`. */
-const FactoryInstructionSchema = Schema.Struct({
-  name: Schema.String,
-  path: Schema.NullOr(Schema.String),
-  store: Schema.Boolean,
-  file: Schema.String,
-  words: Schema.NullOr(Schema.String),
-  error: Schema.NullOr(Schema.String),
-  stored: Schema.Boolean,
-}) satisfies Schema.Schema<FactoryInstruction>;
+const FactoryInstructionSchema = decodes<FactoryInstruction>()(
+  Schema.Struct({
+    name: Schema.String,
+    path: Schema.NullOr(Schema.String),
+    store: Schema.Boolean,
+    file: Schema.String,
+    words: Schema.NullOr(Schema.String),
+    error: Schema.NullOr(Schema.String),
+    stored: Schema.Boolean,
+  }),
+);
 
 /** The route of the instruction of the factory `name`. */
 const instructionRoute = (name: string): string => `/api/factories/${encodeURIComponent(name)}/instruction`;
@@ -270,7 +279,7 @@ export const fireAgent = (name: string, step: string): Promise<Fired> =>
  */
 export type FactoryServer = {
   name: string;
-  type: string;
+  type: 'http' | 'sse';
   url: string;
   headers?: Record<string, string>;
   oauth?: { clientId: string; callbackPort?: number };
@@ -282,7 +291,7 @@ export type FactoryServer = {
 /** One server Nemia ships, as the add form offers it: the facts a factory would record of it. */
 export type ShippedServer = {
   name: string;
-  type: string;
+  type: 'http' | 'sse';
   url: string;
   headers?: Record<string, string>;
   oauth?: { clientId: string; callbackPort?: number };
@@ -302,35 +311,37 @@ export type FactoryServers = {
 const ServerOauthSchema = Schema.Struct({ clientId: Schema.String, callbackPort: Schema.optional(Schema.Number) });
 
 /** Decodes a `FactoryServers`. */
-const FactoryServersSchema = Schema.Struct({
-  factory: Schema.String,
-  servers: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({
-        name: Schema.String,
-        type: Schema.String,
-        url: Schema.String,
-        headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-        oauth: Schema.optional(ServerOauthSchema),
-        state: Schema.NullOr(Schema.String),
-        tools: Schema.optional(Schema.Number),
-        error: Schema.optional(Schema.String),
-      }),
+const FactoryServersSchema = decodes<FactoryServers>()(
+  Schema.Struct({
+    factory: Schema.String,
+    servers: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          name: Schema.String,
+          type: Schema.Literals(['http', 'sse']),
+          url: Schema.String,
+          headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+          oauth: Schema.optional(ServerOauthSchema),
+          state: Schema.NullOr(Schema.String),
+          tools: Schema.optional(Schema.Number),
+          error: Schema.optional(Schema.String),
+        }),
+      ),
     ),
-  ),
-  unread: Schema.NullOr(Schema.String),
-  shipped: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({
-        name: Schema.String,
-        type: Schema.String,
-        url: Schema.String,
-        headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
-        oauth: Schema.optional(ServerOauthSchema),
-      }),
+    unread: Schema.NullOr(Schema.String),
+    shipped: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          name: Schema.String,
+          type: Schema.Literals(['http', 'sse']),
+          url: Schema.String,
+          headers: Schema.optional(Schema.Record(Schema.String, Schema.String)),
+          oauth: Schema.optional(ServerOauthSchema),
+        }),
+      ),
     ),
-  ),
-}) satisfies Schema.Schema<FactoryServers>;
+  }),
+);
 
 const serversRoute = (name: string): string => `/api/factories/${encodeURIComponent(name)}/servers`;
 const serverRoute = (name: string, server: string): string => `${serversRoute(name)}/${encodeURIComponent(server)}`;
@@ -354,7 +365,7 @@ const SERVERS_WRITTEN = "The server may be recorded: read the factory's servers 
 /** The answer a write of one server gives: the file written, and the server as it was recorded. */
 type ServerWritten = { file: string };
 
-const ServerWrittenSchema = Schema.Struct({ file: Schema.String }) satisfies Schema.Schema<ServerWritten>;
+const ServerWrittenSchema = decodes<ServerWritten>()(Schema.Struct({ file: Schema.String }));
 
 /**
  * Record `server` for the factory `name`, a second of one name replacing the first. Rejects with a `WriteRefusal` in the package's
@@ -374,7 +385,7 @@ export const removeServer = (name: string, server: string): Promise<ServerWritte
 /** What a sign-in answers at once, as apps/api/src/servers/sign-in.ts answers it: the address to open, and when it stops waiting. */
 export type SignInStarted = { authUrl: string; until: string };
 
-const SignInStartedSchema = Schema.Struct({ authUrl: Schema.String, until: Schema.String }) satisfies Schema.Schema<SignInStarted>;
+const SignInStartedSchema = decodes<SignInStarted>()(Schema.Struct({ authUrl: Schema.String, until: Schema.String }));
 
 /** The words of a sign-in's state, as the engine holds it: none asked, one waiting, or how the last one ended. */
 export const SIGN_IN_WORDS = ['none', 'waiting', 'connected', 'expired', 'failed'] as const;
@@ -382,16 +393,18 @@ export const SIGN_IN_WORDS = ['none', 'waiting', 'connected', 'expired', 'failed
 /** A server's last sign-in, as the api answers it from the engine's memory. */
 export type SignInState = { state: (typeof SIGN_IN_WORDS)[number]; until?: string; why?: string };
 
-const SignInStateSchema = Schema.Struct({
-  state: Schema.Literals(SIGN_IN_WORDS),
-  until: Schema.optional(Schema.String),
-  why: Schema.optional(Schema.String),
-}) satisfies Schema.Schema<SignInState>;
+const SignInStateSchema = decodes<SignInState>()(
+  Schema.Struct({
+    state: Schema.Literals(SIGN_IN_WORDS),
+    until: Schema.optional(Schema.String),
+    why: Schema.optional(Schema.String),
+  }),
+);
 
 /** What a sign-out answers. */
 type SignedOut = { signedOut: true };
 
-const SignedOutSchema = Schema.Struct({ signedOut: Schema.Literal(true) }) satisfies Schema.Schema<SignedOut>;
+const SignedOutSchema = decodes<SignedOut>()(Schema.Struct({ signedOut: Schema.Literal(true) }));
 
 const signInRoute = (name: string, server: string): string => `${serverRoute(name, server)}/sign-in`;
 

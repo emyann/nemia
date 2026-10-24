@@ -1,11 +1,10 @@
 /**
  * An agent's rules for Auto on the board: the mirror of what the api answers, which decodes the rules in force, the proposal and the
- * custom instruction and refuses an answer it does not read, and the writes of a confirm, sending the words the person read, and a drop,
+ * custom instruction (its shape held by `test/wire.test.ts`), and the writes of a confirm, sending the words the person read, and a drop,
  * with an empty body, each on its route.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { UnreadAnswer } from '../src/lib/api/read.ts';
 import { autoQuery, confirmRule, dropRule, type AutoList } from '../src/lib/api/auto.ts';
 
 /** The rule that ships, as the api words it. */
@@ -61,27 +60,6 @@ test('autoQuery, confirmRule, dropRule: her rules read back as the api answers t
     answering(t, { ...LIST, proposed: null, instruction: null });
     assert.deepEqual(await readAuto(), { ...LIST, proposed: null, instruction: null });
   });
-  await t.test(
-    'REFUSED: an answer no rule gives, a condition the board has no word for, a rule with no words, and no proposal key',
-    async (t) => {
-      answering(t, { ...LIST, rules: [{ ...DEFAULT, answer: 'accept' }] });
-      await assert.rejects(readAuto(), (err: unknown) => err instanceof UnreadAnswer && /at rules\[0\]\.answer/.test(err.message));
-      answering(t, { ...LIST, rules: [{ ...DEFAULT, when: ['cheap'] }] });
-      await assert.rejects(readAuto(), (err: unknown) => err instanceof UnreadAnswer && /at rules\[0\]\.when\[0\]/.test(err.message));
-      const { words: _words, ...unworded } = DEFAULT;
-      answering(t, { ...LIST, rules: [unworded] });
-      await assert.rejects(
-        readAuto(),
-        (err: unknown) => err instanceof UnreadAnswer && /at rules\[0\]\.words, the value is missing/.test(err.message),
-      );
-      const { proposed: _proposed, ...noProposal } = LIST;
-      answering(t, noProposal);
-      await assert.rejects(
-        readAuto(),
-        (err: unknown) => err instanceof UnreadAnswer && /at proposed, the value is missing/.test(err.message),
-      );
-    },
-  );
   await t.test(
     'a confirm is a PUT sending the words read and a drop a DELETE sending an empty body, each reading the rules back',
     async (t) => {

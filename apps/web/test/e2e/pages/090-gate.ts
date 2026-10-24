@@ -66,8 +66,8 @@ export default {
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     const node = graph.locator(`.react-flow__node[data-id="${gated}"]`);
     await expectVisible(
-      node.locator('[data-state="awaiting-approval"]', { hasText: 'awaiting approval' }),
-      `${gated}'s chip reads awaiting approval, as a wait on a person`,
+      node.locator('[data-state="awaiting-approval"]', { hasText: 'waits on you' }),
+      `${gated}'s chip, awaiting approval, reads waits on you, as a wait on a person`,
     );
     await expectVisible(
       node.locator('[data-need="approve"]', { hasText: `approve ${gated}` }),

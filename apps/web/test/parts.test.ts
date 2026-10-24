@@ -213,7 +213,7 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
     async () => {
       const html = await drawn(createElement(RunSteps, { steps: STEPS, cancelled: false, held: false, names: true }));
       assert.match(tagWith(html, 'data-run-steps'), /role="img"/);
-      assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits for you"/);
+      assert.match(html, /aria-label="design verified, implement at work, review failed its check, land waits on you"/);
       assert.deepEqual(
         [...html.matchAll(/data-step="([^"]+)" data-state="([^"]+)"/g)].map((m) => [m[1], m[2]]),
         [
@@ -261,7 +261,7 @@ test('RunSteps, Pager and TextLink: the rail of a run, and the ways off a page',
       const rail = tagWith(html, 'data-run-steps');
       assert.match(rail, /role="group"/);
       assert.doesNotMatch(rail, /role="img"/);
-      assert.match(rail, /aria-label="design verified, implement at work, review failed its check, land waits for you"/);
+      assert.match(rail, /aria-label="design verified, implement at work, review failed its check, land waits on you"/);
       assert.deepEqual(
         [...html.matchAll(/data-wrapped="([^"]+)"><span data-step="([^"]+)"/g)].map((m) => [m[1], m[2]]),
         [

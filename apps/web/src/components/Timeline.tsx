@@ -115,7 +115,7 @@ function SpanRow({
       <td className={`${CELL} font-mono`}>{label}</td>
       {lost ? (
         <td colSpan={7} data-cell="lost" className={`${CELL} text-muted-foreground`}>
-          the engine has no record of {span.taskId}
+          no record of {span.taskId}
         </td>
       ) : (
         <>

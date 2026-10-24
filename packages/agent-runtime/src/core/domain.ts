@@ -1001,11 +1001,14 @@ function attemptEnded(ended: Attempt, attempts: number, turn: number): Lifecycle
   return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts, turn, ...refusal };
 }
 
+/** Whether an overdue attempt's session is live, with the sighting that says so: a stop needs a session to send to. */
+const liveOf = (sighting: Sighting | undefined): { live: true; sighting: Sighting } | { live: false; sighting?: Sighting } =>
+  sighting && isLive(sighting.state) ? { live: true, sighting } : { live: false, sighting };
+
 /** What `observe` reads off an attempt in flight, by its rules 2 to 4: its deadline, its sighting, or its absence. */
 function flightEvent(state: State, last: Attempt, sighting: Sighting | undefined, now: Now, overdue: boolean): LifecycleEvent {
   const endedOwn = sighting !== undefined && ENDED_OWN.has(sighting.state);
-  if (overdue && !state.stopRequested && !endedOwn)
-    return { type: 'DEADLINE_PASSED', attempt: last.n, sighting, live: sighting !== undefined && isLive(sighting.state) };
+  if (overdue && !state.stopRequested && !endedOwn) return { type: 'DEADLINE_PASSED', attempt: last.n, ...liveOf(sighting) };
   if (sighting) return sessionEvent(state, last, sighting, now);
   if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue };
   if (!last.spawnedAt) return { type: 'UNSPAWNED', attempt: last.n, name: nameFor(state.taskId, last.n) };

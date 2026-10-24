@@ -143,7 +143,7 @@ export type LifecycleEvent =
   | { type: 'UNSEEN_IN_GRACE'; attempt: number }
   | { type: 'LOST'; attempt: number }
   | { type: 'UNREAD'; attempt: number; overdue: boolean }
-  | { type: 'DEADLINE_PASSED'; attempt: number; sighting?: Sighting; live: boolean }
+  | ({ type: 'DEADLINE_PASSED'; attempt: number } & ({ live: true; sighting: Sighting } | { live: false; sighting?: Sighting }))
   | { type: 'SPAWN_REFUSED'; attempt: number; error: string }
   | { type: 'NOTHING_OPEN' }
   | { type: 'AWAITING_INPUT' }
@@ -271,9 +271,9 @@ const harness = [
 const deadline = [
   {
     guard: 'live',
-    actions: act('stop', (e: Ev<'DEADLINE_PASSED'>) => ({
+    actions: act('stop', (e: Extract<Ev<'DEADLINE_PASSED'>, { live: true }>) => ({
       do: 'stop',
-      sessionId: e.sighting?.sessionId ?? '(never seen)',
+      sessionId: e.sighting.sessionId,
       why: 'deadline',
     })),
   },

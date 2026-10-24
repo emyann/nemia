@@ -11,16 +11,19 @@ import type { StepStatus } from '../record/record.ts';
 const STATUSES = Object.keys(REASON_OF) as StepStatus[];
 
 test('holdsTheRun', async (t) => {
-  await t.test('what holds a run is what waits on the person and a step stopped on what it was asked, never one the engine ended on its own', () => {
-    assert.deepEqual(STATUSES.filter(holdsTheRun), [
-      'blocked',
-      'unsigned',
-      'awaiting approval',
-      'exhausted',
-      'over budget',
-      'budget exhausted',
-      'denied',
-      'failed (check)',
-    ]);
-  });
+  await t.test(
+    'what holds a run is what waits on the person and a step stopped on what it was asked, never one the engine ended on its own',
+    () => {
+      assert.deepEqual(STATUSES.filter(holdsTheRun), [
+        'blocked',
+        'unsigned',
+        'awaiting approval',
+        'exhausted',
+        'over budget',
+        'budget exhausted',
+        'denied',
+        'failed (check)',
+      ]);
+    },
+  );
 });

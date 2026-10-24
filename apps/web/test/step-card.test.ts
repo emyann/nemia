@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunDetail } from '../src/lib/api.ts';
 import { stepCardOf, type StepCardFacts } from '../src/lib/stepCard.ts';
+import { PERSON } from '../src/lib/words.ts';
 import { aCardOpen, CARD_REACH, cardOpened, previewSide, SHEET_QUERY } from '../src/lib/useSheetPreview.ts';
 import { detail, step, summary } from './run-fixtures.ts';
 
@@ -75,7 +76,7 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
       ]);
       assert.equal(card.kind, 'work');
       assert.equal(card.hue, 'alive');
-      assert.deepEqual(card.tag, { word: 'at work', color: 'secondary', variant: 'tonal' });
+      assert.deepEqual(card.tag, { word: PERSON.working.rail, color: 'secondary', variant: 'tonal' });
       assert.deepEqual(card.agent, { name: 'Ada', initial: 'A', role: 'Software engineer' });
       assert.equal(card.place, 'try 1 · round 1 of 3');
       assert.equal(card.time?.label, 'At work');
@@ -102,7 +103,7 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     ]);
     assert.equal(card.kind, 'gate');
     assert.equal(card.hue, 'yours');
-    assert.deepEqual(card.tag, { word: 'waits for you', color: 'primary', variant: 'filled' });
+    assert.deepEqual(card.tag, { word: PERSON['awaiting-approval'].rail, color: 'primary', variant: 'filled' });
     assert.equal(card.place, 'try 1');
     assert.equal(card.time?.label, 'Waiting');
     assert.equal(card.time?.value, '17m');
@@ -114,7 +115,7 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     const card = cardOf('design', STATUSES, [quiet('design', 'verified ✓', { tries: [aTry(1), aTry(2)] })]);
     assert.equal(card.kind, 'done');
     assert.equal(card.hue, 'none');
-    assert.deepEqual(card.tag, { word: 'verified', color: 'neutral', variant: 'tonal' });
+    assert.deepEqual(card.tag, { word: PERSON.verified.rail, color: 'neutral', variant: 'tonal' });
     assert.equal(card.place, '2 tries');
     assert.equal(card.time?.label, 'Done');
     assert.equal(card.time?.note, 'its last try ran 1m');
@@ -138,7 +139,7 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     ]);
     assert.equal(card.kind, 'come');
     assert.equal(card.hue, 'none');
-    assert.deepEqual(card.tag, { word: 'to come', color: 'secondary', variant: 'outlined' });
+    assert.deepEqual(card.tag, { word: PERSON.waiting.rail, color: 'secondary', variant: 'outlined' });
     assert.equal(card.place, 'up to 3 rounds');
     assert.deepEqual(card.time, { label: 'Starts', value: 'after implement', note: '', ink: 'muted' });
     assert.deepEqual(card.spend, { kind: 'words', label: 'Budget', said: '$16', note: '' });
@@ -153,10 +154,10 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     ]);
     assert.equal(card.kind, 'failed');
     assert.equal(card.hue, 'none');
-    assert.deepEqual(card.tag, { word: 'failed its check', color: 'error', variant: 'tonal' });
+    assert.deepEqual(card.tag, { word: PERSON['failed-check'].rail, color: 'error', variant: 'tonal' });
     assert.equal(card.time?.label, 'Failed');
     assert.equal(card.time?.ink, 'failure');
-    assert.deepEqual(card.note, { text: 'Its check refused it (exit 1).', icon: 'fail' });
+    assert.deepEqual(card.note, { text: 'It failed its check (exit 1).', icon: 'fail' });
   });
   await t.test("the agent's last line comes first in the note, before the calls denied", () => {
     const card = cardOf('implement', STATUSES, [
@@ -195,7 +196,7 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     const row = summary(Object.entries(STATUSES));
     const card = stepCardOf({ run: row, step: 'implement', now: NOW });
     assert.equal(card.hue, 'alive');
-    assert.equal(card.tag.word, 'at work');
+    assert.equal(card.tag.word, PERSON.working.rail);
     assert.equal(card.agent, null);
     assert.equal(card.facts, null);
     assert.equal(card.spend, null);

@@ -14,6 +14,7 @@ import { clockCounts, repoName, runClock, titleOf, toDecideOf, waitsOnRuns, wait
 import { flowSteps, railOf, tilesOf } from '@/lib/flow';
 import { decideLine, gateOfSummary } from '@/lib/gate';
 import { useNow } from '@/lib/useNow';
+import { ENDED } from '@/lib/words';
 import { RouteLink } from './AgentParts';
 import { CardGate, type Taken } from './CardGate';
 import { CardLift } from './LiftHold';
@@ -349,7 +350,7 @@ function Chips({ run, decide, cancelled, reads }: { run: RunSummary; decide: boo
         </Badge>
       )}
       {run.holding && !cancelled && <CardLift id={run.id} />}
-      {cancelled && <Badge variant="outline">cancelled</Badge>}
+      {cancelled && <Badge variant="outline">{ENDED.cancelled.word}</Badge>}
       {run.pruned && (
         <Badge variant="outline" data-pruned title={run.pruned.said} className="text-on-surface-variant">
           pruned

@@ -67,8 +67,8 @@ export default {
       'the edge back runs beneath the row, under both steps',
     );
     await expectVisible(
-      node(LOOPING.exhausted).locator(`[data-state="exhausted"][title^="rounds exhausted: "][title$="${LOOPING.notes.review}"]`, {
-        hasText: 'rounds exhausted',
+      node(LOOPING.exhausted).locator(`[data-state="exhausted"][title$="${LOOPING.notes.review}"]`, {
+        hasText: 'waits on you',
       }),
       `${LOOPING.exhausted}, out of rounds, is a chip that waits on a person on the graph, its note after what that means on hover, with no room under a chip`,
     );
@@ -77,10 +77,10 @@ export default {
       `${LOOPING.exhausted}, out of rounds, is drawn as a human gate, as a step signed off blocked is`,
     );
     await expectVisible(
-      node(LOOPING.exhausted).getByText('waiting on you'),
-      `${LOOPING.exhausted}, out of rounds, says it is waiting on you on the graph`,
+      node(LOOPING.exhausted).locator('[data-gate-band]', { hasText: 'waits on you' }),
+      `${LOOPING.exhausted}, out of rounds, says in its band that it waits on you on the graph`,
     );
-    await expectCount(node('implement').getByText('waiting on you'), 0, 'implement, done on its own word, is not a human gate');
+    await expectCount(node('implement').locator('[data-gate-band]'), 0, 'implement, done on its own word, is not a human gate');
     await expectVisible(
       node('implement').locator(`[data-state="unverified"][title$="${LOOPING.notes.implement}"]`),
       `implement's chip on the graph ends its title with the round it is on (${LOOPING.notes.implement})`,

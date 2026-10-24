@@ -14,7 +14,7 @@ import { StepCard } from './StepCard';
 type RailRun = Pick<RunSummary, 'id' | 'cancelledAt' | 'holding' | 'steps'>;
 
 /** A bar of the rail as the rail hands it: its step's name and state. */
-type RailStep = { name: string; state: StepState };
+type RailStep = { name: string; state: StepState; status: string };
 
 /** A bar's button: 32 pixels tall, its 8-pixel bar drawn in its middle, pulled in so that the rail keeps its height. */
 const BAR_BUTTON = cn('-my-3 grid h-8 w-full cursor-pointer content-center outline-none', focusRing());
@@ -81,7 +81,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
     <PreviewTrigger delay={warm ? 0 : undefined} onOpenChange={opened}>
       <Button
         ref={bar}
-        aria-label={barSaid(step.name, step.state)}
+        aria-label={barSaid(step.name, step.state, step.status)}
         data-step-bar={step.name}
         data-step-preview="card"
         className={BAR_BUTTON}
@@ -105,7 +105,7 @@ function HoverPreview({ run, step, asOf, children }: { run: RailRun; step: RailS
 /** A bar where no pointer hovers or the window is compact: a press opens the same card in the kit's modal bottom sheet. */
 function SheetPreview({ run, step, asOf, children }: { run: RailRun; step: RailStep; asOf: Date; children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const said = barSaid(step.name, step.state);
+  const said = barSaid(step.name, step.state, step.status);
   return (
     <>
       <Button aria-label={said} data-step-bar={step.name} data-step-preview="sheet" className={BAR_BUTTON} onPress={() => setOpen(true)}>

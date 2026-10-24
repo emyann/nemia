@@ -5,6 +5,7 @@
  * the turn she is answering ended. Each type with the schema `get` and `send` decode it with.
  */
 import { Option, Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get, send } from './read.ts';
 
 /** Mirrors the package's `ChatFrom`: who a message is from — her, the person, or the keeper, whose words are a quiet marker. */
@@ -59,19 +60,23 @@ const ChatFromSchema = Schema.Literals(['agent', 'person', 'keeper']);
 const ChatStepStateSchema = Schema.Literals(['done', 'running', 'error', 'pending', 'waits']);
 
 /** Decodes an `AskOption`. */
-const AskOptionSchema = Schema.Struct({
-  label: Schema.String,
-  description: Schema.String,
-  recommended: Schema.Boolean,
-}) satisfies Schema.Schema<AskOption>;
+const AskOptionSchema = decodes<AskOption>()(
+  Schema.Struct({
+    label: Schema.String,
+    description: Schema.String,
+    recommended: Schema.Boolean,
+  }),
+);
 
 /** Decodes an `AskQuestion`. */
-const AskQuestionSchema = Schema.Struct({
-  question: Schema.String,
-  header: Schema.String,
-  options: Schema.Array(AskOptionSchema),
-  multiSelect: Schema.Boolean,
-}) satisfies Schema.Schema<AskQuestion>;
+const AskQuestionSchema = decodes<AskQuestion>()(
+  Schema.Struct({
+    question: Schema.String,
+    header: Schema.String,
+    options: Schema.Array(AskOptionSchema),
+    multiSelect: Schema.Boolean,
+  }),
+);
 
 /** What a `question` and a `proposal` carry alike, for the member of each. */
 const ASK_FIELDS = {
@@ -89,28 +94,30 @@ const ASK_FIELDS = {
  * Decodes a `ChatEvent`. Its members stand by the keys they own, the widest first, so none is read by a member it extends; each is
  * told apart by its `kind` all the same, which no two share.
  */
-const ChatEventSchema = Schema.Union([
-  Schema.Struct({
-    kind: Schema.Literal('step'),
-    id: Schema.String,
-    at: Schema.String,
-    tool: Schema.String,
-    sentence: Schema.String,
-    fact: Schema.optionalKey(Schema.String),
-    state: ChatStepStateSchema,
-  }),
-  Schema.Struct({
-    kind: Schema.Literal('message'),
-    id: Schema.String,
-    at: Schema.String,
-    from: ChatFromSchema,
-    text: Schema.String,
-    delivered: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  }),
-  Schema.Struct({ kind: Schema.Literal('question'), ...ASK_FIELDS }),
-  Schema.Struct({ kind: Schema.Literal('proposal'), ...ASK_FIELDS }),
-  Schema.Struct({ kind: Schema.Literal('session'), id: Schema.String, at: Schema.String, attempt: Schema.Number }),
-]) satisfies Schema.Schema<ChatEvent>;
+const ChatEventSchema = decodes<ChatEvent>()(
+  Schema.Union([
+    Schema.Struct({
+      kind: Schema.Literal('step'),
+      id: Schema.String,
+      at: Schema.String,
+      tool: Schema.String,
+      sentence: Schema.String,
+      fact: Schema.optionalKey(Schema.String),
+      state: ChatStepStateSchema,
+    }),
+    Schema.Struct({
+      kind: Schema.Literal('message'),
+      id: Schema.String,
+      at: Schema.String,
+      from: ChatFromSchema,
+      text: Schema.String,
+      delivered: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    }),
+    Schema.Struct({ kind: Schema.Literal('question'), ...ASK_FIELDS }),
+    Schema.Struct({ kind: Schema.Literal('proposal'), ...ASK_FIELDS }),
+    Schema.Struct({ kind: Schema.Literal('session'), id: Schema.String, at: Schema.String, attempt: Schema.Number }),
+  ]),
+);
 
 /**
  * Mirrors the package's `Presence`, as the api answers it: `up`, her session live; `answering`, a turn in progress; `waitsOnYou`, the
@@ -120,12 +127,14 @@ const ChatEventSchema = Schema.Union([
 export type ChatPresence = { up: boolean; answering: boolean; waitsOnYou: number; unread: number };
 
 /** Decodes a `ChatPresence`. */
-const ChatPresenceSchema = Schema.Struct({
-  up: Schema.Boolean,
-  answering: Schema.Boolean,
-  waitsOnYou: Schema.Number,
-  unread: Schema.Number,
-}) satisfies Schema.Schema<ChatPresence>;
+const ChatPresenceSchema = decodes<ChatPresence>()(
+  Schema.Struct({
+    up: Schema.Boolean,
+    answering: Schema.Boolean,
+    waitsOnYou: Schema.Number,
+    unread: Schema.Number,
+  }),
+);
 
 /**
  * Mirrors the package's `ChatHistory`: a page of her chat, oldest first, the id to ask `before` for the page older (null at the
@@ -134,50 +143,60 @@ const ChatPresenceSchema = Schema.Struct({
 export type ChatHistory = { events: ChatEvent[]; before: string | null; cursor: string; presence: ChatPresence };
 
 /** Decodes a `ChatHistory`. */
-const ChatHistorySchema = Schema.Struct({
-  events: Schema.mutable(Schema.Array(ChatEventSchema)),
-  before: Schema.NullOr(Schema.String),
-  cursor: Schema.String,
-  presence: ChatPresenceSchema,
-}) satisfies Schema.Schema<ChatHistory>;
+const ChatHistorySchema = decodes<ChatHistory>()(
+  Schema.Struct({
+    events: Schema.mutable(Schema.Array(ChatEventSchema)),
+    before: Schema.NullOr(Schema.String),
+    cursor: Schema.String,
+    presence: ChatPresenceSchema,
+  }),
+);
 
 /** Mirrors the package's `OutboxEntry`: what the person wrote, as her outbox keeps it until the keeper says it to her. */
 export type ChatSent = { id: string; at: string; text: string };
 
 /** Decodes a `ChatSent`. */
-const ChatSentSchema = Schema.Struct({
-  id: Schema.String,
-  at: Schema.String,
-  text: Schema.String,
-}) satisfies Schema.Schema<ChatSent>;
+const ChatSentSchema = decodes<ChatSent>()(
+  Schema.Struct({
+    id: Schema.String,
+    at: Schema.String,
+    text: Schema.String,
+  }),
+);
 
 /** Mirrors the package's `AskAnswer`: the person's answer to one ask of hers, keyed by each question's own words. */
 export type ChatAnswer = { id: string; at: string; answers: Record<string, string> };
 
 /** Decodes a `ChatAnswer`. */
-const ChatAnswerSchema = Schema.Struct({
-  id: Schema.String,
-  at: Schema.String,
-  answers: Schema.Record(Schema.String, Schema.String),
-}) satisfies Schema.Schema<ChatAnswer>;
+const ChatAnswerSchema = decodes<ChatAnswer>()(
+  Schema.Struct({
+    id: Schema.String,
+    at: Schema.String,
+    answers: Schema.Record(Schema.String, Schema.String),
+  }),
+);
 
 /** Mirrors the package's `SourceStop`: when the turn she was answering was asked to end, and of which attempt of hers. */
 export type ChatStop = { at: string; attempt: number };
 
 /** Decodes a `ChatStop`. */
-const ChatStopSchema = Schema.Struct({
-  at: Schema.String,
-  attempt: Schema.Number,
-}) satisfies Schema.Schema<ChatStop>;
+const ChatStopSchema = decodes<ChatStop>()(
+  Schema.Struct({
+    at: Schema.String,
+    attempt: Schema.Number,
+  }),
+);
 
 /** Mirrors the package's `ReadMark`: the last event the person saw, and when they said so. */
 export type ChatReadMark = { through: string; at: string };
 
 /** Decodes a `ChatReadMark`. */
-const ChatReadMarkSchema = Schema.Struct({
-  through: Schema.String,
-  at: Schema.String,
-}) satisfies Schema.Schema<ChatReadMark>;
+const ChatReadMarkSchema = decodes<ChatReadMark>()(
+  Schema.Struct({
+    through: Schema.String,
+    at: Schema.String,
+  }),
+);
 
 /** The data of each event her chat's stream sends that the board reads, by the event's name. */
 export type ChatStreamData = {
@@ -190,10 +209,12 @@ export type ChatStreamData = {
 const CHAT_SCHEMAS: { readonly [K in keyof ChatStreamData]: Schema.Decoder<ChatStreamData[K]> } = {
   presence: ChatPresenceSchema,
   chat: ChatEventSchema,
-  unreadable: Schema.Struct({
-    error: Schema.String,
-    retrying: Schema.Boolean,
-  }) satisfies Schema.Schema<ChatStreamData['unreadable']>,
+  unreadable: decodes<ChatStreamData['unreadable']>()(
+    Schema.Struct({
+      error: Schema.String,
+      retrying: Schema.Boolean,
+    }),
+  ),
 };
 
 /** The data `data` of a stream event named `event`, decoded by its schema: undefined for data that is no JSON or not of its shape. */

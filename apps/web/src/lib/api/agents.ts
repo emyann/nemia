@@ -1,6 +1,7 @@
 /** The agents, and the writes of one of yours (apps/api/src/agents/agents.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get, send, type SendHow } from './read.ts';
 import { AgentSkillSchema, GivenSkillSchema, SchemaFileSchema, type AgentSkill, type GivenSkill, type SchemaFile } from './library.ts';
 
@@ -22,19 +23,21 @@ export type AgentRoleKey =
   | 'output';
 
 /** Decodes an agent's role keys as its file writes them, each only where it sets it. */
-const RoleKeysSchema = Schema.Struct({
-  harness: Schema.optionalKey(Schema.String),
-  model: Schema.optionalKey(Schema.String),
-  effort: Schema.optionalKey(Schema.String),
-  context: Schema.optionalKey(Schema.String),
-  permissionMode: Schema.optionalKey(Schema.String),
-  sandbox: Schema.optionalKey(Schema.String),
-  tools: Schema.optionalKey(Schema.String),
-  disallowedTools: Schema.optionalKey(Schema.String),
-  allowedTools: Schema.optionalKey(Schema.String),
-  remote: Schema.optionalKey(Schema.String),
-  output: Schema.optionalKey(Schema.String),
-}) satisfies Schema.Schema<Partial<Record<AgentRoleKey, string>>>;
+const RoleKeysSchema = decodes<Partial<Record<AgentRoleKey, string>>>()(
+  Schema.Struct({
+    harness: Schema.optionalKey(Schema.String),
+    model: Schema.optionalKey(Schema.String),
+    effort: Schema.optionalKey(Schema.String),
+    context: Schema.optionalKey(Schema.String),
+    permissionMode: Schema.optionalKey(Schema.String),
+    sandbox: Schema.optionalKey(Schema.String),
+    tools: Schema.optionalKey(Schema.String),
+    disallowedTools: Schema.optionalKey(Schema.String),
+    allowedTools: Schema.optionalKey(Schema.String),
+    remote: Schema.optionalKey(Schema.String),
+    output: Schema.optionalKey(Schema.String),
+  }),
+);
 
 /** Mirrors `AgentUser` in apps/api/src/agents/agents.ts: a node that names an agent, the step of a workflow in the agent's own place. */
 export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string };
@@ -43,11 +46,13 @@ export type AgentUser = { from: 'repo' | 'yours'; workflow: string; step: string
 const AgentPlaceSchema = Schema.Literals(['repo', 'yours']);
 
 /** Decodes an `AgentUser`. */
-const AgentUserSchema = Schema.Struct({
-  from: AgentPlaceSchema,
-  workflow: Schema.String,
-  step: Schema.String,
-}) satisfies Schema.Schema<AgentUser>;
+const AgentUserSchema = decodes<AgentUser>()(
+  Schema.Struct({
+    from: AgentPlaceSchema,
+    workflow: Schema.String,
+    step: Schema.String,
+  }),
+);
 
 /**
  * Mirrors `AgentListing` in apps/api/src/agents/agents.ts: one agent — its keys as its file writes them, its instructions, the result
@@ -91,28 +96,30 @@ export type AgentListing = {
 };
 
 /** Decodes an `AgentListing`: each key the board reads, of its type and words; a key it does not know is dropped. */
-const AgentListingSchema = Schema.Struct({
-  name: Schema.String,
-  from: AgentPlaceSchema,
-  dir: Schema.String,
-  file: Schema.String,
-  role: Schema.NullOr(Schema.String),
-  description: Schema.NullOr(Schema.String),
-  keys: RoleKeysSchema,
-  body: Schema.String,
-  schema: Schema.NullOr(SchemaFileSchema),
-  card: Schema.NullOr(Schema.mutable(Schema.Array(AgentSkillSchema))),
-  cardError: Schema.NullOr(Schema.String),
-  skills: Schema.NullOr(Schema.String),
-  harnessPrompt: Schema.NullOr(Schema.String),
-  mcp: Schema.NullOr(Schema.String),
-  given: Schema.mutable(Schema.Array(GivenSkillSchema)),
-  source: Schema.String,
-  version: Schema.String,
-  usedBy: Schema.mutable(Schema.Array(AgentUserSchema)),
-  error: Schema.NullOr(Schema.String),
-  untried: Schema.NullOr(Schema.Struct({ why: Schema.String, copy: Schema.NullOr(Schema.String) })),
-}) satisfies Schema.Schema<AgentListing>;
+const AgentListingSchema = decodes<AgentListing>()(
+  Schema.Struct({
+    name: Schema.String,
+    from: AgentPlaceSchema,
+    dir: Schema.String,
+    file: Schema.String,
+    role: Schema.NullOr(Schema.String),
+    description: Schema.NullOr(Schema.String),
+    keys: RoleKeysSchema,
+    body: Schema.String,
+    schema: Schema.NullOr(SchemaFileSchema),
+    card: Schema.NullOr(Schema.mutable(Schema.Array(AgentSkillSchema))),
+    cardError: Schema.NullOr(Schema.String),
+    skills: Schema.NullOr(Schema.String),
+    harnessPrompt: Schema.NullOr(Schema.String),
+    mcp: Schema.NullOr(Schema.String),
+    given: Schema.mutable(Schema.Array(GivenSkillSchema)),
+    source: Schema.String,
+    version: Schema.String,
+    usedBy: Schema.mutable(Schema.Array(AgentUserSchema)),
+    error: Schema.NullOr(Schema.String),
+    untried: Schema.NullOr(Schema.Struct({ why: Schema.String, copy: Schema.NullOr(Schema.String) })),
+  }),
+);
 
 /**
  * Mirrors `LibraryAgent` in apps/api/src/agents/agents.ts, as the Agents page reads it: an agent's listing, and the names of the factories
@@ -121,10 +128,12 @@ const AgentListingSchema = Schema.Struct({
 export type LibraryAgent = AgentListing & { factories: string[] };
 
 /** Decodes a `LibraryAgent`: an `AgentListing` and its factories. */
-const LibraryAgentSchema = Schema.Struct({
-  ...AgentListingSchema.fields,
-  factories: Schema.mutable(Schema.Array(Schema.String)),
-}) satisfies Schema.Schema<LibraryAgent>;
+const LibraryAgentSchema = decodes<LibraryAgent>()(
+  Schema.Struct({
+    ...AgentListingSchema.fields,
+    factories: Schema.mutable(Schema.Array(Schema.String)),
+  }),
+);
 
 /** Every agent of the repository's and of yours, with the factories each fills a step in, read from disk on each request. */
 export const agentsQuery = queryOptions({
@@ -167,11 +176,13 @@ export type AgentSaved = { agent: AgentListing; written: string[]; removed: stri
 const Strings = Schema.mutable(Schema.Array(Schema.String));
 
 /** Decodes an `AgentSaved`. */
-const AgentSavedSchema = Schema.Struct({
-  agent: AgentListingSchema,
-  written: Strings,
-  removed: Strings,
-}) satisfies Schema.Schema<AgentSaved>;
+const AgentSavedSchema = decodes<AgentSaved>()(
+  Schema.Struct({
+    agent: AgentListingSchema,
+    written: Strings,
+    removed: Strings,
+  }),
+);
 
 /**
  * A write of an agent the api refused: the package's sentence, the nodes that still name the agent when that is why, and the api's status —
@@ -231,7 +242,7 @@ const TRIED = 'The try may have started: look on the Runs page before trying the
 export type AgentTried = { id: string };
 
 /** Decodes an `AgentTried`. */
-const AgentTriedSchema = Schema.Struct({ id: Schema.String }) satisfies Schema.Schema<AgentTried>;
+const AgentTriedSchema = decodes<AgentTried>()(Schema.Struct({ id: Schema.String }));
 
 /**
  * Try an agent of yours on a short brief: a one-step folder run of it, fenced to its folder with a dollar to spend. Rejects with an
@@ -248,22 +259,26 @@ export const tryAgent = (name: string, brief: string): Promise<AgentTried> =>
 export type CustomInstructions = { name: string; file: string; words: string | null; error: string | null };
 
 /** Decodes a `CustomInstructions`. */
-const CustomInstructionsSchema = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  words: Schema.NullOr(Schema.String),
-  error: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<CustomInstructions>;
+const CustomInstructionsSchema = decodes<CustomInstructions>()(
+  Schema.Struct({
+    name: Schema.String,
+    file: Schema.String,
+    words: Schema.NullOr(Schema.String),
+    error: Schema.NullOr(Schema.String),
+  }),
+);
 
 /** Mirrors `CustomInstructionsCleared` in apps/api/src/custom/custom.ts: the file a clear looked at, and whether it removed words. */
 export type CustomInstructionsCleared = { name: string; file: string; removed: boolean };
 
 /** Decodes a `CustomInstructionsCleared`. */
-const CustomInstructionsClearedSchema = Schema.Struct({
-  name: Schema.String,
-  file: Schema.String,
-  removed: Schema.Boolean,
-}) satisfies Schema.Schema<CustomInstructionsCleared>;
+const CustomInstructionsClearedSchema = decodes<CustomInstructionsCleared>()(
+  Schema.Struct({
+    name: Schema.String,
+    file: Schema.String,
+    removed: Schema.Boolean,
+  }),
+);
 
 /** The route of an agent's custom instructions, by its name. */
 const customRoute = (name: string): string => `/api/custom-instructions/${encodeURIComponent(name)}`;

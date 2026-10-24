@@ -23,6 +23,9 @@ import { type ApiEnv, served, type Served } from '../layer.ts';
 import { workflowPageOf, type WorkflowPageAddress } from '../step/step.ts';
 import { findRun, noSuchRun, runPlaced } from '../store.ts';
 
+/** A person's hold on a run, as `PUT /api/runs/:id/hold` answers it beside the run (`{ id, lifted: false, hold }`). */
+export type { Hold } from 'agent-orchestrator/run';
+
 /** A run as the list answers it: its summary, and the address of its workflow's page, null where the board pages none. */
 export type RunListing = RunSummary & { workflowPage: WorkflowPageAddress | null };
 

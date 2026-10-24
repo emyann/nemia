@@ -4,6 +4,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get, send, type SendHow } from './read.ts';
 import { AgentSkillSchema, SkillCostSchema, SkillSourceSchema, type AgentSkill, type SkillCost, type SkillSource } from './library.ts';
 
@@ -28,33 +29,37 @@ export type SkillRow = {
 };
 
 /** Decodes a `SkillRow`. */
-const SkillRowSchema = Schema.Struct({
-  name: Schema.String,
-  from: SkillSourceSchema,
-  dir: Schema.String,
-  entry: Schema.NullOr(AgentSkillSchema),
-  error: Schema.NullOr(Schema.String),
-  preload: Schema.Boolean,
-  cost: Schema.NullOr(SkillCostSchema),
-  usedBy: Strings,
-  found: Schema.NullOr(Schema.Literals(['yours', 'repo'])),
-}) satisfies Schema.Schema<SkillRow>;
+const SkillRowSchema = decodes<SkillRow>()(
+  Schema.Struct({
+    name: Schema.String,
+    from: SkillSourceSchema,
+    dir: Schema.String,
+    entry: Schema.NullOr(AgentSkillSchema),
+    error: Schema.NullOr(Schema.String),
+    preload: Schema.Boolean,
+    cost: Schema.NullOr(SkillCostSchema),
+    usedBy: Strings,
+    found: Schema.NullOr(Schema.Literals(['yours', 'repo'])),
+  }),
+);
 
 /** Mirrors `SkillPlace`: one place, in the order an agent of yours finds a name, the shipped last. */
 export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
 
 /** Decodes a `SkillPlace`. */
-const SkillPlaceSchema = Schema.Struct({
-  from: SkillSourceSchema,
-  dir: Schema.String,
-  skills: Schema.mutable(Schema.Array(SkillRowSchema)),
-}) satisfies Schema.Schema<SkillPlace>;
+const SkillPlaceSchema = decodes<SkillPlace>()(
+  Schema.Struct({
+    from: SkillSourceSchema,
+    dir: Schema.String,
+    skills: Schema.mutable(Schema.Array(SkillRowSchema)),
+  }),
+);
 
 /** Mirrors `SkillAdded`: the copied skill as it now reads in your library, and its files. */
 export type SkillAdded = { skill: SkillRow; written: string[] };
 
 /** Decodes a `SkillAdded`. */
-const SkillAddedSchema = Schema.Struct({ skill: SkillRowSchema, written: Strings }) satisfies Schema.Schema<SkillAdded>;
+const SkillAddedSchema = decodes<SkillAdded>()(Schema.Struct({ skill: SkillRowSchema, written: Strings }));
 
 /** Every skill the picker lists, by place, read from disk on each request. */
 export const skillsQuery = queryOptions({
@@ -96,21 +101,23 @@ export type SkillDraft = {
 };
 
 /** Decodes a `SkillDraft`: a key it leaves out stays out. */
-const SkillDraftSchema = Schema.Struct({
-  name: Schema.String,
-  title: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  description: Schema.optionalKey(Schema.NullOr(Schema.String)),
-  tags: Schema.optionalKey(Schema.NullOr(Strings)),
-  examples: Schema.optionalKey(Schema.NullOr(Strings)),
-  preload: Schema.optionalKey(Schema.Boolean),
-  body: Schema.String,
-}) satisfies Schema.Schema<SkillDraft>;
+const SkillDraftSchema = decodes<SkillDraft>()(
+  Schema.Struct({
+    name: Schema.String,
+    title: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    description: Schema.optionalKey(Schema.NullOr(Schema.String)),
+    tags: Schema.optionalKey(Schema.NullOr(Strings)),
+    examples: Schema.optionalKey(Schema.NullOr(Strings)),
+    preload: Schema.optionalKey(Schema.Boolean),
+    body: Schema.String,
+  }),
+);
 
 /** Mirrors `SkillUser`: an agent that gives a skill, by its place and its name. */
 export type SkillUser = { from: 'yours' | 'repo'; name: string };
 
 /** Decodes a `SkillUser`. */
-const SkillUserSchema = Schema.Struct({ from: Schema.Literals(['yours', 'repo']), name: Schema.String }) satisfies Schema.Schema<SkillUser>;
+const SkillUserSchema = decodes<SkillUser>()(Schema.Struct({ from: Schema.Literals(['yours', 'repo']), name: Schema.String }));
 
 /**
  * Mirrors `SkillDetail`: one skill on its page — its row, the version a write carries back, its draft (null where its SKILL.md does not
@@ -127,20 +134,22 @@ export type SkillDetail = {
 };
 
 /** Decodes a `SkillDetail`. */
-const SkillDetailSchema = Schema.Struct({
-  skill: SkillRowSchema,
-  version: Schema.String,
-  draft: Schema.NullOr(SkillDraftSchema),
-  body: Schema.String,
-  users: Schema.mutable(Schema.Array(SkillUserSchema)),
-  copyHint: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<SkillDetail>;
+const SkillDetailSchema = decodes<SkillDetail>()(
+  Schema.Struct({
+    skill: SkillRowSchema,
+    version: Schema.String,
+    draft: Schema.NullOr(SkillDraftSchema),
+    body: Schema.String,
+    users: Schema.mutable(Schema.Array(SkillUserSchema)),
+    copyHint: Schema.NullOr(Schema.String),
+  }),
+);
 
 /** Mirrors `SkillSaved`: a skill written, as its page now reads it. */
 export type SkillSaved = SkillDetail & { written: string[] };
 
 /** Decodes a `SkillSaved`. */
-const SkillSavedSchema = Schema.Struct({ ...SkillDetailSchema.fields, written: Strings }) satisfies Schema.Schema<SkillSaved>;
+const SkillSavedSchema = decodes<SkillSaved>()(Schema.Struct({ ...SkillDetailSchema.fields, written: Strings }));
 
 /** One skill, read from disk now: its page's read. Under `skillsQuery`'s key, so a write that reads the list again reads it again too. */
 export const skillQuery = (from: string, name: string) =>

@@ -1,6 +1,7 @@
 /** The version of what serves the board (`GET /api/version`, apps/api/src/app.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 
 /**
@@ -13,18 +14,22 @@ export type VersionRelease = { kind: 'checkout' | 'install'; root: string; tag?:
 export type Version = { version: string; release?: VersionRelease };
 
 /** Decodes a `VersionRelease`. */
-const VersionReleaseSchema = Schema.Struct({
-  kind: Schema.Literals(['checkout', 'install']),
-  root: Schema.String,
-  tag: Schema.optional(Schema.String),
-  commit: Schema.optional(Schema.String),
-}) satisfies Schema.Schema<VersionRelease>;
+const VersionReleaseSchema = decodes<VersionRelease>()(
+  Schema.Struct({
+    kind: Schema.Literals(['checkout', 'install']),
+    root: Schema.String,
+    tag: Schema.optional(Schema.String),
+    commit: Schema.optional(Schema.String),
+  }),
+);
 
 /** Decodes a `Version`. */
-const VersionSchema = Schema.Struct({
-  version: Schema.String,
-  release: Schema.optional(VersionReleaseSchema),
-}) satisfies Schema.Schema<Version>;
+const VersionSchema = decodes<Version>()(
+  Schema.Struct({
+    version: Schema.String,
+    release: Schema.optional(VersionReleaseSchema),
+  }),
+);
 
 /** The version, read once a page: it changes only when the api restarts on another, and a page loaded since reads that one. */
 export const versionQuery = queryOptions({

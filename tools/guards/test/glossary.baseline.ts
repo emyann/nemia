@@ -23,7 +23,7 @@
  * retired them (a wait on a person said by the `Awaiting*` codes, a wait on a thing by `Waiting` and `on`): each a key of
  * `FORMER_REASONS` in `reason.ts`, which reads a line on disk and a stored selector that still names one. They stay while a feed or a
  * subscription on disk may hold them.
-  *
+ *
  * `shipped` and `ships`, on the day decision 13a retired them (`Landed` in the run core's, the api's and the board's tables): the run's
  * sense, a run's result on its base, says `landed` everywhere since that card. Every count left is the product's sense, what comes with
  * Nemia (its git place, the skills, servers and rules it lists, a default it is given with), which decision 13b renames to `builtin`

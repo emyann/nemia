@@ -23,8 +23,8 @@ type InboxEntry = import('./inbox.ts').InboxEntry;
 type InboxCardPage = import('./inbox.ts').InboxCardPage;
 type InboxFiled = import('./inbox.ts').InboxFiled;
 type RunDetail = import('../detail/detail.ts').RunDetail;
-/** What POST /api/runs answers a card it started (201): the run, the card, and whether the card left the inbox — and why not. */
-type CardStarted = { id: string; card: string; removed: boolean; why?: string; ignoredRepo?: string };
+/** What POST /api/runs answers a card it started (201): the run and the card, which stays in the inbox. */
+type CardStarted = { id: string; card: string; ignoredRepo?: string };
 type Refused = { error: string };
 
 const write = (file: string, text: string): void => {
@@ -91,10 +91,10 @@ const packageRefusal = (opts: { text: string; workflow?: string; repo?: string }
   return assert.fail(`${JSON.stringify(opts)} was filed, and should have been refused`);
 };
 
-test('a person starts a card: the run carries where it came from, and the card leaves the inbox', async (t) => {
+test('a person starts a card: the run carries where it came from, and the card stays in the inbox, listed as started', async (t) => {
   const s = story(t);
   await s.test(
-    'POST /api/runs with `card` starts the card through the package: the brief as the person edited it, the workflow the api found, `after` — the record carries `from`, and the card leaves the inbox',
+    'POST /api/runs with `card` starts the card through the package: the brief as the person edited it, the workflow the api found, `after` — the record carries `from`, and the card stays, listed as started',
     async () => {
       clear();
       const { card } = addToInbox({ text: 'Show what a step cost\n\nOn the run page.', workflow: 'mine', repo });
@@ -103,7 +103,6 @@ test('a person starts a card: the run carries where it came from, and the card l
         engine(),
         startFromInbox({ name: other.card.name, callerRepo: repo, workflow: dev, brief: 'A run to wait on' }),
       );
-      assert.equal(parent.removed, true);
 
       const res = await startCard({
         workflow: 'dev',
@@ -114,7 +113,7 @@ test('a person starts a card: the run carries where it came from, and the card l
       });
       assert.equal(res.status, 201, await res.clone().text());
       const answered = (await res.json()) as CardStarted;
-      assert.deepEqual(answered, { id: answered.id, card: card.name, removed: true });
+      assert.deepEqual(answered, { id: answered.id, card: card.name }, 'the answer says no removal: the card is kept');
       assert.equal(res.headers.get('location'), `/api/runs/${answered.id}`);
 
       const run = runStore.runs.read(answered.id);
@@ -129,8 +128,14 @@ test('a person starts a card: the run carries where it came from, and the card l
         },
         "the workflow the start named, over the card's own: the form's is preset from the card, and changeable",
       );
-      assert.deepEqual(cards(), [], 'the card left the inbox');
-      assert.equal((await listed()).length, 0);
+      assert.deepEqual(
+        (await listed()).map((e) => [e.name, e.state, e.startedAs]).sort(),
+        [
+          [card.name, 'started', [answered.id]],
+          [other.card.name, 'started', [parent.run.id]],
+        ].sort(),
+        'both cards kept, each listed as started by the run it became',
+      );
 
       const { card: plain } = addToInbox({ text: 'Keep the brief\n\nAs the card says it.' });
       const bodied = await startCard({ workflow: 'mine', card: plain.name });
@@ -173,34 +178,20 @@ test('a person starts a card: the run carries where it came from, and the card l
   );
 });
 
-test(
-  "POST /api/runs with `card` whose removal fails still starts: 201 with `removed: false` and the package's why, the record written, the card listed as started — and refused a second start until it is dropped",
-  { skip: process.getuid?.() === 0 ? 'root removes a file from a read-only folder all the same' : false },
-  async () => {
-    clear();
-    const { card, file: cardFile } = addToInbox({ text: 'Stays in the inbox' });
-    fs.chmodSync(inbox, 0o555);
-    try {
-      const res = await startCard({ workflow: 'dev', card: card.name });
-      assert.equal(res.status, 201, await res.clone().text());
-      const answered = (await res.json()) as CardStarted;
-      assert.deepEqual(Object.keys(answered).sort(), ['card', 'id', 'removed', 'why']);
-      assert.deepEqual([answered.card, answered.removed], [card.name, false]);
-      assert.ok(answered.why?.startsWith(`${cardFile} could not be removed — `), answered.why);
-      assert.deepEqual(runStore.runs.read(answered.id).from, { inbox: card.name });
-      assert.deepEqual(cards(), [`${card.name}.md`], 'the card is still there');
-      assert.deepEqual((await listed()).find((e) => e.name === card.name)?.startedAs, [answered.id]);
+test('POST /api/runs with `card` of a card already started is refused, 409, naming its run: a card is started once, and kept', async () => {
+  clear();
+  const { card } = addToInbox({ text: 'Stays in the inbox' });
+  const res = await startCard({ workflow: 'dev', card: card.name });
+  assert.equal(res.status, 201, await res.clone().text());
+  const answered = (await res.json()) as CardStarted;
+  assert.deepEqual(cards(), [`${card.name}.md`], 'the card is still there');
 
-      const again = await startCard({ workflow: 'dev', card: card.name });
-      assert.equal(again.status, 409);
-      assert.ok(((await again.json()) as Refused).error.includes(`this card was started as ${answered.id}`));
-    } finally {
-      fs.chmodSync(inbox, 0o755);
-    }
-    assert.equal((await drop(card.name)).status, 200);
-    assert.deepEqual(cards(), []);
-  },
-);
+  const again = await startCard({ workflow: 'dev', card: card.name });
+  assert.equal(again.status, 409);
+  assert.ok(((await again.json()) as Refused).error.includes(answered.id));
+  assert.equal((await drop(card.name)).status, 200);
+  assert.deepEqual(cards(), []);
+});
 
 /** What `startFromInbox` refuses `name` with, asked as the route asks it. */
 const startRefusal = async (name: string, extra: { brief?: string; after?: string[] } = {}): Promise<string> => {
@@ -446,6 +437,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
           factory: null,
           from: [],
           startedAs: [],
+          state: 'filed',
           error: null,
           body: 'Cache the views between passes\n\nThe tick reads each task twice.',
           filedAt: old.toISOString(),
@@ -500,7 +492,7 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       clear();
       write(path.join(inbox, 'broken.md'), '---\nafter: some-run\n---\nWait for it.\n');
       write(path.join(inbox, 'notes.txt'), 'not a card\n');
-      const { card } = addToInbox({ text: 'Started, and its removal failed' });
+      const { card } = addToInbox({ text: 'Started at the command line' });
       write(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', card.name));
 
       const entries = await listed();
@@ -509,7 +501,9 @@ test("a person files cards, in a factory and out of one, lists them, opens a car
       assert.deepEqual([broken.body, broken.title, typeof broken.filedAt], [null, null, 'string']);
       const stray = entries.find((e) => e.file === 'notes.txt')!;
       assert.match(stray.error!, /^notes\.txt: not a card/);
-      assert.deepEqual(entries.find((e) => e.name === card.name)!.startedAs, ['started-run-k2q9']);
+      const started = entries.find((e) => e.name === card.name)!;
+      assert.deepEqual([started.startedAs, started.state], [['started-run-k2q9'], 'started']);
+      assert.deepEqual([broken.state, stray.state], ['filed', 'filed'], 'every entry has its state, one that does not read filed');
 
       fs.rmSync(path.join(inbox, 'broken.md'));
       assert.equal(

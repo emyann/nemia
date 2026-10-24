@@ -1173,7 +1173,7 @@ test('HELD OPEN: a task held open signs and waits on a person, is answered into 
       assert.deepEqual(
         decide(unsaid, seen(), now(70_000)),
         { do: 'nothing', why: 'input-required' },
-        'a turn ended `succeeded` with no statement waits as any other',
+        'a `succeeded` turn with no statement waits as any other',
       );
       const formerTurn = fold(TASK, [
         ...held(),

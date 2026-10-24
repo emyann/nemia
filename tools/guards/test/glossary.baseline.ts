@@ -14,6 +14,10 @@
  * It only shrinks: a change that takes a retired spelling out of a file lowers its count here in the same commit, and takes the entry
  * off where none is left; a new retired row in a table adds the counts of its files the day it lands. A count is never raised, nor a
  * file added for an old spelling.
+ *
+ * `stated`, `unsigned` and `checkoutMcp`, on the day the runtime retired them: each a stored key or literal an older runtime's journal
+ * holds, read by `upgrade` and named in its doc (`journal.ts`), the stored schema (`event-schema.ts`) and the filing door's
+ * `RENAMED_ARGS` (`args.ts`). They stay while a journal on disk may hold them.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   wf: {
@@ -35,5 +39,18 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/workflow/validate.ts': 1,
     'packages/agent-orchestrator/src/workspace/workspace.ts': 6,
     'packages/agent-orchestrator/src/workspace/worktree.store.ts': 3,
+  },
+  stated: {
+    'packages/agent-runtime/src/core/engine/journal.ts': 3,
+    'packages/agent-runtime/src/core/event-schema.ts': 1,
+  },
+  unsigned: {
+    'packages/agent-runtime/src/core/engine/journal.ts': 1,
+    'packages/agent-runtime/src/core/event-schema.ts': 1,
+  },
+  checkoutmcp: {
+    'packages/agent-runtime/src/core/engine/journal.ts': 1,
+    'packages/agent-runtime/src/core/event-schema.ts': 1,
+    'packages/agent-runtime/src/harness/args.ts': 1,
   },
 };

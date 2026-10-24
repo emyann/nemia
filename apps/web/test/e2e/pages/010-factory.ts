@@ -347,7 +347,7 @@ export default {
     await expectVisible(ending.getByRole('button', { name: 'Send back…', exact: true }), 'and Send back…');
     await expectVisible(ending.getByText('to decide', { exact: true }), 'and is marked to decide');
     await expectVisible(
-      ending.locator(`[data-step="${ENDING.ending}"][data-state="awaiting-approval"][title^="${ENDING.ending}: awaiting approval"]`),
+      ending.locator(`[data-step="${ENDING.ending}"][data-state="awaiting-approval"][title^="${ENDING.ending}: waits on you — "]`),
       `and its rail shows ${ENDING.ending} as awaiting approval`,
     );
     await expectCount(
@@ -415,7 +415,7 @@ export default {
     await expectLeftOf(cardOf(page, cancelled.id), cardOf(page, orphan.id), `${cancelled.id} is left of ${orphan.id}, which waits on it`);
     await expectVisible(
       page.locator(
-        `.react-flow__node[data-id="${LOOPING.id}"] [data-step="${LOOPING.exhausted}"][data-state="exhausted"][title*="rounds exhausted"][title$="${LOOPING.notes.review}"]`,
+        `.react-flow__node[data-id="${LOOPING.id}"] [data-step="${LOOPING.exhausted}"][data-state="exhausted"][title*=": waits on you — "][title$="${LOOPING.notes.review}"]`,
       ),
       `the loop's rail shows ${LOOPING.exhausted} out of rounds as a pill that waits on a person, its note after what that means on hover (${LOOPING.id})`,
     );
@@ -448,8 +448,8 @@ export default {
     );
     await expectVisible(card.locator(`a[href="/runs/${FAKE.id}"]`), "the card's title links to the run's page");
     await expectVisible(
-      pill(FAKE.refused).and(page.locator('[data-state="failed-check"][title*="failed ✗ check (exit 1)"]')),
-      `the card's rail shows ${FAKE.refused}'s refused check as a red pill, the check's exit on hover`,
+      pill(FAKE.refused).and(page.locator('[data-state="failed-check"][title*=": failed its check — "]')),
+      `the card's rail shows ${FAKE.refused}'s refused check as a red pill, failed its check on hover`,
     );
     await expectCount(pills, FAKE.steps.length, `a pill per step on the card at rest (${FAKE.steps.join(', ')})`);
     await expectCount(
@@ -501,12 +501,12 @@ export default {
       `${FAKE.blocked}'s tile says what it asks, whole on hover`,
     );
     await expectVisible(
-      tile(FAKE.refused).locator('[data-state="failed-check"]', { hasText: 'failed ✗ check (exit 1)' }),
+      tile(FAKE.refused).locator('[data-state="failed-check"]', { hasText: 'failed its check' }),
       `${FAKE.refused}, whose check refused, has a red chip`,
     );
     await expectVisible(
-      tile(FAKE.unverified).locator('[data-state="unverified"]', { hasText: 'unverified · done' }),
-      `${FAKE.unverified}, signed off with no check, is marked unverified, not done`,
+      tile(FAKE.unverified).locator('[data-state="unverified"]', { hasText: 'done' }),
+      `${FAKE.unverified}, signed off with no check, is done on its own word, its chip marked unverified`,
     );
     await expectVisible(
       tile('respond').getByText('not filed yet', { exact: true }),

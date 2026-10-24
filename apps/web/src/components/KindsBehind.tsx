@@ -20,7 +20,7 @@ export const behindWords = (k: NonNullable<RunDetail['kinds']>[number]): string 
  * draws nothing. The tag is the look's (`CutTag`), as every tag on the board is.
  */
 export function KindsBehind({ run }: { run: RunDetail }) {
-  const kinds = run.kinds ?? [];
+  const kinds = run.kinds;
   if (kinds.length === 0) return null;
   return (
     <section

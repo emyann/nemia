@@ -433,8 +433,5 @@ export const behind = (): RunDetail =>
     ],
   });
 
-/** A run the api answered before revisions: no `kinds` at all, and nothing drawn. */
-export const unpinned = (): RunDetail => {
-  const { kinds: _, refresh: __, ...rest } = detail();
-  return rest;
-};
+/** A run behind no revision: no `kinds`, and nothing drawn. */
+export const unpinned = (): RunDetail => ({ ...detail(), kinds: [] });

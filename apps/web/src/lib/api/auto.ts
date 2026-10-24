@@ -5,6 +5,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
 import { get, send } from './read.ts';
 
@@ -61,23 +62,25 @@ const RULE_FIELDS = {
 };
 
 /** Decodes an `PolicyList`. */
-const PolicyListSchema = Schema.Struct({
-  agent: Schema.String,
-  file: Schema.String,
-  isDefault: Schema.Boolean,
-  rules: Schema.Array(Schema.Struct(RULE_FIELDS)),
-  shipped: Schema.Struct(RULE_FIELDS),
-  proposed: Schema.NullOr(
-    Schema.Struct({
-      file: Schema.String,
-      at: Schema.String,
-      rules: Schema.Array(Schema.Struct({ ...RULE_FIELDS, confirmed: Schema.Boolean })),
-      guidance: Schema.Array(Schema.String),
-      stale: Schema.Boolean,
-    }),
-  ),
-  instruction: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<PolicyList>;
+const PolicyListSchema = decodes<PolicyList>()(
+  Schema.Struct({
+    agent: Schema.String,
+    file: Schema.String,
+    isDefault: Schema.Boolean,
+    rules: Schema.Array(Schema.Struct(RULE_FIELDS)),
+    shipped: Schema.Struct(RULE_FIELDS),
+    proposed: Schema.NullOr(
+      Schema.Struct({
+        file: Schema.String,
+        at: Schema.String,
+        rules: Schema.Array(Schema.Struct({ ...RULE_FIELDS, confirmed: Schema.Boolean })),
+        guidance: Schema.Array(Schema.String),
+        stale: Schema.Boolean,
+      }),
+    ),
+    instruction: Schema.NullOr(Schema.String),
+  }),
+);
 
 /** `agent`'s rules for Auto: polled slowly, since the agent proposes from its session. */
 export const policyQuery = (agent: string) =>

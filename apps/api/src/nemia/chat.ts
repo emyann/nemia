@@ -22,6 +22,20 @@ import { NotBlank, readBody, type Words } from '../body.ts';
 import { refusedBeforeReading, type Guarded } from '../guard.ts';
 import { type ApiEnv, served, type Served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
+import type { Effect } from 'effect';
+
+/** What `GET /api/nemia/chat` answers: a page of her chat, the cursor and her presence. */
+export type ChatHistoryAnswer = Effect.Success<ReturnType<typeof chatHistory>>;
+/** What `POST /api/nemia/chat/send` answers: the words as her outbox keeps them. */
+export type ChatSentAnswer = Effect.Success<ReturnType<typeof chatSend>>;
+/** What `POST /api/nemia/chat/stop` answers. */
+export type ChatStopAnswer = Effect.Success<ReturnType<typeof chatStop>>;
+/** What `POST /api/nemia/chat/answer` takes: the ask, and the person's pick for each of its questions. */
+export type ChatAnswerBody = Parameters<typeof chatAnswer>[1];
+/** What `POST /api/nemia/chat/answer` answers. */
+export type ChatAnswerAnswer = Effect.Success<ReturnType<typeof chatAnswer>>;
+/** What `POST /api/nemia/chat/read` answers. */
+export type ChatReadAnswer = Effect.Success<ReturnType<typeof chatRead>>;
 
 /** How often a followed chat is read again, shipped: `Beats.chat`'s default (layer.ts). */
 export const CHAT_BEAT_MS = 2000;

@@ -83,7 +83,7 @@ export function QueueButtons({ entry, pending, onQueue }: { entry: InboxEntry; p
           disabled={pending}
           onClick={() => onQueue(true)}
           className={SECONDARY}
-          title="Take it off the queue: it waits for you to start it"
+          title="Take it off the queue: it waits on you to start it"
         >
           {pending ? 'Unqueueing…' : 'Unqueue'}
         </button>

@@ -25,7 +25,7 @@ export const Done: StoryObj = { render: () => <Rail steps={DONE} /> };
 /** A run at work: the step at work filled in its hue, its glow breathing, still where reduced motion is asked for. */
 export const AtWork: StoryObj = { render: () => <Rail steps={AT_WORK} /> };
 
-/** A run whose step its check refused. */
+/** A run whose step failed its check. */
 export const Refused: StoryObj = { render: () => <Rail steps={REFUSED} /> };
 
 /** A rail with no names under its bars, as a table's row draws it. */

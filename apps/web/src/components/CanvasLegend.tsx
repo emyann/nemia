@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Panel } from '@xyflow/react';
 import { edgeLine, edgeStroke, type EdgeState } from '../lib/canvas';
+import { PERSON } from '../lib/words';
 import { READ_LINE, Travelling } from './StateEdge';
 
 /**
@@ -21,7 +22,7 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
       aria-label="Legend"
       className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-body-small text-muted-foreground ${className}`}
     >
-      <Item sample={<Sample state="to-come" />}>to come</Item>
+      <Item sample={<Sample state="to-come" />}>{PERSON.waiting.rail}</Item>
       <Item
         sample={
           <>

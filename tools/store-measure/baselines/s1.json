@@ -4,17 +4,18 @@
     "cores": 12,
     "memoryBytes": 16770084864,
     "node": "v24.20.0",
-    "platform": "linux"
+    "platform": "linux",
+    "load": 4.25
   },
-  "commit": "5dd708f33d8d763125cb69acb7b71c42756cbff2",
-  "date": "2026-10-24T09:18:30.879Z",
+  "commit": "b3241449f393307587fafd4ea636c1cfa78c25a6",
+  "date": "2026-10-24T10:33:00.330Z",
   "repeat": 5,
   "from": "~/.agent-workflows",
   "engine": "~/.agent-engine",
   "copy": {
-    "files": 88711,
-    "bytes": 1899439531,
-    "ms": 6940.726428,
+    "files": 89516,
+    "bytes": 1947788364,
+    "ms": 9234.755435000001,
     "leftOut": [
       "api.log",
       "daemon.json",
@@ -24,12 +25,12 @@
     ]
   },
   "counts": {
-    "runs": 88,
-    "finishedRuns": 70,
-    "openRuns": 18,
-    "tasks": 6979,
-    "journalBytes": 112327173,
-    "feedLines": 35401,
+    "runs": 89,
+    "finishedRuns": 75,
+    "openRuns": 14,
+    "tasks": 7015,
+    "journalBytes": 112608516,
+    "feedLines": 35574,
     "unreadable": {
       "runs": 0,
       "passLines": 0
@@ -37,70 +38,70 @@
     "invariantRefusals": 0
   },
   "asked": {
-    "finishedRun": "the-review-step-reads-its-pu-3fz6",
-    "openRun": "the-read-only-agents-know-a-5qax",
-    "feedCursor": 7739911,
+    "finishedRun": "when-ci-goes-red-the-next-tr-zond",
+    "openRun": "a-field-that-says-a-state-or-zg7f",
+    "feedCursor": 7815025,
     "feedLinesRead": 1000
   },
   "measures": {
     "runList": {
       "cold": {
-        "ms": 1404.492388999999,
-        "heapMb": 121.330248
+        "ms": 2120.3441189999976,
+        "heapMb": 124.182744
       },
       "warm": {
-        "ms": 146.49707599999965,
-        "heapMb": 1.099784
+        "ms": 138.9637419999999,
+        "heapMb": 1.096856
       }
     },
     "stats": {
       "cold": {
-        "ms": 4000.324370000002,
-        "heapMb": 41.94576
+        "ms": 4684.036220999995,
+        "heapMb": 43.9356
       },
       "warm": {
-        "ms": 219.92561800000112,
-        "heapMb": 0.24936
+        "ms": 408.7276279999933,
+        "heapMb": 0.238664
       }
     },
     "finishedRun": {
       "cold": {
-        "ms": 899.9573839999939,
-        "heapMb": 80.612056
+        "ms": 972.6795450000063,
+        "heapMb": 81.001504
       },
       "warm": {
-        "ms": 15.937299000004714,
-        "heapMb": 0.459216
+        "ms": 16.934987000000547,
+        "heapMb": 0.510208
       }
     },
     "openRun": {
       "cold": {
-        "ms": 862.851155999997,
-        "heapMb": 80.308336
+        "ms": 981.8233360000013,
+        "heapMb": 81.22876
       },
       "warm": {
-        "ms": 13.652968000002147,
-        "heapMb": 0.323792
+        "ms": 67.6353580000141,
+        "heapMb": 0.409976
       }
     },
     "feedFromCursor": {
       "cold": {
-        "ms": 25.61727200000314,
-        "heapMb": 0.179128
+        "ms": 32.33139600000868,
+        "heapMb": 0.175504
       },
       "warm": {
-        "ms": 22.262360000000626,
-        "heapMb": 0.07812
+        "ms": 27.205423999999766,
+        "heapMb": 0.080192
       }
     },
     "tickPass": {
       "cold": {
-        "ms": 656.8562119999988,
-        "heapMb": 0.340024
+        "ms": 774.0041300000012,
+        "heapMb": 0.359408
       },
       "warm": {
-        "ms": 209.89696399999957,
-        "heapMb": 0.206912
+        "ms": 217.33532299999206,
+        "heapMb": 0.19588
       }
     }
   },

@@ -82,6 +82,15 @@ test("the tests' team, exported and rendered, loads as the team loads, its hires
   );
 });
 
+test("a manifest's revisions policy is rendered into the tree's wiring, and a manifest that says none renders none", () => {
+  const { dir } = exported();
+  assert.equal(Object.hasOwn(rendered(dir).out.wiring, 'revisions'), false, 'a manifest that says nothing leaves the factory pinned');
+  edit(dir, 'nemia.yaml', (spec) => (spec.revisions = 'follow'));
+  const { tree, out } = rendered(dir);
+  assert.equal(out.wiring.revisions, 'follow');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(tree, 'factory.json'), 'utf8')).revisions, 'follow');
+});
+
 test("an agent's mcp: line has its place in a template: exported in the agent's spec, and rendered back as the line it was", () => {
   const repo = scratch('wf-render-repo-');
   fs.renameSync(teamCopy(), path.join(repo, 'workflows'));

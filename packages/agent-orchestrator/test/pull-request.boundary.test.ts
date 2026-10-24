@@ -312,9 +312,32 @@ test('wait polls the ci context until it has a verdict, and passes on a green on
 /** `lines` as a job's log GitHub serves: each line stamped with the time it was printed. */
 const stamped = (lines: string[]): string => lines.map((line) => `2026-10-24T09:00:00.0000000Z ${line}`).join('\n');
 
-test("REFUSED: a red ci, with the Actions URL, the failing jobs, each job's failing tests and their diffs, and the retry line", () => {
+test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that failed each job, and the retry line', () => {
   const at = placed();
   const TESTS_URL = CI_URL.replace('/job/5678', '/job/9012');
+  const CHECKS_URL = CI_URL.replace('/job/5678', '/job/3456');
+  const cleanup = [
+    'Post job cleanup.',
+    '[command]/usr/bin/git version',
+    "Temporarily overriding HOME='<runner>/_temp/x' before making global git config changes",
+    'Cleaning up orphan processes',
+  ];
+  const WORKED = 'e2e: FAILED — the inbox page (/inbox) in the dark theme: a card for the ask — none seen';
+  const pastSpawnBuffer = `[w1] visiting page ${'x'.repeat(1024 * 1024)}`;
+  const E2E = 'e2e: FAILED — the runs page (/runs) in the dark theme: a row for the run — none seen';
+  const checks = stamped([
+    "web:typecheck: src/a.ts(3,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "  x eslint(no-unused-vars): Variable 'b' is declared but never used.",
+    '   ,-[src/b.ts:1:7]',
+    ' 1 | const b = 1;',
+    ...Array.from({ length: 40 }, (_, i) => `[w1] visiting page ${i}`),
+    pastSpawnBuffer,
+    `[w1] ${E2E}`,
+    E2E,
+    `[w2] ${WORKED}`,
+    'Process completed with exit code 1.',
+    ...cleanup,
+  ]);
   const tests = stamped([
     ...Array.from({ length: 50 }, (_, i) => `agent-orchestrator:test: ✔ a passing test ${i} (1ms)`),
     'agent-orchestrator:test: ✖ the export is pinned (2ms)',
@@ -329,7 +352,7 @@ test("REFUSED: a red ci, with the Actions URL, the failing jobs, each job's fail
     "agent-orchestrator:test:   - 'moved'",
     'agent-orchestrator:test:       at TestContext.<anonymous> (file:///a.test.ts:3:33)',
   ]);
-  const gathered = stamped(['Every job succeeded', 'test: failure', 'Process completed with exit code 1.']);
+  const gathered = stamped(['Every job succeeded', 'test: failure', 'Process completed with exit code 1.', ...cleanup]);
   at.gh.answers([
     ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
     {
@@ -338,9 +361,11 @@ test("REFUSED: a red ci, with the Actions URL, the failing jobs, each job's fail
         { status: 'COMPLETED', conclusion: 'FAILURE' },
         { name: 'test agent-orchestrator on node 22', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: TESTS_URL },
         { name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: CI_URL },
+        { name: 'e2e and types', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: CHECKS_URL },
       ),
     },
     { when: 'actions/jobs/9012/logs', out: tests },
+    { when: 'actions/jobs/3456/logs', out: checks },
     { when: 'actions/jobs/5678/logs', out: gathered },
   ]);
   const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0', WF_STEP: 'implement' });
@@ -357,11 +382,20 @@ test("REFUSED: a red ci, with the Actions URL, the failing jobs, each job's fail
   assert.ok(!r.err.includes('2026-10-24T09'), `GitHub's stamps are stripped:\n${r.err}`);
   assert.equal(r.err.split('✖ the export is pinned').length - 1, 1, 'a failure repeated in the summary is told once');
   assert.match(r.err, /Process completed with exit code 1\./, 'a job that names no failing test gives its tail');
+  for (const told of ['error TS2322', 'x eslint(no-unused-vars)', ',-[src/b.ts:1:7]'])
+    assert.ok(r.err.includes(told), `a type or lint error, with its place: ${told}\n${r.err}`);
+  const e2eTold = r.err.split(E2E).length - 1;
+  assert.equal(e2eTold, 1, 'one e2e page, from a log past 1 MiB');
+  assert.ok(r.err.includes(WORKED), 'a page told only behind its worker');
+  assert.ok(!r.err.includes('visiting page'), `a job with a failing line gives no tail:\n${r.err}`);
+  for (const noise of ['Post job cleanup', '[command]/usr/bin/git', 'Temporarily overriding HOME', 'Cleaning up orphan processes'])
+    assert.ok(!r.err.includes(noise), `GitHub's post-job lines are no reason: ${noise}\n${r.err}`);
   assert.ok(r.err.includes(RETRY), r.err);
   assert.deepEqual(
     asked(r.calls, 'api').map((call) => call.argv),
     [
       ['api', 'repos/{owner}/{repo}/actions/jobs/9012/logs'],
+      ['api', 'repos/{owner}/{repo}/actions/jobs/3456/logs'],
       ['api', 'repos/{owner}/{repo}/actions/jobs/5678/logs'],
     ],
     'each failing job is read by its id, the gathering `ci` last',

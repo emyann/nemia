@@ -6,6 +6,10 @@ import { Hono } from 'hono';
 import { COMMANDS } from 'agent-orchestrator';
 import { type ApiEnv, served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
+import type { AUTO_PROPOSE, Command } from 'agent-orchestrator';
+
+/** What `GET /api/auto/:name` and its writes answer: an agent's rules for auto, as the package's table types them. */
+export type AutoAnswer = typeof AUTO_PROPOSE extends Command<infer T> ? T : never;
 
 /** `nemia level`'s entry of the package's table, whose bare read the api serves by hand. */
 const LEVEL = COMMANDS.find((c) => c.name === 'level')!;

@@ -30,6 +30,7 @@ import { duration } from '../lib/canvas';
 import { clockCounts, inFlight, runClock, waitedMs } from '../lib/factory';
 import { useNow } from '../lib/useNow';
 import { container, ink } from '../lib/meaning';
+import { ENDED } from '../lib/words';
 
 /**
  * `step`, the old address of one step of the run, opens that step in the frame's bar: the page is loaded again in place of that address,
@@ -177,7 +178,7 @@ function Run({ run }: { run: RunDetail }) {
                 ] satisfies Array<[string, ReactNode]>)),
             ['created', when(run.createdAt)],
             ['started', startedRow(run)],
-            ['cancelled', run.cancelledAt && when(run.cancelledAt)],
+            [ENDED.cancelled.word, run.cancelledAt && when(run.cancelledAt)],
             ...(run.pruned ? ([['pruned', <Pruned key="pruned" pruned={run.pruned} />]] satisfies Array<[string, ReactNode]>) : []),
             ['workflow', code(run.workflowDir)],
           ]}

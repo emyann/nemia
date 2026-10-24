@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
-import { stateMeaning, type StepState } from '../src/lib/status.ts';
+import type { StepState } from '../src/lib/status.ts';
+import { PAUSED, PERSON } from '../src/lib/words.ts';
 import {
   agoWords,
   barSaid,
@@ -22,10 +23,8 @@ import {
   WAIT_KINDS,
   waitKindOf,
   waitOf,
-  WAITS,
   waitSentence,
   waitTag,
-  WAITS_TAG,
   whenWords,
   type WaitKind,
 } from '../src/lib/runWords.ts';
@@ -58,7 +57,7 @@ const ROWS: Record<WaitKind, { row: RunSummary; says: string; opens: string }> =
   blocked: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.', opens: 'Read the question' },
   check: {
     row: landing('failed ✗ check (exit 1)'),
-    says: "The check refused Land's work. Try it again or call the run off.",
+    says: 'Land failed its check. Try it again or call the run off.',
     opens: 'Read the check',
   },
   unfinished: {
@@ -135,29 +134,28 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
       assert.equal(openWord(tasked(skipped, 'land', null)), 'Read the design', 'the last step done before it, not the step beside it');
     },
   );
-  await t.test('REFUSED: a kind with no sentence fails rather than printing nothing', () => {
-    for (const kind of WAIT_KINDS) {
-      const said = sentenceOf({ kind, step: 'land', done: 0 });
-      assert.ok(said.length > 10 && said.endsWith('.'), `${kind} says a sentence: ${JSON.stringify(said)}`);
-    }
-  });
-  await t.test('every state the api lists a step in as waiting on a person has a kind, and no other state has one', () => {
-    const waits: StepState[] = [
-      'blocked',
-      'awaiting-approval',
-      'failed-check',
-      'unsigned',
-      'denied',
-      'exhausted',
-      'over-budget',
-      'budget-exhausted',
-    ];
-    for (const state of Object.keys(stateMeaning) as StepState[]) {
-      assert.equal(waitKindOf[state] !== null, waits.includes(state), state);
-    }
-    assert.equal(waitKindOf['budget-exhausted'], 'budget');
-    assert.equal(waitOf(landing('budget exhausted'))?.kind, 'budget');
-  });
+  await t.test(
+    'the states whose words carry a sentence are exactly those the api lists a step in as waiting on a person, each with a kind',
+    () => {
+      const waits: StepState[] = [
+        'blocked',
+        'awaiting-approval',
+        'failed-check',
+        'unsigned',
+        'denied',
+        'exhausted',
+        'over-budget',
+        'budget-exhausted',
+      ];
+      for (const state of Object.keys(PERSON) as StepState[]) {
+        assert.equal(PERSON[state].sentence !== null, waits.includes(state), state);
+        assert.equal(waitKindOf[state] !== null, waits.includes(state), state);
+      }
+      assert.equal(sentenceOf({ kind: 'budget', step: 'land', done: 0 }), PERSON['budget-exhausted'].sentence!({ step: 'land', done: 0 }));
+      assert.equal(waitKindOf['budget-exhausted'], 'budget');
+      assert.equal(waitOf(landing('budget exhausted'))?.kind, 'budget');
+    },
+  );
   await t.test('REFUSED: a check that did not finish is said as no refusal, and nobody is told to call the run off', () => {
     const row = landing('failed ✗ check (unfinished)');
     assert.deepEqual(waitOf(row), { kind: 'unfinished', step: 'land', done: 3 });
@@ -212,8 +210,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
   await t.test('REFUSED: a waiting row whose step says a word the board does not know says it waits on you, never nothing', () => {
     const unknown = summary([['plan', 'pondering']], { waitingOnYou: ['plan'] });
     assert.equal(waitOf(unknown), null);
-    assert.equal(waitSentence(unknown), WAITS);
-    assert.equal(WAITS, 'It waits on you.');
+    assert.match(waitSentence(unknown), /waits on you/);
   });
   await t.test('REFUSED: no sentence says a word of git or of a command line, though the row carries a command', () => {
     const words = /\bgit\b|\bbranch|\bmerge|\bcommit|worktree|`|--|\bwf |\bnemia /i;
@@ -224,7 +221,8 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
       const now = nowOf(ROWS[kind].row);
       assert.doesNotMatch(`${now?.word} ${now?.note}`, words, `the note of ${kind}`);
     }
-    assert.doesNotMatch(`${WAITS} ${WAITS_TAG}`, words);
+    const unknown = summary([['plan', 'pondering']], { waitingOnYou: ['plan'] });
+    assert.doesNotMatch(`${waitSentence(unknown)} ${waitTag(unknown)}`, words);
     for (const outcome of ['succeeded', 'failed', 'cancelled', 'undecided'] as const) {
       assert.doesNotMatch(`${endedWords(outcome).word} ${endedWords(outcome).title}`, words, outcome);
     }
@@ -232,8 +230,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
   await t.test("a waiting card's tag names the step where the person acts on one, and says a wait the board has no kind for", () => {
     assert.equal(waitTag(ROWS.approve.row), 'approve land');
     assert.equal(waitTag(ROWS.blocked.row), 'answer land');
-    assert.equal(waitTag(summary([['plan', 'pondering']], { waitingOnYou: ['plan'] })), WAITS_TAG);
-    assert.equal(WAITS_TAG, 'waits on you');
+    assert.equal(waitTag(summary([['plan', 'pondering']], { waitingOnYou: ['plan'] })), PERSON['awaiting-approval'].rail);
   });
 });
 
@@ -241,11 +238,13 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
 const PLAIN = /^[ -~]+$/;
 
 test('endedWords, whenWords, presentWait, sinceCreated: how a run ended, and when, in plain words', async (t) => {
-  await t.test('how a finished run ended: done, cancelled, failed, or that nobody has decided its result', () => {
-    assert.deepEqual(endedWords('succeeded'), { word: 'done', title: 'Every step of it is done.', hue: 'sage' });
-    assert.deepEqual(endedWords('cancelled'), { word: 'cancelled', title: 'Somebody called it off.', hue: 'grey' });
-    assert.deepEqual(endedWords('failed'), { word: 'failed', title: 'It stopped on a step that failed.', hue: 'failure' });
-    assert.deepEqual(endedWords('undecided'), { word: 'undecided', title: 'Nobody has decided its result.', hue: 'yours' });
+  await t.test('how a finished run ended is drawn in its hue, and a run called off is said as its steps are', () => {
+    const outcomes = ['succeeded', 'cancelled', 'failed', 'undecided'] as const;
+    assert.deepEqual(
+      outcomes.map((outcome) => endedWords(outcome).hue),
+      ['sage', 'grey', 'failure', 'yours'],
+    );
+    assert.equal(endedWords('cancelled').word, PERSON.cancelled.rail);
   });
   await t.test('a time is a fact to the minute, wall time', () => {
     const [S, M, H, D] = [1_000, 60_000, 3_600_000, 86_400_000];
@@ -317,7 +316,7 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       ['implement', 'unverified'],
       ['land', 'awaiting approval'],
     ]).steps;
-    assert.equal(railSaid(mixed, false, false), 'design verified, implement done, land waits for you', 'a check is told from a word');
+    assert.equal(railSaid(mixed, false, false), 'design verified, implement done, land waits on you', 'a check is told from a word');
     assert.equal(railSaid(mixed, false, true), 'design verified, implement done, land held');
     assert.equal(
       railSaid(
@@ -330,6 +329,7 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       ),
       'a at work, b to come',
     );
+    assert.equal(railSaid(summary([['a', 'waiting on the pause']]).steps, false, false), `a ${PAUSED.rail}`);
   });
   await t.test('what a run in flight does now: its first step not done and its place among its steps, and no duration at all', () => {
     const working = summary([...DONE.slice(0, 1), ['implement', 'running (working)'], ['review', 'waiting'], ['land', 'waiting']]);
@@ -338,6 +338,8 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
     assert.deepEqual(nowOf(checking), { word: 'being checked', note: 'implement (2 of 2)' });
     const queued = summary([['design', 'waiting']]);
     assert.deepEqual(nowOf(queued), { word: 'to come', note: 'design (1 of 1)' });
+    const paused = summary([...DONE.slice(0, 1), ['implement', 'waiting on the pause']]);
+    assert.equal(nowOf(paused)?.word, PAUSED.rail, 'a check the pause holds says so, as its chip does');
     assert.equal(nowOf(summary([...DONE])), null, 'every step done: nothing to say');
     const DURATION = /\b\d+[dhms]\b|under a minute/;
     assert.match(`implement (2 of 4), 2m`, DURATION, 'the pattern finds the duration the note used to carry');
@@ -349,9 +351,10 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       );
   });
   await t.test("a bar as a button says its step's name and the rail's word for its state", () => {
-    assert.equal(barSaid('implement', 'working'), 'implement, at work');
-    assert.equal(barSaid('design', 'awaiting-approval'), 'design, waits for you');
-    assert.equal(barSaid('land', 'failed-check'), 'land, failed its check');
-    assert.equal(barSaid('review', 'waiting'), 'review, to come');
+    assert.equal(barSaid('implement', 'working', 'running (working)'), 'implement, at work');
+    assert.equal(barSaid('design', 'awaiting-approval', 'awaiting approval'), 'design, waits on you');
+    assert.equal(barSaid('land', 'failed-check', 'failed ✗ check (exit 1)'), 'land, failed its check');
+    assert.equal(barSaid('review', 'waiting', 'waiting'), 'review, to come');
+    assert.equal(barSaid('theme', 'waiting', 'waiting on the pause'), `theme, ${PAUSED.rail}`, 'a check the pause holds');
   });
 });

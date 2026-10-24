@@ -348,7 +348,13 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
           { field: 'later', questions: [asking('When?')] },
         ],
       } as Step['closeout'];
-      const blocked = { by: 'retry' as const, above: 1.5, said: '$1.50', modes: ['nudge', 'fresh'] as RetryMode[], own: 'blocked' };
+      const blocked = {
+        by: 'retry' as const,
+        above: 1.5,
+        said: '$1.50',
+        modes: ['nudge', 'fresh'] as RetryMode[],
+        own: 'blocked' as const,
+      };
       const palette = step('palette', 'over budget $1.50 of $1', { raise: blocked, needs: 'Two questions.', closeout });
       const offers = offersOf(run([palette], ['palette']));
       assert.equal(offers.length, 1);
@@ -364,11 +370,23 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
         above: 4.25,
         said: '$4.25',
         modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
-        own: 'failed (check)',
+        own: 'failed (check)' as const,
       };
       const byRound = { by: 'round' as const, above: 2.1, said: '$2.10', modes: [] as RetryMode[], own: null };
-      const ended = { by: 'retry' as const, above: 3.02, said: '$3.02', modes: ['nudge', 'fresh'] as RetryMode[], own: 'budget exhausted' };
-      const blocked = { by: 'retry' as const, above: 1.5, said: '$1.50', modes: ['nudge', 'fresh'] as RetryMode[], own: 'blocked' };
+      const ended = {
+        by: 'retry' as const,
+        above: 3.02,
+        said: '$3.02',
+        modes: ['nudge', 'fresh'] as RetryMode[],
+        own: 'budget exhausted' as const,
+      };
+      const blocked = {
+        by: 'retry' as const,
+        above: 1.5,
+        said: '$1.50',
+        modes: ['nudge', 'fresh'] as RetryMode[],
+        own: 'blocked' as const,
+      };
       const unfinished = { ...byTry, above: 3.5, said: '$3.50' };
       const steps = [
         step('tokens', 'over budget $4.25 of $3', {
@@ -438,7 +456,7 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
         above: 4.25,
         said: '$4.25',
         modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
-        own: 'failed (check)',
+        own: 'failed (check)' as const,
       };
       assert.deepEqual(
         offersOf(run([step('implement', 'over budget $2.10 of $2', { raise: null })], ['implement'])),

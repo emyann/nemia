@@ -8,6 +8,9 @@ import { FACTORY_INSTRUCTION, factoryNameRefusal, type FactoryInstruction } from
 import { type ApiEnv, served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
 
+/** What `GET /api/factories/:factory/instruction` answers. */
+export type { FactoryInstruction };
+
 /**
  * A factory's instruction's read. A name that is no factory's is refused in the package's words (400) before anything is read, so none
  * reaches outside the store; the default factory, which keeps none, is 409 (`Conflict`); a name with no factory 404 (`Missing`); a file

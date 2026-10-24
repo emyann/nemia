@@ -4,6 +4,7 @@
  * decodes the api's answer with.
  */
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
 export const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
@@ -15,7 +16,7 @@ export const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
 export type PlaceKind = 'repository' | 'folder';
 
 /** Decodes a `PlaceKind`. */
-export const PlaceKindSchema = Schema.Literals(['repository', 'folder']) satisfies Schema.Schema<PlaceKind>;
+export const PlaceKindSchema = decodes<PlaceKind>()(Schema.Literals(['repository', 'folder']));
 
 /**
  * Mirrors `RunStatus` in agent-orchestrator: where `assess` puts the run. `failed` is a run in which a step broke; one a person alone
@@ -24,14 +25,9 @@ export const PlaceKindSchema = Schema.Literals(['repository', 'folder']) satisfi
 export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked';
 
 /** Decodes a `RunStatus`. */
-export const RunStatusSchema = Schema.Literals([
-  'running',
-  'succeeded',
-  'failed',
-  'cancelled',
-  'awaiting approval',
-  'blocked',
-]) satisfies Schema.Schema<RunStatus>;
+export const RunStatusSchema = decodes<RunStatus>()(
+  Schema.Literals(['running', 'succeeded', 'failed', 'cancelled', 'awaiting approval', 'blocked']),
+);
 
 /**
  * Mirrors `RunToDecide` in agent-orchestrator: what a person has to decide about a run's result, the fifth reason a run waits on
@@ -60,19 +56,21 @@ export type RunToDecide =
   | { kind: 'result'; branches: string[]; said: string; command: string };
 
 /** Decodes a `RunToDecide`, either kind. */
-export const RunToDecideSchema = Schema.Union([
-  Schema.Struct({
-    kind: Schema.Literal('approve'),
-    step: Schema.String,
-    says: Schema.NullOr(Schema.String),
-    filed: Schema.Boolean,
-    back: StringsSchema,
-    onto: Schema.NullOr(Schema.String),
-    said: Schema.String,
-    command: Schema.String,
-  }),
-  Schema.Struct({ kind: Schema.Literal('result'), branches: StringsSchema, said: Schema.String, command: Schema.String }),
-]) satisfies Schema.Schema<RunToDecide>;
+export const RunToDecideSchema = decodes<RunToDecide>()(
+  Schema.Union([
+    Schema.Struct({
+      kind: Schema.Literal('approve'),
+      step: Schema.String,
+      says: Schema.NullOr(Schema.String),
+      filed: Schema.Boolean,
+      back: StringsSchema,
+      onto: Schema.NullOr(Schema.String),
+      said: Schema.String,
+      command: Schema.String,
+    }),
+    Schema.Struct({ kind: Schema.Literal('result'), branches: StringsSchema, said: Schema.String, command: Schema.String }),
+  ]),
+);
 
 /**
  * Mirrors `Spent` in agent-orchestrator: what sessions cost, as the package adds it up — the dollars of the attempts that ended
@@ -82,12 +80,14 @@ export const RunToDecideSchema = Schema.Union([
 export type Spent = { usd: number; measured: number; unmeasured: number; said: string };
 
 /** Decodes a `Spent`. */
-export const SpentSchema = Schema.Struct({
-  usd: Schema.Number,
-  measured: Schema.Number,
-  unmeasured: Schema.Number,
-  said: Schema.String,
-}) satisfies Schema.Schema<Spent>;
+export const SpentSchema = decodes<Spent>()(
+  Schema.Struct({
+    usd: Schema.Number,
+    measured: Schema.Number,
+    unmeasured: Schema.Number,
+    said: Schema.String,
+  }),
+);
 
 /**
  * Mirrors `AtWork` in agent-orchestrator's timeline/took.ts: a run's time at work, two tasks at once counted once and a wait counted for
@@ -97,11 +97,13 @@ export const SpentSchema = Schema.Struct({
 export type AtWork = { ms: number; since: string | null; endedAt: string | null };
 
 /** Decodes an `AtWork`. */
-export const AtWorkSchema = Schema.Struct({
-  ms: Schema.Number,
-  since: Schema.NullOr(Schema.String),
-  endedAt: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<AtWork>;
+export const AtWorkSchema = decodes<AtWork>()(
+  Schema.Struct({
+    ms: Schema.Number,
+    since: Schema.NullOr(Schema.String),
+    endedAt: Schema.NullOr(Schema.String),
+  }),
+);
 
 /**
  * Mirrors `RunTokens` in agent-orchestrator's timeline/took.ts: the tokens a run's sessions used — `total`, the `input` and its parts
@@ -122,18 +124,20 @@ export type RunTokens = {
 };
 
 /** Decodes a `RunTokens`. */
-export const RunTokensSchema = Schema.Struct({
-  total: Schema.Number,
-  input: Schema.Number,
-  output: Schema.Number,
-  cacheRead: Schema.NullOr(Schema.Number),
-  cacheWrite: Schema.NullOr(Schema.Number),
-  uncached: Schema.NullOr(Schema.Number),
-  measured: Schema.Number,
-  unmeasured: Schema.Number,
-  said: Schema.String,
-  split: Schema.String,
-}) satisfies Schema.Schema<RunTokens>;
+export const RunTokensSchema = decodes<RunTokens>()(
+  Schema.Struct({
+    total: Schema.Number,
+    input: Schema.Number,
+    output: Schema.Number,
+    cacheRead: Schema.NullOr(Schema.Number),
+    cacheWrite: Schema.NullOr(Schema.Number),
+    uncached: Schema.NullOr(Schema.Number),
+    measured: Schema.Number,
+    unmeasured: Schema.Number,
+    said: Schema.String,
+    split: Schema.String,
+  }),
+);
 
 /**
  * Mirrors `RunWaiting` in agent-orchestrator: what a run started `--after` still waits on, in the package's words. `runs` are each
@@ -148,16 +152,18 @@ export type RunWaiting = {
 };
 
 /** Decodes a `RunWaiting`. */
-export const RunWaitingSchema = Schema.Struct({
-  runs: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({ run: Schema.String, missing: Schema.Boolean, cancelledAt: Schema.NullOr(Schema.String), gone: StringsSchema }),
+export const RunWaitingSchema = decodes<RunWaiting>()(
+  Schema.Struct({
+    runs: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({ run: Schema.String, missing: Schema.Boolean, cancelledAt: Schema.NullOr(Schema.String), gone: StringsSchema }),
+      ),
     ),
-  ),
-  word: Schema.String,
-  advice: Schema.String,
-  onYou: Schema.Boolean,
-}) satisfies Schema.Schema<RunWaiting>;
+    word: Schema.String,
+    advice: Schema.String,
+    onYou: Schema.Boolean,
+  }),
+);
 
 /**
  * Mirrors `RunHolding` in agent-orchestrator: a person's hold on a run (the CLI's `hold <run> --until <run>`), in the package's
@@ -176,23 +182,25 @@ export type RunHolding = {
 };
 
 /** Decodes a `RunHolding`. */
-export const RunHoldingSchema = Schema.Struct({
-  at: Schema.String,
-  runs: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({
-        run: Schema.String,
-        missing: Schema.Boolean,
-        cancelledAt: Schema.NullOr(Schema.String),
-        gone: StringsSchema,
-        shipped: Schema.Boolean,
-      }),
+export const RunHoldingSchema = decodes<RunHolding>()(
+  Schema.Struct({
+    at: Schema.String,
+    runs: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          run: Schema.String,
+          missing: Schema.Boolean,
+          cancelledAt: Schema.NullOr(Schema.String),
+          gone: StringsSchema,
+          shipped: Schema.Boolean,
+        }),
+      ),
     ),
-  ),
-  word: Schema.String,
-  advice: Schema.String,
-  onYou: Schema.Boolean,
-}) satisfies Schema.Schema<RunHolding>;
+    word: Schema.String,
+    advice: Schema.String,
+    onYou: Schema.Boolean,
+  }),
+);
 
 /**
  * Mirrors `StepNeeds` in agent-orchestrator. `needs`: the closeout's, for a step whose current try signed off blocked.

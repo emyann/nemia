@@ -62,7 +62,8 @@ export const FEED_BACK = 1000;
 
 /** What the report says, as `--json` writes it and `--compare` reads it. */
 export type StoreMeasure = {
-  machine: { cpu: string; cores: number; memoryBytes: number; node: string; platform: string };
+  /** `load` is the machine's five-minute load average as the measure ends: numbers taken under another's load are not a baseline. */
+  machine: { cpu: string; cores: number; memoryBytes: number; node: string; platform: string; load: number };
   commit: string;
   date: string;
   repeat: number;
@@ -428,7 +429,7 @@ export function rendered(report: StoreMeasure): string {
   return [
     `store measure of ${report.from} (${report.engine}), copied: ${report.copy.files} files, ${mb(report.copy.bytes)} MB in ${(report.copy.ms / 1000).toFixed(0)} s, without ${report.copy.leftOut.join(', ') || 'nothing'}`,
     `${counts.runs} runs (${counts.finishedRuns} finished, ${counts.openRuns} open), ${counts.tasks} tasks, ${mb(counts.journalBytes)} MB of journals, ${counts.feedLines} feed lines; unreadable: ${counts.unreadable.runs} runs, ${counts.unreadable.passLines} pass lines; invariant refusals: ${counts.invariantRefusals}`,
-    `${report.machine.cpu}, ${report.machine.cores} cores, ${mb(report.machine.memoryBytes)} MB, node ${report.machine.node}; commit ${report.commit.slice(0, 12)}; ${report.date}; median of ${report.repeat}`,
+    `${report.machine.cpu}, ${report.machine.cores} cores, ${mb(report.machine.memoryBytes)} MB, node ${report.machine.node}, load ${report.machine.load}; commit ${report.commit.slice(0, 12)}; ${report.date}; median of ${report.repeat}`,
     `runs read: finished ${report.asked.finishedRun ?? '—'}, open ${report.asked.openRun ?? '—'}; feed from byte ${report.asked.feedCursor}, ${report.asked.feedLinesRead} lines`,
     '',
     '| read | cold ms | cold heap MB | warm ms | warm heap MB |',
@@ -486,6 +487,7 @@ const machineNow = (): StoreMeasure['machine'] => {
     memoryBytes: os.totalmem(),
     node: process.version,
     platform: process.platform,
+    load: Number((os.loadavg()[1] ?? 0).toFixed(2)),
   };
 };
 

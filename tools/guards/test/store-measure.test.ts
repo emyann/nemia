@@ -180,7 +180,7 @@ test('on an empty store the report counts no run and holds every measure, the ma
   assert.equal(written.counts.tasks, 0);
   assert.equal(written.counts.invariantRefusals, 0);
   assert.deepEqual(Object.keys(written.measures).sort(), [...MEASURES].sort());
-  for (const key of ['cpu', 'cores', 'memoryBytes', 'node']) assert.ok(key in written.machine, key);
+  for (const key of ['cpu', 'cores', 'memoryBytes', 'node', 'load']) assert.ok(key in written.machine, key);
   assert.match(written.commit, /^[0-9a-f]{40}$/);
   assert.ok(Number.isFinite(Date.parse(written.date)));
   for (const key of ['tickPass', 'runList', 'stats'] as const) {

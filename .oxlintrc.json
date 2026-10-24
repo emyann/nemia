@@ -421,7 +421,7 @@
     {
       "files": ["apps/web/src/components/RunCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 88, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

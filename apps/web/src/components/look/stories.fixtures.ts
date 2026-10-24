@@ -3,15 +3,15 @@ import type { CSSProperties } from 'react';
 import type { RunSummary } from '@/lib/api';
 
 /** A step of a rail, by its name and its codes, and its check's verdict. */
-type RailStep = Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'verdict'>;
+type RailStep = Pick<RunSummary['steps'][number], 'name' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'>;
 
 /** The codes of each state the stories draw. */
-const VERIFIED = { phase: 'succeeded', reason: 'CheckPassed', verdict: { result: 'passed', exit: 0 } } as const;
-const UNVERIFIED = { phase: 'succeeded', reason: 'Succeeded', verdict: null } as const;
-const APPROVAL = { phase: 'waiting', reason: 'AwaitingApproval', verdict: null } as const;
-const WORKING = { phase: 'running', reason: 'Running', verdict: null } as const;
-const TO_COME = { phase: 'pending', reason: 'Waiting', verdict: null } as const;
-const REFUSED_CHECK = { phase: 'failed', reason: 'CheckFailed', verdict: { result: 'failed', exit: 1 } } as const;
+const VERIFIED = { phase: 'succeeded', reason: 'CheckPassed', on: null, via: null, verdict: { result: 'passed', exit: 0 } } as const;
+const UNVERIFIED = { phase: 'succeeded', reason: 'Succeeded', on: null, via: null, verdict: null } as const;
+const APPROVAL = { phase: 'waiting', reason: 'AwaitingApproval', on: null, via: null, verdict: null } as const;
+const WORKING = { phase: 'running', reason: 'Running', on: null, via: null, verdict: null } as const;
+const TO_COME = { phase: 'pending', reason: 'Pending', on: null, via: null, verdict: null } as const;
+const REFUSED_CHECK = { phase: 'failed', reason: 'CheckFailed', on: null, via: null, verdict: { result: 'failed', exit: 1 } } as const;
 
 /** A run at its gate: every step verified, the last waiting on a person's word. */
 export const GATE: RailStep[] = [

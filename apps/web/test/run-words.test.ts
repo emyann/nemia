@@ -360,10 +360,10 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       );
   });
   await t.test("a bar as a button says its step's name and the rail's word for its state", () => {
-    assert.equal(barSaid('implement', 'working', 'Running'), 'implement, at work');
-    assert.equal(barSaid('design', 'awaiting-approval', 'AwaitingApproval'), 'design, waits on you');
-    assert.equal(barSaid('land', 'failed-check', 'CheckFailed'), 'land, failed its check');
-    assert.equal(barSaid('review', 'waiting', 'Waiting'), 'review, to come');
-    assert.equal(barSaid('theme', 'waiting', 'WaitingForPause'), `theme, ${PAUSED.rail}`, 'a check the pause holds');
+    assert.equal(barSaid('implement', 'working', null), 'implement, at work');
+    assert.equal(barSaid('design', 'awaiting-approval', null), 'design, waits on you');
+    assert.equal(barSaid('land', 'failed-check', null), 'land, failed its check');
+    assert.equal(barSaid('review', 'waiting', 'run'), 'review, to come');
+    assert.equal(barSaid('theme', 'waiting', 'pause'), `theme, ${PAUSED.rail}`, 'a check the pause holds');
   });
 });

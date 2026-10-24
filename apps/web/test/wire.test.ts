@@ -219,6 +219,12 @@ export type StepPhase = Holds<Same<Board.StepPhase, runs.RunListing['steps'][num
 export type StepReason = Holds<Same<Board.StepReason, Step['reason']>>;
 export type TryPhase = Holds<Same<Board.StepPhase, tries.StepTry['phase']>>;
 export type TryReason = Holds<Same<Board.StepReason, tries.StepTry['reason']>>;
+export type TryOn = Holds<Same<Board.WaitOn | null, tries.StepTry['on']>>;
+export type TryVia = Holds<Same<Board.AnswerVia | null, tries.StepTry['via']>>;
+export type StepOn = Holds<Same<Board.WaitOn | null, Step['on']>>;
+export type StepVia = Holds<Same<Board.AnswerVia | null, Step['via']>>;
+export type RunOn = Holds<Same<Board.WaitOn | null, runs.RunListing['on']>>;
+export type RunVia = Holds<Same<Board.AnswerVia | null, runs.RunListing['via']>>;
 export type CheckVerdict = Holds<Same<Board.CheckVerdict, NonNullable<logs.StepCheck['verdict']>>>;
 export type StepVerdict = Holds<Same<Board.CheckVerdict, NonNullable<runs.RunListing['steps'][number]['verdict']>>>;
 export type CheckResult = Holds<Same<Board.CheckResult, NonNullable<logs.StepCheck['verdict']>['result']>>;
@@ -408,7 +414,9 @@ const aTry: BoardTry = {
   taskId: 't-1',
   note: null,
   phase: 'waiting',
-  reason: 'Blocked',
+  reason: 'AwaitingAnswer',
+  on: null,
+  via: 'closeout',
   message: 'succeeded · BLOCKED',
   status: 'succeeded · BLOCKED',
   attempts: { count: 1, latest: null },
@@ -433,6 +441,10 @@ test('a step reads its codes, and a reason or a verdict this board does not know
   assert.deepEqual(await readOf(aTry, StepTrySchema), aTry);
   await assert.rejects(readOf({ ...aTry, reason: 'NotAReason' }, StepTrySchema), UnreadAnswer);
   await assert.rejects(readOf({ ...aTry, phase: 'blocked' }, StepTrySchema), UnreadAnswer);
+  await assert.rejects(readOf({ ...aTry, via: 'harness' }, StepTrySchema), UnreadAnswer);
+  await assert.rejects(readOf({ ...aTry, on: 'slot' }, StepTrySchema), UnreadAnswer);
+  const { via: _, ...unqualified } = aTry;
+  await assert.rejects(readOf(unqualified, StepTrySchema), UnreadAnswer, 'a key the board reads is required, null rather than absent');
   await assert.rejects(readOf({ ...aTry, check: { ...aTry.check, verdict: { result: 'exit 1', exit: 1 } } }, StepTrySchema), UnreadAnswer);
   await assert.rejects(readOf({ ...aTry, check: { ...aTry.check, verdict: 'passed' } }, StepTrySchema), UnreadAnswer);
 });

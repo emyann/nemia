@@ -1065,7 +1065,8 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
     assert.deepEqual((await stage.runWith(b.e, list(b.e, readRun(run.id)))).steps[0], {
       name: 'implement',
       status: 'needs-human',
-      reason: 'NeedsHuman',
+      reason: 'AwaitingAnswer',
+      via: 'session',
       phase: 'waiting',
       branch: run.branch,
       note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',

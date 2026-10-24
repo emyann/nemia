@@ -20,28 +20,24 @@ import {
   type Drawn,
   type StepState,
 } from '../src/lib/status.ts';
-import { STEP_REASONS, type StepPhase, type StepReason } from '../src/lib/api/reasons.ts';
+import { STEP_REASONS, type StepCodes, type StepPhase, type StepReason } from '../src/lib/api/reasons.ts';
 import { container, meaningOf } from '../src/lib/meaning.ts';
 import { isLive, movingInto } from '../src/lib/canvas.ts';
 
-/** A step's codes, by the reason it stands in and the phase the orchestrator gives that reason (`PHASE_OF`). */
+/** A step's phase, by the reason it stands in, as the orchestrator gives that reason (`PHASE_OF`). */
 const PHASE: Record<StepReason, StepPhase> = {
   Pending: 'pending',
   Waiting: 'pending',
-  WaitingForSlot: 'pending',
-  WaitingForCheckout: 'pending',
-  WaitingForPause: 'pending',
   Unknown: 'pending',
   Running: 'running',
   Checking: 'running',
-  NeedsHuman: 'waiting',
   AwaitingApproval: 'waiting',
-  Blocked: 'waiting',
-  RoundsExhausted: 'waiting',
+  AwaitingAnswer: 'waiting',
+  AwaitingRound: 'waiting',
   OverBudget: 'waiting',
   BudgetExhausted: 'waiting',
   Unsigned: 'waiting',
-  CheckDenied: 'waiting',
+  Denied: 'waiting',
   Succeeded: 'succeeded',
   CheckPassed: 'succeeded',
   Failed: 'failed',
@@ -50,73 +46,63 @@ const PHASE: Record<StepReason, StepPhase> = {
   Stopped: 'stopped',
 };
 
-/** The state of a step standing in `reason`, at its phase, on a run called off or not and held or not. */
-const stateAt = (reason: StepReason, runCancelled = false, runHeld = false): StepState =>
-  stepState(PHASE[reason], reason, runCancelled, runHeld);
+/** The readings of a qualified reason, by what qualifies it: a wait by what it waits on, a question by where it is asked. */
+const QUALIFIED = {
+  'Waiting on run': { reason: 'Waiting', on: 'run', via: null },
+  'Waiting on limit': { reason: 'Waiting', on: 'limit', via: null },
+  'Waiting on checkout': { reason: 'Waiting', on: 'checkout', via: null },
+  'Waiting on pause': { reason: 'Waiting', on: 'pause', via: null },
+  'AwaitingAnswer via session': { reason: 'AwaitingAnswer', on: null, via: 'session' },
+  'AwaitingAnswer via closeout': { reason: 'AwaitingAnswer', on: null, via: 'closeout' },
+} as const satisfies Record<string, Omit<StepCodes, 'phase'>>;
+
+/** A step's codes by name: a reason no field qualifies, or a qualified reading of one that is (`QUALIFIED`). */
+type Named = Exclude<StepReason, 'Waiting' | 'AwaitingAnswer'> | keyof typeof QUALIFIED;
+
+/** The codes of the step `named` names, at the phase of its reason. */
+const codesOf = (named: Named): StepCodes => {
+  const qualified: Omit<StepCodes, 'phase'> =
+    named in QUALIFIED ? QUALIFIED[named as keyof typeof QUALIFIED] : { reason: named as StepReason, on: null, via: null };
+  return { phase: PHASE[qualified.reason], ...qualified };
+};
+
+/** The state of the step `named` names, at its phase, on a run called off or not and held or not. */
+const stateAt = (named: Named, runCancelled = false, runHeld = false): StepState => stepState(codesOf(named), runCancelled, runHeld);
+
+/** The codes of a step whose reason is `reason` at `phase`, qualified by nothing. */
+const plain = (phase: StepPhase, reason: StepReason): StepCodes => ({ phase, reason, on: null, via: null });
 
 test('stepState: each reason the api carries, read as the state a person acts on', async (t) => {
+  await t.test('a qualified reason reads by what qualifies it: an answer by where it is asked, a wait by what it waits on', () => {
+    const cases: Array<[keyof typeof QUALIFIED, StepState]> = [
+      ['AwaitingAnswer via session', 'needs-human'],
+      ['AwaitingAnswer via closeout', 'blocked'],
+      ['Waiting on limit', 'waiting-for-slot'],
+      ['Waiting on run', 'waiting'],
+      ['Waiting on checkout', 'waiting'],
+      ['Waiting on pause', 'waiting'],
+    ];
+    for (const [named, state] of cases) assert.equal(stateAt(named), state, named);
+  });
   await t.test('every reason has its state (`STATE_OF`), and every state it names is drawn', () => {
     assert.deepEqual(Object.keys(STATE_OF).sort(), [...STEP_REASONS].sort());
     for (const reason of STEP_REASONS) assert.ok(stateDrawn[STATE_OF[reason]], reason);
   });
-  await t.test(
-    "each reason reads as the state a person acts on: the waits, the gates, the run's verdicts, and the engine's own word for the step's task",
-    () => {
-      const cases: Array<[StepReason, StepState]> = [
-        ['Running', 'working'],
-        ['NeedsHuman', 'needs-human'],
-        ['Checking', 'checking'],
-        ['CheckPassed', 'verified'],
-        ['RoundsExhausted', 'exhausted'],
-        ['AwaitingApproval', 'awaiting-approval'],
-        ['OverBudget', 'over-budget'],
-        ['BudgetExhausted', 'budget-exhausted'],
-        ['Succeeded', 'unverified'],
-        ['CheckFailed', 'failed-check'],
-        ['Unsigned', 'unsigned'],
-        ['CheckDenied', 'denied'],
-        ['Blocked', 'blocked'],
-        ['Failed', 'failed'],
-        ['UnreadableCloseout', 'unreadable'],
-        ['Stopped', 'cancelled'],
-        ['Pending', 'waiting'],
-        ['Waiting', 'waiting'],
-        ['WaitingForCheckout', 'waiting'],
-        ['WaitingForPause', 'waiting'],
-        ['WaitingForSlot', 'waiting-for-slot'],
-        ['Unknown', 'unknown'],
-      ];
-      for (const [reason, state] of cases) assert.equal(stateAt(reason), state, reason);
-    },
-  );
   await t.test('a step whose record the api could not judge is unreadable, apart from a task the engine has no record of', () => {
-    assert.equal(stepState('failed', 'Unknown', false, false), 'unreadable');
-    assert.equal(stepState('pending', 'Unknown', false, false), 'unknown');
+    assert.equal(stepState(plain('failed', 'Unknown'), false, false), 'unreadable');
+    assert.equal(stepState(plain('pending', 'Unknown'), false, false), 'unknown');
   });
   await t.test("a session that ended is not work that was done: the engine's `Succeeded` alone is never verified", () => {
     assert.equal(stateAt('Succeeded'), 'unverified');
     assert.notEqual(stateAt('Succeeded'), stateAt('CheckPassed'));
   });
-  await t.test('a step that signed off blocked is not shown as done, though its session succeeded', () => {
-    assert.equal(stateAt('Blocked'), 'blocked');
-    assert.equal(stateAt('Blocked', true), 'blocked');
-  });
   await t.test('a step yet to start on a cancelled run reads cancelled, not waiting', () => {
-    for (const reason of ['Pending', 'Waiting', 'WaitingForSlot', 'WaitingForCheckout', 'WaitingForPause'] as const)
-      assert.equal(stateAt(reason, true), 'cancelled', reason);
+    for (const named of ['Pending', 'Waiting on run', 'Waiting on limit', 'Waiting on checkout', 'Waiting on pause'] as const)
+      assert.equal(stateAt(named, true), 'cancelled', named);
     assert.equal(stateAt('Running', true), 'working', 'a step still running when the run was called off is running until the stop lands');
   });
-  await t.test(
-    'a root of a run waiting on runs (`Waiting`) and one waiting on the checkout are waiting, and cancelled on a run called off',
-    () => {
-      for (const reason of ['Waiting', 'WaitingForCheckout'] as const) {
-        assert.equal(stateAt(reason), 'waiting', reason);
-        assert.equal(stateAt(reason, true), 'cancelled', reason);
-      }
-    },
-  );
-  await t.test('a step signed off whose check the pause keeps from being filed (`WaitingForPause`) is waiting, never checking', () => {
-    const state = stateAt('WaitingForPause');
+  await t.test('a step signed off whose check the pause keeps from being filed (`Waiting` on `pause`) is waiting, never checking', () => {
+    const state = stateAt('Waiting on pause');
     assert.equal(state, 'waiting');
     assert.notEqual(state, stateAt('Checking'), 'no check of it is filed');
     assert.equal(isLive(state), false, 'no session or check of it is at work');
@@ -125,21 +111,21 @@ test('stepState: each reason the api carries, read as the state a person acts on
 
 test('stepState, satisfiesAfter, isGate: what is work done, what waits on a person, and what a hold stops', async (t) => {
   await t.test('only verified and unverified are work done; a refused check, a failed session and an unsigned step are not', () => {
-    const notDone: StepReason[] = [
+    const notDone: Named[] = [
       'CheckFailed',
       'Failed',
       'Unsigned',
-      'CheckDenied',
-      'Blocked',
-      'RoundsExhausted',
+      'Denied',
+      'AwaitingAnswer via closeout',
+      'AwaitingRound',
       'Checking',
       'Running',
-      'Waiting',
+      'Waiting on run',
       'UnreadableCloseout',
       'Unknown',
     ];
     for (const reason of notDone) assert.equal(satisfiesAfter(stateAt(reason)), false, reason);
-    assert.equal(satisfiesAfter(stepState('failed', 'Unknown', false, false)), false, 'unreadable');
+    assert.equal(satisfiesAfter(stepState(plain('failed', 'Unknown'), false, false)), false, 'unreadable');
     for (const reason of ['CheckPassed', 'Succeeded'] as const) assert.equal(satisfiesAfter(stateAt(reason)), true, reason);
     assert.notEqual(
       stateAt('CheckFailed'),
@@ -150,16 +136,16 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
   await t.test(
     'a loop out of rounds waits on a person, in the yellow of the look like a step that signed off blocked, and says so on hover',
     () => {
-      assert.equal(stateAt('RoundsExhausted'), 'exhausted');
+      assert.equal(stateAt('AwaitingRound'), 'exhausted');
       assert.notEqual(
-        stateAt('RoundsExhausted'),
-        stateAt('Blocked'),
+        stateAt('AwaitingRound'),
+        stateAt('AwaitingAnswer via closeout'),
         'its own state, not `blocked`: nothing was left unfinished, the loop asked for more than its workflow allows',
       );
       assert.equal(stateClass.exhausted, stateClass.blocked);
       assert.match(stateClass.exhausted, /\bbg-yours\b/);
       assert.equal(
-        stateAt('RoundsExhausted', true),
+        stateAt('AwaitingRound', true),
         'exhausted',
         'final, so a run somebody called off does not make it read as a step that never started',
       );
@@ -182,22 +168,22 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
   await t.test(
     'a human gate is a step a person decides: signed off blocked, a loop out of rounds, or a step past its budget — and on a cancelled run, none',
     () => {
-      for (const reason of ['Blocked', 'RoundsExhausted', 'OverBudget', 'BudgetExhausted'] as const) {
+      for (const reason of ['AwaitingAnswer via closeout', 'AwaitingRound', 'OverBudget', 'BudgetExhausted'] as const) {
         assert.equal(isGate(stateAt(reason), false), true, reason);
         assert.equal(isGate(stateAt(reason, true), true), false, `${reason}, on a cancelled run: nobody waits for the answer`);
       }
-      const notGates: StepReason[] = [
+      const notGates: Named[] = [
         'CheckFailed',
         'Unsigned',
-        'CheckDenied',
+        'Denied',
         'CheckPassed',
         'Succeeded',
         'Checking',
         'Running',
-        'NeedsHuman',
+        'AwaitingAnswer via session',
         'Failed',
         'Stopped',
-        'Waiting',
+        'Waiting on run',
         'UnreadableCloseout',
         'Unknown',
       ];
@@ -207,7 +193,7 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
           false,
           `${reason}: work to try again, not a decision, or a state that waits on nobody`,
         );
-      assert.equal(isGate(stepState('failed', 'Unknown', false, false), false), false, 'unreadable');
+      assert.equal(isGate(stepState(plain('failed', 'Unknown'), false, false), false), false, 'unreadable');
     },
   );
   await t.test(
@@ -230,30 +216,30 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
     },
   );
   await t.test(
-    'a root of a run the cap on runs in flight holds (`WaitingForSlot`) is a wait nobody is asked about — never working — and cancelled on a run called off',
+    'a root of a run the cap on runs in flight holds (`Waiting` on `limit`) is a wait nobody is asked about — never working — and cancelled on a run called off',
     () => {
-      const state = stateAt('WaitingForSlot');
+      const state = stateAt('Waiting on limit');
       assert.equal(state, 'waiting-for-slot');
       assert.equal(isLive(state), false, 'no session of it is at work');
       assert.equal(movingInto(state), false, 'nothing moves into it');
       assert.equal(isGate(state, false), false, 'nobody is asked');
       assert.equal(satisfiesAfter(state), false, 'not work done');
-      assert.equal(stateAt('WaitingForSlot', true), 'cancelled', 'on a run called off');
-      assert.equal(stateAt('WaitingForSlot', false, true), 'held', 'on a run a person holds');
+      assert.equal(stateAt('Waiting on limit', true), 'cancelled', 'on a run called off');
+      assert.equal(stateAt('Waiting on limit', false, true), 'held', 'on a run a person holds');
       assert.notEqual(stateClass['waiting-for-slot'], stateClass.working, 'drawn as the wait it is, not as a session at work');
     },
   );
   await t.test(
     'on a run a person holds (`wf hold`), a step not filed and a step at a human gate are `held`, in their own words — and nothing else moves',
     () => {
-      const held: StepReason[] = [
-        'Waiting',
+      const held: Named[] = [
+        'Waiting on run',
         'Pending',
-        'WaitingForCheckout',
-        'WaitingForPause',
-        'Blocked',
+        'Waiting on checkout',
+        'Waiting on pause',
+        'AwaitingAnswer via closeout',
         'AwaitingApproval',
-        'RoundsExhausted',
+        'AwaitingRound',
         'OverBudget',
         'BudgetExhausted',
       ];
@@ -265,15 +251,15 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
           `${reason}: nobody is asked while the hold stands, and every verb that would answer the gate is refused`,
         );
       }
-      const unmoved: Array<[StepReason, StepState]> = [
+      const unmoved: Array<[Named, StepState]> = [
         ['Running', 'working'],
-        ['NeedsHuman', 'needs-human'],
+        ['AwaitingAnswer via session', 'needs-human'],
         ['Checking', 'checking'],
         ['CheckPassed', 'verified'],
         ['Succeeded', 'unverified'],
         ['CheckFailed', 'failed-check'],
         ['Unsigned', 'unsigned'],
-        ['CheckDenied', 'denied'],
+        ['Denied', 'denied'],
         ['Failed', 'failed'],
         ['Stopped', 'cancelled'],
         ['UnreadableCloseout', 'unreadable'],
@@ -285,8 +271,8 @@ test('stepState, satisfiesAfter, isGate: what is work done, what waits on a pers
           state,
           `${reason}: the hold stops what is filed next and the answers to a gate, not what is in flight, a session asking through its harness, or a verdict`,
         );
-      assert.equal(stepState('failed', 'Unknown', false, true), 'unreadable', 'an unreadable step, held or not');
-      assert.equal(stateAt('Waiting', true, true), 'cancelled', 'a run called off is called off, held or not');
+      assert.equal(stepState(plain('failed', 'Unknown'), false, true), 'unreadable', 'an unreadable step, held or not');
+      assert.equal(stateAt('Waiting on run', true, true), 'cancelled', 'a run called off is called off, held or not');
       assert.equal(stateAt('AwaitingApproval', true, true), 'awaiting-approval');
       assert.equal(satisfiesAfter('held'), false);
       assert.notEqual(stateClass.held, stateClass.waiting, 'a person stops it, not the order of the steps');

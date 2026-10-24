@@ -70,7 +70,7 @@ import {
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
 import { driftNow, type RunGraph, runGraph } from 'agent-orchestrator';
-import type { CheckVerdict, RunPhase, RunReason, StepPhase, StepReason } from 'agent-orchestrator';
+import type { AnswerVia, CheckVerdict, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from 'agent-orchestrator';
 
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
 import { engineRead, type Engine, judgedOn, workFolderOf } from '../store.ts';
@@ -278,6 +278,10 @@ export type RunDetail = {
   phase: RunPhase;
   /** As on `RunSummary`. */
   reason: RunReason;
+  /** As on `RunSummary`: what a `Waiting` run waits on, else null. */
+  on: WaitOn | null;
+  /** As on `RunSummary`: where an `AwaitingAnswer` run's answer is asked, else null. */
+  via: AnswerVia | null;
   /** As on `RunSummary`. */
   moving: boolean;
   /** As on `RunSummary`. */
@@ -348,6 +352,10 @@ export type RunDetail = {
     /** As on `RunSummary`: where the step stands, as codes, and the sentence a person reads, never compared. */
     phase: StepPhase;
     reason: StepReason;
+    /** As on `RunSummary`: what a `Waiting` step waits on, else null. */
+    on: WaitOn | null;
+    /** As on `RunSummary`: where an `AwaitingAnswer` step's answer is asked, else null. */
+    via: AnswerVia | null;
     message: string;
     /** As on `RunSummary`: its check's verdict as codes, null for a step not judged by its check. */
     verdict: CheckVerdict | null;

@@ -140,6 +140,8 @@ const firstTry = (step: {
   taskId: string | null;
   phase: string;
   reason: string;
+  on: string | null;
+  via: string | null;
   message: string;
   status: string;
   attempts: object;
@@ -156,6 +158,8 @@ const firstTry = (step: {
     taskId: step.taskId,
     phase: step.phase,
     reason: step.reason,
+    on: step.on,
+    via: step.via,
     message: step.message,
     status: step.status,
     attempts: step.attempts,
@@ -344,6 +348,8 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         status: 'cancelled',
         phase: 'cancelled',
         reason: 'Cancelled',
+        on: null,
+        via: null,
         moving: false,
         /** Nothing of it was measured: no cost, which is not $0. */
         cost: null,
@@ -359,6 +365,8 @@ test("a store's runs read on the list and on a run's page: each summarized with 
             /** `t-1` is on the record and not in this engine's store: a fresh `WF_ROOT` has no tasks at all. */
             phase: 'pending',
             reason: 'Unknown',
+            on: null,
+            via: null,
             message: 'unknown',
             verdict: null,
             status: 'unknown',
@@ -378,7 +386,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
             taskId: null,
             branch: null,
             phase: 'pending',
-            reason: 'Waiting',
+            reason: 'Pending',
+            on: null,
+            via: null,
             message: 'waiting',
             verdict: null,
             status: 'waiting',
@@ -442,7 +452,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         /** implement signed off blocked, so review is not filed: the run waits on an answer, and nothing in it failed. */
         status: 'blocked',
         phase: 'waiting',
-        reason: 'Blocked',
+        reason: 'AwaitingAnswer',
+        on: null,
+        via: 'closeout',
         moving: false,
         cost: null,
         /** implement spawned and ended at the same instant, and nothing else ran: at work for no time, and over. */
@@ -469,7 +481,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     const implementTry = {
       taskId: 't-2',
       phase: 'waiting',
-      reason: 'Blocked',
+      reason: 'AwaitingAnswer',
+      on: null,
+      via: 'closeout',
       message: 'succeeded · BLOCKED',
       status: 'succeeded · BLOCKED',
       check: null,
@@ -546,7 +560,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     const reviewTry = {
       taskId: null,
       phase: 'pending',
-      reason: 'Waiting',
+      reason: 'Pending',
+      on: null,
+      via: null,
       message: 'waiting',
       status: 'waiting',
       check: null,
@@ -652,10 +668,12 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         const words = await runWith(e, list(e, runStore.runs.read(id)));
         const run = await listed(id);
         assert.deepEqual(
-          run.steps.map(({ name, status, branch, phase, reason, verdict }) => ({
+          run.steps.map(({ name, status, branch, phase, reason, on, via, verdict }) => ({
             name,
             status,
             reason,
+            ...(on ? { on } : {}),
+            ...(via ? { via } : {}),
             phase,
             ...(verdict ? { verdict } : {}),
             branch,
@@ -800,7 +818,9 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
     const originalTry = {
       taskId: 't-6',
       phase: 'waiting',
-      reason: 'Blocked',
+      reason: 'AwaitingAnswer',
+      on: null,
+      via: 'closeout',
       message: 'succeeded · BLOCKED',
       status: 'succeeded · BLOCKED',
       check: null,
@@ -1128,6 +1148,8 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
         'branch',
         'phase',
         'reason',
+        'on',
+        'via',
         'message',
         'verdict',
         'status',
@@ -1403,16 +1425,21 @@ function askFor(id: string, name: string, ask: object) {
 }
 
 /** A step row as the list and the detail both carry it. */
-type Row = Pick<RunSummary['steps'][number], 'name' | 'status' | 'branch' | 'note' | 'roundDue' | 'phase' | 'reason' | 'verdict'>;
+type Row = Pick<
+  RunSummary['steps'][number],
+  'name' | 'status' | 'branch' | 'note' | 'roundDue' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'
+>;
 
 /**
  * A step row as `list` has it: its codes, its check's verdict only where it was judged by one, a note only where it prints one, and
  * `roundDue` only where a round is due.
  */
-const asListed = ({ name, status, branch, note, roundDue, phase, reason, verdict }: Row) => ({
+const asListed = ({ name, status, branch, note, roundDue, phase, reason, on, via, verdict }: Row) => ({
   name,
   status,
   reason,
+  ...(on ? { on } : {}),
+  ...(via ? { via } : {}),
   phase,
   ...(verdict ? { verdict } : {}),
   branch,
@@ -1494,10 +1521,12 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
         ['detail', detail],
       ] as const) {
         assert.deepEqual(
-          run.steps.map(({ name, status, branch, phase, reason, verdict }) => ({
+          run.steps.map(({ name, status, branch, phase, reason, on, via, verdict }) => ({
             name,
             status,
             reason,
+            ...(on ? { on } : {}),
+            ...(via ? { via } : {}),
             phase,
             ...(verdict ? { verdict } : {}),
             branch,
@@ -2099,6 +2128,8 @@ test("a step's tries and its closeout: every try of a looped step off one observ
             note: null,
             phase: 'succeeded',
             reason: 'Succeeded',
+            on: null,
+            via: null,
             message: 'succeeded',
             status: 'succeeded',
             attempts: once,
@@ -2122,6 +2153,8 @@ test("a step's tries and its closeout: every try of a looped step off one observ
             note: 'try 2, by retries: 1',
             phase: 'succeeded',
             reason: 'Succeeded',
+            on: null,
+            via: null,
             message: 'succeeded',
             status: 'succeeded',
             attempts: once,
@@ -2139,6 +2172,8 @@ test("a step's tries and its closeout: every try of a looped step off one observ
             note: 'round 2 of 3',
             phase: 'succeeded',
             reason: 'CheckPassed',
+            on: null,
+            via: null,
             message: 'verified ✓',
             status: 'verified ✓',
             attempts: once,
@@ -2166,6 +2201,8 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           note: null,
           phase: 'succeeded',
           reason: 'Succeeded',
+          on: null,
+          via: null,
           message: 'succeeded',
           status: 'succeeded',
           attempts: once,
@@ -2187,6 +2224,8 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           note: 'round 2 of 3',
           phase: 'succeeded',
           reason: 'Succeeded',
+          on: null,
+          via: null,
           message: review.status,
           status: review.status,
           attempts: once,

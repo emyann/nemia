@@ -96,7 +96,7 @@ const selected = (values: readonly string[]): string[] => {
 };
 
 test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and every malformed selector or reserved label refused by name', async (t) => {
-  await t.test('a selector names one of the ten keys of a feed line, and the message is none of them', () => {
+  await t.test('a selector names one of the twelve keys of a feed line, and the message is none of them', () => {
     assert.deepEqual([...SELECTABLE_KEYS], [...LABEL_KEYS, ...RESERVED_KEYS]);
     const refused = selectorsRefusal(['message=hi']);
     assert.match(refused ?? '', /^"message" is no key of a feed line/);
@@ -122,7 +122,12 @@ test('selectorsRefusal and labelKeysRefusal: the keys a selector may name, and e
   await t.test('a label may not take a reserved name of a line, and the refusal names it', () => {
     assert.equal(labelKeysRefusal(LABEL_KEYS), undefined, 'the labels the feed ships with take none');
     assert.equal(LABEL_KEYS.length, 5, 'and the list it is asked of is every label there is, held above');
-    names(labelKeysRefusal(['run', 'reason', 'agent']), 'reason is a reserved key', 'kind, reason, type, waits, source', 'name the label');
+    names(
+      labelKeysRefusal(['run', 'reason', 'agent']),
+      'reason is a reserved key',
+      'kind, reason, on, via, type, waits, source',
+      'name the label',
+    );
     for (const key of RESERVED_KEYS) assert.match(labelKeysRefusal(['run', key]) ?? '', new RegExp(`^${key} is a reserved key`));
   });
   await t.test('every malformed selector is refused by name, and says what the grammar takes', () => {

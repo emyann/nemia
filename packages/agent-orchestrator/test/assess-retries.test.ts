@@ -981,7 +981,8 @@ test("a person's ask on a step whose session its harness blocked, or that works 
         {
           name: 'implement',
           status: 'needs-human',
-          reason: 'NeedsHuman',
+          reason: 'AwaitingAnswer',
+          via: 'session',
           phase: 'waiting',
           branch: null,
           note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
@@ -1098,7 +1099,7 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
   await t.test('a harness that says nothing, or a caller that asks nothing, reads as before', () => {
     assert.deepEqual(
       lsWith('needs-human', () => undefined),
-      { name: 'implement', status: 'needs-human', reason: 'NeedsHuman', phase: 'waiting', branch: null },
+      { name: 'implement', status: 'needs-human', reason: 'AwaitingAnswer', via: 'session', phase: 'waiting', branch: null },
     );
     assert.equal(
       listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'needs-human' }), closeoutOf: signedOff({}) }).steps[0].status,
@@ -1126,7 +1127,8 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
     assert.deepEqual(l.steps[0], {
       name: 'implement',
       status: 'needs-human',
-      reason: 'NeedsHuman',
+      reason: 'AwaitingAnswer',
+      via: 'session',
       phase: 'waiting',
       branch: null,
       note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',

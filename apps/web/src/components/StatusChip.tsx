@@ -1,11 +1,11 @@
 import { CircleDashed } from 'lucide-react';
-import type { StepPhase, StepReason } from '../lib/api';
+import type { StepCodes } from '../lib/api';
 import { stateClass, stepState } from '../lib/status';
 import { stateWordsOf } from '../lib/words';
 
 /**
- * A step's state, from its codes (`phase`, `reason`), in a person's word (`PERSON`'s rail word, never the CLI's sentence), coloured by
- * what it means, and what that is on hover.
+ * A step's state, from its codes (`phase`, `reason`, `on`, `via`), in a person's word (`PERSON`'s rail word, never the CLI's sentence),
+ * coloured by what it means, and what that is on hover.
  *
  * `unverified` carries a dashed circle before its words: its colour is neutral, like a step still to do,
  * and the mark says it is not one — it signed off, and nothing but its own word says it worked.
@@ -19,20 +19,18 @@ import { stateWordsOf } from '../lib/words';
  * No wider than where it is put: the word is short, and is cut short where even it has no room.
  */
 export function StatusChip({
-  phase,
-  reason,
+  codes,
   runCancelled,
   runHeld,
   note = null,
 }: {
-  phase: StepPhase;
-  reason: StepReason;
+  codes: StepCodes;
   runCancelled: boolean;
   runHeld: boolean;
   note?: string | null;
 }) {
-  const state = stepState(phase, reason, runCancelled, runHeld);
-  const { rail, meaning } = stateWordsOf(state, reason);
+  const state = stepState(codes, runCancelled, runHeld);
+  const { rail, meaning } = stateWordsOf(state, codes.on);
   return (
     <span
       title={note ? `${meaning}\n${note}` : meaning}

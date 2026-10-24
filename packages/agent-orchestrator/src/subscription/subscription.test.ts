@@ -6,7 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { feedWords, upgraded, type FeedLine, type RunLine } from '../feed/index.ts';
+import { codedStep, codesOf, feedWords, upgraded, type FeedLine, type QualifiedStep, type RunLine } from '../feed/index.ts';
 import type { Listing } from '../list/list.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Instant } from '../daemon/daemon.ts';
@@ -33,7 +33,15 @@ const AT = '2026-10-05T12:00:00.000Z';
 /** A listing of one run whose one step `review` stands at `status`, waiting on a person where `onYou`. */
 const listed = (status: string, { onYou = false, waits }: { onYou?: boolean; waits?: string } = {}) =>
   ({
-    steps: [{ name: 'review', status, branch: null, ...(waits ? { waits } : {}) }],
+    steps: [
+      {
+        name: 'review',
+        status,
+        ...codedStep(codesOf({ word: status }, 'Step') as QualifiedStep),
+        branch: null,
+        ...(waits ? { waits } : {}),
+      },
+    ],
     waitingOnYou: onYou ? ['review'] : [],
     waiting: [],
   }) as unknown as Listing;
@@ -92,26 +100,30 @@ test("which lines wake a subscriber: the default selector over every line the fe
     assert.equal(sorted(shot, parseSelectors(['reason=ToolDenied'])), 'wake', 'a subscription that names it is');
   });
   await t.test(
-    "a run blocked, its note waiting on you: review, wakes on the run's own line, and a loop out of rounds on the step's",
+    "a run blocked on a loop out of rounds wakes on the run's own line, by its step's reason, and on the step's; a note alone wakes nobody",
     () => {
       const [run] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'blocked' });
-      assert.deepEqual(run, upgraded({ at: AT, run: 'r-1', word: 'blocked', note: 'waiting on you: review' }));
-      assert.deepEqual({ reason: run.reason, type: run.type, waits: run.waits }, { reason: 'Blocked', type: 'Warning', waits: 'person' });
+      assert.deepEqual([run.word, run.note], ['blocked', 'waiting on you: review']);
+      assert.deepEqual(
+        { reason: run.reason, type: run.type, waits: run.waits },
+        { reason: 'AwaitingRound', type: 'Warning', waits: 'person' },
+      );
       assert.equal(sorted(run), 'wake');
       assert.equal(
         sorted(upgraded({ at: AT, run: 'r-1', word: 'running', note: 'waiting on you: review' })),
-        'wake',
-        'by its note alone, which the tick reads into the line’s waits',
+        'routine',
+        'a run still at work wakes nobody by its note: its waiting step’s own line does',
       );
       const [, step] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'running' });
       assert.equal(step.word, 'rounds exhausted');
       assert.equal(sorted(step), 'wake');
     },
   );
-  await t.test("a blocked sign-off wakes by its note's needs: alone, whatever its word", () => {
+  await t.test("a blocked sign-off wakes by its reason, an answer asked by the closeout, and never by its note's needs:", () => {
     const [, step] = linesOf(listed('succeeded · BLOCKED'), { status: 'running' }, BLOCKED);
-    assert.equal(step.note, 'needs: a decision on the schema');
-    assert.equal(sorted(upgraded({ at: AT, run: 'r-1', step: 'review', word: 'succeeded', note: step.note })), 'wake');
+    assert.deepEqual([step.reason, step.via, step.note], ['AwaitingAnswer', 'closeout', 'needs: a decision on the schema']);
+    assert.equal(sorted(step), 'wake');
+    assert.equal(sorted(upgraded({ at: AT, run: 'r-1', step: 'review', word: 'succeeded', note: step.note })), 'routine');
   });
   await t.test('routine words do not wake: a step at work, verified, waiting, a run running or succeeded, a hold', () => {
     for (const status of ['running', 'verified ✓', 'waiting', 'pending', 'succeeded · done'])

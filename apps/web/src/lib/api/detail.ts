@@ -11,17 +11,7 @@ import type { RetryMode, Said } from './asks.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { WorkflowPageAddressSchema, type WorkflowPageAddress } from './address.ts';
 import { BridgeSchema, type Bridge } from './bridge.ts';
-import {
-  CheckVerdictSchema,
-  RunPhaseSchema,
-  RunReasonSchema,
-  StepCodesFields,
-  type CheckVerdict,
-  type RunPhase,
-  type RunReason,
-  type StepPhase,
-  type StepReason,
-} from './reasons.ts';
+import { CheckVerdictSchema, RunCodesFields, StepCodesFields, type CheckVerdict, type RunCodes, type StepCodes } from './reasons.ts';
 import { StepLayersSchema, TaskPartSchema, type StepLayers, type TaskPart } from './layers.ts';
 import {
   AtWorkSchema,
@@ -309,7 +299,7 @@ const StepFiledSchema = decodes<StepFiled>()(
  * Mirrors `RunPage` in apps/api/src/runs/runs.ts: a run in full (`RunDetail`, apps/api/src/detail/detail.ts), and its workflow page's
  * address.
  */
-export type RunDetail = {
+export type RunDetail = RunCodes & {
   id: string;
   brief: string;
   /** The line that prints what there is to decide on the run. */
@@ -356,10 +346,6 @@ export type RunDetail = {
   /** As on `RunSummary`. */
   holding: RunHolding | null;
   status: RunStatus;
-  /** As on `RunSummary`. */
-  phase: RunPhase;
-  /** As on `RunSummary`. */
-  reason: RunReason;
   moving: boolean;
   /** As on `RunSummary`. */
   cost: Spent | null;
@@ -387,78 +373,80 @@ export type RunDetail = {
   refresh: string;
   /** The steps as a graph, from the workflow the run froze: what the canvases draw, so none derives it from `after`. */
   graph: RunGraph;
-  steps: Array<{
-    name: string;
-    spec: StepSpec | null;
-    /** What the engine filed its current try with; null for a step not filed. */
-    filed: StepFiled | null;
-    body: string | null;
-    told: string | null;
-    /** What it was told, by layer, from what the run froze; null for a run that froze no workflow, whose `told` is all there is. */
-    layers: StepLayers | null;
-    /** The task split into its own text and each run it was handed, how it was handed; null for a step not filed. */
-    taskParts: TaskPart[] | null;
-    taskId: string | null;
-    workspace: string | null;
-    /**
-     * For a step of a folder run, every file its folder holds now — the whole of what it made, not only what its closeout named.
-     * Empty for a step of a repository run, whose work is a branch, and for one not filed yet.
-     */
-    files: StepArtifact[];
-    /** Why that list is empty when the folder is there and could not be read; null where the list is what the folder holds. */
-    filesError: string | null;
-    branch: string | null;
-    /** As on `RunSummary`: where the step stands, as codes, and the sentence a person reads, never compared. */
-    phase: StepPhase;
-    reason: StepReason;
-    message: string;
-    /** As on `RunSummary`: its check's verdict as codes, null for a step its check did not judge. */
-    verdict: CheckVerdict | null;
-    /** @deprecated As on `RunSummary`: `message` under its old name, which the board reads nowhere. */
-    status: string;
-    /** As on `RunSummary`. */
-    note: string | null;
-    /** As on `RunSummary`. */
-    roundDue: boolean;
-    /** The lines a person types for what the step's controls do: its approval, a try in its session, and words said to it. */
-    commands: { approve: string; retry: string; say: string };
-    needs: string | null;
-    blockedByHarness: boolean;
-    /** As on `RunSummary`: what the harness says the session waits for, and what a person does about it. */
-    waitingFor: StepNeeds['waitingFor'];
-    approve: string | null;
-    /** As on `RunSummary`: what the harness denied its current try, the calls and the line that names them. */
-    denied: StepNeeds['denied'];
-    /** As on `RunSummary`: why the runtime could not read its session alone, in its words; null where it read it. */
-    sessionUnread: StepNeeds['sessionUnread'];
-    /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
-    gate: StepGate | null;
-    /** For a looping step a person ended out of rounds (the CLI's `accept`), their acceptance of the try it is on; else null. */
-    accepted: StepAcceptance | null;
-    /** For a step the harness blocked, what its session said last; null for any other, and for one that said nothing the api could read. */
-    lastLine: string | null;
-    /** What a person said to its current try's session while it ran (the CLI's `say`, or the session page's composer), in order. */
-    said: Said[];
-    /** The try a person asked for that the next tick files; null when none is. */
-    asked: StepAsked | null;
-    closeout: StepCloseout | null;
-    unreadable: StepUnreadable | null;
-    /** Null for a step with no `check:`. */
-    check: StepCheck | null;
-    attempts: StepAttempts;
-    /** What its current try consumed, in the CLI `decide`'s words; null for a step not filed. */
-    used: StepUsed | null;
-    /** What all its tries have cost together, as the CLI's `ls` puts it beside its word; null until a cost was measured. */
-    spent: Spent | null;
-    /** Its cap in force, and what its tries have cost of it; null for a step with no `budget:`. */
-    budget: StepBudget | null;
-    /** The raise of its cap the package takes, and how; null where none does, and on a run called off. */
-    raise: StepRaise | null;
-    /** Every try, earliest first, the current one last: `attempts` counts the current try's task alone. */
-    tries: StepTry[];
-    /** Where the step's time went, try by try and check by check; empty for a step not filed. */
-    timeline: StepTimelineTry[];
-  }>;
+  steps: Array<
+    StepCodes & {
+      name: string;
+      spec: StepSpec | null;
+      /** What the engine filed its current try with; null for a step not filed. */
+      filed: StepFiled | null;
+      body: string | null;
+      told: string | null;
+      /** What it was told, by layer, from what the run froze; null for a run that froze no workflow, whose `told` is all there is. */
+      layers: StepLayers | null;
+      /** The task split into its own text and each run it was handed, how it was handed; null for a step not filed. */
+      taskParts: TaskPart[] | null;
+      taskId: string | null;
+      workspace: string | null;
+      /**
+       * For a step of a folder run, every file its folder holds now — the whole of what it made, not only what its closeout named.
+       * Empty for a step of a repository run, whose work is a branch, and for one not filed yet.
+       */
+      files: StepArtifact[];
+      /** Why that list is empty when the folder is there and could not be read; null where the list is what the folder holds. */
+      filesError: string | null;
+      branch: string | null;
+      /** As on `RunSummary`: the sentence a person reads beside its codes (`StepCodes`), never compared. */
+      message: string;
+      /** As on `RunSummary`: its check's verdict as codes, null for a step its check did not judge. */
+      verdict: CheckVerdict | null;
+      /** @deprecated As on `RunSummary`: `message` under its old name, which the board reads nowhere. */
+      status: string;
+      /** As on `RunSummary`. */
+      note: string | null;
+      /** As on `RunSummary`. */
+      roundDue: boolean;
+      /** The lines a person types for what the step's controls do: its approval, a try in its session, and words said to it. */
+      commands: { approve: string; retry: string; say: string };
+      needs: string | null;
+      blockedByHarness: boolean;
+      /** As on `RunSummary`: what the harness says the session waits for, and what a person does about it. */
+      waitingFor: StepNeeds['waitingFor'];
+      approve: string | null;
+      /** As on `RunSummary`: what the harness denied its current try, the calls and the line that names them. */
+      denied: StepNeeds['denied'];
+      /** As on `RunSummary`: why the runtime could not read its session alone, in its words; null where it read it. */
+      sessionUnread: StepNeeds['sessionUnread'];
+      /** Its gate, awaiting approval or approved (`StepGate`); null for a step with none. */
+      gate: StepGate | null;
+      /** For a looping step a person ended out of rounds (the CLI's `accept`), their acceptance of the try it is on; else null. */
+      accepted: StepAcceptance | null;
+      /**
+       * For a step the harness blocked, what its session said last; null for any other, and for one that said nothing the api could read.
+       */
+      lastLine: string | null;
+      /** What a person said to its current try's session while it ran (the CLI's `say`, or the session page's composer), in order. */
+      said: Said[];
+      /** The try a person asked for that the next tick files; null when none is. */
+      asked: StepAsked | null;
+      closeout: StepCloseout | null;
+      unreadable: StepUnreadable | null;
+      /** Null for a step with no `check:`. */
+      check: StepCheck | null;
+      attempts: StepAttempts;
+      /** What its current try consumed, in the CLI `decide`'s words; null for a step not filed. */
+      used: StepUsed | null;
+      /** What all its tries have cost together, as the CLI's `ls` puts it beside its word; null until a cost was measured. */
+      spent: Spent | null;
+      /** Its cap in force, and what its tries have cost of it; null for a step with no `budget:`. */
+      budget: StepBudget | null;
+      /** The raise of its cap the package takes, and how; null where none does, and on a run called off. */
+      raise: StepRaise | null;
+      /** Every try, earliest first, the current one last: `attempts` counts the current try's task alone. */
+      tries: StepTry[];
+      /** Where the step's time went, try by try and check by check; empty for a step not filed. */
+      timeline: StepTimelineTry[];
+    }
+  >;
   /** The run's time together: each round of its loop, and the whole run — with what the sessions in each cost. */
   timeline: { rounds: TimelineTotal[]; run: TimelineTotal };
 };
@@ -655,8 +643,7 @@ const RunDetailSchema = decodes<RunDetail>()(
     heldUntil: StringsSchema,
     holding: Schema.NullOr(RunHoldingSchema),
     status: RunStatusSchema,
-    phase: RunPhaseSchema,
-    reason: RunReasonSchema,
+    ...RunCodesFields,
     moving: Schema.Boolean,
     cost: Schema.NullOr(SpentSchema),
     atWork: Schema.NullOr(AtWorkSchema),

@@ -136,8 +136,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                print cursor: <n> and stop; from the start with no cursor. -l: the
                                lines a selector takes, given again for another (key=v, key!=v, "key in
                                (a,b)", "key notin (a,b)", key), over run, factory, workflow, step,
-                               agent, kind, reason, type, waits and source. --cursor-file: keep the
-                               cursor read to in a file, and start from it where it is there.
+                               agent, kind, reason, on, via, type, waits and source. --cursor-file:
+                               keep the cursor read to in a file, and start from it where it is there.
                                --json: one JSON object a line, a feed line with its cursor, and a
                                cursor of its own every 30 seconds while the feed is still. With no -l,
                                every line; -l waits=person takes the lines that wait on a person. A

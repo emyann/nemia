@@ -4,7 +4,15 @@
  */
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
-import { CheckVerdictSchema, StepCodesFields, type CheckVerdict, type StepPhase, type StepReason } from './reasons.ts';
+import {
+  CheckVerdictSchema,
+  StepCodesFields,
+  type AnswerVia,
+  type CheckVerdict,
+  type StepPhase,
+  type StepReason,
+  type WaitOn,
+} from './reasons.ts';
 
 /**
  * A list of strings, mutable as the plain types say: this file's own, as it imports no value from a sibling but the shared ones
@@ -231,6 +239,8 @@ export type StepTry = {
   note: string | null;
   phase: StepPhase;
   reason: StepReason;
+  on: WaitOn | null;
+  via: AnswerVia | null;
   message: string;
   /** @deprecated `message` under its old name: read `message`. */
   status: string;

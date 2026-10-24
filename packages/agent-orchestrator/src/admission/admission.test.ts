@@ -77,7 +77,7 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
     'nemia policy confirm nemia tries',
     "nemia policy confirm nemia tries --words 'Try again the step implement unasked when its check passed and the run has cost under $20.'",
     'nemia policy confirm nemia tries --words "Try again the step implement unasked."',
-    'nemia policy drop nemia default',
+    'nemia policy rm nemia default',
     'nemia show r && nemia policy confirm nemia tries',
     'nemia factory apply made --template /t --repo /r',
     'nemia factory upgrade made --to 0.2.0',
@@ -207,7 +207,7 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
       'nemia policy confirm nemia tries',
       "nemia policy confirm nemia tries --words 'Try again the step implement unasked when its check passed and the run has cost under $20.'",
       'nemia policy confirm nemia tries --words "Try again the step implement unasked."',
-      'nemia policy drop nemia default',
+      'nemia policy rm nemia default',
       'nemia show r && nemia policy confirm nemia tries',
       'nemia auto drop nemia default',
       'nemia factory apply made --template /t --repo /r',
@@ -218,7 +218,7 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
   });
   await t.test("the rules' read and a factory's plan are no ask, at auto", () => {
     assert.equal(decidedAt('nemia policy nemia', atAuto([DEFAULT_AUTO])), undefined, 'the read is no ask');
-    assert.equal(decidedAt('nemia factory plan made --to 0.2.0', atAuto([DEFAULT_AUTO])), undefined, 'the plan is no ask');
+    assert.equal(decidedAt('nemia factory diff made --to 0.2.0', atAuto([DEFAULT_AUTO])), undefined, 'the plan is no ask');
   });
 });
 

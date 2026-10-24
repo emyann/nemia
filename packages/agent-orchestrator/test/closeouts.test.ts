@@ -792,9 +792,9 @@ test('REFUSED at `nemia start`, before a run is written — exit 2, by kind and 
       ['nemia start does not take --inputs', '--input <file> once per file', '--gate <step>', '--factory <name>', '--brief "<brief>"'],
     ],
     [
-      '`nemia plan --input`',
-      () => stage.main(['plan', plan, '--repo', repo, '--input', a]),
-      ['nemia plan does not take --input', 'nemia start <card.md> --workflows <dir> --input <file>'],
+      '`nemia start <folder> --input`',
+      () => stage.main(['start', plan, '--repo', repo, '--input', a]),
+      ['nemia start <folder> does not take --input', 'nemia start <card.md> --workflows <dir> --input <file>'],
     ],
   ];
   for (const [name, refused, facts] of rows)

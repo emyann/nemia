@@ -1,9 +1,9 @@
 /**
- * Runs that wait on runs, told as a person's stories on the stage (`story.ts`): a diamond `nemia plan` starts, whose children file once
- * their parents land, each root handed `## From run <parent>`; a parent that will not land — cancelled, failed with nothing committed,
- * its branch gone — and the parents that land all the same; and context without a wait (`--from`). Beside them, what `nemia start
- * --after` refuses of the store and git as they stand, what `nemia plan` refuses before it starts anything, and a plan stopped part-way
- * by a start that dies, kept focused.
+ * Runs that wait on runs, told as a person's stories on the stage (`story.ts`): a diamond `nemia start <folder>` starts, whose children
+ * file once their parents land, each root handed `## From run <parent>`; a parent that will not land — cancelled, failed with nothing
+ * committed, its branch gone — and the parents that land all the same; and context without a wait (`--from`). Beside them, what `nemia
+ * start --after` refuses of the store and git as they stand, what `nemia start <folder>` refuses before it starts anything, and a plan
+ * stopped part-way by a start that dies, kept focused.
  *
  * What the waits mean is pure, in `src/wait/wait.test.ts` (readiness, the words, `afterRefusal`'s every reason); a card's format and
  * the plan's order in `src/plan/plan.test.ts`; the sections a root is handed in `src/brief/handed.test.ts`. A parent on another
@@ -214,7 +214,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
   };
 
   await s.test(
-    '`nemia plan` starts four runs, parents first, each `after` the runs of the cards it names, and prints a line per card',
+    '`nemia start <folder>` starts four runs, parents first, each `after` the runs of the cards it names, and prints a line per card',
     async () => {
       const plan = aPlan((dir) => ({
         'README.md': '# The flag\n\nParse it, then document and store it, then show it.\n',
@@ -227,7 +227,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
         'a.md': cardText('workflow: dev', 'Parse the flag\n\nIn cli.ts, before anything reads it.'),
       }));
       const before = runsWritten();
-      const printed = await printedBy(t, () => stage.main(['plan', plan, '--repo', repo]));
+      const printed = await printedBy(t, () => stage.main(['start', plan, '--repo', repo]));
       assert.equal(runsWritten(), before + 4, 'four runs, and no file of the plan');
       Object.assign(ids, Object.fromEntries(printed.slice(0, 4).map((l) => l.split(/ +/).slice(0, 2))));
       assert.deepEqual(Object.keys(ids), ['a', 'b', 'c', 'd'], 'parents first');
@@ -311,7 +311,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
         assert.deepEqual([r.filed, r.waiting], [['implement'], []], card);
         const now = readRun(ids[card]);
         assert.notEqual(startedOn, tip);
-        assert.equal(now.baseRef, tip, `${card}: the base as it stands now, and not as it stood at \`nemia plan\``);
+        assert.equal(now.baseRef, tip, `${card}: the base as it stands now, and not as it stood at \`nemia start <folder>\``);
         line(card);
         assert.equal(fs.readFileSync(path.join(lines[card].wt, 'a.txt'), 'utf8'), 'a.txt\n', `${card}'s worktree has a's work`);
         assert.equal(world().head(lines[card].wt), tip);
@@ -663,13 +663,13 @@ test('context without a wait: a run handed another with `--from` files at once, 
   );
 });
 
-test('REFUSED by name at shipped defaults: `nemia plan` starts nothing on a folder it cannot start whole, nor with a flag it does not take', async (t) => {
+test('REFUSED by name at shipped defaults: `nemia start <folder>` starts nothing on a folder it cannot start whole, nor with a flag the folder says instead', async (t) => {
   const repo = aRepo();
   const first = oneStep();
   const broken = folderOf({ implement: ['afer: plan'] });
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${first}`, 'the first card') }));
   const empty = aPlan(() => ({ 'README.md': '# Nothing yet\n' }));
-  const planned = (...argv: string[]) => stage.main(['plan', ...argv]);
+  const planned = (...argv: string[]) => stage.main(['start', ...argv]);
   const cards = (files: Record<string, string>) => {
     for (const f of fs.readdirSync(plan)) if (f !== 'a.md') fs.rmSync(path.join(plan, f), { recursive: true });
     for (const [file, text] of Object.entries(files)) {
@@ -701,28 +701,22 @@ test('REFUSED by name at shipped defaults: `nemia plan` starts nothing on a fold
     ],
     ['a folder inside the plan', { 'drafts/': '' }, [plan, '--repo', repo], 'Invalid', ['drafts/', plan, 'not a card']],
     ['a folder with no card', {}, [empty, '--repo', repo], 'Invalid', [empty, 'no cards', 'README.md']],
-    ['no folder', {}, [path.join(ROOT, 'no-such-plan'), '--repo', repo], 'Invalid', ['no plan folder at', 'no-such-plan']],
     [
       '--after: the folder says it',
       {},
       [plan, '--repo', repo, '--after', 'r-xyz'],
       'Invalid',
-      ['nemia plan does not take --after', 'nemia start <card.md> --workflows <dir> --after <runId>'],
+      ['nemia start <folder> does not take --after', 'nemia start <card.md> --workflows <dir> --after <runId>'],
     ],
-    ['--after=<run>', {}, [plan, '--after=r-xyz', '--repo', repo], 'Invalid', ['nemia plan does not take --after']],
+    ['--after=<run>', {}, [plan, '--after=r-xyz', '--repo', repo], 'Invalid', ['nemia start <folder> does not take --after']],
     [
       '--workflows',
       {},
       [plan, '--workflows', 'dev', '--repo', repo],
       'Invalid',
-      ['nemia plan does not take --workflows', 'in its workflow:'],
+      ['nemia start <folder> does not take --workflows', 'in its workflow:'],
     ],
-    ['--no-worktree', {}, [plan, '--no-worktree', '--repo', repo], 'Invalid', ['nemia plan does not take --no-worktree']],
-    ['an unknown flag', {}, [plan, '--repos', repo], 'Invalid', ['nemia plan does not take --repos', '--repo <r>', '--factory <name>']],
-    ['--repo twice', {}, [plan, '--repo', repo, '--repo', repo], 'Invalid', ['nemia plan takes --repo once']],
-    ['--repo with no value', {}, [plan, '--repo'], 'Invalid', ['nemia plan <folder> --repo <r>']],
-    ['--repo= with none', {}, [plan, '--repo='], 'Invalid', ['--repo takes the repository the plan works on']],
-    ['a second folder', {}, [plan, plan, '--repo', repo], 'Invalid', ['nemia plan takes one folder', `${plan} is a second`]],
+    ['--no-worktree', {}, [plan, '--no-worktree', '--repo', repo], 'Invalid', ['nemia start <folder> does not take --no-worktree']],
   ];
   for (const [what, files, argv, tag, facts] of rows) {
     await t.test(what, async () => {

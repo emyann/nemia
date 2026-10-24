@@ -564,10 +564,10 @@ test('`--gate` and a card’s `gate:`, REFUSED before a run is written', async (
     ['the CLI: --gate followed by a flag', () => typed('--gate', '--no-worktree'), 'Invalid', ['--gate takes the step']],
     ['the CLI: --gate naming no step', () => typed('--gate', 'reveiw'), 'Invalid', ['--gate reveiw', 'no step "reveiw"']],
     [
-      '`nemia plan --gate`, by name',
-      () => stage.main(['plan', ROOT, '--gate', 'plan']),
+      '`nemia start <folder> --gate`, by name',
+      () => stage.main(['start', ROOT, '--gate', 'plan']),
       'Invalid',
-      ['nemia plan does not take --gate', 'gate: true', 'nemia start <card.md> --workflows <dir> --gate <step>'],
+      ['nemia start <folder> does not take --gate', 'gate: true', 'nemia start <card.md> --workflows <dir> --gate <step>'],
     ],
     [
       "a card's `gate:` naming no step, in the card's words",

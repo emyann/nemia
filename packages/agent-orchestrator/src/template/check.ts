@@ -1,5 +1,5 @@
 /**
- * `nemia template check`'s judgement of a folder already read (`ReadFolder`): the layout's and each document's rules (`layout.ts`), then
+ * `nemia template lint`'s judgement of a folder already read (`ReadFolder`): the layout's and each document's rules (`layout.ts`), then
  * what the folder's parts say of each other — a hire, a skill, a sibling step, a parameter or a file named that the folder lacks — and
  * each harness's block against the words the runtime gives that harness (`HARNESS_KNOBS`). Pure: every problem comes back at once.
  */

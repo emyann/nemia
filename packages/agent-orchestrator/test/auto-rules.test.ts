@@ -286,7 +286,7 @@ test('The rules on disk refuse, by their kind, writing nothing', async (t) => {
       confirmRule(home, 'nemia', 'tries', TRIES, NOW);
       const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', TRIES, NOW));
       assert.equal(kind, 'Conflict');
-      names(message, 'nemia policy drop nemia tries');
+      names(message, 'nemia policy rm nemia tries');
       assert.equal(refusal(() => confirmedFile(home, '../x')).kind, 'Invalid');
     },
   );

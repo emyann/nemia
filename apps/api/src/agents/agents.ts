@@ -67,11 +67,11 @@ const AGENT_CARD = COMMANDS.find((c) => c.name === 'agents card')!;
 
 /**
  * The board's agent library in the package's table, each entry served on the api alone: an agent written (`agents write`), removed
- * (`agents remove`), tried (`agents try`) and read for its page (`agents read`).
+ * (`agents rm`), tried (`agents run`) and read for its page (`agents read`).
  */
 const WRITE = COMMANDS.find((c) => c.name === 'agents write')!;
-const REMOVE = COMMANDS.find((c) => c.name === 'agents remove')!;
-const TRY = COMMANDS.find((c) => c.name === 'agents try')!;
+const REMOVE = COMMANDS.find((c) => c.name === 'agents rm')!;
+const TRY = COMMANDS.find((c) => c.name === 'agents run')!;
 const READ = COMMANDS.find((c) => c.name === 'agents read')!;
 
 /** The package's listing of the agent files the store knows (`nemia agents sources`): on `GET /api/agents/sources`. */

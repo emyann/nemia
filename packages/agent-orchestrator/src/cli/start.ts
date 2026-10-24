@@ -1,12 +1,13 @@
 /**
- * The runners of the commands that start work from where they are typed — `nemia start`, `nemia plan`, `nemia inbox add` and `nemia inbox
- * queue`: each reads the files and folders its command line names, hands its entry's handler what it found, and prints what the entry says
- * of it.
+ * The runners of the commands that start work from where they are typed — `nemia start`, of a brief or a folder of cards, `nemia inbox add`
+ * and `nemia inbox queue`: each reads the files and folders its command line names, hands its entry's handler what it found, and prints
+ * what the entry says of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import {
   cardToStart,
+  folderRefusal,
   inboxDir,
   inboxNameAt,
   INBOX_ADD,
@@ -92,9 +93,13 @@ function briefArgs(arg: string, args: Args): Args {
   };
 }
 
-/** `nemia start`: a run of a brief, a plan's card or an inbox card (`START`), and what it prints of it. */
+/**
+ * `nemia start`: a run of a brief, a plan's card or an inbox card (`START`), and what it prints of it; or, for a folder, a run per card of
+ * the plan it holds (`folderRun`). A brief is words or a file, never a folder, so a folder is always a plan.
+ */
 export async function startRun(args: Args, e: Engine, place: Place): Promise<void> {
   const arg = textOf(args, 'brief') ?? '';
+  if (fs.statSync(arg, { throwIfNoEntry: false })?.isDirectory()) return folderRun(arg, args, e, place);
   const card = inboxNameAt(arg);
   const asked = card !== null ? cardArgs(card, args) : briefArgs(arg, args);
   const data = await runWith(e, placedIn(place, START.handler(asked)));
@@ -102,12 +107,15 @@ export async function startRun(args: Args, e: Engine, place: Place): Promise<voi
 }
 
 /**
- * `nemia plan`: a run per card of a plan folder, a line each, in the factory and on the repository a `nemia start` typed here would be
- * (`placeOfStart`); a card that did not start stops the rest, and fails with what it was told.
+ * `nemia start <folder>`: a run per card of a plan folder, a line each, in the factory and on the repository a `nemia start` typed here
+ * would be (`placeOfStart`); refused for a flag the folder says instead (`folderRefusal`); a card that did not start stops the rest, and
+ * fails with what it was told.
  */
-export async function planRun(args: Args, e: Engine, place: Place): Promise<void> {
+async function folderRun(folder: string, args: Args, e: Engine, place: Place): Promise<void> {
+  const refused = folderRefusal(args);
+  if (refused !== undefined) usage(refused);
   const { factory, repo } = placeOfStart(args);
-  const plan = { dir: path.resolve(textOf(args, 'folder') ?? ''), repo: path.resolve(repo) };
+  const plan = { dir: path.resolve(folder), repo: path.resolve(repo) };
   const { started, stopped, folderOf } = await runWith(
     e,
     placedIn(place, startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) })),

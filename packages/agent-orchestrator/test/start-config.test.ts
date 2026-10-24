@@ -118,7 +118,7 @@ test("REFUSED at `nemia start`: a step whose line its harness refuses fails `sta
   assert.deepEqual(runsWritten(), before);
 });
 
-test('REFUSED at `nemia plan`: a card whose workflow has a step its harness refuses fails `startPlan` behind the card, and no run is written', async () => {
+test('REFUSED at `nemia start <folder>`: a card whose workflow has a step its harness refuses fails `startPlan` behind the card, and no run is written', async () => {
   const plan = fs.mkdtempSync(path.join(ROOT, 'plan-'));
   fs.writeFileSync(path.join(plan, 'card.md'), `---\nworkflow: ${ULTRA}\n---\nadd a flag\n`);
   const before = runsWritten();

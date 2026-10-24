@@ -42,8 +42,8 @@ export const Card = Schema.Struct({
   .annotate({ identifier: 'Card' });
 export type Card = typeof Card.Type;
 
-/** A queued card's start the tick tried and did not make, as it writes it down (`QueueTry`). */
-const QueueTry = Schema.Struct({
+/** A queued card's start the tick tried and did not make, as it writes it down (`MissedStart`, inbox.ts). */
+const MissedStart = Schema.Struct({
   at: Schema.String,
   text: Schema.String,
   repo: Schema.String,
@@ -54,7 +54,7 @@ const QueueTry = Schema.Struct({
 /** The inbox as the store holds it: its cards (`inbox/<name>.md`), and the tick's tries of the queued ones (`queue/<name>.json`). */
 export const Inbox = Schema.Struct({
   cards: Schema.Array(Card),
-  tries: Schema.Record(CardName.OnRead, QueueTry),
+  tries: Schema.Record(CardName.OnRead, MissedStart),
 }).annotate({ identifier: 'Inbox' });
 export type Inbox = typeof Inbox.Type;
 

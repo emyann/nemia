@@ -9,7 +9,7 @@
 import { Schema } from 'effect';
 import { brandedCount, brandedId, foreignId, type Count, type Id } from './brand.ts';
 import { erDiagram, type ErModel } from './er.ts';
-import { HarnessArgsSchema, StoredEventSchema, UsageSchema } from './event-schema.ts';
+import { FORMER_REASONS, HarnessArgsSchema, StoredEventSchema, UsageSchema } from './event-schema.ts';
 
 /** The most bytes a file's name may hold on the file systems a store is kept on. */
 const NAME_BYTES = 255;
@@ -69,7 +69,7 @@ export const HarnessArgs = Schema.StructWithRest(
 export type HarnessArgs = typeof HarnessArgs.Type;
 
 const Outcome = Schema.Literals(['succeeded', 'failed', 'stopped']).annotate({ identifier: 'Outcome' });
-const EndReason = Schema.Literals(['harness', 'lost', 'unsigned', 'unstartable', 'operator', 'deadline']).annotate({
+const EndReason = Schema.Literals(['harness', 'lost', 'unstartable', 'operator', 'deadline']).annotate({
   identifier: 'EndReason',
 });
 const Monotonic = Schema.Struct({ boot: Schema.String, ms: Schema.Number });
@@ -90,7 +90,8 @@ export const Attempt = Schema.Struct({
   resumeFrom: Schema.optional(SessionId.OnRead),
   nudge: Schema.optional(Schema.String),
   closeout: Schema.optional(Schema.Unknown),
-  stated: Schema.optional(Schema.Boolean),
+  closedOut: Schema.optional(Schema.Boolean),
+  former: Schema.optional(Schema.Literals(FORMER_REASONS)),
   usage: Schema.NullOr(UsageSchema),
   exitCode: Schema.NullOr(Schema.Number),
   denials: Schema.optional(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) }))),

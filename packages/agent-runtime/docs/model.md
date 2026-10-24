@@ -54,7 +54,8 @@ erDiagram
     SessionId resumeFrom FK "optional"
     string nudge "optional"
     unknown closeout "optional"
-    boolean stated "optional"
+    boolean closedOut "optional"
+    unsigned former "optional"
     object usage
     number exitCode
     list denials "optional"
@@ -84,7 +85,7 @@ erDiagram
     list allowedTools "optional"
     string effort "optional"
     object mcp "optional"
-    list checkoutMcp "optional"
+    list projectMcp "optional"
     number contextTokens "optional"
     boolean background "optional"
     number budgetUsd "optional"
@@ -97,6 +98,7 @@ erDiagram
     boolean mayAsk "optional"
     unknown enabledSkills "optional"
     boolean remoteControl "optional"
+    list checkoutMcp "optional"
   }
   Mount {
     string path

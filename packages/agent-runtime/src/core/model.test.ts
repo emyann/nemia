@@ -76,7 +76,8 @@ test('the entities hold the keys the fold holds, and a mount the harness’s sha
   const task: SameKeys<Model.Task, State> = true;
   const attempt: SameKeys<Model.Attempt, FoldedAttempt> = true;
   const mount: Agree<Model.Mount, HarnessMount> = true;
-  assert.deepEqual([task, attempt, mount], [true, true, true]);
+  const reason: Agree<Model.Attempt['reason'], FoldedAttempt['reason']> = true;
+  assert.deepEqual([task, attempt, mount, reason], [true, true, true, true]);
 });
 
 test('a journal entry is a task’s id and an event as the journal holds it', () => {

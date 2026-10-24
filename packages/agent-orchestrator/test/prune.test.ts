@@ -16,7 +16,7 @@ import path from 'node:path';
 import { Effect } from 'effect';
 import { until, WAITED } from 'agent-runtime/testing';
 import type { Engine } from '../src/runtime-client.ts';
-import type { TaskPhase } from '../src/run.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 import type { Place } from '../src/place/place.store.ts';
 import type { PlaceRequests, PlaceVerb } from '../src/place/place.ts';
 import type { Turned } from '../src/runner.ts';
@@ -83,7 +83,7 @@ const oneStep = (budget?: number) => {
  */
 const board = () => {
   const b = stage.board();
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, usage?: object) => {
+  const settle = (id: string, phase: EnginePhase, closeout?: unknown, usage?: object) => {
     b.settle(id, phase, closeout);
     if (usage) Object.assign(b.tasks.get(id)!.attempt!, { usage });
   };

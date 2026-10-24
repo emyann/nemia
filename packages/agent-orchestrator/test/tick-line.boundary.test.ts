@@ -18,6 +18,7 @@ import { scratch } from './scratch.ts';
 import { Effect } from 'effect';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 
 const ROOT = scratch('wf-tick-line-');
 fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
@@ -48,7 +49,7 @@ const planned = (): string => {
 test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked` for one waiting on an answer — REFUSED: `failed` for either, kept for a run in which a step broke', async (t) => {
   const b = engine();
   const e = engineOf(b.layer);
-  const stopped = async (gates: string[], phase: string, closeout?: unknown) => {
+  const stopped = async (gates: string[], phase: EnginePhase, closeout?: unknown) => {
     const repo = fs.mkdtempSync(path.join(ROOT, 'repo-'));
     stand().world.repository(repo, {});
     const run = await runPlaced(startRun({ brief: 'plan the flag', repo, workflowDir: planned(), isolate: false, gates }));

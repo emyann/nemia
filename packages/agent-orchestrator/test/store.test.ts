@@ -342,7 +342,7 @@ const board = () => {
                         usage: settled && t.usage ? t.usage : null,
                         ...(reason ? endOf(reason) : { ended: null }),
                         ...(settled && denials.get(id) ? { denials: denials.get(id) } : {}),
-                        ...(settled && !reason && stated.has(id) ? { ended: 'done', reason: 'harness', stated: stated.get(id) } : {}),
+                        ...(settled && !reason && stated.has(id) ? { ended: 'succeeded', reason: 'harness', stated: stated.get(id) } : {}),
                       },
                 ),
         },

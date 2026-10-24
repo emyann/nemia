@@ -291,7 +291,7 @@ test('a pass that answered and died before writing the run down is adopted: the 
   await runWith(e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag' }));
   await Effect.runPromise(e.answer(plan, 'the --dry-run flag'));
   await Effect.runPromise(e.tick());
-  assert.match((await stateOf(e, plan)).phase, /^running/, 'what the pass did before it died: the answer, and nothing on the record');
+  assert.equal((await stateOf(e, plan)).phase, 'working', 'what the pass did before it died: the answer, and nothing on the record');
   const adopted = await runWith(e, advanceRun(readRun(run.id)));
   assert.deepEqual([adopted.tried, adopted.filed], [[], []]);
   const view = await stateOf(e, plan);
@@ -429,7 +429,7 @@ test('a gated step closed on its approval reads on `nemia ls` as it signed, in t
   const closed = await stateOf(e, plan);
   assert.deepEqual(
     [closed.phase, closed.state.closed, closed.state.settled],
-    ['between attempts', true, null],
+    ['between-attempts', true, null],
     'the seed: closed, and the engine has not settled it yet',
   );
   assert.equal(phaseOfView(closed), 'succeeded');
@@ -437,7 +437,7 @@ test('a gated step closed on its approval reads on `nemia ls` as it signed, in t
   await Effect.runPromise(e.tick());
   assert.equal((await stateOf(e, plan)).state.settled, 'succeeded');
   assert.equal(between, (await statuses(e, run.id)).plan, 'the same line before the engine settles it and after');
-  assert.doesNotMatch(between, /between attempts|running/);
+  assert.doesNotMatch(between, /between-attempts|running/);
   const listed = await runWith(e, list(e, readRun(run.id)));
   assert.deepEqual(listed.waitingOnYou, []);
 });

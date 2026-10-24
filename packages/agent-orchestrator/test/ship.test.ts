@@ -823,7 +823,7 @@ test("a place that gives no reading of the checkout, or reads its merge as anoth
       assert.equal(asked, 0, 'a pause read over 10 landed runs, with the marker and without, asks nothing');
 
       const { repo, waiting, staging } = await stagingAndWaiting();
-      for (const phase of ['pending', 'running'] as const) {
+      for (const phase of ['pending', 'working'] as const) {
         settle(`${staging.id}-ship`, phase);
         const hold = await holdOf(e, waiting.id, statusMemo(at.liveHeads, counted));
         assert.deepEqual(hold, { run: staging.id, step: 'ship' }, `${phase}: held by the ending in it`);

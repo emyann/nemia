@@ -14,7 +14,7 @@ const over = <A, E>(made: TestEngine, use: (engine: typeof Engine.Service) => Ef
 async function atWork(): Promise<TestEngine> {
   const made = testEngine();
   await over(made, (engine) => engine.file({ id: 't', brief: 'work', cwd: '/' }));
-  made.settle('t', 'running');
+  made.settle('t', 'working');
   return made;
 }
 

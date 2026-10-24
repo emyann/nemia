@@ -12,7 +12,7 @@ import { type BranchReader, branchStandings } from '../branches/branches.store.t
 import { resultSteps } from '../branches/index.ts';
 import { type BranchStanding, sendBackTo, type Spend, type SpendOf, spentWord } from '../status/status.ts';
 import { closeoutOf, deniedOf, unreadOf } from '../views/views.verb.ts';
-import { wordOfView } from '../views/views-words.ts';
+import { wordOfView, type EnginePhase } from '../views/views-words.ts';
 import { holdAdvice, holdWord, type ParentRun, type Wait, waitAdvice, waitWord } from '../wait/wait.ts';
 import { merges, type ToDecide, toDecideWords } from '../ending/ending.ts';
 import type { Retry, RetryAsk } from '../retry/index.ts';
@@ -201,13 +201,13 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
 }
 
 /**
- * The engine's own word for a task — `running (working)`, `needs-human`, `succeeded` — as `nemia ls` shows it (`wordOfView`): `unknown`
+ * The engine's own word for a task — `working`, `needs-human`, `succeeded` — as `nemia ls` shows it (`wordOfView`): `unknown`
  * for a task the engine has no record of, which it folds to the state of one filed and waiting for a slot and calls `pending`, in flight;
- * and `succeeded` for a task held open that was closed after it signed, which it calls `between attempts` until its next pass settles it.
+ * and `succeeded` for a task held open that was closed after it signed, which it calls `between-attempts` until its next pass settles it.
  */
 export const wordOf =
   (views: Views) =>
-  (taskId: string): string =>
+  (taskId: string): EnginePhase | 'unknown' =>
     wordOfView(views.get(taskId));
 
 /**

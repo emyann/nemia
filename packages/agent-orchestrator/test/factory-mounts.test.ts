@@ -20,6 +20,7 @@ import { testEngine } from 'agent-runtime/testing';
 import { readsMounts } from '../src/filed/filed.ts';
 import { testPlace } from '../place/memory/index.ts';
 import { eachTest, runGiven, runOver } from './placed.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 
 const ROOT = scratch('wf-factory-mounts-');
 process.env.WF_ROOT = ROOT;
@@ -85,7 +86,7 @@ const readOnly = (...paths: string[]) => paths.map((p) => ({ path: p, readOnly: 
 const board = () => {
   const held = engine();
   const filed = () => new Map(held.specs.map((spec) => [spec.id, spec]));
-  const settle = (id: string, phase: string, closeout?: unknown, lost = false) =>
+  const settle = (id: string, phase: EnginePhase, closeout?: unknown, lost = false) =>
     held.settle(id, phase, { ...(closeout !== undefined && { closeout }), ...(lost && { nativeId: null }) });
   return {
     e: engineOf(held.layer),

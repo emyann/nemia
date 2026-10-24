@@ -21,7 +21,7 @@ const counting = () => {
         failOnce = false;
         throw new Error('no journal');
       }
-      return { id, phase: 'done' } as unknown as TaskView;
+      return { id, phase: 'succeeded' } as unknown as TaskView;
     },
     async list() {
       return { views: [], unreadable: [] };

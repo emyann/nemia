@@ -83,7 +83,7 @@ const aFinished = async () => {
 /** A run of one step whose session runs: in flight. */
 const anInFlight = async () => {
   const id = await started({ work: null });
-  engine().settle(`${id}-work`, 'running');
+  engine().settle(`${id}-work`, 'working');
   return id;
 };
 
@@ -183,7 +183,7 @@ test('a run that moves and also waits is among the waiting, once; a cancelled ru
   seeded(t);
   const both = await started({ plan: null, side: null }, ['plan'], true);
   engine().settle(`${both}-plan`, 'succeeded', { closeout: SIGNED });
-  engine().settle(`${both}-side`, 'running');
+  engine().settle(`${both}-side`, 'working');
   await advanced(both);
   const called = await aWaiting();
   cancelled(called, T0 + 5 * MIN);

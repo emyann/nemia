@@ -109,7 +109,7 @@ test('the engine is new for each test: one test files a task, settles it at work
   assert.equal(engine(), b, 'one engine for the whole test');
   const e = engineOf(b.layer);
   const task = await Effect.runPromise(e.file({ id: 'kept-by-one-test', brief: 'do it', cwd: ROOT }));
-  b.settle(task, 'running');
+  b.settle(task, 'working');
   await Effect.runPromise(e.say(task, 'hello'));
   await Effect.runPromise(e.stop(task));
   assert.deepEqual([b.tasks.size, b.filings, b.said, b.stopped], [1, [task], [{ taskId: task, text: 'hello' }], [task]]);

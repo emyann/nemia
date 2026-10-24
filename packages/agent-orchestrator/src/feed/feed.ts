@@ -25,7 +25,8 @@
  * Pure: the line, the fold, what a pass owes and what it judged of a run in the feed's words (`feedWords`). The file — read, appended to
  * and followed — is `feed.store.ts`'s, and the controllers hand the rest of the package what it needs.
  */
-import { onYouWords, shownStatus, type Listing } from '../list/list.ts';
+import { onYouWords, shownStatus, type ListedPhase, type Listing } from '../list/list.ts';
+import type { EnginePhase } from '../views/views-words.ts';
 import { oneLine, type Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
@@ -603,16 +604,35 @@ export type FeedCloseout = { step: string; try: number; said: unknown; read: Clo
 export type FeedDenial = { step: string; try: number; call: string };
 
 /**
- * The engine's word for a task, as the feed keeps it: every word of a session at work — `running (working)`, `running (idle)`,
- * `working (quiescent)`, `starting`, `between attempts` — is `running`, and every other word is itself. Pure.
+ * The engine's word for a task, as the feed keeps it: every word of a session at work — `starting`, `working`, `quiescent`, `ending`,
+ * `between-attempts` — is `running`, and every other word is itself. Total over the engine's words, so a word the runtime adds fails the
+ * typecheck here until the feed says what it keeps of it.
  *
  * A session's live state moves between those words on its own, many times a step, and nothing of the run's judgement moves with it: a
  * feed that wrote each would write a line every few passes for every step at work, and a watcher waiting for a gate would read through
- * them. `ae watch` is where a session's own life is followed. `pending` (filed, waiting for a session slot), `needs-human` and the settled
- * words are kept: each is something the run decides on.
+ * them. `ae watch` is where a session's own life is followed. `pending` (filed, waiting for a session slot), `needs-human`,
+ * `input-required`, `idle`, `restarting` and the settled words are kept: each is something the run decides on, or a word the feed has
+ * always kept as itself, so no line already in `feed.jsonl` changes meaning.
  */
-export const feedPhase = (word: string): string =>
-  word.startsWith('running (') || word === 'working (quiescent)' || word === 'starting' || word === 'between attempts' ? 'running' : word;
+const FEED_WORD: Record<EnginePhase | 'unknown', ListedPhase> = {
+  pending: 'pending',
+  starting: 'running',
+  working: 'running',
+  quiescent: 'running',
+  'needs-human': 'needs-human',
+  'input-required': 'input-required',
+  idle: 'idle',
+  restarting: 'restarting',
+  'between-attempts': 'running',
+  ending: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  stopped: 'stopped',
+  unknown: 'unknown',
+};
+
+/** The engine's word for a task as the feed keeps it (`FEED_WORD`). Pure. */
+export const feedPhase = (word: EnginePhase | 'unknown'): ListedPhase => FEED_WORD[word];
 
 /**
  * What the feed says of a run as a pass judged it: the listing `nemia ls` prints (`listing`, handed the engine's words through

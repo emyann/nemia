@@ -26,14 +26,14 @@ test('every ended attempt gives each call it was denied, one per call, in order;
   const view = {
     state: {
       attempts: [
-        { ended: 'done', denials: [write] },
+        { ended: 'succeeded', denials: [write] },
         { ended: 'failed', denials: [write, push] },
         { ended: null, denials: [push] },
       ],
     },
   };
   assert.deepEqual(deniedCallsOf(view), [write, write, push]);
-  assert.deepEqual(deniedCallsOf({ state: { attempts: [{ ended: 'done' }] } }), [], 'a session denied nothing');
+  assert.deepEqual(deniedCallsOf({ state: { attempts: [{ ended: 'succeeded' }] } }), [], 'a session denied nothing');
   assert.deepEqual(deniedCallsOf(undefined), []);
 });
 
@@ -61,22 +61,22 @@ test('a session filed before steps ran as jobs records no denial, nor one whose 
 test('every ended attempt gives each skill it loaded, one per load, in order; an attempt not ended gives none', () => {
   const attempts = [
     { ended: 'failed', skills: ['look'] },
-    { ended: 'done', skills: ['look', 'effect'] },
+    { ended: 'succeeded', skills: ['look', 'effect'] },
     { ended: null, skills: ['x'] },
   ];
   assert.deepEqual(skillsLoadedOf({ state: { attempts } }, []), ['look', 'look', 'effect']);
-  const empty = [{ ended: 'done', skills: [] }, { ended: null }];
+  const empty = [{ ended: 'succeeded', skills: [] }, { ended: null }];
   assert.deepEqual(skillsLoadedOf({ state: { attempts: empty } }, []), [], 'a session that loaded none is a measured empty list');
 });
 
 test('a loaded skill is counted under the name the step’s line writes it, one named with its folder too; one the step did not give, as loaded', () => {
-  const attempts = [{ ended: 'done', skills: ['y', 'look', 'other', 'y'] }];
+  const attempts = [{ ended: 'succeeded', skills: ['y', 'look', 'other', 'y'] }];
   assert.deepEqual(skillsLoadedOf({ state: { attempts } }, ['app:y', 'look']), ['app:y', 'look', 'other', 'app:y']);
   assert.deepEqual(skillsLoadedOf({ state: { attempts } }, []), ['y', 'look', 'other', 'y']);
 });
 
 test('a session is unmeasured where one ended attempt does not say its skills, where none ended, and with no view', () => {
-  const unsaid = [{ ended: 'failed', skills: ['look'] }, { ended: 'done' }];
+  const unsaid = [{ ended: 'failed', skills: ['look'] }, { ended: 'succeeded' }];
   assert.equal(skillsLoadedOf({ state: { attempts: unsaid } }, []), null, 'one end without the key: not measured, never its others alone');
   assert.equal(skillsLoadedOf({ state: { attempts: [{ ended: null, skills: ['look'] }] } }, ['look']), null, 'no attempt ended');
   assert.equal(skillsLoadedOf({ state: { attempts: [] } }, []), null);
@@ -84,7 +84,7 @@ test('a session is unmeasured where one ended attempt does not say its skills, w
 });
 
 test("a task's files are each file its ended attempts touched, once, in the order first touched; unmeasured where one end does not say", () => {
-  const ended = (files?: string[]) => ({ ended: 'done', ...(files ? { files } : {}) });
+  const ended = (files?: string[]) => ({ ended: 'succeeded', ...(files ? { files } : {}) });
   const view = (...attempts: object[]) => ({ state: { attempts } }) as Parameters<typeof filesTouchedOf>[0];
   assert.deepEqual(filesTouchedOf(view(ended(['b.ts', 'a.ts']), ended(['a.ts', 'c.ts']), { ended: null, files: ['d.ts'] })), [
     'b.ts',

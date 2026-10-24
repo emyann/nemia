@@ -177,15 +177,15 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
     world().repository(lands, {});
     runs.landing = await begun(SHIP, { repo: lands, isolate: true });
     await pass();
-    for (const name of ['session', 'asked', 'ended', 'landing', 'called'] as const) b.settle(task(name), 'running');
+    for (const name of ['session', 'asked', 'ended', 'landing', 'called'] as const) b.settle(task(name), 'working');
     b.settle(task('checking'), 'succeeded', SIGNED);
     fs.writeFileSync(path.join(readRun(runs.landing.id).steps.work.workspace!, 'work.txt'), 'work\n');
     b.settle(task('landing'), 'succeeded', SIGNED);
     await pass();
-    b.settle(checkOf('checking'), 'running');
+    b.settle(checkOf('checking'), 'working');
     await stage.runWith(b.e, approveRun(runs.landing.id, 'ship'));
     await pass();
-    b.settle(task('landing', 'ship'), 'running');
+    b.settle(task('landing', 'ship'), 'working');
     fs.mkdirSync(asksDir(runs.asked.id), { recursive: true });
     fs.writeFileSync(
       askFile(runs.asked.id, 'work', 2),
@@ -233,7 +233,7 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
     'a pass under the pause files nothing new — no try asked, no check of a step signed off — and the due schedule starts nothing',
     async () => {
       t.mock.timers.setTime(Date.parse(MONDAY) + 30_000);
-      b.settle(task('session'), 'running');
+      b.settle(task('session'), 'working');
       filings = [...b.filings];
       const paused = await pass();
       assert.deepEqual([paused.scheduled, scheduledDues(), b.filings], [undefined, [], filings]);
@@ -426,7 +426,7 @@ test("a warm read of what a pause at once would stop reads the live runs' record
   write('r-live', 'live-1');
   for (let n = 0; n < 200; n++) write(ids[n + 1], `fin-${n}`);
   await Effect.runPromise(b.e.file({ id: 'live-1', brief: 'b', cwd: ROOT }));
-  b.settle('live-1', 'running');
+  b.settle('live-1', 'working');
   const memo = recordMemo<RunTasks>();
   process.env.WF_VERIFY_REST = '0';
   t.after(() => {

@@ -20,6 +20,7 @@ import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 
 process.env.WF_ROOT = scratch('wf-nemia-chat-');
 process.env.WF_VERIFY_REST = '1';
@@ -48,7 +49,7 @@ const stage = staged({ runWith, main, engineOf });
 const run = <A, E>(program: Parameters<typeof stage.runWith<A, E>>[1]) => stage.runWith(stage.board().e, program);
 
 /** A long-lived task of hers filed on the board as `her-<name>`, in `phase` where one is given, and a chat folder of its own. */
-const filed = async (name: string, phase?: string) => {
+const filed = async (name: string, phase?: EnginePhase) => {
   const b = stage.board();
   const id = await run(b.e.file({ id: `her-${name}`, brief: 'be there', cwd: '/r', restartPolicy: 'Always' }));
   if (phase !== undefined) b.settle(id, phase);
@@ -72,7 +73,7 @@ const event = (id: string, words: string) => ({
 /** Her task `her-<name>` at work on its second attempt, each attempt's transcript planted, and her chat's place. */
 const twoAttempts = async (name: string) => {
   const b = stage.board();
-  const { id: task, dir } = await filed(name, 'running (working)');
+  const { id: task, dir } = await filed(name, 'working');
   b.plantTranscript(task, 1, [event('a', 'One.'), event('b', 'Two.')]);
   b.restart(task);
   b.plantTranscript(task, 2, [event('c', 'Three.')]);
@@ -145,14 +146,14 @@ test("She is written to: the person's words kept while she is down, said once sh
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'Hello' });
     assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: [], left: ['o1'] }, 'not started: nothing hears it');
     assert.equal(outboxOwed(dir), true);
-    stage.board().settle(id, 'running (working)');
+    stage.board().settle(id, 'working');
     assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
     assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: [], left: [] });
     assert.deepEqual(saidTo(id), [{ taskId: id, text: framedForHer('Hello') }]);
     assert.equal(outboxOwed(dir), false);
   });
   await s.test('a word written while her turn is over, her session open to hear the next, is said on the next pass', async () => {
-    const { id, dir } = await filed('between', 'running (input-required)');
+    const { id, dir } = await filed('between', 'input-required');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'Next, the two kit cards' });
     assert.deepEqual(
       await run(deliverOutbox(id, dir)),
@@ -163,7 +164,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     assert.equal(outboxOwed(dir), false);
   });
   await s.test('REFUSED: a restart between the say and the mark is finished by the mark alone, never said twice', async () => {
-    const { id, dir } = await filed('cut-short', 'running (working)');
+    const { id, dir } = await filed('cut-short', 'working');
     appendOutbox(dir, { id: 'o1', at: new Date(Date.now() - 1000).toISOString(), text: 'Ship it' });
     const heard = await run(stage.board().e.say(id, framedForHer('Ship it')));
     assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: ['o1'], said: [], left: [] });
@@ -171,7 +172,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     assert.deepEqual(readDelivered(dir), [{ id: 'o1', said: heard.at, attempt: 1 }]);
   });
   await s.test('REFUSED: words said before the entry was written are never taken for it', async () => {
-    const { id, dir } = await filed('before', 'running (working)');
+    const { id, dir } = await filed('before', 'working');
     await run(stage.board().e.say(id, framedForHer('Again')));
     appendOutbox(dir, { id: 'o1', at: '2999-01-01T00:00:00.000Z', text: 'Again' });
     assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
@@ -179,7 +180,7 @@ test("She is written to: the person's words kept while she is down, said once sh
   });
   await s.test('two entries of one text claim two saids in order, never one twice', async (sub) => {
     sub.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-15T12:00:00.000Z') });
-    const { id, dir } = await filed('twice', 'running (working)');
+    const { id, dir } = await filed('twice', 'working');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'yes' });
     appendOutbox(dir, { id: 'o2', at: new Date().toISOString(), text: 'yes' });
     sub.mock.timers.tick(5);
@@ -196,7 +197,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     assert.equal(saidTo(id).length, 2);
   });
   await s.test('REFUSED: a say the task refuses stops the delivery with no mark, and the next delivers', async () => {
-    const { id, dir } = await filed('refused', 'running (working)');
+    const { id, dir } = await filed('refused', 'working');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'one' });
     appendOutbox(dir, { id: 'o2', at: new Date().toISOString(), text: 'two' });
     stage.board().refuseSay(1);
@@ -297,7 +298,7 @@ test('She asks, and the person answers: on the board, back through the call she 
   const s = story(t);
   let asking = { id: '', dir: '' };
   await s.test('the keeper copies each ask her session holds open into the chat once, and the board reads it after', async () => {
-    asking = await filed('asks', 'running (working)');
+    asking = await filed('asks', 'working');
     stage.board().plantAsk(asking.id, RAW);
     assert.deepEqual(await run(recordAsks(asking.id, asking.dir)), ['call-1']);
     assert.deepEqual(readAsks(asking.dir), [kept], 'the chat keeps the ask as the board draws it, not as the call spelled its labels');
@@ -312,7 +313,7 @@ test('She asks, and the person answers: on the board, back through the call she 
   });
   let open = { id: '', dir: '' };
   await s.test("the person's answer on the board is a file of their own, which her chat then draws", async () => {
-    open = await filed('answered', 'running (working)');
+    open = await filed('answered', 'working');
     stage.board().plantAsk(open.id, RAW);
     await run(recordAsks(open.id, open.dir));
     const place = { task: open.id, dir: open.dir };
@@ -354,7 +355,7 @@ test('She asks, and the person answers: on the board, back through the call she 
     assert.equal(invalid._tag, 'Conflict', 'an ask already answered is refused before its picks are read');
   });
   await s.test('REFUSED: an ask of other words is no answer of the record, and waits on the person itself', async () => {
-    const { id, dir } = await filed('other', 'running (working)');
+    const { id, dir } = await filed('other', 'working');
     appendAsk(dir, kept);
     appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [QUESTION]: 'Cut it on read' } });
     const other = { ...RAW, id: 'call-2', questions: [{ ...RAW.questions[0], question: 'And the values?' }] };
@@ -365,7 +366,7 @@ test('She asks, and the person answers: on the board, back through the call she 
     assert.deepEqual(answeredIn(id), [], 'and no answer of the record was written into its call');
   });
   await s.test('an answer whose call was cut is said to her as words, naming the question, exactly once across two beats', async () => {
-    const { id, dir } = await filed('words', 'running (working)');
+    const { id, dir } = await filed('words', 'working');
     appendAsk(dir, kept);
     appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [QUESTION]: 'First line as it is' } });
     const first = await run(answersDue(id, dir));
@@ -382,7 +383,7 @@ test('She asks, and the person answers: on the board, back through the call she 
     assert.deepEqual(answeredIn(id), [], 'and nothing was written into a call that is gone');
   });
   await s.test('REFUSED: a say the task will not take leaves the answer owed, and the next beat says it', async () => {
-    const { id, dir } = await filed('unsaid', 'running (working)');
+    const { id, dir } = await filed('unsaid', 'working');
     appendAsk(dir, kept);
     appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [QUESTION]: 'Cut it on read' } });
     stage.board().refuseSay(1);
@@ -394,7 +395,7 @@ test('She asks, and the person answers: on the board, back through the call she 
   await s.test(
     'the same question asked again after a restart is answered from the record, and put to the person no second time',
     async () => {
-      const { id, dir } = await filed('restart', 'running (working)');
+      const { id, dir } = await filed('restart', 'working');
       stage.board().plantAsk(id, RAW);
       await run(recordAsks(id, dir));
       appendAnswer(dir, { id: 'call-1', at: new Date().toISOString(), answers: { [QUESTION]: 'Cut it on read' } });
@@ -420,7 +421,7 @@ test('Her call is cut: the ask stops waiting and is drawn as cut, asked again it
   await s.test(
     'an ask whose call her session no longer holds is closed as cut: it stops waiting on the person, and is drawn as cut',
     async () => {
-      cut = await filed('cut', 'running (working)');
+      cut = await filed('cut', 'working');
       stage.board().plantAsk(cut.id, RAW);
       await run(recordAsks(cut.id, cut.dir));
       assert.equal(asksWaiting(asksOf(cut.dir)), 1);
@@ -462,7 +463,7 @@ test('Her call is cut: the ask stops waiting and is drawn as cut, asked again it
   await s.test(
     'a question cut, asked again, and answered then goes to the call that is waiting for it, and is said to her no second time',
     async () => {
-      const { id, dir } = await filed('again', 'running (working)');
+      const { id, dir } = await filed('again', 'working');
       stage.board().plantAsk(id, RAW);
       await run(recordAsks(id, dir));
       stage.board().cutAsks(id);
@@ -494,7 +495,7 @@ test('Her call is cut: the ask stops waiting and is drawn as cut, asked again it
     },
   );
   await s.test('her words asked under a call no mark of them names are marked as asked again, cut or not', async () => {
-    const { id, dir } = await filed('unseen', 'running (working)');
+    const { id, dir } = await filed('unseen', 'working');
     stage.board().plantAsk(id, RAW);
     await run(recordAsks(id, dir));
     stage.board().cutAsks(id);
@@ -511,7 +512,7 @@ test('Her call is cut: the ask stops waiting and is drawn as cut, asked again it
   await s.test(
     'REFUSED: a harness that cannot say what its session holds open closes nothing, nor does a look that read no session',
     async () => {
-      const { id, dir } = await filed('unsaid-asks', 'running (working)');
+      const { id, dir } = await filed('unsaid-asks', 'working');
       appendAsk(dir, kept);
       assert.equal(closesOwed(dir, undefined), false, 'an absence read off a harness that does not report asks is no absence');
       await run(recordAsks(id, dir));

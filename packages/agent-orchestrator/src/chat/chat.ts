@@ -9,6 +9,7 @@
  * (`deliver.verb.ts`).
  */
 import { Invalid } from '../refusal/refusal.ts';
+import type { EnginePhase } from '../views/views-words.ts';
 
 /** Who a message is from: the task's agent (`agent`), the person, or the keeper, whose words are a quiet marker. */
 export type ChatFrom = 'agent' | 'person' | 'keeper';
@@ -120,7 +121,8 @@ export type ChatSources = {
   asks: readonly Ask[];
   answers: readonly AskAnswer[];
   closed: readonly AskClose[];
-  phase: string;
+  /** The task's phase in the engine's words, null where no task is filed. */
+  phase: EnginePhase | null;
 };
 
 /** The words the person's `text` is said to the task in, so it knows who wrote them. Pure. */
@@ -583,16 +585,48 @@ export function changedSince(then: readonly ChatEvent[], now: readonly ChatEvent
   return now.filter((e) => seen.get(e.id) !== JSON.stringify(e));
 }
 
-/** Whether a runtime phase is a session that is live: one that hears what is said to it. */
-export const upOf = (phase: string): boolean =>
-  phase === 'idle' ||
-  phase === 'needs-human' ||
-  phase === 'input-required' ||
-  phase === 'working (quiescent)' ||
-  phase.startsWith('running (');
+/**
+ * Which runtime phases are a session that is live, one that hears what is said to it: a session waiting (`idle`, `needs-human`,
+ * `input-required`), at work (`working`, `quiescent`) or ending. Total, so a phase the runtime adds fails the typecheck until it is said.
+ */
+const UP: Record<EnginePhase, boolean> = {
+  pending: false,
+  starting: false,
+  working: true,
+  quiescent: true,
+  'needs-human': true,
+  'input-required': true,
+  idle: true,
+  restarting: false,
+  'between-attempts': false,
+  ending: true,
+  succeeded: false,
+  failed: false,
+  stopped: false,
+};
 
-/** Whether a runtime phase is a turn in progress. */
-const answeringOf = (phase: string): boolean => phase === 'running (working)' || phase === 'working (quiescent)';
+/** Which runtime phases are a turn in progress: a session at work, quiet or not. Total, as `UP` is. */
+const ANSWERING: Record<EnginePhase, boolean> = {
+  pending: false,
+  starting: false,
+  working: true,
+  quiescent: true,
+  'needs-human': false,
+  'input-required': false,
+  idle: false,
+  restarting: false,
+  'between-attempts': false,
+  ending: false,
+  succeeded: false,
+  failed: false,
+  stopped: false,
+};
+
+/** Whether a runtime phase is a session that is live: one that hears what is said to it (`UP`). */
+export const upOf = (phase: EnginePhase): boolean => UP[phase];
+
+/** Whether a runtime phase is a turn in progress (`ANSWERING`). */
+const answeringOf = (phase: EnginePhase): boolean => ANSWERING[phase];
 
 /** Whether a chat event is a message of the agent's own, which is what goes unread. */
 const hers = (e: ChatEvent): boolean => e.kind === 'message' && e.from === 'agent';
@@ -614,7 +648,12 @@ const unreadOf = (events: readonly ChatEvent[], mark: ReadMark | undefined): num
  * person's read mark: `waitsOnYou` the runs waiting and the asks of its own the person has not answered (`asksWaiting`), unread the
  * agent's messages the mark leaves unread (`unreadOf`). Pure.
  */
-export function presenceOf(phase: string | undefined, waiting: number, events: readonly ChatEvent[], mark: ReadMark | undefined): Presence {
+export function presenceOf(
+  phase: EnginePhase | undefined,
+  waiting: number,
+  events: readonly ChatEvent[],
+  mark: ReadMark | undefined,
+): Presence {
   const up = phase !== undefined && upOf(phase);
   return {
     up,

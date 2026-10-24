@@ -24,7 +24,7 @@ export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stoppe
 
 /**
  * What the engine's record of a task says of its closeout: `false`, never asked for one; `true`, asked; `unsigned`, asked, and its
- * last attempt ended without it (`stated: false` on its end, or `reason: 'unsigned'`). `stepStatus` reads it; a caller with only a yes
+ * last attempt ended without it (`closedOut: false` on its end, or `former: 'unsigned'`). `stepStatus` reads it; a caller with only a yes
  * or a no gives that (`closeoutAsked` in views.verb.ts reads all three).
  */
 export type CloseoutAsked = boolean | 'unsigned';

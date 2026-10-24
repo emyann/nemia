@@ -246,8 +246,9 @@ export const pauseAsksVoid = (
  * told it ended without calling `StructuredOutput`, that its work stands and it should change nothing and sign off, finishing first if
  * it had not, and signing off anyway saying what stops it if it cannot (`retrySection`). Once a round (`signoffsSpent`), never in a
  * loop: a nudge that ends unsigned again leaves the step `unsigned`, on a person. Keyed on what the engine recorded (`closeoutAsked`:
- * `stated: false`, or a reason `unsigned`), not on the step's word `unsigned`, which also covers a closeout short of a declared field —
- * a statement given, which a reminder to give one would not mend — and a `done` whose end says nothing of a statement. Nor is a step
+ * `closedOut: false`, or an old journal's `former: 'unsigned'`), not on the step's word `unsigned`, which also covers a closeout short
+ * of a declared field — a statement given, which a reminder to give one would not mend — a `done` whose end says nothing of a
+ * statement, and a `failed` end with `closedOut: false` and no `former`, a session that broke. Nor is a step
  * over its budget nudged: its status is `over budget`, and the run spends nothing more on it on its own word.
  *
  * And a step `unsigned` because its closeout named a file the run did not have (`lackedOf`) is nudged the same way, under the same one

@@ -80,7 +80,7 @@ const spy = () => {
     },
     async release() {
       saw('release');
-      return { turns: 1 };
+      return { responses: 1 };
     },
     async transcript() {
       saw('transcript');

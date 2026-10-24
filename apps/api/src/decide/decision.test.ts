@@ -161,7 +161,7 @@ const diffOf = (file: string) =>
     .replace(/\n$/, '')
     .split('\n');
 
-settledTask('t-d1-implement', done, { turns: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 });
+settledTask('t-d1-implement', done, { responses: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 });
 settledTask('t-d1-review', done, { toolCalls: 4, inputTokens: 8_000, outputTokens: 650, costUsd: 0.004 });
 writeRun({
   id: 'r-d1',
@@ -271,8 +271,8 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
         body.used,
         {
           implement: {
-            usage: { turns: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 },
-            used: '12 turns · 30 tool calls · 112k in · 6.35k out',
+            usage: { responses: 12, toolCalls: 30, inputTokens: 112_000, outputTokens: 6_350 },
+            used: '12 responses · 30 tool calls · 112k in · 6.35k out',
             cost: 'not measured',
             costUsd: null,
             apiMs: null,
@@ -283,7 +283,7 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
           },
           review: {
             usage: { toolCalls: 4, inputTokens: 8_000, outputTokens: 650, costUsd: 0.004 },
-            used: 'turns not measured · 4 tool calls · 8k in · 650 out',
+            used: 'responses not measured · 4 tool calls · 8k in · 650 out',
             cost: '$0.004',
             costUsd: 0.004,
             apiMs: null,
@@ -299,7 +299,7 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
         body.total,
         {
           usage: { toolCalls: 34, inputTokens: 120_000, outputTokens: 7_000 },
-          used: 'turns not measured · 34 tool calls · 120k in · 7k out',
+          used: 'responses not measured · 34 tool calls · 120k in · 7k out',
           cost: 'not measured',
           costUsd: null,
           apiMs: null,

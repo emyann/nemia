@@ -4,7 +4,7 @@
  *
  * A session that signs off with `StructuredOutput` and leaves a `run_in_background` loop running is listed busy by the
  * registry, and its transcript stays exactly as its closing turn left it. `busy` stops the runner reading a statement, and
- * stops `closedOut` acting on one, so the last word in the conversation answers the question `busy` cannot: a session
+ * stops `endedOnStatement` acting on one, so the last word in the conversation answers the question `busy` cannot: a session
  * whose own closeout is the last thing in it, and which has written nothing since for the quiescence floor, has finished,
  * whatever its process is still doing.
  *
@@ -205,9 +205,9 @@ test('a session held by a background shell, at shipped defaults: its own closeou
         await Effect.runPromise(engine.tick());
         const v = await Effect.runPromise(engine.view(id));
         assert.deepEqual(
-          [v.state.attempts[0]?.ended, v.state.attempts[0]?.stated],
+          [v.state.attempts[0]?.ended, v.state.attempts[0]?.closedOut],
           ['succeeded', false],
-          'idle, the quiescence floor reads it quiet with no statement: `stated: false`, which the layer above reads as unsigned',
+          'idle, the quiescence floor reads it quiet with no statement: `closedOut: false`, which the layer above reads as unsigned',
         );
       });
     },
@@ -242,7 +242,7 @@ test('a session held by a background shell, at shipped defaults: its own closeou
         assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
         const w = await Effect.runPromise(engine.view(silent));
         assert.deepEqual(
-          [w.state.attempts[0]?.ended, w.state.attempts[0]?.stated],
+          [w.state.attempts[0]?.ended, w.state.attempts[0]?.closedOut],
           ['succeeded', false],
           'and with nothing said, quiet all the same, where a busy one is not',
         );

@@ -41,7 +41,7 @@ function ranTo(id: string): void {
   const at = new Date().toISOString();
   const task = `${id}-try`;
   const usage = {
-    turns: 3,
+    responses: 3,
     toolCalls: 4,
     inputTokens: 42_000,
     cacheReadTokens: 30_000,

@@ -831,11 +831,11 @@ export const APART: readonly Apart[] = [
   },
   {
     name: 'whether the statement a task asked for came',
-    why: 'the engine reads it off the end its harness reported; a test that needs it settles the attempt with `stated`',
+    why: 'the engine reads it off the end its harness reported; a test that needs it settles the attempt with `closedOut`',
     walk: async ({ engine, settle }) => {
       await asked(engine.file({ ...task('a'), closeoutSchema: { type: 'object' } }));
       await settle('a', 'succeeded', { exitCode: 0, closeout: { ok: 1 } });
-      return (await Effect.runPromise(engine.view('a'))).state.attempts[0]?.stated ?? null;
+      return (await Effect.runPromise(engine.view('a'))).state.attempts[0]?.closedOut ?? null;
     },
     standIn: null,
   },

@@ -91,7 +91,7 @@ and `core/engine/bodies.ts:82` writes `now`.
 **What is wrong.** libuv 1.51.0 truncates a millisecond time set through `utimes`: 496 of 1,000 consecutive millisecond values read
 back changed — `1767323045678` kept, `1767323045677.999` read. Every `!==` above then reads a cache it wrote itself as stale, and the
 six runtime tests that failed in GitHub Actions run 39336719053 on Node 22.18.0 were that one bug: two in `test/said.test.ts` compared
-the time directly, and the four in `test/shell.test.ts` and `test/unsigned.test.ts` never settled a quiet session, because the capture
+the time directly, and the four in `test/shell.test.ts` and `test/closed-out.test.ts` never settled a quiet session, because the capture
 the quiescence reads was discarded on every look. Measured on official binaries: 22.18.0 and 22.23.3 (libuv 1.51.0) change 496 of
 1,000; 24.16.0 and 24.20.0 (libuv 1.52.1) change none.
 
@@ -283,7 +283,7 @@ system says when a process started.
 A quiet session is no longer reported `done` (bug 1, fixed): the runner says how long it has been quiet and leaves it
 `working`, so `say` reaches it, and an idle session's inbox starts a turn — the "nudge it past a stall" case this issue
 was about. What is left is a race. A pass that observes the session between the words being posted and its first write,
-or its going busy, still reads it quiet and ends the attempt — `done`, with `stated: false` for a task that asked for a
+or its going busy, still reads it quiet and ends the attempt — `done`, with `closedOut: false` for a task that asked for a
 statement (`unsigned` until stage 4a) — and releases the session with the words unread. The window is that one moment against a pass every few
 seconds; it was not measured. `find` changes nothing here: `say` needs the session's state and its process, and still
 observes.
@@ -733,7 +733,7 @@ What `codex exec` cannot do, said and not faked:
   the text it is writing, a background one (`--bg`) at message level.
 
 And one window, found by the check's parallel run: **the engine waits before the harness has let go.** The engine ends an
-attempt on its statement once one is on disk and the session is not busy (`closedOut` in `src/core/engine/engine.ts`), and Codex writes
+attempt on its statement once one is on disk and the session is not busy (`endedOnStatement` in `src/core/engine/engine.ts`), and Codex writes
 `-o` before it exits; the worker writes `done` only once Codex has exited and its pipes have drained. For that moment `view`
 says `input-required` while `getTask` still answers the harness's `WORKING`, and the process is still there. It closes by
 itself, and the test pins both sides of it with a fake that holds its exit (`test/codex-agent.test.ts`). Nothing reads the
@@ -1046,8 +1046,8 @@ keep the disk and those reads bounded. Not changed with the reads, so a store's 
   given its closeout; none that ended by quiet, and none settled without an end.
 
 - **An unsigned end, and its nudge** (§6 item 18). A fake `claude` that keeps a registry, at shipped defaults
-  (`test/unsigned.test.ts`), and `decide` alone; every new guard was taken out once and a test failed. Since stage 4a
-  the same fake holds the fact the engine reports instead (`stated: false`, nothing continued), and the judgement and
+  (`test/closed-out.test.ts`), and `decide` alone; every new guard was taken out once and a test failed. Since stage 4a
+  the same fake holds the fact the engine reports instead (`closedOut: false`, nothing continued), and the judgement and
   the nudge are held in agent-orchestrator (`test/store.test.ts`, *UNSIGNED is the orchestrator's word since stage 4a*). The live test
   that would show how Claude Code itself ends such a session was written and not run (last section).
 
@@ -1078,7 +1078,7 @@ keep the disk and those reads bounded. Not changed with the reads, so a store's 
 - **Resuming a Codex task** (`f63dc55`). The argument order is checked against Codex's own parser; no
   workflow has resumed a Codex step, so whether exec-level `-C` and `-s` apply to the resumed session
   is unknown.
-- **Discarding a statement inherited on resume** (`closedOut` in `agent-runtime/src/core/engine/engine.ts`). In the
+- **Discarding a statement inherited on resume** (`endedOnStatement` in `agent-runtime/src/core/engine/engine.ts`). In the
   one live resumed step, the session was busy for as long as only its parent's `StructuredOutput` call
   existed, so the busy rule alone explains why it did not settle early.
 - **A resumed attempt's own closeout and usage** (engine `00e301b`). A fake `claude` that keeps a
@@ -1288,12 +1288,12 @@ for a long implement: the model summarises and stops.
 and this task asks for a closing statement. Change nothing: the work you did stands, and nothing is being asked of it.
 Call StructuredOutput now with your closeout. If the work is not finished, finish it first and then call it; if you
 cannot finish it, call it anyway, saying what stops you."* (`NUDGE` in `agent-runtime/src/core/domain.ts`). The words are the
-fix, so `src/core/decide.test.ts` pins them exactly and `test/unsigned.test.ts` checks what a continued session is actually
+fix, so `src/core/decide.test.ts` pins them exactly and `test/closed-out.test.ts` checks what a continued session is actually
 told. The tool's name is Claude Code's, and it is the only harness a nudge reaches: `unsigned` needs quiet, and only the
 `claude --bg` runner reports it.
 
-**Moved** (stage 4a, 2026-09-23). The engine nudges nothing now: it records an end without its statement as `stated:
-false`, and the one nudge per step per round is agent-orchestrator's (`SIGNOFF` in its `brief/brief-sections.ts`, filed by `retriesDue` in `retry/retry.ts`),
+**Moved** (stage 4a, 2026-09-23). The engine nudges nothing now: it records an end without its statement as `closedOut:
+false` (`stated` until its rename), and the one nudge per step per round is agent-orchestrator's (`SIGNOFF` in its `brief/brief-sections.ts`, filed by `retriesDue` in `retry/retry.ts`),
 which names the tool too. `NUDGE` is gone from `domain.ts`; a journal that recorded a nudge on a `starting` entry still
 folds it and spawns with it.
 
@@ -1373,7 +1373,7 @@ once it has ended, its harness's others read, and why said on every look (`lookO
 | a step that gave its closeout and was then marked `blocked` never ended: needs-a-person for ever, its run needs-human, its slot held | a closeout made during the attempt, from a session not busy, ends a `blocked` attempt as it ends a `working` one; the busy and inherited-statement rules unchanged, `decide` untouched | engine `9073c18` |
 | a relative `cwd` filed through the API failed a detached harness: its worker was launched in `repo`, then launched the harness in `repo` again, from inside it (`spawn sh ENOENT`) | `file()` refuses a `cwd` that is not absolute, naming it resolved; the detached runner resolves the one it is handed, as `claude --bg` always has | engine `7425471` |
 | a `claude-detached` task never gave a closeout: its spec dropped `closeoutSchema` | `--json-schema` and `--output-format json`, and the answer read from the result's `structured_output` in the worker's capture, stamped with when that was written. The worker writes a run's end only once the harness's output is in the log: `exit` can come before the pipes drain, and the pass that records the end missed the answer (found writing the test) | engine `3e44ab6` |
-| every Codex attempt recorded `usage: null`, though its `exec --json` stream reports tokens | read from the worker's capture of that stream: tool calls by item, tokens from `turn.completed`, each absent when the stream cannot say. `turns` and `toolCalls` may now be absent from any `Usage` — a Codex turn is a prompt, not a model response — and `ae show` names what was not measured | engine `bb3de3c` |
+| every Codex attempt recorded `usage: null`, though its `exec --json` stream reports tokens | read from the worker's capture of that stream: tool calls by item, tokens from `turn.completed`, each absent when the stream cannot say. `turns` (now `responses`) and `toolCalls` may now be absent from any `Usage` — a Codex turn is a prompt, not a model response — and `ae show` names what was not measured | engine `bb3de3c` |
 | every `claude --bg` session stayed in `claude agents` after its task settled — one that gave its closeout sat `working/idle` for good, and each run's were cleared by hand | once an attempt's end is on the record, the engine releases its session on every pass that still lists it: `claude stop` if it runs, then `claude rm`, measured live first to leave `ae logs` and `--resume` working. A worktree task's session is only stopped, since `rm` deletes the worktree; `ae logs` finds a released session by its recorded id, through the task's own harness | engine `7200295` |
 | a released session that had ended by quiet was removed without a `claude stop` — and a worktree task's was never touched, left `working` for good — because `release` read the runner's translated `done` | `release` stops on the state `claude agents` itself listed (found in review) | engine `c2ebd62` |
 | a task stopped by a person or at its deadline settled with no `ended`, so its session's id was never journalled and its session stayed listed | `settled` records the open attempt's session id, read off the sighting as an ending's facts are; such a session is released, and `ae logs` still reads it (found in review) | engine `9c4221e` |
@@ -1480,18 +1480,18 @@ machine's store on 2026-09-19, 5 had a last end journalled `observed: done`, `re
 `succeeded` (implement steps of four runs, among them `the-web-app-s-components-on-3xq9` and
 `the-workflow-builder-on-the-4ifo`). `decide` now reads a `done` sighting with no statement, on a task that asked for one,
 as it reads quiet: `unsigned`, recorded `failed`. One condition, in `decide` (`src/core/decide.test.ts`, and a fake `claude`
-listing the session `done` in `test/unsigned.test.ts`; both fail with it reverted). A journal written before keeps what
+listing the session `done` in `test/closed-out.test.ts`; both fail with it reverted). A journal written before keeps what
 it recorded. The out-of-attempts note now says *ended without*, not *went quiet without*, since quiet is one door of two. The nudge before a person is agent-orchestrator', not the
 engine's: the run continues an unsigned session once a round (`signoff`, agent-orchestrator's features.md, P0.5), and the engine's
 own allowance stays `maxAttempts`, which agent-orchestrator leaves at 1.
 
 **The judgement, moved up (stage 4a, 2026-09-23).** Both doors now end the attempt as its harness ended it — `done`,
-reason `harness` — with `stated: false` beside it, written on every end read off a sighting of a task that asked for a
+reason `harness` — with `closedOut: false` beside it (`stated` until its rename, which `upgrade` reads as `closedOut`), written on every end read off a sighting of a task that asked for a
 statement (`true` when one came). The engine settles such a task `succeeded`, continues nothing and nudges nothing, whatever
-attempts it has left. agent-orchestrator reads `stated: false` as `unsigned` (`closeoutAsked` in its `views/views.verb.ts`,
+attempts it has left. agent-orchestrator reads `closedOut: false` on a succeeded end as `unsigned` (`closeoutAsked` in its `views/views.verb.ts`,
 `endWords` in its `views/views-words.ts`), and files its sign-off nudge on it; `wf` and the board say what they said.
-An end with no `stated` key — any journal written before — is not read as unsigned, and an old end the engine judged `unsigned` settles
-`failed` with its note, never continued. `maxAttempts:` and `resume:` stay on the task for `lost` and for a person's `always`;
+An end with no `closedOut` key — any journal written before — is not read as unsigned, and an old end the engine judged `unsigned`,
+read today as the harness's with `closedOut: false` and `former: 'unsigned'`, settles `failed` with its note, never continued. `maxAttempts:` and `resume:` stay on the task for `lost` and for a person's `always`;
 retiring them is part 2 of stage 4a.
 
 **One attempt per start (stage 4a part 2, 2026-09-23).** Retired: `decide` starts one attempt at a task, and any end but

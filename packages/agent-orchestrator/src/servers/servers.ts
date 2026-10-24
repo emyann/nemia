@@ -106,8 +106,8 @@ export const factoryServersRefusal = (servers: Readonly<Record<string, unknown>>
  * An agent's `mcp:` names split against the factory's record: those the **factory** supplies, as servers to hand the session, and
  * those left to the checkout's `.mcp.json`, as names.
  *
- * The factory comes first: a name it records is taken out of `checkoutMcp` altogether, which both gives the factory precedence and
- * keeps the runtime's existing "one would hide the other" refusal (`checkoutMcpRefusalOf`) untripped — a name on both lists would
+ * The factory comes first: a name it records is taken out of `projectMcp` altogether, which both gives the factory precedence and
+ * keeps the runtime's existing "one would hide the other" refusal (`projectMcpRefusalOf`) untripped — a name on both lists would
  * otherwise refuse the step rather than resolve. A name the factory does not record resolves against the checkout exactly as it did,
  * and is still refused there when the file does not declare it.
  *

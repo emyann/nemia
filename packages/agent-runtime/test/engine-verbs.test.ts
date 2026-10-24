@@ -212,7 +212,7 @@ test('the file-backed default needs no configuration: a journal and a feed on di
   await s.test(
     'a usage whose key has no value — `{ costUsd: undefined }`, which the files journal writes without the key — is nothing new to write down, on any pass',
     async () => {
-      for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed', usage: { turns: 3, costUsd: undefined } });
+      for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed', usage: { responses: 3, costUsd: undefined } });
       for (let i = 0; i < 4; i++) await Effect.runPromise(engine.tick());
       assert.equal((await Effect.runPromise(engine.view(id))).state.settled, 'succeeded');
       assert.deepEqual(await measured(), [], 'the end already says turns, and nothing says a cost: nothing to write, on any pass');
@@ -220,10 +220,10 @@ test('the file-backed default needs no configuration: a journal and a feed on di
   );
 
   await s.test('a cost that arrives is written once, not on every pass', async () => {
-    for (const [k, v] of sessions) sessions.set(k, { ...v, usage: { turns: 3, costUsd: 0.5 } });
+    for (const [k, v] of sessions) sessions.set(k, { ...v, usage: { responses: 3, costUsd: 0.5 } });
     for (let i = 0; i < 3; i++) await Effect.runPromise(engine.tick());
     assert.equal((await measured()).length, 1, 'a cost that arrives is written once');
-    assert.deepEqual((await Effect.runPromise(engine.view(id))).state.attempts[0]?.usage, { turns: 3, costUsd: 0.5 });
+    assert.deepEqual((await Effect.runPromise(engine.view(id))).state.attempts[0]?.usage, { responses: 3, costUsd: 0.5 });
   });
 });
 
@@ -345,7 +345,7 @@ test(
 );
 
 /** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
-const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { turns: 'three' } }) + '\n';
+const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { responses: 'three' } }) + '\n';
 
 test('a task whose journal holds an entry no runtime wrote is left out of each pass and said, naming the file, the entry and the field; every other task moves', async () => {
   const root = scratch('ae-verbs-');
@@ -362,7 +362,7 @@ test('a task whose journal holds an entry no runtime wrote is left out of each p
   assert.equal(first.unreadable.length, 1);
   assert.ok(
     first.unreadable[0].startsWith(
-      `${bad}'s journal (${journal}), entry 2 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`,
+      `${bad}'s journal (${journal}), entry 2 is a \`measured\` event, and its \`usage.responses\` is "three", where the runtime writes number.`,
     ),
     first.unreadable[0],
   );

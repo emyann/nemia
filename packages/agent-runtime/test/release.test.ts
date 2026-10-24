@@ -266,7 +266,7 @@ test('release at shipped defaults: a finished Claude Code session is stopped if 
           );
           assert.deepEqual(
             state.attempts[0]?.usage,
-            { turns: 1, toolCalls: 1, costUsd: 0.25, apiMs: 4000, toolMs: 300 },
+            { responses: 1, toolCalls: 1, costUsd: 0.25, apiMs: 4000, toolMs: 300 },
             `${at}: on the attempt`,
           );
           assert.deepEqual(

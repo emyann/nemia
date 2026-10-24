@@ -36,7 +36,7 @@ const seen = (usage?: Usage): Sighting => ({
 const counted = (usage: Usage, n = 1): Event => ({ kind: 'counted', at: at(10), attempt: n, usage });
 
 const TWO_TURNS: Usage = {
-  turns: 2,
+  responses: 2,
   toolCalls: 1,
   inputTokens: 300,
   uncachedTokens: 10,
@@ -49,7 +49,7 @@ test("countedFacts, fold and the view: a long-lived attempt's counts journalled 
   await t.test(
     'COUNTED: a long-lived attempt in flight whose sighting reports more than the record is written one counted entry, its counts and never a cost',
     () => {
-      const state = fold(TASK, inFlight(true, counted({ turns: 1, outputTokens: 20 })));
+      const state = fold(TASK, inFlight(true, counted({ responses: 1, outputTokens: 20 })));
       const facts = countedFacts(state, seen({ ...TWO_TURNS, costUsd: 0.5, apiMs: 900, toolMs: 30, unpricedModel: true }), at(20));
       assert.deepEqual(facts, [{ kind: 'counted', at: at(20), attempt: 1, usage: TWO_TURNS }]);
     },
@@ -81,23 +81,23 @@ test("countedFacts, fold and the view: a long-lived attempt's counts journalled 
 
   await t.test('COUNTED: a reading with fewer turns than the record is no count of this attempt, and is written nothing', () => {
     const state = fold(TASK, inFlight(true, counted(TWO_TURNS)));
-    assert.deepEqual(countedFacts(state, seen({ turns: 1, outputTokens: 900 }), at(20)), []);
+    assert.deepEqual(countedFacts(state, seen({ responses: 1, outputTokens: 900 }), at(20)), []);
   });
 
   await t.test(
     'COUNTED: a compacted attempt whose reading lost its tokens but grew in turns is written them gone, and the fold drops the stale tokens',
     () => {
       const events = inFlight(true, counted(TWO_TURNS));
-      const facts = countedFacts(fold(TASK, events), seen({ turns: 3, toolCalls: 2, compactions: 1 }), at(20));
-      assert.deepEqual(facts, [{ kind: 'counted', at: at(20), attempt: 1, usage: { turns: 3, toolCalls: 2, compactions: 1 } }]);
+      const facts = countedFacts(fold(TASK, events), seen({ responses: 3, toolCalls: 2, compactions: 1 }), at(20));
+      assert.deepEqual(facts, [{ kind: 'counted', at: at(20), attempt: 1, usage: { responses: 3, toolCalls: 2, compactions: 1 } }]);
       const usage = fold(TASK, [...events, ...facts]).attempts[0].usage;
-      assert.deepEqual(usage, { turns: 3, toolCalls: 2, compactions: 1 }, 'no inputTokens left over from the reading before');
+      assert.deepEqual(usage, { responses: 3, toolCalls: 2, compactions: 1 }, 'no inputTokens left over from the reading before');
     },
   );
 
   await t.test('FOLD: a counted entry replaces the attempt usage whole, where a measured one merges into it', () => {
-    const twice = fold(TASK, inFlight(true, counted({ turns: 1, inputTokens: 100 }), counted({ turns: 2 })));
-    assert.deepEqual(twice.attempts[0].usage, { turns: 2 });
+    const twice = fold(TASK, inFlight(true, counted({ responses: 1, inputTokens: 100 }), counted({ responses: 2 })));
+    assert.deepEqual(twice.attempts[0].usage, { responses: 2 });
   });
 
   await t.test(
@@ -105,8 +105,8 @@ test("countedFacts, fold and the view: a long-lived attempt's counts journalled 
     () => {
       const lost: Event = { kind: 'ended', at: at(30), attempt: 1, sessionId: 's1', observed: 'failed', reason: 'lost' };
       assert.deepEqual(fold(TASK, inFlight(true, counted(TWO_TURNS), lost)).attempts[0].usage, TWO_TURNS);
-      const read = { ...lost, reason: 'harness' as const, usage: { turns: 3 } };
-      assert.deepEqual(fold(TASK, inFlight(true, counted(TWO_TURNS), read)).attempts[0].usage, { turns: 3 });
+      const read = { ...lost, reason: 'harness' as const, usage: { responses: 3 } };
+      assert.deepEqual(fold(TASK, inFlight(true, counted(TWO_TURNS), read)).attempts[0].usage, { responses: 3 });
       const measured: Event = { kind: 'measured', at: at(40), attempt: 1, usage: { costUsd: 0.25 } };
       assert.deepEqual(fold(TASK, inFlight(true, counted(TWO_TURNS), lost, measured)).attempts[0].usage, { ...TWO_TURNS, costUsd: 0.25 });
     },
@@ -121,9 +121,9 @@ test("countedFacts, fold and the view: a long-lived attempt's counts journalled 
   await t.test(
     "VIEW: a long-lived task shows its attempt's journalled counts, though the view's own sighting counts less; a job shows its sighting's",
     () => {
-      const lower = new Map([[nameFor(TASK, 1), seen({ turns: 1 })]]);
+      const lower = new Map([[nameFor(TASK, 1), seen({ responses: 1 })]]);
       assert.deepEqual(viewOfState(fold(TASK, inFlight(true, counted(TWO_TURNS))), lower).usage, TWO_TURNS);
-      assert.deepEqual(viewOfState(fold(TASK, inFlight(false)), lower).usage, { turns: 1 });
+      assert.deepEqual(viewOfState(fold(TASK, inFlight(false)), lower).usage, { responses: 1 });
     },
   );
 });

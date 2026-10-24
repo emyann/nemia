@@ -743,7 +743,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
           '  none',
           '',
           '  implement  BLOCKED',
-          '    used  turns not measured · tool calls not measured · tokens in not measured · tokens out not measured',
+          '    used  responses not measured · tool calls not measured · tokens in not measured · tokens out not measured',
           '    cost  $3.40 · budget $3',
           '    timeline  try 1  filed <times>',
           '    did it',

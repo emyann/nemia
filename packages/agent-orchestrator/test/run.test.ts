@@ -641,11 +641,8 @@ test("a run's start is its first filing — of any try, check or step, whatever 
     [null, null],
     'nothing filed, waiting on runs or held for a slot: no start, whatever the feed holds for other runs',
   );
-  assert.equal(
-    runStartedAt({ ...waiting, steps: { implement: { taskId: null, tries: [{ taskId: 't1', cause: 'retries' }] } } }, filed),
-    clock(4, 30),
-    'a try whose retry is asked and not filed yet has started all the same',
-  );
+  const asked = { ...waiting, steps: { implement: { taskId: null, tries: [{ taskId: 't1', cause: 'retries' as const }] } } };
+  assert.equal(runStartedAt(asked, filed), clock(4, 30), 'a try whose retry is asked and not filed yet has started all the same');
 });
 
 test('a recheck ran no session: the try it reached names the session it checked again, counted once in the totals; each round of a loop totals apart', () => {

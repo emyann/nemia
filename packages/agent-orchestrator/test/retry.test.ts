@@ -702,12 +702,13 @@ test('a check that ended stopped spends no retry, and `nemia retry --recheck` ru
     assert.deepEqual([pass.tried, pass.checked, pass.filed], [['implement'], ['implement'], []]);
     assert.deepEqual(b.filings, [`${run.id}-implement`, check1(), check2()], 'a check, and no step');
     assert.equal(b.tasks.get(check2())!.spec.harness, 'check');
+    const rechecked = [{ taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck' }];
     assert.deepEqual(filedAs(readRun(run.id).steps.implement), {
       taskId: `${run.id}-implement`,
       workspace: run.repo,
       branch: run.branch,
       check: { taskId: check2() },
-      tries: [{ taskId: `${run.id}-implement`, check: { taskId: check1() }, cause: 'recheck' }],
+      tries: rechecked,
     });
   });
   await s.test('the check exits 0: the work passed as it stood, and the follower is filed', async () => {

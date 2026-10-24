@@ -408,8 +408,9 @@ test('REFUSED: a gated step sent back from its gate with words waited on no answ
   later(6);
   await runWith(engine, retryRun(run.id, 'intake', { mode: 'nudge', message: 'smaller steps, please' }));
   await tickUntil(() => sessions.has(nameFor(intake, 2)));
+  const causes = readRun(run.id).steps.intake.tries?.map((x) => x.cause);
   assert.deepEqual(
-    [readRun(run.id).steps.intake.taskId, readRun(run.id).steps.intake.tries?.map((x) => x.cause)],
+    [readRun(run.id).steps.intake.taskId, causes],
     [intake, ['nudge']],
     'the record an answer to a blocked sign-off leaves, but for what the first turn signed',
   );

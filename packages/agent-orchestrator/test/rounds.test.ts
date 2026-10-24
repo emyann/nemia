@@ -192,14 +192,11 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
         'replies',
       ]);
       const branch = run.steps.implement.branch;
+      const implemented = [{ taskId: `${id}-implement`, check: { taskId: `${id}-implement-check` }, cause: 'round' }];
+      const reviewed = [{ taskId: `${id}-review`, cause: 'round' }];
       assert.deepEqual(Object.fromEntries(Object.entries(run.steps).map(([name, record]) => [name, filedAs(record)])), {
-        implement: {
-          taskId: try2,
-          workspace: run.workspace,
-          branch,
-          tries: [{ taskId: `${id}-implement`, check: { taskId: `${id}-implement-check` }, cause: 'round' }],
-        },
-        review: { taskId: null, workspace: run.workspace, branch, tries: [{ taskId: `${id}-review`, cause: 'round' }] },
+        implement: { taskId: try2, workspace: run.workspace, branch, tries: implemented },
+        review: { taskId: null, workspace: run.workspace, branch, tries: reviewed },
         ship: { taskId: null },
       });
       assert.deepEqual(

@@ -97,7 +97,12 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
  */
 function Session({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
-  const following = useStepTranscript(run.id, step.name, sessionToRead(step), isGate(stepState(step.status, cancelled, false), cancelled));
+  const following = useStepTranscript(
+    run.id,
+    step.name,
+    sessionToRead(step),
+    isGate(stepState(step.phase, step.reason, cancelled, false), cancelled),
+  );
   const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
   const said = useMemo(() => mergeSaid(step.said, sent.taskId === step.taskId ? sent.said : []), [step.said, step.taskId, sent]);
   const turns = useMemo(() => {
@@ -111,7 +116,7 @@ function Session({ run, step }: { run: RunDetail; step: Step }) {
         <BackToRun run={run} />
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <h1 className="font-semibold">{step.name}</h1>
-          <StatusChip status={step.status} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
+          <StatusChip phase={step.phase} reason={step.reason} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
           {following.live && (
             <span
               data-following

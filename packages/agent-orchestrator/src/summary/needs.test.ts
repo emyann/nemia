@@ -47,10 +47,12 @@ const run = {
   steps: { build: { taskId: 't-build' }, review: { taskId: 't-review' } },
 } as unknown as Run;
 
+const starting = { phase: 'running', reason: 'Running', verdict: null } as const;
+
 const judged = {
-  words: new Map([
-    ['build', 'starting'],
-    ['review', 'starting'],
+  codes: new Map([
+    ['build', starting],
+    ['review', starting],
   ]),
   waitingOnYou: [] as string[],
   beside: new Map<string, { waits?: string; denied?: string }>(),

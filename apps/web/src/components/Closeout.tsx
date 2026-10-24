@@ -1,10 +1,11 @@
 import { useId, useState, type ReactNode } from 'react';
 import { Switch } from '@/components/ui/switch';
-import type { StepAttempts, StepCloseout, StepTry } from '../lib/api';
+import type { CheckResult, CheckVerdict, StepAttempts, StepCloseout, StepTry } from '../lib/api';
 import { duration } from '../lib/canvas';
 import { foldsAtGate, imagePaths, type Outcome, outcomeOf, outcomeWord } from '../lib/outcome';
 import { bodyLeadsWith, summaryShown } from '../lib/transcript';
 import { cn } from '../lib/utils';
+import { verdictWords } from '../lib/words';
 import { Artifacts, Values } from './Artifacts';
 import { Markdown } from './Markdown';
 import { FieldView, Json, OutcomeHead } from './Outcome';
@@ -18,22 +19,34 @@ export { Artifacts, bytesWord } from './Artifacts';
  */
 export function tryLabel(t: StepTry, tries: readonly StepTry[]): string {
   const before = tries.find((other) => other.try === t.try - 1);
-  return `round ${t.round} · try ${t.try}${before?.then ? ` (${before.then})` : ''}`;
+  return `round ${t.round} · try ${t.try}${before?.cause ? ` (${before.cause})` : ''}`;
 }
 
-/** A try's attempts as its row says them: how many, and how long the latest took, or that it runs. */
+/** A try's sessions as its row says them: how many, and how long the latest took, or that it runs. */
 export function attemptsWord({ count, latest }: StepAttempts): string {
-  if (!latest) return 'no attempt';
+  if (!latest) return 'no session';
   const took = latest.endedAt ? duration(Date.parse(latest.endedAt) - Date.parse(latest.startedAt)) : latest.ended ? null : 'running';
   return took ? `#${count} · ${took}` : `#${count}`;
 }
 
-const verdictClass = (verdict: string | null) =>
-  verdict === 'passed'
-    ? 'text-foreground'
-    : verdict === 'unfinished' || verdict?.startsWith('exit ')
-      ? 'font-semibold text-failure'
-      : 'text-muted-foreground';
+/** The ink of a check's verdict, by its result: plain where it passed, a failure where it failed or did not finish, else muted. */
+const VERDICT_CLASS: Record<CheckResult, string> = {
+  passed: 'text-foreground',
+  failed: 'font-semibold text-failure',
+  unfinished: 'font-semibold text-failure',
+  running: 'text-muted-foreground',
+  unknown: 'text-muted-foreground',
+};
+
+/** A try's check's verdict as its row says it — `check exit 1` — inked by its result; `not filed` until the run files the check. */
+function CheckVerdictWords({ verdict }: { verdict: CheckVerdict | null }) {
+  const said = verdict ? verdictWords(verdict) : 'not filed';
+  return (
+    <span data-verdict={said} data-verdict-result={verdict?.result}>
+      check <span className={cn('font-mono', verdict ? VERDICT_CLASS[verdict.result] : 'text-muted-foreground')}>{said}</span>
+    </span>
+  );
+}
 
 /**
  * Every try of a step, a row each, earliest first: its round and number and how it was reached, its task, its attempts and how
@@ -74,11 +87,7 @@ export function Rounds({ tries, selected, onSelect }: { tries: readonly StepTry[
               <p className="break-all font-mono text-body-small text-muted-foreground">{t.taskId ?? 'not filed'}</p>
               <p className="flex flex-wrap gap-x-3">
                 <span data-attempts>{attemptsWord(t.attempts)}</span>
-                {t.check && (
-                  <span data-verdict={t.check.verdict ?? 'not filed'}>
-                    check <span className={cn('font-mono', verdictClass(t.check.verdict))}>{t.check.verdict ?? 'not filed'}</span>
-                  </span>
-                )}
+                {t.check && <CheckVerdictWords verdict={t.check.verdict} />}
               </p>
               {t.answer && (
                 <p data-your-answer title={t.answer} className="line-clamp-2 break-words">

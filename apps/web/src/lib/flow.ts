@@ -69,7 +69,7 @@ export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under
 export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'> & { holding?: RunSummary['holding'] }): EdgeStep[] =>
   run.steps.map((step) => ({
     name: step.name,
-    state: stepState(step.status, run.cancelledAt !== null, run.holding != null),
+    state: stepState(step.phase, step.reason, run.cancelledAt !== null, run.holding != null),
     note: step.note,
     roundDue: step.roundDue,
   }));

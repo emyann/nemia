@@ -34,7 +34,7 @@ import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { parentRecord, shippedOf, type BranchReader } from '../branches/branches.store.ts';
 import { continuesFrom } from '../retry/index.ts';
-import { phaseOfView, unsignedEnd, wordOfView } from './views-words.ts';
+import { phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
 
 /**
  * The attempts of a task's current turn: every attempt of a task not held open, and of one held open those since the last answer a
@@ -379,6 +379,12 @@ export const exitVerdicts =
 export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string): string | undefined =>
   continuesFrom(views.get(taskId)?.state.attempts);
 
+/** The word of a step on a run left unjudged, a task of which does not read (`unjudgedWord`). */
+export const UNREADABLE = 'unreadable';
+
+/** A step's word on a run left unjudged (`unjudgedWord`): `unreadable`, or the engine's word for its task. */
+export type UnjudgedWord = typeof UNREADABLE | EnginePhase | 'unknown';
+
 /**
  * A step's word on a run left unjudged because a task it reads does not (`unjudgedWords`): `unreadable` when any task the step has filed —
  * its own, its check's, an earlier try's or its check's (`stepTasks`) — is among `unreadable`; else `pending` with no task of its own
@@ -386,12 +392,8 @@ export const sessionIn = (views: ReadonlyMap<string, TaskView>, taskId: string):
  */
 export const unjudgedWord =
   (views: ReadonlyMap<string, TaskView>, unreadable: ReadonlyMap<string, string>) =>
-  (step: StepRecord | undefined): string =>
-    step && stepTasks(step).some((id) => unreadable.has(id))
-      ? 'unreadable'
-      : !step?.taskId
-        ? 'pending'
-        : wordOfView(views.get(step.taskId));
+  (step: StepRecord | undefined): UnjudgedWord =>
+    step && stepTasks(step).some((id) => unreadable.has(id)) ? UNREADABLE : !step?.taskId ? 'pending' : wordOfView(views.get(step.taskId));
 
 /**
  * How many times a person said something to each step's current try while it ran (`nemia say`): the engine's `said` on the try's task, off

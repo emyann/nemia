@@ -104,7 +104,7 @@ const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
-      then: 'round' as const,
+      cause: 'round' as const,
     }));
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   return run(
@@ -146,7 +146,7 @@ test('REFUSED by `sayRefusal` before the engine is asked: a step the run does no
       'nemia retry r-1 implement --message "<words>"',
     );
   }
-  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge' }] }, review: { taskId: null } } });
+  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'nudge' }] }, review: { taskId: null } } });
   assert.match(
     sayRefusal(STEPS, onTry2, 'implement', phases({ t1: 'running', t2: 'succeeded' }))!,
     /^implement is not running: try 2's task settled `succeeded`/,
@@ -209,15 +209,17 @@ test("`nemia ls` notes a step whose current try's session a person told somethin
   assert.deepEqual(rows(live, { t1: 'working' }, { implement: 2 })[0], {
     name: 'implement',
     status: 'working',
+    reason: 'Running',
+    phase: 'running',
     branch: null,
     note: 'said to 2×',
   });
   assert.deepEqual(
     rows(live, { t1: 'working' }, {})[0],
-    { name: 'implement', status: 'working', branch: null },
+    { name: 'implement', status: 'working', reason: 'Running', phase: 'running', branch: null },
     'no note for a step nobody told',
   );
-  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge' }] }, review: { taskId: null } } });
+  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'nudge' }] }, review: { taskId: null } } });
   assert.equal(rows(onTry2, { t2: 'working' }, { implement: 1 })[0].note, 'try 2, nudged on your word · said to 1×');
   assert.deepEqual([saidWord(0), saidWord(1), saidWord(3)], ['', 'said to 1×', 'said to 3×']);
 });
@@ -310,7 +312,7 @@ const B4 = () => {
         implement: {
           taskId: 't2',
           check: { taskId: 'c2' },
-          tries: [{ taskId: 't1', check: { taskId: 'c1' }, then: 'retries' }],
+          tries: [{ taskId: 't1', check: { taskId: 'c1' }, cause: 'retries' }],
         },
       },
     },
@@ -415,7 +417,7 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
 
 test('a try still running has no end, says so, and holds the totals open: no wall, and its run time left out of the sum and named', () => {
   const { r, views, filed } = B4();
-  r.steps.implement = { taskId: 't3', tries: [...r.steps.implement.tries!, { taskId: 't2', check: { taskId: 'c2' }, then: 'nudge' }] };
+  r.steps.implement = { taskId: 't3', tries: [...r.steps.implement.tries!, { taskId: 't2', check: { taskId: 'c2' }, cause: 'nudge' }] };
   views.set('t3', task([[clock(30, 2), clock(30, 5), null]], null));
   filed.set('t3', clock(30));
   const t = timeline(r, views, filed);
@@ -606,7 +608,7 @@ test("a run's start is its first filing — of any try, check or step, whatever 
       createdAt: clock(0),
       steps: {
         review: { taskId: 'rv' },
-        implement: { taskId: 't2', check: { taskId: 'c2' }, tries: [{ taskId: 't1', check: { taskId: 'c1' }, then: 'retries' }] },
+        implement: { taskId: 't2', check: { taskId: 'c2' }, tries: [{ taskId: 't1', check: { taskId: 'c1' }, cause: 'retries' }] },
       },
     },
   );
@@ -641,11 +643,8 @@ test("a run's start is its first filing — of any try, check or step, whatever 
     [null, null],
     'nothing filed, waiting on runs or held for a slot: no start, whatever the feed holds for other runs',
   );
-  assert.equal(
-    runStartedAt({ ...waiting, steps: { implement: { taskId: null, tries: [{ taskId: 't1', then: 'retries' }] } } }, filed),
-    clock(4, 30),
-    'a try whose retry is asked and not filed yet has started all the same',
-  );
+  const asked = { ...waiting, steps: { implement: { taskId: null, tries: [{ taskId: 't1', cause: 'retries' as const }] } } };
+  assert.equal(runStartedAt(asked, filed), clock(4, 30), 'a try whose retry is asked and not filed yet has started all the same');
 });
 
 test('a recheck ran no session: the try it reached names the session it checked again, counted once in the totals; each round of a loop totals apart', () => {
@@ -653,7 +652,7 @@ test('a recheck ran no session: the try it reached names the session it checked 
   r.steps.implement = {
     taskId: 't2',
     check: { taskId: 'c3' },
-    tries: [...r.steps.implement.tries!, { taskId: 't2', check: { taskId: 'c2' }, then: 'recheck' }],
+    tries: [...r.steps.implement.tries!, { taskId: 't2', check: { taskId: 'c2' }, cause: 'recheck' }],
   };
   views.set('c3', task([[clock(40, 1), clock(40, 1), clock(41)]], 'succeeded'));
   filed.set('c3', clock(40));
@@ -671,8 +670,8 @@ test('a recheck ran no session: the try it reached names the session it checked 
     {},
     {
       steps: {
-        implement: { taskId: 'i2', tries: [{ taskId: 'i1', then: 'round' }] },
-        review: { taskId: 'v2', tries: [{ taskId: 'v1', then: 'round' }] },
+        implement: { taskId: 'i2', tries: [{ taskId: 'i1', cause: 'round' }] },
+        review: { taskId: 'v2', tries: [{ taskId: 'v1', cause: 'round' }] },
       },
     },
   );
@@ -743,8 +742,8 @@ test("REFUSED: a round's total counts only the steps its loop files again — a 
     {
       steps: {
         plan: { taskId: 'p' },
-        implement: { taskId: 'i2', tries: [{ taskId: 'i1', then: 'round' }] },
-        review: { taskId: 'v2', tries: [{ taskId: 'v1', then: 'round' }] },
+        implement: { taskId: 'i2', tries: [{ taskId: 'i1', cause: 'round' }] },
+        review: { taskId: 'v2', tries: [{ taskId: 'v1', cause: 'round' }] },
         ship: { taskId: 's' },
       },
     },
@@ -798,7 +797,7 @@ test("REFUSED: a round's total counts only the steps its loop files again — a 
       steps: Object.fromEntries(
         ['implement', 'review', 'docs', 'proofread'].map((name) => [
           name,
-          { taskId: `${name}-2`, tries: [{ taskId: `${name}-1`, then: 'round' }] },
+          { taskId: `${name}-2`, tries: [{ taskId: `${name}-1`, cause: 'round' }] },
         ]),
       ),
     },

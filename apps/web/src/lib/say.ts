@@ -22,7 +22,7 @@ export type Sayable = { open: true } | { open: false; why: string };
  */
 export function sayable(
   run: Pick<RunDetail, 'cancelledAt'>,
-  step: Pick<RunDetail['steps'][number], 'name' | 'taskId' | 'status'>,
+  step: Pick<RunDetail['steps'][number], 'name' | 'taskId' | 'phase' | 'reason'>,
 ): Sayable {
   if (run.cancelledAt !== null) {
     return {
@@ -32,7 +32,7 @@ export function sayable(
   }
   if (!step.taskId)
     return { open: false, why: `${step.name} is not filed yet, so it has no session to say anything to. Say it here once it runs.` };
-  const state = stepState(step.status, false, false);
+  const state = stepState(step.phase, step.reason, false, false);
   if (state === 'working' || state === 'needs-human') return { open: true };
   if (state === 'unknown')
     return { open: false, why: `The engine has no record of ${step.name}'s task, so there is no session to say anything to.` };

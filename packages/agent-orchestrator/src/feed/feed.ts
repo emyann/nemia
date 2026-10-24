@@ -31,7 +31,8 @@ import { oneLine, type Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { holdWord } from '../wait/wait.ts';
-import { SLOT_WAIT, slotWord } from '../cap/cap.ts';
+import { SLOT_WAIT } from '../cap/cap.ts';
+import { runCodes } from '../phase/phase.ts';
 import { takeoverLine, type DaemonStanding } from '../daemon/daemon.ts';
 import {
   DAEMON_STARTED,
@@ -152,13 +153,18 @@ const labelsOf = (line: FeedLine): FeedLabels =>
  * this table does not have, or mark as waiting a reason this one does not: re-deriving either would answer for its writer, and a line is
  * a report of what its writer judged. Only a line with no version at all — one written before the feed was signed — is read off its word
  * and its note, and even then the fold reaches what it needs through `involvedOf` and the table where a key is still missing.
+ *
+ * A line built with its `reason` keeps it: a run's and a step's word carry the code the listing judged them by (`feedWords`), and only
+ * a line that carries none — a v0 line, a one-shot offered by its word — is classified off its word (`reasonOf`). The reason is placed
+ * where a classified one would be, so a line written says its fields in one order whichever way its reason came.
  */
 export function upgraded(line: FeedLine): FeedLine {
   if (line.apiVersion !== undefined) return line;
+  const { reason: given, ...said } = line;
   const involved = involvedOf(line);
-  const reason = reasonOf(line, involved.kind);
+  const reason = given ?? reasonOf(line, involved.kind);
   return {
-    ...line,
+    ...said,
     apiVersion: FEED_VERSION,
     involved,
     labels: labelsOf(line),
@@ -503,6 +509,7 @@ export function feedChanges(
       ...saidKeys(said),
       involved: step === undefined ? { kind: 'Run', name: run } : { kind: 'Step', name: `${run}/${step}` },
       labels,
+      ...(said.reason !== undefined ? { reason: said.reason } : {}),
     }) as RunLine;
   const out: Array<RunLine | StoreLine> = [];
   for (const [id, words] of now) {
@@ -563,8 +570,12 @@ export function publishedOf({ lines, before, after, leading }: FeedAppended): Fe
   });
 }
 
-/** A word the feed keeps, and the note beside it, when there is one: what one line of it says of a run or of a step. */
-export type FeedSaid = { word: string; note?: string };
+/**
+ * A word the feed keeps, and the note beside it, when there is one: what one line of it says of a run or of a step. And, where the pass
+ * judged it (`feedWords`), the `reason` its line names: the code the listing set beside the word (`Listing`'s `reason`, `runCodes`), never
+ * read back off it. A word folded off the feed carries none: two words are the same by their word and note (`same`).
+ */
+export type FeedSaid = { word: string; note?: string; reason?: Reason };
 
 /**
  * What a pass judged of one run, in the words the feed keeps (`feedWords`): the run's, and each step's in the order they run; and
@@ -638,12 +649,13 @@ export const feedPhase = (word: EnginePhase | 'unknown'): ListedPhase => FEED_WO
  * What the feed says of a run as a pass judged it: the listing `nemia ls` prints (`listing`, handed the engine's words through
  * `feedPhase`), in the feed's words. Pure.
  *
- * Each step's word is its status as `nemia ls` prints it (`shownStatus`), and its note the note beside it there — the try due or on, the
+ * Each step's word is its status as `nemia ls` prints it (`shownStatus`), its reason the code the listing judged it by (`reason`), and its
+ * note the note beside it there — the try due or on, the
  * gate and what answers it, how many times it was said to — which is where a person's writes show. Not its cost, which moves while nothing
  * is decided. A step that signed off blocked puts what it needs before that note (`needsNote`). The run's word is `assess`'s status —
  * `awaiting approval` at a gate, as `nemia decide` says it, and `failed` only where a step broke —
  * `(pruned)` beside it as `nemia ls` says it, and its note who it waits on you for (`onYouWords`) — or, on a held run, what it is held
- * until (`holdWord`), and nobody is waited on.
+ * until (`holdWord`), and nobody is waited on; its reason is its status's, `Held` where the hold is its note (`runCodes`).
  *
  * One more departure from `nemia ls`: a root the cap on runs in flight holds says `waiting for a run slot`, without the count in flight,
  * which moves with every other run's start and end while nothing of this one does.
@@ -675,6 +687,7 @@ export function feedWords(
   } = {},
 ): FeedWords {
   const onYou = onYouWords(l);
+  const held = Boolean(run.hold) && status !== 'cancelled';
   return {
     ...(labelled.run ? { labels: labelled.run } : {}),
     ...(labelled.denials?.length ? { denials: labelled.denials } : {}),
@@ -685,19 +698,21 @@ export function feedWords(
     ...(labelled.lifted !== undefined ? { lifted: labelled.lifted } : {}),
     run: {
       word: `${status}${run.pruned ? ' (pruned)' : ''}`,
-      ...(run.hold && status !== 'cancelled'
+      ...(held && run.hold
         ? { note: holdWord(l.holding ?? [], run.hold) }
         : onYou.length
           ? { note: `waiting on you: ${onYou.join(', ')}` }
           : {}),
+      reason: runCodes(status, held).reason,
     },
     steps: l.steps.map((s) => {
       const note = [needsNote(closeoutOf(s.name)), s.note].filter(Boolean).join(' · ');
       const labels = labelled.step?.(s.name);
       return {
         name: s.name,
-        word: l.slot && s.status === slotWord(l.slot) ? SLOT_WAIT : shownStatus(s),
+        word: s.reason === 'WaitingForSlot' ? SLOT_WAIT : shownStatus(s),
         ...(note ? { note } : {}),
+        reason: s.reason,
         ...(labels ? { labels } : {}),
       };
     }),

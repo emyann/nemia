@@ -158,7 +158,7 @@ export default {
       "the Decide section says why each step past its budget is held, in wf decide's words",
     );
     await expectVisible(
-      decide.locator('section[aria-label="Used"] dd', { hasText: 'run $7.85 measured · 2 attempts not measured' }),
+      decide.locator('section[aria-label="Used"] dd', { hasText: 'run $7.85 measured · 2 sessions not measured' }),
       "and what every try of the run cost, in wf decide's words",
     );
     const answers = decide.locator('section[aria-label="Answer"]');

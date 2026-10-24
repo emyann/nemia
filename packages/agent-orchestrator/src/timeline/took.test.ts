@@ -127,8 +127,8 @@ const used = (input: number, output: number, read?: number, write?: number): Con
 
 test('a run’s tokens are every session’s of every try, once — a recheck’s try shares its session, and a check measures nothing', () => {
   const r = run({
-    plan: { taskId: 'p2', check: { taskId: 'pc2' }, tries: [{ taskId: 'p1', check: { taskId: 'pc1' }, then: 'retries' }] },
-    build: { taskId: 'b1', tries: [{ taskId: 'b1', check: { taskId: 'bc1' }, then: 'recheck' }] },
+    plan: { taskId: 'p2', check: { taskId: 'pc2' }, tries: [{ taskId: 'p1', check: { taskId: 'pc1' }, cause: 'retries' }] },
+    build: { taskId: 'b1', tries: [{ taskId: 'b1', check: { taskId: 'bc1' }, cause: 'recheck' }] },
   });
   const views = new Map([
     ['p1', task([attempt(at(10), at(10, 5), { usage: used(1_000_000, 10_000, 900_000, 80_000) })])],
@@ -171,7 +171,7 @@ const ASK = { name: 'ask', gate: true, after: [] } as unknown as Workflow;
 
 /** A run of one gated step held open on task `T`: it signed off blocked, a person answered, and its second try is that answer's turn. */
 const answered = (approved: { try: number; at: string }): RepositoryRun => ({
-  ...run({ ask: { taskId: 'T', tries: [{ taskId: 'T', then: 'nudge' }] } }),
+  ...run({ ask: { taskId: 'T', tries: [{ taskId: 'T', cause: 'nudge' }] } }),
   approvals: [{ step: 'ask', ...approved }],
 });
 
@@ -204,7 +204,7 @@ test("the opposite order: an approval that names the try owning the session wait
 
 test("REFUSED: a recheck's try waits from its check's end, and an answered try whose turn has not ended has no wait", () => {
   const rechecked = {
-    ...run({ ask: { taskId: 'T', check: { taskId: 'c2' }, tries: [{ taskId: 'T', check: { taskId: 'c1' }, then: 'recheck' }] } }),
+    ...run({ ask: { taskId: 'T', check: { taskId: 'c2' }, tries: [{ taskId: 'T', check: { taskId: 'c1' }, cause: 'recheck' }] } }),
     approvals: [{ step: 'ask', try: 2, at: at(11) }],
   } as RepositoryRun;
   const views = new Map([

@@ -182,7 +182,7 @@ export function timeline(
         taskId: t.taskId,
         check: t.check?.taskId,
         round: roundIn({ taskId: null, tries: earlier.slice(0, i) }),
-        then: t.then,
+        cause: t.cause,
       })),
       ...(record.taskId ? [{ taskId: record.taskId, check: record.check?.taskId, round: roundIn(record) }] : []),
     ];

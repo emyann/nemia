@@ -260,7 +260,7 @@ function loopRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, re
  * files (`routed`) — or undefined.
  *
  * `routed` is the ungated ending's case, and it is why `cleanNext` needs none: a merge filed there would file the work again with
- * `then: 'merge'` on the very pass that files the landing, which is the collision this refusal exists to prevent. Read before the trial
+ * `cause: 'merge'` on the very pass that files the landing, which is the collision this refusal exists to prevent. Read before the trial
  * merge, so it answers whether the base conflicts or not (`test/ship.test.ts`, *a merge asked of quick's shape*).
  */
 function followerRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string | undefined {

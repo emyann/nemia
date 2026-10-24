@@ -28,7 +28,7 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
  */
 export const decisionStamp = (
   run: Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { holding?: RunSummary['holding'] } & {
-    steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'status'>>;
+    steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'phase' | 'reason' | 'message'>>;
   },
 ): string =>
   JSON.stringify([
@@ -36,9 +36,9 @@ export const decisionStamp = (
     run.waitingOnYou,
     run.holding?.word ?? null,
     run.steps.map((s) => {
-      const state = stepState(s.status, run.cancelledAt !== null, false);
+      const state = stepState(s.phase, s.reason, run.cancelledAt !== null, false);
       const inFlight = s.taskId !== null && (state === 'working' || state === 'needs-human' || state === 'waiting');
-      return [s.name, s.taskId, inFlight ? 'in flight' : s.status];
+      return [s.name, s.taskId, inFlight ? 'in flight' : s.message];
     }),
   ]);
 

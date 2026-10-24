@@ -83,7 +83,7 @@ const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
-      then: 'round' as const,
+      cause: 'round' as const,
     }));
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   const steps = {
@@ -343,11 +343,11 @@ test('roundFiled: a round moves every step of the loop behind it', async (t) => 
       implement: {
         taskId: 'r-1-implement-try2',
         ...where,
-        tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, then: 'round' }],
+        tries: [{ taskId: 'r-1-implement', check: { taskId: 'r-1-implement-check' }, cause: 'round' }],
         closeoutHash: closeoutHashOf(IMPLEMENT, chain),
       },
-      test: { taskId: null, ...where, tries: [{ taskId: 'r-1-test', then: 'round' }] },
-      review: { taskId: null, ...where, tries: [{ taskId: 'r-1-review', then: 'round' }] },
+      test: { taskId: null, ...where, tries: [{ taskId: 'r-1-test', cause: 'round' }] },
+      review: { taskId: null, ...where, tries: [{ taskId: 'r-1-review', cause: 'round' }] },
     } satisfies Run['steps']);
     assert.equal(r.steps.implement.tries, undefined);
     const ids = [roundOf(next, 'review'), stepTaskId(next, 'test', 2), checkTaskId(next, 'implement')];
@@ -358,7 +358,7 @@ test('roundFiled: a round moves every step of the loop behind it', async (t) => 
     const filed = roundFiled(BUDGETED_LOOP, inRound(1), due, 'i2');
     assert.deepEqual(
       [filed.implement.tries, filed.review.tries],
-      [[{ taskId: 'i1', check: { taskId: 'c1' }, then: 'round', budget: 10 }], [{ taskId: 'r1', then: 'round' }]],
+      [[{ taskId: 'i1', check: { taskId: 'c1' }, cause: 'round', budget: 10 }], [{ taskId: 'r1', cause: 'round' }]],
     );
     assert.equal(budgetOf(BUDGETED_LOOP[0], filed.implement), 10);
   });

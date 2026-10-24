@@ -4,8 +4,12 @@
  */
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
+import { CheckVerdictSchema, StepCodesFields, type CheckVerdict, type StepPhase, type StepReason } from './reasons.ts';
 
-/** A list of strings, mutable as the plain types say: this file's own, as it imports no value from a sibling (`test/api-files.test.ts`). */
+/**
+ * A list of strings, mutable as the plain types say: this file's own, as it imports no value from a sibling but the shared ones
+ * (`test/api-files.test.ts`).
+ */
 const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
 
 /**
@@ -151,13 +155,14 @@ export const StepLogSchema = decodes<StepLog>()(Schema.Struct({ lines: StringsSc
 
 /**
  * Mirrors `StepCheck` in apps/api/src/steps/logs.ts: the command a step is judged by, from the workflow the run
- * froze, its task and verdict — `passed`, `exit 1`, `unfinished`, `checking` — and once it failed its check, the
- * exit in the CLI `ls`'s words and the end of each stream. `stdout` is null on an earlier try's check, whose output the api does not read.
+ * froze, its task and verdict as codes (`CheckVerdict`, null until the run files it; `verdictWords` says it) — and once it failed its
+ * check, the exit in the CLI `ls`'s words and the end of each stream. `stdout` is null on an earlier try's check, whose output the api
+ * does not read.
  */
 export type StepCheck = {
   command: string;
   taskId: string | null;
-  verdict: string | null;
+  verdict: CheckVerdict | null;
   refused: { exit: string; stdout: StepLog | null; stderr: StepLog; unreadable: string | null } | null;
 };
 
@@ -166,7 +171,7 @@ export const StepCheckSchema = decodes<StepCheck>()(
   Schema.Struct({
     command: Schema.String,
     taskId: Schema.NullOr(Schema.String),
-    verdict: Schema.NullOr(Schema.String),
+    verdict: Schema.NullOr(CheckVerdictSchema),
     refused: Schema.NullOr(
       Schema.Struct({
         exit: Schema.String,
@@ -212,17 +217,22 @@ export const StepAttemptsSchema = decodes<StepAttempts>()(
 );
 
 /**
- * Mirrors `StepTry` in apps/api/src/detail/tries.ts: one try of a step, earliest first. `then` is what replaced it, null on the current
- * try, which `current` marks; `note` how it was reached, in the CLI `ls`'s words. `status` is the step's word on the current try, and
- * the engine's word for the task on an earlier one.
+ * Mirrors `StepTry` in apps/api/src/detail/tries.ts: one try of a step, earliest first. `cause` is what replaced it, null on the current
+ * try, which `current` marks; `note` how it was reached, in the CLI `ls`'s words. `phase`, `reason` and `message` are the step's own on
+ * the current try, and on an earlier one the codes and the word of its task's engine; `message` is shown, never compared. `status` is
+ * `message` under its old name, which the board reads nowhere.
  */
 export type StepTry = {
   try: number;
   round: number;
-  then: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | 'merge' | 'signoff' | 'back' | null;
+  cause: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | 'merge' | 'signoff' | 'back' | null;
   current: boolean;
   taskId: string | null;
   note: string | null;
+  phase: StepPhase;
+  reason: StepReason;
+  message: string;
+  /** @deprecated `message` under its old name: read `message`. */
   status: string;
   attempts: StepAttempts;
   check: StepCheck | null;
@@ -238,10 +248,11 @@ export const StepTrySchema = decodes<StepTry>()(
   Schema.Struct({
     try: Schema.Number,
     round: Schema.Number,
-    then: Schema.NullOr(Schema.Literals(['retries', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'signoff', 'back'])),
+    cause: Schema.NullOr(Schema.Literals(['retries', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'signoff', 'back'])),
     current: Schema.Boolean,
     taskId: Schema.NullOr(Schema.String),
     note: Schema.NullOr(Schema.String),
+    ...StepCodesFields,
     status: Schema.String,
     attempts: StepAttemptsSchema,
     check: Schema.NullOr(StepCheckSchema),

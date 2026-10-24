@@ -119,9 +119,9 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A person's word for a step's state has one writer, `PERSON` in `lib/words.ts`, a total `Record<StepState, PersonWords>`: its rail word
   (on the chip, the rail and the card's tag), what it means on hover, and the words of its wait for a state that waits on a person. The
   run's own waits (`RUN_WAITS`) and how a run ended (`ENDED`, `called off` for `cancelled`) sit beside it. Where the board's word differs
-  from the code's, it is translated there alone: `status.ts` parses, `runWords.ts` and `stepCard.ts` compose. `test/structure.test.ts`
-  refuses a rail word spelled elsewhere, a retired phrasing (`waits for you`, `check refused`, `not signed`, `cancelled` said to a person)
-  and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.
+  from the code's, it is translated there alone: `status.ts` reads the codes, `runWords.ts` and `stepCard.ts` compose.
+  `test/structure.test.ts` refuses a rail word spelled elsewhere, a retired phrasing (`waits for you`, `check refused`, `not signed`,
+  `cancelled` said to a person) and a runtime word (`journal`, `engine`, `WF_MAX_RUNS`) on hover.
 - A value two files under `lib/api/` need sits in a sibling that imports no sibling: the builder's saves decode a `WorkflowListing`, so
   they sit in `workflows.ts` beside its schema.
 
@@ -142,9 +142,12 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - Send what the current choice takes, not what hidden state holds (`afterFor`).
 - A form keyed on an agent's version is thrown away with its draft when a write beside the agent moves the version (`keptAfterCopy`,
   `formKeyOf` in `lib/agents.ts`).
-- A new step status is drawn as `working` until `stepState` (`lib/status.ts`) knows it: add the word there, its drawing (`stateDrawn`,
-  whose hue gives the chip's class and the minimap's fill) and `offersOf`, and its words in `PERSON` (`lib/words.ts`: rail, meaning, and
-  the words of its wait if the api lists it as waiting on a person), in the same change; the compiler refuses a state `PERSON` lacks.
+- A step's state is read from the codes the api carries (`phase`, `reason`, a check's `verdict`), never from its sentence (`message`),
+  which is shown as it comes; a step's `status` is that sentence under its old name, read nowhere. A reason the api adds is refused at
+  the decode until the board's copy (`lib/api/reasons.ts`, held equal by `test/wire.test.ts`) has it, and then by the compiler until
+  `STATE_OF` (`lib/status.ts`) draws it: add its state there, its drawing (`stateDrawn`, whose hue gives the chip's class and the
+  minimap's fill) and `offersOf`, and its words in `PERSON` (`lib/words.ts`: rail, meaning, and the words of its wait if the api lists it
+  as waiting on a person), in the same change; the compiler refuses a state `PERSON` lacks. A card's kind is its phase's (`kindOf`).
 - A page that must agree with a verb's refusal reads the package's decision (`Decidable.awaiting`), never the list's `toDecide`.
 - A read decodes with `get` (`lib/api/read.ts`) through a schema beside its plain type, written `const XSchema = decodes<X>()(…)`
   (`lib/api/decodes.ts`), which the barrel never exports (`export type *`): every key the board reads required, an unknown key dropped.

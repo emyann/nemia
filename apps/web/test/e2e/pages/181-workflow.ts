@@ -96,7 +96,7 @@ export default {
       0,
       "a step no run has started has no status chip, counted inside the nodes: an edge's path carries data-state too",
     );
-    await expectCount(graph.getByText(/no attempt yet|^#\d/), 0, 'nor an attempt');
+    await expectCount(graph.getByText(/no session yet|^#\d/), 0, 'nor a session');
     await expectCount(graph.locator('.react-flow__edge'), 2, "the graph's two edges: implement → review, and the edge back");
     await expectVisible(
       graph.locator('.react-flow__edge[data-id="loop:review->implement"] .react-flow__edge-path'),

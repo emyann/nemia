@@ -4,7 +4,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { decisionQuery, ReadRefusal, retryRun, runGone, runQuery, sayToStep } from '../src/lib/api.ts';
 import { decisionStamp } from '../src/lib/decide.ts';
-import { decidable, detail } from './run-fixtures.ts';
+import { coded, decidable, detail, type Word } from './run-fixtures.ts';
 import { bell, until, WAITED } from './waits.ts';
 
 const { workflowNameOf } = await import('../src/lib/api.ts');
@@ -115,13 +115,13 @@ test(
       client.clear();
     });
 
-    const run = (tokens: string) => ({
+    const run = (tokens: Word) => ({
       status: 'failed' as const,
       cancelledAt: null,
       waitingOnYou: ['implement'],
       steps: [
-        { name: 'implement', taskId: 't-1', status: 'succeeded · BLOCKED' },
-        { name: 'tokens', taskId: 't-2', status: tokens },
+        { name: 'implement', taskId: 't-1', ...coded('succeeded · BLOCKED') },
+        { name: 'tokens', taskId: 't-2', ...coded(tokens) },
       ],
     });
     const observer = new QueryObserver(client, decisionQuery('r-1', decisionStamp(run('running (working)'))));
@@ -138,7 +138,7 @@ test(
     answers[0](first);
     await until(t, () => observer.getCurrentResult().data !== undefined, 'the first answer shown', { bell: rang });
 
-    for (const word of ['working (quiescent)', 'starting', 'between attempts', 'needs-human', 'running (working)']) {
+    for (const word of ['working (quiescent)', 'starting', 'between attempts', 'needs-human', 'running (working)'] as const) {
       observer.setOptions(decisionQuery('r-1', decisionStamp(run(word))));
       await new Promise((resolve) => setTimeout(resolve, 20));
     }

@@ -9,7 +9,7 @@ import { Effect } from 'effect';
 import type { Workflow } from '../step/step.ts';
 import type { Engine } from '../runtime-client.ts';
 import { type AtWork, atWork, runStartedAt, type RunTokens, runTokens } from '../timeline/index.ts';
-import { unjudgedWord } from '../views/views.verb.ts';
+import { UNREADABLE, unjudgedWord, type UnjudgedWord } from '../views/views.verb.ts';
 import { isRepositoryRun, type PlaceKind, placeOf, prunedWords, type Run } from '../record/record.ts';
 import { runStore } from '../record/files.store.ts';
 import { prunedKept } from '../prune/prune.ts';
@@ -17,6 +17,8 @@ import type { BranchReader } from '../branches/branches.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { type RestingMemo, restingRead } from '../rest/resting.verb.ts';
 import { type RunGraph, runGraph } from './graph.ts';
+import { ENGINE_REASON, PHASE_OF, type RunPhase, type RunReason, type StepPhase, type StepReason } from '../feed/index.ts';
+import type { CheckVerdict } from '../check/check.ts';
 import {
   filedTimes,
   type Filings,
@@ -40,6 +42,8 @@ import {
   type RunWaiting,
   type Spent,
   standingsOf,
+  runSaid,
+  stepSaid,
   type StepNeeds,
 } from './judged.verb.ts';
 
@@ -95,6 +99,11 @@ export type RunSummary = {
    * broke; `awaiting approval` for one stopped at its gates alone; `blocked` for one a person's word stops otherwise.
    */
   status: RunStatus;
+  /** Where the run is in its life (`RunPhase`), from its reason (`runCodes`): the code a screen groups it by, never parsed from `status`.
+   */
+  phase: RunPhase;
+  /** Why it is in that phase: the feed's code for its status, `Held` for a running run a person holds (`runCodes`). */
+  reason: RunReason;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
    * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
@@ -122,6 +131,12 @@ export type RunSummary = {
    */
   tokens: RunTokens | null;
   /**
+   * `phase` and `reason` are where the step stands, as codes (`StepPhase`, the feed's `StepReason`), computed where the listing judges
+   * it (`lineOf`) and never parsed from a sentence; a screen groups and colours by them. `message` is what `nemia ls` prints for the step,
+   * shown to a person and never compared. `verdict` is its check's, as codes (`CheckVerdict`), for a step judged by its check — passed,
+   * failed with its exit, unfinished, running — and null for any other. `status` is `message` under its old name, kept for one card so a
+   * reader of it keeps working, and compared by nothing: read `message`.
+   *
    * `status` is what `nemia ls` prints for the step — see `judge` for the one word it corrects. `note` is what `nemia ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
    * `round 2 of 3`, `round 3 asked (nemia round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
@@ -134,6 +149,11 @@ export type RunSummary = {
       name: string;
       taskId: string | null;
       branch: string | null;
+      phase: StepPhase;
+      reason: StepReason;
+      message: string;
+      verdict: CheckVerdict | null;
+      /** @deprecated `message` under its old name, kept for one card: read `message`. */
       status: string;
       note: string | null;
       roundDue: boolean;
@@ -208,7 +228,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     waiting: judged.waiting,
     heldUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
-    status: judged.status,
+    ...runSaid(judged),
     moving: judged.moving,
     cost: judged.cost,
     atWork: atWork(run, views),
@@ -217,7 +237,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
       name,
       taskId: run.steps[name]?.taskId ?? null,
       branch: run.steps[name]?.branch ?? null,
-      status: judged.words.get(name)!,
+      ...stepSaid(judged, name),
       note: judged.notes.get(name) ?? null,
       roundDue: judged.roundDue.has(name),
       agent: agentOf(name),
@@ -232,6 +252,15 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
   };
   return { summary, asked } satisfies Judged;
 });
+
+/**
+ * A step's codes on a run left unjudged, off its word (`unjudgedWord`): `failed` with `Unknown` for the step a task of which does not read
+ * (`unreadable`), which nothing judges; any other the engine's word for its task (`ENGINE_REASON`), `pending` for none filed.
+ */
+function unjudgedCodes(word: UnjudgedWord): { phase: StepPhase; reason: StepReason } {
+  if (word === UNREADABLE) return { phase: 'failed', reason: 'Unknown' };
+  return { phase: PHASE_OF[ENGINE_REASON[word]], reason: ENGINE_REASON[word] };
+}
 
 /**
  * A run a task of which does not read, or whose unfrozen folder does not load, answered off its record: what it asked, where, its steps
@@ -262,6 +291,8 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     heldUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
     holding: null,
     status: 'running',
+    phase: 'running',
+    reason: 'Running',
     moving: true,
     cost: null,
     atWork: null,
@@ -270,6 +301,9 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
       name,
       taskId: run.steps[name]?.taskId ?? null,
       branch: run.steps[name]?.branch ?? null,
+      ...unjudgedCodes(wordOf(run.steps[name])),
+      message: wordOf(run.steps[name]),
+      verdict: null,
       status: wordOf(run.steps[name]),
       note: null,
       roundDue: false,

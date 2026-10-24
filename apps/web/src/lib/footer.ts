@@ -25,7 +25,7 @@ export function atWork(open: Pick<OpenRuns, 'counts' | 'waiting' | 'inFlight'>):
   for (const run of openRows(open)) {
     if (run.cancelledAt) continue;
     for (const step of run.steps) {
-      const state = stepState(step.status, false, run.holding != null);
+      const state = stepState(step.phase, step.reason, false, run.holding != null);
       if (state === 'working' || state === 'checking') sessions += 1;
     }
   }

@@ -106,9 +106,9 @@ one as files; another place is code that implements `PlaceService`, given as a l
 per run*: a run copies no place and its record names none (`test/start-place.boundary.test.ts`), so a run in flight is answered by the place
 of the process that asks, the release installed, and a change to the place reaches it at the next restart.
 
-**A loop's rounds** are the orchestrator's, counted off the looping step's tries that went `then: 'round'` (`roundIn`,
+**A loop's rounds** are the orchestrator's, counted off the looping step's tries that went `cause: 'round'` (`roundIn`,
 `src/status/status.ts`): a reviewer's `again: true`, and a person's `nemia round`. A merge of the base (`nemia merge`, `src/merge/`) is
-no round: the loop's target is filed again to merge the base at the commit a trial merge read, its try `then: 'merge'`, the run's
+no round: the loop's target is filed again to merge the base at the commit a trial merge read, its try `cause: 'merge'`, the run's
 `baseRef` moves to that commit, and the reviewer after it reads the merge; a finding of it with `again: true` is a round, counted as any
 (`test/merge-round-walk.boundary.test.ts`, *a merge send-back leaves the round count unchanged*). A merge of work that merges cleanly is refused, pointed to
 the landing — its approval, or, where its review routes an ungated one, the tick that files it; one of a run whose result step closes no

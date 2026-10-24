@@ -706,7 +706,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
     );
     const before = readRun(run.id);
     const plan = before.steps.plan;
-    rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, then: 'recheck' }] } } });
+    rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, cause: 'recheck' }] } } });
     assert.equal(tryOf(readRun(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
     await ticks(3);
     assert.deepEqual(
@@ -877,7 +877,7 @@ test("a step's closeout read is a one-shot `closed out` of its step and try, sai
   await s.test('REFUSED: a recheck says no closeout again — its turn, and its closeout, are the try before it', async () => {
     const before = readRun(run.id);
     const plan = before.steps.plan;
-    rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, then: 'recheck' }] } } });
+    rewriteRun({ ...before, steps: { ...before.steps, plan: { ...plan, tries: [{ taskId: plan.taskId!, cause: 'recheck' }] } } });
     assert.equal(tryOf(readRun(run.id), 'plan'), 2, 'the step is on a second try, on the task it was already on');
     await ticks(3);
     assert.deepEqual(closed(run), [['plan', 'closed out', 'try 1', 1, 'Normal']]);

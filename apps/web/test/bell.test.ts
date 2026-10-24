@@ -6,6 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
+import { coded } from './run-fixtures.ts';
 import { bellHash, bellRows } from '../src/lib/bell.ts';
 import { waitsOnYou } from '../src/lib/factory.ts';
 
@@ -25,6 +26,8 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
   cancelledAt: null,
   pruned: null,
   status: 'running',
+  phase: 'running',
+  reason: 'Running',
   moving: true,
   cost: null,
   atWork: null,
@@ -33,7 +36,7 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
     name,
     taskId: `t-${name}`,
     branch: null,
-    status: 'waiting',
+    ...coded('waiting'),
     note: null,
     roundDue: false,
     agent: null,

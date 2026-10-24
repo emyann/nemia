@@ -226,13 +226,13 @@ export function endingStopped(
 }
 
 /**
- * The record of an ending sent back with its work (`Retry.back`): its try moved behind, `then: 'back'`, and nothing in its place — so it
+ * The record of an ending sent back with its work (`Retry.back`): its try moved behind, `cause: 'back'`, and nothing in its place — so it
  * waits for the work, then at its gate for an approval of the try it is now on: the one given for the try that stopped names a try it is
  * past, and is spent (`spentApprovals`). Pure.
  */
 export function sentBack(record: StepRecord): StepRecord {
   const { check, tries = [], taskId, handedOff: _, landed: __, filesRead: ___, ...rest } = record;
-  return { ...rest, taskId: null, tries: [...tries, { taskId: taskId!, ...(check ? { check } : {}), then: 'back' }] };
+  return { ...rest, taskId: null, tries: [...tries, { taskId: taskId!, ...(check ? { check } : {}), cause: 'back' }] };
 }
 
 /**
@@ -716,9 +716,10 @@ export type RoundAsk = { step: string; round: number; budget?: number; at: strin
 export const capOf = (looping: Workflow): number => looping.rounds ?? DEFAULT_ROUNDS;
 
 /**
- * The round a step's record is on: the first, and one more for each round that moved a try behind it. A merge (`then: 'merge'`) is not one.
+ * The round a step's record is on: the first, and one more for each round that moved a try behind it. A merge (`cause: 'merge'`) is not
+ * one.
  */
-export const roundIn = (record: StepRecord | undefined): number => 1 + (record?.tries?.filter((t) => t.then === 'round').length ?? 0);
+export const roundIn = (record: StepRecord | undefined): number => 1 + (record?.tries?.filter((t) => t.cause === 'round').length ?? 0);
 
 /** The round a step of a run is on (`roundIn`). Every step of a loop moves on together, so the looping step's is the loop's. */
 export const roundOf = (run: Run, step: string): number => roundIn(run.steps[step]);
@@ -744,7 +745,7 @@ export const owesReplies = (steps: readonly Workflow[], run: Run, name: string):
  * whatever tries came after it within the round.
  */
 export const merged = (record: StepRecord | undefined): boolean =>
-  [...(record?.tries ?? [])].reverse().find((t) => t.then === 'round' || t.then === 'merge')?.then === 'merge';
+  [...(record?.tries ?? [])].reverse().find((t) => t.cause === 'round' || t.cause === 'merge')?.cause === 'merge';
 
 /**
  * The looping step, and its try that asked for the round a loop's target is on — or undefined when the target owes no `replies`.
@@ -756,7 +757,7 @@ export const merged = (record: StepRecord | undefined): boolean =>
 export function askingTry(steps: readonly Workflow[], run: Run, name: string): { looping: Workflow; taskId: string } | undefined {
   const looping = steps.find((s) => s.loop === name);
   if (!looping || !owesReplies(steps, run, name)) return undefined;
-  const taskId = [...(run.steps[looping.name]?.tries ?? [])].reverse().find((t) => t.then === 'round')?.taskId;
+  const taskId = [...(run.steps[looping.name]?.tries ?? [])].reverse().find((t) => t.cause === 'round')?.taskId;
   return taskId ? { looping, taskId } : undefined;
 }
 

@@ -24,7 +24,7 @@
     },
     {
       "term": "Attempt",
-      "meaning": "one start of a task's session; whatever ends it settles the task.",
+      "meaning": "one start of a task's session, numbered n and named `ae/<task>/<n>`: a restart inside one task, the way a container's restart count goes up inside one Pod, and never a try, which is the layer above's filing of a new task. Whatever ends it settles the task.",
       "type": "Attempt",
       "see": {
         "label": "An attempt",

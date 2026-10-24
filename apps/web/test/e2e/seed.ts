@@ -353,7 +353,7 @@ export const LOOPING = {
 /**
  * A fourth run, started last: `implement`'s session is at work, an attached one, its conversation ending on the harness's login refresh
  * race (`line`), and `review` waits on it. The run is running and moves, and in the package's words nobody is waiting on you: the step
- * asked nothing. On the floor by default, in the cell after NEIGHBOUR's; the hold pages hold a run until it ships. Its name is from when
+ * asked nothing. On the floor by default, in the cell after NEIGHBOUR's; the hold pages hold a run until it lands. Its name is from when
  * a Claude Code session could be blocked by its harness, which only a remote agent's can now.
  */
 export const HELD = {

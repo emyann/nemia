@@ -566,7 +566,7 @@ test("REFUSED at the door: Claude Code's flags on the wrong harness, a flag the 
         closeoutSchema: { type: 'object' },
         config: EVERYTHING,
       };
-      const io = { checkoutMcpConfig: '/r/.mcp.json', mcpConfigFile: '/m.json' };
+      const io = { projectMcpConfig: '/r/.mcp.json', mcpConfigFile: '/m.json' };
       assert.deepEqual(
         flagsIn(claudeJob.command(request, { ...io, requestFile: '/r.json' }).args),
         [],

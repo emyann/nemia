@@ -69,7 +69,7 @@ a required `home: string`, as every store function does since the root became a 
 runtime's: `mcpServerOf` (`agent-runtime/src/harness/mcp.ts`) is the one producer of a server object's bytes, in one fixed key order,
 feeding both the session's `Options.mcpServers` and the state read, because the harness files a sign-in under those bytes and two
 spellings are two servers to it. An agent's `mcp:` name resolves against the factory's record first and against the checkout's
-`.mcp.json` after (`serversOf`, `src/filed/filed.ts`), the factory's name taken out of `checkoutMcp` altogether. **The state of a
+`.mcp.json` after (`serversOf`, `src/filed/filed.ts`), the factory's name taken out of `projectMcp` altogether. **The state of a
 server is an engine read verb**, `mcpState` (`agent-runtime/src/service/mcp-state.ts`): `mcpServerStatus()` is a method on the Agent
 SDK's `query()` object, so only the runtime may ask it, and it travels runtime → orchestrator (`src/runtime-client.ts`) → api → board.
 The states are the harness's own words — `connected`, `needs-auth`, `failed`, `pending`, `disabled` — carried whole and never worded
@@ -135,7 +135,7 @@ the default factory, and a raise for a stretch that ends by itself, read as it p
 
 **The rules for auto** are the person's and the orchestrator's (`src/auto/`): an agent's proposal (`auto/<agent>.proposed.json`, written
 by `nemia auto propose` alone) and the person's confirmed list (`auto/<agent>.json`, written by `nemia auto confirm` and `nemia auto
-drop` alone, classed `prompts` and asked every time, `asksAlways`; a confirm carries the words the person read, refused once the rule
+drop` alone, classed `ask` and asked every time, `asksAlways`; a confirm carries the words the person read, refused once the rule
 reads otherwise), the rule that ships in force while none is confirmed
 (`DEFAULT_AUTO`). Whether a rule allows an answer is pure (`allowedBy` over `Facts`, `src/auto/auto.ts` and `facts.ts`); the facts are
 read off the run by a controller (`seenOf`, `src/admission/seen.verb.ts`), and admission gives unasked what the list allows in a run at

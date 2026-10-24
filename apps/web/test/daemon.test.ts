@@ -13,7 +13,7 @@ const at = (min: number) => new Date(NOW.getTime() - min * 60_000).toISOString()
 const START = 'npm start in apps/api';
 const held = (over: Partial<Daemon> = {}): Daemon => ({
   kind: 'ticking',
-  by: 'wf up',
+  by: 'nemia up',
   url: null,
   start: START,
   ticking: true,
@@ -26,7 +26,7 @@ const held = (over: Partial<Daemon> = {}): Daemon => ({
   stoppedAt: null,
   staleAfterMs: 15 * 60_000,
   identity: 'same',
-  line: 'wf up: ticking, pid 4242',
+  line: 'nemia up: ticking, pid 4242',
   unobserved: [],
   ...over,
 });
@@ -45,7 +45,7 @@ const free = (kind: 'none' | 'unreadable'): Daemon => ({
   stoppedAt: null,
   staleAfterMs: null,
   identity: null,
-  line: `wf up: ${kind}`,
+  line: `nemia up: ${kind}`,
   unobserved: [],
 });
 const said = (d: Daemon): string | null => {
@@ -70,10 +70,10 @@ test('daemonSentence and daemonWords: what is said of the daemon, kind by kind',
       'Nothing ticks this store, so no run moves: its daemon.json does not read as a daemon’s. Start one with npm start in apps/api — it takes the store over.',
     );
   });
-  await t.test('REFUSED: a daemon that stopped is said by its kind, the api or a wf up, with when', () => {
+  await t.test('REFUSED: a daemon that stopped is said by its kind, the api or a nemia up, with when', () => {
     assert.equal(
       said(held({ kind: 'stopped', ticking: false, stoppedAt: at(12), lastHeardAt: at(12) })),
-      'Nothing ticks this store, so no run moves: the wf up of pid 4242 stopped 12 min ago. Start one with npm start in apps/api.',
+      'Nothing ticks this store, so no run moves: the nemia up of pid 4242 stopped 12 min ago. Start one with npm start in apps/api.',
     );
     assert.match(
       said(held({ kind: 'stopped', by: 'api', url: 'http://127.0.0.1:8787', ticking: false, stoppedAt: at(12) }))!,
@@ -94,7 +94,7 @@ test('daemonSentence and daemonWords: what is said of the daemon, kind by kind',
   await t.test('REFUSED: a daemon alive but silent past its stale mark is said as stalled, and the next daemon takes it over', () => {
     assert.equal(
       said(held({ kind: 'stalled', ticking: false, passedAt: at(20), lastHeardAt: at(20) })),
-      'Nothing ticks this store, so no run moves: the wf up of pid 4242 is alive but silent, last heard from 20 min ago. Start one with npm start in apps/api — it takes the store over.',
+      'Nothing ticks this store, so no run moves: the nemia up of pid 4242 is alive but silent, last heard from 20 min ago. Start one with npm start in apps/api — it takes the store over.',
     );
   });
   await t.test("the command is the api's own start, its own part, for the page to set as code", () => {

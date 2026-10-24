@@ -1,8 +1,8 @@
 /**
  * The inbox on disk: `$WF_ROOT/inbox/`, filed, listed, started and dropped through the verbs, as a person types them — one story on
- * `story(t)`, and a table of what each verb refuses (`nemia inbox add` and `rm`, and `nemia start` of a card). Kept focused: a card whose
- * removal fails, or that is gone before it is removed, and a warm read of the inbox. A queued card the tick starts is the story of
- * `test/queue-store.test.ts`.
+ * `story(t)`, and a table of what each verb refuses (`nemia inbox add` and `rm`, and `nemia start` of a card). Kept focused: a queued card
+ * whose `queued:` line cannot be taken off at its start, or that is gone before it is, and a warm read of the inbox. A queued card the tick
+ * starts is the story of `test/queue-store.test.ts`.
  *
  * What a card is and what the listing says are pure, and live in inbox.test.ts. This is the part that is not: the folder, the name a card
  * is filed under, and the run records a listing reads. `WF_ROOT` is set before the import, since the module reads it as it loads, and
@@ -299,7 +299,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
     },
   );
   await s.test(
-    "`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and removes the card; `nemia decide` names the card under the run's line; a plan's card started so stays where it is",
+    "`nemia start <inbox>/<name>.md` starts the card — its body the brief, its `workflow:` found in its `repo:` — writes `from` on the record and keeps the card, listed as started and never started again; `nemia decide` names the card under the run's line; a plan's card started so stays where it is",
     async (t) => {
       emptyInbox();
       const repo = aRepoWith('dev', 'ui');
@@ -323,11 +323,22 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       );
       assert.deepEqual(printed.slice(0, 3), [
         `${id}  1 step(s): implement`,
-        `from inbox card ${card.name} — removed from the inbox`,
+        `from inbox card ${card.name} — kept in the inbox, listed as started`,
         `workspace: ${repo}`,
       ]);
-      assert.equal(fs.existsSync(file), false, 'the card left the inbox');
-      assert.deepEqual(readInbox(), []);
+      assert.ok(fs.existsSync(file), 'the card stays in the inbox');
+      assert.deepEqual(
+        readInbox().map((l) => [l.name, l.state, l.startedAs]),
+        [[card.name, 'started', [id]]],
+      );
+      const before = runsWritten();
+      await assert.rejects(main(['start', file], noEngine()), refusedWith('Conflict', card.file, id, 'nemia inbox add'));
+      await assert.rejects(
+        async () => await runPlaced(startFromInbox({ name: card.name, callerRepo: repo })),
+        refusedWith('Conflict', card.file, id),
+      );
+      await assert.rejects(main(['inbox', 'queue', card.name], noEngine()), refusedWith('Conflict', card.file, id));
+      assert.equal(runsWritten(), before, 'a card is started once');
       const decided = await printedBy(t, 'decide', id);
       assert.deepEqual(decided.slice(0, 2), [`${id}  Cache the views between passes`, `  from inbox card ${card.name}`]);
       const typed = await runPlaced(startRun({ brief: 'typed', repo, workflowDir: path.join(repo, 'workflows', 'dev') }));
@@ -361,8 +372,8 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       [run.brief, run.workflowDir, run.from],
       ['Cache the views between passes', path.join(repo, 'workflows', 'dev'), { inbox: card.name }],
     );
-    assert.equal(printed[1], `from inbox card ${card.name} — removed from the inbox`);
-    assert.equal(fs.existsSync(file), false, 'the card left the inbox');
+    assert.equal(printed[1], `from inbox card ${card.name} — kept in the inbox, listed as started`);
+    assert.ok(fs.existsSync(file), 'the card stays in the inbox');
     assert.ok(fs.existsSync(other.file), 'and the other card is where it was');
   });
   await s.test(
@@ -414,7 +425,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       const byBoard = await runPlaced(
         startFromInbox({ name: given.card.name, workflow: path.join(repo, 'workflows', 'dev'), callerRepo: repo }),
       );
-      assert.deepEqual([byBoard.run.repo, byBoard.run.workflowDir, byBoard.removed], [repo, path.join(repo, 'workflows', 'dev'), true]);
+      assert.deepEqual([byBoard.run.repo, byBoard.run.workflowDir], [repo, path.join(repo, 'workflows', 'dev')]);
 
       const brief = path.join(mine, 'work.md');
       fs.writeFileSync(brief, 'Parse the flag in cli.ts.\n');
@@ -749,64 +760,60 @@ test('REFUSED by name at shipped defaults: `nemia start` of an inbox card, befor
   fs.rmSync(path.join(ROOT, 'runs', 'source-a1.json'));
 });
 test(
-  'REFUSED at shipped defaults: a card whose removal fails after its run is written is listed `started as` that run, and not started again until a person drops it',
-  { skip: process.getuid?.() === 0 && 'root removes a file from a folder it may not write' },
+  "a queued card started has its `queued:` line taken off, every other line kept; one whose line cannot be taken off is started all the same, says so, and stays out of the queue while its run's record stands",
+  { skip: process.getuid?.() === 0 && 'root writes a folder it may not write' },
   async (t) => {
     emptyInbox();
     const repo = aRepoWith('dev');
-    const { card, file } = addToInbox({ text: 'Cache the views', workflow: 'dev', repo });
-    const before = runsWritten();
+    const queuedCard = (name: string) => {
+      const file = path.join(INBOX, `${name}.md`);
+      fs.mkdirSync(INBOX, { recursive: true });
+      fs.writeFileSync(file, `---\nworkflow: dev\nrepo: ${repo}\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views\n`);
+      return file;
+    };
+    const taken = queuedCard('taken-a1b2');
+    const started = await runPlaced(startFromInbox({ name: 'taken-a1b2', callerRepo: repo }));
+    assert.equal(started.queueLeft, undefined);
+    assert.equal(fs.readFileSync(taken, 'utf8'), `---\nworkflow: dev\nrepo: ${repo}\n---\nCache the views\n`);
+    assert.deepEqual(
+      readInbox().map((l) => [l.name, l.state, l.queued]),
+      [['taken-a1b2', 'started', undefined]],
+    );
+
+    const left = queuedCard('left-c3d4');
     fs.chmodSync(INBOX, 0o555);
     let printed: string[];
     try {
-      printed = await printedBy(t, 'start', file);
+      printed = await printedBy(t, 'start', left);
     } finally {
       fs.chmodSync(INBOX, 0o755);
     }
     const id = printed[0].split(' ')[0];
-    assert.equal(runsWritten(), before + 1, 'the run is written');
-    assert.deepEqual(readRun(id).from, { inbox: card.name });
+    assert.deepEqual(readRun(id).from, { inbox: 'left-c3d4' });
+    assert.ok(printed[2].includes('nemia inbox queue left-c3d4 --off'), printed[2]);
+    const listed = readInbox().find((l) => l.name === 'left-c3d4')!;
+    assert.deepEqual([listed.state, listed.queued], ['started', { at: '2026-09-16T10:00:00.000Z', place: null }]);
     assert.match(
-      printed[1],
-      new RegExp(
-        `^from inbox card ${escaped(card.name)} — still in the inbox: ${escaped(file)} could not be removed — .*\\. nemia inbox lists it as started as ${escaped(id)}: drop it with nemia inbox rm ${escaped(card.name)}$`,
-      ),
+      (await printedBy(t, 'inbox')).find((line) => line.startsWith('left-c3d4'))!,
+      new RegExp(`started as ${escaped(id)}$`),
     );
-    assert.deepEqual(
-      readInbox().map((l) => [l.name, l.startedAs]),
-      [[card.name, [id]]],
-    );
-    assert.match(
-      (await printedBy(t, 'inbox'))[0],
-      new RegExp(`^${escaped(card.name)}  Cache the views  workflow: dev  repo: ${escaped(repo)}  started as ${escaped(id)}$`),
-    );
-
-    await assert.rejects(
-      main(['start', file], noEngine()),
-      refusedWith('Conflict', `${card.file}: this card was started as ${id}`, `nemia inbox rm ${card.name};`),
-    );
-    await assert.rejects(
-      async () => await runPlaced(startFromInbox({ name: card.name, callerRepo: repo })),
-      refusedWith('Conflict', `${card.file}: this card was started as ${id}`, `nemia inbox rm ${card.name};`),
-    );
-    assert.equal(runsWritten(), before + 1, 'not started twice');
-    await printedBy(t, 'inbox', 'rm', card.name);
-    assert.deepEqual(readInbox(), []);
   },
 );
 
-test('a card gone between its start and its removal — removed by someone else once the run is written — is still said removed, and the run stands', async (t) => {
+test('a card gone between its start and the taking off of its `queued:` line is not written back, and the run stands', async (t) => {
   emptyInbox();
   const repo = aRepoWith('dev');
-  const { card, file } = addToInbox({ text: 'Cache the views', workflow: 'dev', repo });
+  const file = path.join(INBOX, 'gone-a1b2.md');
+  fs.mkdirSync(INBOX, { recursive: true });
+  fs.writeFileSync(file, `---\nworkflow: dev\nrepo: ${repo}\nqueued: 2026-09-16T10:00:00.000Z\n---\nCache the views\n`);
   const create = runStore.runs.create;
   t.mock.method(runStore.runs, 'create', (run: Run) => {
     create(run);
     fs.rmSync(file);
   });
-  const started = await runPlaced(startFromInbox({ name: card.name, callerRepo: repo }));
-  assert.equal(started.removed, true, 'a card already gone is not a removal that failed');
-  assert.deepEqual(readRun(started.run.id).from, { inbox: card.name });
+  const started = await runPlaced(startFromInbox({ name: 'gone-a1b2', callerRepo: repo }));
+  assert.equal(started.queueLeft, undefined, 'a card already gone is not a line left');
+  assert.deepEqual(readRun(started.run.id).from, { inbox: 'gone-a1b2' });
   assert.deepEqual(readInbox(), []);
 });
 

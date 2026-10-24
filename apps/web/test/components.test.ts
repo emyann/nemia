@@ -25,7 +25,7 @@ const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch 
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { TemplateCard } = await import('../src/components/TemplateCard.tsx');
-const { stateMeaning } = await import('../src/lib/status.ts');
+const { PERSON } = await import('../src/lib/words.ts');
 const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx');
 const { RunGone } = await import('../src/components/RunGone.tsx');
 const { KindsBehind } = await import('../src/components/KindsBehind.tsx');
@@ -59,19 +59,26 @@ const titleOf = (html: string): string | undefined =>
     .replaceAll('&gt;', '>')
     .replaceAll('&amp;', '&');
 
-test("a chip carries the step's note after what its state means, on hover — and only a note it was given", () => {
+test("a chip shows a person's word for the state, never the status; on hover what it means, then the step's note it was given", () => {
   const withNote = renderToStaticMarkup(
     createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, runHeld: false, note: exhaustedNote }),
   );
   assert.match(withNote, /data-state="exhausted"/);
-  assert.equal(titleOf(withNote), `${stateMeaning.exhausted}\n${exhaustedNote}`);
+  assert.equal(withNote.replace(/<[^>]*>/g, ''), PERSON.exhausted.rail, 'the rail word is the text');
+  assert.doesNotMatch(withNote.replace(/<[^>]*>/g, ''), /rounds exhausted/, 'the status is not shown');
+  assert.equal(titleOf(withNote), `${PERSON.exhausted.meaning}\n${exhaustedNote}`);
 
   for (const note of [null, undefined, '']) {
     const without = renderToStaticMarkup(
       createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, runHeld: false, note }),
     );
-    assert.equal(titleOf(without), stateMeaning.exhausted, String(note));
+    assert.equal(titleOf(without), PERSON.exhausted.meaning, String(note));
   }
+  const cancelled = renderToStaticMarkup(createElement(StatusChip, { status: 'stopped', runCancelled: true, runHeld: false }));
+  assert.equal(cancelled.replace(/<[^>]*>/g, ''), 'called off');
+  const paused = renderToStaticMarkup(createElement(StatusChip, { status: 'waiting on the pause', runCancelled: false, runHeld: false }));
+  assert.match(paused, /data-state="waiting"/);
+  assert.notEqual(paused.replace(/<[^>]*>/g, ''), PERSON.waiting.rail, 'a check the pause holds is its own wait, not a step to come');
 });
 
 test('a note under a chip is the note as `wf ls` prints it, and nothing at all for a step without one', () => {
@@ -105,6 +112,8 @@ const UNMEASURED: StepUsed = {
 function runWith(note: string | null): RunDetail {
   return {
     id: 'r-1',
+    kinds: [],
+    refresh: 'nemia refresh r-1',
     brief: 'Go round again',
     decide: 'nemia decide r-1',
     repo: '/code/app',
@@ -258,13 +267,13 @@ function nodeMarkup(run: RunDetail): string {
   return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(StepNode, props)));
 }
 
-const gateDrawn = (html: string) => />human gate</.test(html) || />waiting on you</.test(html) || /border-yours/.test(html);
+const gateDrawn = (html: string) => />human gate</.test(html) || /data-gate-band/.test(html) || /border-yours/.test(html);
 
 test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked step is — and on a cancelled run, not', () => {
   for (const status of ['rounds exhausted', 'succeeded · BLOCKED']) {
     const gate = nodeMarkup(runOf(status, { waitingOnYou: ['review'] }));
     assert.match(gate, />human gate</, status);
-    assert.match(gate, />waiting on you</, status);
+    assert.match(gate, new RegExp(`data-gate-band[^>]*><span[^>]*>${PERSON['awaiting-approval'].rail}</`), status);
     assert.match(gate, /border-yours/, status);
 
     for (const waitingOnYou of [[], ['review']]) {
@@ -630,8 +639,8 @@ test("a card at rest draws its run's steps as a rail: a pill each in its state, 
   assert.match(html, /<ul aria-label="Steps">/);
   assert.match(
     html,
-    /title="review: running \(working\) — /,
-    "a pill's name is cut to its width; hovering says it whole, with its status and what that means",
+    /title="review: at work — /,
+    "a pill's name is cut to its width; hovering says it whole, with a person's word for its state and what that means",
   );
 });
 
@@ -1448,7 +1457,7 @@ test('the Decide section copies its commands and runs none: a button per command
     total: {
       ...UNMEASURED,
       usage: { toolCalls: 34 },
-      used: 'turns not measured · 34 tool calls · tokens in not measured · tokens out not measured',
+      used: 'responses not measured · 34 tool calls · tokens in not measured · tokens out not measured',
     },
     cost: null,
     overBudget: null,
@@ -1470,7 +1479,7 @@ test('the Decide section copies its commands and runs none: a button per command
     />implement: succeeded · BLOCKED\. Continue its session, told what happened {2}\(--fresh, or --model &lt;m&gt;, for a new session\)</,
     "the once-more line's words, without the command that follows it on the line below",
   );
-  assert.match(html, /<dt[^>]*>used<\/dt><dd[^>]*>turns not measured · 34 tool calls/, "the run's total, in `wf decide`'s words");
+  assert.match(html, /<dt[^>]*>used<\/dt><dd[^>]*>responses not measured · 34 tool calls/, "the run's total, in `wf decide`'s words");
   assert.match(html, /<dt[^>]*>cost<\/dt><dd[^>]*>not measured<\/dd>/, 'never a 0 for what nobody measured');
   assert.match(
     html,
@@ -1500,8 +1509,8 @@ test("the inspector's Details say what a step used and what it cost beside its a
     ...run.steps[0],
     used: {
       ...UNMEASURED,
-      usage: { turns: 12, costUsd: 0.004 },
-      used: '12 turns · tool calls not measured · tokens in not measured · tokens out not measured',
+      usage: { responses: 12, costUsd: 0.004 },
+      used: '12 responses · tool calls not measured · tokens in not measured · tokens out not measured',
       cost: '$0.004',
       costUsd: 0.004,
     },
@@ -1509,7 +1518,7 @@ test("the inspector's Details say what a step used and what it cost beside its a
   const said = Object.fromEntries(rows(measured));
   assert.deepEqual(
     [said.used, said.cost],
-    ['12 turns · tool calls not measured · tokens in not measured · tokens out not measured', '$0.004'],
+    ['12 responses · tool calls not measured · tokens in not measured · tokens out not measured', '$0.004'],
   );
   const unfiledStep = { ...run.steps[0], taskId: null, used: null };
   const unfiled = Object.fromEntries(rows(unfiledStep));
@@ -2320,13 +2329,13 @@ function needing(
   };
 }
 
-test("a step's node says what it needs: a gate's question after `waiting on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
+test("a step's node says what it needs: a gate's question after `waits on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
   const question = 'Should a finished run keep its card on the Factory?';
   const gate = nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: ['review'] }));
-  const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(gate);
+  const footer = /<p data-gate-band="true" title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(gate);
   assert.ok(footer, `one truncated line, as the node's others: a second would make it taller than the layering's row\n${gate}`);
   assert.equal(footer[1], `asks: ${question}`);
-  assert.equal(footer[2], `<span class="font-semibold">waiting on you</span><span data-need="asks"> · asks: ${question}</span>`);
+  assert.equal(footer[2], `<span class="font-semibold">${PERSON.blocked.rail}</span><span data-need="asks"> · asks: ${question}</span>`);
   assert.doesNotMatch(
     nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: [] })),
     /data-need/,
@@ -2863,16 +2872,16 @@ const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<Run
 const withClient = (element: ReturnType<typeof createElement>) =>
   renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, element));
 
-test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waiting on you` — and on a run called off, not', () => {
+test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waits on you` — and on a run called off, not', () => {
   const html = nodeMarkup(atGate());
   assert.match(html, />human gate</);
   assert.match(html, /border-yours/);
   assert.match(html, /data-state="awaiting-approval"/);
-  const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(html);
+  const footer = /<p data-gate-band="true" title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(html);
   assert.ok(footer, html);
   assert.equal(
     footer[2],
-    '<span class="font-semibold">waiting on you</span><span data-need="approve"> · approve review&#x27;s hand-off</span>',
+    `<span class="font-semibold">${PERSON['awaiting-approval'].rail}</span><span data-need="approve"> · approve review&#x27;s hand-off</span>`,
     'what approving does, in a line that names the step as `wf ls` does: a step that ran hands on',
   );
   const spec = { ...atGate().steps[0].spec, workspace: 'main' } as RunDetail['steps'][number]['spec'];
@@ -3456,7 +3465,7 @@ test('the edges between cards are drawn only for live waits: dashed, out of one 
   assert.doesNotMatch(line, /marker-end/);
 });
 
-test("the run page's timeline: a row per try's session and per check, in the api's words — a recheck, a check still running, a task the engine lost — and the totals", async () => {
+test("the run page's timeline: a row per try's session and per check, in the api's words — a recheck, a check still running, a task with no record — and the totals", async () => {
   const { Timeline } = await import('../src/components/Timeline.tsx');
   type TaskSpan = import('../src/lib/api.ts').TaskSpan;
   type TimelineTotal = import('../src/lib/api.ts').TimelineTotal;
@@ -3484,8 +3493,8 @@ test("the run page's timeline: a row per try's session and per check, in the api
   const base = runWith(null);
   const used: StepUsed = {
     ...UNMEASURED,
-    usage: { turns: 54 },
-    used: '54 turns · tool calls not measured · tokens in not measured · tokens out not measured',
+    usage: { responses: 54 },
+    used: '54 responses · tool calls not measured · tokens in not measured · tokens out not measured',
   };
   const run: RunDetail = {
     ...base,
@@ -3561,8 +3570,9 @@ test("the run page's timeline: a row per try's session and per check, in the api
   );
   assert.match(timeToTheSecond(filed), /^\d{1,2}:00:12 [AP]M$/);
   assert.match(unescaped(html), /try 2<\/td><td colSpan="7"[^>]*>its session is try 1's, checked again/i);
-  assert.match(html, /the engine has no record of t-lost/);
-  assert.ok(html.includes('>54 turns · tool calls not measured'), 'what the session used, beside it');
+  assert.match(html, /no record of t-lost/);
+  assert.doesNotMatch(html, /\bengine\b/, 'a person reads no runtime word');
+  assert.ok(html.includes('>54 responses · tool calls not measured'), 'what the session used, beside it');
   assert.doesNotMatch(html, /data-step="respond"/, 'a step not filed has no row');
   assert.deepEqual(
     [...html.matchAll(/data-total="([^"]+)"/g)].map((m) => m[1]),
@@ -3921,7 +3931,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     above: 4.25,
     said: '$4.25',
     modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
-    own: 'failed (check)',
+    own: 'failed (check)' as const,
     needs: null,
     unfinished: false,
     questions: [],
@@ -4406,7 +4416,7 @@ const HOLDING = {
   onYou: false,
 };
 
-test('on a run a person holds, a step at its gate is drawn held — no human gate, no waiting on you — in its own words, and a step at work is drawn at work', () => {
+test('on a run a person holds, a step at its gate is drawn held — no human gate, no waiting on you — and said held, and a step at work is drawn at work', () => {
   for (const status of ['awaiting approval', 'rounds exhausted', 'succeeded · BLOCKED']) {
     const held = nodeMarkup({ ...runOf(status, { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] });
     assert.equal(
@@ -4415,7 +4425,7 @@ test('on a run a person holds, a step at its gate is drawn held — no human gat
       `${status}, held, as the api gives a held run: nobody is waited on, and no step offers its approval: ${held}`,
     );
     assert.match(held, /data-state="held"/, status);
-    assert.ok(held.includes(`>${status}</span>`), `${status} keeps its words: ${held}`);
+    assert.ok(held.includes(`>${PERSON.held.rail}</span>`), `${status}, held, is said as held: ${held}`);
     assert.doesNotMatch(
       nodeMarkup(runOf(status, { waitingOnYou: [] })),
       /data-state="held"/,
@@ -7034,6 +7044,7 @@ const inboxCard = (extra: Record<string, unknown> = {}) =>
     factory: null,
     from: [],
     startedAs: [],
+    state: 'filed',
     error: null,
     body: 'An idea',
     filedAt: null,
@@ -7089,7 +7100,11 @@ test('REFUSED: a card that names a workflow and no factory says it has no Queue 
   }
   assert.equal(note({ factory: 'solo', workflow: 'dev' }), '', 'a card of a factory has its Queue');
   assert.equal(note({ factory: null }), '', 'no workflow: nothing to queue it on');
-  assert.equal(note({ factory: null, workflow: 'dev', queued: { at: '2026-09-16T10:00:00.000Z', place: 1 } }), '', 'queued: Unqueue');
+  assert.equal(
+    note({ factory: null, workflow: 'dev', state: 'queued', queued: { at: '2026-09-16T10:00:00.000Z', place: 1 } }),
+    '',
+    'queued: Unqueue',
+  );
 });
 
 test('REFUSED: the box says the factories are being read until they are, and never that the store has none', async () => {

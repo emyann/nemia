@@ -1,7 +1,8 @@
 /**
  * The run page's reads decode the api's answers where they enter (`get`): a run's detail (`runQuery`), its decision (`decisionQuery`), a
  * step's conversation (`readTranscript`) and its try's path (`stepPathQuery`). Each reads back what the api gave, every union in its
- * shapes; each refuses an answer it does not read, at the key, with the fix; a key the board does not know is dropped.
+ * shapes; a key the api leaves out stays out and one the board does not know is dropped. Which keys each answer has is
+ * `test/wire.test.ts`'s.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,49 +25,13 @@ const readDetail = runQuery('r-1').queryFn as unknown as () => Promise<RunDetail
 const readDecision = decisionQuery('r-1', 'stamp').queryFn as unknown as () => Promise<RunDecision>;
 const readPath = stepPathQuery('r-1', 'implement', 'stamp', null, () => false).queryFn as unknown as () => Promise<StepPath>;
 
-/** Whether `err` is an `UnreadAnswer` of `route` whose message names `at`, what was found there, and the fix. */
-const unread = (route: string, at: string, found: string) => (err: unknown) => {
-  assert.ok(err instanceof UnreadAnswer, String(err));
-  assert.equal(err.route, `GET ${route}`);
-  assert.ok(err.message.startsWith(`GET ${route} answered what this board does not read`), err.message);
-  assert.ok(err.message.includes(`at ${at}, `), err.message);
-  assert.ok(err.message.includes(found), err.message);
-  assert.ok(
-    err.message.endsWith('restart the api (npm run dev) and rebuild the board (npm run build), then reload the page.'),
-    err.message,
-  );
-  return true;
-};
-
 /** `value` without `keys`, as an api that does not send them answers. */
 const without = (value: object, ...keys: string[]): object => Object.fromEntries(Object.entries(value).filter(([k]) => !keys.includes(k)));
-
-/** What a step was told, by layer, as the api answers it for a run started in a factory that keeps rules. */
-const LAYERS = {
-  agent: 'ada',
-  instructions: 'Build what was asked.',
-  custom: null,
-  factory: 'Never push on a Friday.',
-  agentSkills: [],
-  policy: 'Keep the diff small.',
-  addedSkills: [],
-  fence: [],
-  folderFiles: true,
-  task: 'A note.',
-  via: 'prompt' as const,
-};
 
 test("get, the run page's reads: each decodes what the api gives, keeps out what it leaves out, drops what the board does not know, and keeps a 404 the api's", async (t) => {
   await t.test("a run's detail decodes as the api gave it, each union in its every shape", async (t) => {
     answering(t, detail());
     assert.deepEqual(await readDetail(), detail());
-  });
-  await t.test("a step's session read alone unread keeps why on the run's detail, in the runtime's words", async (t) => {
-    const unreadStep = step({
-      sessionUnread: "`ae/t-1/1`'s transcript cannot be read: line 2 is an `assistant` line whose `timestamp` is 7",
-    });
-    answering(t, detail({ steps: [unreadStep] }));
-    assert.equal((await readDetail()).steps[0].sessionUnread, unreadStep.sessionUnread);
   });
   await t.test("a run's detail from no inbox card has neither `from` nor `fromNote`, and they stay absent", async (t) => {
     const bare = without(detail(), 'from', 'fromNote');
@@ -75,15 +40,6 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
     assert.equal(Object.hasOwn(read, 'from') || Object.hasOwn(read, 'fromNote'), false);
     assert.deepEqual(read, bare);
   });
-  await t.test(
-    "a step's layers decode as the api gave them, the factory's rules a layer of their own, or null where its run froze none",
-    async (t) => {
-      for (const layers of [LAYERS, { ...LAYERS, factory: null }]) {
-        answering(t, detail({ steps: [step({ layers })] }));
-        assert.deepEqual((await readDetail()).steps[0].layers, layers);
-      }
-    },
-  );
   await t.test(
     'a file a closeout names keeps what the api served it with, or pruned it with: a bare path does not swallow either',
     async (t) => {
@@ -144,46 +100,5 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
     answering(t, transcript({ events: [call] }));
     const [event] = (await readTranscript('r-1', 'implement')).events;
     assert.deepEqual(event, call);
-  });
-});
-
-test("REFUSED, get, the run page's reads: an answer the board does not read, refused at its key with the fix", async (t) => {
-  await t.test("REFUSED: a run's detail with a step without its gate, naming the key and the fix", async (t) => {
-    answering(t, detail({ steps: [without(step(), 'gate') as RunDetail['steps'][number]] }));
-    await assert.rejects(readDetail(), unread('/api/runs/r-1', 'steps[0].gate', 'is missing'));
-  });
-  await t.test("REFUSED: a run's detail without its graph, its run's time, or with who it waits on not a list", async (t) => {
-    answering(t, { ...detail(), graph: null });
-    await assert.rejects(readDetail(), unread('/api/runs/r-1', 'graph', 'is null, where'));
-    answering(t, { ...detail(), timeline: { rounds: [] } });
-    await assert.rejects(readDetail(), unread('/api/runs/r-1', 'timeline.run', 'is missing'));
-    answering(t, { ...detail(), onYou: 'approve plan' });
-    await assert.rejects(readDetail(), unread('/api/runs/r-1', 'onYou', '"approve plan", where the board reads array'));
-  });
-  await t.test("REFUSED: a step's layers that leave the factory's rules out, naming the key and the fix", async (t) => {
-    answering(t, detail({ steps: [step({ layers: without(LAYERS, 'factory') as typeof LAYERS })] }));
-    await assert.rejects(readDetail(), unread('/api/runs/r-1', 'steps[0].layers.factory', 'is missing'));
-  });
-  await t.test("REFUSED: a run's decision whose lesson is no word the board knows, and one running that is not", async (t) => {
-    answering(t, decidable({ lesson: { said: 'x', state: 'maybe' as never } }));
-    await assert.rejects(
-      readDecision(),
-      unread('/api/runs/r-1/decision', 'lesson.state', '"maybe", where the board reads "written" | "nothing" | "unknown"'),
-    );
-    answering(t, { running: false });
-    await assert.rejects(readDecision(), (err: unknown) => {
-      assert.ok(err instanceof UnreadAnswer, String(err));
-      return true;
-    });
-  });
-  await t.test("REFUSED: a step's conversation with an event of no role the board knows, and a path without its try", async (t) => {
-    const [first, ...rest] = transcript().events;
-    answering(t, transcript({ events: [{ ...first, role: 'robot' as never }, ...rest] }));
-    await assert.rejects(
-      readTranscript('r-1', 'implement'),
-      unread('/api/runs/r-1/steps/implement/transcript', 'events[0].role', '"robot", where'),
-    );
-    answering(t, without(stepPath(), 'try'));
-    await assert.rejects(readPath(), unread('/api/runs/r-1/steps/implement/path', 'try', 'is missing'));
   });
 });

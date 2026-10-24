@@ -13,7 +13,7 @@ wf plan ./plans/flag --repo ~/code/myapp               # a folder of cards: a ru
 wf start ./plans/flag/d.md --repo ~/code/myapp --after r-b --after r-c   # one card by hand: its body is the brief
 wf inbox add "Cache the views between passes" --repo ~/code/myapp   # park an idea as a card, to start later
 wf inbox                                               # the cards parked, name and first line each
-wf start ~/.agent-workflows/inbox/cache-the-views-between-pass-k2q9.md --workflows dev   # start one: it leaves the inbox
+wf start ~/.agent-workflows/inbox/cache-the-views-between-pass-k2q9.md --workflows dev   # start one: it stays, listed as started
 wf inbox rm cache-the-views-between-pass-k2q9          # or drop one unstarted
 wf up                # the daemon on a machine with no board; npm start in apps/api is the daemon that serves one
 wf ls
@@ -686,7 +686,7 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
 - `mcp:` — the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them, comma-separated: `mcp: playwright`.
   A session loads the servers its agent and its step name and no other: where neither has a line it loads none, and neither does a
   step with no agent.
-  The run hands the runtime the names alone (`checkoutMcp`), which reads those entries from the session's checkout when it starts it; a
+  The run hands the runtime the names alone (`projectMcp`), which reads those entries from the session's checkout when it starts it; a
   name that file does not declare refuses the session at its start, saying so. A Codex step is handed the same entries as
   `-c mcp_servers=…`. Loading a server allows none of its tools: the agent's fence still decides. Refused at load: a line that names
   no server, an empty name, a name twice, and any name on a step a remote agent runs, which loads what its operator configured. A
@@ -1483,7 +1483,7 @@ gated ship runs the line whole on the merged tree.
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
 | the engine's phase: `working`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
-| `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`stated: false`; a journal from before stage 4a says `failed`, `unsigned`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares, or its closeout named a file the run does not have | **never runs** — the run nudges it once a round first, below |
+| `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`closedOut: false`; a journal from before stage 4a says `failed`, `unsigned`, which the engine reads back as `former: 'unsigned'`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares, or its closeout named a file the run does not have | **never runs** — the run nudges it once a round first, below |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
@@ -1542,7 +1542,7 @@ retries: 1
   session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
   is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
-  — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `stated: false`, and
+  — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `closedOut: false`, and
   the run reads that as `unsigned` (`closeoutAsked`) — that said nothing is continued once:
   the next tick files the next try as a nudge on no one's word (`then: 'signoff'` on the record), with the same
   schema, model, effort, context window, tools and permission mode as the session it continues, told in
@@ -1552,9 +1552,10 @@ retries: 1
   `wf ls` says `try 2, nudged to sign off by the run`, `wf decide` `UNSIGNED: implement (nudged to sign off once
   by the run, and unsigned again)`. A person's ask for that try comes first. Not nudged: a step over its budget,
   a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
-  engine said `unsigned` for `done`, and any `done` recorded with no `stated` key. Why the run and not the engine: an
-  engine allowance was per task, so a person's try would earn another in the same round; each engine attempt got the
-  whole cap; and it restarted a session the harness failed too. The runtime makes one attempt per start since
+  engine said `unsigned` for `done`, any `done` recorded with no `closedOut` key, and a session that broke (a `failed`
+  end with `closedOut: false` and no `former`). Why the run and not the engine: an engine allowance was per task,
+  so a person's try would earn another in the same round; each engine attempt got the whole cap; and it restarted a
+  session the harness failed too. The runtime makes one attempt per start since
   2026-09-23, and `maxAttempts:` is refused.
 - **A closeout that names a file the run does not have is refused, and is no check.** On the pass that first reads a step's
   task signed, after it collected what the closeout named and before it judges the run, the tick reads each file of
@@ -1978,9 +1979,9 @@ kept nowhere:
 
   implement
     check  npm test  →  exit 0 ✓
-    used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s
+    used  29 responses · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s
     cost  $3.01 · read 21.4M · wrote 412k · peak 167k · budget $5
-    timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 29 turns · …  cost $3.01
+    timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 29 responses · …  cost $3.01
               try 1 check  filed 08:19:56Z  spawned 08:19:57Z  ended 08:20:55Z  queued 1s  ran 58s
 
   cost  run $3.01
@@ -2732,7 +2733,7 @@ start one: wf start /home/me/.agent-workflows/inbox/<name>.md [--workflows <w>] 
 $ wf start ~/.agent-workflows/inbox/show-what-a-step-cost-on-the-c3cw.md --repo ~/code/myapp --workflows dev \
     --brief "Show each step's cost beside its status on the run page, in dollars."
 show-each-step-s-cost-beside-42g6  2 step(s): implement → review
-from inbox card show-what-a-step-cost-on-the-c3cw — removed from the inbox
+from inbox card show-what-a-step-cost-on-the-c3cw — kept in the inbox, listed as started
 workspace: /home/me/code/myapp
 run 'wf tick' (or 'wf up') to start it
 ```
@@ -2788,10 +2789,14 @@ run 'wf tick' (or 'wf up') to start it
   - the repository is `--repo`, else the card's `repo:`, else the factory's one repository, else `.` — chosen before the card's
     `workflow:` is found in it;
   - `--after`, `--from`, `--input` and `--no-worktree` are `wf start`'s, as for any brief; `--from` adds to the card's `from:`.
-- **The record is written first, then the card is removed.** The record carries `from: { inbox: <name> }`, and `wf decide`
-  prints `from inbox card <name>` under the run's line. A removal that fails leaves a card `wf inbox` lists as
-  `started as <runId>` — never a run with no trace of its card — and `wf start` refuses that card, naming its run, until
-  `wf inbox rm` drops it. A plan's card started with `wf start` is never removed.
+- **The card is kept: it has a life of its own.** The record carries `from: { inbox: <name> }`, and `wf decide` prints
+  `from inbox card <name>` under the run's line. The card stays in the inbox, and `wf inbox` lists it as `started as <runId>`.
+  Its state is one closed word, `CardState` — `filed`, `queued`, `refused` (queued, and its start as it stands refused) or
+  `started` — computed once by the listing (`cardState`) from its file, the records that name it and the tick's tries, and sent
+  on the wire as is: the board reads it and never rebuilds it. A card is started once: `wf start` and `wf inbox queue` refuse a
+  started card, naming its run; to run the idea again, file it again. A queued card's `queued:` line is taken off at its start,
+  so the tick never starts it again, even once its run is forgotten (it then reads `filed`, and a person may start it).
+  `wf inbox rm` drops a card. A plan's card started with `wf start` stays where it is too.
 - **Refused by name**, exit 2, with the fix, before anything is written:
   - a key an inbox card does not have, `after:` among them, with where what it waits on is said instead: for a file
     `wf inbox add` is given, delete the line, file the idea, and give `--after` when starting the card;
@@ -3081,7 +3086,7 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   a `retry` of a step at its gate, on its question, out of rounds or at its cap, any `--budget` — is asked of the person by her
   admission (`nemia admit`, a hook asked before each of her shell calls), and so is a write that cannot be undone or changes their
   settings or a factory (`cancel`, `rm`, `factory add`, `level semi-auto`); the rest — a read, `start`, `hold`, `say`, `inbox add`, a
-  retry that waits on no one — is hers. Each command's class in the table decides (`nemia` on its entry, `src/admission/class.ts`), and
+  retry that waits on no one — is hers. Each command's class in the table decides (`class` on its entry, `src/admission/class.ts`), and
   a "don't ask again" never widens what waits. The harness must trust her folder first, once, by hand: the
   refusal names the command. **`nemia level manual`** puts her off: the keeper stops her session and drops her subscription. A
   session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
@@ -3209,11 +3214,12 @@ up — every 4000ms, ^C to stop
   (`queueRepo`). Its base is its base branch as it is at that
   moment, and its brief is frozen then. One card a pass: its run has nothing filed, and the next pass counts it against the cap
   before another card is started. `--after` stays for cards that depend on one another.
-- **Started, the card leaves the inbox** as any start removes it, and `wf up` and `wf tick` log `started <card> as <runId>`. A
-  removal that fails leaves a card `wf inbox` lists as `started as <runId>`, which neither a pass nor a person starts again.
+- **Started, the card stays in the inbox**, listed as started, its `queued:` line taken off, and `wf up` and `wf tick` log
+  `started <card> as <runId>`. A line that cannot be taken off is said on that log line; the card's record keeps it out of the
+  queue all the same (`queueOrder` leaves out a `started` card), and neither a pass nor a person starts it again.
 - **A start the package refuses is written down, not tried again.** The workflow gone, the repository gone, whatever
   `startFromInbox` refuses by name (exit 2): `wf up`'s line names it, `wf inbox` says `not started at <time>: <why>` beside
-  the card's place, and the card is left as it is. The tick keeps the refusal in `$WF_ROOT/queue/<name>.json` with the card's
+  the card's place, and the card is left as it is. The tick keeps the refusal, a `MissedStart`, in `$WF_ROOT/queue/<name>.json` with the card's
   text and the repository it was tried on, and passes over the card while both are the same: one try, no hot loop, and the card
   behind it has its turn. Edit the card, or take it back and queue it again — or, for a card whose repository neither its
   `repo:` nor its factory names, run `wf up` in another repository — and the next pass tries it again.
@@ -3251,7 +3257,7 @@ task is never refused, however many passes read it.
 The tick keeps one writer per file, and two ticks are two writers. So the store's daemon takes the store for itself, through a file of its
 own, `$WF_ROOT/daemon.json`, which it alone writes. The daemon is the api's process (`npm start` in `apps/api`), which answers the board's
 `/api` as it ticks (the board itself is the web's server, which proxies to it), or `wf up` on a machine that serves none: both run `up` (`src/daemon/up.verb.ts`), which takes the store before anything else,
-and the file names which one holds it (`by`, `"api"` or `"wf up"`, read as `wf up` when absent) and where an api serves (`url`, written
+and the file names which one holds it (`by`, `"api"` or `"up"`; a file written before, with none or `"wf up"`, reads as `up`) and where an api serves (`url`, written
 once it listens). An api started with `--no-tick` answers on 8788, behind the vite dev server, and takes nothing: it ticks no store, so a run filed on it
 moves on the daemon's next pass.
 
@@ -3271,9 +3277,9 @@ not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` f
 (`stalled`), or one `ticking`. The interval is a whole number of milliseconds from 1 to 2147483647 and anything else is refused, exit 2,
 before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
 
-The lease also names what the daemon's own engine holds, `holder`: the cards it serves on its port, by the harness each is for, written
-right after it took the lease and held its engine (`heldHolder`), by that process, which is the one writer of the file — the api's url and
-the holder's cards are both facts of the process that holds it. Another process on this store reads them (`holderOnStore`) to follow one
+The lease also names what the daemon's own engine holds, `serves` (`holder` before, read as `serves`): the cards it serves on its port, by the harness each is for, written
+right after it took the lease and held its engine (`heldServes`), by that process, which is the one writer of the file — the api's url and
+the holder's cards are both facts of the process that holds it. Another process on this store reads them (`servesOnStore`) to follow one
 of those sessions live over that port rather than off the files, and reads them afresh at every follow: a holder's port is ephemeral, and
 a process that read it once would dial a dead port after any restart. Nothing is answered for a lease that stopped, whose process is gone
 or that has gone silent — there is no port to dial — nor for a lease the asking process itself holds, which would be a viewer dialling

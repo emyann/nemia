@@ -462,7 +462,7 @@ What it leaves:
 
 - **`mcp:` on a step is shipped.** An agent's file names the servers of the checkout's `.mcp.json` its sessions
   load (`mcp:`), a step's own `mcp:` line adds to them as its `skills:` does, and the runtime leaves the rest of
-  the file out (`checkoutMcp`): a session loads what its agent and its step name and no other. A server only one
+  the file out (`projectMcp`): a session loads what its agent and its step name and no other. A server only one
   repository has is named by the step that needs it, and no agent of this repository's team names one
   (`tools/guards/test/team-portable.test.ts`). The line only adds; one that takes a server of the agent's away is not built.
 - **`--tools` does not narrow a server's tools, measured.** `claude --help` (2.1.270) says the list is "from the
@@ -1604,6 +1604,10 @@ What it leaves:
 
 ## Shipped: an inbox — cards parked before they are started
 
+*Since superseded in part by "A card keeps its identity after it starts": a start keeps the card, listed as `started` (`CardState`), and
+answers `{ id, card }` with no `removed` or `why`. What this section says of a removal that failed, and of showing its `why` once, is
+history.*
+
 An idea about the project had nowhere to be parked. The unit for one already existed: a card, a workflow and a brief. But a card lived only
 in a plan folder, started whole by `wf plan`, or was started by hand and left where it was. The old hkb parked such a note with
 `hkb new --triage` and listed them with `hkb ls --phase triage`, and its ADR-015 records that triage became a phase in the machinery
@@ -2198,7 +2202,7 @@ in `src/service/`:
   tick, and resumes only the pause it put. A start that never ticks leaves the store paused and says `nemia resume`.
 - **`nemia service uninstall`** stops, disables and removes it; **`nemia service status`** names the unit's state, the checkout it runs,
   who holds the lease, and lingering (`loginctl show-user -p Linger`, read only). All three are the CLI's alone; Nemia's fence asks
-  before install and uninstall (`prompts`) and lets status run (`read`).
+  before install and uninstall (`ask`) and lets status run (`read`).
 
 Tested in `src/service/service.test.ts` (the unit and the plist against golden text, `KillMode=process`, escaping read back, every
 refusal, WSL, the status lines, the landings waited for) and `src/service/service.verb.test.ts` (over a fake machine: install free,
@@ -2223,7 +2227,7 @@ which code served the board. What was built, in `src/release/`:
 - **Refused, changing nothing**: a tag that climbs out of `releases/`, hides, holds a space or is `current` (`Invalid`); a tag the
   repository lacks (`Missing`); a built tag that now names another commit (`Conflict`); no `release:check` script, or a command that
   fails (`Invalid`, naming its log, which is kept). A tag built at the same commit is switched to without a rebuild, so a rollback is
-  an older tag. Class `prompts`, the CLI's alone.
+  an older tag. Class `ask`, the CLI's alone.
 - **`nemia version [--json]`** says this `nemia`'s release (an install's tag and commit, or the checkout), the store's pointer and the
   daemon's (`release` on its lease). Class `read`, the CLI's alone. `/api/version` adds the api's `release`, and the board's footer says
   `v1.0.0 · <tag>` or `v1.0.0 · checkout`, the folder in its title.
@@ -2479,12 +2483,12 @@ the runtime: the words in her live session's inbox, one attempt, never stopped),
 Card A of the third Nemia amendment: every command of the table is classed once by who answers for it when an agent calls it, and her
 fence is derived from the class, with no hand list in `nemia/nemia.md`.
 
-- **The class** (`nemia` on each entry, `src/admission/class.ts`): `read`, `hers`, `prompts` (a write that cannot be undone or changes
-  the person's settings or a factory), `answers` (to what waits: a gate, a step's question, a loop out of rounds, a cap) and `out`
-  (`tick`, `up`); a command that reads bare names the words or flags that set. `classBreaks` refuses a command with none, a read classed
-  as a write and a write as a read, a flag in neither list, and a name a longer one's rule would override (`test/commands.test.ts`).
+- **The class** (`class` on each entry, `src/admission/class.ts`): `read`, `act` (a write run unasked), `ask` (a write that cannot be
+  undone or changes the person's settings or a factory), `answer` (to what waits: a gate, a step's question, a loop out of rounds, a
+  cap) and `none` (`tick`, `up`); a command that reads bare names the words or flags that set. Every entry carries one, as its type
+  requires; `classBreaks` refuses a read classed as a write and a write as a read, a flag in neither list, and a name a longer one's rule would override (`test/commands.test.ts`).
 - **Her fence** (`nemiaFence`, `src/admission/fence.ts`): a read, her own write and an answer allowed; a prompt asked; a setter asked
-  set; `out` denied, with `wf` and `ae` denied by her definition and the store outside her folder denied (`storeDenies`), never asked.
+  set; `none` denied, with `wf` and `ae` denied by her definition and the store outside her folder denied (`storeDenies`), never asked.
   A prompt the person allowed by its own rule in her folder's local settings is asked no more from her next filing (`widened`), and
   `nemia level` lists it: an ask outranks an allow wherever each is written, so the keeper takes the ask out.
 - **Her admission** (`nemia admit`, `src/admission/`), the runtime's hook on her `Bash` calls: an approval, a round, an accept, any
@@ -2531,7 +2535,7 @@ what prompts, prompts; the rest is hers, on her judgement, and said.
 - **Her verbs, generated**: the `verbs` skill (`nemia/skills/verbs/SKILL.md`) is written from the command table and each command's
   class by `verbsSkill` (`src/nemia/verbs.verb.ts`): every verb the CLI serves her, under *Reads*, *Yours*, *Prompts the person* or
   *Answers what waits*, with its usage and help as `nemia --help` prints them; a command that reads bare is a read, with the words that
-  make it prompt; `out` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
+  make it prompt; `none` and api-only entries are left out. The CLI's own verb (`decide`) is said once, in `CLI_VERBS`
   (`src/command/command.ts`), which `nemia --help` renders too. `test/verbs-skill.test.ts` refuses the file once it drifts from the
   table, naming the command that regenerates it:
   `node -e "import('./packages/agent-orchestrator/src/nemia/verbs.verb.ts').then((m) => process.stdout.write(m.verbsSkill()))" > packages/agent-orchestrator/nemia/skills/verbs/SKILL.md`.
@@ -2847,6 +2851,10 @@ taller than its cell (`CELL_HEIGHT`).
   step, fails a test each.
 
 ## Shipped: the queue — a cap on runs in flight, and cards that start themselves
+
+*Since superseded in part by "A card keeps its identity after it starts": the tick's start keeps the card and takes its `queued:` line off,
+so a card is not started twice because its record names it and its line is gone, not because its removal failed; `QueueTry` is
+`MissedStart`.*
 
 Item 3 of this list, registered 2026-09-16 by the operator: a Factory canvas filled for a week, cards queued, picked whenever a slot frees.
 The workflow layer built its engine with `WF_MAX_CONCURRENT`, named in no document: a cap on sessions per harness, not on runs. Every run

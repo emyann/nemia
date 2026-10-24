@@ -1,9 +1,10 @@
 /** What sessions consumed, in the CLI `decide`'s words (apps/api/src/detail/usage.ts), each type with the schema `get` decodes it with. */
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 
 /** Mirrors `Usage` in apps/api/src/detail/usage.ts: a count nobody measured is absent, never 0. */
 export type Usage = {
-  turns?: number;
+  responses?: number;
   toolCalls?: number;
   inputTokens?: number;
   outputTokens?: number;
@@ -24,29 +25,31 @@ export type Usage = {
 const Count = Schema.optionalKey(Schema.Number);
 
 /** Decodes a `Usage`. */
-export const UsageSchema = Schema.Struct({
-  turns: Count,
-  toolCalls: Count,
-  inputTokens: Count,
-  outputTokens: Count,
-  costUsd: Count,
-  apiMs: Count,
-  toolMs: Count,
-  cacheReadTokens: Count,
-  cacheWriteTokens: Count,
-  uncachedTokens: Count,
-  peakContextTokens: Count,
-  firstContextTokens: Count,
-  firstCacheWriteTokens: Count,
-  compactions: Count,
-  rebuiltCaches: Count,
-}) satisfies Schema.Schema<Usage>;
+export const UsageSchema = decodes<Usage>()(
+  Schema.Struct({
+    responses: Count,
+    toolCalls: Count,
+    inputTokens: Count,
+    outputTokens: Count,
+    costUsd: Count,
+    apiMs: Count,
+    toolMs: Count,
+    cacheReadTokens: Count,
+    cacheWriteTokens: Count,
+    uncachedTokens: Count,
+    peakContextTokens: Count,
+    firstContextTokens: Count,
+    firstCacheWriteTokens: Count,
+    compactions: Count,
+    rebuiltCaches: Count,
+  }),
+);
 
 /** Where a peak context stands: at the step's `context:` cap, or past 200k on a step with none. */
 export type PeakMark = 'cap' | 'large' | null;
 
 /** Decodes a `PeakMark`. */
-export const PeakMarkSchema = Schema.NullOr(Schema.Literals(['cap', 'large'])) satisfies Schema.Schema<PeakMark>;
+export const PeakMarkSchema = decodes<PeakMark>()(Schema.NullOr(Schema.Literals(['cap', 'large'])));
 
 /**
  * Mirrors `StepUsed` in apps/api/src/detail/usage.ts: the usage, and the CLI `decide`'s words for it — `used` and `cost`, `not measured`
@@ -67,17 +70,19 @@ export type StepUsed = {
 };
 
 /** Decodes a `StepUsed`. */
-export const StepUsedSchema = Schema.Struct({
-  usage: Schema.NullOr(UsageSchema),
-  used: Schema.String,
-  cost: Schema.String,
-  costUsd: Schema.NullOr(Schema.Number),
-  apiMs: Schema.NullOr(Schema.Number),
-  toolMs: Schema.NullOr(Schema.Number),
-  read: Schema.NullOr(Schema.String),
-  peak: PeakMarkSchema,
-  rebuilt: Schema.Number,
-}) satisfies Schema.Schema<StepUsed>;
+export const StepUsedSchema = decodes<StepUsed>()(
+  Schema.Struct({
+    usage: Schema.NullOr(UsageSchema),
+    used: Schema.String,
+    cost: Schema.String,
+    costUsd: Schema.NullOr(Schema.Number),
+    apiMs: Schema.NullOr(Schema.Number),
+    toolMs: Schema.NullOr(Schema.Number),
+    read: Schema.NullOr(Schema.String),
+    peak: PeakMarkSchema,
+    rebuilt: Schema.Number,
+  }),
+);
 
 /**
  * Mirrors `RunRead` in apps/api/src/detail/usage.ts: what a run's sessions read, by price, in words, where its peak stands, and how many
@@ -86,8 +91,10 @@ export const StepUsedSchema = Schema.Struct({
 export type RunRead = { said: string; peak: PeakMark; rebuilt: number };
 
 /** Decodes a `RunRead`. */
-export const RunReadSchema = Schema.Struct({
-  said: Schema.String,
-  peak: PeakMarkSchema,
-  rebuilt: Schema.Number,
-}) satisfies Schema.Schema<RunRead>;
+export const RunReadSchema = decodes<RunRead>()(
+  Schema.Struct({
+    said: Schema.String,
+    peak: PeakMarkSchema,
+    rebuilt: Schema.Number,
+  }),
+);

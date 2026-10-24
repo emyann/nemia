@@ -125,7 +125,7 @@ export const mcpServerOf = (server: RemoteMcpServer): RemoteMcpServer => ({
  * relative `repo` would name `repo/repo`. One that is not JSON is refused here, before anything runs — named, it stops
  * the CLI before a session exists ("MCP config is not a valid JSON").
  */
-export const checkoutMcpConfig = (cwd: string): string | undefined => {
+export const projectMcpConfig = (cwd: string): string | undefined => {
   const file = path.resolve(cwd, '.mcp.json');
   let text: string;
   try {
@@ -146,14 +146,14 @@ export const checkoutMcpConfig = (cwd: string): string | undefined => {
 };
 
 /**
- * The entries of the checkout's `.mcp.json` under `names`, as the file gives them, none changed: what a task's `checkoutMcp`
+ * The entries of the checkout's `.mcp.json` under `names`, as the file gives them, none changed: what a task's `projectMcp`
  * loads of it. No name reads no file. Refused, saying what to change: a checkout with no `.mcp.json`, one that is not JSON or
  * has no `mcpServers` map, and a name the file does not declare.
  */
-export const pickedCheckoutMcp = (cwd: string, names: readonly string[]): Record<string, unknown> => {
+export const pickedProjectMcp = (cwd: string, names: readonly string[]): Record<string, unknown> => {
   if (!names.length) return {};
   const file = path.resolve(cwd, '.mcp.json');
-  const asked = `\`checkoutMcp: ${JSON.stringify(names)}\``;
+  const asked = `\`projectMcp: ${JSON.stringify(names)}\``;
   let text: string;
   try {
     text = fs.readFileSync(file, 'utf8');
@@ -185,15 +185,15 @@ export const pickedCheckoutMcp = (cwd: string, names: readonly string[]): Record
 };
 
 /**
- * The servers a session's config file holds: the entries a task's `checkoutMcp` picks from its checkout's `.mcp.json`
- * (`pickedCheckoutMcp`), then the task's own `mcp`. `undefined` when the task gives neither.
+ * The servers a session's config file holds: the entries a task's `projectMcp` picks from its checkout's `.mcp.json`
+ * (`pickedProjectMcp`), then the task's own `mcp`. `undefined` when the task gives neither.
  */
 export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> | undefined =>
-  config?.checkoutMcp ? { ...pickedCheckoutMcp(cwd, config.checkoutMcp), ...config.mcp } : config?.mcp;
+  config?.projectMcp ? { ...pickedProjectMcp(cwd, config.projectMcp), ...config.mcp } : config?.mcp;
 
 /**
  * Every server a session is given, as a value: the checkout's own `.mcp.json` whole, as `claude -p` reads its second config — unless
- * the task picks entries of it by name (`checkoutMcp`), which `sessionMcp` has already taken — with the session's own laid over it, so
+ * the task picks entries of it by name (`projectMcp`), which `sessionMcp` has already taken — with the session's own laid over it, so
  * the task's server wins a name both give. `{}` where neither gives one.
  *
  * What `writeMcpConfig` writes to a file, for the caller that hands the map over as a value instead: an attached session's
@@ -201,7 +201,7 @@ export const sessionMcp = (cwd: string, config: HarnessArgs | undefined): Record
  * here, so the type says `unknown` and the caller that hands them to the SDK is the one that names the SDK's shape.
  */
 export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Record<string, unknown> => {
-  const checkout = config?.checkoutMcp ? undefined : checkoutMcpConfig(cwd);
+  const checkout = config?.projectMcp ? undefined : projectMcpConfig(cwd);
   const theirs = checkout ? ((JSON.parse(fs.readFileSync(checkout, 'utf8')) as { mcpServers?: object }).mcpServers ?? {}) : {};
   return { ...theirs, ...sessionMcp(cwd, config) };
 };
@@ -212,7 +212,7 @@ export const everyMcpServer = (cwd: string, config: HarnessArgs | undefined): Re
  * `headers` value may be a secret. For a harness handed a config file of its own (`HarnessSpec`, a `.mcp.json`'s shape); a Claude
  * Code session, a job's and a held one's alike, hands the servers over as a value (`everyMcpServer`), which the SDK
  * spells onto the child's argv, so the owner-only file is no part of that path and this warning is not its cover. Returns
- * the file's absolute path, as `checkoutMcpConfig` does: a `file` given relative is relative to the engine, not to the
+ * the file's absolute path, as `projectMcpConfig` does: a `file` given relative is relative to the engine, not to the
  * session's cwd.
  */
 export const writeMcpConfig = (file: string, mcp: Record<string, unknown> | undefined): string | undefined => {

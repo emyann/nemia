@@ -4,6 +4,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 import { StepKeySchema, StepSpecPartSchema, type StepKey, type WorkflowStepSpec } from './library.ts';
 
@@ -11,19 +12,9 @@ import { StepKeySchema, StepSpecPartSchema, type StepKey, type WorkflowStepSpec 
 export type KeyKind = 'steps' | 'step' | 'choice' | 'harness-word' | 'text' | 'list' | 'count' | 'dollars' | 'tokens' | 'flag' | 'schema';
 
 /** Decodes a `KeyKind`. */
-const KeyKindSchema = Schema.Literals([
-  'steps',
-  'step',
-  'choice',
-  'harness-word',
-  'text',
-  'list',
-  'count',
-  'dollars',
-  'tokens',
-  'flag',
-  'schema',
-]) satisfies Schema.Schema<KeyKind>;
+const KeyKindSchema = decodes<KeyKind>()(
+  Schema.Literals(['steps', 'step', 'choice', 'harness-word', 'text', 'list', 'count', 'dollars', 'tokens', 'flag', 'schema']),
+);
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
 const Strings = Schema.mutable(Schema.Array(Schema.String));
@@ -41,13 +32,15 @@ export type KeyField = {
 };
 
 /** Decodes a `KeyField`. */
-const KeyFieldSchema = Schema.Struct({
-  key: StepKeySchema,
-  meaning: Schema.String,
-  kind: KeyKindSchema,
-  choices: Schema.NullOr(Strings),
-  byHarness: Schema.NullOr(Schema.Record(Schema.String, Strings)),
-}) satisfies Schema.Schema<KeyField>;
+const KeyFieldSchema = decodes<KeyField>()(
+  Schema.Struct({
+    key: StepKeySchema,
+    meaning: Schema.String,
+    kind: KeyKindSchema,
+    choices: Schema.NullOr(Strings),
+    byHarness: Schema.NullOr(Schema.Record(Schema.String, Strings)),
+  }),
+);
 
 /**
  * Mirrors `KeyForm` in apps/api/src/workflows/builder.ts: every key a step may set, in the package's order, the harness a step runs on when
@@ -66,14 +59,16 @@ export type KeyForm = {
 };
 
 /** Decodes a `KeyForm`: each key the board reads, of its type and words; a key it does not know is dropped. */
-const KeyFormSchema = Schema.Struct({
-  keys: Schema.mutable(Schema.Array(KeyFieldSchema)),
-  defaultHarness: Schema.String,
-  roleKeys: Schema.mutable(Schema.Array(StepKeySchema)),
-  policyKeys: Schema.mutable(Schema.Array(StepKeySchema)),
-  agents: Schema.Record(Schema.String, StepSpecPartSchema),
-  remote: Schema.Struct({ prefix: Schema.String, refuses: Schema.mutable(Schema.Array(StepKeySchema)) }),
-}) satisfies Schema.Schema<KeyForm>;
+const KeyFormSchema = decodes<KeyForm>()(
+  Schema.Struct({
+    keys: Schema.mutable(Schema.Array(KeyFieldSchema)),
+    defaultHarness: Schema.String,
+    roleKeys: Schema.mutable(Schema.Array(StepKeySchema)),
+    policyKeys: Schema.mutable(Schema.Array(StepKeySchema)),
+    agents: Schema.Record(Schema.String, StepSpecPartSchema),
+    remote: Schema.Struct({ prefix: Schema.String, refuses: Schema.mutable(Schema.Array(StepKeySchema)) }),
+  }),
+);
 
 /** What a step's form is drawn from. It changes with the package, so once a visit. */
 export const keyFormQuery = queryOptions({

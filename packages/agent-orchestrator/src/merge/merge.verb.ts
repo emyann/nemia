@@ -168,7 +168,7 @@ export const MERGE: Command<{ step: string; target: string; onto: string; sha: s
   },
   writes: true,
   ticks: true,
-  nemia: 'hers',
+  class: 'act',
   route: { method: 'POST', path: '/api/runs/:runId/merge', status: 202 },
   apiKeys: ['step', 'target', 'onto', 'sha', 'round', 'file'],
   handler: Effect.fnUntraced(function* (args: Args) {

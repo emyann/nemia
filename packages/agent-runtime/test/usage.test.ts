@@ -93,7 +93,7 @@ test('an attempt begins at its start to the millisecond: a response one millisec
     response(new Date(since).toISOString(), 'msg_at', [{ type: 'tool_use', id: 'tu_at', name: 'Bash' }]),
   ].join('\n');
   assert.deepEqual(transcriptUsage(jsonl, since), {
-    turns: 1,
+    responses: 1,
     toolCalls: 1,
     inputTokens: 1110,
     uncachedTokens: 10,
@@ -138,7 +138,7 @@ test('a count carried on from a total the transcript does not show is no cost', 
   const jsonl = [prompt('2026-09-15T01:12:05Z'), costState(43.0383, 3335346, 341815, Date.parse('2026-09-15T00:04:43Z'))].join('\n');
   assert.deepEqual(
     transcriptUsage(jsonl, since),
-    { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
+    { responses: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
     'its count began an hour before it did, and nothing says at what',
   );
 
@@ -193,7 +193,7 @@ test('usage decodes only the lines it reads: a response before the attempt began
     prompt('2026-09-12T09:00:01Z'),
     response('2026-09-12T09:00:02Z', 'msg_1', [{ type: 'text', text: 'done' }]),
   ].join('\n');
-  assert.equal(transcriptUsage(jsonl, since).turns, 1);
+  assert.equal(transcriptUsage(jsonl, since).responses, 1);
 });
 
 test("transcriptUsage and fold: an attempt's count and cost, measured off its transcript, or absent — never a 0 for nobody counted", async (t) => {
@@ -209,7 +209,7 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
       '{half a line mentioning "assistant"',
     ].join('\n');
     assert.deepEqual(transcriptUsage(jsonl, Date.parse('2026-09-12T09:00:00Z')), {
-      turns: 2,
+      responses: 2,
       toolCalls: 3,
       inputTokens: 2220,
       uncachedTokens: 20,
@@ -225,7 +225,7 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
   await t.test('tokens are absent, not 0, when a counted response did not carry them — and a transcript has no cost', () => {
     const jsonl = [response('2026-09-12T09:00:01Z', 'msg_1', [], null), response('2026-09-12T09:00:02Z', 'msg_2', [])].join('\n');
     const u = transcriptUsage(jsonl, 0);
-    assert.equal(u.turns, 2);
+    assert.equal(u.responses, 2);
     assert.equal('inputTokens' in u, false);
     assert.equal('outputTokens' in u, false);
     assert.equal('costUsd' in u, false);
@@ -243,7 +243,7 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
         costState(0.1925, 44777, 217, since - 300),
       ].join('\n');
       assert.deepEqual(transcriptUsage(jsonl, since), {
-        turns: 1,
+        responses: 1,
         toolCalls: 1,
         inputTokens: 1110,
         uncachedTokens: 10,
@@ -269,7 +269,7 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
       response('2026-09-13T04:06:20Z', 'msg_child', []),
     ].join('\n');
     const u = transcriptUsage(running, since);
-    assert.equal(u.turns, 1);
+    assert.equal(u.responses, 1);
     for (const key of ['costUsd', 'apiMs', 'toolMs', 'unpricedModel'])
       assert.equal(key in u, false, `${key}: its process has not exited, and the parent's total is not its own`);
   });
@@ -293,7 +293,7 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
       const running = transcriptUsage(lines.join('\n'), since);
       assert.deepEqual(
         running,
-        { turns: 2, toolCalls: 2, peakContextTokens: 83770, firstContextTokens: 1110, firstCacheWriteTokens: 100, compactions: 1 },
+        { responses: 2, toolCalls: 2, peakContextTokens: 83770, firstContextTokens: 1110, firstCacheWriteTokens: 100, compactions: 1 },
         'no tokens rather than a count missing the summary',
       );
 
@@ -301,7 +301,7 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
       assert.deepEqual(
         transcriptUsage(exited, since),
         {
-          turns: 2,
+          responses: 2,
           toolCalls: 2,
           peakContextTokens: 83770,
           firstContextTokens: 1110,
@@ -421,14 +421,14 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
       const journal = [
         '{"kind":"filed","at":"2026-09-18T09:00:00Z","brief":"b","cwd":"/r"}',
         '{"kind":"starting","at":"2026-09-18T09:00:01Z","attempt":1}',
-        '{"kind":"ended","at":"2026-09-18T09:05:00Z","attempt":1,"sessionId":"s","observed":"done","reason":"harness","usage":{"turns":85,"toolCalls":40,"inputTokens":21861234,"outputTokens":40100}}',
+        '{"kind":"ended","at":"2026-09-18T09:05:00Z","attempt":1,"sessionId":"s","observed":"done","reason":"harness","usage":{"responses":85,"toolCalls":40,"inputTokens":21861234,"outputTokens":40100}}',
         '{"kind":"measured","at":"2026-09-18T09:05:02Z","attempt":1,"usage":{"costUsd":14.72,"apiMs":679931,"toolMs":29305}}',
       ].map((l) => JSON.parse(l) as Event);
       const [a] = fold('t', journal).attempts;
       assert.deepEqual(
         a.usage,
         {
-          turns: 85,
+          responses: 85,
           toolCalls: 40,
           inputTokens: 21861234,
           outputTokens: 40100,
@@ -442,7 +442,7 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
         assert.equal(key in a.usage, false, key);
       assert.equal(
         usageLine(a.usage),
-        '85 turns · 40 tool calls · 21.9M in · 40.1k out · $14.72 · cache not measured · peak not measured',
+        '85 responses · 40 tool calls · 21.9M in · 40.1k out · $14.72 · cache not measured · peak not measured',
         'and ae show names what it did not count',
       );
     },
@@ -472,7 +472,7 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
         { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r' },
         { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
       ];
-      const counted = { turns: 3, toolCalls: 5, inputTokens: 10, outputTokens: 2 };
+      const counted = { responses: 3, toolCalls: 5, inputTokens: 10, outputTokens: 2 };
       const legacy = fold('t', [
         ...begun,
         { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'succeeded', reason: 'harness', usage: counted },
@@ -519,7 +519,7 @@ test("a resumed session is charged its own spend: its parent's conversation, cos
     assert.deepEqual(
       transcriptUsage(jsonl, Date.parse('2026-09-13T04:06:15Z')),
       {
-        turns: 1,
+        responses: 1,
         toolCalls: 0,
         inputTokens: 1110,
         uncachedTokens: 10,
@@ -557,7 +557,7 @@ test("a resumed session is charged its own spend: its parent's conversation, cos
     assert.deepEqual(
       own,
       {
-        turns: 1,
+        responses: 1,
         toolCalls: 0,
         inputTokens: 1110,
         uncachedTokens: 10,
@@ -600,7 +600,7 @@ test("a resumed session is charged its own spend: its parent's conversation, cos
     ].join('\n');
     const child = transcriptUsage(jsonl, since);
     assert.deepEqual(
-      [child.turns, child.uncachedTokens, child.cacheWriteTokens, child.cacheReadTokens, child.inputTokens, child.peakContextTokens],
+      [child.responses, child.uncachedTokens, child.cacheWriteTokens, child.cacheReadTokens, child.inputTokens, child.peakContextTokens],
       [2, 7, 184_500, 183_000, 367_507, 184_501],
       "its own two responses: the parent's are not counted, and nothing of the parent's is taken off the peak",
     );
@@ -644,7 +644,7 @@ test("a resumed session is charged its own spend: its parent's conversation, cos
       assert.deepEqual(
         transcriptUsage(jsonl, since),
         {
-          turns: 1,
+          responses: 1,
           toolCalls: 0,
           inputTokens: 1110,
           uncachedTokens: 10,
@@ -707,13 +707,13 @@ test('a long-lived attempt is counted across its processes, and its counts and d
       ].join('\n');
 
       const attempt = transcriptUsage(jsonl, since);
-      assert.equal(attempt.turns, 4, "the killed process wrote no cost-state, and its turns are the attempt's all the same");
+      assert.equal(attempt.responses, 4, "the killed process wrote no cost-state, and its turns are the attempt's all the same");
       assert.equal(attempt.outputTokens, 20);
       for (const key of ['costUsd', 'apiMs', 'toolMs'])
         assert.equal(key in attempt, false, `${key}: the respawned process counted its own turns alone, too low for the attempt`);
 
       const respawn = transcriptUsage(jsonl, Date.parse(at(respawned + 813)));
-      assert.equal(respawn.turns, 1, 'counted from the respawn, its own turn');
+      assert.equal(respawn.responses, 1, 'counted from the respawn, its own turn');
       assert.equal(respawn.costUsd, 0.0046575, 'and the cost-state is its count, begun as it registered');
     },
   );
@@ -725,18 +725,18 @@ test('a long-lived attempt is counted across its processes, and its counts and d
         kind: 'counted',
         at: '2026-10-02T22:10:00Z',
         attempt: 1,
-        usage: { turns: 4, toolCalls: 2, inputTokens: 20400, outputTokens: 1530 },
+        usage: { responses: 4, toolCalls: 2, inputTokens: 20400, outputTokens: 1530 },
       };
       assert.equal(
         entryLine('t-1', counted),
-        `22:10:00  ${'t-1'.padEnd(34)} ${'counted'.padEnd(10)}  attempt 1: 4 turns · 2 tool calls · 20.4k in · 1.5k out · cache not measured · peak not measured`,
+        `22:10:00  ${'t-1'.padEnd(34)} ${'counted'.padEnd(10)}  attempt 1: 4 responses · 2 tool calls · 20.4k in · 1.5k out · cache not measured · peak not measured`,
       );
       const state = fold('t-1', [
         { kind: 'filed', at: '2026-10-02T22:00:00Z', brief: 'keep watch', cwd: '/r', restartPolicy: 'Always' },
         { kind: 'starting', at: '2026-10-02T22:00:01Z', attempt: 1 },
         counted,
       ]);
-      assert.match(taskLine({ id: 't-1', state, phase: 'working', sessionId: null }), /working {13}cost not measured · 4t  keep watch$/);
+      assert.match(taskLine({ id: 't-1', state, phase: 'working', sessionId: null }), /working {13}cost not measured · 4r  keep watch$/);
     },
   );
 
@@ -772,12 +772,12 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
 
   await t.test('a measured attempt prints what was measured, and names what was not', () => {
     assert.equal(
-      usageLine({ turns: 12, toolCalls: 31, inputTokens: 1_234_567, outputTokens: 20_400 }),
-      '12 turns · 31 tool calls · 1.2M in · 20.4k out · cost not measured · cache not measured · peak not measured',
+      usageLine({ responses: 12, toolCalls: 31, inputTokens: 1_234_567, outputTokens: 20_400 }),
+      '12 responses · 31 tool calls · 1.2M in · 20.4k out · cost not measured · cache not measured · peak not measured',
     );
     assert.equal(
       usageLine({
-        turns: 85,
+        responses: 85,
         toolCalls: 40,
         inputTokens: 21_861_234,
         uncachedTokens: 1_234,
@@ -787,7 +787,7 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
         outputTokens: 40_100,
         costUsd: 14.72,
       }),
-      '85 turns · 40 tool calls · 21.9M in · 40.1k out · $14.72 · read 21.4M · wrote 412.0k · uncached 1.2k · peak 167.0k',
+      '85 responses · 40 tool calls · 21.9M in · 40.1k out · $14.72 · read 21.4M · wrote 412.0k · uncached 1.2k · peak 167.0k',
       'the classes and the peak beside the cost',
     );
     assert.equal(
@@ -801,10 +801,10 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
         outputTokens: 13_138,
         costUsd: 1.25,
       }),
-      'turns not measured · tool calls not measured · 601.4k in · 13.1k out · $1.25 · read 298.4k · wrote 225.8k · uncached 77.1k · peak 173.6k · compacted 2 times',
+      'responses not measured · tool calls not measured · 601.4k in · 13.1k out · $1.25 · read 298.4k · wrote 225.8k · uncached 77.1k · peak 173.6k · compacted 2 times',
       'a session that compacted says so: its peak stops short of its window',
     );
-    assert.equal(usageLine({ turns: 4, toolCalls: 2, costUsd: 0.1054 }), '4 turns · 2 tool calls · tokens not measured · $0.11');
+    assert.equal(usageLine({ responses: 4, toolCalls: 2, costUsd: 0.1054 }), '4 responses · 2 tool calls · tokens not measured · $0.11');
     const [a] = fold('t', [
       { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r' },
       { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
@@ -816,12 +816,12 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
         observed: 'failed',
         reason: 'harness',
         exitCode: 3,
-        usage: { turns: 1, toolCalls: 0 },
+        usage: { responses: 1, toolCalls: 0 },
       },
     ]).attempts;
     assert.equal(
       attemptLine(a),
-      'attempt 1  failed  09:00:01 → 09:05:00 (4m 59s)  exit 3  1 turns · 0 tool calls · tokens not measured · cost not measured',
+      'attempt 1  failed  09:00:01 → 09:05:00 (4m 59s)  exit 3  1 responses · 0 tool calls · tokens not measured · cost not measured',
     );
   });
 
@@ -832,8 +832,8 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
       assert.equal(usd(0.0042), '<$0.01', 'a resumed claude -p that spent less than a cent did not spend nothing');
       assert.equal(usd(0), '$0.00');
       assert.equal(
-        usageLine({ turns: 1, toolCalls: 0, apiMs: 900, unpricedModel: true }),
-        '1 turns · 0 tool calls · tokens not measured · cost not measured (a model without a price)',
+        usageLine({ responses: 1, toolCalls: 0, apiMs: 900, unpricedModel: true }),
+        '1 responses · 0 tool calls · tokens not measured · cost not measured (a model without a price)',
       );
 
       const base: Event[] = [
@@ -863,7 +863,7 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
       ]);
       assert.equal(
         attemptLine(spent.attempts[0]),
-        'attempt 1  failed (budget)  09:00:01 → 09:00:04 (3s)  exit 1  turns not measured · tool calls not measured · tokens not measured · $0.02',
+        'attempt 1  failed (budget)  09:00:01 → 09:00:04 (3s)  exit 1  responses not measured · tool calls not measured · tokens not measured · $0.02',
       );
 
       const shown = (state: ReturnType<typeof fold>, usage?: object) =>
@@ -878,14 +878,14 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
           sessionId: 's',
           observed: 'succeeded',
           reason: 'harness',
-          usage: { turns: 12 },
+          usage: { responses: 12 },
         },
-        { kind: 'measured', at: '2026-09-15T09:05:01Z', attempt: 1, usage: { turns: 12, costUsd: 3.0054 } },
+        { kind: 'measured', at: '2026-09-15T09:05:01Z', attempt: 1, usage: { responses: 12, costUsd: 3.0054 } },
       ]);
-      assert.match(shown(measured), /working {13}\$3\.01 · 12t  read the notes$/, 'measured once its session was let go');
+      assert.match(shown(measured), /working {13}\$3\.01 · 12r  read the notes$/, 'measured once its session was let go');
       assert.match(
-        shown(fold('t-1', base), { turns: 3 }),
-        /working {13}cost not measured · 3t  read the notes$/,
+        shown(fold('t-1', base), { responses: 3 }),
+        /working {13}cost not measured · 3r  read the notes$/,
         'running: no cost written yet',
       );
       assert.match(shown(fold('t-1', base.slice(0, 1))), /working {13}read the notes$/, 'no attempt, nothing to cost');
@@ -934,11 +934,11 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
         ...extra,
       });
       const shown = (extra: object) => [attemptLine(fold('t-1', [...base, end(extra)]).attempts[0]), entryLine('t-1', end(extra))];
-      assert.deepEqual(shown({ stated: false }), [
+      assert.deepEqual(shown({ closedOut: false }), [
         'attempt 1  succeeded (no statement)  09:00:01 → 09:00:04 (3s)  usage not measured',
         `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  succeeded (no statement)`,
       ]);
-      for (const extra of [{ stated: true, closeout: { outcome: 'done' } }, {}])
+      for (const extra of [{ closedOut: true, closeout: { outcome: 'done' } }, {}])
         assert.deepEqual(
           shown(extra),
           [
@@ -948,9 +948,9 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
           JSON.stringify(extra),
         );
       assert.equal(
-        entryLine('t-1', end({ observed: 'failed', reason: 'unsigned' })),
-        `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  failed (unsigned)`,
-        "an older journal's end the engine judged: its reason, as written",
+        entryLine('t-1', end({ observed: 'failed', closedOut: false, former: 'unsigned' })),
+        `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  failed (no statement)`,
+        "an older journal's end its engine judged by a reason of its own, as `upgrade` reads it: the harness's, with no statement",
       );
     },
   );
@@ -975,11 +975,11 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
   await t.test('a count its runner could not see is named as not measured — a Codex attempt has tokens and no turns', () => {
     assert.equal(
       usageLine({ toolCalls: 12, inputTokens: 373_710, outputTokens: 1_082 }),
-      'turns not measured · 12 tool calls · 373.7k in · 1.1k out · cost not measured · cache not measured · peak not measured',
+      'responses not measured · 12 tool calls · 373.7k in · 1.1k out · cost not measured · cache not measured · peak not measured',
     );
     assert.equal(
       usageLine({ inputTokens: 10, outputTokens: 5 }),
-      'turns not measured · tool calls not measured · 10 in · 5 out · cost not measured · cache not measured · peak not measured',
+      'responses not measured · tool calls not measured · 10 in · 5 out · cost not measured · cache not measured · peak not measured',
     );
   });
 
@@ -1030,7 +1030,7 @@ test("codexOutput: a Codex run's usage read from its stream, and nothing it cann
       },
       'cached tokens are part of input_tokens and reasoning part of output_tokens: neither is added',
     );
-    assert.equal('turns' in read.usage, false, "Codex's turns are prompts, not model responses");
+    assert.equal('responses' in read.usage, false, "Codex's turns are prompts, not model responses");
     assert.equal('costUsd' in read.usage, false);
   });
 

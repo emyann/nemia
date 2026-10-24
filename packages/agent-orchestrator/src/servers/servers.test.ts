@@ -3,7 +3,7 @@
  *
  * The two refusals the card rests on are each proven by the fixture that would pass without them: an `Authorization` header, against
  * the same entry with a toolset header, which is kept; and a local server, against the same entry given a `url`. And the split's
- * precedence is proven by a name that is on both the record and the checkout's list, which must leave `checkoutMcp` altogether.
+ * precedence is proven by a name that is on both the record and the checkout's list, which must leave `projectMcp` altogether.
  *
  * The store takes its root as a required `home: string`, so every call here names this file's own scratch root and nothing reads the
  * person's: that is what `test/root-given.test.ts` holds for the whole package, and this file is the fixture that shows it. The
@@ -157,7 +157,7 @@ test("REFUSED: a url that is no address, a transport the harness loads nothing f
   assert.equal(factoryServersRefusal({ github: GITHUB }), undefined);
 });
 
-test('the split gives the factory precedence: a name it records leaves checkoutMcp altogether', () => {
+test('the split gives the factory precedence: a name it records leaves projectMcp altogether', () => {
   const record = { github: GITHUB };
   assert.deepEqual(
     splitServers(['github', 'repo'], record),
@@ -167,7 +167,7 @@ test('the split gives the factory precedence: a name it records leaves checkoutM
   assert.deepEqual(
     splitServers(['github'], record).checkout,
     [],
-    'and the name is NOT left on checkoutMcp too: both lists would trip the runtime\'s "one would hide the other" refusal and refuse the step',
+    'and the name is NOT left on projectMcp too: both lists would trip the runtime\'s "one would hide the other" refusal and refuse the step',
   );
   assert.deepEqual(splitServers(['repo', 'docs'], record), { checkout: ['repo', 'docs'] }, 'a name it does not record resolves as it did');
   assert.deepEqual(splitServers(['repo'], undefined), { checkout: ['repo'] }, 'a factory with no record changes nothing');

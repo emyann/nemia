@@ -8,6 +8,9 @@ import { type Answer, answerRefusal, answerText, approvedAnswerText, type Questi
 import type { Refusal } from '../guard.ts';
 import type { Engine } from '../store.ts';
 
+/** A person's answer to one question, as the board sends it in the body of a retry or an approval. */
+export type { Answer };
+
 /**
  * The questions `step`'s current closeout asks, in the order its fields ask them: none where it asks none, or has not signed off. The
  * package's reading (`askedNow`), its fields flattened.

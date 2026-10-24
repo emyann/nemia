@@ -193,7 +193,7 @@ export {
   queueOrder,
   workflowAt,
 } from './inbox/index.ts';
-export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox/index.ts';
+export type { CardState, InboxCard, InboxListing, QueueStarted, MissedStart } from './inbox/index.ts';
 export {
   DEFAULT_FACTORY,
   factoryLines,
@@ -243,7 +243,7 @@ export {
   STALE_PASSES,
   daemonLine,
   everyOf,
-  holderOf,
+  holderName,
   holderWords,
   livenessLine,
   livenessWords,
@@ -274,7 +274,7 @@ export {
   ceilings,
   daemonFile,
   daemonStanding,
-  heldHolder,
+  heldServes,
   identify,
   lastCeilings,
   lastPassCost,
@@ -282,6 +282,7 @@ export {
   passed,
   procStartOf,
   releaseStore,
+  servesOnStore,
   stillHeld,
   storeRefusal,
   takeStore,

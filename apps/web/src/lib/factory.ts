@@ -8,6 +8,7 @@ import type { Flow } from './flow.ts';
 import { instantWhole } from './instant.ts';
 import { layers, type Point } from './layout.ts';
 import { sinceShort } from './runWords.ts';
+import { ENDED } from './words.ts';
 
 /**
  * Whether a run is in flight, and so on the Factory by default: `assess` has it `running`, or it still moves — the engine holds a task of
@@ -84,10 +85,8 @@ export const onYouOf = (
  * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
  * a run that never ships is one, though it has filed nothing and is not in flight; in flight; or finished.
  */
-export const standingOf = (
-  run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>,
-): 'cancelled' | 'waiting on you' | 'in flight' | 'finished' =>
-  run.cancelledAt ? 'cancelled' : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
+export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): string =>
+  run.cancelledAt ? ENDED.cancelled.word : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
 
 type Clocked = Pick<RunSummary, 'createdAt' | 'startedAt' | 'cancelledAt'> &
   Held & { waitingOnYou?: RunSummary['waitingOnYou']; atWork?: AtWork | null };

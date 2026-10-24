@@ -541,7 +541,7 @@ test(
           effort: 'low',
           permissionMode: 'dontAsk',
           allowedTools: ['mcp__playwright__browser_navigate', 'mcp__playwright__browser_take_screenshot'],
-          checkoutMcp: ['playwright'],
+          projectMcp: ['playwright'],
           budgetUsd: 1,
           env: { [STEP_FILES]: files },
         },

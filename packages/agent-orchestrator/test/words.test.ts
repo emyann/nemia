@@ -8,8 +8,9 @@
  *   `nemia` and Nemia. Refused in the runtime's `src` and `bin`.
  * - **The layer above's words for what the runtime has its own for stay above it** (`LAYER_ABOVE`): a session that signs for one that
  *   ends (`signed`, `signs`, `unsigned`), the board for the store, and a try for an attempt (`tries`, and `A_TRY`'s "the last try").
- *   Refused in the runtime's `src` and `bin`. A sign-in is no end: `signed` or `signs` before `in`, `out` or `into` is not counted
- *   (`SIGN_IN`), so "signed in to a server" is said and "the session that signed" is not.
+ *   Refused in the runtime's `src` and `bin`, but a word the runtime's glossary retires (`RETIRED`), which its own guard counts
+ *   (`tools/guards/test/glossary.test.ts`) so that no file is held to the same word twice. A sign-in is no end: `signed` or `signs`
+ *   before `in`, `out` or `into` is not counted (`SIGN_IN`), so "signed in to a server" is said and "the session that signed" is not.
  * - **This repository's team stays out of the packages** (`teamOf`): the name of each agent of `workflows/agents/`, read as the test
  *   runs, so a new agent is refused with no edit here. Refused in every package's `src`. A name that is plain English (`PLAIN_NAMES`)
  *   counts only as a quoted literal or a path segment.
@@ -56,14 +57,29 @@ const WORKFLOW = [
   'nemia',
 ];
 
-/** The layer above's words for an end, the store and an attempt, which the runtime says as `ended`, `store` and `attempt`. */
+/**
+ * The spellings the runtime's glossary retires (`packages/agent-runtime/glossary.json`, each term's `retired`), in lower case: its
+ * own guard counts each in the runtime's files, against a baseline that only shrinks.
+ */
+const RETIRED: ReadonlySet<string> = new Set(
+  (
+    JSON.parse(fs.readFileSync(path.join(ROOT, 'packages', 'agent-runtime', 'glossary.json'), 'utf8')) as {
+      terms: ReadonlyArray<{ retired?: ReadonlyArray<{ spelling: string }> }>;
+    }
+  ).terms.flatMap((t) => (t.retired ?? []).map((r) => r.spelling.toLowerCase())),
+);
+
+/**
+ * The layer above's words for an end, the store and an attempt, which the runtime says as `ended`, `store` and `attempt`. Counted but
+ * those its glossary retires (`RETIRED`, `layerAboveIn`), which its own guard holds.
+ */
 const LAYER_ABOVE = ['signed', 'signs', 'unsigned', 'board', 'boards', 'tries'];
 
 /** A try as one of a row of attempts — "the last try", "an earlier try" — where `try` alone is the plain verb. */
 const A_TRY = /(?<![\w$])(?:earlier|later|last|next|another) try(?![\w$])/gi;
 
 /** A sign-in, which logs in to a server and ends nothing: `signed` or `signs` before `in`, `out` or `into`. */
-const SIGN_IN = /(?<![\w$])(?:signed|signs)[\s-]+(?:in|out|into)(?![\w$])/gi;
+const SIGN_IN = /(?<![\w$])(signed|signs)[\s-]+(?:in|out|into)(?![\w$])/gi;
 
 /** The team's names that are plain English, counted only as a quoted literal or a path segment. */
 const PLAIN_NAMES: readonly string[] = ['grace'];
@@ -76,8 +92,6 @@ const CARDS: Readonly<Record<string, string>> = {
   'slice-3': 'Nemia platform slice 3 (amend-the-nemia-intent-one-n-y2vp): one daemon per machine, session admission and pools',
   'slice-4':
     "Nemia platform slice 4 (amend-the-nemia-intent-one-n-y2vp): the command table and the rename to nemia; the api answers the web's command text",
-  'intent-2':
-    "the runtime's journalled renames, the second intent of the language work's decisions 2 and 11: `'unsigned'` out of EndReason, `stated` → `closedOut`, `Usage.turns` → `responses`, `checkoutMcp` → `projectMcp`",
 };
 
 type Move = { move: string; to: string };
@@ -241,11 +255,7 @@ const WORKFLOW_WORDS: Baseline = {
 };
 
 /** Each runtime file that says the layer above's word for an end, the store or an attempt today, its count and what removes them. */
-const LAYER_ABOVE_WORDS: Baseline = {
-  'packages/agent-runtime/src/core/domain.ts': { count: 5, card: 'intent-2' },
-  'packages/agent-runtime/src/core/event-schema.ts': { count: 1, card: 'intent-2' },
-  'packages/agent-runtime/src/core/lifecycle.ts': { count: 2, card: 'intent-2' },
-};
+const LAYER_ABOVE_WORDS: Baseline = {};
 
 /** Each package file that names an agent of the team today, with its count and what removes them. */
 const TEAM_NAMES: Baseline = {
@@ -331,8 +341,21 @@ function wordsIn(text: string, words: readonly string[], plain: readonly string[
 
 const matches = (text: string, pattern: RegExp): number => [...text.matchAll(pattern)].length;
 
-/** How many times `text` says the layer above's word: `LAYER_ABOVE` whole but a sign-in (`SIGN_IN`), and `A_TRY`. */
-const layerAboveIn = (text: string): number => wordsIn(text, LAYER_ABOVE) - matches(text, SIGN_IN) + matches(text, A_TRY);
+/**
+ * How many times `text` says the layer above's word: `LAYER_ABOVE` whole but a sign-in (`SIGN_IN`), and `A_TRY` — of `LAYER_ABOVE`, the
+ * words `retired` does not hold, the runtime's glossary's (`RETIRED`) unless another set is given.
+ */
+const layerAboveIn = (text: string, retired: ReadonlySet<string> = RETIRED): number => {
+  const signIns = [...text.matchAll(SIGN_IN)].filter((m) => !retired.has((m[1] ?? '').toLowerCase())).length;
+  return (
+    wordsIn(
+      text,
+      LAYER_ABOVE.filter((w) => !retired.has(w)),
+    ) -
+    signIns +
+    matches(text, A_TRY)
+  );
+};
 
 /** Each file's count by `count`, for the files that say one at least once. */
 const measuredBy = (texts: ReadonlyMap<string, string>, count: (text: string) => number): Record<string, number> =>
@@ -411,11 +434,17 @@ test('the matcher counts a word whole and in any case, and a plain word only quo
 });
 
 test("the layer above's words: an end said as signing, the board, a try in a row — and a sign-in, a longer name and a plain try are not", () => {
-  assert.equal(layerAboveIn('the session that signed; it signs off; an unsigned end; on the board, two boards; three tries'), 6);
+  const none = new Set<string>();
+  assert.equal(layerAboveIn('the session that signed; it signs off; an unsigned end; on the board, two boards; three tries', none), 6);
+  assert.equal(
+    layerAboveIn('the session that signed; an unsigned end, signed in; on the board', new Set(['unsigned', 'board', 'signed'])),
+    0,
+    "a word the runtime's glossary retires is its guard's, and a sign-in of it is not taken off twice",
+  );
   assert.equal(layerAboveIn('the last try, an earlier try, another try, the next try, a later try'), 5);
   assert.equal(layerAboveIn('signed in to a server, signs out, signed into it, signed-in'), 0, 'a sign-in is no end');
   assert.equal(layerAboveIn('signsInMcp, SIGN_IN_STATES, boardId, retries, try again, one try at a rotation'), 0);
-  assert.equal(layerAboveIn('Signed, BOARD, The Last Try'), 3, 'in any case');
+  assert.equal(layerAboveIn('Signed, BOARD, The Last Try', none), 3, 'in any case');
 });
 
 test("the lists: the runtime's harness words but the plain ones, every plain one the runtime's, and the team read from its folder", () => {
@@ -463,10 +492,11 @@ test('REFUSED: a new file in each layer that says a word of another', () => {
   ]);
   const domain = 'packages/agent-runtime/src/core/domain.ts';
   const said = texts.workflow.get(domain) ?? '';
-  const raised = planted('workflow', domain, `${said}\n/** On the board. */\n`);
-  assert.equal(raised.length, 1, raised.join('\n'));
-  assert.ok(raised[0]?.startsWith(`${domain} holds 6 `), raised[0]);
-  assert.match(raised[0] ?? '', /more than the 5/);
+  assert.equal(layerAboveIn(said), 0, `${domain} says none of the layer above's words its glossary does not retire`);
+  assert.ok(!RETIRED.has('signed'), "a word the runtime's glossary does not retire, so this guard and no other holds it");
+  assert.deepEqual(planted('workflow', domain, `${said}\n/** The session signed. */\n`), [
+    `${domain} holds 1 the layer above's words: ${above}; never add them here`,
+  ]);
   assert.deepEqual(planted('team', 'packages/agent-runtime/src/x.ts', "export const reviewer = 'seldon';\n"), [
     `packages/agent-runtime/src/x.ts holds 1 team names: ${TEAM_RULE.fix}; never add them here`,
   ]);

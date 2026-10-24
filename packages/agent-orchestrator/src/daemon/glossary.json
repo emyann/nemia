@@ -20,8 +20,42 @@
       }
     },
     {
+      "term": "Class",
+      "meaning": "who answers for a command an agent calls, said on its entry of the command table: `read` runs unasked, `act` writes unasked, `ask` asks the person each time, `answer` answers what waits on the person, `none` is out of reach.",
+      "type": "CommandClass",
+      "retired": [
+        {
+          "spelling": "hers",
+          "card": "Generic tables stop speaking one agent's words"
+        }
+      ],
+      "see": {
+        "label": "What she is allowed to do",
+        "href": "/nemia/#what-she-is-allowed-to-do"
+      }
+    },
+    {
       "term": "Daemon",
-      "meaning": "the process that ticks the store's runs, one per store; the api's process is the daemon.",
+      "meaning": "the process that ticks the store's runs, one per store: the api's process (`api`) or a `nemia up` (`up`).",
+      "type": "HolderKind",
+      "see": {
+        "label": "Two loops",
+        "href": "/how-a-run-lives/#two-loops-both-level-triggered"
+      }
+    },
+    {
+      "term": "Serves",
+      "meaning": "what the process holding the lease serves on its own port, the A2A cards by harness, written on the daemon's file beside its url.",
+      "retired": [
+        {
+          "spelling": "heldHolder",
+          "card": "Generic tables stop speaking one agent's words"
+        },
+        {
+          "spelling": "holderOnStore",
+          "card": "Generic tables stop speaking one agent's words"
+        }
+      ],
       "see": {
         "label": "Two loops",
         "href": "/how-a-run-lives/#two-loops-both-level-triggered"

@@ -62,7 +62,7 @@ export default {
   /**
    * The inbox: the seeded cards, newest first, and the queue; a card filed from the box into a factory, queued, unqueued, then removed
    * with its Remove; a card's start form, in the factory picked for it, preset from the card. Each in a page of its own: a card started,
-   * which opens its run's page; a start whose card cannot be removed; a card started already; a card about a repository the factory
+   * which opens its run's page and stays listed, started; a card started already; a card about a repository the factory
    * picked does not work on; stray files and a folder; an empty inbox; and a start, a remove and a queue each refused behind the page's
    * back. Every start picks its factory first, and is sent with it (`expectInFactory`); the factory is made able to start its workflow
    * for the page (`hiringStarts`). Every write is taken back, so every page after this one, in either theme, reads the store as seeded.
@@ -388,8 +388,10 @@ async function visit(page: Page): Promise<void> {
       expectInFactory(started, checkout);
       if (started.status() !== 201)
         throw new Refused(`the api starts the card, through the board's proxy — it answered ${started.status()}: ${await started.text()}`);
-      const { id, removed } = (await started.json()) as { id: string; removed: boolean };
-      if (removed !== true) throw new Refused(`the api says the card left the inbox — it answered removed: ${removed}`);
+      const answer = (await started.json()) as { id: string };
+      const { id } = answer;
+      if ('removed' in answer || 'why' in answer)
+        throw new Refused(`the start answers the run alone, a card started being kept — it answered ${JSON.stringify(answer)}`);
       await starting.waitForURL(`**/runs/${id}`, { timeout: WAIT_MS });
       await expectVisible(starting.locator('h1', { hasText: id }), `the start opens the run's page (${id})`);
       await expectVisible(
@@ -419,7 +421,19 @@ async function visit(page: Page): Promise<void> {
       };
       if (JSON.stringify(got) !== JSON.stringify(expected))
         throw new Refused(`the record is the card's start — it holds ${JSON.stringify(got)}, and should hold ${JSON.stringify(expected)}`);
-      if (fs.existsSync(cardFile)) throw new Refused(`the card leaves the inbox once its run is written — ${cardFile} is still there`);
+      if (!fs.existsSync(cardFile) || fs.readFileSync(cardFile, 'utf8') !== cardText)
+        throw new Refused(`the card stays in the inbox as it was once its run is written — ${cardFile} is gone or changed`);
+      await idle(starting);
+      await starting.goto(page.url(), { waitUntil: 'load' });
+      await idle(starting);
+      const kept = cardIn(starting, planned.name);
+      await expectVisible(
+        kept.locator(`[data-started-as].text-muted-foreground a[href="/runs/${id}"]`),
+        `back on the inbox, the card is listed, started as ${id}, linked to the run, in rest: a start is no fault`,
+      );
+      await expectCount(kept.getByRole('button', { name: 'Start' }), 0, 'and offers no Start: started again, the idea would run twice');
+      await expectCount(kept.getByRole('button', { name: 'Queue', exact: true }), 0, 'nor Queue');
+      await expectVisible(kept.getByRole('button', { name: 'Remove' }), 'and offers Remove');
       await idle(starting);
       const seen = problems();
       if (seen.length)
@@ -433,67 +447,6 @@ async function visit(page: Page): Promise<void> {
       if (!fs.existsSync(cardFile)) {
         fs.writeFileSync(cardFile, cardText);
         fs.utimesSync(cardFile, cardTime, cardTime);
-      }
-    }
-
-    if (process.getuid?.() === 0) {
-      console.log('e2e: inbox — a start whose card cannot be removed is not looked at as root, which removes it all the same');
-    } else {
-      const keptRuns = fs.readdirSync(runsDir).sort();
-      const kept = await page.context().newPage();
-      try {
-        const { problems } = watch(kept);
-        await kept.goto(page.url(), { waitUntil: 'load' });
-        await idle(kept);
-        const item = await startIn(kept, planned.name);
-        const form = item.locator(`form[aria-label="Start ${planned.name}"]`);
-        await expectVisible(form.getByRole('button', { name: 'Start' }), `Start opens ${planned.name}'s start form`);
-        const reread = kept.waitForResponse((r) => r.request().method() === 'GET' && new URL(r.url()).pathname === '/api/inbox', {
-          timeout: WAIT_MS,
-        });
-        fs.chmodSync(inbox, 0o555);
-        const [started] = await Promise.all([
-          kept.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/runs', { timeout: WAIT_MS }),
-          form.getByRole('button', { name: 'Start' }).click(),
-        ]);
-        expectInFactory(started, checkout);
-        const answer = (await started.json()) as { id?: string; removed?: boolean; why?: string };
-        if (started.status() !== 201 || answer.removed !== false || !answer.why?.startsWith(`${cardFile} could not be removed — `)) {
-          throw new Refused(
-            `the api starts a card it cannot remove, the inbox read-only, and says so — it answered ${started.status()}: ${JSON.stringify(answer)}`,
-          );
-        }
-        const listing = (await (await reread).json()) as Array<{ name: string; startedAs: string[] }>;
-        if (JSON.stringify(listing.find((e) => e.name === planned.name)?.startedAs) !== JSON.stringify([answer.id])) {
-          throw new Refused(`the inbox read again names the run the card was started as — it listed ${JSON.stringify(listing)}`);
-        }
-        await idle(kept);
-        await expectVisible(
-          item.locator(`[data-started-as] a[href="/runs/${answer.id}"]`),
-          `the card says it was started as ${answer.id}, linked to the run`,
-        );
-        const why = await item.locator('[data-started-as] [data-kept]').textContent();
-        if (why !== answer.why)
-          throw new Refused(
-            `the card says why it was not removed, in the api's words — it shows ${JSON.stringify(why)}, and the api said ${JSON.stringify(answer.why)}`,
-          );
-        await expectCount(item.getByRole('button', { name: 'Start' }), 0, 'and offers no Start: started again, the idea would run twice');
-        await expectCount(item.locator('[data-start-card]'), 0, 'its start form is gone');
-        if (new URL(kept.url()).pathname !== '/inbox') throw new Refused(`the page stays on the inbox — it went to ${kept.url()}`);
-        if (!fs.existsSync(cardFile)) throw new Refused(`the card is still in the inbox — ${cardFile} is gone`);
-        await settled(kept);
-        await photograph(kept, path.join(OUT, `inbox-kept-${await themeOf(kept)}.png`), { fullPage: true });
-        await idle(kept);
-        const seen = problems();
-        if (seen.length)
-          throw new Refused(
-            `no console error and no failed request on a start whose card stayed — ${seen.length} seen:\n    ${seen.join('\n    ')}`,
-          );
-      } finally {
-        await kept.close();
-        fs.chmodSync(inbox, 0o755);
-        for (const file of fs.readdirSync(runsDir))
-          if (!keptRuns.includes(file)) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
       }
     }
 

@@ -67,8 +67,8 @@ export const transcriptRecords = (sessionIds: readonly string[]): Map<string, st
 
 /**
  * When a Claude Code session's transcript was last written: its file's mtime in whole milliseconds, as the Agent SDK's
- * the Agent SDK's getSessionInfo gives it, read by a stat that reads none of its bytes; `undefined` while no project folder holds it, or when
- * the stat fails.
+ * getSessionInfo gives it, read by a stat that reads none of its bytes; `undefined` while no project folder holds it, or when the
+ * stat fails.
  */
 export const transcriptWrittenAt = async (sessionId: string): Promise<number | undefined> => {
   const file = transcriptFile(sessionId);
@@ -360,7 +360,7 @@ export const transcriptUsage = (jsonl: string, since: number, file?: string): Us
   const compacted = compactions > 0;
   const first = counted[0];
   return {
-    turns: responses.size,
+    responses: responses.size,
     toolCalls: toolCalls.size,
     ...(all && !compacted
       ? {

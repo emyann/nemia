@@ -111,9 +111,9 @@ test(
     assert.deepEqual(Object.keys(up.held.cards), ['claude'], `the holder serves the one harness it runs attached: ${up.said()}`);
     writeRun(up.held.taskId);
 
-    const lease = JSON.parse(fs.readFileSync(path.join(root, 'daemon.json'), 'utf8')) as { pid: number; holder?: object };
+    const lease = JSON.parse(fs.readFileSync(path.join(root, 'daemon.json'), 'utf8')) as { pid: number; serves?: object };
     assert.equal(lease.pid, up.child.pid, 'the lease is the holder’s');
-    assert.deepEqual(lease.holder, up.held.cards, 'and names what it serves, by harness');
+    assert.deepEqual(lease.serves, up.held.cards, 'and names what it serves, by harness');
 
     const tokenFile = path.join(root, 'engine', 'a2a', 'holder-token');
     const token = fs.readFileSync(tokenFile, 'utf8').trim();

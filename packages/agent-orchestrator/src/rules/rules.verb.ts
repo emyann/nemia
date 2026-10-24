@@ -107,7 +107,7 @@ export const FACTORY_RULES: Command<FactoryRules> = {
       ? 'nemia factory rules takes --file or --clear, not both: --file writes the rules, --clear removes them.'
       : leftOut(SPEC, args),
   writes: true,
-  nemia: { bare: 'read', sets: 'prompts', setsBy: ['--file', '--clear'] },
+  class: { bare: 'read', sets: 'ask', setsBy: ['--file', '--clear'] },
   route: [
     {
       method: 'GET',

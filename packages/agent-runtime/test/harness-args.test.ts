@@ -35,7 +35,6 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty argumen
         'allowedTools',
         'budgetUsd',
         'callAdmission',
-        'checkoutMcp',
         'claude',
         'codex',
         'command',
@@ -50,6 +49,7 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty argumen
         'mounts',
         'niceness',
         'permissionMode',
+        'projectMcp',
         'tools',
         'worktree',
       ]);
@@ -73,6 +73,22 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty argumen
     },
   );
   await t.test(
+    'checkoutMcp, the former name of projectMcp, is refused under config and beside it at any value, naming config.projectMcp — and taken by its new name',
+    () => {
+      for (const value of [['repo'], [], undefined]) {
+        for (const spec of [
+          { ...task, config: { checkoutMcp: value } },
+          { ...task, checkoutMcp: value },
+          { ...task, model: 'opus', config: { checkoutMcp: value } },
+        ]) {
+          const says = argsRefusalOf(spec as never) ?? '';
+          assert.ok(says.includes('`config.projectMcp`') && says.includes('`checkoutMcp`'), `${JSON.stringify(spec)}: ${says}`);
+        }
+      }
+      assert.equal(argsRefusalOf({ ...task, config: { projectMcp: ['repo'] } }), undefined);
+    },
+  );
+  await t.test(
     'a harness argument filed beside config is refused, naming where it goes — each of the twenty — and the same value under config is taken',
     () => {
       const value: Record<keyof HarnessArgs, unknown> = {
@@ -83,7 +99,7 @@ test('argsRefusalOf: where a key is and whether it is one — the twenty argumen
         allowedTools: ['Edit(**)'],
         disallowedTools: ['SendMessage'],
         mcp: {},
-        checkoutMcp: ['playwright'],
+        projectMcp: ['playwright'],
         contextTokens: 200000,
         worktree: true,
         budgetUsd: 5,
@@ -253,25 +269,25 @@ test("argsRefusalOf: what each argument's value is — a spend cap, Claude Code'
     for (const good of [0, 1, 10, 19]) assert.equal(argsRefusalOf({ ...task, config: { niceness: good } }), undefined, String(good));
   });
   await t.test(
-    'checkoutMcp is a list of server names, none twice and none the task gives itself: anything else is refused, saying what one is',
+    'projectMcp is a list of server names, none twice and none the task gives itself: anything else is refused, saying what one is',
     () => {
       for (const bad of ['playwright', [''], ['a', 3], ['a b'], { a: true }, null]) {
-        const says = argsRefusalOf({ ...task, config: { checkoutMcp: bad } } as never) ?? '';
+        const says = argsRefusalOf({ ...task, config: { projectMcp: bad } } as never) ?? '';
         assert.match(
           says,
-          /^`checkoutMcp: .*` is not a list of server names\. Give the names .*\[\] for none, or leave it out for the whole file\.$/,
+          /^`projectMcp: .*` is not a list of server names\. Give the names .*\[\] for none, or leave it out for the whole file\.$/,
         );
       }
       assert.equal(
-        argsRefusalOf({ ...task, config: { checkoutMcp: ['a', 'b', 'a'] } }),
-        '`checkoutMcp` names `a` twice. Name each server once.',
+        argsRefusalOf({ ...task, config: { projectMcp: ['a', 'b', 'a'] } }),
+        '`projectMcp` names `a` twice. Name each server once.',
       );
       assert.match(
-        argsRefusalOf({ ...task, config: { checkoutMcp: ['a'], mcp: { a: { command: 'x' } } } }) ?? '',
-        /^`checkoutMcp` names `a`, and `mcp.a` gives a server of that name too: one would hide the other\./,
+        argsRefusalOf({ ...task, config: { projectMcp: ['a'], mcp: { a: { command: 'x' } } } }) ?? '',
+        /^`projectMcp` names `a`, and `mcp.a` gives a server of that name too: one would hide the other\./,
       );
-      assert.equal(argsRefusalOf({ ...task, config: { checkoutMcp: [] } }), undefined, 'none of the file');
-      assert.equal(argsRefusalOf({ ...task, config: { checkoutMcp: ['a'], mcp: { b: { command: 'x' } } } }), undefined);
+      assert.equal(argsRefusalOf({ ...task, config: { projectMcp: [] } }), undefined, 'none of the file');
+      assert.equal(argsRefusalOf({ ...task, config: { projectMcp: ['a'], mcp: { b: { command: 'x' } } } }), undefined);
     },
   );
   await t.test("enabledSkills is 'default' or a list of skill names, none twice: anything else is refused", () => {

@@ -66,9 +66,9 @@ const aRepo = (): string => {
  *   (`TaskView.waitingFor`).
  * - `denials`: what the harness denied each task's last attempt, as the runtime records it on the attempt's end (`Attempt.denials`):
  *   once it has settled.
- * - `stated`: whether each task's last attempt gave the statement it was asked for, as the runtime reports it (`Attempt.stated`): once
- *   it has settled, its attempt ended `done` by its harness with the fact beside it. Absent, the attempt carries no such key, as an
- *   older journal's does.
+ * - `closedOut`: whether each task's last attempt gave the statement it was asked for, as the runtime reports it (`Attempt.closedOut`):
+ *   once it has settled, its attempt ended `done` by its harness with the fact beside it. Absent, the attempt carries no such key, as
+ *   an older journal's does.
  */
 const board = () => {
   type Filed = TaskSpec & { id: string };
@@ -84,7 +84,7 @@ const board = () => {
   const deaf = new Set<string>();
   const waiting = new Map<string, string>();
   const denials = new Map<string, Array<{ tool: string; what?: string }>>();
-  const stated = new Map<string, boolean>();
+  const closedOut = new Map<string, boolean>();
   const forgets: { taskIds: string[]; yes: boolean }[] = [];
   const endOf = (reason: string) =>
     reason === 'budget' ? { ended: 'failed', reason: 'harness', limit: 'budget' } : { ended: 'failed', reason };
@@ -125,7 +125,9 @@ const board = () => {
                         usage: settled && t.usage ? t.usage : null,
                         ...(reason ? endOf(reason) : { ended: null }),
                         ...(settled && denials.get(id) ? { denials: denials.get(id) } : {}),
-                        ...(settled && !reason && stated.has(id) ? { ended: 'succeeded', reason: 'harness', stated: stated.get(id) } : {}),
+                        ...(settled && !reason && closedOut.has(id)
+                          ? { ended: 'succeeded', reason: 'harness', closedOut: closedOut.get(id) }
+                          : {}),
                       },
                 ),
         },
@@ -175,7 +177,7 @@ const board = () => {
   });
   const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string | string[], usage?: object) =>
     Object.assign(tasks.get(id)!, { phase, closeout, exitCode, reason, usage });
-  return { e, tasks, filings, stopped, forgets, settle, logs, outputs, said, deaf, waiting, denials, stated };
+  return { e, tasks, filings, stopped, forgets, settle, logs, outputs, said, deaf, waiting, denials, closedOut };
 };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
@@ -421,7 +423,7 @@ test('the whole screen of a step whose closeout does not read, never nudged', as
   const run = await started(folder());
   const b = board();
   await runWith(b.e, advanceRun(readRun(run.id)));
-  b.stated.set(`${run.id}-implement`, true);
+  b.closedOut.set(`${run.id}-implement`, true);
   b.settle(`${run.id}-implement`, 'succeeded', '{"outcome": "done", "summary": ');
   await runWith(b.e, advanceRun(readRun(run.id)));
   assert.deepEqual(await whole(t, b.e, run), [

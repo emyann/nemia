@@ -34,7 +34,7 @@ import { heldHarnessesOf, isClaude, isRemote, isSpec, type HarnessConfig, type T
  *    `mounts` leaves the mode out; its session would not reach the folder as asked;
  * 7c. a `callAdmission` on a harness that runs no command before a call (`admissionMisplaced`): Codex, a remote agent, a `HarnessSpec`
  *    that does not declare `callAdmission`; its session would make every call unadmitted;
- * 7d. a `checkoutMcp` on a `HarnessSpec` that does not declare it (`checkoutMcpMisplaced`): its session would not leave the
+ * 7d. a `projectMcp` on a `HarnessSpec` that does not declare it (`projectMcpMisplaced`): its session would not leave the
  *    checkout's servers out as asked;
  * 7e. a list in `enabledSkills` on a harness that cannot close a session's skills (`enabledSkillsMisplaced`): a `HarnessSpec` that
  *    does not declare `enabledSkills`, whose session would hold every skill it finds; Claude Code holds one through its SDK, which
@@ -43,7 +43,7 @@ import { heldHarnessesOf, isClaude, isRemote, isSpec, type HarnessConfig, type T
  * 9. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
  * A `RunnerOps` brought as its own is the consumer's: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude`, a
- * `codex`, a `command`, an `env`, a `niceness`, `mounts`, `callAdmission`, `checkoutMcp` and `enabledSkills`, and asked nothing
+ * `codex`, a `command`, an `env`, a `niceness`, `mounts`, `callAdmission`, `projectMcp` and `enabledSkills`, and asked nothing
  * here: its own `refuses`, if it has one, is asked by `file` through the `Runner`.
  */
 export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
@@ -176,7 +176,7 @@ const codexArgsMisplaced = (
 /**
  * Why a task's arguments of one kind of harness cannot go on its own (`codexArgsMisplaced`, `commandArgsMisplaced`), or a mount on
  * one that cannot hold it (`mountsMisplaced`), or admission on one that runs none (`admissionMisplaced`), or a pick of the
- * checkout's servers on one that holds none (`checkoutMcpMisplaced`), or `undefined`.
+ * checkout's servers on one that holds none (`projectMcpMisplaced`), or `undefined`.
  */
 const argsMisplaced = (
   spec: TaskSpec & { harness: string },
@@ -188,26 +188,26 @@ const argsMisplaced = (
   envMisplaced(spec, h, harnesses) ??
   mountsMisplaced(spec, h, harnesses) ??
   admissionMisplaced(spec, h, harnesses) ??
-  checkoutMcpMisplaced(spec, h, harnesses);
+  projectMcpMisplaced(spec, h, harnesses);
 
 /** Whether a harness can leave the checkout's `.mcp.json` out of a session: Claude Code, and a `HarnessSpec` that declares it. */
-const picksMcp = (h: HarnessConfig): boolean => isClaude(h) || (isSpec(h) && h.checkoutMcp === true);
+const picksMcp = (h: HarnessConfig): boolean => isClaude(h) || (isSpec(h) && h.projectMcp === true);
 
 /**
- * Why a task's `config.checkoutMcp` cannot go on its harness — or `undefined`: a `HarnessSpec` that does not declare `checkoutMcp`,
+ * Why a task's `config.projectMcp` cannot go on its harness — or `undefined`: a `HarnessSpec` that does not declare `projectMcp`,
  * whose session would start with whatever it loads itself. The refusal names the harnesses of this engine that hold it. A remote
  * agent refuses it in its own words, with every other argument (`remoteRefuses`); a `RunnerOps` brought as its own is handed it.
  */
-const checkoutMcpMisplaced = (
+const projectMcpMisplaced = (
   spec: TaskSpec & { harness: string },
   h: HarnessConfig,
   harnesses: Record<string, HarnessConfig>,
 ): string | undefined => {
-  if (spec.config?.checkoutMcp === undefined || !isSpec(h) || picksMcp(h)) return undefined;
+  if (spec.config?.projectMcp === undefined || !isSpec(h) || picksMcp(h)) return undefined;
   const takers = Object.entries(harnesses)
     .filter(([, o]) => picksMcp(o))
     .map(([name]) => `\`${name}\``);
-  return `\`checkoutMcp\` says which servers of the checkout's \`.mcp.json\` the session loads, and the \`${spec.harness}\` harness loads no MCP server it could leave out: it would run as if nothing were asked. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`checkoutMcp\` off.` : "Leave `checkoutMcp` off: none of this engine's harnesses holds it."}`;
+  return `\`projectMcp\` says which servers of the checkout's \`.mcp.json\` the session loads, and the \`${spec.harness}\` harness loads no MCP server it could leave out: it would run as if nothing were asked. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`projectMcp\` off.` : "Leave `projectMcp` off: none of this engine's harnesses holds it."}`;
 };
 
 /** Whether a harness runs admission before a call: Claude Code, a `HarnessSpec` that declares it, a remote agent never. */

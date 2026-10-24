@@ -9,7 +9,7 @@ import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { MergeOf, RoundAsk } from '../status/status.ts';
-import type { QueueTry } from '../inbox/index.ts';
+import type { MissedStart } from '../inbox/index.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { Pin } from '../revisions/revisions.ts';
 
@@ -24,7 +24,7 @@ export type TaskPhase = 'pending' | 'running' | 'succeeded' | 'failed' | 'stoppe
 
 /**
  * What the engine's record of a task says of its closeout: `false`, never asked for one; `true`, asked; `unsigned`, asked, and its
- * last attempt ended without it (`stated: false` on its end, or `reason: 'unsigned'`). `stepStatus` reads it; a caller with only a yes
+ * last attempt ended without it (`closedOut: false` on its end, or `former: 'unsigned'`). `stepStatus` reads it; a caller with only a yes
  * or a no gives that (`closeoutAsked` in views.verb.ts reads all three).
  */
 export type CloseoutAsked = boolean | 'unsigned';
@@ -114,8 +114,9 @@ type RunBase = {
   inputs?: string[];
   /**
    * Where the run came from, when it was not typed at `nemia start`: `{ inbox: <name> }` for a card started out of the inbox
-   * (`startFromInbox` in inbox.verb.ts), which removes the card once this record is written. `nemia inbox` reads it to say a card still
-   * there was `started as` this run, and `nemia decide` names the card under the run's line. Absent on a run started any other way.
+   * (`startFromInbox` in inbox.verb.ts), which keeps the card. The inbox's listing reads it to give the card its state, `started` while
+   * this record stands, and `nemia inbox` to say it was `started as` this run, and `nemia decide` names the card under the run's line.
+   * Absent on a run started any other way.
    */
   from?: { inbox: string };
   /**
@@ -774,9 +775,9 @@ export type RunStore = {
      * The tick's tries of a queued card's start that did not happen, by card name. A file that does not read as one, torn or removed
      * after the listing, is none.
      */
-    readonly tries: () => Map<string, QueueTry>;
+    readonly tries: () => Map<string, MissedStart>;
     /** Write down the tick's try of the card `name`, whole over the one there: the tick's alone. Throws what the filesystem throws. */
-    readonly putTry: (name: string, tried: QueueTry) => void;
+    readonly putTry: (name: string, tried: MissedStart) => void;
     /** Remove the tick's try of the card `name`, there or not: the tick's alone. */
     readonly dropTry: (name: string) => void;
   };

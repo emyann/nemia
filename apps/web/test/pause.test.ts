@@ -84,8 +84,8 @@ test('pauseWords: what the pause says, from none to Pausing to Paused', async (t
 
 test('interruptSentence and finishingSentence: what a pause stops and what finishes', async (t) => {
   await t.test("what a pause at once would stop is named by its run, then its step's session or check", () => {
-    assert.equal(interruptSentence({ run: 'r-1', step: 'implement', kind: 'session' }), "r-1: implement's session");
-    assert.equal(interruptSentence({ run: 'r-2', step: 'review', kind: 'check' }), "r-2: review's check");
+    assert.equal(interruptSentence({ run: 'r-1', step: 'implement', kind: 'session', taskId: 't-1' }), "r-1: implement's session");
+    assert.equal(interruptSentence({ run: 'r-2', step: 'review', kind: 'check', taskId: 't-2' }), "r-2: review's check");
   });
   await t.test('a task a pause at once asked to stop is stopping, and tried again on the resume, not finishing', () => {
     assert.equal(

@@ -122,7 +122,7 @@ const carriedFrom = (root: string, resumeFrom: string): NonNullable<AttachedRun[
 
 /**
  * A run file's sighting: its state, whether a process still holds the session and which (`held`, `pid`), its bridge, its call in
- * flight, and what its capture says it stated, used and was denied.
+ * flight, and what its capture says it closed out with, used and was denied.
  *
  * A session a holder still runs (`isOpen`) says whether its process is there, which `decide` reads for a long-lived task alone: held,
  * its idle session is open (`idleOf`); with its holder gone it is one the harness is taking up again (`respawning`), and is not

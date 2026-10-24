@@ -151,7 +151,7 @@ const running = async (b: ReturnType<typeof board>, s: Parameters<typeof file>[0
 test('a job runs to its end: filed, spawned once, running, ended on what its harness says, settled — each step on the feed, in order', async (t) => {
   const s = story(t);
   const b = board();
-  const usage = { turns: 3, toolCalls: 5, inputTokens: 1200, outputTokens: 80 };
+  const usage = { responses: 3, toolCalls: 5, inputTokens: 1200, outputTokens: 80 };
   let id = '';
   let cursor = 0;
 
@@ -796,22 +796,26 @@ test('a long-lived session beside a job: its spend counted as it grows, left ope
       await run(file({ ...spec, id: open, restartPolicy: 'Always' }));
       await run(file({ ...spec, id: job }));
       await run(tick());
-      sight({ turns: 1, outputTokens: 10 });
+      sight({ responses: 1, outputTokens: 10 });
       await run(tick());
-      sight({ turns: 1, outputTokens: 10 });
+      sight({ responses: 1, outputTokens: 10 });
       await run(tick());
-      sight({ turns: 2, outputTokens: 25, costUsd: 0.1 });
+      sight({ responses: 2, outputTokens: 25, costUsd: 0.1 });
       const report = await run(tick());
       const events = await run(eventsOf(open));
       assert.deepEqual(
         events.flatMap((e) => (e.kind === 'counted' ? [e.usage] : [])),
         [
-          { turns: 1, outputTokens: 10 },
-          { turns: 2, outputTokens: 25 },
+          { responses: 1, outputTokens: 10 },
+          { responses: 2, outputTokens: 25 },
         ],
         'two readings, two entries, and no cost among them',
       );
-      assert.deepEqual(report.views.find((v) => v.id === open)?.usage, { turns: 2, outputTokens: 25 }, 'the pass reports what it wrote');
+      assert.deepEqual(
+        report.views.find((v) => v.id === open)?.usage,
+        { responses: 2, outputTokens: 25 },
+        'the pass reports what it wrote',
+      );
       assert.equal((await run(kindsOf(job))).includes('counted'), false, 'a job writes its spend at its end');
     },
   );
@@ -868,13 +872,13 @@ test('a long-lived session beside a job: its spend counted as it grows, left ope
   await s.test(
     "its death is ended with the sighting's reading at its end, on the monotonic clock of this boot after its gap, which the restart measures",
     async () => {
-      sight({ turns: 3, outputTokens: 40 }, 'failed');
+      sight({ responses: 3, outputTokens: 40 }, 'failed');
       await run(tick());
       const events = await run(eventsOf(open));
       const gap = events.find((e) => e.kind === 'gap');
       const end = events.find((e) => e.kind === 'ended');
       assert.ok(gap?.kind === 'gap' && end?.kind === 'ended', 'a gap and an end journalled');
-      assert.deepEqual(end.usage, { turns: 3, outputTokens: 40 }, "the end carries the sighting's reading at its end");
+      assert.deepEqual(end.usage, { responses: 3, outputTokens: 40 }, "the end carries the sighting's reading at its end");
       assert.equal(end.mono?.boot, monoNow()?.boot, 'the end is stamped in this boot');
       assert.ok(end.mono!.ms >= gap.mono!.ms, 'and later on that clock');
     },
@@ -1030,9 +1034,9 @@ test('the closing statement as the engine judges it: own, inherited, unstamped, 
     const v = await b.run(view(id, new Map()));
     assert.equal(v.state.settled, 'succeeded');
     assert.deepEqual(
-      v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.stated]),
+      v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.closedOut]),
       [['succeeded', 'harness', undefined, false]],
-      'ended by its harness, the inherited statement is not written down as its own, and having said nothing of its own it is recorded `stated: false`, which the layer above reads as unsigned',
+      'ended by its harness, the inherited statement is not written down as its own, and having said nothing of its own it is recorded `closedOut: false`, which the layer above reads as unsigned',
     );
   });
 
@@ -1044,7 +1048,7 @@ test('the closing statement as the engine judges it: own, inherited, unstamped, 
     const v = await b.run(view(id, new Map()));
     assert.equal(v.state.settled, 'succeeded');
     assert.deepEqual(
-      v.state.attempts.map((a) => [a.ended, a.closeout, a.stated]),
+      v.state.attempts.map((a) => [a.ended, a.closeout, a.closedOut]),
       [['succeeded', { outcome: 'done', by: 'child' }, true]],
       'no time to judge it by, and none needed: a runner gives none only for a session that cannot carry another attempt’s statement',
     );
@@ -1113,11 +1117,11 @@ test('the closing statement as the engine judges it: own, inherited, unstamped, 
     const action = await b.run(reconcile(id, new Map(b.sessions)));
     assert.ok(action.do === 'record-end');
     assert.equal(action.closeout, undefined, "ended by its harness, the parent's statement is not written down as this attempt's");
-    assert.equal(action.stated, false, 'nothing of its own was said');
+    assert.equal(action.closedOut, false, 'nothing of its own was said');
     await b.run(tick());
     const v = await b.run(view(id, new Map()));
     assert.equal(v.state.attempts[0]?.closeout, undefined);
-    assert.equal(v.state.attempts[0]?.stated, false);
+    assert.equal(v.state.attempts[0]?.closedOut, false);
   });
 
   await t.test('blocked and busy: a statement it may yet revise still waits', async () => {
@@ -1426,25 +1430,25 @@ test('the release: a finished session is let go and looked for no more, what it 
            * Stops the session on the first call, as Claude Code writes a session's cost only then; it stays listed, as a worktree
            * task's does.
            */
-          release: () => Effect.sync(() => (++asked === 1 ? { turns: 2, costUsd: 0.5, apiMs: 900 } : undefined)),
+          release: () => Effect.sync(() => (++asked === 1 ? { responses: 2, costUsd: 0.5, apiMs: 900 } : undefined)),
         }),
       );
       const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
       const id = await run(file(spec));
       await run(tick());
-      for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed', usage: { turns: 2 } });
+      for (const [k, v] of sessions) sessions.set(k, { ...v, state: 'completed', usage: { responses: 2 } });
       for (let i = 0; i < 3; i++) await run(tick());
 
       assert.equal(asked, 3, 'released on every pass that still sees it');
       const events = await run(eventsOf(id));
       const ended = events.find((e) => e.kind === 'ended');
-      assert.deepEqual(ended?.kind === 'ended' && ended.usage, { turns: 2 }, 'its end, as the sighting that ended it said');
+      assert.deepEqual(ended?.kind === 'ended' && ended.usage, { responses: 2 }, 'its end, as the sighting that ended it said');
       assert.deepEqual(
         events.filter((e) => e.kind === 'measured').map((e) => e.kind === 'measured' && e.usage),
-        [{ turns: 2, costUsd: 0.5, apiMs: 900 }],
+        [{ responses: 2, costUsd: 0.5, apiMs: 900 }],
         'written once',
       );
-      assert.deepEqual(fold(id, events).attempts[0].usage, { turns: 2, costUsd: 0.5, apiMs: 900 });
+      assert.deepEqual(fold(id, events).attempts[0].usage, { responses: 2, costUsd: 0.5, apiMs: 900 });
     },
   );
 

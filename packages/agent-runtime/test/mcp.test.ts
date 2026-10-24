@@ -156,26 +156,26 @@ test("a task's MCP servers reach each runner strictly, the checkout's and the ta
     assert.deepEqual(fs.readdirSync(cwd), ['.mcp.json'], 'nothing landed in the checkout');
   });
 
-  await s.test("checkoutMcp: [] leaves the checkout's .mcp.json out, still strict", () => {
-    const job = jobServers(checkoutOf(), { checkoutMcp: [] });
+  await s.test("projectMcp: [] leaves the checkout's .mcp.json out, still strict", () => {
+    const job = jobServers(checkoutOf(), { projectMcp: [] });
     assert.equal(job.servers, undefined, "the checkout's servers are not given");
     assert.ok(job.strict && !job.chrome, 'and nothing else loads in their place');
   });
 
-  await s.test("checkoutMcp: names gives those entries alone, as the file gives them, with the task's own", () => {
+  await s.test("projectMcp: names gives those entries alone, as the file gives them, with the task's own", () => {
     const own = { mine: { command: 'x' } };
-    assert.deepEqual(jobServers(checkoutOf(), { checkoutMcp: ['a'], mcp: own }).servers, { a: TWO.a, ...own }, 'a verbatim, b left out');
+    assert.deepEqual(jobServers(checkoutOf(), { projectMcp: ['a'], mcp: own }).servers, { a: TWO.a, ...own }, 'a verbatim, b left out');
   });
 
   await s.test(
-    'a task filed with checkoutMcp reads it back from its journal, and one filed without names the whole file again',
+    'a task filed with projectMcp reads it back from its journal, and one filed without names the whole file again',
     async () => {
       const cwd = checkoutOf();
       const root = tmp('root');
       const engine = builtEngine(Engine.layer({ root }));
-      const id = await Effect.runPromise(engine.file({ brief: 'b', cwd, harness: 'claude', config: { checkoutMcp: ['a'] } }));
+      const id = await Effect.runPromise(engine.file({ brief: 'b', cwd, harness: 'claude', config: { projectMcp: ['a'] } }));
       const again = builtEngine(Engine.layer({ root }));
-      assert.deepEqual((await Effect.runPromise(again.view(id))).state.config?.checkoutMcp, ['a']);
+      assert.deepEqual((await Effect.runPromise(again.view(id))).state.config?.projectMcp, ['a']);
       assert.deepEqual(jobServers(cwd).servers, TWO, 'filed without, the whole file again');
     },
   );
@@ -201,15 +201,15 @@ test("a task's MCP servers reach each runner strictly, the checkout's and the ta
   });
 
   await s.test(
-    'codex is handed the picked entries with the task own in one mcp_servers override, and none for checkoutMcp: []',
+    'codex is handed the picked entries with the task own in one mcp_servers override, and none for projectMcp: []',
     async () => {
       const cwd = checkoutOf({ a: { command: 'a-server' }, b: { type: 'http', url: 'https://b.example/mcp' } });
-      const picked = await spawnAtDefaults(t, { cwd, harness: 'codex', config: { checkoutMcp: ['b'], mcp: { mine: { command: 'x' } } } });
+      const picked = await spawnAtDefaults(t, { cwd, harness: 'codex', config: { projectMcp: ['b'], mcp: { mine: { command: 'x' } } } });
       assert.equal(
         picked.args?.find((a) => a.startsWith('mcp_servers=')),
         'mcp_servers={"b"={"url"="https://b.example/mcp","transport"="http"},"mine"={"command"="x"}}',
       );
-      const none = await spawnAtDefaults(t, { cwd, harness: 'codex', config: { checkoutMcp: [] } });
+      const none = await spawnAtDefaults(t, { cwd, harness: 'codex', config: { projectMcp: [] } });
       assert.ok(none.args, 'codex was spawned');
       assert.equal(
         none.args.some((a) => a.startsWith('mcp_servers')),
@@ -268,18 +268,18 @@ const REFUSALS: readonly Refusal[] = [
   })),
   ...[...CLAUDES, 'codex'].flatMap((harness) => [
     {
-      name: `${harness}: a checkoutMcp name the file does not declare`,
-      refused: (t: Waiter) => unstartable(t, { cwd: checkoutOf(), harness, config: { checkoutMcp: ['a', 'nope'] } }),
-      names: ['`checkoutMcp: ["a","nope"]` names `nope`', 'its servers are a, b', 'Declare the server there'],
+      name: `${harness}: a projectMcp name the file does not declare`,
+      refused: (t: Waiter) => unstartable(t, { cwd: checkoutOf(), harness, config: { projectMcp: ['a', 'nope'] } }),
+      names: ['`projectMcp: ["a","nope"]` names `nope`', 'its servers are a, b', 'Declare the server there'],
     },
     {
-      name: `${harness}: checkoutMcp names in a checkout with no file`,
-      refused: (t: Waiter) => unstartable(t, { cwd: tmp('bare'), harness, config: { checkoutMcp: ['a'] } }),
+      name: `${harness}: projectMcp names in a checkout with no file`,
+      refused: (t: Waiter) => unstartable(t, { cwd: tmp('bare'), harness, config: { projectMcp: ['a'] } }),
       names: ['names servers of', 'cannot be read', 'Declare them there'],
     },
     {
-      name: `${harness}: checkoutMcp names in a checkout whose file is not JSON`,
-      refused: (t: Waiter) => unstartable(t, { cwd: brokenCheckout(), harness, config: { checkoutMcp: ['a'] } }),
+      name: `${harness}: projectMcp names in a checkout whose file is not JSON`,
+      refused: (t: Waiter) => unstartable(t, { cwd: brokenCheckout(), harness, config: { projectMcp: ['a'] } }),
       names: ['.mcp.json is not valid JSON', 'Fix the file.'],
     },
   ]),
@@ -290,26 +290,26 @@ const REFUSALS: readonly Refusal[] = [
   },
   {
     name: 'codex: a picked SSE server',
-    refused: (t) => unstartable(t, { cwd: checkoutOf(PICKABLE), harness: 'codex', config: { checkoutMcp: ['sse'] } }),
-    names: ['`mcp.sse` is an SSE server', 'picked by `checkoutMcp`'],
+    refused: (t) => unstartable(t, { cwd: checkoutOf(PICKABLE), harness: 'codex', config: { projectMcp: ['sse'] } }),
+    names: ['`mcp.sse` is an SSE server', 'picked by `projectMcp`'],
   },
   {
     name: 'codex: a picked shape its table cannot say',
-    refused: (t) => unstartable(t, { cwd: checkoutOf(PICKABLE), harness: 'codex', config: { checkoutMcp: ['odd'] } }),
-    names: ['`mcp.odd` has `extra`', 'picked by `checkoutMcp`'],
+    refused: (t) => unstartable(t, { cwd: checkoutOf(PICKABLE), harness: 'codex', config: { projectMcp: ['odd'] } }),
+    names: ['`mcp.odd` has `extra`', 'picked by `projectMcp`'],
   },
   {
     name: "codex: a picked name its operator's config has",
     refused: (t) =>
       unstartable(
         t,
-        { cwd: checkoutOf(PICKABLE), harness: 'codex', config: { checkoutMcp: ['docs'] } },
+        { cwd: checkoutOf(PICKABLE), harness: 'codex', config: { projectMcp: ['docs'] } },
         codexHomeWith('[mcp_servers.docs]\ncommand = "operator-docs"\n'),
       ),
     names: ['`mcp.docs`', 'config.toml already has a server by that name'],
   },
   {
-    name: 'everyMcpServer: a file that is not JSON, as `checkoutMcpConfig` refuses it, before a session exists',
+    name: 'everyMcpServer: a file that is not JSON, as `projectMcpConfig` refuses it, before a session exists',
     refused: () => {
       const broken = brokenCheckout();
       const file = path.join(broken, '.mcp.json');
@@ -369,8 +369,8 @@ const REFUSALS: readonly Refusal[] = [
 /** What is not refused beside them: each a spawn that starts, or a server accepted. */
 const TAKEN: readonly { name: string; taken: (t: Waiter) => Promise<boolean> | boolean }[] = [
   {
-    name: 'checkoutMcp: [] reads no file: a checkout with none starts',
-    taken: () => jobServers(tmp('bare'), { checkoutMcp: [] }).servers === undefined,
+    name: 'projectMcp: [] reads no file: a checkout with none starts',
+    taken: () => jobServers(tmp('bare'), { projectMcp: [] }).servers === undefined,
   },
   {
     name: "codex: a name the operator's config does not use is given to codex",
@@ -420,7 +420,7 @@ test("a spec's config file: the task's servers written owner-only outside the wo
       const cwd = checkoutOf();
       const detached = detachedOps(spy, root);
       const own = { mine: { command: 'x' } };
-      await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd, config: { checkoutMcp: ['a'], mcp: own } }));
+      await Effect.runPromise(detached.spawn({ name: 'ae/t/2', brief: 'x', cwd, config: { projectMcp: ['a'], mcp: own } }));
       const written = given?.mcpConfigFile;
       assert.ok(written && fs.existsSync(written), 'written the first time');
       assert.deepEqual(JSON.parse(fs.readFileSync(written, 'utf8')), { mcpServers: { a: TWO.a, ...own } }, "a verbatim, and the task's");
@@ -525,12 +525,12 @@ test('everyMcpServer and mcpServerOf: the servers a session gets as one value, s
       servers: { repo: { command: 'repo-server' }, both: { command: 'ours' }, mine: { command: 'my-server' } },
     },
     {
-      name: 'a task that picks entries by name gets those and no more of the file, as `pickedCheckoutMcp` picks them',
+      name: 'a task that picks entries by name gets those and no more of the file, as `pickedProjectMcp` picks them',
       cwd: withCheckout,
-      config: { checkoutMcp: ['repo'], mcp: { mine: { command: 'my-server' } } },
+      config: { projectMcp: ['repo'], mcp: { mine: { command: 'my-server' } } },
       servers: { repo: { command: 'repo-server' }, mine: { command: 'my-server' } },
     },
-    { name: '`checkoutMcp: []` leaves the file out altogether', cwd: withCheckout, config: { checkoutMcp: [] }, servers: {} },
+    { name: '`projectMcp: []` leaves the file out altogether', cwd: withCheckout, config: { projectMcp: [] }, servers: {} },
     { name: 'a cwd with no .mcp.json and a task with no config: {}', cwd: () => tmp('every-bare'), config: undefined, servers: {} },
     { name: 'a cwd with no .mcp.json and a task with no server: {}', cwd: () => tmp('every-bare'), config: {}, servers: {} },
   ];

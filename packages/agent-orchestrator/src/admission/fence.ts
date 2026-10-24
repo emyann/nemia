@@ -6,7 +6,7 @@
 import type { CommandClass } from './class.ts';
 
 /** An entry of the table as her fence reads it: its name and its class. */
-type Entry = { readonly name: string; readonly nemia: CommandClass };
+type Entry = { readonly name: string; readonly class: CommandClass };
 
 /** Her fence: the rules that let a call through unasked (`allow`), ask the person first (`ask`), and refuse it (`deny`). */
 export type Fence = { allow: string[]; ask: string[]; deny: string[] };
@@ -21,7 +21,7 @@ const any = (name: string): string => `Bash(nemia ${name}:*)`;
  *
  * - a read, her own write and an answer to what waits on the person run unasked, bare and with any words. Admission asks an answer of the
  *   person where it answers what waits (`admissionOf`): a rule cannot read the run's state;
- * - a write that prompts asks, whatever follows;
+ * - a write classed `ask` asks, whatever follows;
  * - a command that reads bare runs unasked, and asks with each word or flag that sets: a word right after its name, a flag anywhere;
  * - a command out of her reach is denied.
  *
@@ -31,12 +31,13 @@ const any = (name: string): string => `Bash(nemia ${name}:*)`;
 export function nemiaFence(table: readonly Entry[]): Fence {
   const unasked = (name: string) => [bare(name), any(name)];
   const fence: Fence = { allow: [], ask: [], deny: [] };
-  for (const { name, nemia } of table) {
-    if (nemia === 'out') fence.deny.push(any(name));
-    else if (nemia === 'prompts') fence.ask.push(any(name));
-    else if (typeof nemia === 'object') {
+  for (const c of table) {
+    const name = c.name;
+    if (c.class === 'none') fence.deny.push(any(name));
+    else if (c.class === 'ask') fence.ask.push(any(name));
+    else if (typeof c.class === 'object') {
       fence.allow.push(...unasked(name));
-      fence.ask.push(...nemia.setsBy.map((s) => (s.startsWith('-') ? `Bash(nemia ${name} *${s}*)` : `Bash(nemia ${name} ${s}:*)`)));
+      fence.ask.push(...c.class.setsBy.map((s) => (s.startsWith('-') ? `Bash(nemia ${name} *${s}*)` : `Bash(nemia ${name} ${s}:*)`)));
     } else fence.allow.push(...unasked(name));
   }
   return fence;

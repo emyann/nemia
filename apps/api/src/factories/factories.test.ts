@@ -297,7 +297,7 @@ test('a person works in a factory with hires: the listing names what is unfilled
   );
 
   await s.test(
-    'a card started in the factory: the record names the factory, its repository and the card, and the card leaves the inbox',
+    'a card started in the factory: the record names the factory, its repository and the card, and the card stays, listed as started',
     async () => {
       const { card } = addToInbox({ text: 'Cache the views' });
       const res = await post('/api/runs?factory=hired', { workflow: 'alpha', card: card.name });
@@ -305,7 +305,7 @@ test('a person works in a factory with hires: the listing names what is unfilled
       const { id } = (await res.json()) as { id: string };
       const run = runStore.runs.read(id);
       assert.deepEqual([run.factory, run.repo, run.from?.inbox], ['hired', repoR, card.name]);
-      assert.ok(!readInbox().some((c) => c.name === card.name), 'the card has left the inbox');
+      assert.equal(readInbox().find((c) => c.name === card.name)?.state, 'started', 'the card is kept, listed as started');
     },
   );
 

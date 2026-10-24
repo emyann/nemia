@@ -1,9 +1,9 @@
 /**
  * `nemia admit`: a call's admission, served to the hook a local session runs before each of its shell calls — the call read on stdin, the
- * runs it tries read as `nemia retry` reads them, given a floor (`--at-least`) the factory of each run it names and each factory's level,
- * given an agent (`--auto`) its rules in force and, for each answer a rule may give, the run's level and facts (`seenOf`), and the answer
- * (`admissionOf`) printed as JSON, or nothing for none. A controller over `EngineService`, run by the command line's runner with the table
- * it decides by.
+ * runs it tries read as `nemia retry` reads them, given the level to be at least at (`--at-least`) the factory of each run it names and
+ * each factory's level, given an agent (`--auto`) its rules in force and, for each answer a rule may give, the run's level and facts
+ * (`seenOf`), and the answer (`admissionOf`) printed as JSON, or nothing for none. A controller over `EngineService`, run by the command
+ * line's runner with the table it decides by.
  */
 import { Effect, Result } from 'effect';
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
@@ -51,7 +51,7 @@ export const ADMIT: Ran = {
         ? (agentNameRefusal(args.auto) ?? null)
         : null,
   writes: false,
-  nemia: 'read',
+  class: 'read',
   only: { side: 'cli', why: "a session's hook asks it before each call, on its own machine" },
 };
 
@@ -88,10 +88,10 @@ function callOf(given: string): AdmissionCall | undefined {
 }
 
 /**
- * The scope of a call under the floor `floor`, each run the line `line` names read for its factory and level, and each factory it names
+ * The scope of a call at least at `atLeast`, each run the line `line` names read for its factory and level, and each factory it names
  * for its level, at the moment of the call.
  */
-const scopeRead = Effect.fnUntraced(function* (line: string, table: Parameters<typeof admissionOf>[1], floor: Level) {
+const scopeRead = Effect.fnUntraced(function* (line: string, table: Parameters<typeof admissionOf>[1], atLeast: Level) {
   const named = namedIn(line, table);
   const factories = new Map<string, Level>();
   const levelOf = function* (factory: string) {
@@ -104,7 +104,7 @@ const scopeRead = Effect.fnUntraced(function* (line: string, table: Parameters<t
     runs.set(runId, Result.isSuccess(factory) ? { factory: factory.success, level: yield* levelOf(factory.success) } : undefined);
   }
   for (const factory of new Set(named.flatMap((n) => n.factories))) yield* levelOf(factory);
-  return { floor, runOf: (runId) => runs.get(runId), factoryOf: (factory) => factories.get(factory) ?? 'manual' } satisfies Scope;
+  return { atLeast, runOf: (runId) => runs.get(runId), factoryOf: (factory) => factories.get(factory) ?? 'manual' } satisfies Scope;
 });
 
 /** The rules in force for `agent` in the store `home`: none where the person's list does not read, so nothing is let through by it. */
@@ -143,9 +143,9 @@ const autoRead = Effect.fnUntraced(function* (line: string, table: Parameters<ty
 
 /**
  * Admission's answer for the call `given` (an `AdmissionCall` as JSON) against `table`: each step a retry on its line tries read first,
- * a run that does not read saying it is not there; given a floor (`atLeast`), each run and factory the line names read for its level;
- * given an agent (`autoAgent`), its rules in the store `home` and what they are judged on (`autoRead`). A call that is no call is asked
- * of the person.
+ * a run that does not read saying it is not there; given the level each is to be at least at (`atLeast`), each run and factory the
+ * line names read for its level; given an agent (`autoAgent`), its rules in the store `home` and what they are judged on (`autoRead`). A
+ * call that is no call is asked of the person.
  */
 export const admitted = Effect.fnUntraced(function* (
   given: string,

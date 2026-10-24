@@ -13,7 +13,6 @@ import {
   satisfiesAfter,
   stateClass,
   stateDrawn,
-  stateMeaning,
   statePaint,
   stepState,
   type Drawn,
@@ -135,7 +134,7 @@ test('stepState: each word wf ls prints, read as the state a person acts on', as
   );
 });
 
-test('stepState, satisfiesAfter, isGate, stateMeaning: what is work done, what waits on a person, and what a hold stops', async (t) => {
+test('stepState, satisfiesAfter, isGate: what is work done, what waits on a person, and what a hold stops', async (t) => {
   await t.test('only verified and unverified are work done; a refused check, a failed session and an unsigned step are not', () => {
     const notDone = [
       'failed ✗ check (exit 1)',
@@ -170,10 +169,6 @@ test('stepState, satisfiesAfter, isGate, stateMeaning: what is work done, what w
       assert.equal(stateClass.exhausted, stateClass.blocked);
       assert.match(stateClass.exhausted, /\bbg-yours\b/);
       assert.equal(
-        stateMeaning.exhausted,
-        'rounds exhausted: the reviewer asked for another round on the last one rounds: allows; a person decides — another round, or accepting what is there to go on with it',
-      );
-      assert.equal(
         stepState('rounds exhausted', true, false),
         'exhausted',
         'final, so a run somebody called off does not make it read as a step that never started',
@@ -186,10 +181,7 @@ test('stepState, satisfiesAfter, isGate, stateMeaning: what is work done, what w
       for (const state of ['over-budget', 'budget-exhausted'] as const) {
         assert.equal(stateClass[state], stateClass.exhausted, state);
         assert.equal(satisfiesAfter(state), false, `${state} is not work done`);
-        assert.match(stateMeaning[state], /until a person raises the cap on a try/);
       }
-      assert.match(stateMeaning['over-budget'], /^over budget: its tries have cost its budget: or more/);
-      assert.match(stateMeaning['budget-exhausted'], /^budget exhausted: its harness ended its session at its budget:/);
       assert.equal(
         stepState('over budget $4.20 of $3', true, false),
         'over-budget',
@@ -251,10 +243,6 @@ test('stepState, satisfiesAfter, isGate, stateMeaning: what is work done, what w
       assert.equal(stateClass['awaiting-approval'], stateClass.blocked);
       assert.equal(isGate('awaiting-approval', false), true);
       assert.equal(isGate('awaiting-approval', true), false, 'nobody waits for an approval on a run called off');
-      assert.match(
-        stateMeaning['awaiting-approval'],
-        /^awaiting approval: it signed off at its gate, and nothing after it is filed until a person approves it, or sends it back with words for its next try$/,
-      );
       assert.equal(stepState('awaiting approvals', false, false), 'working', 'not a word that merely starts like it');
     },
   );
@@ -271,7 +259,6 @@ test('stepState, satisfiesAfter, isGate, stateMeaning: what is work done, what w
         assert.equal(stepState(word, true, false), 'cancelled', `${word}, on a run called off`);
         assert.equal(stepState(word, false, true), 'held', `${word}, on a run a person holds`);
       }
-      assert.match(stateMeaning['waiting-for-slot'], /^waiting for a run slot: not filed yet — the cap on runs in flight \(WF_MAX_RUNS\)/);
       assert.notEqual(stateClass['waiting-for-slot'], stateClass.working, 'drawn as the wait it is, not as a session at work');
       assert.equal(stepState('waiting for a run slotted', false, false), 'working', 'not a word that merely starts like it');
     },
@@ -321,7 +308,6 @@ test('stepState, satisfiesAfter, isGate, stateMeaning: what is work done, what w
       assert.equal(stepState('waiting', true, true), 'cancelled', 'a run called off is called off, held or not');
       assert.equal(stepState('awaiting approval', true, true), 'awaiting-approval');
       assert.equal(satisfiesAfter('held'), false);
-      assert.match(stateMeaning.held, /^held: a person holds the run until other runs ship/);
       assert.notEqual(stateClass.held, stateClass.waiting, 'a person stops it, not the order of the steps');
       assert.notEqual(stateClass.held, stateClass.blocked, 'it asks nobody, as a gate does');
     },

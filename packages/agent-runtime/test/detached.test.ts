@@ -1723,7 +1723,7 @@ test(
       const state = await settledOn(sub, prints);
       assert.equal(state.settled, 'succeeded');
       assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
-      assert.notEqual(state.attempts[0]?.stated, false);
+      assert.notEqual(state.attempts[0]?.closedOut, false);
     });
 
     await t.test(
@@ -1737,7 +1737,7 @@ test(
         const state = await settledOn(sub, answers);
         assert.equal(state.settled, 'succeeded');
         assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it wrote, on the record');
-        assert.notEqual(state.attempts[0]?.stated, false);
+        assert.notEqual(state.attempts[0]?.closedOut, false);
       },
     );
 
@@ -1762,7 +1762,7 @@ test(
         assert.deepEqual(parent.attempts[0]?.closeout, { outcome: 'parent' }, 'the parent stated');
         const child = await settledOn(sub, spec, { resumeFrom: SESSION });
         assert.equal(child.attempts[0]?.closeout, undefined, "the parent's statement is not the child's");
-        assert.equal(child.attempts[0]?.stated, false, 'and the child is on the record as not having stated');
+        assert.equal(child.attempts[0]?.closedOut, false, 'and the child is on the record as not having stated');
       },
     );
   },

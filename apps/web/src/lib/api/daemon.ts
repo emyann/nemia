@@ -2,6 +2,7 @@
 import { queryOptions } from '@tanstack/react-query';
 import { pace } from '../feed.ts';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 
 /**
@@ -31,24 +32,26 @@ export type Daemon = {
 };
 
 /** Decodes a `Daemon`. */
-const DaemonSchema = Schema.Struct({
-  kind: Schema.Literals(['none', 'unreadable', 'stopped', 'gone', 'stalled', 'ticking']),
-  by: Schema.NullOr(Schema.String),
-  url: Schema.NullOr(Schema.String),
-  start: Schema.String,
-  ticking: Schema.Boolean,
-  pid: Schema.NullOr(Schema.Number),
-  cwd: Schema.NullOr(Schema.String),
-  every: Schema.NullOr(Schema.Number),
-  startedAt: Schema.NullOr(Schema.String),
-  passedAt: Schema.NullOr(Schema.String),
-  lastHeardAt: Schema.NullOr(Schema.String),
-  stoppedAt: Schema.NullOr(Schema.String),
-  staleAfterMs: Schema.NullOr(Schema.Number),
-  identity: Schema.NullOr(Schema.Literals(['same', 'other', 'unknown', 'gone'])),
-  line: Schema.String,
-  unobserved: Schema.Array(Schema.String),
-}) satisfies Schema.Schema<Daemon>;
+const DaemonSchema = decodes<Daemon>()(
+  Schema.Struct({
+    kind: Schema.Literals(['none', 'unreadable', 'stopped', 'gone', 'stalled', 'ticking']),
+    by: Schema.NullOr(Schema.String),
+    url: Schema.NullOr(Schema.String),
+    start: Schema.String,
+    ticking: Schema.Boolean,
+    pid: Schema.NullOr(Schema.Number),
+    cwd: Schema.NullOr(Schema.String),
+    every: Schema.NullOr(Schema.Number),
+    startedAt: Schema.NullOr(Schema.String),
+    passedAt: Schema.NullOr(Schema.String),
+    lastHeardAt: Schema.NullOr(Schema.String),
+    stoppedAt: Schema.NullOr(Schema.String),
+    staleAfterMs: Schema.NullOr(Schema.Number),
+    identity: Schema.NullOr(Schema.Literals(['same', 'other', 'unknown', 'gone'])),
+    line: Schema.String,
+    unobserved: Schema.Array(Schema.String),
+  }),
+);
 
 /**
  * Whether a daemon ticks the store: polled at `pace`, the same fallback as the cap's, since the feed carries no pass of the daemon — a pass

@@ -83,7 +83,7 @@ export const FAKE = {
   /** A check-affecting file whose diff is longer than the board shows of one. */
   capped: 'apps/web/test/theme.test.ts',
   /** What `tokens`' session consumed, in `wf decide`'s words. */
-  used: '14 turns · 31 tool calls · 112k in · 6.35k out',
+  used: '14 responses · 31 tool calls · 112k in · 6.35k out',
   /**
    * What `tokens` named in its closeout: an image and a text file in its files directory, which the api serves, and a path on its branch.
    */
@@ -2207,7 +2207,7 @@ export function seed(root: string, now = Date.now()): void {
     ],
   };
   signedOff(`${id}-tokens`, 'codex', lane, 'Pick the colour tokens.', 40, 30, tokensCloseout, undefined, {
-    turns: 14,
+    responses: 14,
     toolCalls: 31,
     inputTokens: 112_000,
     outputTokens: 6_350,
@@ -2691,7 +2691,7 @@ export function seed(root: string, now = Date.now()): void {
     outputTokens: 3_100,
   };
   priced(cost('implement-1'), 'claude', costLane, 'Implement it.', [1.49, 1.48, 1.35], done('Implemented it.'), {
-    turns: 22,
+    responses: 22,
     toolCalls: 48,
     inputTokens: 1_840_000,
     cacheReadTokens: 1_700_000,
@@ -2726,7 +2726,7 @@ export function seed(root: string, now = Date.now()): void {
       ],
     }),
     {
-      turns: 9,
+      responses: 9,
       toolCalls: 17,
       inputTokens: 760_000,
       cacheReadTokens: 700_000,
@@ -2751,7 +2751,7 @@ export function seed(root: string, now = Date.now()): void {
     unpriced,
   );
   priced(cost('tokens'), 'claude', tokensLane, 'Pick the colour tokens.', [1.49, 1.48, 1.3], done('Picked the colour tokens.'), {
-    turns: 14,
+    responses: 14,
     toolCalls: 31,
     inputTokens: 1_120_000,
     cacheReadTokens: 1_000_000,
@@ -2774,7 +2774,7 @@ export function seed(root: string, now = Date.now()): void {
     [1.24, 1.23, 1.0],
     done('Picked them again.'),
     {
-      turns: 18,
+      responses: 18,
       toolCalls: 36,
       inputTokens: 1_530_000,
       cacheReadTokens: 1_320_000,
@@ -2805,7 +2805,7 @@ export function seed(root: string, now = Date.now()): void {
       artifacts: [],
     },
     {
-      turns: 11,
+      responses: 11,
       toolCalls: 19,
       inputTokens: 980_000,
       cacheReadTokens: 820_000,
@@ -2942,7 +2942,7 @@ export function writeAsking(root: string, now = Date.now()): string[] {
     6,
     { outcome: 'blocked', summary: 'Drafted a warm palette and a cool one.', needs: ASKING.needs, artifacts: [], open: [ASKING.tone] },
     {
-      turns: 11,
+      responses: 11,
       toolCalls: 19,
       inputTokens: 980_000,
       cacheReadTokens: 820_000,

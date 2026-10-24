@@ -375,7 +375,7 @@ export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }>
   spec: APPLY_SPEC,
   check: (args) => leftOut(APPLY_SPEC, args),
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   asksAlways: true,
   only: HERE,
   handler: (args) =>

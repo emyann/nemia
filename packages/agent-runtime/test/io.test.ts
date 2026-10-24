@@ -221,7 +221,7 @@ const listBoard = async () => {
 };
 
 /** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
-const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { turns: 'three' } }) + '\n';
+const MISWRITTEN = JSON.stringify({ kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { responses: 'three' } }) + '\n';
 
 test('the api lists some tasks: each journal read once, one look at the harness for those in flight, an unreadable task named once, and anything else refused', async (t) => {
   const s = story(t);

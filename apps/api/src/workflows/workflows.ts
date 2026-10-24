@@ -9,7 +9,7 @@
  * The start is `nemia start`'s entry of the package's command table (`START`), its handler `startRun`: it writes the run's record and files
  * nothing — `nemia tick` or `nemia up` files the first step, as it does for a run started at the command line. A start that names an inbox
  * card (`card`) is the same handler's `startFromInbox`, `nemia start <inbox>/<name>.md`'s: the same record, with `from` on it, and the
- * card removed.
+ * card kept, listed as started.
  * Nothing else here writes; the inbox's own writes are inbox.ts's, and a folder the builder puts back is builder.ts's.
  *
  * A step's page reads one step of one folder through its own router (step/step.ts), which reads the step's file with `stepSourceOf`.
@@ -566,8 +566,8 @@ export function agentSkillsOf(step: Workflow, dir: string, places: Places): Agen
 /**
  * The inbox card `asked` names, started by `nemia start`'s entry (`START`) with `repo` as the caller's and in the factory `factory` when
  * one is named, over the card's `factory:` — one that names none either way is refused, its fix `?factory=<name>` — and what
- * `POST /api/runs` answers: the run's id and the card's name, whether the card was removed and why not, and the card's `repo:` the run
- * did not look at.
+ * `POST /api/runs` answers: the run's id and the card's name — the card kept in the inbox, listed as started — and the card's `repo:` the
+ * run did not look at.
  */
 async function cardStarted(
   e: Engine['Service'],
@@ -593,8 +593,6 @@ async function cardStarted(
   return {
     id: started.id,
     card: started.card,
-    removed: started.removed,
-    ...(started.removed ? {} : { why: started.why }),
     ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
   };
 }
@@ -620,8 +618,7 @@ async function cardStarted(
  *   is the caller's, as `.` is `nemia start`'s, and the card's `repo:` is over it; the folder is the one
  *   `folderOf` found. `startFromInbox` refuses a card not there as a `Missing` (404), one a run's record already names as a
  *   `Conflict` (409), and the rest as an `Invalid` (422): a card that does not read, a workflow that does not load, a blank brief, and
- *   what `startRun` refuses. A run started when the card could not be
- *   removed is started all the same: the answer says `removed: false` and `why`, and the card lists as started until it is dropped. A
+ *   what `startRun` refuses. The card is kept, and lists as started. A
  *   card whose `repo:` the run looked at none of — a folder team's — carries it as `ignoredRepo`, as `nemia start` prints it and a tick's
  *   line says it (`ignoredRepoLine`): a client that starts a card is told the same fact wherever it started from. In a factory
  *   (`?factory=`), the run is started in it (`startRun`'s `factory`), which refuses a workflow it has not attached, a step its hires leave

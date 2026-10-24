@@ -256,7 +256,7 @@ test('the queue routes: what a queue or a take-back refuses, writing nothing', a
       const bare = addToInbox({ text: 'No workflow named' }).card;
       const queued = addToInbox({ text: 'Queued already', workflow: 'dev' }).card;
       queueInInbox(queued.name);
-      const started = addToInbox({ text: 'Started, its removal failed', workflow: 'dev' }).card;
+      const started = addToInbox({ text: 'Started already', workflow: 'dev' }).card;
       fs.mkdirSync(path.join(root, 'runs'), { recursive: true });
       fs.writeFileSync(path.join(root, 'runs', 'started-run-k2q9.json'), startedFrom('started-run-k2q9', started.name));
       fs.writeFileSync(path.join(inbox, 'broken.md'), '---\nafter: some-run\nworkflow: dev\n---\nWait for it.\n');

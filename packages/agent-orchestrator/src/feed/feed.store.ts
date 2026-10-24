@@ -126,14 +126,14 @@ function cursorRefusalAt(file: string, after: number): string | undefined {
 const Rest = [Schema.Record(Schema.String, Schema.Unknown)] as const;
 
 /**
- * What a v1 line signs itself with (`Signal` in `feed.ts`), each key optional so a line written before this version still decodes and is
+ * What a v1 line signs itself with (`Line` in `feed.ts`), each key optional so a line written before this version still decodes and is
  * upgraded on read (`upgraded`) rather than dropped.
  *
  * Every one of them is as loose as the JSON it came from — a string where this version writes a literal — on purpose: a `nemia` newer
  * than this one may name a reason, a type or a source this one does not, and a closed literal here would drop its line whole and leave
  * the fold reading a feed with a hole in it.
  */
-const SIGNAL_KEYS = {
+const LINE_KEYS = {
   apiVersion: Schema.optionalKey(Schema.String),
   involved: Schema.optionalKey(Schema.Struct({ kind: Schema.String, name: Schema.String })),
   labels: Schema.optionalKey(
@@ -167,7 +167,7 @@ export const FeedLineSchema = Schema.Union([
       step: Schema.optionalKey(Schema.String),
       word: Schema.String,
       note: Schema.optionalKey(Schema.String),
-      ...SIGNAL_KEYS,
+      ...LINE_KEYS,
     }),
     Rest,
   ),
@@ -177,7 +177,7 @@ export const FeedLineSchema = Schema.Union([
       daemon: Schema.Finite,
       word: Schema.Literal(DAEMON_STARTED),
       note: Schema.optionalKey(Schema.String),
-      ...SIGNAL_KEYS,
+      ...LINE_KEYS,
     }),
     Rest,
   ),
@@ -187,7 +187,7 @@ export const FeedLineSchema = Schema.Union([
       store: Schema.String,
       word: Schema.String,
       note: Schema.optionalKey(Schema.String),
-      ...SIGNAL_KEYS,
+      ...LINE_KEYS,
     }),
     Rest,
   ),

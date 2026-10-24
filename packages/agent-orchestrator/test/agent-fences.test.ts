@@ -1717,10 +1717,13 @@ test("REFUSED: cd to Seldon, Agora and Iris, each by a deny of its own, where th
   }
 });
 
-/** The agents that design, review and interview, each of which reads Anthropic's documentation. */
-const READERS = ['seldon', 'agora', 'iris'];
+/** The agents that review and interview, each of which reads Anthropic's documentation by host. */
+const READERS = ['agora', 'iris'];
 
-/** Anthropic's documentation, by the host a fetch reads: the only hosts those agents open. */
+/** The agent that designs: a spec is only as good as the documents it reads, so Seldon fetches any site. */
+const DESIGNER = 'seldon';
+
+/** Anthropic's documentation, by the host a fetch reads: the only hosts the readers open. */
 const DOCUMENTATION: Call[] = ['code.claude.com', 'docs.claude.com', 'platform.claude.com', 'docs.anthropic.com'].map((domain) => ({
   tool: 'WebFetch',
   domain,
@@ -1732,7 +1735,17 @@ const ELSEWHERE: Call[] = ['claude.com', 'code.claude.com.example.test', 'exampl
   domain,
 }));
 
-test("Seldon, Agora and Iris read Anthropic's documentation and search the web by their own allow, each host by name, and no other host", () => {
+test('Seldon fetches any site and searches the web by his own allow, a fetch that names no host included', () => {
+  const step = shippedStepOf(DESIGNER);
+  assert.ok(step.tools?.includes('WebFetch') && step.tools.includes('WebSearch'), 'seldon is given WebFetch and WebSearch');
+  assert.deepEqual(
+    runs(step, [...DOCUMENTATION, ...ELSEWHERE, { tool: 'WebFetch' }, { tool: 'WebSearch' }], {}, []),
+    [...DOCUMENTATION.map(shown), ...ELSEWHERE.map(shown), 'WebFetch', 'WebSearch'],
+    'seldon: by his own allow, no settings read',
+  );
+});
+
+test("Agora and Iris read Anthropic's documentation and search the web by their own allow, each host by name, and no other host", () => {
   for (const agent of READERS) {
     const step = shippedStepOf(agent);
     assert.ok(step.tools?.includes('WebFetch') && step.tools.includes('WebSearch'), `${agent} is given WebFetch and WebSearch`);
@@ -3344,9 +3357,9 @@ const editVerdictOf = (rules: Rules, file: string): Verdict =>
 function owedOf(table: readonly (typeof TABLE)[number][]): [string, Verdict][] {
   return table
     .filter((entry) => entry.only?.side !== 'api')
-    .flatMap(({ name, nemia: c }): [string, Verdict][] => {
+    .flatMap(({ name, class: c }): [string, Verdict][] => {
       const forms = [`nemia ${name}`, `nemia ${name} r-1`];
-      if (c === 'out' || c === 'prompts') return forms.map((form) => [form, c === 'out' ? 'deny' : 'ask']);
+      if (c === 'none' || c === 'ask') return forms.map((form) => [form, c === 'none' ? 'deny' : 'ask']);
       if (typeof c !== 'object') return forms.map((form) => [form, 'allow']);
       const set = (s: string) => (s.startsWith('-') ? [`nemia ${name} r-1 ${s} v`, `nemia ${name} ${s} v r-1`] : [`nemia ${name} ${s}`]);
       return [
@@ -3398,7 +3411,7 @@ test('her fence asks every write that prompts and every write form of a command 
 
 test('REFUSED: a command of the fence reclassed, an ask rule of the fence taken away, and a deny taken away are each named', () => {
   const rules = herRules(herStore());
-  const reclassed = TABLE.map((entry) => (entry.name === 'cancel' ? { ...entry, nemia: 'hers' as const } : entry));
+  const reclassed = TABLE.map((entry) => (entry.name === 'cancel' ? { ...entry, class: 'act' as const } : entry));
   assert.deepEqual(misjudged(rules, reclassed), ['nemia cancel: ask', 'nemia cancel r-1: ask']);
   const cut = { ...rules, ask: rules.ask.filter((rule) => rule !== 'Bash(nemia rm:*)') };
   assert.deepEqual(misjudged(cut), ['nemia rm: unmatched', 'nemia rm r-1: unmatched']);

@@ -74,7 +74,7 @@ test("the map: a remote agent's Task in the runtime's words, and a spawn, words 
         { payload: { n: 3 } },
         'the last data part of it',
       );
-      assert.equal(done(artifact(text('only words'))), undefined, 'none: the end is recorded `stated: false`');
+      assert.equal(done(artifact(text('only words'))), undefined, 'none: the end is recorded `closedOut: false`');
       assert.equal(done(), undefined);
     },
   );

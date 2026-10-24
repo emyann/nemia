@@ -509,7 +509,7 @@ test('REFUSED: a file in the asks directory that no reader reads still takes its
 
 test("REFUSED: an event on a task's journal alone — no file in the store moved — takes its run out: the pass reads the feed", async () => {
   await evicts('a journal line', (run) =>
-    h.journal.append(`${run.id}-work`, { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { turns: 3 } }),
+    h.journal.append(`${run.id}-work`, { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { responses: 3 } }),
   );
 });
 

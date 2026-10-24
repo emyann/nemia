@@ -38,7 +38,7 @@ export default {
    * An inbox card that names a factory (`factory:`) is started in it. Its start lists the workflows the factory offers on its one
    * repository, read with its hires, the card's preset among them; a workflow whose step the factory hires no one into says so in the
    * package's words, with no Start. Once the factory hires into it, the start sends `?factory=` and `?repo=`, the record names the factory,
-   * and the card leaves the inbox. The card, the hires, the agent hired and the run are taken back.
+   * and the card stays in the inbox, started. The card, the hires, the agent hired and the run are taken back.
    */
   name: 'inbox-factory',
   route: '/inbox',
@@ -110,7 +110,7 @@ export default {
         throw new Refused(
           `the record is the card's start in ${factory} — it holds ${JSON.stringify(got)}, not ${JSON.stringify(expected)}`,
         );
-      if (fs.existsSync(cardFile)) throw new Refused(`the card leaves the inbox once its run is written — ${cardFile} is still there`);
+      if (!fs.existsSync(cardFile)) throw new Refused(`the card stays in the inbox once its run is written — ${cardFile} is gone`);
       await idle(other);
       const seen = problems();
       if (seen.length)

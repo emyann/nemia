@@ -186,7 +186,7 @@ const refusedNaming = (got: { tag?: string; message: string }, ...names: string[
   for (const name of names) assert.ok(got.message.includes(name), `${name} named in: ${got.message}`);
 };
 
-test('file(): command, niceness, env and checkoutMcp go to the harnesses that take them, and are refused by name where the session would start without them', async (t) => {
+test('file(): command, niceness, env and projectMcp go to the harnesses that take them, and are refused by name where the session would start without them', async (t) => {
   const root = scratch('ae-command-');
   const harnesses = {
     codex,
@@ -263,16 +263,16 @@ test('file(): command, niceness, env and checkoutMcp go to the harnesses that ta
   });
 
   await t.test(
-    'checkoutMcp is refused on the command harness, which loads no server to leave out, naming the harnesses that hold it',
+    'projectMcp is refused on the command harness, which loads no server to leave out, naming the harnesses that hold it',
     async () => {
       refusedNaming(
-        await filed('command', { command: ['true'], checkoutMcp: [] }),
-        '`checkoutMcp`',
+        await filed('command', { command: ['true'], projectMcp: [] }),
+        '`projectMcp`',
         'the `command` harness',
         '`codex` or `claude`',
       );
-      assert.equal((await filed('codex', { checkoutMcp: [] })).tag, 'filed');
-      assert.equal((await filed('claude', { checkoutMcp: ['a'] })).tag, 'filed');
+      assert.equal((await filed('codex', { projectMcp: [] })).tag, 'filed');
+      assert.equal((await filed('claude', { projectMcp: ['a'] })).tag, 'filed');
     },
   );
 });

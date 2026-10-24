@@ -40,7 +40,7 @@ export default {
       `and what approving ${gated} does`,
     );
     await expectVisible(
-      card.locator(`ul[aria-label="Steps"] [data-step="${gated}"][data-state="awaiting-approval"][title^="${gated}: awaiting approval"]`),
+      card.locator(`ul[aria-label="Steps"] [data-step="${gated}"][data-state="awaiting-approval"][title^="${gated}: waits on you — "]`),
       `and ${gated}'s pill on its rail, awaiting approval`,
     );
     await settled(page);

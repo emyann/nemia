@@ -28,7 +28,7 @@ export type SpawnAt = {
  * goes first — its answer, its output and its streams, what was read of that output, its own request, and the stop asked of it,
  * which its worker would otherwise read as asked of this one and start nothing. A spec with `needsRequest` is handed its
  * servers in the request and names no config file, though its own config under the name is written or cleared all the same, so a
- * re-spawn leaves no servers behind; `sessionMcp` is read on either road, since it is what refuses a `checkoutMcp` name the
+ * re-spawn leaves no servers behind; `sessionMcp` is read on either road, since it is what refuses a `projectMcp` name the
  * checkout does not declare, before anything runs. The request is written owner-only: it carries the task's `config`, whose `mcp`
  * may hold an `env` or a header that is a secret.
  */

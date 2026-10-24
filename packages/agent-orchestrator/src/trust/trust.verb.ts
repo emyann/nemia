@@ -127,7 +127,7 @@ export const FACTORY_TRUST: Command<{ name: string; trusts: readonly PlaceTrust[
     missing: 'nemia factory trust takes the name of the factory, as nemia factory ls lists it: nemia factory trust <name>.',
   },
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   only: { side: 'cli', why: 'the board trusts no place: it shows the line to type, and nemia factory trust does it' },
   handler: (args) =>
     Effect.gen(function* () {

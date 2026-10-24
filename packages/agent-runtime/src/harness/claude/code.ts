@@ -30,7 +30,7 @@ import { besideRun, detachedFind, detachedOps, type HarnessIO, type HarnessSpec,
 import { claudeTranscriptEvents, claudeTranscriptFile, claudeTranscriptRecords } from './transcript.ts';
 import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeCodeRefuses, claudeRefuses } from './vocabulary.ts';
 import { claudePartials, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
-import { checkoutMcpConfig } from '../mcp.ts';
+import { projectMcpConfig } from '../mcp.ts';
 import { RunnerError } from '../error.ts';
 import { BridgeFactsSchema, bridgeOf, type AttachedBridge } from './attached-bridge.ts';
 import type { Attached } from './attached.ts';
@@ -59,13 +59,13 @@ const BRIDGE_END = 'bridge';
 
 /**
  * What a job is given of the machine before it runs: the checkout's `.mcp.json`, found on disk here so that `command` stays a function
- * of what it is given — none for a task that says which of its servers it loads (`checkoutMcp`), those being in the task's own config
+ * of what it is given — none for a task that says which of its servers it loads (`projectMcp`), those being in the task's own config
  * — and, where the task asks for a bridge (`bridgeAsked`), the file its process writes the bridge's facts on (`bridgeFile`), beside its
  * run, a former attempt's under the name cleared first so a look never reads its bridge as this one's.
  */
 export const claudePrepare = (r: SpawnRequest, beside?: (end: string) => string): Partial<HarnessIO> => {
-  const found = r.config?.checkoutMcp ? undefined : checkoutMcpConfig(r.cwd);
-  const io: Partial<HarnessIO> = found ? { checkoutMcpConfig: found } : {};
+  const found = r.config?.projectMcp ? undefined : projectMcpConfig(r.cwd);
+  const io: Partial<HarnessIO> = found ? { projectMcpConfig: found } : {};
   if (!bridgeAsked(r) || beside === undefined) return io;
   const bridgeFile = beside(BRIDGE_END);
   fs.rmSync(bridgeFile, { force: true });
@@ -137,7 +137,7 @@ export const claudeJobSpec = (executable?: string): HarnessSpec => ({
   prepare: claudePrepare,
   refuses: claudeRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
-  checkoutMcp: true,
+  projectMcp: true,
   enabledSkills: true,
   env: true,
   claudeFlags: true,

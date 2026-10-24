@@ -35,8 +35,8 @@ const { beat, daemonFile, daemonStanding, lastCeilings, procStartOf, readFeed } 
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
 const {
-  heldHolder,
-  holderOnStore,
+  heldServes,
+  servesOnStore,
   parseDaemonFile,
   parsePassCost,
   parseRecentPasses,
@@ -135,6 +135,7 @@ const read = () =>
     passedMono?: { boot: string; ms: number };
     beatMono?: { boot: string; ms: number };
     release?: { kind: string; root: string; tag?: string; commit?: string };
+    serves?: Record<string, Record<string, unknown>>;
     holder?: Record<string, Record<string, unknown>>;
   };
 
@@ -239,7 +240,7 @@ test(
 
 test("the beat writes only its own daemon's file: not over another holder, not after a stop, not a file it did not take", () => {
   clear();
-  const self = { pid: process.pid, startedAt: minutesAgo(1), cwd: '/here', every: 4000, passedAt: minutesAgo(0.5) };
+  const self = { pid: process.pid, by: 'up' as const, startedAt: minutesAgo(1), cwd: '/here', every: 4000, passedAt: minutesAgo(0.5) };
   fs.writeFileSync(FILE, JSON.stringify(self));
   const mono = monoAgo(0);
   beat(self, { at: Date.parse('2026-09-22T12:00:00.000Z'), mono });
@@ -270,55 +271,66 @@ const CARDS = { claude: { name: 'claude', supportedInterfaces: [{ url: 'http://1
 test('the lease carries what its holder serves: written by the holding process, and read back key for key through the schema', () => {
   clear();
   const { held } = takeStore({ every: 4000, cwd: '/here', by: 'api' });
-  assert.equal(heldHolder(CARDS), true, 'the process that holds the lease writes it');
-  assert.deepEqual(read().holder, CARDS, 'on the file');
+  assert.equal(heldServes(CARDS), true, 'the process that holds the lease writes it');
+  assert.deepEqual(read().serves, CARDS, 'on the file');
   assert.deepEqual(
-    parseDaemonFile(fs.readFileSync(FILE, 'utf8'))?.holder,
+    parseDaemonFile(fs.readFileSync(FILE, 'utf8'))?.serves,
     CARDS,
     'and back through the schema, which names the key — a key it does not name is dropped on the next write',
   );
   const next = passed(held);
-  assert.deepEqual(read().holder, CARDS, 'and a pass of its own daemon keeps it');
+  assert.deepEqual(read().serves, CARDS, 'and a pass of its own daemon keeps it');
   beat(next);
-  assert.deepEqual(read().holder, CARDS, 'as does its beat');
+  assert.deepEqual(read().serves, CARDS, 'as does its beat');
   clear();
   takeStore({ every: 4000, cwd: '/here', by: 'api' });
-  assert.equal('holder' in read(), false, 'a daemon that writes none names none');
+  assert.equal('serves' in read(), false, 'a daemon that writes none names none');
   clear();
 });
 
-test('REFUSED: heldHolder writes nothing over another holder’s lease, nothing after a stop, and nothing where there is no lease', () => {
+test('a lease written before `up` and `serves` reads as them, and its next beat writes them and no `holder`', () => {
+  for (const over of [{ holder: CARDS }, { by: 'wf up', holder: CARDS }, { by: 'up', serves: CARDS }]) {
+    const held = parseDaemonFile(holdBy(process.pid, over));
+    assert.deepEqual([held?.by, held?.serves], ['up', CARDS], JSON.stringify(over));
+    beat(held!);
+    const { by, serves, holder, beatAt } = read();
+    assert.deepEqual({ by, serves, holder, beat: beatAt !== undefined }, { by: 'up', serves: CARDS, holder: undefined, beat: true });
+  }
+  clear();
+});
+
+test('REFUSED: heldServes writes nothing over another holder’s lease, nothing after a stop, and nothing where there is no lease', () => {
   clear();
   for (const [name, over] of [
     ['another holder', { pid: LIVE }],
     ['stopped', { stoppedAt: minutesAgo(0.1) }],
   ] as const) {
     const text = holdBy(process.pid, over);
-    assert.equal(heldHolder(CARDS), false, `${name}: it answers it wrote nothing`);
+    assert.equal(heldServes(CARDS), false, `${name}: it answers it wrote nothing`);
     assert.equal(fs.readFileSync(FILE, 'utf8'), text, `${name}: and the file is byte for byte as it was`);
   }
   clear();
-  assert.equal(heldHolder(CARDS), false, 'no lease is no lease of this process’s');
+  assert.equal(heldServes(CARDS), false, 'no lease is no lease of this process’s');
   assert.equal(fs.existsSync(FILE), false, 'and nothing is written');
 });
 
-test('holderOnStore answers another live process’s holder alone: never this process’s own, and never a lease nobody ticks', () => {
+test('servesOnStore answers what another live process serves alone: never this process’s own, and never a lease nobody ticks', () => {
   clear();
-  assert.equal(holderOnStore(), undefined, 'no lease names no holder');
-  holdBy(LIVE, { holder: CARDS });
-  assert.deepEqual(holderOnStore(), CARDS, 'a ticking lease of another live process names its holder');
-  holdBy(process.pid, { holder: CARDS });
-  assert.equal(holderOnStore(), undefined, 'a lease this process holds names no holder for it: a viewer never dials itself');
-  holdBy(LIVE, { holder: CARDS, stoppedAt: minutesAgo(0.1) });
-  assert.equal(holderOnStore(), undefined, 'a lease let go names a port no one listens on');
-  holdBy(GONE, { holder: CARDS });
-  assert.equal(holderOnStore(), undefined, 'nor does one whose process is gone');
-  holdBy(LIVE, { holder: CARDS, passedAt: minutesAgo(30), startedAt: minutesAgo(40) });
-  assert.equal(holderOnStore(), undefined, 'nor one that has gone silent past its window');
+  assert.equal(servesOnStore(), undefined, 'no lease serves nothing');
+  holdBy(LIVE, { serves: CARDS });
+  assert.deepEqual(servesOnStore(), CARDS, 'a ticking lease of another live process names what it serves');
+  holdBy(process.pid, { serves: CARDS });
+  assert.equal(servesOnStore(), undefined, 'a lease this process holds serves nothing to it: a viewer never dials itself');
+  holdBy(LIVE, { serves: CARDS, stoppedAt: minutesAgo(0.1) });
+  assert.equal(servesOnStore(), undefined, 'a lease let go names a port no one listens on');
+  holdBy(GONE, { serves: CARDS });
+  assert.equal(servesOnStore(), undefined, 'nor does one whose process is gone');
+  holdBy(LIVE, { serves: CARDS, passedAt: minutesAgo(30), startedAt: minutesAgo(40) });
+  assert.equal(servesOnStore(), undefined, 'nor one that has gone silent past its window');
   holdBy(LIVE);
-  assert.equal(holderOnStore(), undefined, 'a ticking lease that names no holder answers none');
+  assert.equal(servesOnStore(), undefined, 'a ticking lease that serves nothing answers none');
   fs.writeFileSync(FILE, 'not json');
-  assert.equal(holderOnStore(), undefined, 'and a file that does not read as a lease answers none');
+  assert.equal(servesOnStore(), undefined, 'and a file that does not read as a lease answers none');
   clear();
 });
 
@@ -811,7 +823,7 @@ test('`nemia tick` says every move its one pass refused', async (t) => {
 
 test('`nemia up` says a task the runtime left out once while it lasts, and again once it clears and comes back; `nemia tick` says each its pass left out', async (t) => {
   clear();
-  const bad = "t-bad's journal (/store/tasks/t-bad.jsonl), entry 2 is a `measured` event, and its `usage.turns` is not a number";
+  const bad = "t-bad's journal (/store/tasks/t-bad.jsonl), entry 2 is a `measured` event, and its `usage.responses` is not a number";
   const feed = 'the feed (/store/feed.jsonl), entry 3 read from cursor 148 is no event this runtime writes';
   const byPass = [[bad], [bad, feed], [bad], [], [bad]];
   const e = engineOf();
@@ -1024,7 +1036,7 @@ test('the daemon names on the lease what its hold serves, and names none when it
     return seen;
   };
   assert.deepEqual(
-    (await ran({ url: 'http://127.0.0.1:45671', token: 'tok-1', cards: CARDS })).map((f) => f.holder),
+    (await ran({ url: 'http://127.0.0.1:45671', token: 'tok-1', cards: CARDS })).map((f) => f.serves),
     [CARDS],
     'a daemon that holds something names it on the lease, before its first pass',
   );
@@ -1034,11 +1046,11 @@ test('the daemon names on the lease what its hold serves, and names none when it
     'and never the token the hold answered beside the cards: the lease carries nothing secret',
   );
   assert.deepEqual(
-    (await ran(null)).map((f) => f.holder),
+    (await ran(null)).map((f) => f.serves),
     [undefined],
-    'a daemon whose hold answers nothing names no holder',
+    'a daemon whose hold answers nothing serves nothing on the lease',
   );
-  assert.equal('holder' in read(), false, 'and the lease a new daemon takes carries no holder of the last, however the last one ended');
+  assert.equal('serves' in read(), false, 'and the lease a new daemon takes carries nothing the last served, however the last one ended');
   clear();
 });
 

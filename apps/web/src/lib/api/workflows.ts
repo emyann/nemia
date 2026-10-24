@@ -4,6 +4,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Option, Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get, send, type SendHow } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
 import { StepLayersSchema, type StepLayers } from './layers.ts';
@@ -47,21 +48,25 @@ export type StepWritten = Omit<ListedStep, 'hired' | 'layers' | 'mcp'>;
 export type StepOwn = { keys: StepKey[]; body: string };
 
 /** Decodes a `StepOwn`: each key a step sets itself, one a step has. */
-const StepOwnSchema = Schema.Struct({
-  keys: Schema.mutable(Schema.Array(StepKeySchema)),
-  body: Schema.String,
-}) satisfies Schema.Schema<StepOwn>;
+const StepOwnSchema = decodes<StepOwn>()(
+  Schema.Struct({
+    keys: Schema.mutable(Schema.Array(StepKeySchema)),
+    body: Schema.String,
+  }),
+);
 
 /** Decodes a `ListedStep`. */
-const ListedStepSchema = Schema.Struct({
-  name: Schema.String,
-  spec: WorkflowStepSpecSchema,
-  body: Schema.String,
-  own: Schema.NullOr(StepOwnSchema),
-  hired: Schema.NullOr(Schema.String),
-  layers: Schema.NullOr(StepLayersSchema),
-  mcp: Schema.mutable(Schema.Array(Schema.String)),
-}) satisfies Schema.Schema<ListedStep>;
+const ListedStepSchema = decodes<ListedStep>()(
+  Schema.Struct({
+    name: Schema.String,
+    spec: WorkflowStepSpecSchema,
+    body: Schema.String,
+    own: Schema.NullOr(StepOwnSchema),
+    hired: Schema.NullOr(Schema.String),
+    layers: Schema.NullOr(StepLayersSchema),
+    mcp: Schema.mutable(Schema.Array(Schema.String)),
+  }),
+);
 
 /**
  * Mirrors `WorkflowListing` in apps/api/src/workflows/workflows.ts: a folder of steps, where it is read from — the repository's
@@ -98,20 +103,22 @@ export type WorkflowListing = {
 const WorkflowSourceSchema = Schema.Literals(['repo', 'yours']);
 
 /** Decodes a `WorkflowListing`: each key the board reads, of its type and words; a key it does not know is dropped. */
-const WorkflowListingSchema = Schema.Struct({
-  name: Schema.String,
-  from: WorkflowSourceSchema,
-  dir: Schema.String,
-  description: Schema.NullOr(Schema.String),
-  readme: Schema.NullOr(Schema.String),
-  steps: Schema.mutable(Schema.Array(ListedStepSchema)),
-  graph: RunGraphSchema,
-  schemas: Schema.mutable(Schema.Array(Schema.String)),
-  folderTeam: Schema.Boolean,
-  version: Schema.String,
-  error: Schema.NullOr(Schema.String),
-  unfilled: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<WorkflowListing>;
+const WorkflowListingSchema = decodes<WorkflowListing>()(
+  Schema.Struct({
+    name: Schema.String,
+    from: WorkflowSourceSchema,
+    dir: Schema.String,
+    description: Schema.NullOr(Schema.String),
+    readme: Schema.NullOr(Schema.String),
+    steps: Schema.mutable(Schema.Array(ListedStepSchema)),
+    graph: RunGraphSchema,
+    schemas: Schema.mutable(Schema.Array(Schema.String)),
+    folderTeam: Schema.Boolean,
+    version: Schema.String,
+    error: Schema.NullOr(Schema.String),
+    unfilled: Schema.NullOr(Schema.String),
+  }),
+);
 
 /** Every workflow there is. Not polled: it changes when a person edits a folder. Read again on each visit. */
 export const workflowsQuery = queryOptions({
@@ -191,44 +198,46 @@ export type WorkflowStepPage = {
 };
 
 /** Decodes a `WorkflowStepPage`. */
-const WorkflowStepPageSchema = Schema.Struct({
-  workflow: Schema.String,
-  from: WorkflowSourceSchema,
-  dir: Schema.String,
-  step: Schema.String,
-  body: Schema.String,
-  source: Schema.String,
-  keys: Schema.mutable(Schema.Array(KeyRowSchema)),
-  agentSkills: Schema.NullOr(Schema.mutable(Schema.Array(AgentSkillSchema))),
-  factory: Schema.NullOr(Schema.String),
-  layers: StepLayersSchema,
-  hired: Schema.NullOr(Schema.String),
-  hiredIn: Schema.mutable(Schema.Array(Schema.Struct({ factory: Schema.String, agent: Schema.String }))),
-  hiring: Schema.Struct({
-    refused: Schema.NullOr(Schema.String),
-    agents: Schema.mutable(Schema.Array(Schema.Struct({ name: Schema.String, description: Schema.NullOr(Schema.String) }))),
+const WorkflowStepPageSchema = decodes<WorkflowStepPage>()(
+  Schema.Struct({
+    workflow: Schema.String,
+    from: WorkflowSourceSchema,
+    dir: Schema.String,
+    step: Schema.String,
+    body: Schema.String,
+    source: Schema.String,
+    keys: Schema.mutable(Schema.Array(KeyRowSchema)),
+    agentSkills: Schema.NullOr(Schema.mutable(Schema.Array(AgentSkillSchema))),
+    factory: Schema.NullOr(Schema.String),
+    layers: StepLayersSchema,
+    hired: Schema.NullOr(Schema.String),
+    hiredIn: Schema.mutable(Schema.Array(Schema.Struct({ factory: Schema.String, agent: Schema.String }))),
+    hiring: Schema.Struct({
+      refused: Schema.NullOr(Schema.String),
+      agents: Schema.mutable(Schema.Array(Schema.Struct({ name: Schema.String, description: Schema.NullOr(Schema.String) }))),
+    }),
+    skillsFrom: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          name: Schema.String,
+          from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'shipped'])),
+          foundIn: Schema.NullOr(Schema.String),
+        }),
+      ),
+    ),
+    recentRuns: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          id: Schema.String,
+          brief: Schema.String,
+          createdAt: Schema.String,
+          factory: Schema.NullOr(Schema.String),
+          filed: Schema.Boolean,
+        }),
+      ),
+    ),
   }),
-  skillsFrom: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({
-        name: Schema.String,
-        from: Schema.NullOr(Schema.Literals(['yours', 'repo', 'shipped'])),
-        foundIn: Schema.NullOr(Schema.String),
-      }),
-    ),
-  ),
-  recentRuns: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({
-        id: Schema.String,
-        brief: Schema.String,
-        createdAt: Schema.String,
-        factory: Schema.NullOr(Schema.String),
-        filed: Schema.Boolean,
-      }),
-    ),
-  ),
-}) satisfies Schema.Schema<WorkflowStepPage>;
+);
 
 /** The place a workflow's or a step's page is read in, as its address carries it: a factory, and a repository where one is named. */
 export type PagePlace = { factory?: string; repo?: string };
@@ -269,15 +278,11 @@ export const repositoryQuery = queryOptions({
   queryFn: () => get('/api/repository', Schema.Struct({ repo: Schema.String })),
 });
 
-/** What a start answers: the new run — and, for an inbox card, whether the card left the inbox, and why not when it did not. */
-export type Started = { id: string; removed?: boolean; why?: string };
+/** What a start answers: the new run. An inbox card started stays in the inbox, listed as `started`. */
+export type Started = { id: string };
 
-/** Decodes a `Started`: a `removed` or a `why` the api leaves out stays out. */
-const StartedSchema = Schema.Struct({
-  id: Schema.String,
-  removed: Schema.optionalKey(Schema.Boolean),
-  why: Schema.optionalKey(Schema.String),
-}) satisfies Schema.Schema<Started>;
+/** Decodes a `Started`. */
+const StartedSchema = decodes<Started>()(Schema.Struct({ id: Schema.String }));
 
 /**
  * Start a run of a workflow, as the CLI's `start` does: the api writes the run's record and files nothing. Resolves with the new run's id;
@@ -287,7 +292,7 @@ const StartedSchema = Schema.Struct({
  * none.
  *
  * `card` starts an inbox card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does: the record carries where it came from, and the
- * card leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started
+ * card keeps its file, listed as `started` from then on. Refused in the package's words: a card not there, one started
  * already.
  *
  * `place` starts it in a factory, on one of its repositories, as the CLI's `start --factory` does (`placeQuery`): refused in the package's
@@ -318,12 +323,14 @@ const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
 export type WorkflowSaved = { workflow: WorkflowListing; written: string[]; kept: string[]; removed: string[] };
 
 /** Decodes a `WorkflowSaved`. */
-const WorkflowSavedSchema = Schema.Struct({
-  workflow: WorkflowListingSchema,
-  written: StringsSchema,
-  kept: StringsSchema,
-  removed: StringsSchema,
-}) satisfies Schema.Schema<WorkflowSaved>;
+const WorkflowSavedSchema = decodes<WorkflowSaved>()(
+  Schema.Struct({
+    workflow: WorkflowListingSchema,
+    written: StringsSchema,
+    kept: StringsSchema,
+    removed: StringsSchema,
+  }),
+);
 
 /**
  * A write of the builder's the api refused: its sentence, and the steps it names — one, several for a cycle, or none for a refusal of the

@@ -355,7 +355,7 @@ export function listing({
         return { name, status: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'checkout' }), branch };
       return { name, ...unfiled(step, waiting, held), branch };
     }
-    if (waitingAgain.has(name)) return { name, status: 'waiting', ...coded({ reason: 'Pending' }), branch };
+    if (waitingAgain.has(name)) return { name, status: 'pending', ...coded({ reason: 'Pending' }), branch };
 
     const status = refiled.has(name) ? own : stands;
     if (holdsTheRun(status) && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
@@ -414,11 +414,11 @@ export function listing({
  * the limit `held` it for (`slotWord`; `Waiting` on `limit`), or on nothing yet (`Pending`).
  */
 function unfiled(step: Workflow, waits: readonly Wait[], held: RunSlot | undefined): CodedStep & { status: string } {
-  if (step.after.length) return { status: 'waiting', ...coded({ reason: 'Pending' }) };
+  if (step.after.length) return { status: 'pending', ...coded({ reason: 'Pending' }) };
   if (waits.length) return { status: waitWord(waits), ...coded({ reason: 'Waiting', on: 'run' }) };
   return held
     ? { status: slotWord(held), ...coded({ reason: 'Waiting', on: 'limit' }) }
-    : { status: 'waiting', ...coded({ reason: 'Pending' }) };
+    : { status: 'pending', ...coded({ reason: 'Pending' }) };
 }
 
 /** A row's codes: its reason and what qualifies it, and the phase that reason stands in (`codedStep`). */

@@ -521,7 +521,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.equal(listed.workflowDir, good, 'the board lists it, with the folder it was started from');
       assert.deepEqual(
         listed.steps.map((s) => s.status),
-        ['waiting', 'waiting'],
+        ['pending', 'pending'],
       );
     },
   );

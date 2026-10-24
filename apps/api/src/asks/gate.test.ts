@@ -315,10 +315,10 @@ test('a person approves a gate on the board: the need on the list and the detail
         run.steps.map(({ name, status, approve, gate }) => ({ name, status, approve, gate })),
         [
           { name: 'plan', status: 'awaiting approval', approve: 'approve plan', gate: { awaiting: true, approval: null } },
-          { name: 'implement', status: 'waiting', approve: null, gate: null },
-          { name: 'review', status: 'waiting', approve: null, gate: null },
+          { name: 'implement', status: 'pending', approve: null, gate: null },
+          { name: 'review', status: 'pending', approve: null, gate: null },
           { name: 'tokens', status: 'unverified · done', approve: null, gate: null },
-          { name: 'sketch', status: 'waiting', approve: null, gate: { awaiting: false, approval: null } },
+          { name: 'sketch', status: 'pending', approve: null, gate: { awaiting: false, approval: null } },
         ],
         'sketch is gated and not signed off: nothing to approve yet',
       );

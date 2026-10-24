@@ -146,7 +146,7 @@ export function approvalRefusal(
   if (status === 'awaiting approval') return null;
   const then = `Its gate holds once it has signed off${step.check ? ' and passed its check' : ''}: approve it then (nemia ls ${run.id}).`;
   const why: Partial<Record<StepStatus, string>> = {
-    waiting: `${name} has not signed off yet: it has not been filed. ${then}`,
+    pending: `${name} has not signed off yet: it has not been filed. ${then}`,
     running: `${name} has not signed off yet: it is still running. ${then}`,
     checking: `${name} has signed off, and its check is still due or running: a gated step is verified first, then held. Approve it once its check has passed (nemia ls ${run.id}).`,
     blocked: `${name} has not signed off its work: it signed off blocked, so there is nothing to approve. Answer it: nemia retry ${run.id} ${name} --message "<answer>".`,

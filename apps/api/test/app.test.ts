@@ -389,9 +389,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
             reason: 'Pending',
             on: null,
             via: null,
-            message: 'waiting',
+            message: 'pending',
             verdict: null,
-            status: 'waiting',
+            status: 'pending',
             note: null,
             roundDue: false,
             agent: null,
@@ -563,8 +563,8 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       reason: 'Pending',
       on: null,
       via: null,
-      message: 'waiting',
-      status: 'waiting',
+      message: 'pending',
+      status: 'pending',
       check: null,
       closeout: null,
       unreadable: null,
@@ -641,7 +641,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     const run = await listed('r-2');
     assert.deepEqual(
       run.steps.map((s: { status: string }) => s.status),
-      ['succeeded · BLOCKED', 'waiting'],
+      ['succeeded · BLOCKED', 'pending'],
     );
     assert.deepEqual(run.waitingOnYou, ['implement']);
   });
@@ -873,10 +873,10 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       tries: firstTry(originalTry),
       timeline: settledTimeline('t-6'),
     });
-    assert.deepEqual([review.body, review.spec?.after, review.status], ['Review it.', ['replacement'], 'waiting']);
+    assert.deepEqual([review.body, review.spec?.after, review.status], ['Review it.', ['replacement'], 'pending']);
     assert.deepEqual(
       [replacement.body, replacement.taskId, replacement.status, replacement.closeout],
-      ['Do the original thing.', null, 'waiting', null],
+      ['Do the original thing.', null, 'pending', null],
     );
 
     const summary = await listed('r-6');
@@ -884,8 +884,8 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       summary.steps.map((s: { name: string; status: string }) => [s.name, s.status]),
       [
         ['original', 'succeeded · BLOCKED'],
-        ['review', 'waiting'],
-        ['replacement', 'waiting'],
+        ['review', 'pending'],
+        ['replacement', 'pending'],
       ],
     );
     assert.deepEqual(summary.waitingOnYou, ['original']);
@@ -1491,7 +1491,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       ['docs', 'unverified · done'],
       ['notes', 'unsigned'],
       ['plan', 'starting'],
-      ['ship', 'waiting'],
+      ['ship', 'pending'],
     ];
     const detail = await detailOf('r-20');
     const summary = await listed('r-20');
@@ -1599,7 +1599,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       [
         ['a', 'failed ✗ check (exit 1)'],
         ['b', 'starting'],
-        ['c', 'waiting'],
+        ['c', 'pending'],
       ],
       "one root's check refused while its sibling's session still runs, and c, which waits on both, will never be filed",
     );
@@ -1826,7 +1826,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
           [],
           [
             ['implement', 'succeeded · BLOCKED', 'try 2 asked (--nudge) — the next tick files it'],
-            ['review', 'waiting', null],
+            ['review', 'pending', null],
           ],
           'signed off blocked, and a person asked for another try: the next tick files it, and nobody is waited on',
         ],

@@ -53,7 +53,7 @@ const RUN_STATUS = {
 
 /** Every status a step stands at, in the word `nemia ls` prints for it. Exhaustive over `StepStatus`. */
 const STEP_STATUS = {
-  waiting: { word: 'waiting', reason: 'Pending' },
+  pending: { word: 'pending', reason: 'Pending' },
   running: { word: 'running', reason: 'Running' },
   blocked: { word: 'blocked', reason: 'AwaitingAnswer', via: 'closeout' },
   unsigned: { word: 'unsigned', reason: 'Unsigned' },
@@ -105,6 +105,9 @@ const WAIT_WORDS: readonly Case[] = [
   { kind: 'Step', word: waitWord([{ run: 'r-2' }]), reason: 'Waiting', on: 'run' },
   { kind: 'Step', word: waitWord([{ run: 'r-2' }, { run: 'r-3' }]), reason: 'Waiting', on: 'run' },
 ];
+
+/** The words a package before card 4c wrote, which a feed it kept still says: a step not filed was `waiting`. */
+const FORMER_WORDS: readonly Case[] = [{ kind: 'Step', word: 'waiting', reason: 'Pending' }];
 
 /** A run's own lines: its statuses, pruned and not, a hold, who it waits on, and the word of a run the store no longer has. */
 const RUN_LINES: readonly Case[] = [
@@ -161,6 +164,7 @@ const CASES: readonly Case[] = [
   ...PHASE_WORDS,
   ...SAID_WORDS,
   ...WAIT_WORDS,
+  ...FORMER_WORDS,
   ...ONE_SHOTS,
   ...ACT_WORDS,
   ...STORE_LINES,

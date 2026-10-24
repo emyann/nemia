@@ -242,7 +242,7 @@ test('listing of how a step signed off', async (t) => {
       live.steps,
       [
         { name: 'implement', status: 'working', reason: 'Running', phase: 'running', branch: null },
-        { name: 'review', status: 'waiting', reason: 'Pending', phase: 'pending', branch: null },
+        { name: 'review', status: 'pending', reason: 'Pending', phase: 'pending', branch: null },
       ],
       'still running, and never filed',
     );

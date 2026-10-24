@@ -297,7 +297,7 @@ test("listing of a step's check: what the run established, not only what the eng
       closeoutOf: signedOff({ implement: said('done') }),
       askedCloseout: asked,
     });
-    assert.deepEqual(statuses(l), ['failed ✗ check (unfinished)', 'waiting']);
+    assert.deepEqual(statuses(l), ['failed ✗ check (unfinished)', 'pending']);
   });
 });
 

@@ -128,7 +128,7 @@
     },
     {
       "term": "Pending",
-      "meaning": "not filed yet: a step waiting on the steps before it (reason `Pending`), or held back by a thing (reason `Waiting`, `on` a run, the limit, the checkout or the pause).",
+      "meaning": "not filed yet: a step waiting on the steps before it (reason `Pending`, status `pending`), or held back by a thing (reason `Waiting`, `on` a run, the limit, the checkout or the pause).",
       "type": "WaitOn"
     },
     {
@@ -218,7 +218,7 @@
     },
     {
       "term": "Step status",
-      "meaning": "the record's own word for a step, inside the orchestrator: `REASON_OF` maps each to a reason, and the reason is what a door says; it crosses one door still, as the api's `StepRaise.own`.",
+      "meaning": "the record's own word for a step, inside the orchestrator: `REASON_OF` maps each to a reason, and the reason is what a door says; it crosses one door still, as the api's `StepRaise.own`. A step not filed is `pending`, as its reason says; it was `waiting` before card 4c, and a feed line of then still reads as `Pending`.",
       "type": "StepStatus",
       "see": {
         "label": "A step",

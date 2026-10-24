@@ -1633,7 +1633,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       const { repo, id, base } = stopped;
       const { ask } = await stage.runWith(e(), retryRun(id, 'review', { mode: 'nudge', message: 'take main, and keep both subs working' }));
       assert.deepEqual([ask.step, ask.try], ['review', 2]);
-      assert.equal(await statusOf(id, 'ship'), 'waiting', 'between the ask and the pass, the ending reads as waiting for the work');
+      assert.equal(await statusOf(id, 'ship'), 'pending', 'between the ask and the pass, the ending reads as waiting for the work');
       const sent = await at.pass(id);
       assert.deepEqual([sent.tried, sent.filed], [['review'], []], 'the reviewer is filed again, and the ending is not');
       assert.deepEqual(filedAs(readRun(id).steps.ship), {
@@ -1751,7 +1751,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       settle(`${id}-review-try2`, 'succeeded', { ...SIGNED, again: true });
       const spent = await at.pass(id);
       assert.deepEqual([spent.looped, spent.filed], [[], []], "at rounds: 1 the loop's only round was spent before ship ran");
-      assert.deepEqual([await statusOf(id, 'review'), await statusOf(id, 'ship')], ['rounds exhausted', 'waiting']);
+      assert.deepEqual([await statusOf(id, 'review'), await statusOf(id, 'ship')], ['rounds exhausted', 'pending']);
       await assert.rejects(stage.runWith(e(), approveRun(id, 'ship')), refusedNaming(), 'and no approval is taken while the work is out');
       const { ask } = await stage.runWith(e(), roundRun(id, 'review'));
       assert.equal(ask.round, 2, 'a person takes the loop once more');
@@ -1860,7 +1860,7 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
       const { repo, id } = await at.atTheCap();
       assert.deepEqual(
         [await statusOf(id, 'review'), await statusOf(id, 'ship')],
-        ['rounds exhausted', 'waiting'],
+        ['rounds exhausted', 'pending'],
         'it never reaches its gate',
       );
       await assert.rejects(stage.runWith(e(), approveRun(id, 'ship')), refusedNaming('ship is not at its gate yet'));

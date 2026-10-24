@@ -126,7 +126,7 @@ export function assess(
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf);
   for (const name of roundSpans(steps, round)) if (status.get(name) === 'over budget') status.set(name, stood.get(name)!.own);
   for (const r of round) status.set(r.step, 'running');
-  for (const name of unheld(steps, run, retry, round)) status.set(name, 'waiting');
+  for (const name of unheld(steps, run, retry, round)) status.set(name, 'pending');
   const ready: string[] = [];
   const check: string[] = [];
   const unreachable: string[] = [];
@@ -134,8 +134,8 @@ export function assess(
   for (const step of steps) {
     const own = status.get(step.name)!;
     if (own === 'checking' && !run.steps[step.name]?.check) check.push(step.name);
-    if (own !== 'waiting') continue;
-    const deps = step.after.map((a) => status.get(a) ?? 'waiting');
+    if (own !== 'pending') continue;
+    const deps = step.after.map((a) => status.get(a) ?? 'pending');
     if (deps.some(stopsFollowers)) unreachable.push(step.name);
     else if (!deps.every(satisfiesAfter)) continue;
     else if (waitsOnCheckout(steps, step.name, checkout)) waitingOnCheckout.push(step.name);
@@ -151,7 +151,7 @@ export function assess(
 
   if (run.hold)
     return { ready: [], check: [], retry: [], round: [], unreachable, waitingOnCheckout: [], status: 'running', heldUntil: run.hold.until };
-  const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'waiting', standings);
+  const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'pending', standings);
   const assessed: Assessment = {
     ready,
     check,

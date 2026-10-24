@@ -132,7 +132,7 @@ export type CodedRun = QualifiedRun & { phase: RunPhase };
  * added to `StepStatus` fails the typecheck here until it has a reason.
  */
 export const REASON_OF: Record<StepStatus, QualifiedStep> = {
-  waiting: { reason: 'Pending' },
+  pending: { reason: 'Pending' },
   running: { reason: 'Running' },
   blocked: { reason: 'AwaitingAnswer', via: 'closeout' },
   unsigned: { reason: 'Unsigned' },

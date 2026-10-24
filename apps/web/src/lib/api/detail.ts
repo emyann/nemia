@@ -65,7 +65,7 @@ const SaidSchema = decodes<Said>()(
 
 /** Mirrors `StepStatus` in agent-orchestrator's record/record.ts: a step's word, as the package and the CLI's `ls` say it. */
 export type StepStatus =
-  | 'waiting'
+  | 'pending'
   | 'running'
   | 'blocked'
   | 'unsigned'
@@ -84,7 +84,7 @@ export type StepStatus =
 /** Decodes a `StepStatus`. */
 const StepStatusSchema = decodes<StepStatus>()(
   Schema.Literals([
-    'waiting',
+    'pending',
     'running',
     'blocked',
     'unsigned',

@@ -300,7 +300,7 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
       [
         ['verified ✓', 'round 3 of 3'],
         ['rounds exhausted', 'round 3 of 3, and it asked again — once more: nemia round r-1 review'],
-        ['waiting', undefined],
+        ['pending', undefined],
       ],
     );
     assert.deepEqual(l.waitingOnYou, ['review']);
@@ -369,7 +369,7 @@ test("a person's `nemia accept` ends a loop out of rounds on their word, as if i
       [
         ['verified ✓', 'round 3 of 3'],
         ['unverified · done', 'round 3 of 3, and it asked again — accepted as it stands at 2026-09-20T14:05:00.000Z, its findings open'],
-        ['waiting', undefined],
+        ['pending', undefined],
       ],
     );
     assert.deepEqual(l.waitingOnYou, []);
@@ -1070,7 +1070,7 @@ test("`nemia ls`' costs: each step's tries' beside its word once measured, and t
           note: 'try 3 due — retries: 2, 1 spent',
           cost: '$2.25',
         },
-        { name: 'review', status: 'waiting', reason: 'Pending', phase: 'pending', branch: null },
+        { name: 'review', status: 'pending', reason: 'Pending', phase: 'pending', branch: null },
         '$2.25',
       ],
     );
@@ -1376,7 +1376,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
   await t.test('both read over budget; no round, and ship not filed', () => {
     assert.deepEqual(
       BUDGETED_LOOP.map((s) => stepStatus(s, r, ALL_SUCCEEDED, said, asked, BUDGETED_LOOP, spent)),
-      ['over budget', 'over budget', 'waiting'],
+      ['over budget', 'over budget', 'pending'],
     );
     const a = assessedInLoop(BUDGETED_LOOP, r, said, { spent });
     assert.deepEqual([a.round, a.ready, a.unreachable, a.status], [[], [], ['ship'], 'blocked']);
@@ -1391,7 +1391,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
           'over budget — implement $4.25 of $3',
           'round 1 of 3, and it asked again, past a budget — once more: nemia round r-1 review --budget <amount>',
         ],
-        ['waiting', undefined],
+        ['pending', undefined],
       ],
     );
     assert.deepEqual(l.waitingOnYou, ['implement', 'review']);
@@ -1468,7 +1468,7 @@ test('a round asked past a budget holds no step of its loop on the pass before i
     );
     assert.deepEqual([raised.a.status, raised.a.ready, raised.a.unreachable], ['running', [], []]);
     assert.deepEqual(roundSpans(BUDGETED_LOOP, raised.a.round), new Set(['implement', 'review']));
-    assert.deepEqual(raised.words, ['verified ✓', 'unverified · done', 'waiting']);
+    assert.deepEqual(raised.words, ['verified ✓', 'unverified · done', 'pending']);
     assert.ok(!raised.words.some((w) => w.startsWith('over budget')), raised.words.join(' | '));
     assert.deepEqual(raised.l.waitingOnYou, []);
     assert.deepEqual(
@@ -1497,7 +1497,7 @@ test('a round asked past a budget holds no step of its loop on the pass before i
       assert.deepEqual(
         [held.words, held.l.waitingOnYou],
         [
-          ['over budget $4.25 of $3', 'over budget — implement $4.25 of $3', 'waiting'],
+          ['over budget $4.25 of $3', 'over budget — implement $4.25 of $3', 'pending'],
           ['implement', 'review'],
         ],
       );
@@ -1513,7 +1513,7 @@ test('at the cap and past a budget: rounds exhausted, its once more asking for `
   await t.test('exhausted, not over budget; both offers, the round with `--budget`', () => {
     assert.deepEqual(
       BUDGETED_LOOP.map((s) => stepStatus(s, r, ALL_SUCCEEDED, said, asked, BUDGETED_LOOP, spent)),
-      ['verified', 'exhausted', 'waiting'],
+      ['verified', 'exhausted', 'pending'],
     );
     const d = decidedInLoop(BUDGETED_LOOP, r, said, { spent });
     assert.deepEqual(d.kind === 'awaiting' && [d.exhausted, d.overBudget], [['review'], []]);
@@ -1545,10 +1545,10 @@ test("an accepted loop is over nobody's budget: no step of it is held, since no 
   await t.test('no step held, nobody waited on, and ship filed', () => {
     assert.deepEqual(
       BUDGETED_LOOP.map((s) => stepStatus(s, r, ALL_SUCCEEDED, said, asked, BUDGETED_LOOP, spent)),
-      ['verified', 'unverified', 'waiting'],
+      ['verified', 'unverified', 'pending'],
     );
     const l = listedInLoop(BUDGETED_LOOP, r, said, { spent });
-    assert.deepEqual([l.steps.map((s) => s.status), l.waitingOnYou], [['verified ✓', 'unverified · done', 'waiting'], []]);
+    assert.deepEqual([l.steps.map((s) => s.status), l.waitingOnYou], [['verified ✓', 'unverified · done', 'pending'], []]);
     assert.deepEqual(assessedInLoop(BUDGETED_LOOP, r, said, { spent, verdict: () => undefined }).ready, ['ship']);
   });
 });

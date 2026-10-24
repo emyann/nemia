@@ -144,7 +144,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
       child,
       'unknown',
       waits,
-      ['waiting on p-1 (cancelled)', 'waiting on p-1 (cancelled)', 'waiting'],
+      ['waiting on p-1 (cancelled)', 'waiting on p-1 (cancelled)', 'pending'],
       waits,
     ],
     [
@@ -152,7 +152,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
       child,
       'unknown',
       undefined,
-      ['waiting', 'waiting', 'waiting'],
+      ['pending', 'pending', 'pending'],
       undefined,
     ],
     [
@@ -160,7 +160,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
       { ...child, cancelledAt: '2026-09-14T11:00:00Z' },
       'unknown',
       waits,
-      ['waiting', 'waiting', 'waiting'],
+      ['pending', 'pending', 'pending'],
       [],
     ],
     [
@@ -168,7 +168,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
       run({ a: 't1', b: null, c: null }, { after: ['p-1'] }),
       'running',
       waits,
-      ['running', 'waiting', 'waiting'],
+      ['running', 'pending', 'pending'],
       [],
     ],
   ];

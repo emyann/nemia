@@ -580,7 +580,7 @@ test("a checked step, from its check's filing to `retries:` spent and the run wa
     const l = await stage.runWith(b.e, list(b.e, readRun(id())));
     assert.deepEqual(
       l.steps.map((x) => x.status),
-      ['failed ✗ check (exit 1)', 'waiting'],
+      ['failed ✗ check (exit 1)', 'pending'],
     );
     assert.deepEqual([l.waitingOnYou, l.steps[0].note], [['implement'], 'try 2, by retries: 1']);
     const { decision: d, checks } = await stage.runWith(b.e, decideRun(id()));

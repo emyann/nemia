@@ -1,7 +1,7 @@
 /**
  * Nemia's folder in the store, `$WF_ROOT/nemia/`: the person's level (`level.json`, written by `nemia level` alone), her memory
  * (`memory/`, written by her session alone, read here), the instruction her session is filed with (`prompt.md`, composed by the keeper),
- * the custom words she was last filed or told with (`told.json`, the keeper's record), and what ships with her in the package's `nemia/`
+ * the custom words she was last filed or told with (`told.json`, the keeper's record), and what is built in with her in the package's `nemia/`
  * folder: her definition (`nemia.md`) and her skills.
  *
  * Beneath the controllers, beside `subscription.store.ts`: it imports no store of runs.
@@ -32,13 +32,13 @@ export const memoryDir = (): string => path.join(nemiaDir(), 'memory');
 /** The person's level, written by `nemia level`. */
 export const levelFile = (): string => path.join(nemiaDir(), 'level.json');
 
-/** The instruction her session is filed with: what ships, then the person's custom words. */
+/** The instruction her session is filed with: what is built in, then the person's custom words. */
 export const promptFile = (): string => path.join(nemiaDir(), 'prompt.md');
 
 /** The keeper's record of the person's custom words her session was last filed or told with (`ToldCustom`). */
 export const toldFile = (): string => path.join(nemiaDir(), 'told.json');
 
-/** What ships with her: her definition, `nemia.md`, and her skills, `skills/`, a plugin folder. */
+/** What is built in with her: her definition, `nemia.md`, and her skills, `skills/`, a plugin folder. */
 export const SHIPPED_NEMIA = path.join(import.meta.dirname, '..', '..', 'nemia');
 
 /** The file that defines her, frontmatter and instruction. */
@@ -108,7 +108,7 @@ export function readNemia(file: string = nemiaDefinition()): Workflow {
   return step;
 }
 
-/** The package she ships in: its `package.json` names its `nemia`. */
+/** The package she is built into: its `package.json` names its `nemia`. */
 const PACKAGE = path.join(import.meta.dirname, '..', '..');
 
 /** A path's real path, or undefined where it is not there. */
@@ -209,7 +209,7 @@ export function readTold(): ToldCustom | undefined {
 }
 
 /**
- * Writes the instruction her session is filed with (`promptFile`): her shipped instruction, then the person's custom words for her from
+ * Writes the instruction her session is filed with (`promptFile`): her builtin instruction, then the person's custom words for her from
  * the store `home`, where there are any, and records those words (`writeTold`). Answers the file.
  */
 export function composePrompt(body: string, home: string = ROOT): string {
@@ -259,7 +259,7 @@ export function readFact(name: string): string {
 
 /**
  * The allow rules a person gave her session at a prompt ("don't ask again"), written in her folder's local settings: what widens her
- * level beyond what ships. None where the file is not there or holds none.
+ * level beyond what is built in. None where the file is not there or holds none.
  */
 export function promptAllows(): string[] {
   let raw: unknown;

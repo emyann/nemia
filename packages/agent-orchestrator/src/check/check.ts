@@ -49,7 +49,7 @@ import type { Workflow } from '../step/step.ts';
  * of this number.
  *
  * Longer than `LANDING_CHECK_DEADLINE_SECONDS`, rightly: a round's check pushes a commit and waits on GitHub, which a landing's does
- * not. A constant rather than a step key: every shipped check is the same command family and none needs another number.
+ * not. A constant rather than a step key: every check of this repository's team is the same command family and none needs another number.
  */
 export const CHECK_DEADLINE_SECONDS = 3300;
 
@@ -64,7 +64,7 @@ export const CHECK_DEADLINE_SECONDS = 3300;
  * to five minutes, is 2700.
  *
  * The e2e grows by a page at a time, so the number is measured again the same way whenever a passing landing check takes more than half
- * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one shipped command family lands, and a round's check is
+ * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one command family of this repository's team lands, and a round's check is
  * measured on its own.
  */
 export const LANDING_CHECK_DEADLINE_SECONDS = 2700;

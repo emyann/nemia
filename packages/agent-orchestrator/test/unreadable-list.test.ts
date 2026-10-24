@@ -24,7 +24,7 @@ fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
 process.env.WF_ROOT = ROOT;
 process.env.WF_MAX_RUNS = '4';
 const { main } = await import('../src/cli/main.ts');
-const { gitPlaceLayer } = await import('../src/place/shipped.store.ts');
+const { gitPlaceLayer } = await import('../src/place/builtin.store.ts');
 const runPlaced = runGiven(gitPlaceLayer);
 const { passStanding } = await import('../src/standing/standing.verb.ts');
 const { listRuns } = await import('../src/record/record.store.ts');

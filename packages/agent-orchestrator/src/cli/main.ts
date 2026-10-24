@@ -42,7 +42,7 @@ import {
   runMain,
   tickRun,
   runWith,
-  shippedGitPlace,
+  builtinGitPlace,
   PlaceService,
   storeRootLayer,
   wfRoot,
@@ -421,7 +421,7 @@ export async function main(
   argv: string[],
   given?: Engine,
   demand: () => DemandHost = liveDemandHost,
-  place: Place = shippedGitPlace,
+  place: Place = builtinGitPlace,
 ): Promise<void> {
   const named = namedIn(argv);
   if (named === undefined) return console.log(HELP);

@@ -136,7 +136,7 @@ export function writeProposed(home: string, agent: string, proposed: Proposed): 
 
 /**
  * Confirms the rule `id` for `agent` in the store `home` at `now`, as the person read it in `words`: the rule it proposed, or the rule
- * that ships (`default`), added to the person's list, which a first confirm seeds with the rule that ships. The list written. Refused,
+ * that is built in (`default`), added to the person's list, which a first confirm seeds with the builtin rule. The list written. Refused,
  * writing nothing: a rule it did not propose (`Missing`), one whose words are no longer `words`, proposed again since (`Conflict`), and one
  * in force already (`Conflict`).
  */
@@ -159,7 +159,7 @@ export function confirmRule(home: string, agent: string, id: string, words: stri
 }
 
 /**
- * Drops the rule `id` from the person's list for `agent` in the store `home` at `now`, the rule that ships among them while they confirmed
+ * Drops the rule `id` from the person's list for `agent` in the store `home` at `now`, the builtin rule among them while they confirmed
  * none. The list written. Refused, writing nothing: a rule not in force (`Missing`).
  */
 export function dropRule(home: string, agent: string, id: string, now: Date): Confirmed {

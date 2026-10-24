@@ -444,7 +444,7 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  * A step as its file: the frontmatter, with the keys the step sets in `STEP_KEYS`' order, each written as the parser reads it — a list as
  * `a, b`, a count and a budget as the number, a context window in its one canonical form (`contextText`: `200k`, however it was written),
  * `output:` as the file it names — then the body. The inverse of `parseWorkflow`: a step it
- * read renders to a file it reads back as the same step, which `test/workflow.test.ts` holds over every shipped folder. Pure.
+ * read renders to a file it reads back as the same step, which `test/workflow.test.ts` holds over every folder of this repository's team. Pure.
  *
  * The frontmatter is written as YAML (`renderFrontmatter`): a value plain where it reads back the same, quoted where it would not, and a
  * literal block (`|-`) for one with a line break or too long to read on one line, as a long shell `check:` is.

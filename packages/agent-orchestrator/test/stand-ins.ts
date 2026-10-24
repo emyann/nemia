@@ -70,8 +70,8 @@ const ENTRY = ['agent-orchestrator', `${O}/src/runner.ts`];
 
 /** The real place, as the package ships it. */
 const REAL_PLACE: Names = {
-  modules: [...ENTRY, `${O}/src/place/shipped.store.ts`],
-  names: ['gitPlaceLayer', 'shippedGitPlace', 'shipped'],
+  modules: [...ENTRY, `${O}/src/place/builtin.store.ts`],
+  names: ['gitPlaceLayer', 'builtinGitPlace', 'builtin'],
 };
 
 /** The folder of the git place's code: any value of it is the real place. */

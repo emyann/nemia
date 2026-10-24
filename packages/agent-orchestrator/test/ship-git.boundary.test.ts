@@ -60,7 +60,7 @@ const { main } = await import('../src/cli/main.ts');
 type PlaceVerb = import('../src/place/place.ts').PlaceVerb;
 const { gitPlace } = await import('../place/git/place.ts');
 const { stagedHere, landingDenies, landingWords } = await import('../src/place/landing.store.ts');
-const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
+const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
 type Place = import('../src/place/place.store.ts').Place;
 const { filedDenies } = await import('../src/ending/ending.ts');
 const { landingContract } = await import('../src/check/check.ts');
@@ -869,8 +869,8 @@ test("a semantic merge whose check's output the engine cannot give is filed all 
 });
 
 test('REFUSED: a landing session is denied and told what its place says — a planted place that denies `hg commit` gives exactly that, and no git word', async () => {
-  const say = { ...shippedGitPlace.declared.say, stage: 'hg -R {repo} merge {branches}' };
-  const place: Place = { ...shippedGitPlace, declared: { denyWhileLanding: ['Bash(hg commit:*)'], say } };
+  const say = { ...builtinGitPlace.declared.say, stage: 'hg -R {repo} merge {branches}' };
+  const place: Place = { ...builtinGitPlace, declared: { denyWhileLanding: ['Bash(hg commit:*)'], say } };
   const { id, repo, branch } = await atTheGate();
   const run = readRun(id);
   const ship = stepsOf(run).find((s) => s.name === 'ship')!;

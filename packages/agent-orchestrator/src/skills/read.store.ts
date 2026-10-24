@@ -56,16 +56,16 @@ export function entriesOf(dir: string): string[] {
   }
 }
 
-/** The folder of the place skills the package ships (`place/<name>`), each a skill an agent may give where no root holds its name. */
+/** The folder of the package's builtin place skills (`place/<name>`), each a skill an agent may give where no root holds its name. */
 export const PLACE_SKILLS = path.join(import.meta.dirname, '..', '..', 'place');
 
-/** Whether the skill folder `dir` is a place skill the package ships (`PLACE_SKILLS`). */
-export const isShippedPlace = (dir: string): boolean => path.dirname(path.resolve(dir)) === path.resolve(PLACE_SKILLS);
+/** Whether the skill folder `dir` is a builtin place skill of the package (`PLACE_SKILLS`). */
+export const isBuiltinPlace = (dir: string): boolean => path.dirname(path.resolve(dir)) === path.resolve(PLACE_SKILLS);
 
 /** Whether `dir` holds a skill: a `SKILL.md` that is a file. */
 const holdsSkill = (dir: string): boolean => fs.statSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() === true;
 
-/** The names of the place skills the package ships: each folder of `PLACE_SKILLS` that holds a skill. */
+/** The names of the package's builtin place skills: each folder of `PLACE_SKILLS` that holds a skill. */
 const placeSkills = (): string[] => entriesOf(PLACE_SKILLS).filter((name) => holdsSkill(path.join(PLACE_SKILLS, name)));
 
 /** Whether the folders `a` and `b` are one folder by real path; false where either cannot be reached. */
@@ -89,7 +89,7 @@ function inBoth(name: string, first: string, root: string): WorkflowError | unde
   );
 }
 
-/** The skills of the roots `roots`, by bare name, each the folder it is or its refusal, a place skill the package ships found last. */
+/** The skills of the roots `roots`, by bare name, each the folder it is or its refusal, a builtin place skill found last. */
 function rootSkills(roots: readonly string[]): Map<string, string | WorkflowError> {
   const found = new Map<string, { at: string; dir: string | WorkflowError }>();
   for (const root of roots) {
@@ -158,7 +158,7 @@ function folderSkill(written: string, given: Required<GivenSkill>, repo: string 
  * Every skill a workflow's agents may give. `all` is each name of the folders looked in (`lookupRoots`): the folder it is —
  * `<root>/skills/<name>`, holding a `SKILL.md` — or its refusal: a link in it that is not followed (`skillLinkRefusal`), rules that do
  * not read, or a name one repository has in both `workflows/skills/` and `.claude/skills/` as two folders. One folder under both, the
- * one a link to the other, is one skill, given from the first. The first root that has a name wins, and a place skill the package ships
+ * one a link to the other, is one skill, given from the first. The first root that has a name wins, and a builtin place skill
  * (`PLACE_SKILLS`) is found last, where no root has its name. `at` answers a bare name from `all`, and a skill named with its folder
  * (`givenSkillOf`) from that folder of the repository `places.repo` alone (`folderSkill`), read when it is first asked and never by a
  * walk: a bare name is never a nested folder's. The roots and the package's place folder are named for the refusal of a name none has

@@ -16,7 +16,7 @@ import { factoryNameRefusal } from '../factory/factory.ts';
 import { firstRefusal } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { factoryServerRefusal, serverNameRefusal } from './servers.ts';
-import type { FactoryServer, FactoryServers, FactoryServersFile, ShippedServer } from './servers.ts';
+import type { FactoryServer, FactoryServers, FactoryServersFile, BuiltinServer } from './servers.ts';
 
 /**
  * One server a factory records: its wire facts — `type`, `url`, `headers` — and the facts of the OAuth client it signs in through,
@@ -107,20 +107,20 @@ export function writeFactoryServers(home: string, name: string, servers: Factory
 }
 
 /**
- * The servers Nemia ships, by name: each `<name>.json` of `dir` that reads as one, in the folder's order. The folder is data in a
+ * Nemia's builtin servers, by name: each `<name>.json` of `dir` that reads as one, in the folder's order. The folder is data in a
  * checkout (`workflows/servers/`), not the store, so `dir` is the caller's to name and no root is read here.
  *
- * An absent folder is an empty list, never a throw — git commits no empty directory, and there is no shipped server today — and a
- * file that does not read is left out rather than failing the read, since one bad shipped file must not blank the add form.
+ * An absent folder is an empty list, never a throw — git commits no empty directory, and there is no builtin server today — and a
+ * file that does not read is left out rather than failing the read, since one bad builtin file must not blank the add form.
  */
-export const shippedServers = (dir: string): readonly ShippedServer[] => {
+export const builtinServers = (dir: string): readonly BuiltinServer[] => {
   let files: string[];
   try {
     files = fs.readdirSync(dir).filter((f) => f.endsWith('.json'));
   } catch {
     return [];
   }
-  return files.flatMap((file): ShippedServer[] => {
+  return files.flatMap((file): BuiltinServer[] => {
     const name = file.slice(0, -'.json'.length);
     if (serverNameRefusal(name) !== undefined) return [];
     let read: unknown;

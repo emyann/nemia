@@ -1,7 +1,7 @@
 /**
  * What a person lets an agent answer unasked at `auto`, as rules the machinery holds: a rule (`AutoRule`) names an answer, the steps it
  * covers and the conditions it needs (`CONDITIONS`), judged on a run's facts at the moment of the call (`Facts`, `allowedBy`); the rule
- * that ships, decide when all agree (`DEFAULT_AUTO`); the list in force (`listInForce`); a rule in the person's words, made from its fields
+ * that is built in, decide when all agree (`DEFAULT_AUTO`); the list in force (`listInForce`); a rule in the person's words, made from its fields
  * (`ruleWords`); and the refusal of a rule that is none (`ruleRefusal`).
  *
  * Pure, and naming no agent: admission reads a list for whichever agent it is given (`admissionOf`). The files are `auto.store.ts`'s, the
@@ -27,7 +27,7 @@ export type AutoAnswer = (typeof AUTO_ANSWERS)[number];
 /**
  * A rule: its `id`; the `answer` it gives unasked; the `steps` it covers, by name, every step where absent; the conditions it needs
  * (`when`), all of them; a dollar line the run's spend stays under (`under`), none where absent; and where it came from (`from`): the
- * default that ships, or an agent's proposal the person confirmed.
+ * builtin default, or an agent's proposal the person confirmed.
  */
 export type AutoRule = {
   id: string;
@@ -54,13 +54,13 @@ export const NO_FACTS: Facts = {
 /** The folder of the store the rules for auto are kept in, one writer to each of its files (`auto.store.ts`). */
 export const AUTO_FOLDER = 'auto';
 
-/** The id of the rule that ships. */
+/** The id of the builtin rule. */
 export const DEFAULT_ID = 'default';
 
-/** The rule that ships, decide when all agree: approve any step unasked when every condition holds. */
+/** The builtin rule, decide when all agree: approve any step unasked when every condition holds. */
 export const DEFAULT_AUTO: AutoRule = { id: DEFAULT_ID, answer: 'approve', when: [...CONDITIONS], from: 'default' };
 
-/** The list in force: the rule that ships while the person has confirmed none, else their confirmed list, which replaces it. Pure. */
+/** The list in force: the builtin rule while the person has confirmed none, else their confirmed list, which replaces it. Pure. */
 export const listInForce = (confirmed: readonly AutoRule[] | undefined): AutoRule[] =>
   confirmed === undefined ? [DEFAULT_AUTO] : [...confirmed];
 
@@ -135,7 +135,7 @@ export function ruleRefusal(rule: unknown, at: string): string | undefined {
   const r = rule as Record<string, unknown>;
   if (typeof r.id !== 'string' || !/^[a-z0-9][a-z0-9-]*$/.test(r.id))
     return `${at}: id is a name of lowercase letters, digits and dashes; ${JSON.stringify(r.id)} is not.`;
-  if (r.id === DEFAULT_ID) return `${at}: the id ${DEFAULT_ID} is the rule that ships: give the rule an id of its own.`;
+  if (r.id === DEFAULT_ID) return `${at}: the id ${DEFAULT_ID} is the builtin rule: give the rule an id of its own.`;
   if (!(AUTO_ANSWERS as readonly unknown[]).includes(r.answer))
     return `${at}: answer is one of ${AUTO_ANSWERS.join(', ')}; ${JSON.stringify(r.answer)} is not one a rule may give unasked.`;
   return shapeRefusal(r, at);

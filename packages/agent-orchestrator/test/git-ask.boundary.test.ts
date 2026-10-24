@@ -14,7 +14,7 @@ import { Effect, Fiber } from 'effect';
 import { gitPlace } from '../place/git/place.ts';
 import { PLACE_DEADLINE_MS, PLACE_VERBS, type PlaceOutcome, type PlaceVerb } from '../src/place/place.ts';
 import { STOP_GRACE_MS } from '../src/place/place.store.ts';
-import { shippedGitPlace } from '../src/place/shipped.store.ts';
+import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { meteredPass } from '../src/meter/tally.store.ts';
 import { running } from './running.ts';
 import { scratch } from './scratch.ts';
@@ -211,8 +211,8 @@ test('the loop runs other work while git runs: a handoff waits in a filter for a
 test("the shipped place counts each question in the pass's place phase, and each git process it starts, and no other process", async () => {
   const dir = repository();
   const asked = Effect.gen(function* () {
-    const first = yield* shippedGitPlace.ask('seal', { tree: path.join(dir, 'no-such-tree') });
-    const second = shippedGitPlace.askNow('status', { checkout: path.join(dir, 'no-such-checkout'), tips: {} });
+    const first = yield* builtinGitPlace.ask('seal', { tree: path.join(dir, 'no-such-tree') });
+    const second = builtinGitPlace.askNow('status', { checkout: path.join(dir, 'no-such-checkout'), tips: {} });
     return [first, second];
   });
   const none = await Effect.runPromise(meteredPass(asked));
@@ -221,8 +221,8 @@ test("the shipped place counts each question in the pass's place phase, and each
   assert.equal(none.tallies.kinds.place.spawned, 0, 'and a question git is not asked for starts no process at all');
 
   const two = Effect.gen(function* () {
-    yield* shippedGitPlace.ask('open', { root: dir, isolate: false });
-    return shippedGitPlace.askNow('open', { root: dir, isolate: false });
+    yield* builtinGitPlace.ask('open', { root: dir, isolate: false });
+    return builtinGitPlace.askNow('open', { root: dir, isolate: false });
   });
   const counted: string[] = [];
   const bin = scratch('wf-git-place-bin-');

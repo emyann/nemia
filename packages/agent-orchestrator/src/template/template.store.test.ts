@@ -74,8 +74,8 @@ test("the tests' team exports into a folder that passes its check, each part sai
   assert.equal(said.get('agents/reviewer/'), reviewer);
   assert.equal(said.get('skills/review-a-change/'), path.join(repo, 'workflows', 'skills', 'review-a-change'));
   assert.equal(said.get('nemia.yaml hires dev/review: reviewer'), `${path.join(repo, 'workflows', 'dev', 'review.md')}, its agent: line`);
-  assert.match(said.get('skills/git/') ?? '', /left out: a place skill nemia ships/);
-  assert.equal(fs.existsSync(path.join(dir, 'skills', 'git')), false, 'a place skill nemia ships is not carried');
+  assert.match(said.get('skills/git/') ?? '', /left out: a builtin place skill/);
+  assert.equal(fs.existsSync(path.join(dir, 'skills', 'git')), false, 'a builtin place skill is not carried');
   assert.deepEqual(readBack(dir, 'nemia.yaml').spec, {
     version: '0.1.0',
     hires: { 'dev/implement': 'implementer', 'dev/review': 'reviewer', 'dev/ship': 'shipper' },

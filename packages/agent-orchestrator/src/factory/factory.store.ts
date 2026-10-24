@@ -311,7 +311,7 @@ export function treeOf(name: string | undefined): string | undefined {
 /**
  * Whether a start may go to the default factory when it names none and no factory holds its folder, or when it starts a card that names
  * none: only with `WF_DEFAULT_FACTORY_STARTS=1`, which the package's and the api's tests set for the starts they make in scratch folders.
- * Unset, as shipped, every such start is refused.
+ * Unset, by default, every such start is refused.
  */
 export const defaultStartsAllowed = (): boolean => process.env.WF_DEFAULT_FACTORY_STARTS === '1';
 

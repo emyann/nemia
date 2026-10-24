@@ -150,7 +150,7 @@ export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed
   ];
 }
 
-/** The instruction her session is filed with: her shipped instruction `body`, then the person's `custom` words where there are any. */
+/** The instruction her session is filed with: her builtin instruction `body`, then the person's `custom` words where there are any. */
 export const nemiaPrompt = (body: string, custom: string | undefined): string =>
   `${[body.trim(), ...(custom === undefined ? [] : [custom])].join('\n\n')}\n`;
 
@@ -159,7 +159,7 @@ export type ToldCustom = { words?: string };
 
 /**
  * Whether the person's custom words `now` differ from those her session has: those of the keeper's record `told`; where it kept none yet,
- * for a session filed before it kept one, whether her filed instruction `filed` ends with them. Her shipped instruction is never compared,
+ * for a session filed before it kept one, whether her filed instruction `filed` ends with them. Her builtin instruction is never compared,
  * and with no record no removal is owed: whether she had words is unknown. Pure.
  */
 export const customChanged = (told: ToldCustom | undefined, now: string | undefined, filed: string | undefined): boolean =>

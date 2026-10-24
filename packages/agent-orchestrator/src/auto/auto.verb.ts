@@ -17,10 +17,10 @@ import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfi
 export type WordedRule = AutoRule & { words: string };
 
 /**
- * An agent's rules, read: the agent, the file of the person's list, whether the rule that ships is in force for want of one (`isDefault`),
+ * An agent's rules, read: the agent, the file of the person's list, whether the builtin rule is in force for want of one (`isDefault`),
  * the rules in force, what the agent proposed, each rule saying whether it is in force, with the words it keeps as guidance and whether the
- * custom instruction changed since (`stale`), or null for nothing proposed; the custom instruction, or null for none; and the rule that
- * ships, with its words, to be confirmed again (`shipped`).
+ * custom instruction changed since (`stale`), or null for nothing proposed; the custom instruction, or null for none; and the builtin
+ * rule, with its words, to be confirmed again (`builtin`).
  */
 export type AutoList = {
   agent: string;
@@ -35,7 +35,7 @@ export type AutoList = {
     stale: boolean;
   } | null;
   instruction: string | null;
-  shipped: WordedRule;
+  builtin: WordedRule;
 };
 
 /** The agent's name in `args`. */
@@ -72,7 +72,7 @@ export function autoListOf(home: string, agent: string): AutoList {
             stale: proposed.digest !== digestOf(instruction),
           },
     instruction: instruction ?? null,
-    shipped: worded(DEFAULT_AUTO),
+    builtin: worded(DEFAULT_AUTO),
   };
 }
 

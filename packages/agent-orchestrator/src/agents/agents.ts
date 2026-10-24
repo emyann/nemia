@@ -388,7 +388,7 @@ function refuseStale(file: string, draft: AgentDraft): void {
 /**
  * An agent as its file: the frontmatter, its own lines first (`AGENT_OWN_KEYS`) and then each role key it sets, in `AGENT_KEYS`' order, as
  * written; then its instructions. The inverse of `parseAgent`: an agent it read renders to a file it reads back as the same agent, which
- * `test/write-agent.test.ts` holds over every shipped agent. Pure. A file's comments are not on the agent, so a render has none.
+ * `test/write-agent.test.ts` holds over every agent of this repository's team. Pure. A file's comments are not on the agent, so a render has none.
  *
  * As `renderStep`, it judges nothing the parser judges: a value the parser would refuse is written as given, and `writeAgent` parses what
  * it rendered before it writes. Refused here is only what a file cannot hold: a key an agent may not set — `agent:`, a step's wiring, one

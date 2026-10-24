@@ -138,6 +138,11 @@ test('REFUSED: a field on a type the door reaches by a property, an index signat
   ]);
 });
 
+test('REFUSED: a field typed by a type parameter, at each instantiation, whichever the walk reaches first', () => {
+  const door = ['export type Page<K> = { kind: K };', "export type Door = { closed: Page<'a'>; open: Page<string> };"].join('\n');
+  assert.deepEqual(openIn({ 'door.ts': door }), ['door.ts#Page.kind']);
+});
+
 test('a type no door reaches, one under node_modules, and a function’s parameters and answer are not read', () => {
   const door = [
     "import type { Foreign } from 'foreign';",

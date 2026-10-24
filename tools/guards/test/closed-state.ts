@@ -7,7 +7,9 @@
  * A door is each entry of agent-runtime's and agent-orchestrator's `exports` but `./testing` and `./package.json`, read from their
  * `package.json` so a new entry is read with no edit here, and each non-test `.ts` under `apps/api/src`, where the api declares its
  * answers. From each type a door exports the walk goes through unions, intersections, arrays, tuples, index signatures and property
- * types, visiting each named type once, by the file that declares it and its name; it leaves out what is declared under
+ * types, visiting each instantiation of a named type once — `Page<'a'>` and `Page<string>` are each a type of their own, so a field
+ * typed by a type parameter is judged at each — and keying what it finds by the file that declares it and its name; a type that
+ * instantiates itself with ever larger arguments stops at `INSTANTIATIONS` of one name. It leaves out what is declared under
  * `node_modules`, and goes into no function's parameters or answer.
  *
  * A field is keyed `<file>#<Owner>.<path>.<prop>`: the file that declares the named type it sits in, from the root, that type's name,
@@ -44,6 +46,9 @@ export const doors = (root = REPO, listed: readonly string[] = files()): string[
   return [...entries, ...listed.filter(apiDoor).sort()];
 };
 
+/** How many instantiations of one named type the walk enters, at most. */
+const INSTANTIATIONS = 64;
+
 export type Hit = { key: string; file: string; line: number };
 
 /** Whether `type`, null and undefined taken off, is `string` or a union one of whose members is. */
@@ -73,7 +78,8 @@ export const openStates = (files: readonly string[], root: string): { hits: Hit[
 
   const hits = new Map<string, Hit>();
   const visited = new Set<string>();
-  const named = new Set<string>();
+  const named = new Map<string, number>();
+  const entered = new Set<ts.Type>();
   const anonymous = new Set<ts.Type>();
 
   const ours = (symbol: ts.Symbol | undefined): ts.Declaration[] =>
@@ -114,8 +120,10 @@ export const openStates = (files: readonly string[], root: string): { hits: Hit[
 
   const enter = (type: ts.Type, owner: Owner): void => {
     const key = `${owner.file}#${owner.name}`;
-    if (named.has(key)) return;
-    named.add(key);
+    const count = named.get(key) ?? 0;
+    if (entered.has(type) || count >= INSTANTIATIONS) return;
+    entered.add(type);
+    named.set(key, count + 1);
     walk(type, owner, '', true);
   };
 

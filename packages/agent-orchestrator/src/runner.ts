@@ -194,7 +194,7 @@ export {
   queueOrder,
   workflowAt,
 } from './inbox/index.ts';
-export type { InboxCard, InboxListing, QueueStarted, QueueTry } from './inbox/index.ts';
+export type { CardState, InboxCard, InboxListing, QueueStarted, MissedStart } from './inbox/index.ts';
 export {
   DEFAULT_FACTORY,
   factoryLines,

@@ -456,7 +456,7 @@ What it leaves:
 
 - **`mcp:` on a step is shipped.** An agent's file names the servers of the checkout's `.mcp.json` its sessions
   load (`mcp:`), a step's own `mcp:` line adds to them as its `skills:` does, and the runtime leaves the rest of
-  the file out (`checkoutMcp`): a session loads what its agent and its step name and no other. A server only one
+  the file out (`projectMcp`): a session loads what its agent and its step name and no other. A server only one
   repository has is named by the step that needs it, and no agent of this repository's team names one
   (`tools/guards/test/team-portable.test.ts`). The line only adds; one that takes a server of the agent's away is not built.
 - **`--tools` does not narrow a server's tools, measured.** `claude --help` (2.1.270) says the list is "from the
@@ -1597,6 +1597,10 @@ What it leaves:
   held.
 
 ## Shipped: an inbox — cards parked before they are started
+
+*Since superseded in part by "A card keeps its identity after it starts": a start keeps the card, listed as `started` (`CardState`), and
+answers `{ id, card }` with no `removed` or `why`. What this section says of a removal that failed, and of showing its `why` once, is
+history.*
 
 An idea about the project had nowhere to be parked. The unit for one already existed: a card, a workflow and a brief. But a card lived only
 in a plan folder, started whole by `wf plan`, or was started by hand and left where it was. The old hkb parked such a note with
@@ -2841,6 +2845,10 @@ taller than its cell (`CELL_HEIGHT`).
   step, fails a test each.
 
 ## Shipped: the queue — a cap on runs in flight, and cards that start themselves
+
+*Since superseded in part by "A card keeps its identity after it starts": the tick's start keeps the card and takes its `queued:` line off,
+so a card is not started twice because its record names it and its line is gone, not because its removal failed; `QueueTry` is
+`MissedStart`.*
 
 Item 3 of this list, registered 2026-09-16 by the operator: a Factory canvas filled for a week, cards queued, picked whenever a slot frees.
 The workflow layer built its engine with `WF_MAX_CONCURRENT`, named in no document: a cap on sessions per harness, not on runs. Every run

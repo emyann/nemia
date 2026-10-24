@@ -8,7 +8,7 @@ import { CardFrom } from '../components/CardFrom';
 import { Instant } from '../components/Instant';
 import { dropCard, inboxQuery, queueCard, type InboxEntry, type Started } from '../lib/api';
 import { factorySearch, keptBy, shownIn } from '../lib/factories';
-import { cardLines, newestCardsFirst, queuedWord, queueOf, unassigned, type CardRefusal } from '../lib/inbox';
+import { cardLines, newestCardsFirst, queuedWord, queueOf, triedShown, unassigned, type CardRefusal } from '../lib/inbox';
 
 export const Route = createFileRoute('/inbox')({
   validateSearch: factorySearch,
@@ -48,9 +48,9 @@ function InboxPage() {
     <article className="space-y-6">
       <p className="text-body-medium text-muted-foreground">
         An idea parked as a card until you start a workflow on it: a file each in the store&apos;s {code('inbox/')}, as the box below or the
-        command line parks one. Starting a card writes its run&apos;s record as any start does, and removes the card. A card queued starts
-        on its own, on the workflow it names, when the daemon — this api, or the command line&apos;s — has a run slot free: the oldest
-        queued first.
+        command line parks one. Starting a card writes its run&apos;s record as any start does, and keeps the card, listed as started. A
+        card queued starts on its own, on the workflow it names, when the daemon — this api, or the command line&apos;s — has a run slot
+        free: the oldest queued first.
       </p>
       <FileCard shown={factory} />
       <section aria-label="Cards" className="space-y-3">
@@ -100,15 +100,14 @@ function InboxPage() {
  * which opens its start, in its factory or in one picked there, and Remove. Queue on a card that names a factory and a workflow, and
  * Unqueue on a queued one (`QueueButtons`), with why not on a card that names a workflow alone (`NoQueue`); on a queued card its place
  * and when it was queued; and, when the tick tried its start and did not make it, why — a card refused stays queued, as the package keeps
- * it. A card a run's record names — started, its removal failed — links to its run and offers Remove only. An entry that does not read as a
+ * it. A card a run's record names (`state` `started`) links to its run, in rest, and offers Remove only. An entry that does not read as a
  * card shows why, with its file for a title, and offers Remove when it is a card's file, which the CLI's `inbox rm` can drop.
  *
  * Its page shows the body rendered and its keys explained, and for a file that does not read, the file as written. A folder, a name the api
  * refuses, or a stray file a card of the same name answers for has no page (`hasPage`), and its title is its name alone.
  *
- * A start from this page whose card could not be removed is kept (`kept`): the start form goes, since the card may not start again, and the
- * card says it was started as that run, before the inbox is read again and names it, with why its removal failed, in the api's words —
- * which only the start's answer carries, so a later visit says it was started, and not why.
+ * A start from this page is held (`startedNow`) until the inbox read again says the card `started`: the start form goes, since the card may
+ * not start again, and the card says it was started as that run.
  *
  * What its start, drop, queue or unqueue was last refused with is the page's (`refusal`, told through `onRefused`), shown at its foot.
  * Remove, Queue and Unqueue read the inbox again whatever the answer, so a card dropped, queued or started behind the page's back reads as
@@ -128,7 +127,7 @@ function CardItem({
 }) {
   const queryClient = useQueryClient();
   const [starting, setStarting] = useState(false);
-  const [kept, setKept] = useState<{ id: string; why: string } | null>(null);
+  const [startedNow, setStartedNow] = useState<string | null>(null);
   const remove = useMutation({
     mutationFn: () => dropCard(entry.name),
     onMutate: () => onRefused(null),
@@ -141,8 +140,8 @@ function CardItem({
     onError: (error, off) => onRefused({ action: off ? 'unqueue' : 'queue', message: error.message }),
     onSettled: () => void queryClient.invalidateQueries({ queryKey: ['inbox'] }),
   });
-  const startedAs = kept && !entry.startedAs.includes(kept.id) ? [...entry.startedAs, kept.id] : entry.startedAs;
-  const started = startedAs.length > 0;
+  const started = entry.state === 'started' || startedNow !== null;
+  const startedAs = entry.state === 'started' || startedNow === null ? entry.startedAs : [startedNow];
   const startable = !started && entry.error === null;
 
   return (
@@ -203,8 +202,8 @@ function CardItem({
         </div>
       </div>
 
-      {started && <StartedAs startedAs={startedAs} kept={kept} />}
-      {entry.queued && entry.tried && <Tried entry={{ ...entry, tried: entry.tried }} />}
+      {started && <StartedAs startedAs={startedAs} />}
+      {triedShown(entry) && <Tried entry={entry} />}
       {entry.error !== null && (
         <div className="space-y-1 rounded border border-failure bg-failure-container px-3 py-2">
           <p className="text-body-medium font-medium text-on-failure-container">Does not read as a card, so it cannot start:</p>
@@ -214,7 +213,7 @@ function CardItem({
       {starting && startable && (
         <StartCard
           entry={entry}
-          onKept={setKept}
+          onStarted={setStartedNow}
           onRefused={(message) => onRefused(message === null ? null : { action: 'start', message })}
         />
       )}
@@ -223,10 +222,10 @@ function CardItem({
   );
 }
 
-/** The runs a card still in the inbox was started as, each linked, and why its removal failed where this page was told (`kept`). */
-function StartedAs({ startedAs, kept }: { startedAs: readonly string[]; kept: { why: string } | null }) {
+/** The runs a card was started as, each linked: in rest, a started card being no fault and waiting on no one. */
+function StartedAs({ startedAs }: { startedAs: readonly string[] }) {
   return (
-    <p data-started-as className="text-body-medium text-yours">
+    <p data-started-as className="text-body-medium text-muted-foreground">
       Started as{' '}
       {startedAs.map((id, i) => (
         <span key={id}>
@@ -236,35 +235,29 @@ function StartedAs({ startedAs, kept }: { startedAs: readonly string[]; kept: { 
           </Link>
         </span>
       ))}
-      , and still here because its removal failed. Remove drops it; to run the idea again, file it again.
-      {kept && (
-        <span data-kept className="mt-1 block font-mono text-body-small break-all">
-          {kept.why}
-        </span>
-      )}
+      . Remove drops it; to run the idea again, file it again.
     </p>
   );
 }
 
 /**
  * A card's start: in the factory it names (`FactoryCardStart`), or, for a card that names none (`unassigned`), in the factory a person
- * picks first (`UnassignedStart`). A start the api took opens the run's page — unless the card stayed in the inbox, which `onKept` is
- * told of, with why, and
- * the page stays. A refusal is `onRefused`'s to show, since the form may not outlive it.
+ * picks first (`UnassignedStart`). A start the api took is told to `onStarted`, the card staying in the inbox, and opens the run's page.
+ * A refusal is `onRefused`'s to show, since the form may not outlive it.
  */
 function StartCard({
   entry,
-  onKept,
+  onStarted: told,
   onRefused,
 }: {
   entry: InboxEntry;
-  onKept: (kept: { id: string; why: string }) => void;
+  onStarted: (id: string) => void;
   onRefused: (message: string | null) => void;
 }) {
   const navigate = useNavigate();
   const onStarted = (started: Started) => {
-    if (started.removed === false) onKept({ id: started.id, why: started.why ?? 'the api did not say why' });
-    else void navigate({ to: '/runs/$runId', params: { runId: started.id } });
+    told(started.id);
+    void navigate({ to: '/runs/$runId', params: { runId: started.id } });
   };
   return unassigned(entry) ? (
     <UnassignedStart entry={entry} onStarted={onStarted} onRefused={onRefused} />

@@ -278,17 +278,11 @@ export const repositoryQuery = queryOptions({
   queryFn: () => get('/api/repository', Schema.Struct({ repo: Schema.String })),
 });
 
-/** What a start answers: the new run — and, for an inbox card, whether the card left the inbox, and why not when it did not. */
-export type Started = { id: string; removed?: boolean; why?: string };
+/** What a start answers: the new run. An inbox card started stays in the inbox, listed as `started`. */
+export type Started = { id: string };
 
-/** Decodes a `Started`: a `removed` or a `why` the api leaves out stays out. */
-const StartedSchema = decodes<Started>()(
-  Schema.Struct({
-    id: Schema.String,
-    removed: Schema.optionalKey(Schema.Boolean),
-    why: Schema.optionalKey(Schema.String),
-  }),
-);
+/** Decodes a `Started`. */
+const StartedSchema = decodes<Started>()(Schema.Struct({ id: Schema.String }));
 
 /**
  * Start a run of a workflow, as the CLI's `start` does: the api writes the run's record and files nothing. Resolves with the new run's id;
@@ -298,7 +292,7 @@ const StartedSchema = decodes<Started>()(
  * none.
  *
  * `card` starts an inbox card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does: the record carries where it came from, and the
- * card leaves the inbox — `removed` says whether it did, and `why` why not. Refused in the package's words: a card not there, one started
+ * card keeps its file, listed as `started` from then on. Refused in the package's words: a card not there, one started
  * already.
  *
  * `place` starts it in a factory, on one of its repositories, as the CLI's `start --factory` does (`placeQuery`): refused in the package's

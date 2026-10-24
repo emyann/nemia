@@ -1381,7 +1381,7 @@ test(
           const ended = (await Effect.runPromise(engine.view(id))).state.attempts[0];
           assert.notEqual(ended.ended, null, 'ended once read');
           assert.deepEqual(ended.closeout, { outcome: 'blocked', summary: 'WORD.txt is not writable' });
-          assert.equal(ended.stated, true);
+          assert.equal(ended.closedOut, true);
         });
       },
     );
@@ -1445,7 +1445,7 @@ test(
           const report = await Effect.runPromise(engine.tick());
           assert.ok(unreadIn(report) >= 1, JSON.stringify(report.observed));
           const ended = (await Effect.runPromise(engine.view(good))).state.attempts[0];
-          assert.equal(ended.stated, true, 'the sibling is read on the same pass and ends stated');
+          assert.equal(ended.closedOut, true, 'the sibling is read on the same pass and ends stated');
           for (const pass of [1, 2]) {
             await Effect.runPromise(engine.tick());
             assert.equal((await Effect.runPromise(engine.view(bad))).state.attempts[0].ended, null, `pass ${pass}: in flight while unread`);

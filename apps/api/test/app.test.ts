@@ -1078,13 +1078,13 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
         { kind: 'settled', at: later, outcome: settled },
       ]);
     const unsignedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'unsigned' } };
-    quiet('t-8u', { observed: 'done', reason: 'harness', stated: false }, 'succeeded');
+    quiet('t-8u', { observed: 'done', reason: 'harness', closedOut: false }, 'succeeded');
     writeRun({ ...r2, id: 'r-8u', steps: { implement: { taskId: 't-8u', branch: 'wf/r-8u/implement' }, review: { taskId: null } } });
     const unsigned = await detailOf('r-8u');
     assert.deepEqual(
       [unsigned.steps[0].attempts, unsigned.steps[0].status],
       [unsignedWords, 'unsigned'],
-      'a session that ended with no statement its task asked for, stated: false on an end its harness settled, reads unsigned',
+      'a session that ended with no statement its task asked for, closedOut: false on an end its harness settled, reads unsigned',
     );
     quiet('t-8o', { observed: 'failed', reason: 'unsigned' }, 'failed');
     writeRun({ ...r2, id: 'r-8o', steps: { implement: { taskId: 't-8o', branch: 'wf/r-8o/implement' }, review: { taskId: null } } });
@@ -1092,7 +1092,7 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     assert.deepEqual(
       [judgedUnsigned.steps[0].attempts, judgedUnsigned.steps[0].status],
       [unsignedWords, 'unsigned'],
-      'an end the runtime judged unsigned itself reads the same',
+      'an old journal, whose end the runtime judged unsigned itself, reads the same',
     );
 
     const cappedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'budget' } };
@@ -2790,7 +2790,7 @@ test("where a run's time and tokens went, on its list line and its page, and the
       ranTask('r-60-implement', 'codex', T(0), T(0, 12), {
         at: T(19, 54),
         outcome: 'succeeded',
-        more: { closeout: done, usage: { turns: 54, toolCalls: 146 } },
+        more: { closeout: done, usage: { responses: 54, toolCalls: 146 } },
       });
       ranTask('r-60-implement-check', 'check', T(19, 56), T(19, 57), { at: T(20, 55), outcome: 'failed', more: { exitCode: 1 } });
       ranTask('r-60-implement-try2', 'codex', T(21), T(21, 3), { at: T(26, 38), outcome: 'succeeded', more: { closeout: done } });
@@ -2867,8 +2867,8 @@ test("where a run's time and tokens went, on its list line and its page, and the
       assert.deepEqual(
         implement.timeline[0].used,
         {
-          usage: { turns: 54, toolCalls: 146 },
-          used: '54 turns · 146 tool calls · tokens in not measured · tokens out not measured',
+          usage: { responses: 54, toolCalls: 146 },
+          used: '54 responses · 146 tool calls · tokens in not measured · tokens out not measured',
           cost: 'not measured',
           costUsd: null,
           apiMs: null,

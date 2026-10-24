@@ -93,8 +93,8 @@ const memoryJournal = (tasks: Tasks, starts: Map<string, number>): AsyncJournal 
   };
 };
 
-/** What no runtime writes: a `measured` whose turns are a word. */
-const MISWRITTEN = { kind: 'measured', at: '2026-10-04T00:00:00Z', attempt: 1, usage: { turns: 'three' } };
+/** What no runtime writes: a `measured` whose responses are a word. */
+const MISWRITTEN = { kind: 'measured', at: '2026-10-04T00:00:00Z', attempt: 1, usage: { responses: 'three' } };
 
 const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null };
 const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artifacts: [], needs: 'which flag?' };

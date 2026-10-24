@@ -90,7 +90,8 @@ export type Outcome =
   | { by: 'nobody'; words: string };
 
 /**
- * The machine's reason an attempt has no statement, in a sentence each, off the engine's `EndReason` (agent-runtime).
+ * The machine's reason an attempt has no statement, in a sentence each, off the engine's `EndReason` (agent-runtime) — but for
+ * `unsigned`, the orchestrator's end word (`endWords`), no longer one of the engine's: an end without the statement its task asked for.
  * `harness` is not here: a harness's own end is a reason only when it said `failed` or `stopped` (`outcomeOf`).
  */
 export const MACHINE_WORDS: Readonly<Record<string, string>> = {
@@ -111,8 +112,8 @@ const CUT_WORDS: Readonly<Record<string, string>> = {
 
 /**
  * How a try ended and who said so. `none` is what the inspector says of a try with no statement and no reason on the record, and of any
- * reason `MACHINE_WORDS` does not name but a harness's `failed` or `stopped`: the engine reports a harness's `done` with no statement as
- * `unsigned`.
+ * reason `MACHINE_WORDS` does not name but a harness's `failed` or `stopped`: the orchestrator reports a harness's `done` with no statement
+ * as `unsigned` (`endWords`).
  */
 export function outcomeOf(t: Pick<StepTry, 'closeout' | 'unreadable' | 'attempts'>, none: string): Outcome {
   const latest = t.attempts.latest;

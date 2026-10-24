@@ -14,7 +14,7 @@ import { runsMoved } from '@/lib/runWrites';
  *
  * Given a `card`, it starts that inbox card, as the CLI's `start <inbox>/<card>.md --brief <brief>` does: the brief is prefilled with the
  * card's body, to make into the work, and the start is refused in the package's words — a card not there, one started already. `onStarted`
- * is told of a start the api took, and whether its card left the inbox (`removed`, and `why` not), which the caller shows; the Workflows
+ * is told of a start the api took, the card staying in the inbox as `started`, which the caller shows; the Workflows
  * page gives none, and says where the run is itself. `repo` is where the run starts, when the card names a repository: what the runs to
  * wait on are listed from. A card's start sits under the workflow it picks, with no rule of its own above it. `place` starts it in a
  * factory, on one of its repositories, which `repo` then is too.
@@ -26,9 +26,10 @@ import { runsMoved } from '@/lib/runWrites';
  * list of runs again alone (`exact`): a prefix would reach every run's decision, which is keyed by the run's state and read again under a
  * key of its own.
  *
- * A card's inbox is read again after any answer to its start. Taken, the card leaves it; refused, it may have left behind the page's back —
- * a 404 for a card dropped, a 409 for one started — and this form with it. So the caller given `onRefused` shows the refusal where it
- * outlives the form, told the api's words, and null when the start is asked again; the form then shows none of its own.
+ * A card's inbox is read again after any answer to its start. Taken, the card stays in it, `started`; refused, it may have left or
+ * started behind the page's back — a 404 for a card dropped, a 409 for one started — and this form with it. So the caller given
+ * `onRefused` shows the refusal where it outlives the form, told the api's words, and null when the start is asked again; the form then
+ * shows none of its own.
  */
 export function StartRun({
   workflow,
@@ -154,7 +155,7 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
 
 /**
  * Where a start runs: in folders, for a team whose every step works in one, else on `repo` — this repository when none is given — and in
- * `factory` when one is named; from the workflow's folder; and, for a card, that it leaves the inbox.
+ * `factory` when one is named; from the workflow's folder; and, for a card, that it stays in the inbox, listed as started.
  */
 function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; repo?: string; factory?: string; card: boolean }) {
   return (
@@ -171,7 +172,7 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; r
         </>
       )}
       , from <code className="font-mono break-all">{workflow.dir}</code>
-      {card && ', and the card leaves the inbox'}.
+      {card && ', and the card stays in the inbox, listed as started'}.
     </span>
   );
 }

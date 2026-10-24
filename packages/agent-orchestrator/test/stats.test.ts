@@ -148,7 +148,7 @@ writeRun(
   { factory: 'other', repo: '/repos/two', workspace: '/repos/two' },
 );
 
-tasks.set('spoilt-build', [{ kind: 'measured', at: at(1), attempt: 1, usage: { turns: 'three' } }]);
+tasks.set('spoilt-build', [{ kind: 'measured', at: at(1), attempt: 1, usage: { responses: 'three' } }]);
 writeRun('spoilt', [{ name: 'build', after: [], body: 'Build it.' }], { build: { taskId: 'spoilt-build' } });
 
 const REVIEWED = '/repos/one/workflows/review';
@@ -169,7 +169,7 @@ function reviewRun(id: string, createdAt: string, text?: string, taskId?: string
   fs.writeFileSync(path.join(dir, 'SKILL.md'), `---\nname: ${SKILL}\ndescription: Review a change.\n---\n${text}\n`);
 }
 
-tasks.set('marks-2-review', [{ kind: 'measured', at: at(1), attempt: 1, usage: { turns: 'three' } }]);
+tasks.set('marks-2-review', [{ kind: 'measured', at: at(1), attempt: 1, usage: { responses: 'three' } }]);
 reviewRun('marks-1', '2026-09-25T08:00:00.000Z', 'Read the diff.');
 reviewRun('marks-2', '2026-09-25T23:59:00.000Z', 'Read the diff, then run the suite.', 'marks-2-review');
 reviewRun('marks-3', '2026-09-26T08:00:00.000Z', 'Read the diff, then run the suite.');

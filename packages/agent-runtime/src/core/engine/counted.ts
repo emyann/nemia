@@ -10,7 +10,7 @@ import type { Event, Sighting, State, Usage } from '../domain.ts';
  * unpriced, which Claude Code writes only as a process exits and an attempt's end records (`measured`).
  */
 const COUNTED_KEYS = [
-  'turns',
+  'responses',
   'toolCalls',
   'inputTokens',
   'uncachedTokens',
@@ -33,7 +33,7 @@ const countsOf = (usage: Usage): Usage => {
 /**
  * What the engine journals of a long-lived attempt's spend off its sighting, before it decides: one `counted` entry when the
  * sighting's counts differ by value from the record's, and none when they are the same — the same reading seen on any number of
- * passes is written once — or when the reading has fewer turns than the record: a count from a later start, not the attempt's.
+ * passes is written once — or when the reading has fewer responses than the record: a count from a later start, not the attempt's.
  * Nothing for a job, whose spend is written at its end, a settled task, an ended attempt, a session the pass did not see, or a
  * sighting that carries no usage, as a busy session's does not.
  */
@@ -42,7 +42,7 @@ export function countedFacts(state: State, sighting: Sighting | undefined, at: s
   if (state.restartPolicy !== 'Always' || state.settled || !last || last.ended !== null || !sighting?.usage) return [];
   const counts = countsOf(sighting.usage);
   const record = last.usage ?? {};
-  if ((counts.turns ?? 0) < (record.turns ?? 0)) return [];
+  if ((counts.responses ?? 0) < (record.responses ?? 0)) return [];
   if (COUNTED_KEYS.every((key) => counts[key] === record[key])) return [];
   return [{ kind: 'counted', at, attempt: last.n, usage: counts }];
 }

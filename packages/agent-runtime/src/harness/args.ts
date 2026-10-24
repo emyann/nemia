@@ -55,10 +55,10 @@ export type HarnessArgs = {
    * The servers of its checkout's `.mcp.json` the session loads, by name, as a Pod's volume gives a ConfigMap's `items`. Absent:
    * the whole file, as it is. `[]`: none of it. Names: those entries alone, read from `<cwd>/.mcp.json` when the session is
    * spawned and handed over with the task's own `mcp`, and a spawn whose file does not declare one is refused, `unstartable`.
-   * Claude Code and Codex hold it; a harness that cannot leave the file out refuses the task (`HarnessSpec.checkoutMcp`).
+   * Claude Code and Codex hold it; a harness that cannot leave the file out refuses the task (`HarnessSpec.projectMcp`).
    * Refused unless a list of server names, none twice and none also in `mcp`.
    */
-  checkoutMcp?: string[];
+  projectMcp?: string[];
   /**
    * The context window the session is given, in tokens — `200000`. Given to Claude Code as `--autocompact`: past about it
    * the session compacts its conversation, a summary in place of what it read, and carries on, on `claude --bg` and
@@ -177,7 +177,7 @@ const KEYS: Record<keyof HarnessArgs, true> = {
   allowedTools: true,
   disallowedTools: true,
   mcp: true,
-  checkoutMcp: true,
+  projectMcp: true,
   contextTokens: true,
   background: true,
   worktree: true,
@@ -200,6 +200,13 @@ export const HARNESS_ARGS = Object.keys(KEYS) as ReadonlyArray<keyof HarnessArgs
  * runtime wrote as the flag (`upgrade` in `journal.ts`).
  */
 export const FORMER_ARGS: Readonly<Record<string, string>> = { remoteControl: 'remoteControl' };
+
+/**
+ * Each harness argument filed under a former name, by that name, and the name it has today: filed by its former name — under
+ * `config` or beside it — it is refused naming today's (`argsRefusalOf`), and read from a journal an older runtime wrote by
+ * today's (`upgrade` in `journal.ts`).
+ */
+export const RENAMED_ARGS: Readonly<Record<string, keyof HarnessArgs>> = { checkoutMcp: 'projectMcp' };
 
 /**
  * The harness arguments a later turn of a task held open may give for itself (`answer`), on top of the task's own. A turn
@@ -272,21 +279,17 @@ const RULE = /^[A-Za-z][^\s,()]*(?:\([^()]+\))?$/;
  *
  * In order:
  *
- * 1. A former argument that Claude Code's flags replace (`FORMER_ARGS`), wherever it was filed, with a sentence naming where
- *    it went. It is refused as an own key, whatever its value, `false` and `undefined` included, so a caller still writing
+ * 1. An argument filed under a former name (`RENAMED_ARGS`), wherever it was filed, with a sentence naming today's, and a
+ *    former argument that Claude Code's flags replace (`FORMER_ARGS`), wherever it was filed, with a sentence naming where
+ *    it went. Each is refused as an own key, whatever its value, `false` and `undefined` included, so a caller still writing
  *    it is told where it went.
  * 2. A harness argument filed beside `config` rather than in it: an untyped caller would otherwise have it journalled
  *    nowhere and its session started without it.
  * 3. `config` itself, then each of its arguments.
  */
 export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefined => {
-  const filed = (spec as { config?: unknown }).config;
-  const at = (o: unknown, key: string) => typeof o === 'object' && o !== null && Object.hasOwn(o, key);
-  const former = Object.entries(FORMER_ARGS).find(([key]) => at(spec, key) || at(filed, key));
-  if (former) {
-    const [key, flag] = former;
-    return `\`${key}\` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as \`config: { claude: { ${flag}: true } }\`, or leave it out.`;
-  }
+  const moved = movedRefusalOf(spec);
+  if (moved) return moved;
   const loose = HARNESS_ARGS.find((key) => Object.hasOwn(spec, key) && (spec as Record<string, unknown>)[key] !== undefined);
   if (loose) return `\`${loose}\` is the harness's configuration: file it under \`config\`, as \`config: { ${loose}: … }\`.`;
   const config = spec.config;
@@ -334,14 +337,33 @@ export const argsRefusalOf = (spec: { config?: HarnessArgs }): string | undefine
 };
 
 /**
+ * Why a filing gives an argument where it no longer is — or `undefined`: under a former name (`RENAMED_ARGS`), naming today's, or
+ * one that Claude Code's flags replace (`FORMER_ARGS`), naming where it went. Each an own key, under `config` or beside it,
+ * whatever its value.
+ */
+const movedRefusalOf = (spec: object): string | undefined => {
+  const filed = (spec as { config?: unknown }).config;
+  const at = (o: unknown, key: string) => typeof o === 'object' && o !== null && Object.hasOwn(o, key);
+  const was = Object.entries(RENAMED_ARGS).find(([key]) => at(spec, key) || at(filed, key));
+  if (was) {
+    const [key, name] = was;
+    return `\`${key}\` is the former name of \`config.${name}\`: file it as \`config: { ${name}: … }\`, or leave it out.`;
+  }
+  const former = Object.entries(FORMER_ARGS).find(([key]) => at(spec, key) || at(filed, key));
+  if (!former) return undefined;
+  const [key, flag] = former;
+  return `\`${key}\` is Claude Code's own flag, not a harness argument: file it with Claude Code's flags, as \`config: { claude: { ${flag}: true } }\`, or leave it out.`;
+};
+
+/**
  * Why the arguments one kind of harness alone reads cannot reach it — Claude Code's flags, Codex's own, a command's — or the
- * mounts and the admission every harness renders its own way, or a `checkoutMcp` that names no servers, or `undefined`.
+ * mounts and the admission every harness renders its own way, or a `projectMcp` that names no servers, or `undefined`.
  */
 const ownArgsRefusalOf = (config: HarnessArgs): string | undefined =>
   claudeFlagsRefusalOf(config.claude) ??
   codexArgsRefusalOf(config.codex) ??
   commandArgsRefusalOf(config) ??
-  checkoutMcpRefusalOf(config) ??
+  projectMcpRefusalOf(config) ??
   mountsRefusalOf(config.mounts) ??
   admissionRefusalOf(config.callAdmission) ??
   mayAskRefusalOf(config) ??
@@ -365,20 +387,20 @@ const mayAskRefusalOf = ({ mayAsk }: HarnessArgs): string | undefined =>
     : `\`mayAsk: ${JSON.stringify(mayAsk)}\` is not true or false. Give true to hold a call that would ask a person while one answers it, or leave it out to have such a call denied.`;
 
 /**
- * Why a task's `checkoutMcp` names no servers of a checkout's `.mcp.json` — or `undefined`: not a list of server names, a name
+ * Why a task's `projectMcp` names no servers of a checkout's `.mcp.json` — or `undefined`: not a list of server names, a name
  * twice, or a name the task's own `mcp` gives too, where one would hide the other.
  */
-const checkoutMcpRefusalOf = ({ checkoutMcp, mcp }: HarnessArgs): string | undefined => {
-  if (checkoutMcp === undefined) return undefined;
-  const names: unknown = checkoutMcp;
+const projectMcpRefusalOf = ({ projectMcp, mcp }: HarnessArgs): string | undefined => {
+  if (projectMcp === undefined) return undefined;
+  const names: unknown = projectMcp;
   if (!(Array.isArray(names) && names.every((n) => typeof n === 'string' && /^[\w-]+$/.test(n)))) {
-    return `\`checkoutMcp: ${JSON.stringify(names)}\` is not a list of server names. Give the names of the checkout's \`.mcp.json\` servers the session loads, like ["playwright"], [] for none, or leave it out for the whole file.`;
+    return `\`projectMcp: ${JSON.stringify(names)}\` is not a list of server names. Give the names of the checkout's \`.mcp.json\` servers the session loads, like ["playwright"], [] for none, or leave it out for the whole file.`;
   }
-  const twice = checkoutMcp.find((n, i) => checkoutMcp.indexOf(n) !== i);
-  if (twice !== undefined) return `\`checkoutMcp\` names \`${twice}\` twice. Name each server once.`;
-  const both = checkoutMcp.find((n) => typeof mcp === 'object' && mcp !== null && Object.hasOwn(mcp, n));
+  const twice = projectMcp.find((n, i) => projectMcp.indexOf(n) !== i);
+  if (twice !== undefined) return `\`projectMcp\` names \`${twice}\` twice. Name each server once.`;
+  const both = projectMcp.find((n) => typeof mcp === 'object' && mcp !== null && Object.hasOwn(mcp, n));
   if (both !== undefined) {
-    return `\`checkoutMcp\` names \`${both}\`, and \`mcp.${both}\` gives a server of that name too: one would hide the other. Give the task's server another name, or take the name off \`checkoutMcp\`.`;
+    return `\`projectMcp\` names \`${both}\`, and \`mcp.${both}\` gives a server of that name too: one would hide the other. Give the task's server another name, or take the name off \`projectMcp\`.`;
   }
   return undefined;
 };

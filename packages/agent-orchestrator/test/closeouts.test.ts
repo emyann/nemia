@@ -292,7 +292,7 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
     },
   );
   await s.test('its job ends `done` with no statement: the task succeeded, and the step reads unsigned', async () => {
-    ended(first(), 'succeeded', { stated: false });
+    ended(first(), 'succeeded', { closedOut: false });
     assert.deepEqual(await askedOf(first()), ['succeeded', 'unsigned']);
     assert.equal((await listed(id)).statuses[0], 'unsigned');
   });
@@ -307,7 +307,7 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
   });
   await s.test('the nudge ends unsigned too, as an older journal says it: the nudge is spent, and the step waits on you', async () => {
     const nudge = `${first()}-try2`;
-    ended(nudge, 'failed', { ended: 'failed', reason: 'unsigned' });
+    ended(nudge, 'failed', { ended: 'failed', reason: 'harness', closedOut: false, former: 'unsigned' });
     assert.deepEqual(await askedOf(nudge), ['failed', 'unsigned']);
     const p = await pass(id);
     assert.deepEqual([p.tried, p.filed, p.blocked], [[], [], ['review']], 'the run refuses a second nudge');
@@ -324,7 +324,7 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
 
 test('the run nudges no end that is not a missing statement', async (t) => {
   await t.test(
-    'a `done` with no `stated` key, as an older journal has: asked and unsigned, no nudge, no check, nothing after it',
+    'a `done` with no `closedOut` key, as an older journal has: asked and unsigned, no nudge, no check, nothing after it',
     async () => {
       const { id, task } = await filed();
       stage.board().settle(task, 'succeeded');
@@ -339,7 +339,7 @@ test('the run nudges no end that is not a missing statement', async (t) => {
   );
   await t.test('one that stated, with nothing the run can read: unreadable, and not nudged, since a statement came', async () => {
     const { id, task } = await filed(twoSteps());
-    ended(task, 'succeeded', { stated: true }, '{"outcome": "done", "summary": ');
+    ended(task, 'succeeded', { closedOut: true }, '{"outcome": "done", "summary": ');
     assert.equal((await listed(id)).statuses[0], 'unsigned · closeout unreadable');
     assert.deepEqual((await pass(id)).tried, []);
   });

@@ -48,6 +48,7 @@ import { setup, transition as xTransition } from 'xstate';
 import { toDirectedGraph } from 'xstate/graph';
 import { endOf, type Outcome } from './session.ts';
 import type { Action, EndReason, Event, Sighting } from './domain.ts';
+import type { FormerReason } from './event-schema.ts';
 
 /** Where a task stands, read off its journal alone (`lifecycleOf` in `domain.ts`). */
 export const STATES = [
@@ -100,7 +101,7 @@ export type VerbGuard = (typeof VERBS)[number]['guard'];
 type Seen = {
   attempt: number;
   sighting: Sighting;
-  /** Whether the task asked for a closing statement (`closeoutSchema`): an end records whether one came (`stated`). */
+  /** Whether the task asked for a closing statement (`closeoutSchema`): an end records whether one came (`closedOut`). */
   asked: boolean;
   /** Whether an end recorded now leaves the task held open, waiting on a person: `input-required` rather than `ending`. */
   holds: boolean;
@@ -149,7 +150,15 @@ export type LifecycleEvent =
   | { type: 'AWAITING_INPUT' }
   | { type: 'CLOSED'; last?: { n: number; ended: Outcome | null } }
   | { type: 'DEADLINE_SPENT'; seconds: number }
-  | { type: 'ATTEMPT_ENDED'; ended: Outcome | null; reason: EndReason | null; attempts: number; turn: number; error?: string }
+  | {
+      type: 'ATTEMPT_ENDED';
+      ended: Outcome | null;
+      reason: EndReason | null;
+      attempts: number;
+      turn: number;
+      error?: string;
+      former?: FormerReason;
+    }
   | { type: 'BACKING_OFF'; attempt: number; backoffMs: number }
   | { type: 'RESTART_DUE'; attempt: number; resumeFrom?: string; nudge?: string }
   | { type: 'SETTLED'; outcome: Outcome };
@@ -202,7 +211,7 @@ const said = (event: LifecycleEvent): Action => {
  * The end of an attempt its harness has let go of, or that went quiet: what it said, untouched, or why it said nothing. Its
  * word is `endOf` the sighting's state — the journal's `succeeded`, `failed` or `stopped`. No edge takes a session waiting on a
  * person here (`SESSION_BLOCKED` waits or stops), so one that did is the table's mistake, thrown as `moveOn` throws one.
- * `stated`, where the task asked for a closing statement: whether it came, a fact for the layer above, which judges it.
+ * `closedOut`, where the task asked for a closing statement: whether it came, a fact for the layer above, which judges it.
  */
 const harnessEnd = (e: Sessioned): Action => ({
   do: 'record-end',
@@ -212,7 +221,7 @@ const harnessEnd = (e: Sessioned): Action => ({
   reason: 'harness',
   nativeId: e.sighting.nativeId,
   closeout: e.sighting.closeout?.payload,
-  ...(e.asked ? { stated: e.sighting.closeout !== undefined } : {}),
+  ...(e.asked ? { closedOut: e.sighting.closeout !== undefined } : {}),
 });
 
 const endedOf = (e: Sessioned): Outcome => {
@@ -240,13 +249,13 @@ const cutEnd = (reason: 'operator' | 'deadline', attempt: number, sighting?: Sig
 
 /**
  * The note a turn with no successful attempt settles `failed` with: how many attempts it had — a journal an older runtime
- * wrote may hold several of one turn, and the note counts them all — and, for an end that runtime's engine judged
- * `unsigned`, that the last ended without the closing statement it was asked for; for a spawn its harness refused, whose
+ * wrote may hold several of one turn, and the note counts them all — and, for an end that runtime's engine judged by a
+ * reason of its own (`former`), that the last ended without the closing statement it was asked for; for a spawn its harness refused, whose
  * words are on the event (`error`), that the last could not start, in those words, and the fix.
  */
 const attemptNote = (e: Ev<'ATTEMPT_ENDED'>) => {
   const none = `${e.attempts} attempt(s)${e.turn ? ` of turn ${e.turn}` : ''}, none succeeded`;
-  if (e.reason === 'unsigned') return `${none}: the last ended without the closing statement it was asked for`;
+  if (e.former !== undefined) return `${none}: the last ended without the closing statement it was asked for`;
   if (e.error !== undefined) return `${none}: the last could not start: ${e.error}; fix what it names and file the task again`;
   return none;
 };

@@ -10,7 +10,7 @@ import { OUT, store } from '../world.ts';
 const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
-const MISWRITTEN = { kind: 'measured', at: new Date(0).toISOString(), attempt: 1, usage: { turns: 'three' } };
+const MISWRITTEN = { kind: 'measured', at: new Date(0).toISOString(), attempt: 1, usage: { responses: 'three' } };
 
 export default {
   /**

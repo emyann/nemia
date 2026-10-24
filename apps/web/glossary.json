@@ -32,6 +32,22 @@
           "card": "decision 15: the board's door, its copies of the api's types checked and people's words from one table"
         }
       ]
+    },
+    {
+      "term": "Session",
+      "meaning": "the board's word for each start of a try's task, which the runtime calls an attempt: a try counts its sessions, one a start. Not the runtime's Session, an agent's conversation, which a try may continue.",
+      "see": {
+        "label": "An attempt",
+        "href": "/runtime/#an-attempt"
+      }
+    },
+    {
+      "term": "Try",
+      "meaning": "one filing of a step, as the api serves it, with its cause; the board says try and never attempt.",
+      "see": {
+        "label": "Trying again",
+        "href": "/workflows/#trying-again"
+      }
     }
   ]
 }

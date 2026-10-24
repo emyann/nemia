@@ -5,9 +5,10 @@
  * Pure, as `timeline.ts` is, and imports nothing of it: the tries of a step's record and a task's attempts in, the turn and its span out.
  */
 import { parseCloseout } from '../closeout/index.ts';
+import type { TryCause } from '../retry/index.ts';
 
-/** A try of a step as a turn is read off it: its session's task, and what replaced it; `then` absent on the step's current try. */
-export type TurnTry = { taskId: string; then?: string };
+/** A try of a step as a turn is read off it: its session's task, and what replaced it; `cause` absent on the step's current try. */
+export type TurnTry = { taskId: string; cause?: TryCause };
 
 /**
  * An attempt as a turn is read off it: its spawn, its end, the turn of a task held open the runtime stamped it with, and the closeout it
@@ -30,9 +31,9 @@ export type TurnSpan = { asked: boolean; heldFrom: string | null; spawnedAt: str
  */
 export function turnOf(tries: readonly TurnTry[], i: number): number | null {
   const behind = tries.slice(0, i).filter((t) => t.taskId === tries[i]?.taskId);
-  const answered = behind.at(-1)?.then;
+  const answered = behind.at(-1)?.cause;
   if (answered === undefined || answered === 'recheck') return null;
-  return behind.filter((t) => t.then !== 'recheck').length;
+  return behind.filter((t) => t.cause !== 'recheck').length;
 }
 
 /** Whether an attempt signed off blocked: its closeout, as `parseCloseout` reads it, says so. An attempt that signed none did not. */

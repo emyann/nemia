@@ -1565,7 +1565,7 @@ retries: 1
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
   — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `closedOut: false`, and
   the run reads that as `unsigned` (`closeoutAsked`) — that said nothing is continued once:
-  the next tick files the next try as a nudge on no one's word (`then: 'signoff'` on the record), with the same
+  the next tick files the next try as a nudge on no one's word (`cause: 'signoff'` on the record), with the same
   schema, model, effort, context window, tools and permission mode as the session it continues, told in
   `## Try <n>` that it ended without calling `StructuredOutput`, that the work stands and it should change
   nothing and sign off now, finishing first if it had not, and signing off anyway saying what stops it if it
@@ -1586,7 +1586,7 @@ retries: 1
   writing the file where its brief says or taking the name off: `not there`, `missing`, `directory`, `escapes`, `outside`,
   `configuration`. Two never do, being the run's own: `not collected` (a file in the workspace whose copy the run did not
   make) and `not known` (the place did not say); `wf decide` says them as before. The run nudges such a step under the same
-  one nudge a round as a session that gave no closeout (`then: 'signoff'`): its session continued, told in `## Try <n>` each
+  one nudge a round as a session that gave no closeout (`cause: 'signoff'`): its session continued, told in `## Try <n>` each
   file, why, a near name its files directory holds (the same last name in another case or folder), and the two fixes. A
   nudged try that names a missing file again leaves the step `unsigned`, on you: `wf decide` names each file and why under
   `UNSIGNED`, and `wf retry` tries it again. A task is read once (`filesDue`, by the record's `filesRead`), so a file
@@ -1667,8 +1667,10 @@ retries: 1
   says why its last try ended and, beside it, that the cap was raised ([What a step may spend](#what-a-step-may-spend-budget)).
 - **The record keeps the current try where it always was.** `steps[name].taskId` and `steps[name].check` are
   the current try's, so everything that reads them reads the try that decides the step. The tries before it
-  go under `steps[name].tries`, in order, each with what replaced it: `retries`, `nudge`, `fresh` (and its
+  go under `steps[name].tries`, in order, each with its `cause`, what replaced it: `retries`, `nudge`, `fresh` (and its
   model) or `recheck` — and the cap a `--budget` raised, when one did. A person's tries do not spend the step's `retries`.
+  A try is a new runtime task, as a Kubernetes Job makes a new Pod; an attempt is the runtime's restart inside one task. A record
+  written before the key was `cause` says it `then`, and reads as `cause`.
 - **`wf ls`** puts the try beside the step's line, without changing the step's word: `try 2 due — retries: 1,
   0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--nudge, with your answer)`,
   `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
@@ -1785,7 +1787,7 @@ rounds: 3
   text and would break the column. `wf decide` says it in full, with the words. And the step after the loop
   is handed `## Accepted` — who ended it, when, and why — then `## From <step>` with the findings the loop
   left open, minus `again`, so the shipper and whoever reads the merge know what is still outstanding.
-- **A round is a try.** Each step of the loop moves its current try behind it with `then: 'round'`, so
+- **A round is a try.** Each step of the loop moves its current try behind it with `cause: 'round'`, so
   `steps[name].taskId` and `.check` stay the current try's and ids stay `<run>-<step>-try<n>`. A pass
   that files a round and dies before writing the record is adopted by the next, as a try is. `wf ls`
   says `round 2 of 3` beside each step of the loop, and `round 2 of 3 due` while the next tick has it
@@ -2383,7 +2385,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   take each. Ship again — `wf retry <run> ship` — for what was not the work: a dirty checkout, a flaky test; its try runs on that word,
   with no new approval. Send the work back — `wf retry <run> review --message "<objection>"`, to the loop step the ending waits on — when
   the work does not hold on the base as it is now: review is filed with the objection and what the ending said, and its `again: true` is
-  a round on the run's branch, where merging the base in is the work's to do. The ending's try moves behind (`then: 'back'`) in the same
+  a round on the run's branch, where merging the base in is the work's to do. The ending's try moves behind (`cause: 'back'`) in the same
   write; once the loop settles it waits at its gate, nothing of it run, for a new approval. Refused, naming the fix: no words, a step
   that is not the loop's, `wf round` of the loop, one way while the other is asked for, and a folder with no loop before its ending.
 - **The tick hands a step's leftovers off once for each try.** What a person leaves in a step's worktree after its hand-off is theirs,

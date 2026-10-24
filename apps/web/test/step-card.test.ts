@@ -35,7 +35,7 @@ const quiet = (name: string, status: string, extra: Partial<Step> = {}): Step =>
 const aTry = (n: number, round = 1): Step['tries'][number] => ({
   try: n,
   round,
-  then: null,
+  cause: null,
   current: true,
   taskId: `t-${n}`,
   note: null,

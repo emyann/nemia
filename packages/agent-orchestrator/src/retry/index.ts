@@ -9,10 +9,12 @@ export {
   sessionModel,
   signoffsSpent,
   spentAsks,
+  TRY_CAUSES,
   tryWord,
   turnsOf,
+  upgradeTries,
 } from './retry-ask.ts';
-export type { EarlierTry, Retry, RetryAsk, RetryHow, RetryMode } from './retry-ask.ts';
+export type { EarlierTry, Retry, RetryAsk, RetryHow, RetryMode, TryCause } from './retry-ask.ts';
 export {
   answerLines,
   deniedOffer,

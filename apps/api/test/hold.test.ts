@@ -170,8 +170,8 @@ holdOn(GATE, ['p-live']);
 const LOOP = 'h-loop';
 const replies = [{ finding: 'src/flag.ts — the flag is not stored', answer: 'fixed', why: 'It is stored now.' }];
 writeRun(LOOP, [implement, { ...review, loop: 'implement', rounds: 2, output: { file: 'review.json', schema: AGAIN } }], {
-  implement: { taskId: `${LOOP}-implement-2`, branch: `wf/${LOOP}/implement`, tries: [{ taskId: `${LOOP}-implement-1`, then: 'round' }] },
-  review: { taskId: `${LOOP}-review-2`, branch: `wf/${LOOP}/implement`, tries: [{ taskId: `${LOOP}-review-1`, then: 'round' }] },
+  implement: { taskId: `${LOOP}-implement-2`, branch: `wf/${LOOP}/implement`, tries: [{ taskId: `${LOOP}-implement-1`, cause: 'round' }] },
+  review: { taskId: `${LOOP}-review-2`, branch: `wf/${LOOP}/implement`, tries: [{ taskId: `${LOOP}-review-1`, cause: 'round' }] },
 });
 signedOff(`${LOOP}-implement-2`, { ...DONE, replies });
 signedOff(`${LOOP}-review-2`, { ...DONE, again: true });

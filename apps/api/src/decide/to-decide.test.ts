@@ -565,7 +565,7 @@ test("the list runs no `git`, however often it is polled: where a branch stands,
   const tried = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as {
     steps: Record<string, { taskId: string; tries?: unknown[] }>;
   };
-  tried.steps.implement = { taskId: `${id}-implement-2`, branch, tries: [{ taskId: `${id}-implement`, then: 'nudge' }] } as never;
+  tried.steps.implement = { taskId: `${id}-implement-2`, branch, tries: [{ taskId: `${id}-implement`, cause: 'nudge' }] } as never;
   signedOff(`${id}-implement-2`, repo);
   write(path.join(root, 'runs', `${id}.json`), JSON.stringify(tried, null, 2));
   git(repo, 'checkout', '-q', branch);

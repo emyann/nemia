@@ -1644,7 +1644,7 @@ test('an ending that stopped on the base branch sends the work back through the 
         taskId: null,
         workspace: repo,
         branch: 'main',
-        tries: [{ taskId: `${id}-ship`, then: 'back' }],
+        tries: [{ taskId: `${id}-ship`, cause: 'back' }],
       });
       assert.equal(world().head(repo), base, 'nothing merged');
       const brief = tasks.get(`${id}-review-try2`)!.spec.brief;
@@ -1843,7 +1843,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       await at.pass(id);
       const r = readRun(id);
       assert.deepEqual(
-        r.steps.implement.tries?.map((x) => x.then),
+        r.steps.implement.tries?.map((x) => x.cause),
         ['merge'],
       );
       assert.equal(r.steps.implement.taskId, `${id}-implement-try2`);
@@ -1942,7 +1942,7 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
       await assert.rejects(stage.runWith(e(), acceptRun(id, 'review', ENOUGH)), waits(`nemia accept ${id} review --message "<why>"`));
       assert.deepEqual((await at.pass(id)).looped, ['review']);
       assert.deepEqual(
-        readRun(id).steps.implement.tries?.map((x) => x.then),
+        readRun(id).steps.implement.tries?.map((x) => x.cause),
         ['merge'],
         'the merge is filed, as asked',
       );

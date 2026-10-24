@@ -5,7 +5,6 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Code, Heading, List, Root, RootContent } from 'mdast';
@@ -15,10 +14,9 @@ import { scratch } from './scratch.ts';
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 const PAGE = path.join(ROOT, 'apps', 'docs', 'src', 'content', 'docs', 'glossary.mdx');
 
-/** A scratch repository holding `files`, by path from its root, under git so its files are known. */
+/** A scratch repository holding `files`, by path from its root. */
 const repoWith = (files: Record<string, unknown>): string => {
   const root = scratch('docs-glossary-');
-  execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
   for (const [file, body] of Object.entries(files)) {
     fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     fs.writeFileSync(path.join(root, file), typeof body === 'string' ? body : JSON.stringify(body));

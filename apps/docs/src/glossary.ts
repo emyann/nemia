@@ -4,7 +4,6 @@
  * plugin replaces it by one section per context, its title, what it is about, and one line per term. A table the fence omits, or an
  * id no table has, fails the page's build, naming it; `typeFaults` names each term's type that its workspace does not export.
  */
-import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
@@ -25,19 +24,32 @@ export type Table = { context: string; title: string; about: string; paths: stri
  */
 export type Fault = { kind: 'omitted' | 'no-table' | 'no-export'; context: string; type?: string; says: string };
 
-/** The files git knows of under `root`, tracked or not ignored, that match `specs`, by path from `root`. */
-const filesOf = (root: string, specs: string[]): string[] =>
-  execFileSync('git', ['ls-files', '-co', '--exclude-standard', '--', ...specs], {
-    cwd: root,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-    .split('\n')
-    .filter((f) => f && fs.existsSync(path.join(root, f)));
+/** Folders no table or source lives in: installed packages, build output and caches. */
+const SKIPPED = new Set(['node_modules', 'dist', 'coverage']);
 
-/** Every glossary table of the repository at `root`: each file named `glossary.json` git knows of, parsed, sorted by its path. */
+/**
+ * The files under each of `dirs`, folders from `root`, by path from `root`: a walk of the folders, leaving out installed packages,
+ * build output and every folder whose name opens with a dot. Read without git, whose calls belong to the place's code alone.
+ */
+const filesOf = (root: string, dirs: string[]): string[] => {
+  const out: string[] = [];
+  const walk = (dir: string): void => {
+    const at = path.join(root, dir);
+    if (!fs.existsSync(at)) return;
+    for (const entry of fs.readdirSync(at, { withFileTypes: true })) {
+      if (entry.name.startsWith('.') || SKIPPED.has(entry.name)) continue;
+      const file = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(file);
+      else if (entry.isFile()) out.push(file);
+    }
+  };
+  for (const dir of dirs) walk(dir);
+  return out;
+};
+
+/** Every glossary table of the repository at `root`: each `glossary.json` under `packages/` and `apps/`, parsed, by its path. */
 export const tablesIn = (root: string): Table[] =>
-  filesOf(root, ['*glossary.json'])
+  filesOf(root, ['packages', 'apps'])
     .filter((f) => path.posix.basename(f) === 'glossary.json')
     .sort()
     .map((file) => ({ ...(JSON.parse(fs.readFileSync(path.join(root, file), 'utf8')) as Omit<Table, 'file'>), file }));

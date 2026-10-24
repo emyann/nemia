@@ -179,7 +179,10 @@ const cutOff = async (held: Promise<unknown>) => {
 /** The uuids of the user messages the turn in flight consumed: the one it took, and any it folded in as it ended. */
 let mine: string[] = [];
 
-/** One turn's work, once a user message came. */
+/**
+ * One turn's work, once a user message came. An interrupted turn's result carries `errors`: the SDK reads them off a result whose
+ * subtype is not `success`, and throws as it reads the stream without them.
+ */
 const work = async () => {
   print({ type: 'system', subtype: 'init', session_id: sessionId, cwd: process.cwd(), tools: [], model: 'stand-in' });
   spent += plan.cost ?? 0.01;

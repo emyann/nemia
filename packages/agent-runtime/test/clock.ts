@@ -1,4 +1,11 @@
-/** Stepping this process's wall clock in a test, as a machine's clock is stepped under load. */
+/**
+ * Stepping this process's wall clock in a test, as a machine's clock is stepped under load.
+ *
+ * A test stamps the times the runtime compares from the journal's attempt start (`begun` in `test/release.test.ts`), so a stepped clock
+ * drops nothing. A runner that cannot be handed another attempt's statement (the detached spawn clears the last one's), or that tells
+ * it from its parent's (`--bg`: the parent's last call id, `harness/claude/parent.ts`), reports it with no time: its test steps the
+ * clock here instead.
+ */
 import type { TestContext } from 'node:test';
 
 /**

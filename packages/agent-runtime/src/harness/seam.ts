@@ -205,6 +205,9 @@ export type Observation = {
  * the engine decides on. Nor does `find`: optional, a cheaper way to one session's id than `observe`, and never
  * its state. Nor does `observeFor`: optional, `observe` told what the journal already names, and answering the same. Nor does
  * `quota`: optional, and asked of the harness, never of a session.
+ *
+ * An optional verb renamed on its way through the seam is dropped by every adapter that takes the old type, with no error: keep the
+ * old verb beside the new one until each adapter is moved, and test the verb through the `Engine` service.
  */
 export type RunnerOps = {
   readonly spawn: (r: SpawnRequest) => Effect.Effect<void, RunnerError>;

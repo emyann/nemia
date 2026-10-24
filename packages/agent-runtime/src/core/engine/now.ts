@@ -22,7 +22,12 @@ const bootId = (): string | null => {
   return boot;
 };
 
-/** The monotonic clock now, in whole milliseconds, under the boot's id; absent where the boot id cannot be read. */
+/**
+ * The monotonic clock now, in whole milliseconds, under the boot's id; absent where the boot id cannot be read.
+ *
+ * Whole milliseconds, so a bound measured on it fires up to 1 ms before `performance.now()` says the delay is gone: a test's floor on
+ * such a bound reads `elapsedMs` over `instantNow()` taken around the call, never `performance.now()`.
+ */
 export const monoNow = (): Monotonic | undefined => {
   const id = bootId();
   return id === null ? undefined : { boot: id, ms: Number(process.hrtime.bigint() / 1_000_000n) };

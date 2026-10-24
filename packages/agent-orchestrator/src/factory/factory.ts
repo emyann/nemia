@@ -98,8 +98,37 @@ export function instructionPathRefusal(p: string): string | undefined {
 /** A factory as `nemia factory ls` lists it, with its file; or an entry that does not read as one, with why (`error`). */
 export type FactoryListing = (Factory & { file: string; status?: TemplateStatus }) | { name: string; file: string; error: string };
 
+/** The conditions the controller says of a templated factory: whether its base holds the template, and whether an upgrade waits. */
+export const FACTORY_CONDITION_TYPES = ['Applied', 'ConflictsPending'] as const;
+
+/** Which condition a factory's is (`FACTORY_CONDITION_TYPES`). */
+export type FactoryConditionType = (typeof FACTORY_CONDITION_TYPES)[number];
+
+/** Why a condition is what it is, one word each, as the controller writes them (`condition` in `applied/applied.verb.ts`). */
+export const FACTORY_CONDITION_REASONS = [
+  'NoUpgrade',
+  'TemplateInvalid',
+  'VersionDrift',
+  'Rendered',
+  'ParamsChanged',
+  'ContentChanged',
+  'VersionUnknown',
+  'Upgraded',
+  'Merged',
+  'UpgradePending',
+  'Conflicts',
+] as const;
+
+/** Why a factory's condition holds or not (`FACTORY_CONDITION_REASONS`); the sentence a person reads is its `message`. */
+export type FactoryConditionReason = (typeof FACTORY_CONDITION_REASONS)[number];
+
 /** A condition of a factory made from a template, as Kubernetes words one: its type, `True` or `False`, a reason, a sentence. */
-export type FactoryCondition = { type: string; status: 'True' | 'False'; reason: string; message: string };
+export type FactoryCondition = {
+  type: FactoryConditionType;
+  status: 'True' | 'False';
+  reason: FactoryConditionReason;
+  message: string;
+};
 
 /**
  * What the controller last observed of a factory made from a template, as `nemia factory ls` lists it: the template's version its base

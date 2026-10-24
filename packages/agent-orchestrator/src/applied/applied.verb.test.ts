@@ -194,6 +194,12 @@ test("the controller renders the base read-only and seeds the tree once; a secon
   fs.rmSync(treeDir('seeded'), { recursive: true });
   await Effect.runPromise(reconcileOnce());
   assert.deepEqual(readStatus('seeded'), status, 'a restart reads it all again off the disk');
+  const onDisk = JSON.parse(fs.readFileSync(statusFile('seeded'), 'utf8'));
+  const [applied, conflicts] = status.conditions;
+  fs.writeFileSync(statusFile('seeded'), JSON.stringify({ ...onDisk, conditions: [{ ...applied, reason: 'Mystery' }, conflicts] }));
+  assert.equal(readStatus('seeded'), undefined, 'a condition word outside FactoryConditionReason reads as no status');
+  assert.deepEqual(reconcileFactory(templated('seeded')), status, 'and the next pass writes it again');
+  assert.deepEqual(readStatus('seeded'), status);
   assert.match(fs.readFileSync(review, 'utf8'), /^budget: 7$/m, 'a tree removed is seeded again from the base');
 });
 

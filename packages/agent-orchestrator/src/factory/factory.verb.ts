@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
-import { factoryLines, type FactoryListing } from './factory.ts';
+import { factoryLines, REVISIONS_POLICIES, type FactoryListing, type RevisionsPolicy } from './factory.ts';
 import {
   addFactory,
   attachWorkflow,
@@ -18,6 +18,7 @@ import {
   hireAgent,
   readFactories,
   removeFactory,
+  setRevisions,
 } from './factory.store.ts';
 import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
@@ -51,6 +52,7 @@ nemia factory server rm <factory> <server>
 nemia factory rules <name> [--file <path>|- | --clear]
 nemia factory instruction <name> [--path <path> | --store | --clear]
 nemia factory instruct <name> --file <path>|- | --clear
+nemia factory revisions <name> follow|pinned
 nemia factory trust <name>
 nemia factory rm <name>
 
@@ -121,6 +123,14 @@ factory, naming the repositories its work is on, the workflows it offers and the
   nemia factory instruct writes the instruction the store keeps (--file <path>, - for stdin), or removes it
                  (--clear): only while the factory keeps its instruction in the store. A file in a
                  folder is edited there.
+  nemia factory revisions says whether the factory's runs follow merged revisions, as a Pod's imagePullPolicy says
+                 whether a container takes a newer image. follow (Always): every new filing of a run — a step,
+                 a retry, a round — is filed on the workflow, agents, skills and rules as the files hold them
+                 then; what was filed is not run again, and no step is added or removed. pinned
+                 (IfNotPresent), the default: a run keeps what it resolved at its first filing until nemia
+                 refresh <run>. Written into the factory's file, or into its tree's factory.json for a factory
+                 made from a template, whose nemia.yaml says it as spec.revisions; read by every pass after, so
+                 a run in flight takes it at its next filing.
   nemia factory trust trusts a factory's places again, as nemia factory add does: for a factory filed before
                  places were trusted, one filed with --no-trust, or a trust taken back since.
   nemia factory rm  removes a factory's file, one that does not read included, then the instruction and the
@@ -438,6 +448,52 @@ const FACTORY_RM: Command<{ file: string; instruction: string | null }> = {
   ],
 };
 
+/** `nemia factory revisions`'s spec: the factory, then the policy, and no flag. */
+const REVISIONS_SPEC: Spec = {
+  positionals: [
+    { key: 'factory', takes: 'required', kind: 'name' },
+    { key: 'revisions', takes: 'required', kind: 'name' },
+  ],
+  flags: [],
+  unknown: (arg) =>
+    arg.startsWith('-')
+      ? `nemia factory revisions does not take ${arg}. It takes the factory, then follow or pinned: nemia factory revisions <name> follow|pinned.`
+      : `nemia factory revisions takes one policy, and ${arg} is one more: nemia factory revisions <name> follow|pinned.`,
+  missing:
+    'nemia factory revisions takes the factory, then follow or pinned: nemia factory revisions <name> follow|pinned. Nothing was changed.',
+  flagFirst: true,
+};
+
+/** The policy `nemia factory revisions` was given, or undefined where it is neither of the two. */
+const policyOf = (args: Args): RevisionsPolicy | undefined => REVISIONS_POLICIES.find((p) => p === args.revisions);
+
+/** `nemia factory revisions`: whether a factory's runs follow merged revisions, written, with what it said before. */
+const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }> = {
+  name: 'factory revisions',
+  usage: '<name> follow|pinned',
+  help: [
+    "whether a factory's runs follow merged revisions at each filing (follow)",
+    'or keep them until nemia refresh (pinned, the default)',
+  ],
+  spec: REVISIONS_SPEC,
+  check: (args) =>
+    args.revisions === undefined || policyOf(args) !== undefined
+      ? leftOut(REVISIONS_SPEC, args)
+      : `nemia factory revisions takes follow or pinned, and was given ${String(args.revisions)}: nemia factory revisions <name> follow|pinned. Nothing was changed.`,
+  writes: true,
+  class: 'ask',
+  only: { side: 'cli', why: "the board shows a factory's revisions policy in no control yet: nemia factory revisions writes it" },
+  handler: (args) =>
+    tried(() => {
+      const { file, was } = setRevisions({ factory: textOf(args, 'factory'), revisions: policyOf(args)! });
+      return { file, was: was ?? null };
+    }),
+  print: ({ file, was }, args) => [
+    `${textOf(args, 'factory')}  revisions: ${textOf(args, 'revisions')}${was === null || was === textOf(args, 'revisions') ? '' : ` (was ${was})`}`,
+    `changed: ${file}`,
+  ],
+};
+
 /** `nemia factory`'s entries, in the order `nemia`'s help lists them. */
 export const FACTORIES: readonly Command[] = [
   FACTORY,
@@ -459,6 +515,7 @@ export const FACTORIES: readonly Command[] = [
   FACTORY_RULES,
   FACTORY_INSTRUCTION,
   FACTORY_INSTRUCT,
+  FACTORY_REVISIONS,
   FACTORY_TRUST,
   FACTORY_RM,
 ] as readonly Command[];

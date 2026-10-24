@@ -233,6 +233,12 @@ test("a document's apiVersion, kind and name are refused when wrong, and a key i
     'a number',
   );
   assertRefused(
+    refusalsOf((d) => (d['nemia.yaml'].spec.revisions = 'always')),
+    'nemia.yaml',
+    ['spec', 'revisions'],
+    'follow or pinned',
+  );
+  assertRefused(
     refusalsOf((d) => delete d[AGENT].spec.role),
     AGENT,
     ['spec'],

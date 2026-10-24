@@ -189,7 +189,7 @@ test('a command on its route answers what its `nemia` entry answers: the same fi
       const res = await post('/api/runs/r-api-gate/steps/plan/approve', { message: 'Go.' });
       assert.equal(res.status, 202);
       const answered = (await res.json()) as { try: number; at: string; message: string; file: string };
-      assert.deepEqual(Object.keys(answered).sort(), ['at', 'file', 'message', 'try']);
+      assert.deepEqual(Object.keys(answered).sort(), ['at', 'file', 'message', 'step', 'try']);
       assert.equal(answered.try, typed.try);
       assert.equal(answered.file, approvalFile('r-api-gate', 'plan', 1));
       assert.equal(typed.file, approvalFile('r-cli-gate', 'plan', 1));
@@ -198,27 +198,78 @@ test('a command on its route answers what its `nemia` entry answers: the same fi
     },
   );
 
-  await t.test('a round on its route writes what `nemia round` writes: the same step, round and file', async () => {
-    loopingRun('r-cli-loop');
-    loopingRun('r-api-loop');
-    const typed = await asTyped('round', ['r-cli-loop']);
-    const res = await post('/api/runs/r-api-loop/round', {});
-    assert.equal(res.status, 202);
-    const answered = (await res.json()) as { step: string; round: number; file: string };
-    assert.deepEqual(Object.keys(answered).sort(), ['file', 'round', 'step']);
-    assert.deepEqual([answered.step, answered.round], [typed.step, typed.round]);
-    assert.equal(answered.file, String(typed.file).replace('r-cli-loop', 'r-api-loop'));
-    assert.deepEqual(written(answered.file), written(String(typed.file)));
-    assert.deepEqual(asked('r-api-loop'), asked('r-cli-loop'));
-  });
+  await t.test(
+    "a round on its former path `POST …/round`, now retry's, writes what `nemia retry --round` writes: the same step, round and file",
+    async () => {
+      loopingRun('r-cli-loop');
+      loopingRun('r-api-loop');
+      const typed = await asTyped('retry', ['r-cli-loop', '--round']);
+      const res = await post('/api/runs/r-api-loop/round', {});
+      assert.equal(res.status, 202);
+      const answered = (await res.json()) as { step: string; round: number; file: string };
+      assert.deepEqual(Object.keys(answered).sort(), ['file', 'round', 'step']);
+      assert.deepEqual([answered.step, answered.round], [typed.step, typed.round]);
+      assert.equal(answered.file, String(typed.file).replace('r-cli-loop', 'r-api-loop'));
+      assert.deepEqual(written(answered.file), written(String(typed.file)));
+      assert.deepEqual(asked('r-api-loop'), asked('r-cli-loop'));
+    },
+  );
 
   await t.test(
-    'REFUSED on its route: a merge of a run whose result step closes no loop — a 409 naming `nemia retry`, as `nemia merge` says it, and no ask',
+    "an acceptance on its former path `POST …/steps/:step/accept`, now approve's, writes what `nemia approve` of a loop out of rounds writes: the same step, try, words and file",
+    async () => {
+      loopingRun('r-cli-enough');
+      loopingRun('r-api-enough');
+      const typed = await asTyped('approve', ['r-cli-enough', 'review', '--message', 'Good enough.']);
+      const res = await post('/api/runs/r-api-enough/steps/review/accept', { message: 'Good enough.' });
+      assert.equal(res.status, 202);
+      const answered = (await res.json()) as { step: string; try: number; message: string; file: string };
+      assert.deepEqual([answered.step, answered.try, answered.message], [typed.step, typed.try, typed.message]);
+      assert.equal(answered.file, String(typed.file).replace('r-cli-enough', 'r-api-enough'));
+      assert.deepEqual(written(answered.file), written(String(typed.file)));
+      assert.deepEqual(asked('r-api-enough'), asked('r-cli-enough'));
+    },
+  );
+
+  await t.test(
+    "a merge on its former path `POST …/merge`, now refresh's, writes what `nemia refresh --base` writes: the same step, target, base commit and file",
+    async () => {
+      const repo = fs.mkdtempSync(path.join(root, 'repo-'));
+      const git = aGitRepo(repo);
+      const base = git('rev-parse', 'HEAD');
+      for (const id of ['r-cli-base', 'r-api-base']) {
+        git('checkout', '-q', '-b', `wf/${id}/implement`, base);
+        fs.writeFileSync(path.join(repo, 'README.md'), `# app, as ${id} has it\n`);
+        git('commit', '-q', '-am', id);
+      }
+      git('checkout', '-q', 'main');
+      fs.writeFileSync(path.join(repo, 'README.md'), '# app, as main has it\n');
+      git('commit', '-q', '-am', 'main moved');
+      for (const id of ['r-cli-base', 'r-api-base']) {
+        loopingRun(id);
+        signedOff(`${id}-review-1`, { ...DONE, again: false });
+        const record = JSON.parse(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8')) as object;
+        write(path.join(root, 'runs', `${id}.json`), JSON.stringify({ ...record, repo, workspace: repo, baseRef: base }));
+      }
+      const typed = await asTyped('refresh', ['r-cli-base', '--base']);
+      const res = await post('/api/runs/r-api-base/merge', {});
+      assert.equal(res.status, 202, JSON.stringify(await res.clone().json()));
+      const answered = (await res.json()) as Record<string, unknown>;
+      for (const key of ['step', 'target', 'onto', 'sha', 'round']) assert.deepEqual(answered[key], typed[key], key);
+      assert.equal(answered.file, String(typed.file).replace('r-cli-base', 'r-api-base'));
+      assert.deepEqual([answered.target, answered.onto, answered.sha], ['implement', 'main', git('rev-parse', 'main')]);
+      assert.deepEqual(written(String(answered.file)), written(String(typed.file)));
+      assert.deepEqual(asked('r-api-base'), asked('r-cli-base'));
+    },
+  );
+
+  await t.test(
+    'REFUSED on its route: a merge of a run whose result step closes no loop — a 409 naming `nemia retry`, as `nemia refresh --base` says it, and no ask',
     async () => {
       gatedRun('r-cli-noloop');
       gatedRun('r-api-noloop');
-      const typed = await asTyped('merge', ['r-cli-noloop']).then(
-        () => assert.fail('nemia merge is refused'),
+      const typed = await asTyped('refresh', ['r-cli-noloop', '--base']).then(
+        () => assert.fail('nemia refresh --base is refused'),
         (err: Error) => err.message,
       );
       const res = await post('/api/runs/r-api-noloop/merge', {});
@@ -298,57 +349,57 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
       .map((r) => ({ command: c, r })),
   );
   assert.deepEqual(
-    routed.map(({ command, r }) => `${command.name} ${r.method}`),
+    routed.map(({ command, r }) => `${command.name} ${r.method} ${r.path}`),
     [
-      'start POST',
-      'inbox add POST',
-      'inbox queue POST',
-      'inbox queue DELETE',
-      'inbox from PUT',
-      'inbox from DELETE',
-      'inbox rm DELETE',
-      'factory hire PUT',
-      'factory fire DELETE',
-      'factory schedule PUT',
-      'factory unschedule DELETE',
-      'factory server add PUT',
-      'factory server rm DELETE',
-      'factory rules PUT',
-      'factory rules DELETE',
-      'factory instruction PUT',
-      'factory instruction DELETE',
-      'factory instruct PUT',
-      'factory instruct DELETE',
-      'retry POST',
-      'approve POST',
-      'round POST',
-      'refresh POST',
-      'accept POST',
-      'merge POST',
-      'say POST',
-      'agents custom PUT',
-      'agents custom DELETE',
-      'agents write POST',
-      'agents write PUT',
-      'agents copy POST',
-      'agents remove DELETE',
-      'agents try POST',
-      'skills write POST',
-      'skills write PUT',
-      'hold POST',
-      'hold DELETE',
-      'rm DELETE',
-      'prune POST',
-      'pause POST',
-      'resume DELETE',
-      'subscribe POST',
-      'unsubscribe DELETE',
-      'level PUT',
-      'policy confirm PUT',
-      'policy drop DELETE',
-      'workflows write POST',
-      'workflows write PUT',
-      'workflows remove DELETE',
+      'start POST /api/runs',
+      'inbox add POST /api/inbox',
+      'inbox queue POST /api/inbox/:name/queue',
+      'inbox queue DELETE /api/inbox/:name/queue',
+      'inbox from PUT /api/inbox/:name/from',
+      'inbox from DELETE /api/inbox/:name/from',
+      'inbox rm DELETE /api/inbox/:name',
+      'factory hire PUT /api/factories/:factory/hires/:step',
+      'factory fire DELETE /api/factories/:factory/hires/:step',
+      'factory schedule PUT /api/factories/:factory/schedules/:workflow',
+      'factory unschedule DELETE /api/factories/:factory/schedules/:workflow',
+      'factory server add PUT /api/factories/:factory/servers/:server',
+      'factory server rm DELETE /api/factories/:factory/servers/:server',
+      'factory rules PUT /api/factories/:factory/rules',
+      'factory rules DELETE /api/factories/:factory/rules',
+      'factory instruction PUT /api/factories/:factory/instruction',
+      'factory instruction DELETE /api/factories/:factory/instruction',
+      'factory instruct PUT /api/factories/:factory/instruction/words',
+      'factory instruct DELETE /api/factories/:factory/instruction/words',
+      'retry POST /api/runs/:runId/steps/:step/retry',
+      'retry POST /api/runs/:runId/round',
+      'approve POST /api/runs/:runId/steps/:step/approve',
+      'approve POST /api/runs/:runId/steps/:step/accept',
+      'refresh POST /api/runs/:runId/refresh',
+      'refresh POST /api/runs/:runId/merge',
+      'say POST /api/runs/:runId/steps/:step/say',
+      'agents custom PUT /api/custom-instructions/:name',
+      'agents custom DELETE /api/custom-instructions/:name',
+      'agents write POST /api/agents/:from',
+      'agents write PUT /api/agents/:from/:name',
+      'agents copy POST /api/agents/yours/copy',
+      'agents remove DELETE /api/agents/:from/:name',
+      'agents try POST /api/agents/:from/:name/try',
+      'skills write POST /api/skills/:from',
+      'skills write PUT /api/skills/:from/:name',
+      'hold POST /api/runs/:runId/hold',
+      'hold DELETE /api/runs/:runId/hold',
+      'rm DELETE /api/runs/:runId',
+      'prune POST /api/runs/:runId/prune',
+      'pause POST /api/pause',
+      'resume DELETE /api/pause',
+      'subscribe POST /api/subscriptions/:name',
+      'unsubscribe DELETE /api/subscriptions/:name',
+      'level PUT /api/level',
+      'policy confirm PUT /api/policy/:name/rules/:id',
+      'policy drop DELETE /api/policy/:name/rules/:id',
+      'workflows write POST /api/workflows/:from',
+      'workflows write PUT /api/workflows/:from/:name',
+      'workflows remove DELETE /api/workflows/:from/:name',
     ],
   );
   for (const { command, r } of routed) {
@@ -356,7 +407,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
     const url = route.replace(':runId', 'r-guard').replace(':step', 'plan').replace(':name', 'g-guard').replace(':from', 'yours');
     const body = JSON.stringify({ mode: 'nudge', message: 'Go.', text: 'Go.' });
     for (const [what, headers, status] of GUARD_LEGS) {
-      const said = `${command.name} ${method}: ${what}`;
+      const said = `${command.name} ${method} ${route}: ${what}`;
       const res = await app.request(url, { method, headers: { ...BOARD, ...headers }, body });
       assert.equal(res.status, status, said);
       assert.match(((await res.json()) as { error: string }).error, new RegExp(`^${method} ${url.replaceAll('/', '\\/')} `), said);
@@ -398,7 +449,7 @@ test('what a route refuses or ignores of its body, and the removals the board wi
   );
 
   await t.test(
-    'REFUSED at shipped defaults: `answers` sent to a round, which takes none on the api — 422 naming the key and the routes that take it, nothing written',
+    'REFUSED at shipped defaults: `answers` sent to a round, or to a loop ended on `…/accept`, which take none on the api — 422 naming the key and the routes that take it, nothing written',
     async () => {
       loopingRun('r-foreign');
       const res = await post('/api/runs/r-foreign/round', {
@@ -410,7 +461,28 @@ test('what a route refuses or ignores of its body, and the removals the board wi
       assert.ok(said.startsWith('`answers` is not a key POST …/round takes'), said);
       for (const fact of ['POST …/retry, POST …/approve take it', '`{ "step"?: "<looping step>", "budget"?: <amount> }`.'])
         assert.ok(said.includes(fact), `${fact} in ${said}`);
+      const accept = await post('/api/runs/r-foreign/steps/review/accept', {
+        message: 'Good enough.',
+        answers: [{ question: 'Which?', chose: ['A'] }],
+      });
+      assert.equal(accept.status, 422, 'a kept path of approve takes no `answers`, as the command it was took none');
+      const acceptSaid = ((await accept.json()) as { error: string }).error;
+      assert.ok(acceptSaid.startsWith('`answers` is not a key POST …/accept takes'), acceptSaid);
       assert.deepEqual(asked('r-foreign'), [], 'nothing written');
+    },
+  );
+
+  await t.test(
+    "REFUSED at shipped defaults: a bad body on a former path is refused in that path's words, not its command's — `budget` as a word on `POST …/round` is a 400 naming the round's body and `nemia retry --round`, nothing written",
+    async () => {
+      loopingRun('r-round-word');
+      const res = await post('/api/runs/r-round-word/round', { budget: 'five' });
+      assert.equal(res.status, 400);
+      const said = ((await res.json()) as { error: string }).error;
+      for (const fact of ['`nemia retry r-round-word --round --budget <amount>`', '`{ "step"?: "<looping step>", "budget"?: <amount> }`'])
+        assert.ok(said.includes(fact), `${fact} in ${said}`);
+      assert.ok(!said.includes('"mode"'), `retry's own body is not named: ${said}`);
+      assert.deepEqual(asked('r-round-word'), [], 'nothing written');
     },
   );
 

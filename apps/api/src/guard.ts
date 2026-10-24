@@ -4,10 +4,11 @@
  * Twenty-eight writes pass it: a factory signed in to a server (`POST /api/factories/:factory/servers/:server/sign-in`,
  * servers/sign-in.ts) or signed out of one (`DELETE` on the same path), each of which writes the harness's own store, which every
  * session of the factory reads; a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the
- * card; an ask for another try (`POST /api/runs/:id/steps/:step/retry`, asks.ts) or another round (`POST /api/runs/:id/round`, asks.ts),
- * each of which writes a person's ask file; an approval of a step waiting at its gate (`POST /api/runs/:id/steps/:step/approve`, asks.ts),
- * which writes a person's approval file, or an acceptance of a loop out of rounds as it stands (`POST /api/runs/:id/steps/:step/accept`,
- * asks.ts), which writes a person's acceptance file; words for a step's running session (`POST /api/runs/:id/steps/:step/say`, asks.ts),
+ * card; an ask for another try (`POST /api/runs/:id/steps/:step/retry`, asks.ts) or another round (`POST /api/runs/:id/round`, asks.ts,
+ * kept for `nemia retry --round`), each of which writes a person's ask file; an approval of a step waiting at its gate (`POST
+ * /api/runs/:id/steps/:step/approve`, asks.ts), which writes a person's approval file, or an acceptance of a loop out of rounds as it
+ * stands (`POST /api/runs/:id/steps/:step/accept`, asks.ts, kept for `nemia approve` of a loop), which writes a person's acceptance file;
+ * words for a step's running session (`POST /api/runs/:id/steps/:step/say`, asks.ts),
  * which the engine hands the session and journals; a card filed in the inbox (`POST /api/inbox`, inbox.ts) or dropped from it (`DELETE
  * /api/inbox/:name`, inbox.ts); a card queued to start on its own (`POST /api/inbox/:name/queue`, inbox.ts) or taken off the queue (`DELETE
  * /api/inbox/:name/queue`), each of which writes the store's inbox; and a workflow of yours built on the board — made (`POST

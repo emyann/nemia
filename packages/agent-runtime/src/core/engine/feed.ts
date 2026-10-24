@@ -508,7 +508,7 @@ const sealTail = (root: string, now: Seen, built: Built, forget: ReadonlySet<str
 };
 
 /**
- * One try at a rotation (`rotateFeed`): the sealed file built outside the lock, then, under it, finished and renamed into place
+ * One attempt at a rotation (`rotateFeed`): the sealed file built outside the lock, then, under it, finished and renamed into place
  * unless another rotation changed the files meanwhile, which answers `undefined`; and `then`, under the same lock.
  */
 const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void, waitMs: number): ForgottenFeed | undefined => {
@@ -553,7 +553,7 @@ const rotateOnce = (root: string, forget: ReadonlySet<string>, then: () => void,
  * when no line was forgotten.
  */
 export const rotateFeed = (root: string, forget: ReadonlySet<string>, then: () => void, waitMs = FEED_LOCK_WAIT_MS): ForgottenFeed => {
-  for (let tries = 0; tries < 10; tries++) {
+  for (let round = 0; round < 10; round++) {
     const done = rotateOnce(root, forget, then, waitMs);
     if (done) return done;
   }

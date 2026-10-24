@@ -26,7 +26,7 @@ import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, 
 import { removeBody, sweep } from './sweep.ts';
 
 /**
- * One entry of the board-wide feed: an event, and which task it happened to.
+ * One entry of the store-wide feed: an event, and which task it happened to.
  *
  * This is the engine's API to whatever is built on top of it. A workflow layer that wants
  * "when task A settles, file task B" reads this and never touches a task journal — which is the
@@ -76,7 +76,7 @@ export type PlainJournalOps = {
   readonly read: (taskId: string) => Effect.Effect<Event[], JournalError>;
   readonly list: Effect.Effect<string[], JournalError>;
   /**
-   * Everything that has happened on this board since `after`, and where to resume.
+   * Everything that has happened in this store since `after`, and where to resume.
    *
    * The cursor never expires: the feed is append-only, so a consumer that was away for a week
    * replays rather than being told to start over. Pass 0 to read the whole history. A cursor at or past the feed's end reads nothing

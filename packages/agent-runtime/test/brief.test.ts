@@ -191,7 +191,7 @@ const BRIEF_REFUSALS: Array<[string, string, RegExp]> = [
   [
     'holdOpen: yes, in its own whole sentence',
     brief('holdOpen: yes'),
-    /^brief: `holdOpen: yes` is not true or false\. Write `holdOpen: true` to have the task wait for `ae answer` or `ae close` when an attempt signs, or leave it out to settle it then\.$/,
+    /^brief: `holdOpen: yes` is not true or false\. Write `holdOpen: true` to have the task wait for `ae answer` or `ae close` when an attempt ends, or leave it out to settle it then\.$/,
   ],
   ...['5m', '0', '-30', 'Infinity', 'soon', '1e400'].map((bad): [string, string, RegExp] => [
     `deadlineSeconds: ${bad}, which would be NaN and stop the task on its first pass`,

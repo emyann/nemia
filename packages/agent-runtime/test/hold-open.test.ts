@@ -298,7 +298,7 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
       const id = ((await run(file({ brief: 'b', cwd: '/r' }))) as { success: string }).success;
       await refusedWith(answer(id, 'go on'), /^`t-.*` was not filed to be held open/);
       await refusedWith(close(id), /^`t-.*` was not filed to be held open/);
-      await refusedWith(answer('t-nope', 'go on'), /^`t-nope` is not a task on this board/);
+      await refusedWith(answer('t-nope', 'go on'), /^`t-nope` is not a task in this store/);
       const held = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
       await refusedWith(answer(held, ' '), /^`text` is empty/);
       await refusedWith(answer(held, 'go on'), /has not started an attempt yet/);
@@ -445,7 +445,7 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
         b,
         't-unrecorded',
         () => Effect.runPromise(b.engine.answer('t-unrecorded', 'go')),
-        /^`t-unrecorded`'s attempt 1 signed, but its harness recorded no session for it, so there is no conversation for an answer to continue\. `close` it/,
+        /attempt 1 ended, .*recorded no session for it.*`close` it/,
       );
       assert.equal((await Effect.runPromise(b.engine.view('t-unrecorded'))).phase, 'input-required');
       await Effect.runPromise(b.engine.close('t-unrecorded'));
@@ -453,9 +453,9 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
     },
   );
 
-  await t.test('answer and close refuse a task not on this board', async () => {
-    await refuses(b, 't-nope', () => Effect.runPromise(b.engine.answer('t-nope', 'go')), /^`t-nope` is not a task on this board/);
-    await refuses(b, 't-nope', () => Effect.runPromise(b.engine.close('t-nope')), /^`t-nope` is not a task on this board/);
+  await t.test('answer and close refuse a task not in this store', async () => {
+    await refuses(b, 't-nope', () => Effect.runPromise(b.engine.answer('t-nope', 'go')), /^`t-nope` is not a task in this store/);
+    await refuses(b, 't-nope', () => Effect.runPromise(b.engine.close('t-nope')), /^`t-nope` is not a task in this store/);
   });
 
   await t.test('the control: the same board closes a task that waits', async () => {

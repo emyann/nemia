@@ -103,6 +103,11 @@ The guards in brackets decide between two edges of one event: `holds` sends a he
 still running past its deadline, and `lastDone`, `endedDone` and `endedStopped` choose the end a task settles on. A person's verbs,
 `requestStop`, `answer` and `close`, are declared beside the machine (`VERBS`), since no pass takes them.
 
+What a person reads of a task is its phase, one word of a closed set (`TaskPhase`): `pending`, `starting`, `working`, `quiescent`,
+`needs-human`, `input-required`, `idle`, `restarting`, `between-attempts` and `ending` while it is not settled, and once it is, its
+outcome: `succeeded`, `failed` or `stopped`. Beside an attempt in flight, a view carries the session's own state in A2A's names
+(`session`).
+
 ## Sources
 
 This page is written from `packages/agent-runtime/README.md` (_Where this stops_, _Admission_, _One attempt per start_, _The model_,

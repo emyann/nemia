@@ -509,7 +509,7 @@ const SAY_REFUSALS: Array<{
   { name: 'words that are only whitespace', says: /`text` is empty/, text: ' \n\t ', task: (engine) => running(engine) },
   {
     name: 'a task the engine has no record of',
-    says: /`no-such-task` is not a task on this board/,
+    says: /`no-such-task` is not a task in this store/,
     task: async () => ({ id: 'no-such-task' }),
   },
   {

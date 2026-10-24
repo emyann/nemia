@@ -229,7 +229,7 @@ test('admit refuses a task it has no record of, and a settled one — AdmitRefus
   const queued = await Effect.runPromise(b.engine.file({ brief: 'q', cwd: '/r', queued: true }));
   await assert.rejects(
     Effect.runPromise(b.engine.admit([queued, 'nobody'])),
-    (e: Error & { _tag?: string }) => e._tag === 'AdmitRefused' && e.message.startsWith('`nobody` is not a task on this board'),
+    (e: Error & { _tag?: string }) => e._tag === 'AdmitRefused' && e.message.startsWith('`nobody` is not a task in this store'),
   );
   assert.equal(
     b.journal.tasks.get(queued)!.some((e) => e.kind === 'admitted'),

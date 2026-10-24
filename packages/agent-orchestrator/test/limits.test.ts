@@ -115,7 +115,6 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-runtime/src/cli/main.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/core/domain.ts': { complexity: 2, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-runtime/src/core/engine/engine.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-runtime/src/core/engine/journal.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/core/event-schema.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/service/harness-refusal.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/args.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },

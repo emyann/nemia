@@ -54,7 +54,7 @@ export const interruptVerbOf = (
   Effect.fn('Engine.interrupt')(function* (taskId: string) {
     const refuse = (message: string) => Effect.fail(new InterruptRefused({ message }));
     const events = yield* read(taskId);
-    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
     const { name: harness, runner } = harnessOf(state);
     const end = runner?.interrupt;

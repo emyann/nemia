@@ -249,7 +249,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const holdOpen = trueOrFalse(
     'holdOpen',
     meta.get('holdOpen'),
-    'to have the task wait for `ae answer` or `ae close` when an attempt signs, or leave it out to settle it then',
+    'to have the task wait for `ae answer` or `ae close` when an attempt ends, or leave it out to settle it then',
   );
   const restartPolicy = restartOf(meta.get('restartPolicy'));
   const cwd = directoryOf(meta.get('cwd'));
@@ -302,7 +302,7 @@ const HELP = `ae — an engine for agent sessions
                                hear the next words: only a session attached on the Agent SDK
   ae answer <id> "<text>" [--budget <usd>]
                                answer a task held open that waits (input-required): its
-                               next turn resumes the session that signed, told the words
+                               next turn resumes the session that ended, told the words
   ae close <id>                settle a task held open that waits: succeeded
   ae admit <id>...             let tasks filed queued start (ae ls: queued): the next
                                tick starts them — one a store filed before stage 4c too
@@ -349,7 +349,7 @@ const HELP = `ae — an engine for agent sessions
   every task filed starts on the next tick: there is no ceiling. To hold one back,
   file it with queued: true and start it with ae admit <id>
 
-  AE_ROOT            a different board, the way a kubeconfig points at a different cluster`;
+  AE_ROOT            a different store, the way a kubeconfig points at a different cluster`;
 
 /**
  * Why `ae` refuses to run with `AE_MAX_CONCURRENT` set, empty too: `ae` builds its engine with no ceiling, since a ceiling is the
@@ -609,7 +609,7 @@ function engineless(argv: string[]): boolean {
 }
 
 /**
- * Runs the `ae` verb `argv` names on the board at `AE_ROOT`, or prints `HELP`; refuses first, with exit code 2, to run with
+ * Runs the `ae` verb `argv` names on the store at `AE_ROOT`, or prints `HELP`; refuses first, with exit code 2, to run with
  * `AE_MAX_CONCURRENT` set (`AE_MAX_CONCURRENT_RETIRED`).
  *
  * - `say` and `answer` take everything after the id as the words, so an unquoted sentence is one message — for `answer`,

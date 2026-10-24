@@ -263,7 +263,7 @@ const task = (name: string, contextId: string, state: TaskState, fill: Fill = {}
 /**
  * A session the harness sees, as a Task: its state mapped, its context the harness's id for it, what it closed with its
  * Artifact, and the whole sighting in `metadata.sighting`. `state` is for the one Task whose state is not its sighting's —
- * a signed session its task holds open for a person (`INPUT_REQUIRED`) — which then carries no sighting `sightingOf` reads.
+ * an ended session its task holds open for a person (`INPUT_REQUIRED`) — which then carries no sighting `sightingOf` reads.
  */
 export const taskOfSighting = (name: string, s: Sighting, state = stateOf(s.state)): Task =>
   task(name, s.nativeId ?? '', state, {

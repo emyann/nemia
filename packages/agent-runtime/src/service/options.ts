@@ -154,7 +154,7 @@ export type TaskSpec = {
    */
   closeoutSchema?: object;
   /**
-   * Hold the task open when an attempt signs, rather than settle it: the task waits, phase `input-required` — A2A's
+   * Hold the task open when an attempt ends, rather than settle it: the task waits, phase `input-required` — A2A's
    * `TASK_STATE_INPUT_REQUIRED` — with no process running, until a person `answer`s it, which starts its next turn, or
    * `close`s it, which settles it. A turn is one attempt, under `deadlineSeconds` and a budget of its own, so a task may
    * wait on a person for as long as they take; a turn that does not end `succeeded` settles the task `failed`. `stop` settles it `stopped`,
@@ -195,22 +195,22 @@ export type TaskSpec = {
  * One pass: how many tasks it read, how many actions it took, the sessions at work on each harness as it left them — its
  * last attempt open, and `working` or not yet listed; a `blocked` one is not — and the
  * view of every task it left unsettled — built off the pass's one observation of each harness and the fold it made, so a
- * layer above that decides what to `admit` reads the board without asking any harness again — and what the pass
+ * layer above that decides what to `admit` reads the store without asking any harness again — and what the pass
  * cost, as facts: `ms`, its wall time, and `observed`, each harness's observes made during it (`ObserveCount`). Nothing decides on
  * them.
  *
  * `refused` is every move the task's lifecycle had no edge for in this pass, off the same steps: the task, the state
  * it was in and the event it was handed. Such a task did nothing and will be asked again next pass, so a refusal that persists
- * is on every report until something changes; a layer above says it once (`wf up`). Empty on a healthy board, and a settled
+ * is on every report until something changes; a layer above says it once (`wf up`). Empty on a healthy store, and a settled
  * task is never on it.
  *
  * `unreadable` says why each task whose journal did not read was left out of the pass, naming its file, the entry and the field —
  * on every report while it lasts, as a refusal is — and each feed entry no runtime wrote that the pass skipped, on the report of
- * the pass that met it. Every other task is moved all the same. Empty on a healthy board.
+ * the pass that met it. Every other task is moved all the same. Empty on a healthy store.
  *
  * `unobserved` says why a harness's look failed this pass, one sentence each, naming the harness and in its words (a registry row
  * that does not decode names the row, its field and the fix): on every report while it lasts, on none after. The names that look
- * was to find are unread (`observed`'s `unread` counts it), and no rule reads the words. Empty on a healthy board.
+ * was to find are unread (`observed`'s `unread` counts it), and no rule reads the words. Empty on a healthy store.
  */
 export type TickReport = {
   tasks: number;

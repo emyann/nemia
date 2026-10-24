@@ -115,7 +115,7 @@ ran (`unstartable`) keeps the `resumeFrom` it was filed with on its record, so a
 
 Until stage 4a part 2 the engine decided this itself: `maxAttempts` counted attempts and a `resume` policy (`interrupted`,
 `always`, `never`) chose between continuing and starting clean. Nobody used it — the orchestrator filed every task
-`maxAttempts: 1` — and both are retired: `file()` and `ae start` refuse either, at any value, saying where trying again went. A
+`maxAttempts: 1` — and both are retired: `file()` and `ae file` refuse either, at any value, saying where trying again went. A
 journal written before still folds, and one with several attempts reads as it did.
 
 Verified against the live harness, when the engine still continued attempts itself: attempt 2 resumed attempt 1 under
@@ -156,8 +156,12 @@ The states are A2A's `TaskState` — `submitted`, `working`, `input-required`, `
 of the runtime's own: `starting` (an attempt's intent journalled, no spawn: the crash window), `stopping` (a person asked it
 to stop) and `ending` (no attempt runs and the record says how the turn ended). A2A's `rejected` is an attempt's
 `unstartable` end. A person's word — `stop`, `answer`, `close` — enters a state by the journal entry its verb writes; the
-machine's edges are what a pass does. The phases a person reads on `ae show`, `wf ls` and the board are `viewOfState`'s,
-and did not change.
+machine's edges are what a pass does. The phases a person reads on `ae show`, `ae ls` and the layers above are `viewOfState`'s,
+one closed set (`TaskPhase`, `TASK_PHASES` in `src/core/session.ts`): `pending`, `starting`, `working`, `quiescent` (at work and
+not computing), `needs-human`, `input-required`, `idle`, `restarting`, `between-attempts`, `ending` (no attempt runs and its end
+is not yet recorded), and, settled, the outcome: `succeeded`, `failed` or `stopped`. Beside an attempt in flight the look saw, a
+view carries `session`, the sighting's own state in A2A's names, so a reader that wants the session's word reads it there and
+never out of the phase.
 
 **A sighting speaks the same names** (since 2026-09-25). `Sighting.state` is `SessionState`, a literal union of A2A's
 eight `TaskState` names in `src/core/session.ts`: the SDK stays out of the pure core. Each driver translates its harness's words
@@ -168,9 +172,10 @@ state through; a `RunnerOps` brought as its own reports A2A's names, and `former
 remote registry entry an older runtime wrote still says them. `observe` gives the three names no harness spoke before no event of their own, since each asks nothing
 the journal can tell apart: `submitted` is at work (`SESSION_LIVE`, or quiet), `auth-required` waits on a person as
 `input-required` does (`SESSION_BLOCKED`, `waitingFor` says which), and `rejected` is an end recorded `failed`. So the
-machine and its diagram did not change. The journal keeps its three end words (`Ended`: `done`, `failed`, `stopped`,
-`endOf`), so a journal written before folds as it did, and a view prints each name in the words views always printed
-(`phaseWordOf`: `running (working)` is what admission compares). `test/session-state.test.ts` holds the corpus as it
+machine and its diagram did not change. An attempt ends with an `Outcome` — `succeeded`, `failed` or `stopped` (`endOf`), the
+words a settled task's phase says; an `ended` an older runtime wrote as `done` reads `succeeded` (`upgrade`), so a journal written
+before folds as it did. A live sighting's state reads into a phase by one total table (`LIVE_PHASE`), and admission holds a slot
+by another over the phase (`HOLDS_SLOT`). `test/session-state.test.ts` holds the corpus as it
 stood before the names changed, translated, to the action `decide` answered then in every case
 (`test/fixtures/decide-corpus.json`), and each of the three names to the one it joins.
 
@@ -509,7 +514,7 @@ share one, while a `claude --bg` resume starts under a new id and so in a contex
 its first `stream-json` line names the session. **What the workload closed with is the Task's one Artifact**, `closeout`:
 a `data` part, or `text/plain` for prose (Codex's), and the time it was given in its metadata when the harness said. A
 listing carries it only when it asks (`includeArtifacts`, A2A's default being no); `getTask` always does; the sighting
-`observe` reads is unchanged. **A signed session whose task is held open is `INPUT_REQUIRED` on `getTask`**, whether its
+`observe` reads is unchanged. **An ended session whose task is held open is `INPUT_REQUIRED` on `getTask`**, whether its
 harness still lists it `done` — a job is never let go — or not at all: the journal is read for that, once per read of a
 session listed `done`. A listing keeps the harness's `COMPLETED` of the same session, since `observe` reads the harness's
 word; the two differ on purpose. `answer` and `close` stay the engine's verbs, journalled; the agent reads the journal and
@@ -540,7 +545,7 @@ and the SDK's client, with a fake `codex` (`test/codex-agent.test.ts`) and once 
 | a held task's turns | `codex exec … resume <thread> <words>`, the same thread id and the same rollout file | M13, codex-cli 0.154.0 |
 | the `closeout` Artifact | the `-o` file: a `data` part under a schema, `text/plain` without one parsed | a listing without `includeArtifacts` carries none |
 | `cancelTask` | SIGTERM to the worker, which ends the harness's process group, then `CANCELED` | the harness and its grandchild end; a done session is refused |
-| `INPUT_REQUIRED` | only a signed attempt of a held task, between turns | the answered turn is `WORKING`, then waits again |
+| `INPUT_REQUIRED` | only an ended attempt of a held task, between turns | the answered turn is `WORKING`, then waits again |
 
 What `codex exec` cannot do, said rather than faked: **it takes no words while it runs** — the card says `say: false`, and a
 follow-up is refused in A2A's own terms, naming a spawn in the session's context, once it has ended, as the way on, while `wf` and the board keep
@@ -620,7 +625,7 @@ other task as long. The card and the auth are still read in the pass, so what ca
 does; then the spawn waits `SPAWN_WAIT_MS` (1 s) for the answer. An agent that answers by then is recorded before the spawn
 returns, and its refusal — a 401, a redirect, a content type it does not take — is still `unstartable`. One that has not is
 left to answer within `SEND_MS` (15 minutes), in this process: until it does, every process reads its entry as a Task
-`submitted` (the view's `running (working)`) while the sending process lives, and the answer is written as before — its
+`submitted` (the view's `working`) while the sending process lives, and the answer is written as before — its
 Task, or its reply ended. A refusal that comes after the spawn returned ends the session `rejected`, a `harness` end, its
 words on `logs`; a send that fails on the way, is not answered within `SEND_MS`, or whose process died is in doubt, never
 sent twice, and `lost` past the grace window. The `SEND_MS` lease is measured on the monotonic clock from the send's own
@@ -703,16 +708,17 @@ after a space starts a comment. The keys are a closed list:
 | `budgetUsd` | the most one attempt may spend, in dollars, digits only — a job on `claude`, or `claude-detached`; see below |
 | `contextTokens` | the session's context window, in tokens, digits only — `claude` and `claude-detached`, 100000 to 1000000; see below |
 | `background` | `true` or `false` — `claude` only: `true` runs the session as `claude --bg`, which a person can attach to and bridge to claude.ai, instead of as a job (`claude -p`); either can be told something with `ae say`; see below |
-| `holdOpen` | `true` or `false` — `true` has the task wait for `ae answer` or `ae close` when an attempt signs, rather than settle; see below |
+| `holdOpen` | `true` or `false` — `true` has the task wait for `ae answer` or `ae close` when an attempt ends, rather than settle; see below |
 | `queued` | `true` or `false` — `true` has the task wait for `ae admit <id>` before it starts: the one way to hold a task back under `ae`, which runs its engine with no ceiling; see *Queued and admitted* |
 | `restartPolicy` | `Always` — with `background: true` only: the session stays open between turns, idle, until `ae stop`; see *A long-lived session* |
 | `trustFrom` | `codex` only: an absolute directory you trust in `~/.codex/config.toml`, whose trust extends to the `cwd` — name it to work in a worktree of a repository you trust; see *Letting a sandboxed Codex step commit* |
 
-A brief writes each key on a line of its own, and `ae start` files the harness's — `model`, `permissionMode`, `worktree`,
+A brief writes each key on a line of its own, and `ae file` files the harness's (`ae start`, its former name, still files, after
+a line on stderr naming `ae file`) — `model`, `permissionMode`, `worktree`,
 `tools`, `effort`, `budgetUsd`, `contextTokens`, `background` — under the task's `config`, and Codex's own `trustFrom`
 under `config.codex`, where `file()` takes them.
 
-**Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae start`
+**Refused, with exit code 2 and a sentence naming the fix, before anything is filed.** `ae file`
 refuses a key not in that list (`afer: implement` is `` `afer` is not a key a brief has ``, with
 the list), a key given twice, a line that is not `key: value`, an empty value, a count or a number
 of seconds that is not one (`deadlineSeconds: 5m` used to become `NaN`, be journalled as `null`,
@@ -725,7 +731,7 @@ refused saying where it goes:
 a harness the engine does not have (it used to run on the fallback, silently), counts and seconds
 it cannot use, a retired `maxAttempts` or `resume`, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
-once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
+once resolved a relative one twice; `ae file` resolves it for you), a `tools` that
 is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `checkoutMcp` that is not a list of server names or is on a harness that loads none (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` that is not a whole number from -2147483648 to 2147483647 (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
@@ -923,7 +929,7 @@ adds nothing, and the operator's own servers still load. The `command` harness, 
 server, refuses the argument (`HarnessSpec.checkoutMcp`), and a remote agent refuses it with every
 other argument.
 
-`ae start` has no `mcp` or `checkoutMcp` key: a brief's values are one line each, so both are the API's for now.
+`ae file` has no `mcp` or `checkoutMcp` key: a brief's values are one line each, so both are the API's for now.
 
 ### Settings: the checkout's, never the operator's
 
@@ -979,7 +985,7 @@ prints is not its own: on 2.1.280 a resume's `total_cost_usd` and `duration_api_
 its own), so the runner takes off what the run it continues printed (`resumeCostCarried`, open issue 4). The harness counts one session's spend, and the engine counts none: a task filed again is handed its cap anew,
 so what a chain of filings spends together is the caller's to count (the orchestrator's `budget:`).
 
-`ae start` takes `budgetUsd: 0.25` in a brief, digits only, and files it under `config`. A journal written before stage 4b
+`ae file` takes `budgetUsd: 0.25` in a brief, digits only, and files it under `config`. A journal written before stage 4b
 carried the cap beside `config` and recorded a capped end with reason `budget`; the journal's reader (`upgrade`) reads both in
 today's shape — the cap under `config`, the end `harness` with `limit: 'budget'` — and rewrites nothing on disk.
 
@@ -1009,7 +1015,7 @@ call on a 100k window, Claude Code said "Autocompact is thrashing" after three c
 and the session was listed `blocked`, which the engine leaves to a person. An attempt that compacted takes its tokens from
 the `cost-state` Claude Code writes as it exits, which counts the summary's calls its transcript does not.
 
-`ae start` takes `contextTokens: 200000` in a brief, digits only, and `ae show` prints it.
+`ae file` takes `contextTokens: 200000` in a brief, digits only, and `ae show` prints it.
 
 ## Reachable from a phone: `claude.remoteControl`
 
@@ -1090,7 +1096,7 @@ queued, so a task admitted after a pass starts one pass (about 4 s under `ae up`
 held open (`holdOpen`) waits for another before each later turn. `admit` does nothing for a task already admitted, filed
 unqueued, or whose turn has started, and refuses one it has no record of and a settled one (exit 2, nothing written for
 any task in the call). `queued` that is not true or false is refused at `file()` and in a brief, where
-`queued: true` is how `ae start` files one.
+`queued: true` is how `ae file` files one.
 
 **The engine admits too, under its ceiling.** `Engine.layer({ root, maxConcurrent })` is how many sessions of each pool may be
 at work at once; with it, each pass ends by admitting the queued tasks its pools have room for, and the next pass starts
@@ -1124,8 +1130,8 @@ start every task at once and say nothing:
 - `maxConcurrent` that is not a whole number from 1, and a `pool` that is not a name (exit 2, naming the harness);
 - a `priority` that is not a whole number in int32 (exit 2);
 - any argument to `tick()` (`TickRefused`);
-- a third argument to `step`, and a `maxSteps` to `settleTask` that is not a whole number above nought:
-  each took the ceiling's `slots` third (`StepRefused`);
+- a third argument to `reconcile`, and a `maxSteps` to `settleTask` that is not a whole number above nought:
+  each took the ceiling's `slots` third (`ReconcileRefused`);
 - `AE_MAX_CONCURRENT` in `ae`'s environment, set to anything, empty too (exit 2, before anything is read or written).
 
 A journal may carry a `priority` that is not a whole number on its `filed` entry, `null` where JSON wrote a `NaN`: it is
@@ -1851,18 +1857,18 @@ naming the harnesses that have one; so is a harness the engine does not have, an
 
 ## Waiting for a person: `holdOpen`, `answer` and `close`
 
-A task filed with `holdOpen: true` does not settle when an attempt signs. It waits, with nothing running, until a
+A task filed with `holdOpen: true` does not settle when an attempt ends. It waits, with nothing running, until a
 person answers it or closes it — A2A's `TASK_STATE_INPUT_REQUIRED`, which is what `view` says: phase `input-required`.
-An answer is the task's next **turn**: an attempt that continues the session that signed (`--resume`), told the words in
+An answer is the task's next **turn**: an attempt that continues the session that ended (`--resume`), told the words in
 place of the brief. A close settles it `succeeded`, note `closed`. It is how a plan waits at its gate without a process
 kept alive for it, and how its next turn keeps the conversation that made the plan.
 
 ```ts
 const id = yield* engine.file({ brief: 'Draft the plan.', cwd, holdOpen: true, closeoutSchema })
-// … it signs: view(id).phase is 'input-required', and its session is let go as any ended attempt's is
+// … it ends: view(id).phase is 'input-required', and its session is let go as any ended attempt's is
 yield* engine.answer(id, 'Cut step 3; keep the rest.', { config: { budgetUsd: 2 } })
 // { at: '…', text: 'Cut step 3; keep the rest.', config: { budgetUsd: 2 } } — the next tick resumes the session, told that
-yield* engine.close(id)      // once it signs again and waits: the next tick settles it succeeded
+yield* engine.close(id)      // once it ends again and waits: the next tick settles it succeeded
 ```
 
 ```bash
@@ -1873,7 +1879,7 @@ node bin/ae.ts close <id>
 **On the journal.** `filed` carries `holdOpen: true`; an answer is an `input` entry — `at`, `text`, and `config` when
 given, the turn's own harness arguments laid over the filing's (`configForTurn`; only `budgetUsd` today, `TURN_ARGS`) — and a close is `closed`. Each attempt folds with the `turn` it belongs to: the number of `input`s journalled before
 its `starting`, absent for the first turn, so a journal written before any of this folds and decides as it did. `decide`
-reads the three, and nothing else about them: the task waits while its current turn's last attempt signed; an `input`
+reads the three, and nothing else about them: the task waits while its current turn's last attempt ended; an `input`
 after it starts the next turn; a `closed` settles it. Level-triggered like the rest — a restarted engine reads the wait,
 the answer or the close off the record.
 
@@ -1881,7 +1887,7 @@ the answer or the close off the record.
 one, the filing's if not. So a task may wait on a person for as long as they take — the deadline times work, not reading —
 and a turn whose attempt fails, is lost or cannot start settles the task `failed`, noting the turn, as a first turn's does;
 nothing is retried within the task. A caller that wants the conversation to go on files a task again with `resumeFrom`: on
-Claude Code that holds the failed attempt too, since `-p --resume` keeps the session's id (M12, open issue 28). A later turn continues only the session that signed the turn before it: where its harness recorded none, an
+Claude Code that holds the failed attempt too, since `-p --resume` keeps the session's id (M12, open issue 28). A later turn continues only the session that ended the turn before it: where its harness recorded none, an
 answer is refused, and one journalled all the same settles the task `failed` rather than start a session cold on it.
 Two answers journalled before the next turn starts are told to it both, in order, and the last budget given is its own:
 nothing serialises two writers of one journal, so the record says both and the turn reads both. A `stop` settles a
@@ -1891,10 +1897,10 @@ waiting task `stopped`, as it does any other.
 above 0, or one the task's harness would not keep (as `file` refuses one: `claude --bg` and `codex` keep none); a task the
 engine has no record of; one not filed to be held open; one settled, closed or asked to stop; and one that is not waiting —
 not started, an attempt running (`say` reaches a running session; `stop` ends it), between attempts, or answered already
-and its next turn not begun. An answer, not a close, is refused too where the attempt that signed has no session recorded. The engine's `answer` and `close` (and the bare ones from `agent-runtime`) refuse in the same words, as
-`InputRefused`. A close is a verdict on a signed turn, so it is refused while one runs, not queued behind it.
+and its next turn not begun. An answer, not a close, is refused too where the attempt that ended has no session recorded. The engine's `answer` and `close` (and the bare ones from `agent-runtime`) refuse in the same words, as
+`InputRefused`. A close is a verdict on an ended turn, so it is refused while one runs, not queued behind it.
 
-**Through the seam** (stage 2 part 5), the attempt that signed is `TASK_STATE_INPUT_REQUIRED` on `getTask` while the task
+**Through the seam** (stage 2 part 5), the attempt that ended is `TASK_STATE_INPUT_REQUIRED` on `getTask` while the task
 waits, its closeout its Artifact, and each turn's attempt is a Task of its own in one context, the session's. A held task is
 not yet one A2A Task across its turns. Measured live on Claude Code jobs (M12, open issue 28) and on Codex threads (M13,
 open issue 31); not on a `--bg` session.
@@ -2238,7 +2244,7 @@ of pure code sits beside it.
 | `src/waits/index.ts` | the wait's face: `until`, `bell` and `WAITED`, as a test of this package and the testing entry read them |
 | `src/waits/waits.ts` | the one copy of the wait a test makes on the event it counts, never on a length of time (`until`), the bell its source rings (`bell`) and the bound a waiting test takes (`WAITED`) |
 | `src/index.ts` | the export list of `agent-runtime`, by name, all Effect — the boundary; `decide` is not on it |
-| `src/core/session.ts` | a session's state in A2A's names, the end each records and the word a person reads (`endOf`, `phaseWordOf`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
+| `src/core/session.ts` | a session's state in A2A's names, the end each records and the phase a person reads (`endOf`, `TaskPhase`, `LIVE_PHASE`): read by both `domain.ts` and `lifecycle.ts`, so neither imports the other's values |
 | `src/core/domain.ts` | events, `fold`, **`decide`** and what it reads — `lifecycleOf`, `observe` — pure, no I/O, the whole judgement, and the session name read back (`nameParts`) |
 | `src/core/lifecycle.ts` | the lifecycle as an XState statechart, used as a pure transition function: its states, the edge for each event and the one action it names, the refusal of an event with no edge, and the diagram generated from it |
 | `src/core/path.ts` | a task's path through the lifecycle, replayed off its journal (`pathOf`): the state after each entry, the entry's kind and its time, for the `path` verb — pure, a reader's, never a pass's |
@@ -2364,7 +2370,7 @@ of pure code sits beside it.
 | `src/service/index.ts` | the face of `service/`, as the face takes it |
 | `src/cli/main.ts` | the verbs, and the brief: parse (closed keys), call, print |
 | `src/cli/compact.ts` | what `ae compact` is asked (`--yes` or nothing) and the lines it prints: per harness its captures, their bytes before and after, and each left with why |
-| `src/cli/lines.ts` | the lines `ae` prints for a person: a task, an attempt, a journal entry, a usage, the limits a task was filed with |
+| `src/cli/lines.ts` | the lines `ae` prints for a person: a task, an attempt, a journal entry, a usage, the limits a task was filed with, and the sessions a pass left running (`runningText`) |
 | `bin/ae.ts` | the `ae` entry point: a refusal prints its sentence and exits 2 |
 | `bin/ae-worker.ts` | the detached worker: babysits one harness process, keeps the run file |
 | `bin/ae-claude-job.ts` | a Claude Code job's own process: one session on the Agent SDK's `query()`, built from the spawn request the runner wrote, printing each message as one line of the stream a job's readers read |
@@ -2391,7 +2397,7 @@ of pure code sits beside it.
 | `src/core/engine/journal.test.ts` | the store and the feed's cursor, and a journal written before the harness's arguments were one `config`, read in today's shape |
 | `test/harness-args.test.ts` | the checks every harness shares of a task's `config`, made to refuse in their own file and through a `Runner` |
 | `test/core-reads.test.ts` | `domain.ts` and `engine.ts` read no harness argument: the `config` they carry is handed on unopened |
-| `test/brief.test.ts` | the brief parser, made to refuse; `ae start` exits 2, and `ae` exits 2 with `AE_MAX_CONCURRENT` set |
+| `test/brief.test.ts` | the brief parser, made to refuse; `ae file` exits 2, `ae start` still files with a hint naming it, and `ae` exits 2 with `AE_MAX_CONCURRENT` set |
 | `test/usage.test.ts` | the transcript count and cost — a resumed session's own share, from its `cost-state` lines — and "not measured" rather than 0 |
 | `test/transcript.test.ts` | a session's conversation as events, from a transcript file and a rollout the test writes: the cursor, words sent in, and each refusal at shipped defaults |
 | `test/hold-open.test.ts` | a task held open, through the engine and the Effect layers: it waits with its session let go, an answer after a restart resumes it, a close settles it, and every refusal of `answer` and `close` |
@@ -2490,8 +2496,8 @@ counts the sessions at work per harness:
 $ ae tick
 2 action(s) over 4 task(s)  [claude:2]
 $ ae ls
-t-mtxp3z06  claude    running (working)   cost not measured  Write the number 1 into N1.txt
-t-mtxp3z5p  claude    running (working)   cost not measured  Write the number 2 into N2.txt
+t-mtxp3z06  claude    working             cost not measured  Write the number 1 into N1.txt
+t-mtxp3z5p  claude    working             cost not measured  Write the number 2 into N2.txt
 t-mtxp3zb3  claude    pending             queued  Write the number 3 into N3.txt
 t-mtxp3zgs  claude    pending             queued  Write the number 4 into N4.txt
 ```
@@ -2553,7 +2559,7 @@ its journal gone nothing names that record, so it is counted for no task from th
 
 ### `tick` and `up`, and why both
 
-`up` is `tick` on a timer — `engine.start()`, with a guard so a slow pass never overlaps the next.
+`up` is `tick` on a timer — `engine.up()` (`start`, its former name, is the same function), with a guard so a slow pass never overlaps the next.
 So the question is not why `tick` exists but why `up` does, and the answer is only convenience:
 somewhere has to hold the timer, and a shell loop pays a Node start per pass.
 

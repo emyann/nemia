@@ -23,7 +23,7 @@ down is in `docs/architecture.md`, *Who owns what*.
 - **XState's `transition` answers an event with no edge by staying**: `moveOn` asks `snapshot.can(event)` first and refuses.
 - **A sighting speaks A2A's names; a harness's rows and the journal keep their own** (`claudeStateOf`, `detachedStateOf` translate at the
   edge; `decide-corpus.json` proves it case for case).
-- **`unsigned` is the orchestrator's word**: the runtime records `stated: false` on a `done` end. Read an end through `closeoutAsked` or
+- **`unsigned` is the orchestrator's word**: the runtime records `stated: false` on a `succeeded` end. Read an end through `closeoutAsked` or
   `endWords`, which also map a fact that replaced an old word back to it (`limit: 'budget'`).
 - **The engine can say a task waits before its harness has let the session go** (`closedOut`, and it waits for the session before ending
   on a statement on disk): a test asserts both sides, or waits for the Task.
@@ -42,7 +42,7 @@ down is in `docs/architecture.md`, *Who owns what*.
 
 ## Arguments and doors
 
-- **A parameter taken away is refused, never ignored** (`Object.hasOwn`, the argument count: `tickRefusalOf`, `StepRefused`).
+- **A parameter taken away is refused, never ignored** (`Object.hasOwn`, the argument count: `tickRefusalOf`, `ReconcileRefused`).
 - **The engine's `root` is required and defaults to nothing**, on `EngineOptions`, `ClaudeOptions`, `claudeCodeOps`'s options,
   `Journal.files`, `Journal.filesOps` and `Runner.claude`: whoever builds an engine says where its records go, and `src/cli/main.ts`
   is the one module that reads `AE_ROOT` or names `~/.agent-engine` (`test/engine-root.test.ts`, which also holds `os.homedir()` to

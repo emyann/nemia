@@ -8,7 +8,7 @@
  * the state, a pass carries nothing, and a restart reads the same state from the same journal (`domain.ts`, which is where
  * both readings live). XState is imported by this file alone (`test/xstate-boundary.test.ts`); no entry exports the
  * machine or its move, as none exports `decide`: `agent-runtime` hands out its graph as plain data (`lifecycleGraph`), which a
- * board draws.
+ * page draws.
  *
  * **The states are A2A's `TaskState`, and three of the runtime's own.** `submitted`, `working`, `input-required`,
  * `completed`, `failed` and `canceled` are the protocol's words for what they say. The runtime's own:
@@ -78,7 +78,7 @@ export type Verb = {
 
 /**
  * The verbs a person writes to a task. None is an edge: each journals its entry, and the next pass reads the state it makes.
- * `stoppable`: not settled, not asked to stop already. `awaitsWord`: held open, its turn signed, waiting on a person.
+ * `stoppable`: not settled, not asked to stop already. `awaitsWord`: held open, its turn ended, waiting on a person.
  */
 export const VERBS = [
   {
@@ -345,7 +345,7 @@ const CONFIG = {
           actions: settle(
             'failed',
             (e: Ev<'NO_SESSION_TO_CONTINUE'>) =>
-              `turn ${e.turn} has no session to continue: its harness recorded none for the attempt that signed`,
+              `turn ${e.turn} has no session to continue: its harness recorded none for the attempt that ended`,
           ),
         },
       },
@@ -400,7 +400,7 @@ const CONFIG = {
         },
       },
     },
-    /** Held open, its turn signed: it waits on a person for as long as they take, before the deadline, which times work. */
+    /** Held open, its turn ended: it waits on a person for as long as they take, before the deadline, which times work. */
     'input-required': {
       on: { AWAITING_INPUT: { actions: nothing } },
     },
@@ -583,10 +583,10 @@ export const diagram = (machine = MACHINE, verbs: readonly Verb[] = VERBS): stri
   ].join('\n');
 };
 
-/** One edge of the lifecycle, as `lifecycleGraph` hands it to a board: plain strings, never a piece of the machine. */
+/** One edge of the lifecycle, as `lifecycleGraph` hands it to a page: plain strings, never a piece of the machine. */
 export type LifecycleEdge = Edge;
 
-/** One verb a person writes to a task, as `lifecycleGraph` hands it to a board: plain strings. */
+/** One verb a person writes to a task, as `lifecycleGraph` hands it to a page: plain strings. */
 export type LifecycleVerb = Omit<Verb, 'from'> & { from: LifecycleState[] };
 
 /**
@@ -602,7 +602,7 @@ export type LifecycleGraph = {
 };
 
 /**
- * The shipped lifecycle as data a board draws, read off the same graph as `diagram` (`statesOf`, `edgesOf`, `FINAL`, `VERBS`).
+ * The shipped lifecycle as data a page draws, read off the same graph as `diagram` (`statesOf`, `edgesOf`, `FINAL`, `VERBS`).
  * Each call returns a fresh copy that survives a JSON round trip: it takes nothing, and hands out no machine and no move.
  */
 export const lifecycleGraph = (): LifecycleGraph => ({

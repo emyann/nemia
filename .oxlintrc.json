@@ -757,12 +757,6 @@
       }
     },
     {
-      "files": ["packages/agent-runtime/src/core/engine/journal.ts"],
-      "rules": {
-        "sonarjs/cognitive-complexity": ["error", 17]
-      }
-    },
-    {
       "files": ["packages/agent-runtime/src/core/event-schema.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 16]

@@ -2005,7 +2005,7 @@ What was built:
 - **Compared against the feed, not memory** (`src/feed/feed.ts`): a process folds the feed as far as it has read it (`foldFeed`), reads on
   from its byte each pass, and writes what differs (`feedChanges`). A fresh process folds from 0, so a restarted daemon writes nothing
   for what did not change; a feed replaced or truncated under it (another inode, a cursor no longer at a line) is folded again from 0.
-- **Words that move only when the judgement does.** The engine's live words fold into `running` (`feedPhase`); a slot wait drops its
+- **Words that move only when the judgement does.** The engine's live phases (`starting`, `working`, `quiescent`, `between-attempts`, `ending`) fold into `running` (`feedPhase`); a slot wait drops its
   count; no cost is said; and a note's change alone, on a run at rest (`atRest`), is not a change. Without these the feed would be
   written on every pass a session went idle, every pass a dollar was spent, and for every finished run once a note is worded anew.
 - **The engine's cursor, refused by name where it cannot be read from**: a read stops at the last newline, never past a partial line;
@@ -2090,7 +2090,7 @@ whether the board follows the feed (`data-feed`). An e2e page that edits the sto
   free a slot or start a queued card. `removed` invalidates `['runs']` and removes the named run's record, `exact: true`. `unreadable`
   with `retrying: false` closes the stream and opens it again with no cursor, then refetches; with `retrying: true` it is said on the
   page until `readable` clears it.
-- **`runsQuery`'s 5 s poll becomes a backstop** of 30–60 s, not nothing: a session's live words (`running (idle)`), cost, a harness's
+- **`runsQuery`'s 5 s poll becomes a backstop** of 30–60 s, not nothing: a session's live phase (`quiescent`), cost, a harness's
   `waitingFor` and a finished run's git standing (`to decide`) are in no feed.
 - **An e2e page of its own** that writes a run's change into the seed's store and sees the Factory move without waiting out a poll; it
   shifts no count (CLAUDE.md), since it writes no run.
@@ -4950,7 +4950,7 @@ next turn: the same task, the same id, in the session that signed.
   (`stepState`), never as one still going. No new field on the api.
 - **Old runs.** A task filed before this has no `holdOpen`: it settles at its sign-off, and a send-back is a `-try2` task, as it was.
 
-**What it leaves.** A closed task reads `between attempts` until the engine's next pass settles it, so `wf ls` can say so for at most
+**What it leaves.** A closed task reads `between-attempts` until the engine's next pass settles it, so `wf ls` can say so for at most
 a pass. The timeline and the said attribution count a turn's session once; `consumption` sums every turn of the task. `wf cancel` calls a
 blocked run off and closes its waiting task (`closeWaitingTasks`), as it does at a gate. Rounds stay
 `-try<n>` tasks, and a step's tries as attempts of one task (4c) wait on the owner. Since 2026-09-28 that item is called *tries as

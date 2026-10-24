@@ -240,7 +240,7 @@ export type EngineShape = {
    */
   readonly path: (taskId: string) => Effect.Effect<LifecycleTransition[], JournalError>;
   /**
-   * Every task on the board, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that
+   * Every task in the store, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that
    * order with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which
    * sessions where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none
    * is. A view of a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up
@@ -433,7 +433,7 @@ export type EngineShape = {
   /**
    * Answer a task held open (`holdOpen`) that waits for one — phase `input-required`. Journalled as an `input` entry — `at`,
    * `text`, and `config` if given — which is returned, and which `view` carries as `state.inputs`. The next tick starts
-   * the task's next turn: an attempt that continues the session that signed (`--resume`), told `text` in place of the
+   * the task's next turn: an attempt that continues the session that ended (`--resume`), told `text` in place of the
    * brief, with `config` laid over the task's own if given. A turn gives its own spend cap and nothing else
    * (`config: { budgetUsd }`, `TURN_ARGS`): the rest of its configuration is the session's it continues. Nothing is
    * sent to any session: none is running.
@@ -552,7 +552,7 @@ export type EngineShape = {
   readonly drain: (holder: number | null) => Effect.Effect<void, DrainRefused>;
   /**
    * Tick on a timer until stopped. Ticks never overlap: a beat that comes while a tick runs is skipped, so a tick that
-   * outruns the interval is not joined by a second pass over the same board. The timer holds the process open, as a control
+   * outruns the interval is not joined by a second pass over the same store. The timer holds the process open, as a control
    * loop must: `stop()` gives the process back.
    */
   readonly up: (options?: {
@@ -845,7 +845,7 @@ const make = (options: EngineOptions) =>
       const refuse = (message: string) => Effect.fail(new TranscriptRefused({ message }));
       const events = yield* read(taskId);
       if (!events.length)
-        return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+        return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
       const state = fold(taskId, events);
       const { name: harness, runner, config: h } = harnessOf(state);
       const transcriptOf = runner.transcriptOf;

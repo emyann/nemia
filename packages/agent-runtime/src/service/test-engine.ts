@@ -222,7 +222,7 @@ const unkept = (verb: string) => () =>
   );
 
 /** The words the engine refuses a task it holds nothing of with. */
-const unknown = (id: string): string => `\`${id}\` is not a task on this board.`;
+const unknown = (id: string): string => `\`${id}\` is not a task in this store.`;
 
 /** What a test reads back and moves by hand, beside the layer: see the file's head. */
 export type TestEngine = {
@@ -561,7 +561,7 @@ const taskFor = (tasks: Map<string, TestTask>, id: string, before: string): Test
 };
 
 /**
- * The task `id` started again: the attempt it had kept as an earlier try — as it ended, where a settle ended it, else failed now — and a
+ * The task `id` started again: the attempt it had kept, now an earlier one — as it ended, where a settle ended it, else failed now — and a
  * new attempt at work in its place.
  */
 const restartIn = (tasks: Map<string, TestTask>, id: string): TestTask => {

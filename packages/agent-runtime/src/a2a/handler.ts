@@ -322,7 +322,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
 
   /**
    * One session: as the harness sees it, or, when it lists no such session, as the journal records the attempt — open,
-   * or how it ended. Neither knows it: `TaskNotFoundError`. A session that signed and whose task is held open for a person
+   * or how it ended. Neither knows it: `TaskNotFoundError`. A session that ended and whose task is held open for a person
    * is `INPUT_REQUIRED`, whether its harness still lists it `completed` — a Claude Code job, never let go — or has let it go:
    * the journal is read for that, once, for a session listed `completed` or listed not at all. `listTasks` still says
    * `COMPLETED` of it, the harness's word, which is what `observe` reads.

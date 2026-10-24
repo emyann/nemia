@@ -59,7 +59,7 @@ export const sayVerbOf = (
     const resume = 'Continue its session with a new task that carries the words (`resumeFrom`), as `wf retry --message` does.';
     if (typeof text !== 'string' || !text.trim()) return yield* refuse('`text` is empty. Give the words the session should hear.');
     const events = yield* read(taskId);
-    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
     const { name: harness, runner, config: h } = harnessOf(state);
     const deliver = runner.say;

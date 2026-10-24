@@ -533,7 +533,7 @@ test('a person stops a running job: the harness is told, the next pass settles i
       const cases: Array<[string, RegExp, RegExp]> = [
         ['done', /^`done` has settled \(succeeded\)/, /`resumeFrom`/],
         ['asked', /^`asked` has settled \(stopped\)/, /`resumeFrom`/],
-        ['nope', /^`nope` is not a task on this board/, /`ae ls`/],
+        ['nope', /^`nope` is not a task in this store/, /`ae ls`/],
       ];
       for (const [id, fact, fix] of cases) {
         const refused = await b.run(Effect.flip(requestStop(id)));

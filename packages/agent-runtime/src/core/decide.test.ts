@@ -1208,7 +1208,7 @@ test('HELD OPEN: a task held open signs and waits on a person, is answered into 
       const settled = {
         do: 'settle',
         outcome: 'failed',
-        note: 'turn 1 has no session to continue: its harness recorded none for the attempt that signed',
+        note: 'turn 1 has no session to continue: its harness recorded none for the attempt that ended',
       };
       assert.deepEqual(decide(fold(TASK, [...unrecorded(), answer(60_000)]), seen(), now(61_000)), settled);
       assert.deepEqual(

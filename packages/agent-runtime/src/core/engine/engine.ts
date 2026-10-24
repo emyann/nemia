@@ -230,7 +230,7 @@ const ALL_READ: ReadonlySet<string> = new Set();
  * One task, one step. Returns the action taken, so a caller can loop until nothing moves.
  *
  * `observed` is passed in rather than read here: one `claude agents` call serves a whole pass, which is the difference
- * between a board that scales and one that shells out per task. Typed to take two arguments, and counts them all the same:
+ * between a store that scales and one that shells out per task. Typed to take two arguments, and counts them all the same:
  * a third, as an untyped caller may still pass the ceiling's slots, fails with `ReconcileRefused` (`reconcileRefusalOf`), nothing read.
  */
 export const reconcile = Effect.fn('reconcile')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
@@ -647,11 +647,11 @@ const lookAt = (runner: RunnerOps, expected: readonly ExpectedSession[]) =>
   ).pipe(Effect.map((o) => ({ ...o, unobserved: [...(o.why ?? [])] })));
 
 /**
- * One pass over every task on the board. This is the whole daemon.
+ * One pass over every task in the store. This is the whole daemon.
  *
  * Each task is stepped in the order `journal.list` gives, against one observation of every harness. A task filed unqueued
  * starts on it, and one filed `queued` starts on the pass after it is admitted: by `admit`, or by the pass itself under the
- * engine's ceiling (`Admission`), off the board as the pass left it — its one observation and the fold it already made, with
+ * engine's ceiling (`Admission`), off the store as the pass left it — its one observation and the fold it already made, with
  * no second look at any harness. Per pool, the waiting task of the highest `priority` goes first, then the earliest filed.
  *
  * `running` is a count, per harness, of the sessions at work as the pass left them (`atWork`), off the same observation
@@ -677,7 +677,7 @@ const lookAt = (runner: RunnerOps, expected: readonly ExpectedSession[]) =>
  *
  * 1. It refuses any argument with `TickRefused`, nothing read (`tickRefusalOf`): typed to take nothing, it counts them all
  *    the same, since an untyped caller may still pass a ceiling.
- * 2. It reads the feed on from the memo's cursor (`forgetNamed`), before anything else of the board is read: whatever is
+ * 2. It reads the feed on from the memo's cursor (`forgetNamed`), before anything else of the store is read: whatever is
  *    appended while the pass reads is past the cursor, and named on the next. A task the feed names is folded again, and
  *    each is forgotten before any is folded, so a pass that fails part way leaves nothing kept that the feed has since named.
  * 3. It folds every task the memo does not keep, before the harnesses are looked at, so the look can be told what to look
@@ -802,7 +802,7 @@ const readEach = Effect.fn('readEach')(function* (taskIds: Iterable<string>) {
  * The views of `taskIds`, over one look at the harnesses: each journal read once, and the harnesses told the last attempt of each task not
  * settled (`observeFor`), which is all a view reads of a sighting — so a look for Claude Code jobs alone lists their run files and asks no
  * `claude agents`, and a look for none is not made. Where a runner cannot be told, it observes everything once, as `list` does. What a
- * caller that shows some of the board reads in place of a `view` each (an observation each for tasks in flight) or of `list` (every
+ * caller that shows some of the store reads in place of a `view` each (an observation each for tasks in flight) or of `list` (every
  * journal in the store). A registry that cannot be read this time is nothing observed, as `view` reads it. Why a session alone was
  * unread (`TaskView.unreadWhy`) is carried off the look that said it.
  *
@@ -825,7 +825,7 @@ export const viewsOf = Effect.fn('viewsOf')(function* (taskIds: readonly string[
 });
 
 /**
- * Every task on the board, each journal read, over one observation of every harness — what `list()` answers. A task whose journal does
+ * Every task in the store, each journal read, over one observation of every harness — what `list()` answers. A task whose journal does
  * not read is left out of `views` and named in `unreadable`, once, as `viewsOf` leaves it out; a store that cannot be listed, or a
  * harness that cannot be observed, fails the read. A full listing says no session's `unreadWhy`.
  */
@@ -877,7 +877,7 @@ const carriedOf = (sighting: Sighting | undefined, phase: TaskView['phase']) => 
  * Its phase is the first of these that holds:
  *
  * 1. its outcome, once settled;
- * 2. `input-required`: held open, signed and waiting for a person's answer or close — A2A's TASK_STATE_INPUT_REQUIRED —
+ * 2. `input-required`: held open, ended and waiting for a person's answer or close — A2A's TASK_STATE_INPUT_REQUIRED —
  *    with nothing running;
  * 3. `restarting`: a long-lived task's session its harness is respawning (`respawning`);
  * 4. `idle`: a long-lived task's session open between turns (`idleOf`), which only a stop ends;

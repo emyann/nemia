@@ -3,7 +3,7 @@
  *
  * `mcpServerStatus()` is a method on the Agent SDK's `query()` object (`sdk.d.ts:3078`), so a state can be read only from inside a
  * session. A session's first answer can be `pending`, since MCP startup is not blocking (measured 0.3.308), and this read makes
- * exactly one ask: it carries whatever that answer said. A settled word is a second read's — the board presses Check again for one —
+ * exactly one ask: it carries whatever that answer said. A settled word is a second read's — the page presses Check again for one —
  * and `MCP_STATE_MS` gives a server no time to settle: it is a deadline that ends the session, as its own refusal says by naming the
  * read again as the fix.
  *

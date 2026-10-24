@@ -119,11 +119,11 @@ export const attemptLine = (a: Attempt): string => {
  */
 export const taskLine = (v: TaskView) => {
   const turn = v.state.inputs.length;
-  const tries = turn ? `turn ${turn}` : '';
+  const turnText = turn ? `turn ${turn}` : '';
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
   const queued = v.admission === 'queued' ? '  queued' : '';
   const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${meter}  ${firstLine(v.state.brief).slice(0, 44)}`;
+  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${turnText ? ` ${turnText}` : ''}${queued}${meter}  ${firstLine(v.state.brief).slice(0, 44)}`;
 };
 
 /** The word each kind of journal entry is printed with. */

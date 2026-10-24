@@ -6,20 +6,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunDetail } from '../src/lib/api.ts';
-import { stepCardOf, type StepCardFacts } from '../src/lib/stepCard.ts';
+import { kindOf, stepCardOf, type StepCardFacts, type StepKind } from '../src/lib/stepCard.ts';
+import type { StepPhase } from '../src/lib/api/reasons.ts';
+import type { StepState } from '../src/lib/status.ts';
 import { PERSON } from '../src/lib/words.ts';
 import { aCardOpen, CARD_REACH, cardOpened, previewSide, SHEET_QUERY } from '../src/lib/useSheetPreview.ts';
-import { detail, step, summary } from './run-fixtures.ts';
+import { coded, detail, step, summary, triedAs, type Word } from './run-fixtures.ts';
 
 type Step = RunDetail['steps'][number];
 
 const NOW = new Date('2026-09-30T05:20:00.000Z');
 
-/** A step of the answer, settled as `status` says, with nothing beside it but what `extra` puts. */
-const quiet = (name: string, status: string, extra: Partial<Step> = {}): Step =>
+/** A step of the answer, settled as `word` and its codes say, with nothing beside it but what `extra` puts. */
+const quiet = (name: string, word: Word, extra: Partial<Step> = {}): Step =>
   step({
     name,
-    status,
+    ...coded(word),
     denied: null,
     check: null,
     gate: null,
@@ -39,7 +41,7 @@ const aTry = (n: number, round = 1): Step['tries'][number] => ({
   current: true,
   taskId: `t-${n}`,
   note: null,
-  status: 'running',
+  ...triedAs('running'),
   attempts: { count: 1, latest: null },
   check: null,
   closeout: null,
@@ -47,9 +49,9 @@ const aTry = (n: number, round = 1): Step['tries'][number] => ({
   answer: null,
 });
 
-/** The card of `name` on a run of design, implement, review whose statuses are `statuses`, its answer's steps `steps`. */
-function cardOf(name: string, statuses: Record<string, string>, steps: Step[], agent: string | null = 'Ada'): StepCardFacts {
-  const row = summary(Object.entries(statuses));
+/** The card of `name` on a run of design, implement, review whose steps say `words`, its answer's steps `steps`. */
+function cardOf(name: string, words: Record<string, Word>, steps: Step[], agent: string | null = 'Ada'): StepCardFacts {
+  const row = summary(Object.entries(words));
   row.steps = row.steps.map((s) => ({ ...s, agent: s.name === name ? agent : null }));
   return stepCardOf({
     run: row,
@@ -60,7 +62,31 @@ function cardOf(name: string, statuses: Record<string, string>, steps: Step[], a
   });
 }
 
-const STATUSES = { design: 'verified ✓', implement: 'running (working)', review: 'waiting' };
+const STATUSES: Record<string, Word> = { design: 'verified ✓', implement: 'running (working)', review: 'waiting' };
+
+test('kindOf: the five kinds of a card, from the phase the api carries', () => {
+  const cases: Array<[StepPhase, StepState, boolean, StepKind]> = [
+    ['running', 'working', false, 'work'],
+    ['running', 'checking', true, 'work'],
+    ['waiting', 'awaiting-approval', true, 'gate'],
+    ['waiting', 'needs-human', true, 'gate'],
+    ['waiting', 'unsigned', true, 'gate'],
+    ['succeeded', 'verified', true, 'done'],
+    ['succeeded', 'unverified', true, 'done'],
+    ['failed', 'failed-check', true, 'failed'],
+    ['failed', 'unreadable', true, 'failed'],
+    ['pending', 'waiting', false, 'come'],
+    ['pending', 'waiting', true, 'done'],
+    ['pending', 'unknown', false, 'come'],
+    ['stopped', 'cancelled', false, 'come'],
+    ['stopped', 'cancelled', true, 'done'],
+  ];
+  for (const [phase, state, ran, kind] of cases) assert.equal(kindOf(phase, state, ran), kind, `${phase} ${state}, ran ${ran}`);
+  assert.equal(kindOf('waiting', 'held', false), 'come', "a gate a person's hold stops asks nothing: no gate, to come");
+  assert.equal(kindOf('waiting', 'held', true), 'done', 'and done where a session of it ran');
+  assert.equal(kindOf('pending', 'held', false), 'come');
+  assert.equal(kindOf('waiting', 'awaiting-approval', false), 'gate', 'a gate held before its step is filed is a gate all the same');
+});
 
 test("stepCardOf: a step's card in each of its states, its facts, its note and its words", async (t) => {
   await t.test(
@@ -145,8 +171,8 @@ test("stepCardOf: a step's card in each of its states, its facts, its note and i
     assert.deepEqual(card.spend, { kind: 'words', label: 'Budget', said: '$16', note: '' });
   });
   await t.test('a step that failed: no hue, failed at its end, and its check refusal as the note', () => {
-    const card = cardOf('implement', { ...STATUSES, implement: 'failed ✗ check' }, [
-      quiet('implement', 'failed ✗ check', {
+    const card = cardOf('implement', { ...STATUSES, implement: 'failed ✗ check (exit 1)' }, [
+      quiet('implement', 'failed ✗ check (exit 1)', {
         tries: [aTry(1)],
         spent: { usd: 0.52, measured: 1, unmeasured: 0, said: '$0.52' },
         check: step().check,

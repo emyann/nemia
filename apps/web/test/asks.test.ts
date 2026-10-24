@@ -19,6 +19,7 @@ import {
   type Need,
 } from '../src/lib/asks.ts';
 import type { RetryMode, RunDetail, RunToDecide } from '../src/lib/api.ts';
+import { coded, EXIT_1, UNFINISHED, type Word } from './run-fixtures.ts';
 
 const LOGIN =
   'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute';
@@ -27,11 +28,11 @@ const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in C
 
 type Step = RunDetail['steps'][number];
 
-/** A step as a run's detail gives it, cut to what these read. */
-const step = (name: string, status: string, over: Partial<Step> = {}): Step =>
+/** A step as a run's detail gives it, saying `word` with its codes, cut to what these read. */
+const step = (name: string, word: Word, over: Partial<Step> = {}): Step =>
   ({
     name,
-    status,
+    ...coded(word),
     note: null,
     needs: null,
     blockedByHarness: false,
@@ -187,9 +188,9 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
       const steps = [
         step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' }),
         step('quiet', 'succeeded · BLOCKED'),
-        step('theme', 'failed ✗ check (exit 1)', { check: { command: 'npm test', taskId: 't-c', verdict: 'exit 1', refused: null } }),
+        step('theme', 'failed ✗ check (exit 1)', { check: { command: 'npm test', taskId: 't-c', verdict: EXIT_1, refused: null } }),
         step('lint', 'failed ✗ check (unfinished)', {
-          check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null },
+          check: { command: 'npm run lint', taskId: 't-l', verdict: UNFINISHED, refused: null },
         }),
         step('docs', 'unsigned'),
         step('notes', 'denied', { denied: { words: 'denied: Write(/tmp/w/notes.md)', calls: ['Write(/tmp/w/notes.md)'] } }),
@@ -391,49 +392,51 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
       const steps = [
         step('tokens', 'over budget $4.25 of $3', {
           raise: byTry,
-          check: { command: 'npm test', taskId: 't-c', verdict: 'exit 1', refused: null },
+          check: { command: 'npm test', taskId: 't-c', verdict: EXIT_1, refused: null },
         }),
         step('review', 'over budget — implement $2.10 of $2', { raise: byRound }),
         step('lint', 'budget exhausted $3.02 of $3', { raise: ended }),
         step('palette', 'over budget $1.50 of $1', { raise: blocked, needs: 'Warm colours, or cool ones?' }),
         step('types', 'failed ✗ check (unfinished)', {
           raise: unfinished,
-          check: { command: 'npm run typecheck', taskId: 't-t', verdict: 'unfinished', refused: null },
+          check: { command: 'npm run typecheck', taskId: 't-t', verdict: UNFINISHED, refused: null },
         }),
+      ];
+      const worded = steps.map((each) => each.message);
+      const raised = [
+        { step: 'tokens', kind: 'raise', message: worded[0], needs: null, unfinished: false, questions: [], ...byTry },
+        {
+          step: 'review',
+          kind: 'raise',
+          message: worded[1],
+          needs: null,
+          unfinished: false,
+          questions: [],
+          ...byRound,
+        },
+        { step: 'lint', kind: 'raise', message: worded[2], needs: null, unfinished: false, questions: [], ...ended },
+        {
+          step: 'palette',
+          kind: 'raise',
+          message: worded[3],
+          needs: 'Warm colours, or cool ones?',
+          unfinished: false,
+          questions: [],
+          ...blocked,
+        },
+        {
+          step: 'types',
+          kind: 'raise',
+          message: worded[4],
+          needs: null,
+          unfinished: true,
+          questions: [],
+          ...unfinished,
+        },
       ];
       assert.deepEqual(
         offersOf(run(steps, ['tokens', 'review', 'lint', 'palette', 'types'])),
-        [
-          { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', needs: null, unfinished: false, questions: [], ...byTry },
-          {
-            step: 'review',
-            kind: 'raise',
-            status: 'over budget — implement $2.10 of $2',
-            needs: null,
-            unfinished: false,
-            questions: [],
-            ...byRound,
-          },
-          { step: 'lint', kind: 'raise', status: 'budget exhausted $3.02 of $3', needs: null, unfinished: false, questions: [], ...ended },
-          {
-            step: 'palette',
-            kind: 'raise',
-            status: 'over budget $1.50 of $1',
-            needs: 'Warm colours, or cool ones?',
-            unfinished: false,
-            questions: [],
-            ...blocked,
-          },
-          {
-            step: 'types',
-            kind: 'raise',
-            status: 'failed ✗ check (unfinished)',
-            needs: null,
-            unfinished: true,
-            questions: [],
-            ...unfinished,
-          },
-        ],
+        raised,
         "palette, signed off blocked past its budget, keeps its word `over budget` and the closeout's question; types, whose check did not finish past its budget, keeps a check's word and a session refused without the raise all the same",
       );
       assert.deepEqual(
@@ -477,7 +480,7 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
       );
       const lint = step('lint', 'failed ✗ check (unfinished)', {
         raise: null,
-        check: { command: 'npm run lint', taskId: 't-l', verdict: 'unfinished', refused: null },
+        check: { command: 'npm run lint', taskId: 't-l', verdict: UNFINISHED, refused: null },
       });
       assert.deepEqual(
         offersOf(run([lint], ['lint'])),

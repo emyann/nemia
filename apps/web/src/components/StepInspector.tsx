@@ -44,7 +44,7 @@ export function StepTabs({ run, step, className }: { run: RunDetail; step: Step;
   const tab = picked ?? openingTab(step);
   const [chosen, setChosen] = useState<{ step: string; try: number } | null>(null);
   const runCancelled = run.cancelledAt !== null;
-  const state = stepState(step.status, runCancelled, run.holding != null);
+  const state = stepState(step.phase, step.reason, runCancelled, run.holding != null);
   const current = step.tries.find((t) => t.current) ?? step.tries.at(-1)!;
   const selected = (chosen?.step === step.name && step.tries.find((t) => t.try === chosen.try)) || current;
   const select = (n: number) => {
@@ -131,7 +131,7 @@ function Details({ run, step, state, runCancelled, current, selected, onSelect }
     <>
       <Asked run={run} step={step} />
       <div className="space-y-1">
-        <StatusChip status={step.status} runCancelled={runCancelled} runHeld={run.holding != null} />
+        <StatusChip phase={step.phase} reason={step.reason} runCancelled={runCancelled} runHeld={run.holding != null} />
         <StepNote note={step.note} />
       </div>
       {step.taskId === null ? (
@@ -199,7 +199,7 @@ function Ended({ at, how }: { at: string | null; how: string }) {
 function Output({ step, state, selected }: { step: Step; state: StepState; selected: StepTry }) {
   const none = !selected.current
     ? "No closeout on the engine's record of this try."
-    : step.status.endsWith('closeout unreadable')
+    : step.reason === 'UnreadableCloseout'
       ? 'It gave a closeout that could not be read.'
       : isLive(state) || state === 'waiting' || state === 'waiting-for-slot'
         ? 'No closeout yet: the step has yet to sign off.'
@@ -217,7 +217,12 @@ const ACTIVITY_TURNS = 30;
  */
 function Activity({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
-  const following = useStepTranscript(run.id, step.name, sessionToRead(step), isGate(stepState(step.status, cancelled, false), cancelled));
+  const following = useStepTranscript(
+    run.id,
+    step.name,
+    sessionToRead(step),
+    isGate(stepState(step.phase, step.reason, cancelled, false), cancelled),
+  );
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 

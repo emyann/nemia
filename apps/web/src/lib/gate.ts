@@ -9,6 +9,7 @@
 import type { Collision, Collisions, Decidable, RunDetail, RunSummary, StepAsked } from './api';
 import { askedSaid, needsOf, stepAnchor, type Need } from './asks.ts';
 import { touchedSummary } from './decide.ts';
+import { verdictWords } from './words.ts';
 
 type DetailStep = RunDetail['steps'][number];
 
@@ -160,17 +161,23 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
           : `${looping.name} signed off ${closeout.outcome}`;
     facts.push({ label: 'last review', said, state: output.again === false && !findings ? 'good' : undefined, step: looping.name });
   }
-  for (const checked of run.steps.filter((s) => s.check)) {
-    const verdict = checked.check!.verdict;
-    facts.push({
-      label: 'check',
-      said: `${checked.name}: ${verdict ?? 'not run'}${checked.tries.length > 1 ? ` on try ${checked.tries.at(-1)!.try}` : ''}`,
-      state: verdict === 'passed' ? 'good' : verdict && verdict !== 'checking' ? 'bad' : undefined,
-      step: checked.name,
-    });
-  }
+  for (const checked of run.steps.filter((s) => s.check)) facts.push(checkFact(checked));
   if (decision) facts.push(...decisionFacts(decision));
   return facts;
+}
+
+/**
+ * The fact of a step's check under a gate: its verdict in words (`verdictWords`), `not run` before it is filed, and the try it is on
+ * where there was more than one — good where it passed, bad where it settled otherwise, and neither while it runs.
+ */
+function checkFact(checked: RunDetail['steps'][number]): GateFact {
+  const verdict = checked.check?.verdict ?? null;
+  return {
+    label: 'check',
+    said: `${checked.name}: ${verdict ? verdictWords(verdict) : 'not run'}${checked.tries.length > 1 ? ` on try ${checked.tries.at(-1)!.try}` : ''}`,
+    state: verdict?.result === 'passed' ? 'good' : verdict && verdict.result !== 'running' ? 'bad' : undefined,
+    step: checked.name,
+  };
 }
 
 /** The facts the run's decision adds under its gate: what it touched, whether each branch merges onto the base, and its collisions. */

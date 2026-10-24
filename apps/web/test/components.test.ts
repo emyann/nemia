@@ -7,7 +7,18 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { behind, detail as detailOf, listed, summary, unpinned } from './run-fixtures.ts';
+import {
+  behind,
+  coded,
+  detail as detailOf,
+  EXIT_1,
+  listed,
+  PASSED,
+  summary,
+  triedAs,
+  unpinned,
+  type Word,
+} from './run-fixtures.ts';
 import './tsx.ts';
 
 const { createElement } = await import('react');
@@ -61,22 +72,26 @@ const titleOf = (html: string): string | undefined =>
 
 test("a chip shows a person's word for the state, never the status; on hover what it means, then the step's note it was given", () => {
   const withNote = renderToStaticMarkup(
-    createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, runHeld: false, note: exhaustedNote }),
+    createElement(StatusChip, { phase: 'waiting', reason: 'RoundsExhausted', runCancelled: false, runHeld: false, note: exhaustedNote }),
   );
   assert.match(withNote, /data-state="exhausted"/);
   assert.equal(withNote.replace(/<[^>]*>/g, ''), PERSON.exhausted.rail, 'the rail word is the text');
-  assert.doesNotMatch(withNote.replace(/<[^>]*>/g, ''), /rounds exhausted/, 'the status is not shown');
+  assert.doesNotMatch(withNote.replace(/<[^>]*>/g, ''), /rounds exhausted|RoundsExhausted/, 'neither the status nor the code is shown');
   assert.equal(titleOf(withNote), `${PERSON.exhausted.meaning}\n${exhaustedNote}`);
 
   for (const note of [null, undefined, '']) {
     const without = renderToStaticMarkup(
-      createElement(StatusChip, { status: 'rounds exhausted', runCancelled: false, runHeld: false, note }),
+      createElement(StatusChip, { phase: 'waiting', reason: 'RoundsExhausted', runCancelled: false, runHeld: false, note }),
     );
     assert.equal(titleOf(without), PERSON.exhausted.meaning, String(note));
   }
-  const cancelled = renderToStaticMarkup(createElement(StatusChip, { status: 'stopped', runCancelled: true, runHeld: false }));
+  const cancelled = renderToStaticMarkup(
+    createElement(StatusChip, { phase: 'stopped', reason: 'Stopped', runCancelled: true, runHeld: false }),
+  );
   assert.equal(cancelled.replace(/<[^>]*>/g, ''), 'called off');
-  const paused = renderToStaticMarkup(createElement(StatusChip, { status: 'waiting on the pause', runCancelled: false, runHeld: false }));
+  const paused = renderToStaticMarkup(
+    createElement(StatusChip, { phase: 'pending', reason: 'WaitingForPause', runCancelled: false, runHeld: false }),
+  );
   assert.match(paused, /data-state="waiting"/);
   assert.notEqual(paused.replace(/<[^>]*>/g, ''), PERSON.waiting.rail, 'a check the pause holds is its own wait, not a step to come');
 });
@@ -136,6 +151,8 @@ function runWith(note: string | null): RunDetail {
     heldUntil: [],
     holding: null,
     status: 'failed',
+    phase: 'failed',
+    reason: 'Failed',
     moving: false,
     cost: null,
     atWork: null,
@@ -161,7 +178,7 @@ function runWith(note: string | null): RunDetail {
         files: [],
         filesError: null,
         branch: 'wf/r-1/implement',
-        status: 'rounds exhausted',
+        ...coded('rounds exhausted'),
         note,
         roundDue: false,
         commands: { approve: 'nemia approve r-1 review', retry: 'nemia retry r-1 review', say: 'nemia say r-1 review' },
@@ -192,7 +209,7 @@ function runWith(note: string | null): RunDetail {
             current: true,
             taskId: 't-1',
             note,
-            status: 'rounds exhausted',
+            ...triedAs('rounds exhausted'),
             check: null,
             closeout: null,
             unreadable: null,
@@ -237,11 +254,11 @@ test("the inspector's Details show a step's note under its chip", () => {
 
 /** The run of one step, `review`, with the word and note `wf ls` gives it, and who the api says is waited on. */
 function runOf(
-  status: string,
+  status: Word,
   { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null },
 ): RunDetail {
   const run = runWith(note);
-  return { ...run, cancelledAt, waitingOnYou, onYou: waitingOnYou, steps: [{ ...run.steps[0], status }] };
+  return { ...run, cancelledAt, waitingOnYou, onYou: waitingOnYou, steps: [{ ...run.steps[0], ...coded(status) }] };
 }
 
 /**
@@ -270,7 +287,7 @@ function nodeMarkup(run: RunDetail): string {
 const gateDrawn = (html: string) => />human gate</.test(html) || /data-gate-band/.test(html) || /border-yours/.test(html);
 
 test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked step is — and on a cancelled run, not', () => {
-  for (const status of ['rounds exhausted', 'succeeded · BLOCKED']) {
+  for (const status of ['rounds exhausted', 'succeeded · BLOCKED'] as const) {
     const gate = nodeMarkup(runOf(status, { waitingOnYou: ['review'] }));
     assert.match(gate, />human gate</, status);
     assert.match(gate, new RegExp(`data-gate-band[^>]*><span[^>]*>${PERSON['awaiting-approval'].rail}</`), status);
@@ -286,7 +303,7 @@ test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked 
       assert.match(cancelled, />step 01</, `${status}, on a cancelled run`);
     }
   }
-  for (const status of ['unsigned', 'failed ✗ check (exit 1)'])
+  for (const status of ['unsigned', 'failed ✗ check (exit 1)'] as const)
     assert.equal(
       gateDrawn(nodeMarkup(runOf(status, { waitingOnYou: ['review'] }))),
       false,
@@ -295,7 +312,7 @@ test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked 
 });
 
 test('a step a person has sent round or asked to retry is no gate from the moment they ask: the canvas draws what the api says', () => {
-  const asked: Array<[status: string, note: string]> = [
+  const asked: Array<[status: Word, note: string]> = [
     ['rounds exhausted', 'round 4 asked (wf round) — the next tick files implement'],
     ['succeeded · BLOCKED', 'try 2 asked (--nudge) — the next tick files it'],
   ];
@@ -318,7 +335,7 @@ test('a step a person has sent round or asked to retry is no gate from the momen
  */
 function loopRun(notes: { implement: string | null; review: string | null }, reviewDue = false): RunDetail {
   const base = runWith(null);
-  const step = { ...base.steps[0], status: 'unverified · done', spec: null };
+  const step = { ...base.steps[0], ...coded('unverified · done'), spec: null };
   return {
     ...base,
     status: 'running',
@@ -459,7 +476,7 @@ test("a loop's edge is drawn from under its looping step, dashed, into its targe
 });
 
 /** A run of steps, each its name, the word `wf ls` gives it, and the step it comes after, if any: the roots are the rest. */
-function runOfSteps(steps: Array<[name: string, status: string, after?: string]>): RunDetail {
+function runOfSteps(steps: Array<[name: string, status: Word, after?: string]>): RunDetail {
   const base = runWith(null);
   const edges = steps.flatMap(([name, , from]): GraphEdge[] => (from ? [{ from, to: name, kind: 'after' }] : []));
   return {
@@ -467,7 +484,7 @@ function runOfSteps(steps: Array<[name: string, status: string, after?: string]>
     status: 'running',
     waitingOnYou: [],
     graph: { roots: steps.filter(([, , from]) => !from).map(([name]) => name), edges },
-    steps: steps.map(([name, status]) => ({ ...base.steps[0], name, status, note: null })),
+    steps: steps.map(([name, status]) => ({ ...base.steps[0], name, ...coded(status), note: null })),
   };
 }
 
@@ -527,11 +544,11 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
  */
 function summaryRun(): RunSummary {
   const none = { needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, sessionUnread: null };
-  const step = (name: string, status: string, extra = {}) => ({
+  const step = (name: string, status: Word, extra = {}) => ({
     name,
     taskId: `t-${name}`,
     branch: null,
-    status,
+    ...coded(status),
     note: null,
     ...none,
     ...extra,
@@ -1595,12 +1612,15 @@ const threeTries: StepTry[] = [
     current: false,
     taskId: 'r-1-implement',
     note: null,
+    phase: 'succeeded',
+    reason: 'Succeeded',
+    message: 'succeeded',
     status: 'succeeded',
     attempts: ranOnce,
     check: {
       command: 'npm test',
       taskId: 'r-1-implement-check',
-      verdict: 'exit 1',
+      verdict: EXIT_1,
       refused: { exit: 'exit 1', stdout: null, stderr: { lines: [], truncated: false }, unreadable: null },
     },
     closeout: closeoutSaying('Added the cache.'),
@@ -1614,9 +1634,12 @@ const threeTries: StepTry[] = [
     current: false,
     taskId: 'r-1-implement-try2',
     note: 'try 2, by retries: 1',
+    phase: 'succeeded',
+    reason: 'Succeeded',
+    message: 'succeeded',
     status: 'succeeded',
     attempts: ranOnce,
-    check: { command: 'npm test', taskId: 'r-1-implement-try2-check', verdict: 'passed', refused: null },
+    check: { command: 'npm test', taskId: 'r-1-implement-try2-check', verdict: PASSED, refused: null },
     closeout: closeoutSaying('Fixed the failing test.'),
     unreadable: null,
     answer: null,
@@ -1628,6 +1651,9 @@ const threeTries: StepTry[] = [
     current: true,
     taskId: 'r-1-implement-try3',
     note: 'round 2 of 3',
+    phase: 'running',
+    reason: 'Running',
+    message: 'running (working)',
     status: 'running (working)',
     attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null } },
     check: { command: 'npm test', taskId: null, verdict: null, refused: null },
@@ -1648,7 +1674,7 @@ test("REFUSED: a step's session alone unread draws an `unread` fact, the runtime
 
 test("the inspector's Details list a step's rounds, a row a try: its round and how it was reached, its task, attempts and verdict, and a link that selects it", () => {
   const run = runWith('round 2 of 3');
-  const step = { ...run.steps[0], name: 'implement', status: 'running (working)', attempts: threeTries[2].attempts, tries: threeTries };
+  const step = { ...run.steps[0], name: 'implement', ...coded('running (working)'), attempts: threeTries[2].attempts, tries: threeTries };
   const html = renderToStaticMarkup(createElement(StepTabs, { run, step }));
   const section = /<section aria-label="Rounds"[\s\S]*?<\/section>/.exec(html)?.[0];
   assert.ok(section, `a Rounds section: ${html}`);
@@ -1698,7 +1724,7 @@ test('a try a merge replaced decodes as the api serves it and reads as a merge, 
     { ...threeTries[2], round: 1, note: 'try 3, merged the base, on your word (nemia merge), the round unchanged' },
   ];
   const run = runWith('round 1 of 3');
-  const step = { ...run.steps[0], name: 'implement', status: 'running (working)', attempts: merged[2].attempts, tries: merged };
+  const step = { ...run.steps[0], name: 'implement', ...coded('running (working)'), attempts: merged[2].attempts, tries: merged };
   const html = renderToStaticMarkup(createElement(StepTabs, { run, step }));
   assert.ok(html.includes('round 1 · try 3 (merge)'), html);
   assert.ok(!html.includes('(round)'), html);
@@ -2307,7 +2333,7 @@ const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in C
 
 /** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
 function needing(
-  status: string,
+  status: Word,
   needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'waitingFor' | 'lastLine' | 'denied'>>,
   over: { waitingOnYou: string[]; cancelledAt?: string | null },
 ): RunDetail {
@@ -2714,7 +2740,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
     ...base.steps[0],
     name: 'implement',
     taskId: 't-2',
-    status: 'succeeded · BLOCKED',
+    ...coded('succeeded · BLOCKED'),
     needs: 'Which database?',
     blockedByHarness: false,
     waitingFor: null,
@@ -2894,7 +2920,7 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
 });
 
 test("the banner says who the run waits on as `wf ls` does — `approve review`, linked to the step's section, where Approve is — beside a step it names by its name", () => {
-  const theme = { ...atGate().steps[0], name: 'theme', status: 'failed ✗ check (exit 1)', approve: null, gate: null };
+  const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
   const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
   const both = bannerMarkup({ ...run, steps: [run.steps[0], theme] });
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
@@ -2914,7 +2940,7 @@ test("the banner says who the run waits on as `wf ls` does — `approve review`,
 });
 
 test("in the frame's bar, the banners name a step by a button that opens the step's bar, where a hash would point nowhere", () => {
-  const theme = { ...atGate().steps[0], name: 'theme', status: 'failed ✗ check (exit 1)', approve: null, gate: null };
+  const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
   const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
   const onStep = () => {};
   const needs = renderToStaticMarkup(
@@ -3069,7 +3095,7 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
     ...base,
     name: 'implement',
     taskId: 't-1',
-    status: 'unverified · done',
+    ...coded('unverified · done'),
     branch: 'wf/r-1/implement',
     gate: null,
     approve: null,
@@ -3082,7 +3108,7 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
     ...base,
     name: 'ship',
     taskId: null,
-    status: 'awaiting approval',
+    ...coded('awaiting approval'),
     branch: null,
     body: `${SHIPS}\n\nLook at the checkout first.`,
     closeout: null,
@@ -3169,7 +3195,7 @@ test("the to-decide banner says what `wf ls` says after `→ to decide:`, and li
 test("the ending step's own gate is not asked for twice: the to-decide banner says it, and the banner below has nothing left to say", () => {
   const run = endingRun();
   assert.equal(bannerMarkup(run), '', 'the whole of what it waits on is the decision');
-  const theme = { ...run.steps[0], name: 'theme', status: 'failed ✗ check (exit 1)', closeout: null, approve: null, gate: null };
+  const theme = { ...run.steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), closeout: null, approve: null, gate: null };
   const both = bannerMarkup({ ...run, steps: [...run.steps, theme], waitingOnYou: ['ship', 'theme'], onYou: ['approve ship', 'theme'] });
   assert.match(both, /^<section aria-label="Waiting on you"/, 'another step waiting on you is still said, beside the decision');
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
@@ -3633,7 +3659,7 @@ const priced = (spent: number | null, cap: number | null, over = false) => ({
 
 /** `run`, its one step priced as `cost` says, with the word and who waits on it. */
 const pricedRun = (
-  status: string,
+  status: Word,
   cost: ReturnType<typeof priced>,
   waitingOnYou: string[] = [],
   cancelledAt: string | null = null,
@@ -3939,11 +3965,11 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     questions: [],
   };
   const html = offersMarkup([
-    { step: 'tokens', kind: 'raise', status: 'over budget $4.25 of $3', ...checkRaise },
+    { step: 'tokens', kind: 'raise', message: 'over budget $4.25 of $3', ...checkRaise },
     {
       step: 'palette',
       kind: 'raise',
-      status: 'over budget $1.50 of $1',
+      message: 'over budget $1.50 of $1',
       by: 'retry',
       above: 1.5,
       said: '$1.50',
@@ -3953,11 +3979,11 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
       unfinished: false,
       questions: [],
     },
-    { step: 'types', kind: 'raise', status: 'failed ✗ check (unfinished)', ...checkRaise, unfinished: true },
+    { step: 'types', kind: 'raise', message: 'failed ✗ check (unfinished)', ...checkRaise, unfinished: true },
     {
       step: 'review',
       kind: 'raise',
-      status: 'over budget — implement $2.10 of $2',
+      message: 'over budget — implement $2.10 of $2',
       by: 'round',
       above: 2.1,
       said: '$2.10',
@@ -4419,7 +4445,7 @@ const HOLDING = {
 };
 
 test('on a run a person holds, a step at its gate is drawn held — no human gate, no waiting on you — and said held, and a step at work is drawn at work', () => {
-  for (const status of ['awaiting approval', 'rounds exhausted', 'succeeded · BLOCKED']) {
+  for (const status of ['awaiting approval', 'rounds exhausted', 'succeeded · BLOCKED'] as const) {
     const held = nodeMarkup({ ...runOf(status, { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] });
     assert.equal(
       gateDrawn(held),
@@ -4509,7 +4535,7 @@ const planCloseout: StepCloseout = {
 };
 
 /** The looping run's one step, at plan's gate with that closeout — or signed off with none, or still running. */
-function gatedRun(closeout: StepCloseout | null, status = 'awaiting approval'): RunDetail {
+function gatedRun(closeout: StepCloseout | null, status: Word = 'awaiting approval'): RunDetail {
   const run = runOf(status, { waitingOnYou: closeout ? ['review'] : [] });
   const [step] = run.steps;
   return {
@@ -4727,7 +4753,7 @@ test('a raise of a step that signed off blocked asking questions as data draws t
     {
       step: 'palette',
       kind: 'raise',
-      status: 'over budget $1.50 of $1',
+      message: 'over budget $1.50 of $1',
       by: 'retry',
       above: 1.5,
       said: '$1.50',
@@ -5262,7 +5288,7 @@ test("a try's run is tagged try and names the agent it tried, linked to its page
 test('REFUSED: the Debug panel is closed by default, and reads and draws nothing of the path while it is', async () => {
   const { DebugPanel } = await import('../src/components/DebugPanel.tsx');
   const client = new QueryClient();
-  const step = { name: 'implement', taskId: 't-1', status: 'running', tries: [{ try: 1, current: true }] };
+  const step = { name: 'implement', taskId: 't-1', message: 'running', tries: [{ try: 1, current: true }] };
   const html = renderToStaticMarkup(
     createElement(QueryClientProvider, { client }, createElement(DebugPanel, { run: { id: 'r-1' } as never, step: step as never })),
   );
@@ -5614,7 +5640,7 @@ async function pagedWith(element: ReturnType<typeof createElement>, data: Array<
 test("the run bar: the run's title and id, what it asks of a person, its steps each a button with its status, and its brief", async () => {
   const { RunBar } = await import('../src/components/RunBar.tsx');
   const { titleOf: runTitle } = await import('../src/lib/factory.ts');
-  const theme = { ...atGate().steps[0], name: 'theme', status: 'failed ✗ check (exit 1)', approve: null, gate: null };
+  const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
   const base = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'], brief: 'Make the **floor** clear.' });
   const run = { ...base, steps: [base.steps[0], theme] };
   const html = await pagedWith(createElement(RunBar, { run: run.id }), [[['runs', run.id], run]]);

@@ -28,7 +28,7 @@ import {
   whenWords,
   type WaitKind,
 } from '../src/lib/runWords.ts';
-import { summary } from './run-fixtures.ts';
+import { summary, type Word } from './run-fixtures.ts';
 
 /** A command, as the api's advice can carry one: no sentence repeats it. */
 const COMMAND = 'nemia approve r-1 land --message "go" && git merge wf/r-1/land';
@@ -39,9 +39,9 @@ const DONE = [
   ['review', 'verified ✓'],
 ] as const;
 
-/** A row of three done steps and `land` saying `status`, which waits on a person. */
-const landing = (status: string, extra: Partial<RunSummary> = {}): RunSummary =>
-  summary([...DONE, ['land', status]], { status: 'failed', moving: false, waitingOnYou: ['land'], onYou: [COMMAND], ...extra });
+/** A row of three done steps and `land` saying `word` with its codes, which waits on a person. */
+const landing = (word: Word, extra: Partial<RunSummary> = {}): RunSummary =>
+  summary([...DONE, ['land', word]], { status: 'failed', moving: false, waitingOnYou: ['land'], onYou: [COMMAND], ...extra });
 
 const holding = { at: '2026-09-30T05:00:00.000Z', runs: [], word: `held: ${COMMAND}`, advice: COMMAND, onYou: true };
 const waiting = {
@@ -104,7 +104,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
     () => {
       for (const kind of WAIT_KINDS) assert.equal(openWord(ROWS[kind].row), ROWS[kind].opens, kind);
       assert.equal(
-        openWord(summary([['plan', 'pondering']], { waitingOnYou: ['plan'] })),
+        openWord(summary([['plan', 'running']], { waitingOnYou: ['plan'] })),
         'Open the run',
         'a wait the board has no kind for',
       );
@@ -163,6 +163,15 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
     assert.equal(waitOf(landing('failed ✗ check (exit 1)'))?.kind, 'check', 'a numeric exit is the refusal');
     assert.equal(waitOf(landing('failed ✗ check (exit 137)'))?.kind, 'check');
   });
+  await t.test('a check that did not finish is read off its verdict, never off the words beside it', () => {
+    const said = (row: RunSummary, message: string, verdict: RunSummary['steps'][number]['verdict']): RunSummary => ({
+      ...row,
+      steps: row.steps.map((step) => (step.name === 'land' ? { ...step, message, status: message, verdict } : step)),
+    });
+    const unfinished = landing('failed ✗ check (unfinished)');
+    assert.equal(waitOf(said(unfinished, 'failed ✗ check (exit 1)', { result: 'unfinished', exit: null }))?.kind, 'unfinished');
+    assert.equal(waitOf(said(unfinished, 'failed ✗ check (unfinished)', { result: 'failed', exit: 1 }))?.kind, 'check');
+  });
   await t.test(
     "REFUSED: a held run at its gate, as the api lists it with no step waiting, says the hold's sentence, not an approval's",
     () => {
@@ -207,8 +216,8 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
       assert.equal(waitOf(landing('unsigned', { waiting, holding }))?.kind, 'hold');
     },
   );
-  await t.test('REFUSED: a waiting row whose step says a word the board does not know says it waits on you, never nothing', () => {
-    const unknown = summary([['plan', 'pondering']], { waitingOnYou: ['plan'] });
+  await t.test('REFUSED: a waiting row whose step stands where the board has no kind of wait says it waits on you, never nothing', () => {
+    const unknown = summary([['plan', 'running']], { waitingOnYou: ['plan'] });
     assert.equal(waitOf(unknown), null);
     assert.match(waitSentence(unknown), /waits on you/);
   });
@@ -221,7 +230,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
       const now = nowOf(ROWS[kind].row);
       assert.doesNotMatch(`${now?.word} ${now?.note}`, words, `the note of ${kind}`);
     }
-    const unknown = summary([['plan', 'pondering']], { waitingOnYou: ['plan'] });
+    const unknown = summary([['plan', 'running']], { waitingOnYou: ['plan'] });
     assert.doesNotMatch(`${waitSentence(unknown)} ${waitTag(unknown)}`, words);
     for (const outcome of ['succeeded', 'failed', 'cancelled', 'undecided'] as const) {
       assert.doesNotMatch(`${endedWords(outcome).word} ${endedWords(outcome).title}`, words, outcome);
@@ -230,7 +239,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
   await t.test("a waiting card's tag names the step where the person acts on one, and says a wait the board has no kind for", () => {
     assert.equal(waitTag(ROWS.approve.row), 'approve land');
     assert.equal(waitTag(ROWS.blocked.row), 'answer land');
-    assert.equal(waitTag(summary([['plan', 'pondering']], { waitingOnYou: ['plan'] })), PERSON['awaiting-approval'].rail);
+    assert.equal(waitTag(summary([['plan', 'running']], { waitingOnYou: ['plan'] })), PERSON['awaiting-approval'].rail);
   });
 });
 
@@ -351,10 +360,10 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       );
   });
   await t.test("a bar as a button says its step's name and the rail's word for its state", () => {
-    assert.equal(barSaid('implement', 'working', 'running (working)'), 'implement, at work');
-    assert.equal(barSaid('design', 'awaiting-approval', 'awaiting approval'), 'design, waits on you');
-    assert.equal(barSaid('land', 'failed-check', 'failed ✗ check (exit 1)'), 'land, failed its check');
-    assert.equal(barSaid('review', 'waiting', 'waiting'), 'review, to come');
-    assert.equal(barSaid('theme', 'waiting', 'waiting on the pause'), `theme, ${PAUSED.rail}`, 'a check the pause holds');
+    assert.equal(barSaid('implement', 'working', 'Running'), 'implement, at work');
+    assert.equal(barSaid('design', 'awaiting-approval', 'AwaitingApproval'), 'design, waits on you');
+    assert.equal(barSaid('land', 'failed-check', 'CheckFailed'), 'land, failed its check');
+    assert.equal(barSaid('review', 'waiting', 'Waiting'), 'review, to come');
+    assert.equal(barSaid('theme', 'waiting', 'WaitingForPause'), `theme, ${PAUSED.rail}`, 'a check the pause holds');
   });
 });

@@ -50,7 +50,7 @@ export function StepNode({
   sourcePosition = Position.Right,
   targetPosition = Position.Left,
 }: NodeProps<StepFlowNode>) {
-  const state = stepState(step.status, runCancelled, runHeld);
+  const state = stepState(step.phase, step.reason, runCancelled, runHeld);
   const live = isLive(state);
   const now = useNow(live ? 1_000 : 30_000);
   const running = state === 'working';
@@ -91,7 +91,7 @@ export function StepNode({
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 border-t border-outline-variant px-3 py-1.5">
-        <StatusChip status={step.status} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
+        <StatusChip phase={step.phase} reason={step.reason} runCancelled={runCancelled} runHeld={runHeld} note={step.note} />
         <span className="font-mono text-body-small text-muted-foreground">
           {attemptLine(step.attempts, live, now) ?? (step.taskId === null ? 'not filed yet' : 'no attempt yet')}
         </span>

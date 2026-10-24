@@ -8,7 +8,7 @@ budget: 12
 tally: findings, findings.kind=placement
 skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
-disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx shadcn@latest:*), Bash(pnpm dlx shadcn@latest:*), Bash(bunx --bun shadcn@latest:*), Bash(npx turbo run test *build*), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
+disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx shadcn@latest:*), Bash(pnpm dlx shadcn@latest:*), Bash(bunx --bun shadcn@latest:*), Bash(npx turbo run test *build*), Bash(npx tsc *-w*), Bash(npx tsc *-W*), Bash(npx tsc *-in*), Bash(npx tsc *-iN*), Bash(npx tsc *-In*), Bash(npx tsc *-IN*), Bash(npx tsc *-i *), Bash(npx tsc *-I *), Bash(npx tsc *-ts*), Bash(npx tsc *-tS*), Bash(npx tsc *-Ts*), Bash(npx tsc *-TS*), Bash(npx tsc *-g*), Bash(npx tsc *-G*), Bash(npx tsc * false*), Bash(npx tsc *@*), Bash(npx oxlint *--fix*), Bash(npx oxlint *--init*), Bash(npx oxlint *--lsp*), Bash(npx oxlint -c*), Bash(npx oxlint * -c*), Bash(npx oxlint *--config*), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
 ---
 Judge what was asked and what the diff does. This is a quick run: **no spec was written**, so what was asked is the card itself, as
 your brief gives it, and nothing else. The implement step left its whole closeout in its folder's `closeout.json`: its summary and body
@@ -34,6 +34,15 @@ that verdict in it; a check that did not pass is a finding, and so is a round wh
 
 Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`.
 Run a package's tests, `npx turbo run test --force --continue --filter=<package>`, only where a finding needs a run to stand on.
+
+To measure what a finding turns on, such as the errors a compiler flag would raise, run the compiler and the linter with any options
+that write nothing, each bare and one command per call, `--noEmit` first:
+`npx tsc --noEmit -p packages/agent-runtime --noUncheckedIndexedAccess`, `npx oxlint -D no-unused-vars packages/agent-runtime/src`.
+Your fence refuses what would write or watch: a `tsc` whose first option is not `--noEmit`, and its `--build`, `--incremental`,
+`--init`, `--tsBuildInfoFile`, `--generateTrace`, `--generateCpuProfile` and `--watch`, an option set `false` and a file of options
+(`@<file>`); `oxlint`'s `--fix`, `--init`, `--lsp`, and a `-c` or `--config`, whose script would run. `tsc` reads an option's name in
+any case and after one dash or two, so the refusal goes by its first letters and takes `--inlineSourceMap` and `--inlineSources` with
+`--incremental`.
 
 When the change touches `apps/web`, read the pictures the implement step named in its `artifacts`, by their paths in its folder's
 `closeout.json`, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding:

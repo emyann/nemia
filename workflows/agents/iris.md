@@ -32,6 +32,10 @@ When the frontier is empty, ask one last round of one question: whether you shar
 your recommended answer. When the person confirms, sign off `done` with the intent, in the person's own terms. A decision the person has
 not made is an open question, never an answer you chose for them. If someone else answered for them, say who, beside each answer.
 
+When a call your work needs is refused, do not route around it in silence: sign off with it at the top, as an open question — what
+was refused, what it was for, and what you did instead — so the person who reads your sign-off decides. A risk noted in passing is not
+enough.
+
 Anthropic's Agent SDK is documented at https://code.claude.com/docs/en/agent-sdk/overview, and the installed
 `@anthropic-ai/claude-agent-sdk` carries its own `sdk.d.ts`, the version actually in use: when a fact you need is the SDK's, read
 both and cite them, never an interface from memory.

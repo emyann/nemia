@@ -5,7 +5,7 @@ gate: true
 budget: 12
 skills: effect, shadcn, change-the-board, look, react-aria, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
-disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx shadcn@latest:*), Bash(pnpm dlx shadcn@latest:*), Bash(bunx --bun shadcn@latest:*), Bash(npx turbo run test *build*), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
+disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx shadcn@latest:*), Bash(pnpm dlx shadcn@latest:*), Bash(bunx --bun shadcn@latest:*), Bash(npx turbo run test *build*), Bash(npx tsc *-w*), Bash(npx tsc *-W*), Bash(npx tsc *-in*), Bash(npx tsc *-iN*), Bash(npx tsc *-In*), Bash(npx tsc *-IN*), Bash(npx tsc *-i *), Bash(npx tsc *-I *), Bash(npx tsc *-ts*), Bash(npx tsc *-tS*), Bash(npx tsc *-Ts*), Bash(npx tsc *-TS*), Bash(npx tsc *-g*), Bash(npx tsc *-G*), Bash(npx tsc * false*), Bash(npx tsc *@*), Bash(npx oxlint *--fix*), Bash(npx oxlint *--init*), Bash(npx oxlint *--lsp*), Bash(npx oxlint -c*), Bash(npx oxlint * -c*), Bash(npx oxlint *--config*), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
 reads: costs
 ---
 Your brief says what recent runs of this workflow cost, per step and whole (*What runs of this workflow cost*): propose the cut and each
@@ -26,6 +26,15 @@ When the change touches `apps/web`, a change that draws a cut, a plate, a tile o
 `apps/web/src/components/look`, through its door, before it draws one of its own: `change-the-board` says which part.
 
 The checks you may run here, each bare: `npx turbo run test --force --continue`, `npm run typecheck`, `npm run lint`.
+
+To measure what the design turns on, such as the errors a compiler flag would raise, run the compiler and the linter with any options
+that write nothing, each bare and one command per call, `--noEmit` first:
+`npx tsc --noEmit -p packages/agent-runtime --noUncheckedIndexedAccess`, `npx oxlint -D no-unused-vars packages/agent-runtime/src`.
+Your fence refuses what would write or watch: a `tsc` whose first option is not `--noEmit`, and its `--build`, `--incremental`,
+`--init`, `--tsBuildInfoFile`, `--generateTrace`, `--generateCpuProfile` and `--watch`, an option set `false` and a file of options
+(`@<file>`); `oxlint`'s `--fix`, `--init`, `--lsp`, and a `-c` or `--config`, whose script would run. `tsc` reads an option's name in
+any case and after one dash or two, so the refusal goes by its first letters and takes `--inlineSourceMap` and `--inlineSources` with
+`--incremental`.
 
 To see a board in the browser, run `npm run board:serve`, bare, and open the address it prints with the `look` skill: this workspace's
 board, built outside the workspace and served on ports of its own against a store of its own that holds the e2e's seed. Never the live

@@ -75,6 +75,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
+import ts from 'typescript';
 import { loadWorkflows } from '../src/folder/folder.store.ts';
 import { parseAgent } from '../src/agents/agents.ts';
 import { stepPlace, WorkflowError, type Workflow } from '../src/step/step.ts';
@@ -2633,14 +2634,111 @@ const TEST_BUILDS: Call[] = [
 /** The deny that answers `TEST_BUILDS`, on the line of each read-only step that runs tests. */
 const TEST_BUILD_DENIES = ['Bash(npx turbo run test *build*)'];
 
+/** The settings' allows of the compiler and the linter run to measure: `tsc` with `--noEmit` first, and `oxlint` whole. */
+const TSC_ALLOW = 'Bash(npx tsc --noEmit:*)';
+const OXLINT_ALLOW = 'Bash(npx oxlint:*)';
+
+/** The compiler and the linter run to measure, with options that write nothing: what design and review may run. */
+const MEASURES: Call[] = [
+  'npx tsc --noEmit',
+  'npx tsc --noEmit -p packages/agent-runtime --noUncheckedIndexedAccess',
+  'npx tsc --noEmit -p apps/web --exactOptionalPropertyTypes --isolatedDeclarations --target es2024',
+  'npx tsc --noEmit --project apps/api --strict --listFilesOnly',
+  'timeout 300 npx tsc --noEmit -p packages/agent-orchestrator',
+  'npx oxlint',
+  'npx oxlint -D no-unused-vars --type-aware packages/agent-runtime/src',
+  'npx oxlint --format json --disable-nested-config --type-check apps/web/src',
+].map((command) => ({ tool: 'Bash', command }));
+
+/**
+ * The compiler and the linter with an option that writes or watches, each after the `--noEmit` the settings' allow reaches: `tsc`'s
+ * build-info file (`--incremental`, `--tsBuildInfoFile`), its config (`--init`), its trace and profile, its watch, an emit turned back on
+ * by `false` or by a file of options (`@<file>`); `oxlint`'s fixes, its config (`--init`), its language server (`--lsp`), and a config
+ * given by `-c` or `--config`, which runs a script one. `tsc` reads an option's name in any case and after one dash or two, so each
+ * spelling is one a session may type, and each is reached by exactly one rule of `MEASURE_DENIES`.
+ */
+const MEASURE_WRITES: Call[] = [
+  'npx tsc --noEmit --watch',
+  'npx tsc --noEmit -p packages/agent-runtime -w',
+  'npx tsc --noEmit --WATCH',
+  'npx tsc --noEmit -W',
+  'npx tsc --noEmit --incremental',
+  'npx tsc --noEmit -incremental -p apps/api',
+  'npx tsc --noEmit --iNCREMENTAL',
+  'npx tsc --noEmit --Incremental',
+  'npx tsc --noEmit --INIT',
+  'npx tsc --noEmit --init',
+  'npx tsc --noEmit -i',
+  'npx tsc --noEmit --i -p apps/api',
+  'npx tsc --noEmit -I',
+  'npx tsc --noEmit --tsBuildInfoFile x',
+  'npx tsc --noEmit --tSBuildInfoFile x',
+  'npx tsc --noEmit -Tsbuildinfofile x',
+  'npx tsc --noEmit --TSBUILDINFOFILE x',
+  'npx tsc --noEmit --generateTrace trace',
+  'npx tsc --noEmit --generateCpuProfile p.cpuprofile',
+  'npx tsc --noEmit --GenerateTrace trace',
+  'npx tsc --noEmit false',
+  'npx tsc --noEmit -p apps/api --NOEMIT false',
+  'npx tsc --noEmit @options.txt',
+  'timeout 300 npx tsc --noEmit --incremental',
+  'npx oxlint --fix',
+  'npx oxlint --fix-suggestions apps/web/src',
+  'npx oxlint apps/web/src --fix-dangerously',
+  'npx oxlint --init',
+  'npx oxlint --lsp',
+  'npx oxlint -c tools/observe/render/render.ts',
+  'npx oxlint -c=oxlint.config.ts apps/web/src',
+  'npx oxlint apps/web/src -c oxlint.config.ts',
+  'npx oxlint --config oxlint.config.ts',
+  'npx oxlint --config=oxlint.config.ts',
+  'timeout 60 npx oxlint --fix',
+].map((command) => ({ tool: 'Bash', command }));
+
+/**
+ * The denies that answer `MEASURE_WRITES`, on the line of each read-only step that measures: each of `tsc`'s by the first letters of the
+ * options it refuses, in each case (`-i` alone, its short `--incremental`, as a word), and `oxlint`'s by name.
+ */
+const MEASURE_DENIES = [
+  'Bash(npx tsc *-w*)',
+  'Bash(npx tsc *-W*)',
+  'Bash(npx tsc *-in*)',
+  'Bash(npx tsc *-iN*)',
+  'Bash(npx tsc *-In*)',
+  'Bash(npx tsc *-IN*)',
+  'Bash(npx tsc *-i *)',
+  'Bash(npx tsc *-I *)',
+  'Bash(npx tsc *-ts*)',
+  'Bash(npx tsc *-tS*)',
+  'Bash(npx tsc *-Ts*)',
+  'Bash(npx tsc *-TS*)',
+  'Bash(npx tsc *-g*)',
+  'Bash(npx tsc *-G*)',
+  'Bash(npx tsc * false*)',
+  'Bash(npx tsc *@*)',
+  'Bash(npx oxlint *--fix*)',
+  'Bash(npx oxlint *--init*)',
+  'Bash(npx oxlint *--lsp*)',
+  'Bash(npx oxlint -c*)',
+  'Bash(npx oxlint * -c*)',
+  'Bash(npx oxlint *--config*)',
+];
+
+/** The denies that keep intake and the janitor, which measure nothing, from the settings' allows of the compiler and the linter. */
+const MEASURELESS_DENIES = ['Bash(npx tsc:*)', 'Bash(npx oxlint:*)'];
+
 /** The denies a read-only step's own line holds, by its agent, for what the settings and the skills allow it besides its reads. */
 const ownedDenies = (agent: string): string[] => [
   ...READ_ONLY_DENIES,
-  ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUN_DENIES : TEST_BUILD_DENIES),
+  ...(TESTLESS_AGENTS.includes(agent) ? [...TEST_RUN_DENIES, ...MEASURELESS_DENIES] : [...TEST_BUILD_DENIES, ...MEASURE_DENIES]),
 ];
 
 /** What a read-only agent's steps are refused of what the settings and the skills allow, by `ownedDenies`. */
-const refusedTo = (agent: string): Call[] => [...SHADCN, ...NPM_TEST, ...(TESTLESS_AGENTS.includes(agent) ? TEST_RUNS : TEST_BUILDS)];
+const refusedTo = (agent: string): Call[] => [
+  ...SHADCN,
+  ...NPM_TEST,
+  ...(TESTLESS_AGENTS.includes(agent) ? [...TEST_RUNS, ...MEASURES, ...MEASURE_WRITES] : [...TEST_BUILDS, ...MEASURE_WRITES]),
+];
 
 /** The file of each read-only step, `<workflow>/<step>.md` from the holder, with its agent. */
 const readOnlyStepFiles = (): Array<{ file: string; agent: string }> =>
@@ -2665,7 +2763,7 @@ const SHADCN_VIEW_ALLOW = 'Bash(npx shadcn view:*)';
 const shadcnView = (): Call[] =>
   checksOf(KIT_COMMAND.file, SHADCN_VIEW_NOTE).map((command) => ({ tool: 'Bash', command: command.replace('<component>', 'button') }));
 
-test("every read-only step is refused shadcn's CLI in every spelling an allow reaches it by, npm test and a build on turbo's test, by its own deny", () => {
+test("every read-only step is refused shadcn's CLI in every spelling an allow reaches it by, npm test, a build on turbo's test and a measure that writes, by its own deny", () => {
   assert.deepEqual(
     readOnlyStepFiles()
       .map(({ file }) => file)
@@ -2723,6 +2821,176 @@ test("REFUSED: a read-only step's file that drops its denies is named, rule by r
       ownedDenies(agent).map((rule) => `${file}: ${rule}`),
     );
   }
+});
+
+/** A command a step's note names: a backticked span that opens with a verb a read-only step's Bash runs. */
+const TOLD_SPANS = /`((?:npm|npx|node|git|gh)\s[^`]*)`/g;
+
+/**
+ * Each command the note of the step file `file` (`<workflow>/<step>.md`) of the holder `root` tells its session to run: every span
+ * `TOLD_SPANS` matches in the file's body, each placeholder (`<package>`) filled in with a word a session types, but a span another of
+ * the note's extends, which names the tool the others run (the janitor's `npx nemia`).
+ */
+function toldOf(file: string, root = SHIPPED_HOLDERS[0]): Call[] {
+  const text = fs.readFileSync(path.join(root, file), 'utf8');
+  const body = text.slice(text.indexOf('\n---\n', 3) + 5);
+  const spans = [
+    ...new Set([...body.matchAll(TOLD_SPANS)].map((span) => span[1].replace(/\s+/g, ' ').replace(/<[^<>]+>/g, 'x'))),
+  ];
+  return spans
+    .filter((span) => !spans.some((other) => other.startsWith(`${span} `)))
+    .map((command) => ({ tool: 'Bash', command }) as const);
+}
+
+/** The read-only steps that measure, design's and the reviews': each whose agent runs tests. */
+const measuringSteps = (): Array<{ named: string; step: Step }> =>
+  readOnlySteps().filter(({ step }) => !TESTLESS_AGENTS.includes(step.agent!.name));
+
+test("every command a read-only step's note tells it to run is one its frozen fence allows, and design and review measure by tsc and oxlint", () => {
+  for (const { named, step } of readOnlySteps()) {
+    const told = toldOf(`${named}.md`);
+    assert.deepEqual(runs(step, told), told.map(shown), named);
+  }
+  for (const { named, step } of measuringSteps()) {
+    const told = toldOf(`${named}.md`).map(({ command }) => command);
+    assert.ok(told.some((command) => command.startsWith('npx tsc --noEmit ')), `${named}'s note names a measure by tsc`);
+    assert.ok(told.some((command) => command.startsWith('npx oxlint ')), `${named}'s note names a measure by oxlint`);
+    assert.deepEqual(runs(step, MEASURES), MEASURES.map(shown), named);
+  }
+  assert.deepEqual(
+    measuringSteps().map(({ named }) => named).sort(),
+    ['build/design', 'build/review', 'quick/review'],
+  );
+});
+
+test("REFUSED: a step's note that names a command its fence refuses is named, a measure's write and the janitor's tsc among them", () => {
+  const root = scratch('wf-fences-told-');
+  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
+  const added: Record<string, string> = { 'build/design.md': 'npx tsc --noEmit --watch', 'janitor/argus.md': 'npx tsc --noEmit' };
+  for (const [file, command] of Object.entries(added)) {
+    fs.appendFileSync(path.join(root, file), `\nRun \`${command}\`.\n`);
+    const step = readOnlySteps().find(({ named }) => `${named}.md` === file)!.step;
+    const told = toldOf(file, root);
+    const reached = runs(step, told);
+    assert.deepEqual(
+      told.map(shown).filter((call) => !reached.includes(call)),
+      [`Bash(${command})`],
+      file,
+    );
+  }
+});
+
+/** `tsc` with a first option that is not `--noEmit`, which emits, builds or watches: reached by no allow of the settings'. */
+const NO_EMIT_FIRST: Call[] = [
+  'npx tsc',
+  'npx tsc -p packages/agent-runtime',
+  'npx tsc --build',
+  'npx tsc -b packages/agent-runtime',
+  'npx tsc --project apps/api --strict',
+].map((command) => ({ tool: 'Bash', command }));
+
+test('REFUSED: design and review run no tsc whose first option is not --noEmit, and with tsc allowed whole each runs', () => {
+  assert.ok(SETTINGS_ALLOWS.includes(TSC_ALLOW), `${TSC_ALLOW} is in the settings`);
+  const whole = { permissions: { allow: SETTINGS_ALLOWS.map((rule) => (rule === TSC_ALLOW ? 'Bash(npx tsc:*)' : rule)) } };
+  for (const { named, step } of measuringSteps()) {
+    assert.deepEqual(runs(step, NO_EMIT_FIRST), [], named);
+    assert.deepEqual(runs(step, NO_EMIT_FIRST, whole), NO_EMIT_FIRST.map(shown), `${named}, tsc allowed whole`);
+  }
+});
+
+test("REFUSED: without the settings' allow of tsc or of oxlint, design and review measure nothing by it", () => {
+  for (const [allow, tool] of [
+    [TSC_ALLOW, 'npx tsc '],
+    [OXLINT_ALLOW, 'npx oxlint'],
+  ]) {
+    assert.ok(SETTINGS_ALLOWS.includes(allow), `${allow} is in the settings`);
+    const without = { permissions: { allow: SETTINGS_ALLOWS.filter((rule) => rule !== allow) } };
+    const its = MEASURES.filter((call) => partsOf(call.command!).some((part) => part.startsWith(tool)));
+    const rest = MEASURES.filter((call) => !its.includes(call));
+    assert.ok(its.length > 0, allow);
+    for (const { named, step } of measuringSteps())
+      assert.deepEqual(runs(step, MEASURES, without), rest.map(shown), `${named} without ${allow}`);
+  }
+});
+
+/** The compiler options that make `tsc --noEmit` write a build-info file all the same. */
+const BUILD_INFO_OPTIONS = ['incremental', 'composite'] as const;
+
+/**
+ * Each tsconfig of the checkout `repo`, by its path from it, that sets an option of `BUILD_INFO_OPTIONS`, itself or through what it
+ * extends, as TypeScript reads it.
+ */
+function buildInfoConfigs(repo = REPO): string[] {
+  return checkoutFiles(repo)
+    .filter((file) => /(?:^|\/)tsconfig[^/]*\.json$/.test(file))
+    .filter((file) => {
+      const at = path.join(repo, file);
+      const read = ts.readConfigFile(at, ts.sys.readFile);
+      assert.equal(read.error, undefined, `${file} reads as a tsconfig`);
+      const { options } = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(at), undefined, at);
+      return BUILD_INFO_OPTIONS.some((option) => options[option] === true);
+    });
+}
+
+test('no tsconfig of the checkout sets incremental or composite, so a measure with --noEmit writes no build-info file', () => {
+  assert.ok(checkoutFiles(REPO).some((file) => file.endsWith('tsconfig.json')), 'the checkout has tsconfigs to read');
+  assert.deepEqual(buildInfoConfigs(), []);
+});
+
+test('REFUSED: a tsconfig that sets incremental, or extends one that sets composite, is named', () => {
+  const repo = scratch('wf-fences-tsconfig-');
+  const write = (file: string, config: unknown) => {
+    fs.mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
+    fs.writeFileSync(path.join(repo, file), JSON.stringify(config));
+  };
+  write('a/tsconfig.json', { compilerOptions: { incremental: true }, files: [] });
+  write('b/base.json', { compilerOptions: { composite: true } });
+  write('b/tsconfig.json', { extends: './base.json', files: [] });
+  write('c/tsconfig.json', { compilerOptions: { strict: true }, files: [] });
+  assert.deepEqual(buildInfoConfigs(repo).sort(), ['a/tsconfig.json', 'b/tsconfig.json']);
+});
+
+/** The first words of the paragraph each read-only agent is told what to do when a call its work needs is refused. */
+const REFUSAL_SAID = 'When a call your work needs is refused';
+
+/** Each read-only agent's paragraph that opens with `REFUSAL_SAID`, in the holder `root`, by agent; `undefined` where it has none. */
+const refusalSaidOf = (root = SHIPPED_HOLDERS[0]): Record<string, string | undefined> =>
+  Object.fromEntries(
+    READ_ONLY_AGENTS.map((agent) => {
+      const text = fs.readFileSync(path.join(root, 'agents', `${agent}.md`), 'utf8');
+      const start = text.indexOf(REFUSAL_SAID);
+      if (start < 0) return [agent, undefined];
+      const rest = text.slice(start);
+      return [agent, rest.slice(0, /\n\s*\n/.exec(rest)?.index ?? rest.length).trim()];
+    }),
+  );
+
+test('each read-only agent is told, in one and the same paragraph, to say a refused call its work needs at the top of its sign-off', () => {
+  const said = refusalSaidOf();
+  assert.deepEqual(
+    READ_ONLY_AGENTS.filter((agent) => said[agent] === undefined),
+    [],
+  );
+  assert.equal(new Set(Object.values(said)).size, 1, 'the four paragraphs are equal');
+});
+
+test("REFUSED: a read-only agent without the paragraph is named, and one whose paragraph drifts makes the four unequal", () => {
+  const root = scratch('wf-fences-refusal-said-');
+  fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
+  const edit = (agent: string, change: (text: string) => string) => {
+    const file = path.join(root, 'agents', `${agent}.md`);
+    const text = fs.readFileSync(file, 'utf8');
+    assert.notEqual(change(text), text, `${agent} has the paragraph to change`);
+    fs.writeFileSync(file, change(text));
+  };
+  edit('iris', (text) => text.replace(REFUSAL_SAID, 'When a call is refused'));
+  edit('agora', (text) => text.replace('A risk noted in passing', 'A risk noted'));
+  const said = refusalSaidOf(root);
+  assert.deepEqual(
+    READ_ONLY_AGENTS.filter((agent) => said[agent] === undefined),
+    ['iris'],
+  );
+  assert.equal(new Set(READ_ONLY_AGENTS.filter((agent) => agent !== 'iris').map((agent) => said[agent])).size, 2);
 });
 
 test("REFUSED: without the settings' allow of the pinned view, design and review read no reference, and a note that names it no more throws", () => {

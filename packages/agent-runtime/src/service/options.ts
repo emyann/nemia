@@ -157,7 +157,7 @@ export type TaskSpec = {
    * Hold the task open when an attempt signs, rather than settle it: the task waits, phase `input-required` — A2A's
    * `TASK_STATE_INPUT_REQUIRED` — with no process running, until a person `answer`s it, which starts its next turn, or
    * `close`s it, which settles it. A turn is one attempt, under `deadlineSeconds` and a budget of its own, so a task may
-   * wait on a person for as long as they take; a turn that does not end `done` settles the task `failed`. `stop` settles it `stopped`,
+   * wait on a person for as long as they take; a turn that does not end `succeeded` settles the task `failed`. `stop` settles it `stopped`,
    * waiting or not. Refused unless `true`.
    */
   holdOpen?: true;

@@ -569,7 +569,7 @@ const SAY_REFUSALS: Array<{
   },
   {
     name: 'an attempt that has ended on a task that has not settled — one held open between turns, where nothing runs to hear anything until a person answers it',
-    says: /has no attempt running: attempt 1 ended `done`/,
+    says: /has no attempt running: attempt 1 ended `succeeded`/,
     task: async (engine) => {
       const r = await running(engine, { holdOpen: true, closeoutSchema: { type: 'object' } });
       listAs(r.row, { state: 'done' });
@@ -577,7 +577,7 @@ const SAY_REFUSALS: Array<{
       const { state } = await Effect.runPromise(engine.view(r.id));
       assert.deepEqual(
         state.attempts.map((a) => a.ended),
-        ['done'],
+        ['succeeded'],
         'the end is written',
       );
       assert.equal(state.settled, null, 'and the task waits');
@@ -595,7 +595,7 @@ const SAY_REFUSALS: Array<{
   },
   {
     name: 'an attempt its harness lists as no longer running',
-    says: /session is `done` on its harness, not running/,
+    says: /session is `completed` on its harness, not running/,
     task: async (engine) => {
       const r = await running(engine);
       listAs(r.row, { state: 'done' });

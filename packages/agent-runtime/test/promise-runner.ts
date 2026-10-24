@@ -4,15 +4,7 @@
  * typecheck.
  */
 import { Effect } from 'effect';
-import {
-  formerStateOf,
-  isSessionState,
-  SESSION_STATES,
-  type PhaseWord,
-  type SessionState,
-  type Sighting,
-  type Usage,
-} from '../src/core/index.ts';
+import { formerStateOf, isSessionState, SESSION_STATES, type SessionState, type Sighting, type Usage } from '../src/core/index.ts';
 import { RunnerError, type RunnerOps, type SpawnRequest, type Transcript, type TranscriptCursor } from '../src/harness/index.ts';
 import { JournalError, type BodiedJournalOps, type Cursor, type Event, type FeedEntry, type StoreOps } from '../src/index.ts';
 
@@ -21,7 +13,7 @@ import { JournalError, type BodiedJournalOps, type Cursor, type Event, type Feed
  * words (`working`, `blocked`, `done`, `failed`, `stopped`), which `asyncOps` reads as their names (`formerStateOf`:
  * `blocked` is `input-required`), so a fake may keep the words it was written in. Any other word is refused.
  */
-export type AsyncSighting = Omit<Sighting, 'state'> & { state: SessionState | PhaseWord };
+export type AsyncSighting = Omit<Sighting, 'state'> & { state: SessionState | 'working' | 'blocked' | 'done' | 'failed' | 'stopped' };
 
 /** A fake harness, in async methods: what `asyncOps` makes a `RunnerOps` of. */
 export type AsyncRunner = {

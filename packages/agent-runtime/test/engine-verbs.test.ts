@@ -96,7 +96,7 @@ test('a consumer runs a task through its whole life in plain async/await, and bu
 
     await s.test('a pass starts it: running, one session', async () => {
       await Effect.runPromise(engine.tick());
-      assert.equal((await Effect.runPromise(engine.view(id))).phase, 'running (working)');
+      assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working');
       assert.equal(sessions.size, 1);
     });
 
@@ -357,7 +357,7 @@ test('a task whose journal holds an entry no runtime wrote is left out of each p
   fs.appendFileSync(journal, MISWRITTEN);
 
   const first = await Effect.runPromise(engine.tick());
-  assert.equal((await Effect.runPromise(engine.view(good))).phase, 'running (working)');
+  assert.equal((await Effect.runPromise(engine.view(good))).phase, 'working');
   assert.deepEqual([...sessions.keys()], [nameFor(good, 1)]);
   assert.equal(first.unreadable.length, 1);
   assert.ok(
@@ -715,7 +715,7 @@ test('a runner brought as an AsyncRunner, at the pass: handed claude.remoteContr
       assert.equal((await Effect.runPromise(engine.view(maybe))).state.settled, null, 'said nothing: not failed');
 
       await Effect.runPromise(engine.tick());
-      assert.equal((await Effect.runPromise(engine.view(maybe))).phase, 'running (working)', 'and its session is adopted');
+      assert.equal((await Effect.runPromise(engine.view(maybe))).phase, 'working', 'and its session is adopted');
     },
   );
 });

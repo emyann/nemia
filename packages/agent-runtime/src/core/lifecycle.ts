@@ -46,7 +46,7 @@
  */
 import { setup, transition as xTransition } from 'xstate';
 import { toDirectedGraph } from 'xstate/graph';
-import { endOf, phaseWordOf, type Ended, type Outcome } from './session.ts';
+import { endOf, type Outcome } from './session.ts';
 import type { Action, EndReason, Event, Sighting } from './domain.ts';
 
 /** Where a task stands, read off its journal alone (`lifecycleOf` in `domain.ts`). */
@@ -147,9 +147,9 @@ export type LifecycleEvent =
   | { type: 'SPAWN_REFUSED'; attempt: number; error: string }
   | { type: 'NOTHING_OPEN' }
   | { type: 'AWAITING_INPUT' }
-  | { type: 'CLOSED'; last?: { n: number; ended: Ended | null } }
+  | { type: 'CLOSED'; last?: { n: number; ended: Outcome | null } }
   | { type: 'DEADLINE_SPENT'; seconds: number }
-  | { type: 'ATTEMPT_ENDED'; ended: Ended | null; reason: EndReason | null; attempts: number; turn: number; error?: string }
+  | { type: 'ATTEMPT_ENDED'; ended: Outcome | null; reason: EndReason | null; attempts: number; turn: number; error?: string }
   | { type: 'BACKING_OFF'; attempt: number; backoffMs: number }
   | { type: 'RESTART_DUE'; attempt: number; resumeFrom?: string; nudge?: string }
   | { type: 'SETTLED'; outcome: Outcome };
@@ -170,13 +170,13 @@ type Open = Ev<'UNSPAWNED' | 'UNSEEN_IN_GRACE' | 'LOST' | 'UNREAD'>;
 
 /**
  * The `nothing` an edge that waits gives, in words from the event's payload alone. Each edge names one action, and this and
- * the helpers below give its words: the `Action` `decide` returns. A live session runs in the words views print
- * (`phaseWordOf`), so a remote Task `submitted` runs as `working` does.
+ * the helpers below give its words: the `Action` `decide` returns. A live session is one at work, `submitted` or `working`
+ * (`RUNNING`), and runs in A2A's `working`, so a remote Task `submitted` runs as `working` does, to the word.
  */
 const said = (event: LifecycleEvent): Action => {
   switch (event.type) {
     case 'SESSION_LIVE':
-      return { do: 'nothing', why: `running (${phaseWordOf(event.sighting.state)})` };
+      return { do: 'nothing', why: 'running (working)' };
     case 'SESSION_IDLE':
       return { do: 'nothing', why: 'idle — open until stopped' };
     case 'SESSION_BLOCKED':
@@ -200,7 +200,7 @@ const said = (event: LifecycleEvent): Action => {
 
 /**
  * The end of an attempt its harness has let go of, or that went quiet: what it said, untouched, or why it said nothing. Its
- * word is `endOf` the sighting's state — the journal's `done`, `failed` or `stopped`. No edge takes a session waiting on a
+ * word is `endOf` the sighting's state — the journal's `succeeded`, `failed` or `stopped`. No edge takes a session waiting on a
  * person here (`SESSION_BLOCKED` waits or stops), so one that did is the table's mistake, thrown as `moveOn` throws one.
  * `stated`, where the task asked for a closing statement: whether it came, a fact for the layer above, which judges it.
  */
@@ -215,7 +215,7 @@ const harnessEnd = (e: Sessioned): Action => ({
   ...(e.asked ? { stated: e.sighting.closeout !== undefined } : {}),
 });
 
-const endedOf = (e: Sessioned): Ended => {
+const endedOf = (e: Sessioned): Outcome => {
   const end = endOf(e.sighting.state);
   if (!end)
     throw new Error(
@@ -301,7 +301,7 @@ const inFlight = {
   SESSION_BLOCKED: { actions: nothing },
   SESSION_QUIET: harness,
   SESSION_ENDED: harness,
-  /** Stopped under it, by its harness or a person at the harness's side: an end that never holds, since only `done` does. */
+  /** Stopped under it, by its harness or a person at the harness's side: an end that never holds, since only `succeeded` does. */
   SESSION_STOPPED: { target: 'ending', actions: act('record-end', harnessEnd) },
   DEADLINE_PASSED: deadline,
 };
@@ -483,8 +483,8 @@ const GUARDS = {
   holds: ({ event }: { event: LifecycleEvent }) => 'holds' in event && event.holds,
   live: ({ event }: { event: LifecycleEvent }) => event.type === 'DEADLINE_PASSED' && event.live,
   overdue: ({ event }: { event: LifecycleEvent }) => event.type === 'UNREAD' && event.overdue,
-  lastDone: ({ event }: { event: LifecycleEvent }) => event.type === 'CLOSED' && event.last?.ended === 'done',
-  endedDone: ({ event }: { event: LifecycleEvent }) => event.type === 'ATTEMPT_ENDED' && event.ended === 'done',
+  lastDone: ({ event }: { event: LifecycleEvent }) => event.type === 'CLOSED' && event.last?.ended === 'succeeded',
+  endedDone: ({ event }: { event: LifecycleEvent }) => event.type === 'ATTEMPT_ENDED' && event.ended === 'succeeded',
   endedStopped: ({ event }: { event: LifecycleEvent }) => event.type === 'ATTEMPT_ENDED' && event.ended === 'stopped',
 };
 

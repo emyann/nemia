@@ -18,12 +18,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
 import { decide, fold, nameFor, observe, type Action, type Sighting } from '../src/core/domain.ts';
-import { endOf, formerStateOf, isSessionState, phaseWordOf, SESSION_STATES, type SessionState } from '../src/core/session.ts';
+import { endOf, formerStateOf, isSessionState, SESSION_STATES, type SessionState, type TaskPhase } from '../src/core/session.ts';
 import { viewOfState } from '../src/core/engine/engine.ts';
 import { AUTH_WAIT, claudeStateOf } from '../src/harness/claude/registry.ts';
 import { detachedStateOf } from '../src/harness/detached/detached.ts';
 import { Engine } from '../src/index.ts';
-import { corpusOf, filed, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';
+import { at, corpusOf, ended, filed, S, spawned, starting, TASK, type Case } from './lifecycle-corpus.ts';
 import { scratch } from './scratch.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
@@ -141,7 +141,7 @@ test("every name over the corpus: the three that joined decide as the one they j
           const a = decide(fold(TASK, c.events), c.observed, c.now);
           if (a.do !== 'record-end') continue;
           ends++;
-          assert.ok(['done', 'failed', 'stopped'].includes(a.observed), `${state}: ${c.name} recorded ${a.observed}`);
+          assert.ok(['succeeded', 'failed', 'stopped'].includes(a.observed), `${state}: ${c.name} recorded ${a.observed}`);
           if (a.reason === 'harness') assert.equal(a.observed, endOf(state), `${state}: ${c.name}`);
         }
       }
@@ -151,21 +151,6 @@ test("every name over the corpus: the three that joined decide as the one they j
 });
 
 test("a session's words, name by name: its journal and view words, the former words read, Claude Code's registry and its waits, the detached worker's run file, and what a view prints", async (t) => {
-  await t.test("endOf and phaseWordOf: each name's journal word and view word, exactly", () => {
-    const expected: Record<SessionState, [ReturnType<typeof endOf>, ReturnType<typeof phaseWordOf>]> = {
-      submitted: ['done', 'working'],
-      working: ['done', 'working'],
-      'input-required': [undefined, 'blocked'],
-      'auth-required': [undefined, 'blocked'],
-      completed: ['done', 'done'],
-      failed: ['failed', 'failed'],
-      rejected: ['failed', 'failed'],
-      canceled: ['stopped', 'stopped'],
-    };
-    assert.deepEqual(Object.keys(expected).sort(), [...SESSION_STATES].sort());
-    for (const state of SESSION_STATES) assert.deepEqual([endOf(state), phaseWordOf(state)], expected[state], state);
-  });
-
   await t.test('formerStateOf reads the five former words, and nothing else', () => {
     assert.deepEqual(['working', 'blocked', 'done', 'failed', 'stopped'].map(formerStateOf), [
       'working',
@@ -257,30 +242,40 @@ test("a session's words, name by name: its journal and view words, the former wo
     },
   );
 
-  await t.test("a view prints each name in the words views have always printed: A2A's names stop at the runtime", () => {
+  await t.test("a view's phase for each name, and the session's own state beside it while an attempt is in flight", () => {
     const inFlight = fold(TASK, [filed(), starting(1), spawned(1)]);
-    const expected: Record<SessionState, string> = {
-      submitted: 'running (working)',
-      working: 'running (working)',
+    const expected: Record<SessionState, TaskPhase> = {
+      submitted: 'working',
+      working: 'working',
       'input-required': 'needs-human',
       'auth-required': 'needs-human',
-      completed: 'running (done)',
-      failed: 'running (failed)',
-      rejected: 'running (failed)',
-      canceled: 'running (stopped)',
+      completed: 'ending',
+      failed: 'ending',
+      rejected: 'ending',
+      canceled: 'ending',
     };
     for (const state of SESSION_STATES) {
       const v = viewOfState(inFlight, new Map([[nameFor(TASK, 1), { sessionId: 's', state, busy: true, waitingFor: 'authentication' }]]));
-      assert.equal(v.phase, expected[state], state);
+      assert.deepEqual([v.phase, v.session], [expected[state], state], state);
       assert.equal(v.waitingFor, v.phase === 'needs-human' ? 'authentication' : undefined, state);
     }
     for (const state of ['submitted', 'working'] as const) {
-      assert.equal(
-        viewOfState(inFlight, new Map([[nameFor(TASK, 1), { sessionId: 's', state, busy: false }]])).phase,
-        'working (quiescent)',
-        state,
-      );
+      const v = viewOfState(inFlight, new Map([[nameFor(TASK, 1), { sessionId: 's', state, busy: false }]]));
+      assert.deepEqual([v.phase, v.session], ['quiescent', state], state);
     }
+    const unseen = viewOfState(inFlight, new Map());
+    assert.deepEqual([unseen.phase, unseen.session], ['starting', undefined], 'spawned, not yet seen');
+    const between = viewOfState(fold(TASK, [filed(), starting(1), spawned(1), ended(1, 'failed', 'lost')]), new Map());
+    assert.deepEqual([between.phase, between.session], ['between-attempts', undefined], 'an attempt ended, the task filed');
+    const settled = fold(TASK, [
+      filed(),
+      starting(1),
+      spawned(1),
+      ended(1, 'succeeded', 'harness'),
+      { kind: 'settled', at: at(3 * S), outcome: 'succeeded' },
+    ]);
+    const done = viewOfState(settled, new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'completed', busy: false }]]));
+    assert.deepEqual([done.phase, done.session], ['succeeded', undefined], 'a settled task carries no session');
   });
 });
 
@@ -350,7 +345,7 @@ test('an engine over the former words: a fake that speaks them, and a journal wr
     ];
     await Effect.runPromise(engine.tick());
     await Effect.runPromise(engine.tick());
-    assert.equal((await Effect.runPromise(engine.view(done))).phase, 'running (working)');
+    assert.equal((await Effect.runPromise(engine.view(done))).phase, 'working');
     sessions.set(nameFor(done, 1), { sessionId: 's-d', state: 'done' });
     sessions.set(nameFor(blocked, 1), { sessionId: 's-b', state: 'blocked' });
     await Effect.runPromise(engine.stop(stopped));
@@ -394,7 +389,7 @@ test('an engine over the former words: a fake that speaks them, and a journal wr
           at: at(3),
           attempt: 1,
           sessionId: 's-1',
-          observed: 'done',
+          observed: 'succeeded',
           reason: 'harness',
           nativeId: 'native-1',
           closeout: { outcome: 'done' },
@@ -425,8 +420,8 @@ test('an engine over the former words: a fake that speaks them, and a journal wr
       );
       assert.deepEqual(
         views.map((v) => v.state.attempts[0].ended),
-        ['done', 'stopped', 'failed'],
-        'the ends are read in the words they were written in',
+        ['succeeded', 'stopped', 'failed'],
+        'the ends are read as written, a former `done` as `succeeded`',
       );
       assert.deepEqual(views[0].state.attempts[0].closeout, { outcome: 'done' });
       ids.forEach((id, i) => {

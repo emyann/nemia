@@ -5,7 +5,7 @@
  */
 import type { Harnessed } from './harnessed.ts';
 import { Cause, Effect, Schema } from 'effect';
-import { fold, idleOf, isLive, nameFor, phaseWordOf, type Attempt, type Event, type State } from '../core/index.ts';
+import { fold, idleOf, isLive, nameFor, type Attempt, type Event, type State } from '../core/index.ts';
 import { Journal, type JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
 
@@ -84,9 +84,7 @@ export const interruptVerbOf = (
       );
     }
     if (!isLive(sighting.state)) {
-      return yield* refuse(
-        `\`${taskId}\`'s session is \`${phaseWordOf(sighting.state)}\` on its harness, not running: there is no turn in it. ${STOP}`,
-      );
+      return yield* refuse(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: there is no turn in it. ${STOP}`);
     }
     if (idleOf(state, sighting)) {
       return yield* refuse(

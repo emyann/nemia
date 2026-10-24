@@ -396,7 +396,7 @@ const sayReaches = (background: boolean) => async (t: TestContext) => {
       while (!said && Date.now() < until) {
         await Effect.runPromise(engine.tick());
         const { phase } = await Effect.runPromise(engine.view(ids.told));
-        if (phase === 'running (working)' || phase === 'working (quiescent)') said = await Effect.runPromise(engine.say(ids.told, words));
+        if (phase === 'working' || phase === 'quiescent') said = await Effect.runPromise(engine.say(ids.told, words));
         else await new Promise((r) => setTimeout(r, 5_000));
       }
       assert.ok(said, 'the told session was seen working within five minutes, and told');
@@ -670,7 +670,7 @@ test(
       );
       assert.ok(v.state.settled, `settled: ${v.phase}`);
       assert.ok(
-        a?.closeout !== undefined || a?.stated === false || a?.ended !== 'done',
+        a?.closeout !== undefined || a?.stated === false || a?.ended !== 'succeeded',
         `recorded done with nothing said and not saying so, ended ${a?.ended} (${a?.reason}), stated ${a?.stated}: bug 1, which the orchestrator could then not read as unsigned`,
       );
     });

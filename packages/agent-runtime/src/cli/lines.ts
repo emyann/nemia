@@ -83,7 +83,7 @@ const ranLine = (a: Attempt): string =>
     : `${a.startedAt.slice(11, 19)} → ${a.endedAt.slice(11, 19)} (${duration(Date.parse(a.endedAt) - Date.parse(a.startedAt))})`;
 
 /**
- * `done (no statement)` for an end whose task asked for a closing statement and was given none (`stated: false`): the fact
+ * `succeeded (no statement)` for an end whose task asked for a closing statement and was given none (`stated: false`): the fact
  * the runtime records. What it means for the work is the layer above's to say; `ae` says only what happened.
  */
 const unstated = (stated: boolean | undefined): string => (stated === false ? ' (no statement)' : '');

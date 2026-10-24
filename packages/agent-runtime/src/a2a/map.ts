@@ -302,7 +302,7 @@ export const wordsOf = (t: Task): string | undefined => {
 
 /**
  * An attempt the harness no longer lists, as the journal records it: open → `SUBMITTED`; ended `unstartable` →
- * `REJECTED`; ended done → `COMPLETED`, or `INPUT_REQUIRED` when its task is held open waiting on a person (`waiting`),
+ * `REJECTED`; ended succeeded → `COMPLETED`, or `INPUT_REQUIRED` when its task is held open waiting on a person (`waiting`),
  * stopped → `CANCELED`, anything else → `FAILED`. Its context is the id the attempt was recorded with, what it closed with
  * its Artifact; the reason and the rest of the attempt ride in `metadata.attempt`, and a refusal's words in `status.message`.
  */
@@ -312,7 +312,7 @@ export const taskOfAttempt = (name: string, a: Attempt, messageId: string, waiti
       ? TaskState.TASK_STATE_SUBMITTED
       : a.reason === 'unstartable'
         ? TaskState.TASK_STATE_REJECTED
-        : a.ended === 'done'
+        : a.ended === 'succeeded'
           ? waiting
             ? TaskState.TASK_STATE_INPUT_REQUIRED
             : TaskState.TASK_STATE_COMPLETED

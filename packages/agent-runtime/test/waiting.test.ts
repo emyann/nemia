@@ -101,7 +101,7 @@ test("a session blocked on a person carries what its harness says it waits for o
   await s.test('working again, it carries no word though its harness still says one: the field rides on needs-human alone', async () => {
     claude.set(name, { state: 'working', status: 'busy', waitingFor: 'permission prompt' });
     const third = await view();
-    assert.equal(third.phase.startsWith('needs-human'), false, 'it is working again');
+    assert.notEqual(third.phase, 'needs-human', 'it is working again');
     assert.equal(Object.hasOwn(third, 'waitingFor'), false, 'and carries no word: the field rides on needs-human alone');
   });
 });

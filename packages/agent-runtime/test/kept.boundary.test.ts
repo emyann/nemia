@@ -62,7 +62,7 @@ const journalled = async (
             at,
             attempt: 1,
             sessionId: `job-${taskId}`,
-            observed: 'done',
+            observed: 'succeeded',
             reason: 'harness',
             ...(nativeId ? { nativeId } : {}),
           },

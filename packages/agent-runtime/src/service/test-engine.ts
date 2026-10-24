@@ -16,7 +16,7 @@
  * alone, and by no file of a `src`.
  */
 import { Effect, Layer } from 'effect';
-import type { Attempt, Said, SessionAsk, State } from '../core/index.ts';
+import type { Attempt, Outcome, Said, SessionAsk, State, TaskPhase } from '../core/index.ts';
 import { JournalError, StopRefused, type TaskView } from '../core/engine/index.ts';
 import {
   attemptRefusal,
@@ -64,7 +64,7 @@ export type TestEnd = Partial<Attempt> & { readonly printed?: Printed };
  */
 export type TestTask = {
   spec: TestFiling;
-  phase: string;
+  phase: TaskPhase;
   filedAt: string;
   stopRequested: boolean;
   said: Said[];
@@ -83,11 +83,8 @@ export type TestTask = {
   asksSaid: boolean;
 };
 
-/** How an attempt ended, by the phase its task settled in. */
-const ENDED = { succeeded: 'done', failed: 'failed', stopped: 'stopped' } as const;
-
-/** The outcome a phase word is, or `null` for a task not settled. */
-const outcomeOf = (phase: string): keyof typeof ENDED | null => (Object.hasOwn(ENDED, phase) ? (phase as keyof typeof ENDED) : null);
+/** The outcome a task settled in, which is its phase once settled, or `null` for a task not settled. */
+const settledOf = (phase: TaskPhase): Outcome | null => (phase === 'succeeded' || phase === 'failed' || phase === 'stopped' ? phase : null);
 
 /** The session a started task of the stand-in runs in. */
 const sessionOf = (id: string): string => `native-${id}`;
@@ -124,17 +121,21 @@ const stateOf = (id: string, t: TestTask): State => ({
   attempts: [...t.earlier, ...(t.attempt ? [t.attempt] : [])],
   said: [...t.said],
   stopRequested: t.stopRequested,
-  settled: outcomeOf(t.phase),
+  settled: settledOf(t.phase),
 });
 
-/** What a task looks like to `view`: a task never filed as the engine reads an empty journal, a held one as `settle` left it. */
+/**
+ * What a task looks like to `view`: a task never filed as the engine reads an empty journal, a held one as `settle` left it. Its
+ * `session` is `working` while its attempt is in flight at work (`working`, `quiescent`), and absent in any other phase.
+ */
 const viewOf = (id: string, t: TestTask | undefined): TaskView => {
   if (!t) return { id, state: blank(id), phase: 'pending', sessionId: null, admission: 'queued' };
-  const waits = t.spec.queued === true && !t.attempt && outcomeOf(t.phase) === null;
+  const waits = t.spec.queued === true && !t.attempt && settledOf(t.phase) === null;
   return {
     id,
     state: stateOf(id, t),
     phase: t.phase,
+    ...(t.attempt?.ended === null && (t.phase === 'working' || t.phase === 'quiescent') ? { session: 'working' as const } : {}),
     sessionId: t.attempt ? sessionOf(id) : null,
     ...(waits ? { admission: 'queued' } : {}),
     ...(t.asksSaid ? { asks: t.asks.map((ask) => ({ ...ask })) } : {}),
@@ -146,14 +147,14 @@ const viewOf = (id: string, t: TestTask | undefined): TaskView => {
  * The one attempt of a task settled in `phase`: begun and spawned now, ended as the phase says, by its harness or, for a stop, by the
  * person who asked, and its session named once it has ended; then `end` over it.
  */
-const attemptOf = (t: TestTask, phase: string, end: Partial<Attempt>): Attempt => {
+const attemptOf = (t: TestTask, phase: TaskPhase, end: Partial<Attempt>): Attempt => {
   const at = new Date().toISOString();
-  const outcome = outcomeOf(phase);
+  const outcome = settledOf(phase);
   return {
     n: t.attempt?.n ?? t.earlier.length + 1,
     startedAt: t.attempt?.startedAt ?? at,
     spawnedAt: t.attempt?.spawnedAt ?? at,
-    ended: outcome ? ENDED[outcome] : null,
+    ended: outcome,
     endedAt: outcome ? at : null,
     reason: outcome === null ? null : outcome === 'stopped' ? 'operator' : 'harness',
     nativeId: outcome ? sessionOf(t.spec.id) : null,
@@ -241,12 +242,12 @@ export type TestEngine = {
   /** Refuses the next `times` says, whatever the task. */
   readonly refuseSay: (times: number) => void;
   /**
-   * Leaves the task `id` in `phase`, any word: `pending` takes its attempt away; `succeeded`, `failed` and `stopped` settle it and end
-   * its attempt; any other word is an attempt in flight. A task stopped before it started settles with no attempt, as the engine
+   * Leaves the task `id` in `phase`: `pending` takes its attempt away; `succeeded`, `failed` and `stopped` settle it and end
+   * its attempt; any other phase is an attempt in flight. A task stopped before it started settles with no attempt, as the engine
    * settles one, unless `end` is given. `end` is laid over the attempt, field for field, but its `printed`, the text the session
    * printed, which the task keeps until a settle gives another. Throws for a task never filed.
    */
-  readonly settle: (id: string, phase: string, end?: TestEnd) => TestTask;
+  readonly settle: (id: string, phase: TaskPhase, end?: TestEnd) => TestTask;
   /** Plants the transcript the attempt `n` of the task `id` read, in place of what was planted before. Throws for a task never filed. */
   readonly plantTranscript: (id: string, n: number, events: readonly TranscriptEvent[]) => void;
   /** Plants a question of a task's session waiting on a person, which `view` says and `answerAsk` answers. */
@@ -499,7 +500,7 @@ const keptOf = (
   const { tasks, filings, specs, stopped, forgets, said, interrupts, answered } = held;
   const settledIn = (id: string) => {
     const t = tasks.get(id);
-    return t ? outcomeOf(t.phase) : null;
+    return t ? settledOf(t.phase) : null;
   };
   return {
     file: (spec) =>
@@ -568,8 +569,8 @@ const restartIn = (tasks: Map<string, TestTask>, id: string): TestTask => {
   if (!t?.attempt) throw new Error(`the test engine holds no started task ${id}: settle it at work before restarting it`);
   t.earlier.push(t.attempt.ended ? t.attempt : attemptOf(t, 'failed', {}));
   t.attempt = null;
-  t.attempt = attemptOf(t, 'running (working)', {});
-  t.phase = 'running (working)';
+  t.attempt = attemptOf(t, 'working', {});
+  t.phase = 'working';
   return t;
 };
 
@@ -639,7 +640,7 @@ export const testEngine = (): TestEngine => {
         ),
     }),
   );
-  const settle = (id: string, phase: string, end?: TestEnd): TestTask => {
+  const settle = (id: string, phase: TaskPhase, end?: TestEnd): TestTask => {
     const t = taskFor(held.tasks, id, 'settling it');
     const unstarted = phase === 'pending' || (phase === 'stopped' && !t.attempt && !end);
     const { printed, ...over } = end ?? {};

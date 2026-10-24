@@ -143,7 +143,7 @@ test('a session that ends without the closing statement its task asked for, at s
         const [first] = v.state.attempts;
         assert.deepEqual(
           [first?.ended, first?.reason, first?.stated, first?.closeout],
-          ['done', 'harness', false, undefined],
+          ['succeeded', 'harness', false, undefined],
           'ended as quiet ends, and said to have stated nothing: the fact the orchestrator reads as unsigned',
         );
         assert.deepEqual(claude.rows(), [], 'its session let go');
@@ -173,7 +173,7 @@ test('a session that ends without the closing statement its task asked for, at s
       assert.equal(v.state.settled, 'succeeded');
       assert.deepEqual(
         v.state.attempts.map((a) => [a.ended, a.reason]),
-        [['done', 'harness']],
+        [['succeeded', 'harness']],
       );
       assert.equal(claude.spawns().length, 1, 'nothing continued');
     });
@@ -247,7 +247,7 @@ test('a session that ends without the closing statement its task asked for, at s
         const v = await Effect.runPromise(engine.view(asked));
         assert.deepEqual(
           v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.stated]),
-          [['done', 'harness', undefined, false]],
+          [['succeeded', 'harness', undefined, false]],
           'it never said it had finished, and the record says so',
         );
 
@@ -255,7 +255,7 @@ test('a session that ends without the closing statement its task asked for, at s
         assert.equal(w.state.settled, 'succeeded', "the harness's word is the only end a task that asked for nothing has");
         assert.deepEqual(
           w.state.attempts.map((a) => [a.ended, a.reason]),
-          [['done', 'harness']],
+          [['succeeded', 'harness']],
         );
         assert.equal('stated' in w.state.attempts[0], false);
       });

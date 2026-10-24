@@ -15,7 +15,7 @@ import type { EngineShape } from '../src/index.ts';
 import { noTranscript } from '../src/harness/transcript.ts';
 
 /** Where a walk moves a task: at work, or settled. */
-export type Moved = 'running (working)' | 'succeeded' | 'failed' | 'stopped';
+export type Moved = 'working' | 'succeeded' | 'failed' | 'stopped';
 
 /** What a session ended with: its process's exit code, what it stated, and the text it printed, stream by stream. */
 export type End = {
@@ -151,10 +151,10 @@ const VIEW: readonly Walk[] = [
     name: 'a task at work has one attempt in flight and a session',
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       return asked(engine.view('a'));
     },
-    says: { id: 'a', state: { ...filed('a'), attempts: [attempt()] }, phase: 'running (working)', sessionId: '<session>' },
+    says: { id: 'a', state: { ...filed('a'), attempts: [attempt()] }, phase: 'working', session: 'working', sessionId: '<session>' },
   },
   {
     name: 'a task whose session completed has succeeded, its attempt done by its harness with what it stated and its exit code',
@@ -169,7 +169,7 @@ const VIEW: readonly Walk[] = [
         ...filed('a'),
         settled: 'succeeded',
         attempts: [
-          attempt({ ended: 'done', endedAt: '<time>', reason: 'harness', nativeId: '<session>', exitCode: 0, closeout: { ok: 1 } }),
+          attempt({ ended: 'succeeded', endedAt: '<time>', reason: 'harness', nativeId: '<session>', exitCode: 0, closeout: { ok: 1 } }),
         ],
       },
       phase: 'succeeded',
@@ -221,7 +221,7 @@ const STOP: readonly Walk[] = [
     name: 'a stop of a task at work is shown on it, and the task settles stopped, its attempt ended by the person who asked',
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       await asked(engine.stop('a'));
       const asking = (await Effect.runPromise(engine.view('a'))).state.stopRequested;
       await settle('a', 'stopped');
@@ -304,7 +304,7 @@ const OUTPUT: readonly Walk[] = [
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
       const before = await asked(engine.output('a', 'stdout'));
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       return [before, await asked(engine.output('a', 'stderr'))];
     },
     says: [null, null],
@@ -331,7 +331,7 @@ const OUTPUT: readonly Walk[] = [
     name: 'a stream of a task at work is the text its session has printed so far',
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
-      await settle('a', 'running (working)', { printed: { stdout: 'so far\n' } });
+      await settle('a', 'working', { printed: { stdout: 'so far\n' } });
       return asked(engine.output('a', 'stdout'));
     },
     says: 'so far\n',
@@ -374,7 +374,7 @@ const LIST: readonly Walk[] = [
       await asked(engine.file(task('a')));
       await asked(engine.file({ ...task('c'), queued: true }));
       await settle('a', 'succeeded', { exitCode: 0, closeout: { ok: 1 } });
-      await settle('b', 'running (working)');
+      await settle('b', 'working');
       const every = await Effect.runPromise(engine.list());
       const viewed: boolean[] = [];
       for (const view of every.views)
@@ -389,7 +389,7 @@ const LIST: readonly Walk[] = [
       };
     },
     says: {
-      every: ['a succeeded', 'b running (working)', 'c pending'],
+      every: ['a succeeded', 'b working', 'c pending'],
       unreadable: [],
       asViewed: [true, true, true],
       some: ['c pending queued', 'a succeeded '],
@@ -426,7 +426,7 @@ const SAY: readonly Walk[] = [
     name: 'a word to a task at work is answered as said to its attempt, and the task keeps it',
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       return [await asked(engine.say('a', 'hello')), (await Effect.runPromise(engine.view('a'))).state.said];
     },
     says: [{ at: '<time>', attempt: 1, text: 'hello', after: null }, [{ at: '<time>', attempt: 1, text: 'hello', after: null }]],
@@ -435,7 +435,7 @@ const SAY: readonly Walk[] = [
     name: 'empty words, or whitespace alone, are refused before the task is looked for, and none is kept',
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       const refused = [await asked(engine.say('nope', '')), await asked(engine.say('a', '')), await asked(engine.say('a', ' \n\t'))];
       return [...refused, (await Effect.runPromise(engine.view('a'))).state.said];
     },
@@ -449,7 +449,7 @@ const INTERRUPT: readonly Walk[] = [
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
       const unstarted = [await asked(engine.interrupt('nope')), await asked(engine.interrupt('a'))];
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       const working = await asked(engine.interrupt('a'));
       const after = (await Effect.runPromise(engine.view('a'))).state;
       await settle('a', 'succeeded', { exitCode: 0 });
@@ -472,7 +472,7 @@ const TRANSCRIPT: readonly Walk[] = [
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
       const unstarted = [await asked(engine.transcript('nope')), await asked(engine.transcript('a', undefined, { attempt: 1 }))];
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       return [...unstarted, await asked(engine.transcript('a', undefined, { attempt: 2 }))];
     },
     says: [{ refused: 'TranscriptRefused' }, { refused: 'TranscriptRefused' }, { refused: 'TranscriptRefused' }],
@@ -482,7 +482,7 @@ const TRANSCRIPT: readonly Walk[] = [
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
       const unstarted = await asked(engine.transcript('a'));
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       return [unstarted, await asked(engine.transcript('a')), await asked(engine.transcript('a', undefined, { attempt: 1 }))];
     },
     says: [
@@ -503,7 +503,7 @@ const FORGET: readonly Walk[] = [
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
       const refused = [await asked(engine.forget(['nope'], { yes: true })), await asked(engine.forget(['a'], { yes: true }))];
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       return [...refused, await asked(engine.forget(['a'], { yes: true })), (await Effect.runPromise(engine.view('a'))).state.brief];
     },
     says: [{ refused: 'ForgetRefused' }, { refused: 'ForgetRefused' }, { refused: 'ForgetRefused' }, 'do a'],
@@ -531,7 +531,7 @@ const KEPT: readonly Walk[] = [
     walk: async ({ engine, settle }) => {
       const none = named(await asked(engine.kept()));
       for (const id of ['a', 'b', 'c']) await asked(engine.file(task(id)));
-      await settle('b', 'running (working)');
+      await settle('b', 'working');
       await settle('c', 'failed', { exitCode: 1 });
       return [none, named(await asked(engine.kept()))];
     },
@@ -572,7 +572,7 @@ const ANSWER: readonly Walk[] = [
       await asked(engine.file(task('a')));
       const given = { id: 'q1', answers: { 'Which way?': 'This one' } };
       const unstarted = [await asked(engine.answerAsk('nope', given)), await asked(engine.answerAsk('a', given))];
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       const working = await asked(engine.answerAsk('a', given));
       const after = (await Effect.runPromise(engine.view('a'))).state;
       await settle('a', 'succeeded', { exitCode: 0 });
@@ -817,7 +817,7 @@ export const APART: readonly Apart[] = [
     why: "a session's logs are its harness's, and the stand-in has none",
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('a')));
-      await settle('a', 'running (working)');
+      await settle('a', 'working');
       return asked(engine.logs('a'));
     },
     standIn: '(the test engine keeps no logs)',

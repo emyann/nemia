@@ -8,7 +8,7 @@
  */
 import type { Harnessed } from './harnessed.ts';
 import { Cause, Effect, Schema } from 'effect';
-import { fold, isLive, nameFor, phaseWordOf, type Event, type State } from '../core/index.ts';
+import { fold, isLive, nameFor, type Event, type State } from '../core/index.ts';
 import { Journal, type JournalError } from '../core/engine/index.ts';
 import { openAttemptOf } from './interrupt.ts';
 import type { Runner } from '../harness/index.ts';
@@ -74,9 +74,7 @@ export const answerVerbOf = (
       );
     }
     if (!isLive(sighting.state)) {
-      return yield* refuse(
-        `\`${taskId}\`'s session is \`${phaseWordOf(sighting.state)}\` on its harness, so no call of it is waiting on a person.`,
-      );
+      return yield* refuse(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, so no call of it is waiting on a person.`);
     }
     if (!(sighting.asks ?? []).some((ask) => ask.id === given.id)) {
       return yield* refuse(

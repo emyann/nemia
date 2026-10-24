@@ -35,7 +35,7 @@ import {
   type VerbName,
 } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
-import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Ended, type Outcome, type SessionState } from './session.ts';
+import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Outcome, type SessionState } from './session.ts';
 
 /** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
 const ENDED_OWN: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'rejected']);
@@ -90,9 +90,9 @@ export type Sighting = {
    * a statement from a busy session — a verdict it may yet revise — which is why quiet, not the statement, is what
    * ends such an attempt.)
    *
-   * A fact about the session, not a verdict on the work: a quiet session has ended, and `decide` records it `done` —
+   * A fact about the session, not a verdict on the work: a quiet session has ended, and `decide` records it `succeeded` —
    * with `stated: false` where its task asked for a closing statement and was told none, which the layer above judges.
-   * Only the journal knows the task, so `decide` reads this, and no runner turns it into `done`.
+   * Only the journal knows the task, so `decide` reads this, and no runner turns it into `succeeded`.
    */
   quietMs?: number;
   /**
@@ -427,7 +427,7 @@ export type Event =
       at: string;
       attempt: number;
       sessionId: string;
-      observed: Ended;
+      observed: Outcome;
       reason: EndReason;
       nativeId?: string;
       closeout?: unknown;
@@ -477,7 +477,7 @@ export type Attempt = {
   spawnedAt: string | null;
   /** The spawn's moment on the monotonic clock, when the engine that journalled it read one. */
   spawnedMono?: Monotonic;
-  ended: Ended | null;
+  ended: Outcome | null;
   /** The `at` of the `ended` entry: when the engine wrote the end down. Null while the attempt runs. */
   endedAt: string | null;
   /** The end's moment on the monotonic clock, when the engine that journalled it read one. */
@@ -741,12 +741,14 @@ export function turnOf(state: State, n = state.inputs.length) {
 }
 
 /**
- * A task held open, its current turn ended `done` (with its statement or without), not closed and not settled: it waits on a person's
+ * A task held open, its current turn ended `succeeded` (with its statement or without), not closed and not settled: it waits on a person's
  * answer, with no process running.
  */
 export function waitsForInput(state: State): boolean {
   const last = state.attempts.at(-1);
-  return state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'done' && (last.turn ?? 0) === state.inputs.length;
+  return (
+    state.holdOpen === true && !state.settled && !state.closed && last?.ended === 'succeeded' && (last.turn ?? 0) === state.inputs.length
+  );
 }
 
 /** A task a person may ask to stop (`requestStop`): not settled, and not asked to stop already. */
@@ -811,7 +813,7 @@ export type Action =
       do: 'record-end';
       attempt: number;
       sessionId: string;
-      observed: Ended;
+      observed: Outcome;
       reason: EndReason;
       nativeId?: string;
       closeout?: unknown;
@@ -1047,7 +1049,7 @@ function sessionEvent(state: State, last: Attempt, sighting: Sighting, now: Now)
     attempt: last.n,
     sighting,
     asked: state.closeoutSchema !== undefined,
-    holds: state.holdOpen === true && !state.closed && ending === 'done' && (last.turn ?? 0) === state.inputs.length,
+    holds: state.holdOpen === true && !state.closed && ending === 'succeeded' && (last.turn ?? 0) === state.inputs.length,
   };
   if (respawning(state, sighting)) {
     const gap = last.gapSince === undefined ? 0 : elapsedMs({ at: Date.parse(last.gapSince), mono: last.gapMono }, instantOf(now));

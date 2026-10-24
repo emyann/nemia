@@ -70,7 +70,16 @@ test('decide and admissionOf: a queued task waits for the word, read off the rec
       admitted(),
       { kind: 'starting', at: at(2), attempt: 1 },
       { kind: 'spawned', at: at(3), attempt: 1 },
-      { kind: 'ended', at: at(4), attempt: 1, sessionId: 's0', observed: 'done', reason: 'harness', nativeId: 'native-1', closeout: {} },
+      {
+        kind: 'ended',
+        at: at(4),
+        attempt: 1,
+        sessionId: 's0',
+        observed: 'succeeded',
+        reason: 'harness',
+        nativeId: 'native-1',
+        closeout: {},
+      },
     ];
     const waiting = fold(TASK, signed);
     assert.deepEqual(decide(waiting, new Map(), now(5)), { do: 'nothing', why: 'input-required' });

@@ -140,12 +140,13 @@ const MonotonicSchema = Schema.Struct({ boot: Schema.String, ms: Schema.Finite }
 
 /**
  * An end as any runtime wrote one: `budget` is the reason an older runtime's journal gives a session its harness ended at a
- * spend cap, read as `harness` with `limit: 'budget'` (`upgrade`).
+ * spend cap, read as `harness` with `limit: 'budget'`, and `done` the word an older runtime recorded an end the harness
+ * vouched for with, read as `succeeded` (`upgrade`, both).
  */
 const Ended = event('ended', {
   attempt: Schema.Finite,
   sessionId: Schema.String,
-  observed: Schema.Literals(['done', 'failed', 'stopped']),
+  observed: Schema.Literals(['succeeded', 'failed', 'stopped', 'done']),
   reason: Schema.Literals(['harness', 'lost', 'unsigned', 'unstartable', 'operator', 'deadline', 'budget']),
   nativeId: Schema.optional(Schema.String),
   closeout: Schema.optional(Schema.Unknown),

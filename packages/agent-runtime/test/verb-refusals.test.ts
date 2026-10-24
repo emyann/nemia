@@ -201,7 +201,7 @@ test('one store, two engines — one built once, one provided its layer for each
     assert.deepEqual(Object.keys(again).sort(), Object.keys(report).sort());
     for (const id of ['one', 'two']) {
       const view = await Effect.runPromise(built.view(id));
-      assert.equal(view.phase, 'running (working)', id);
+      assert.equal(view.phase, 'working', id);
       assert.deepEqual(await effect((e) => e.view(id)), view, id);
       assert.equal(await effect((e) => e.logs(id)), await Effect.runPromise(built.logs(id)));
       const observed = Effect.runSync(built.io()).observed;
@@ -317,7 +317,7 @@ test('a long-lived task through either engine: filed with its restart policy, id
   sessions.set('ae/one/1', { ...sessions.get('ae/one/1')!, held: false });
   assert.match(
     (await failure(effect((e) => e.say('one', 'gone')))).message,
-    /^`one`'s session is `done` on its harness, not running: the next pass writes its end\./,
+    /^`one`'s session is `completed` on its harness, not running: the next pass writes its end\./,
     'a session listed done with no process is gone, and refused as for a job',
   );
   sessions.set('ae/one/1', { ...sessions.get('ae/one/1')!, held: true });

@@ -28,7 +28,7 @@ import {
   type Usage,
 } from '../domain.ts';
 import type { Monotonic } from '../clock.ts';
-import { atWorkState, phaseWordOf, type SessionState } from '../session.ts';
+import { atWorkState, LIVE_PHASE, type SessionState, type TaskPhase } from '../session.ts';
 import { Journal } from './journal.ts';
 import { bridgeOfTask, configForTurn } from '../../harness/args.ts';
 import { Runner, type ExpectedSession, type Observation, type RunnerOps, type SpawnRequest } from '../../harness/seam.ts';
@@ -92,7 +92,13 @@ export const refusedText = (m: RefusedMove): string =>
 export type TaskView = {
   id: string;
   state: State;
-  phase: string;
+  /** Where the task stands, by `viewOfState`'s rules in order: one of a closed set (`TaskPhase`), never a sentence. */
+  phase: TaskPhase;
+  /**
+   * The harness's own state of the attempt in flight, in A2A's names, as the look saw it: beside the phase, never folded into it.
+   * Absent for a task with no attempt in flight, one whose session the look did not see, and one settled.
+   */
+  session?: SessionState;
   /** The session as its harness lists it — or, once the harness has let it go, its own id as recorded. */
   sessionId: string | null;
   /**
@@ -120,7 +126,7 @@ export type TaskView = {
   /**
    * Where a task filed `queued` stands with the layer above: `queued` while its current turn waits for the word to start,
    * `admitted` once given and until the next pass starts it. Beside the phase, never in it: the phase of either is `pending`
-   * — or `between attempts`, for a later turn of a task held open — as for a task that waits for no word.
+   * — or `between-attempts`, for a later turn of a task held open — as for a task that waits for no word.
    * Absent for a task not filed queued, and once its turn has started. Off the record alone.
    */
   admission?: 'queued' | 'admitted';
@@ -827,17 +833,17 @@ export const everyView = Effect.fn('everyView')(function* () {
 });
 
 /** The phase `viewOfState` gives a task, by its rules in order, off its record and the sighting of its last attempt. */
-function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sighting: Sighting | undefined): string {
+function phaseOfView(state: State, observed: ReadonlyMap<string, Sighting>, sighting: Sighting | undefined): TaskPhase {
   const last = state.attempts.at(-1);
   if (state.settled) return state.settled;
   if (waitsForInput(state)) return 'input-required';
-  const live = last?.ended === null && sighting ? phaseWordOf(sighting.state) : undefined;
+  const live = last?.ended === null ? sighting : undefined;
   if (live && respawning(state, sighting)) return 'restarting';
   if (live && idleOf(state, sighting)) return 'idle';
   if (needsHuman(state, observed)) return 'needs-human';
-  if (live) return live === 'working' && sighting?.busy === false ? 'working (quiescent)' : `running (${live})`;
+  if (live) return LIVE_PHASE[live.state] === 'working' && live.busy === false ? 'quiescent' : LIVE_PHASE[live.state];
   if (last?.ended === null) return 'starting';
-  return last ? 'between attempts' : 'pending';
+  return last ? 'between-attempts' : 'pending';
 }
 
 /** Why the look left a task's last session unread, by its name in `unreadWhy`; none for a task never spawned. */
@@ -873,13 +879,16 @@ const carriedOf = (sighting: Sighting | undefined, phase: TaskView['phase']) => 
  * 3. `restarting`: a long-lived task's session its harness is respawning (`respawning`);
  * 4. `idle`: a long-lived task's session open between turns (`idleOf`), which only a stop ends;
  * 5. `needs-human` (`needsHuman`);
- * 6. `working (quiescent)`: listed `working` and not busy, so it believes it has work and is computing nothing. Said out
- *    loud, because it is indistinguishable from progress in every other view, and it is what a stalled step looks like from
- *    outside;
- * 7. `running (…)` for any other live session, in the words every view prints (`phaseWordOf`): A2A's names stop at the
- *    runtime;
+ * 6. `quiescent`: at work (`submitted` or `working`) and not busy, so it believes it has work and is computing nothing. Said
+ *    out loud, because it is indistinguishable from progress in every other view, and it is what a stalled step looks like
+ *    from outside;
+ * 7. for any other live session, by its state (`LIVE_PHASE`): `working` at work, `ending` once its harness says it ended and
+ *    before the pass records that end;
  * 8. `starting`: spawned but not yet in the harness's registry — the grace window, not a gap between attempts;
- * 9. `between attempts` — a long-lived task backing off before its restart among them — or `pending` before the first.
+ * 9. `between-attempts` — a long-lived task backing off before its restart among them — or `pending` before the first.
+ *
+ * Its `session` is the sighting's state, in A2A's names, for an attempt in flight the look saw, and absent otherwise: a settled
+ * task carries none.
  *
  * Its `sessionId` is the sighting's, or else the id its last end was recorded with: a released session is in no
  * observation, and that id is what `logs` reads then. What the sighting carries through untouched is `carriedOf`'s, never
@@ -898,6 +907,7 @@ export function viewOfState(state: State, observed: ReadonlyMap<string, Sighting
     id: taskId,
     state,
     phase,
+    ...(!state.settled && last?.ended === null && sighting ? { session: sighting.state } : {}),
     sessionId: sighting?.sessionId ?? last?.nativeId ?? null,
     usage: state.restartPolicy === 'Always' ? (last?.usage ?? undefined) : sighting?.usage,
     ...carriedOf(sighting, phase),

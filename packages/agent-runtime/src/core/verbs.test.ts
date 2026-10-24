@@ -29,7 +29,7 @@ const WRITES: Record<string, Writer> = {
 const OWN: Record<string, Event[]> = {
   'settled failed': [filed(), starting(1), spawned(1), ended(1, 'failed'), { kind: 'settled', at: at(3 * S), outcome: 'failed' }],
   'settled stopped': [filed(), { kind: 'stop-requested', at: at(0) }, { kind: 'settled', at: at(S), outcome: 'stopped' }],
-  'held open, signed, no session recorded': [filed({ holdOpen: true }), starting(1), spawned(1), ended(1, 'done')],
+  'held open, signed, no session recorded': [filed({ holdOpen: true }), starting(1), spawned(1), ended(1, 'succeeded')],
   'held open, signed, stop asked': [
     filed({ holdOpen: true }),
     starting(1),

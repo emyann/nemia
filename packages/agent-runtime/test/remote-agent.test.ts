@@ -83,7 +83,7 @@ const until = async (e: EngineShape, id: string, ok: (v: TaskView) => boolean, w
   throw new Error(`${id} never ${what}: last seen ${v?.phase}`);
 };
 const settled = (e: EngineShape, id: string) => until(e, id, (v) => v.state.settled !== null, 'settled');
-const running = (e: EngineShape, id: string) => until(e, id, (v) => v.phase.startsWith('running'), 'ran');
+const running = (e: EngineShape, id: string) => until(e, id, (v) => v.phase === 'working' || v.phase === 'ending', 'ran');
 /** The first attempt of a task filed on `e` as `o` says, once it has settled. */
 const attemptOf = async (e: EngineShape, o: Partial<TaskSpec> = {}) =>
   (await settled(e, await Effect.runPromise(e.file(task(o))))).state.attempts[0];
@@ -616,7 +616,7 @@ for (const bindings of BINDINGS) {
       const [sent, made, sends] = [s.sent.length, s.tasks().length, calls(s, 'sendMessage')];
       const id = await Effect.runPromise(e.file(task()));
       const v = await running(e, id);
-      assert.equal(v.phase, 'running (working)');
+      assert.equal(v.phase, 'working');
       assert.equal(v.sessionId, s.tasks()[made]);
       assert.deepEqual(s.sent[sent].metadata, { [RUNTIME_EXTENSION]: { closeoutSchema: SCHEMA } });
       s.move(s.tasks()[made], { data: { painted: 'white' }, state: 'completed' });
@@ -789,7 +789,7 @@ test('a remote agent across an engine restart, with a send in doubt: its Task ad
       writeJournal(root, id, agedBy(journalOf(root, id), 10 * 60_000));
       for (let i = 0; i < 3; i++) await Effect.runPromise(dead.tick());
       const v = await Effect.runPromise(dead.view(id));
-      assert.equal(v.phase, 'running (working)', 'past the grace window, and not lost');
+      assert.equal(v.phase, 'working', 'past the grace window, and not lost');
       assert.equal(v.sessionId, entry.taskId, 'every GetTask fails at an address nothing answers: the task reads as last seen');
       s.move(taskId, { data: { ok: true }, state: 'completed' });
       assert.equal((await settled(e, id)).state.settled, 'succeeded');
@@ -853,7 +853,7 @@ test('a remote agent across an engine restart, with a send in doubt: its Task ad
       assert.equal(spawned()?.error, undefined, 'the spawn leaves the send to the process making it');
       await Effect.runPromise(e.tick());
       const v = await Effect.runPromise(e.view(id));
-      assert.equal(v.phase, 'running (working)');
+      assert.equal(v.phase, 'working');
       assert.equal(v.sessionId, 'm-there', 'the session is the message until the agent names its Task');
       assert.equal(calls(s, 'sendMessage') - sends, 0, 'nothing sent from here');
     } finally {
@@ -1097,7 +1097,7 @@ test(
     assert.equal(s.replies(), 0, 'and went on before the agent replied: the send is off the pass');
     const spawned = (journalOf(root, id) as Array<{ kind: string; error?: string }>).find((ev) => ev.kind === 'spawned');
     assert.ok(spawned && spawned.error === undefined, 'spawned, with no doubt');
-    assert.equal((await Effect.runPromise(e.view(id))).phase, 'running (working)', 'being sent: submitted, which runs as working');
+    assert.equal((await Effect.runPromise(e.view(id))).phase, 'working', 'being sent: submitted, which runs as working');
     await untilEvent(
       t,
       async () => {
@@ -1151,11 +1151,7 @@ test(
     const entry = JSON.parse(fs.readFileSync(entryFile(root, `ae/${a}/1`), 'utf8'));
     assert.equal(entry.taskId, undefined);
     assert.equal(entry.sending.pid, process.pid);
-    assert.equal(
-      (await Effect.runPromise(e.view(a))).phase,
-      'running (working)',
-      'read submitted, a Task at work as far as anyone can tell',
-    );
+    assert.equal((await Effect.runPromise(e.view(a))).phase, 'working', 'read submitted, a Task at work as far as anyone can tell');
     assert.equal((await Effect.runPromise(e.view(a))).state.settled, null);
     g.open();
     const v = await settled(e, a);

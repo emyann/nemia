@@ -74,9 +74,11 @@ const boundary = (at: string) =>
     compactMetadata: { trigger: 'auto', preTokens: 83770, postTokens: 17465 },
   });
 
-/** Attempt 1 as fold reads it: started at `startedAt`, and ended `done` at `endedAt` when there is one. */
+/** Attempt 1 as fold reads it: started at `startedAt`, and ended `succeeded` at `endedAt` when there is one. */
 const ranAt = (startedAt: string, endedAt?: string) => {
-  const ended: Event[] = endedAt ? [{ kind: 'ended', at: endedAt, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' }] : [];
+  const ended: Event[] = endedAt
+    ? [{ kind: 'ended', at: endedAt, attempt: 1, sessionId: 's', observed: 'succeeded', reason: 'harness' }]
+    : [];
   return fold('t', [
     { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r' },
     { kind: 'starting', at: startedAt, attempt: 1 },
@@ -473,19 +475,19 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
       const counted = { turns: 3, toolCalls: 5, inputTokens: 10, outputTokens: 2 };
       const legacy = fold('t', [
         ...begun,
-        { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: counted },
+        { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'succeeded', reason: 'harness', usage: counted },
       ]);
       assert.deepEqual(legacy.attempts[0].usage, counted, 'as recorded: no cost, and nothing standing in for one');
 
       const printed = fold('t', [
         ...begun,
-        { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: { costUsd: 0.018, apiMs: 718 } },
+        { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'succeeded', reason: 'harness', usage: { costUsd: 0.018, apiMs: 718 } },
       ]);
       assert.deepEqual(printed.attempts[0].usage, { costUsd: 0.018, apiMs: 718 }, 'on its end, as claude -p printed it');
 
       const measured = fold('t', [
         ...begun,
-        { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', usage: counted },
+        { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'succeeded', reason: 'harness', usage: counted },
         { kind: 'measured', at, attempt: 1, usage: { ...counted, costUsd: 0.42, apiMs: 900, toolMs: 30 } },
         { kind: 'measured', at, attempt: 2, usage: { costUsd: 9 } },
       ]);
@@ -498,7 +500,7 @@ test("transcriptUsage and fold: an attempt's count and cost, measured off its tr
 
       const unmeasuredEnd = fold('t', [
         ...begun,
-        { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' },
+        { kind: 'ended', at, attempt: 1, sessionId: 's', observed: 'succeeded', reason: 'harness' },
         { kind: 'measured', at, attempt: 1, usage: { costUsd: 1 } },
       ]);
       assert.deepEqual(unmeasuredEnd.attempts[0].usage, { costUsd: 1 });
@@ -734,10 +736,7 @@ test('a long-lived attempt is counted across its processes, and its counts and d
         { kind: 'starting', at: '2026-10-02T22:00:01Z', attempt: 1 },
         counted,
       ]);
-      assert.match(
-        taskLine({ id: 't-1', state, phase: 'running (working)', sessionId: null }),
-        /\(working\) {3}cost not measured · 4t  keep watch$/,
-      );
+      assert.match(taskLine({ id: 't-1', state, phase: 'working', sessionId: null }), /working {13}cost not measured · 4t  keep watch$/);
     },
   );
 
@@ -763,12 +762,12 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
       { kind: 'filed', at: '2026-09-12T09:00:00Z', brief: 'b', cwd: '/r' },
       { kind: 'starting', at: '2026-09-12T09:00:01Z', attempt: 1 },
       { kind: 'spawned', at: '2026-09-12T09:00:02Z', attempt: 1 },
-      { kind: 'ended', at: '2026-09-12T09:05:00Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness' },
+      { kind: 'ended', at: '2026-09-12T09:05:00Z', attempt: 1, sessionId: 's', observed: 'succeeded', reason: 'harness' },
     ];
     const [a] = fold('t', events).attempts;
     assert.equal(a.usage, null);
     assert.equal(a.exitCode, null);
-    assert.equal(attemptLine(a), 'attempt 1  done  09:00:01 → 09:05:00 (4m 59s)  usage not measured');
+    assert.equal(attemptLine(a), 'attempt 1  succeeded  09:00:01 → 09:05:00 (4m 59s)  usage not measured');
   });
 
   await t.test('a measured attempt prints what was measured, and names what was not', () => {
@@ -868,8 +867,8 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
       );
 
       const shown = (state: ReturnType<typeof fold>, usage?: object) =>
-        taskLine({ id: 't-1', state, phase: state.settled ?? 'running (working)', sessionId: null, ...(usage ? { usage } : {}) });
-      assert.match(shown(spent), /\(working\) {3}\$0\.02  read the notes$/);
+        taskLine({ id: 't-1', state, phase: state.settled ?? 'working', sessionId: null, ...(usage ? { usage } : {}) });
+      assert.match(shown(spent), /working {13}\$0\.02  read the notes$/);
       const measured = fold('t-1', [
         ...base,
         {
@@ -877,19 +876,19 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
           at: '2026-09-15T09:05:00Z',
           attempt: 1,
           sessionId: 's',
-          observed: 'done',
+          observed: 'succeeded',
           reason: 'harness',
           usage: { turns: 12 },
         },
         { kind: 'measured', at: '2026-09-15T09:05:01Z', attempt: 1, usage: { turns: 12, costUsd: 3.0054 } },
       ]);
-      assert.match(shown(measured), /\(working\) {3}\$3\.01 · 12t  read the notes$/, 'measured once its session was let go');
+      assert.match(shown(measured), /working {13}\$3\.01 · 12t  read the notes$/, 'measured once its session was let go');
       assert.match(
         shown(fold('t-1', base), { turns: 3 }),
-        /\(working\) {3}cost not measured · 3t  read the notes$/,
+        /working {13}cost not measured · 3t  read the notes$/,
         'running: no cost written yet',
       );
-      assert.match(shown(fold('t-1', base.slice(0, 1))), /\(working\) {3}read the notes$/, 'no attempt, nothing to cost');
+      assert.match(shown(fold('t-1', base.slice(0, 1))), /working {13}read the notes$/, 'no attempt, nothing to cost');
     },
   );
 
@@ -903,23 +902,23 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
       const ended = (extra: object) =>
         fold('t-1', [
           ...base,
-          { kind: 'ended', at: '2026-09-23T09:00:04Z', attempt: 1, sessionId: 's', observed: 'done', reason: 'harness', ...extra },
+          { kind: 'ended', at: '2026-09-23T09:00:04Z', attempt: 1, sessionId: 's', observed: 'succeeded', reason: 'harness', ...extra },
         ]).attempts[0];
       assert.equal(
         attemptLine(ended({ denials: [{ tool: 'Skill', what: 'look' }, { tool: 'Bash', what: 'pytest' }, { tool: 'WebFetch' }] })),
-        'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured  denied: Skill(look), Bash(pytest), WebFetch',
+        'attempt 1  succeeded  09:00:01 → 09:00:04 (3s)  usage not measured  denied: Skill(look), Bash(pytest), WebFetch',
       );
-      assert.equal(attemptLine(ended({})), 'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured');
+      assert.equal(attemptLine(ended({})), 'attempt 1  succeeded  09:00:01 → 09:00:04 (3s)  usage not measured');
       assert.equal(
         attemptLine(ended({ denials: [] })),
-        'attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured',
+        'attempt 1  succeeded  09:00:01 → 09:00:04 (3s)  usage not measured',
         'none denied: nothing said',
       );
     },
   );
 
   await t.test(
-    'ae show and ae feed say an end gave no statement where its task asked for one — `done (no statement)` — and nothing where it gave one or none was asked',
+    'ae show and ae feed say an end gave no statement where its task asked for one — `succeeded (no statement)` — and nothing where it gave one or none was asked',
     () => {
       const base: Event[] = [
         { kind: 'filed', at: '2026-09-23T09:00:00Z', brief: 'b', cwd: '/r', closeoutSchema: { type: 'object' } },
@@ -930,19 +929,22 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
         at: '2026-09-23T09:00:04Z',
         attempt: 1,
         sessionId: 's',
-        observed: 'done',
+        observed: 'succeeded',
         reason: 'harness',
         ...extra,
       });
       const shown = (extra: object) => [attemptLine(fold('t-1', [...base, end(extra)]).attempts[0]), entryLine('t-1', end(extra))];
       assert.deepEqual(shown({ stated: false }), [
-        'attempt 1  done (no statement)  09:00:01 → 09:00:04 (3s)  usage not measured',
-        `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  done (no statement)`,
+        'attempt 1  succeeded (no statement)  09:00:01 → 09:00:04 (3s)  usage not measured',
+        `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  succeeded (no statement)`,
       ]);
       for (const extra of [{ stated: true, closeout: { outcome: 'done' } }, {}])
         assert.deepEqual(
           shown(extra),
-          ['attempt 1  done  09:00:01 → 09:00:04 (3s)  usage not measured', `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  done`],
+          [
+            'attempt 1  succeeded  09:00:01 → 09:00:04 (3s)  usage not measured',
+            `09:00:04  ${'t-1'.padEnd(34)} ${'ended'.padEnd(10)}  succeeded`,
+          ],
           JSON.stringify(extra),
         );
       assert.equal(
@@ -983,14 +985,17 @@ test('ae show, ae ls and ae feed print what an attempt measured, cost and was de
 
   await t.test('ae show says when each attempt ran: its start, its end, and how long that took', () => {
     const shown = (startedAt: string, endedAt: string) => attemptLine(ranAt(startedAt, endedAt));
-    assert.equal(shown('2026-09-12T09:00:01Z', '2026-09-12T09:00:43Z'), 'attempt 1  done  09:00:01 → 09:00:43 (42s)  usage not measured');
+    assert.equal(
+      shown('2026-09-12T09:00:01Z', '2026-09-12T09:00:43Z'),
+      'attempt 1  succeeded  09:00:01 → 09:00:43 (42s)  usage not measured',
+    );
     assert.equal(
       shown('2026-09-12T09:00:01.250Z', '2026-09-12T10:02:30.000Z'),
-      'attempt 1  done  09:00:01 → 10:02:30 (1h 02m)  usage not measured',
+      'attempt 1  succeeded  09:00:01 → 10:02:30 (1h 02m)  usage not measured',
     );
     assert.equal(
       shown('2026-09-12T23:59:30Z', '2026-09-13T00:00:15Z'),
-      'attempt 1  done  23:59:30 → 00:00:15 (45s)  usage not measured',
+      'attempt 1  succeeded  23:59:30 → 00:00:15 (45s)  usage not measured',
       'the length is taken from the timestamps, not from the clock text: past midnight it is still 45 seconds',
     );
   });

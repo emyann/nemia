@@ -39,7 +39,6 @@ import {
   DENIED,
   isOnce,
   codesOf,
-  currentOf,
   messageOf,
   reasonOf,
   REMOVED,
@@ -52,6 +51,7 @@ import {
   type LineSource,
   type LineType,
 } from './reason.ts';
+import { currentOf } from '../former-reason/former-reason.ts';
 
 export { DAEMON_STARTED, REMOVED, LINE_WORDS };
 export type { InvolvedKind, Reason, LineSource, LineType };

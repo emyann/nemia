@@ -949,7 +949,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
     });
   });
   await t.test("a run a person's word stops says its first waiting step's reason, and a held run waits on runs", () => {
-    const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running'): CodedStep => codedStep({ reason });
+    const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running' | 'Unsigned'): CodedStep => codedStep({ reason });
     assert.deepEqual(runCodes('running', true), { reason: 'Waiting', on: 'run', phase: 'pending' });
     assert.deepEqual(runCodes('blocked', false, [step('Running'), step('OverBudget'), step('AwaitingApproval')]), {
       reason: 'OverBudget',

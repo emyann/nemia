@@ -49,7 +49,6 @@ export type {
 } from './feed.ts';
 export { codesOf, DENIED, isOnce, kindsOf, messageOf, reasonOf, REASONS, REASON_CODES, sourceOf, typeOf, waitsOf } from './reason.ts';
 export type { Codes, Said } from './reason.ts';
-export { currentOf, formerHints, formerOf, FORMER_REASONS, isFormerReason } from './reason.ts';
 export {
   ANSWER_VIA,
   codedStep,

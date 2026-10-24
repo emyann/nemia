@@ -222,7 +222,6 @@ export type {
 export {
   ENGINE_REASON,
   feedLineWords,
-  formerHints,
   PHASE_OF,
   REASON_CODES,
   REASON_OF,
@@ -237,6 +236,7 @@ export {
 } from './feed/index.ts';
 export type { AnswerVia, Reason, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './feed/index.ts';
 export type { FeedLine, FeedPublished } from './feed/index.ts';
+export { formerHints } from './former-reason/former-reason.ts';
 export type { FeedSaid, FeedWords } from './run.ts';
 export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_SELECTORS, subscriptionNameRefusal, watchedLine } from './subscription/index.ts';
 export {

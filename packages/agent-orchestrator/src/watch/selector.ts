@@ -17,7 +17,8 @@
  * reason and of the one it would have been written under (`formerOf`), so `reason=NeedsHuman` and `reason notin (WaitingForSlot)` keep
  * their meaning in a selector typed or stored before the codes were renamed, which is never rewritten.
  */
-import { formerOf, involvedOf, isFormerReason, upgraded, type Codes, type FeedLabels, type FeedLine } from '../feed/index.ts';
+import { formerOf, isFormerReason } from '../former-reason/former-reason.ts';
+import { involvedOf, upgraded, type Codes, type FeedLabels, type FeedLine } from '../feed/index.ts';
 
 /**
  * Every label key of a feed line, each named once. A `Record` of `keyof FeedLabels`, whose keys are required however optional the

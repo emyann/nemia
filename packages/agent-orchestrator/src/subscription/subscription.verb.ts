@@ -16,7 +16,7 @@ import { dropSubscription, putSubscription } from './subscription.store.ts';
 import { NEMIA_SUBSCRIPTION } from '../nemia/nemia.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 import { SELECTOR_FORM } from '../watch/selector.ts';
-import { formerHints } from '../feed/index.ts';
+import { formerHints } from '../former-reason/former-reason.ts';
 import { retiredWakeRefusal } from './former-wake.ts';
 import {
   DEFAULT_DIGEST_EVERY,

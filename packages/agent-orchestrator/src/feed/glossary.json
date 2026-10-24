@@ -4,7 +4,8 @@
   "about": "The store's stream of what happened, and who follows it.",
   "paths": [
     "packages/agent-orchestrator/src/feed",
-    "packages/agent-orchestrator/src/subscription"
+    "packages/agent-orchestrator/src/subscription",
+    "packages/agent-orchestrator/src/former-reason"
   ],
   "terms": [
     {

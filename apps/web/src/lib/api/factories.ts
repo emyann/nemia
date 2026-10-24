@@ -10,8 +10,31 @@ import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { get, send } from './read.ts';
 
+/** Which condition a factory's is: mirrors `FACTORY_CONDITION_TYPES` in packages/agent-orchestrator/src/factory/factory.ts. */
+const CONDITION_TYPES = ['Applied', 'ConflictsPending'] as const;
+
+/** Why a condition is what it is: mirrors `FACTORY_CONDITION_REASONS` in packages/agent-orchestrator/src/factory/factory.ts. */
+const CONDITION_REASONS = [
+  'NoUpgrade',
+  'TemplateInvalid',
+  'VersionDrift',
+  'Rendered',
+  'ParamsChanged',
+  'ContentChanged',
+  'VersionUnknown',
+  'Upgraded',
+  'Merged',
+  'UpgradePending',
+  'Conflicts',
+] as const;
+
 /** A condition of a factory made from a template, as the daemon wrote it: `Applied` or `ConflictsPending`, its state and why. */
-export type FactoryCondition = { type: string; status: 'True' | 'False'; reason: string; message: string };
+export type FactoryCondition = {
+  type: (typeof CONDITION_TYPES)[number];
+  status: 'True' | 'False';
+  reason: (typeof CONDITION_REASONS)[number];
+  message: string;
+};
 
 /**
  * The template a factory is made from: where it is, the version wanted and the parameters given; the version its tree was last applied
@@ -117,9 +140,9 @@ const FactorySchema = decodes<Factory>()(
         conditions: Schema.mutable(
           Schema.Array(
             Schema.Struct({
-              type: Schema.String,
+              type: Schema.Literals(CONDITION_TYPES),
               status: Schema.Literals(['True', 'False']),
-              reason: Schema.String,
+              reason: Schema.Literals(CONDITION_REASONS),
               message: Schema.String,
             }),
           ),

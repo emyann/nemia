@@ -5,7 +5,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  acceptStepOf,
   barOf,
   changeOf,
   decidableRun,
@@ -254,7 +253,7 @@ test("decidableRun, decisionStamp: when a run's decision is asked for and read a
   );
 });
 
-test("diffLine, changeOf, acceptStepOf: a diff's lines, a file among the changes, and the step accept is pressed on", async (t) => {
+test("diffLine, changeOf: a diff's lines, and a file among the changes", async (t) => {
   await t.test("a diff's lines, told apart for their colour: a file's header, a hunk's, added, removed and context", () => {
     const kinds = [
       'diff --git a/package.json b/package.json',
@@ -280,40 +279,6 @@ test("diffLine, changeOf, acceptStepOf: a diff's lines, a file among the changes
       assert.equal(changeOf(read, 'README.md'), undefined);
       assert.equal(changeOf(unread('wf/r/gone'), 'CLAUDE.md'), undefined);
       assert.equal(changeOf(undefined, 'CLAUDE.md'), undefined);
-    },
-  );
-  await t.test(
-    'the board presses `accept` on the step the api names beside it, never on one read off its text, and on no other row',
-    () => {
-      const accept = (command: string, step: string | null) => ({ label: 'accept' as const, command, step });
-      assert.equal(acceptStepOf(accept('nemia approve r-1 review --message "<why>"', 'review')), 'review');
-      assert.equal(
-        acceptStepOf(accept('nemia approve r-1 implement --message "<why>"', 'review')),
-        'review',
-        'REFUSED: the step is the one the api names, not the one the text spells',
-      );
-      assert.equal(acceptStepOf({ label: 'once more', step: 'review' }), null, 'every other row only copies');
-      assert.equal(acceptStepOf(accept('nemia approve r-1 review --message "<why>"', null)), null, 'names no step');
-    },
-  );
-  await t.test(
-    'a merge `nemia decide` offers decodes as the api serves it, labelled merge, and the board only copies it: it presses accept alone',
-    async (t) => {
-      const merge = {
-        label: 'merge',
-        command: 'nemia refresh r-1 review --base',
-        said: "review: implement's work conflicts with main. Merge main into it — implement continued, then a new review, on round 1, which the merge does not spend:  nemia refresh r-1 review --base",
-        step: 'review',
-      } as const;
-      const before = globalThis.fetch;
-      globalThis.fetch = async () =>
-        new Response(JSON.stringify(decidable({ commands: [merge] })), { status: 200, headers: { 'content-type': 'application/json' } });
-      t.after(() => {
-        globalThis.fetch = before;
-      });
-      const answered = await decisionQuery('r-1', 'stamp').queryFn!({} as never);
-      assert.deepEqual(isDecidable(answered) ? answered.commands : answered, [merge]);
-      assert.equal(acceptStepOf(merge), null);
     },
   );
 });

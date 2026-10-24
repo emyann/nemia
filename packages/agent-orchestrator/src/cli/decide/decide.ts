@@ -525,8 +525,8 @@ function printCollisions({ collisions }: Decided): void {
  * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `nemia rm` for a
  * folder run, or the git commands to land or drop.
  */
-function printChoice({ toDecide, commands, closeouts }: Decided, steps: Steps): void {
-  if (toDecide?.kind === 'approve') return printApprove(toDecide, steps, commands, closeouts[toDecide.step]);
+function printChoice({ run, toDecide, commands, closeouts }: Decided, steps: Steps): void {
+  if (toDecide?.kind === 'approve') return printApprove(run.id, toDecide, steps, commands, closeouts[toDecide.step]);
   const said = (label: DecideCommand['label']) => commands.find((c) => c.label === label);
   const forget = said('forget it');
   if (forget) return console.log(`\n  done with it   ${forget.command}  — ${forget.said}`);
@@ -543,6 +543,7 @@ function printChoice({ toDecide, commands, closeouts }: Decided, steps: Steps): 
  * run's commands say them.
  */
 function printApprove(
+  runId: string,
   toDecide: Extract<Decided['toDecide'], { kind: 'approve' }>,
   steps: Steps,
   commands: readonly DecideCommand[],
@@ -553,7 +554,8 @@ function printApprove(
   console.log(`\n  to decide  ${step.name}${toDecide.filed ? ' has signed off and waits for your word:' : unrun}`);
   const [paragraph] = toDecide.says === null ? [] : ownNote(step).split(/\n[ \t]*\n/);
   for (const line of paragraph?.split('\n') ?? []) console.log(`    ${line}`);
-  const at = commands.findIndex((c) => c.label === 'approve' && c.command.endsWith(` ${step.name}`));
+  // The gate's own line, word for word: a loop out of rounds is offered `nemia approve` too, with its `--message "<why>"`.
+  const at = commands.findIndex((c) => c.label === 'approve' && c.command === `nemia approve ${runId} ${step.name}`);
   if (at < 0) return;
   console.log(`\n  approve it    ${commands[at].command} ${answersOr(step, said, '[--message "<words>"]')}`);
   for (const back of commands.slice(at + 1)) {

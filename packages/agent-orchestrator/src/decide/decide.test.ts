@@ -59,7 +59,7 @@ test('choicesOf', async (t) => {
       'nemia refresh r-1 implement --base',
       'nemia retry r-1 implement --message "<objection>"',
     ].map(offer);
-    const labels = ['once more', 'once more', 'once more', 'once more', 'accept', 'merge', 'send back'];
+    const labels = ['once more', 'once more', 'once more', 'once more', 'approve', 'refresh', 'send back'];
     assert.deepEqual(
       choicesOf(STEPS, RUN, awaiting(), offers).map((c) => [c.label, c.command, c.said, c.step]),
       [

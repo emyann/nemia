@@ -293,25 +293,25 @@ export type Offer = { step: string; command: string; said: string };
 
 /**
  * A command `nemia decide` offers, and runs none of: land it, drop it, read it for a run worked on its base branch, forget it for a folder
- * run, each once-more (`nemia retry`, `nemia retry --round`), accept (`nemia approve` of a loop) and merge (`nemia refresh --base`) with
- * the line it prints it in, and for a step waiting at its gate on you, the approval (`nemia approve`) and a send-back (`nemia retry
+ * run, each once-more (`nemia retry`, `nemia retry --round`), approve (`nemia approve` of a loop) and refresh (`nemia refresh --base`)
+ * with the line it prints it in, and for a step waiting at its gate on you, the approval (`nemia approve`) and a send-back (`nemia retry
  * --message`) for each step it names. `said` is null where the label is all it says; `step`, the step it acts on, null for a command on
  * the whole run.
  */
 export type DecideCommand = {
-  label: 'land it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'merge' | 'approve' | 'send back' | 'forget it';
+  label: 'land it' | 'drop it' | 'read it' | 'once more' | 'refresh' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
   step: string | null;
 };
 
 /**
- * The label of an offer's command: an acceptance (`nemia approve` of a loop out of rounds: a gate's approval is no offer), a merge of the
- * base (`nemia refresh --base`), a send-back with its objection, or once more.
+ * The label of an offer's command, its verb's: an approval (`nemia approve` of a loop out of rounds: a gate's approval is no offer), a
+ * refresh of the base (`nemia refresh --base`), a send-back with its objection, or once more.
  */
 const labelOf = (command: string): DecideCommand['label'] => {
-  if (command.startsWith('nemia approve ')) return 'accept';
-  if (command.startsWith('nemia refresh ') && command.endsWith(' --base')) return 'merge';
+  if (command.startsWith('nemia approve ')) return 'approve';
+  if (command.startsWith('nemia refresh ') && command.endsWith(' --base')) return 'refresh';
   return command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
 };
 
@@ -339,7 +339,7 @@ function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly str
 }
 
 /**
- * The commands `nemia decide` offers on a run awaiting a person (`Decision`), none on any other: once more, accept or a send-back for each
+ * The commands `nemia decide` offers on a run awaiting a person (`Decision`), none on any other: once more, approve or a send-back for each
  * offer (`offers`, round's then retry's), the approval and its send-backs for each step waiting at its gate on you, then land it and drop
  * it for the branches, or read it for a run worked on its base branch, which has nothing to merge nor a branch to delete. A folder run has
  * none of those: forgetting it (`nemia rm`) is its one command, and nothing about git. A workflow whose step acts on the base branch itself

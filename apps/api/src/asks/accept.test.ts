@@ -269,7 +269,7 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
       assert.deepEqual(run.waitingOnYou, [], 'and nobody waited on');
       const decision = (await (await app().request(`/api/runs/${R}/decision`)).json()) as RunDecision;
       const commands = 'commands' in decision ? decision.commands : [];
-      assert.ok(!commands.some((c) => c.label === 'accept'), `accept is offered no more: ${JSON.stringify(commands)}`);
+      assert.ok(!commands.some((c) => c.label === 'approve'), `the loop's approve is offered no more: ${JSON.stringify(commands)}`);
     },
   );
 

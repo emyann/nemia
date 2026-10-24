@@ -1,6 +1,6 @@
 /**
  * One writer per chat file: the person's outbox and read mark are written by the chat's verbs alone (`chat.verb.ts`), the delivered
- * marks by the delivery alone (`deliver.verb.ts`), and none by any other file of the package's or the api's source. Each writer's
+ * marks by the delivery alone (`say.verb.ts`), and none by any other file of the package's or the api's source. Each writer's
  * name is matched as a call, across line breaks; its definitions in the store are its own.
  *
  * Made to refuse a planted source first: a rule that reads nothing passes too.
@@ -16,7 +16,7 @@ const REPO = path.join(import.meta.dirname, '..', '..', '..');
 const WRITERS: Readonly<Record<string, string>> = {
   appendOutbox: 'packages/agent-orchestrator/src/chat/chat.verb.ts',
   writeReadMark: 'packages/agent-orchestrator/src/chat/chat.verb.ts',
-  appendDelivered: 'packages/agent-orchestrator/src/chat/deliver.verb.ts',
+  appendDelivered: 'packages/agent-orchestrator/src/chat/say.verb.ts',
 };
 
 /** The store that defines the writers. */
@@ -52,7 +52,7 @@ test('REFUSED: a second writer of the outbox, the read mark or the delivered mar
     }),
     [
       'packages/agent-orchestrator/src/nemia/keep.verb.ts calls appendOutbox, which packages/agent-orchestrator/src/chat/chat.verb.ts alone calls',
-      'packages/agent-orchestrator/src/chat/chat.verb.ts calls appendDelivered, which packages/agent-orchestrator/src/chat/deliver.verb.ts alone calls',
+      'packages/agent-orchestrator/src/chat/chat.verb.ts calls appendDelivered, which packages/agent-orchestrator/src/chat/say.verb.ts alone calls',
       'apps/api/src/nemia/chat.ts calls writeReadMark, which packages/agent-orchestrator/src/chat/chat.verb.ts alone calls',
     ],
   );

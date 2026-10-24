@@ -1,6 +1,6 @@
 /**
  * A chat with a long-lived task, read and written as the board asks: its history a page at a time with where the task is
- * (`chatHistory`), what changed since a stream's cursor (`chatSince`), the person's words put in the outbox (`chatSend`), their read
+ * (`chatHistory`), what changed since a stream's cursor (`chatSince`), the person's words put in the outbox (`chatSay`), their read
  * mark moved (`chatRead`) and the turn it is answering stopped (`chatStop`). Every read projects again from the task's record, its
  * transcripts and the chat's files (`projectChat`).
  *
@@ -165,10 +165,10 @@ export const chatSince = Effect.fn('chatSince')(function* (place: ChatPlace, aft
 const entryId = (): string => `${Date.now().toString(36)}-${randomBytes(3).toString('hex')}`;
 
 /**
- * The person's `text` put in the outbox of the chat at `place`, which the keeper delivers once the task is up: the entry. Refused
- * (`Invalid`) for text that is empty or longer than `CHAT_TEXT_MAX`.
+ * The person's `text` put in the outbox of the chat at `place`, which the keeper says to the task once it is up (`sayOutbox`): the
+ * entry. Refused (`Invalid`) for text that is empty or longer than `CHAT_TEXT_MAX`.
  */
-export const chatSend = Effect.fn('chatSend')(function* (place: ChatPlace, text: string) {
+export const chatSay = Effect.fn('chatSay')(function* (place: ChatPlace, text: string) {
   if (typeof text !== 'string' || text.trim() === '')
     return yield* Effect.fail(new Invalid({ message: 'The message is empty: write something to send.' }));
   if (text.length > CHAT_TEXT_MAX)

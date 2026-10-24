@@ -24,7 +24,7 @@ import type { EnginePhase } from '../src/views/views-words.ts';
 
 process.env.WF_ROOT = scratch('wf-nemia-chat-');
 process.env.WF_VERIFY_REST = '1';
-const { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } = await import('../src/chat/chat.verb.ts');
+const { chatAnswer, chatHistory, chatRead, chatSay, chatSince, chatStop } = await import('../src/chat/chat.verb.ts');
 const {
   appendAnswer,
   appendAsk,
@@ -39,7 +39,7 @@ const {
   readStops,
 } = await import('../src/chat/chat.store.ts');
 const { answeredBefore, askOf, asksWaiting, framedForHer, presenceOf, projectChat } = await import('../src/chat/chat.ts');
-const { answersDue, answersOwed, closesOwed, deliverOutbox, outboxOwed, recordAsks } = await import('../src/chat/deliver.verb.ts');
+const { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } = await import('../src/chat/say.verb.ts');
 const { engineOf, runWith } = await import('../src/runtime-client.ts');
 /** The CLI's `main`, loaded only if a checkpoint types a command: these stories call the verbs, and its import is the slowest. */
 const main: Parameters<typeof staged>[0]['main'] = async (...argv) => (await import('../src/cli/main.ts')).main(...argv);
@@ -122,21 +122,21 @@ test("She is written to: the person's words kept while she is down, said once sh
   const s = story(t);
   await s.test('REFUSED: a send that is empty or too long puts nothing in the outbox; one that is not is put there once', async () => {
     const place = { task: undefined, dir: scratch('wf-nemia-chat-dir-') };
-    await assert.rejects(run(chatSend(place, '  ')), (err: Error) => {
+    await assert.rejects(run(chatSay(place, '  ')), (err: Error) => {
       names(err.message, 'The message is empty');
       return true;
     });
-    await assert.rejects(run(chatSend(place, 'x'.repeat(8001))), (err: Error) => {
+    await assert.rejects(run(chatSay(place, 'x'.repeat(8001))), (err: Error) => {
       names(err.message, 'send at most 8000');
       return true;
     });
     assert.deepEqual(readOutbox(place.dir), []);
-    const sent = await run(chatSend(place, 'Go'));
+    const sent = await run(chatSay(place, 'Go'));
     assert.deepEqual(readOutbox(place.dir), [sent]);
   });
   await s.test('no task filed is a chat with nothing but the outbox, and she is down', async () => {
     const place = { task: undefined, dir: scratch('wf-nemia-chat-dir-') };
-    await run(chatSend(place, 'Are you there?'));
+    await run(chatSay(place, 'Are you there?'));
     const read = await run(chatHistory(place));
     assert.deepEqual(texts(read.events), ['Are you there?']);
     assert.deepEqual(read.presence, { up: false, answering: false, waitsOnYou: 0, unread: 0 });
@@ -144,11 +144,11 @@ test("She is written to: the person's words kept while she is down, said once sh
   await s.test('a send while the task is down is kept, then said once when it is up, and a second delivery says nothing', async () => {
     const { id, dir } = await filed('down');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'Hello' });
-    assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: [], left: ['o1'] }, 'not started: nothing hears it');
+    assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: [], left: ['o1'] }, 'not started: nothing hears it');
     assert.equal(outboxOwed(dir), true);
     stage.board().settle(id, 'working');
-    assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
-    assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: [], left: [] });
+    assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
+    assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: [], left: [] });
     assert.deepEqual(saidTo(id), [{ taskId: id, text: framedForHer('Hello') }]);
     assert.equal(outboxOwed(dir), false);
   });
@@ -156,7 +156,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     const { id, dir } = await filed('between', 'input-required');
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'Next, the two kit cards' });
     assert.deepEqual(
-      await run(deliverOutbox(id, dir)),
+      await run(sayOutbox(id, dir)),
       { marked: [], said: ['o1'], left: [] },
       'a long-lived session between turns is up, and hears the words as one in a turn does',
     );
@@ -167,7 +167,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     const { id, dir } = await filed('cut-short', 'working');
     appendOutbox(dir, { id: 'o1', at: new Date(Date.now() - 1000).toISOString(), text: 'Ship it' });
     const heard = await run(stage.board().e.say(id, framedForHer('Ship it')));
-    assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: ['o1'], said: [], left: [] });
+    assert.deepEqual(await run(sayOutbox(id, dir)), { marked: ['o1'], said: [], left: [] });
     assert.equal(saidTo(id).length, 1, 'said once, by the delivery cut short');
     assert.deepEqual(readDelivered(dir), [{ id: 'o1', said: heard.at, attempt: 1 }]);
   });
@@ -175,7 +175,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     const { id, dir } = await filed('before', 'working');
     await run(stage.board().e.say(id, framedForHer('Again')));
     appendOutbox(dir, { id: 'o1', at: '2999-01-01T00:00:00.000Z', text: 'Again' });
-    assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
+    assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: ['o1'], left: [] });
     assert.equal(saidTo(id).length, 2);
   });
   await s.test('two entries of one text claim two saids in order, never one twice', async (sub) => {
@@ -186,7 +186,7 @@ test("She is written to: the person's words kept while she is down, said once sh
     sub.mock.timers.tick(5);
     const first = await run(stage.board().e.say(id, framedForHer('yes')));
     sub.mock.timers.tick(5);
-    assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: ['o1'], said: ['o2'], left: [] });
+    assert.deepEqual(await run(sayOutbox(id, dir)), { marked: ['o1'], said: ['o2'], left: [] });
     assert.deepEqual(
       readDelivered(dir).map((m) => [m.id, m.said]),
       [
@@ -201,9 +201,9 @@ test("She is written to: the person's words kept while she is down, said once sh
     appendOutbox(dir, { id: 'o1', at: new Date().toISOString(), text: 'one' });
     appendOutbox(dir, { id: 'o2', at: new Date().toISOString(), text: 'two' });
     stage.board().refuseSay(1);
-    assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: [], left: ['o1', 'o2'] });
+    assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: [], left: ['o1', 'o2'] });
     assert.deepEqual(readDelivered(dir), []);
-    assert.deepEqual(await run(deliverOutbox(id, dir)), { marked: [], said: ['o1', 'o2'], left: [] });
+    assert.deepEqual(await run(sayOutbox(id, dir)), { marked: [], said: ['o1', 'o2'], left: [] });
     assert.deepEqual(
       saidTo(id).map((one) => one.text),
       [framedForHer('one'), framedForHer('two')],
@@ -239,7 +239,7 @@ test('Her chat read: a history across two attempts, a stream since its cursor, t
   await s.test("a read after the history's cursor gives only what came since, and the person's words once delivered", async () => {
     ({ cursor } = await run(chatHistory(place)));
     assert.deepEqual((await run(chatSince(place, cursor))).events, []);
-    const sent = await run(chatSend(place, 'Hi'));
+    const sent = await run(chatSay(place, 'Hi'));
     const pending = await run(chatSince(place, cursor));
     assert.deepEqual(
       pending.events.map((x) => [x.id, x.kind === 'message' && x.delivered]),

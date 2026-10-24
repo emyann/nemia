@@ -3132,7 +3132,7 @@ session at the keeper's next beat, through the runtime's `say`, with no restart,
 instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
 
 Her chat, `src/chat/`, keeps only what nobody else holds, under `$WF_ROOT/nemia/chat/`: the person's words (`outbox.jsonl`) and read
-mark (`read.json`), written by the api's routes (`chatSend`, `chatRead`), and the keeper's marks of what it delivered
+mark (`read.json`), written by the api's routes (`chatSay`, `chatRead`), and the keeper's marks of what it delivered
 (`delivered.jsonl`). The rest is projected on every read (`projectChat`): her words and her tool calls from her transcripts, attempt
 by attempt with a line between them, and what was said to her from the runtime's `said`, the person's where a mark claims it, else
 the keeper's quiet marker. The keeper delivers while she is kept and her session live, framed as the person's

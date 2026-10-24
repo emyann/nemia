@@ -863,7 +863,7 @@ test('REFUSED: Grace and Otto without their deny of gh, read from their files as
 });
 
 /** The two reads of the pull request review's note names, and the settings' allows that reach them and nothing else. */
-const PR_READS = ['gh pr view 7', 'gh pr checks 7'];
+const PR_READS = ['gh pr view <n> --json state,mergeable,headRefOid,title,body,url', 'gh pr checks <n>'];
 const PR_READ_ALLOWS = ['Bash(gh pr view:*)', 'Bash(gh pr checks:*)'];
 
 test("the two gh reads review's note names are allowed Agora by the settings, and REFUSED with either allow dropped", () => {

@@ -13,12 +13,12 @@
     "@hono/node-server": "^2.1.1",
     "@modelcontextprotocol/sdk": "^1.30.0",
     "agent-orchestrator": "*",
-    "effect": "4.0.1",
+    "effect": "4.0.6",
     "hono": "^4.13.7"
   },
   "devDependencies": {
-    "@types/node": "^22.20.2",
+    "@types/node": "^24.19.2",
     "agent-runtime": "*",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.3"
   }
 }

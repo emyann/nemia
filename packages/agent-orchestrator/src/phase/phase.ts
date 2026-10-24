@@ -255,11 +255,11 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
 
 /**
  * A run's codes. A running run a person holds is `Waiting` on `run`. A `blocked` run carries the reason (and `via`) of its first step,
- * in the order `steps` gives them (the workflow's), whose phase is `waiting` — every such reason is a run's too; `AwaitingAnswer` with
- * no `via` where none is. Every other status is `RUN_REASON_OF`'s. Pure.
+ * in the order `steps` gives them (the workflow's), whose phase is `waiting` and that is no gate — a run is blocked when some stop is
+ * not a gate, so a gate before it does not say why; every such reason is a run's too; `AwaitingAnswer` with no `via` where none is. Every other status is `RUN_REASON_OF`'s. Pure.
  */
 export function runCodes(status: RunStatus, held: boolean, steps: readonly CodedStep[] = []): CodedRun {
-  const stop = status === 'blocked' ? steps.find((s) => s.phase === 'waiting') : undefined;
+  const stop = status === 'blocked' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
   const q: QualifiedRun = status === 'running' && held ? { reason: 'Waiting', on: 'run' } : stop ? stoppedOn(stop) : RUN_REASON_OF[status];
   return { ...q, phase: RUN_PHASE_OF[q.reason] };
 }

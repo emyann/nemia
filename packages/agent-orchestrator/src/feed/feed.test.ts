@@ -955,6 +955,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       reason: 'OverBudget',
       phase: 'waiting',
     });
+    assert.deepEqual(runCodes('blocked', false, [step('AwaitingApproval'), step('Unsigned')]), { reason: 'Unsigned', phase: 'waiting' });
     assert.deepEqual(runCodes('blocked', false, [codedStep({ reason: 'AwaitingAnswer', via: 'closeout' })]), {
       reason: 'AwaitingAnswer',
       via: 'closeout',

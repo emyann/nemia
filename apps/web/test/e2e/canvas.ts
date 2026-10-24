@@ -200,7 +200,7 @@ export const cardsOf = (page: Page, ...ids: string[]): Locator =>
   page.locator(ids.map((id) => `.react-flow__node[data-id="${id}"]`).join(', '));
 /** The edge from a run into one that waits on it (`--after`). */
 export const edgeOf = (page: Page, from: string, to: string): Locator => page.locator(`.react-flow__edge[data-id="after:${from}->${to}"]`);
-/** The edge from a run into a card held until it ships (`wf hold`), which `runEdges` names apart from an `--after` one. */
+/** The edge from a run into a card held until it lands (`wf hold`), which `runEdges` names apart from an `--after` one. */
 export const holdEdgeOf = (page: Page, from: string, to: string): Locator =>
   page.locator(`.react-flow__edge[data-id="hold:${from}->${to}"]`);
 

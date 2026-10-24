@@ -1,5 +1,5 @@
 /**
- * `nemia hold`: hold a run until other runs ship (`hold`), and lift a hold by hand (`unhold`), each writing the person's own file, refused
+ * `nemia hold`: hold a run until other runs land (`hold`), and lift a hold by hand (`unhold`), each writing the person's own file, refused
  * before anything is written. A controller, reaching the runtime through the client (`runtime-client.ts`): each verb is a program that
  * fails with its refusal (`Invalid`, `Missing`, `Conflict`) and dies of anything else the store, git or the engine throws.
  */
@@ -28,16 +28,16 @@ import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 export type Holding = { run: Run; hold: Hold };
 
 /**
- * Hold a run until other runs ship — `nemia hold <run> --until <run>…`: while any of them has not shipped, as `nemia decide` says it of
+ * Hold a run until other runs land — `nemia hold <run> --until <run>…`: while any of them has not landed, as `nemia decide` says it of
  * that run (`parentRead`, which `--after` reads), nothing of this run is filed and nothing of it is asked of a person (`assess`); what
- * is in flight runs on. The tick lifts the hold on the pass that reads every one of them shipped (`advanceRun`).
+ * is in flight runs on. The tick lifts the hold on the pass that reads every one of them landed (`advanceRun`).
  *
  * Fails before anything is written, with what to do instead: an id that is not a run's (`idRefusal`), and one named after `--until`,
  * whose fix keeps the run to hold (`Invalid`); a run not there (`Missing`); and what `holdRefusal` refuses (`Conflict`) — nothing
- * named, a run cancelled, pruned, shipped (as `--after` reads it, where the branches stand now: `standingLiveOf`) or succeeded with
+ * named, a run cancelled, pruned, landed (as `--after` reads it, where the branches stand now: `standingLiveOf`) or succeeded with
  * nothing left but a person's merge, asked of the engine only for a run nothing else refuses, a run already held, a folder run; and of
  * each run named: twice, the run itself, one not there, a folder run, another repository or base branch, `--no-worktree`, cancelled, a
- * result branch gone, already shipped — and one that already waits on this run, through `--after` or a hold. Writes `runs/<id>.hold`,
+ * result branch gone, already landed — and one that already waits on this run, through `--after` or a hold. Writes `runs/<id>.hold`,
  * exclusively: a hold two people put at once is the first one's, and the second is refused as already held. Dies of anything else the
  * store, git or the engine throws.
  *
@@ -65,9 +65,9 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
       { concurrency: 'unbounded' },
     ),
   );
-  let finished: 'shipped' | 'succeeded' | undefined;
+  let finished: 'landed' | 'succeeded' | undefined;
   if (until.length && !run.cancelledAt && !run.pruned && !run.hold) {
-    if ((yield* parentRead(id, git)).shipped) finished = 'shipped';
+    if ((yield* parentRead(id, git)).landed) finished = 'landed';
     else {
       const steps = yield* tried(() => stepsOf(run));
       const { views, phaseOf } = yield* taskPhasesRead(run);
@@ -88,14 +88,14 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
     }
   }
   const others = yield* tried(() => runStore.runs.list());
-  const refused = holdRefusal(run, until, (u) => read.get(u) ?? { shipped: false }, others, finished);
+  const refused = holdRefusal(run, until, (u) => read.get(u) ?? { landed: false }, others, finished);
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const put = yield* tried(() => runStore.holds.put(id, until, { ...said, by: said.by ?? osUser() }));
   if (!put) {
     const again = yield* tried(() => runStore.runs.read(id));
     return yield* Effect.fail(
       new Conflict({
-        message: holdRefusal(again, until, (u) => read.get(u) ?? { shipped: false }, []) ?? `${id} is already held: nemia ls ${id}.`,
+        message: holdRefusal(again, until, (u) => read.get(u) ?? { landed: false }, []) ?? `${id} is already held: nemia ls ${id}.`,
       }),
     );
   }
@@ -129,7 +129,7 @@ export const unhold = Effect.fn('unhold')(function* (id: string) {
   if (!held)
     return yield* Effect.fail(
       new Conflict({
-        message: `${id} is not held, so there is no hold to lift. To hold it until other runs ship: nemia hold ${id} --until <runId>.`,
+        message: `${id} is not held, so there is no hold to lift. To hold it until other runs land: nemia hold ${id} --until <runId>.`,
       }),
     );
   if (!(yield* tried(() => runStore.holds.lift(id, held.at))) && (yield* tried(() => runStore.holds.stands(id))))

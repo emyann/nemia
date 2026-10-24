@@ -54,16 +54,16 @@ const section = (run: string, asked: string) =>
 test("context without a wait: a run's concluded section read, a card's from: set and taken off, and a step's From run sections labelled by how each was handed", async (t) => {
   const s = story(t);
   await s.test(
-    'GET /api/runs/:runId/concluded answers the run, whether it shipped and its section in context words; an unknown run is a 404',
+    'GET /api/runs/:runId/concluded answers the run, whether it landed and its section in context words; an unknown run is a 404',
     async () => {
       writeRun({ id: 'source-c1' });
       const res = await app().request('/api/runs/source-c1/concluded');
       assert.equal(res.status, 200);
-      const answer = (await res.json()) as { run: string; shipped: boolean; section: string };
+      const answer = (await res.json()) as { run: string; landed: boolean; section: string };
       assert.equal(answer.run, 'source-c1');
-      assert.equal(answer.shipped, false, 'a run with nothing landed has not shipped');
+      assert.equal(answer.landed, false, 'a run with nothing on its base has not landed');
       assert.match(answer.section, /^\n## From run source-c1\n/);
-      assert.match(answer.section, /Not shipped, not judged/);
+      assert.match(answer.section, /Not landed, not judged/);
 
       const missing = await app().request('/api/runs/nobody-z9/concluded');
       assert.equal(missing.status, 404);

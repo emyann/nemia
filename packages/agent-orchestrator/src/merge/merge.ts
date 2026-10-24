@@ -284,7 +284,7 @@ const endingAfter = (steps: readonly Workflow[], looping: Workflow): Workflow | 
 
 /**
  * The landing of the ending after `looping` that its check refused on `sha` (`MergeLanding`): its record says it aborted the merge staged
- * on that commit of the base (`Landed`'s `refusedOn`), and names its check's task — or undefined.
+ * on that commit of the base (`LandingRecord`'s `refusedOn`), and names its check's task — or undefined.
  */
 function refusedLanding(steps: readonly Workflow[], run: Run, looping: Workflow, sha: string): MergeLanding | undefined {
   const ending = endingAfter(steps, looping);
@@ -294,7 +294,7 @@ function refusedLanding(steps: readonly Workflow[], run: Run, looping: Workflow,
 
 /**
  * The task of the check that refused the merge an ending staged on `sha`, a commit of the base, as the ending's `record` says it
- * (`Landed`'s `refusedOn`): undefined when the ending's landing was not aborted on that commit, or names no check.
+ * (`LandingRecord`'s `refusedOn`): undefined when the ending's landing was not aborted on that commit, or names no check.
  */
 export function landingRefusedOn(record: StepRecord | undefined, sha: string): string | undefined {
   const landed = record?.landed;
@@ -303,7 +303,7 @@ export function landingRefusedOn(record: StepRecord | undefined, sha: string): s
 }
 
 /**
- * What to do with a loop whose work merges cleanly: approve the ending at its gate, ship a stopped one again, or nothing.
+ * What to do with a loop whose work merges cleanly: approve the ending at its gate, land a stopped one again, or nothing.
  *
  * It names an approval without asking whether the ending is gated, because an ungated one never reaches here: `followerRefusal` runs
  * first, and its `routed` holds the merge off for exactly the state this would answer — an ungated ending not yet filed. Filed, it is
@@ -313,7 +313,7 @@ export function landingRefusedOn(record: StepRecord | undefined, sha: string): s
 function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string {
   const ending = endingAfter(steps, looping);
   if (!ending) return `see where the run stands: nemia decide ${run.id}`;
-  if (run.steps[ending.name]?.taskId && reads.stopped(ending)) return `ship it again: nemia retry ${run.id} ${ending.name}`;
+  if (run.steps[ending.name]?.taskId && reads.stopped(ending)) return `land it again: nemia retry ${run.id} ${ending.name}`;
   return `approve the landing: nemia approve ${run.id} ${ending.name}`;
 }
 

@@ -6,7 +6,7 @@ description: The git place — a run's steps work in a git repository, each in a
 # Git
 
 Your workspace is a git worktree on a branch the run made for your step. What you commit there is your step's result: the steps after
-you start from it, and a person decides whether it ships.
+you start from it, and a person decides whether it lands.
 
 ## Commit as you go
 

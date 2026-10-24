@@ -9,7 +9,7 @@ import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * A run of a factory started `--after` a run of the default factory that may still ship is on its factory's floor as a ghost, dimmed and
+   * A run of a factory started `--after` a run of the default factory that may still land is on its factory's floor as a ghost, dimmed and
    * dashed: its line says what it waits on in `wf ls`'s words, the run it waits on a link to that run's page. The run it waits on, in
    * another factory, brings no card onto this floor, and no edge comes into the ghost. The run is taken back. Before it, the floor's lane:
    * the factory's two queued cards, in the queue's order, the try marked on the one its factory refused.

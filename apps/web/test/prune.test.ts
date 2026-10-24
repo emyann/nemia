@@ -17,7 +17,7 @@ const keys = (run: Prunable, awaiting: Awaiting | null) => pruneOffer(run, await
 
 test('pruneOffer, awaitingOf: what a finished run is offered to prune, and what it is told it loses', async (t) => {
   await t.test(
-    'a run nobody waits on — shipped, or called off — is offered its worktrees, or its files too, and nothing about merging',
+    'a run nobody waits on — landed, or called off — is offered its worktrees, or its files too, and nothing about merging',
     () => {
       const offer = pruneOffer(finished, null)!;
       assert.deepEqual(
@@ -82,11 +82,11 @@ test('pruneOffer, awaitingOf: what a finished run is offered to prune, and what 
     },
   );
   await t.test(
-    'a failed run whose branch a person merged by hand shipped, as the package reads it: both choices open, and no branch is said to be the only copy',
+    'a failed run whose branch a person merged by hand landed, as the package reads it: both choices open, and no branch is said to be the only copy',
     () => {
-      const shippedByHand = { nothing: 'shipped — wf/r-1/implement is already on main' };
+      const landedByHand = { nothing: 'landed — wf/r-1/implement is already on main' };
       const failed = { ...finished, status: 'failed' as const };
-      const offer = pruneOffer(failed, awaitingOf(shippedByHand))!;
+      const offer = pruneOffer(failed, awaitingOf(landedByHand))!;
       assert.deepEqual(
         offer.choices.map((c) => [c.key, c.unavailable]),
         [
@@ -95,7 +95,7 @@ test('pruneOffer, awaitingOf: what a finished run is offered to prune, and what 
         ],
       );
       assert.equal(offer.warning, null);
-      assert.equal(firstChoice(offer).key, 'worktrees', 'the api answers such a run `nothing: shipped …`: the status does not decide it');
+      assert.equal(firstChoice(offer).key, 'worktrees', 'the api answers such a run `nothing: landed …`: the status does not decide it');
       assert.equal(
         firstChoice(pruneOffer(failed, unmerged)!).key,
         'unmerged',

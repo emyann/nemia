@@ -26,7 +26,7 @@ const readAgo = (ago: number) => ({ at: new Date(NOW - ago).toISOString() });
 test('with no snapshot the line says where branches stand is not read, and names no verdict on a branch', () => {
   const line = standingLine({ none: true }, daemonOf('ticking'), NOW) ?? '';
   assert.match(line, /not read/);
-  for (const verdict of ['shipped', ' is on ', 'ahead of', 'gone']) assert.ok(!line.includes(verdict), `the line says ${verdict}: ${line}`);
+  for (const verdict of ['landed', ' is on ', 'ahead of', 'gone']) assert.ok(!line.includes(verdict), `the line says ${verdict}: ${line}`);
 });
 
 test('a snapshot older than the stale bound of a ticking daemon prints its age; a fresh one prints nothing', () => {

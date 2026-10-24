@@ -1,6 +1,6 @@
 /**
  * The commands `nemia decide` offers (`choicesOf`): each offer's bare command beside its sentence, a gate's approval and send-backs, and
- * ship it and drop it, read it or forget it by the run's place — none on a run that awaits nobody.
+ * land it and drop it, read it or forget it by the run's place — none on a run that awaits nobody.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -63,7 +63,7 @@ test('choicesOf', async (t) => {
       choicesOf(STEPS, RUN, awaiting(), offers).map((c) => [c.label, c.command, c.said, c.step]),
       [
         ...offers.map((o, i) => [labels[i], o.command, o.said, o.step]),
-        ['ship it', 'git -C /code/app merge --no-ff wf/r-1/implement', null, null],
+        ['land it', 'git -C /code/app merge --no-ff wf/r-1/implement', null, null],
         ['drop it', 'git -C /code/app branch -D wf/r-1/implement', null, null],
       ],
     );
@@ -92,7 +92,7 @@ test('choicesOf', async (t) => {
     },
   );
 
-  await t.test('a workflow whose step merges is offered no ship it nor drop it', () => {
+  await t.test('a workflow whose step merges is offered no land it nor drop it', () => {
     const merging = [...STEPS, { name: 'ship', after: ['implement'], body: 'Land it.', workspace: 'main' }] as Workflow[];
     assert.deepEqual(choicesOf(merging, RUN, awaiting(), []), []);
   });
@@ -117,7 +117,7 @@ test('choicesOf', async (t) => {
 
   for (const [row, decided] of [
     ['a running run is offered nothing', { kind: 'running', waiting: ['implement'] }],
-    ['a shipped run is offered nothing', { kind: 'shipped', branches: ['wf/r-1/implement'] }],
+    ['a landed run is offered nothing', { kind: 'landed', branches: ['wf/r-1/implement'] }],
   ] as Array<[string, Decision]>) {
     await t.test(row, () => {
       assert.deepEqual(choicesOf(STEPS, RUN, decided, [offer('nemia retry r-1 implement')]), []);

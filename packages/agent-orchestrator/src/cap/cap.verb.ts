@@ -72,7 +72,7 @@ const needOf = Effect.fnUntraced(function* (
     spendReader(listed),
   );
   const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(seen));
-  return slotNeed(run, phaseOf, a, (id) => parent(id).shipped, steps);
+  return slotNeed(run, phaseOf, a, (id) => parent(id).landed, steps);
 });
 
 /**

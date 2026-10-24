@@ -12,7 +12,7 @@ import type { Workflow } from '../workflow.ts';
 import { sizeOf } from '../artifacts/artifacts.ts';
 import { heldCheckouts, runAdmitted, type MainClaim, type RunSlot } from '../cap/cap.ts';
 import { endingAsked, landedWords, landingDue, landingOpen } from './ending.ts';
-import { isRepositoryRun, type CloseoutAsked, type RepositoryRun, type Landed, type Run, type TaskPhase } from '../record/record.ts';
+import { isRepositoryRun, type CloseoutAsked, type RepositoryRun, type LandingRecord, type Run, type TaskPhase } from '../record/record.ts';
 import { landsOnCheck, ownStatus, type SpendOf } from '../status/status.ts';
 import { runReady } from '../wait/wait.ts';
 import { assess } from '../tick/assess.ts';
@@ -95,7 +95,7 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
  *
  * It WAITS for the checkout on a person's word that would file it — an approval of an ending that has not run, or the ask for a try of one
  * that ended blocked (`endingAsked`) — and only where the pass would in fact file it: a send-back of the work un-holds the gate, an ask no
- * tick honours files nothing, a run waiting on runs that have not shipped files no root of its own (`runReady`), and neither does one the
+ * tick honours files nothing, a run waiting on runs that have not landed files no root of its own (`runReady`), and neither does one the
  * cap on runs in flight holds (`runAdmitted`) — so an ending that will not be filed does not hold another run's. Those last two are the
  * questions `advance` asks before it files a ready step, and they bite only on a run with nothing filed: an ending is one when it is also
  * its root, which a folder whose one step merges has. Neither touches a try, since a run with a try due has started. Its `slot` is asked
@@ -148,7 +148,7 @@ const mainClaim = Effect.fnUntraced(function* (
     spendReader(views),
   );
   const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(e));
-  const files = runReady(run, (id) => parent(id).shipped) && runAdmitted(run, yield* slot);
+  const files = runReady(run, (id) => parent(id).landed) && runAdmitted(run, yield* slot);
   return (files && a.ready.includes(ending.name)) || a.retry.some((r) => r.step === ending.name)
     ? { id: run.id, repo, step: ending.name, holds: false, at }
     : undefined;
@@ -201,7 +201,7 @@ export function landEnding(
   );
   if (!due) return { notes: [], landed: false };
   const name = ending.name;
-  const write = (landed: Landed, note: string) => {
+  const write = (landed: LandingRecord, note: string) => {
     const dropped =
       'commit' in landed
         ? dropLandedPictures(run, name, signedOff(name), { commit: landed.commit, checkTaskId: record.check?.taskId })
@@ -231,7 +231,11 @@ export function landEnding(
  * Commit the merge staged in `run`'s checkout with `message` through its place (`landThrough`), and abort it where the place refuses the
  * commit: what to write on the step's record, with its note, or why the next pass tries again.
  */
-function committedThrough(run: RepositoryRun, message: string, memo: StatusMemo): { landed: Landed; note: string } | { again: string } {
+function committedThrough(
+  run: RepositoryRun,
+  message: string,
+  memo: StatusMemo,
+): { landed: LandingRecord; note: string } | { again: string } {
   const made = landThrough(run, { act: 'commit', message }, memo);
   if ('commit' in made) return { landed: made, note: `its check passed on the merge, and ${landedWords(run, made)}` };
   if ('aborted' in made) return { again: 'the place answered an abort where the run asked a commit of its merge' };

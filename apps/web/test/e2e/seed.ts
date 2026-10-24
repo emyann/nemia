@@ -18,8 +18,8 @@
  * so its page has something to decide. The other two runs name a repository that is not on the machine, which reads as a
  * branch git could not read.
  *
- * Beside the store, the sessions the fake `claude` lists (REGISTRY): HELD's, which the harness marked blocked, and NEIGHBOUR's `draft`, at
- * work, registered as Claude Code registers a session, with an inbox run.ts listens on (SAYING).
+ * Beside the store, the sessions at work, each an attached one as the daemon's holder writes its run file (`attachedRun`), held by the
+ * e2e's own process: HELD's `implement`, and NEIGHBOUR's `draft`, whose words said run.ts reads off its say file (SAYING).
  *
  * Beside the store, a checkout for the api to serve on the Capabilities page (`HKB_REPO`): CHECKOUT.
  * And the workflows the Workflows page lists, in the checkout's `workflows/` and in the store's: WORKFLOWS. And the cards the Inbox page
@@ -253,17 +253,15 @@ export const NEIGHBOUR = {
 } as const;
 
 /**
- * NEIGHBOUR's `draft`, the session in flight the `say` page speaks to: `claude agents` lists it at work, with the pid Claude Code registers
- * it under — `claude/sessions/<pid>.json` in the store, the e2e's CLAUDE_CONFIG_DIR, whose `messagingSocketPath` is INBOX — and its
- * conversation so far is on disk (DRAFT_TRANSCRIPT): the prompt, words, and a call still waiting on its result. run.ts listens on INBOX,
- * standing in for the session's inbox, and writes into that file what a working session writes when it reads the words between calls
- * (`arrivalLine`).
+ * NEIGHBOUR's `draft`, the session in flight the `say` page speaks to: an attached session at work (`attachedRun`), and its
+ * conversation so far is on disk (DRAFT_TRANSCRIPT): the prompt, words, and a call still waiting on its result. run.ts reads its say file
+ * (`attachedFiles`), standing in for its holder, and writes into that conversation what a working session writes when it reads the words
+ * between calls (`arrivalLine`).
  */
 export const SAYING = {
   run: NEIGHBOUR.id,
   step: 'draft',
   sessionId: '3f6a2c1d-8e4b-4c7a-9d2f-5b1e0a7c6d84',
-  pid: 424_242,
   prompt: 'Draft it.',
   /** What the session said so far, before its call. */
   line: 'Drafting the outline, one section at a time.',
@@ -273,8 +271,21 @@ export const SAYING = {
   mark: { kind: 'tool_use', id: 'toolu_draft_read' },
 } as const;
 
-/** Where in the store the stand-in for draft's inbox listens: a Unix socket run.ts opens before the api starts. */
-export const INBOX = 'inbox.sock';
+/**
+ * The files of the attached session under `name` in the store, as the runtime names them (`filesOf`, `attached-file.ts`): its run file,
+ * and the words said to it, which its holder hands the session.
+ */
+export const attachedFiles = (root: string, name: string): { run: string; say: string } => {
+  const base = path.join(root, 'engine', 'runs', 'attached', name.replace(/[^A-Za-z0-9._-]/g, '_'));
+  return { run: `${base}.json`, say: `${base}.say.jsonl` };
+};
+
+/**
+ * An attached session's run file, as its holder writes it: `state` its holder's word, held by this process — alive while the pages run,
+ * and not the api's, so the api's engine reads the session as another holder's and leaves it be.
+ */
+export const attachedRun = (name: string, sessionId: string, state: 'working' | 'idle' | 'completed', startedAt: string): string =>
+  JSON.stringify({ name, state, owner: process.pid, startedAt, sessionId, request: {} });
 
 /** Where draft's conversation is kept, from the store: the file its session writes, and run.ts adds to when the session reads words. */
 export const DRAFT_TRANSCRIPT = path.join('claude', 'projects', '-code-hkb-v2', `${SAYING.sessionId}.jsonl`);
@@ -340,11 +351,10 @@ export const LOOPING = {
 } as const;
 
 /**
- * A fourth run, started last: `implement`'s session is one the harness marked blocked, and it gave no closeout — stopped by the
- * harness's login refresh race — and `review` waits on it. The engine reads it `needs-human`, so the
- * run is running and moves, and in the package's words nobody is waiting on you: the step asked nothing. On the floor by default,
- * in the cell after NEIGHBOUR's. The board names the harness, what it says it waits for (`waitingFor`, on the registry row) and what
- * the session said last (`line`), and continues the session as `wf retry` does: the `held` page presses Continue, and takes its ask back.
+ * A fourth run, started last: `implement`'s session is at work, an attached one, its conversation ending on the harness's login refresh
+ * race (`line`), and `review` waits on it. The run is running and moves, and in the package's words nobody is waiting on you: the step
+ * asked nothing. On the floor by default, in the cell after NEIGHBOUR's; the hold pages hold a run until it ships. Its name is from when
+ * a Claude Code session could be blocked by its harness, which only a remote agent's can now.
  */
 export const HELD = {
   id: 'blocked-by-the-harness-e2e3',
@@ -354,10 +364,6 @@ export const HELD = {
   sessionId: '9c3e1d2a-7b4f-4e8a-b6d5-1f0a2c3b4d5e',
   /** What the harness wrote into the session last, word for word as Claude Code 2.1.270 writes it. */
   line: 'Could not refresh your login because another Claude Code process is refreshing it (or exited mid-refresh) · Try again in a minute; if it keeps happening, close other Claude Code windows or sign in again with /login',
-  /** What `claude agents --json` says that session waits for (`waitingFor`), and the board's words for it and for answering it. */
-  waitingFor: 'permission prompt',
-  wait: 'waiting for a permission prompt',
-  advice: 'answer it in Claude Code: claude agents, session ae/blocked-by-the-harness-e2e3-implement/1',
 } as const;
 
 /**
@@ -1005,9 +1011,6 @@ export function seedChained(root: string, repo: string, now = Date.now()): strin
   );
   return file;
 }
-
-/** Where in the store the sessions `claude agents --all --json` lists are kept, for the fake `claude` run.ts puts on the api's PATH. */
-export const REGISTRY = 'claude-agents.json';
 
 /**
  * HELD's `implement`, as its session said it before the harness stopped it: the prompt, words, a call and its result, and the harness's
@@ -2072,17 +2075,16 @@ export function writeRegated(root: string, now: number): void {
  * filed on the check harness: its process exited 1, the engine wrote the code down with the attempt's end, and the harness's worker left a
  * run file and the output with the exit code printed last, its stderr in a file of its own beside the run records.
  *
- * NEIGHBOUR's plan signed off with no check, draft's session started after it and has not ended, and sketch failed. draft is registered
- * as Claude Code registers a session, its inbox the socket run.ts listens on, its conversation so far on disk, and listed with its pid
- * (REGISTRY).
+ * NEIGHBOUR's plan signed off with no check, draft's session started after it and has not ended, and sketch failed. draft is an attached
+ * session at work (`attachedRun`), its say file read by run.ts, its conversation so far on disk.
  *
  * LOOPING's review loops back to implement, on round 3: each step's place holds its round-3 task and a try behind it for each round
  * before, a task the engine ran once, moved there with `then: 'round'` as the run moves it when it files a round. review's `rounds` is
  * what the parser sets for a loop that does not say. A declared field is a field of the closeout, beside the four every closeout has:
  * implement answers the findings it was handed, as a loop's target owes from round 2, and each review asks for another round.
  *
- * HELD's implement was spawned and never ended, `claude agents` lists its session blocked (REGISTRY), and its conversation ends on the
- * harness's line; review waits on it, not filed. GATED's plan signed off at the gate the run was started with, filed as the run started
+ * HELD's implement was spawned and never ended, its session is an attached one at work (`attachedRun`), and its conversation ends on
+ * the harness's line; review waits on it, not filed. GATED's plan signed off at the gate the run was started with, filed as the run started
  * and signed off a few seconds later, sooner than the minute FAKE's steps take from filing to spawn; implement waits on it, not filed.
  *
  * COSTLY's tokens is over its own budget, and review's loop is held on implement's. Each session's attempt carries what the engine read of
@@ -2300,16 +2302,8 @@ export function seed(root: string, now = Date.now()): void {
       { kind: 'spawned', at: ago(2.5), attempt: 1 },
     ]),
   );
-  write(
-    path.join(root, 'claude', 'sessions', `${SAYING.pid}.json`),
-    JSON.stringify({
-      pid: SAYING.pid,
-      sessionId: SAYING.sessionId,
-      name: `ae/${SAYING.run}-${SAYING.step}/1`,
-      kind: 'bg',
-      messagingSocketPath: path.join(root, INBOX),
-    }),
-  );
+  const draft = `ae/${SAYING.run}-${SAYING.step}/1`;
+  write(attachedFiles(root, draft).run, attachedRun(draft, SAYING.sessionId, 'working', ago(2.5)));
   write(path.join(root, DRAFT_TRANSCRIPT), lines(draftConversation(ago)));
   write(
     path.join(root, 'engine', 'tasks', `${NEIGHBOUR.id}-sketch.jsonl`),
@@ -2440,7 +2434,7 @@ export function seed(root: string, now = Date.now()): void {
         baseRef: '19c9365',
         branch: 'main',
         isolate: true,
-        brief: `${HELD.title}\n\nA fourth run seeded by npm run e2e: implement's session is blocked by the harness, on the login refresh race, and gave no closeout.`,
+        brief: `${HELD.title}\n\nA fourth run seeded by npm run e2e: implement's session is at work, its conversation ending on the login refresh race.`,
         workflowDir: heldDir,
         workflow: [
           { name: 'implement', after: [], body: 'Implement it.', harness: 'claude' },
@@ -2461,29 +2455,8 @@ export function seed(root: string, now = Date.now()): void {
       { kind: 'spawned', at: ago(2.9), attempt: 1 },
     ]),
   );
-  write(
-    path.join(root, REGISTRY),
-    JSON.stringify([
-      {
-        name: `ae/${heldTask}/1`,
-        sessionId: HELD.sessionId,
-        kind: 'background',
-        state: 'blocked',
-        status: 'idle',
-        waitingFor: HELD.waitingFor,
-        startedAt: now - 2.9 * 60_000,
-      },
-      {
-        name: `ae/${SAYING.run}-${SAYING.step}/1`,
-        sessionId: SAYING.sessionId,
-        kind: 'background',
-        state: 'working',
-        status: 'busy',
-        startedAt: now - 2.5 * 60_000,
-        pid: SAYING.pid,
-      },
-    ]),
-  );
+  const held = `ae/${heldTask}/1`;
+  write(attachedFiles(root, held).run, attachedRun(held, HELD.sessionId, 'working', ago(2.9)));
   write(path.join(root, 'claude', 'projects', '-code-hkb-v2', `${HELD.sessionId}.jsonl`), lines(heldConversation(ago)));
 
   const gateDir = path.join(root, 'workflow-gate');

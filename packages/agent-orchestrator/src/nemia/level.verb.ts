@@ -253,7 +253,7 @@ export const LEVEL: Command<NemiaLevel> = {
     ],
     unknown: (arg) => `nemia level takes one level, not ${arg}: ${LEVEL_FORM}.`,
   },
-  check: (args) => (typeof args.level === 'string' ? (levelRefusal(args.level) ?? null) : null) ?? factoryArgsRefusal(args),
+  check: (args) => (typeof args.level === 'string' ? levelRefusal(args.level) : undefined) ?? factoryArgsRefusal(args),
   writes: true,
   nemia: { bare: 'read', sets: 'prompts', setsBy: [...LEVELS, '--factory', '--for', '--end'] },
   route: [

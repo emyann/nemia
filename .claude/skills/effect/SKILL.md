@@ -50,7 +50,7 @@ v4 is not v3: read the page, not your memory.
 
 ## Effect 3 names this version does not have
 
-Measured on `4.0.1`. `tsc` catches each, but writing from memory costs a round per name.
+Measured on `4.0.6`. `tsc` catches each, but writing from memory costs a round per name.
 
 | Effect 3 | Effect 4 |
 | --- | --- |

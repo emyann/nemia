@@ -378,9 +378,9 @@ export type RunDetail = {
   gates: string[];
   warning: string | null;
   /**
-   * The kinds the run is behind the revisions ledger on, as the api reads them: the kind (a workflow folder, an agent, a skill, a
-   * factory's rules), its name, the revision the run resolved and the one there is now — and, for a line about a step that has already
-   * been filed, that step's name.
+   * The kinds whose files have moved past what the run resolved, as the api works them out on its read: the kind (a workflow folder,
+   * an agent, a skill, a factory's rules), its name, the revision the run resolved and the one its next filing would take — lower when
+   * the files went back to an older content — and, for a line about a step that has already been filed, that step's name.
    */
   kinds: Array<{ kind: 'workflow' | 'agent' | 'skill' | 'rules'; name: string; pinned: number; now: number; step?: string }>;
   /** The line the api says to type to take the new revisions, so the board spells no command. */

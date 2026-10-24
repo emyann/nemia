@@ -155,7 +155,7 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
 
 /**
  * Where a start runs: in folders, for a team whose every step works in one, else on `repo` — this repository when none is given — and in
- * `factory` when one is named; from the workflow's folder; and, for a card, that it leaves the inbox.
+ * `factory` when one is named; from the workflow's folder; and, for a card, that it stays in the inbox, listed as started.
  */
 function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; repo?: string; factory?: string; card: boolean }) {
   return (
@@ -172,7 +172,7 @@ function Where({ workflow, repo, factory, card }: { workflow: WorkflowListing; r
         </>
       )}
       , from <code className="font-mono break-all">{workflow.dir}</code>
-      {card && ', and the card leaves the inbox'}.
+      {card && ', and the card stays in the inbox, listed as started'}.
     </span>
   );
 }

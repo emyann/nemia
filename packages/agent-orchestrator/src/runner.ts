@@ -222,6 +222,7 @@ export type {
 export {
   ENGINE_REASON,
   feedLineWords,
+  formerHints,
   PHASE_OF,
   REASON_CODES,
   REASON_OF,

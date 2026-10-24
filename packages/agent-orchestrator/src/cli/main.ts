@@ -20,6 +20,7 @@ import {
   keepCursor,
   BOOKMARK_EVERY,
   bookmarkLine,
+  formerHints,
   parseSelectors,
   selects,
   type Selectors,
@@ -64,7 +65,6 @@ import {
   liveDemandHost,
   type DemandHost,
 } from '../runner.ts';
-import { formerHints } from '../feed/index.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { admitRun, agentsCustomRun, autoProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';

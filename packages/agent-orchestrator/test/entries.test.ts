@@ -210,6 +210,7 @@ const PINNED: Record<string, string[]> = {
     'FeedHub',
     'feedHubLayer',
     'followFeed',
+    'formerHints',
     'followStep',
     'feedFile',
     'feedLineWords',

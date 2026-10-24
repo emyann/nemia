@@ -163,6 +163,11 @@ export type HarnessSpec = {
    */
   checkoutMcp?: true;
   /**
+   * The harness gives a session exactly the skills a task's `config.enabledSkills` lists, and hides and refuses every other. Absent:
+   * `file()` refuses a task with a list rather than start a session that holds skills it was not given.
+   */
+  enabledSkills?: true;
+  /**
    * The modes of a task's `config.mounts` this harness holds, and `command` renders: `readOnly`, a folder the session can read and
    * not write; `writable`, one it can write too. Absent, or a mode left out: `file()` refuses a task with such a mount rather than
    * start a session that would not see the folder, or could write where it was told it may only read.

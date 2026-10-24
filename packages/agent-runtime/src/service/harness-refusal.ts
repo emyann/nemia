@@ -36,11 +36,14 @@ import { heldHarnessesOf, isClaude, isRemote, isSpec, type HarnessConfig, type T
  *    that does not declare `callAdmission`; its session would make every call unadmitted;
  * 7d. a `checkoutMcp` on a `HarnessSpec` that does not declare it (`checkoutMcpMisplaced`): its session would not leave the
  *    checkout's servers out as asked;
+ * 7e. a list in `enabledSkills` on a harness that cannot close a session's skills (`enabledSkillsMisplaced`): Claude Code holds one only
+ *    through its SDK, which a job and a session held attached run on, and `claude --bg` and `claude -p` have no flag or settings key
+ *    for it; a `HarnessSpec` that does not declare `enabledSkills`; its session would hold every skill it finds;
  * 8. a long-lived task on a harness whose session ends with its turn (`longLivedMisplaced`);
  * 9. what the harness's own `refuses` refuses: Claude Code's lists, a spec's, or a remote agent's (`remoteRefuses`).
  *
  * A `RunnerOps` brought as its own is the consumer's: it is handed a `contextTokens`, a `claude.remoteControl`, a `claude`, a
- * `codex`, a `command`, an `env`, a `niceness`, `mounts`, `callAdmission` and `checkoutMcp`, and asked nothing here: its own
+ * `codex`, a `command`, an `env`, a `niceness`, `mounts`, `callAdmission`, `checkoutMcp` and `enabledSkills`, and asked nothing here: its own
  * `refuses`, if it has one, is asked by `file` through the `Runner`.
  */
 export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
@@ -84,7 +87,36 @@ export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses
 
 /** What a task asks of its harness that only another harness of this engine gives: its arguments, then a long-lived session. */
 const misplaced = (spec: TaskSpec & { harness: string }, h: HarnessConfig, harnesses: Record<string, HarnessConfig>): string | undefined =>
-  argsMisplaced(spec, h, harnesses) ?? longLivedMisplaced(spec, h, harnesses) ?? mayAskMisplaced(spec, harnesses);
+  argsMisplaced(spec, h, harnesses) ??
+  longLivedMisplaced(spec, h, harnesses) ??
+  mayAskMisplaced(spec, harnesses) ??
+  enabledSkillsMisplaced(spec, h, harnesses);
+
+/**
+ * Whether a task's session on `h` is given its skills through Claude Code's SDK (`Options.skills`), or a spec's own knob: a job of a
+ * harness configured `'claude'`, a session of one held attached (`restartPolicy: 'Always'`, `heldHarnessesOf`), and a `HarnessSpec`
+ * that declares `enabledSkills`. A `claude --bg` session is driven by no `query()` of ours, and Claude Code's CLI has no flag or
+ * settings key that closes its skills.
+ */
+const closesSkills = (spec: TaskSpec, h: HarnessConfig): boolean =>
+  isSpec(h) ? h.enabledSkills === true : h === 'claude' && (spec.config?.background !== true || spec.restartPolicy === 'Always');
+
+/**
+ * Why a task's `config.enabledSkills` list cannot go on its harness — or `undefined`: one whose session would hold every skill it finds
+ * rather than the list (`closesSkills`). `'default'` goes anywhere. A remote agent refuses it in its own words, with every other
+ * argument (`remoteRefuses`); a `RunnerOps` brought as its own is handed it.
+ */
+const enabledSkillsMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined => {
+  if (!Array.isArray(spec.config?.enabledSkills) || !(isClaude(h) || isSpec(h)) || closesSkills(spec, h)) return undefined;
+  const takers = Object.entries(harnesses)
+    .filter(([, o]) => o === 'claude' || (isSpec(o) && o.enabledSkills === true))
+    .map(([name, o]) => (o === 'claude' ? `\`${name}\` without \`config.background\`` : `\`${name}\``));
+  return `\`enabledSkills\` gives the session those skills alone, and the \`${spec.harness}\` harness runs ${h === 'claude' || h === 'claude-bg' ? "it as `claude --bg`, whose CLI has no flag or setting that closes a session's skills" : 'a session that holds every skill it finds'}. ${takers.length ? `File the task on ${takers.join(' or ')}, or give \`enabledSkills: 'default'\`.` : "Give `enabledSkills: 'default'`: none of this engine's harnesses closes a session's skills."}`;
+};
 
 /**
  * Why a task's `config.mayAsk: true` cannot go to its harness — or `undefined`: a call is held open at the hook of the session this

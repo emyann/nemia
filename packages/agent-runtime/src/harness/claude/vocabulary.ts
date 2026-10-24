@@ -312,10 +312,14 @@ export const claudePrintRefuses = (task: Omit<SpawnRequest, 'name'>): string | u
  * What a Claude Code background session cannot be asked for, beyond what Claude Code cannot (`claudeRefuses`): a spend
  * cap. `claude --bg` takes `--max-budget-usd` and keeps nothing of it — its help says the flag "only works with --print",
  * and a `--bg` session given a cap spends past it and ends on its own (`test/live.test.ts`). A cap that caps nothing is refused rather than
- * carried; a job keeps one, on `Options.maxBudgetUsd`, and so does `claude -p`.
+ * carried; a job keeps one, on `Options.maxBudgetUsd`, and so does `claude -p`. A closed list of skills (`enabledSkills`) is refused
+ * the same way: Claude Code holds one only through the Agent SDK's `Options.skills`, and its CLI has no flag or settings key for it.
  */
 export const claudeBgRefuses = (task: Omit<SpawnRequest, 'name'>): string | undefined =>
   claudeRefuses(task) ??
+  (Array.isArray(task.config?.enabledSkills)
+    ? "`enabledSkills` gives the session those skills alone, and a `claude --bg` session has no flag or setting that closes its skills: it would hold every skill it finds. File the task on `claude`, whose jobs are given the list through the Agent SDK, or give `enabledSkills: 'default'`."
+    : undefined) ??
   (task.config?.budgetUsd === undefined
     ? undefined
     : `\`budgetUsd: ${task.config.budgetUsd}\` is a spend cap, and a \`claude --bg\` session does not keep one: Claude Code takes \`--max-budget-usd\` only with \`--print\`, and a background session spends past a cap it is given. File the task on \`claude\`, whose jobs run one prompt and end at their cap, or on \`claude-detached\`, which runs \`claude -p\` and does the same, or leave \`budgetUsd\` off.`);

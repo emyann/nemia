@@ -176,6 +176,17 @@ const refusedNaming =
 
 const ROWS: { name: string; check: () => void }[] = [
   {
+    name: 'a task that closes its skills is given exactly those on `Options.skills`, and one that does not is left Claude Code’s own set',
+    check: () => {
+      const closed = attachedOptions({ ...RICH, config: { ...RICH.config, enabledSkills: ['plug:review', 'plug:ship'] } });
+      assert.deepEqual(closed.skills, ['plug:review', 'plug:ship']);
+      assert.deepEqual(attachedOptions({ ...RICH, config: { ...RICH.config, enabledSkills: [] } }).skills, [], 'none at all');
+      for (const open of [RICH, { ...RICH, config: { ...RICH.config, enabledSkills: 'default' as const } }]) {
+        assert.equal(Object.hasOwn(attachedOptions(open), 'skills'), false, "left out, which is Claude Code's own set, never 'all'");
+      }
+    },
+  },
+  {
     name: 'a task with no server of its own and no .mcp.json is given no servers at all, and no file is written for it',
     check: () => {
       const bare = scratch('ae-attached-options-bare-');

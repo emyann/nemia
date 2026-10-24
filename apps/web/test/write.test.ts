@@ -239,16 +239,16 @@ test("each family of writes: its answer decoded, an answer unread refused with w
     );
   });
   await t.test(
-    "REFUSED: workflows — a start whose removed is a word; a card's start resolves without the keys the board does not read",
+    "REFUSED: workflows — a start whose id is a number; a card's start resolves to its run alone, without the keys the board does not read",
     async (t) => {
       const asked = { workflow: 'dev', from: 'repo' as const, brief: 'b' };
-      answering(t, { id: 'r', removed: 'no' }, 201);
+      answering(t, { id: 7 }, 201);
       await assert.rejects(
         startRun(asked),
-        unread('POST /api/runs', 'removed', 'is "no", where the board reads boolean', 'look on the Runs page before starting it again.'),
+        unread('POST /api/runs', 'id', 'is 7, where the board reads string', 'look on the Runs page before starting it again.'),
       );
-      answering(t, { id: 'r', card: 'c', removed: false, why: 'locked', ignoredRepo: '/x' }, 201);
-      assert.deepEqual(await startRun({ ...asked, card: 'c' }), { id: 'r', removed: false, why: 'locked' });
+      answering(t, { id: 'r', card: 'c', ignoredRepo: '/x' }, 201);
+      assert.deepEqual(await startRun({ ...asked, card: 'c' }), { id: 'r' });
     },
   );
   await t.test(

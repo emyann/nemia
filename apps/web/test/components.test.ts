@@ -6943,7 +6943,7 @@ test("a factory's Template card: where it is, the version wanted and applied, ea
     createElement(TemplateCard, {
       template: template('v1', [
         { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'the template is at v2, applied at v1' },
-        { type: 'ConflictsPending', status: 'False', reason: 'None', message: 'nothing to merge' },
+        { type: 'ConflictsPending', status: 'False', reason: 'NoUpgrade', message: 'nothing to merge' },
       ]),
     }),
   );

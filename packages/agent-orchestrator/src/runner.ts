@@ -212,6 +212,8 @@ export {
 export type {
   Factory,
   FactoryCondition,
+  FactoryConditionReason,
+  FactoryConditionType,
   FactoryListing,
   FactoryTemplate,
   Hires,

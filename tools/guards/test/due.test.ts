@@ -78,5 +78,15 @@ test("the repository's own guards#test inputs, which turbo caches by, are the on
   const folders = dependencyFolders(ROOT);
   for (const file of ['workflows/x.md', '.github/workflows/ci.yml', 'docs/x.md'])
     assert.equal(dueOf([file], inputs, folders).due, true, file);
-  assert.equal(dueOf(['apps/web/src/x.tsx'], inputs, folders).due, false);
+  for (const file of [
+    'apps/web/src/x.tsx',
+    'apps/web/vite.config.ts',
+    'apps/web/.storybook/preview.tsx',
+    'apps/web/glossary.json',
+    'apps/api/glossary.json',
+    'packages/agent-runtime/glossary.json',
+    'packages/agent-orchestrator/src/feed/glossary.json',
+  ])
+    assert.equal(dueOf([file], inputs, folders).due, true, `${file}: the glossary guard reads it`);
+  assert.equal(dueOf(['apps/web/public/x.svg'], inputs, folders).due, false);
 });

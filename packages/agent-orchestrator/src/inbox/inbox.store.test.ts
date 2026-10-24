@@ -1,7 +1,7 @@
 /**
  * The inbox on disk: `$WF_ROOT/inbox/`, filed, listed, started and dropped through the verbs, as a person types them — one story on
- * `story(t)`, and a table of what each verb refuses (`nemia inbox add` and `rm`, and `nemia start` of a card). Kept focused: a card whose
- * removal fails, or that is gone before it is removed, and a warm read of the inbox. A queued card the tick starts is the story of
+ * `story(t)`, and a table of what each verb refuses (`nemia inbox add` and `rm`, and `nemia start` of a card). Kept focused: a queued card whose
+ * `queued:` line cannot be taken off at its start, or that is gone before it is, and a warm read of the inbox. A queued card the tick starts is the story of
  * `test/queue-store.test.ts`.
  *
  * What a card is and what the listing says are pure, and live in inbox.test.ts. This is the part that is not: the folder, the name a card

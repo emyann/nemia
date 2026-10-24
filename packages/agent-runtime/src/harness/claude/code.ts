@@ -47,7 +47,7 @@ import { memorylessFlags } from './memory.ts';
 import { claudeTelemetryEnv } from './telemetry.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
 import { claudePartials, claudeResultOutput, claudeStreamKept, claudeStreamOutput } from '../detached/output.ts';
-import { checkoutMcpConfig, claudeMcpArgs } from '../mcp.ts';
+import { claudeMcpArgs, projectMcpConfig } from '../mcp.ts';
 import { RunnerError } from '../error.ts';
 import type { Attached } from './attached.ts';
 
@@ -102,7 +102,7 @@ export const claudePrintFlags = (r: SpawnRequest, io: HarnessIO | undefined): st
   ...claudeFlagsOf(memorylessFlags(admittedFlags(r.config))),
   '--permission-mode',
   r.config?.permissionMode ?? CLAUDE_DEFAULT_MODE,
-  ...claudeMcpArgs([io?.checkoutMcpConfig, io?.mcpConfigFile]),
+  ...claudeMcpArgs([io?.projectMcpConfig, io?.mcpConfigFile]),
   '--setting-sources',
   'project',
   ...(r.config?.model ? ['--model', r.config?.model] : []),
@@ -124,12 +124,12 @@ export const CLAUDE_RESULT_START: StartEvent = { event: { type: 'result' }, id: 
 
 /**
  * The checkout's `.mcp.json`, found on disk here so that `command` stays a function of what it is given. None for a task that
- * says which of its servers it loads (`checkoutMcp`): those are in the task's own config file, and the checkout's is left out.
+ * says which of its servers it loads (`projectMcp`): those are in the task's own config file, and the checkout's is left out.
  */
 export const claudePrepare = (r: SpawnRequest): Partial<HarnessIO> => {
-  if (r.config?.checkoutMcp) return {};
-  const found = checkoutMcpConfig(r.cwd);
-  return found ? { checkoutMcpConfig: found } : {};
+  if (r.config?.projectMcp) return {};
+  const found = projectMcpConfig(r.cwd);
+  return found ? { projectMcpConfig: found } : {};
 };
 
 /**
@@ -157,7 +157,7 @@ export const claudeDetached: HarnessSpec = {
   prepare: claudePrepare,
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
-  checkoutMcp: true,
+  projectMcp: true,
   env: true,
   claudeFlags: true,
   mounts: { readOnly: true, writable: true },
@@ -228,7 +228,7 @@ export const claudeJobSpec = (executable?: string): HarnessSpec => ({
   prepare: claudePrepare,
   refuses: claudePrintRefuses,
   contextTokens: CLAUDE_CONTEXT_TOKENS,
-  checkoutMcp: true,
+  projectMcp: true,
   enabledSkills: true,
   env: true,
   claudeFlags: true,

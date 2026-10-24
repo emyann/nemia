@@ -7,6 +7,13 @@ import { KeyRowSchema, type KeyRow } from './library.ts';
 import type { WorkflowListing } from './workflows.ts';
 
 /**
+ * A card's life, as the orchestrator computes it once (`CardState` in its inbox) and the api sends it: `started` once a run's record names
+ * it, whatever else it carries; `refused` queued and refused as it stands; `queued` queued otherwise; `filed` every other, an entry that
+ * does not read as a card among them. The board reads it and never rebuilds it from `queued`, `tried` or `startedAs`.
+ */
+export type CardState = 'filed' | 'queued' | 'refused' | 'started';
+
+/**
  * Mirrors `InboxEntry` in apps/api/src/inbox/inbox.ts: a card as the CLI's `inbox` lists it — or an entry of the inbox that does not read
  * as one, `error` saying why — with its body, the brief a start is prefilled with, and when its file was written, which the page orders the
  * cards by.
@@ -25,8 +32,10 @@ export type InboxEntry = {
   from: string[];
   /** The step its run is gated at, as written; absent on a card with no gate. */
   gate?: string;
-  /** The runs a record says it was started as: a card still here was started, and its removal failed. */
+  /** The runs a record says it was started as, each linked from the card: a started card keeps its file, and stays in the inbox. */
   startedAs: string[];
+  /** Its life, closed (`CardState`): what the page offers on it and how it draws it. */
+  state: CardState;
   error: string | null;
   body: string | null;
   filedAt: string | null;
@@ -58,6 +67,7 @@ const inboxEntryFields = {
   from: Schema.mutable(Schema.Array(Schema.String)),
   gate: Schema.optionalKey(Schema.String),
   startedAs: Schema.mutable(Schema.Array(Schema.String)),
+  state: Schema.Literals(['filed', 'queued', 'refused', 'started']),
   error: Schema.NullOr(Schema.String),
   body: Schema.NullOr(Schema.String),
   filedAt: Schema.NullOr(Schema.String),

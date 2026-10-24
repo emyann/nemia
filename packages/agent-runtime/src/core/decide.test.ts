@@ -56,10 +56,23 @@ const inFlight = (schema: boolean, legacy = false): Event[] => [
 const quiet = (extra: Partial<Sighting> = {}): Map<string, Sighting> =>
   new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'working' as const, busy: false, quietMs: 120_000, ...extra }]]);
 
-/** A journal an older runtime wrote, whose engine judged attempt 1 `unsigned`: a reason `decide` reads and never records. */
-const unsigned = (legacy = false): Event[] => [
+/**
+ * A journal an older runtime wrote, whose engine judged attempt 1 by a reason of its own, as `upgrade` reads it: the harness's
+ * end with no statement, the reason kept as `former`, which `decide` never records.
+ */
+const formerEnd = (legacy = false): Event[] => [
   ...inFlight(true, legacy),
-  { kind: 'ended', at: at(3), attempt: 1, sessionId: 's0', observed: 'failed', reason: 'unsigned', nativeId: 'n1' },
+  {
+    kind: 'ended',
+    at: at(3),
+    attempt: 1,
+    sessionId: 's0',
+    observed: 'failed',
+    reason: 'harness',
+    closedOut: false,
+    former: 'unsigned',
+    nativeId: 'n1',
+  },
 ];
 
 /** A reading of the monotonic clock `ms` into boot `boot`, as the engine stamps one. */
@@ -297,7 +310,7 @@ test('decide: how a job starts and settles — each end its harness, a person or
   });
 });
 
-test('decide: what a closing statement records — a quiet session, the harness’s own end, `stated`, and a limit nobody here judges', async (t) => {
+test('decide: what a closing statement records — a quiet session, the harness’s own end, `closedOut`, and a limit nobody here judges', async (t) => {
   await t.test(
     'a session its harness ended at a limit its configuration set ends as its harness said: the limit is carried on the attempt, and judged by nobody here',
     () => {
@@ -360,7 +373,7 @@ test('decide: what a closing statement records — a quiet session, the harness�
   });
 
   await t.test(
-    'a QUIET session asked for a statement that gave none ends `done`, and says it gave none — `stated: false`, a fact the engine does not judge',
+    'a QUIET session asked for a statement that gave none ends `done`, and says it gave none — `closedOut: false`, a fact the engine does not judge',
     () => {
       assert.deepEqual(
         decide(fold(TASK, inFlight(true)), quiet(), now(5)),
@@ -372,9 +385,9 @@ test('decide: what a closing statement records — a quiet session, the harness�
           reason: 'harness',
           nativeId: 'n1',
           closeout: undefined,
-          stated: false,
+          closedOut: false,
         },
-        "`unsigned` is the orchestrator's word, read off `stated`",
+        "what a missing statement means is the layer above's to say, read off `closedOut`",
       );
       assert.deepEqual(decide(fold(TASK, inFlight(true)), quiet({ closeout: { payload: { ok: true }, at: 3 } }), now(5)), {
         do: 'record-end',
@@ -384,13 +397,13 @@ test('decide: what a closing statement records — a quiet session, the harness�
         reason: 'harness',
         nativeId: 'n1',
         closeout: { ok: true },
-        stated: true,
+        closedOut: true,
       });
     },
   );
 
   await t.test(
-    "the HARNESS'S `done` without a statement is recorded as the harness said it, with `stated: false` — for a task that asked for one, and only for one",
+    "the HARNESS'S `done` without a statement is recorded as the harness said it, with `closedOut: false` — for a task that asked for one, and only for one",
     () => {
       const done = (extra: Partial<Sighting> = {}): Map<string, Sighting> =>
         new Map([[N1, { sessionId: 's0', nativeId: 'n1', state: 'completed' as const, ...extra }]]);
@@ -402,7 +415,7 @@ test('decide: what a closing statement records — a quiet session, the harness�
         reason: 'harness',
         nativeId: 'n1',
         closeout: undefined,
-        stated: false,
+        closedOut: false,
       });
       assert.deepEqual(decide(fold(TASK, inFlight(true)), done({ closeout: { payload: { ok: true }, at: 3 } }), now(5)), {
         do: 'record-end',
@@ -412,7 +425,7 @@ test('decide: what a closing statement records — a quiet session, the harness�
         reason: 'harness',
         nativeId: 'n1',
         closeout: { ok: true },
-        stated: true,
+        closedOut: true,
       });
       assert.deepEqual(
         decide(fold(TASK, inFlight(false)), done(), now(5)),
@@ -425,7 +438,7 @@ test('decide: what a closing statement records — a quiet session, the harness�
           nativeId: 'n1',
           closeout: undefined,
         },
-        'a task that asked for nothing is told of nothing: no `stated` key',
+        'a task that asked for nothing is told of nothing: no `closedOut` key',
       );
       assert.deepEqual(
         decide(fold(TASK, inFlight(true)), done({ state: 'failed' }), now(5)),
@@ -437,7 +450,7 @@ test('decide: what a closing statement records — a quiet session, the harness�
           reason: 'harness',
           nativeId: 'n1',
           closeout: undefined,
-          stated: false,
+          closedOut: false,
         },
         "a harness's `failed` is its verdict, statement or not",
       );
@@ -451,7 +464,7 @@ test('decide: what a closing statement records — a quiet session, the harness�
           reason: 'harness',
           nativeId: 'n1',
           closeout: undefined,
-          stated: false,
+          closedOut: false,
         },
         "a limit the harness names is no reason of the engine's",
       );
@@ -459,7 +472,7 @@ test('decide: what a closing statement records — a quiet session, the harness�
   );
 
   await t.test(
-    'an end with `stated: false` settles SUCCEEDED, a journal that allowed more attempts included: the engine neither nudges nor retries it',
+    'an end with `closedOut: false` settles SUCCEEDED, a journal that allowed more attempts included: the engine neither nudges nor retries it',
     () => {
       for (const legacy of [false, true]) {
         const s = fold(TASK, [
@@ -472,10 +485,10 @@ test('decide: what a closing statement records — a quiet session, the harness�
             observed: 'succeeded',
             reason: 'harness',
             nativeId: 'n1',
-            stated: false,
+            closedOut: false,
           },
         ]);
-        assert.equal(s.attempts[0]?.stated, false);
+        assert.equal(s.attempts[0]?.closedOut, false);
         assert.deepEqual(
           decide(s, quiet(), now(9)),
           { do: 'settle', outcome: 'succeeded' },
@@ -668,7 +681,7 @@ test('decide: the deadline — on which clock, from when, what it stops, and the
   });
 });
 
-test('decide: a journal an older runtime wrote — its retired keys, its `unsigned` ends, its nudges, no `said` — folds and settles as it did', async (t) => {
+test('decide: a journal an older runtime wrote — its retired keys, the ends it judged by a reason of its own, its nudges, no `said` — folds and settles as it did', async (t) => {
   await t.test('an old journal that recorded a `done` end with no statement on a schema task folds, and settles, as it did', () => {
     const old = fold(TASK, [
       ...inFlight(true),
@@ -683,7 +696,7 @@ test('decide: a journal an older runtime wrote — its retired keys, its `unsign
   });
 
   await t.test(
-    "an old UNSIGNED end settles failed and says why, a journal that allowed more attempts included — never continued, never nudged: the nudge is the orchestrator's",
+    "an old end its engine judged by a reason of its own (`former`) settles failed and says why, a journal that allowed more attempts included — never continued, never nudged: the nudge is the orchestrator's",
     () => {
       for (const legacy of [false, true]) {
         const note = {
@@ -691,14 +704,14 @@ test('decide: a journal an older runtime wrote — its retired keys, its `unsign
           outcome: 'failed',
           note: '1 attempt(s), none succeeded: the last ended without the closing statement it was asked for',
         };
-        assert.deepEqual(decide(fold(TASK, unsigned(legacy)), seen(), now(9)), note, `legacy ${legacy}`);
-        assert.deepEqual(decide(fold(TASK, unsigned(legacy)), quiet(), now(9)), note, `legacy ${legacy}: still quiet`);
+        assert.deepEqual(decide(fold(TASK, formerEnd(legacy)), seen(), now(9)), note, `legacy ${legacy}`);
+        assert.deepEqual(decide(fold(TASK, formerEnd(legacy)), quiet(), now(9)), note, `legacy ${legacy}: still quiet`);
       }
     },
   );
 
   await t.test('a nudge is on the attempt it started, from the journal', () => {
-    const s = fold(TASK, [...unsigned(true), { kind: 'starting', at: at(4), attempt: 2, resumeFrom: 'n1', nudge: 'finish' }]);
+    const s = fold(TASK, [...formerEnd(true), { kind: 'starting', at: at(4), attempt: 2, resumeFrom: 'n1', nudge: 'finish' }]);
     assert.deepEqual(
       s.attempts.map((a) => a.nudge),
       [undefined, 'finish'],
@@ -906,7 +919,7 @@ test("CONTRACT: every attempt a task settles over is ended — with the statemen
                   reason: a.reason,
                   nativeId: a.nativeId,
                   closeout: a.closeout,
-                  ...(a.stated !== undefined ? { stated: a.stated } : {}),
+                  ...(a.closedOut !== undefined ? { closedOut: a.closedOut } : {}),
                 });
               else break;
             }
@@ -928,9 +941,9 @@ test("CONTRACT: every attempt a task settles over is ended — with the statemen
               );
             if (attempt.ended === 'succeeded' && cut !== 'operator')
               assert.equal(settled, 'succeeded', `${at_}: ended done, and settled ${settled}`);
-            if (!schema) assert.equal('stated' in attempt, false, `${at_}: nothing asked, nothing reported`);
+            if (!schema) assert.equal('closedOut' in attempt, false, `${at_}: nothing asked, nothing reported`);
             else if (attempt.reason === 'harness')
-              assert.equal(attempt.stated, attempt.closeout !== undefined, `${at_}: stated is whether a statement came`);
+              assert.equal(attempt.closedOut, attempt.closeout !== undefined, `${at_}: closedOut is whether a statement came`);
           }
   assert.ok(walked > 100, `walked ${walked}`);
 });
@@ -973,7 +986,14 @@ const answer = (ms: number, text = 'make it smaller', config?: HarnessArgs): Eve
 /** Turn 1's first attempt, started at `ms`, and its end if given. */
 const turn1 = (
   ms: number,
-  ended?: { observed: Outcome; reason?: 'harness' | 'unsigned' | 'lost'; nativeId?: string; stated?: boolean; limit?: string },
+  ended?: {
+    observed: Outcome;
+    reason?: 'harness' | 'lost';
+    nativeId?: string;
+    closedOut?: boolean;
+    former?: 'unsigned';
+    limit?: string;
+  },
 ): Event[] => [
   { kind: 'starting', at: at(ms), attempt: 2, resumeFrom: 'native-1', nudge: 'make it smaller' },
   { kind: 'spawned', at: at(ms + 100), attempt: 2 },
@@ -987,7 +1007,8 @@ const turn1 = (
           observed: ended.observed,
           reason: ended.reason ?? 'harness',
           nativeId: ended.nativeId ?? 'native-1',
-          ...(ended.stated !== undefined ? { stated: ended.stated } : {}),
+          ...(ended.closedOut !== undefined ? { closedOut: ended.closedOut } : {}),
+          ...(ended.former ? { former: ended.former } : {}),
           ...(ended.limit ? { limit: ended.limit } : {}),
         } as Event,
       ]
@@ -1144,29 +1165,29 @@ test('HELD OPEN: a task held open signs and waits on a person, is answered into 
         ...turn1(61_000, { observed: 'failed', reason: 'lost', nativeId: 'native-2' }),
       ]);
       assert.deepEqual(decide(legacy, seen(), now(70_000)), settled, 'legacy');
-      const unstated = fold(TASK, [
+      const unsaid = fold(TASK, [
         ...held(),
         answer(60_000),
-        ...turn1(61_000, { observed: 'succeeded', nativeId: 'native-2', stated: false }),
+        ...turn1(61_000, { observed: 'succeeded', nativeId: 'native-2', closedOut: false }),
       ]);
       assert.deepEqual(
-        decide(unstated, seen(), now(70_000)),
+        decide(unsaid, seen(), now(70_000)),
         { do: 'nothing', why: 'input-required' },
-        'a turn ended `succeeded` unstated waits as any other',
+        'a `succeeded` turn with no statement waits as any other',
       );
-      const unsignedTurn = fold(TASK, [
+      const formerTurn = fold(TASK, [
         ...held(),
         answer(60_000),
-        ...turn1(61_000, { observed: 'failed', reason: 'unsigned', nativeId: 'native-2' }),
+        ...turn1(61_000, { observed: 'failed', closedOut: false, former: 'unsigned', nativeId: 'native-2' }),
       ]);
       assert.deepEqual(
-        decide(unsignedTurn, seen(), now(70_000)),
+        decide(formerTurn, seen(), now(70_000)),
         {
           do: 'settle',
           outcome: 'failed',
           note: '1 attempt(s) of turn 1, none succeeded: the last ended without the closing statement it was asked for',
         },
-        'an older end the engine judged `unsigned` settles failed, as a task not held open does',
+        'an older end its engine judged by a reason of its own settles failed, as a task not held open does',
       );
       const twice = fold(TASK, [
         ...held(),

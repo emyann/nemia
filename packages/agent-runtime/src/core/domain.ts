@@ -23,6 +23,7 @@
  */
 
 import type { HarnessArgs } from '../harness/args.ts';
+import type { FormerReason } from './event-schema.ts';
 import type { TranscriptMark } from '../harness/seam.ts';
 import {
   transition,
@@ -86,12 +87,12 @@ export type Sighting = {
    * process is doing something other than the work — a background shell it left running — while the last word in its
    * conversation is its own closing statement. Whether a runner can tell those apart is its harness's business; this
    * field is the answer, and `busy` is a separate fact about the process. So a reader of a sighting, and a runner
-   * written against this type, must not take quiet to mean not busy. (`closedOut` in `engine.ts` does refuse to act on
+   * written against this type, must not take quiet to mean not busy. (`endedOnStatement` in `engine.ts` does refuse to act on
    * a statement from a busy session — a verdict it may yet revise — which is why quiet, not the statement, is what
    * ends such an attempt.)
    *
    * A fact about the session, not a verdict on the work: a quiet session has ended, and `decide` records it `succeeded` —
-   * with `stated: false` where its task asked for a closing statement and was told none, which the layer above judges.
+   * with `closedOut: false` where its task asked for a closing statement and was told none, which the layer above judges.
    * Only the journal knows the task, so `decide` reads this, and no runner turns it into `succeeded`.
    */
   quietMs?: number;
@@ -215,9 +216,10 @@ export const denialText = (d: Denial): string => (d.what ? `${d.tool}(${d.what})
 export type Usage = {
   /**
    * Model responses, each counted once however many lines it was written as. Absent from a runner
-   * that cannot see them: Codex's stream reports turns of a prompt, not the responses inside one.
+   * that cannot see them: Codex's stream reports turns of a prompt, not the responses inside one. A journal an older runtime
+   * wrote counts them as `turns`, read as these (`upgrade` in `journal.ts`).
    */
-  turns?: number;
+  responses?: number;
   /** Tool calls the model made. Absent when its runner could not count them. */
   toolCalls?: number;
   /**
@@ -283,13 +285,11 @@ export const nameParts = (name: string): { taskId: string; n: number } | undefin
  *
  *   `harness`      the harness reported a terminal state — or the session went quiet, which is the only end it has.
  *                  It ran, and this is what it concluded. Whether it gave the closing statement its task asked for
- *                  is `stated` on the end, a fact beside the reason: the layer above judges it, not the engine.
+ *                  is `closedOut` on the end, a fact beside the reason: the layer above judges it, not the engine.
+ *                  A journal an older runtime wrote may give an end a reason of its own judging (`FORMER_REASONS`),
+ *                  read as `harness` with `closedOut: false` and that reason kept as the end's `former` (`upgrade`).
  *   `lost`         we never heard: the session vanished, or a detached worker stopped beating.
  *                  The work in the transcript is real; nobody said it was finished.
- *   `unsigned`     only in a journal an older runtime wrote, whose engine judged a session that ended without the
- *                  closing statement its task asked for, and recorded it `failed`. This engine judges no such end: it
- *                  is `harness` with `stated: false`. A task whose last attempt ended `unsigned` settles `failed`
- *                  with a note that says so (`attemptNote` in `lifecycle.ts`).
  *   `unstartable`  the spawn failed and the harness vouched that nothing started. Nothing ran.
  *                  A harness that ended the session at a limit its configuration set — a spend cap — ends it `harness`
  *                  too, with the limit beside it (`limit`), a fact the layer above judges. A journal an older runtime
@@ -309,27 +309,28 @@ export const nameParts = (name: string): { taskId: string; n: number } | undefin
  * above, which decides whether to try again and which session to continue, can tell a lost session's unjudged work
  * from a conclusion and from a spawn that ran nothing.
  */
-export type EndReason = 'harness' | 'lost' | 'unsigned' | 'unstartable' | 'operator' | 'deadline';
+export type EndReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadline';
 
 /**
  * One entry of a task's journal. Every side effect is bracketed by two entries: the intent, then the result. That bracket
  * is what makes a crash between them recoverable — `decide` can always tell which side it is on.
  *
- * - `filed`: the desired state, stated once. A `filed` an older runtime wrote may also carry keys folded unread:
+ * - `filed`: the desired state, said once. A `filed` an older runtime wrote may also carry keys folded unread:
  *   `maxAttempts` and `resume`, how many attempts a turn had and which session a later one continued — the runtime makes
  *   one attempt per start, and trying again is the layer above's. It may carry the spend
  *   cap beside `config`, read as one of the harness's arguments, under it (`upgrade` in `journal.ts`).
  * - `starting`: INTENT — the engine is about to spawn `nameFor(taskId, attempt)`. `nudge` is what a continued session is
  *   told instead of the brief — a later turn's answer; in a journal an older runtime wrote, also why a session that
- *   stopped unsigned was back — decided here with `resumeFrom`, and never re-derived.
+ *   stopped with no statement was back — decided here with `resumeFrom`, and never re-derived.
  * - `spawned`: RESULT — the spawn call returned, and the session is the harness's problem now. `error` when the call
  *   failed without the harness vouching that nothing started: whether a session exists is then the grace window's to
  *   find out.
  * - `ended`: an attempt reached a terminal state, as observed — never as assumed. `usage`, `exitCode`, `denials`, `skills`,
  *   `files`, `ranOn` and `limit` come from the same sighting, when its runner measured them; `decide` reads none of them.
- *   `stated`, on an end read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a
+ *   `closedOut`, on an end read off a sighting of a task that asked for a closing statement: whether one came. A fact, never a
  *   verdict — `decide` does not read it, and the layer above judges what a missing statement means. Absent from an end an older runtime
- *   wrote, and from an end with no sighting behind it (`lost`, `unstartable`, a cut).
+ *   wrote, and from an end with no sighting behind it (`lost`, `unstartable`, a cut). `former`, on an end an older runtime gave a
+ *   reason of its own judging (`FORMER_REASONS`): that reason, the end read as the harness's with `closedOut: false` (`upgrade`).
  * - `measured`: what an ended attempt consumed, read once its session was let go — for a harness that writes part of it
  *   only as the session's process exits, which is after the end was written (Claude Code's cost). Merged into the
  *   attempt's `usage`. A fact for the record, written once; `decide` never reads it.
@@ -431,7 +432,8 @@ export type Event =
       reason: EndReason;
       nativeId?: string;
       closeout?: unknown;
-      stated?: boolean;
+      closedOut?: boolean;
+      former?: FormerReason;
       usage?: Usage;
       exitCode?: number;
       denials?: Denial[];
@@ -488,8 +490,8 @@ export type Attempt = {
   /** What this attempt was told to continue, decided when it started and never re-derived. */
   resumeFrom?: string;
   /**
-   * What it was told instead of the task's brief: a later turn's answer (in a journal an older runtime wrote, also why an unsigned session
-   * was back). Carried, never read.
+   * What it was told instead of the task's brief: a later turn's answer (in a journal an older runtime wrote, also why a session that ended
+   * with no statement was back). Carried, never read.
    */
   nudge?: string;
   /** What the workload said when this attempt ended, if it said anything. Carried, never read. */
@@ -499,7 +501,12 @@ export type Attempt = {
    * let go with none. Absent where its task asked for none, where no sighting ended it, and on an end an older runtime
    * wrote. Carried, never read: whether that is a failure is the caller's judgement, not the runtime's.
    */
-  stated?: boolean;
+  closedOut?: boolean;
+  /**
+   * The reason an older runtime gave this attempt's end that today's are no word for (`FORMER_REASONS`), its end read as the
+   * harness's with `closedOut: false`. Absent from every end this runtime writes. Carried, never read.
+   */
+  former?: FormerReason;
   /** What this attempt consumed; `null` when its runner measured nothing, never zeros. Carried, never read. */
   usage: Usage | null;
   /** How its process exited; `null` for a harness whose process is not ours, or one that never exited. */
@@ -584,7 +591,8 @@ function endAttempt(a: Attempt, e: Extract<Event, { kind: 'ended' }>): void {
   a.reason = e.reason;
   a.nativeId = e.nativeId ?? a.nativeId;
   a.closeout = e.closeout;
-  if (e.stated !== undefined) a.stated = e.stated;
+  if (e.closedOut !== undefined) a.closedOut = e.closedOut;
+  if (e.former !== undefined) a.former = e.former;
   a.usage = e.usage ?? a.usage;
   a.exitCode = e.exitCode ?? null;
   if (e.denials?.length) a.denials = e.denials;
@@ -817,7 +825,7 @@ export type Action =
       reason: EndReason;
       nativeId?: string;
       closeout?: unknown;
-      stated?: boolean;
+      closedOut?: boolean;
       error?: string;
     }
   | { do: 'stop'; sessionId: string; why: string }
@@ -933,7 +941,7 @@ export function lifecycleOf(state: State): LifecycleState {
  *    `SESSION_RESPAWNING` — or `RESPAWN_OVERDUE`, listed so `RESPAWN_GAP_MS` since the gap opened. Its idle session
  *    (`idleOf`), `SESSION_IDLE`: its turn's end, its idle listing and its silence are not its end. Waiting on a person,
  *    `SESSION_BLOCKED`. At work, `SESSION_QUIET` once quiet — its runner holds it has stopped, and that is its end; whether
- *    it gave the statement its task asked for is recorded beside it (`stated`) and judged by the layer above, for the
+ *    it gave the statement its task asked for is recorded beside it (`closedOut`) and judged by the layer above, for the
  *    engine reports and never nudges — else `SESSION_LIVE`.
  *    Canceled, `SESSION_STOPPED`; any other end, `SESSION_ENDED`.
  * 3. `UNREAD`, when its harness could not be read this pass: nothing is known of the session, and an absence read off a
@@ -996,11 +1004,13 @@ const restarts = (state: State, ended: Attempt): boolean => state.restartPolicy 
 
 /**
  * `ATTEMPT_ENDED` for `ended`, the last of `attempts` in turn `turn`: with the harness's words (`error`) only when it
- * refused the spawn, since a spawn error on an attempt that ended otherwise is not why it ended.
+ * refused the spawn, since a spawn error on an attempt that ended otherwise is not why it ended, and the reason an older
+ * runtime gave its end (`former`) where it gave one.
  */
 function attemptEnded(ended: Attempt, attempts: number, turn: number): LifecycleEvent {
   const refusal = ended.reason === 'unstartable' && ended.error !== undefined ? { error: ended.error } : {};
-  return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts, turn, ...refusal };
+  const former = ended.former === undefined ? {} : { former: ended.former };
+  return { type: 'ATTEMPT_ENDED', ended: ended.ended, reason: ended.reason, attempts, turn, ...refusal, ...former };
 }
 
 /** Whether an overdue attempt's session is live, with the sighting that says so: a stop needs a session to send to. */

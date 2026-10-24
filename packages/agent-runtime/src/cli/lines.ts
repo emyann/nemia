@@ -35,15 +35,15 @@ export const usageLine = (u: Usage | null): string => (u ? `${countsLine(u)} · 
 /** What an attempt has consumed so far, for a person, with no cost: a long-lived attempt's is written only at its end. */
 const runningLine = (u: Usage): string => `${countsLine(u)}${readLine(u)}`;
 
-/** An attempt's turns, tool calls and tokens, for a person, each one its runner could not see named not measured. */
+/** An attempt's responses, tool calls and tokens, for a person, each one its runner could not see named not measured. */
 const countsLine = (u: Usage): string => {
   const tokens =
     u.inputTokens !== undefined && u.outputTokens !== undefined
       ? ` · ${count(u.inputTokens)} in · ${count(u.outputTokens)} out`
       : ' · tokens not measured';
-  const turns = u.turns !== undefined ? `${u.turns} turns` : 'turns not measured';
+  const responses = u.responses !== undefined ? `${u.responses} responses` : 'responses not measured';
   const calls = u.toolCalls !== undefined ? `${u.toolCalls} tool calls` : 'tool calls not measured';
-  return `${turns} · ${calls}${tokens}`;
+  return `${responses} · ${calls}${tokens}`;
 };
 
 /**
@@ -89,10 +89,10 @@ const ranLine = (a: Attempt): string =>
     : `${a.startedAt.slice(11, 19)} → ${a.endedAt.slice(11, 19)} (${duration(Date.parse(a.endedAt) - Date.parse(a.startedAt))})`;
 
 /**
- * `succeeded (no statement)` for an end whose task asked for a closing statement and was given none (`stated: false`): the fact
+ * `succeeded (no statement)` for an end whose task asked for a closing statement and was given none (`closedOut: false`): the fact
  * the runtime records. What it means for the work is the layer above's to say; `ae` says only what happened.
  */
-const unstated = (stated: boolean | undefined): string => (stated === false ? ' (no statement)' : '');
+const noStatement = (closedOut: boolean | undefined): string => (closedOut === false ? ' (no statement)' : '');
 
 /**
  * One attempt, for `ae show`: how it ended, when it ran, how its process exited if it has one, what it consumed. A session
@@ -105,16 +105,16 @@ export const attemptLine = (a: Attempt): string => {
   if (a.ended === null) return `attempt ${a.n}  running ${when}${denied}`;
   if (a.reason === 'unstartable')
     return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error === undefined ? '' : firstLine(a.error)}`.trimEnd();
-  const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : a.limit ? ` (${a.limit})` : unstated(a.stated)}`;
+  const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : a.limit ? ` (${a.limit})` : noStatement(a.closedOut)}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
   const failedCall = a.error ? `  — the spawn call failed: ${firstLine(a.error)}` : '';
   return `attempt ${a.n}  ${how}  ${when}${exit}  ${usageLine(a.usage)}${denied}${failedCall}`;
 };
 
 /**
- * One task, for `ae ls`: `queued` while it waits for `ae admit`, and its latest attempt's cost beside its turns
- * — `$3.01 · 12t`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
- * Code writes a session's cost as its process exits. A long-lived attempt's turns are those journalled as it grows, its
+ * One task, for `ae ls`: `queued` while it waits for `ae admit`, and its latest attempt's cost beside its responses
+ * — `$3.01 · 12r`, or `cost not measured` — once it has an attempt. An attempt still running has none yet: Claude
+ * Code writes a session's cost as its process exits. A long-lived attempt's responses are those journalled as it grows, its
  * cost the one recorded at its end. A task held open and answered says which turn it is on — `turn 1`.
  */
 export const taskLine = (v: TaskView) => {
@@ -122,7 +122,7 @@ export const taskLine = (v: TaskView) => {
   const turnText = turn ? `turn ${turn}` : '';
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
   const queued = v.admission === 'queued' ? '  queued' : '';
-  const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
+  const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.responses !== undefined ? [`${u.responses}r`] : [])].join(' · ')}` : '';
   return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${turnText ? ` ${turnText}` : ''}${queued}${meter}  ${firstLine(v.state.brief).slice(0, 44)}`;
 };
 
@@ -150,7 +150,7 @@ const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => s
   counted: (e) => `  attempt ${e.attempt}: ${runningLine(e.usage)}`,
   denied: (e) => `  attempt ${e.attempt}: ${denialText(e)}`,
   ended: (e) =>
-    `  ${e.observed}${e.limit ? ` (${e.limit})` : e.reason === 'harness' ? unstated(e.stated) : ` (${e.reason})`}${e.error ? `: ${firstLine(e.error).slice(0, 160)}` : ''}`,
+    `  ${e.observed}${e.limit ? ` (${e.limit})` : e.reason === 'harness' ? noStatement(e.closedOut) : ` (${e.reason})`}${e.error ? `: ${firstLine(e.error).slice(0, 160)}` : ''}`,
   spawned: (e) => (e.error ? `  but the call failed: ${firstLine(e.error).slice(0, 160)}` : ''),
   said: (e) => `  to attempt ${e.attempt}: ${firstLine(e.text.trim()).slice(0, 160)}`,
   input: (e) =>

@@ -108,11 +108,11 @@ test('a background session works busy, falls quiet once its own closeout is its 
   });
   const list = (state: string, status: string, name = 'ae/t-1/1') =>
     fs.writeFileSync(rows, JSON.stringify([{ name, sessionId: 's-1', state, status, kind: 'background', startedAt: STARTED }]));
-  const clock: { t: number; written: number; said: Statement | undefined; turns: number } = {
+  const clock: { t: number; written: number; said: Statement | undefined; responses: number } = {
     t: STARTED,
     written: STARTED,
     said: { payload: { outcome: 'done' }, at: STARTED, lastWord: true },
-    turns: 4,
+    responses: 4,
   };
   const reads = { closeout: 0, usage: 0 };
   const ops = bgOps({
@@ -124,7 +124,7 @@ test('a background session works busy, falls quiet once its own closeout is its 
     },
     usageFrom: async () => {
       reads.usage++;
-      return { turns: clock.turns };
+      return { responses: clock.responses };
     },
   });
   const look = (name = 'ae/t-1/1') => Effect.runPromise(ops.observe).then((seen) => seen.get(name));
@@ -179,7 +179,7 @@ test('a background session works busy, falls quiet once its own closeout is its 
       assert.deepEqual(seen?.closeout, { payload: { outcome: 'done' }, at: clock.written }, 'with the statement, for the engine to judge');
       assert.equal(seen?.state, 'working', 'reported, not concluded');
       assert.equal(seen?.busy, true, 'and still busy: that is a fact about its process, not about the work');
-      assert.deepEqual(seen?.usage, { turns: 4 }, 'over, so what it consumed is final too');
+      assert.deepEqual(seen?.usage, { responses: 4 }, 'over, so what it consumed is final too');
     },
   );
 
@@ -209,17 +209,17 @@ test('a background session works busy, falls quiet once its own closeout is its 
       const before = { ...reads };
       for (let i = 0; i < 10; i++) {
         const seen = await look();
-        assert.deepEqual({ said: seen?.closeout, turns: seen?.usage?.turns }, { said: undefined, turns: 4 }, `look ${i + 1}`);
+        assert.deepEqual({ said: seen?.closeout, responses: seen?.usage?.responses }, { said: undefined, responses: 4 }, `look ${i + 1}`);
         clock.t += 1_000;
       }
       assert.deepEqual(reads, before, 'ten looks over a transcript nothing wrote: no read');
       clock.written = clock.t;
       clock.said = { payload: 7, at: clock.written };
-      clock.turns = 5;
+      clock.responses = 5;
       clock.t += 5_000;
       const seen = await look();
       assert.deepEqual(seen?.closeout, { payload: 7, at: clock.written }, 'a turn wrote the transcript: read again');
-      assert.deepEqual(seen?.usage, { turns: 5 }, 'and the usage with it');
+      assert.deepEqual(seen?.usage, { responses: 5 }, 'and the usage with it');
       assert.equal(seen?.state, 'working', 'reported, not acted on — whose it is, the engine decides');
       assert.deepEqual(reads, { closeout: before.closeout + 1, usage: before.usage + 1 });
     },
@@ -236,14 +236,14 @@ test('a background session works busy, falls quiet once its own closeout is its 
         'Claude Code lists a session that gave its closeout and ended its turn as blocked and idle: the engine ends that attempt only if it is handed the statement',
       );
       assert.equal(first?.state, 'input-required');
-      assert.deepEqual(first?.usage, { turns: 5 }, 'a blocked session reports its usage too');
+      assert.deepEqual(first?.usage, { responses: 5 }, 'a blocked session reports its usage too');
       const before = { ...reads };
       for (let i = 0; i < 10; i++) {
         clock.t += 1_000;
         const seen = await look();
         assert.deepEqual(
           { said: seen?.closeout, usage: seen?.usage },
-          { said: { payload: 7, at: clock.written }, usage: { turns: 5 } },
+          { said: { payload: 7, at: clock.written }, usage: { responses: 5 } },
           `look ${i + 1}`,
         );
       }
@@ -301,7 +301,7 @@ const heldSession = (after: number, written: number, said: Statement | undefined
         asked++;
         return said;
       },
-      usageFrom: async () => ({ turns: 4 }),
+      usageFrom: async () => ({ responses: 4 }),
     });
     return { seen: await lookOf(ops), asked };
   });
@@ -316,7 +316,7 @@ const BUSY: Row[] = [
       assert.deepEqual(seen?.closeout, { payload: { outcome: 'done' }, at: STARTED + 10 }, 'with the statement, for the engine to judge');
       assert.equal(seen?.state, 'working', 'reported, not concluded');
       assert.equal(seen?.busy, true, 'and still busy: that is a fact about its process, not about the work');
-      assert.deepEqual(seen?.usage, { turns: 4 }, 'over, so what it consumed is final too');
+      assert.deepEqual(seen?.usage, { responses: 4 }, 'over, so what it consumed is final too');
     },
   },
   {
@@ -475,12 +475,12 @@ const STARTS: Row[] = [
           closeoutFrom: async () => undefined,
           usageFrom: async (_id, from) => {
             since = from;
-            return { turns: 2, toolCalls: 1 };
+            return { responses: 2, toolCalls: 1 };
           },
         });
         const seen = await lookOf(ops);
         assert.equal(since, STARTED);
-        assert.deepEqual(seen?.usage, { turns: 2, toolCalls: 1 });
+        assert.deepEqual(seen?.usage, { responses: 2, toolCalls: 1 });
       }),
   },
   {
@@ -493,7 +493,7 @@ const STARTS: Row[] = [
           closeoutFrom: async () => undefined,
           usageFrom: async () => {
             asked++;
-            return { turns: 9, toolCalls: 9 };
+            return { responses: 9, toolCalls: 9 };
           },
         });
         assert.equal((await lookOf(ops))?.usage, undefined);
@@ -509,7 +509,7 @@ const STARTS: Row[] = [
           transcriptTime: async () => 0,
           usageFrom: async () => {
             asked++;
-            return { turns: 1, toolCalls: 0 };
+            return { responses: 1, toolCalls: 0 };
           },
         });
         assert.equal((await lookOf(ops))?.usage, undefined);
@@ -981,11 +981,11 @@ test('REFUSED: a session whose transcript cannot be read reads as failed only on
 });
 
 /** The argv `bgOps().spawn` hands to `claude`, recorded by a fake one on PATH; `cwd` holds the `.mcp.json` it is given. */
-const argvOf = async (r: Partial<SpawnRequest>, o: { root?: string; checkoutMcp?: boolean } = {}) => {
+const argvOf = async (r: Partial<SpawnRequest>, o: { root?: string; projectMcp?: boolean } = {}) => {
   const dir = scratch('fake-claude-');
   const argsFile = path.join(dir, 'args');
   fs.writeFileSync(path.join(dir, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
-  if (o.checkoutMcp) fs.writeFileSync(path.join(dir, '.mcp.json'), '{"mcpServers":{}}');
+  if (o.projectMcp) fs.writeFileSync(path.join(dir, '.mcp.json'), '{"mcpServers":{}}');
   const prev = process.env.PATH;
   process.env.PATH = `${dir}:${prev}`;
   try {
@@ -1036,7 +1036,7 @@ test("claude --bg's argv, pinned: its name, auto, the MCP flags and the prompt a
             budgetUsd: 0.5,
           },
         },
-        { root, checkoutMcp: true },
+        { root, projectMcp: true },
       );
       assert.deepEqual(args, [
         '--bg',
@@ -1406,7 +1406,7 @@ const LISTINGS: Row[] = [
           closeoutFrom: async () => undefined,
           usageFrom: async (_id, from) => {
             since.push(from);
-            return { turns: 1, toolCalls: 0 };
+            return { responses: 1, toolCalls: 0 };
           },
         });
         await Effect.runPromise(ops.observe);
@@ -1429,7 +1429,7 @@ const LISTINGS: Row[] = [
         const released = [];
         for (const r of rows)
           released.push(await Effect.runPromise(ops.release!({ sessionId: r.sessionId, state: 'completed' }, { worktree: true })));
-        assert.deepEqual(released, [undefined, undefined, { turns: 1, toolCalls: 0 }, undefined]);
+        assert.deepEqual(released, [undefined, undefined, { responses: 1, toolCalls: 0 }, undefined]);
         assert.deepEqual(since, [5], 'only the row with a start, and a process, is read again');
       });
     },

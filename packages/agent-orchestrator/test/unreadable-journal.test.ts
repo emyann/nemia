@@ -43,8 +43,8 @@ stand().world.repository(REPO, {});
 const FOLDER = fs.mkdtempSync(path.join(ROOT, 'wf-'));
 fs.writeFileSync(path.join(FOLDER, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 
-/** What no runtime writes: a `measured` whose turns are a word. */
-const MISWRITTEN = { kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { turns: 'three' } };
+/** What no runtime writes: a `measured` whose responses are a word. */
+const MISWRITTEN = { kind: 'measured', at: '2026-09-28T00:00:00Z', attempt: 1, usage: { responses: 'three' } };
 
 const tasks = new Map<string, unknown[]>();
 /** When the journal says each attempt began, in milliseconds, by its session's name: a closeout counts only when made after it. */
@@ -135,7 +135,7 @@ test('a run whose task journal holds an entry no runtime wrote is left out of th
     undefined,
     'the bad run is not judged on a journal that does not read',
   );
-  const entry = `${badTask}'s journal, entry ${tasks.get(badTask)!.length} is a \`measured\` event, and its \`usage.turns\``;
+  const entry = `${badTask}'s journal, entry ${tasks.get(badTask)!.length} is a \`measured\` event, and its \`usage.responses\``;
   assert.ok(
     pass.unreadable?.some((w) => w.startsWith(`${bad.id} is not advanced while a task it reads is unreadable: ${entry}`)),
     JSON.stringify(pass.unreadable),

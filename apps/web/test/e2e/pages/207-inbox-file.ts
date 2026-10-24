@@ -52,7 +52,7 @@ function expectFile(file: string, text: string, assertion: string): void {
 /**
  * Start the card `name`, which names no factory, on a page of its own: its Start draws a Factory list and no start form; with the
  * factory picked, then its workflow, Start sends the factory and its repository in the query of `POST /api/runs`, the record names
- * the factory, the repository and the card, and the card leaves the inbox. The run is taken back.
+ * the factory, the repository and the card, and the card stays in the inbox, started. The run is taken back.
  */
 async function startUnassigned(page: Page, name: string, theme: string): Promise<void> {
   const factory = FACTORIES.hiring.name;
@@ -83,7 +83,7 @@ async function startUnassigned(page: Page, name: string, theme: string): Promise
     await expectStartedIn(started, { factory, repo: checkout, card: name });
     const { id } = (await started.json()) as { id: string };
     await other.waitForURL(`**/runs/${id}`, { timeout: WAIT_MS });
-    if (fs.existsSync(path.join(store!, 'inbox', `${name}.md`))) throw new Refused(`the card leaves the inbox once its run is written`);
+    if (!fs.existsSync(path.join(store!, 'inbox', `${name}.md`))) throw new Refused(`the card stays in the inbox once its run is written`);
     await idle(other);
     const seen = problems();
     if (seen.length)

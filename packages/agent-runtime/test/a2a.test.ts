@@ -131,11 +131,11 @@ test('the A2A map: every mapping of a session, a spawn, words and an attempt, ex
     }
     assert.deepEqual(taskOfAttempt('ae/t-1/1', ended, 'm').artifacts, [], 'an attempt that said nothing has no Artifact');
     assert.equal(closeoutOf(taskOfAttempt('ae/t-1/1', ended, 'm')), undefined);
-    const unstated = overTheWire(taskOfAttempt('ae/t-1/1', { ...ended, stated: false }, 'm'));
+    const unstated = overTheWire(taskOfAttempt('ae/t-1/1', { ...ended, closedOut: false }, 'm'));
     assert.deepEqual(
-      [unstated.status!.state, unstated.artifacts, (unstated.metadata as { attempt: Attempt }).attempt.stated],
+      [unstated.status!.state, unstated.artifacts, (unstated.metadata as { attempt: Attempt }).attempt.closedOut],
       [TaskState.TASK_STATE_COMPLETED, [], false],
-      "an end without the statement its task asked for is the harness's end, and says so beside it: COMPLETED, no Artifact, and `stated: false` on the attempt it carries, for the layer above to judge",
+      "an end without the statement its task asked for is the harness's end, and says so beside it: COMPLETED, no Artifact, and `closedOut: false` on the attempt it carries, for the layer above to judge",
     );
   });
 
@@ -301,7 +301,7 @@ const full: Sighting = {
   busy: true,
   nativeId: 'native-7',
   usage: {
-    turns: 4,
+    responses: 4,
     toolCalls: 9,
     inputTokens: 1200,
     cacheReadTokens: 900,
@@ -397,7 +397,7 @@ const driven = (o: { spawnFails?: unknown; stopFails?: string; observeFails?: st
       : {
           find: (name: string) => answer('find', name, sessions.get(name) && { sessionId: sessions.get(name)!.sessionId }),
           release: (session: Sighting, task: { worktree?: string | boolean }) =>
-            answer('release', [session, task], session.state === 'completed' ? { turns: 2, costUsd: 0.5 } : undefined),
+            answer('release', [session, task], session.state === 'completed' ? { responses: 2, costUsd: 0.5 } : undefined),
           say: (session: { name: string; sessionId: string }, text: string) => answer('say', [session, text], undefined),
           quota: answer('quota', undefined, { kind: 'unanswered' as const, subscription: 'max' }),
           /** Told what is expected, the sessions it names alone. */
@@ -557,7 +557,7 @@ test('the conformance walk: each verb through the client reaches the driver as t
       assert.equal(await Effect.runPromise(d.runner.find!('ae/t-9/1')), undefined, 'none found is undefined, as a driver says it');
       assert.equal(await Effect.runPromise(d.runner.logs('s-1')), 'logs of s-1');
       const done: Sighting = { ...full, state: 'completed' };
-      assert.deepEqual(await Effect.runPromise(d.runner.release!(done, { worktree: '/w/t-1' })), { turns: 2, costUsd: 0.5 });
+      assert.deepEqual(await Effect.runPromise(d.runner.release!(done, { worktree: '/w/t-1' })), { responses: 2, costUsd: 0.5 });
       assert.equal(await Effect.runPromise(d.runner.release!({ sessionId: 's-2', state: 'canceled' }, {})), undefined);
       assert.deepEqual(d.acted().slice(1), [
         ['find', request.name],

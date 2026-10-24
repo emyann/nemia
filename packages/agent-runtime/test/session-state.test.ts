@@ -77,7 +77,7 @@ test('the corpus recorded before the words changed: decided as it was through ea
       for (const [way, by] of ways) {
         const cases = corpusOf(translated(by));
         assert.deepEqual(cases.map((c) => c.name).sort(), Object.keys(RECORDED).sort(), `${way}: every recorded case, and no other`);
-        assert.equal(cases.length, 2184, `${way}: every journal shape, deadline, sighting and time`);
+        assert.equal(cases.length, 2132, `${way}: every journal shape, deadline, sighting and time`);
         for (const c of cases) assert.deepEqual(asJson(read(c)), asJson(RECORDED[c.name]), `${way}: ${c.name}`);
       }
     },

@@ -44,8 +44,8 @@ import { runPlaced } from '../store.ts';
 
 /**
  * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,
- * the runs it was `startedAs`, the repository its factory picks for it (`factoryRepo`), and, for an entry that does not read as a card,
- * why — with two things the listing does not carry.
+ * the runs it was `startedAs`, its `state` (`CardState`), computed once by the package and passed through as is, the repository its
+ * factory picks for it (`factoryRepo`), and, for an entry that does not read as a card, why — with two things the listing does not carry.
  *
  * `body` is the card's text below its frontmatter, the brief a start is prefilled with: null for an entry that does not read. `filedAt` is
  * when its file was last written — when it was filed, unless a person has edited it since — which is what the board orders the cards by,

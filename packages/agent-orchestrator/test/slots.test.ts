@@ -106,7 +106,7 @@ function writeRun(id: string, minute: number, steps: Record<string, object>) {
 signedOff('r-a-implement');
 writeRun('r-a', 2, { implement: { taskId: 'r-a-implement' } });
 signedOff('r-bad-implement');
-tasks.get('r-bad-implement')!.push({ kind: 'measured', at: at(0), attempt: 1, usage: { turns: 'three' } });
+tasks.get('r-bad-implement')!.push({ kind: 'measured', at: at(0), attempt: 1, usage: { responses: 'three' } });
 writeRun('r-bad', 1, { implement: { taskId: 'r-bad-implement' } });
 writeRun('r-new', 4, {});
 writeRun('r-old', 3, {});

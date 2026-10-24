@@ -35,7 +35,7 @@ import { admittedFlags } from './admission.ts';
 import { memorylessFlags } from './memory.ts';
 import { telemeteredFlags } from './telemetry.ts';
 import { withoutTelemetry } from '../telemetry.ts';
-import { checkoutMcpConfig, claudeMcpArgs, sessionMcp, writeMcpConfig } from '../mcp.ts';
+import { claudeMcpArgs, projectMcpConfig, sessionMcp, writeMcpConfig } from '../mcp.ts';
 import { readTranscript } from '../transcript.ts';
 import { countSpawn } from '../../core/engine/tally.ts';
 import type { Monotonic } from '../../core/clock.ts';
@@ -448,7 +448,7 @@ const spawnBg = (root: string, parentCallFrom: (sessionId: string) => Promise<Pa
   Effect.tryPromise({
     try: async () => {
       const mcpArgs = claudeMcpArgs([
-        r.config?.checkoutMcp ? undefined : checkoutMcpConfig(r.cwd),
+        r.config?.projectMcp ? undefined : projectMcpConfig(r.cwd),
         writeMcpConfig(mcpFileOf(root, r.name), sessionMcp(r.cwd, r.config)),
       ]);
       await recordParent(parentFileOf(root, r.name), r.resumeFrom, parentCallFrom);

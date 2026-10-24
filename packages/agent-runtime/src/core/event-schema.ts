@@ -56,7 +56,7 @@ const harnessArgs = {
   allowedTools: Schema.optional(Strings),
   effort: Schema.optional(Schema.String),
   mcp: Schema.optional(Schema.Record(Schema.String, McpServerSchema)),
-  checkoutMcp: Schema.optional(Strings),
+  projectMcp: Schema.optional(Strings),
   contextTokens: Schema.optional(Schema.Finite),
   background: Schema.optional(Schema.Boolean),
   budgetUsd: Schema.optional(Schema.Finite),
@@ -73,13 +73,16 @@ const harnessArgs = {
 
 /**
  * `FORMER_ARGS`: a former harness argument that Claude Code's flag of the same key replaces, which `upgrade` moves into `config.claude`.
+ * `RENAMED_ARGS`: a harness argument by the name it was filed under before it took today's, which `upgrade` reads by its new one.
  */
-const formerArgs = { remoteControl: Schema.optional(Schema.Boolean) };
+const formerArgs = { remoteControl: Schema.optional(Schema.Boolean), checkoutMcp: Schema.optional(Strings) };
 
 export const HarnessArgsSchema = Schema.StructWithRest(Schema.Struct({ ...harnessArgs, ...formerArgs }), Rest);
 
 export const UsageSchema = Schema.StructWithRest(
   Schema.Struct({
+    responses: Schema.optional(Schema.Finite),
+    /** `responses` by its former name, which `upgrade` reads by today's. */
     turns: Schema.optional(Schema.Finite),
     toolCalls: Schema.optional(Schema.Finite),
     inputTokens: Schema.optional(Schema.Finite),
@@ -140,18 +143,31 @@ const Filed = event('filed', {
 const MonotonicSchema = Schema.Struct({ boot: Schema.String, ms: Schema.Finite });
 
 /**
+ * The reasons an older runtime gave an end that today's are no word for, each an end that runtime judged by itself when the
+ * harness ended with no statement: `upgrade` reads it as the harness's end with `closedOut: false`, keeping the reason it was
+ * written with as the end's `former`.
+ */
+export const FORMER_REASONS = ['unsigned'] as const;
+
+/** A reason an older runtime gave an end, kept on the end it reads as (`FORMER_REASONS`). */
+export type FormerReason = (typeof FORMER_REASONS)[number];
+
+/**
  * An end as any runtime wrote one: `budget` is the reason an older runtime's journal gives a session its harness ended at a
- * spend cap, read as `harness` with `limit: 'budget'`, and `done` the word an older runtime recorded an end the harness
- * vouched for with, read as `succeeded` (`upgrade`, both).
+ * spend cap, read as `harness` with `limit: 'budget'`, `done` the word an older runtime recorded an end the harness
+ * vouched for with, read as `succeeded`, a former reason (`FORMER_REASONS`) the harness's end with no statement, and
+ * `closedOut` given by its former name (`upgrade`, each).
  */
 const Ended = event('ended', {
   attempt: Schema.Finite,
   sessionId: Schema.String,
   observed: Schema.Literals(['succeeded', 'failed', 'stopped', 'done']),
-  reason: Schema.Literals(['harness', 'lost', 'unsigned', 'unstartable', 'operator', 'deadline', 'budget']),
+  reason: Schema.Literals(['harness', 'lost', 'unstartable', 'operator', 'deadline', 'budget', ...FORMER_REASONS]),
   nativeId: Schema.optional(Schema.String),
   closeout: Schema.optional(Schema.Unknown),
+  closedOut: Schema.optional(Schema.Boolean),
   stated: Schema.optional(Schema.Boolean),
+  former: Schema.optional(Schema.Literals(FORMER_REASONS)),
   usage: Schema.optional(UsageSchema),
   exitCode: Schema.optional(Schema.Finite),
   denials: Schema.optional(Schema.mutable(Schema.Array(Schema.Struct({ tool: Schema.String, what: Schema.optional(Schema.String) })))),

@@ -83,12 +83,12 @@ const aRepo = (): string => {
 /** The engine stand-in the walk settles by hand, keeping each task as it was filed. Each task's session is its own, `native-<id>`. */
 const board = () => {
   const held = engine();
-  const settle = (id: string, phase: EnginePhase, closeout?: unknown, exitCode?: number, reason?: string) =>
+  const settle = (id: string, phase: EnginePhase, closeout?: unknown, exitCode?: number, end?: object) =>
     held.settle(id, phase, {
       ...(closeout !== undefined && { closeout }),
       ...(exitCode !== undefined && { exitCode }),
-      ...(reason !== undefined && { reason }),
-    } as never);
+      ...end,
+    });
   return { e: engineOf(held.layer), tasks: held.tasks, settle };
 };
 
@@ -357,7 +357,7 @@ for (const name of LOOPED) {
         if (t.phase !== 'pending' || id === nudge) continue;
         order.push(id);
         if (id.endsWith('-check')) b.settle(id, 'succeeded', undefined, 0);
-        else if (id === first) b.settle(id, 'failed', undefined, undefined, 'unsigned');
+        else if (id === first) b.settle(id, 'failed', undefined, undefined, { reason: 'harness', closedOut: false, former: 'unsigned' });
         else
           b.settle(id, 'succeeded', {
             ...SIGNED,

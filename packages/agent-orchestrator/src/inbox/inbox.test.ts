@@ -23,6 +23,9 @@ import {
   queuedText,
   queueLine,
   queueOrder,
+  cardState,
+  CARD_STATES,
+  type CardState,
   queueRefusal,
   queueRepo,
   startedRefusal,
@@ -225,6 +228,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: null,
         factory: null,
         startedAs: ['broken-gh78'],
+        state: 'started',
         from: [],
         factoryRepo: null,
         error: 'refused',
@@ -237,6 +241,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: '/home/me/code/app',
         factory: null,
         startedAs: [],
+        state: 'filed',
         from: [],
         factoryRepo: null,
         error: null,
@@ -249,6 +254,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: null,
         factory: null,
         startedAs: [],
+        state: 'filed',
         from: [],
         factoryRepo: null,
         error: 'refused',
@@ -261,6 +267,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: null,
         factory: null,
         startedAs: [],
+        state: 'filed',
         from: [],
         factoryRepo: null,
         error: 'refused',
@@ -273,6 +280,7 @@ test("`inboxListing`: each card by file name, with the runs whose record's `from
         repo: null,
         factory: null,
         startedAs: ['parse-the-flag-ab12', 'parse-the-flag-ef56'],
+        state: 'started',
         from: [],
         factoryRepo: null,
         error: null,
@@ -442,7 +450,7 @@ test('`inboxNameOf`: every path under the inbox names a card — `<inbox>/<name>
   }
 });
 
-test('a card with no workflow is refused naming the workflows the repository has, and how to name one — or that it has none; a card a record names as started, naming the run and how to drop it; `nemia decide` names the card a run came from', () => {
+test('a card with no workflow is refused naming the workflows the repository has, and how to name one — or that it has none; a card a record names as started, naming the run and how to file the idea again; `nemia decide` names the card a run came from', () => {
   const card = { name: 'cache-the-views-k2q9', file: 'cache-the-views-k2q9.md' };
   const where = '/home/me/.agent-workflows/inbox/cache-the-views-k2q9.md';
   assert.equal(
@@ -453,10 +461,9 @@ test('a card with no workflow is refused naming the workflows the repository has
     noWorkflowRefusal(card, where, '/home/me/code/app', []),
     'cache-the-views-k2q9.md: no workflow — the card names none, and none was given, so nothing says what runs it. /home/me/code/app/workflows has no workflows. Give a workflow folder: nemia start /home/me/.agent-workflows/inbox/cache-the-views-k2q9.md --workflows <dir>, or write `workflow:` in the card.',
   );
-  assert.equal(
-    startedRefusal(card, where, ['cache-the-views-ab12']),
-    `cache-the-views-k2q9.md: this card was started as cache-the-views-ab12 — that run's record says so — and is still in the inbox because its removal failed. Drop it with nemia inbox rm cache-the-views-k2q9; to run the idea again, park it again under a name of its own first: nemia inbox add ${where}.`,
-  );
+  const once = startedRefusal(card, where, ['cache-the-views-ab12']);
+  assert.ok(once.includes('cache-the-views-ab12'), once);
+  assert.ok(once.includes(`nemia inbox add ${where}`), once);
   assert.match(
     startedRefusal(card, where, ['a-1', 'b-2']),
     /^cache-the-views-k2q9\.md: this card was started as a-1, b-2 — their records say so — /,
@@ -534,18 +541,24 @@ test("`inboxListing` gives each queued card its place in the order — by when i
   ]);
   const listing = inboxListing(files, [{ id: 'started-by-hand-ab12', from: { inbox: 'e-started' } }], isDirectory, tries);
   assert.deepEqual(
-    listing.map((l) => [l.name, l.queued, l.tried]),
+    listing.map((l) => [l.name, l.state, l.queued, l.tried]),
     [
-      ['a-tied', { at: '2026-09-16T10:01:00.000Z', place: 2 }, { at: '2026-09-16T10:07:00.000Z', repo: app, why: noGit, refused: false }],
-      ['b-late', { at: '2026-09-16T10:05:00.000Z', place: 4 }, undefined],
-      ['c-tied', { at: '2026-09-16T10:01:00.000Z', place: 3 }, undefined],
+      [
+        'a-tied',
+        'queued',
+        { at: '2026-09-16T10:01:00.000Z', place: 2 },
+        { at: '2026-09-16T10:07:00.000Z', repo: app, why: noGit, refused: false },
+      ],
+      ['b-late', 'queued', { at: '2026-09-16T10:05:00.000Z', place: 4 }, undefined],
+      ['c-tied', 'queued', { at: '2026-09-16T10:01:00.000Z', place: 3 }, undefined],
       [
         'd-first',
+        'refused',
         { at: '2026-09-16T09:00:00.000Z', place: 1 },
         { at: '2026-09-16T10:06:00.000Z', repo: app, why: 'd-first.md: `workflow: nope` — no workflow folder.', refused: true },
       ],
-      ['e-started', { at: '2026-09-16T08:00:00.000Z', place: null }, undefined],
-      ['f-parked', undefined, undefined],
+      ['e-started', 'started', { at: '2026-09-16T08:00:00.000Z', place: null }, undefined],
+      ['f-parked', 'filed', undefined, undefined],
     ],
   );
   assert.equal(
@@ -623,6 +636,20 @@ test("`inboxListing` gives each queued card its place in the order — by when i
   );
 });
 
+test('`cardState`: one closed word per entry — started wins whatever the card carries, then refused, queued, filed', async (t) => {
+  const tried = (refused: boolean) => ({ at: '2026-09-16T10:06:00.000Z', repo: '/home/me/code/app', why: 'x', refused });
+  const queued = { at: '2026-09-16T10:00:00.000Z', place: null };
+  const rows: [string, Parameters<typeof cardState>[0], CardState][] = [
+    ['a record names it, though it is queued and was refused', { startedAs: ['r-1'], queued, tried: tried(true) }, 'started'],
+    ['queued, its try as it stands refused', { startedAs: [], queued, tried: tried(true) }, 'refused'],
+    ['queued, its try failed otherwise', { startedAs: [], queued, tried: tried(false) }, 'queued'],
+    ['queued, never tried', { startedAs: [], queued }, 'queued'],
+    ['neither queued nor started', { startedAs: [] }, 'filed'],
+  ];
+  for (const [name, entry, state] of rows) await t.test(name, () => assert.equal(cardState(entry), state));
+  assert.deepEqual([...new Set(rows.map(([, , state]) => state))].sort(), [...CARD_STATES].sort(), 'every state has its row');
+});
+
 test("a queued card of a factory is tried on the factory's one repository, and its refusal there is remembered: `nextQueued` passes over it from a daemon anywhere — `queueRepo` says the daemon's repository only when neither the card nor its factory names one", () => {
   const text = '---\nworkflow: build\nqueued: 2026-09-16T09:00:00.000Z\nfactory: solo\n---\nSolo\n';
   const refused = { at: '2026-09-16T10:06:00.000Z', text, repo: '/repos/solo', why: 'build: not offered.', refused: true };
@@ -673,17 +700,16 @@ test("a queued card of a factory is tried on the factory's one repository, and i
   );
 });
 
-test('`queueLine`: what `nemia up` logs of the queue — `started <card> as <runId>`, a removal that failed with what then, a start refused with how to have it tried again, and one that failed otherwise, tried again', () => {
+test('`queueLine`: what `nemia up` logs of the queue — `started <card> as <runId>`, a `queued:` line its start could not take off with what then, a start refused with how to have it tried again, and one that failed otherwise, tried again', () => {
   assert.equal(
-    queueLine({ card: 'cache-the-views-k2q9', run: 'cache-the-views-between-pass-ab12', removed: true }),
+    queueLine({ card: 'cache-the-views-k2q9', run: 'cache-the-views-between-pass-ab12' }),
     'started cache-the-views-k2q9 as cache-the-views-between-pass-ab12',
   );
-  const removal = '/inbox/cache-the-views-k2q9.md could not be removed — EACCES';
-  const stillIn = queueLine({ card: 'cache-the-views-k2q9', run: 'cache-ab12', removed: false, why: removal });
-  assert.ok(stillIn.startsWith('started cache-the-views-k2q9 as cache-ab12 — '), stillIn);
-  assert.ok(stillIn.includes(`still in the inbox: ${removal}. `), stillIn);
-  assert.match(stillIn, /it is not started again/);
-  assert.match(stillIn, /nemia inbox rm cache-the-views-k2q9$/);
+  const left = '/inbox/cache-the-views-k2q9.md keeps its queued: line — EACCES';
+  const stillQueued = queueLine({ card: 'cache-the-views-k2q9', run: 'cache-ab12', queueLeft: left });
+  assert.ok(stillQueued.startsWith('started cache-the-views-k2q9 as cache-ab12 — '), stillQueued);
+  assert.ok(stillQueued.includes(left), stillQueued);
+  assert.ok(stillQueued.includes('nemia inbox queue cache-the-views-k2q9 --off'), stillQueued);
 
   const noFolder = 'cache-the-views-k2q9.md: `workflow: nope` — no workflow folder.';
   const notStarted = queueLine({ card: 'cache-the-views-k2q9', refused: noFolder });
@@ -949,9 +975,9 @@ test('REFUSED by name at shipped defaults: `queueRefusal` refuses a card with no
         'nemia inbox queue cache-the-views-k2q9 --off.',
       ],
     ],
-    'started already, its removal failed': [
+    'started already': [
       () => queueRefusal(card, where, ['cache-the-views-ab12'], null, 'dev'),
-      ['cache-the-views-k2q9.md: this card was started as cache-the-views-ab12', 'its removal failed'],
+      ['cache-the-views-k2q9.md: this card was started as cache-the-views-ab12', `nemia inbox add ${where}`],
     ],
   };
   for (const [row, [said, facts]] of Object.entries(rows))

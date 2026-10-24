@@ -128,7 +128,7 @@ test('a restart after a settle keeps the attempt as it ended, its usage with it;
   const made = testEngine();
   const engine = builtEngine(made.layer);
   await Effect.runPromise(engine.file({ id: 'a', brief: 'do a', cwd: '/r' }));
-  const usage = { turns: 3, inputTokens: 10, outputTokens: 5 } as never;
+  const usage = { responses: 3, inputTokens: 10, outputTokens: 5 } as never;
   made.settle('a', 'failed', { exitCode: 1, usage });
   made.restart('a');
   made.restart('a');

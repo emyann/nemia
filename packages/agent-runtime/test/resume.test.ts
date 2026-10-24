@@ -131,7 +131,7 @@ test('a resumed or re-read session at shipped defaults is read for its own attem
         assert.deepEqual(
           was?.usage,
           {
-            turns: 2,
+            responses: 2,
             toolCalls: 2,
             inputTokens: 200,
             uncachedTokens: 20,
@@ -163,7 +163,7 @@ test('a resumed or re-read session at shipped defaults is read for its own attem
         claude.set(resumed.name, { state: 'done', startedAt: again });
         assert.deepEqual(
           (await Effect.runPromise(engine.view(retry))).usage,
-          { turns: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
+          { responses: 0, toolCalls: 0, inputTokens: 0, uncachedTokens: 0, cacheWriteTokens: 0, cacheReadTokens: 0, outputTokens: 0 },
           "nothing since its own start — not the first try's count",
         );
 
@@ -185,7 +185,7 @@ test('a resumed or re-read session at shipped defaults is read for its own attem
         assert.deepEqual(
           is?.usage,
           {
-            turns: 3,
+            responses: 3,
             toolCalls: 2,
             inputTokens: 300,
             uncachedTokens: 30,
@@ -225,7 +225,7 @@ test('a resumed or re-read session at shipped defaults is read for its own attem
       assert.deepEqual(
         (await Effect.runPromise(engine.view(id))).usage,
         {
-          turns: 1,
+          responses: 1,
           toolCalls: 1,
           inputTokens: 100,
           uncachedTokens: 10,
@@ -241,7 +241,7 @@ test('a resumed or re-read session at shipped defaults is read for its own attem
       append(row.sessionId, began + 2, response('msg_2', { type: 'text', text: 'the background task finished' }));
       age(row.sessionId, 30_000);
       assert.equal(
-        (await Effect.runPromise(engine.view(id))).usage?.turns,
+        (await Effect.runPromise(engine.view(id))).usage?.responses,
         2,
         'written after the read, though stamped before it as a wall clock stepped back stamps it: its mtime changed, so read again',
       );
@@ -254,7 +254,7 @@ test('a resumed or re-read session at shipped defaults is read for its own attem
       const [a] = v.state.attempts;
       assert.deepEqual(a?.closeout, { outcome: 'done' }, 'found, not the nothing read before it was made');
       assert.deepEqual(a?.usage, {
-        turns: 3,
+        responses: 3,
         toolCalls: 2,
         inputTokens: 300,
         uncachedTokens: 30,

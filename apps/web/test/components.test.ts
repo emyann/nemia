@@ -1458,7 +1458,7 @@ test('the Decide section copies its commands and runs none: a button per command
     total: {
       ...UNMEASURED,
       usage: { toolCalls: 34 },
-      used: 'turns not measured · 34 tool calls · tokens in not measured · tokens out not measured',
+      used: 'responses not measured · 34 tool calls · tokens in not measured · tokens out not measured',
     },
     cost: null,
     overBudget: null,
@@ -1480,7 +1480,7 @@ test('the Decide section copies its commands and runs none: a button per command
     />implement: succeeded · BLOCKED\. Continue its session, told what happened {2}\(--fresh, or --model &lt;m&gt;, for a new session\)</,
     "the once-more line's words, without the command that follows it on the line below",
   );
-  assert.match(html, /<dt[^>]*>used<\/dt><dd[^>]*>turns not measured · 34 tool calls/, "the run's total, in `wf decide`'s words");
+  assert.match(html, /<dt[^>]*>used<\/dt><dd[^>]*>responses not measured · 34 tool calls/, "the run's total, in `wf decide`'s words");
   assert.match(html, /<dt[^>]*>cost<\/dt><dd[^>]*>not measured<\/dd>/, 'never a 0 for what nobody measured');
   assert.match(
     html,
@@ -1510,8 +1510,8 @@ test("the inspector's Details say what a step used and what it cost beside its a
     ...run.steps[0],
     used: {
       ...UNMEASURED,
-      usage: { turns: 12, costUsd: 0.004 },
-      used: '12 turns · tool calls not measured · tokens in not measured · tokens out not measured',
+      usage: { responses: 12, costUsd: 0.004 },
+      used: '12 responses · tool calls not measured · tokens in not measured · tokens out not measured',
       cost: '$0.004',
       costUsd: 0.004,
     },
@@ -1519,7 +1519,7 @@ test("the inspector's Details say what a step used and what it cost beside its a
   const said = Object.fromEntries(rows(measured));
   assert.deepEqual(
     [said.used, said.cost],
-    ['12 turns · tool calls not measured · tokens in not measured · tokens out not measured', '$0.004'],
+    ['12 responses · tool calls not measured · tokens in not measured · tokens out not measured', '$0.004'],
   );
   const unfiledStep = { ...run.steps[0], taskId: null, used: null };
   const unfiled = Object.fromEntries(rows(unfiledStep));
@@ -3494,8 +3494,8 @@ test("the run page's timeline: a row per try's session and per check, in the api
   const base = runWith(null);
   const used: StepUsed = {
     ...UNMEASURED,
-    usage: { turns: 54 },
-    used: '54 turns · tool calls not measured · tokens in not measured · tokens out not measured',
+    usage: { responses: 54 },
+    used: '54 responses · tool calls not measured · tokens in not measured · tokens out not measured',
   };
   const run: RunDetail = {
     ...base,
@@ -3573,7 +3573,7 @@ test("the run page's timeline: a row per try's session and per check, in the api
   assert.match(unescaped(html), /try 2<\/td><td colSpan="7"[^>]*>its session is try 1's, checked again/i);
   assert.match(html, /no record of t-lost/);
   assert.doesNotMatch(html, /\bengine\b/, 'a person reads no runtime word');
-  assert.ok(html.includes('>54 turns · tool calls not measured'), 'what the session used, beside it');
+  assert.ok(html.includes('>54 responses · tool calls not measured'), 'what the session used, beside it');
   assert.doesNotMatch(html, /data-step="respond"/, 'a step not filed has no row');
   assert.deepEqual(
     [...html.matchAll(/data-total="([^"]+)"/g)].map((m) => m[1]),
@@ -7046,6 +7046,7 @@ const inboxCard = (extra: Record<string, unknown> = {}) =>
     factory: null,
     from: [],
     startedAs: [],
+    state: 'filed',
     error: null,
     body: 'An idea',
     filedAt: null,
@@ -7101,7 +7102,11 @@ test('REFUSED: a card that names a workflow and no factory says it has no Queue 
   }
   assert.equal(note({ factory: 'solo', workflow: 'dev' }), '', 'a card of a factory has its Queue');
   assert.equal(note({ factory: null }), '', 'no workflow: nothing to queue it on');
-  assert.equal(note({ factory: null, workflow: 'dev', queued: { at: '2026-09-16T10:00:00.000Z', place: 1 } }), '', 'queued: Unqueue');
+  assert.equal(
+    note({ factory: null, workflow: 'dev', state: 'queued', queued: { at: '2026-09-16T10:00:00.000Z', place: 1 } }),
+    '',
+    'queued: Unqueue',
+  );
 });
 
 test('REFUSED: the box says the factories are being read until they are, and never that the store has none', async () => {

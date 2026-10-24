@@ -607,7 +607,7 @@ said.
   it did.
 - The record keeps no message. `wf ls` and `wf decide` read it off the ask files, waiting and in `done/`
   (`readAnswers`), and `answerOf` counts one only for the try it names, filed the way it asked. `wf ls` says
-  `try 2 asked (--nudge, with your answer)`, then `try 2, nudged on your word, answered`. `wf decide` says the
+  `try 2 asked (--continue, with your answer)`, then `try 2, nudged on your word, answered`. `wf decide` says the
   same on the step's line and prints `try 1 needs:` and `your answer:` under it; under a blocked step's
   `needs` it prints `to answer it:  wf retry <run> <step> --message "<answer>"` (`answerLines`). The offers
   under *once more* are unchanged.
@@ -868,7 +868,7 @@ What was built:
   nudge continues the session, since the settled task keeps the session's id. Nothing is carried between the passes:
   the stop request is on the engine's record, and the ask is in its file.
 - What each command says:
-  - `wf ls` puts `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside the step's
+  - `wf ls` puts `try 2 asked (--continue) — stopping its blocked session, then the tick files it` beside the step's
     `needs-human`.
   - The pass that asks for the stop says so in its notes, once.
   - `wf retry` prints that the next tick stops the session and files the try once it has stopped.
@@ -923,7 +923,7 @@ What was measured:
   - The first pass stops the task once, files nothing, leaves the record byte for byte, and keeps the ask.
   - Two more passes, one on a board read afresh as after a restart, stop nothing more and file nothing.
   - Settled `stopped`, the next pass files try 2 with `resumeFrom` the session, a brief that starts `## Try 2` and
-    says `wf retry --nudge`, and the ask consumed. A fourth pass files nothing.
+    says `nemia retry --continue`, and the ask consumed. A fourth pass files nothing.
   - Through `main`, `wf retry` refuses a session still working (nudge and fresh), `--recheck` on a harness-blocked
     step, and one that signed off and runs on. Each is exit 2, with no ask and no stop.
   - A one-step parent whose step failed with nothing committed: git says its branch is on the base, and its
@@ -1330,7 +1330,7 @@ What was built:
   harness still says blocked, and `runsOn` marks a session the harness no longer calls blocked. The tick then does what W4
   built: it asks the engine to stop the session once, since a task with `stopRequested` is not asked again, and files the try
   once the task has settled.
-- `wf ls` notes it: `try 2 asked (--nudge) — stopping its session, then the tick files it`. While the harness still says blocked,
+- `wf ls` notes it: `try 2 asked (--continue) — stopping its session, then the tick files it`. While the harness still says blocked,
   the words stay `stopping its blocked session`, which apps/api and apps/web pin. The pass's note says the session runs on.
 - `listing` now reads `unknown`, a task the engine has no record of, as that and not as running: the tick stops nothing of such a
   task, and `wf ls` does not say it would.
@@ -3450,7 +3450,7 @@ What was measured:
     approval is refused, `plan has no gate: …`, beside Approve, verbatim, with the words kept and nothing written. That page's watch sees
     that one 409 and nothing else;
   - then an approval with words: the file as `wf approve` writes it, the approval read under the step, and the gate and banner gone;
-  - taken back, then a send-back: the ask as `wf retry --message` writes it, and the note `try 2 asked (--nudge, with your answer)`;
+  - taken back, then a send-back: the ask as `wf retry --message` writes it, and the note `try 2 asked (--continue, with your answer)`;
   - taken back again, and the page ends as it began.
   Both themes passed. The screenshots were read: `gate-awaiting`, `gate-refused`, `gate-approved`, `gate-sent-back`, the Factory and Runs.
 

@@ -1664,8 +1664,8 @@ retries: 1
   A try is a new runtime task, as a Kubernetes Job makes a new Pod; an attempt is the runtime's restart inside one task. A record
   written before the key was `cause` says it `then`, and reads as `cause`.
 - **`wf ls`** puts the try beside the step's line, without changing the step's word: `try 2 due — retries: 1,
-  0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--nudge, with your answer)`,
-  `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
+  0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--continue, with your answer)`,
+  `try 2 asked (--continue) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
   `stopping its session` beside a session that works again since it was asked), and
   once filed `try 2, by retries: 1` or `try 2, nudged on your word, answered`. A step with a try due is not
   waiting on you. **`wf decide`** names the try each closeout and check belong to — for a try you answered,

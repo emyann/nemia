@@ -359,7 +359,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     "`nemia approve` of the loop out of rounds ends it on a person's word, refused without `--message`: the acceptance written whole, beside the asks, and no record; the former `nemia accept` still runs as it",
     async () => {
       const accepted = path.join(asksDir(id), 'accept-review-4');
-      await assert.rejects(typedOn(t, ['approve', id, 'review']), refusedAs('Conflict', '--message'));
+      await assert.rejects(typedOn(t, ['approve', id, 'review']), refusedAs('Invalid', '--message'));
       assert.deepEqual(asksOf(id, 'accept'), [], 'refused without your words: nothing written');
       const { out, hints } = await typedOn(t, ['approve', id, 'review', '--message', ENOUGH]);
       assert.deepEqual([out[1]?.trim(), hints], [accepted, []], 'the file `nemia accept` wrote, and no hint');

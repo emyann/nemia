@@ -15,6 +15,11 @@
         "label": "The orchestrator",
         "href": "/map/#the-orchestrator"
       }
+    },
+    {
+      "term": "Mount kind",
+      "meaning": "the kind of place a run's work is on, `repository` or `folder`, as its record says; what Place becomes on decision 9's card.",
+      "type": "MountKind"
     }
   ]
 }

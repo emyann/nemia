@@ -17,8 +17,14 @@
       }
     },
     {
+      "term": "Card name",
+      "meaning": "a card's name: its file's in the inbox, without its extension, which `nemia inbox` lists and a start names it by.",
+      "type": "CardName"
+    },
+    {
       "term": "Inbox",
       "meaning": "where cards wait before they are started.",
+      "type": "Inbox",
       "see": {
         "label": "From a card to a landing",
         "href": "/how-a-run-lives/#from-a-card-to-a-landing"

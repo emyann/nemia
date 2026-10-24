@@ -17,6 +17,11 @@
       }
     },
     {
+      "term": "Daemon's line",
+      "meaning": "a line a daemon writes once it has taken the store, naming its pid and how the one before it ended.",
+      "type": "DaemonLine"
+    },
+    {
       "term": "Feed",
       "meaning": "the store's stream of what happened, written by the daemon alone, which the board and Nemia follow.",
       "type": "FeedLine",
@@ -24,6 +29,11 @@
         "label": "Who writes what",
         "href": "/how-a-run-lives/#who-writes-what"
       }
+    },
+    {
+      "term": "Feed cursor",
+      "meaning": "a byte offset of complete lines of the feed, from 0: where a read, or a subscription's news, starts.",
+      "type": "FeedCursor"
     },
     {
       "term": "Line",
@@ -64,6 +74,16 @@
       }
     },
     {
+      "term": "Run's line",
+      "meaning": "a line of one run, or of one of its steps, naming each by id.",
+      "type": "RunLine"
+    },
+    {
+      "term": "Store's line",
+      "meaning": "a line of the store itself: its pause put or lifted.",
+      "type": "StoreLine"
+    },
+    {
       "term": "Subscription",
       "meaning": "Nemia's subscription, `nemia`, is the orchestrator's own: it wakes her on the lines of the store's feed its selectors take.",
       "type": "Subscription",
@@ -71,6 +91,11 @@
         "label": "Her subscription",
         "href": "/nemia/#her-subscription"
       }
+    },
+    {
+      "term": "Subscription name",
+      "meaning": "what a subscription's files are named after: a letter or a digit, then letters, digits, `-` and `_`.",
+      "type": "SubscriptionName"
     }
   ]
 }

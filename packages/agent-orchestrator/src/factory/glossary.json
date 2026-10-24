@@ -17,6 +17,11 @@
       }
     },
     {
+      "term": "Factory name",
+      "meaning": "a factory's name: its file's in the store, without its extension, a lowercase slug of at most 40 characters.",
+      "type": "FactoryName"
+    },
+    {
       "term": "Factory's instruction",
       "meaning": "what Nemia is to know about a factory, `NEMIA.md` by default; no step is told it.",
       "see": {

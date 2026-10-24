@@ -54,6 +54,8 @@
         "$TURBO_ROOT$/apps/*/src/*/*.test.ts*",
         "$TURBO_ROOT$/apps/*/tsconfig.json",
         "$TURBO_ROOT$/apps/*/src/**",
+        "$TURBO_ROOT$/apps/*/*.ts",
+        "$TURBO_ROOT$/apps/web/.storybook/**",
         "$TURBO_ROOT$/apps/*/glossary.json",
         "$TURBO_ROOT$/apps/docs/src/content/docs/**",
         "$TURBO_ROOT$/CLAUDE.md",

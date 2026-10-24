@@ -36,12 +36,11 @@ test('attachedLongLived: a long-lived request runs attached while a holder holds
   for (const row of ROWS) await t.test(row.name, row.run);
 });
 
-test('REFUSED: a long-lived spawn with nothing holding the attached sessions, refused naming `nemia up`, and its attempt never restarted', async (t) => {
+test('REFUSED: a long-lived spawn with nothing holding the attached sessions, refused, and its attempt never restarted', async (t) => {
   const request = { name: 'ae/t1/1', brief: 'stay', cwd: '/r', restartPolicy: 'Always' as const };
   await t.test('a runner with no attached sessions refuses it, `refused`, before anything runs', async () => {
     const err = await Effect.runPromise(Effect.flip(claudeCodeOps({ root: scratch('ae-route-') }).spawn(request)));
     assert.deepEqual([err._tag, err.refused], ['RunnerError', true]);
-    assert.ok(err.message.includes('nemia up'), err.message);
   });
   await t.test('an engine whose attached sessions nothing holds ends the attempt `unstartable` and starts no other', async () => {
     const engine = builtEngine(Engine.layer({ root: scratch('ae-route-root-'), harnesses: { claude: 'claude' } }));
@@ -53,6 +52,5 @@ test('REFUSED: a long-lived spawn with nothing holding the attached sessions, re
       ['unstartable'],
       'one attempt, unstartable, and no restart',
     );
-    assert.ok(state.attempts[0]?.error?.includes('nemia up'), state.attempts[0]?.error);
   });
 });

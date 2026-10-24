@@ -22,6 +22,7 @@ const AT_WORK = {
   id: 'w:1',
   running: true,
   ms: 41_000,
+  counts: 'call' as const,
   lines: [
     line({ id: 'l:1', fact: '16 cards' }),
     line({ id: 'l:2', tool: 'Grep', sentence: 'Searched for the runs that wait', fact: '3 matches' }),

@@ -316,7 +316,7 @@ export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatAs
   const out: ConversationItem<ChatAsk>[] = [];
   for (const item of foldChat(events)) {
     if (item.kind === 'turn') {
-      out.push({ kind: 'work', id: item.id, lines: item.calls.map(lineOf), running: item.running, ms: item.ms });
+      out.push({ kind: 'work', id: item.id, lines: item.calls.map(lineOf), running: item.running, ms: item.ms, counts: 'call' });
       continue;
     }
     const event = item.event;

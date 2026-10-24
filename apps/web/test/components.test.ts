@@ -7309,7 +7309,7 @@ test('a turn at work draws its lines, the one that waits on a person in yours; a
   const over = workOf([chatCall('t:1', 'done', 0), chatCall('t:2', 'done', 134)]);
   const folded = renderToStaticMarkup(createElement(Worked, { work: over, marks: 'chat' }));
   assert.match(folded, /data-chat-turn="folded"/);
-  assert.match(folded, /Worked for 2m 14s · 2 steps/);
+  assert.match(folded, /Worked for 2m 14s · 2 calls/);
   assert.doesNotMatch(folded, /data-chat-step=/, 'a closed fold lays out none of its calls');
 });
 

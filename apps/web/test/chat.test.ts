@@ -420,7 +420,7 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
         'the turn keeps the order they came in',
       );
       assert.equal(turn.running, false);
-      assert.equal(turnWords(turn.ms, turn.calls.length), 'Worked for 2m 14s · 3 steps');
+      assert.equal(turnWords(turn.ms, turn.calls.length, 'call'), 'Worked for 2m 14s · 3 calls');
       const live = foldChat([call('t:1:a', 2, 'done'), call('t:1:b', 3, 'running')])[0] as Extract<ChatItem, { kind: 'turn' }>;
       assert.equal(live.running, true, 'a turn whose call is at work is still running');
       assert.equal(

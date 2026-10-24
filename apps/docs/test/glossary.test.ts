@@ -148,7 +148,20 @@ test('the repository’s page lists every table in the map’s order, and every 
   const fence = /^```glossary\n([\s\S]*?)^```$/m.exec(fs.readFileSync(PAGE, 'utf8'))?.[1];
   assert.ok(fence !== undefined, 'the glossary page holds a ```glossary fence');
   const order = idsOf(fence);
-  assert.deepEqual(order, ['runtime', 'run-core', 'api', 'board', 'place', 'planning', 'factory', 'agents', 'nemia', 'feed', 'operations']);
+  assert.deepEqual(order, [
+    'runtime',
+    'run-core',
+    'commands',
+    'api',
+    'board',
+    'place',
+    'planning',
+    'factory',
+    'agents',
+    'nemia',
+    'feed',
+    'operations',
+  ]);
   const tables = tablesIn(ROOT);
   assert.deepEqual(facts(fenceFaults(tables, order)), [], 'add each context to the fence, and take off an id with no table');
   assert.deepEqual(

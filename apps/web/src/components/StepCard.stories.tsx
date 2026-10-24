@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import type { StepCardFacts } from '@/lib/stepCard';
+import { PERSON } from '@/lib/words';
 import { StepCard } from './StepCard';
 
 /** A step's card in each of its states, with the values the owner's canvas draws: at work, at a gate, done, to come and failed. */
@@ -20,7 +21,7 @@ const SELDON = { name: 'Seldon', initial: 'S', role: 'Software architect' };
 const AT_WORK: StepCardFacts = {
   kind: 'work',
   hue: 'alive',
-  tag: { word: 'at work', color: 'secondary', variant: 'tonal' },
+  tag: { word: PERSON.working.rail, color: 'secondary', variant: 'tonal' },
   agent: { name: 'Ada', initial: 'A', role: 'Software engineer' },
   step: 'implement',
   place: 'try 1 · round 1 of 3',
@@ -34,7 +35,7 @@ const AT_WORK: StepCardFacts = {
 const AT_A_GATE: StepCardFacts = {
   kind: 'gate',
   hue: 'yours',
-  tag: { word: 'waits for you', color: 'primary', variant: 'filled' },
+  tag: { word: PERSON['awaiting-approval'].rail, color: 'primary', variant: 'filled' },
   agent: SELDON,
   step: 'design',
   place: 'try 1',
@@ -49,7 +50,7 @@ const DONE: StepCardFacts = {
   ...AT_A_GATE,
   kind: 'done',
   hue: 'none',
-  tag: { word: 'verified', color: 'neutral', variant: 'tonal' },
+  tag: { word: PERSON.verified.rail, color: 'neutral', variant: 'tonal' },
   place: '2 tries',
   time: { label: 'Done', value: '7:55 PM', note: 'its last try ran 4m', ink: 'plain' },
   spend: { kind: 'meter', label: 'Spent', value: 3.71, max: 10, said: '$3.71 of $10' },
@@ -60,7 +61,7 @@ const DONE: StepCardFacts = {
 const TO_COME: StepCardFacts = {
   kind: 'come',
   hue: 'none',
-  tag: { word: 'to come', color: 'secondary', variant: 'outlined' },
+  tag: { word: PERSON.waiting.rail, color: 'secondary', variant: 'outlined' },
   agent: { name: 'Agora', initial: 'A', role: 'Code reviewer' },
   step: 'review',
   place: 'up to 3 rounds',
@@ -74,14 +75,14 @@ const TO_COME: StepCardFacts = {
 const FAILED: StepCardFacts = {
   kind: 'failed',
   hue: 'none',
-  tag: { word: 'failed its check', color: 'error', variant: 'tonal' },
+  tag: { word: PERSON['failed-check'].rail, color: 'error', variant: 'tonal' },
   agent: { name: 'Otto', initial: 'O', role: 'Release engineer' },
   step: 'land',
   place: 'try 1',
   time: { label: 'Failed', value: '7:57 PM', note: 'ran 4m', ink: 'failure' },
   facts: facts('high', '200k tokens', 'auto'),
   spend: { kind: 'meter', label: 'Spent', value: 0.52, max: 10, said: '$0.52 of $10' },
-  note: { text: 'Its check refused it (exit 1).', icon: 'fail' },
+  note: { text: 'It failed its check (exit 1).', icon: 'fail' },
   action: { words: 'Open the step', runId: 'the-board-s-frame-on-the-kit-04ys', step: 'land' },
 };
 

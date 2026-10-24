@@ -211,8 +211,8 @@ export default {
       `what ${FAKE.unverified}'s session used, beside its times`,
     );
     await expectVisible(
-      timeline.locator('tr[data-step="review"][data-at="unknown"]', { hasText: `the engine has no record of ${FAKE.id}-review` }),
-      'review, whose task the engine lost, is said, not timed',
+      timeline.locator('tr[data-step="review"][data-at="unknown"]', { hasText: `no record of ${FAKE.id}-review` }),
+      'review, whose task has no record, is said, not timed',
     );
     await expectCount(timeline.locator('tr[data-step="respond"]'), 0, 'respond, not filed, has no row');
     const total = timeline.locator('tr[data-total="run"]');

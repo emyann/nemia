@@ -7,8 +7,9 @@ import type { AgentListing } from './api/agents.ts';
 import type { RunDetail } from './api/detail.ts';
 import type { RunSummary } from './api/runs.ts';
 import { meaningOf } from './meaning.ts';
-import { railWord, sinceShort, sinceWords, whenWords } from './runWords.ts';
+import { sinceShort, sinceWords, whenWords } from './runWords.ts';
 import { stateDrawn, stepState, type StepState } from './status.ts';
+import { PERSON } from './words.ts';
 
 /** The card's five kinds, one a story: a step at work, at a gate (waiting on a person), done, to come, and failed. */
 export type StepKind = 'work' | 'gate' | 'done' | 'come' | 'failed';
@@ -177,7 +178,7 @@ export function spendOf(step: DetailStep, kind: StepKind): CardSpend {
 }
 
 /** The check's refusal, or null where its check did not refuse. */
-const refusalOf = (step: DetailStep): string | null => (step.check?.refused ? `Its check refused it (${step.check.refused.exit}).` : null);
+const refusalOf = (step: DetailStep): string | null => (step.check?.refused ? `It failed its check (${step.check.refused.exit}).` : null);
 
 /** What the gate asks, or what a person said when they approved it; null for a step with no gate. */
 function gateWords(step: DetailStep, now: Date): string | null {
@@ -218,7 +219,7 @@ export function stepCardOf({ run, step, detail, agents, now }: StepCardInput): S
   return {
     kind,
     hue: hueOf(state),
-    tag: { word: railWord[state], ...TAGS[kind] },
+    tag: { word: PERSON[state].rail, ...TAGS[kind] },
     agent: agentOf(row?.agent ?? null, agents),
     step,
     place: own && detail ? placeOf(own, detail.steps, kind) : null,

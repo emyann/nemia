@@ -5,7 +5,8 @@ import { attemptLine, edgeLine, edgeStroke, isLive } from '../lib/canvas';
 import { costText, pastBudget } from '../lib/cost';
 import type { Flow, Pill } from '../lib/flow';
 import { gateNodeLine, gateOfSummary } from '../lib/gate';
-import { isGate, stateClass, stateMeaning, stepState } from '../lib/status';
+import { isGate, stateClass, stepState } from '../lib/status';
+import { PERSON } from '../lib/words';
 import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
 import { Travelling } from './StateEdge';
@@ -103,9 +104,12 @@ export function StepRail({ run, flow }: { run: RunSummary; flow: Flow }) {
   );
 }
 
-/** A step's name, its status and its meaning, and its note: what hovering over it says. */
-const stepTitle = (step: SummaryStep | undefined, name: string, cancelled: boolean, held: boolean): string =>
-  step ? `${name}: ${step.status} — ${stateMeaning[stepState(step.status, cancelled, held)]}${step.note ? `\n${step.note}` : ''}` : name;
+/** A step's name, a person's word for its state and what that means, and its note: what hovering over it says. */
+function stepTitle(step: SummaryStep | undefined, name: string, cancelled: boolean, held: boolean): string {
+  if (!step) return name;
+  const words = PERSON[stepState(step.status, cancelled, held)];
+  return `${name}: ${words.rail} — ${words.meaning}${step.note ? `\n${step.note}` : ''}`;
+}
 
 /**
  * A run's steps on its card opened, to the right of what the card says at rest: every step a tile on the run's layering (`tilesOf`), with

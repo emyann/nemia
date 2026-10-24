@@ -11,12 +11,18 @@
  * The board names no store path and builds no command of its own: a command or a store folder it shows is text the api answered, and no
  * file of `src` spells one, JSDoc included (`STORE_PATHS`, `COMMAND_TEXT`, both empty). `ratchetBreaks` refuses a file the baseline does
  * not hold, a count above the measure or below it, an entry for a file that is gone or clean, and an entry that names no card.
+ *
+ * A person's words for a step's state are written once, in `src/lib/words.ts`'s `PERSON`: no other file spells a word of it
+ * (`personWordBreaks`), no file says a retired phrasing or `cancelled` to a person (`retiredBreaks`), and no hover says a runtime word
+ * (`hoverRuntimeBreaks`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
+import ts from 'typescript';
+import { PERSON } from '../src/lib/words.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 
@@ -428,4 +434,117 @@ test('REFUSED: a new file that spells a store path or a command, a count above o
   assert.deepEqual(ratchetBreaks('commands', measured(planted, COMMAND), COMMAND_TEXT, onDisk), [
     'src/x.ts holds 1 commands: the board shows what the api answers, so have the api answer it, never add it here',
   ]);
+});
+
+/** The one file that writes a person's words for a step's state. */
+const WORDS = 'src/lib/words.ts';
+
+/** The kit's components, another repository's files: their words are not the board's. */
+const KIT = /^src\/components\/ui\//;
+
+/**
+ * A piece of text a file of `src` says: a string, a part of a template, or JSX text; whether it is whole (no part of a template),
+ * whether it is in a `title`, and whether it is JSX text.
+ */
+type Said = { text: string; whole: boolean; title: boolean; jsx: boolean };
+
+/** Every piece of text `text` says, read through TypeScript's tree: no comment, no module a file imports. */
+function saidIn(file: string, text: string): Said[] {
+  const kind = file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true, kind);
+  const out: Said[] = [];
+  const visit = (node: ts.Node, title: boolean): void => {
+    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) out.push({ text: node.text, whole: true, title, jsx: false });
+    else if (ts.isTemplateLiteralToken(node)) out.push({ text: node.text, whole: false, title, jsx: false });
+    else if (ts.isJsxText(node)) out.push({ text: node.text, whole: true, title, jsx: true });
+    const inTitle = title || (ts.isJsxAttribute(node) && node.name.getText(source) === 'title');
+    ts.forEachChild(node, (child) => visit(child, inTitle));
+  };
+  visit(source, false);
+  return out;
+}
+
+/** The files of `src` whose words are the board's: every one but the kit's. */
+const boardTexts = (texts: ReadonlyMap<string, string>): Array<[string, string]> => [...texts].filter(([file]) => !KIT.test(file));
+
+/**
+ * Each whole text outside `WORDS` that is a person's word for a state, of more than one word (`waits on you`, `called off`), as the
+ * rail writes it: a state's words are written in `PERSON` alone, and read from there. A label that opens with a capital (`At work`, a
+ * gauge's name) and a part of a sentence pass.
+ */
+const personWordBreaks = (texts: ReadonlyMap<string, string>, rails: readonly string[]): string[] => {
+  const multi = new Set(rails.filter((rail) => rail.includes(' ')));
+  return boardTexts(texts)
+    .filter(([file]) => file !== WORDS)
+    .flatMap(([file, text]) =>
+      saidIn(file, text)
+        .filter((said) => said.whole && multi.has(said.text.trim()))
+        .map((said) => `${file} spells '${said.text.trim()}', a state's word for a person: read it from PERSON in ${WORDS}`),
+    );
+};
+
+/** The phrasings a person no longer reads, word-bounded: `waits for your approval` is not `waits for you`, nor `not signed off` the tag. */
+const RETIRED = /\b(?:waits for you\b|check refused\b|not signed\b(?! off))/i;
+
+/**
+ * Each text of `src` that says a retired phrasing, or `cancelled` to a person (in JSX text, or in a sentence): the board says
+ * `called off`. A bare `'cancelled'` is the code's word, and passes.
+ */
+const retiredBreaks = (texts: ReadonlyMap<string, string>): string[] =>
+  boardTexts(texts).flatMap(([file, text]) =>
+    saidIn(file, text)
+      .filter((said) => RETIRED.test(said.text) || (/\bcancelled\b/i.test(said.text) && (said.jsx || /\S\s+\S/.test(said.text.trim()))))
+      .map(
+        (said) => `${file} says '${said.text.trim()}': write the person's word of ${WORDS} (waits on you, failed its check, called off)`,
+      ),
+  );
+
+/** The runtime's words, which a person hovering over the board never reads. */
+const RUNTIME = /\b(?:journal|engine|WF_MAX_RUNS)\b/i;
+
+/** Each hover text — a JSX `title`, or any value of `WORDS`, which the chips' hovers read — that says a runtime word. */
+const hoverRuntimeBreaks = (texts: ReadonlyMap<string, string>): string[] =>
+  boardTexts(texts).flatMap(([file, text]) =>
+    saidIn(file, text)
+      .filter((said) => (said.title || file === WORDS) && RUNTIME.test(said.text))
+      .map((said) => `${file} says '${said.text.trim()}' on hover: say it in a person's words, with no runtime word`),
+  );
+
+/** The multi-word rail words, from the one table. */
+const RAILS = Object.values(PERSON).map((words) => words.rail);
+
+test(`a state's words for a person are written in ${WORDS} alone, as a total Record<StepState, PersonWords>`, () => {
+  const texts = sourceTexts();
+  assert.match(texts.get(WORDS)!, /export const PERSON: Record<StepState, PersonWords> =/);
+  assert.ok(RAILS.filter((rail) => rail.includes(' ')).length >= 5, 'the scan has multi-word rails to look for');
+  assert.deepEqual(personWordBreaks(texts, RAILS), []);
+  assert.deepEqual(retiredBreaks(texts), []);
+  assert.deepEqual(hoverRuntimeBreaks(texts), []);
+});
+
+test('REFUSED: a state word spelled outside the table, a retired phrasing, and a runtime word on hover', () => {
+  const planted = (file: string, text: string): Map<string, string> => new Map([[file, text]]);
+  const spelled = personWordBreaks(
+    planted('src/components/X.tsx', "export const x = <span>{'waits on you'}</span>;\nconst g = 'At work';\nconst t = `${g} at work`;\n"),
+    RAILS,
+  );
+  assert.equal(spelled.length, 1, 'the rail word refused; a capitalised label and a part of a sentence pass');
+  assert.match(spelled[0], /^src\/components\/X\.tsx spells 'waits on you'/);
+  const retired = retiredBreaks(
+    planted(
+      'src/components/X.tsx',
+      "export const x = <p title={`${s} waits for your approval`}>The check refused it. The run was cancelled.</p>;\nconst s = 'cancelled';\n",
+    ),
+  );
+  assert.equal(retired.length, 1, 'one JSX text refused; a word-bounded approval and a bare code word pass');
+  assert.match(retired[0], /^src\/components\/X\.tsx says 'The check refused it/);
+  const hover = hoverRuntimeBreaks(
+    planted(
+      'src/components/X.tsx',
+      "// the engine's journal\nconst said = 'the engine filed it';\nexport const x = <p title={`the engine filed ${said}`} />;\n",
+    ),
+  );
+  assert.equal(hover.length, 1, 'a title is refused; a comment and a literal off hover pass');
+  assert.match(hover[0], /^src\/components\/X\.tsx says 'the engine filed' on hover/);
 });

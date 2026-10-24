@@ -67,8 +67,8 @@ export default {
       'the edge back runs beneath the row, under both steps',
     );
     await expectVisible(
-      node(LOOPING.exhausted).locator(`[data-state="exhausted"][title^="rounds exhausted: "][title$="${LOOPING.notes.review}"]`, {
-        hasText: 'rounds exhausted',
+      node(LOOPING.exhausted).locator(`[data-state="exhausted"][title$="${LOOPING.notes.review}"]`, {
+        hasText: 'waits on you',
       }),
       `${LOOPING.exhausted}, out of rounds, is a chip that waits on a person on the graph, its note after what that means on hover, with no room under a chip`,
     );

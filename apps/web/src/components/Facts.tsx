@@ -188,7 +188,7 @@ function ranWith(
   return workflow === null ? (
     <Marked value={engine ?? unset} mark="default" word={engine === null} />
   ) : (
-    <Marked value={engine!} mark="this try" title={`The workflow says ${workflow}; the engine filed this try with ${engine}.`} />
+    <Marked value={engine!} mark="this try" title={`The workflow says ${workflow}; this try was filed with ${engine}.`} />
   );
 }
 
@@ -229,7 +229,7 @@ function modeRow(workflow: string | null, filed: StepFiled | null): ReactNode {
       <Marked
         value={runs.mode}
         mark="this try"
-        title={`The workflow says ${workflow}; the engine filed this try with ${filed.permissionMode ?? 'none'}.`}
+        title={`The workflow says ${workflow}; this try was filed with ${filed.permissionMode ?? 'none'}.`}
       />
     );
   }

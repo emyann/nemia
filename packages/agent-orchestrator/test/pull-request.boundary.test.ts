@@ -382,11 +382,8 @@ test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that 
   assert.match(r.err, /Process completed with exit code 1\./, 'a job that names no failing test gives its tail');
   for (const told of ['error TS2322', 'x eslint(no-unused-vars)', ',-[src/b.ts:1:7]'])
     assert.ok(r.err.includes(told), `a type or lint error, with its place: ${told}\n${r.err}`);
-  assert.equal(
-    r.err.split(E2E).length - 1,
-    1,
-    `the e2e's failed page is told once, with or without its worker, from a log past spawnSync's default 1 MiB:\n${r.err}`,
-  );
+  const e2eTold = r.err.split(E2E).length - 1;
+  assert.equal(e2eTold, 1, 'one e2e page, from a log past 1 MiB');
   assert.ok(!r.err.includes('visiting page'), `a job with a failing line gives no tail:\n${r.err}`);
   for (const noise of ['Post job cleanup', '[command]/usr/bin/git', 'Temporarily overriding HOME', 'Cleaning up orphan processes'])
     assert.ok(!r.err.includes(noise), `GitHub's post-job lines are no reason: ${noise}\n${r.err}`);

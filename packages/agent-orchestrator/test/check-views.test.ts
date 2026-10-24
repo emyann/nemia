@@ -77,7 +77,7 @@ test(
     for (const id of settled) await Effect.runPromise(file(id));
     await reached(t, settled, (p) => p === 'succeeded', 'succeeded');
     await Effect.runPromise(file('live', true));
-    await reached(t, ['live'], (p) => p.startsWith('running'), 'running');
+    await reached(t, ['live'], (p) => p === 'working' || p === 'quiescent', 'working');
 
     const run = { steps: Object.fromEntries([...settled, 'live'].map((id) => [id, { check: { taskId: id } }])) } as unknown as Run;
     const before = await calls();

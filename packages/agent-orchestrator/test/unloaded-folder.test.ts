@@ -175,7 +175,7 @@ test('under a pause, a pass and `nemia ls` over a run at work whose folder stops
   const working = await started('at work when its folder goes');
   for (let k = 0; k < 3; k++) await runWith(e, tickRun({ repo: ROOT }));
   const taskId = readRun(working.id).steps.work.taskId!;
-  assert.match((await Effect.runPromise(e.view(taskId))).phase, /^running/, 'its step at work before its folder goes');
+  assert.match((await Effect.runPromise(e.view(taskId))).phase, /^(working|quiescent)$/, 'its step at work before its folder goes');
   unfrozen(working.id, path.join(ROOT, 'no-folder-at-work'));
   putPause({ why: 'a test pauses', by: 'ann' });
   t.after(() => resumePause());

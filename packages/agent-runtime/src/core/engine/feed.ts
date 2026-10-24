@@ -145,9 +145,11 @@ const sealedRecords = (sealed: Opened): Sealed[] =>
 const forgottenAfter = (run: readonly number[], c: number, after: number): number => {
   let end = c;
   let count = 0;
-  for (let i = run.length - 1; i >= 0 && end > after; i--) {
+  for (let i = run.length - 1; end > after; i--) {
+    const length = run[i];
+    if (length === undefined) break;
     count++;
-    end -= run[i];
+    end -= length;
   }
   return count;
 };

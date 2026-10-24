@@ -52,7 +52,8 @@ export type AttachedOptions = Pick<
 const extraValueOf = (key: string, value: string | number | true | string[]): string | null => {
   if (value === true) return null;
   if (!Array.isArray(value)) return String(value);
-  if (value.length === 1) return value[0];
+  const [only, ...more] = value;
+  if (only !== undefined && more.length === 0) return only;
   throw new Error(
     `\`config.claude.${key}\` gives ${value.length} values, and an attached session takes one per flag. Give one, or file the task on \`claude-detached\`.`,
   );

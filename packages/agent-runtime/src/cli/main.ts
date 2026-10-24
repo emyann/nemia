@@ -131,9 +131,9 @@ const dollarsOf = (budgetUsd: string | undefined): number | undefined => {
 const tokensOf = (contextTokens: string | undefined): number | undefined => {
   if (contextTokens === undefined) return undefined;
   if (/^[1-9]\d*$/.test(contextTokens) && Number.isSafeInteger(Number(contextTokens))) return Number(contextTokens);
-  const k = /^(\d+)\s*([kKmM])$/.exec(contextTokens);
+  const [, digits, unit] = /^(\d+)\s*([kKmM])$/.exec(contextTokens) ?? [];
   throw refuse(
-    `\`contextTokens: ${contextTokens}\` is not a number of tokens. Write a whole number in digits${k ? ` — \`contextTokens: ${Number(k[1]) * (k[2].toLowerCase() === 'k' ? 1_000 : 1_000_000)}\`` : ', like `contextTokens: 200000`'}.`,
+    `\`contextTokens: ${contextTokens}\` is not a number of tokens. Write a whole number in digits${digits !== undefined && unit !== undefined ? ` — \`contextTokens: ${Number(digits) * (unit.toLowerCase() === 'k' ? 1_000 : 1_000_000)}\`` : ', like `contextTokens: 200000`'}.`,
   );
 };
 
@@ -529,10 +529,10 @@ const WRITING: Readonly<Record<string, (engine: EngineShape, id: string, words: 
  */
 const wroteToSession = async (engine: EngineShape, argv: readonly string[]): Promise<boolean> => {
   const [verb, id, ...words] = argv;
-  if (verb === undefined || !Object.hasOwn(WRITING, verb)) return false;
-  if (!id) console.log(HELP);
-  else await WRITING[verb](engine, id, words);
-  return true;
+  const write = verb !== undefined && Object.hasOwn(WRITING, verb) ? WRITING[verb] : undefined;
+  if (write && id) await write(engine, id, words);
+  else if (write) console.log(HELP);
+  return write !== undefined;
 };
 
 /** The verbs over what the store keeps, each given the arguments after it: `sweep`, `forget` and `compact`. */
@@ -544,7 +544,7 @@ const KEEPING: Readonly<Record<string, (engine: EngineShape, rest: readonly stri
 
 /** The verb `verb` names among `KEEPING`, or, for any other word, the help printed. */
 const keepingVerb = (verb: string | undefined) =>
-  verb !== undefined && Object.hasOwn(KEEPING, verb) ? KEEPING[verb] : async () => console.log(HELP);
+  (verb !== undefined && Object.hasOwn(KEEPING, verb) ? KEEPING[verb] : undefined) ?? (async () => console.log(HELP));
 
 /**
  * The engine over `options`, its layer built once and kept for the process. Refused — rejects with an `Error` whose `exitCode` is 2, led

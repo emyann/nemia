@@ -6,13 +6,12 @@
  *
  * It is the verb of `src/service/interrupt.ts`'s shape, and reads the same open attempt (`openAttemptOf`).
  */
+import type { Harnessed } from './harnessed.ts';
 import { Cause, Effect, Schema } from 'effect';
 import { fold, isLive, nameFor, phaseWordOf, type Event, type State } from '../core/index.ts';
 import { Journal, type JournalError } from '../core/engine/index.ts';
 import { openAttemptOf } from './interrupt.ts';
 import type { Runner } from '../harness/index.ts';
-import type { SeamOps } from '../a2a/index.ts';
-import type { HarnessConfig } from './options.ts';
 
 /** An ask `answerAsk` will not answer, and why, in words that say what to do instead. Nothing was answered. */
 export class AnswerRefused extends Schema.TaggedError<AnswerRefused>()('AnswerRefused', {
@@ -44,17 +43,14 @@ export type AskAnswered = { at: string; attempt: number };
 export const answerVerbOf = (
   go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>,
   read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>,
-  runners: Record<string, SeamOps>,
-  harnesses: Record<string, HarnessConfig>,
-  harnessOf: (state: State) => string,
+  harnessOf: (state: State) => Harnessed,
 ) =>
   Effect.fn('Engine.answerAsk')(function* (taskId: string, given: Answering) {
     const refuse = (message: string) => Effect.fail(new AnswerRefused({ message }));
     const events = yield* read(taskId);
     if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
-    const harness = harnessOf(state);
-    const runner = runners[harness];
+    const { name: harness, runner } = harnessOf(state);
     const take = runner?.answer;
     if (!take || !runner) {
       return yield* refuse(

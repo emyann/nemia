@@ -3,12 +3,11 @@
  * its harness, the session left open to hear the next words. It journals nothing — the next pass reads the session's state as it reads
  * any other — and so it is no lifecycle verb: no entry of it is on the record, and no state is read from one.
  */
+import type { Harnessed } from './harnessed.ts';
 import { Cause, Effect, Schema } from 'effect';
 import { fold, idleOf, isLive, nameFor, phaseWordOf, type Attempt, type Event, type State } from '../core/index.ts';
 import { Journal, type JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
-import type { SeamOps } from '../a2a/index.ts';
-import type { HarnessConfig } from './options.ts';
 
 /** A turn `interrupt` will not end, and why, in words that say what to do instead. Nothing was sent. */
 export class InterruptRefused extends Schema.TaggedError<InterruptRefused>()('InterruptRefused', {
@@ -50,17 +49,14 @@ const wordsOf = (e: unknown): string => (e instanceof Error ? e.message : String
 export const interruptVerbOf = (
   go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>,
   read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>,
-  runners: Record<string, SeamOps>,
-  harnesses: Record<string, HarnessConfig>,
-  harnessOf: (state: State) => string,
+  harnessOf: (state: State) => Harnessed,
 ) =>
   Effect.fn('Engine.interrupt')(function* (taskId: string) {
     const refuse = (message: string) => Effect.fail(new InterruptRefused({ message }));
     const events = yield* read(taskId);
     if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
-    const harness = harnessOf(state);
-    const runner = runners[harness];
+    const { name: harness, runner } = harnessOf(state);
     const end = runner?.interrupt;
     if (!end) {
       return yield* refuse(

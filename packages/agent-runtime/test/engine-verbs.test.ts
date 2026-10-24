@@ -623,6 +623,21 @@ test('the engine refuses what it cannot be built from — a `maxConcurrent` that
       );
     });
   }
+  const homeless = [
+    ['a `defaultHarness` none of its harnesses has', { harnesses: { only: asyncOps(fakeHarness(sessions)) }, defaultHarness: 'nowhere' }],
+    ['no harness at all', { harnesses: {} }],
+  ] as const;
+  for (const [name, given] of homeless) {
+    await t.test(`an engine with ${name}, where a task that names no harness would run, is refused`, () => {
+      assert.throws(
+        () => builtEngine(EngineService.layer({ root: scratch('ae-engine-verbs-root-'), journal: asyncStore(memoryJournal()), ...given })),
+        (e: Error & { _tag?: string }) => {
+          assert.equal(e._tag, 'EngineRefused', e.message);
+          return true;
+        },
+      );
+    });
+  }
   await t.test('a pool on a spec, a runner and a remote agent is taken', () => {
     assert.doesNotThrow(
       () =>

@@ -224,9 +224,9 @@ const chosenOf = (card: AgentCard, address: string | undefined): AgentInterface 
   const spoken = spokenOf(card);
   const chosen = address ? spoken.find((i) => originOf(i.url) === new URL(address).origin) : spoken[0];
   if (chosen) return chosen;
-  if (spoken.length) {
+  if (address && spoken.length) {
     throw new Refusal(
-      `the agent's card names ${quote(spoken.map((i) => i.url).join(', '), WORDS_QUOTE)}, and none is on ${new URL(address!).origin}, the origin the harness was given: a request, and any secret it carries, goes only there. Give the harness the agent's own address, or its card as \`card\`. Nothing was sent.`,
+      `the agent's card names ${quote(spoken.map((i) => i.url).join(', '), WORDS_QUOTE)}, and none is on ${new URL(address).origin}, the origin the harness was given: a request, and any secret it carries, goes only there. Give the harness the agent's own address, or its card as \`card\`. Nothing was sent.`,
     );
   }
   const offered = card.supportedInterfaces.map((i) => `${i.protocolBinding}${i.protocolVersion ? ` ${i.protocolVersion}` : ''}`);

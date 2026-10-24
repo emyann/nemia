@@ -72,8 +72,10 @@ export const remoteCursorOf = (messageId: string, artifacts: number): Transcript
 
 /** A cursor `remoteCursorOf` gave, read back; `undefined` for any other. */
 const cursorRead = (after: TranscriptCursor | undefined): { messageId: string; artifacts: number } | undefined => {
-  const m = after === undefined ? null : CURSOR.exec(after);
-  return m ? { artifacts: Number(m[1]), messageId: Buffer.from(m[2], 'base64url').toString() } : undefined;
+  const [, artifacts, messageId] = (after === undefined ? null : CURSOR.exec(after)) ?? [];
+  return artifacts === undefined || messageId === undefined
+    ? undefined
+    : { artifacts: Number(artifacts), messageId: Buffer.from(messageId, 'base64url').toString() };
 };
 
 /**

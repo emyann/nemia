@@ -8,7 +8,9 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node"]
+    "types": ["node"],
+    "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "bin", "test"]
+  "include": ["src", "bin"],
+  "exclude": ["src/**/*.test.ts"]
 }

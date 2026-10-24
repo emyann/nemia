@@ -29,7 +29,7 @@ export const CLAUDE_PERMISSION_MODES: readonly string[] = [
  * `acceptEdits` writes in its directory unasked; `auto` lets a classifier allow what it judges safe; `bypassPermissions` asks about
  * nothing. Every word of `CLAUDE_PERMISSION_MODES` has one (`test/fence-reach.test.ts`).
  */
-export const CLAUDE_MODE_RANK: Readonly<Record<string, number>> = {
+export const CLAUDE_MODE_RANK = {
   plan: 0,
   dontAsk: 1,
   default: 1,
@@ -37,7 +37,7 @@ export const CLAUDE_MODE_RANK: Readonly<Record<string, number>> = {
   acceptEdits: 2,
   auto: 3,
   bypassPermissions: 4,
-};
+} satisfies Readonly<Record<string, number>>;
 
 /**
  * The permission modes a job runs what its allow rules reach in, and refuses every other call in rather than stopping to ask: every mode
@@ -350,4 +350,4 @@ export const worktreeName = (r: SpawnRequest): string =>
  * The folders Claude Code reads as its own configuration inside a folder it is given by `--add-dir`: `.claude`, whose `skills` it lists
  * in the session (its `CLAUDE.md` is not read). Taken whole, since what it does with the folder's other subfolders is unmeasured.
  */
-export const CLAUDE_CONFIG_FOLDERS: readonly string[] = ['.claude'];
+export const CLAUDE_CONFIG_FOLDERS: readonly [string, ...string[]] = ['.claude'];

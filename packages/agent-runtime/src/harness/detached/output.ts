@@ -6,7 +6,7 @@
  * (`harness/codex/stream.ts`).
  */
 import path from 'node:path';
-import type { Denial, Usage } from '../../core/index.ts';
+import { firstPiece, type Denial, type Usage } from '../../core/index.ts';
 import { partialMarksOf, printedKindOf, printedLinesOf, type PrintedKind, type PrintedLine, type Printed } from '../claude/print.ts';
 import type { HarnessOutput } from './detached.ts';
 import type { PartialMark } from './follow.ts';
@@ -75,9 +75,12 @@ const tokensOf = (usage: Printed<'result'>['usage']): Usage => {
 export const sessionTokensOf = (modelUsage: Printed<'result'>['modelUsage']): Usage => {
   const models = Object.values(modelUsage ?? {});
   const sum = (key: keyof (typeof models)[number]) => models.reduce((n, m) => n + (m[key] ?? NaN), 0);
-  const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = (
-    ['inputTokens', 'cacheCreationInputTokens', 'cacheReadInputTokens', 'outputTokens'] as const
-  ).map(sum);
+  const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = [
+    sum('inputTokens'),
+    sum('cacheCreationInputTokens'),
+    sum('cacheReadInputTokens'),
+    sum('outputTokens'),
+  ];
   const inputTokens = uncachedTokens + cacheWriteTokens + cacheReadTokens;
   return models.length && inputTokens > 0 && outputTokens >= 0
     ? { inputTokens, uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens }
@@ -132,7 +135,7 @@ export const READ_INPUT_KEYS: Readonly<Record<string, string>> = { Bash: 'comman
 const readKeyOf = (tool: string): string | undefined => (Object.hasOwn(READ_INPUT_KEYS, tool) ? READ_INPUT_KEYS[tool] : undefined);
 
 /** The first word of a command, as `denialOf` names a denied one. */
-const firstWord = (command: string): string => command.trim().split(/\s+/)[0];
+const firstWord = (command: string): string => firstPiece(command.trim(), /\s+/);
 
 /**
  * A denied call as a person reads it, and as a permission rule would name it: a command by its first word
@@ -249,7 +252,8 @@ export const claudeStreamOutput = (output: string): HarnessOutput => {
 
 /** The skill a `Skill` call's input names, after its last `:` — a plugin's skill by its bare name — or none. */
 const skillNamed = (input: unknown): string | undefined => {
-  const v = (input as Record<string, unknown> | null | undefined)?.[READ_INPUT_KEYS.Skill];
+  const key = readKeyOf('Skill');
+  const v = key === undefined ? undefined : (input as Record<string, unknown> | null | undefined)?.[key];
   const name = typeof v === 'string' ? v.slice(v.lastIndexOf(':') + 1).trim() : '';
   return name || undefined;
 };
@@ -265,7 +269,8 @@ const loadedSkills = ({ skills, denied }: StreamFacts): string[] =>
 
 /** The file a file tool's call names, as `FILE_KEYS` reads it, made relative to `cwd`: none when it names none, or one outside `cwd`. */
 const fileIn = (cwd: string, tool: string, input: unknown): string | undefined => {
-  const v = (input as Record<string, unknown> | null | undefined)?.[READ_INPUT_KEYS[tool]];
+  const key = readKeyOf(tool);
+  const v = key === undefined ? undefined : (input as Record<string, unknown> | null | undefined)?.[key];
   if (typeof v !== 'string' || !v.trim()) return undefined;
   const rel = path.relative(cwd, path.resolve(cwd, v.trim()));
   return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : undefined;

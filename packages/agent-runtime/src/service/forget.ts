@@ -2,9 +2,10 @@
  * The engine's `forget` verb, and what refuses it: settled tasks' journals, the files their harness keeps of each session, and
  * their lines in the feed, removed together, or, without `yes`, counted.
  */
+import type { Harnessed } from './harnessed.ts';
 import fs from 'node:fs';
 import { Effect, Schema } from 'effect';
-import { atWorkState, fold, nameFor, waitsForInput, type Event, type Sighting, type State } from '../core/index.ts';
+import { atWorkState, fold, nameFor, own, waitsForInput, type Event, type Sighting, type State } from '../core/index.ts';
 import { Journal, type JournalError, type StoreOps } from '../core/engine/index.ts';
 import type { RunnerError, Runner } from '../harness/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
@@ -76,8 +77,7 @@ export const journalBytesOf =
   };
 
 /** A task's count in `counts`, 0 where it has none. */
-const countOf = (counts: Readonly<Record<string, number>> | undefined, taskId: string): number =>
-  counts && Object.hasOwn(counts, taskId) ? counts[taskId] : 0;
+const countOf = (counts: Readonly<Record<string, number>> | undefined, taskId: string): number => (counts && own(counts, taskId)) ?? 0;
 
 /**
  * Each task of `ids`' lines in the feed, read once, for a `forget` that removes nothing (`dry`) or one that removes them: off the
@@ -135,7 +135,7 @@ const sessionsHeld = (go: Go, held: Held) =>
 export const forgetVerbOf = (
   go: Go,
   runners: Record<string, SeamOps>,
-  harnessOf: (state: State) => string,
+  harnessOf: (state: State) => Harnessed,
   bytesOf: (taskId: string, events: readonly Event[]) => number,
 ) => {
   const heldOf = (taskId: string, listed: ReadonlySet<string>) =>
@@ -160,8 +160,8 @@ export const forgetVerbOf = (
           `task ${taskId} ran on the \`${state.harness}\` harness, which this engine does not have, so its session files cannot be found; give the engine the \`${state.harness}\` harness again: ${NOTHING}.`,
           taskId,
         );
-      const harness = harnessOf(state);
-      return { taskId, state, events, harness, runner: runners[harness] } satisfies Held;
+      const { name: harness, runner } = harnessOf(state);
+      return { taskId, state, events, harness, runner } satisfies Held;
     });
 
   const sessionsOf = (held: Held, dry: boolean) =>

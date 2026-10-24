@@ -73,11 +73,11 @@ const inputOf = () => {
   return {
     async *[Symbol.asyncIterator]() {
       for (;;) {
-        while (items.length) {
+        for (let content = items.shift(); content !== undefined; content = items.shift()) {
           yield {
             type: 'user' as const,
             uuid: randomUUID(),
-            message: { role: 'user' as const, content: items.shift()! },
+            message: { role: 'user' as const, content },
             parent_tool_use_id: null,
             session_id: '',
           };

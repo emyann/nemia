@@ -204,11 +204,16 @@ export const CLAUDE_JOB_BIN = path.join(path.dirname(fileURLToPath(import.meta.u
  */
 export const claudeJobSpec = (executable?: string): HarnessSpec => ({
   name: 'claude',
-  command: (_r, io) => ({
-    cmd: process.execPath,
-    args: [CLAUDE_JOB_BIN, io!.requestFile!],
-    ...(executable ? { env: { AE_CLAUDE_EXECUTABLE: executable } } : {}),
-  }),
+  command: (_r, io) => {
+    const requestFile = io?.requestFile;
+    if (requestFile === undefined)
+      throw new Error('a Claude Code job starts on its spawn request file, and none was given: its runner writes one for `needsRequest`');
+    return {
+      cmd: process.execPath,
+      args: [CLAUDE_JOB_BIN, requestFile],
+      ...(executable ? { env: { AE_CLAUDE_EXECUTABLE: executable } } : {}),
+    };
+  },
   needsRequest: true,
   input: {
     line: (text) => JSON.stringify({ type: 'user', message: { role: 'user', content: text } }),
@@ -271,6 +276,17 @@ export const isClaudeJob = (sessionId: string) => nameParts(sessionId) !== undef
  * - `kept` names what either mode keeps under each session's name, joined the same way, a path named once.
  * - `compact` rewrites the jobs' ended captures to what their readers read (`claudeStreamKept`); a background session keeps none.
  */
+/**
+ * The verb `verb` of `ops`, one of the runners this module composes, each of which gives it: a runner without it was composed
+ * wrong, and is thrown naming the verb rather than called as absent.
+ */
+const verbOf = <K extends keyof RunnerOps>(ops: RunnerOps, verb: K): NonNullable<RunnerOps[K]> => {
+  const given = ops[verb];
+  if (given === undefined || given === null)
+    throw new Error(`Claude Code's runner was composed of one with no \`${String(verb)}\`: compose it of runners that give it`);
+  return given;
+};
+
 export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): RunnerOps => {
   const root = options.root;
   const spec = claudeJobSpec(options.claudeExecutable);
@@ -311,10 +327,10 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
      * each session alone was unread (`unreadWhy`), as the job read or the registry's said it, for a name still unread.
      */
     observeFor: (expected) =>
-      read(job.observeFor!(expected)).pipe(
+      read(verbOf(job, 'observeFor')(expected)).pipe(
         Effect.flatMap((jobs) =>
           !jobs.value || expected.some((e) => !jobs.value.seen.has(e.name))
-            ? read(bg.observeFor!(expected)).pipe(Effect.map((sessions) => ({ jobs, sessions })))
+            ? read(verbOf(bg, 'observeFor')(expected)).pipe(Effect.map((sessions) => ({ jobs, sessions })))
             : Effect.succeed({ jobs, sessions: NOTHING_ASKED }),
         ),
         Effect.map(({ jobs: { value: jobs, ...j }, sessions: { value: sessions, ...s } }): Observation => {
@@ -327,43 +343,43 @@ export const claudeCodeOps = (options: ClaudeOptions, attached?: Attached): Runn
         }),
       ),
 
-    find: (name) => findJob(name).pipe(Effect.flatMap((found) => (found ? Effect.succeed(found) : bg.find!(name)))),
+    find: (name) => findJob(name).pipe(Effect.flatMap((found) => (found ? Effect.succeed(found) : verbOf(bg, 'find')(name)))),
 
     stop: (sessionId) => of(sessionId).stop(sessionId),
     logs: (sessionId) => of(sessionId).logs(sessionId),
     interrupt: (session) => interruptThrough(of(session.sessionId), session),
 
-    release: (session, task) => (isClaudeJob(session.sessionId) ? Effect.succeed(undefined) : bg.release!(session, task)),
+    release: (session, task) => (isClaudeJob(session.sessionId) ? Effect.succeed(undefined) : verbOf(bg, 'release')(session, task)),
 
-    transcript: (sessionId, after) => of(sessionId).transcript!(sessionId, after),
+    transcript: (sessionId, after) => verbOf(of(sessionId), 'transcript')(sessionId, after),
     follow: (sessionId) =>
       isClaudeJob(sessionId)
         ? Stream.unwrap(
             findJob(sessionId).pipe(
-              Effect.map((found) => (found ? job.follow!(sessionId) : bg.follow!(sessionId))),
-              Effect.catchCause(() => Effect.succeed(job.follow!(sessionId))),
+              Effect.map((found) => (found ? verbOf(job, 'follow')(sessionId) : verbOf(bg, 'follow')(sessionId))),
+              Effect.catchCause(() => Effect.succeed(verbOf(job, 'follow')(sessionId))),
             ),
           )
-        : bg.follow!(sessionId),
+        : verbOf(bg, 'follow')(sessionId),
 
-    say: (session, text) => of(session.sessionId).say!(session, text),
+    say: (session, text) => verbOf(of(session.sessionId), 'say')(session, text),
 
     ...answerOf(attached),
 
     quota: claudeQuota(),
 
     forget: (session, options) =>
-      Effect.all([job.forget!(session, options), bg.forget!(session, options)]).pipe(
+      Effect.all([verbOf(job, 'forget')(session, options), verbOf(bg, 'forget')(session, options)]).pipe(
         Effect.map(([jobs, sessions]) => ({
           files: [...jobs.files, ...sessions.files],
           left: [...new Set([...jobs.left, ...sessions.left])],
         })),
       ),
 
-    compact: job.compact!,
+    ...(job.compact ? { compact: job.compact } : {}),
 
     kept: (sessions) =>
-      Effect.all([job.kept!(sessions), bg.kept!(sessions)]).pipe(
+      Effect.all([verbOf(job, 'kept')(sessions), verbOf(bg, 'kept')(sessions)]).pipe(
         Effect.map(([jobs, held]) =>
           Object.fromEntries(
             [...new Set([...Object.keys(jobs), ...Object.keys(held)])].map((name) => [
@@ -426,7 +442,10 @@ const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
     observeFor: (expected) => {
       const ours = expected.filter((e) => attached.has(e.name));
       const theirs = expected.filter((e) => !attached.has(e.name));
-      return Effect.all([theirs.length ? job.observeFor!(theirs) : Effect.succeed(undefined), a.observeFor!(ours)]).pipe(
+      return Effect.all([
+        theirs.length ? verbOf(job, 'observeFor')(theirs) : Effect.succeed(undefined),
+        verbOf(a, 'observeFor')(ours),
+      ]).pipe(
         Effect.map(([jobs, mine]): Observation => ({
           ...jobs,
           seen: new Map([...(jobs?.seen ?? []), ...mine.seen]),
@@ -437,8 +456,8 @@ const withAttached = (job: RunnerOps, attached: Attached): RunnerOps => {
     stop: (name) => to(name).stop(name),
     logs: (name) => to(name).logs(name),
     interrupt: (session) => interruptThrough(to(session.name), session),
-    transcript: (name, after) => to(name).transcript!(name, after),
-    say: (session, text) => to(session.name).say!(session, text),
-    follow: (name) => to(name).follow!(name),
+    transcript: (name, after) => verbOf(to(name), 'transcript')(name, after),
+    say: (session, text) => verbOf(to(session.name), 'say')(session, text),
+    follow: (name) => verbOf(to(name), 'follow')(name),
   };
 };

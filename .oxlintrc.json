@@ -279,6 +279,14 @@
         ]
       }
     },
+    // The runtime's source is under noUncheckedIndexedAccess, which makes every index read say what its absence means; `x!` would take
+    // that back, so it is refused there. A test's `!` is a loud claim that the value is there, and a failing test already answers it.
+    // packages/agent-orchestrator/test/index-reads.test.ts holds this block and the flag.
+    {
+      "files": ["packages/agent-runtime/src/**", "packages/agent-runtime/bin/**"],
+      "excludeFiles": ["packages/agent-runtime/src/**/*.test.ts"],
+      "rules": { "typescript/no-non-null-assertion": "error" }
+    },
     // The runtime is the bottom layer: it reaches no layer above it.
     {
       "files": ["packages/agent-runtime/src/**", "packages/agent-runtime/bin/**"],
@@ -744,7 +752,7 @@
     {
       "files": ["packages/agent-runtime/src/core/engine/engine.ts"],
       "rules": {
-        "complexity": ["error", { "max": 33 }],
+        "complexity": ["error", { "max": 30 }],
         "sonarjs/cognitive-complexity": ["error", 52]
       }
     },
@@ -803,7 +811,7 @@
     {
       "files": ["packages/agent-runtime/src/service/engine.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 151, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 150, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

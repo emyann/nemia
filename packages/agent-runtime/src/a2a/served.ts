@@ -80,7 +80,7 @@ export const servedCardOf = (harness: string, ops: RunnerOps, url: string): Agen
     },
     securityRequirements: [{ schemes: { [BEARER]: { list: [] } } }],
     capabilities: {
-      ...card.capabilities!,
+      ...card.capabilities,
       extensions: (card.capabilities?.extensions ?? []).map((e) => ({
         ...e,
         params: { methods: [], say: false } satisfies RuntimeExtensionParams,

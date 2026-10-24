@@ -166,8 +166,9 @@ export const lastStructuredOutput = (
 ): { payload: unknown; at: number; lastWord: boolean; id?: string } | undefined => {
   const lines = jsonl.split('\n');
   for (let i = lines.length - 1; i >= 0; i--) {
-    if (!lines[i].includes('StructuredOutput')) continue;
-    const line = lineOf(lines[i], ['assistant'], lineAt(i, file));
+    const text = lines[i];
+    if (text === undefined || !text.includes('StructuredOutput')) continue;
+    const line = lineOf(text, ['assistant'], lineAt(i, file));
     const found = line && callOf(line);
     if (found) {
       const { payload, at, id } = found;
@@ -191,8 +192,9 @@ export const lastStructuredOutput = (
  */
 const endsWithResultOf = (lines: readonly string[], id: string, file?: string): boolean => {
   for (let i = lines.length - 1; i >= 0; i--) {
-    if (!lines[i].includes('"type"')) continue;
-    const line = lineOf(lines[i], ['user', 'assistant'], lineAt(i, file));
+    const text = lines[i];
+    if (text === undefined || !text.includes('"type"')) continue;
+    const line = lineOf(text, ['user', 'assistant'], lineAt(i, file));
     if (!line) continue;
     const content = line.message.content;
     return Array.isArray(content) && content.filter(isBlock('tool_result')).some((b) => b.tool_use_id === id);

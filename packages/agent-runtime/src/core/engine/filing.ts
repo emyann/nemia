@@ -217,7 +217,7 @@ export const admit = Effect.fn('admit')(function* (taskIds: readonly string[]) {
     const state = events.length ? fold(id, events) : undefined;
     const refused = admitRefusalOf(id, state);
     if (refused) return yield* Effect.fail(new AdmitRefused({ message: refused }));
-    states.push(state!);
+    if (state) states.push(state);
   }
   const admitted: string[] = [];
   for (const state of states) {
@@ -273,8 +273,8 @@ const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | 
   if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
   const last = state.attempts.at(-1);
   if (verbTakes(verb, state)) {
-    return verb === 'answer' && !last!.nativeId
-      ? `\`${taskId}\`'s attempt ${last!.n} signed, but its harness recorded no session for it, so there is no conversation for an answer to continue. \`close\` it, and file a task whose brief says the words.`
+    return verb === 'answer' && last !== undefined && !last.nativeId
+      ? `\`${taskId}\`'s attempt ${last.n} signed, but its harness recorded no session for it, so there is no conversation for an answer to continue. \`close\` it, and file a task whose brief says the words.`
       : undefined;
   }
   if (!state.holdOpen)

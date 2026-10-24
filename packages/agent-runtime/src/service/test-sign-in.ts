@@ -17,18 +17,18 @@ export const signInHeld = () => {
   const signIns: Array<{ readonly name: string; readonly secret: boolean }> = [];
   const signOuts: string[] = [];
   const refuse = (message: string, held = false) => Effect.fail(new McpSignInRefused({ message, held }));
+  const noPort = (name: string) => `\`${name}\` names no OAuth client with a callback port, and a sign-in is made through one.`;
   const noClient = (name: string, server: RemoteMcpServer) => {
     const refused = mcpStateRefusal({ [name]: server });
     if (refused) return refused;
-    return server.oauth?.callbackPort === undefined
-      ? `\`${name}\` names no OAuth client with a callback port, and a sign-in is made through one.`
-      : undefined;
+    return server.oauth?.callbackPort === undefined ? noPort(name) : undefined;
   };
   const verbs: Pick<EngineShape, 'mcpSignIn' | 'mcpSignInState' | 'mcpSignOut'> = {
     mcpSignIn: (name, server, clientSecret) => {
       const refused = noClient(name, server);
-      if (refused) return refuse(refused);
-      const port = server.oauth!.callbackPort!;
+      const oauth = server.oauth;
+      const port = oauth?.callbackPort;
+      if (refused || oauth === undefined || port === undefined) return refuse(refused ?? noPort(name));
       const other = byPort.get(port);
       if (other !== undefined) return refuse(`a sign-in to \`${other}\` already waits on port ${port}.`, true);
       signIns.push({ name, secret: clientSecret !== undefined });
@@ -36,7 +36,7 @@ export const signInHeld = () => {
       const until = new Date(Date.UTC(2026, 9, 22, 12, 5)).toISOString();
       states.set(name, { state: 'waiting', until });
       return Effect.succeed({
-        authUrl: `https://github.com/login/oauth/authorize?client_id=${server.oauth!.clientId}&state=stand-in`,
+        authUrl: `https://github.com/login/oauth/authorize?client_id=${oauth.clientId}&state=stand-in`,
         until,
       });
     },

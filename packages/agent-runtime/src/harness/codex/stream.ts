@@ -11,7 +11,7 @@
  * Its first line is its start, `thread.started`, whose `thread_id` the worker reads as the session's own id (`CODEX_START`).
  */
 import { Result, Schema } from 'effect';
-import { firstRefusal, type Usage } from '../../core/index.ts';
+import { firstRefusal, own, type Usage } from '../../core/index.ts';
 import type { HarnessOutput, StartEvent } from '../detached/detached.ts';
 import type { PartialMark } from '../detached/follow.ts';
 
@@ -63,8 +63,11 @@ const FIX =
   'Run a Codex whose `exec --json` stream this runtime reads, or a runtime whose `CodexEventSchema` (`harness/codex/stream.ts`)' +
   ' reads this one.';
 
-/** The object `line` holds when it is one whose `type` the runtime reads, or `undefined` for any other line. */
-const ours = (line: string): (Record<string, unknown> & { type: string }) | undefined => {
+/**
+ * The object `line` holds when it is one whose `type` the runtime reads, with the decoder of that type, or `undefined` for any other
+ * line.
+ */
+const ours = (line: string): { event: Record<string, unknown> & { type: string }; decode: (typeof DECODERS)[string] } | undefined => {
   if (!line.includes('"type"')) return undefined;
   let parsed: unknown;
   try {
@@ -74,7 +77,20 @@ const ours = (line: string): (Record<string, unknown> & { type: string }) | unde
   }
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return undefined;
   const { type } = parsed as { type?: unknown };
-  return typeof type === 'string' && Object.hasOwn(DECODERS, type) ? (parsed as Record<string, unknown> & { type: string }) : undefined;
+  const decode = typeof type === 'string' ? own(DECODERS, type) : undefined;
+  return decode === undefined ? undefined : { event: parsed as Record<string, unknown> & { type: string }, decode };
+};
+
+/** The sum of `key` over `turns`, or `undefined` where there are no turns to count or one of them did not say it. */
+const sumOf = (turns: readonly Partial<Record<'input' | 'read', number>>[] | undefined, key: 'input' | 'read'): number | undefined => {
+  if (turns === undefined) return undefined;
+  let n = 0;
+  for (const t of turns) {
+    const v = t[key];
+    if (v === undefined) return undefined;
+    n += v;
+  }
+  return n;
 };
 
 /**
@@ -86,9 +102,10 @@ export const codexEventsOf = (output: string): { events: CodexEvent[] } | { wron
   const events: CodexEvent[] = [];
   const lines = output.split('\n');
   for (const [at, line] of lines.entries()) {
-    const event = ours(line);
-    if (!event) continue;
-    const decoded = DECODERS[event.type](event);
+    const read = ours(line);
+    if (!read) continue;
+    const { event, decode } = read;
+    const decoded = decode(event);
     if (Result.isSuccess(decoded)) {
       events.push(decoded.success);
       continue;
@@ -168,13 +185,14 @@ export const codexOutput = (output: string): HarnessOutput => {
   }
   if (started === 0 && completed.length === 0) return {};
   const turns = completed.length === started ? completed : undefined;
-  const sum = (key: 'input' | 'read') => turns!.reduce((n, t) => n + t[key]!, 0);
+  const input = sumOf(turns, 'input');
+  const cached = sumOf(turns, 'read');
   const usage: Usage = {
     ...(uncounted ? {} : { toolCalls: calls.size }),
-    ...(turns?.every((t) => t.input !== undefined) ? { inputTokens: sum('input') } : {}),
-    ...(turns?.every((t) => t.input !== undefined && t.read !== undefined)
-      ? { uncachedTokens: sum('input') - sum('read'), cacheWriteTokens: 0, cacheReadTokens: sum('read') }
-      : {}),
+    ...(input === undefined ? {} : { inputTokens: input }),
+    ...(input === undefined || cached === undefined
+      ? {}
+      : { uncachedTokens: input - cached, cacheWriteTokens: 0, cacheReadTokens: cached }),
     ...(turns ? { outputTokens: turns.reduce((n, t) => n + t.output, 0) } : {}),
   };
   return Object.keys(usage).length ? { usage } : {};

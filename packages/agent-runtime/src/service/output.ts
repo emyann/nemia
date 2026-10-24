@@ -1,8 +1,8 @@
 /** The engine's `output` verb, and what refuses it: one stream of a task's latest attempt, kept whole by its harness. */
+import type { Harnessed } from './harnessed.ts';
 import { Effect, Schema } from 'effect';
 import { fold, nameFor, type Event, type State } from '../core/index.ts';
 import type { JournalError } from '../core/engine/index.ts';
-import type { SeamOps } from '../a2a/index.ts';
 
 /** A stream `output` will not read, and why: a stream that is neither, a count of bytes that is none, a task or harness without one. */
 export class OutputRefused extends Schema.TaggedError<OutputRefused>()('OutputRefused', {
@@ -23,8 +23,7 @@ export const notACount = (lastBytes: unknown): string =>
  */
 export const outputVerbOf = (
   read: (taskId: string) => Effect.Effect<readonly Event[], JournalError>,
-  runners: Record<string, SeamOps>,
-  harnessOf: (state: State) => string,
+  harnessOf: (state: State) => Harnessed,
 ) =>
   Effect.fn('Engine.output')(function* (taskId: string, stream: 'stdout' | 'stderr', lastBytes?: number) {
     const refuse = (message: string) => Effect.fail(new OutputRefused({ message }));
@@ -33,8 +32,8 @@ export const outputVerbOf = (
     const events = yield* read(taskId);
     if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
-    const harness = harnessOf(state);
-    const output = runners[harness].output;
+    const { name: harness, runner } = harnessOf(state);
+    const output = runner.output;
     if (!output)
       return yield* refuse(
         `the \`${harness}\` harness keeps no whole streams: it mixes them in one log. \`logs\` gives what its session printed.`,

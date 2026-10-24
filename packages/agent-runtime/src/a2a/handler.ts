@@ -223,6 +223,12 @@ export interface SessionMethods {
 /** Every listed session, as one listing saw them: the pages of that listing are served from here. */
 type Snapshot = { id: number; contextId: string; status: TaskState; tasks: Task[] };
 
+/** Drops the oldest of the `open` listings, the first one kept. */
+const dropOldest = (open: Map<number, Snapshot>): void => {
+  const oldest = open.keys().next();
+  if (!oldest.done) open.delete(oldest.value);
+};
+
 export class HarnessHandler implements A2ARequestHandler, SessionMethods {
   private readonly harness: string;
   private readonly ops: RunnerOps;
@@ -380,7 +386,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
         .filter(
           (t) =>
             (!params.contextId || t.contextId === params.contextId) &&
-            (status === TaskState.TASK_STATE_UNSPECIFIED || t.status!.state === status),
+            (status === TaskState.TASK_STATE_UNSPECIFIED || t.status?.state === status),
         )
         .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
       snap = { id: ++this.listings, contextId: params.contextId, status, tasks };
@@ -404,7 +410,7 @@ export class HarnessHandler implements A2ARequestHandler, SessionMethods {
     const next = offset + size < snap.tasks.length ? `${snap.id}:${offset + size}` : '';
     if (next) {
       this.open.set(snap.id, snap);
-      if (this.open.size > OPEN_LISTINGS) this.open.delete(this.open.keys().next().value!);
+      if (this.open.size > OPEN_LISTINGS) dropOldest(this.open);
     } else {
       this.open.delete(snap.id);
     }

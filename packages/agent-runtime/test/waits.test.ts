@@ -133,13 +133,13 @@ test('REFUSED: a wait that says what it waits for by a function says it as it st
     () => `c1 succeeded; c1 ${phase}`,
     { everyMs: 1 },
   ).catch((e: unknown) => e);
-  phase = 'running (working)';
+  phase = 'working';
   await new Promise((r) => setTimeout(r, 10));
   stuck.abort();
   const err = await waiting;
   assert.ok(err instanceof Error);
-  assert.equal(err.message, 'never came: c1 succeeded; c1 running (working)', 'asked as the wait fails, not as it began');
-  assert.deepEqual(stuck.said, ['never came: c1 succeeded; c1 running (working)']);
+  assert.equal(err.message, 'never came: c1 succeeded; c1 working', 'asked as the wait fails, not as it began');
+  assert.deepEqual(stuck.said, ['never came: c1 succeeded; c1 working']);
 
   const unsaid = waiter(of);
   let still: unknown;

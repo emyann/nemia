@@ -467,7 +467,7 @@ test("a session followed through the seam: the card says it streams, each moment
 
   await t.test('REFUSED: a subscription to a Task that has ended, in the words that say to read its transcript', async () => {
     const d = driver(Stream.fromIterable<Followed>([{ kind: 'state', state: 'completed' }]));
-    const words = 'session `ae/t-1/1` has ended (done): there is nothing to follow. Read its transcript (sessionTranscript).';
+    const words = 'session `ae/t-1/1` has ended (completed): there is nothing to follow. Read its transcript (sessionTranscript).';
     await assert.rejects(
       new HarnessHandler('fake', d.ops, async () => []).resubscribe({ tenant: '', id: 'ae/t-1/1' }, ctx).next(),
       (e) => e instanceof UnsupportedOperationError && e.message === words,

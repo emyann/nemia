@@ -153,11 +153,11 @@ test('a blocked sign-off waits on a person until the turn that answers it spawns
           endedAt: at(10, 5),
           reason: 'harness',
           usage: null,
-          ended: 'done',
+          ended: 'succeeded',
           turn: 0,
           closeout: BLOCKED,
         },
-        { startedAt: at(10, 30), spawnedAt: at(10, 30), endedAt: at(10, 40), reason: 'harness', usage: null, ended: 'done', turn: 1 },
+        { startedAt: at(10, 30), spawnedAt: at(10, 30), endedAt: at(10, 40), reason: 'harness', usage: null, ended: 'succeeded', turn: 1 },
       ],
     },
   };

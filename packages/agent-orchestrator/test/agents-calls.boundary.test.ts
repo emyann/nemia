@@ -109,7 +109,7 @@ const atWork = (t: Waiter, runId: string) =>
       await pass();
       const taskId = readRun(runId).steps.work?.taskId;
       if (!taskId) return undefined;
-      return (await Effect.runPromise(e.view(taskId))).phase === 'running (working)' && taskId;
+      return (await Effect.runPromise(e.view(taskId))).phase === 'working' && taskId;
     },
     `${runId}'s step at work`,
     { everyMs: 50 },
@@ -160,7 +160,7 @@ test(
         'both runs in flight, each step read',
       );
     assert.equal(done.cost?.harnesses.claude?.spawned, 1);
-    assert.equal((await Effect.runPromise(e.view(bg))).phase, 'running (working)');
+    assert.equal((await Effect.runPromise(e.view(bg))).phase, 'working');
   },
 );
 
@@ -170,9 +170,9 @@ test('a background session left running across a restart is observed on the firs
   memo = freshRestMemo();
   const { calls, done } = await counted();
   assert.equal(calls, 1, 'a fresh engine remembers no session it spawned: the journal names the session, and the registry is asked for it');
-  assert.equal((await Effect.runPromise(e.view(bg))).phase, 'running (working)', 'at work, as the registry lists it — not lost');
+  assert.equal((await Effect.runPromise(e.view(bg))).phase, 'working', 'at work, as the registry lists it — not lost');
   assert.equal(advanced(done, bgRun.id)?.status, 'running');
-  assert.equal((await Effect.runPromise(e.view(taskOf(jobRun.id)))).phase, 'running (working)', 'and the job, off its run file');
+  assert.equal((await Effect.runPromise(e.view(taskOf(jobRun.id)))).phase, 'working', 'and the job, off its run file');
 });
 
 test('the board drains', WAITED, async (t) => {

@@ -2,11 +2,12 @@
  * Which queued tasks a pass admits: a ceiling on the sessions at work in each pool, and the order waiting tasks are given a free slot.
  * Pure: the pass hands it the views it built off its one observation (`tick` in `engine/engine.ts`) and journals what it returns.
  */
+import type { TaskPhase } from './session.ts';
 
 /** The part of a task's view admission reads. */
 export type AdmissionView = {
   id: string;
-  phase: string;
+  phase: TaskPhase;
   admission?: 'queued' | 'admitted';
   state: { harness?: string; filedAt?: string; priority?: number };
 };
@@ -22,13 +23,33 @@ export type AdmissionRule = { ceiling?: number; unschedulable?: () => boolean; p
 export const ownPool = (harness: string | undefined): string => harness ?? 'default';
 
 /**
- * Whether a task holds a slot of its pool: a session at work (`running (working)`, `working (quiescent)`), one spawned and not yet in the
- * harness's registry (`starting`), and one admitted and not yet started, which the next pass starts. A session blocked on a person
- * (`needs-human`), a task held open for an answer (`input-required`), one between attempts and one settled hold none: nobody is working
- * on them, and a slot they held would be a slot nobody used.
+ * Whether a task in each phase holds a slot of its pool: a session at work (`working`, `quiescent`) and one spawned and not yet in the
+ * harness's registry (`starting`) do. A session blocked on a person (`needs-human`), a task held open for an answer
+ * (`input-required`), one open between turns (`idle`), one its harness respawns (`restarting`), one whose harness says it ended
+ * (`ending`), one between attempts and one settled hold none: nobody is working on them, and a slot they held would be a slot nobody
+ * used.
+ */
+const HOLDS_SLOT: Record<TaskPhase, boolean> = {
+  pending: false,
+  starting: true,
+  working: true,
+  quiescent: true,
+  'needs-human': false,
+  'input-required': false,
+  idle: false,
+  restarting: false,
+  'between-attempts': false,
+  ending: false,
+  succeeded: false,
+  failed: false,
+  stopped: false,
+};
+
+/**
+ * Whether a task holds a slot of its pool: by its phase (`HOLDS_SLOT`), or admitted and not yet started, which the next pass starts.
  */
 export const holdsSlot = (view: Pick<AdmissionView, 'phase' | 'admission'>): boolean =>
-  view.admission === 'admitted' || view.phase === 'starting' || view.phase === 'running (working)' || view.phase === 'working (quiescent)';
+  view.admission === 'admitted' || HOLDS_SLOT[view.phase];
 
 /** A filing time as a number to sort by; one that does not parse goes last. */
 const filedMs = (view: AdmissionView): number => {

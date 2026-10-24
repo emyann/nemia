@@ -126,8 +126,9 @@ type TaskList = Effect.Success<ReturnType<Engine['list']>>;
  * The engine a command reads — `nemia ls`, `nemia decide` — whose `view` of a task is read once for the whole command: `nemia ls` views a
  * run's tasks, and again each run another waits on, and `nemia decide` its current tries and then every try. A view is the engine's word at
  * the moment it was read, and a command is one moment; nothing is kept past the command. A verb that changes a task drops what was read of
- * it, as `reportedEngine` does, and a pass — a `tick` or a `start` — drops all of it, so a command that acts reads the engine's word after
- * its act. A view that failed is not kept: the next read asks the engine again. Two reads of one task at once share the one read.
+ * it, as `reportedEngine` does, and a pass — a `tick`, an `up` or a `start` — drops all of it, so a command that acts reads the engine's
+ * word after its act. A view that failed is not kept: the next read asks the engine again. Two reads of one task at once share the one
+ * read.
  */
 export function viewedOnce(e: Engine): Engine {
   type Read = Deferred.Deferred<TaskView, Effect.Error<ReturnType<Engine['view']>>>;
@@ -151,7 +152,7 @@ export function viewedOnce(e: Engine): Engine {
           );
         }),
     },
-    (key) => ENGINE_READS.has(key) && key !== 'tick' && key !== 'start',
+    (key) => ENGINE_READS.has(key) && key !== 'tick' && key !== 'up' && key !== 'start',
   );
 }
 
@@ -192,6 +193,7 @@ const ENGINE_READS = new Set([
   'watch',
   'io',
   'tallied',
+  'up',
   'start',
   'sweep',
   'kept',

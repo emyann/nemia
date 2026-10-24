@@ -139,7 +139,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
   let id = '';
   await s.test('round 1: implement is filed and told something while it works; `nemia round` refuses a round still running', async () => {
     id = await startedLoop(looped('', '', { ship: ['gate: true'] }));
-    stage.board().settle(`${id}-implement`, 'running');
+    stage.board().settle(`${id}-implement`, 'working');
     await over(sayRun(id, 'implement', 'Leave the parser alone.'));
     await assert.rejects(
       over(roundRun(id)),

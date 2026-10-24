@@ -180,7 +180,7 @@ test(
             ['admitted', 'admitted'],
           );
           await runWith(e, tickRun());
-          await reached(t, ['a1', 'a2'], 'running (working)');
+          await reached(t, ['a1', 'a2'], 'working');
 
           await fileInOrder(t, [
             ['b1', 'claude'],
@@ -198,7 +198,7 @@ test(
           assert.equal(await attempts('c3'), 0, 'and has a ceiling of its own');
 
           fake.open('a1');
-          await reached(t, ['a1'], 'running (done)');
+          await reached(t, ['a1'], 'ending');
           await runWith(e, tickRun());
           assert.equal((await Effect.runPromise(e.view('a1'))).state.settled, 'succeeded');
           assert.equal(
@@ -227,7 +227,7 @@ test(
           ]);
           await runWith(e, tickRun());
           await runWith(e, tickRun());
-          await reached(t, ['p1', 'p2'], 'running (working)');
+          await reached(t, ['p1', 'p2'], 'working');
 
           await fileInOrder(t, [
             ['q1', 'claude-detached'],
@@ -268,7 +268,7 @@ test(
           assert.equal(first?.harnesses.claude?.calls, 1, 'and the meter counts the observe, which listed the jobs alone');
           assert.equal(first?.harnesses.claude?.spawned, 0);
           await runWith(e, tickRun());
-          await reached(t, ['s1', 's2'], 'running (working)');
+          await reached(t, ['s1', 's2'], 'working');
           assert.equal((await Effect.runPromise(e.view('s3'))).admission, 'queued');
 
           const before = fake.agentsCalls();

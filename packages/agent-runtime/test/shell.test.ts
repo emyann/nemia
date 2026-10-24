@@ -206,7 +206,7 @@ test('a session held by a background shell, at shipped defaults: its own closeou
         const v = await Effect.runPromise(engine.view(id));
         assert.deepEqual(
           [v.state.attempts[0]?.ended, v.state.attempts[0]?.stated],
-          ['done', false],
+          ['succeeded', false],
           'idle, the quiescence floor reads it quiet with no statement: `stated: false`, which the layer above reads as unsigned',
         );
       });
@@ -243,7 +243,7 @@ test('a session held by a background shell, at shipped defaults: its own closeou
         const w = await Effect.runPromise(engine.view(silent));
         assert.deepEqual(
           [w.state.attempts[0]?.ended, w.state.attempts[0]?.stated],
-          ['done', false],
+          ['succeeded', false],
           'and with nothing said, quiet all the same, where a busy one is not',
         );
       });

@@ -191,7 +191,7 @@ const BRIEF_REFUSALS: Array<[string, string, RegExp]> = [
   [
     'holdOpen: yes, in its own whole sentence',
     brief('holdOpen: yes'),
-    /^brief: `holdOpen: yes` is not true or false\. Write `holdOpen: true` to have the task wait for `ae answer` or `ae close` when an attempt signs, or leave it out to settle it then\.$/,
+    /^brief: `holdOpen: yes` is not true or false\. Write `holdOpen: true` to have the task wait for `ae answer` or `ae close` when an attempt ends, or leave it out to settle it then\.$/,
   ],
   ...['5m', '0', '-30', 'Infinity', 'soon', '1e400'].map((bad): [string, string, RegExp] => [
     `deadlineSeconds: ${bad}, which would be NaN and stop the task on its first pass`,
@@ -297,30 +297,41 @@ const mainWith = async (value: string | undefined, argv: string[]) => {
   }
 };
 
-test("`ae` refuses at exit 2 with the sentence and files nothing: a brief `ae start` cannot parse, and `AE_MAX_CONCURRENT` set at any value — a person's `AE_MAX_CONCURRENT=1`, read and ignored, would start every task at once", async (t) => {
-  await t.test('`ae start` on a brief with an unknown key exits 2 with the sentence, not a stack trace, and files nothing', () => {
+test("`ae` refuses at exit 2 with the sentence and files nothing: a brief `ae file` cannot parse, and `AE_MAX_CONCURRENT` set at any value — a person's `AE_MAX_CONCURRENT=1`, read and ignored, would start every task at once", async (t) => {
+  await t.test('`ae file` on a brief with an unknown key exits 2 with the sentence, not a stack trace, and files nothing', () => {
     const dir = tmp();
     const file = path.join(dir, 'brief.md');
     fs.writeFileSync(file, brief('afer: implement'));
-    const r = spawnSync(process.execPath, [ae, 'start', file], { env: { ...process.env, AE_ROOT: dir }, encoding: 'utf8' });
+    const r = spawnSync(process.execPath, [ae, 'file', file], { env: { ...process.env, AE_ROOT: dir }, encoding: 'utf8' });
     assert.equal(r.status, 2);
     assert.match(r.stderr, /^brief: `afer` is not a key a brief has/);
     assert.equal(fs.existsSync(path.join(dir, 'tasks')), false);
   });
 
   await t.test(
-    '`ae start` on a brief `file()` refuses (a harness there is none of) exits 2 with its sentence, not a stack trace, and files nothing',
+    '`ae file` on a brief `file()` refuses (a harness there is none of) exits 2 with its sentence, not a stack trace, and files nothing',
     () => {
       const dir = tmp();
       const file = path.join(dir, 'brief.md');
       fs.writeFileSync(file, brief('harness: banana'));
-      const r = spawnSync(process.execPath, [ae, 'start', file], { env: { ...process.env, AE_ROOT: dir }, encoding: 'utf8' });
+      const r = spawnSync(process.execPath, [ae, 'file', file], { env: { ...process.env, AE_ROOT: dir }, encoding: 'utf8' });
       assert.equal(r.status, 2, r.stderr);
       assert.match(r.stderr, /^file: /);
       assert.doesNotMatch(r.stderr, /\n\s+at /, 'no stack trace');
       assert.equal(fs.existsSync(path.join(dir, 'tasks')), false);
     },
   );
+
+  await t.test('`ae start`, the old spelling, still files the task, and says on stderr that it is `ae file` now', () => {
+    const dir = tmp();
+    const file = path.join(dir, 'brief.md');
+    fs.writeFileSync(file, brief('model: opus'));
+    const r = spawnSync(process.execPath, [ae, 'start', file], { env: { ...process.env, AE_ROOT: dir }, encoding: 'utf8' });
+    assert.equal(r.status, 0, r.stderr);
+    assert.ok(r.stderr.includes('ae file'), r.stderr);
+    assert.match(r.stdout, /filed/);
+    assert.equal(fs.readdirSync(path.join(dir, 'tasks')).length, 1, 'one task filed');
+  });
 
   await t.test('`ae ls` with `AE_MAX_CONCURRENT` set exits 2 with the sentence, and writes nothing', () => {
     const dir = tmp();

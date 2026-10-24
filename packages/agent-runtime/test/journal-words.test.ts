@@ -74,7 +74,7 @@ const board = (spawnFails?: Error) => {
   );
   const record = async (id: string) =>
     (await journal.read(id)).map((e) => ({ ...e, at: '<at>', ...('mono' in e ? { mono: '<mono>' } : {}) }));
-  return { engine, sessions, asked, record };
+  return { engine, tasks, sessions, asked, record };
 };
 
 const filing = {
@@ -138,7 +138,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
         mono: '<mono>',
         attempt: 1,
         sessionId: 's-1',
-        observed: 'done',
+        observed: 'succeeded',
         reason: 'harness',
         nativeId: 's-1',
         closeout: { outcome: 'done', summary: 'wrote them' },
@@ -154,6 +154,19 @@ test("the journal's words, run by run: each written as the engine wrote it befor
       { kind: 'settled', at: '<at>', outcome: 'succeeded', note: undefined },
     ]);
     assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
+  });
+
+  await t.test("a stored end in the former word, `observed: 'done'`, folds to an attempt that ended `succeeded`", async () => {
+    const b = board();
+    const at = new Date().toISOString();
+    b.tasks.set('t-former', [
+      { kind: 'filed', at, brief: 'an old journal', cwd: '/repo', harness: 'fake' },
+      { kind: 'starting', at, attempt: 1 },
+      { kind: 'spawned', at, attempt: 1 },
+      { kind: 'ended', at, attempt: 1, sessionId: 's-old', observed: 'done' as never, reason: 'harness' },
+    ]);
+    const { state } = await Effect.runPromise(b.engine.view('t-former'));
+    assert.equal(state.attempts[0].ended, 'succeeded');
   });
 
   await t.test(
@@ -175,7 +188,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
           mono: '<mono>',
           attempt: 1,
           sessionId: 's-1',
-          observed: 'done',
+          observed: 'succeeded',
           reason: 'harness',
           nativeId: 's-1',
           closeout: undefined,
@@ -450,7 +463,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
       mono: '<mono>',
       attempt: n,
       sessionId: `s-${n}`,
-      observed: 'done',
+      observed: 'succeeded',
       reason: 'harness',
       nativeId: `s-${n}`,
       closeout: { outcome: 'done', summary },

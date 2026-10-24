@@ -37,7 +37,11 @@ const attempt = (from: string, to: string | null, more: Partial<AttemptClock> = 
 });
 
 /** A task's view: its attempts, settled as `settled` says, and what the attempt in flight has used so far. */
-const task = (attempts: AttemptClock[], settled: string | null = 'succeeded', more: Partial<TaskClock> = {}): TaskClock => ({
+const task = (
+  attempts: AttemptClock[],
+  settled: 'succeeded' | 'failed' | 'stopped' | null = 'succeeded',
+  more: Partial<TaskClock> = {},
+): TaskClock => ({
   state: { brief: 'filed', settled, attempts },
   ...more,
 });
@@ -65,7 +69,7 @@ test('a wait at a gate counts for nothing: the session, its check, and the next 
 
 test('a task held open counts turn by turn: between the turn that signed and the next, a person was deciding', () => {
   const r = run({ chat: { taskId: 'c' } });
-  const turns = [attempt(at(10), at(10, 20), { turn: 0, ended: 'done' }), attempt(at(12), at(12, 5), { turn: 1, ended: 'done' })];
+  const turns = [attempt(at(10), at(10, 20), { turn: 0, ended: 'succeeded' }), attempt(at(12), at(12, 5), { turn: 1, ended: 'succeeded' })];
   assert.equal(atWork(r, new Map([['c', task(turns)]])).ms, 25 * MIN);
 });
 
@@ -102,7 +106,7 @@ test('an attempt that never started, a task the engine has no record of, and ano
     ['a', task([attempt(at(9), at(9, 1), { reason: 'unstartable' }), attempt(at(10), at(10, 10))])],
     [
       'b',
-      task([attempt(at(10, 10), at(10, 15), { ended: 'done' })], null, {
+      task([attempt(at(10, 10), at(10, 15), { ended: 'succeeded' })], null, {
         phase: 'input-required',
       }),
     ],
@@ -174,7 +178,7 @@ const answered = (approved: { try: number; at: string }): RepositoryRun => ({
 /** The held session: a first turn that ended at 10:05, and the answer's turn from 10:11 to `end`, signed and waiting on a person. */
 const held = (end: string | null = at(10, 20)): TaskClock =>
   task(
-    [attempt(at(10), at(10, 5), { turn: 0, ended: 'done' }), attempt(at(10, 11), end, { turn: 1, ended: end ? 'done' : null })],
+    [attempt(at(10), at(10, 5), { turn: 0, ended: 'succeeded' }), attempt(at(10, 11), end, { turn: 1, ended: end ? 'succeeded' : null })],
     null,
     end ? { phase: 'input-required' } : {},
   );

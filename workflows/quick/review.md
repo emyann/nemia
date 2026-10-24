@@ -60,8 +60,8 @@ When the change touches `tools/observe`, read each dashboard's picture and text 
 `dashboard-<name>.png` and `dashboard-<name>.txt`, with the `see-a-dashboard` skill: the text first. A dashboard the change touches
 with no picture and text of it is a finding. You do not render one yourself: your fence refuses the command and Docker.
 
-**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `gh pr view 7` and
-`gh pr checks 7`, the number that address ends on. A red, cancelled or absent `ci` is a finding, as is a pull request whose head is not
+**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `gh pr view <n> --json state,mergeable,headRefOid,title,body,url`
+(its plain form, with no fields named, fails on GitHub's deprecation of Projects classic) and `gh pr checks <n>`, `<n>` the number that address ends on. A red, cancelled or absent `ci` is a finding, as is a pull request whose head is not
 the commit you are reviewing. You open, edit, merge and close none: those are refused you, and Otto's.
 
 Never build or run the e2e: CI ran every page on the commit implement pushed, and its verdict is in the check you are handed.

@@ -98,7 +98,7 @@ function appAtWork(working: string) {
       Effect.succeed({
         views: ids
           .filter((id) => id === working)
-          .map((id) => ({ id, phase: 'running (working)', state: { brief: 'b', settled: null, attempts: [{ startedAt: 'x' }] } })),
+          .map((id) => ({ id, phase: 'working', state: { brief: 'b', settled: null, attempts: [{ startedAt: 'x' }] } })),
       }),
     stop: (taskId: string) =>
       Effect.sync(() => {

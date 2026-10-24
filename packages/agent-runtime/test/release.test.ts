@@ -360,7 +360,7 @@ test('release at shipped defaults: a finished Claude Code session is stopped if 
           const at = `worktree: ${worktree}`;
           assert.equal(
             (await Effect.runPromise(engine.view(id))).state.attempts[0]?.ended,
-            'done',
+            'succeeded',
             `${at}: ended by quiet, with no statement`,
           );
           assert.deepEqual(
@@ -394,7 +394,7 @@ test('release at shipped defaults: a finished Claude Code session is stopped if 
         const [row] = claude.rows();
         wrote(row, 0);
         for (let i = 0; i < 2; i++) await Effect.runPromise(engine.tick());
-        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working (quiescent)');
+        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'quiescent');
         assert.deepEqual(claude.releases(), [], 'running: nothing stopped, nothing removed');
 
         await Effect.runPromise(engine.stop(id));

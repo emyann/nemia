@@ -5,7 +5,7 @@
  */
 import type { Harnessed } from './harnessed.ts';
 import { Cause, Effect, Schema } from 'effect';
-import { fold, idleOf, isLive, nameFor, phaseWordOf, type Attempt, type Event, type State } from '../core/index.ts';
+import { fold, idleOf, isLive, nameFor, type Attempt, type Event, type State } from '../core/index.ts';
 import { Journal, type JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
 
@@ -54,7 +54,7 @@ export const interruptVerbOf = (
   Effect.fn('Engine.interrupt')(function* (taskId: string) {
     const refuse = (message: string) => Effect.fail(new InterruptRefused({ message }));
     const events = yield* read(taskId);
-    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`);
+    if (!events.length) return yield* refuse(`\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`);
     const state = fold(taskId, events);
     const { name: harness, runner } = harnessOf(state);
     const end = runner?.interrupt;
@@ -84,9 +84,7 @@ export const interruptVerbOf = (
       );
     }
     if (!isLive(sighting.state)) {
-      return yield* refuse(
-        `\`${taskId}\`'s session is \`${phaseWordOf(sighting.state)}\` on its harness, not running: there is no turn in it. ${STOP}`,
-      );
+      return yield* refuse(`\`${taskId}\`'s session is \`${sighting.state}\` on its harness, not running: there is no turn in it. ${STOP}`);
     }
     if (idleOf(state, sighting)) {
       return yield* refuse(

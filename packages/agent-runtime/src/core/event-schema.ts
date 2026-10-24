@@ -141,12 +141,13 @@ const MonotonicSchema = Schema.Struct({ boot: Schema.String, ms: Schema.Finite }
 
 /**
  * An end as any runtime wrote one: `budget` is the reason an older runtime's journal gives a session its harness ended at a
- * spend cap, read as `harness` with `limit: 'budget'` (`upgrade`).
+ * spend cap, read as `harness` with `limit: 'budget'`, and `done` the word an older runtime recorded an end the harness
+ * vouched for with, read as `succeeded` (`upgrade`, both).
  */
 const Ended = event('ended', {
   attempt: Schema.Finite,
   sessionId: Schema.String,
-  observed: Schema.Literals(['done', 'failed', 'stopped']),
+  observed: Schema.Literals(['succeeded', 'failed', 'stopped', 'done']),
   reason: Schema.Literals(['harness', 'lost', 'unsigned', 'unstartable', 'operator', 'deadline', 'budget']),
   nativeId: Schema.optional(Schema.String),
   closeout: Schema.optional(Schema.Unknown),
@@ -217,7 +218,7 @@ export const EVENT_KINDS: readonly string[] = StoredEventSchema.members.map((m) 
 /** A task's journal as a store holds it: its events, in order. */
 export const StoredEventsSchema = Schema.Array(StoredEventSchema);
 
-/** One entry of the board's feed as a store holds it: which task an event happened to. */
+/** One entry of the store's feed as a store holds it: which task an event happened to. */
 export const StoredFeedEntrySchema = Schema.StructWithRest(Schema.Struct({ taskId: Schema.String, event: StoredEventSchema }), Rest);
 
 const fieldOf = (value: unknown, key: PropertyKey): unknown =>

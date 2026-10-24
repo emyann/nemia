@@ -172,7 +172,7 @@ test('a spawn the runtime died inside is adopted by the next one by name, never 
     [['spawn', 'ae/t-r/1']],
     'adopted, not spawned again',
   );
-  assert.equal((await Effect.runPromise(b.view(id))).phase, 'running (working)');
+  assert.equal((await Effect.runPromise(b.view(id))).phase, 'working');
 
   w.sessions.set('ae/t-r/1', { ...w.sessions.get('ae/t-r/1')!, state: 'completed', busy: false });
   await Effect.runPromise(b.tick());

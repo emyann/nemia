@@ -36,7 +36,7 @@ import {
   wordsOf,
 } from '../src/a2a/map.ts';
 import { nameParts } from '../src/core/domain.ts';
-import { SESSION_STATES, type Ended, type SessionState } from '../src/core/session.ts';
+import { SESSION_STATES, type Outcome, type SessionState } from '../src/core/session.ts';
 import type { Attempt, Sighting } from '../src/core/domain.ts';
 import { Runner, RunnerError, testOps, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/harness/seam.ts';
 
@@ -249,10 +249,10 @@ test('the A2A map: every mapping of a session, a spawn, words and an attempt, ex
         [{}, TaskState.TASK_STATE_SUBMITTED],
         [{ spawnedAt: '2026-09-23T10:00:01.000Z' }, TaskState.TASK_STATE_SUBMITTED],
         [{ ended: 'failed', reason: 'unstartable', error: 'fake: no binary' }, TaskState.TASK_STATE_REJECTED],
-        [{ ended: 'done', reason: 'harness' }, TaskState.TASK_STATE_COMPLETED],
+        [{ ended: 'succeeded', reason: 'harness' }, TaskState.TASK_STATE_COMPLETED],
         [{ ended: 'stopped', reason: 'operator' }, TaskState.TASK_STATE_CANCELED],
         [{ ended: 'failed', reason: 'harness' }, TaskState.TASK_STATE_FAILED],
-        [{ ended: 'working' as Ended, reason: 'lost' }, TaskState.TASK_STATE_FAILED],
+        [{ ended: 'working' as Outcome, reason: 'lost' }, TaskState.TASK_STATE_FAILED],
         [{ ended: 'stopped', reason: 'deadline' }, TaskState.TASK_STATE_CANCELED],
       ];
       for (const [change, state] of cases) {
@@ -331,7 +331,7 @@ const ended: Attempt = {
   n: 1,
   startedAt: '2026-09-23T10:00:00.000Z',
   spawnedAt: '2026-09-23T10:00:01.000Z',
-  ended: 'done',
+  ended: 'succeeded',
   endedAt: '2026-09-23T10:05:00.000Z',
   reason: 'harness',
   nativeId: 'conv-a',
@@ -816,7 +816,7 @@ test('REFUSED by the seam alone: what no driver is asked, and what the agent doe
     const e = await failure(d.runner.say!({ name: request.name, sessionId: 's-1' }, 'hi'));
     assert.deepEqual(
       { verb: e.verb, message: e.message },
-      { verb: 'say', message: 'session `ae/t-1/2` has ended (done): it takes no more words.' },
+      { verb: 'say', message: 'session `ae/t-1/2` has ended (completed): it takes no more words.' },
     );
     const gone = await failure(d.runner.say!({ name: 'ae/t-9/1', sessionId: 's-9' }, 'hi'));
     assert.deepEqual(

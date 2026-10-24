@@ -27,6 +27,7 @@ import {
   type Credentials,
   type MissingCredential,
   type RemoteAgent,
+  type TaskPhase,
   Engine as RuntimeEngine,
   refusalWords,
   type EngineShape,
@@ -39,6 +40,19 @@ import { holderOnStore } from './daemon/daemon.store.ts';
 import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 import { exportIntervalRefusalOf, sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
+import type { EnginePhase } from './views/views-words.ts';
+
+/**
+ * Whether two unions hold the same words: `true` only when each is assignable to the other, `false` otherwise, so a `true` annotation
+ * fails the typecheck the moment they part.
+ */
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+/**
+ * The orchestrator's copy of the runtime's phases (`EnginePhase`, written out in a pure file that imports no runtime) held equal to the
+ * runtime's `TaskPhase`: a word added to or dropped from either fails the typecheck here, never a reader at run time.
+ */
+export const enginePhaseHeld: Same<EnginePhase, TaskPhase> = true;
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;

@@ -948,7 +948,7 @@ test('a denial is journalled while the attempt is at work, before its result', W
     'the denial journalled',
     { everyMs: 100 },
   );
-  assert.equal(denied.phase.startsWith('running'), true, 'the attempt is still at work');
+  assert.equal(denied.phase === 'working' || denied.phase === 'ending', true, 'the attempt is still at work');
   assert.deepEqual(
     denied.state.attempts.at(-1)?.denials?.map((d) => d.tool),
     ['WebFetch'],

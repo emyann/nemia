@@ -23,7 +23,7 @@ export type Filing = {
   resumeFrom?: string;
   closeoutSchema?: object;
   id?: string;
-  /** Wait for a person when an attempt signs, rather than settle: `answer` starts the next turn, `close` settles. */
+  /** Wait for a person when an attempt ends, rather than settle: `answer` starts the next turn, `close` settles. */
   holdOpen?: true;
   /** Wait for `admit` before each turn starts, rather than start on the next pass. See the `filed` event. */
   queued?: boolean;
@@ -54,7 +54,7 @@ export const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
 
 /** What to do instead of a retired key: file the task again, or, in a workflow, let the orchestrator try again. */
 export const RETIRED_INSTEAD =
-  "To run the task again, file it again — with `resumeFrom: <session id>` to continue its session. In a workflow, give the step `retries:`, or ask for a try with `wf retry <run> <step>` (`--nudge` continues the last try's session, `--fresh` starts clean).";
+  "To run the task again, file it again — with `resumeFrom: <session id>` to continue its session. In a workflow, give the step `retries:`, or ask for an attempt with `wf retry <run> <step>` (`--nudge` continues the last attempt's session, `--fresh` starts clean).";
 
 /** Why a key a task no longer takes is refused, and what to do instead. */
 export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\` is retired: ${RETIRED_KEYS[key]}. ${RETIRED_INSTEAD}`;
@@ -108,7 +108,7 @@ export const refusalOf = (spec: Filing): string | undefined => {
   }
   if (spec.resumeFrom === '') return '`resumeFrom` is empty. Leave it out to start cold.';
   if (spec.holdOpen !== undefined && spec.holdOpen !== true) {
-    return `\`holdOpen: ${JSON.stringify(spec.holdOpen)}\` is not a yes. Give true to have the task wait for an answer when an attempt signs, or leave it out to settle it then.`;
+    return `\`holdOpen: ${JSON.stringify(spec.holdOpen)}\` is not a yes. Give true to have the task wait for an answer when an attempt ends, or leave it out to settle it then.`;
   }
   if (spec.queued !== undefined && typeof spec.queued !== 'boolean') {
     return `\`queued: ${JSON.stringify(spec.queued)}\` is not a yes or a no. Give true to have the task wait for \`admit\` before it starts, or leave it out to start it on the next pass.`;
@@ -196,7 +196,7 @@ export class AdmitRefused extends Schema.TaggedError<AdmitRefused>()('AdmitRefus
 
 /** Why `admit` would not take this task, or `undefined`: one it has no record of, or one that has settled. Off the record alone. */
 export const admitRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
-  if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  if (!state) return `\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`;
   if (state.settled)
     return `\`${taskId}\` has settled (${state.settled}): there is nothing left to start. File a task that continues its session (\`resumeFrom\`) to go on.`;
   return undefined;
@@ -207,7 +207,7 @@ export const admitRefusalOf = (taskId: string, state: State | undefined): string
  * it (`awaitsAdmission`), and returns those ids. The next pass starts them, whatever the engine's ceiling. Reads each task's
  * record and nothing else — no harness is asked — so it is a message, and can cross a seam. Idempotent: a task already
  * admitted, not filed queued, or whose turn has started is left as it is. Refused, and nothing written for any of them,
- * when one is not on the board or has settled.
+ * when one is not in the store or has settled.
  */
 export const admit = Effect.fn('admit')(function* (taskIds: readonly string[]) {
   const journal = yield* Journal;
@@ -239,7 +239,7 @@ export class StopRefused extends Schema.TaggedError<StopRefused>()('StopRefused'
  * Off the record alone, so it costs no registry call.
  */
 export const stopRefusalOf = (taskId: string, state: State | undefined): string | undefined => {
-  if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  if (!state) return `\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`;
   if (verbTakes('requestStop', state)) return undefined;
   if (state.settled)
     return `\`${taskId}\` has settled (${state.settled}): there is nothing left to stop. File a task that continues its session (\`resumeFrom\`) to go on.`;
@@ -265,20 +265,20 @@ export class InputRefused extends Schema.TaggedError<InputRefused>()('InputRefus
 
 /**
  * Why a task cannot take an answer or a close now — or `undefined`. Only a task its guard (`awaitsWord`, by `verbTakes`) takes
- * does: held open, its current turn signed, nothing running, nothing said since and no stop asked — and an answer only one
- * whose signing session its harness recorded, since the answer is told to that session. Otherwise the words say why not. Read
+ * does: held open, its current turn ended, nothing running, nothing said since and no stop asked — and an answer only one
+ * whose ending session its harness recorded, since the answer is told to that session. Otherwise the words say why not. Read
  * off the record alone, so it costs no registry call.
  */
 const waitRefusalOf = (verb: 'answer' | 'close', taskId: string, state: State | undefined): string | undefined => {
-  if (!state) return `\`${taskId}\` is not a task on this board. \`ae ls\`, or \`list()\`, gives the ones it has.`;
+  if (!state) return `\`${taskId}\` is not a task in this store. \`ae ls\`, or \`list()\`, gives the ones it has.`;
   const last = state.attempts.at(-1);
   if (verbTakes(verb, state)) {
     return verb === 'answer' && last !== undefined && !last.nativeId
-      ? `\`${taskId}\`'s attempt ${last.n} signed, but its harness recorded no session for it, so there is no conversation for an answer to continue. \`close\` it, and file a task whose brief says the words.`
+      ? `\`${taskId}\`'s attempt ${last.n} ended, but its harness recorded no session for it, so there is no conversation for an answer to continue. \`close\` it, and file a task whose brief says the words.`
       : undefined;
   }
   if (!state.holdOpen)
-    return `\`${taskId}\` was not filed to be held open, so it settles when an attempt signs and waits for nothing. File it with \`holdOpen: true\` to ${verb} it.`;
+    return `\`${taskId}\` was not filed to be held open, so it settles when an attempt ends and waits for nothing. File it with \`holdOpen: true\` to ${verb} it.`;
   if (state.settled)
     return `\`${taskId}\` has settled (${state.settled}): it waits for nothing. File a task that continues its session (\`resumeFrom\`) to go on.`;
   if (state.closed)
@@ -304,7 +304,7 @@ export const closeRefusalOf = (taskId: string, state: State | undefined): string
 
 /**
  * A person's answer to a task held open that waits for one. Journalled as an `input`, and returned; the next pass
- * starts the task's next turn — an attempt that continues the session that signed, told `text` — with `config` laid
+ * starts the task's next turn — an attempt that continues the session that ended, told `text` — with `config` laid
  * over the task's own when given (`TURN_ARGS`: its spend cap). The configuration is the harness's to keep, so the one
  * the turn would start with is asked of it as a filing's is.
  */

@@ -38,7 +38,7 @@ const write = (file: string, text: string) => {
 };
 
 /** A Claude Code task filed and left in `phase`, with `closeout` where it ended. */
-const task = (taskId: string, phase: string, closeout?: object) => {
+const task = (taskId: string, phase: Parameters<ReturnType<typeof testEngine>['settle']>[1], closeout?: object) => {
   Effect.runSync(engine().file({ id: taskId, brief: 'Do it.', cwd: '/code/app', harness: 'claude' }));
   standIn().settle(taskId, phase, closeout ? { exitCode: 0, closeout } : undefined);
 };
@@ -46,9 +46,9 @@ const task = (taskId: string, phase: string, closeout?: object) => {
 const R = 'r-say';
 const C = 'r-say-cancelled';
 beforeEachTest(() => {
-  task('t-implement', 'running (working)');
+  task('t-implement', 'working');
   task('t-settled', 'succeeded', { outcome: 'done', summary: 'Done.', needs: null, artifacts: [] });
-  task('t-cancelled', 'running (working)');
+  task('t-cancelled', 'working');
 });
 
 const record = (id: string, steps: Record<string, { taskId: string | null }>) =>

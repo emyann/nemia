@@ -376,7 +376,7 @@ test('a cap of two runs: the rest wait for a slot, as `nemia tick`, `nemia ls` a
   );
 
   await s.test('a run called off while it runs frees its slot once the engine has stopped it, and the run held next takes it', async () => {
-    b.settle(task(two), 'running');
+    b.settle(task(two), 'working');
     await runWith(b.e, cancelRun(two.id));
     assert.ok(b.stopped.includes(task(two)), 'its task asked to stop');
     b.settle(task(two), 'stopped');

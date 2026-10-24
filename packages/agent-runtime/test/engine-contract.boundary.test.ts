@@ -44,7 +44,7 @@ function realSide(): Side {
     }
     if (!sessions.has(sessionOf(id))) await pass();
     if (end.printed) printed.set(sessionOf(id), end.printed);
-    if (moved === 'running (working)') return;
+    if (moved === 'working') return;
     sessions.set(sessionOf(id), {
       ...sessions.get(sessionOf(id))!,
       state: moved === 'succeeded' ? 'completed' : 'failed',

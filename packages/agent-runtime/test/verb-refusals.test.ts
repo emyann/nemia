@@ -139,6 +139,7 @@ const VERBS = [
   'tallied',
   'tick',
   'transcript',
+  'up',
   'view',
   'watch',
 ];
@@ -184,11 +185,11 @@ test('one store, two engines — one built once, one provided its layer for each
     assert.deepEqual(heardByService, heardByPromise);
     assert.equal(heardByService.event.kind, 'filed');
 
-    const tickedByService = await firstOf<TickReport>((onTick, onError) => effect((e) => e.start({ intervalMs: 1, onTick, onError })));
+    const tickedByService = await firstOf<TickReport>((onTick, onError) => effect((e) => e.up({ intervalMs: 1, onTick, onError })));
     const tickedByPromise = await firstOf<TickReport>(async (onTick, onError) =>
       Effect.runSync(built.start({ intervalMs: 1, onTick, onError })),
     );
-    assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [2, 2]);
+    assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [2, 2], '`up` through the service, and `start`, its old name');
     assert.equal(sessions.size, 0, 'queued, neither started');
   });
 
@@ -201,7 +202,7 @@ test('one store, two engines — one built once, one provided its layer for each
     assert.deepEqual(Object.keys(again).sort(), Object.keys(report).sort());
     for (const id of ['one', 'two']) {
       const view = await Effect.runPromise(built.view(id));
-      assert.equal(view.phase, 'running (working)', id);
+      assert.equal(view.phase, 'working', id);
       assert.deepEqual(await effect((e) => e.view(id)), view, id);
       assert.equal(await effect((e) => e.logs(id)), await Effect.runPromise(built.logs(id)));
       const observed = Effect.runSync(built.io()).observed;
@@ -317,7 +318,7 @@ test('a long-lived task through either engine: filed with its restart policy, id
   sessions.set('ae/one/1', { ...sessions.get('ae/one/1')!, held: false });
   assert.match(
     (await failure(effect((e) => e.say('one', 'gone')))).message,
-    /^`one`'s session is `done` on its harness, not running: the next pass writes its end\./,
+    /^`one`'s session is `completed` on its harness, not running: the next pass writes its end\./,
     'a session listed done with no process is gone, and refused as for a job',
   );
   sessions.set('ae/one/1', { ...sessions.get('ae/one/1')!, held: true });
@@ -349,16 +350,16 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
     ['tick', 'TickRefused', () => effect((e) => untyped(e.tick)(3)), /takes nothing|handed/],
     ['admit', 'AdmitRefused', () => effect((e) => e.admit(['ghost'])), /`ghost`/],
     ['list', 'ListRefused', () => effect((e) => untyped(e.list)('one')), /^takes the task ids to view/],
-    ['transcript', 'TranscriptRefused', () => effect((e) => e.transcript('ghost')), /^`ghost` is not a task on this board\./],
+    ['transcript', 'TranscriptRefused', () => effect((e) => e.transcript('ghost')), /^`ghost` is not a task in this store\./],
     [
       'transcript',
       'TranscriptRefused',
       () => effect((e) => e.transcript('one', undefined, { attempt: 99 })),
       /^`attempt: 99` is no attempt of this task: it has no attempt yet\./,
     ],
-    ['say', 'SayRefused', () => effect((e) => e.say('ghost', 'hi')), /^`ghost` is not a task on this board\./],
+    ['say', 'SayRefused', () => effect((e) => e.say('ghost', 'hi')), /^`ghost` is not a task in this store\./],
     ['say', 'SayRefused', () => effect((e) => e.say('one', ' ')), /^`text` is empty\./],
-    ['interrupt', 'InterruptRefused', () => effect((e) => e.interrupt('ghost')), /^`ghost` is not a task on this board\./],
+    ['interrupt', 'InterruptRefused', () => effect((e) => e.interrupt('ghost')), /^`ghost` is not a task in this store\./],
     [
       'interrupt',
       'InterruptRefused',
@@ -373,9 +374,9 @@ test('each refusal is a tagged error, and refusalWords words it behind the verb,
       /^`budgetUsd` is the harness's configuration/,
     ],
     ['close', 'InputRefused', () => effect((e) => e.close('one')), /`one`/],
-    ['stop', 'StopRefused', () => effect((e) => e.stop('ghost')), /^`ghost` is not a task on this board\./],
-    ['output', 'OutputRefused', () => effect((e) => e.output('ghost', 'stdout')), /^`ghost` is not a task on this board\./],
-    ['follow', 'FollowRefused', () => effect((e) => e.follow('ghost')), /^`ghost` is not a task on this board\./],
+    ['stop', 'StopRefused', () => effect((e) => e.stop('ghost')), /^`ghost` is not a task in this store\./],
+    ['output', 'OutputRefused', () => effect((e) => e.output('ghost', 'stdout')), /^`ghost` is not a task in this store\./],
+    ['follow', 'FollowRefused', () => effect((e) => e.follow('ghost')), /^`ghost` is not a task in this store\./],
     [
       'follow',
       'FollowRefused',

@@ -20,7 +20,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import type { TaskPhase } from '../src/run.ts';
+import type { EnginePhase } from '../src/views/views-words.ts';
 import { CLOSEOUT_SCHEMA, closeoutSchemaOf } from '../src/closeout/closeout.ts';
 import type { Workflow } from '../src/workflow.ts';
 import { scratch } from './scratch.ts';
@@ -83,7 +83,7 @@ const aRepo = (): string => {
 /** The engine stand-in the walk settles by hand, keeping each task as it was filed. Each task's session is its own, `native-<id>`. */
 const board = () => {
   const held = engine();
-  const settle = (id: string, phase: TaskPhase, closeout?: unknown, exitCode?: number, reason?: string) =>
+  const settle = (id: string, phase: EnginePhase, closeout?: unknown, exitCode?: number, reason?: string) =>
     held.settle(id, phase, {
       ...(closeout !== undefined && { closeout }),
       ...(exitCode !== undefined && { exitCode }),

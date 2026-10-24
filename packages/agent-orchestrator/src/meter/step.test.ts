@@ -48,7 +48,7 @@ const RUN = {
 } as unknown as Run;
 
 /** A task's view that ran from 10:00 to 10:05 and settled as `settled`, its last attempt's exit `exitCode`. */
-const view = (settled: string, exitCode?: number): FactView => ({
+const view = (settled: 'succeeded' | 'failed' | 'stopped', exitCode?: number): FactView => ({
   state: {
     brief: 'Do it.',
     settled,
@@ -315,7 +315,13 @@ test("REFUSED: a fact whose attributes carry a run's id is recorded nowhere", as
 const DAY = '2026-10-06';
 
 /** A task's view filed at `filed`, spawned at `spawned`, ended at `ended` and settled as `settled`, its exit `exitCode`; times of `DAY`. */
-const clocked = (filed: string, spawned: string, ended: string, settled = 'succeeded', exitCode?: number): FactView => ({
+const clocked = (
+  filed: string,
+  spawned: string,
+  ended: string,
+  settled: 'succeeded' | 'failed' | 'stopped' = 'succeeded',
+  exitCode?: number,
+): FactView => ({
   state: {
     brief: 'Do it.',
     settled,
@@ -519,7 +525,7 @@ const ANSWERED_VIEWS = new Map<string, FactView>([
         attempts: [
           { startedAt: `${DAY}T10:00:00.000Z`, spawnedAt: `${DAY}T10:00:00.000Z`, endedAt: `${DAY}T10:05:00.000Z`, turn: 0 },
           { startedAt: `${DAY}T10:11:00.000Z`, spawnedAt: `${DAY}T10:11:00.000Z`, endedAt: `${DAY}T10:20:00.000Z`, turn: 1 },
-        ].map((a) => ({ ...a, reason: null, usage: null, ended: 'done' })),
+        ].map((a) => ({ ...a, reason: null, usage: null, ended: 'succeeded' })),
       },
     },
   ],
@@ -625,7 +631,11 @@ test('a wait is recorded into its histogram by the five attributes, and as a spa
 });
 
 /** An attempt that began at `hm` of `DAY`, was denied `denials`, and ended a minute later as `ended`, or runs still with none. */
-const deniedAttempt = (hm: string, denials: Array<{ tool: string; what?: string }>, ended: string | null = 'done') => ({
+const deniedAttempt = (
+  hm: string,
+  denials: Array<{ tool: string; what?: string }>,
+  ended: 'succeeded' | 'failed' | 'stopped' | null = 'succeeded',
+) => ({
   startedAt: `${DAY}T${hm}:00.000Z`,
   spawnedAt: `${DAY}T${hm}:00.000Z`,
   endedAt: ended === null ? null : `${DAY}T${hm}:59.000Z`,
@@ -641,7 +651,7 @@ const turns = (...attempts: ReturnType<typeof deniedAttempt>[]): FactView => ({ 
 const BASH = { tool: 'Bash', what: 'git push' };
 const DENIED_RUN = { ...RUN, deniedCounted: [] } as Run;
 const DENIED_VIEWS = new Map([
-  ['r-1-work-try2', turns(deniedAttempt('10:00', [{ tool: 'Glob' }], 'blocked'), deniedAttempt('10:10', [BASH, BASH]))],
+  ['r-1-work-try2', turns(deniedAttempt('10:00', [{ tool: 'Glob' }], 'failed'), deniedAttempt('10:10', [BASH, BASH]))],
   ['r-1-work-try2-check', turns(deniedAttempt('10:20', [{ tool: 'Read' }]))],
 ]);
 const callOf = (d: { tool: string; what?: string }) => (d.what ? `${d.tool}(${d.what})` : d.tool);
@@ -694,7 +704,7 @@ test("a task that is the step's and one of its tries' is read once", () => {
     ...DENIED_RUN,
     steps: { work: { status: 'running', taskId: 'r-1-work', tries: [{ taskId: 'r-1-work' }] } },
   } as unknown as Run;
-  const views = new Map([['r-1-work', turns(deniedAttempt('10:00', [{ tool: 'Glob' }], 'blocked'))]]);
+  const views = new Map([['r-1-work', turns(deniedAttempt('10:00', [{ tool: 'Glob' }], 'failed'))]]);
   assert.deepEqual(denied(held, views), [['r-1-work', 1, 'Glob', 'Glob', '10:00:59']]);
 });
 

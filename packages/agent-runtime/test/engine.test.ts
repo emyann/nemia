@@ -28,7 +28,7 @@ import { Effect, Layer } from 'effect';
 import { Journal, type FeedEntry, type JournalOps } from '../src/core/engine/journal.ts';
 import { Runner, RunnerError, testOps, type ExpectedSession } from '../src/harness/seam.ts';
 import { admit, answer, file, requestStop } from '../src/core/engine/filing.ts';
-import { GRACE_MS, Lifecycle, LIVE, step, settleTask, tick, view } from '../src/core/engine/engine.ts';
+import { GRACE_MS, Lifecycle, LIVE, reconcile, settleTask, tick, view } from '../src/core/engine/engine.ts';
 import { withoutEdge } from '../src/core/lifecycle.ts';
 import { decide, fold, nameFor, RESTART_WORDS, type Event, type Sighting } from '../src/core/domain.ts';
 import type { SessionState } from '../src/core/session.ts';
@@ -162,7 +162,7 @@ test('a job runs to its end: filed, spawned once, running, ended on what its har
       await b.run(tick());
       assert.equal(b.sessions.size, 1, 'exactly one session was started');
       assert.ok(b.sessions.has(nameFor(id, 1)), 'the session carries the name the journal implies');
-      assert.equal(await b.run(phaseOf(id)), 'running (working)');
+      assert.equal(await b.run(phaseOf(id)), 'working');
       const events = await b.run(eventsOf(id));
       const starting = events.find((e) => e.kind === 'starting');
       const spawned = events.find((e) => e.kind === 'spawned');
@@ -194,7 +194,7 @@ test('a job runs to its end: filed, spawned once, running, ended on what its har
     const before = [...b.sessions.keys()];
     for (let i = 0; i < 5; i++) await b.run(tick());
     assert.deepEqual([...b.sessions.keys()], before, 'no second session, five restarts later');
-    assert.equal(await b.run(phaseOf(id)), 'running (working)');
+    assert.equal(await b.run(phaseOf(id)), 'working');
   });
 
   await s.test(
@@ -241,7 +241,7 @@ test('tick: what a pass starts, carries to its harness untouched, and reports', 
     await b.run(tick());
     assert.equal(b.sessions.size, 12, 'a second pass starts nothing new');
     const views = await Promise.all(ids.map((id) => b.run(phaseOf(id))));
-    assert.ok(views.every((p) => p === 'running (working)'));
+    assert.ok(views.every((p) => p === 'working'));
   });
 
   await t.test(
@@ -400,7 +400,7 @@ test('the crash windows: the engine dies at each point of a start, and the resta
   await t.test('CRASH between minting the id and spawning: the restart spawns that same id, once', async () => {
     const b = board();
     const id = await b.run(file(spec));
-    const first = await b.run(step(id, new Map()));
+    const first = await b.run(reconcile(id, new Map()));
     assert.equal(first.do, 'start', 'one step only journals `starting`, and the process dies before the spawn');
     assert.equal(b.sessions.size, 0, 'nothing was spawned');
     await b.run(tick());
@@ -413,7 +413,7 @@ test('the crash windows: the engine dies at each point of a start, and the resta
     async () => {
       const b = board();
       const id = await b.run(file(spec));
-      await b.run(step(id, new Map()));
+      await b.run(reconcile(id, new Map()));
       b.sessions.set(nameFor(id, 1), { sessionId: 'orphan', state: 'working' });
       await b.run(tick());
       assert.equal(b.sessions.size, 1, 'the orphan was adopted, not duplicated');
@@ -434,7 +434,7 @@ test('the crash windows: the engine dies at each point of a start, and the resta
       assert.match(v.state.attempts[0].error ?? '', /lost the acknowledgement/);
 
       await b.run(tick());
-      assert.equal((await b.run(view(id, await b.run(Effect.flatMap(Runner, (r) => r.observe))))).phase, 'running (working)', 'adopted');
+      assert.equal((await b.run(view(id, await b.run(Effect.flatMap(Runner, (r) => r.observe))))).phase, 'working', 'adopted');
 
       await b.run(requestStop(id));
       await b.run(tick());
@@ -448,7 +448,7 @@ test('the crash windows: the engine dies at each point of a start, and the resta
   await t.test('...and when no session shows up, the grace window ends it lost, as for any spawn never registered', async () => {
     const b = board();
     const id = await b.run(file(spec));
-    await b.run(step(id, new Map()));
+    await b.run(reconcile(id, new Map()));
     const spawnedAt = new Date().toISOString();
     await b.run(
       Effect.flatMap(Journal, (j) =>
@@ -497,7 +497,7 @@ test('a person stops a running job: the harness is told, the next pass settles i
       await b.run(requestStop('asked'));
       await b.run(tick());
       assert.equal(b.sessions.get(nameFor('asked', 1))?.state, 'canceled', 'the harness was actually told');
-      assert.equal(await b.run(phaseOf('asked')), 'running (stopped)', 'not settled on an assumption');
+      assert.equal(await b.run(phaseOf('asked')), 'ending', 'not settled on an assumption');
       assert.deepEqual(
         [...b.sessions.keys()].sort(),
         ['asked', 'broke', 'done'].map((id) => nameFor(id, 1)).sort(),
@@ -533,7 +533,7 @@ test('a person stops a running job: the harness is told, the next pass settles i
       const cases: Array<[string, RegExp, RegExp]> = [
         ['done', /^`done` has settled \(succeeded\)/, /`resumeFrom`/],
         ['asked', /^`asked` has settled \(stopped\)/, /`resumeFrom`/],
-        ['nope', /^`nope` is not a task on this board/, /`ae ls`/],
+        ['nope', /^`nope` is not a task in this store/, /`ae ls`/],
       ];
       for (const [id, fact, fix] of cases) {
         const refused = await b.run(Effect.flip(requestStop(id)));
@@ -581,7 +581,7 @@ test('a deadline: past it a session working or blocked is stopped and settles fa
     const events = await b.run(eventsOf('finished'));
     const state = fold('finished', events);
     assert.equal(state.settled, 'succeeded', 'the deadline did not overrule a session that finished');
-    assert.deepEqual([state.attempts[0].ended, state.attempts[0].reason, state.attempts[0].exitCode], ['done', 'harness', 0]);
+    assert.deepEqual([state.attempts[0].ended, state.attempts[0].reason, state.attempts[0].exitCode], ['succeeded', 'harness', 0]);
     assert.deepEqual(
       events.slice(finishedBefore).map((e) => e.kind),
       ['ended', 'settled'],
@@ -1031,7 +1031,7 @@ test('the closing statement as the engine judges it: own, inherited, unstamped, 
     assert.equal(v.state.settled, 'succeeded');
     assert.deepEqual(
       v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.stated]),
-      [['done', 'harness', undefined, false]],
+      [['succeeded', 'harness', undefined, false]],
       'ended by its harness, the inherited statement is not written down as its own, and having said nothing of its own it is recorded `stated: false`, which the layer above reads as unsigned',
     );
   });
@@ -1045,7 +1045,7 @@ test('the closing statement as the engine judges it: own, inherited, unstamped, 
     assert.equal(v.state.settled, 'succeeded');
     assert.deepEqual(
       v.state.attempts.map((a) => [a.ended, a.closeout, a.stated]),
-      [['done', { outcome: 'done', by: 'child' }, true]],
+      [['succeeded', { outcome: 'done', by: 'child' }, true]],
       'no time to judge it by, and none needed: a runner gives none only for a session that cannot carry another attempt’s statement',
     );
   });
@@ -1070,9 +1070,9 @@ test('the closing statement as the engine judges it: own, inherited, unstamped, 
       busy: false,
       closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 },
     });
-    const action = await b.run(step(id, new Map(b.sessions)));
+    const action = await b.run(reconcile(id, new Map(b.sessions)));
     assert.ok(action.do === 'record-end', `the attempt ends, not "${action.do === 'nothing' ? action.why : action.do}"`);
-    assert.equal(action.observed, 'done');
+    assert.equal(action.observed, 'succeeded');
     assert.deepEqual(action.closeout, { outcome: 'done' }, 'with what it said on the end');
     await b.run(tick());
     const v = await b.run(view(id, new Map(b.sessions)));
@@ -1084,7 +1084,7 @@ test('the closing statement as the engine judges it: own, inherited, unstamped, 
     const b = board();
     const { id, name } = await running(b, { ...spec, closeoutSchema: SCHEMA });
     b.sessions.set(name, { ...b.sessions.get(name)!, state: 'input-required', busy: false });
-    assert.deepEqual(await b.run(step(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
+    assert.deepEqual(await b.run(reconcile(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
     await b.run(tick());
     assert.equal(await b.run(phaseOf(id)), 'needs-human');
 
@@ -1105,12 +1105,12 @@ test('the closing statement as the engine judges it: own, inherited, unstamped, 
       busy: false,
       closeout: { payload: { outcome: 'done', by: 'parent' }, at: 0 },
     });
-    assert.deepEqual(await b.run(step(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
+    assert.deepEqual(await b.run(reconcile(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
     await b.run(tick());
     assert.equal(await b.run(phaseOf(id)), 'needs-human');
 
     b.sessions.set(name, { ...b.sessions.get(name)!, state: 'completed' });
-    const action = await b.run(step(id, new Map(b.sessions)));
+    const action = await b.run(reconcile(id, new Map(b.sessions)));
     assert.ok(action.do === 'record-end');
     assert.equal(action.closeout, undefined, "ended by its harness, the parent's statement is not written down as this attempt's");
     assert.equal(action.stated, false, 'nothing of its own was said');
@@ -1129,7 +1129,7 @@ test('the closing statement as the engine judges it: own, inherited, unstamped, 
       busy: true,
       closeout: { payload: { outcome: 'done' }, at: startedAt + 1000 },
     });
-    assert.deepEqual(await b.run(step(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
+    assert.deepEqual(await b.run(reconcile(id, new Map(b.sessions))), { do: 'nothing', why: 'blocked — needs a person' });
     assert.equal((await b.run(view(id, new Map()))).state.settled, null);
   });
 
@@ -1183,22 +1183,22 @@ test("the pass's refusals: an argument a pass, a step or a settle was never buil
   );
 
   await t.test(
-    "step and settleTask refuse the ceiling's old slots — neither drops them, nor settles nothing on them — and journal nothing",
+    "reconcile and settleTask refuse the ceiling's old slots — neither drops them, nor settles nothing on them — and journal nothing",
     async () => {
       const b = board();
       const id = await b.run(file(spec));
       const journalOf = async () => (await b.run(view(id, new Map()))).state.attempts.length;
-      const oldStep = step as (...a: unknown[]) => ReturnType<typeof step>;
+      const oldReconcile = reconcile as (...a: unknown[]) => ReturnType<typeof reconcile>;
       for (const extra of [[{ used: 0, max: 3 }], [undefined], [{ used: 0, max: 3 }, 8]]) {
-        const refused = await b.run(Effect.flip(oldStep(id, new Map(), ...extra)));
-        assert.equal(refused._tag, 'StepRefused');
-        assert.match(refused.message, new RegExp(`^step takes a task .* handed ${extra.length} more`));
+        const refused = await b.run(Effect.flip(oldReconcile(id, new Map(), ...extra)));
+        assert.equal(refused._tag, 'ReconcileRefused');
+        assert.match(refused.message, new RegExp(`^reconcile takes a task .* handed ${extra.length} more`));
         assert.match(refused.message, /`maxConcurrent`/);
       }
       const oldSettle = settleTask as (...a: unknown[]) => ReturnType<typeof settleTask>;
       for (const args of [[{ used: 0, max: 3 }], [{ used: 0, max: 3 }, 8], [0], [-1], [1.5], [Number.NaN], ['8'], [null], [8, 'more']]) {
         const refused = await b.run(Effect.flip(oldSettle(id, new Map(), ...args)));
-        assert.equal(refused._tag, 'StepRefused', `settleTask(id, observed, ${String(args)})`);
+        assert.equal(refused._tag, 'ReconcileRefused', `settleTask(id, observed, ${String(args)})`);
         assert.match(refused.message, /^settleTask takes a task, an observation and/);
         assert.match(refused.message, /`maxConcurrent`/);
       }
@@ -1291,7 +1291,7 @@ test("a move the lifecycle has no edge for is on every pass's report while it la
       ],
       `pass ${pass}`,
     );
-    assert.equal(await b.run(phaseOf(id)), 'running (working)', 'and nothing was done to it');
+    assert.equal(await b.run(phaseOf(id)), 'working', 'and nothing was done to it');
   }
   b.sessions.set(nameFor(other, 1), { ...b.sessions.get(nameFor(other, 1))!, state: 'completed' });
   const report = await planted(tick());
@@ -1724,7 +1724,7 @@ test('a harness unread for a pass: neither there nor gone — nothing ended, spa
       await run(tick());
       const v = await run(view(id, new Map(sessions)));
       assert.equal(v.state.attempts[0].ended, null);
-      assert.equal(v.phase, 'running (working)', 'followed as it runs');
+      assert.equal(v.phase, 'working', 'followed as it runs');
     },
   );
 
@@ -1761,7 +1761,7 @@ test('a harness unread for a pass: neither there nor gone — nothing ended, spa
       assert.deepEqual(spawns, [], 'the next good read finds the session under the name');
       const v = await run(view(id, new Map(sessions)));
       assert.equal(v.state.attempts[0].ended, null);
-      assert.equal(v.phase, 'running (working)', 'adopted, and followed as it runs');
+      assert.equal(v.phase, 'working', 'adopted, and followed as it runs');
     },
   );
 
@@ -1858,7 +1858,7 @@ test('a harness unread for a pass: neither there nor gone — nothing ended, spa
         'harness `claude`: claude agents: timed out',
         'harness `codex`: its transcripts folder cannot be listed',
       ]);
-      assert.equal(failed.views.find((v) => v.id === other)?.phase, 'running (working)', "the other harness's session is read");
+      assert.equal(failed.views.find((v) => v.id === other)?.phase, 'working', "the other harness's session is read");
       assert.equal(failed.actions, 0, 'and nothing is done on the unread name');
       assert.ok(
         failed.views.some((v) => v.id === mine),

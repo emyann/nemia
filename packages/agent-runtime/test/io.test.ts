@@ -56,7 +56,10 @@ const runs = (t: Waiter, engine: ReturnType<typeof builtEngine>, id: string) => 
   let phase = 'not viewed yet';
   return until(
     t,
-    async () => (phase = (await Effect.runPromise(engine.view(id))).phase).startsWith('running'),
+    async () => {
+      phase = (await Effect.runPromise(engine.view(id))).phase;
+      return phase === 'working' || phase === 'ending';
+    },
     () => `${id} running; it is ${phase}`,
     { everyMs: 50 },
   );
@@ -104,7 +107,7 @@ test(
         assert.ok(io().spawned - spawn0 >= 1, 'the pass that started the attempt started its worker');
         await runs(sub, engine, id);
         const before = calls();
-        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'running (working)');
+        assert.equal((await Effect.runPromise(engine.view(id))).phase, 'working');
         assert.equal(calls() - before, 1, "an attempt in flight is observed: its phase is its session's state");
       },
     );
@@ -250,7 +253,7 @@ test('the api lists some tasks: each journal read once, one look at the harness 
       );
       assert.deepEqual(
         views.map((v) => v.phase),
-        ['running (working)', 'succeeded', 'pending', 'running (working)'],
+        ['working', 'succeeded', 'pending', 'working'],
       );
       assert.equal(
         reads(cold) - read0,
@@ -269,7 +272,7 @@ test('the api lists some tasks: each journal read once, one look at the harness 
     async () => {
       const cold = builtEngine(Engine.layer({ root, harnesses: { mine: asyncOps(runner) } }));
       const observed0 = reads(cold);
-      assert.equal((await Effect.runPromise(cold.view(flying[0]))).phase, 'running (working)');
+      assert.equal((await Effect.runPromise(cold.view(flying[0]))).phase, 'working');
       assert.equal(reads(cold) - observed0, 1, 'a task in flight, observed, is one read');
       const settled0 = reads(cold);
       assert.ok((await Effect.runPromise(cold.view(settled[1]))).state.settled, 'the task settled');

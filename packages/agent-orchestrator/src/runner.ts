@@ -540,8 +540,7 @@ export { ledgerOf } from './revisions/revisions.store.ts';
 export { driftNow } from './revisions/pin.verb.ts';
 export { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
-export type { ChatEvent, ChatFrom, Presence, StepState } from './chat/chat.ts';
-export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion } from './chat/chat.ts';
+export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, ChatEvent, ChatFrom, Presence, StepState } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';
 
 import * as RunModel from './record/record.model.ts';

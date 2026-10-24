@@ -3,8 +3,8 @@
  * `disallowedTools:` adds to its agent's (`deniesWith`), so the session is refused the union and a step can never lift one of its agent's
  * denies. `fenceRefusal` judges the other fence keys a step writes itself, which replace its agent's — `tools:`, `allowedTools:`,
  * `permissionMode:` and `sandbox:` — against its agent's, a step that runs a fenced agent on the other harness, whose fence cannot be
- * compared with the agent's, and a step's `background: true` over an agent an allow rule would widen: a background session also reads the
- * person's own settings. `addedSkillsRefusal` judges a skill a step adds to its agent's, which the agent's fence must let the session load.
+ * compared with the agent's. `addedSkillsRefusal` judges a skill a step adds to its agent's, which the agent's fence must let the session
+ * load.
  *
  * `writable:` is the one key that reaches past the fence's directory, and it widens where a step's writes reach, never what it may do:
  * `refuseUnwritable` refuses it over a fence that writes nothing.
@@ -92,9 +92,8 @@ function narrowerThan(reach: FenceReach, asked: string, own: string): string[] |
 /**
  * Why step `step` would widen its agent's fence, or `undefined` when it does not: `own` are the keys the step writes itself, the sandbox
  * under its own name (`codexSandboxNamed`), and `resolved` the step they were read into, with the agent's. A key the step does not write is
- * its agent's and widens nothing, nor does its `disallowedTools:`, which adds to its agent's (`deniesWith`); `background: true` widens it
- * as an allow rule would (`backgroundRefusal`). A remote step is left to `remoteRefusal` in harness.ts, which refuses every fence key
- * there. The refusal names the step, the key, what it would add, and the fix.
+ * its agent's and widens nothing, nor does its `disallowedTools:`, which adds to its agent's (`deniesWith`). A remote step is left to
+ * `remoteRefusal` in harness.ts, which refuses every fence key there. The refusal names the step, the key, what it would add, and the fix.
  */
 export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<StepKey, string>>, resolved: Workflow): string | undefined {
   const harness = resolved.harness ?? DEFAULT_HARNESS;
@@ -114,8 +113,7 @@ export function fenceRefusal(step: string, agent: Agent, own: Partial<Record<Ste
     const why = own[key] === undefined ? undefined : judge[key]({ step, line: `${key}: ${own[key]}`, agent: agent.name, file });
     if (why !== undefined) return why;
   }
-  if (resolved.background !== true) return undefined;
-  return backgroundRefusal({ step, line: 'background: true', agent: agent.name, file }, reachOf(harness), agent.keys.permissionMode);
+  return undefined;
 }
 
 /**
@@ -230,22 +228,6 @@ function modeRefusal(said: Said, modes: FenceReach, mode: string, agents: string
       ? `names no mode, so its agent runs in \`${agentMode}\`, the runtime's default`
       : `runs its agent in \`${agentMode}\``;
   return `${said.step}: \`${said.line}\` is wider than ${said.file}, which ${runs} ${tighten(said, `Name one as narrow or narrower — ${listed(narrower)} — or widen the mode`)}`;
-}
-
-/**
- * Refused: `background: true` over an agent in any mode but the widest of `modes` (`widestOf`), or over one whose file names no mode. A
- * background session also reads the person's own user and local settings, where each "don't ask again" writes an allow rule, and every
- * other mode runs more of what such a rule allows; `agents` is the agent's mode, never the step's, since the rule widens the agent's.
- */
-function backgroundRefusal(said: Said, modes: FenceReach, agents: string | undefined): string | undefined {
-  const agentMode = agents ?? modes.given;
-  const widest = widestOf(modes);
-  if (modes.rank[agentMode] === modes.rank[widest]) return undefined;
-  const runs =
-    agents === undefined
-      ? `names no mode, so its agent runs in \`${agentMode}\`, the runtime's default`
-      : `runs its agent in \`${agentMode}\``;
-  return `${said.step}: \`${said.line}\` runs the step's sessions as background sessions, which also read the person's own user and local settings, where each "don't ask again" writes an allow rule; ${said.file} ${runs}, which runs what such a rule allows — a step may only tighten its agent's fence. Delete the line and the step runs as a job, which reads only the checkout's settings, or attach an agent whose file runs it in \`${widest}\`, which no allow rule widens, and which denies by name what it must never do.`;
 }
 
 /** Refused: a sandbox wider than the agent's, or than its harness's default when its file names none, as `sandboxes` ranks them. */

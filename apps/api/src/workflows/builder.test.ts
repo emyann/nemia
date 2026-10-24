@@ -156,7 +156,6 @@ const spec = (fields: Partial<WorkflowStepSpec> = {}): WorkflowStepSpec => ({
   disallowedTools: [],
   allowedTools: [],
   denials: null,
-  background: null,
   remote: null,
   deadlineSeconds: null,
   budget: null,
@@ -299,7 +298,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
         );
       }
       const flags = Object.fromEntries(form.keys.filter((k) => k.kind === 'flag').map((k) => [k.key, k.choices]));
-      assert.deepEqual(flags, { background: ['true', 'false'], remote: ['true', 'false'], gate: ['true'] });
+      assert.deepEqual(flags, { remote: ['true', 'false'], gate: ['true'] });
       for (const [key, words] of Object.entries(flags))
         for (const word of words) assert.equal(refusedAs(key, word), null, `the parser takes the flag's word ${key}: ${word}`);
       assert.match(
@@ -508,18 +507,28 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
         'and listed back as the number',
       );
 
+      const kept = snapshot(dir);
       const background = await put('drawn', { steps: [plan, { ...build, spec: { ...build.spec, retries: 1, background: true } }, review] });
-      assert.equal(background.status, 200, await background.clone().text());
-      assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^background: true$/m);
-      const listed = ((await background.json()) as WorkflowSaved).workflow.steps;
+      assert.equal(
+        background.status,
+        422,
+        `\`background\` is no key of a step: the package refuses it — ${await background.clone().text()}`,
+      );
+      assert.match(((await background.json()) as BuildRefused).error, /`background`/, 'naming the key');
+      assert.deepEqual(snapshot(dir), kept, 'nothing written');
+
+      const remote = await put('drawn', { steps: [plan, { ...build, spec: { ...build.spec, retries: 1, remote: true } }, review] });
+      assert.equal(remote.status, 200, await remote.clone().text());
+      assert.match(fs.readFileSync(path.join(dir, 'build.md'), 'utf8'), /^remote: true$/m);
+      const listed = ((await remote.json()) as WorkflowSaved).workflow.steps;
       assert.deepEqual(
-        listed.map((s) => [s.name, s.spec.background]),
+        listed.map((s) => [s.name, s.spec.remote]),
         [
           ['plan', null],
           ['build', true],
           ['review', null],
         ],
-        'a step run as a background session says so and is listed back as one; a step that does not say is a job, listed as null',
+        'a step bridged to claude.ai says so and is listed back as one, as every Claude Code step is a job; a step that does not say is listed as null',
       );
 
       const gone = await put('drawn', { steps: [plan, { name: 'build', spec: { place: 'git', check: 'npm test' }, body: 'Build it.' }] });
@@ -1083,7 +1092,6 @@ test("the builder's routes: a body not in its shape, a source not yours, a folde
         ],
         [{ steps: [{ ...plan, spec: { budget: '$5' } }] }, /`budget` is a number/],
         [{ steps: [{ ...plan, spec: { context: '200k' } }] }, /`context` is a number, or null for unset, and this request's was "200k"/],
-        [{ steps: [{ ...plan, spec: { background: 'yes' } }] }, /`background` is true or false/],
         [{ steps: [{ ...plan, spec: { remote: 'yes' } }] }, /`remote` is true or false/],
         [{ steps: [{ ...plan, spec: { gate: 'true' } }] }, /`gate` is true or false/],
         [{ steps: [{ ...plan, spec: { output: { file: 'x.json' } } }] }, /`output` is a string, the schema file's name/],

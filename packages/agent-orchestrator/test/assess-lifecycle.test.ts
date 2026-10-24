@@ -555,7 +555,7 @@ test('composeBrief: what a step is told of the request, the work before it and i
         assert.doesNotMatch(
           brief,
           /\/store\/runs\/n-1\/artifacts\//,
-          'the directory the run keeps is outside the fence, and a folder step runs in dontAsk (validateFolderMode): it is not named',
+          'the directory the run keeps is outside the fence, and a folder step is a job fenced to its folder: it is not named',
         );
         assert.doesNotMatch(brief, /by absolute path/);
         assert.doesNotMatch(

@@ -188,12 +188,11 @@ export type EngineShape = {
    * `.mcp.json`'s shape; a word its harness does not take (a permission mode or an effort — a `HarnessSpec`'s own `refuses`, or Claude
    * Code's lists); a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no context
    * window to set (`codex`); a `remoteControl` under `config` or beside it, which is Claude Code's flag and goes in `config.claude`,
-   * and a `claude.remoteControl` on a harness with no such flag (any but one brought as `'claude-bg'` or a `RunnerOps`, and one
-   * brought as `'claude'` in a task whose `background` is not true); a `background` that is not true or false, or `true` on any
-   * harness not brought as `'claude'`; a `claude` on a `HarnessSpec` without `claudeFlags`, which is not Claude Code; a `codex` that
-   * is not an object holding only `trustFrom`, an absolute path, or one on any harness but a `HarnessSpec` with `codexArgs`, which is
-   * Codex; and, on `'claude'`, a `budgetUsd` beside `background: true`, which `claude --bg` does not keep. A harness brought as a
-   * `RunnerOps` is asked only its own `refuses`.
+   * and a `claude.remoteControl` on a `HarnessSpec`, whose process no control request of the Agent SDK reaches (a `'claude'` task
+   * takes it, a job's and a long-lived session's alike); a `background`, under `config` or beside it and whatever its value, which ran
+   * a session as `claude --bg` and is taken away (`TAKEN_ARGS`); a `claude` on a `HarnessSpec` without `claudeFlags`, which is not
+   * Claude Code; and a `codex` that is not an object holding only `trustFrom`, an absolute path, or one on any harness but a
+   * `HarnessSpec` with `codexArgs`, which is Codex. A harness brought as a `RunnerOps` is asked only its own `refuses`.
    */
   readonly file: (spec: TaskSpec) => Effect.Effect<string, FileRefused | JournalError>;
   /**
@@ -228,7 +227,7 @@ export type EngineShape = {
    *
    * Whatever is observed is observed on the task's own harness — the one `logs` and `transcript` ask — and no other, since no
    * other registry can name its session; a harness that can be told which sessions (`observeFor`) is told this task's own, so a
-   * view of a Claude Code job lists the jobs and asks no `claude agents`. A registry that cannot be read this time is nothing
+   * view of a Claude Code job reads its own run file and no other job's. A registry that cannot be read this time is nothing
    * observed, as a pass reads it. A task on a harness this engine does not have is read off its record, and no harness is
    * asked. `usage` is the attempt in flight's; an ended attempt's is on `state.attempts`.
    */
@@ -242,7 +241,7 @@ export type EngineShape = {
   /**
    * Every task in the store, each journal read, over one observation of every harness. Given `taskIds`, those tasks alone, in that
    * order with no id twice: each journal read once, and every harness looked at once for the tasks among them in flight — told which
-   * sessions where it can be, so Claude Code jobs cost a listing of their run files and no `claude agents` — and not at all when none
+   * sessions where it can be, so Claude Code jobs cost a read of their own run files — and not at all when none
    * is. A view of a settled one is read off its record, as `view` reads it, but for a session id no record has, which `view` looks up
    * and this does not.
    *
@@ -277,7 +276,7 @@ export type EngineShape = {
    *
    * Refused — `TranscriptRefused` — for a task this engine has no record of;
    * a harness that keeps no conversation this engine can read (a `HarnessSpec` or a `RunnerOps`
-   * without `transcript`); and, for the engine's own readers (`claude`, `claude-bg` and a `HarnessSpec`), an
+   * without `transcript`); and, for the engine's own readers (`claude` and a `HarnessSpec`), an
    * `after` that none of them gave. A brought runner's cursor is its own, and passed through.
    *
    * `options.attempt` names an earlier attempt to read, by its `n` — `kubectl logs --previous` — and the latest is read where it names
@@ -321,23 +320,19 @@ export type EngineShape = {
    * taken are not words read: a harness may still set them aside (Claude Code: its `crossSessionInbound`
    * setting, a rate limit, an identical repeat), and says nothing back when it does. A session its harness lists
    * `blocked` is told too, as a working one is, and reads the words only if it moves again: one waiting on a permission
-   * prompt nobody answers keeps them queued, and a stopped or continued one has lost them. `claude agents` does not say
-   * which wait a session is in, so neither is refused. A quiet session is `working` too: its runner reports how long it
-   * has been quiet, not an end, and an idle session's inbox starts a turn.
+   * prompt nobody answers keeps them queued, and a stopped or continued one has lost them. Which wait a session is in is not
+   * refused on. A long-lived session idle between turns takes the words as its next turn.
    *
    * Refused — `SayRefused`, and nothing sent or journalled — in this order, what the
    * record says before what the harness says, so a settled task's harness is not asked: an empty `text`; a task this
    * engine has no record of; a harness with no channel into a running session (a `HarnessSpec`, in its own words, or a
-   * `RunnerOps` without `say`); what the harness cannot carry (Claude Code's background session: a task in
-   * `bypassPermissions`, or words longer than its inbox reads), asked of a task whose config makes it one; a task that
-   * has settled, or has been asked to stop; one with no attempt in flight; then, off its harness, an attempt its harness
-   * does not list; what a background session cannot carry, asked again of a session on `claude` that is no job (one an older
-   * runtime started `--bg` without `background` in its config); a session its harness lists ended; and a task on a remote A2A agent
+   * `RunnerOps` without `say`); a task that has settled, or has been asked to stop; one with no attempt in flight; then, off its
+   * harness, an attempt its harness does not list; a session its harness lists ended; and a task on a remote A2A agent
    * whose Task is at work, since A2A lets its caller speak only once the Task asks for input. A registry that cannot be read this time
-   * — on `claude`, a session Claude Code has registered that its listing does not show — or words the harness did not take, fail with
+   * — on `claude`, a session whose run file is there that its listing does not show — or words the harness did not take, fail with
    * `SayUnsent`, its `cause` what failed: ask again.
    *
-   * A Claude Code job (`claude -p`) is told on its stdin: the words go to an inbox its worker writes on as the
+   * A Claude Code job on its own process is told on its stdin: the words go to an inbox its worker writes on as the
    * next user message, which the job takes into the turn it is working. Once it has given its result its input
    * is closed, and words said then are not taken — a `SayUnsent`, since the job is still
    * `working` until it exits, and its record settles on the next tick. Words said in the half second before its
@@ -357,8 +352,8 @@ export type EngineShape = {
    * engine has no record of; a harness that cannot end a turn without ending its session (every harness but Claude Code attached on
    * the Agent SDK); a task that has settled, or has been asked to stop; one with no attempt in flight; then, off its harness, an
    * attempt its harness does not list; a session its harness lists ended; a long-lived session open and waiting for its next
-   * words, which has no turn in it (`idleOf`); and a session whose own runner cannot end a turn, in that runner's words (Claude
-   * Code's `--bg` session and its job, under the one `claude` harness that offers the verb). A harness that could not be read, or
+   * words, which has no turn in it (`idleOf`); and a session whose own runner cannot end a turn, in that runner's words (a Claude
+   * Code job on its own process, under the one `claude` harness that offers the verb). A harness that could not be read, or
    * that did not take the request, fails with `InterruptUnsent`, its `cause` what failed: ask again.
    */
   readonly interrupt: (taskId: string) => Effect.Effect<Interrupted, InterruptRefused | InterruptUnsent | JournalError>;
@@ -381,7 +376,7 @@ export type EngineShape = {
   readonly answerAsk: (taskId: string, given: Answering) => Effect.Effect<AskAnswered, AnswerRefused | AnswerUnsent | JournalError>;
   /**
    * What a harness's subscription has left (`HarnessQuota`), asked of `harness`, or of the default harness when none is named: the
-   * plan's limits, each with its use and its reset, or why there are none. Claude Code answers it, as `claude` and as `claude-bg`, by
+   * plan's limits, each with its use and its reset, or why there are none. Claude Code answers it, as `claude`, by
    * starting the `claude` on PATH with its `get_usage` request: no prompt, no model called. Every way the ask goes is an answer —
    * no `claude` on PATH is `missing`, one that ends or does not answer in time is `failed` or `timeout` — never a failure.
    *
@@ -534,7 +529,8 @@ export type EngineShape = {
    * session parked, or left by a holder that is gone, is resumed under its own id on the next look. As the scope closes it holds back
    * the new tool calls of each session with none in flight, waits at most `LET_GO_MS` for each call in flight to end, then stops each
    * session and parks it for the next holder, a call it cut at that bound kept on the session's run file and said on the log. An
-   * engine that never takes it runs such a task as a `claude -p` job.
+   * engine that never takes it runs such a task as a job on its own process (`bin/ae-claude-job.ts`), and refuses a long-lived one's
+   * spawn `unstartable`: a long-lived Claude Code session runs attached, and nowhere else.
    *
    * Answers what the hold serves (`Served`): a loopback port of its own, speaking A2A as a reading surface alone — the card,
    * `GetTask` and `SubscribeToTask` — behind one bearer token, for the sessions of each harness configured as the literal
@@ -717,7 +713,7 @@ const writtenVerbsOf = (...given: Parameters<typeof sayVerbOf>) => ({
 
 /**
  * The engine over `options` that `Engine.layer` builds: the file-backed store under the `root` given — required, with no default — or
- * the `journal` given, and the `harnesses` given — by default `claude`, `codex` and `claude-detached`. Built once, and shared by every
+ * the `journal` given, and the `harnesses` given — by default `claude`, `codex` and `command`. Built once, and shared by every
  * verb:
  *
  * - the store, and its `subscribe` where it has one (the file store's does), which pushes to `watch`;
@@ -763,9 +759,9 @@ const make = (options: EngineOptions) =>
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);
-    const { credentials, missingCredential, telemetry, claudeExecutable, sayTimeoutMs } = options;
+    const { credentials, missingCredential, telemetry, claudeExecutable } = options;
     const attached = attachedSessions(root, claudeExecutable);
-    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, claudeExecutable, sayTimeoutMs);
+    const made = runnersOf(harnesses, root, credentials, missingCredential, telemetry, attached, claudeExecutable);
     const runners = Object.fromEntries(Object.entries(made).map(seamOf(harnesses, events, counted, options)));
     const byName = harnessedOf(harnesses, runners);
     const fallen = own(byName, fallback);

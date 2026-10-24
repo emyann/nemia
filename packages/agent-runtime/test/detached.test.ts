@@ -50,7 +50,7 @@ import { claudeResultOutput, claudeStreamOutput } from '../src/harness/detached/
 import { carriedOf } from '../src/harness/detached/carried.ts';
 import { H4SJ_IMPLEMENT, H4SJ_IMPLEMENT_TRY2, UV7V_IMPLEMENT } from './session-results.ts';
 import { codex, trustedProjects } from '../src/harness/codex/codex.ts';
-import { claudeDetached, claudeJob } from '../src/harness/claude/code.ts';
+import { claudeJob } from '../src/harness/claude/code.ts';
 import { Engine } from '../src/index.ts';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { composite } from '../src/harness/seam.ts';
@@ -1041,9 +1041,9 @@ const refusedWith = (read: () => HarnessOutput): string => {
 /** The refusal of a Claude Code line, as `printedLinesOf` words it: the line, its kind, its field and what is there, and the fix. */
 const printedRefusal = (line: number, kind: string, field: string, found: string) =>
   `line ${line} of the session's output is ${kind} line whose \`${field}\` ${found}. An output that holds it is refused, never read` +
-  " as saying nothing: run a Claude Code whose output this runtime reads — the lines `claude -p` prints, which a job's own" +
+  " as saying nothing: run a Claude Code whose output this runtime reads — the lines a job's own" +
   " process prints from the Agent SDK's messages — or a runtime whose schema for the line in" +
-  ' `PRINTED` (`harness/claude/print.ts`) reads this one.';
+  ' `PRINTED` (`harness/claude/stream.ts`) reads this one.';
 
 /** A Claude Code job `name` written into `dir` as its worker leaves it, in `state`: its output a line of stderr, then `lines`. */
 const claudeRun = (dir: string, name: string, lines: string[], state: 'working' | 'done' = 'done') => {
@@ -1276,74 +1276,8 @@ test('a claude job whose output has stderr before its result and a line torn mid
   assert.deepEqual(value.get('ae/j2/1')?.usage, { costUsd: 0.2 });
 });
 
-/** The settings every `claude -p` is given, and the flags after them at shipped defaults. */
-const CLAUDE_TAIL = ['--settings', '{"autoMemoryEnabled":false}'];
-const CLAUDE_FENCE = ['--strict-mcp-config', '--no-chrome', '--setting-sources', 'project'];
-
 test('the detached argv, whole, per harness: at shipped defaults, with every option, and where an option moves the prompt', async (t) => {
   const golden = [
-    {
-      name: 'claude-detached at shipped defaults: JSON, `auto`, and no tool list, effort, schema, budget or window',
-      argv: () => claudeDetached.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r' }),
-      cmd: 'claude',
-      args: ['-p', 'the prompt', '--output-format', 'json', ...CLAUDE_TAIL, '--permission-mode', 'auto', ...CLAUDE_FENCE],
-    },
-    {
-      name: 'claude-detached with every option: the prompt -p’s own, each variadic list ended by a flag, a NAMED worktree derived from the session',
-      argv: () =>
-        claudeDetached.command({
-          name: 'ae/t-abc/2',
-          brief: 'the prompt',
-          cwd: '/r',
-          resumeFrom: 'abc',
-          closeoutSchema: { type: 'object' },
-          config: {
-            worktree: true,
-            permissionMode: 'dontAsk',
-            effort: 'max',
-            tools: ['Read', 'Grep'],
-            disallowedTools: ['Bash(git push)'],
-            allowedTools: ['Write(**)'],
-            budgetUsd: 0.25,
-            contextTokens: 150000,
-          },
-        }),
-      cmd: 'claude',
-      args: [
-        '-p',
-        'the prompt',
-        '--output-format',
-        'json',
-        '--tools',
-        'Read,Grep',
-        '--disallowedTools',
-        'Bash(git push)',
-        '--allowedTools',
-        'Write(**)',
-        ...CLAUDE_TAIL,
-        '--permission-mode',
-        'dontAsk',
-        ...CLAUDE_FENCE,
-        '--effort',
-        'max',
-        '--autocompact',
-        '150000',
-        '--json-schema',
-        '{"type":"object"}',
-        '--resume',
-        'abc',
-        '--worktree',
-        'ae-t-abc-2',
-        '--max-budget-usd',
-        '0.25',
-      ],
-    },
-    {
-      name: 'a task may name its own worktree',
-      argv: () => claudeDetached.command({ name: 'ae/t/1', brief: 'b', cwd: '/r', config: { worktree: 'my-branch' } }),
-      cmd: 'claude',
-      args: ['-p', 'b', '--output-format', 'json', ...CLAUDE_TAIL, '--permission-mode', 'auto', ...CLAUDE_FENCE, '--worktree', 'my-branch'],
-    },
     {
       name: 'codex at shipped defaults: workspace-write, no effort, no schema, the prompt last',
       argv: () => codex.command({ name: 'ae/t/1', brief: 'the prompt', cwd: '/r' }),
@@ -1464,9 +1398,9 @@ test("refuses: each detached harness refuses what it does not have, naming what 
       codex.refuses!(task({ permissionMode: 'acceptEdits' })) ?? '',
       /not a sandbox Codex has.*read-only, workspace-write, danger-full-access/,
     );
-    assert.match(claudeDetached.refuses!(task({ permissionMode: 'read-only' })) ?? '', /not a mode Claude Code has/);
+    assert.match(claudeJob.refuses!(task({ permissionMode: 'read-only' })) ?? '', /not a mode Claude Code has/);
     assert.equal(codex.refuses!(task({ permissionMode: 'read-only' })), undefined);
-    assert.equal(claudeDetached.refuses!(task({ permissionMode: 'auto' })), undefined);
+    assert.equal(claudeJob.refuses!(task({ permissionMode: 'auto' })), undefined);
   });
 
   await t.test('an effort a harness does not have is refused by that harness, in its own words', () => {
@@ -1475,27 +1409,30 @@ test("refuses: each detached harness refuses what it does not have, naming what 
       /not a reasoning effort Codex has.*none, minimal, low, medium, high, xhigh, max/,
     );
     assert.match(
-      claudeDetached.refuses!(task({ effort: 'minimal' })) ?? '',
+      claudeJob.refuses!(task({ effort: 'minimal' })) ?? '',
       /not an effort Claude Code has.*low, medium, high, xhigh, max/,
       'Claude Code would only warn and run at its default: the engine refuses what the CLI ignores',
     );
     assert.equal(codex.refuses!(task({ effort: 'minimal' })), undefined);
-    assert.equal(claudeDetached.refuses!(task({ effort: 'xhigh' })), undefined);
+    assert.equal(claudeJob.refuses!(task({ effort: 'xhigh' })), undefined);
   });
 
-  await t.test('REFUSED: a budget on codex, which has no spend cap, naming the harness that has one; claude -p keeps one', () => {
-    assert.equal(claudeDetached.refuses!(task({ budgetUsd: 0.25 })), undefined, 'claude -p keeps one');
+  await t.test("REFUSED: a budget on codex, which has no spend cap, naming the harness that has one; Claude Code's job keeps one", () => {
+    assert.equal(claudeJob.refuses!(task({ budgetUsd: 0.25 })), undefined, 'a job keeps one');
     assert.match(
       codex.refuses!(task({ budgetUsd: 0.25 })) ?? '',
-      /`budgetUsd: 0\.25` is a spend cap in dollars, and `codex exec` has none.*`claude-detached`/,
+      /`budgetUsd: 0\.25` is a spend cap in dollars, and `codex exec` has none.*`claude`/,
     );
     assert.equal(codex.refuses!({ brief: 'b', cwd: '/r' }), undefined, 'no budget, nothing refused');
   });
 
-  await t.test('a context window: claude -p declares the range it keeps, and codex declares none, so file() refuses one there', () => {
-    assert.deepEqual(claudeDetached.contextTokens, { least: 100_000, most: 1_000_000 });
-    assert.equal(codex.contextTokens, undefined, 'codex exec has no such knob');
-  });
+  await t.test(
+    "a context window: Claude Code's job declares the range it keeps, and codex declares none, so file() refuses one there",
+    () => {
+      assert.deepEqual(claudeJob.contextTokens, { least: 100_000, most: 1_000_000 });
+      assert.equal(codex.contextTokens, undefined, 'codex exec has no such knob');
+    },
+  );
 
   await t.test('REFUSED: a deny list on codex, which has no tool list to take from, naming the sandbox', () => {
     assert.match(
@@ -1546,6 +1483,9 @@ const namedDir = (trust: boolean) => {
   return { dir, home };
 };
 
+/** Where a spec names a file beside its run: what `prepare` is handed, which Codex names none by. */
+const beside = (end: string) => `/runs/codex/ae_t_1.${end}`;
+
 test('codex.prepare: the trust a run is given is the trust you gave in Codex, from the directory the task names alone', async (t) => {
   await t.test('trusted projects are read the way Codex writes them, and only those', () => {
     const toml = [
@@ -1563,13 +1503,17 @@ test('codex.prepare: the trust a run is given is the trust you gave in Codex, fr
 
   await t.test('a worktree of a repository you trust in Codex, which the task names, is trusted for the run, repository included', () => {
     const { repo, wt, home } = repoWithWorktree(true);
-    const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: repo } } }));
+    const io = inCodexHome(home, () =>
+      codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: repo } } }, beside),
+    );
     assert.deepEqual(io.trustedDirs, [repo, wt]);
   });
 
   await t.test('a repository you never trusted gets no trust from the engine', () => {
     const { repo, wt, home } = repoWithWorktree(false);
-    const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: repo } } }));
+    const io = inCodexHome(home, () =>
+      codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: repo } } }, beside),
+    );
     assert.equal(io.trustedDirs, undefined, "trusting it would also load whatever Codex settings it ships: not the engine's call");
   });
 
@@ -1578,7 +1522,7 @@ test('codex.prepare: the trust a run is given is the trust you gave in Codex, fr
     () => {
       const { wt, home } = repoWithWorktree(true);
       const before = ioCounts().spawned;
-      const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }));
+      const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt }, beside));
       assert.equal(io.trustedDirs, undefined);
       assert.equal(ioCounts().spawned, before, 'the repository behind the cwd is never asked of git');
     },
@@ -1588,7 +1532,7 @@ test('codex.prepare: the trust a run is given is the trust you gave in Codex, fr
     const { dir, home } = namedDir(true);
     const cwd = scratch('ae-trust-cwd-');
     const before = ioCounts().spawned;
-    const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd, config: { codex: { trustFrom: dir } } }));
+    const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd, config: { codex: { trustFrom: dir } } }, beside));
     assert.deepEqual(io.trustedDirs, [dir, cwd]);
     assert.equal(ioCounts().spawned, before, 'no git is spawned for a directory the task names');
   });
@@ -1596,7 +1540,7 @@ test('codex.prepare: the trust a run is given is the trust you gave in Codex, fr
   await t.test('a directory the task names, which you never trusted, gets no trust from the engine', () => {
     const { dir, home } = namedDir(false);
     const cwd = scratch('ae-trust-cwd-');
-    const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd, config: { codex: { trustFrom: dir } } }));
+    const io = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd, config: { codex: { trustFrom: dir } } }, beside));
     assert.equal(io.trustedDirs, undefined);
   });
 
@@ -1607,7 +1551,7 @@ test('codex.prepare: the trust a run is given is the trust you gave in Codex, fr
       const untrusted = scratch('ae-trust-from-');
       const before = ioCounts().spawned;
       const io = inCodexHome(home, () =>
-        codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: untrusted } } }),
+        codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: wt, config: { codex: { trustFrom: untrusted } } }, beside),
       );
       assert.equal(io.trustedDirs, undefined, 'the repository behind the cwd is not asked for');
       assert.equal(ioCounts().spawned, before);
@@ -1618,10 +1562,12 @@ test('codex.prepare: the trust a run is given is the trust you gave in Codex, fr
     const { dir, home } = namedDir(true);
     const cwd = scratch('ae-trust-cwd-');
     const slashed = inCodexHome(home, () =>
-      codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd, config: { codex: { trustFrom: `${dir}/` } } }),
+      codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd, config: { codex: { trustFrom: `${dir}/` } } }, beside),
     );
     assert.deepEqual(slashed.trustedDirs, [dir, cwd]);
-    const itself = inCodexHome(home, () => codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: dir, config: { codex: { trustFrom: dir } } }));
+    const itself = inCodexHome(home, () =>
+      codex.prepare!({ name: 'ae/t/1', brief: 'b', cwd: dir, config: { codex: { trustFrom: dir } } }, beside),
+    );
     assert.deepEqual(itself.trustedDirs, [dir]);
   });
 });
@@ -1822,132 +1768,62 @@ test(
   },
 );
 
-test(
-  'claude-detached and codex filed through the engine at shipped defaults, against fake binaries: what they print is on the record',
-  WAITED,
-  async (t) => {
-    const s = story(t);
-    const bin = scratch('ae-fake-bin-');
-    fs.writeFileSync(
-      path.join(bin, 'claude'),
-      [
-        '#!/bin/sh',
-        `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`,
-        `printf '%s\\n' "$@" > '${bin}/argv'`,
-        'echo "a warning" >&2',
-        `printf '%s\\n' '${resultLine({ structured_output: { outcome: 'done' }, total_cost_usd: 0.0123, duration_api_ms: 850 })}'`,
-      ].join('\n'),
-      { mode: 0o755 },
-    );
-    const codexStream = [
-      { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' },
-      { type: 'turn.started' },
-      { type: 'item.started', item: { id: 'item_1', type: 'command_execution', command: 'ls', status: 'in_progress' } },
-      { type: 'item.completed', item: { id: 'item_1', type: 'command_execution', exit_code: 0, status: 'completed' } },
-      {
-        type: 'turn.completed',
-        usage: {
-          input_tokens: 1200,
-          cached_input_tokens: 1000,
-          cache_write_input_tokens: 0,
-          output_tokens: 80,
-          reasoning_output_tokens: 8,
-        },
+test('codex filed through the engine at shipped defaults, against a fake binary: what it prints is on the record', WAITED, async (t) => {
+  const s = story(t);
+  const bin = scratch('ae-fake-bin-');
+  const codexStream = [
+    { type: 'thread.started', thread_id: '01a09996-d343-7932-8971-b2f209ba315b' },
+    { type: 'turn.started' },
+    { type: 'item.started', item: { id: 'item_1', type: 'command_execution', command: 'ls', status: 'in_progress' } },
+    { type: 'item.completed', item: { id: 'item_1', type: 'command_execution', exit_code: 0, status: 'completed' } },
+    {
+      type: 'turn.completed',
+      usage: {
+        input_tokens: 1200,
+        cached_input_tokens: 1000,
+        cache_write_input_tokens: 0,
+        output_tokens: 80,
+        reasoning_output_tokens: 8,
       },
-    ];
-    fs.writeFileSync(
-      path.join(bin, 'codex'),
-      [
-        '#!/bin/sh',
-        'echo "Reading additional input from stdin..." >&2',
-        ...codexStream.map((e) => `printf '%s\\n' '${JSON.stringify(e)}'`),
-      ].join('\n'),
-      { mode: 0o755 },
+    },
+  ];
+  fs.writeFileSync(
+    path.join(bin, 'codex'),
+    [
+      '#!/bin/sh',
+      'echo "Reading additional input from stdin..." >&2',
+      ...codexStream.map((e) => `printf '%s\\n' '${JSON.stringify(e)}'`),
+    ].join('\n'),
+    { mode: 0o755 },
+  );
+  const prev = { PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME };
+  process.env.PATH = `${bin}:${prev.PATH}`;
+  process.env.CODEX_HOME = root();
+  try {
+    const engine = builtEngine(Engine.layer({ root: root() }));
+
+    await s.test(
+      'codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it',
+      async (sub) => {
+        const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' }));
+        await ticked(sub, engine, id);
+        const { state } = await Effect.runPromise(engine.view(id));
+        assert.equal(state.settled, 'succeeded');
+        assert.deepEqual(
+          state.attempts[0]?.usage,
+          { toolCalls: 1, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 },
+          'measured, and nothing it did not measure',
+        );
+        assert.equal(state.attempts[0]?.exitCode, 0);
+        assert.equal(state.attempts[0]?.nativeId, '01a09996-d343-7932-8971-b2f209ba315b');
+      },
     );
-    const argv = () => fs.readFileSync(path.join(bin, 'argv'), 'utf8').split('\n');
-    const prev = { PATH: process.env.PATH, CODEX_HOME: process.env.CODEX_HOME };
-    process.env.PATH = `${bin}:${prev.PATH}`;
-    process.env.CODEX_HOME = root();
-    try {
-      const engine = builtEngine(Engine.layer({ root: root() }));
-      const cwd = root();
-      const schema = { type: 'object', properties: { outcome: { type: 'string' } } };
-
-      await s.test(
-        'claude-detached at shipped defaults: a task that asked for a closeout gets the one it printed, and its session id',
-        async (sub) => {
-          const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd, harness: 'claude-detached', closeoutSchema: schema }));
-          await ticked(sub, engine, id);
-          const { state } = await Effect.runPromise(engine.view(id));
-          assert.equal(state.settled, 'succeeded');
-          assert.deepEqual(state.attempts[0]?.closeout, { outcome: 'done' }, 'the answer it printed, on the record');
-          assert.equal(state.attempts[0]?.nativeId, SESSION, 'and the session id, from the same JSON');
-          assert.deepEqual(state.attempts[0]?.usage, { costUsd: 0.0123, apiMs: 850 }, 'and what it cost, from the same JSON');
-        },
-      );
-
-      await s.test('it was asked for JSON and for the schema, and wrote nothing in the workspace', () => {
-        const given = argv();
-        assert.deepEqual(JSON.parse(given[given.indexOf('--json-schema') + 1]), schema);
-        assert.equal(given[given.indexOf('--output-format') + 1], 'json');
-        assert.deepEqual(fs.readdirSync(cwd), [], 'nothing in the workspace');
-      });
-
-      await s.test(
-        'claude-detached, filed through the engine with disallowedTools, spawns claude with --disallowedTools and the rules',
-        async (sub) => {
-          const rules = ['Bash(npm run build)', 'Bash(npm run e2e)'];
-          const allow = ['Write(**)'];
-          const id = await Effect.runPromise(
-            engine.file({
-              brief: 'the prompt',
-              cwd: root(),
-              harness: 'claude-detached',
-              config: { tools: ['Read', 'Bash'], disallowedTools: rules, allowedTools: allow },
-            }),
-          );
-          await ticked(sub, engine, id);
-          assert.deepEqual((await Effect.runPromise(engine.view(id))).state.config?.disallowedTools, rules, 'on the record');
-          const given = argv();
-          const i = given.indexOf('--disallowedTools');
-          assert.notEqual(i, -1, given.join(' '));
-          assert.equal(given[i + 1], 'Bash(npm run build),Bash(npm run e2e)');
-          assert.match(given[i + 2], /^--/, 'a flag ends the variadic list');
-          assert.deepEqual(
-            (await Effect.runPromise(engine.view(id))).state.config?.allowedTools,
-            allow,
-            'and the allow list beside it, on the record',
-          );
-          const a = given.indexOf('--allowedTools');
-          assert.notEqual(a, -1, given.join(' '));
-          assert.equal(given[a + 1], 'Write(**)');
-          assert.equal(given[a + 2], '--settings', 'a flag ends this variadic list too');
-        },
-      );
-
-      await s.test(
-        'codex at shipped defaults: what the attempt consumed is read from its exec --json stream and recorded on it',
-        async (sub) => {
-          const id = await Effect.runPromise(engine.file({ brief: 'the prompt', cwd: root(), harness: 'codex' }));
-          await ticked(sub, engine, id);
-          const { state } = await Effect.runPromise(engine.view(id));
-          assert.equal(state.settled, 'succeeded');
-          assert.deepEqual(
-            state.attempts[0]?.usage,
-            { toolCalls: 1, inputTokens: 1200, uncachedTokens: 200, cacheWriteTokens: 0, cacheReadTokens: 1000, outputTokens: 80 },
-            'measured, and nothing it did not measure',
-          );
-          assert.equal(state.attempts[0]?.exitCode, 0);
-          assert.equal(state.attempts[0]?.nativeId, '01a09996-d343-7932-8971-b2f209ba315b');
-        },
-      );
-    } finally {
-      process.env.PATH = prev.PATH;
-      if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
-      else process.env.CODEX_HOME = prev.CODEX_HOME;
-    }
-  },
-);
+  } finally {
+    process.env.PATH = prev.PATH;
+    if (prev.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = prev.CODEX_HOME;
+  }
+});
 
 test(
   "a spec's spawn: what it prepares merged into its command's io, and a spawn request written whole, owner-only, never stale, forgotten with the rest",
@@ -2655,14 +2531,14 @@ test("observe: a resumed run is charged its own share — its parent's totals ta
     );
   });
 
-  await t.test("claude-detached's resumed try counts its own tokens, cost and API time, its parent's taken off", async () => {
+  await t.test("Claude Code's job's resumed try counts its own tokens, cost and API time, its parent's taken off", async () => {
     const dir = root();
     const at = (s: number) => ({ nativeId: SESSION, startedAt: `2026-10-22T09:00:0${s}Z` });
-    doneRun(dir, 'ae/h/1', at(0), H4SJ_IMPLEMENT, claudeDetached.name);
-    doneRun(dir, 'ae/h/2', { ...at(1), resumeFrom: SESSION }, H4SJ_IMPLEMENT_TRY2, claudeDetached.name);
-    const seen = await Effect.runPromise(detachedOps(claudeDetached, dir).observe);
+    doneRun(dir, 'ae/h/1', at(0), H4SJ_IMPLEMENT, claudeJob.name);
+    doneRun(dir, 'ae/h/2', { ...at(1), resumeFrom: SESSION }, H4SJ_IMPLEMENT_TRY2, claudeJob.name);
+    const seen = await Effect.runPromise(detachedOps(claudeJob, dir).observe);
     assert.equal(tokensOf(seen.get('ae/h/1')?.usage).cacheReadTokens, 85418088, 'try 1 is its whole session');
-    const told = await Effect.runPromise(detachedOps(claudeDetached, dir).observeFor!([{ name: 'ae/h/2' }]));
+    const told = await Effect.runPromise(detachedOps(claudeJob, dir).observeFor!([{ name: 'ae/h/2' }]));
     for (const usage of [seen.get('ae/h/2')?.usage, told.seen.get('ae/h/2')?.usage]) {
       assert.deepEqual(tokensOf(usage), H4SJ_TRY2_OWN, "h4sj's try 2: its 4.2M cache reads, not the 89.6M its modelUsage carries");
       assert.ok(usage?.costUsd !== undefined && Math.abs(usage.costUsd - 1.327168) < 1e-9, `cost ${usage?.costUsd}`);
@@ -2739,34 +2615,6 @@ test(
         for (const name of ['ae/u/1', 'ae/v/2', 'ae/n/1']) await settle(sub, detachedOps(spec, dir), name, 'completed');
       },
     );
-
-    await s.test("claude-detached's resumed spawn carries its parent's totals on its run file, and its try counts its own", async (sub) => {
-      const bin = scratch('ae-fake-claude-');
-      const printed = path.join(bin, 'result.json');
-      fs.writeFileSync(printed, `${JSON.stringify({ ...JSON.parse(H4SJ_IMPLEMENT_TRY2), session_id: SESSION })}\n`);
-      fs.writeFileSync(
-        path.join(bin, 'claude'),
-        ['#!/bin/sh', `if [ "$1" = agents ]; then echo '[]'; exit 0; fi`, `cat '${printed}'`].join('\n'),
-        { mode: 0o755 },
-      );
-      const prev = process.env.PATH;
-      process.env.PATH = `${bin}:${prev}`;
-      try {
-        const own = root();
-        doneRun(own, 'ae/h/1', { nativeId: SESSION, startedAt: '2026-10-22T09:00:00Z' }, H4SJ_IMPLEMENT, claudeDetached.name);
-        const ops = detachedOps(claudeDetached, own);
-        await Effect.runPromise(ops.spawn({ ...req('ae/h/2', own), resumeFrom: SESSION }));
-        const run = JSON.parse(fs.readFileSync(runFileOf(own, claudeDetached.name, 'ae/h/2'), 'utf8'));
-        assert.equal(run.resumeFrom, SESSION);
-        assert.deepEqual(run.carried, carriedOf(claudeResultOutput(H4SJ_IMPLEMENT)), "try 1's whole session, kept at spawn");
-        await settle(sub, ops, 'ae/h/2', 'completed');
-        const usage = (await Effect.runPromise(detachedOps(claudeDetached, own).observe)).get('ae/h/2')?.usage;
-        assert.deepEqual(tokensOf(usage), H4SJ_TRY2_OWN);
-        assert.ok(usage?.costUsd !== undefined && Math.abs(usage.costUsd - 1.327168) < 1e-9, `cost ${usage?.costUsd}`);
-      } finally {
-        process.env.PATH = prev;
-      }
-    });
   },
 );
 

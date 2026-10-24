@@ -424,12 +424,12 @@ test("a step with an agent: what it owns, what its agent gives it, and the keys 
       key: 'harness',
       meaning: '',
       kind: 'choice',
-      choices: ['claude', 'codex', 'claude-detached'],
+      choices: ['claude', 'codex'],
       byHarness: null,
     };
     const permissionMode = {
       key: 'permissionMode',
-      byHarness: { claude: ['dontAsk'], 'claude-detached': ['dontAsk'] },
+      byHarness: { claude: ['dontAsk'] },
     } satisfies Pick<KeyField, 'key' | 'byHarness'>;
     const sandbox = { key: 'sandbox', byHarness: { codex: ['read-only'] } } satisfies Pick<KeyField, 'key' | 'byHarness'>;
     const form: Pick<KeyForm, 'keys' | 'remote'> = { keys: [harness], remote: { prefix: 'a2a:', refuses: ['model', 'permissionMode'] } };

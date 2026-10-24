@@ -99,7 +99,7 @@ const board = () => {
           said: said.get(id) ?? [],
           /**
            * An attempt given a reason ended `failed` with it, as the engine records a session that went quiet unsigned, or broke. What it
-           * consumed is on it once it has settled, and not before: a `--bg` session writes its cost as its process exits. Given several
+           * consumed is on it once it has settled, and not before: a job writes its cost as it prints its result. Given several
            * reasons, one attempt ended with each, in order, and the last carries what the task settled with. `budget` is no end the
            * runtime judges: its harness's cut is carried on a failed end as `limit`, as the runtime records it.
            */

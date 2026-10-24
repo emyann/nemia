@@ -1,8 +1,8 @@
 /**
- * A session the SDK runs is fenced as `claude -p` is for the same task — a held session and a job alike, since
- * `bin/ae-claude-job.ts` builds its options with this very function: every fact of `claudePrintFlags`' argv (`claude-detached`'s,
- * the one spec that still spells a command line) is in
- * `attachedOptions`, on the SDK's own option where it has one and on `extraArgs` where it has none, the closing statement's schema is
+ * A session the SDK runs is fenced the same for the same task — a held session and a job alike, since `bin/ae-claude-job.ts` builds
+ * its options with this very function: every fact of a task is in `attachedOptions`, held here as written (the facts `claude -p`'s
+ * argv carried for it, before that road was taken away), on the SDK's own option where it has one and on `extraArgs` where it has
+ * none, the closing statement's schema is
  * handed on unread, and the session is given Claude Code's own system prompt, which a job has by default, with the agent's appended
  * to it.
  *
@@ -17,7 +17,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
 import { attachedOptions } from './attached-options.ts';
-import { claudePrintFlags } from './code.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
 import type { SpawnRequest } from '../seam.ts';
 import type { ClaudeFlags } from './vocabulary.ts';
@@ -67,63 +66,64 @@ const RICH: SpawnRequest = {
 /** `RICH` with `claude` as given and nothing else of it changed. */
 const withClaude = (claude: ClaudeFlags): SpawnRequest => ({ ...RICH, config: { ...RICH.config, claude } });
 
-/** The values `flag` takes in `argv`, each split on its commas where the flag joins a list. */
-const valuesOf = (argv: string[], flag: string): string[] => {
-  const at = argv.indexOf(flag);
-  return at < 0 ? [] : [argv[at + 1]];
-};
-
-test('attachedOptions: a rich task is fenced as claude -p is for the same task, on the SDK’s own options', async (t) => {
+test('attachedOptions: a rich task is fenced on the SDK’s own options, each fact of it in its place', async (t) => {
   const s = story(t);
-  const argv = claudePrintFlags(RICH, undefined);
   const given = attachedOptions(RICH);
 
-  await s.test('the options carry these keys and no other: a key added is a question — what is it, and has claude -p it too?', () => {
-    assert.deepEqual(Object.keys(given).sort(), [
-      'additionalDirectories',
-      'allowedTools',
-      'cwd',
-      'disallowedTools',
-      'effort',
-      'env',
-      'extraArgs',
-      'includePartialMessages',
-      'maxBudgetUsd',
-      'mcpServers',
-      'model',
-      'outputFormat',
-      'permissionMode',
-      'plugins',
-      'resume',
-      'settingSources',
-      'settings',
-      'strictMcpConfig',
-      'systemPrompt',
-      'tools',
-    ]);
+  await s.test(
+    'the options carry these keys and no other: a key added is a question — what is it, and has the SDK an option for it?',
+    () => {
+      assert.deepEqual(Object.keys(given).sort(), [
+        'additionalDirectories',
+        'allowedTools',
+        'cwd',
+        'disallowedTools',
+        'effort',
+        'env',
+        'extraArgs',
+        'includePartialMessages',
+        'maxBudgetUsd',
+        'mcpServers',
+        'model',
+        'outputFormat',
+        'permissionMode',
+        'plugins',
+        'resume',
+        'settingSources',
+        'settings',
+        'strictMcpConfig',
+        'systemPrompt',
+        'tools',
+      ]);
+    },
+  );
+
+  await s.test('every deny, allow, tool and added folder of the task is in the options, a mount an edit denied or allowed under it', () => {
+    assert.deepEqual(given.disallowedTools, ['Bash(git push:*)', 'WebFetch', 'Edit(//ro/**)']);
+    assert.deepEqual(given.allowedTools, ['Edit(**)', 'Bash(npm test)', 'Edit(//rw/**)']);
+    assert.deepEqual(given.tools, ['Read', 'Bash']);
+    assert.deepEqual(given.additionalDirectories, ['/ro', '/rw']);
   });
 
-  await s.test('every deny, allow, tool and added folder of the job is in the attached options', () => {
-    assert.deepEqual(given.disallowedTools, valuesOf(argv, '--disallowedTools')[0].split(','));
-    assert.deepEqual(given.allowedTools, valuesOf(argv, '--allowedTools')[0].split(','));
-    assert.deepEqual(given.tools, valuesOf(argv, '--tools')[0].split(','));
-    assert.deepEqual(given.additionalDirectories, argv.slice(argv.indexOf('--add-dir') + 1, argv.indexOf('--add-dir') + 3));
-  });
-
-  await s.test('the mode, model, effort, budget, resume, worktree, settings and window of the job are in the attached options', () => {
-    assert.equal(given.permissionMode, valuesOf(argv, '--permission-mode')[0]);
-    assert.equal(given.model, valuesOf(argv, '--model')[0]);
-    assert.equal(given.effort, valuesOf(argv, '--effort')[0]);
-    assert.equal(String(given.maxBudgetUsd), valuesOf(argv, '--max-budget-usd')[0]);
-    assert.equal(given.resume, valuesOf(argv, '--resume')[0]);
-    assert.deepEqual(given.settingSources, valuesOf(argv, '--setting-sources'));
-    assert.equal(given.extraArgs?.worktree, valuesOf(argv, '--worktree')[0]);
+  await s.test('the mode, model, effort, budget, resume, worktree, settings and window of the task are in the options', () => {
+    assert.equal(given.permissionMode, 'dontAsk');
+    assert.equal(given.model, 'opus');
+    assert.equal(given.effort, 'high');
+    assert.equal(given.maxBudgetUsd, 3);
+    assert.equal(given.resume, 'parent-session');
+    assert.deepEqual(given.settingSources, ['project']);
+    assert.equal(given.extraArgs?.worktree, 'tree');
+    assert.equal(
+      attachedOptions({ name: 'ae/t-abc/2', brief: 'b', cwd: '/r', config: { worktree: true } }).extraArgs?.worktree,
+      'ae-t-abc-2',
+      'a worktree the task did not name is named after the session',
+    );
     assert.deepEqual(
       given.settings,
-      { ...(JSON.parse(valuesOf(argv, '--settings')[0]) as object), autoCompactWindow: Number(valuesOf(argv, '--autocompact')[0]) },
-      "the job's settings, on the SDK's own option, the window the job spells as a flag in them",
+      { env: {}, autoMemoryEnabled: false, autoCompactWindow: 200_000 },
+      "the task's settings, on the SDK's own option, auto-memory off and the window in them",
     );
-    assert.deepEqual(given.plugins, [{ type: 'local', path: path.resolve(CWD, valuesOf(argv, '--plugin-dir')[0]) }]);
+    assert.deepEqual(given.plugins, [{ type: 'local', path: path.resolve(CWD, 'plug') }]);
   });
 
   await s.test('the closing statement schema is handed on as given, and the environment is a job’s with the task’s under it', () => {
@@ -142,8 +142,7 @@ test('attachedOptions: a rich task is fenced as claude -p is for the same task, 
   });
 
   await s.test('the servers’ fence is the SDK’s own option, strict for every task', () => {
-    assert.ok(argv.includes('--strict-mcp-config'), 'a job is spawned strict');
-    assert.equal(given.strictMcpConfig, true, 'and so is an attached session, on `strictMcpConfig`');
+    assert.equal(given.strictMcpConfig, true, 'a job and a held session alike, on `strictMcpConfig`');
   });
 
   await s.test('an attached session is given Claude Code’s own system prompt, the agent’s appended to it', () => {
@@ -224,11 +223,11 @@ const ROWS: { name: string; check: () => void }[] = [
       assert.equal(attachedOptions(withClaude({ systemPromptFile: 'beside.md' })).systemPrompt, 'you are the agent beside the work'),
   },
   {
-    name: 'REFUSED: a task giving both prompt files, naming both keys and the harness that takes both flags',
+    name: 'REFUSED: a task giving both prompt files, naming both keys',
     check: () =>
       assert.throws(
         () => attachedOptions(withClaude({ appendSystemPromptFile: APPEND, systemPromptFile: REPLACE })),
-        refusedNaming('appendSystemPromptFile', 'systemPromptFile', 'claude-detached'),
+        refusedNaming('appendSystemPromptFile', 'systemPromptFile'),
       ),
   },
   {
@@ -247,11 +246,11 @@ const ROWS: { name: string; check: () => void }[] = [
     },
   },
   {
-    name: 'REFUSED: a flag of config.claude given twice, naming the flag and the detached job',
+    name: 'REFUSED: a flag of config.claude given twice, naming the flag',
     check: () =>
       assert.throws(
         () => attachedOptions({ ...RICH, config: { claude: { mcpDebug: ['a', 'b'] } } }),
-        refusedNaming('`config.claude.mcpDebug`', 'claude-detached'),
+        refusedNaming('`config.claude.mcpDebug`'),
       ),
   },
 ];

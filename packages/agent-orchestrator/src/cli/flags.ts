@@ -27,7 +27,7 @@ ${helpOf(CLI_VERBS)}
 A workflow is a folder of markdown files. One file is one step:
 
     ---
-    harness: codex        # claude (default) | codex | claude-detached
+    harness: codex        # claude (default) | codex
     after: implement      # what must finish first: verified, or unverified if it has no check
     output: review.json   # what its closeout declares for a later step: a JSON Schema beside it
     loop: implement       # again: true in its closeout runs implement again, then this step
@@ -39,7 +39,7 @@ No key is control flow: \`after\` orders, \`resume\` continues, \`check\` measur
 tries the run may re-file a step its check refused, \`gate\` holds a step's handoff for a person's nemia approve,
 \`denials\` holds one whose try the harness denied a call, \`output\` declares what a closeout says for a later step and \`input\` reads it, \`loop\` is the edge back
 and \`rounds\` counts it — whether to go round is the step's own \`again\` — and the rest (model, effort,
-permissionMode on Claude Code, sandbox on Codex, tools, disallowedTools, allowedTools, background, remote, deadlineSeconds, budget) say who does the work, with
+permissionMode on Claude Code, sandbox on Codex, tools, disallowedTools, allowedTools, remote, deadlineSeconds, budget) say who does the work, with
 what, who may drive it, for how long and for how much. Everything else the agent is told is prose.
 
   nemia ls says what the run established: verified ✓ · checking · failed ✗ check (exit N)
@@ -56,9 +56,9 @@ what, who may drive it, for how long and for how much. Everything else the agent
   base branch with nothing having merged it.
 
   WF_ROOT            where runs and the engine's board live, an absolute path (default ~/.agent-workflows)
-  WF_MAX_CONCURRENT  sessions at work per pool at once, a whole number from 1 (default 2): claude and
-                     claude-detached one pool, codex and checks their own; a blocked session holds no
-                     slot; one run's review competes with another run's implement
+  WF_MAX_CONCURRENT  sessions at work per pool at once, a whole number from 1 (default 2): claude, codex
+                     and checks each a pool; a blocked session holds no slot; one run's review competes
+                     with another run's implement
   WF_MAX_RUNS        runs in flight at once (unset or 0: no cap): a run with nothing filed waits for a
                      slot, oldest first; a run waiting on --after counts once it is filed; a run of a
                      one-step workflow that says slot: none is not counted and never waits for one

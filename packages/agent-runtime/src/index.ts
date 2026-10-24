@@ -94,7 +94,6 @@ export type { BodyEntry, BodyOps, BodyRef } from './core/engine/index.ts';
 export type { IoCounts } from './core/engine/index.ts';
 
 export { Runner, RunnerError, testOps } from './harness/index.ts';
-export { claudeOps } from './harness/claude/index.ts';
 export type {
   ExpectedSession,
   Followed,
@@ -109,7 +108,7 @@ export type {
   TranscriptEvent,
   TranscriptMark,
 } from './harness/index.ts';
-export { HARNESS_ARGS, TURN_ARGS, argsRefusalOf } from './harness/index.ts';
+export { HARNESS_ARGS, TAKEN_ARGS, TURN_ARGS, argsRefusalOf } from './harness/index.ts';
 export type { Admission, AdmissionAnswer, AdmissionCall, CodexArgs, HarnessArgs, Mount } from './harness/index.ts';
 export type { ClaudeFlags } from './harness/claude/index.ts';
 export { detachedOps, STALE_MS } from './harness/detached/detached.ts';
@@ -134,7 +133,6 @@ export { heldHarnessesOf } from './service/options.ts';
  */
 export { remoteConfigRefusal } from './a2a/index.ts';
 export { codex } from './harness/codex/codex.ts';
-export { claudeDetached } from './harness/claude/index.ts';
 /**
  * How long a holder's whole let-go takes at most, in milliseconds: for a caller that waits for such a process to stop — a service
  * unit's stop timeout, a restart's wait for the lease — which is set above it rather than repeating the number.

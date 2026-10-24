@@ -456,7 +456,7 @@ test('what a session used, with the api and tool time its harness counted — be
       'used  responses not measured · tool calls not measured · tokens in not measured · tokens out not measured · api 1m01s · tools not measured',
       'cost  $4.20',
     ],
-    'claude-detached counts api time and cost, and nothing else',
+    'a harness that counts api time and cost, and nothing else',
   );
   assert.equal(
     usedLines({ responses: 3, toolMs: 400 })[0],
@@ -509,7 +509,7 @@ test('what a session read, by price: its classes add up, its peak is the largest
   assert.equal(
     readWords({ cacheReadTokens: 900, cacheWriteTokens: 0, uncachedTokens: 5 }),
     'read 900 · wrote 0',
-    'claude -p and codex: classes, no peak',
+    'a harness that counts classes and no peak',
   );
   assert.deepEqual(usedLines({ costUsd: 4.87, ...a }), [
     'used  responses not measured · tool calls not measured · tokens in not measured · tokens out not measured',

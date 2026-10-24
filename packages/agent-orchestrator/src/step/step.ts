@@ -106,7 +106,7 @@ export type Workflow = {
   permissionMode?: string;
   /**
    * Codex's sandbox, `codex exec -s`, which the runtime judges at `nemia start` — `read-only`, `workspace-write`,
-   * `danger-full-access`. Absent: Codex's `workspace-write`. Refused on claude and claude-detached, whose fence is `permissionMode`.
+   * `danger-full-access`. Absent: Codex's `workspace-write`. Refused on claude, whose fence is `permissionMode`.
    *
    * On codex the key's former name, `permissionMode:`, is still read in a folder or an agent: a sandbox's word is read as `sandbox:`
    * (`codexSandboxNamed`, with `bypassPermissions` as `danger-full-access`), and `nemia start` names the line to rename (`codexModeLine`).
@@ -152,37 +152,25 @@ export type Workflow = {
    * the run filed on its own would be denied the same call again. A person tries it again with `nemia retry` (a new session, told what it
    * was denied, to do without it), or adds the rule the offer names to the folder's `allowedTools:` and starts a new run. Absent: denials
    * are recorded and said, and decide nothing. Every denial counts, one the checkout's settings or the step's own `disallowedTools:` make
-   * on purpose included. Refused where no denial is ever read, rather than accepted and never met: on codex, which records none, and beside
-   * `background: true`, whose `claude --bg` session records none either (agent-runtime's open issue 28).
+   * on purpose included. Refused where no denial is ever read, rather than accepted and never met: on codex, which records none.
    */
   denials?: 'fail';
   /**
-   * `remote: true`: every session of the step is bridged to claude.ai — Claude Code's `--remote-control`, filed as
+   * `remote: true`: every session of the step is bridged to claude.ai — Claude Code's Remote Control, filed as
    * `config.claude.remoteControl` — and listed in the web's agents view, where anyone signed in to the account can drive it from a browser
    * or a phone: type into it, answer its prompts, stop it. A deliberate setting, never a default, for that reason. `remote: false` is what
-   * a step without the line is. Refused at `nemia start` on a harness the engine has no such flag for, and on `claude` without
-   * `background: true`: only Claude Code's background sessions are bridged, and a job (`claude -p`) opens no bridge.
+   * a step without the line is. Refused at `nemia start` on a harness the engine has no such flag for (`configRefused`): a `claude` step
+   * runs as a job on the Agent SDK, which the runtime bridges as it starts.
    */
   remote?: boolean;
-  /**
-   * `background: true`: every session of the step runs as a Claude Code background session, `claude --bg` — the engine's
-   * `config.background` — which never ends on its own, is listed in `claude agents`, and can be attached to and bridged (`remote:`).
-   * Without it a `claude` step runs as a job, `claude -p`: it runs its brief to its end and exits, waits on nobody in any permission
-   * mode (a call it may not make is denied and recorded on its attempt), takes `nemia say` on its stdin until its result, and keeps a spend
-   * cap (`budget:`). So the line is for a session that must outlive a brief — the supervisor — and nothing else. Refused on a harness
-   * other than `claude`, which has no second way to run, beside `budget:`, which a background session does not keep, and over an agent
-   * in any mode but the widest (`fenceRefusal`), since a background session also reads the person's own settings and their allow rules.
-   * A step's key, not an agent's: it is how a step's session is run, not who does the work.
-   */
-  background?: boolean;
   deadlineSeconds?: number;
   /**
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
    * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
-   * try, no round of a loop it is in — until a person raises it (`nemia retry --budget`, `nemia round --budget`). On `claude` and
-   * `claude-detached`, whose sessions are `claude -p` jobs, what is left of it is handed to the engine as `config.budgetUsd` too — a
-   * harness argument the runtime judges nothing of — and the harness ends a session once the tries together reach it (`budgetUsdFor`).
-   * Refused on codex, which has none, and beside `background: true`, whose `claude --bg` keeps none either.
+   * try, no round of a loop it is in — until a person raises it (`nemia retry --budget`, `nemia round --budget`). On `claude`, whose
+   * sessions are jobs on the Agent SDK, what is left of it is handed to the engine as `config.budgetUsd` too — a harness argument the
+   * runtime judges nothing of — and the harness ends a session once the tries together reach it (`budgetUsdFor`). Refused on codex, which
+   * has none.
    */
   budget?: number;
   /**
@@ -347,7 +335,6 @@ export const STEP_KEYS = [
   'disallowedTools',
   'allowedTools',
   'denials',
-  'background',
   'remote',
   'deadlineSeconds',
   'budget',
@@ -414,13 +401,13 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
     "skills the step adds to its agent's, each a folder in a `skills/` beside `agents/`: the session is given the agent's, then these, each once, and none is taken away — on a step with an agent, whose fence lets it load them with `Skill`",
   mcp: "MCP servers the step adds to its agent's, each by its name in the checkout's `.mcp.json`: the session loads the agent's, then these, each once, and none is taken away — on a step with an agent; loading a server allows none of its tools",
   harness:
-    "what runs the session: `claude` (the default), `codex` or `claude-detached` — or `a2a:<name>`, a remote A2A agent the store's `a2a-agents.json` declares, which takes none of the keys that tell a harness of ours how to run",
+    "what runs the session: `claude` (the default) or `codex` — or `a2a:<name>`, a remote A2A agent the store's `a2a-agents.json` declares, which takes none of the keys that tell a harness of ours how to run",
   model: "the model the harness runs the session on: the harness's own default when unset",
   effort: "how hard the harness thinks, in its own words: Claude Code's `--effort`, Codex's `model_reasoning_effort`",
   context:
     "the session's context window, in tokens — `200k`: past about it Claude Code compacts the conversation and carries on; the model's whole window when unset",
   permissionMode:
-    "Claude Code's permission mode — whether it asks, denies or allows what no rule decides — on `claude` and `claude-detached`; on codex the fence is `sandbox:`",
+    "Claude Code's permission mode — whether it asks, denies or allows what no rule decides — on `claude`; on codex the fence is `sandbox:`",
   sandbox:
     "Codex's sandbox — `read-only`, `workspace-write` or `danger-full-access` — on `codex` only; on Claude Code the fence is `permissionMode:`; `workspace-write` when unset",
   tools: "the only tools the session may have, in the harness's names: the harness's own set when unset",
@@ -428,11 +415,9 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   allowedTools:
     "what the session may do without being asked, in Claude Code's permission rules — `Edit(**)`, a glob against the step's own directory, which covers every file-editing tool: what a step in `dontAsk` needs to write its own work, since that mode asks nobody and so allows nothing",
   denials:
-    '`fail`: a try the harness denied a call is not passed on — the step reads `denied`, stops what comes after it and waits on a person, and `retries:` never retries it; on `claude` and `claude-detached` jobs only',
-  background:
-    "`true`: the step runs as a Claude Code background session (`claude --bg`), which outlives its brief and can be attached to and bridged, rather than as a job (`claude -p`) — on `claude` only, with no `budget:`, and over an agent only when its file runs it in the widest mode, since a background session also reads the person's own settings",
+    '`fail`: a try the harness denied a call is not passed on — the step reads `denied`, stops what comes after it and waits on a person, and `retries:` never retries it; on `claude` only',
   remote:
-    '`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` with `background: true` only',
+    '`true`: every session of the step is bridged to claude.ai, where anyone signed in to the account can drive it from a browser or a phone — on `claude` only',
   deadlineSeconds: COUNTS.deadlineSeconds.counts,
   budget: "the most the step's tries may cost together, in dollars: past it the run files nothing more for it until a person raises it",
   check: "a shell command the run executes in the step's workspace after it hands off: exit 0 makes the step verified",
@@ -473,6 +458,10 @@ export const REFUSED: Record<string, string> = {
     'the runtime makes one attempt at a session and tries nothing again on its own, so a count of attempts has nothing' +
     " to count. Trying again is the run's: `retries: N` files the step again after its check refuses it, and `nemia retry <run> <step>`" +
     ' asks for a try of one that failed, was lost or could not start (`--nudge` continues its session, `--fresh` starts clean). Delete the line',
+  background:
+    'every Claude Code session runs on the Agent SDK: a step runs as a job, which runs its brief to its end, and a session that must' +
+    " outlive a brief is the runtime's long-lived task (`restartPolicy: 'Always'`), which no step files. Delete the line: the step runs" +
+    ' as a job on the Agent SDK',
 };
 
 /** A step that is wrong: its author's to fix, and the message says how. An `Invalid`, so its `exitCode` is 2. */

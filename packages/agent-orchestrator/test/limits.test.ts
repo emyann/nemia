@@ -117,12 +117,10 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-runtime/src/core/event-schema.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/service/harness-refusal.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/args.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-runtime/src/harness/claude/code.ts': { complexity: 1 },
   'packages/agent-runtime/src/harness/detached/detached.ts': { 'max-lines-per-function': 1 },
   'packages/agent-runtime/src/harness/mcp.ts': { 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/harness/sdk.ts': { 'max-lines-per-function': 1, complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/service/engine.ts': { 'max-lines-per-function': 2 },
-  'packages/agent-runtime/src/service/say.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
 };
 
 type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, unknown> };

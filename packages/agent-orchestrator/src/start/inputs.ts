@@ -60,7 +60,7 @@ const inputKind = (name: string): 'a picture' | 'a text file' | 'a file' => {
  * part of what was asked; each by name with what it is (`inputKind`); then where they are and what the step may do with them. It obliges
  * no step to open one. Undefined for a run given none, or with no directory to name.
  *
- * `inFolder` for a step of a folder run, which is fenced to its own folder (`validateFolderMode` in workflow/validate.ts): the run's own
+ * `inFolder` for a step of a folder run, which is fenced to its own folder, a job that asks nobody: the run's own
  * `inputs/` sits beside that folder, outside the fence, and named it the session would be denied the read with no prompt and no way to say
  * so. The run copies them in instead (`givenPlan`, `folderPlace.make`), and the line names the copy, by its path from the folder.
  *

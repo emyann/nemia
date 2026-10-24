@@ -23,7 +23,7 @@ import {
   type AttachedRun,
   type AttachedState,
 } from './attached-file.ts';
-import { bridgeStateOf, enableBridge } from './attached-bridge.ts';
+import { bridgeDue, bridgeStateOf, enableBridge } from './attached-bridge.ts';
 import { bridgeAsked } from './vocabulary.ts';
 import { claudeStreamKept } from '../detached/output.ts';
 import type { SpawnRequest } from '../seam.ts';
@@ -287,7 +287,7 @@ const hooksOf = (root: string, live: Live, held: Held, mayAsk: boolean): Partial
   };
 };
 
-/** Appends `line` to the session's capture, as a reader of `claude -p`'s stream reads it. */
+/** Appends `line` to the session's capture, as a reader of a job's stream reads it. */
 const capture = (root: string, name: string, line: object): void => {
   const kept = claudeStreamKept(JSON.stringify(line));
   if (kept) fs.appendFileSync(filesOf(root, name).out, `${kept}\n`);
@@ -475,11 +475,14 @@ export const startSession = (
   live.q = q as Live['q'];
   live.done = (async () => {
     let end: AttachedState = 'failed';
-    let turns = 0;
+    let bridging = bridgeAsked(r);
     try {
       for await (const m of q) {
         took(root, live, m);
-        if (m.type === 'result' && ++turns === 1 && bridgeAsked(r)) await bridgeOn(root, live, q, run.name);
+        if (bridging && bridgeDue(m)) {
+          bridging = false;
+          await bridgeOn(root, live, q, run.name);
+        }
       }
     } catch {
       end = abort.signal.aborted ? 'canceled' : 'failed';
@@ -492,11 +495,15 @@ export const startSession = (
 };
 
 /**
- * Opens the session's claude.ai bridge after its first turn, where its request asked for one, and writes what came of it on the run
- * file — the bridge's facts, or why there is none (`attached-bridge.ts`). A resume re-attaches the claude.ai session its run file kept.
+ * Opens the session's claude.ai bridge on its first message (`bridgeDue`, its `system`/`init`), where its request asked for one, and
+ * writes what came of it on the run file — the bridge's facts, or why there is none (`attached-bridge.ts`). Asked once a session, and
+ * awaited before its next message is taken, so the `bridge_state` messages the answer drives are written after it. A long-lived
+ * session keeps its claude.ai session past this process (`keepSessionOnExit`), and a resume re-attaches the one its run file kept; a
+ * job's claude.ai session ends with it, and re-attaches none.
  */
 const bridgeOn = async (root: string, live: Live, q: unknown, name: string): Promise<void> => {
   if (live.letGo) return;
-  const bridge = await enableBridge(q, name, live.run.bridge?.bridgeSessionId);
+  const reattach = live.open ? live.run.bridge?.bridgeSessionId : undefined;
+  const bridge = await enableBridge(q, name, { keepSessionOnExit: live.open, ...(reattach ? { reattach } : {}) });
   rewrite(root, live, { bridge });
 };

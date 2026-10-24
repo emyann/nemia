@@ -30,10 +30,10 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * reads `git status --porcelain` as dirty and stops. Such a step has no check to be given `WF_ARTIFACTS` either,
  * since `workspace: main` refuses one, and nothing follows it to read what it wrote. So it is told the one way.
  *
- * `inFolder` for a step of a folder run (`place: folder`): there the *first* way is the one that does harm. Such a step runs in
- * `dontAsk` (`validateFolderMode` in workflow/validate.ts), fenced to its own folder, and that directory sits beside the folder, outside
- * the fence: told to put a file there, the session is denied. The second way needs nothing outside the fence and hands the file over all
- * the same. So it too is told one way, and neither mentions a branch, since a folder run has none.
+ * `inFolder` for a step of a folder run (`place: folder`): there the *first* way is the one that does harm. Such a step runs as a
+ * job, which asks nobody, fenced to its own folder, and that directory sits beside the folder, outside the fence: told to put a file
+ * there, the session is denied. The second way needs nothing outside the fence and hands the file over all the same. So it too is told
+ * one way, and neither mentions a branch, since a folder run has none.
  *
  * Both of the ways that hand files to the steps after say that a file through a folder a harness reads as its own configuration
  * (`CONFIG_FOLDERS`) is refused, and why: a later step reads the files directory as a mounted folder, and its harness would take such a

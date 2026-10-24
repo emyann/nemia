@@ -18,7 +18,6 @@ import path from 'node:path';
 import { Cause, Context, Effect, Exit, Layer, References, Scope } from 'effect';
 import {
   BEARER,
-  claudeDetached,
   codex,
   commandHarness,
   heldHarnessesOf,
@@ -82,7 +81,7 @@ export { refusedText } from 'agent-runtime';
  * `nemia retry` ask of a step's filed config before anything is written, and word in the step's keys (`filedRefusal`).
  */
 export { configRefusal } from 'agent-runtime';
-/** Whether a harness trusts a folder to run a background session in: what `nemia level` asks before it lets the keeper file one there. */
+/** Whether a harness trusts a folder to run a long-lived session in: what `nemia level` asks before it lets the keeper file one there. */
 export { trustedFolder } from 'agent-runtime';
 /**
  * A harness's trust of a folder a factory names, in the runtime's words: read as it is now (`folderTrust`), and given (`trustFolder`),
@@ -136,27 +135,20 @@ export const unreadableJournal = (err: unknown): string | undefined => {
  * default map rather than adding to it, so the defaults are named again here — leaving them out would
  * quietly send every step to whichever harness came first.
  *
- * A step runs on the engine's harness of its name as a job, which ends on its own, asks nobody in any mode, and keeps a spend cap; a
- * step that says `background: true` is filed with `config.background` and runs as a background session, which a person can talk to.
- *
- * The detached harness and the job it stands beside are one subscription, so it counts in the job's pool (`pool`), under one ceiling;
- * every other harness, `check` among them, is a pool of its own.
+ * A step runs on the engine's harness of its name as a job, which ends on its own, asks nobody in any mode, and keeps a spend cap. Each
+ * harness, `check` among them, is a pool of its own.
  */
 export const HARNESSES = {
   claude: 'claude',
   codex,
-  'claude-detached': { ...claudeDetached, pool: 'claude' },
   check: { ...commandHarness, name: 'check' },
 } as const;
 
 /**
- * The harnesses the daemon asks for their quota (`up`): each of the engine's that is a subscription of its own, so none that counts in
- * another's pool. One that reports no quota refuses the ask, and is asked again all the same: the refusal costs no process, and no span.
+ * The harnesses the daemon asks for their quota (`up`): each of the engine's, every one a subscription of its own. One that reports no
+ * quota refuses the ask, and is asked again all the same: the refusal costs no process, and no span.
  */
-export const quotaHarnesses = (): string[] =>
-  Object.entries(HARNESSES)
-    .filter(([, h]) => typeof h === 'string' || !('pool' in h))
-    .map(([name]) => name);
+export const quotaHarnesses = (): string[] => Object.keys(HARNESSES);
 
 /**
  * The engine the controllers use. Every filing goes out `queued`, and the runtime admits it per pool under the ceiling handed to it here,

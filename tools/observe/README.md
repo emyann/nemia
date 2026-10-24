@@ -313,7 +313,8 @@ is counted once, as its Agent tool.
 
 - **Tools are timed on `claude_code.tool`.** Its `tool.execution` and `tool.blocked_on_user` children carry no `tool_name` (measured
   2026-10-07), so a tool's time is its call's, the permission wait shown as the part of it spent waiting.
-- **`claude_code.interaction` is sent by a `-p` job alone**, a step; a long-lived session (`--bg`) sends none, and has no turn to sum.
+- **`claude_code.interaction` was sent by a `-p` job**, a step (measured 2026-10-07, when jobs ran as `claude -p`); a `--bg` session,
+  which no longer runs, sent none and had no turn to sum.
 - **The main thread's leaves are read structurally**: `{… name="claude_code.interaction"} > {name="claude_code.llm_request"}` keeps a
   turn's own children, and a subagent's, a level further down, out. `span.agent_id = nil` beside a `name` returned no series or the wrong
   count on Tempo 3.0.3 (2026-10-07). Prometheus' permission wait is the span metrics', and so a subagent's is in it.

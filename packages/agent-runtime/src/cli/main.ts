@@ -9,7 +9,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { Effect, ManagedRuntime } from 'effect';
 import { admissionHook, Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
-import { refusedText, retiredKeyRefusal, type CodexArgs, type ForgetReport, type HarnessArgs } from '../index.ts';
+import { refusedText, retiredKeyRefusal, TAKEN_ARGS, type CodexArgs, type ForgetReport, type HarnessArgs } from '../index.ts';
 import type { SweepReport, TaskSpec } from '../index.ts';
 import { attemptLine, entryLine, limitLines, runningText, taskLine } from './lines.ts';
 import { compactAsked, compactLines } from './compact.ts';
@@ -35,7 +35,6 @@ export const BRIEF_KEYS = [
   'effort',
   'budgetUsd',
   'contextTokens',
-  'background',
   'holdOpen',
   'queued',
   'restartPolicy',
@@ -53,6 +52,12 @@ const RETIRED_BRIEF_KEYS = ['maxAttempts', 'resume'] as const;
 const isRetiredBriefKey = (key: string): key is (typeof RETIRED_BRIEF_KEYS)[number] =>
   (RETIRED_BRIEF_KEYS as readonly string[]).includes(key);
 
+/**
+ * The keys a brief refuses because what they asked for is gone, each with what to write instead: `background` ran the session as
+ * `claude --bg`, which the runtime no longer runs (`TAKEN_ARGS`, in `file()`'s words).
+ */
+const TAKEN_BRIEF_KEYS: Readonly<Record<string, string>> = TAKEN_ARGS;
+
 /** A refusal: exit code 2, and a sentence that says what to write instead. */
 const refuse = (message: string) => Object.assign(new Error(`brief: ${message}`), { exitCode: 2 });
 
@@ -66,13 +71,15 @@ const isDirectory = (p: string) => {
 
 /**
  * One frontmatter line, its comment cut: its key and its value, trimmed. Refuses a line that is not `key: value`, then a
- * retired key, then a key not in `BRIEF_KEYS`.
+ * retired key, then a key taken away (`TAKEN_BRIEF_KEYS`), then a key not in `BRIEF_KEYS`.
  */
 const metaEntry = (line: string): [BriefKey, string] => {
   const i = line.indexOf(':');
   if (i <= 0) throw refuse(`\`${line}\` is not a \`key: value\` line. Write it as \`key: value\`, or delete it.`);
   const key = line.slice(0, i).trim();
   if (isRetiredBriefKey(key)) throw refuse(retiredKeyRefusal(key));
+  const taken = Object.hasOwn(TAKEN_BRIEF_KEYS, key) ? TAKEN_BRIEF_KEYS[key] : undefined;
+  if (taken !== undefined) throw refuse(`${taken} Delete the \`${key}:\` line.`);
   if (!isBriefKey(key)) throw refuse(`\`${key}\` is not a key a brief has. A brief's keys are: ${BRIEF_KEYS.join(', ')}.`);
   return [key, line.slice(i + 1).trim()];
 };
@@ -141,7 +148,7 @@ const tokensOf = (contextTokens: string | undefined): number | undefined => {
  * A `true` or `false` value of `key` as a boolean, or `undefined` when there is none. Refuses anything else, saying what
  * `key: true` does in `use`.
  */
-const trueOrFalse = (key: 'background' | 'queued' | 'holdOpen', value: string | undefined, use: string): boolean | undefined => {
+const trueOrFalse = (key: 'queued' | 'holdOpen', value: string | undefined, use: string): boolean | undefined => {
   if (value === undefined) return undefined;
   if (value !== 'true' && value !== 'false') throw refuse(`\`${key}: ${value}\` is not true or false. Write \`${key}: true\` ${use}.`);
   return value === 'true';
@@ -219,8 +226,10 @@ const worktreeOf = (worktree: string | undefined): true | string | undefined =>
  *   read the one as NaN.
  * - `contextTokens` is a whole number in digits; `200k` is refused with the arithmetic done. Whether the harness takes the
  *   number is `file()`'s to say.
- * - `queued`, `holdOpen` and `background` are `true` or `false`; `queued: true` holds the task until `ae admit` starts it.
- * - `restartPolicy` is `Always` alone: the session stays open until `ae stop`, which `file()` takes on `claude --bg` alone.
+ * - `queued` and `holdOpen` are `true` or `false`; `queued: true` holds the task until `ae admit` starts it.
+ * - `background` is refused, whatever its value, with what to write instead: the runtime runs no `claude --bg` session.
+ * - `restartPolicy` is `Always` alone: the session stays open until `ae stop`, which `file()` takes on `claude`, held attached
+ *   while a process holds the sessions (`ae up`).
  * - `closeoutSchema` is a path to a JSON Schema file, relative to where `ae` runs: frontmatter is one line per key, and a
  *   schema is not.
  * - `tools` is one line, comma-separated: `tools: Read, Grep, Glob`. Which names a harness has is its to say.
@@ -236,11 +245,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
   const deadlineSeconds = secondsOf(meta.get('deadlineSeconds'));
   const budgetUsd = dollarsOf(meta.get('budgetUsd'));
   const contextTokens = tokensOf(meta.get('contextTokens'));
-  const background = trueOrFalse(
-    'background',
-    meta.get('background'),
-    'to run the session as `claude --bg`, which a person can attach to, or leave it out to run it as a job',
-  );
   const queued = trueOrFalse(
     'queued',
     meta.get('queued'),
@@ -265,7 +269,6 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
       tools,
       effort: meta.get('effort'),
       contextTokens,
-      background,
       budgetUsd,
       codex: trustFrom === undefined ? undefined : { trustFrom },
     }).filter(([, value]) => value !== undefined),
@@ -297,7 +300,7 @@ const HELP = `ae — an engine for agent sessions
                                keeps them apart kept it (the command harness): stdout by default
   ae stop <id>                 ask it to stop
   ae say <id> "<text>"         tell its running session something, and journal it: a job on
-                               its stdin until its result, a background session in its inbox
+                               its stdin until its result, a long-lived session on its input
   ae interrupt <id>            end the turn its session is in, and leave the session open to
                                hear the next words: only a session attached on the Agent SDK
   ae answer <id> "<text>" [--budget <usd>]
@@ -319,7 +322,7 @@ const HELP = `ae — an engine for agent sessions
 
   a brief is markdown with optional frontmatter:
     cwd, model, permissionMode
-    harness          claude (default) | codex | claude-detached
+    harness          claude (default) | codex | command
     deadlineSeconds  wall clock of the task's attempt (of a turn's, when held open)
     resumeFrom       a session id to continue, instead of starting cold
     worktree         true, or a name — the harness cuts it
@@ -328,18 +331,15 @@ const HELP = `ae — an engine for agent sessions
                      unless the list has Bash, Write or Edit)
     effort           claude: low | medium | high | xhigh | max
                      codex:  none | minimal | low | medium | high | xhigh | max
-    budgetUsd        dollars one attempt may spend — a job on claude, or claude-detached:
-                     the session ends at it; a background session keeps no cap
-    background       true — claude only: run the session as claude --bg, which a person
-                     can attach to, instead of as a job (the Agent SDK, the default); ae
-                     say reaches either
+    budgetUsd        dollars one attempt may spend — claude: the session ends at it
     holdOpen         true — when a turn ends done, wait for ae answer or ae close
                      rather than settle: input-required, with nothing running
     queued           true — wait for ae admit <id> before it starts
-    restartPolicy    Always — background only: keep the session open between turns, idle
-                     until ae stop; ae say gives it its next words
+    restartPolicy    Always — claude: keep the session open between turns, idle until ae
+                     stop, held attached while ae up holds the sessions (refused
+                     unstartable with none); ae say gives it its next words
     contextTokens    the session's context window, in tokens: it compacts past about it —
-                     claude and claude-detached, 100000 to 1000000
+                     claude, 100000 to 1000000
     trustFrom        codex only: an absolute directory you trust in ~/.codex/config.toml,
                      whose trust extends to cwd — name it to work in a worktree of it
   a key not listed here, or a value the harness cannot take, is refused (exit 2)

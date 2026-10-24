@@ -1,14 +1,13 @@
 /**
  * A Claude Code session's transcript, read: where it is, the closeout it gave, its lines as events, and what it
- * consumed. Read by both runners that run Claude Code — `claude --bg` (`harness/claude/bg.ts`) and `claude -p`
- * (`harness/claude/code.ts`) — and `renderTranscript` by the Agent SDK's (`harness/sdk.ts`).
+ * consumed. Read by the runners that run Claude Code — a job (`harness/claude/code.ts`) and a held session (`attached.ts`) — and
+ * `renderTranscript` by the Agent SDK's (`harness/sdk.ts`).
  */
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Usage } from '../../core/index.ts';
 import type { TranscriptEvent } from '../seam.ts';
-import { readTextAsync } from '../../core/engine/tally.ts';
 import { isoTime } from '../transcript.ts';
 import { type ContentBlock, decodeLine, type Line, lineOf, writtenAt } from './lines.ts';
 
@@ -68,8 +67,8 @@ export const transcriptRecords = (sessionIds: readonly string[]): Map<string, st
 
 /**
  * When a Claude Code session's transcript was last written: its file's mtime in whole milliseconds, as the Agent SDK's
- * `getSessionInfo` gives it, read by a stat that reads none of its bytes; `undefined` while no project folder holds it, or when
- * the stat fails.
+ * getSessionInfo gives it, read by a stat that reads none of its bytes; `undefined` while no project folder holds it, or when the
+ * stat fails.
  */
 export const transcriptWrittenAt = async (sessionId: string): Promise<number | undefined> => {
   const file = transcriptFile(sessionId);
@@ -78,40 +77,6 @@ export const transcriptWrittenAt = async (sessionId: string): Promise<number | u
     return Math.trunc((await fs.promises.stat(file)).mtimeMs);
   } catch {
     return undefined;
-  }
-};
-
-/**
- * A transcript found and then not read: the OS refused the read (`code`, as `EACCES`, `EIO`, or `ENOENT` for a file gone since it
- * was found). Never no transcript: what it says is unknown until a later look reads it.
- */
-export class TranscriptUnread extends Error {
-  readonly file: string;
-  readonly code: string | undefined;
-  constructor(file: string, cause: unknown) {
-    const code = (cause as { code?: unknown } | null)?.code;
-    super(
-      `the transcript \`${file}\` was found and cannot be read (${cause instanceof Error ? cause.message : String(cause)}); the next look` +
-        ' reads it again',
-      { cause },
-    );
-    this.name = 'TranscriptUnread';
-    this.file = file;
-    this.code = typeof code === 'string' ? code : undefined;
-  }
-}
-
-/**
- * A session's transcript, found (`transcriptFile`) and read, with where it is; `undefined` only when no project folder holds it.
- * Throws a `TranscriptUnread` when one found cannot be read, whatever the OS says, a file gone since it was found included.
- */
-export const readSessionTranscript = async (sessionId: string): Promise<{ file: string; text: string } | undefined> => {
-  const file = transcriptFile(sessionId);
-  if (!file) return undefined;
-  try {
-    return { file, text: await readTextAsync(file) };
-  } catch (cause) {
-    throw new TranscriptUnread(file, cause);
   }
 };
 
@@ -126,83 +91,7 @@ const isBlock =
   (block: ContentBlock): block is BlockOf<T> =>
     block.type === type;
 
-/**
- * The last StructuredOutput call an `assistant` line makes, with the line's time and the call's id; `undefined` with no such call or no
- * time.
- */
-const callOf = (line: Line<'assistant'>): { payload: unknown; at: number; id?: string } | undefined => {
-  const at = Date.parse(line.timestamp ?? '');
-  const content = line.message.content;
-  if (!Number.isFinite(at) || !Array.isArray(content)) return undefined;
-  const call = content
-    .filter(isBlock('tool_use'))
-    .filter((b) => b.name === 'StructuredOutput')
-    .at(-1);
-  return call && { payload: call.input, at, ...(call.id !== undefined ? { id: call.id } : {}) };
-};
-
-/**
- * The LAST StructuredOutput call in a transcript, when it was made, its `tool_use` id when the block has one, and whether the
- * conversation ends with its result — `lastWord`: the session gave its closeout and has said nothing since.
- *
- * Read from the raw JSONL rather than through `getSessionMessages`, because the SDK's messages carry no timestamp and no call id.
- * A resumed transcript holds its parent's whole conversation, parent's calls included, under the child's own session id, each
- * call under the id and the time the parent made it. The id tells the session's own statement from one it inherited, where the
- * runner recorded the parent's last call when it spawned the session (`harness/claude/parent.ts`); the time tells them apart
- * where it did not.
- *
- * `lastWord` is what tells a session held by something other than the work from one still doing it,
- * so it is read here, off the same file, rather than by a second pass over it. Only a line that names
- * `StructuredOutput` is parsed: most lines are not it, and the tool's own definition names it too, so
- * only an `assistant` line's `tool_use` block counts.
- *
- * Backwards, from the end: the `assistant` lines that name it are decoded (`lines.ts`) from the last until one makes the call,
- * and none before it, so a resumed transcript's inherited calls are not read. Throws an `Error` naming the line, in `file` when it
- * is given, its field and the fix, when a line read here does not decode: never read as no statement.
- */
-export const lastStructuredOutput = (
-  jsonl: string,
-  file?: string,
-): { payload: unknown; at: number; lastWord: boolean; id?: string } | undefined => {
-  const lines = jsonl.split('\n');
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const text = lines[i];
-    if (text === undefined || !text.includes('StructuredOutput')) continue;
-    const line = lineOf(text, ['assistant'], lineAt(i, file));
-    const found = line && callOf(line);
-    if (found) {
-      const { payload, at, id } = found;
-      return { payload, at, lastWord: id !== undefined && endsWithResultOf(lines, id, file), ...(id !== undefined ? { id } : {}) };
-    }
-  }
-  return undefined;
-};
-
-/**
- * Whether a conversation ends with the result of the call `id`: the last `user` or `assistant` line is a
- * `tool_result` naming it.
- *
- * Only those two line types are the conversation. Claude Code writes bookkeeping around the closing turn —
- * the structured output's own `attachment` line, then a `system` line carrying the turn's duration — and a
- * check that took the very last line would therefore never fire on a real session: a closing turn is
- * written `assistant`(tool_use) · `attachment` · `user`(tool_result) · `system`.
- *
- * Backwards, because only the end matters and a transcript runs to tens of megabytes. A line still
- * being written, or one that is not JSON, is skipped; the last conversation line is decoded, and throws when it does not.
- */
-const endsWithResultOf = (lines: readonly string[], id: string, file?: string): boolean => {
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const text = lines[i];
-    if (text === undefined || !text.includes('"type"')) continue;
-    const line = lineOf(text, ['user', 'assistant'], lineAt(i, file));
-    if (!line) continue;
-    const content = line.message.content;
-    return Array.isArray(content) && content.filter(isBlock('tool_result')).some((b) => b.tool_use_id === id);
-  }
-  return false;
-};
-
-/** A Claude Code session's transcript file, for the other runner that reads one: `claude -p`'s. */
+/** A Claude Code session's transcript file, for the runners that read one by a spec (`claudeJobSpec`). */
 export const claudeTranscriptFile = (sessionId: string): string | undefined => transcriptFile(sessionId);
 
 /** A detached spec's `transcript.records` for Claude Code: `transcriptRecords`. */

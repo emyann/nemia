@@ -5,7 +5,7 @@
  */
 import type { Capabilities, Ceilings, Daemon, InboxCardPage, InboxEntry, PassCost, Quota, QuotaWindow, StepReach } from '../src/lib/api.ts';
 
-/** A queued card whose start the tick tried and did not make: `queued` and `tried` both set. */
+/** A queued card whose start the tick tried and did not make, `queued` and `tried` both set, and which a record names: `started`. */
 export const inboxEntry = (extra: Partial<InboxEntry> = {}): InboxEntry => ({
   name: 'decode-the-reads',
   file: 'decode-the-reads.md',
@@ -15,6 +15,7 @@ export const inboxEntry = (extra: Partial<InboxEntry> = {}): InboxEntry => ({
   factory: 'nemia',
   from: [],
   startedAs: ['r-0'],
+  state: 'started',
   error: null,
   body: 'Decode the reads\n',
   filedAt: '2026-09-30T05:00:00.000Z',

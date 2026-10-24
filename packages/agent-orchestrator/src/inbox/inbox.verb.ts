@@ -13,6 +13,7 @@ import {
   nextQueued,
   queueOrder,
   queueRepo,
+  queuedText,
   noCardLine,
   noWorkflowRefusal,
   parseInboxCard,
@@ -21,7 +22,7 @@ import {
   type InboxCard,
   type InboxListing,
   type QueueStarted,
-  type QueueTry,
+  type MissedStart,
 } from './inbox.ts';
 import { gateRefusal } from '../ending/ending.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
@@ -71,16 +72,16 @@ export type InboxStart = {
 };
 
 /**
- * What `startFromInbox` did: the run, the card it started, and whether the card left the inbox — and, when not, why.
+ * What `startFromInbox` did: the run and the card it started, which stays in the inbox and lists as `started` while the run's record
+ * stands. `queueLeft` says why a queued card still carries its `queued:` line, when taking it off failed: the record keeps it from the
+ * queue all the same (`queueOrder`).
  *
  * `ignoredRepo` is the card's own `repo:` when the run looks at no repository: a folder team's does not, and a card written by hand, or
  * by a writer that does not ask `cardRepoRefusal`, may carry one. The run is started all the same, and the line says the path was not
  * looked at: said, not refused, since a card on disk cannot be edited from the board. A `repo` a person gives for such a team is refused by
  * `start()`.
  */
-export type InboxStarted = ({ run: Run; card: InboxCard; removed: true } | { run: Run; card: InboxCard; removed: false; why: string }) & {
-  ignoredRepo?: string;
-};
+export type InboxStarted = { run: Run; card: InboxCard; ignoredRepo?: string; queueLeft?: string };
 
 /**
  * The workflow folder a card is started on, found in the factory's `tree` where it has one, then in `repo`: `opts.workflow`, from
@@ -114,7 +115,8 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
 
 /**
  * `nemia start <inbox>/<name>.md`, and the board's start of a card: a card out of the inbox started with `start()`, `from: { inbox: <name>
- * }` on its record, then removed from the inbox.
+ * }` on its record. The card is kept, and lists as `started` while that record stands; a queued one has its `queued:` line taken off, so
+ * that the tick never starts it again, even once the run is forgotten.
  *
  * The brief is `brief`, or else the card's body. The workflow is `workflow`, else the card's `workflow:` — found from the inbox folder as
  * `nemia plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the
@@ -122,8 +124,8 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
  * card's `repo:`, else the factory's one repository, else `callerRepo` (`repoFor`), chosen before the workflow is found in it; `start()`
  * judges the factory. The run is gated at the card's `gate:` and at `gates`, the card's first; a step both name is gated once.
  *
- * The record is written first, so a removal that fails leaves a card `nemia inbox` lists as started — never a run with no trace of its
- * card. It says so in `why`, and the card is not started again (`startedRefusal`) until a person drops it. Refused by name before anything
+ * The record is written first, so taking `queued:` off, should it fail, leaves a card the record keeps out of the queue; it says so in
+ * `queueLeft`. A started card is not started again (`startedRefusal`). Refused by name before anything
  * is written, exit 2: a name that is not a card's (`inboxNameRefusal`), a card not there (`Missing`) — naming the cards there are — a card
  * that does not read, a card already started (`Conflict`), no factory from either — `Invalid`, naming the line to write and `fix`
  * (`unfactoredCardRefusal`), unless `defaultStartsAllowed` — or the default factory named (`defaultStartRefusal`), no workflow, a
@@ -175,19 +177,31 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     ...(factory !== undefined ? { factory } : {}),
   });
   const ignoredRepo = card.repo !== undefined && !isRepositoryRun(run) ? { ignoredRepo: card.repo } : {};
-  try {
-    runStore.inbox.drop(`${opts.name}.md`);
-  } catch (err) {
-    return {
-      run,
-      card,
-      removed: false,
-      why: `${file} could not be removed — ${(err as Error).message}`,
-      ...ignoredRepo,
-    } satisfies InboxStarted;
-  }
-  return { run, card, removed: true, ...ignoredRepo } satisfies InboxStarted;
+  const queueLeft = card.queued === undefined ? undefined : takeQueueOff(card.name, file);
+  const out: InboxStarted = { run, card, ...ignoredRepo, ...(queueLeft !== undefined ? { queueLeft } : {}) };
+  return out;
 });
+
+/**
+ * A started card's `queued:` line taken off, so the tick never starts it again — read again first, so a card gone since is not written
+ * back and an edit made since is kept, its paths not judged, as `nemia inbox queue --off` takes it off. Why it is still there, when that
+ * failed.
+ */
+function takeQueueOff(name: string, file: string): string | undefined {
+  try {
+    const now = runStore.inbox.read(`${name}.md`);
+    if (now === null) return undefined;
+    const card = parseInboxCard(`${name}.md`, now, () => true);
+    if (card.queued !== undefined)
+      runStore.inbox.rewrite(
+        `${name}.md`,
+        queuedText(card, null, () => true),
+      );
+    return undefined;
+  } catch (err) {
+    return `${file} keeps its queued: line — ${(err as Error).message}`;
+  }
+}
 
 /** The steps a card's run is gated at: its `gate:` first, then `flags`, a step both name once — refused as the card's line when no step. */
 function cardGates(card: InboxCard, flags: readonly string[], workflowDir: string, repo: string): string[] {
@@ -270,7 +284,7 @@ const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon
  * factory names one, and the start turns on where the daemon runs — never for a card that names no factory, which is refused wherever the
  * daemon runs (`unfactoredCardRefusal`, with no start's words), and lasts until the card names one.
  *
- * A start that does not happen is written down (`QueueTry`), and the card left as it is. A refusal — exit 2, the package's own, by name:
+ * A start that does not happen is written down (`MissedStart`), and the card left as it is. A refusal — exit 2, the package's own, by name:
  * the workflow gone, the repository gone — lasts: no pass after it tries the card while it reads the same and would be tried on the same
  * repository, and the next card has its turn. Any other failure — git failing on the repository, say — is no verdict on the card: the next
  * pass tries it again, where it keeps its place, and a failure the same as the last pass's is said as `again`, and not written again. A
@@ -293,9 +307,8 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, run
   if (Exit.isSuccess(tried)) {
     const started = tried.value;
     const ignored = started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {};
-    return started.removed
-      ? ({ card: next.name, run: started.run.id, removed: true, ...ignored } satisfies QueueStarted)
-      : ({ card: next.name, run: started.run.id, removed: false, why: started.why, ...ignored } satisfies QueueStarted);
+    const left = started.queueLeft !== undefined ? { queueLeft: started.queueLeft } : {};
+    return { card: next.name, run: started.run.id, ...ignored, ...left } satisfies QueueStarted;
   }
   const err = Cause.squash(tried.cause);
   const refused = (err as { exitCode?: number }).exitCode === 2;
@@ -307,7 +320,7 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, run
   const last = next.tried;
   if (!refused && last && !last.refused && last.why === why && last.repo === on)
     return { card: next.name, failed: why, again: true, ...where } satisfies QueueStarted;
-  const record: QueueTry = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, repo: on, why, refused };
+  const record: MissedStart = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, repo: on, why, refused };
   try {
     runStore.inbox.putTry(next.name, record);
   } catch {}

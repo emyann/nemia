@@ -228,11 +228,9 @@ export const queueOf = (entries: readonly InboxEntry[]): InboxEntry[] =>
   entries.filter((e) => e.queued?.place).sort((a, b) => a.queued!.place! - b.queued!.place!);
 
 /**
- * Whether a card could be queued were its factory not asked: it names a workflow, it reads, it is not queued, and no record says it was
- * started.
+ * Whether a card could be queued were its factory not asked: it is `filed` — neither queued nor started — names a workflow, and reads.
  */
-const queueableButFactory = (entry: InboxEntry): boolean =>
-  entry.workflow !== null && entry.error === null && !entry.queued && entry.startedAs.length === 0;
+const queueableButFactory = (entry: InboxEntry): boolean => entry.state === 'filed' && entry.workflow !== null && entry.error === null;
 
 /**
  * Whether the page offers Queue on a card: it names a factory (`unassigned`) and a workflow — a queued card starts on its own, in the
@@ -243,6 +241,13 @@ export const queueable = (entry: InboxEntry): boolean => !unassigned(entry) && q
 
 /** Whether a card has no Queue for its factory alone: it names none (`unassigned`), and would be `queueable` with one. */
 export const queueNeedsFactory = (entry: InboxEntry): boolean => unassigned(entry) && queueableButFactory(entry);
+
+/**
+ * Whether a card shows the tick's last try of its start (`triedLine`): it is `queued` or `refused` and carries the try — never a started
+ * card, whatever try it still carries.
+ */
+export const triedShown = (entry: InboxEntry): entry is InboxEntry & { tried: NonNullable<InboxEntry['tried']> } =>
+  (entry.state === 'queued' || entry.state === 'refused') && entry.tried !== undefined;
 
 /** The workflows a list of options leaves out: those that do not read, each with why (`error`). */
 export const unreadWorkflows = <T extends Pick<WorkflowListing, 'error'>>(workflows: readonly T[]): Array<T & { error: string }> =>
@@ -285,12 +290,12 @@ export function capLine(ceilings: Pick<Ceilings, 'cap' | 'inFlight'>, queued: nu
 }
 
 /**
- * The cards of the factory `picked` names that are not yet started, as the rail's Inbox badge counts them: each card that reads and no
- * record says was started, queued or not; every factory's while `picked` names none (`shownIn`), as the Inbox page lists them then.
+ * The cards of the factory `picked` names that are not yet started, as the rail's Inbox badge counts them: each card that reads and is
+ * not `started`, queued or not; every factory's while `picked` names none (`shownIn`), as the Inbox page lists them then.
  */
 export const notStarted = (entries: readonly InboxEntry[], picked: string | undefined): InboxEntry[] =>
   shownIn(
-    entries.filter((entry) => entry.error === null && entry.startedAs.length === 0),
+    entries.filter((entry) => entry.error === null && entry.state !== 'started'),
     picked,
   );
 

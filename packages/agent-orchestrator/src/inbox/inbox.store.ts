@@ -40,7 +40,7 @@ export const inboxCards = (): string[] =>
 
 /**
  * `nemia inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that
- * does not read as a card, with why. The run records are read for their `from`, so a card whose removal failed after its start is listed as
+ * does not read as a card, with why. The run records are read for their `from`, so a card a run was started from is listed as
  * started; the tick's tries, so a queued card whose start was refused, or failed, says why; and the factories that read, so a card says the
  * repository its factory picks for it (`factoryRepo`).
  *

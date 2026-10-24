@@ -138,7 +138,8 @@ const START_SPEC: Spec = {
 };
 
 /**
- * A run started, and, for an inbox card, the card, whether it left the inbox and why not, and a `repo:` the start did not take; the store's
+ * A run started, and, for an inbox card, the card, why its `queued:` line is still on it when it could not be taken off, and a `repo:` the
+ * start did not take; the store's
  * pause as it stood once the run was written (`pausedRead`), while one stands; and `shipped`, the runs it is handed as context that had
  * shipped when it started.
  */
@@ -146,8 +147,7 @@ type Started = {
   id: string;
   run: Run;
   card?: string;
-  removed?: boolean;
-  why?: string;
+  queueLeft?: string;
   ignoredRepo?: string;
   paused?: Paused;
   shipped?: readonly string[];
@@ -194,15 +194,18 @@ function gateLines(run: Run): string[] {
   ];
 }
 
-/** Where an inbox card's run came from, and whether the card left the inbox, as `nemia start` says it. */
-const fromLines = ({ run, card, removed, why }: Started): string[] =>
+/** Where an inbox card's run came from, the card kept in the inbox as started, as `nemia start` says it. */
+const fromLines = ({ run, card, queueLeft }: Started): string[] =>
   card === undefined
     ? []
-    : removed
-      ? [`${fromNote(run)} — removed from the inbox`]
-      : [
-          `${fromNote(run)} — still in the inbox: ${why}. nemia inbox lists it as started as ${run.id}: drop it with nemia inbox rm ${card}`,
-        ];
+    : [
+        `${fromNote(run)} — kept in the inbox, listed as started`,
+        ...(queueLeft !== undefined
+          ? [
+              `${queueLeft}: the tick does not start it again while ${run.id}'s record stands; take the line off with nemia inbox queue ${card} --off`,
+            ]
+          : []),
+      ];
 
 /**
  * What `nemia start` prints of a run it started: its steps, where it came from, its factory, the folders it mounts, where it works, and
@@ -255,8 +258,7 @@ const cardStart = Effect.fnUntraced(function* (card: string, args: Args) {
     id: started.run.id,
     run: started.run,
     card: started.card.name,
-    removed: started.removed,
-    ...(started.removed ? {} : { why: started.why }),
+    ...(started.queueLeft !== undefined ? { queueLeft: started.queueLeft } : {}),
     ...(started.ignoredRepo !== undefined ? { ignoredRepo: started.ignoredRepo } : {}),
   } satisfies Started;
 });
@@ -299,8 +301,8 @@ export const START: Command<Started> = {
     'one factory alone does; none, or two, is refused, naming the fix.',
     'The default factory is history only: --factory default is refused',
     'a card of the inbox (nemia inbox --help), by its path or its name,',
-    'starts its body, or --brief',
-    '"<brief>" in its place, and leaves the inbox: --workflows is its workflow:',
+    'starts its body, or --brief "<brief>" in its place, and stays in the',
+    'inbox, listed as started: --workflows is its workflow:',
     'unless given, --repo its repo:, --factory its factory:, and a card',
     'that names no factory either way is refused',
   ],

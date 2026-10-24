@@ -46,8 +46,8 @@ function CardPage() {
         </p>
       </header>
 
-      {card.startedAs.length > 0 && (
-        <p data-started-as className="text-body-medium text-yours">
+      {card.state === 'started' && (
+        <p data-started-as className="text-body-medium text-muted-foreground">
           Started as{' '}
           {card.startedAs.map((id, i) => (
             <span key={id}>
@@ -57,7 +57,7 @@ function CardPage() {
               </Link>
             </span>
           ))}
-          , and still in the inbox because its removal failed.
+          .
         </p>
       )}
 

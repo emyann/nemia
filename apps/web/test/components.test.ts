@@ -7046,6 +7046,7 @@ const inboxCard = (extra: Record<string, unknown> = {}) =>
     factory: null,
     from: [],
     startedAs: [],
+    state: 'filed',
     error: null,
     body: 'An idea',
     filedAt: null,
@@ -7101,7 +7102,11 @@ test('REFUSED: a card that names a workflow and no factory says it has no Queue 
   }
   assert.equal(note({ factory: 'solo', workflow: 'dev' }), '', 'a card of a factory has its Queue');
   assert.equal(note({ factory: null }), '', 'no workflow: nothing to queue it on');
-  assert.equal(note({ factory: null, workflow: 'dev', queued: { at: '2026-09-16T10:00:00.000Z', place: 1 } }), '', 'queued: Unqueue');
+  assert.equal(
+    note({ factory: null, workflow: 'dev', state: 'queued', queued: { at: '2026-09-16T10:00:00.000Z', place: 1 } }),
+    '',
+    'queued: Unqueue',
+  );
 });
 
 test('REFUSED: the box says the factories are being read until they are, and never that the store has none', async () => {

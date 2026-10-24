@@ -11,6 +11,10 @@
  * file's `by: 'wf up'`), the check's marker `wf <name>:`, the alias's own words, the run's branches `wf/<run>/<step>` and git's identity
  * `user.name=wf`; that card says which of them go.
  *
+ * `wordState` and `pauseHolds`, the board's parses of a step's sentence into its state, retired by its *Step state* row the day the
+ * step's codes reached the board: 5 words in 2 files, which that card (A step's state crosses the wire as a code, not a sentence) takes
+ * out. Their keys here are lower-cased, as every spelling's is.
+ *
  * It only shrinks: a change that takes a retired spelling out of a file lowers its count here in the same commit, and takes the entry
  * off where none is left; a new retired row in a table adds the counts of its files the day it lands. A count is never raised, nor a
  * file added for an old spelling.
@@ -35,5 +39,12 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/workflow/validate.ts': 1,
     'packages/agent-orchestrator/src/workspace/workspace.ts': 6,
     'packages/agent-orchestrator/src/workspace/worktree.store.ts': 3,
+  },
+  pauseholds: {
+    'apps/web/src/lib/status.ts': 1,
+    'apps/web/src/lib/words.ts': 2,
+  },
+  wordstate: {
+    'apps/web/src/lib/status.ts': 2,
   },
 };

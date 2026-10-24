@@ -146,13 +146,13 @@ export const PERSON: Record<StepState, PersonWords> = {
 };
 
 /** A step `waiting` whose check the store's pause holds: not to come, since it signed off, but held until the factories resume. */
-const PAUSED: Pick<PersonWords, 'rail' | 'meaning'> = {
+export const PAUSED: Pick<PersonWords, 'rail' | 'meaning'> = {
   rail: 'waits on the pause',
   meaning: 'It signed off, and its check runs once the factories are resumed.',
 };
 
 /** The rail word and meaning of a step by its state, and by its status where a state has a wait of its own (the pause's). */
-export const railOf = (state: StepState, status: string): Pick<PersonWords, 'rail' | 'meaning'> =>
+export const stateWordsOf = (state: StepState, status: string): Pick<PersonWords, 'rail' | 'meaning'> =>
   state === 'waiting' && pauseHolds(status) ? PAUSED : PERSON[state];
 
 /**

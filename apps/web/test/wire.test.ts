@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import ts from 'typescript';
 import type * as Board from '../src/lib/api.ts';
-import type { Holds, Same } from '../src/lib/api/decodes.ts';
+import { Schema } from 'effect';
+import { decodes, type Holds, type Same } from '../src/lib/api/decodes.ts';
 import type * as agents from '../../api/src/agents/agents.ts';
 import type * as answers from '../../api/src/asks/answers.ts';
 import type * as app from '../../api/src/app.ts';
@@ -371,4 +372,17 @@ test('REFUSED: a mirror with no entry, named with its file', () => {
   assert.equal(found.length, 1);
   assert.match(found[0], /^planted\.ts: Planted /);
   assert.equal(unwired(planted, new Set(['Planted'])).length, 0, 'and an entry answers it');
+});
+
+test('decodes takes a schema that decodes its type, and the compiler refuses one that does not', () => {
+  const taken = decodes<{ a: string; b?: number }>()(Schema.Struct({ a: Schema.String, b: Schema.optional(Schema.Number) }));
+  assert.ok(Schema.isSchema(taken));
+  // @ts-expect-error -- a schema that decodes `any`.
+  decodes<{ a: string }>()(Schema.Any);
+  // @ts-expect-error -- a key the type requires, made optional.
+  decodes<{ a: string }>()(Schema.Struct({ a: Schema.optional(Schema.String) }));
+  // @ts-expect-error -- a key of the type left out.
+  decodes<{ a: string; b: number }>()(Schema.Struct({ a: Schema.String }));
+  // @ts-expect-error -- a word of the type left out.
+  decodes<{ a: 'x' | 'y' }>()(Schema.Struct({ a: Schema.Literal('x') }));
 });

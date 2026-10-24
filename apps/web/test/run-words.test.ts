@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { RunSummary } from '../src/lib/api.ts';
 import type { StepState } from '../src/lib/status.ts';
-import { PERSON } from '../src/lib/words.ts';
+import { PAUSED, PERSON } from '../src/lib/words.ts';
 import {
   agoWords,
   barSaid,
@@ -329,6 +329,7 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       ),
       'a at work, b to come',
     );
+    assert.equal(railSaid(summary([['a', 'waiting on the pause']]).steps, false, false), `a ${PAUSED.rail}`);
   });
   await t.test('what a run in flight does now: its first step not done and its place among its steps, and no duration at all', () => {
     const working = summary([...DONE.slice(0, 1), ['implement', 'running (working)'], ['review', 'waiting'], ['land', 'waiting']]);
@@ -337,6 +338,8 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
     assert.deepEqual(nowOf(checking), { word: 'being checked', note: 'implement (2 of 2)' });
     const queued = summary([['design', 'waiting']]);
     assert.deepEqual(nowOf(queued), { word: 'to come', note: 'design (1 of 1)' });
+    const paused = summary([...DONE.slice(0, 1), ['implement', 'waiting on the pause']]);
+    assert.equal(nowOf(paused)?.word, PAUSED.rail, 'a check the pause holds says so, as its chip does');
     assert.equal(nowOf(summary([...DONE])), null, 'every step done: nothing to say');
     const DURATION = /\b\d+[dhms]\b|under a minute/;
     assert.match(`implement (2 of 4), 2m`, DURATION, 'the pattern finds the duration the note used to carry');
@@ -348,9 +351,10 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       );
   });
   await t.test("a bar as a button says its step's name and the rail's word for its state", () => {
-    assert.equal(barSaid('implement', 'working'), 'implement, at work');
-    assert.equal(barSaid('design', 'awaiting-approval'), 'design, waits on you');
-    assert.equal(barSaid('land', 'failed-check'), 'land, failed its check');
-    assert.equal(barSaid('review', 'waiting'), 'review, to come');
+    assert.equal(barSaid('implement', 'working', 'running (working)'), 'implement, at work');
+    assert.equal(barSaid('design', 'awaiting-approval', 'awaiting approval'), 'design, waits on you');
+    assert.equal(barSaid('land', 'failed-check', 'failed ✗ check (exit 1)'), 'land, failed its check');
+    assert.equal(barSaid('review', 'waiting', 'waiting'), 'review, to come');
+    assert.equal(barSaid('theme', 'waiting', 'waiting on the pause'), `theme, ${PAUSED.rail}`, 'a check the pause holds');
   });
 });

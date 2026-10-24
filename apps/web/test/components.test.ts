@@ -267,13 +267,13 @@ function nodeMarkup(run: RunDetail): string {
   return renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(StepNode, props)));
 }
 
-const gateDrawn = (html: string) => />human gate</.test(html) || />waiting on you</.test(html) || /border-yours/.test(html);
+const gateDrawn = (html: string) => />human gate</.test(html) || /data-gate-band/.test(html) || /border-yours/.test(html);
 
 test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked step is — and on a cancelled run, not', () => {
   for (const status of ['rounds exhausted', 'succeeded · BLOCKED']) {
     const gate = nodeMarkup(runOf(status, { waitingOnYou: ['review'] }));
     assert.match(gate, />human gate</, status);
-    assert.match(gate, />waiting on you</, status);
+    assert.match(gate, new RegExp(`data-gate-band[^>]*><span[^>]*>${PERSON['awaiting-approval'].rail}</`), status);
     assert.match(gate, /border-yours/, status);
 
     for (const waitingOnYou of [[], ['review']]) {
@@ -2330,13 +2330,13 @@ function needing(
   };
 }
 
-test("a step's node says what it needs: a gate's question after `waiting on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
+test("a step's node says what it needs: a gate's question after `waits on you`, and a session the harness blocked, with what the harness waits for and what the session said last — whole on hover", () => {
   const question = 'Should a finished run keep its card on the Factory?';
   const gate = nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: ['review'] }));
-  const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(gate);
+  const footer = /<p data-gate-band="true" title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(gate);
   assert.ok(footer, `one truncated line, as the node's others: a second would make it taller than the layering's row\n${gate}`);
   assert.equal(footer[1], `asks: ${question}`);
-  assert.equal(footer[2], `<span class="font-semibold">waiting on you</span><span data-need="asks"> · asks: ${question}</span>`);
+  assert.equal(footer[2], `<span class="font-semibold">${PERSON.blocked.rail}</span><span data-need="asks"> · asks: ${question}</span>`);
   assert.doesNotMatch(
     nodeMarkup(needing('succeeded · BLOCKED', { needs: question }, { waitingOnYou: [] })),
     /data-need/,
@@ -2873,16 +2873,16 @@ const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<Run
 const withClient = (element: ReturnType<typeof createElement>) =>
   renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, element));
 
-test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waiting on you` — and on a run called off, not', () => {
+test('a step at its gate is a human gate on the canvas, and its node says what is asked of you — `approve review` after `waits on you` — and on a run called off, not', () => {
   const html = nodeMarkup(atGate());
   assert.match(html, />human gate</);
   assert.match(html, /border-yours/);
   assert.match(html, /data-state="awaiting-approval"/);
-  const footer = /<p title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(html);
+  const footer = /<p data-gate-band="true" title="([^"]*)" class="truncate [^"]*">([\s\S]*?)<\/p>/.exec(html);
   assert.ok(footer, html);
   assert.equal(
     footer[2],
-    '<span class="font-semibold">waiting on you</span><span data-need="approve"> · approve review&#x27;s hand-off</span>',
+    `<span class="font-semibold">${PERSON['awaiting-approval'].rail}</span><span data-need="approve"> · approve review&#x27;s hand-off</span>`,
     'what approving does, in a line that names the step as `wf ls` does: a step that ran hands on',
   );
   const spec = { ...atGate().steps[0].spec, workspace: 'main' } as RunDetail['steps'][number]['spec'];

@@ -1,6 +1,6 @@
 import { CircleDashed } from 'lucide-react';
 import { stateClass, stepState } from '../lib/status';
-import { railOf } from '../lib/words';
+import { stateWordsOf } from '../lib/words';
 
 /**
  * A step's state in a person's word (`PERSON`'s rail word, never the CLI's status), coloured by what it means, and what that is on
@@ -29,7 +29,7 @@ export function StatusChip({
   note?: string | null;
 }) {
   const state = stepState(status, runCancelled, runHeld);
-  const { rail, meaning } = railOf(state, status);
+  const { rail, meaning } = stateWordsOf(state, status);
   return (
     <span
       title={note ? `${meaning}\n${note}` : meaning}

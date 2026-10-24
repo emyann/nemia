@@ -22,7 +22,7 @@ import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
-import { PERSON } from '../src/lib/words.ts';
+import { PAUSED, PERSON } from '../src/lib/words.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 
@@ -511,8 +511,8 @@ const hoverRuntimeBreaks = (texts: ReadonlyMap<string, string>): string[] =>
       .map((said) => `${file} says '${said.text.trim()}' on hover: say it in a person's words, with no runtime word`),
   );
 
-/** The multi-word rail words, from the one table. */
-const RAILS = Object.values(PERSON).map((words) => words.rail);
+/** The rail words, from the one table and the pause's word beside it. */
+const RAILS = [...Object.values(PERSON), PAUSED].map((words) => words.rail);
 
 test(`a state's words for a person are written in ${WORDS} alone, as a total Record<StepState, PersonWords>`, () => {
   const texts = sourceTexts();
@@ -531,14 +531,25 @@ test('REFUSED: a state word spelled outside the table, a retired phrasing, and a
   );
   assert.equal(spelled.length, 1, 'the rail word refused; a capitalised label and a part of a sentence pass');
   assert.match(spelled[0], /^src\/components\/X\.tsx spells 'waits on you'/);
-  const retired = retiredBreaks(
+  const passing = retiredBreaks(
     planted(
       'src/components/X.tsx',
-      "export const x = <p title={`${s} waits for your approval`}>The check refused it. The run was cancelled.</p>;\nconst s = 'cancelled';\n",
+      "export const x = <p title={`${s} waits for your approval`}>It is not signed off.</p>;\nconst s = 'cancelled';\n",
     ),
   );
-  assert.equal(retired.length, 1, 'one JSX text refused; a word-bounded approval and a bare code word pass');
-  assert.match(retired[0], /^src\/components\/X\.tsx says 'The check refused it/);
+  assert.equal(passing.length, 0, 'a word-bounded approval, a fact of signing off and a bare code word pass');
+  const each: Array<[file: string, jsx: string]> = [
+    ['src/components/A.tsx', 'It waits for you.'],
+    ['src/components/B.tsx', 'The check refused it.'],
+    ['src/components/C.tsx', 'It is not signed.'],
+    ['src/components/D.tsx', 'The run was cancelled.'],
+  ];
+  const retired = retiredBreaks(new Map(each.map(([file, jsx]) => [file, `export const x = <p>${jsx}</p>;\n`])));
+  assert.deepEqual(
+    retired.map((line) => line.split(' ')[0]),
+    each.map(([file]) => file),
+    'each retired phrasing, and cancelled said to a person, is refused on its own',
+  );
   const hover = hoverRuntimeBreaks(
     planted(
       'src/components/X.tsx',

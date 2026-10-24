@@ -42,7 +42,7 @@ export default {
     );
     for (const step of FAKE.steps) await expectVisible(graph.locator(`.react-flow__node[data-id="${step}"]`), `the graph has ${step}`);
     await expectVisible(
-      graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"]`).getByText('waiting on you'),
+      graph.locator(`.react-flow__node[data-id="${FAKE.blocked}"] [data-gate-band]`, { hasText: 'waits on you' }),
       `${FAKE.blocked} is drawn as a human gate`,
     );
     await expectVisible(

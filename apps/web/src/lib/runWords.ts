@@ -9,7 +9,7 @@ import type { RunOutcome, RunSummary } from './api/runs.ts';
 import type { Hue } from './meaning.ts';
 import { stepState, type StepState } from './status.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
-import { ANY_WAIT, ENDED, OPENS, PERSON, RUN_WAITS, type Wait as Waited, type WaitWords } from './words.ts';
+import { ANY_WAIT, ENDED, OPENS, PERSON, RUN_WAITS, stateWordsOf, type Wait as Waited, type WaitWords } from './words.ts';
 
 /** Every kind of wait on a person the page has a sentence for. */
 export const WAIT_KINDS = ['approve', 'blocked', 'check', 'unfinished', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
@@ -150,7 +150,7 @@ export function nowOf(row: WaitingRow): Now | null {
   const at = states.findIndex((step) => !PAST.includes(step.state));
   const step = states[at];
   if (!step) return null;
-  return { word: PERSON[step.state].rail, note: `${step.name} (${at + 1} of ${states.length})` };
+  return { word: stateWordsOf(step.state, step.status).rail, note: `${step.name} (${at + 1} of ${states.length})` };
 }
 
 /** How a finished run ended, as the page says it: a word, its whole sentence, and the hue it is drawn in. */
@@ -203,7 +203,8 @@ export const railStates = (
   steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>,
   cancelled: boolean,
   held: boolean,
-): Array<{ name: string; state: StepState }> => steps.map((step) => ({ name: step.name, state: stepState(step.status, cancelled, held) }));
+): Array<{ name: string; state: StepState; status: string }> =>
+  steps.map((step) => ({ name: step.name, state: stepState(step.status, cancelled, held), status: step.status }));
 
 /** What the rail says aloud: each step and its word, in the run's order: `design verified, land waits on you`, a step a
  * check verified told from one done on its own word. */
@@ -213,11 +214,11 @@ export const railSaid = (
   held: boolean,
 ): string =>
   railStates(steps, cancelled, held)
-    .map((step) => `${step.name} ${PERSON[step.state].rail}`)
+    .map((step) => `${step.name} ${stateWordsOf(step.state, step.status).rail}`)
     .join(', ');
 
 /** A bar of the rail as a button says it: its step's name and the rail's word for its state, `implement, at work`. */
-export const barSaid = (name: string, state: StepState): string => `${name}, ${PERSON[state].rail}`;
+export const barSaid = (name: string, state: StepState, status: string): string => `${name}, ${stateWordsOf(state, status).rail}`;
 
 /**
  * The parts of a date as a person reads it in `timeZone`, theirs by default: its year, its month in three letters and its day; each

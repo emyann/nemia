@@ -155,7 +155,7 @@ const StepApprovalSchema = decodes<StepApproval>()(
 
 /**
  * Mirrors `StepGate` in apps/api/src/detail/detail.ts: a gated step's gate. `awaiting` while it waits at it — the CLI `ls`'s `awaiting
- * approval` — and `approval` once a person approved the try it is on. Neither, for a gated step not signed off yet.
+ * approval` — and `approval` once a person approved the try it is on. Neither, for a gated step yet to sign off.
  */
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 

@@ -46,7 +46,7 @@ export default {
     if ((await nodeNeed.getAttribute('title')) !== said)
       throw new Refused(`the whole of it is on hover — the node's title is ${JSON.stringify(await nodeNeed.getAttribute('title'))}`);
     await expectCount(node.locator('[data-advice]'), 0, 'and not where to answer it: a node has one line, and the banner says that');
-    await expectCount(node.getByText('waiting on you'), 0, 'and is no human gate: nothing was asked of a person');
+    await expectCount(node.locator('[data-gate-band]'), 0, 'and is no human gate: nothing was asked of a person');
 
     const retried = (r: { request: () => { method: () => string }; url: () => string }) =>
       r.request().method() === 'POST' && new URL(r.url()).pathname === `/api/runs/${HELD.id}/steps/${HELD.blocked}/retry`;

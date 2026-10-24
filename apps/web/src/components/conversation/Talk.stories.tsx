@@ -31,6 +31,7 @@ const ITEMS: ConversationItem<Own>[] = [
     id: 'w:1',
     running: false,
     ms: 134_000,
+    counts: 'call',
     lines: [
       { id: 'l:1', tool: 'Read', sentence: 'Read the inbox', fact: '16 cards', state: 'done' },
       { id: 'l:2', tool: 'Grep', sentence: 'Read the runs that wait', fact: '2 gates', state: 'done' },

@@ -41,14 +41,14 @@ test('REFUSED: a name that extends an answer or a prompt by a word in another cl
 test("REFUSED: asksAlways on a class but ask, and a write of the person's rules for auto not asked always", () => {
   assert.deepEqual(
     classBreaks([
-      { name: 'auto', writes: false, class: 'read' },
-      { name: 'auto propose', writes: true, class: 'act' },
-      { name: 'auto confirm', writes: true, class: 'ask', asksAlways: true },
-      { name: 'auto drop', writes: true, class: 'ask' },
+      { name: 'policy', writes: false, class: 'read' },
+      { name: 'policy propose', writes: true, class: 'act' },
+      { name: 'policy confirm', writes: true, class: 'ask', asksAlways: true },
+      { name: 'policy drop', writes: true, class: 'ask' },
       { name: 'cancel', writes: true, class: 'answer', asksAlways: true },
     ]),
     [
-      "auto drop writes the person's rules for auto and is not asked always: give it asksAlways, so no allow at a prompt reaches it",
+      "policy drop writes the person's rules for auto and is not asked always: give it asksAlways, so no allow at a prompt reaches it",
       "cancel asks always and is classed \"answer\": asksAlways is a prompt's, so class it 'ask' or drop it",
     ],
   );

@@ -22,7 +22,7 @@ const PROPOSAL = {
 /** Press `control`, wait for the api's answer to the rule's write by `method`, and refuse any but a 200: the body the board sent. */
 async function wrote(page: Page, control: Locator, method: 'PUT' | 'DELETE', what: string): Promise<unknown> {
   const [answer] = await Promise.all([
-    page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname.startsWith('/api/auto/nemia/rules/'), {
+    page.waitForResponse((r) => r.request().method() === method && new URL(r.url()).pathname.startsWith('/api/policy/nemia/rules/'), {
       timeout: WAIT_MS,
     }),
     control.click(),

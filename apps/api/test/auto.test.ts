@@ -1,9 +1,10 @@
 /**
- * An agent's rules for auto on the api, through the entries of the package's command table: `GET /api/auto/:name` reads the default in
- * force while nothing is confirmed, beside what the agent proposed and its words kept as guidance; `PUT /api/auto/:name/rules/:id`
+ * An agent's rules for auto on the api, through the entries of the package's command table: `GET /api/policy/:name` reads the default in
+ * force while nothing is confirmed, beside what the agent proposed and its words kept as guidance; `PUT /api/policy/:name/rules/:id`
  * confirms a proposed rule as the person read it, keeping the default beside it, and refuses one not proposed (404), one that reads
  * otherwise since (409), one in force already (409), a confirm with no words (422) or a key but them (400), and a request from another
- * site (403), each writing nothing; `DELETE` drops a rule, and takes no body but `{}` (400); a name that is no agent's is a 400.
+ * site (403), each writing nothing; `DELETE` drops a rule, and takes no body but `{}` (400); a name that is no agent's is a 400; the
+ * former spelling `/api/auto/…` is a 308 to the same path under `/api/policy/`.
  *
  * At shipped defaults, over the harness's scratch store (`root`).
  */
@@ -48,7 +49,7 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
   await s.test(
     'the default is in force while nothing is confirmed, read beside what the agent proposed and the words it keeps as guidance',
     async () => {
-      const read = await asked('GET', '/api/auto/nemia');
+      const read = await asked('GET', '/api/policy/nemia');
       assert.equal(read.status, 200);
       assert.equal(read.body.isDefault, true);
       assert.deepEqual(
@@ -72,18 +73,18 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
   await s.test(
     'REFUSED, writing nothing: a rule not proposed, a body but {}, a request from another site, and a name that is no agent',
     async () => {
-      const ghost = await asked('PUT', '/api/auto/nemia/rules/ghost', { words: WORDS });
+      const ghost = await asked('PUT', '/api/policy/nemia/rules/ghost', { words: WORDS });
       assert.equal(ghost.status, 404);
       assert.match(String(ghost.body.error), /^nemia proposed no rule ghost/);
-      assert.equal((await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS, why: 'go' })).status, 400);
-      const wordless = await asked('PUT', '/api/auto/nemia/rules/tries', {});
+      assert.equal((await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS, why: 'go' })).status, 400);
+      const wordless = await asked('PUT', '/api/policy/nemia/rules/tries', {});
       assert.equal(wordless.status, 422);
       assert.match(String(wordless.body.error), /takes the rule's words as you read them/);
-      assert.equal((await asked('DELETE', '/api/auto/nemia/rules/default', { why: 'go' })).status, 400);
-      const foreign = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
+      assert.equal((await asked('DELETE', '/api/policy/nemia/rules/default', { why: 'go' })).status, 400);
+      const foreign = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS }, { ...BOARD, 'sec-fetch-site': 'cross-site' });
       assert.equal(foreign.status, 403);
       assert.equal(fs.existsSync(CONFIRMED), false);
-      const hidden = await asked('GET', '/api/auto/.nemia');
+      const hidden = await asked('GET', '/api/policy/.nemia');
       assert.equal(hidden.status, 400);
       assert.match(String(hidden.body.error), /is not an agent's name/);
     },
@@ -93,7 +94,7 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
     async () => {
       propose({ answer: 'approve', when: [] });
       try {
-        const stale = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS });
+        const stale = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS });
         assert.equal(stale.status, 409);
         assert.match(String(stale.body.error), /^nemia's rule tries now reads "Approve any step unasked, whatever the run’s state\."/);
         assert.equal(fs.existsSync(CONFIRMED), false);
@@ -103,7 +104,7 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
     },
   );
   await s.test('a confirm puts the rule in force beside the default; again is a 409; a drop takes the default out', async () => {
-    const confirmed = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS });
+    const confirmed = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS });
     assert.equal(confirmed.status, 200);
     assert.deepEqual(
       (confirmed.body.rules as { id: string; from: string }[]).map((r) => [r.id, r.from]),
@@ -112,14 +113,23 @@ test('A person keeps her rules: the default in force, a proposed rule refused bu
         ['tries', 'proposed'],
       ],
     );
-    const twice = await asked('PUT', '/api/auto/nemia/rules/tries', { words: WORDS });
+    const twice = await asked('PUT', '/api/policy/nemia/rules/tries', { words: WORDS });
     assert.equal(twice.status, 409);
-    const dropped = await asked('DELETE', '/api/auto/nemia/rules/default');
+    const dropped = await asked('DELETE', '/api/policy/nemia/rules/default');
     assert.equal(dropped.status, 200);
     assert.deepEqual(
       (dropped.body.rules as { id: string }[]).map((r) => r.id),
       ['tries'],
     );
     assert.equal(dropped.body.isDefault, false);
+  });
+  await s.test("the routes' former spelling, /api/auto/…, is sent on to /api/policy/… with its method and body kept", async () => {
+    const res = await app.request('/api/auto/nemia/rules/tries?x=1', {
+      method: 'PUT',
+      headers: BOARD,
+      body: JSON.stringify({ words: WORDS }),
+    });
+    assert.equal(res.status, 308);
+    assert.equal(res.headers.get('location'), '/api/policy/nemia/rules/tries?x=1');
   });
 });

@@ -33,7 +33,7 @@ const { customInstructionsFile } = await import('../src/agents/read.store.ts');
 const { DEFAULT_AUTO, ruleWords } = await import('../src/auto/auto.ts');
 const { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfirmed, writeProposed } =
   await import('../src/auto/auto.store.ts');
-const { autoListOf, proposalOf } = await import('../src/auto/auto.verb.ts');
+const { policyListOf, proposalOf } = await import('../src/auto/auto.verb.ts');
 const { engineOf, runWith } = await import('../src/runtime-client.ts');
 /** The CLI's `main`, loaded only if a checkpoint types a command: these stories call the verbs, and its import is the slowest. */
 const main: Parameters<typeof staged>[0]['main'] = async (...argv) => (await import('../src/cli/main.ts')).main(...argv);
@@ -148,7 +148,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
     assert.equal(fs.existsSync(confirmedFile(ROOT, 'nemia')), false);
     assert.equal(path.dirname(proposedFile(ROOT, 'nemia')), path.dirname(confirmedFile(ROOT, 'nemia')));
-    const list = autoListOf(ROOT, 'nemia');
+    const list = policyListOf(ROOT, 'nemia');
     assert.equal(list.isDefault, true);
     assert.equal(list.builtin.id, 'default', 'the builtin rule is offered to be confirmed again');
     assert.deepEqual(
@@ -168,7 +168,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
       since: NOW.toISOString(),
       rules: [DEFAULT_AUTO, { id: 'tries', answer: 'retry', steps: ['implement'], when: ['checked'], under: 20, from: 'proposed' }],
     });
-    const list = autoListOf(ROOT, 'nemia');
+    const list = policyListOf(ROOT, 'nemia');
     assert.equal(list.isDefault, false);
     const words = list.rules[1]?.words ?? '';
     for (const fact of ['Try again', 'implement', 'its check passed', 'under $20']) assert.ok(words.includes(fact), words);
@@ -222,19 +222,19 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     },
   );
   await s.test('REFUSED: a confirm of a rule is asked every time, at auto', async () => {
-    assert.equal(await decidedAtAuto('nemia auto confirm nemia default'), 'ask');
+    assert.equal(await decidedAtAuto('nemia policy confirm nemia default'), 'ask');
   });
   await s.test('a proposal read from a custom instruction is stale once its words change, and one proposed from none is stale', () => {
     const file = customInstructionsFile(ROOT, 'nemia');
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.writeFileSync(file, 'approve when all agree\n');
     writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: digestOf('approve when all agree') });
-    assert.equal(autoListOf(ROOT, 'nemia').proposed?.stale, false);
-    assert.equal(autoListOf(ROOT, 'nemia').instruction, 'approve when all agree');
+    assert.equal(policyListOf(ROOT, 'nemia').proposed?.stale, false);
+    assert.equal(policyListOf(ROOT, 'nemia').instruction, 'approve when all agree');
     fs.writeFileSync(file, 'approve when all agree, and retry a check once\n');
-    assert.equal(autoListOf(ROOT, 'nemia').proposed?.stale, true);
+    assert.equal(policyListOf(ROOT, 'nemia').proposed?.stale, true);
     writeProposed(ROOT, 'nemia', { at: NOW.toISOString(), ...proposalOf(PROPOSAL), digest: null });
-    assert.equal(autoListOf(ROOT, 'nemia').proposed?.stale, true, 'proposed from no instruction');
+    assert.equal(policyListOf(ROOT, 'nemia').proposed?.stale, true, 'proposed from no instruction');
   });
   await s.test('the person drops the default: an approval is asked, and a list that does not read lets nothing through', async () => {
     dropRule(ROOT, 'nemia', 'default', new Date('2026-10-06T09:00:00.000Z'));
@@ -250,7 +250,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     const home = proposed();
     dropRule(home, 'nemia', 'default', NOW);
     assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [], 'nothing in force: every answer is asked');
-    assert.equal(autoListOf(home, 'nemia').isDefault, false);
+    assert.equal(policyListOf(home, 'nemia').isDefault, false);
     confirmRule(home, 'nemia', 'default', DEFAULT, NOW);
     assert.deepEqual(readConfirmed(home, 'nemia')?.rules, [DEFAULT_AUTO]);
   });
@@ -286,7 +286,7 @@ test('The rules on disk refuse, by their kind, writing nothing', async (t) => {
       confirmRule(home, 'nemia', 'tries', TRIES, NOW);
       const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', TRIES, NOW));
       assert.equal(kind, 'Conflict');
-      names(message, 'nemia auto drop nemia tries');
+      names(message, 'nemia policy drop nemia tries');
       assert.equal(refusal(() => confirmedFile(home, '../x')).kind, 'Invalid');
     },
   );
@@ -300,7 +300,7 @@ test('The rules on disk refuse, by their kind, writing nothing', async (t) => {
     const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', TRIES, NOW));
     assert.equal(kind, 'Conflict');
     assert.ok(message.startsWith("nemia's rule tries"), message);
-    names(message, '"Approve any step unasked', 'nemia auto nemia');
+    names(message, '"Approve any step unasked', 'nemia policy nemia');
     assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);
     assert.equal(refusal(() => confirmRule(home, 'nemia', 'default', `${DEFAULT} `, NOW)).kind, 'Conflict', "the default's own words");
     assert.equal(fs.existsSync(confirmedFile(home, 'nemia')), false);

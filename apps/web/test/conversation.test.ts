@@ -96,8 +96,9 @@ test("the family's pure rules: a mark under its caller's prefix, a line's trace 
     assert.notEqual(traceStatusOf('waits'), 'pending', 'a line that waits on a person is never drawn at rest');
   });
   await t.test('the words the family says: a folded turn, the pill over the talk, and the line over what is new', () => {
-    assert.equal(turnWords(134_000, 2), 'Worked for 2m 14s · 2 steps');
-    assert.equal(turnWords(134_000, 1), 'Worked for 2m 14s · 1 step');
+    assert.equal(turnWords(134_000, 2, 'call'), 'Worked for 2m 14s · 2 calls');
+    assert.equal(turnWords(134_000, 1, 'call'), 'Worked for 2m 14s · 1 call');
+    assert.equal(turnWords(134_000, 2, 'step'), 'Worked for 2m 14s · 2 steps');
     assert.equal(jumpWords(2), '2 new · Jump to the latest');
     assert.equal(jumpWords(1), '1 new · Jump to the latest');
     assert.equal(
@@ -124,6 +125,7 @@ test("the family's pure rules: a mark under its caller's prefix, a line's trace 
       id: 'w:1',
       running: true,
       ms: 0,
+      counts: 'call',
       lines: Array.from({ length: lines }, (_, i) => ({ id: `l:${i}`, tool: 'Read', sentence: '', state: 'done' as const })),
     });
     const [before, after] = [

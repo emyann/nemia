@@ -10,6 +10,17 @@
   ],
   "terms": [
     {
+      "term": "Call",
+      "meaning": "one tool call of hers in her chat, with its sentence, its fact and where it stands: done, running, failed, not begun, or waiting on the person.",
+      "type": "CallState",
+      "retired": [
+        {
+          "spelling": "StepState",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        }
+      ]
+    },
+    {
       "term": "Keeper",
       "meaning": "the daemon's part that files Nemia's session while any factory is above `manual`, and stops it once none is.",
       "see": {

@@ -1,7 +1,8 @@
 /**
  * A turn of a conversation, as shadcn's Trace draws it in the look: a line a call, with its tool's glyph, its sentence and its quiet
  * fact in mono, in the state `traceStatusOf` gives it. A turn with a line still at work is drawn open, that line alive; one with none
- * folds into the single line `turnWords` gives it — `Worked for 2m 14s · 9 steps` — whose lines are drawn only while it is open.
+ * folds into the single line `turnWords` gives it — `Worked for 2m 14s · 9 calls` in her chat, `· 9 steps` in a step's session —
+ * whose lines are drawn only while it is open.
  *
  * A line that carries what it asked or what came back opens to show them, each block capped and scrolling inside itself, the result in
  * the failure's ink where the call failed; a line that carries neither is drawn plain, with nothing to open. Every data mark is written
@@ -115,7 +116,7 @@ export function Worked({ work, marks, open }: { work: Work; marks: string; open?
           <TraceIcon>
             <WorkflowIcon />
           </TraceIcon>
-          <TraceTitle>{turnWords(work.ms, work.lines.length)}</TraceTitle>
+          <TraceTitle>{turnWords(work.ms, work.lines.length, work.counts)}</TraceTitle>
         </TraceLine>
       </TraceCollapsibleTrigger>
       <TraceCollapsibleContent kind="nest">

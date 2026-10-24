@@ -126,6 +126,41 @@
       }
     },
     {
+      "term": "Policy",
+      "meaning": "an agent's rules at `auto`: the answers it may give unasked, which the person confirms, read and written by `nemia policy`. `nemia auto`, its former name, still runs with a hint; the package's `auto` folder and the store's keep their name, so no confirmed rule is orphaned.",
+      "type": "PolicyList",
+      "retired": [
+        {
+          "spelling": "AutoList",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "autoListOf",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "AUTO_ENTRIES",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "AUTO_PROPOSE",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "AUTO_CONFIRM",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "AUTO_DROP",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "autoProposeRun",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        }
+      ]
+    },
+    {
       "term": "Reason",
       "meaning": "why a step stands where it does, as the feed's closed code (`Reason`), set where the listing builds the step's row and never parsed back out of its sentence; a run's is a `RunReason`.",
       "type": "StepReason",

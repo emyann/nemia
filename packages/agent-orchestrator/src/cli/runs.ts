@@ -9,7 +9,7 @@ import path from 'node:path';
 import {
   admitted,
   AGENTS_CUSTOM,
-  AUTO_PROPOSE,
+  POLICY_PROPOSE,
   FACTORY_INSTRUCT,
   FACTORY_RULES,
   freeingMany,
@@ -252,12 +252,12 @@ export async function factoryRulesRun(args: Args, e: Engine, place: Place): Prom
 }
 
 /**
- * `nemia auto propose`'s runner: the proposal `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
+ * `nemia policy propose`'s runner: the proposal `--file` names read (`wordsFrom`), handed to its entry's handler, and what it says printed.
  */
-export async function autoProposeRun(args: Args, e: Engine, place: Place): Promise<void> {
-  const asked = withWords(args, AUTO_PROPOSE.name);
-  const data = await runWith(e, placedIn(place, AUTO_PROPOSE.handler(asked, undefined, HOME)));
-  for (const line of AUTO_PROPOSE.print(data, asked)) console.log(line);
+export async function policyProposeRun(args: Args, e: Engine, place: Place): Promise<void> {
+  const asked = withWords(args, POLICY_PROPOSE.name);
+  const data = await runWith(e, placedIn(place, POLICY_PROPOSE.handler(asked, undefined, HOME)));
+  for (const line of POLICY_PROPOSE.print(data, asked)) console.log(line);
 }
 
 /**

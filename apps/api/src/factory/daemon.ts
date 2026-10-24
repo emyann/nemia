@@ -7,8 +7,7 @@ import {
   daemonLine,
   daemonStanding,
   type DaemonStanding,
-  holderOf,
-  type HolderKind,
+  holderName,
   type Identity,
   lastPassCost,
   type PassCostRead,
@@ -24,14 +23,14 @@ export const START = 'npm start in apps/api';
  * latest of its start, its last pass and its beat on the wall clock, said to a person; the package measures the silence beside it on the
  * monotonic clock, and `staleAfterMs` of silence makes a live daemon `stalled`.
  * `identity` is what the api's own process table said of the pid (the package's `Identity`). `by` is which kind of daemon wrote the file,
- * the api or a `nemia up` (a file that names none is a `nemia up`'s), and `url` where an api holder serves the board, null for a `nemia
+ * as a line says it: `api` or `nemia up` (`holderName`), and `url` where an api holder serves the board, null for a `nemia
  * up`. `start` is how a person starts one (`START`). A file that does not read has no fields.
  * `unobserved` is why the daemon's last pass could not read a harness, in the runtime's words (`PassCost.unobserved`): said only while it
  * ticks and of a pass since it started, empty otherwise.
  */
 export type Daemon = {
   kind: DaemonStanding['kind'];
-  by: HolderKind | null;
+  by: string | null;
   url: string | null;
   start: string;
   ticking: boolean;
@@ -77,7 +76,7 @@ export function daemonOf(standing: DaemonStanding, now: number, pass: PassCostRe
   const { file } = standing;
   return {
     kind: standing.kind,
-    by: holderOf(file),
+    by: holderName(file.by),
     url: file.url ?? null,
     start: START,
     ticking: standing.kind === 'ticking',

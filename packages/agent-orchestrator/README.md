@@ -3277,7 +3277,7 @@ task is never refused, however many passes read it.
 The tick keeps one writer per file, and two ticks are two writers. So the store's daemon takes the store for itself, through a file of its
 own, `$WF_ROOT/daemon.json`, which it alone writes. The daemon is the api's process (`npm start` in `apps/api`), which answers the board's
 `/api` as it ticks (the board itself is the web's server, which proxies to it), or `wf up` on a machine that serves none: both run `up` (`src/daemon/up.verb.ts`), which takes the store before anything else,
-and the file names which one holds it (`by`, `"api"` or `"wf up"`, read as `wf up` when absent) and where an api serves (`url`, written
+and the file names which one holds it (`by`, `"api"` or `"up"`; a file written before, with none or `"wf up"`, reads as `up`) and where an api serves (`url`, written
 once it listens). An api started with `--no-tick` answers on 8788, behind the vite dev server, and takes nothing: it ticks no store, so a run filed on it
 moves on the daemon's next pass.
 
@@ -3297,9 +3297,9 @@ not read, a holder that `stopped`, one whose process is `gone` (`kill(pid, 0)` f
 (`stalled`), or one `ticking`. The interval is a whole number of milliseconds from 1 to 2147483647 and anything else is refused, exit 2,
 before the store is taken: `wf up -5` would write an interval the file does not read back, and a holder that does not read holds nothing.
 
-The lease also names what the daemon's own engine holds, `holder`: the cards it serves on its port, by the harness each is for, written
-right after it took the lease and held its engine (`heldHolder`), by that process, which is the one writer of the file — the api's url and
-the holder's cards are both facts of the process that holds it. Another process on this store reads them (`holderOnStore`) to follow one
+The lease also names what the daemon's own engine holds, `serves` (`holder` before, read as `serves`): the cards it serves on its port, by the harness each is for, written
+right after it took the lease and held its engine (`heldServes`), by that process, which is the one writer of the file — the api's url and
+the holder's cards are both facts of the process that holds it. Another process on this store reads them (`servesOnStore`) to follow one
 of those sessions live over that port rather than off the files, and reads them afresh at every follow: a holder's port is ephemeral, and
 a process that read it once would dial a dead port after any restart. Nothing is answered for a lease that stopped, whose process is gone
 or that has gone silent — there is no port to dial — nor for a lease the asking process itself holds, which would be a viewer dialling

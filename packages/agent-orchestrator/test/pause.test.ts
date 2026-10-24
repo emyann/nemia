@@ -367,13 +367,13 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
       const stopped = stops.find((x) => x.taskId.startsWith(`${runs.session.id}-`))!.taskId;
       const resumed = readRun(runs.session.id).steps.work;
       assert.notEqual(resumed.taskId, stopped, "the session's try 2 filed");
-      assert.deepEqual(resumed.tries, [{ taskId: stopped, then: 'nudge', paused: true }]);
+      assert.deepEqual(resumed.tries, [{ taskId: stopped, cause: 'nudge', paused: true }]);
       const stoppedAttempt = b.tasks.get(resumed.tries[0].taskId)!.attempt;
       assert.equal(b.tasks.get(resumed.taskId!)!.spec.resumeFrom, stoppedAttempt?.nativeId, 'continuing the session it stopped');
       const checked = stops.find((x) => x.taskId.startsWith(`${runs.checking.id}-`))!.taskId;
       const rechecked = readRun(runs.checking.id).steps.work;
       assert.notEqual(rechecked.check?.taskId, checked, 'its check filed again');
-      assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checked }, then: 'recheck', paused: true });
+      assert.deepEqual(rechecked.tries?.at(-1), { taskId: rechecked.taskId, check: { taskId: checked }, cause: 'recheck', paused: true });
       assert.equal(readRun(runs.ended.id).steps.work?.tries, undefined, 'the run whose session ended first is not tried');
       assert.deepEqual(scheduledDues(), [MONDAY], 'the fire held by the pause starts on the pass after the resume');
       const feed = await printedBy(sub, () => stage.main(['watch', '--once']));

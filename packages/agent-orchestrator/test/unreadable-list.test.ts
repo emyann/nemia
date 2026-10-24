@@ -142,7 +142,7 @@ signedOff('r-try-implement');
 spoil('r-try-implement');
 signedOff('r-try-implement-2');
 writeRun('r-try', {
-  implement: { taskId: 'r-try-implement-2', branch: 'wf/r-try/implement', tries: [{ taskId: 'r-try-implement', then: 'retries' }] },
+  implement: { taskId: 'r-try-implement-2', branch: 'wf/r-try/implement', tries: [{ taskId: 'r-try-implement', cause: 'retries' }] },
 });
 
 writeRun('r-waiting', {}, { after: ['r-check'] });

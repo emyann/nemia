@@ -40,7 +40,7 @@ type Try = {
   end: string;
   cost?: number | null;
   check?: CheckVerdict;
-  then?: 'round' | 'retries';
+  cause?: 'round' | 'retries';
   failed?: true;
   denied?: string[];
   skills?: string[];
@@ -105,7 +105,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
       const taskId = t.recheck || t.answers ? ids[i - 1].taskId : own;
       const sessionEnd = t.check ? minus(t.end, 10 * MIN) : t.end;
       if (t.answers) {
-        ids[i - 1].then = 'nudge';
+        ids[i - 1].cause = 'nudge';
         views.set(taskId, answeredBy(views.get(taskId)!, sessionEnd));
       } else {
         views.set(taskId, ended(sessionEnd, t.cost === undefined ? 1 : t.cost, t.failed));
@@ -121,7 +121,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
         filed.set(`${own}-check`, minus(t.end, 9 * MIN));
         verdicts.set(`${own}-check`, t.check);
       }
-      ids.push({ taskId, then: t.then ?? 'retries', ...(t.check ? { check: { taskId: `${own}-check` } } : {}) });
+      ids.push({ taskId, cause: t.cause ?? 'retries', ...(t.check ? { check: { taskId: `${own}-check` } } : {}) });
     });
     const last = ids.at(-1)!;
     record[name] = { taskId: last.taskId, ...(last.check ? { check: last.check } : {}), tries: ids.slice(0, -1) };
@@ -158,10 +158,10 @@ const twoRounds = (id: string, steps = TEAM, landed: object = { commit: 'abc' },
   const tries = {
     [design]: [{ end: at(1) }],
     [implement]: [
-      { end: at(2), check: 'passed' as const, then: 'round' as const },
+      { end: at(2), check: 'passed' as const, cause: 'round' as const },
       { end: at(4), check: 'passed' as const },
     ],
-    [review]: [{ end: at(3), then: 'round' as const }, { end: at(5) }],
+    [review]: [{ end: at(3), cause: 'round' as const }, { end: at(5) }],
     [land]: [{ end: at(7), check: 'passed' as const }],
   };
   return withLanded(readOf(id, steps, tries, more), land, landed);
@@ -217,7 +217,7 @@ test('first-try landings read the `workspace: main` step: landed on try 1 counts
       implement: [{ end: at(2) }],
       review: [{ end: at(3) }],
       land: [
-        { end: at(5), check: 'refused', then: 'retries' },
+        { end: at(5), check: 'refused', cause: 'retries' },
         { end: at(7), check: 'passed' },
       ],
     }),
@@ -255,8 +255,8 @@ test('an ending that commits in its own prose finishes once done, its landing un
   const prose = TEAM.map((s) => (s.workspace === 'main' ? { ...s, check: undefined } : s));
   const tries = (land: Try[]) => ({
     design: [{ end: at(1) }],
-    implement: [{ end: at(2), then: 'round' as const }, { end: at(4) }],
-    review: [{ end: at(3), then: 'round' as const }, { end: at(5) }],
+    implement: [{ end: at(2), cause: 'round' as const }, { end: at(4) }],
+    review: [{ end: at(3), cause: 'round' as const }, { end: at(5) }],
     land,
   });
   const [old] = factsOf(readOf('old', prose, tries([{ end: at(7) }]))).runs;
@@ -313,7 +313,7 @@ test("a gate wait runs from the try's end to its approval; none without one, non
   const gated = [step('brief', []), step('design', ['brief'], { gate: true, by: 'seldon' }), step('implement', ['design'], { by: 'ada' })];
   const tries = {
     brief: [{ end: at(0) }],
-    design: [{ end: at(1), check: 'passed' as const, then: 'retries' as const }, { end: at(3) }],
+    design: [{ end: at(1), check: 'passed' as const, cause: 'retries' as const }, { end: at(3) }],
     implement: [{ end: at(5) }],
   };
   const approved = readOf('g', gated, tries, { approvals: [{ step: 'design', try: 1, at: minus(at(2), 30 * MIN) }] });
@@ -356,7 +356,7 @@ test("a gate approved on a try that answered a session waits from that answer's 
 test('a try falls on the UTC day it ended: 23:59Z and 00:01Z the next morning are two days', () => {
   const late = '2026-09-10T23:59:00.000Z';
   const early = '2026-09-11T00:01:00.000Z';
-  const r = readOf('d', [step('implement', [])], { implement: [{ end: late, then: 'retries' }, { end: early }] });
+  const r = readOf('d', [step('implement', [])], { implement: [{ end: late, cause: 'retries' }, { end: early }] });
   const s = statsOf(factsOfAll(r), {}, new Date('2026-09-11T12:00:00.000Z'));
   assert.deepEqual(
     s.all.days.map((d) => [d.day, d.tries]),
@@ -369,7 +369,7 @@ test('a try falls on the UTC day it ended: 23:59Z and 00:01Z the next morning ar
 
 test('the tiles are the last 14 days to today and the 14 before: a try on today-13 is in the last, one on today-14 in the before', () => {
   const r = readOf('t', [step('implement', [])], {
-    implement: [{ end: at(12, '2026-09-17'), then: 'retries' }, { end: at(12, '2026-09-16') }],
+    implement: [{ end: at(12, '2026-09-17'), cause: 'retries' }, { end: at(12, '2026-09-16') }],
   });
   const { last, before } = statsOf(factsOfAll(r), {}, new Date('2026-09-30T08:00:00.000Z')).all.tiles;
   assert.deepEqual([last.from, last.to, last.tries], ['2026-09-17', '2026-09-30', 1]);

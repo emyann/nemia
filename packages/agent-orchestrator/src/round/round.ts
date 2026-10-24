@@ -41,7 +41,7 @@ import {
   dollars,
 } from '../status/status.ts';
 import { loopSpan } from '../workflow/index.ts';
-import type { EarlierTry } from '../retry/index.ts';
+import type { EarlierTry, TryCause } from '../retry/index.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
 import { holdWord } from '../wait/wait.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
@@ -125,7 +125,7 @@ function askedRound(
 /**
  * The run's steps once a round is filed. Pure.
  *
- * Every step of the loop moves its try behind it, `then: 'round'` — `then: 'merge'` on a merge, which spends no round — and keeps its
+ * Every step of the loop moves its try behind it, `cause: 'round'` — `cause: 'merge'` on a merge, which spends no round — and keeps its
  * workspace and branch, and each ending a merge sends the work back from moves its own behind (`sentBack`). The target's place is taken
  * by the task just filed, which continues its session. Every other step's is left unfiled, for `assess` to file once what it waits on is
  * verified — a new session, under its next try's id (`stepTaskId`). So the looping step's closeout that asked for the round is behind it,
@@ -142,11 +142,11 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
     steps.find((s) => s.name === r.target),
   );
   const next = { ...run.steps };
-  const then = r.by === 'merge' ? 'merge' : 'round';
+  const cause: TryCause = r.by === 'merge' ? 'merge' : 'round';
   for (const name of looping ? loopSpan(steps, looping) : []) {
     const { check, tries = [], handedOff: _, landed: __, filesRead: ___, ...rest } = run.steps[name] ?? { taskId: null };
     const raised = r.budget !== undefined && r.raise?.includes(name) ? { budget: r.budget } : {};
-    const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), then, ...raised }] : [];
+    const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), cause, ...raised }] : [];
     next[name] = { ...rest, taskId: name === r.target ? taskId : null, tries: [...tries, ...over] };
   }
   const refiled = { ...next, ...Object.fromEntries((r.back ?? []).filter((b) => next[b]).map((b) => [b, sentBack(next[b])])) };

@@ -374,6 +374,6 @@ for (const name of LOOPED) {
     const filed = [...order, nudge].map((id) => b.tasks.get(id)!.spec);
     assert.equal(b.tasks.get(nudge)!.spec.resumeFrom, `native-${first}`, 'the same session, continued');
     assert.deepEqual(chainDifferences(filed), []);
-    assert.equal(readRun(run.id).steps[target]?.tries?.at(-1)?.then, 'signoff');
+    assert.equal(readRun(run.id).steps[target]?.tries?.at(-1)?.cause, 'signoff');
   });
 }

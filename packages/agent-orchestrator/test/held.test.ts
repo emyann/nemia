@@ -204,7 +204,7 @@ test("a step that signed off blocked stays open, and a person's answer — `nemi
   const record = readRun(run.id).steps.plan;
   assert.equal(record.taskId, plan, 'the same task');
   assert.deepEqual(
-    record.tries?.map((t) => [t.taskId, t.then]),
+    record.tries?.map((t) => [t.taskId, t.cause]),
     [[plan, 'nudge']],
     'the try it was, behind it',
   );

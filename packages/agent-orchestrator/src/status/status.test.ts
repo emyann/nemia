@@ -102,7 +102,7 @@ test('budgetUsdFor and budgetOf: what is left of the cap in force goes to the en
     assert.equal(budgetUsdFor(budgetOf({ ...step('implement'), budget: 3 }, undefined), cost(1)), 2);
   });
   await t.test('a raised cap, less what was spent', () => {
-    const raised = budgetOf(detached, { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge', budget: 10 }] });
+    const raised = budgetOf(detached, { taskId: 't2', tries: [{ taskId: 't1', cause: 'nudge', budget: 10 }] });
     assert.equal(budgetUsdFor(raised, cost(4.25)), 5.75);
   });
   await t.test('digits, rounded up to a millionth: never 0, which the engine refuses', () => {
@@ -131,7 +131,7 @@ const inRound = (n: number, extra: Partial<RepositoryRun> = {}): Run => {
     Array.from({ length: n - 1 }, (_, k) => ({
       taskId: `${prefix}${k + 1}`,
       ...(checked ? { check: { taskId: `c${k + 1}` } } : {}),
-      then: 'round' as const,
+      cause: 'round' as const,
     }));
   const tries = (t: EarlierTry[]) => (t.length ? { tries: t } : {});
   const steps = {

@@ -12,7 +12,7 @@ import { Result, Schema, SchemaIssue } from 'effect';
 import { BY_CAP, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { spentRoundAsks } from '../round/round.ts';
-import { spentAsks, type RetryAsk } from '../retry/index.ts';
+import { spentAsks, TRY_CAUSES, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
@@ -29,11 +29,14 @@ const Kept = <const F extends Schema.Struct.Fields>(fields: F) => Schema.StructW
 
 const Strings = Schema.mutable(Schema.Array(Schema.String));
 
-/** A try a step had before the one it is on (`EarlierTry`), as any version of the tick writes one. */
+/**
+ * A try a step had before the one it is on (`EarlierTry`), as any version of the tick writes one: its `cause` written under the former
+ * `then` by an older tick is read under `cause` (`upgradeTries`) before this reads it, so a try with neither is refused at its `cause`.
+ */
 const EarlierTrySchema = Kept({
   taskId: Schema.String,
   check: Schema.optional(Kept({ taskId: Schema.String })),
-  then: Schema.Literals(['retries', 'signoff', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'back']),
+  cause: Schema.Literals(TRY_CAUSES),
   model: Schema.optional(Schema.String),
   budget: Schema.optional(Schema.Finite),
   paused: Schema.optional(Schema.Literal(true)),
@@ -289,7 +292,8 @@ export const removeHold = (id: string, at: string): boolean => {
  * `records` while a pass is metered.
  *
  * The frozen steps are read under the names their keys have now (`asNamed`), and written back under them (`recordText`), in their place
- * among the record's keys, so a record read and written back moves no line. Refused: an id with no record, as `no such run` naming
+ * among the record's keys, so a record read and written back moves no line; a try's former `then` is read as its `cause`
+ * (`upgradeTries`). Refused: an id with no record, as `no such run` naming
  * `nemia ls` (`Missing`), for every verb that takes one; and a record that does not read as a run (`UnreadableRecord`).
  */
 export const readRun = (id: string): Run => within('records', () => readRecord(id));
@@ -299,7 +303,7 @@ const readRecord = (id: string): Run => {
   countRecord();
   let raw: unknown;
   try {
-    raw = JSON.parse(readText(runFile(id)));
+    raw = upgradeTries(JSON.parse(readText(runFile(id))));
   } catch (err) {
     if (!(err instanceof SyntaxError)) throw err;
     throw new UnreadableRecord(id, `is not JSON (${err.message})`);

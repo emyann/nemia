@@ -521,7 +521,7 @@ test('a pass that filed try 2 and died before writing the run down is adopted, n
   );
   assert.equal(filings.filter((f) => f === try2).length, 1);
   assert.deepEqual(
-    [readRun(run.id).steps.implement?.taskId, readRun(run.id).steps.implement?.tries?.map((t) => t.then)],
+    [readRun(run.id).steps.implement?.taskId, readRun(run.id).steps.implement?.tries?.map((t) => t.cause)],
     [try2, ['retries']],
   );
 
@@ -727,7 +727,7 @@ test('a pass that filed a round and died before writing the run down is adopted,
   );
   assert.equal(b.filings.filter((f) => f === try2).length, 1);
   const record = readRun(run.id).steps;
-  assert.deepEqual([record.implement?.taskId, record.review?.taskId, record.review?.tries?.map((t) => t.then)], [try2, null, ['round']]);
+  assert.deepEqual([record.implement?.taskId, record.review?.taskId, record.review?.tries?.map((t) => t.cause)], [try2, null, ['round']]);
 
   writeRun(before);
   b.settle(try2, 'running');

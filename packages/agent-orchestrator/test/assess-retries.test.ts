@@ -109,8 +109,8 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Par
   );
 /** Two tries `retries: 2` filed. */
 const SPENT: EarlierTry[] = [
-  { taskId: 't-a', check: { taskId: 'c-a' }, then: 'retries' },
-  { taskId: 't-b', check: { taskId: 'c-b' }, then: 'retries' },
+  { taskId: 't-a', check: { taskId: 'c-a' }, cause: 'retries' },
+  { taskId: 't-b', check: { taskId: 'c-b' }, cause: 'retries' },
 ];
 /** The JSON a brief carries in a fenced block, however long its fence. */
 const dataIn = (brief: string) => JSON.parse(/\n(`{3,})json\n([\s\S]*?)\n\1/.exec(brief)![2]);
@@ -532,8 +532,8 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   });
   await t.test("a person's tries do not spend what the run may spend on its own", () => {
     const yours: EarlierTry[] = [
-      { ...SPENT[0], then: 'nudge' },
-      { ...SPENT[1], then: 'fresh' },
+      { ...SPENT[0], cause: 'nudge' },
+      { ...SPENT[1], cause: 'fresh' },
     ];
     assert.deepEqual(
       assess(RETRIED, onTry(yours), checkFailed, signedDone, asked, () => 1).retry.map((r) => [r.try, r.by]),
@@ -614,7 +614,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     );
   });
   await t.test("the current try decides the step: try 2 verified files what waits on it, and the step's line says which try", () => {
-    const r = onTry([{ taskId: 't0', check: { taskId: 'c0' }, then: 'retries' }], 'c1');
+    const r = onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'retries' }], 'c1');
     const p = phases({ t0: 'succeeded', c0: 'failed', t1: 'succeeded', c1: 'succeeded' });
     assert.deepEqual(assess(RETRIED, r, p, signedDone, asked, () => 0).ready, ['review']);
     assert.deepEqual(lsOf(r, 'succeeded', undefined).steps[0], {
@@ -624,7 +624,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
       note: 'try 2, by retries: 2',
     });
     assert.equal(
-      tryNote(RETRIED[0], { taskId: 't', tries: [{ taskId: 'a', then: 'fresh', model: 'opus' }] }),
+      tryNote(RETRIED[0], { taskId: 't', tries: [{ taskId: 'a', cause: 'fresh', model: 'opus' }] }),
       'try 2, fresh on opus, on your word',
     );
     assert.deepEqual(
@@ -677,7 +677,7 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
     );
   });
   await t.test('filed, the try is behind it as signoff, and the run says a nudge was tried', () => {
-    assert.deepEqual(nudged.steps.implement.tries, [{ taskId: 't1', then: 'signoff' }]);
+    assert.deepEqual(nudged.steps.implement.tries, [{ taskId: 't1', cause: 'signoff' }]);
     assert.equal(signoffsSpent(nudged.steps.implement), 1);
     assert.equal(tryNote(STEPS[0], nudged.steps.implement), 'try 2, nudged to sign off by the run');
   });
@@ -686,14 +686,14 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
     assert.deepEqual(lsOf(nudged, { t2: 'failed' }).waitingOnYou, ['implement']);
     assert.equal(lsOf(nudged, { t2: 'failed' }).steps[0].note, 'try 2, nudged to sign off by the run');
   });
-  const after = (then: 'nudge' | 'round') => ({
+  const after = (cause: 'nudge' | 'round') => ({
     ...nudged,
     steps: {
       implement: {
         taskId: 't3',
         tries: [
-          { taskId: 't1', then: 'signoff' as const },
-          { taskId: 't2', then },
+          { taskId: 't1', cause: 'signoff' as const },
+          { taskId: 't2', cause },
         ],
       },
       review: { taskId: null },
@@ -863,7 +863,7 @@ test("a person's ask: due for the step's next try only, once", async (t) => {
     assert.deepEqual([l.steps[0].note, l.waitingOnYou], ['try 2 asked (--model opus) — the next tick files it', []]);
   });
   await t.test('an ask for a try the record holds is spent and files nothing (spentAsks)', () => {
-    const honoured = onTry([{ taskId: 't1', check: { taskId: 'c1' }, then: 'recheck' }], 'c2');
+    const honoured = onTry([{ taskId: 't1', check: { taskId: 'c1' }, cause: 'recheck' }], 'c2');
     const q = phases({ t1: 'succeeded', c1: 'stopped', c2: 'running' });
     assert.deepEqual(assess(RETRIED, honoured, q, signedDone, asked, () => undefined, [askFor(2, 'recheck')]).retry, []);
     assert.deepEqual(spentAsks(honoured, [askFor(2, 'recheck'), askFor(3)]), [askFor(2, 'recheck')]);
@@ -1131,7 +1131,7 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
     });
     assert.equal(l.steps[0].note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
   });
-  const nudged = onTry([{ taskId: 't0', check: { taskId: 'c0' }, then: 'nudge' }], 'c1');
+  const nudged = onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'nudge' }], 'c1');
   await t.test('a try a person answered says so on `nemia ls`, read off the ask, never the record', () => {
     assert.equal(answerOf(nudged, 'implement', [askFor(3), answered]), answered);
     const listed = (answers: RetryAsk[] = []) =>
@@ -1149,9 +1149,9 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
     assert.equal(answerOf(nudged, 'implement', [{ ...answered, try: 3 }]), undefined, 'not answered: the next try');
     assert.equal(answerOf(nudged, 'implement', [{ ...answered, mode: 'fresh' }]), undefined, 'asked fresh, and the record says nudge');
     assert.equal(answerOf(nudged, 'implement', [askFor(2)]), undefined, 'asked without a message');
-    assert.equal(answerOf(onTry([{ taskId: 't0', then: 'retries' }]), 'implement', [answered]), undefined, 'filed by retries:');
+    assert.equal(answerOf(onTry([{ taskId: 't0', cause: 'retries' }]), 'implement', [answered]), undefined, 'filed by retries:');
     assert.equal(answerOf(onTry(), 'implement', [answered]), undefined, 'a first try');
-    const onOpus = onTry([{ taskId: 't0', then: 'fresh', model: 'opus' }]);
+    const onOpus = onTry([{ taskId: 't0', cause: 'fresh', model: 'opus' }]);
     assert.equal(answerOf(onOpus, 'implement', [{ ...askFor(2, 'fresh'), message: 'm' }]), undefined, 'asked fresh on the default model');
     const opus = Boolean(answerOf(onOpus, 'implement', [{ ...askFor(2, 'fresh', 'opus'), message: 'm' }]));
     assert.equal(tryNote(RETRIED[0], onOpus.steps.implement, RETRIED, opus), 'try 2, fresh on opus, on your word, answered');
@@ -1293,7 +1293,7 @@ test("`nemia ls` says what a step's current try was denied after its note, never
   await t.test("the current try's task, not the try before it, after whatever else its note says", () => {
     const tried = fullListing({
       steps: RETRIED,
-      run: onTry([{ taskId: 't0', then: 'nudge' }], null),
+      run: onTry([{ taskId: 't0', cause: 'nudge' }], null),
       phaseOf: shown({ t1: 'working' }),
       deniedOf: (id) => (id === 't1' ? ['Bash(npm)'] : ['Skill(look)']),
     }).steps[0];

@@ -100,7 +100,7 @@ function briefs(told: Telling): Record<string, string> {
       told(run, implement),
     );
   const mergedRun = runOf({
-    review: { taskId: 't4', workspace: '/wt/implement', branch: 'wf/r-1/implement', tries: [{ taskId: 't2', then: 'merge' }] },
+    review: { taskId: 't4', workspace: '/wt/implement', branch: 'wf/r-1/implement', tries: [{ taskId: 't2', cause: 'merge' }] },
   });
   return {
     'first.txt': composeBrief(implement, first, STEPS, () => undefined, '/art/implement', ...NONE, undefined, told(first, implement)),

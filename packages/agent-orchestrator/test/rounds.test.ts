@@ -197,9 +197,9 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
           taskId: try2,
           workspace: run.workspace,
           branch,
-          tries: [{ taskId: `${id}-implement`, check: { taskId: `${id}-implement-check` }, then: 'round' }],
+          tries: [{ taskId: `${id}-implement`, check: { taskId: `${id}-implement-check` }, cause: 'round' }],
         },
-        review: { taskId: null, workspace: run.workspace, branch, tries: [{ taskId: `${id}-review`, then: 'round' }] },
+        review: { taskId: null, workspace: run.workspace, branch, tries: [{ taskId: `${id}-review`, cause: 'round' }] },
         ship: { taskId: null },
       });
       assert.deepEqual(
@@ -430,7 +430,7 @@ test('a loop past its budget waits for a person to raise it, then goes round and
       'implement goes again',
     );
     assert.deepEqual(readRun(id).steps.implement?.tries, [
-      { taskId: `${id}-implement`, check: { taskId: `${id}-implement-check` }, then: 'round', budget: 10 },
+      { taskId: `${id}-implement`, check: { taskId: `${id}-implement-check` }, cause: 'round', budget: 10 },
     ]);
     assert.equal(specOf(`${id}-implement-try2`).config?.budgetUsd, 5.75, 'on claude, a job, what is left of the raised cap');
     assert.equal((await over(list(stage.board().e, readRun(id)))).steps[0].note, 'round 2 of 3, budget $10');

@@ -109,6 +109,8 @@ const UNMEASURED: StepUsed = {
 function runWith(note: string | null): RunDetail {
   return {
     id: 'r-1',
+    kinds: [],
+    refresh: 'nemia refresh r-1',
     brief: 'Go round again',
     decide: 'nemia decide r-1',
     repo: '/code/app',
@@ -3928,7 +3930,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     above: 4.25,
     said: '$4.25',
     modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
-    own: 'failed (check)',
+    own: 'failed (check)' as const,
     needs: null,
     unfinished: false,
     questions: [],

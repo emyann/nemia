@@ -129,23 +129,23 @@ test('each of her skills reads as Claude Code reads her plugin, and the skill br
   assert.equal(plugin.name, 'nemia');
 });
 
-/** The section of `bring-what-waits` that brings a step in each status that waits on the person (`WAITS_ON_PERSON`). */
+/** The section of `bring-what-waits` that brings a step in each reason a try of it waits on the person for (`WAITS_ON_PERSON`). */
 const BROUGHT_IN: Record<string, string> = {
-  'awaiting approval': 'A step at its gate',
-  blocked: "A step's question to the person",
-  exhausted: 'A loop out of rounds',
-  'over budget': 'A step at its cap',
-  'budget exhausted': 'A step at its cap',
+  AwaitingApproval: 'A step at its gate',
+  AwaitingAnswer: "A step's question to the person",
+  AwaitingRound: 'A loop out of rounds',
+  OverBudget: 'A step at its cap',
+  BudgetExhausted: 'A step at its cap',
 };
 
-test('each status that waits on the person has a section of bring-what-waits that brings it', () => {
+test('each reason a try waits on the person for has a section of bring-what-waits that brings it', () => {
   const waiting = Object.entries(WAITS_ON_PERSON)
     .filter(([, waits]) => waits)
-    .map(([status]) => status);
-  assert.deepEqual([...waiting].sort(), Object.keys(BROUGHT_IN).sort(), 'a status that waits on the person is given its section here');
+    .map(([reason]) => reason);
+  assert.deepEqual([...waiting].sort(), Object.keys(BROUGHT_IN).sort(), 'a reason that waits on the person is given its section here');
   const skill = fs.readFileSync(path.join(SHIPPED, 'skills', 'bring-what-waits', 'SKILL.md'), 'utf8');
   assert.deepEqual(
-    waiting.filter((status) => !skill.includes(`\n## ${BROUGHT_IN[status]}\n`)),
+    waiting.filter((reason) => !skill.includes(`\n## ${BROUGHT_IN[reason]}\n`)),
     [],
   );
 });

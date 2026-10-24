@@ -18,6 +18,7 @@ import {
   type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
+import { REASON_OF, type QualifiedStep } from '../phase/phase.ts';
 import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import {
   aboveWord,
@@ -61,7 +62,7 @@ import { answersOr } from '../question/index.ts';
  * in one conversation.
  *
  * And one try that is not over: a step whose session its harness blocked — the engine's `needs-human`, as
- * `harnessBlocked` says it — and that signed nothing, `blockedByHarness`. It reads `running`, and nothing in it
+ * `harnessBlocked` says it — and that signed nothing: it stands as `AwaitingAnswer` via `session`. It reads `running`, and nothing in it
  * moves without a person. `nudge` and `fresh` may be asked for it, and the tick stops the session before it
  * files the try (`stopFirst`), so no two agents share the conversation. Not `recheck`: nothing of it was
  * checked. Left out, `harnessBlocked` says no session is blocked, and such a step is running, with nothing to try.
@@ -104,11 +105,12 @@ export function retryable(
   harnessBlocked: (taskId: string) => boolean = () => false,
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): { status: StepStatus; modes: RetryMode[]; blockedByHarness: boolean; sendsBack?: true; back?: string[]; raise?: Raise } {
+): { status: StepStatus; modes: RetryMode[]; sendsBack?: true; back?: string[]; raise?: Raise } & QualifiedStep {
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const taskId = run.steps[step.name]?.taskId;
   const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
-  const blockedByHarness = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
+  const harnessAsks = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
+  const codes: QualifiedStep = harnessAsks ? { reason: 'AwaitingAnswer', via: 'session' } : REASON_OF[status];
   const tried = status === 'over budget' ? own : status;
   const followers = steps.filter((s) => s.after.includes(step.name));
   const noneFiled = followers.length > 0 && !followers.some((s) => run.steps[s.name]?.taskId);
@@ -139,7 +141,7 @@ export function retryable(
           (tried === 'blocked' && settled) ||
           tried === 'budget exhausted' ||
           tried === 'denied' ||
-          blockedByHarness ||
+          harnessAsks ||
           sendsBack
         ? ['nudge', 'fresh']
         : [];
@@ -147,8 +149,8 @@ export function retryable(
     settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
   return {
     status,
+    ...codes,
     modes,
-    blockedByHarness,
     ...(sendsBack ? { sendsBack: true as const } : {}),
     ...(sendsBack && back ? { back } : {}),
     ...(raise ? { raise } : {}),
@@ -289,7 +291,7 @@ export function retriesDue(
   const open = asks.filter((a) => pauseAskDue(run, a, phaseOf));
   for (const step of steps) {
     const record = run.steps[step.name];
-    const { status, modes, blockedByHarness, sendsBack, back, raise } = retryable(
+    const { status, modes, via, sendsBack, back, raise } = retryable(
       step,
       run,
       phaseOf,
@@ -323,7 +325,7 @@ export function retriesDue(
         ...(ask.message !== undefined ? { message: ask.message } : {}),
         ...raisedBy(ask, raise),
         by: askedBy(ask),
-        ...(unsettled ? { stopFirst: true as const, ...(blockedByHarness ? {} : { runsOn: true as const }) } : {}),
+        ...(unsettled ? { stopFirst: true as const, ...(via === 'session' ? {} : { runsOn: true as const }) } : {}),
         ...(back && !unsettled ? { back } : {}),
       });
     } else if (

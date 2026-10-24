@@ -1417,8 +1417,8 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       retryable(DENYING[0], r, p, signedDone, asked, DENYING, () => false, denied),
       {
         status: 'denied',
+        reason: 'Denied',
         modes: ['nudge', 'fresh'],
-        blockedByHarness: false,
       },
     );
     const refusal = (how: RetryHow) =>

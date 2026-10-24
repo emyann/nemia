@@ -19,8 +19,8 @@ import {
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { codedStep, ENGINE_REASON, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
-import { answerOf, dueNote, modeWord, retriesDue, tryNote, HOLDS_THE_RUN, type RetryAsk } from '../retry/index.ts';
+import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
+import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
 import {
   acceptanceOf,
   approvedFirst,
@@ -358,7 +358,7 @@ export function listing({
     if (waitingAgain.has(name)) return { name, status: 'waiting', ...coded({ reason: 'Pending' }), branch };
 
     const status = refiled.has(name) ? own : stands;
-    if (HOLDS_THE_RUN[status] && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
+    if (holdsTheRun(status) && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
       waitingOnYou.push(name);
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);

@@ -970,8 +970,8 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
       retryable(CAPPED[0], r, p, nothingSaid, asked, CAPPED, () => false, ended),
       {
         status: 'budget exhausted',
+        reason: 'BudgetExhausted',
         modes: ['nudge', 'fresh'],
-        blockedByHarness: false,
         raise: { above: 3.02, spent: { usd: 3.02, measured: 1, unmeasured: 0 }, cap: 3 },
       },
     );

@@ -21,8 +21,8 @@
  *
  * `shipped` and `ships`, on the day decision 13a retired them (`Landed` in the run core's, the api's and the board's tables): the run's
  * sense, a run's result on its base, says `landed` everywhere since that card; the product's sense, what comes with Nemia (its git place,
- * the skills, servers and rules it lists), says `builtin` since decision 13b (`Builtin` in the same three tables). The one count left is
- * the api's former address of a builtin skill, `/api/skills/shipped/<name>`, which answers a permanent redirect to its `builtin` address
+ * the skills, servers and rules it lists), says `builtin` since decision 13b (its Builtin row in the same three tables). The one count left
+ * is the api's former address of a builtin skill, `/api/skills/shipped/<name>`, which answers a permanent redirect to its `builtin` address
  * (`FORMER_BUILTIN`, `skills.ts`): it stays while a link or a bookmark may still name it.
  *
  * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former

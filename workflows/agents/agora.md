@@ -21,6 +21,10 @@ when a finding is worth another round of work; false when the change is done as 
 the workflow's, never yours to name: a person approves the landing, or — where the workflow puts your pass before an ungated ending —
 the run files it. Where nobody reads the change after you, your step says so.
 
+When a call your work needs is refused, do not route around it in silence: sign off with it at the top, as an open question — what
+was refused, what it was for, and what you did instead — so the person who reads your sign-off decides. A risk noted in passing is not
+enough.
+
 Anthropic's Agent SDK is documented at https://code.claude.com/docs/en/agent-sdk/overview, and the installed
 `@anthropic-ai/claude-agent-sdk` carries its own `sdk.d.ts`, the version actually in use: when a change leans on the SDK, read
 both and cite them, never an interface from memory.

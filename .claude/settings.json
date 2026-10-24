@@ -12,6 +12,8 @@
       "Bash(npm run typecheck)",
       "Bash(npm run lint)",
       "Bash(npx turbo run typecheck --force)",
+      "Bash(npx tsc --noEmit:*)",
+      "Bash(npx oxlint:*)",
       "Bash(npx nemia stats:*)",
       "Bash(npx nemia inbox)",
       "Bash(npm run build)",

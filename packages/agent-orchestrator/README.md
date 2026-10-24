@@ -4009,9 +4009,10 @@ for the same reason, and so does the `wf` command.
 | `workflows/` | your workflows, beside the repository's, as the board lists them |
 
 `assess()` is pure and has no idea the runtime exists — the same split as the runtime's `decide`, one layer up. Every
-file in `src/` and `bin/` is of one of four kinds, and `test/boundary.test.ts` fails the suite on a file of none. A file
-in a feature folder (`src/<feature>/`) says its kind by its name — `x.store.ts` a store, `x.verb.ts` a controller, any
-other name pure — and `src/cli/` is the CLI's; a file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or
+file in `src/` and `bin/` is of one of five kinds, and `test/boundary.test.ts` fails the suite on a file of none. A file
+in a feature folder (`src/<feature>/`) says its kind by its name — `x.store.ts` a store, `x.verb.ts` a controller,
+`x.model.ts` a model (a context's entities as Effect Schemas, `docs/model.md`), any other name pure — and `src/cli/` is the
+CLI's; a file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or
 `CLIENT`. **Pure** files (`tick/assess.ts`, `workflow.ts`, `check/check.ts` and the rest) import no runtime, read no disk,
 spawn nothing, and import no file of the other kinds. **Store** files are the I/O beneath the controllers: they import
 no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `skills/read.store.ts`

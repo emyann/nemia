@@ -97,12 +97,28 @@
       }
     },
     {
+      "term": "RunId",
+      "meaning": "a run's id, as `nemia start` mints it from the brief: lowercase letters, digits and dashes.",
+      "type": "RunId"
+    },
+    {
       "term": "Step",
       "meaning": "one markdown file of a workflow: who does it, what it may do, and what must finish first.",
+      "type": "Step",
       "see": {
         "label": "A step",
         "href": "/workflows/#a-step"
       }
+    },
+    {
+      "term": "StepName",
+      "meaning": "a step's name: its file's name in its workflow's folder, without its extension.",
+      "type": "StepName"
+    },
+    {
+      "term": "TaskId",
+      "meaning": "the runtime's id of the task a step's try ran as, which run-core holds by the runtime's key and never checks.",
+      "type": "TaskId"
     },
     {
       "term": "Tick",
@@ -113,6 +129,16 @@
       }
     },
     {
+      "term": "Try",
+      "meaning": "one session of a step: the task it ran as, its check and how it ended, numbered from 1 by its place among the step's tries.",
+      "type": "Try"
+    },
+    {
+      "term": "TryNumber",
+      "meaning": "a try's number within its step, from 1.",
+      "type": "TryNumber"
+    },
+    {
       "term": "Workflow",
       "meaning": "a folder of markdown files, one file a step.",
       "type": "Workflow",
@@ -120,6 +146,11 @@
         "label": "Workflows",
         "href": "/workflows/"
       }
+    },
+    {
+      "term": "WorkflowName",
+      "meaning": "a workflow's name: its folder's.",
+      "type": "WorkflowName"
     }
   ]
 }

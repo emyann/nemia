@@ -87,7 +87,7 @@ export type Listing = {
   waitingOnYou: string[];
   /**
    * The runs a person holds this run until (`Run.hold`, `holdsOf`): while the hold stands, nothing is asked of anyone, and `nemia ls` says
-   * `held until <run> ships` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off; empty
+   * `held until <run> lands` where it would say who the run waits on (`holdWord`). Absent on a run nobody holds, or one called off; empty
    * on a hold whose file names no run, which `Run.hold` still says.
    */
   holding?: Wait[];
@@ -168,7 +168,7 @@ export interface ListingInput {
   readonly roundAsks?: readonly RoundAsk[];
   /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`). */
   readonly answers?: readonly RetryAsk[];
-  /** The runs this run waits on that have not shipped (`waitsOf`): what its roots say where `waiting` would be. */
+  /** The runs this run waits on that have not landed (`waitsOf`): what its roots say where `waiting` would be. */
   readonly waits?: readonly Wait[];
   /**
    * How many times a person said something to each step's current try while it ran (`nemia say`), off the engine's `said` on its
@@ -203,8 +203,8 @@ export interface ListingInput {
    */
   readonly deniedOf?: (taskId: string) => readonly string[];
   /**
-   * The runs a held run waits on to ship, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
-   * the runs the hold names, each taken as one that may still ship.
+   * The runs a held run waits on to land, as `holdsOf` reads them: said where `waiting on you` would be (`holdWord`). Left out,
+   * the runs the hold names, each taken as one that may still land.
    */
   readonly holds?: readonly Wait[];
 }
@@ -626,7 +626,7 @@ function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }
   if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) lines.push(`   → waiting on you: ${waitAdvice(run, waiting)}`);
   if (holding) {
     const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);
-    const lifting = holding.length > 0 && holding.every((w) => w.shipped);
+    const lifting = holding.length > 0 && holding.every((w) => w.landed);
     lines.push(
       `   → ${holdWord(holding, run.hold)}${never ? `: ${holdAdvice(run, holding)}` : lifting ? '' : `  —  nemia hold ${run.id} --off lifts it`}`,
     );

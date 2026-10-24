@@ -310,8 +310,8 @@ export const LANDED_PICTURES = 'e2e-pictures.txt';
 
 /**
  * Remove the pictures an ending's check took of the merged tree, once that check passed and the merge landed: what `landEnding` does on
- * the pass that writes `{ commit }`. The ship's check runs the e2e on the merge staged in the repository's checkout, with its files
- * directory as `WF_ARTIFACTS`, after the ship's gate — so no person and no step reads those pictures before it, and after a pass nothing
+ * the pass that writes `{ commit }`. The ending's check runs the e2e on the merge staged in the repository's checkout, with its files
+ * directory as `WF_ARTIFACTS`, after the ending's gate — so no person and no step reads those pictures before it, and after a pass nothing
  * shows them but `nemia decide`'s list of files (sizes, no pictures). They are a second photograph, of another tree, not copies of the
  * implement step's, which are kept. A check that did not pass is never landed as a commit, so its pictures, the failed page's among them,
  * stay for whoever reads why.

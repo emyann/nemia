@@ -20,6 +20,20 @@
       }
     },
     {
+      "term": "Builtin",
+      "meaning": "what comes with the product: its git place, the skills and servers it lists, its default rules. The product sense of the retired 'shipped'.",
+      "retired": [
+        {
+          "spelling": "shipped",
+          "card": "decision 13b: 'builtin' for what comes with the product"
+        },
+        {
+          "spelling": "ships",
+          "card": "decision 13b: 'builtin' for what comes with the product"
+        }
+      ]
+    },
+    {
       "term": "Check",
       "meaning": "a command the run executes after a step signs off; its exit code, not the agent's word, decides whether the run goes on.",
       "see": {
@@ -57,6 +71,21 @@
       "term": "Hold",
       "meaning": "only a person's hold of a run until other runs land (`nemia hold`): the run is pending, reason `Waiting`, `on` run.",
       "type": "Run"
+    },
+    {
+      "term": "Landed",
+      "meaning": "a run's result is on its base: asked of the place's standing on each pass, never stored. A run lands; `nemia decide` says it has landed, and a run waiting on it (`--after`, a hold's `--until`) goes on.",
+      "type": "Landed",
+      "retired": [
+        {
+          "spelling": "shipped",
+          "card": "decision 13a: 'landed' for a run's result on its base"
+        },
+        {
+          "spelling": "ships",
+          "card": "decision 13a: 'landed' for a run's result on its base"
+        }
+      ]
     },
     {
       "term": "Landing",

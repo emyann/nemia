@@ -17,7 +17,7 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
 
 /**
  * The run's state for the decision's cache: where the run stands, who it waits on, what a hold on it says, and each step's task and
- * settled word. A decision is read again only when one of those moves: a hold written, lifted, or whose runs have shipped.
+ * settled word. A decision is read again only when one of those moves: a hold written, lifted, or whose runs have landed.
  * A run without `holding` is stamped as one nobody holds. A step's word is read as on a run nobody holds, so a gate in flight or not
  * is one stamp either way: the hold is stamped on its own.
  *

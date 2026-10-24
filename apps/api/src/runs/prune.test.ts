@@ -8,7 +8,7 @@
  * At shipped defaults: the api's own engine over a store this file seeds, git for real — branches, a merge, a worktree cut for each run —
  * and the harness's fake `claude` (test/harness.ts) first on PATH. The runs it seeds: `p-merged`, `p-unmerged` and `p-running`, repository
  * runs of one step; `p-failed-merged`, whose step failed and whose branch a person merged by hand all the same — on the base, however it
- * got there, so shipped; `p-direct`, which worked on main itself (`--no-worktree`), with no branch of its own to merge, and waits on your
+ * got there, so landed; `p-direct`, which worked on main itself (`--no-worktree`), with no branch of its own to merge, and waits on your
  * decision all the same; and `p-folder`, a folder run whose one step signed off: its folder is its work, and never pruned.
  */
 import { root } from '../../test/harness.ts';

@@ -5,7 +5,7 @@
  * chooses the state and its colour. `cancelled` is a fact about the run rather than the step: a step to come on a run somebody called
  * off never will, and a step the cancellation stopped is `Stopped`.
  *
- * `held` is a fact about the run too: a person holds it until other runs ship (the CLI's `hold`), so a step not filed will not be until the
+ * `held` is a fact about the run too: a person holds it until other runs land (the CLI's `hold`), so a step not filed will not be until the
  * hold lifts, and a step at a human gate asks nothing of anyone while it stands — every verb that would answer it is refused. A step at
  * work, asking through its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a
  * verdict.

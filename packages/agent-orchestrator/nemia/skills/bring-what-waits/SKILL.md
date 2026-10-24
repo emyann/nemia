@@ -34,7 +34,7 @@ Bring it, a short part each:
     each, numbered as `nemia decide <run>` prints them: `nemia approve <run> <step> --answer 1=a --answer "2=b: <words>"`;
   - send it back with what to change: `nemia retry <run> <step> --message "<their objection>"`.
 
-A hold is yours, at its gate too: when the step cannot hand on yet, because what it needs has not shipped, hold the run
+A hold is yours, at its gate too: when the step cannot hand on yet, because what it needs has not landed, hold the run
 (`nemia hold <run> --until <other run> --why "<words>"`) and say so when you bring it. So is a merge, when the loop's work no longer
 merges on its base (`nemia merge <run>`): do it, and say it was done.
 

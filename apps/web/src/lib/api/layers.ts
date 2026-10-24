@@ -47,7 +47,7 @@ export const StepLayersSchema = decodes<StepLayers>()(
 /**
  * Mirrors `TaskPart` in apps/api/src/detail/told.ts: a part of a step's task — its own text, or a run it was handed, by its id, the first
  * line that run was asked (empty where its section could not read it), the section's body, and how it was handed: waited on until it
- * shipped (`--after`), or read as context (`--from`); absent where the record names it as neither.
+ * landed (`--after`), or read as context (`--from`); absent where the record names it as neither.
  */
 export type TaskPart = { kind: 'from'; run: string; asked: string; body: string; how?: 'waited' | 'read' } | { kind: 'text'; text: string };
 

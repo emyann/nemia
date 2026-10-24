@@ -33,7 +33,7 @@ export default {
       decide.locator(`[data-command="forget it"] code`, { hasText: FOLDER.forget }),
       `forget it: ${FOLDER.forget}, as a line to copy`,
     );
-    await expectCount(decide.locator('[data-command]'), 1, 'and nothing else is offered: no branch to ship, and none to drop');
+    await expectCount(decide.locator('[data-command]'), 1, 'and nothing else is offered: no branch to land, and none to drop');
 
     const mode = article.locator('[data-fact="permission mode"] dd').first();
     await expectVisible(

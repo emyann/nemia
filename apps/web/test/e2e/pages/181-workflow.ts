@@ -163,7 +163,7 @@ export default {
         form.getByRole('button', { name: 'Start' }).click(),
       ]);
       const { error } = (await answered.json()) as { error?: string };
-      const sentence = `--after ${DIAMOND.cancelled.id}: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships, so this run would wait for ever. Start it without --after ${DIAMOND.cancelled.id}.`;
+      const sentence = `--after ${DIAMOND.cancelled.id}: ${DIAMOND.cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never lands, so this run would wait for ever. Start it without --after ${DIAMOND.cancelled.id}.`;
       if (answered.status() !== 422 || error !== sentence) {
         throw new Refused(
           `the api refuses to wait on a run called off, in afterRefusal's words — it answered ${answered.status()}: ${JSON.stringify(error)}`,

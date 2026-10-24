@@ -50,8 +50,8 @@ const row = (extra: object = {}): RunSummary => ({
   heldUntil: [],
   holding: {
     at: '2026-09-30T05:00:00.000Z',
-    runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], shipped: false }],
-    word: 'held until r-0 ships',
+    runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],
+    word: 'held until r-0 lands',
     advice: 'wf hold r-1 --off',
     onYou: true,
   },

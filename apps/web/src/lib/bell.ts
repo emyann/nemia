@@ -15,7 +15,7 @@ export type BellRow = { run: string; title: string; factory: string; waitsFor: s
 
 /**
  * What `run` waits for, in the package's words: each step as the api asks it (`onYou`), else each by name; the run it waits on that never
- * ships without a person (`waiting.word`); and the hold only a person lifts (`holding.word`).
+ * lands without a person (`waiting.word`); and the hold only a person lifts (`holding.word`).
  */
 function waitsForOf(run: RunSummary): string[] {
   const steps = run.onYou.length ? run.onYou : run.waitingOnYou;

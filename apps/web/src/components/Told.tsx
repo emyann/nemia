@@ -235,7 +235,7 @@ export function StepPolicy({ layers }: { layers: StepLayers | null }) {
 }
 
 /** How a run was handed to the step, as its block's heading says it. */
-const HANDED = { read: 'Read as context', waited: 'Waited on, shipped' } as const;
+const HANDED = { read: 'Read as context', waited: 'Waited on, landed' } as const;
 
 /**
  * A task in its parts: its own text as `Words`, and each run it was handed a block headed by how it was handed and the first line that

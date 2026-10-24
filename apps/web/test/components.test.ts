@@ -1456,7 +1456,7 @@ test('the Decide section copies its commands and runs none: a button per command
       said: 'implement: succeeded · BLOCKED. Continue its session, told what happened:  wf retry r-1 implement  (--fresh, or --model <m>, for a new session)',
       step: 'implement',
     },
-    { label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null },
+    { label: 'land it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null },
     { label: 'drop it', command: 'git -C /code/app branch -D wf/r-1/implement', said: null, step: null },
   ] as const;
   const decision: Decidable = {
@@ -2615,7 +2615,7 @@ test('the Decide section puts the answers first, before what there is to decide,
     cost: null,
     overBudget: null,
     collisions: null,
-    commands: [{ label: 'ship it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null }],
+    commands: [{ label: 'land it', command: 'git -C /code/app merge --no-ff wf/r-1/implement', said: null, step: null }],
     awaiting: null,
   };
   const offers = createElement(
@@ -3056,16 +3056,16 @@ test('the approval under a step: the try, when, and the words as they were writt
 });
 
 /** What `wf ls` says of a run at its ending's gate, as the api gives it (`RunToDecide`). */
-const SHIPS = 'Merge this run onto the base branch, or abort on any failure.';
+const SHIP_SAYS = 'Merge this run onto the base branch, or abort on any failure.';
 const toShip = {
   kind: 'approve' as const,
   step: 'ship',
-  says: SHIPS,
+  says: SHIP_SAYS,
   filed: false,
   /** An ending's send-back goes to the work it waits on, not to the step itself. */
   back: ['implement'],
   onto: 'main',
-  said: `${SHIPS} — wf approve r-1 ship`,
+  said: `${SHIP_SAYS} — wf approve r-1 ship`,
   command: 'wf approve r-1 ship',
 };
 
@@ -3096,7 +3096,7 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
     taskId: null,
     ...coded('awaiting approval'),
     branch: null,
-    body: `${SHIPS}\n\nLook at the checkout first.`,
+    body: `${SHIP_SAYS}\n\nLook at the checkout first.`,
     closeout: null,
     approve: 'approve ship',
     gate: { awaiting: true, approval: null },
@@ -3317,7 +3317,7 @@ test("REFUSED: an ending's gate brief quotes the package's `toDecide.says` alone
     assert.ok(said.includes('ship waits at its gate'), said);
     assert.doesNotMatch(said, /You are|Its folder says/, 'no decision about this step: nothing quoted');
   }
-  assert.ok(brief(toShip).includes(`Its folder says what it does: “${SHIPS}”`), "the decision's own words, where it names this step");
+  assert.ok(brief(toShip).includes(`Its folder says what it does: “${SHIP_SAYS}”`), "the decision's own words, where it names this step");
 });
 
 test("a step's facts say `workspace` only where the step says it: the step that ends the run in the checkout, and no empty row for the rest", () => {
@@ -3402,7 +3402,7 @@ test('REFUSED: an ending that waits on nothing is offered no send-back, since a 
   );
 });
 
-test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits until one ships, and the faint dotted line of a run read — and a run's page's legend does not", () => {
+test("the Factory's legend adds the edge between two cards, dashed and still as it is while a run waits until one lands, and the faint dotted line of a run read — and a run's page's legend does not", () => {
   const legendOf = (cards: boolean) =>
     withMotion(false, () => renderToStaticMarkup(createElement(ReactFlowProvider, null, createElement(CanvasLegend, { cards }))));
   const itemsOf = (html: string) =>
@@ -3416,17 +3416,17 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
   const items = itemsOf(legendOf(true));
   assert.deepEqual(
     [...items.keys()],
-    ['to come', 'running', 'done', 'loops back', 'waits until it ships', 'reads what it concluded', 'human gate', 'to decide'],
+    ['to come', 'running', 'done', 'loops back', 'waits until it lands', 'reads what it concluded', 'human gate', 'to decide'],
     'the edge between cards, the line of what a card reads, and the ring round a card whose result nobody has decided, which only the Factory draws',
   );
   assert.match(items.get('to decide')!, /ring-1 ring-yours/);
   const html = legendOf(true);
-  assert.match(html, /title="A run that has started draws no line from its waits\."[^>]*>[\s\S]*?waits until it ships/);
+  assert.match(html, /title="A run that has started draws no line from its waits\."[^>]*>[\s\S]*?waits until it lands/);
   const reads = items.get('reads what it concluded')!;
   assert.match(reads, /data-sample="reads"/);
   assert.match(reads, /stroke-dasharray:1 5/);
   assert.doesNotMatch(reads, / Z"/, 'no arrow: it waits on nothing');
-  const cards = items.get('waits until it ships')!;
+  const cards = items.get('waits until it lands')!;
   assert.match(cards, /data-sample="cards"/);
   assert.equal((cards.match(/<rect /g) ?? []).length, 2, 'a card at each end');
   assert.match(cards, /stroke:var\(--edge-to-come\);stroke-width:1.5;stroke-dasharray:5 4/);
@@ -4422,10 +4422,10 @@ test('REFUSED at shipped defaults: no such note on a team that works on a reposi
 
 const HOLDING = {
   at: '2026-09-23T07:00:00.000Z',
-  runs: [{ run: 'p-1', missing: false, cancelledAt: null, gone: [], shipped: false }],
-  word: 'held until p-1 ships',
+  runs: [{ run: 'p-1', missing: false, cancelledAt: null, gone: [], landed: false }],
+  word: 'held until p-1 lands',
   advice:
-    'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p-1 has shipped; to go on before then: wf hold r-1 --off',
+    'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p-1 has landed; to go on before then: wf hold r-1 --off',
   onYou: false,
 };
 
@@ -4465,8 +4465,8 @@ test("a held run's rail draws its gate and the steps not filed held, and its wor
   assert.deepEqual(pills, { implement: 'verified', tokens: 'unverified', review: 'working', theme: 'held', respond: 'held' }, html);
 });
 
-test('a hold is drawn between two cards as an --after edge is: from the run it is held until into the held card, dashed — and none once it shipped', () => {
-  const card = (id: string, held: Array<{ run: string; shipped: boolean }>) => ({
+test('a hold is drawn between two cards as an --after edge is: from the run it is held until into the held card, dashed — and none once it landed', () => {
+  const card = (id: string, held: Array<{ run: string; landed: boolean }>) => ({
     id,
     waiting: null,
     holding: held.length
@@ -4479,13 +4479,13 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
         }
       : null,
   });
-  const edges = afterEdges([card('p', []), card('h', [{ run: 'p', shipped: false }])]);
+  const edges = afterEdges([card('p', []), card('h', [{ run: 'p', landed: false }])]);
   assert.deepEqual(
     edges.map(({ id, source, target, type, data }) => ({ id, source, target, type, data })),
     [{ id: 'hold:p->h', source: 'p', target: 'h', type: 'state', data: { state: 'to-come', loop: false } }],
   );
   assert.match(edgeMarkup(edges[0]), /stroke-dasharray:5 4/);
-  assert.deepEqual(afterEdges([card('p', []), card('h', [{ run: 'p', shipped: true }])]), [], 'a hold whose run shipped is no wait');
+  assert.deepEqual(afterEdges([card('p', []), card('h', [{ run: 'p', landed: true }])]), [], 'a hold whose run landed is no wait');
 });
 
 const { HandedOn } = await import('../src/components/Closeout.tsx');
@@ -5590,26 +5590,26 @@ test('the card the bar shows is ringed and marked as inspected, and a card it do
 
 test('a card that reads runs as context says how many in a chip, each run on hover by its id and title — and a card that reads none has none', async () => {
   const { readsLines } = await import('../src/lib/factory.ts');
-  const reader = atGate({}, { context: ['shipped-a1', 'gone-b2'] });
-  const reads = readsLines(reader, [{ id: 'shipped-a1', brief: '# Cache the floor\nand more' }]);
-  assert.deepEqual(reads, ['shipped-a1 — Cache the floor', 'gone-b2'], 'a run the list does not have is said by its id');
+  const reader = atGate({}, { context: ['landed-a1', 'gone-b2'] });
+  const reads = readsLines(reader, [{ id: 'landed-a1', brief: '# Cache the floor\nand more' }]);
+  assert.deepEqual(reads, ['landed-a1 — Cache the floor', 'gone-b2'], 'a run the list does not have is said by its id');
   const html = await cardMarkup(reader, false, reads);
   const chip = /<span[^>]*data-context="true"[^>]*>[\s\S]*?<\/span>/.exec(html)?.[0] ?? '';
-  assert.match(chip, /title="shipped-a1 — Cache the floor\ngone-b2"/);
+  assert.match(chip, /title="landed-a1 — Cache the floor\ngone-b2"/);
   assert.match(chip, />⧉ reads 2 runs</);
   assert.doesNotMatch(await cardMarkup(atGate(), false), /data-context/);
 });
 
-test('a run picked to read shows what it would hand, as markdown — badged not shipped, not judged where it has not shipped, and unbadged where it has', async () => {
+test('a run picked to read shows what it would hand, as markdown — badged not landed, not judged where it has not landed, and unbadged where it has', async () => {
   const { ConcludedPreview } = await import('../src/components/ContextPicker.tsx');
-  const preview = (shipped: boolean) =>
+  const preview = (landed: boolean) =>
     routedWith(createElement(ConcludedPreview, { run: 'probe-b2' }), [
-      [['runs', 'probe-b2', 'concluded'], { run: 'probe-b2', shipped, section: '\n## From run probe-b2\n\nIt measured **the cache**.' }],
+      [['runs', 'probe-b2', 'concluded'], { run: 'probe-b2', landed, section: '\n## From run probe-b2\n\nIt measured **the cache**.' }],
     ]);
   const inFlight = await preview(false);
-  assert.match(inFlight, /data-not-shipped[^>]*>not shipped, not judged</);
+  assert.match(inFlight, /data-not-landed[^>]*>not landed, not judged</);
   assert.match(inFlight, /<strong>the cache<\/strong>/);
-  assert.doesNotMatch(await preview(true), /data-not-shipped|not shipped, not judged/);
+  assert.doesNotMatch(await preview(true), /data-not-landed|not landed, not judged/);
 });
 
 /** A piece that reads the address (`useBar`), drawn as a loaded root route's page, with the queries it reads already answered. */
@@ -6043,7 +6043,7 @@ test('the task is drawn in its parts: its text, and each run it was handed a blo
   const parts: TaskPart[] = [
     { kind: 'text', text: 'Do the work.' },
     { kind: 'from', run: 'cache-a1', asked: 'Build the cache.', body: 'It built **the cache**.', how: 'waited' },
-    { kind: 'from', run: 'probe-b2', asked: 'Measure the cache.', body: 'Not shipped, not judged.', how: 'read' },
+    { kind: 'from', run: 'probe-b2', asked: 'Measure the cache.', body: 'Not landed, not judged.', how: 'read' },
     { kind: 'from', run: 'old-c3', asked: '', body: 'An older section.' },
   ];
   const html = await routedWith(createElement(Told, { told: null, layers: LAYERS, parts, filed: true }));
@@ -6051,7 +6051,7 @@ test('the task is drawn in its parts: its text, and each run it was handed a blo
   assert.ok(task.indexOf('Do the work.') < task.indexOf('data-from-run="cache-a1"'), 'in the order the task has them');
   const block = (run: string) => new RegExp(`<section data-from-run="${run}"[\\s\\S]*?</section>`).exec(task)?.[0] ?? '';
   assert.match(block('cache-a1'), /data-how="waited"/);
-  assert.match(block('cache-a1'), /href="\/runs\/cache-a1"[^>]*>Waited on, shipped · Build the cache\. ↗<\/a>/);
+  assert.match(block('cache-a1'), /href="\/runs\/cache-a1"[^>]*>Waited on, landed · Build the cache\. ↗<\/a>/);
   assert.match(block('cache-a1'), /<strong>the cache<\/strong>/, 'its body drawn as markdown');
   assert.match(block('probe-b2'), /href="\/runs\/probe-b2"[^>]*>Read as context · Measure the cache\. ↗<\/a>/);
   assert.doesNotMatch(task, /data-from-run="old-c3"|href="\/runs\/old-c3"/);

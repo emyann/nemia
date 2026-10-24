@@ -383,7 +383,7 @@ const holdSince = (at: string): string => `since ${at}`;
  * lift already written is no concern of this: each is an offer like any other, and `oncePast` holds it to one line. Pure.
  *
  * **The put is offered from the hold the pass lifted too.** `liftHold` takes the hold off the record before the pass is worded, so a pass
- * that reads a hold and lifts it in one go — a parent that shipped before the daemon's next pass, or a daemon restarted after it — sees
+ * that reads a hold and lifts it in one go — a parent that landed before the daemon's next pass, or a daemon restarted after it — sees
  * only `lifted`. Offering the put from `held ?? lifted` is what keeps the person's own `nemia hold` from losing its line there; on a pass
  * that had already written the put, `oncePast` drops the second offer.
  *
@@ -391,7 +391,7 @@ const holdSince = (at: string): string => `since ${at}`;
  * reads only its absence; the feed holds the put, so the lift is due, and once written the pair is matched and no pass says it again. A
  * hold put, lifted and put again is two puts and two lifts, each told apart by the moment its hold was put (`holdSince`).
  *
- * The tick lifts a hold itself once every run it names has shipped (`liftHold`), and by then the hold is already off the record, so the
+ * The tick lifts a hold itself once every run it names has landed (`liftHold`), and by then the hold is already off the record, so the
  * absence rule would read the tick's own deed as a person's. The pass that lifted it says so (`lifted`), and that one put is the
  * absence rule's exception: exactly one lift either way, sourced by whoever took the hold off.
  */

@@ -13,7 +13,7 @@ import type { Workflow } from '../workflow.ts';
 type PinsRead = { run: Pick<Run, 'pinned'>; reads: { steps: readonly Workflow[] } };
 
 /**
- * The agent and skill pins one step is filed on, off the run's pins: what the step's own record keeps, so a shipped step says which
+ * The agent and skill pins one step is filed on, off the run's pins: what the step's own record keeps, so a landed step says which
  * revisions it ran on once a refresh has moved the run's own past them. None for a step with no agent.
  */
 export const stepPins = (step: Workflow, pins: readonly Pin[]): Pin[] => {
@@ -25,7 +25,7 @@ export const stepPins = (step: Workflow, pins: readonly Pin[]): Pin[] => {
 
 /**
  * What a step's record keeps of the filing: the agent and skill revisions it was filed on (`stepPins`), and the digest of the closeout
- * schema it was given (`closeoutHashOf`). Written at every filing, so a step that has shipped says which revisions its try ran on even
+ * schema it was given (`closeoutHashOf`). Written at every filing, so a step that has landed says which revisions its try ran on even
  * once a refresh has moved the run's own past them. Nothing for a step the steps given do not hold. Pure.
  */
 export const filedOn = (f: PinsRead, step: Workflow | undefined): Pick<StepRecord, 'pinned' | 'closeoutHash'> => {

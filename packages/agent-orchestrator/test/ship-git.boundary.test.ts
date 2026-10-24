@@ -68,10 +68,10 @@ type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
 
 const { standingLive } = await import('../src/standing/standing.verb.ts');
 
-/** Whether `branch` of `run` is shipped, its standing asked now, as a person's verb asks it (`standingLive`). */
-const isShipped = async (run: RepositoryRun, branch: string) => (await runPlaced(standingLive([run]))).shipped(run, branch);
+/** Whether `branch` of `run` is landed, its standing asked now, as a person's verb asks it (`standingLive`). */
+const isLanded = async (run: RepositoryRun, branch: string) => (await runPlaced(standingLive([run]))).landed(run, branch);
 
-/** A run this file started on a repository, as `isShipped` reads one: a repository run. */
+/** A run this file started on a repository, as `isLanded` reads one: a repository run. */
 const repositoryRun = (run: Run): RepositoryRun => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
@@ -259,7 +259,7 @@ async function atTheGate(given: Given = {}) {
   return { repo, id: run.id, branch: work.branch!, e, tasks, filings, settle, pass, base: git(repo, 'rev-parse', 'HEAD') };
 }
 
-test("an approved ending with no check of its own is filed, in the repository's own checkout, and the merge its prose describes ships the run", async () => {
+test("an approved ending with no check of its own is filed, in the repository's own checkout, and the merge its prose describes lands the run", async () => {
   const { repo, id, branch, e, tasks, settle, base } = await atTheGate({ dir: uncheckedFolder() });
   const { approval } = await runWith(e, approveRun(id, 'ship', 'Merge it.'));
   assert.deepEqual([approval.step, approval.try], ['ship', 1]);
@@ -311,9 +311,9 @@ test("an approved ending with no check of its own is filed, in the repository's 
   );
   assert.equal(git(repo, 'log', '-1', '--format=%(trailers)'), '', 'with no trailer');
   assert.equal(git(repo, 'status', '--porcelain'), '', 'and nothing is left in the checkout, the message included');
-  assert.equal(await isShipped(repositoryRun(record), branch), true);
+  assert.equal(await isLanded(repositoryRun(record), branch), true);
   const { decision, toDecide, standings } = await runWith(e, decideRun(id));
-  assert.deepEqual([decision.kind, toDecide, standings], ['shipped', undefined, [{ branch, where: 'on' }]]);
+  assert.deepEqual([decision.kind, toDecide, standings], ['landed', undefined, [{ branch, where: 'on' }]]);
   assert.equal(
     git(repo, 'rev-parse', 'HEAD'),
     merged,
@@ -507,7 +507,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(mergeHead(repo), false);
   assert.deepEqual(readRun(id).steps.ship.landed, { commit: head });
   assert.ok(
-    landed.notes.includes(`ship: its check passed on the merge, and the run committed its merge onto main as ${head.slice(0, 7)}`),
+    landed.notes.includes(`ship: its check passed on the merge, and the run landed on main as ${head.slice(0, 7)}`),
     landed.notes.join('\n'),
   );
   assert.deepEqual(pngsIn(shot.dir), [], 'landed, its pictures of the merged tree are read by nobody: removed on the pass that lands');
@@ -535,12 +535,12 @@ test("an approved ending stages the merge and signs off its message; the run exe
   );
   assert.equal(landed.status, 'succeeded');
   const { decision } = await runWith(e, decideRun(id));
-  assert.equal(decision.kind, 'shipped');
+  assert.equal(decision.kind, 'landed');
   const shipLine = (await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!;
   assert.equal(shipLine.status, 'verified ✓');
   assert.equal(
     shipLine.note,
-    `the run committed its merge onto main as ${head.slice(0, 7)}`,
+    `the run landed on main as ${head.slice(0, 7)}`,
     'nemia ls, and the board after it, say what landed — the commit — where nothing else of a run names it',
   );
 

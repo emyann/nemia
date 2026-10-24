@@ -253,7 +253,7 @@ export function retrySection(step: Workflow, r: RetryBriefing, inFolder = false)
   const told = r.resumed ? saidSection(r.said) : [];
   const said = r.ending
     ? `You signed off, and the work went on to ${r.ending.step}, which a person approved: it acts on ${r.ending.onto} in the repository's own checkout, and it stopped there — \`${r.ending.status}\` — without doing what it was approved for. ` +
-      `A person sent the work back to you rather than ship it again: what they object to is below, then what ${r.ending.step} said.`
+      `A person sent the work back to you rather than land it again: what they object to is below, then what ${r.ending.step} said.`
     : whyEnded(r);
   const denied =
     r.status === 'denied' && r.denied?.length ? ['', '## What your session was denied', '', ...fenced(r.denied.join('\n'), 'text')] : [];

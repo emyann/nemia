@@ -89,7 +89,7 @@ const pinOf = (pinned: readonly Pin[] | undefined, kind: Pin['kind'], name: stri
 const started = (dir: string, repo: string, how: { after?: string[]; isolate?: boolean; factory?: string } = {}) =>
   runPlaced(startRun({ brief: 'build a thing', repo, workflowDir: dir, isolate: false, ...how }));
 
-/** `branch` merged into `repo`'s checkout and committed, as a person ships a result by hand: what `--after` waits for. */
+/** `branch` merged into `repo`'s checkout and committed, as a person lands a result by hand: what `--after` waits for. */
 const shippedByHand = (repo: string, branch: string): void => {
   stand().world.stage(repo, branch);
   stand().world.commit(repo, `merge ${branch}`);
@@ -114,7 +114,7 @@ test('a run that has filed nothing resolves the folder afresh: an edit made whil
   fs.writeFileSync(t.stepFile, `---\nplace: git\nagent: ${t.agent}\n---\nDo it differently.\n`);
 
   const pass = await runWith(b.e, advanceRun(readRun(run.id)));
-  assert.deepEqual(pass.filed, ['build'], 'the parent shipped, so the first step is filed');
+  assert.deepEqual(pass.filed, ['build'], 'the parent landed, so the first step is filed');
   const after = readRun(run.id);
   assert.equal(pinOf(after.pinned, 'agent', t.agent)!.n, 2, 'the edited agent is pinned at its new revision');
   assert.equal(pinOf(after.pinned, 'workflow', t.name)!.n, 2, 'and so is the folder, whose files and agents it digests');

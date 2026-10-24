@@ -25,9 +25,9 @@ const withCheck = (checkId: string, extra: Partial<RepositoryRun> = {}) =>
 /** A watcher's workflow: one step that takes no slot. */
 const WATCHING = [{ name: 'supervise', after: [], body: 'x', slot: 'none' } as Workflow];
 
-/** What `r` asks of the cap with its tasks in `p`, as `steps` say (none: every run counted), the runs it waits on shipped or not. */
-const need = (r: Run, p: Record<string, TaskPhase>, o: { shipped?: boolean; steps?: readonly Workflow[]; wf?: Workflow[] } = {}) =>
-  slotNeed(r, phases(p), assess(o.wf ?? STEPS, r, phases(p), signedDone, asked), () => o.shipped ?? true, o.steps);
+/** What `r` asks of the cap with its tasks in `p`, as `steps` say (none: every run counted), the runs it waits on landed or not. */
+const need = (r: Run, p: Record<string, TaskPhase>, o: { landed?: boolean; steps?: readonly Workflow[]; wf?: Workflow[] } = {}) =>
+  slotNeed(r, phases(p), assess(o.wf ?? STEPS, r, phases(p), signedDone, asked), () => o.landed ?? true, o.steps);
 
 test('`slotNeed`: in flight while a task is filed and not settled, or a started run files something; wants a slot with nothing filed and a root ready', async (t) => {
   const fresh = run({ implement: null, review: null });
@@ -60,8 +60,8 @@ test('`slotNeed`: in flight while a task is filed and not settled, or a started 
       () => need(run({ implement: null, review: null }, CANCELLED), {}),
       { inFlight: false, wants: false },
     ],
-    ['waiting on a run: it counts once it is filed', () => need(waits, {}, { shipped: false }), { inFlight: false, wants: false }],
-    ['once that run has shipped', () => need(waits, {}, { shipped: true }), { inFlight: false, wants: true }],
+    ['waiting on a run: it counts once it is filed', () => need(waits, {}, { landed: false }), { inFlight: false, wants: false }],
+    ['once that run has landed', () => need(waits, {}, { landed: true }), { inFlight: false, wants: true }],
     [
       '`slot: none`: a running watcher is never in flight',
       () => need(running, { t1: 'running' }, { steps: WATCHING }),

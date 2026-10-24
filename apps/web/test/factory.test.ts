@@ -602,13 +602,13 @@ test("placeRuns: an open run's graph moves the cards it covers, and never one a 
   });
 });
 
-/** What the api says a run waiting on `p` waits on: a run that may still ship, or one that was cancelled and never will. */
+/** What the api says a run waiting on `p` waits on: a run that may still land, or one that was cancelled and never will. */
 const waitingOn = (onYou: boolean): RunSummary['waiting'] => ({
   runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [] }],
   word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
   advice: onYou
-    ? `p was cancelled at ${cancelledAt}, and a cancelled run never ships — yours to resolve: wf cancel r-1, or start the work again without --after p`
-    : 'nothing of r-1 is filed until wf decide says p has shipped onto main; nothing to decide yet',
+    ? `p was cancelled at ${cancelledAt}, and a cancelled run never lands — yours to resolve: wf cancel r-1, or start the work again without --after p`
+    : 'nothing of r-1 is filed until wf decide says p has landed onto main; nothing to decide yet',
   onYou,
 });
 
@@ -1006,7 +1006,7 @@ test("runClock and clockCounts: a card's and a row's clock, and what its hover s
       const waiting = {
         runs: [],
         word: 'waiting on 7a87',
-        advice: 'nothing of 7fev is filed until wf decide says 7a87 has shipped onto main',
+        advice: 'nothing of 7fev is filed until wf decide says 7a87 has landed onto main',
         onYou: false,
       };
       const onRuns = runClock({ createdAt, startedAt: null, cancelledAt: null, waiting }, now, false);
@@ -1016,13 +1016,13 @@ test("runClock and clockCounts: a card's and a row's clock, and what its hover s
       assert.equal(
         runClock({ createdAt, startedAt: null, cancelledAt: null, waiting: null }, now, false).words,
         'waiting for 4h 29m',
-        'held for a slot, or its parents shipped and the next pass yet to file it: nothing to name, and waiting all the same',
+        'held for a slot, or its parents landed and the next pass yet to file it: nothing to name, and waiting all the same',
       );
       const onYou = { createdAt, startedAt: null, cancelledAt: null, waiting: { ...waiting, onYou: true } };
       assert.equal(
         runClock(onYou, now, true).words,
         'waiting for 4h 29m',
-        'waiting on a run that never ships without a person: off the moving floor, finished, and still waiting',
+        'waiting on a run that never lands without a person: off the moving floor, finished, and still waiting',
       );
       assert.equal(clockCounts(onYou, true), true, 'and its clock still counts');
       assert.equal(waitedMs(onYou), null);
@@ -1037,14 +1037,14 @@ test("runClock and clockCounts: a card's and a row's clock, and what its hover s
   );
 });
 
-/** What the api says of a run a person holds until `p` ships (`wf hold`): a hold that lifts on its own, or one only a person lifts. */
+/** What the api says of a run a person holds until `p` lands (`wf hold`): a hold that lifts on its own, or one only a person lifts. */
 const holdingOn = (onYou: boolean): NonNullable<RunSummary['holding']> => ({
   at: '2026-09-13T00:30:00.000Z',
-  runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [], shipped: false }],
-  word: 'held until p ships',
+  runs: [{ run: 'p', missing: false, cancelledAt: onYou ? cancelledAt : null, gone: [], landed: false }],
+  word: 'held until p lands',
   advice: onYou
     ? 'p was cancelled — yours to resolve: wf hold r-1 --off, or wf cancel r-1'
-    : 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p has shipped; to go on before then: wf hold r-1 --off',
+    : 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p has landed; to go on before then: wf hold r-1 --off',
   onYou,
 });
 
@@ -1104,7 +1104,7 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
     );
   });
   await t.test(
-    'a run waiting on runs that may still ship is in flight; one waiting on a run that never ships is not, and waits on you — though `assess` calls both running',
+    'a run waiting on runs that may still land is in flight; one waiting on a run that never lands is not, and waits on you — though `assess` calls both running',
     () => {
       const mayShip = run(['waiting on p'], { moving: true, after: ['p'], waiting: waitingOn(false) });
       assert.deepEqual([inFlight(mayShip), waitsOnYou(mayShip)], [true, false]);
@@ -1140,7 +1140,7 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
     assert.deepEqual(onYouOf(ahead), ['implement'], 'a branch nobody merged asks for no step, so nothing is filtered');
   });
   await t.test(
-    "where a run stands, in the start form's word: called off, waiting on you — a step, or a run it waits on that never ships — in flight, or finished",
+    "where a run stands, in the start form's word: called off, waiting on you — a step, or a run it waits on that never lands — in flight, or finished",
     () => {
       assert.equal(standingOf(run([], { status: 'cancelled', cancelledAt })), ENDED.cancelled.word);
       assert.equal(
@@ -1164,7 +1164,7 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
     },
   );
   await t.test(
-    'a run held until runs that may still ship is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs',
+    'a run held until runs that may still land is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs',
     () => {
       const gated = { status: 'running' as const, moving: false, waitingOnYou: [] as string[], waiting: null };
       const lifts = run(['awaiting approval', 'waiting'], { ...gated, heldUntil: ['p'], holding: holdingOn(false) });
@@ -1202,12 +1202,12 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
 });
 
 test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finished runs included', async (t) => {
-  await t.test('a run waits on runs, a ghost on the floor, while what it waits on may still ship and nothing of it is filed', () => {
+  await t.test('a run waits on runs, a ghost on the floor, while what it waits on may still land and nothing of it is filed', () => {
     assert.equal(waitsOnRuns(run(['waiting'], { after: ['p'], waiting: waitingOn(false), moving: true })), true);
     assert.equal(
       waitsOnRuns(run(['waiting'], { after: ['p'], waiting: waitingOn(true) })),
       false,
-      'a run waiting on a run that never ships waits on you',
+      'a run waiting on a run that never lands waits on you',
     );
     assert.equal(
       waitsOnRuns(
@@ -1316,16 +1316,16 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         createdAt: at(0),
       }),
       run(['unverified · done'], { id: 'ahead', status: 'succeeded', toDecide: merge('ahead', 'wf/ahead/implement'), createdAt: at(1) }),
-      run(['unverified · done', 'unverified · done'], { id: 'shipped', status: 'succeeded', createdAt: at(2) }),
+      run(['unverified · done', 'unverified · done'], { id: 'landed', status: 'succeeded', createdAt: at(2) }),
     ];
     assert.deepEqual(
       floorRuns(runs, false).map((r) => r.id),
       ['ends', 'ahead'],
-      "ends, finished at its ending's gate, and ahead, succeeded with a branch nobody merged, stay; shipped, decided, is off the floor",
+      "ends, finished at its ending's gate, and ahead, succeeded with a branch nobody merged, stay; landed, decided, is off the floor",
     );
     assert.deepEqual(
       floorRuns(runs, true).map((r) => r.id),
-      ['ends', 'ahead', 'shipped'],
+      ['ends', 'ahead', 'landed'],
     );
     const old = [{ ...runs[1], toDecide: undefined as unknown as RunSummary['toDecide'] }];
     assert.deepEqual(
@@ -1419,7 +1419,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         onYou: ['step-0'],
         createdAt: at(4),
       }),
-      run([], { id: 'shipped', status: 'succeeded', createdAt: at(5) }),
+      run([], { id: 'landed', status: 'succeeded', createdAt: at(5) }),
       run(['running (working)'], { id: 'going', moving: true, createdAt: at(6) }),
     ];
     const counted = runs.filter(waitsOnYou).map((r) => r.id);
@@ -1476,15 +1476,15 @@ test('runEdges and contextEdges: the edges drawn between cards', async (t) => {
       );
     },
   );
-  await t.test('a wait that is over draws nothing: a card started after its waits, and a hold whose run shipped', () => {
+  await t.test('a wait that is over draws nothing: a card started after its waits, and a hold whose run landed', () => {
     assert.deepEqual(
       runEdges([run(['verified ✓'], { id: 'a' }), run(['running (working)'], { id: 'b', after: ['a'], waiting: null })]),
       [],
-      'b has started: its parents shipped, and it waits on none',
+      'b has started: its parents landed, and it waits on none',
     );
-    const shipped = { ...holdingOn(false), runs: [{ run: 'a', missing: false, cancelledAt: null, gone: [], shipped: true }] };
+    const landed = { ...holdingOn(false), runs: [{ run: 'a', missing: false, cancelledAt: null, gone: [], landed: true }] };
     assert.deepEqual(
-      runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', heldUntil: ['a'], holding: shipped })]),
+      runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', heldUntil: ['a'], holding: landed })]),
       [],
     );
   });
@@ -1506,11 +1506,11 @@ test('runEdges and contextEdges: the edges drawn between cards', async (t) => {
     },
   );
   await t.test(
-    'an edge from each run a card is held until that has not shipped, both on the floor, drawn as an `after` edge — and none where an `after` edge already joins the two',
+    'an edge from each run a card is held until that has not landed, both on the floor, drawn as an `after` edge — and none where an `after` edge already joins the two',
     () => {
       const held = (...runs: string[]): RunSummary['holding'] => ({
         ...holdingOn(false),
-        runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [], shipped: false })),
+        runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [], landed: false })),
       });
       const edges = runEdges([
         run(['verified ✓'], { id: 'a' }),

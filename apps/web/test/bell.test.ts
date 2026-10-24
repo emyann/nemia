@@ -77,16 +77,16 @@ const atGate = (id: string, extra: Partial<RunSummary> = {}): RunSummary => {
 /** The bell's rows of those of `runs` the board's own rule says wait on a person. */
 const bellRuns = (runs: readonly RunSummary[]) => bellRows(runs.filter(waitsOnYou));
 
-/** A hold on a run until `p` ships: one a person lifts alone when `onYou`. */
+/** A hold on a run until `p` lands: one a person lifts alone when `onYou`. */
 const holdOn = (onYou: boolean): RunSummary['holding'] => ({
   at: '2026-10-01T00:00:00.000Z',
-  runs: [{ run: 'p', missing: onYou, cancelledAt: null, gone: [], shipped: false }],
-  word: onYou ? 'held until p ships (no such run)' : 'held until p ships',
+  runs: [{ run: 'p', missing: onYou, cancelledAt: null, gone: [], landed: false }],
+  word: onYou ? 'held until p lands (no such run)' : 'held until p lands',
   advice: 'wf hold r --off',
   onYou,
 });
 
-/** What a run started after `p` waits on: a run that never ships without a person when `onYou`. */
+/** What a run started after `p` waits on: a run that never lands without a person when `onYou`. */
 const waitOn = (onYou: boolean): RunSummary['waiting'] => ({
   runs: [{ run: 'p', missing: false, cancelledAt: onYou ? '2026-10-01T00:00:00.000Z' : null, gone: [] }],
   word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
@@ -95,13 +95,13 @@ const waitOn = (onYou: boolean): RunSummary['waiting'] => ({
 });
 
 test("bellRows, bellHash: the waiting bar's rows, their order, what each waits for and where it opens", async (t) => {
-  await t.test('REFUSED: a run held until a run that may still ship waits on nobody, and is not on the bell', () => {
+  await t.test('REFUSED: a run held until a run that may still land waits on nobody, and is not on the bell', () => {
     const held = run('held', { heldUntil: ['p'], holding: holdOn(false) });
     assert.equal(bellRuns([held]).length, 0);
     const lifted = run('stuck', { heldUntil: ['p'], holding: holdOn(true) });
     assert.deepEqual(
       bellRuns([held, lifted]).map((row) => [row.run, row.waitsFor]),
-      [['stuck', ['held until p ships (no such run)']]],
+      [['stuck', ['held until p lands (no such run)']]],
       'a hold only a person lifts is',
     );
   });
@@ -118,7 +118,7 @@ test("bellRows, bellHash: the waiting bar's rows, their order, what each waits f
     assert.equal(bellRuns([unmerged]).length, 0);
   });
   await t.test(
-    'a run waiting on a run that never ships without a person is on the bell, with its word; one that may still ship is not',
+    'a run waiting on a run that never lands without a person is on the bell, with its word; one that may still land is not',
     () => {
       const never = run('never', { after: ['p'], waiting: waitOn(true), moving: false });
       const may = run('may', { after: ['p'], waiting: waitOn(false) });

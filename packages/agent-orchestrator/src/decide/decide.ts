@@ -33,26 +33,26 @@ import { merges } from '../ending/ending.ts';
 /**
  * What is left for a person to do about this run.
  *
- * A review and a reply are two opinions; something has to say what ships, and that something is
+ * A review and a reply are two opinions; something has to say what lands, and that something is
  * not a step. An agent that graded the exchange would be a third opinion with no more standing
  * than the first two, and the one thing it could not do is the thing the moment is for — commit
  * the repository to an answer. So the run ends by handing the choice over, deliberately, instead
  * of settling `succeeded` and going quiet.
  *
- * `shipped` is ASKED, not stored. Whether the work landed is a question git can already answer —
+ * `landed` is ASKED, not stored. Whether the work landed is a question git can already answer —
  * is the result branch an ancestor of the base branch — and a stored decision would be a second
  * copy of it, wrong the moment somebody merges by hand. A run still holds no status of its own;
  * cancellation remains the single exception, and it is one because nothing else knows it.
  *
  * Git's yes is not always an answer, though. A result branch is cut at the run's base, which is on the
  * base branch, so a branch nobody committed to is "on the base branch" from the moment it is cut. Read
- * as shipped, a run whose last step failed with nothing committed would say `shipped`: `nemia decide` would
- * hide the failure, and a run waiting on it (`--after`) would start. So `shipped` says which yes it is (`Shipped`).
+ * as landed, a run whose last step failed with nothing committed would say `landed`: `nemia decide` would
+ * hide the failure, and a run waiting on it (`--after`) would start. So `landed` says which yes it is (`Landed`).
  */
 export type Decision =
   | { kind: 'running'; waiting: string[] }
   | { kind: 'cancelled'; at: string }
-  | { kind: 'shipped'; branches: string[] }
+  | { kind: 'landed'; branches: string[] }
   | {
       kind: 'awaiting';
       outcome: 'succeeded' | 'failed' | 'blocked';
@@ -91,18 +91,18 @@ export type Decision =
     };
 
 /**
- * Whether a result branch is on the run's base branch, as its place's `standing` says it (`shipped` on a `BranchReader`):
+ * Whether a result branch is on the run's base branch, as its place's `standing` says it (`landed` on a `BranchReader`):
  *
  *   false        it is not
  *   'unchanged'  it is, and only because nothing is committed on it past the run's base — where it was cut
  *   true         it is, with commits past the run's base: work a person merged
  *
- * `decision` calls a run shipped on `true` whatever its steps said, and on `'unchanged'` only when every
+ * `decision` calls a run landed on `true` whatever its steps said, and on `'unchanged'` only when every
  * step succeeded: a branch that never moved says nothing landed, and a run that failed or waits on a
- * person has not shipped for having nothing to merge. Neither while a step waits at its gate: the gate
+ * person has not landed for having nothing to merge. Neither while a step waits at its gate: the gate
  * is a person's word on the record, and a merge is not that word — a run `--after` it waits for both.
  */
-export type Shipped = boolean | 'unchanged';
+export type Landed = boolean | 'unchanged';
 
 /**
  * What is left for a person to do about this run (`Decision`). Pure. Read on `assess`'s inputs: a step a round due files again is held
@@ -112,11 +112,11 @@ export type Shipped = boolean | 'unchanged';
  * `running` names what it waits on, each once: a step whose agent or check is still going, one ready, an ending step waiting for the
  * repository's own checkout (`heldByCheckout`), a step the next tick tries again and a loop going round again.
  *
- * A run that worked directly on its base branch is never asked whether it shipped: git's answer is always yes. Every result branch is
- * asked, not some — a fan-out that ends in two branches is not shipped because one landed — each once, and none after the first that is
- * not on the base branch. A step waiting at its gate is a person's word not yet given, and the run is not shipped while one does, save
+ * A run that worked directly on its base branch is never asked whether it landed: git's answer is always yes. Every result branch is
+ * asked, not some — a fan-out that ends in two branches has not landed because one did — each once, and none after the first that is
+ * not on the base branch. A step waiting at its gate is a person's word not yet given, and the run is not landed while one does, save
  * an ending at its gate that has not run whose result git already has (`resultOnBase`): the merge its gate holds was made by hand, so
- * the run is shipped and a run `--after` it starts (`parentOf`), since its approval is refused and that child would wait for ever.
+ * the run is landed and a run `--after` it starts (`parentOf`), since its approval is refused and that child would wait for ever.
  *
  * The steps are told apart by how each ended on its own work (`ownStatus`): blocked, a question; failed or stopped, a thing that broke;
  * a check that refused, a thing the run can name; a check that did not finish, one to run again. Being over budget is said beside that,
@@ -133,7 +133,7 @@ export function decision(
   steps: readonly Workflow[],
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  shipped: (branch: string) => Shipped,
+  landed: (branch: string) => Landed,
   closeoutOf: (step: string) => Closeout | undefined = () => undefined,
   askedCloseout: (taskId: string) => CloseoutAsked = () => false,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
@@ -183,9 +183,9 @@ export function decision(
 
   const direct = run.branch !== undefined && branches.includes(run.branch);
 
-  const said = new Map<string, Shipped>();
-  const landed = (branch: string): Shipped => {
-    if (!said.has(branch)) said.set(branch, shipped(branch));
+  const said = new Map<string, Landed>();
+  const stands = (branch: string): Landed => {
+    if (!said.has(branch)) said.set(branch, landed(branch));
     return said.get(branch)!;
   };
   const atGate = steps
@@ -194,10 +194,10 @@ export function decision(
     .sort();
   const unrunEnding = (name: string): boolean => !run.steps[name]?.taskId && steps.some((s) => s.name === name && approvedFirst(s, run));
   const byHand =
-    atGate.length > 0 && atGate.every(unrunEnding) && branches.length > 0 && !direct && branches.every((b) => landed(b) !== false);
+    atGate.length > 0 && atGate.every(unrunEnding) && branches.length > 0 && !direct && branches.every((b) => stands(b) !== false);
   const awaitingApproval = byHand ? [] : atGate;
-  const onBase = branches.length > 0 && !direct && !awaitingApproval.length && branches.every(landed);
-  if (onBase && branches.every((b) => landed(b) === true)) return { kind: 'shipped', branches };
+  const onBase = branches.length > 0 && !direct && !awaitingApproval.length && branches.every(stands);
+  if (onBase && branches.every((b) => stands(b) === true)) return { kind: 'landed', branches };
 
   const named = (...want: StepStatus[]) =>
     steps
@@ -230,7 +230,7 @@ export function decision(
           awaitingApproval.length
         ? 'blocked'
         : 'succeeded';
-  if (onBase && outcome === 'succeeded') return { kind: 'shipped', branches };
+  if (onBase && outcome === 'succeeded') return { kind: 'landed', branches };
   return {
     kind: 'awaiting',
     outcome,
@@ -292,13 +292,13 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
 export type Offer = { step: string; command: string; said: string };
 
 /**
- * A command `nemia decide` offers, and runs none of: ship it, drop it, read it for a run worked on its base branch, forget it for a folder
+ * A command `nemia decide` offers, and runs none of: land it, drop it, read it for a run worked on its base branch, forget it for a folder
  * run, each once-more (`nemia retry`, `nemia round`), accept and merge (`nemia merge`) with the line it prints it in, and for a step
  * waiting at its gate on you, the approval (`nemia approve`) and a send-back (`nemia retry --message`) for each step it names. `said` is
  * null where the label is all it says; `step`, the step it acts on, null for a command on the whole run.
  */
 export type DecideCommand = {
-  label: 'ship it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'merge' | 'approve' | 'send back' | 'forget it';
+  label: 'land it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'merge' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
   step: string | null;
@@ -336,10 +336,10 @@ function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly str
 
 /**
  * The commands `nemia decide` offers on a run awaiting a person (`Decision`), none on any other: once more, accept or a send-back for each
- * offer (`offers`, round's then retry's), the approval and its send-backs for each step waiting at its gate on you, then ship it and drop
+ * offer (`offers`, round's then retry's), the approval and its send-backs for each step waiting at its gate on you, then land it and drop
  * it for the branches, or read it for a run worked on its base branch, which has nothing to merge nor a branch to delete. A folder run has
  * none of those: forgetting it (`nemia rm`) is its one command, and nothing about git. A workflow whose step acts on the base branch itself
- * (`merges`) is offered no ship it nor drop it: its ending step is what merges, one approval away.
+ * (`merges`) is offered no land it nor drop it: its ending step is what merges, one approval away.
  *
  * Every command is a bare `nemia` or `git -C` line, never a sentence: an offer's is the one it was made with.
  */
@@ -359,7 +359,7 @@ export function choicesOf(steps: readonly Workflow[], run: Run, d: Decision, off
   if (!first) return once;
   return [
     ...once,
-    { label: 'ship it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null, step: null },
+    { label: 'land it', command: `git -C ${run.repo} merge --no-ff ${first}`, said: null, step: null },
     { label: 'drop it', command: `git -C ${run.repo} branch -D ${d.branches.join(' ')}`, said: null, step: null },
   ];
 }

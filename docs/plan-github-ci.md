@@ -33,7 +33,7 @@ on top of main and the changes ahead of it, then merges. Nothing chases main.
 3. ~~**Settle what the history exposes**~~ (below). Done: audited over all 1,333 commits, and the three decisions on it taken.
 4. **Put it on GitHub** by renaming the existing repository and replacing its code, keeping the old code reachable.
 5. **CI**: an Actions workflow and branch protection. Under way; the merge queue moved to step 6 with the pull-request landing.
-6. **The factory ships through pull requests**, with the merge queue. A named follow-on intent's, not this one's.
+6. **The factory lands through pull requests**, with the merge queue. A named follow-on intent's, not this one's.
 7. **Other repositories** (`docs/plan-multi-repo.md`) follow mostly as configuration once 4 to 6 hold.
 
 ## 3. What the history exposes
@@ -52,8 +52,8 @@ log, evaluation and experiment, and every commit's metadata. Audited on 2026-09-
 - **A personal email on 11 commits.** The first eleven, all 2026-09-12, are authored `renaudin.yann@gmail.com`; the other 1,311
   use the GitHub no-reply address, and 11 more are `wf <wf@local>` (the run's own hand-off commits). **Decided 2026-09-25: left
   as they are; the history is not rewritten.** Rewriting the authors (`git filter-repo --mailmap`) would change every commit's hash
-  after them, which is all of main, and the store's past runs judge "shipped" by whether their result branch is an ancestor of
-  main: every finished run would read as not shipped, and every `--after` chain on one would wait for ever.
+  after them, which is all of main, and the store's past runs judge "landed" by whether their result branch is an ancestor of
+  main: every finished run would read as not landed, and every `--after` chain on one would wait for ever.
 - **Local paths.** 28 files at HEAD named `/home/<user>` or `/mnt/c/Users/<user>` with the owner's username (the evaluation
   reports, `plan-hold-the-bar.md`, the Jev experiments' scripts and datasets, one judge test). Harmless, but a username. With the
   Jev experiments out of the tree (below), 16 were left, the cost scripts' transcript globs and one test among them. **Generalised at
@@ -205,7 +205,7 @@ that exist. So the file cannot quietly test less than it claims.
 (`workflows/build/landing.ts`). CI now gates a landing rather than reporting on one: `ci` is required on the head the review read, and
 a red or missing one is the landing's refusal. Nothing is pushed by hand, and one pull request names one landing.
 
-## 6. The factory ships through pull requests
+## 6. The factory lands through pull requests
 
 **Done, 2026-10-19/20, by the intent `a-run-s-change-is-a-pull-req-t452`** — all but the merge queue. The factory now merges through
 pull requests end to end: a run pushes only its own branch, opens the pull request its round check waits on, and lands by merging that

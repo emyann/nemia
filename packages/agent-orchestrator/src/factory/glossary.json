@@ -1,0 +1,45 @@
+{
+  "context": "factory",
+  "title": "Factory",
+  "about": "A body of work's repositories, workflows and hires.",
+  "paths": [
+    "packages/agent-orchestrator/src/factory",
+    "packages/agent-orchestrator/src/template"
+  ],
+  "terms": [
+    {
+      "term": "Factory",
+      "meaning": "a named grouping in the store: the repositories a body of work is on, the workflows it offers, and the agents it hires into their steps.",
+      "type": "Factory",
+      "see": {
+        "label": "Factories",
+        "href": "/factories/"
+      }
+    },
+    {
+      "term": "Factory's instruction",
+      "meaning": "what Nemia is to know about a factory, `NEMIA.md` by default; no step is told it.",
+      "see": {
+        "label": "Its instruction",
+        "href": "/factories/#its-instruction"
+      }
+    },
+    {
+      "term": "Factory's rules",
+      "meaning": "the rules and policies of one factory, a file kept in your store with it, `~/.agent-workflows/factories/<name>/RULES.md`, told to every agent hired into it.",
+      "see": {
+        "label": "Its rules",
+        "href": "/factories/#its-rules"
+      }
+    },
+    {
+      "term": "Hire",
+      "meaning": "a factory's choice of the agent that does one step of a workflow.",
+      "type": "Hire",
+      "see": {
+        "label": "Hires",
+        "href": "/factories/#hires"
+      }
+    }
+  ]
+}

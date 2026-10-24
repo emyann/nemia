@@ -1,0 +1,20 @@
+{
+  "context": "place",
+  "title": "Place",
+  "about": "Where a run's steps keep their work, and the git place Nemia ships.",
+  "paths": [
+    "packages/agent-orchestrator/src/place",
+    "packages/agent-orchestrator/place"
+  ],
+  "terms": [
+    {
+      "term": "Place",
+      "meaning": "where a run's steps keep their work: the git place gives each step a worktree on a branch of its own, and reads and acts on the repository for it.",
+      "type": "PlaceService",
+      "see": {
+        "label": "The orchestrator",
+        "href": "/map/#the-orchestrator"
+      }
+    }
+  ]
+}

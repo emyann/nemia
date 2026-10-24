@@ -1,0 +1,69 @@
+{
+  "context": "agents",
+  "title": "Agents and skills",
+  "about": "Who does a step's work, what it is told, and what it may do.",
+  "paths": [
+    "packages/agent-orchestrator/src/agents",
+    "packages/agent-orchestrator/src/skills",
+    "packages/agent-orchestrator/src/workflow/fence.ts"
+  ],
+  "terms": [
+    {
+      "term": "Agent",
+      "meaning": "who does a step's work: its instructions, its tools, its fence and its skills, written once and named by the steps it works on.",
+      "type": "Agent",
+      "see": {
+        "label": "Agents",
+        "href": "/agents/"
+      }
+    },
+    {
+      "term": "Custom instructions",
+      "meaning": "what a person adds to an agent they use, one file per agent in their store, without rewriting it.",
+      "see": {
+        "label": "Five layers",
+        "href": "/agents/#what-an-agent-is-told-five-layers"
+      }
+    },
+    {
+      "term": "Fence",
+      "meaning": "what a step's session may not do: the tools it is denied (`disallowedTools`) and the permission mode it runs in.",
+      "see": {
+        "label": "Tools and the fence",
+        "href": "/agents/#tools-and-the-fence"
+      }
+    },
+    {
+      "term": "Folder's files",
+      "meaning": "the files the harness itself reads in the folder an agent works in, `CLAUDE.md` or `AGENTS.md`, which hold for every agent at work there; the third layer, above the agent's own instructions and below the factory's rules.",
+      "see": {
+        "label": "Five layers",
+        "href": "/agents/#what-an-agent-is-told-five-layers"
+      }
+    },
+    {
+      "term": "Instruction layers",
+      "meaning": "the five layers of what an agent is told, numbered by precedence: its instructions, a person's custom instructions, the folder's files, the factory's rules, and the step's policy. Where two say different things the higher number wins, and the task is above them all, and a session is told so: each layer Nemia composes is headed by its number and its owner, and every brief opens on the precedence in words.",
+      "see": {
+        "label": "Five layers",
+        "href": "/agents/#what-an-agent-is-told-five-layers"
+      }
+    },
+    {
+      "term": "Skill",
+      "meaning": "a folder of instructions and files an agent is given for one kind of work.",
+      "see": {
+        "label": "Skills",
+        "href": "/agents/#skills"
+      }
+    },
+    {
+      "term": "Tools",
+      "meaning": "the only tools a step's session has (`tools`), beside its fence.",
+      "see": {
+        "label": "Tools and the fence",
+        "href": "/agents/#tools-and-the-fence"
+      }
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "context": "board",
+  "title": "The board",
+  "about": "`apps/web` shows the workflows to a person.",
+  "paths": [
+    "apps/web"
+  ],
+  "terms": [
+    {
+      "term": "Board",
+      "meaning": "`apps/web`, the pages a person looks at, which reach the api over HTTP alone.",
+      "see": {
+        "label": "The board",
+        "href": "/map/#the-board"
+      }
+    }
+  ]
+}

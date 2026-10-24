@@ -39,6 +39,7 @@ export default defineConfig({
       sidebar: [
         { label: 'What Nemia is', link: '/' },
         { label: 'The map', link: '/map/' },
+        { label: 'The model', link: '/model/' },
         { label: 'The runtime', link: '/runtime/' },
         { label: 'A2A', link: '/a2a/' },
         { label: 'Workflows', link: '/workflows/' },

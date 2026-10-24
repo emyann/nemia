@@ -1,8 +1,9 @@
 /**
  * Mermaid on the docs' pages, drawn at build by beautiful-mermaid into an SVG that takes Starlight's colours. A fence
- * `mermaid diagram=<name>` holds nothing: its diagram is a state machine's own, read from between its `diagram:<name>` markers in the
- * packages' docs, never copied. Any other `mermaid` fence is a flowchart or a sequence drawn on the page. A diagram the renderer would
- * draw short, a line of it read as nothing, fails the page's build, naming the line.
+ * `mermaid diagram=<name>` holds nothing: its diagram is the code's own, a state machine or a layer's model as an entity-relation
+ * diagram, read from between its `diagram:<name>` markers in the packages' docs, never copied. Any other `mermaid` fence is a
+ * flowchart or a sequence drawn on the page. A diagram the renderer would draw short, a line of it read as nothing, fails the page's
+ * build, naming the line.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -72,9 +73,15 @@ export const diagramFrom = (root: string, name: string): string => {
   return found[0].block;
 };
 
-/** What a diagram's lines read as: its graph for a flowchart or a state diagram, which the parser reads, else its whole SVG. */
+/** The headers whose diagram the parser does not read, so that a line of it is judged by the SVG drawn with and without it. */
+const RENDERED = new Set(['sequenceDiagram', 'erDiagram']);
+
+/**
+ * What a diagram's lines read as: its graph for a flowchart or a state diagram, which the parser reads, else its whole SVG, as for a
+ * sequence or an entity-relation diagram.
+ */
 const readAs = (lines: string[]): string =>
-  lines[0] === 'sequenceDiagram'
+  RENDERED.has(lines[0])
     ? renderMermaidSVG(lines.join('\n'))
     : JSON.stringify(parseMermaid(lines.join('\n')), (_key, value: unknown) => (value instanceof Map ? [...value] : value));
 

@@ -1,0 +1,64 @@
+/**
+ * The agents model: an agent's name and a skill's refuse what their refusals refuse and take what the tests' team names, each agent of
+ * that team decodes as `parseAgent` reads it, and each of its steps names its agent by id.
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Option, Schema } from 'effect';
+import { Agent, AgentName, agentsModel, SkillName, StepAgent } from './agents.model.ts';
+import { parseAgent } from './agents.ts';
+import { TEAM, TEAM_DEV } from '../../test/team.ts';
+
+/** The files of `dir` that end in `.md`, without it, the folder's README left out. */
+const named = (dir: string): string[] =>
+  fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith('.md') && f !== 'README.md')
+    .map((f) => f.slice(0, -'.md'.length));
+
+test("an agent's name is checked on create by agentNameRefusal's rule and read as any string", async (t) => {
+  await t.test('refuses what agentNameRefusal refuses', () => {
+    for (const name of ['', 'a/b', '..', '.x', ' x', 'x.md', 'README', 'x'.repeat(260), `a${String.fromCharCode(7)}`])
+      assert.equal(Option.isNone(AgentName.create.option(name)), true, JSON.stringify(name));
+  });
+  await t.test("takes each name of the tests' team", () => {
+    for (const name of named(path.join(TEAM, 'agents'))) assert.equal(Schema.is(AgentName.OnCreate)(name), true, name);
+  });
+  await t.test('reads a name written before the check', () => assert.equal(Schema.is(AgentName.OnRead)('old/name'), true));
+});
+
+test("a skill's name is checked on create by skillNameRefusal's rule and read as any string", async (t) => {
+  await t.test('refuses what skillNameRefusal refuses', () => {
+    for (const name of ['../agents', 'Review', 'a_b', '.hidden', '', 'x'.repeat(65)])
+      assert.equal(Option.isNone(SkillName.create.option(name)), true, JSON.stringify(name));
+  });
+  await t.test("takes each skill of the tests' team, and one of 64 characters", () => {
+    for (const name of [...fs.readdirSync(path.join(TEAM, 'skills')), 'write-a-note', 'x'.repeat(64)])
+      assert.equal(Schema.is(SkillName.OnCreate)(name), true, name);
+  });
+  await t.test('reads a name written before the check', () => assert.equal(Schema.is(SkillName.OnRead)('Old_Skill'), true));
+});
+
+test("each agent of the tests' team decodes as parseAgent reads it", async (t) => {
+  for (const name of named(path.join(TEAM, 'agents')))
+    await t.test(name, () => {
+      const at = (file: string) => path.join(TEAM, 'agents', file);
+      const agent = parseAgent(name, fs.readFileSync(at(`${name}.md`), 'utf8'), (file) => fs.readFileSync(at(file), 'utf8'));
+      assert.equal(Schema.decodeUnknownResult(Agent)(agent)._tag, 'Success');
+    });
+});
+
+test("each step of the tests' team names its agent by id", async (t) => {
+  for (const step of named(TEAM_DEV))
+    await t.test(step, () => {
+      const agent = /^agent:\s*(\S+)/m.exec(fs.readFileSync(path.join(TEAM_DEV, `${step}.md`), 'utf8'))?.[1];
+      assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step, agent }), true);
+    });
+  await t.test('REFUSED: a step with no agent', () => assert.equal(Schema.is(StepAgent)({ workflow: 'dev', step: 'x' }), false));
+  await t.test('the model', () => {
+    assert.deepEqual(agentsModel.ids, { AgentName: 'Agent' });
+    assert.deepEqual(agentsModel.entities, [Agent, StepAgent]);
+  });
+});

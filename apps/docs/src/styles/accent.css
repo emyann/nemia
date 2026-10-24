@@ -44,3 +44,31 @@ figure.diagram svg {
 figure.diagram svg text {
   font-family: var(--sl-font);
 }
+
+/* Two diagrams beside each other, as wide as the column lets each be at 22rem, else one above the other; each scrolls on its own. */
+.side-by-side {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+  align-items: start;
+}
+
+.side-by-side > figure.diagram {
+  min-width: 0;
+  margin-top: 0;
+}
+
+/* A page that sets two models side by side takes the whole width beside the sidebar, and each model is drawn whole in its column. */
+:root:has(.side-by-side) {
+  --sl-content-width: 100%;
+}
+
+.side-by-side > figure.diagram svg {
+  min-width: 0;
+  width: 100%;
+  height: auto;
+}
+
+.side-by-side > figure.diagram figcaption {
+  display: none;
+}

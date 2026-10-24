@@ -223,7 +223,7 @@ repository's team (`test/nemia-shipped.test.ts`); how her session runs is the ru
 and the attached runner that rule brings).
 Her chat is the orchestrator's too, written over a long-lived task and a folder (`src/chat/`): projected on every read from her
 transcripts across her attempts and the runtime's `said`, never a copy; what the person writes (`outbox.jsonl`) and their read mark
-(`read.json`) are theirs, written by the api's programs alone, and delivered by the keeper's `deliver` act, the one writer of
+(`read.json`) are theirs, written by the api's programs alone, and said to her by the keeper's `sayOutbox` act, the one writer of
 `delivered.jsonl`, which reconciles with `said` before it says (`test/chat-writers.test.ts`).
 
 **The library's writers** are the orchestrator's: an agent, a skill or a workflow of yours written, or removed, against the version it
@@ -320,9 +320,10 @@ Tests: `packages/agent-runtime/test/contract.test.ts`, `packages/agent-orchestra
 `packages/agent-runtime/test/xstate-boundary.test.ts`, and `packages/agent-orchestrator/test/imports.boundary.test.ts`, which runs oxlint
 with the layers' blocks on planted files.
 
-**2. Inside the orchestrator, every file is of one of four kinds**, held by
+**2. Inside the orchestrator, every file is of one of five kinds**, held by
 `packages/agent-orchestrator/test/boundary.test.ts`. A file in a feature folder (`src/<feature>/`) says its kind by its
-name: `x.store.ts` is a store, `x.verb.ts` a controller, any other name pure, and every file of `src/cli/` is the CLI's.
+name: `x.store.ts` is a store, `x.verb.ts` a controller, `x.model.ts` a model, any other name pure, and every file of `src/cli/`
+is the CLI's.
 A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT`.
 
 - **pure** imports no agent-runtime, no node:fs (nor fs/promises), no node:child_process, no node:http, node:https,
@@ -352,8 +353,13 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
   and cli/exit.ts. The client and
   the controllers import one another with no cycle.
 - **client** is `src/runtime-client.ts`, the subject of the third rule.
+- **model** is a layer's declaration of its entities as Effect Schemas — its branded ids, its aggregates and their invariants —
+  beside each context's glossary (`record/record.model.ts` for run-core), with the printer and the whole diagram in `src/model/`,
+  which holds model files alone. It imports Effect, other model files and pure files, nothing else, and no pure file imports it, so
+  `agent-orchestrator/run` and `/workflow` load none. A model reshapes nothing: its doors adopt it slice by slice, each read
+  decoding through it once its slice comes (`packages/agent-orchestrator/docs/model.md`).
 
-A place's code (`place/<name>/`, the git place's `place.ts`, `git.ts` and `verbs/`) is none of the four, and stands beside `src`: it
+A place's code (`place/<name>/`, the git place's `place.ts`, `git.ts` and `verbs/`) is none of the five, and stands beside `src`: it
 imports node's built-ins, `effect`, its own files, and what a place is (`src/place/place.ts`, `src/place/place.store.ts`), and one file
 of `src` alone imports it, `src/place/shipped.store.ts`, which gives it as a layer (`gitPlaceLayer`); every other file asks the place it
 is given (`PlaceService`). `placeBreaks` in the same test holds both. The CLI's `main` is handed its place as it is handed its engine,
@@ -363,7 +369,8 @@ the git place where it is handed none, and each command gives its program that o
 A file in src or bin that no kind names fails the suite. `packages/agent-orchestrator/test/layout.test.ts` holds the
 folders: at most six source files in one, no folder named `utils`, `helpers`, `common`, `shared` or `misc`, no two
 source files that need each other's values, no source file that imports a test, and a folder's pure code imported from
-outside through its face — its `index.ts`, or its one pure file.
+outside through its face — its `index.ts`, or its one pure file; a store, a verb or a model is imported by its own path. A folder
+holding a context's `glossary.json` leaves its one `<folder>.model.ts` out of its six.
 
 **3. The runtime is reached through one client.** Of the orchestrator's files, `src/runtime-client.ts` alone imports
 agent-runtime, a type included (`CLIENT` in test/boundary.test.ts). It creates the runtime (`engine()`, `HARNESSES`): the

@@ -198,6 +198,10 @@ What the `create-an-agent` skill, being generic, does not say here:
   (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
 - `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
   full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
+- `tools/store-measure/` — what the store's reads cost, cold and warm: a tick pass, the run list, the stats, a run's page and the feed from
+  a cursor, on a copy of both stores in a temp folder with the run count beside them, never the live store
+  (`node --expose-gc tools/store-measure/report.ts [--repeat N] [--json <file>] [--compare <baseline.json>]`); the baseline before the
+  Run door is `tools/store-measure/baselines/s1.json`. A session's measure, held by `tools/guards/test/store-measure.test.ts`.
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
   started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` (the live daemon alone: a probe goes to a held throwaway,
   `node tools/observe/render/render.ts --hold`, at the collector address it prints), and its six dashboards held to the code's names by

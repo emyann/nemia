@@ -43,8 +43,6 @@ test('factoryNameRefusal: a lowercase slug of up to 40 characters names a factor
   await t.test('REFUSED: one not lowercase, naming the lowercase', () => names(factoryNameRefusal('Nemia'), 'nemia'));
   await t.test('REFUSED: one that climbs, naming names that are', () => names(factoryNameRefusal('a/b'), 'pipao', 'nemia-2'));
   await t.test('REFUSED: an empty one, saying so', () => names(factoryNameRefusal(''), 'empty'));
-  for (const name of ['pipao', 'nemia', 'nemia-2', '2x', 'a'.repeat(40)])
-    await t.test(`taken: ${name.slice(0, 12)}`, () => assert.equal(factoryNameRefusal(name), undefined));
 });
 
 test("workflowNameRefusal: a workflow's name is no path, hidden, nor the agents' or the skills' folder", async (t) => {

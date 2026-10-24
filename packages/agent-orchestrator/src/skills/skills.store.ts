@@ -112,7 +112,8 @@ export type SkillCopied = { dir: string; name: string; written: string[] };
 /**
  * The skill `name` of the folder of skills `from` copied whole into the folder of skills `to`, under the same name: what the board's skill
  * picker does with a builtin skill, so an agent of yours can give it — an agent of the store finds skills in the store and the
- * repository it runs on, never in the checkout Nemia's builtin skills come from. A write of its own, done before and apart from any save of an agent.
+ * repository it runs on, never in the checkout Nemia's builtin skills come from. A write of its own, done before and apart from any
+ * save of an agent.
  *
  * Judged whole before a byte is written, each refusal by name: `to` is a `skills/` beside the workflows the board lists — the store's, or a
  * repository's — unless `{ anywhere: true }`; the name is a skill's (`skillNameRefusal`); `from` has that skill, a folder holding a

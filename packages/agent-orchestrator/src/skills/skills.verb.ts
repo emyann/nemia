@@ -1,8 +1,8 @@
 /**
  * The skill library as entries of the command table: the skill folders the board lists, each read (`SKILLS_LIST`, `skillRead`), and one
  * skill read for its page (`SKILLS_READ`), on the api alone; and a skill of yours written from its SKILL.md or form, or copied from Nemia's
- * builtin skills (`SKILLS_WRITE`, `writeSkill`, `copySkill`), served on both sides. The api resolves which folders a read names, guards each
- * write, and words the board's answer around what each entry answers.
+ * builtin skills (`SKILLS_WRITE`, `writeSkill`, `copySkill`), served on both sides. The api resolves which folders a read names, guards
+ * each write, and words the board's answer around what each entry answers.
  */
 import { tried } from '../runtime-client.ts';
 import path from 'node:path';

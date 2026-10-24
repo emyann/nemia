@@ -64,8 +64,8 @@ export const CHECK_DEADLINE_SECONDS = 3300;
  * to five minutes, is 2700.
  *
  * The e2e grows by a page at a time, so the number is measured again the same way whenever a passing landing check takes more than half
- * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one command family of this repository's team lands, and a round's check is
- * measured on its own.
+ * of it. A constant beside `CHECK_DEADLINE_SECONDS` rather than a step key: one command family of this repository's team lands, and a
+ * round's check is measured on its own.
  */
 export const LANDING_CHECK_DEADLINE_SECONDS = 2700;
 

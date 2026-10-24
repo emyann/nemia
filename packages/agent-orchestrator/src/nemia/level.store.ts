@@ -1,8 +1,8 @@
 /**
  * Nemia's folder in the store, `$WF_ROOT/nemia/`: the person's level (`level.json`, written by `nemia level` alone), her memory
  * (`memory/`, written by her session alone, read here), the instruction her session is filed with (`prompt.md`, composed by the keeper),
- * the custom words she was last filed or told with (`told.json`, the keeper's record), and what is built in with her in the package's `nemia/`
- * folder: her definition (`nemia.md`) and her skills.
+ * the custom words she was last filed or told with (`told.json`, the keeper's record), and what is built in with her in the package's
+ * `nemia/` folder: her definition (`nemia.md`) and her skills.
  *
  * Beneath the controllers, beside `subscription.store.ts`: it imports no store of runs.
  */

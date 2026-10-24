@@ -1,8 +1,8 @@
 /**
  * What a person lets an agent answer unasked at `auto`, as rules the machinery holds: a rule (`AutoRule`) names an answer, the steps it
- * covers and the conditions it needs (`CONDITIONS`), judged on a run's facts at the moment of the call (`Facts`, `allowedBy`); the rule
- * that is built in, decide when all agree (`DEFAULT_AUTO`); the list in force (`listInForce`); a rule in the person's words, made from its fields
- * (`ruleWords`); and the refusal of a rule that is none (`ruleRefusal`).
+ * covers and the conditions it needs (`CONDITIONS`), judged on a run's facts at the moment of the call (`Facts`, `allowedBy`); the
+ * builtin rule, decide when all agree (`DEFAULT_AUTO`); the list in force (`listInForce`); a rule in the person's words, made from its
+ * fields (`ruleWords`); and the refusal of a rule that is none (`ruleRefusal`).
  *
  * Pure, and naming no agent: admission reads a list for whichever agent it is given (`admissionOf`). The files are `auto.store.ts`'s, the
  * facts `facts.ts`'s, the commands `auto.verb.ts`'s.

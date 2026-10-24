@@ -22,7 +22,17 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Workflow } from '../step/step.ts';
 import type { CheckVerdict } from '../check/check.ts';
-import { runCodes, type RunPhase, type RunReason, type StepPhase, type StepReason } from '../phase/phase.ts';
+import {
+  runCodes,
+  type AnswerVia,
+  type CodedRun,
+  type CodedStep,
+  type RunPhase,
+  type RunReason,
+  type StepPhase,
+  type StepReason,
+  type WaitOn,
+} from '../phase/phase.ts';
 import { bare, judgedSteps, type Views } from './reads.verb.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
@@ -214,16 +224,43 @@ export const wordOf =
     wordOfView(views.get(taskId));
 
 /**
- * Where a step stands as codes, as the listing judged it (`Listing`'s `phase`, `reason` and `verdict`): its check's verdict null where it
- * was not judged by one.
+ * Where a step stands as codes, as the listing judged it (`Listing`'s `phase`, `reason`, `on`, `via` and `verdict`): `on` null but on a
+ * `Waiting` step, `via` null but on an `AwaitingAnswer` one, and its check's verdict null where it was not judged by one.
  */
-export type StepCodes = { phase: StepPhase; reason: StepReason; verdict: CheckVerdict | null };
+export type StepCodes = {
+  phase: StepPhase;
+  reason: StepReason;
+  on: WaitOn | null;
+  via: AnswerVia | null;
+  verdict: CheckVerdict | null;
+};
+
+/** A row's codes as a door carries them (`StepCodes`): what qualifies its reason null where nothing does. */
+const doorCodes = (s: CodedStep & { verdict?: CheckVerdict }): StepCodes => ({
+  phase: s.phase,
+  reason: s.reason,
+  on: s.on ?? null,
+  via: s.via ?? null,
+  verdict: s.verdict ?? null,
+});
+
+/** A run's codes as a door carries them: what qualifies its reason null where nothing does. */
+const runDoor = (c: CodedRun): { phase: RunPhase; reason: RunReason; on: WaitOn | null; via: AnswerVia | null } => ({
+  phase: c.phase,
+  reason: c.reason,
+  on: c.on ?? null,
+  via: c.via ?? null,
+});
 
 /** A run's word and codes as a door says them (`RunSummary`): `assess`'s status, and its phase and reason (`runCodes`). */
-export const runSaid = (judged: Pick<Judged, 'status' | 'phase' | 'reason'>): Pick<Judged, 'status' | 'phase' | 'reason'> => ({
+export const runSaid = (
+  judged: Pick<Judged, 'status' | 'phase' | 'reason' | 'on' | 'via'>,
+): Pick<Judged, 'status' | 'phase' | 'reason' | 'on' | 'via'> => ({
   status: judged.status,
   phase: judged.phase,
   reason: judged.reason,
+  on: judged.on,
+  via: judged.via,
 });
 
 /**
@@ -231,9 +268,9 @@ export const runSaid = (judged: Pick<Judged, 'status' | 'phase' | 'reason'>): Pi
  * the name `message` had, kept for one card.
  */
 export const stepSaid = (judged: Pick<Judged, 'codes' | 'words'>, name: string): StepCodes & { message: string; status: string } => {
-  const { phase, reason, verdict } = judged.codes.get(name)!;
+  const { phase, reason, on, via, verdict } = judged.codes.get(name)!;
   const word = judged.words.get(name)!;
-  return { phase, reason, message: word, verdict, status: word };
+  return { phase, reason, on, via, message: word, verdict, status: word };
 };
 
 /**
@@ -259,9 +296,14 @@ type Judged = {
   toDecide: RunToDecide | null;
   /** The run in one word, as `assess` judged it: `failed` where a step broke, `awaiting approval` or `blocked` where a person stops it. */
   status: RunStatus;
-  /** Where the run is in its life, and why, as codes (`runCodes`): `Held` for a running run a person holds (`holding`). */
+  /**
+   * Where the run is in its life, and why, as codes (`runCodes`): `Waiting` on `run` for a running run a person holds (`holding`), and
+   * for a run a person's word stops, the reason and `via` of its first step that waits on them.
+   */
   phase: RunPhase;
   reason: RunReason;
+  on: WaitOn | null;
+  via: AnswerVia | null;
   /**
    * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file — a
    * check, a try, a round due once a loop's looping step settled, or roots `assess` makes ready. Roots of a run waiting on runs are filed
@@ -428,7 +470,7 @@ export const judge = Effect.fn('judge')(function* (
   const waitingOnYou = names.filter((name) => read.waitingOnYou.includes(name));
   return {
     words: new Map(read.steps.map((s) => [s.name, s.status])),
-    codes: new Map(read.steps.map((s) => [s.name, { phase: s.phase, reason: s.reason, verdict: s.verdict ?? null }])),
+    codes: new Map(read.steps.map((s) => [s.name, doorCodes(s)])),
     notes: new Map(read.steps.map((s) => [s.name, s.note ?? null])),
     roundDue: new Set(read.steps.filter((s) => s.roundDue).map((s) => s.name)),
     beside: new Map(read.steps.map(({ name, waits, denied }) => [name, { waits, denied }])),
@@ -436,7 +478,7 @@ export const judge = Effect.fn('judge')(function* (
     onYou: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),
     status,
-    ...runCodes(status, holding !== null),
+    ...runDoor(runCodes(status, holding !== null, read.steps)),
     moving:
       inFlight(run, read.phaseOf).length > 0 ||
       (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),

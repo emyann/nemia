@@ -17,7 +17,16 @@ import type { BranchReader } from '../branches/branches.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { type RestingMemo, restingRead } from '../rest/resting.verb.ts';
 import { type RunGraph, runGraph } from './graph.ts';
-import { ENGINE_REASON, PHASE_OF, type RunPhase, type RunReason, type StepPhase, type StepReason } from '../feed/index.ts';
+import {
+  codedStep,
+  ENGINE_REASON,
+  type AnswerVia,
+  type RunPhase,
+  type RunReason,
+  type StepPhase,
+  type StepReason,
+  type WaitOn,
+} from '../feed/index.ts';
 import type { CheckVerdict } from '../check/check.ts';
 import {
   filedTimes,
@@ -102,8 +111,15 @@ export type RunSummary = {
   /** Where the run is in its life (`RunPhase`), from its reason (`runCodes`): the code a screen groups it by, never parsed from `status`.
    */
   phase: RunPhase;
-  /** Why it is in that phase: the feed's code for its status, `Held` for a running run a person holds (`runCodes`). */
+  /**
+   * Why it is in that phase: the feed's code for its status, `Waiting` on `run` for a running run a person holds, and the reason of its
+   * first step that waits on a person for a run a person's word stops (`runCodes`).
+   */
   reason: RunReason;
+  /** What a `Waiting` run waits on (`run`, a person's hold until other runs land); null for any other reason. */
+  on: WaitOn | null;
+  /** Where an `AwaitingAnswer` run's answer is asked, the step's it stopped on; null for any other reason, or where none is known. */
+  via: AnswerVia | null;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
    * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
@@ -151,6 +167,10 @@ export type RunSummary = {
       branch: string | null;
       phase: StepPhase;
       reason: StepReason;
+      /** What a `Waiting` step waits on (`WaitOn`); null for any other reason. */
+      on: WaitOn | null;
+      /** Where an `AwaitingAnswer` step's answer is asked (`AnswerVia`); null for any other reason. */
+      via: AnswerVia | null;
       message: string;
       verdict: CheckVerdict | null;
       /** @deprecated `message` under its old name, kept for one card: read `message`. */
@@ -257,9 +277,15 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
  * A step's codes on a run left unjudged, off its word (`unjudgedWord`): `failed` with `Unknown` for the step a task of which does not read
  * (`unreadable`), which nothing judges; any other the engine's word for its task (`ENGINE_REASON`), `pending` for none filed.
  */
-function unjudgedCodes(word: UnjudgedWord): { phase: StepPhase; reason: StepReason } {
-  if (word === UNREADABLE) return { phase: 'failed', reason: 'Unknown' };
-  return { phase: PHASE_OF[ENGINE_REASON[word]], reason: ENGINE_REASON[word] };
+function unjudgedCodes(word: UnjudgedWord): {
+  phase: StepPhase;
+  reason: StepReason;
+  on: WaitOn | null;
+  via: AnswerVia | null;
+} {
+  if (word === UNREADABLE) return { phase: 'failed', reason: 'Unknown', on: null, via: null };
+  const { phase, reason, on, via } = codedStep(ENGINE_REASON[word]);
+  return { phase, reason, on: on ?? null, via: via ?? null };
 }
 
 /**
@@ -293,6 +319,8 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     status: 'running',
     phase: 'running',
     reason: 'Running',
+    on: null,
+    via: null,
     moving: true,
     cost: null,
     atWork: null,

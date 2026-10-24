@@ -32,9 +32,9 @@ type Selecting = { readonly reasons?: readonly Reason[]; readonly waits?: true }
  */
 export const FORMER_WAKE: Readonly<Record<string, Selecting>> = {
   'awaiting approval': { reasons: ['AwaitingApproval'] },
-  'rounds exhausted': { reasons: ['RoundsExhausted'] },
-  'needs-human': { reasons: ['NeedsHuman'] },
-  blocked: { reasons: ['Blocked'] },
+  'rounds exhausted': { reasons: ['AwaitingRound'] },
+  'needs-human': { reasons: ['AwaitingAnswer'] },
+  blocked: { reasons: ['AwaitingAnswer'] },
   failed: { reasons: ['Failed', 'CheckFailed'] },
   'waiting on you:': { waits: true },
   'needs:': { waits: true },

@@ -47,10 +47,14 @@ export type {
   LineType,
   StoreLine,
 } from './feed.ts';
-export { DENIED, isOnce, kindsOf, messageOf, reasonOf, REASONS, REASON_CODES, sourceOf, typeOf, waitsOf } from './reason.ts';
-export type { Said } from './reason.ts';
+export { codesOf, DENIED, isOnce, kindsOf, messageOf, reasonOf, REASONS, REASON_CODES, sourceOf, typeOf, waitsOf } from './reason.ts';
+export type { Codes, Said } from './reason.ts';
+export { currentOf, formerHints, formerOf, FORMER_REASONS, isFormerReason } from './former-reason.ts';
 export {
+  ANSWER_VIA,
+  codedStep,
   ENGINE_REASON,
+  PERSON_WAITS,
   PHASE_OF,
   REASON_OF,
   RUN_PHASE_OF,
@@ -60,5 +64,17 @@ export {
   runCodes,
   STEP_PHASES,
   STEP_REASONS,
+  WAIT_ON,
 } from '../phase/phase.ts';
-export type { RunPhase, RunReason, StepPhase, StepReason } from '../phase/phase.ts';
+export type {
+  AnswerVia,
+  CodedRun,
+  CodedStep,
+  QualifiedRun,
+  QualifiedStep,
+  RunPhase,
+  RunReason,
+  StepPhase,
+  StepReason,
+  WaitOn,
+} from '../phase/phase.ts';

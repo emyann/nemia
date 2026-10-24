@@ -19,7 +19,7 @@ import {
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { ENGINE_REASON, PHASE_OF, REASON_OF, type StepPhase, type StepReason } from '../phase/phase.ts';
+import { codedStep, ENGINE_REASON, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
 import { answerOf, dueNote, modeWord, retriesDue, tryNote, HOLDS_THE_RUN, type RetryAsk } from '../retry/index.ts';
 import {
   acceptanceOf,
@@ -61,24 +61,25 @@ export type Listing = {
    * (`roundsDue`) and which no retry takes first: what its note words as `roundDueNote`. `asks`, only on a step waiting on a person whose
    * closeout asks questions: how many (`askedQuestions`), which `nemia ls` counts in the note and `nemia decide` prints whole.
    *
-   * `reason` and `phase` are where the step stands as codes (`StepReason`, `StepPhase`), set here from the facts the row's word is built
-   * from and never read back off it: what every door carries and compares, the word (`status`) being the message a person reads.
+   * `reason` and `phase` are where the step stands as codes (`StepReason`, `StepPhase`), with `on`, what a `Waiting` step waits on, and
+   * `via`, where an `AwaitingAnswer` step's answer is asked (`CodedStep`), set here from the facts the row's word is built from and never
+   * read back off it: what every door carries and compares, the word (`status`) being the message a person reads.
    * `verdict`, only on a step judged by its check: that check's, as codes (`CheckVerdict`).
    */
-  steps: Array<{
-    name: string;
-    status: string;
-    reason: StepReason;
-    phase: StepPhase;
-    verdict?: CheckVerdict;
-    branch: string | null;
-    note?: string;
-    cost?: string;
-    waits?: string;
-    denied?: string;
-    roundDue?: true;
-    asks?: number;
-  }>;
+  steps: Array<
+    CodedStep & {
+      name: string;
+      status: string;
+      verdict?: CheckVerdict;
+      branch: string | null;
+      note?: string;
+      cost?: string;
+      waits?: string;
+      denied?: string;
+      roundDue?: true;
+      asks?: number;
+    }
+  >;
   /**
    * Steps a person has to act on — blocked, unsigned, refused by their check, or awaiting approval, with no try due — on a run nobody has
    * called off, pruned or held.
@@ -351,10 +352,10 @@ export function listing({
     const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && heldByCheckout(steps, name, checkout) && !waitingAgain.has(name))
-        return { name, status: checkoutWord(checkout), ...coded('WaitingForCheckout'), branch };
+        return { name, status: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'checkout' }), branch };
       return { name, ...unfiled(step, waiting, held), branch };
     }
-    if (waitingAgain.has(name)) return { name, status: 'waiting', ...coded('Waiting'), branch };
+    if (waitingAgain.has(name)) return { name, status: 'waiting', ...coded({ reason: 'Pending' }), branch };
 
     const status = refiled.has(name) ? own : stands;
     if (HOLDS_THE_RUN[status] && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
@@ -366,11 +367,11 @@ export function listing({
     }
     if (status === 'awaiting approval') {
       atGates.add(name);
-      return { name, status: 'awaiting approval', ...coded('AwaitingApproval'), branch };
+      return { name, status: 'awaiting approval', ...coded({ reason: 'AwaitingApproval' }), branch };
     }
     if (status === 'exhausted') {
       exhausted.add(name);
-      return { name, status: 'rounds exhausted', ...coded('RoundsExhausted'), branch };
+      return { name, status: 'rounds exhausted', ...coded({ reason: 'AwaitingRound' }), branch };
     }
     const judged = judgedRow(status, () => verdictOf(name), assessed.paused?.checks.includes(name) === true);
     if (judged) return { name, ...judged, branch };
@@ -409,39 +410,37 @@ export function listing({
 }
 
 /**
- * A step not filed: waiting on the steps before it, on the runs it `waits` on (`waitWord`), on a run slot the cap `held` it for
- * (`slotWord`), or on nothing yet.
+ * A step not filed: waiting on the steps before it (`Pending`), on the runs it `waits` on (`waitWord`; `Waiting` on `run`), on a run slot
+ * the limit `held` it for (`slotWord`; `Waiting` on `limit`), or on nothing yet (`Pending`).
  */
-function unfiled(
-  step: Workflow,
-  waits: readonly Wait[],
-  held: RunSlot | undefined,
-): { status: string; reason: StepReason; phase: StepPhase } {
-  if (step.after.length) return { status: 'waiting', ...coded('Waiting') };
-  if (waits.length) return { status: waitWord(waits), ...coded('Waiting') };
-  return held ? { status: slotWord(held), ...coded('WaitingForSlot') } : { status: 'waiting', ...coded('Waiting') };
+function unfiled(step: Workflow, waits: readonly Wait[], held: RunSlot | undefined): CodedStep & { status: string } {
+  if (step.after.length) return { status: 'waiting', ...coded({ reason: 'Pending' }) };
+  if (waits.length) return { status: waitWord(waits), ...coded({ reason: 'Waiting', on: 'run' }) };
+  return held
+    ? { status: slotWord(held), ...coded({ reason: 'Waiting', on: 'limit' }) }
+    : { status: 'waiting', ...coded({ reason: 'Pending' }) };
 }
 
-/** A row's codes: its reason, and the phase that reason stands in (`PHASE_OF`). */
-const coded = (reason: StepReason): { reason: StepReason; phase: StepPhase } => ({ reason, phase: PHASE_OF[reason] });
+/** A row's codes: its reason and what qualifies it, and the phase that reason stands in (`codedStep`). */
+const coded = codedStep;
 
 /**
- * The reason of a step's word where nothing narrower is known of it: `Blocked` where its closeout `c` signed off blocked, whatever the
- * word; else the engine's word for its task (`ENGINE_REASON`), or the status it is shown by where it has no task or no word of the
+ * The reason of a step's word where nothing narrower is known of it: `AwaitingAnswer` by the closeout where its closeout `c` signed off
+ * blocked, whatever the word; else the engine's word for its task (`ENGINE_REASON`), or the status it is shown by where it has no task or no word of the
  * engine's counts (`REASON_OF`) — and, for a word that names no reason of its own (`unverified`, and the engine's `input-required`,
  * `idle` and `restarting`), what its closeout says: done, or unreadable. `unknown`, a task the engine has no record of, stays `Unknown`
  * whatever its closeout, as the feed has always read it.
  */
-function saidReason(word: StepStatus | ListedPhase, c: Closeout | { error: string } | undefined): StepReason {
-  if (c && !('error' in c) && c.outcome === 'blocked') return 'Blocked';
+function saidReason(word: StepStatus | ListedPhase, c: Closeout | { error: string } | undefined): QualifiedStep {
+  if (c && !('error' in c) && c.outcome === 'blocked') return { reason: 'AwaitingAnswer', via: 'closeout' };
   const known =
     word === 'unverified'
       ? undefined
       : Object.hasOwn(ENGINE_REASON, word)
         ? ENGINE_REASON[word as ListedPhase]
         : REASON_OF[word as StepStatus];
-  if (known !== undefined && (known !== 'Unknown' || word === 'unknown')) return known;
-  return !c ? 'Unknown' : 'error' in c ? 'UnreadableCloseout' : 'Succeeded';
+  if (known !== undefined && (known.reason !== 'Unknown' || word === 'unknown')) return known;
+  return { reason: !c ? 'Unknown' : 'error' in c ? 'UnreadableCloseout' : 'Succeeded' };
 }
 
 /** What a check's verdict is as codes while it runs, and while the pause keeps it from being filed: running, with no exit yet. */
@@ -456,17 +455,21 @@ function judgedRow(
   status: StepStatus,
   verdictOf: () => Verdict | undefined,
   held: boolean,
-): { status: string; reason: StepReason; phase: StepPhase; verdict?: CheckVerdict; note?: string } | undefined {
-  if (status === 'verified') return { status: 'verified ✓', ...coded('CheckPassed'), verdict: { result: 'passed', exit: 0 } };
+): (CodedStep & { status: string; verdict?: CheckVerdict; note?: string }) | undefined {
+  if (status === 'verified') return { status: 'verified ✓', ...coded({ reason: 'CheckPassed' }), verdict: { result: 'passed', exit: 0 } };
   if (status === 'checking')
     return held
-      ? { status: PAUSE_WAIT, ...coded('WaitingForPause'), verdict: CHECK_RUNNING, note: PAUSE_WAIT_NOTE }
-      : { status: 'checking', ...coded('Checking'), verdict: CHECK_RUNNING };
+      ? { status: PAUSE_WAIT, ...coded({ reason: 'Waiting', on: 'pause' }), verdict: CHECK_RUNNING, note: PAUSE_WAIT_NOTE }
+      : { status: 'checking', ...coded({ reason: 'Checking' }), verdict: CHECK_RUNNING };
   if (status === 'failed (check)') {
     const verdict = verdictOf() ?? 'unfinished';
-    return { status: `failed ✗ check (${verdictWord(verdict)})`, ...coded('CheckFailed'), verdict: checkVerdictOf('failed', verdict) };
+    return {
+      status: `failed ✗ check (${verdictWord(verdict)})`,
+      ...coded({ reason: 'CheckFailed' }),
+      verdict: checkVerdictOf('failed', verdict),
+    };
   }
-  if (status === 'denied') return { status: 'denied', ...coded('CheckDenied') };
+  if (status === 'denied') return { status: 'denied', ...coded({ reason: 'Denied' }) };
   return undefined;
 }
 

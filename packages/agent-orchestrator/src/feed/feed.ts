@@ -32,12 +32,14 @@ import type { Assessment } from '../tick/assess.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { holdWord } from '../wait/wait.ts';
 import { SLOT_WAIT } from '../cap/cap.ts';
-import { runCodes } from '../phase/phase.ts';
+import { runCodes, type AnswerVia, type WaitOn } from '../phase/phase.ts';
+import { currentOf } from './former-reason.ts';
 import { takeoverLine, type DaemonStanding } from '../daemon/daemon.ts';
 import {
   DAEMON_STARTED,
   DENIED,
   isOnce,
+  codesOf,
   messageOf,
   reasonOf,
   REMOVED,
@@ -68,7 +70,8 @@ export type FeedLabels = { run?: string; factory?: string; workflow?: string; st
 
 /**
  * What a v1 line says besides the four fields it keeps for one release: its version, what it is about (`involved`), its labels, the
- * `reason` a machine selects on, how serious it is (`type`), whether it waits on a person (`waits`), who wrote it (`source`) and the
+ * `reason` a machine selects on and what qualifies it (`on`, what a `Waiting` line waits on; `via`, where an `AwaitingAnswer` line's
+ * answer is asked), how serious it is (`type`), whether it waits on a person (`waits`), who wrote it (`source`) and the
  * `message` a person reads. And, on a `ToolDenied` one-shot alone, the `call` the harness denied, as `denialText` spells it, and `try`,
  * the step's try it belongs to, from 1 — the two fields a selector matches a denial by, and the two the tick counts the denials already
  * written by.
@@ -81,6 +84,8 @@ type Line = {
   involved?: Involved;
   labels?: FeedLabels;
   reason?: Reason;
+  on?: WaitOn;
+  via?: AnswerVia;
   type?: LineType;
   waits?: 'person';
   source?: LineSource;
@@ -149,31 +154,54 @@ const labelsOf = (line: FeedLine): FeedLabels =>
  * the table (`sourceOf`), unless the offer named one of its own: a hold the tick lifted is the tick's deed under a reason a person's verb
  * usually writes, and nothing but the pass that lifted it can know that.
  *
- * A line that carries an `apiVersion` is trusted as written, whatever version it names. A `nemia` newer than this one may name a reason
- * this table does not have, or mark as waiting a reason this one does not: re-deriving either would answer for its writer, and a line is
- * a report of what its writer judged. Only a line with no version at all — one written before the feed was signed — is read off its word
- * and its note, and even then the fold reaches what it needs through `involvedOf` and the table where a key is still missing.
+ * A line that carries an `apiVersion` is trusted as written, whatever version it names, but for its reason: a code the feed no longer
+ * names (`FORMER_REASONS`) reads as its current one, with its `on` or `via`, and a step's `Waiting` with no `on` as `Pending`
+ * (`currentOf`), its `waits` and its type kept as written. A `nemia` newer than this one may name a reason this table does not have, or
+ * mark as waiting a reason this one does not: re-deriving either would answer for its writer, and a line is a report of what its writer
+ * judged. Only a line with no version at all — one written before the feed was signed — is read off its word, and even then the fold
+ * reaches what it needs through `involvedOf` and the table where a key is still missing. Its note is never read for a code.
  *
  * A line built with its `reason` keeps it: a run's and a step's word carry the code the listing judged them by (`feedWords`), and only
  * a line that carries none — a v0 line, a one-shot offered by its word — is classified off its word (`reasonOf`). The reason is placed
  * where a classified one would be, so a line written says its fields in one order whichever way its reason came.
  */
 export function upgraded(line: FeedLine): FeedLine {
-  if (line.apiVersion !== undefined) return line;
-  const { reason: given, ...said } = line;
+  if (line.apiVersion !== undefined) return current(line);
+  const { reason: given, on: givenOn, via: givenVia, ...said } = line;
   const involved = involvedOf(line);
-  const reason = given ?? reasonOf(line, involved.kind);
+  const { reason, on, via } =
+    given === undefined ? codesOf(line, involved.kind) : currentOf({ reason: given, on: givenOn, via: givenVia }, involved.kind);
   return {
     ...said,
     apiVersion: FEED_VERSION,
     involved,
     labels: labelsOf(line),
     reason,
+    ...(on ? { on } : {}),
+    ...(via ? { via } : {}),
     type: typeOf(reason),
-    ...(waitsOf(reason, line.note) ? { waits: 'person' as const } : {}),
+    ...(waitsOf(reason) ? { waits: 'person' as const } : {}),
     source: line.source ?? sourceOf(reason),
     message: messageOf(line),
   };
+}
+
+/**
+ * A signed line with its reason current (`currentOf`): the line as it is where its code is, else the same line under the current code
+ * and its qualifier, in the place the reason was. Its other fields — `waits`, `type`, `message` — are its writer's, kept. Pure.
+ */
+function current(line: FeedLine): FeedLine {
+  if (line.reason === undefined) return line;
+  const kind = involvedOf(line).kind;
+  const now = currentOf({ reason: line.reason, on: line.on, via: line.via }, kind);
+  if (now.reason === line.reason && now.on === line.on && now.via === line.via) return line;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(line)) {
+    if (key === 'on' || key === 'via') continue;
+    if (key !== 'reason') out[key] = value;
+    else Object.assign(out, { reason: now.reason }, now.on ? { on: now.on } : {}, now.via ? { via: now.via } : {});
+  }
+  return out as FeedLine;
 }
 
 /**
@@ -510,6 +538,8 @@ export function feedChanges(
       involved: step === undefined ? { kind: 'Run', name: run } : { kind: 'Step', name: `${run}/${step}` },
       labels,
       ...(said.reason !== undefined ? { reason: said.reason } : {}),
+      ...(said.on !== undefined ? { on: said.on } : {}),
+      ...(said.via !== undefined ? { via: said.via } : {}),
     }) as RunLine;
   const out: Array<RunLine | StoreLine> = [];
   for (const [id, words] of now) {
@@ -572,10 +602,10 @@ export function publishedOf({ lines, before, after, leading }: FeedAppended): Fe
 
 /**
  * A word the feed keeps, and the note beside it, when there is one: what one line of it says of a run or of a step. And, where the pass
- * judged it (`feedWords`), the `reason` its line names: the code the listing set beside the word (`Listing`'s `reason`, `runCodes`), never
+ * judged it (`feedWords`), the `reason` its line names, with its `on` or `via`: the code the listing set beside the word (`Listing`'s `reason`, `runCodes`), never
  * read back off it. A word folded off the feed carries none: two words are the same by their word and note (`same`).
  */
-export type FeedSaid = { word: string; note?: string; reason?: Reason };
+export type FeedSaid = { word: string; note?: string; reason?: Reason; on?: WaitOn; via?: AnswerVia };
 
 /**
  * What a pass judged of one run, in the words the feed keeps (`feedWords`): the run's, and each step's in the order they run; and
@@ -703,21 +733,28 @@ export function feedWords(
         : onYou.length
           ? { note: `waiting on you: ${onYou.join(', ')}` }
           : {}),
-      reason: runCodes(status, held).reason,
+      ...said(runCodes(status, held, l.steps)),
     },
     steps: l.steps.map((s) => {
       const note = [needsNote(closeoutOf(s.name)), s.note].filter(Boolean).join(' · ');
       const labels = labelled.step?.(s.name);
       return {
         name: s.name,
-        word: s.reason === 'WaitingForSlot' ? SLOT_WAIT : shownStatus(s),
+        word: s.on === 'limit' ? SLOT_WAIT : shownStatus(s),
         ...(note ? { note } : {}),
-        reason: s.reason,
+        ...said(s),
         ...(labels ? { labels } : {}),
       };
     }),
   };
 }
+
+/** What a line says of its codes: its reason, and its `on` or `via` where it has one. */
+const said = ({ reason, on, via }: { reason: Reason; on?: WaitOn; via?: AnswerVia }): Pick<FeedSaid, 'reason' | 'on' | 'via'> => ({
+  reason,
+  ...(on ? { on } : {}),
+  ...(via ? { via } : {}),
+});
 
 /**
  * The longest `needs` the feed carries. A feed line is one line of `nemia watch`, and a step's `needs` is the agent's, of any length: past

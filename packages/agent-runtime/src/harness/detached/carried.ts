@@ -27,9 +27,13 @@ const CARRIED_TOKENS = ['uncachedTokens', 'cacheWriteTokens', 'cacheReadTokens',
  */
 const tokensLess = (mine: Usage, carried: Carried, own: Usage): Usage => {
   const { inputTokens: _, uncachedTokens: _u, cacheWriteTokens: _w, cacheReadTokens: _r, outputTokens: _o, ...others } = mine;
-  const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = CARRIED_TOKENS.map(
-    (k) => (mine[k] ?? NaN) - (carried[k] ?? NaN),
-  );
+  const less = (k: (typeof CARRIED_TOKENS)[number]) => (mine[k] ?? NaN) - (carried[k] ?? NaN);
+  const [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens] = [
+    less('uncachedTokens'),
+    less('cacheWriteTokens'),
+    less('cacheReadTokens'),
+    less('outputTokens'),
+  ];
   const inputTokens = uncachedTokens + cacheWriteTokens + cacheReadTokens;
   return [uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens].every((n) => n >= 0) && inputTokens > 0
     ? { ...others, inputTokens, uncachedTokens, cacheWriteTokens, cacheReadTokens, outputTokens }

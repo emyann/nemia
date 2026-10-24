@@ -272,9 +272,9 @@ export const nameFor = (taskId: string, attempt: number) => `ae/${taskId}/${atte
 
 /** The runtime's task and the attempt a session name carries, or `undefined` for a name that is not `ae/<task>/<n>`. */
 export const nameParts = (name: string): { taskId: string; n: number } | undefined => {
-  const m = /^ae\/(.+)\/([1-9][0-9]*)$/.exec(name);
-  if (!m) return undefined;
-  const parts = { taskId: m[1], n: Number(m[2]) };
+  const [, taskId, n] = /^ae\/(.+)\/([1-9][0-9]*)$/.exec(name) ?? [];
+  if (taskId === undefined || n === undefined) return undefined;
+  const parts = { taskId, n: Number(n) };
   return nameFor(parts.taskId, parts.n) === name ? parts : undefined;
 };
 
@@ -967,8 +967,9 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   const sighting = last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
   const turn = turnOf(state);
 
-  const ranFor = turn.attempts.length > 0 ? elapsedMs(startedWhen(turn.attempts[0]), instantOf(now)) : 0;
-  const overdue = state.deadlineSeconds !== undefined && turn.attempts.length > 0 && ranFor > state.deadlineSeconds * 1000;
+  const first = turn.attempts[0];
+  const ranFor = first === undefined ? 0 : elapsedMs(startedWhen(first), instantOf(now));
+  const overdue = state.deadlineSeconds !== undefined && first !== undefined && ranFor > state.deadlineSeconds * 1000;
 
   if (last && last.ended === null) return flightEvent(state, last, sighting, now, overdue);
 
@@ -977,7 +978,7 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   if (waitsForInput(state)) return { type: 'AWAITING_INPUT' };
   if (overdue && last?.reason === 'deadline') return { type: 'DEADLINE_SPENT', seconds: Math.round(ranFor / 1000) };
   const ended = turn.attempts.at(-1);
-  if (ended && restarts(state, ended)) return restartOf(state, sighting, now);
+  if (ended && restarts(state, ended)) return restartOf(state, ended, sighting, now);
   if (ended) return attemptEnded(ended, turn.attempts.length, turn.n);
   if (turn.n > 0 && !turn.continues) return { type: 'NO_SESSION_TO_CONTINUE', turn: turn.n };
   if (awaitsAdmission(state)) return { type: 'QUEUED' };
@@ -1077,14 +1078,13 @@ export function needsHuman(state: State, observed: ReadonlyMap<string, Sighting>
 }
 
 /**
- * The restart of a long-lived task whose last attempt ended with no stop asked, and not refused at its spawn (that settles),
+ * The restart of a long-lived task whose last attempt, `last`, ended with no stop asked, and not refused at its spawn (that settles),
  * `observe`'s fifth rule with nothing in flight:
  * `UNREAD` while its harness could not read the old name, `PREVIOUS_LIVE` while it still holds the old session, `BACKING_OFF`
  * within `backoffOf` the end, then `RESTART_DUE` — continuing the latest session an attempt recorded, told `RESTART_WORDS`;
  * with none recorded, what the turn continues, told the brief.
  */
-function restartOf(state: State, sighting: Sighting | undefined, now: Now): LifecycleEvent {
-  const last = state.attempts[state.attempts.length - 1];
+function restartOf(state: State, last: Attempt, sighting: Sighting | undefined, now: Now): LifecycleEvent {
   if (now.unread?.has(nameFor(state.taskId, last.n))) return { type: 'UNREAD', attempt: last.n, overdue: false };
   if (sighting && (sighting.held === true || isLive(sighting.state))) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
   const backoffMs = backoffOf(state.attempts);
@@ -1110,8 +1110,8 @@ const instantOf = (now: Now): Instant => ({ at: now.at.getTime(), mono: now.mono
 export function backoffOf(attempts: readonly Attempt[]): number {
   const { initialMs, factor, maxMs, resetAfterMs } = RESTART_BACKOFF;
   let ends = 0;
-  for (let i = attempts.length - 1; i >= 0 && attempts[i].ended !== null; i--) {
-    if (elapsedMs(startedWhen(attempts[i]), endedWhen(attempts[i])) >= resetAfterMs) break;
+  for (const a of [...attempts].reverse()) {
+    if (a.ended === null || elapsedMs(startedWhen(a), endedWhen(a)) >= resetAfterMs) break;
     ends++;
   }
   return Math.min(initialMs * factor ** Math.max(0, ends - 1), maxMs);

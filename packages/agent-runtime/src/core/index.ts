@@ -9,6 +9,8 @@ export { SESSION_STATES, atWorkState, formerStateOf, isLive, isSessionState, pha
 export type { Ended, Outcome, PhaseWord, SessionState } from './session.ts';
 export { lifecycleGraph } from './lifecycle.ts';
 export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleVerb } from './lifecycle.ts';
+export { own } from './own.ts';
+export { firstPiece } from './text.ts';
 export { pathOf } from './path.ts';
 export { firstRefusal } from './event-schema.ts';
 export { firstOf, quote, VALUE_QUOTE, WORDS_QUOTE } from './quote.ts';

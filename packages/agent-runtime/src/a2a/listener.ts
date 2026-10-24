@@ -26,7 +26,7 @@ import http from 'node:http';
 import type { Socket } from 'node:net';
 import { Effect, type Scope } from 'effect';
 import { JsonRpcTransportHandler, ServerCallContext, STATE_HEADERS_KEY } from '@a2a-js/sdk/server';
-import type { Event } from '../core/index.ts';
+import { firstPiece, type Event } from '../core/index.ts';
 import type { RunnerOps } from '../harness/index.ts';
 import { STATE_GONE_KEY } from './follow.ts';
 import { HarnessHandler } from './handler.ts';
@@ -136,12 +136,15 @@ const answerStream = async (
   if (!res.closed) res.end();
 };
 
-/** The harness a request's path names, and whether it asks for that harness's card; `undefined` for a path this port has none for. */
-const routeOf = (url: string | undefined, ports: Map<string, Port>): { harness: string; card: boolean } | undefined => {
-  const at = decodeURIComponent((url ?? '/').split('?')[0]);
-  for (const harness of ports.keys()) {
-    if (at === `/${harness}`) return { harness, card: false };
-    if (at === `/${harness}${CARD_PATH}`) return { harness, card: true };
+/**
+ * The harness a request's path names, with its port, and whether it asks for that harness's card; `undefined` for a path this port
+ * has none for.
+ */
+const routeOf = (url: string | undefined, ports: Map<string, Port>): { harness: string; port: Port; card: boolean } | undefined => {
+  const at = decodeURIComponent(firstPiece(url ?? '/', '?'));
+  for (const [harness, port] of ports) {
+    if (at === `/${harness}`) return { harness, port, card: false };
+    if (at === `/${harness}${CARD_PATH}`) return { harness, port, card: true };
   }
   return undefined;
 };
@@ -152,7 +155,7 @@ const answerOf = async (req: http.IncomingMessage, res: http.ServerResponse, por
   if (!route) {
     return answerPlain(res, 404, `this port serves ${[...ports.keys()].map((h) => `/${h}`).join(', ')} and nothing else.\n`);
   }
-  const port = ports.get(route.harness)!;
+  const { port } = route;
   if (route.card) {
     if (req.method !== 'GET') return answerPlain(res, 405, 'a card is read with GET.\n');
     return answerJson(res, 200, port.card);

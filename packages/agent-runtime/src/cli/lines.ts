@@ -3,6 +3,12 @@
  */
 import { denialText, type Attempt, type Event, type State, type TaskView, type Usage } from '../index.ts';
 
+/** `text` up to its first line break, or the whole of it where there is none. */
+const firstLine = (text: string): string => {
+  const at = text.indexOf('\n');
+  return at === -1 ? text : text.slice(0, at);
+};
+
 /** What `ae show` says of the limits a task was filed with: its spend cap and its context window, each only when it has one. */
 export const limitLines = (state: Pick<State, 'config'>): string[] => [
   ...(state.config?.budgetUsd !== undefined ? [`budget: $${state.config.budgetUsd} an attempt`] : []),
@@ -91,10 +97,11 @@ export const attemptLine = (a: Attempt): string => {
   const when = ranLine(a);
   const denied = a.denials?.length ? `  denied: ${a.denials.map(denialText).join(', ')}` : '';
   if (a.ended === null) return `attempt ${a.n}  running ${when}${denied}`;
-  if (a.reason === 'unstartable') return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error?.split('\n')[0] ?? ''}`.trimEnd();
+  if (a.reason === 'unstartable')
+    return `attempt ${a.n}  ${a.ended} (unstartable)  ${when}  ${a.error === undefined ? '' : firstLine(a.error)}`.trimEnd();
   const how = `${a.ended}${a.reason === 'lost' ? ' (lost)' : a.limit ? ` (${a.limit})` : unstated(a.stated)}`;
   const exit = a.exitCode !== null ? `  exit ${a.exitCode}` : '';
-  const failedCall = a.error ? `  — the spawn call failed: ${a.error.split('\n')[0]}` : '';
+  const failedCall = a.error ? `  — the spawn call failed: ${firstLine(a.error)}` : '';
   return `attempt ${a.n}  ${how}  ${when}${exit}  ${usageLine(a.usage)}${denied}${failedCall}`;
 };
 
@@ -110,7 +117,7 @@ export const taskLine = (v: TaskView) => {
   const u = v.usage ?? v.state.attempts.at(-1)?.usage ?? undefined;
   const queued = v.admission === 'queued' ? '  queued' : '';
   const meter = v.state.attempts.length ? `  ${[costLine(u), ...(u?.turns !== undefined ? [`${u.turns}t`] : [])].join(' · ')}` : '';
-  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${meter}  ${v.state.brief.split('\n')[0].slice(0, 44)}`;
+  return `${v.id}  ${(v.state.harness ?? 'claude').padEnd(9)} ${v.phase.padEnd(18)}${tries ? ` ${tries}` : ''}${queued}${meter}  ${firstLine(v.state.brief).slice(0, 44)}`;
 };
 
 /** The word each kind of journal entry is printed with. */
@@ -137,11 +144,11 @@ const EXTRAS: { [K in Event['kind']]?: (event: Extract<Event, { kind: K }>) => s
   counted: (e) => `  attempt ${e.attempt}: ${runningLine(e.usage)}`,
   denied: (e) => `  attempt ${e.attempt}: ${denialText(e)}`,
   ended: (e) =>
-    `  ${e.observed}${e.limit ? ` (${e.limit})` : e.reason === 'harness' ? unstated(e.stated) : ` (${e.reason})`}${e.error ? `: ${e.error.split('\n')[0].slice(0, 160)}` : ''}`,
-  spawned: (e) => (e.error ? `  but the call failed: ${e.error.split('\n')[0].slice(0, 160)}` : ''),
-  said: (e) => `  to attempt ${e.attempt}: ${e.text.trim().split('\n')[0].slice(0, 160)}`,
+    `  ${e.observed}${e.limit ? ` (${e.limit})` : e.reason === 'harness' ? unstated(e.stated) : ` (${e.reason})`}${e.error ? `: ${firstLine(e.error).slice(0, 160)}` : ''}`,
+  spawned: (e) => (e.error ? `  but the call failed: ${firstLine(e.error).slice(0, 160)}` : ''),
+  said: (e) => `  to attempt ${e.attempt}: ${firstLine(e.text.trim()).slice(0, 160)}`,
   input: (e) =>
-    `  ${e.text.trim().split('\n')[0].slice(0, 160)}${e.config?.budgetUsd !== undefined ? `  (budget $${e.config.budgetUsd})` : ''}`,
+    `  ${firstLine(e.text.trim()).slice(0, 160)}${e.config?.budgetUsd !== undefined ? `  (budget $${e.config.budgetUsd})` : ''}`,
 };
 
 /**

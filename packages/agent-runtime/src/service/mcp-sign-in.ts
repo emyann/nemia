@@ -81,11 +81,13 @@ const signInRefusal = (name: unknown, server: unknown): string | undefined => {
   const refused = mcpStateRefusal({ [name]: server });
   if (refused) return refused;
   const oauth = (server as RemoteMcpServer).oauth;
-  if (oauth === undefined || typeof oauth.clientId !== 'string' || typeof oauth.callbackPort !== 'number') {
-    return `\`${name}\` names no OAuth client with a callback port, and a sign-in is made through one. Give it \`oauth: { "clientId": "…", "callbackPort": 8791 }\`, as its app is registered.`;
-  }
+  if (oauth === undefined || typeof oauth.clientId !== 'string' || typeof oauth.callbackPort !== 'number') return noClient(name);
   return undefined;
 };
+
+/** Why the server `name` cannot be signed in to: it names no OAuth client with a callback port. */
+const noClient = (name: string): string =>
+  `\`${name}\` names no OAuth client with a callback port, and a sign-in is made through one. Give it \`oauth: { "clientId": "…", "callbackPort": 8791 }\`, as its app is registered.`;
 
 /**
  * The callback ports this engine's sign-ins hold: a port is claimed by name before a sign-in's first child is spawned, and held by its
@@ -161,8 +163,8 @@ export const mcpSignInVerbsOf = (
 
   const mcpSignIn = Effect.fnUntraced(function* (name: string, server: RemoteMcpServer, clientSecret?: string) {
     const refused = signInRefusal(name, server) ?? noClaude();
-    if (refused) return yield* refuse(refused);
-    const port = server.oauth!.callbackPort!;
+    const port = server.oauth?.callbackPort;
+    if (refused || port === undefined) return yield* refuse(refused ?? noClient(name));
     const waiting = waitsOn(port);
     if (waiting) {
       return yield* refuse(

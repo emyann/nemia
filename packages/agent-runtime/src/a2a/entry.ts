@@ -67,7 +67,10 @@ export const readEntry = (file: string): Entry | undefined => {
 };
 
 /** Where the registry in `dir` keeps the entry of the session `name`: open, and let go of. */
-const entryFilesOf = (dir: string, name: string): string[] => [entryFileOf(dir, name), entryFileOf(path.join(dir, 'done'), name)];
+const entryFilesOf = (dir: string, name: string): [open: string, done: string] => [
+  entryFileOf(dir, name),
+  entryFileOf(path.join(dir, 'done'), name),
+];
 
 /**
  * The remote harness `harness`'s `forget`, its registry in `dir`: the session's entry, open or let go of, removed or with `dry`

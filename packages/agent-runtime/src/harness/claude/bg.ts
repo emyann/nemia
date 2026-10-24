@@ -16,7 +16,7 @@ import { execFile } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
 import { getSessionMessages } from '@anthropic-ai/claude-agent-sdk';
-import type { Bridge, SessionState, Sighting, Usage } from '../../core/index.ts';
+import { firstPiece, type Bridge, type SessionState, type Sighting, type Usage } from '../../core/index.ts';
 import { claudeInbox, claudeInboxLine, claudeInboxPost, claudeRegistered } from './inbox.ts';
 import { claudeBridge } from './bridge.ts';
 import {
@@ -897,7 +897,7 @@ const sayThrough =
     });
 
 /** A session's short id, as `claude stop` and `claude rm` take it: the uuid's first block. */
-const short = (sessionId: string) => sessionId.split('-')[0];
+const short = (sessionId: string) => firstPiece(sessionId, '-');
 
 /** Whether `err`, what `execFile` failed with, is the OS refusing to create the process for a reason that stays. */
 const refusedSpawn = (err: Error) => (err as NodeJS.ErrnoException).syscall?.startsWith('spawn') === true && refusedOsError(err);

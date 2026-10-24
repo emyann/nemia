@@ -2,8 +2,9 @@
  * The engine's `kept` verb, and what refuses it: what the store and the harnesses keep on the disk for the sessions the engine
  * ran, in bytes, by task. It removes nothing.
  */
+import type { Harnessed } from './harnessed.ts';
 import { Effect, Schema } from 'effect';
-import { nameFor, type State } from '../core/index.ts';
+import { nameFor, own, type State } from '../core/index.ts';
 import { diskBytesOf, journalsKept, type Journal, type JournalError, type JournalKept, type StoreOps } from '../core/engine/index.ts';
 import type { Runner, SessionKept } from '../harness/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
@@ -80,7 +81,8 @@ const taskKept = (task: JournalKept, asked: Asked | string | undefined, seen: Se
   const answered = typeof asked === 'object' && 'kept' in asked ? asked.kept : {};
   const sessions = task.attempts.flatMap((a) => {
     const name = nameFor(task.taskId, a.n);
-    return Object.hasOwn(answered, name) ? [answered[name]] : [];
+    const kept = own(answered, name);
+    return kept === undefined ? [] : [kept];
   });
   const output = bytesOf(
     sessions.flatMap((s) => s.output ?? []),
@@ -114,7 +116,7 @@ const taskKept = (task: JournalKept, asked: Asked | string | undefined, seen: Se
  */
 export const keptVerbOf = (store: StoreOps, runners: Record<string, SeamOps>, harnessNamed: (harness?: string) => string | undefined) => {
   const ask = (harness: string, sessions: readonly { name: string; nativeId?: string }[]) => {
-    const kept = runners[harness].kept;
+    const kept = own(runners, harness)?.kept;
     if (!kept || !sessions.length) return Effect.succeed<Asked>({ kept: {} });
     return kept(sessions).pipe(
       Effect.map((answer): Asked => ({ kept: answer })),
@@ -155,7 +157,7 @@ export const keepingVerbsOf = (
   go: <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.Effect<A, E>,
   store: StoreOps,
   runners: Record<string, SeamOps>,
-  harnessOf: (state: State) => string,
+  harnessOf: (state: State) => Harnessed,
   fallback: string,
 ): Pick<EngineShape, 'forget' | 'kept' | 'compact'> => ({
   forget: forgetVerbOf(go, runners, harnessOf, journalBytesOf(store)),

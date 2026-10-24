@@ -21,6 +21,7 @@
  */
 import { Context, Effect, Layer, type Stream } from 'effect';
 import type { SessionState, Sighting, Usage } from '../core/index.ts';
+import { own } from '../core/own.ts';
 import { argsRefusalOf, type HarnessArgs } from './args.ts';
 import { claudeOps, type ClaudeOptions } from './claude/bg.ts';
 import { causeWords, RunnerError } from './error.ts';
@@ -467,8 +468,19 @@ const answerOn = (
         }),
       );
 
+/** The runner of `fallback`, the harness of `harnesses` a session no other owns goes to: one not among them is thrown, naming them. */
+const fallbackOf = (harnesses: Record<string, RunnerOps>, fallback: string): RunnerOps => {
+  const ops = own(harnesses, fallback);
+  if (ops === undefined)
+    throw new Error(
+      `the default harness \`${fallback}\` is not one of ${Object.keys(harnesses).join(', ')}: name one of them as the fallback`,
+    );
+  return ops;
+};
+
 export const composite = (harnesses: Record<string, RunnerOps>, fallback: string): RunnerOps => {
-  const pick = (name?: string) => harnesses[name ?? fallback] ?? harnesses[fallback];
+  const fallbackOps = fallbackOf(harnesses, fallback);
+  const pick = (name?: string) => (name === undefined ? undefined : own(harnesses, name)) ?? fallbackOps;
 
   const owner = new Map<string, string>();
 
@@ -476,6 +488,7 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
     const name = asked ?? fallback;
     return Object.hasOwn(harnesses, name) ? name : undefined;
   };
+  const opsOf = (asked?: string): RunnerOps | undefined => own(harnesses, asked ?? fallback);
 
   const notHere = (asked: string) =>
     Effect.fail(
@@ -510,14 +523,11 @@ export const composite = (harnesses: Record<string, RunnerOps>, fallback: string
 
   return {
     spawn: (r) => {
-      const route = routeOf(r.harness);
-      return route === undefined ? notHere(r.harness ?? fallback) : harnesses[route].spawn(r);
+      const ops = opsOf(r.harness);
+      return ops === undefined ? notHere(r.harness ?? fallback) : ops.spawn(r);
     },
 
-    refuses: (task) => {
-      const route = routeOf(task.harness);
-      return route === undefined ? undefined : harnesses[route].refuses?.(task);
-    },
+    refuses: (task) => opsOf(task.harness)?.refuses?.(task),
 
     observe: observeAll((_, ops) => ({ read: listing(ops), expected: [] })).pipe(Effect.map((o) => o.seen)),
 

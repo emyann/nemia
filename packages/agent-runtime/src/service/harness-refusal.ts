@@ -4,6 +4,7 @@
  */
 import { CLAUDE_CONTEXT_TOKENS, bridgeAsked, claudeBgRefuses, claudeCodeRefuses } from '../harness/claude/index.ts';
 import { remoteRefuses } from '../a2a/index.ts';
+import { own } from '../core/index.ts';
 import { heldHarnessesOf, isClaude, isRemote, isSpec, type HarnessConfig, type TaskSpec } from './options.ts';
 
 /**
@@ -43,26 +44,23 @@ import { heldHarnessesOf, isClaude, isRemote, isSpec, type HarnessConfig, type T
  * `refuses`, if it has one, is asked by `file` through the `Runner`.
  */
 export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
-  if (!Object.hasOwn(harnesses, spec.harness)) {
+  const h = own(harnesses, spec.harness);
+  if (h === undefined) {
     return `\`harness: ${spec.harness}\` is not a harness this engine has. Its harnesses are: ${Object.keys(harnesses).join(', ')}.`;
   }
-  const h = harnesses[spec.harness];
   const { contextTokens, background } = spec.config ?? {};
   if (background && h !== 'claude') {
-    const modal = Object.keys(harnesses)
-      .filter((name) => harnesses[name] === 'claude')
-      .map((name) => `\`${name}\``);
+    const modal = Object.entries(harnesses)
+      .filter(([, o]) => o === 'claude')
+      .map(([name]) => `\`${name}\``);
     return `\`background: true\` asks for a Claude Code background session, and the \`${spec.harness}\` harness has no such mode${h === 'claude-bg' ? ': every session of it is one already. Leave `background` off' : `. ${modal.length ? `File the task on ${modal.join(' or ')}, or leave \`background\` off` : "Leave `background` off: none of this engine's harnesses has the mode"}`}.`;
   }
   if (contextTokens !== undefined && (isClaude(h) || isSpec(h))) {
     const range = isClaude(h) ? CLAUDE_CONTEXT_TOKENS : h.contextTokens;
     if (!range) {
-      const windowed = Object.keys(harnesses)
-        .filter((name) => {
-          const o = harnesses[name];
-          return isClaude(o) || (isSpec(o) && o.contextTokens);
-        })
-        .map((name) => `\`${name}\``);
+      const windowed = Object.entries(harnesses)
+        .filter(([, o]) => isClaude(o) || (isSpec(o) && o.contextTokens))
+        .map(([name]) => `\`${name}\``);
       return `\`contextTokens: ${contextTokens}\` sets the session's context window, and the \`${spec.harness}\` harness has no such knob: it would run on its own window, whatever the task says. ${windowed.length ? `File the task on ${windowed.join(' or ')}, whose sessions compact past it, or leave \`contextTokens\` off.` : "Leave `contextTokens` off: none of this engine's harnesses sets a session's window."}`;
     }
     if (contextTokens < range.least || contextTokens > range.most) {
@@ -70,26 +68,23 @@ export const harnessRefusalOf = (spec: TaskSpec & { harness: string }, harnesses
     }
   }
   if (bridgeAsked(spec) && isSpec(h)) {
-    const bridged = Object.keys(harnesses)
-      .filter((name) => isClaude(harnesses[name]))
-      .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
+    const bridged = Object.entries(harnesses)
+      .filter(([, o]) => isClaude(o))
+      .map(([name, o]) => (o === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
     return `\`claude.remoteControl\` asks for a session bridged to claude.ai, and the \`${spec.harness}\` harness has no such flag: it runs a prompt and exits, and only a Claude Code background session (\`claude --bg --remote-control\`) is bridged. ${bridged.length ? `File the task on ${bridged.join(' or ')}, or leave \`claude.remoteControl\` off.` : "Leave `claude.remoteControl` off: none of this engine's harnesses bridges a session."}`;
   }
   if (spec.config?.claude !== undefined && isSpec(h) && !h.claudeFlags) {
-    const takers = Object.keys(harnesses)
-      .filter((name) => {
-        const o = harnesses[name];
-        return isClaude(o) || (isSpec(o) && o.claudeFlags);
-      })
-      .map((name) => `\`${name}\``);
+    const takers = Object.entries(harnesses)
+      .filter(([, o]) => isClaude(o) || (isSpec(o) && o.claudeFlags))
+      .map(([name]) => `\`${name}\``);
     return `\`claude\` gives Claude Code flags of its own, and the \`${spec.harness}\` harness is not Claude Code: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`claude\` off.` : "Leave `claude` off: none of this engine's harnesses is Claude Code."}`;
   }
-  return misplaced(spec, harnesses) ?? ownRefuses(h, spec.harness)?.(spec);
+  return misplaced(spec, h, harnesses) ?? ownRefuses(h, spec.harness)?.(spec);
 };
 
 /** What a task asks of its harness that only another harness of this engine gives: its arguments, then a long-lived session. */
-const misplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined =>
-  argsMisplaced(spec, harnesses) ?? longLivedMisplaced(spec, harnesses) ?? mayAskMisplaced(spec, harnesses);
+const misplaced = (spec: TaskSpec & { harness: string }, h: HarnessConfig, harnesses: Record<string, HarnessConfig>): string | undefined =>
+  argsMisplaced(spec, h, harnesses) ?? longLivedMisplaced(spec, h, harnesses) ?? mayAskMisplaced(spec, harnesses);
 
 /**
  * Why a task's `config.mayAsk: true` cannot go to its harness — or `undefined`: a call is held open at the hook of the session this
@@ -112,14 +107,17 @@ const mayAskMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record
  * prompt and exits (Codex among them), and a remote agent. The refusal names the harnesses of this engine that keep one open. A
  * `RunnerOps` brought as its own is the consumer's, and asked nothing.
  */
-const longLivedMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
-  const h = harnesses[spec.harness];
+const longLivedMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined => {
   const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
   if (spec.restartPolicy !== 'Always' || ownRunner || h === 'claude-bg' || (h === 'claude' && spec.config?.background === true))
     return undefined;
-  const open = Object.keys(harnesses)
-    .filter((name) => harnesses[name] === 'claude' || harnesses[name] === 'claude-bg')
-    .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
+  const open = Object.entries(harnesses)
+    .filter(([, o]) => o === 'claude' || o === 'claude-bg')
+    .map(([name, o]) => (o === 'claude' ? `\`${name}\` with \`config.background: true\`` : `\`${name}\``));
   return `\`restartPolicy: 'Always'\` keeps a session open until it is stopped, and the \`${spec.harness}\` harness${h === 'claude' ? ' runs this task as a job, which' : ''} ends its session with its turn. ${open.length ? `File the task on ${open.join(' or ')}, or leave \`restartPolicy\` off.` : "Leave `restartPolicy` off: none of this engine's harnesses keeps a session open."}`;
 };
 
@@ -143,14 +141,17 @@ const ownRefuses = (h: HarnessConfig, name: string): ((task: TaskSpec) => string
  * Claude Code or a remote agent or a `HarnessSpec` without `codexArgs`, which would start its session without them. The
  * refusal names the harnesses of this engine that take them. A `RunnerOps` brought as its own is the consumer's, and asked nothing.
  */
-const codexArgsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+const codexArgsMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined => {
   const isCodex = (o: HarnessConfig) => isSpec(o) && o.codexArgs === true;
-  const h = harnesses[spec.harness];
   const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
   if (spec.config?.codex === undefined || ownRunner || isCodex(h)) return undefined;
-  const takers = Object.keys(harnesses)
-    .filter((name) => isCodex(harnesses[name]))
-    .map((name) => `\`${name}\``);
+  const takers = Object.entries(harnesses)
+    .filter(([, o]) => isCodex(o))
+    .map(([name]) => `\`${name}\``);
   return `\`codex\` gives Codex arguments of its own, and the \`${spec.harness}\` harness is not Codex: its session would start without them. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`codex\` off.` : "Leave `codex` off: none of this engine's harnesses is Codex."}`;
 };
 
@@ -159,13 +160,17 @@ const codexArgsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Rec
  * one that cannot hold it (`mountsMisplaced`), or admission on one that runs none (`admissionMisplaced`), or a pick of the
  * checkout's servers on one that holds none (`checkoutMcpMisplaced`), or `undefined`.
  */
-const argsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined =>
-  codexArgsMisplaced(spec, harnesses) ??
-  commandArgsMisplaced(spec, harnesses) ??
-  envMisplaced(spec, harnesses) ??
-  mountsMisplaced(spec, harnesses) ??
-  admissionMisplaced(spec, harnesses) ??
-  checkoutMcpMisplaced(spec, harnesses);
+const argsMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined =>
+  codexArgsMisplaced(spec, h, harnesses) ??
+  commandArgsMisplaced(spec, h, harnesses) ??
+  envMisplaced(spec, h, harnesses) ??
+  mountsMisplaced(spec, h, harnesses) ??
+  admissionMisplaced(spec, h, harnesses) ??
+  checkoutMcpMisplaced(spec, h, harnesses);
 
 /** Whether a harness can leave the checkout's `.mcp.json` out of a session: Claude Code, and a `HarnessSpec` that declares it. */
 const picksMcp = (h: HarnessConfig): boolean => isClaude(h) || (isSpec(h) && h.checkoutMcp === true);
@@ -175,12 +180,15 @@ const picksMcp = (h: HarnessConfig): boolean => isClaude(h) || (isSpec(h) && h.c
  * whose session would start with whatever it loads itself. The refusal names the harnesses of this engine that hold it. A remote
  * agent refuses it in its own words, with every other argument (`remoteRefuses`); a `RunnerOps` brought as its own is handed it.
  */
-const checkoutMcpMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
-  const h = harnesses[spec.harness];
+const checkoutMcpMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined => {
   if (spec.config?.checkoutMcp === undefined || !isSpec(h) || picksMcp(h)) return undefined;
-  const takers = Object.keys(harnesses)
-    .filter((name) => picksMcp(harnesses[name]))
-    .map((name) => `\`${name}\``);
+  const takers = Object.entries(harnesses)
+    .filter(([, o]) => picksMcp(o))
+    .map(([name]) => `\`${name}\``);
   return `\`checkoutMcp\` says which servers of the checkout's \`.mcp.json\` the session loads, and the \`${spec.harness}\` harness loads no MCP server it could leave out: it would run as if nothing were asked. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`checkoutMcp\` off.` : "Leave `checkoutMcp` off: none of this engine's harnesses holds it."}`;
 };
 
@@ -192,13 +200,16 @@ const admits = (h: HarnessConfig): boolean => isClaude(h) || (isSpec(h) && h.cal
  * `HarnessSpec` that does not declare `callAdmission`, a remote agent), whose session would make every call unadmitted. The refusal names
  * the harnesses of this engine that admit. A `RunnerOps` brought as its own is handed it, and not asked.
  */
-const admissionMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
-  const h = harnesses[spec.harness];
+const admissionMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined => {
   const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
   if (spec.config?.callAdmission === undefined || ownRunner || admits(h)) return undefined;
-  const takers = Object.keys(harnesses)
-    .filter((name) => admits(harnesses[name]))
-    .map((name) => `\`${name}\``);
+  const takers = Object.entries(harnesses)
+    .filter(([, o]) => admits(o))
+    .map(([name]) => `\`${name}\``);
   return `\`callAdmission\` asks a command before each of the session's calls, and the \`${spec.harness}\` harness runs none before a call: its session would make every call unadmitted. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`callAdmission\` off.` : "Leave `callAdmission` off: none of this engine's harnesses admits a call."}`;
 };
 
@@ -211,16 +222,19 @@ const holdsMount = (h: HarnessConfig, mode: 'readOnly' | 'writable'): boolean =>
  * none of this machine's disk, and holds no mount. The refusal names the harnesses of this engine that hold the mode. A
  * `RunnerOps` brought as its own is handed the mounts, and not asked.
  */
-const mountsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
-  const h = harnesses[spec.harness];
+const mountsMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined => {
   const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
   const mount = ownRunner ? undefined : spec.config?.mounts?.find((m) => !holdsMount(h, m.readOnly ? 'readOnly' : 'writable'));
   if (mount === undefined) return undefined;
   const mode = mount.readOnly ? 'readOnly' : 'writable';
   const words = mount.readOnly ? 'read-only' : 'writable';
-  const holders = Object.keys(harnesses)
-    .filter((name) => holdsMount(harnesses[name], mode))
-    .map((name) => `\`${name}\``);
+  const holders = Object.entries(harnesses)
+    .filter(([, o]) => holdsMount(o, mode))
+    .map(([name]) => `\`${name}\``);
   return `\`mounts\` gives the session ${mount.path} ${words}, and the \`${spec.harness}\` harness cannot hold a ${words} mount: its session would not reach the folder as asked. ${holders.length ? `File the task on ${holders.join(' or ')}, or leave the mount off.` : `Leave the mount off: none of this engine's harnesses holds a ${words} mount.`}`;
 };
 
@@ -228,15 +242,18 @@ const mountsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record
  * Why a task's `command` or `niceness` cannot go on its harness — or `undefined`: they are the arguments of a harness that runs a
  * process (`commandArgs`), and any other would run its own session without them. A `RunnerOps` brought as its own is not asked.
  */
-const commandArgsMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
+const commandArgsMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined => {
   const runsCommands = (o: HarnessConfig) => isSpec(o) && o.commandArgs === true;
-  const h = harnesses[spec.harness];
   const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
   const key = (['command', 'niceness'] as const).find((k) => spec.config?.[k] !== undefined);
   if (key === undefined || ownRunner || runsCommands(h)) return undefined;
-  const takers = Object.keys(harnesses)
-    .filter((name) => runsCommands(harnesses[name]))
-    .map((name) => `\`${name}\``);
+  const takers = Object.entries(harnesses)
+    .filter(([, o]) => runsCommands(o))
+    .map(([name]) => `\`${name}\``);
   return `\`${key}\` names a process to run, and the \`${spec.harness}\` harness runs a session of its own: it would start without it. ${takers.length ? `File the task on ${takers.join(' or ')}, or leave \`${key}\` off.` : `Leave \`${key}\` off: none of this engine's harnesses runs a command.`}`;
 };
 
@@ -250,13 +267,16 @@ const takesEnv = (h: HarnessConfig, background: boolean): boolean =>
  * that neither runs a command nor takes an `env`. The refusal names the harnesses of this engine that take one. A `RunnerOps` brought
  * as its own is not asked.
  */
-const envMisplaced = (spec: TaskSpec & { harness: string }, harnesses: Record<string, HarnessConfig>): string | undefined => {
-  const h = harnesses[spec.harness];
+const envMisplaced = (
+  spec: TaskSpec & { harness: string },
+  h: HarnessConfig,
+  harnesses: Record<string, HarnessConfig>,
+): string | undefined => {
   const ownRunner = !(isClaude(h) || isSpec(h) || isRemote(h));
   if (spec.config?.env === undefined || ownRunner || takesEnv(h, spec.config.background === true)) return undefined;
-  const takers = Object.keys(harnesses)
-    .filter((name) => takesEnv(harnesses[name], false))
-    .map((name) => (harnesses[name] === 'claude' ? `\`${name}\` as a job` : `\`${name}\``));
+  const takers = Object.entries(harnesses)
+    .filter(([, o]) => takesEnv(o, false))
+    .map(([name, o]) => (o === 'claude' ? `\`${name}\` as a job` : `\`${name}\``));
   const fix = takers.length
     ? `File the task on ${takers.join(' or ')}, or leave \`env\` off.`
     : "Leave `env` off: none of this engine's harnesses spawns a session's process.";

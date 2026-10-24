@@ -271,7 +271,11 @@ const harness = [
 const deadline = [
   {
     guard: 'live',
-    actions: act('stop', (e: Ev<'DEADLINE_PASSED'>) => ({ do: 'stop', sessionId: e.sighting!.sessionId, why: 'deadline' })),
+    actions: act('stop', (e: Ev<'DEADLINE_PASSED'>) => ({
+      do: 'stop',
+      sessionId: e.sighting?.sessionId ?? '(never seen)',
+      why: 'deadline',
+    })),
   },
   { target: 'ending', actions: act('record-end', (e: Ev<'DEADLINE_PASSED'>) => cutEnd('deadline', e.attempt, e.sighting)) },
 ];

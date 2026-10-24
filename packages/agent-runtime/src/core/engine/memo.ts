@@ -50,6 +50,16 @@ export const TickMemo = Context.Reference<TickMemoState | undefined>('engine/Tic
 export const tickMemoLayer = (options: { verify?: boolean } = {}) =>
   Layer.succeed(TickMemo)({ cursor: undefined, settled: new Map(), listed: new Set(), verify: options.verify === true });
 
+/** The task `id` as `memo` keeps it settled, with the memo that keeps it; none for a task it does not keep, or without a memo. */
+export const keptIn = (memo: TickMemoState | undefined, id: string): { memo: TickMemoState; kept: Releasable } | undefined => {
+  const kept = memo?.settled.get(id);
+  return memo && kept ? { memo, kept } : undefined;
+};
+
+/** The settled tasks `memo` keeps looking for, each whose finished session could still move (`listed`); none without a memo. */
+export const keptLooked = (memo: TickMemoState | undefined): Releasable[] =>
+  memo ? [...memo.listed].flatMap((id) => memo.settled.get(id) ?? []) : [];
+
 /** Why a task a pass skipped would have been read otherwise, or `undefined`: the proof `verify` asks of every skip. */
 export const divergence = (kept: Releasable, fresh: State, decided: { do: string }): string | undefined =>
   !settledQuiet(fresh)

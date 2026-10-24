@@ -34,7 +34,7 @@ import { bridgeOfTask, configForTurn } from '../../harness/args.ts';
 import { Runner, type ExpectedSession, type Observation, type RunnerOps, type SpawnRequest } from '../../harness/seam.ts';
 import { TASK_LABEL } from '../labels.ts';
 import { transition, type Move, type Refusal } from '../lifecycle.ts';
-import { divergence, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
+import { divergence, keptIn, keptLooked, releasableOf, TickMemo, TickMemoDiverged, type Releasable, type TickMemoState } from './memo.ts';
 import { CEILING_INSTEAD } from './filing.ts';
 import { ownPool, toAdmit, type AdmissionRule } from '../admission.ts';
 import { countedFacts } from './counted.ts';
@@ -703,7 +703,7 @@ export const tick = Effect.fn('tick')(function* () {
     if ('why' in read) unreadable.push(read.why);
     else folded.set(id, fold(id, read.events));
   }
-  const lookedFor = [...folded.values(), ...[...(memo?.listed ?? [])].flatMap((id) => memo!.settled.get(id) ?? [])];
+  const lookedFor = [...folded.values(), ...keptLooked(memo)];
   const { seen: observed, unread, unobserved, unreadWhy } = yield* lookAt(runner, expectedOf(lookedFor));
 
   const taken: Action[] = [];
@@ -712,13 +712,13 @@ export const tick = Effect.fn('tick')(function* () {
   const stalled: RefusedMove[] = [];
   let keptCount = 0;
   for (const id of ids) {
-    const kept = memo?.settled.get(id);
-    if (kept) {
+    const held = keptIn(memo, id);
+    if (held) {
       keptCount++;
-      if (memo!.verify) yield* verifyKept(kept, observed, unread);
-      const { listed } = yield* releaseFinished(kept, observed, unread);
-      if (listed) memo!.listed.add(id);
-      else memo!.listed.delete(id);
+      if (held.memo.verify) yield* verifyKept(held.kept, observed, unread);
+      const { listed } = yield* releaseFinished(held.kept, observed, unread);
+      if (listed) held.memo.listed.add(id);
+      else held.memo.listed.delete(id);
       continue;
     }
     const before = folded.get(id);

@@ -251,7 +251,7 @@ export function SkillLink({ from, name, className }: { from: SkillSource; name: 
 }
 
 /**
- * Where a skill an agent is given is found: your library, the repository, what Nemia ships — or nowhere, which the package refuses on
+ * Where a skill an agent is given is found: your library, the repository, Nemia's builtin ones — or nowhere, which the package refuses on
  * save. One with no page that the repository has all the same (`foundIn`, a skill named with its folder) is the repository's too,
  * marked `folder`.
  */
@@ -265,7 +265,7 @@ export function SkillSourceBadge({ from, foundIn = null }: { from: SkillSource |
         'shrink-0 rounded-full px-2 py-0.5 text-body-small leading-none font-medium',
         from === 'yours' && container.grey,
         (from === 'repo' || folder) && 'bg-muted text-muted-foreground',
-        from === 'shipped' && hairline,
+        from === 'builtin' && hairline,
         lost && container.failure,
       )}
     >

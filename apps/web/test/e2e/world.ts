@@ -57,7 +57,7 @@ export const heard: unknown[] = [];
 
 /** A pass's read of where the store's branches stand, as the tick's pass reads it and writes it down (`passStanding`). */
 const PASS =
-  "import { engine, passStanding, runStore, runWith, shipped } from 'agent-orchestrator'; await runWith(engine(), shipped(passStanding(runStore.runs.list())));";
+  "import { engine, passStanding, runStore, runWith, builtin } from 'agent-orchestrator'; await runWith(engine(), builtin(passStanding(runStore.runs.list())));";
 
 /**
  * Where the store's result branches stand, read now and written to its `standing.json` as the tick's pass writes it, in a process of the

@@ -235,7 +235,7 @@ export type Advanced = {
   tried: string[];
   looped: string[];
   status: Assessment['status'];
-  blocked: string[];
+  unreachable: string[];
   notes: string[];
   waiting: Wait[];
   inFlight: boolean;
@@ -719,7 +719,7 @@ function answerOf(
   const { steps, views, phaseOf, asks } = r;
   const { held, waiting } = admission;
   const { filed, checked, tried, looped, notes, feed } = done;
-  const { status, blocked } = assessed;
+  const { status, unreachable } = assessed;
   const inFlight = !takesNoSlot(steps) && (admission.need.inFlight || [filed, checked, tried, looped].some((names) => names.length > 0));
   const ending = steps.find((s) => s.workspace === 'main');
   const facts: RestFacts = {
@@ -744,7 +744,7 @@ function answerOf(
     tried,
     looped,
     status,
-    blocked,
+    unreachable,
     notes,
     waiting,
     inFlight,

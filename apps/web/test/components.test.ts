@@ -4872,7 +4872,7 @@ const PLACES = [
       },
     ],
   },
-  { from: 'shipped', dir: '/hkb/workflows/skills', skills: [] },
+  { from: 'builtin', dir: '/hkb/workflows/skills', skills: [] },
 ];
 
 /** An agent's form of yours with the skill list read already, as the picker reads it, inside a router: a given skill links to its page. */

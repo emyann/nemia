@@ -311,8 +311,8 @@ export type FactoryServer = {
   error?: string;
 };
 
-/** One server Nemia ships, as the add form offers it: the facts a factory would record of it. */
-export type ShippedServer = {
+/** One of Nemia's builtin servers, as the add form offers it: the facts a factory would record of it. */
+export type BuiltinServer = {
   name: string;
   type: 'http' | 'sse';
   url: string;
@@ -322,13 +322,13 @@ export type ShippedServer = {
 
 /**
  * What the board reads of a factory's MCP servers: its record with each server's state, `unread` saying in the runtime's words why
- * none was read, and the servers Nemia ships.
+ * none was read, and Nemia's builtin servers.
  */
 export type FactoryServers = {
   factory: string;
   servers: FactoryServer[];
   unread: string | null;
-  shipped: ShippedServer[];
+  builtin: BuiltinServer[];
 };
 
 const ServerOauthSchema = Schema.Struct({ clientId: Schema.String, callbackPort: Schema.optional(Schema.Number) });
@@ -352,7 +352,7 @@ const FactoryServersSchema = decodes<FactoryServers>()(
       ),
     ),
     unread: Schema.NullOr(Schema.String),
-    shipped: Schema.mutable(
+    builtin: Schema.mutable(
       Schema.Array(
         Schema.Struct({
           name: Schema.String,

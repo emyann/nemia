@@ -10,7 +10,7 @@ import { GivenSkills, SkillSourceBadge } from './AgentParts';
 /**
  * The skills an agent of yours gives, composed from a list: each given one with where it is found and what it costs a turn, and Remove; and
  * Add a skill, a sheet of every skill an agent of yours can be given — your library, then this repository's, in the order a start finds a
- * name — and the skills Nemia ships, each copied into your library before it is given, since an agent of yours finds none where Nemia keeps
+ * name — and Nemia's builtin skills, each copied into your library before it is given, since an agent of yours finds none where Nemia keeps
  * them.
  *
  * Adding and removing edit the form's `skills:` line, saved with the agent. The copy does not wait for Save: it writes your library at
@@ -110,7 +110,7 @@ function Place({
       <header className="space-y-0.5">
         <h3 className="text-label-medium text-muted-foreground uppercase">{PLACE_LABELS[place.from]}</h3>
         <p className="font-mono text-body-small break-all text-muted-foreground">{place.dir}</p>
-        {place.from === 'shipped' && (
+        {place.from === 'builtin' && (
           <p data-copy-note className="text-body-small text-muted-foreground">
             An agent of yours finds no skill here. Copy to my library writes the skill's folder into your library at once — a write of its
             own, kept there whether or not this agent is saved — and gives it to this agent.

@@ -3,7 +3,7 @@
  * `connected`, and nothing for any other state.
  *
  * A person only signs in. The press starts a sign-in the engine holds, and the board shows the address to open — GitHub's, for the
- * server Nemia ships — where they pick repositories and approve. The board then polls the sign-in's state, which the api answers from
+ * builtin server — where they pick repositories and approve. The board then polls the sign-in's state, which the api answers from
  * memory and spawns nothing for, every 2 seconds while it waits; once it reads `connected` the servers are read again, so the row's chip
  * says what a session now finds. No secret, token or port is typed or shown: the address is the one value the board is handed.
  */

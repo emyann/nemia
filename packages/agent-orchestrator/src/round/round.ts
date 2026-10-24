@@ -285,10 +285,10 @@ export function roundAsk(
 
   const step = (n: string) => steps.find((s) => s.name === n)!;
   const at = (n: string) => standing(step(n), run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
-  const stuck = loopSpan(steps, looping).find((n) => at(n).own !== 'exhausted' && stopsFollowers(at(n).own));
-  if (stuck) {
+  const stopping = loopSpan(steps, looping).find((n) => at(n).own !== 'exhausted' && stopsFollowers(at(n).own));
+  if (stopping) {
     return no(
-      `${stuck} is ${at(stuck).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stuck} again: nemia retry ${run.id} ${stuck} — or see why: nemia decide ${run.id}.`,
+      `${stopping} is ${at(stopping).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stopping} again: nemia retry ${run.id} ${stopping} — or see why: nemia decide ${run.id}.`,
     );
   }
   const gate = loopSpan(steps, looping).find((n) => at(n).status === 'awaiting approval');

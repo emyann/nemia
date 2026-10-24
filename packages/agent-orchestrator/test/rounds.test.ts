@@ -245,7 +245,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
   await s.test('UNSIGNED: try 2 signs off answering nothing, so it is not checked and review waits', async () => {
     stage.board().settle(`${id}-implement-try2`, 'succeeded', { ...SIGNED, summary: 'IMPLEMENTER-SUMMARY' });
     const pass = await tick(id);
-    assert.deepEqual([pass.checked, pass.blocked], [[], ['review']]);
+    assert.deepEqual([pass.checked, pass.unreachable], [[], ['review']]);
     assert.match((await over(list(stage.board().e, readRun(id)))).steps[0].status, /^unsigned/);
   });
   await s.test(

@@ -19,13 +19,13 @@ import {
 } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { checkVerdictOf, verdictWord, type CheckVerdict, type Verdict } from '../check/check.ts';
-import { codedStep, ENGINE_REASON, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
-import { answerOf, dueNote, modeWord, retriesDue, tryNote, HOLDS_THE_RUN, type RetryAsk } from '../retry/index.ts';
+import { codedStep, ENGINE_REASON, holdsTheRun, REASON_OF, type CodedStep, type QualifiedStep } from '../phase/phase.ts';
+import { answerOf, dueNote, modeWord, retriesDue, tryNote, type RetryAsk } from '../retry/index.ts';
 import {
   acceptanceOf,
   approvedFirst,
   budgetOf,
-  heldByCheckout,
+  waitsOnCheckout,
   loopOver,
   overBudget,
   resultOnBase,
@@ -241,7 +241,7 @@ export interface ListingInput {
  * where the branch stands (`resultOnBase`).
  *
  * A step's note says, in order: its try, or the try, round or send-back due — a try the checkout holds back
- * says so (`heldByCheckout`) — or that a person accepted its loop (`nemia approve`), never their words, which
+ * says so (`waitsOnCheckout`) — or that a person accepted its loop (`nemia approve`), never their words, which
  * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
  * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
  * was denied. Its cost goes beside its word once measured, unless the word already shows it.
@@ -314,7 +314,7 @@ export function listing({
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
     const accepted = step.loop ? acceptanceOf(run, step.name) : undefined;
-    const heldOut = retry && checkout && heldByCheckout(steps, step.name, checkout) ? checkout : undefined;
+    const heldOut = retry && checkout && waitsOnCheckout(steps, step.name, checkout) ? checkout : undefined;
     const tried = heldOut
       ? `try ${retry!.try} asked (${modeWord(retry!)}) — ${checkoutWord(heldOut)}`
       : retry
@@ -351,14 +351,14 @@ export function listing({
     const branch = run.steps[name]?.branch ?? null;
     const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
-      if (checkout && heldByCheckout(steps, name, checkout) && !waitingAgain.has(name))
+      if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
         return { name, status: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'checkout' }), branch };
       return { name, ...unfiled(step, waiting, held), branch };
     }
     if (waitingAgain.has(name)) return { name, status: 'waiting', ...coded({ reason: 'Pending' }), branch };
 
     const status = refiled.has(name) ? own : stands;
-    if (HOLDS_THE_RUN[status] && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
+    if (holdsTheRun(status) && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
       waitingOnYou.push(name);
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
@@ -373,7 +373,7 @@ export function listing({
       exhausted.add(name);
       return { name, status: 'rounds exhausted', ...coded({ reason: 'AwaitingRound' }), branch };
     }
-    const judged = judgedRow(status, () => verdictOf(name), assessed.paused?.checks.includes(name) === true);
+    const judged = judgedRow(status, () => verdictOf(name), assessed.waitingOnPause?.checks.includes(name) === true);
     if (judged) return { name, ...judged, branch };
 
     const c = closeoutOf(name);

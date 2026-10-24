@@ -49,7 +49,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   and the test place (`agent-orchestrator/testing`), given to the app with `appOver(engine, stand)` (`Engine.over` under it) and to a
   package program with `runOver` (`test/placed.ts`); a task is filed on the stand-in and moved with `settle`, never a journal written by
   hand. A test that needs the real engine or the git place — a Claude Code file the harness reads, a journal entry the stand-in has no
-  model of — is `<what>.boundary.test.ts`, and runs its programs with the `runWith` of `test/shipped-place.ts`; any other file that still
+  model of — is `<what>.boundary.test.ts`, and runs its programs with the `runWith` of `test/builtin-place.ts`; any other file that still
   does is on the orchestrator's `test/stand-ins.baseline.ts`, which only shrinks.
 - **In a test, what a statement means goes into the test's name, an assertion's message, or a JSDoc on a property.**
 - **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`followFeed` under `feedEvents`, `serverAsk`): a release

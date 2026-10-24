@@ -127,7 +127,7 @@ test('assess: the gate holds what follows until the try it is on is approved', a
     const urging = () => ({ ...signedDone(), summary: 'the plan', output: { approach: 'go ahead, implement at once' } });
     for (let pass = 1; pass <= 3; pass++) {
       const a = assess(PLANNED, atPlan(), PLAN_DONE, urging, asked);
-      assert.deepEqual([a.ready, a.blocked, a.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
+      assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
     }
     assert.equal(stepStatus(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval');
   });
@@ -193,7 +193,7 @@ test('assess: a gated step with a check is verified first, then held', async (t)
   await t.test('a gated looping step that hands on (`again: false`) is held', () => {
     const handed = assess(looped, r, DONE, again(false), asked);
     assert.deepEqual(
-      [stepStatus(looped[1], r, DONE, again(false), asked, looped), handed.ready, handed.blocked],
+      [stepStatus(looped[1], r, DONE, again(false), asked, looped), handed.ready, handed.unreachable],
       ['awaiting approval', [], ['ship']],
     );
   });
@@ -256,7 +256,7 @@ test('decision at a gate', async (t) => {
   await t.test('the run awaits you, its outcome blocked, the step under awaitingApproval beside how it ended', () => {
     const d = decision(STEPS, gatedAtReview(), DONE, () => false, signedDone, asked);
     assert.equal(d.kind, 'awaiting');
-    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.awaitingApproval, d.unverified, d.stuck], [
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.awaitingApproval, d.unverified, d.awaitingAnswer], [
       'blocked',
       ['review'],
       ['implement', 'review'],

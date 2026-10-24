@@ -255,7 +255,7 @@ test('`again: true` with rounds left: a round is due, and what waits on the loop
   await t.test('assess: implement goes again, nothing filed after the loop, the run running', () => {
     const a = assess(LOOP, inRound(1), ALL_SUCCEEDED, said, asked);
     assert.deepEqual(a.round, [{ step: 'review', target: 'implement', round: 2, by: 'again' }]);
-    assert.deepEqual([a.ready, a.blocked, a.retry, a.status], [[], [], [], 'running']);
+    assert.deepEqual([a.ready, a.unreachable, a.retry, a.status], [[], [], [], 'running']);
   });
   await t.test("listing: review's word says the round is due, and nobody is waited on", () => {
     const l = listedInRound(inRound(1), said);
@@ -290,7 +290,7 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
   await t.test('blocked and not failed: nothing filed, ship never will be, and the run is not finished', () => {
     assert.equal(stepStatus(LOOPING_REVIEW, r, ALL_SUCCEEDED, said, asked, LOOP), 'exhausted');
     const a = assess(LOOP, r, ALL_SUCCEEDED, said, asked);
-    assert.deepEqual([a.round, a.ready, a.blocked, a.status], [[], [], ['ship'], 'blocked']);
+    assert.deepEqual([a.round, a.ready, a.unreachable, a.status], [[], [], ['ship'], 'blocked']);
     assert.deepEqual(cancelPlan(LOOP, r, ALL_SUCCEEDED, said, asked), { kind: 'cancel', stop: [] });
   });
   await t.test('listing: rounds exhausted, offering once more, and waiting on you', () => {
@@ -308,7 +308,7 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
   await t.test('decision: awaiting, exhausted; `nemia decide` offers another round, then the work as it stands', () => {
     const d = decision(LOOP, r, ALL_SUCCEEDED, nothingShipped, said, asked);
     assert.ok(d.kind === 'awaiting', d.kind);
-    assert.deepEqual([d.outcome, d.exhausted, d.failed, d.stuck, d.unsigned], ['blocked', ['review'], [], [], []]);
+    assert.deepEqual([d.outcome, d.exhausted, d.failed, d.awaitingAnswer, d.unsigned], ['blocked', ['review'], [], [], []]);
     assert.deepEqual(roundLines(LOOP, r, d), [
       'review: it asked for round 4, and `rounds: 3` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia retry r-1 review --round',
       'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  nemia approve r-1 review --message "<why>"',
@@ -360,7 +360,7 @@ test("a person's `nemia approve` ends a loop out of rounds on their word, as if 
     assert.equal(tryOf(r, 'review'), 3);
     assert.equal(stepStatus(LOOPING_REVIEW, r, ALL_SUCCEEDED, said, asked, LOOP), 'unverified');
     const a = assess(LOOP, r, ALL_SUCCEEDED, said, asked);
-    assert.deepEqual([a.round, a.ready, a.blocked, a.status], [[], ['ship'], [], 'running']);
+    assert.deepEqual([a.round, a.ready, a.unreachable, a.status], [[], ['ship'], [], 'running']);
   });
   await t.test('listing: accepted as it stands, its findings open, and nobody waited on', () => {
     const l = listedInRound(r, said);
@@ -446,9 +446,9 @@ test("UNSIGNED: from round 2 a loop's target owes `replies`, and a looping step'
       stepStatus(IMPLEMENT, reviewDue(2), ALL_SUCCEEDED, () => signedDone(), asked, LOOP),
       'unsigned',
     );
-    assert.deepEqual(assess(LOOP, reviewDue(2), ALL_SUCCEEDED, () => signedDone(), asked).blocked, ['review']);
+    assert.deepEqual(assess(LOOP, reviewDue(2), ALL_SUCCEEDED, () => signedDone(), asked).unreachable, ['review']);
     assert.equal(stepStatus(IMPLEMENT, reviewDue(2), ALL_SUCCEEDED, saying([]), asked, LOOP), 'unsigned');
-    assert.deepEqual(assess(LOOP, reviewDue(2), ALL_SUCCEEDED, saying([]), asked).blocked, ['review']);
+    assert.deepEqual(assess(LOOP, reviewDue(2), ALL_SUCCEEDED, saying([]), asked).unreachable, ['review']);
     assert.equal(
       stepStatus(IMPLEMENT, reviewDue(2), ALL_SUCCEEDED, () => answered, asked, LOOP),
       'verified',
@@ -713,7 +713,7 @@ test('REFUSED past its budget, at shipped defaults: a step whose ended tries cos
   await t.test("over budget, its check refused: no try on the run's word, the run failed and not finished", () => {
     assert.equal(stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED, OVER.spent, OVER.verdict), 'over budget');
     const a = assessed(BUDGETED, r, p, signedDone, OVER);
-    assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
+    assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'failed']);
     assert.deepEqual(cancelPlan(BUDGETED, r, p, signedDone, asked, OVER.verdict, [], [], OVER.spent), { kind: 'cancel', stop: [] });
   });
   await t.test('listing: the amounts in its word, waiting on you', () => {
@@ -956,7 +956,7 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
   });
   await t.test('never tried by `retries:`, waited on by a person, offered `--budget`', () => {
     const a = assessed(CAPPED, r, p, nothingSaid, { spent: ended });
-    assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'blocked']);
+    assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'blocked']);
     const l = listed(CAPPED, r, shown({ t1: 'failed' }), signedOff({}), { spent: ended });
     assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['budget exhausted $3.02 of $3', ['implement']]);
     const d = decided(CAPPED, r, p, nothingSaid, { spent: ended });
@@ -970,8 +970,8 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
       retryable(CAPPED[0], r, p, nothingSaid, asked, CAPPED, () => false, ended),
       {
         status: 'budget exhausted',
+        reason: 'BudgetExhausted',
         modes: ['nudge', 'fresh'],
-        blockedByHarness: false,
         raise: { above: 3.02, spent: { usd: 3.02, measured: 1, unmeasured: 0 }, cap: 3 },
       },
     );
@@ -1206,7 +1206,7 @@ test('REFUSED as a verdict past a budget: a check that did not finish reads fail
     await t.test(`${why}: failed (check), the recheck offered first`, () => {
       assert.equal(stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED, spent, v), 'failed (check)');
       const a = assessed(BUDGETED, r, p, signedDone, { verdict: v, spent });
-      assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
+      assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'failed']);
       const d = decided(BUDGETED, r, p, signedDone, { verdict: v, spent });
       assert.deepEqual(d.kind === 'awaiting' && [d.unfinishedCheck, d.failedCheck, d.overBudget], [['implement'], [], []]);
       const lines = retryLines(BUDGETED, r, d, p, signedDone, asked, spent, v);
@@ -1379,7 +1379,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
       ['over budget', 'over budget', 'waiting'],
     );
     const a = assessedInLoop(BUDGETED_LOOP, r, said, { spent });
-    assert.deepEqual([a.round, a.ready, a.blocked, a.status], [[], [], ['ship'], 'blocked']);
+    assert.deepEqual([a.round, a.ready, a.unreachable, a.status], [[], [], ['ship'], 'blocked']);
   });
   await t.test("listing: review's word shows implement's spend, its own beside it, and both wait on you", () => {
     const l = listedInLoop(BUDGETED_LOOP, r, said, { spent });
@@ -1466,7 +1466,7 @@ test('a round asked past a budget holds no step of its loop on the pass before i
       raised.a.round.map((x) => [x.step, x.raise]),
       [['review', ['implement']]],
     );
-    assert.deepEqual([raised.a.status, raised.a.ready, raised.a.blocked], ['running', [], []]);
+    assert.deepEqual([raised.a.status, raised.a.ready, raised.a.unreachable], ['running', [], []]);
     assert.deepEqual(roundSpans(BUDGETED_LOOP, raised.a.round), new Set(['implement', 'review']));
     assert.deepEqual(raised.words, ['verified ✓', 'unverified · done', 'waiting']);
     assert.ok(!raised.words.some((w) => w.startsWith('over budget')), raised.words.join(' | '));
@@ -1493,7 +1493,7 @@ test('a round asked past a budget holds no step of its loop on the pass before i
   ] as const) {
     await t.test(`${why}: both still read held`, () => {
       const held = seen([...rounds]);
-      assert.deepEqual([held.a.round, held.a.status, held.a.blocked], [[], 'blocked', ['ship']]);
+      assert.deepEqual([held.a.round, held.a.status, held.a.unreachable], [[], 'blocked', ['ship']]);
       assert.deepEqual(
         [held.words, held.l.waitingOnYou],
         [

@@ -233,7 +233,7 @@
     },
     {
       "term": "Step status",
-      "meaning": "the record's own word for a step, inside the orchestrator alone: `REASON_OF` maps each to a reason, and it crosses no door.",
+      "meaning": "the record's own word for a step, inside the orchestrator: `REASON_OF` maps each to a reason, and the reason is what a door says; it crosses one door still, as the api's `StepRaise.own`.",
       "type": "StepStatus",
       "see": {
         "label": "A step",
@@ -282,9 +282,35 @@
       "type": "TryNumber"
     },
     {
+      "term": "Unreachable",
+      "meaning": "a step that cannot run, because a step it waits on stops what follows it (`stopsFollowers`): an assessment's `unreachable`, and `nemia tick`'s `unreachable:`. Never called blocked, which is a closeout's outcome alone.",
+      "type": "Assessment"
+    },
+    {
       "term": "Waiting",
-      "meaning": "only a wait on a person: the phase of a step or a run that a person must act on, at a gate, a question, a loop out of rounds, a budget, an unsigned or refused try; its reasons are `AwaitingApproval`, `AwaitingAnswer` (`via` session or closeout), `AwaitingRound` and the stops beside them. Reason `Waiting` is a wait on a thing, phase pending.",
-      "type": "StepPhase"
+      "meaning": "only a wait on a person: the phase of a step or a run that a person must act on, at a gate, a question, a loop out of rounds, a budget, an unsigned or refused try; its reasons are `AwaitingApproval`, `AwaitingAnswer` (`via` session or closeout), `AwaitingRound` and the stops beside them. Reason `Waiting` is a wait on a thing, phase pending. A try of a step needs the person's word where its reason says so (`WAITS_ON_PERSON`, keyed by reason, a session asking through its harness standing as `AwaitingAnswer` via session), and a step holds its run where its reason waits on a person and is no `Failed` (`holdsTheRun`).",
+      "type": "StepPhase",
+      "retired": [
+        {
+          "spelling": "stuck",
+          "card": "4b: decide's steps that signed off blocked are `awaitingAnswer`"
+        },
+        {
+          "spelling": "HOLDS_THE_RUN",
+          "card": "4b: what holds a run is derived from `PERSON_WAITS` (`holdsTheRun`)"
+        }
+      ]
+    },
+    {
+      "term": "Waiting on",
+      "meaning": "a wait on a thing, reason `Waiting` with what it waits on (`on`: a run, the limit, the checkout or the pause), phase pending; an assessment names the steps waiting on the repository's checkout (`waitingOnCheckout`, as `waitsOnCheckout` says of a step) and on the store's pause (`waitingOnPause`). Never called held, which is a person's hold alone.",
+      "type": "WaitOn",
+      "retired": [
+        {
+          "spelling": "heldByCheckout",
+          "card": "4b: a step waiting on the checkout `waitsOnCheckout`"
+        }
+      ]
     },
     {
       "term": "Workflow",

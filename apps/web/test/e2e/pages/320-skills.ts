@@ -11,7 +11,7 @@ export default {
    * An agent of yours composes its skills from a list, and Claude Code's prompt from what it does. `scribe`, which gives none, first names
    * a skill no place has, as one copied from elsewhere would before its folder came, so its row reads not found; the file is put back. Its
    * description is edited and left unsaved. The sheet lists your library, this repository's and Nemia's in that order, the repository's
-   * `scratch` refused with its reason and nothing to press, and Nemia's saying none: Nemia ships no skill. A skill of your library is added
+   * `scratch` refused with its reason and nothing to press, and Nemia's saying none: none is built in. A skill of your library is added
    * from the sheet's first group, a change of the form alone: nothing is written until Save, and the edit is kept. Its tools, which leave
    * out Skill, are put right from the note that says so, and Doesn't write code is picked, with Only my instructions behind For experts.
    * Saved, the file gives the skill and says harnessPrompt: no-coding. The page takes the agent back, so each visit, in either theme, reads
@@ -71,8 +71,8 @@ export default {
       const sheet = page.getByRole('dialog', { name: 'Add a skill' });
       await expectTexts(
         sheet.locator('section[data-skill-place] h3'),
-        ['Your library', 'This repository', 'Shipped with Nemia'],
-        'the sheet lists your library, this repository and what Nemia ships, in the order an agent of yours finds a name',
+        ['Your library', 'This repository', 'Built into Nemia'],
+        'the sheet lists your library, this repository and what is built into Nemia, in the order an agent of yours finds a name',
       );
       const scratch = sheet.locator('section[aria-label="This repository"] [data-offered-skill="scratch"]');
       await expectVisible(
@@ -81,8 +81,8 @@ export default {
       );
       await expectCount(scratch.getByRole('button'), 0, 'and nothing to press');
       await expectVisible(
-        sheet.locator('section[aria-label="Shipped with Nemia"]', { hasText: 'None here.' }),
-        'Nemia ships no skill, and its group says so',
+        sheet.locator('section[aria-label="Built into Nemia"]', { hasText: 'None here.' }),
+        'no skill is built into Nemia, and its group says so',
       );
       const offered = sheet.locator(`section[aria-label="Your library"] [data-offered-skill="${mine}"]`);
       await expectVisible(offered.locator('p', { hasText: /tokens/ }), `${mine} says what it costs a turn`);

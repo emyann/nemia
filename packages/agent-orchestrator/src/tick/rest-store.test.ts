@@ -42,7 +42,7 @@ const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, r
 const { feedFile } = await import('../feed/feed.store.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
 const { PlaceService } = await import('../place/place.store.ts');
-const { meteredPlace } = await import('../place/shipped.store.ts');
+const { meteredPlace } = await import('../place/builtin.store.ts');
 const made = testPlace();
 /** The file's test place, each question of it counted as the pass's `place` phase, as the shipped place counts its own. */
 const place = { ...made, place: meteredPlace(made.place), layer: PlaceService.layer(meteredPlace(made.place)) };

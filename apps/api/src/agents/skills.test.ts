@@ -1,8 +1,8 @@
 /**
  * The board's skill picker (skills.ts): the skills an agent of yours can be given, by place, in the order a start finds a name, and what
- * Nemia ships beside them — nothing today, so what a shipped row says is read off the tests' team (`team.ts`) handed to `listSkills` as the
- * shipped place — in a scratch store and a scratch repository. Every refusal is made to refuse, asserted on its words, with the library as
- * it was. And one skill on its own page, and one of yours
+ * is built into Nemia beside them — nothing today, so what a builtin row says is read off the tests' team (`team.ts`) handed to
+ * `listSkills` as the builtin place — in a scratch store and a scratch repository. Every refusal is made to refuse, asserted on its words,
+ * with the library as it was. And one skill on its own page, and one of yours
  * written on the board: made, changed at its version, its preload switched — each moving the version of every agent that gives it.
  *
  * The repository's `.claude/skills` is written first and your library after, so neither the order on disk nor the order of the names puts
@@ -14,11 +14,11 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { engine, shippedGitPlace, skillCopyCommand } from 'agent-orchestrator';
+import { engine, builtinGitPlace, skillCopyCommand } from 'agent-orchestrator';
 import { skillTurnCost } from 'agent-orchestrator/workflow';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { foundInOf, listSkills, SHIPPED_SKILLS, skillDetail } from './skills.ts';
+import { foundInOf, listSkills, BUILTIN_SKILLS, skillDetail } from './skills.ts';
 import { TEAM } from '../../test/team.ts';
 const repo = scratch('nemia-api-skills-repo-');
 process.env.HKB_REPO = repo;
@@ -27,15 +27,15 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 type SkillPlace = import('./skills.ts').SkillPlace;
 type SkillRow = import('./skills.ts').SkillRow;
 
-/** What Nemia ships: `workflows/skills` of the checkout these tests run in, which is the api's own (`HOME_REPO`). Read, never written. */
-const SHIPPED = SHIPPED_SKILLS;
-const shipped = fs.existsSync(SHIPPED)
+/** Nemia's builtin skills: `workflows/skills` of the checkout these tests run in, the api's own (`HOME_REPO`). Read, never written. */
+const BUILTIN = BUILTIN_SKILLS;
+const builtin = fs.existsSync(BUILTIN)
   ? fs
-      .readdirSync(SHIPPED)
-      .filter((name) => fs.existsSync(path.join(SHIPPED, name, 'SKILL.md')))
+      .readdirSync(BUILTIN)
+      .filter((name) => fs.existsSync(path.join(BUILTIN, name, 'SKILL.md')))
       .sort()
   : [];
-/** The tests' team's skills, standing in for a shipped place where a row's `found` is read. */
+/** The tests' team's skills, standing in for a builtin place where a row's `found` is read. */
 const TEAM_SKILLS = path.join(TEAM, 'skills');
 /** A team skill your library has, one the repository has, and one neither has. */
 const [inLibrary, inRepo, toCopy] = ['ask-for-another-round', 'implement-a-change', 'review-a-change'];
@@ -100,14 +100,14 @@ async function listed(): Promise<SkillPlace[]> {
 const rowOf = (places: SkillPlace[], from: string, name: string): SkillRow | undefined =>
   places.find((p) => p.from === from)?.skills.find((s) => s.name === name);
 
-test("the skills are listed by place — yours, the repository's, then what Nemia ships — each name where an agent of yours finds it", async () => {
+test("the skills are listed by place — yours, the repository's, then what is built into Nemia — each name where an agent of yours finds it", async () => {
   const places = await listed();
   assert.deepEqual(
     places.map((p) => [p.from, p.dir]),
     [
       ['yours', LIBRARY],
       ['repo', THEIRS],
-      ['shipped', SHIPPED],
+      ['builtin', BUILTIN],
     ],
   );
   assert.deepEqual(
@@ -121,7 +121,7 @@ test("the skills are listed by place — yours, the repository's, then what Nemi
   );
   assert.deepEqual(
     places[2].skills.map((s) => s.name),
-    shipped,
+    builtin,
   );
   assert.equal(rowOf(places, 'yours', 'shared')!.entry?.description, 'Mine.', 'your library wins a name the repository has too');
   assert.equal(rowOf(places, 'yours', 'shared')!.dir, path.join(LIBRARY, 'shared'));
@@ -177,7 +177,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     const inside = rowOf(places, 'repo', 'inside')!;
     assert.equal(inside.error, null);
     assert.equal(inside.entry?.description, 'Kept inside.');
-    const page = await skillDetail(engine(), shippedGitPlace, 'repo', 'inside', repo, root);
+    const page = await skillDetail(engine(), builtinGitPlace, 'repo', 'inside', repo, root);
     assert.equal(page?.skill.entry?.description, 'Kept inside.');
     assert.match(page?.version ?? '', /^[0-9a-f]{16}$/);
 
@@ -186,7 +186,7 @@ test('a repository skill linked inside the repository lists under repo, read, wi
     assert.equal(apart.entry, null);
     assert.equal(apart.cost, null, 'nothing of what it points at is read');
     assert.match(apart.error ?? '', /^apart is a link, and what it points at is outside the folder of skills/);
-    const refused = await skillDetail(engine(), shippedGitPlace, 'repo', 'apart', repo, root);
+    const refused = await skillDetail(engine(), builtinGitPlace, 'repo', 'apart', repo, root);
     assert.equal(refused?.skill.entry, null);
     const res = await app.request('/api/skills/repo/apart');
     assert.equal(res.status, 200, 'its page answers, and says the refusal');
@@ -202,15 +202,15 @@ test('a repository skill linked inside the repository lists under repo, read, wi
   }
 });
 
-test('a shipped skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', async () => {
-  const places = await listSkills(engine(), shippedGitPlace, repo, root, TEAM_SKILLS);
-  assert.equal(rowOf(places, 'shipped', inLibrary)!.found, 'yours');
-  assert.equal(rowOf(places, 'shipped', inRepo)!.found, 'repo');
-  assert.equal(rowOf(places, 'shipped', toCopy)!.found, null);
-  assert.equal(rowOf(places, 'shipped', toCopy)!.error, null, 'every skill of the place reads');
+test('a builtin skill says where an agent of yours already finds its name: in your library, in the repository, or nowhere yet', async () => {
+  const places = await listSkills(engine(), builtinGitPlace, repo, root, TEAM_SKILLS);
+  assert.equal(rowOf(places, 'builtin', inLibrary)!.found, 'yours');
+  assert.equal(rowOf(places, 'builtin', inRepo)!.found, 'repo');
+  assert.equal(rowOf(places, 'builtin', toCopy)!.found, null);
+  assert.equal(rowOf(places, 'builtin', toCopy)!.error, null, 'every skill of the place reads');
   assert.ok(
     places[2].skills.every((s) => s.usedBy.length === 0),
-    'no agent of yours is given a skill from where Nemia ships it',
+    'no agent of yours is given a skill from where it is built into Nemia',
   );
 });
 
@@ -227,7 +227,7 @@ test("REFUSED at shipped defaults: a skill Nemia does not ship, a name that is n
   );
   await refused(send('/api/skills/yours', { copy: '../agents' }), 422, /^`\.\.\/agents` is not a skill's name/);
   await refused(send('/api/skills/yours', { copy: 'Bad_Name' }), 422, /^`Bad_Name` is not a skill's name/);
-  await refused(send('/api/skills/yours', { copy: 7 }), 400, /`copy` is the name of the skill Nemia ships to copy, a string/);
+  await refused(send('/api/skills/yours', { copy: 7 }), 400, /`copy` is the name of the builtin skill to copy, a string/);
   await refused(send('/api/skills/yours', [toCopy]), 400, /takes a JSON object: .*`{ "copy"/);
   await refused(send('/api/skills/yours', '{'), 400, /takes a JSON body/);
 });
@@ -398,9 +398,9 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
     assert.equal(broken.body, '# Scratch\n\nNo frontmatter.');
     assert.match(broken.skill.error ?? '', /has no frontmatter/);
     assert.equal(
-      (await skillDetail(engine(), shippedGitPlace, 'shipped', toCopy, repo, root, TEAM_SKILLS))?.copyHint,
+      (await skillDetail(engine(), builtinGitPlace, 'builtin', toCopy, repo, root, TEAM_SKILLS))?.copyHint,
       null,
-      'a shipped skill is copied with the board, not by hand',
+      'a builtin skill is copied with the board, not by hand',
     );
   } finally {
     fs.rmSync(path.join(repo, 'workflows', 'agents'), { recursive: true });
@@ -408,6 +408,19 @@ test("a skill's page says what it says, what it costs a turn, the agents of eith
   assert.equal((await app.request('/api/skills/yours/no-such')).status, 404);
   assert.equal((await app.request('/api/skills/yours/Bad_Name')).status, 400);
   assert.equal((await app.request('/api/skills/elsewhere/mine')).status, 400);
+});
+
+test("a builtin skill's page is at /api/skills/builtin/<name>, and its former address answers a permanent redirect there", async () => {
+  const former = await app.request('/api/skills/shipped/x');
+  assert.equal(former.status, 308, 'a link or bookmark naming the former address is sent on, its method kept');
+  assert.equal(former.headers.get('location'), '/api/skills/builtin/x');
+  assert.equal(
+    (await app.request('/api/skills/shipped/a%20b')).headers.get('location'),
+    '/api/skills/builtin/a%20b',
+    'the name is carried encoded',
+  );
+  assert.equal((await app.request('/api/skills/builtin/no-such')).status, 404, '`builtin` is a place a page is read from');
+  assert.equal((await app.request('/api/skills/nope/mine')).status, 400, 'a place that is none of the three is still refused');
 });
 
 test('a skill written on the board is made in your library, read back as its page reads it, and listed', async () => {
@@ -521,7 +534,7 @@ test('REFUSED at shipped defaults: a change at a version the skill has moved on 
 test("REFUSED at shipped defaults: each key of a skill sent as the wrong type is a 400 in the api's words, word for word, a key no skill has only once the rest are read — and a body sending both or neither is refused as such before either is read", async () => {
   const route = 'POST /api/skills/yours';
   const shape =
-    '`{ "copy": "<the name of a skill Nemia ships>" }`, or `{ "skill": { "name": "<a-name>", "title": "<a title, or null>", "description": "<what it does, one line>", "tags": ["<a word>"] or null, "examples": ["<what a person would ask>"] or null, "preload": true or false, "body": "<its instructions>" } }`';
+    '`{ "copy": "<the name of a builtin skill>" }`, or `{ "skill": { "name": "<a-name>", "title": "<a title, or null>", "description": "<what it does, one line>", "tags": ["<a word>"] or null, "examples": ["<what a person would ask>"] or null, "preload": true or false, "body": "<its instructions>" } }`';
   const fresh = { ...NOTES, name: 'fresh' };
   for (const [skill, said] of [
     [null, "`skill` is the skill, an object, and this request's was null"],

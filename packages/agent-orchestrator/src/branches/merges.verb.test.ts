@@ -14,9 +14,9 @@ import { runOver } from '../../test/placed.ts';
 
 process.env.WF_ROOT = scratch('wf-merge-root-');
 const { MERGES, mergesOf } = await import('./merges.verb.ts');
-const { shippedGitPlace } = await import('../place/shipped.store.ts');
+const { builtinGitPlace } = await import('../place/builtin.store.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
-const { gitPlaceLayer } = await import('../place/shipped.store.ts');
+const { gitPlaceLayer } = await import('../place/builtin.store.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 
 /** A repository on `main` with `src/a.ts`, and its git. */
@@ -67,11 +67,11 @@ test('a branch merges cleanly, then conflicts once main writes its file otherwis
   commit('src/a.ts', 'export const a = 1;\n', 'implement');
   git('checkout', '-q', 'main');
   runOn('r-1', repo);
-  assert.deepEqual(mergesOf(shippedGitPlace, 'r-1', ['wf/r-1/implement']), {
+  assert.deepEqual(mergesOf(builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
     'wf/r-1/implement': { clean: true, said: 'merges cleanly onto main' },
   });
   commit('src/a.ts', 'export const a = 2;\n', 'main writes a.ts too');
-  assert.deepEqual(mergesOf(shippedGitPlace, 'r-1', ['wf/r-1/implement']), {
+  assert.deepEqual(mergesOf(builtinGitPlace, 'r-1', ['wf/r-1/implement']), {
     'wf/r-1/implement': { clean: false, conflicts: ['src/a.ts'], said: 'conflicts with main in 1 file: src/a.ts' },
   });
   assert.equal(git('status', '--porcelain'), '', "a trial in git's object store alone");
@@ -80,7 +80,7 @@ test('a branch merges cleanly, then conflicts once main writes its file otherwis
 test("a branch git does not have is neither clean nor conflicted: it carries git's own word for why it cannot say", () => {
   const { repo } = repoOf();
   runOn('r-2', repo);
-  const gone = mergesOf(shippedGitPlace, 'r-2', ['wf/no-such-run/implement'])['wf/no-such-run/implement'];
+  const gone = mergesOf(builtinGitPlace, 'r-2', ['wf/no-such-run/implement'])['wf/no-such-run/implement'];
   assert.ok('error' in gone && /no-such-run/.test(gone.error), JSON.stringify(gone));
   assert.match(gone.said, /^whether it merges onto main is not known: .*no-such-run/);
 });

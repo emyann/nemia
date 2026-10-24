@@ -248,10 +248,10 @@ function loopRefusal(steps: readonly Workflow[], run: Run, looping: Workflow, re
     return `the run goes round again itself: ${looping.name} asked for round ${now + 1}, which ${looping.loop} works on as the base is. Merge once it ends, if the base still conflicts: nemia refresh ${run.id} ${looping.name} --base.`;
   const { status } = reads.standingOf(looping);
   if (loopDone(status)) return undefined;
-  const stuck =
+  const stopping =
     steps.find((s) => s.name === looping.loop && stopsFollowers(reads.standingOf(s).own)) ?? (stopsFollowers(status) ? looping : undefined);
-  if (stuck)
-    return `${stuck.name} is ${reads.standingOf(stuck).status} in round ${now} of ${looping.name}'s loop, so the round cannot end. Try it again — nemia retry ${run.id} ${stuck.name} — or see why: nemia decide ${run.id}.`;
+  if (stopping)
+    return `${stopping.name} is ${reads.standingOf(stopping).status} in round ${now} of ${looping.name}'s loop, so the round cannot end. Try it again — nemia retry ${run.id} ${stopping.name} — or see why: nemia decide ${run.id}.`;
   return `round ${now} of ${looping.name}'s loop is ${status}, so its work is not ready to merge. Wait for it: nemia ls ${run.id}.`;
 }
 

@@ -24,8 +24,8 @@ import {
 } from '../src/workflow.ts';
 import { FrozenStepSchema, loadWorkflows } from '../src/folder/folder.store.ts';
 import { agentsFor, agentVersion } from '../src/agents/read.store.ts';
-import { PLACE_SKILLS, isShippedPlace, lookupRoots, skillsFor } from '../src/skills/read.store.ts';
-import { SHIPPED_PLACE } from '../src/place/shipped.store.ts';
+import { PLACE_SKILLS, isBuiltinPlace, lookupRoots, skillsFor } from '../src/skills/read.store.ts';
+import { BUILTIN_PLACE } from '../src/place/builtin.store.ts';
 import {
   briefBody,
   enabledSkillsOf,
@@ -434,13 +434,13 @@ test("the package's place skill is found after every place, where none has its n
   const repo = tree({});
   const dir = team('---\nskills: git\n---\nYou build.\n', {});
   const found = skillsFor(dir, { repo, home });
-  assert.equal(found.at.get('git'), SHIPPED_PLACE);
+  assert.equal(found.at.get('git'), BUILTIN_PLACE);
   assert.equal(found.looked.at(-1), PLACE_SKILLS);
-  assert.ok(isShippedPlace(SHIPPED_PLACE));
+  assert.ok(isBuiltinPlace(BUILTIN_PLACE));
   const own = team('---\nskills: git\n---\nYou build.\n', { 'workflows/skills/git/SKILL.md': SKILL('git') });
   const ownGit = path.join(path.dirname(own), 'skills', 'git');
   assert.equal(skillsFor(own, { repo, home }).at.get('git'), ownGit);
-  assert.equal(isShippedPlace(ownGit), false);
+  assert.equal(isBuiltinPlace(ownGit), false);
 });
 
 /**

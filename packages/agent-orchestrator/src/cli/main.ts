@@ -43,7 +43,7 @@ import {
   runMain,
   tickRun,
   runWith,
-  shippedGitPlace,
+  builtinGitPlace,
   PlaceService,
   storeRootLayer,
   wfRoot,
@@ -190,9 +190,9 @@ function tickRunLine(r: Pass['runs'][number]): string {
   const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';
   const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';
   const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
-  const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
+  const unreachable = r.unreachable.length ? `  unreachable: ${r.unreachable.join(', ')}` : '';
   const waiting = r.waiting.length ? `  ${waitWord(r.waiting)}` : r.held ? `  ${slotWord(r.held)}` : '';
-  return `${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}${waiting}`;
+  return `${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${unreachable}${waiting}`;
 }
 
 /** What `nemia tick` prints of a run: its line (`tickRunLine`), then its notes, a line each. */
@@ -425,7 +425,7 @@ export async function main(
   argv: string[],
   given?: Engine,
   demand: () => DemandHost = liveDemandHost,
-  place: Place = shippedGitPlace,
+  place: Place = builtinGitPlace,
 ): Promise<void> {
   const renamed = renamedIn(argv);
   if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);

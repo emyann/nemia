@@ -11,7 +11,7 @@ import { atRest, evictedBy, restBlockers, type RestFacts } from './rest.ts';
 const RESTING: RestFacts = {
   run: { workflow: [] },
   status: 'succeeded',
-  due: { ready: [], check: [], retry: [], round: [], held: [] },
+  due: { ready: [], check: [], retry: [], round: [], waitingOnCheckout: [] },
   settled: true,
   acted: false,
   notes: [],
@@ -59,7 +59,7 @@ test('REFUSED: a task not settled — at work, waiting for a word, unknown to th
 });
 
 test('REFUSED: anything due, and anything the pass did, is a pass the next must repeat', () => {
-  for (const key of ['ready', 'check', 'held'] as const)
+  for (const key of ['ready', 'check', 'waitingOnCheckout'] as const)
     assert.equal(atRest({ ...RESTING, due: { ...RESTING.due, [key]: ['work'] } }), false, key);
   assert.equal(
     atRest({ ...RESTING, due: { ...RESTING.due, retry: [{ step: 'work', try: 2, by: 'ask', mode: 'nudge' }] } }),
@@ -99,7 +99,7 @@ test("restBlockers names each clause that holds a run out, and none of a run at 
     ['due.check', { due: { ...RESTING.due, check: ['work'] } }],
     ['due.retry', { due: { ...RESTING.due, retry: [{ step: 'work', try: 2, by: 'ask', mode: 'nudge' }] } }],
     ['due.round', { due: { ...RESTING.due, round: [{ step: 'review', target: 'work', round: 2, by: 'again' }] } }],
-    ['due.held', { due: { ...RESTING.due, held: ['work'] } }],
+    ['due.waitingOnCheckout', { due: { ...RESTING.due, waitingOnCheckout: ['work'] } }],
     ['notes', { notes: ['work: said'] }],
     ['handOffDue', { handOffDue: ['work'] }],
     ['landingOwed', { landingOwed: true }],

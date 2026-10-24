@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { Effect, Layer } from 'effect';
-import { engine, PlaceService, runStore, runWith as runEngine, shippedGitPlace, standingWhen, type Place } from 'agent-orchestrator';
+import { engine, PlaceService, runStore, runWith as runEngine, builtinGitPlace, standingWhen, type Place } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../app.ts';
 import { diffFiles, DIFF_LINES } from './decision.ts';
 
@@ -174,14 +174,14 @@ writeRun({
 function countedStanding() {
   let asks = 0;
   const place: Place = {
-    declared: shippedGitPlace.declared,
+    declared: builtinGitPlace.declared,
     ask: (verb, request, options) => {
       if (verb === 'standing') asks += 1;
-      return shippedGitPlace.ask(verb, request, options);
+      return builtinGitPlace.ask(verb, request, options);
     },
     askNow: (verb, request, options) => {
       if (verb === 'standing') asks += 1;
-      return shippedGitPlace.askNow(verb, request, options);
+      return builtinGitPlace.askNow(verb, request, options);
     },
   };
   return { layer: PlaceService.layer(place), asks: () => asks };

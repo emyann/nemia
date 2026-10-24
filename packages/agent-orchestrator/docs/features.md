@@ -2467,7 +2467,7 @@ reaches her open long-lived session within one keeper beat, through the runtime'
 
 - **Owed, level-triggered**: while she is `kept`, each beat reads the person's words for her as they read now and compares them with
   those her session was last filed or told with, the keeper's record (`customChanged`, `$WF_ROOT/nemia/told.json`, denied her as
-  `prompt.md` is); where they differ, `nemiaDue` owes `sayCustom`. Her shipped instruction is never compared: a change to it alone tells her
+  `prompt.md` is); where they differ, `nemiaDue` owes `sayCustom`. Her builtin instruction is never compared: a change to it alone tells her
   nothing. A session filed before the keeper kept the record is judged by the words her filed instruction ends with, and is never told a
   removal of words it is unknown she had. Nothing is carried between beats, so a restart owes what the files say. In any other state no
   `sayCustom` is owed, and the words are not read, so words that do not read never hold a stop.

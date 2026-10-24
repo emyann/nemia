@@ -183,7 +183,7 @@ test("assess and stepStatus of a step's check", async (t) => {
     await t.test(`a check that does not exit 0 fails the step, whatever the agent said: ${c}`, () => {
       const p = phases({ t1: 'succeeded', c1: c });
       const a = assess(CHECKED, withCheck('c1'), p, signedDone, asked);
-      assert.deepEqual([a.ready, a.blocked, a.status], [[], ['review'], 'failed']);
+      assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['review'], 'failed']);
       assert.equal(stepStatus(CHECKED[0], withCheck('c1'), p, signedDone, asked), 'failed (check)');
     });
   await t.test('a cancelled run files no check, however due', () => {
@@ -306,7 +306,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
     const p = phases({ t1: 'succeeded' });
     const none = () => undefined;
     const a = assess(CHECKED, withCheck(null), p, none, asked);
-    assert.deepEqual([a.ready, a.check, a.blocked, a.status], [[], [], ['review'], 'blocked'], 'no signed work to check');
+    assert.deepEqual([a.ready, a.check, a.unreachable, a.status], [[], [], ['review'], 'blocked'], 'no signed work to check');
     assert.equal(stepStatus(CHECKED[0], withCheck(null), p, none, asked), 'unsigned');
     assert.deepEqual(
       assess(STEPS, run({ implement: 't1', review: null }), p, none, asked).ready,
@@ -503,7 +503,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   await t.test("a check that checkFailed, with `retries:` left, is due another try on the run's word, waiting on nobody", () => {
     const a = assess(RETRIED, onTry(), checkFailed, signedDone, asked, () => 1);
     assert.deepEqual(a.retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'retries' }]);
-    assert.deepEqual([a.ready, a.blocked, a.status], [[], [], 'running'], 'what waits on it waits; nothing is final yet');
+    assert.deepEqual([a.ready, a.unreachable, a.status], [[], [], 'running'], 'what waits on it waits; nothing is final yet');
     const l = lsOf(onTry(), 'failed', 1);
     assert.deepEqual(l.steps[0], {
       name: 'implement',
@@ -527,7 +527,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   });
   await t.test('REFUSED past `retries:`: no try is due, and the step waits on you as it did before retries', () => {
     const a = assess(RETRIED, onTry(SPENT), checkFailed, signedDone, asked, () => 1);
-    assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
+    assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'failed']);
     assert.deepEqual(lsOf(onTry(SPENT), 'failed', 1).waitingOnYou, ['implement']);
     assert.deepEqual(assess(CHECKED, withCheck('c1'), checkFailed, signedDone, asked, () => 1).retry, [], 'nor at all, with no `retries:`');
     assert.deepEqual(
@@ -555,7 +555,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     await t.test(`a check that did not finish is no refusal, spends no retry, and is offered --recheck: ${why}`, () => {
       const p = phases({ t1: 'succeeded', c1: phase });
       const a = assess(RETRIED, onTry(), p, signedDone, asked, () => verdict);
-      assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
+      assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'failed']);
       assert.deepEqual(lsOf(onTry(), phase, verdict).waitingOnYou, ['implement']);
       const d = decision(RETRIED, onTry(), p, nothingShipped, signedDone, asked, () => verdict);
       assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.unfinishedCheck, d.outcome], [[], ['implement'], 'failed']);
@@ -601,7 +601,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   });
   await t.test('a caller that gives no verdict reads a check stopped at its deadline as the tick does', () => {
     const unread = assess(RETRIED, onTry(), checkFailed, signedDone, asked);
-    assert.deepEqual([unread.retry, unread.blocked, unread.status], [[], ['review'], 'failed']);
+    assert.deepEqual([unread.retry, unread.unreachable, unread.status], [[], ['review'], 'failed']);
     assert.deepEqual(
       assess(RETRIED, onTry(), checkFailed, signedDone, asked, () => 'unfinished'),
       unread,
@@ -956,7 +956,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
   await t.test("the tick's reading: due, to stop the blocked session first, the run still going and waiting on nobody", () => {
     const a = assess(STEPS, r, live, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman);
     assert.deepEqual(
-      [a.retry, a.ready, a.blocked, a.status],
+      [a.retry, a.ready, a.unreachable, a.status],
       [[{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true }], [], [], 'running'],
     );
     assert.deepEqual(
@@ -993,7 +993,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
   });
   await t.test("REFUSED before, now honoured: without the harness's word, or once it works again, due as a session that runs on", () => {
     const a = assess(STEPS, r, live, nothingSigned, asked, () => undefined, [askFor(2)]);
-    assert.deepEqual([a.retry, a.ready, a.blocked, a.status], [[stale()], [], [], 'running']);
+    assert.deepEqual([a.retry, a.ready, a.unreachable, a.status], [[stale()], [], [], 'running']);
     assert.deepEqual(
       assess(
         STEPS,
@@ -1371,7 +1371,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       () => false,
       denied,
     );
-    assert.deepEqual([a.check, a.retry, a.blocked, a.status], [[], [], ['review'], 'blocked']);
+    assert.deepEqual([a.check, a.retry, a.unreachable, a.status], [[], [], ['review'], 'blocked']);
     assert.deepEqual(
       retriesDue(
         DENYING,
@@ -1418,8 +1418,8 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       retryable(DENYING[0], r, p, signedDone, asked, DENYING, () => false, denied),
       {
         status: 'denied',
+        reason: 'Denied',
         modes: ['nudge', 'fresh'],
-        blockedByHarness: false,
       },
     );
     const refusal = (how: RetryHow) =>

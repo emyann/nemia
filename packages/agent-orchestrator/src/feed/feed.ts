@@ -717,7 +717,7 @@ export function feedWords(
     lifted?: string;
   } = {},
 ): FeedWords {
-  const onYou = onYouWords(l);
+  const waitingWords = onYouWords(l);
   const held = Boolean(run.hold) && status !== 'cancelled';
   return {
     ...(labelled.run ? { labels: labelled.run } : {}),
@@ -731,8 +731,8 @@ export function feedWords(
       word: `${status}${run.pruned ? ' (pruned)' : ''}`,
       ...(held && run.hold
         ? { note: holdWord(l.holding ?? [], run.hold) }
-        : onYou.length
-          ? { note: `waiting on you: ${onYou.join(', ')}` }
+        : waitingWords.length
+          ? { note: `waiting on you: ${waitingWords.join(', ')}` }
           : {}),
       ...said(runCodes(status, held, l.steps)),
     },

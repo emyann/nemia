@@ -105,6 +105,17 @@
         "label": "Trying again",
         "href": "/workflows/#trying-again"
       }
+    },
+    {
+      "term": "Waits on a person",
+      "meaning": "the states of a step that wait on a person's word (`WAITS_ON_A_PERSON` in `apps/web/src/lib/status.ts`), read by `waitsOnPerson`; of them, the human gates (`AT_A_GATE`: signed off blocked, at its gate, a loop out of rounds, past its budget), read by `waitsAtGate` and drawn with the gate's badge. Neither waits on a run called off. A row's kind of wait (`WaitKind`, `apps/web/src/lib/runWords.ts`) for a step that signed off blocked is `answer`.",
+      "type": "StepState",
+      "retired": [
+        {
+          "spelling": "isGate",
+          "card": "4c: a human gate is read by `waitsAtGate`, of the states `waitsOnPerson` reads"
+        }
+      ]
     }
   ]
 }

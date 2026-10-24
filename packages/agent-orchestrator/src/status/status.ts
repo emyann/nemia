@@ -385,7 +385,7 @@ export function standing(
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   if (held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)) return { own, status: 'over budget' };
   if (atGate(step, run, own, closeoutOf)) return { own, status: 'awaiting approval' };
-  if (own === 'waiting' && waitsAtGate(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))
+  if (own === 'pending' && waitsAtGate(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))
     return { own, status: 'awaiting approval' };
   return { own, status: own };
 }
@@ -471,7 +471,7 @@ export function ownStatus(
   spendOf: SpendOf,
 ): StepStatus {
   const st = run.steps[step.name];
-  if (!st?.taskId) return 'waiting';
+  if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);
   if (said?.outcome === 'blocked') return 'blocked';
 

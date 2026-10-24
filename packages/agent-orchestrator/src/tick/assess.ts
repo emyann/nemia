@@ -43,10 +43,10 @@ export type Assessment = {
   /**
    * The run in one word. `failed` is a run in which a step broke: its task failed or was stopped, or its check refused it or did not
    * finish. A run stopped on a person alone is not `failed`: `awaiting approval` when every step that stops what follows it waits at its
-   * gate, and `blocked` when a person's word is what stops it otherwise — a step that signed off blocked, or unsigned, a loop out of
+   * gate, and `waiting` when a person's word is what stops it otherwise — a step that signed off blocked, or unsigned, a loop out of
    * rounds, a cap reached (`stoppedOnWord`). Each of the three is a run that stopped: it is at rest, and no longer in flight.
    */
-  status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked';
+  status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
   /**
    * What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing.
    */
@@ -55,7 +55,7 @@ export type Assessment = {
    * The runs a person holds this one until (`Run.hold`), while the hold stands: the run is `running`, and nothing is due — no step, check,
    * try or round — nor asked of anyone (`toDecide`). What is in flight runs on. Absent on a run nobody holds.
    */
-  heldUntil?: string[];
+  holdUntil?: string[];
   /**
    * What waits on the store's pause (`Run.pause`) on this pass: every step whose session, try, round or check the pass would file, by
    * name (`steps`), and the steps among them whose check is what waits (`checks`). Nothing of them is filed, and the run counts against the
@@ -72,7 +72,7 @@ export type Assessment = {
  * - A cancelled run files nothing more, however its predecessors ended: no step, no check, no try, no round.
  * - A pruned run honours no person's ask, since its worktrees are gone (`mayFile`): an ask written by hand is no try due. A held run
  *   honours none until the hold lifts, files nothing and asks nothing of a person; it is `running`, since a hold is no decision about the
- *   work, with `heldUntil`, and keeps `unreachable`, since what can never run is a fact about the steps.
+ *   work, with `holdUntil`, and keeps `unreachable`, since what can never run is a fact about the steps.
  * - A step about to be tried again, and a looping step whose loop goes round again, is `running`: what waits on it waits. No step of a
  *   round due is `over budget` (`roundSpans`): the round is what a person raised the cap for.
  * - An ending step that `waitsOnCheckout` is not filed, neither a first session nor a person's try of it, since two sessions trial merging
@@ -126,7 +126,7 @@ export function assess(
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf);
   for (const name of roundSpans(steps, round)) if (status.get(name) === 'over budget') status.set(name, stood.get(name)!.own);
   for (const r of round) status.set(r.step, 'running');
-  for (const name of unheld(steps, run, retry, round)) status.set(name, 'waiting');
+  for (const name of unheld(steps, run, retry, round)) status.set(name, 'pending');
   const ready: string[] = [];
   const check: string[] = [];
   const unreachable: string[] = [];
@@ -134,8 +134,8 @@ export function assess(
   for (const step of steps) {
     const own = status.get(step.name)!;
     if (own === 'checking' && !run.steps[step.name]?.check) check.push(step.name);
-    if (own !== 'waiting') continue;
-    const deps = step.after.map((a) => status.get(a) ?? 'waiting');
+    if (own !== 'pending') continue;
+    const deps = step.after.map((a) => status.get(a) ?? 'pending');
     if (deps.some(stopsFollowers)) unreachable.push(step.name);
     else if (!deps.every(satisfiesAfter)) continue;
     else if (waitsOnCheckout(steps, step.name, checkout)) waitingOnCheckout.push(step.name);
@@ -150,8 +150,8 @@ export function assess(
       : 'running';
 
   if (run.hold)
-    return { ready: [], check: [], retry: [], round: [], unreachable, waitingOnCheckout: [], status: 'running', heldUntil: run.hold.until };
-  const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'waiting', standings);
+    return { ready: [], check: [], retry: [], round: [], unreachable, waitingOnCheckout: [], status: 'running', holdUntil: run.hold.until };
+  const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'pending', standings);
   const assessed: Assessment = {
     ready,
     check,
@@ -184,7 +184,7 @@ function underPause(run: Run, a: Assessment): Assessment {
 function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus }>): Assessment['status'] {
   const stops = each.filter((s) => stopsFollowers(s.status));
   if (stops.some((s) => [s.status, s.own].some((w) => w === 'failed' || w === 'stopped' || w === 'failed (check)'))) return 'failed';
-  return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'blocked';
+  return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'waiting';
 }
 
 /** What the run refused of the last try's closeout's envelope (`envelopeRefusals`), as its next try is told it; nothing for none. */

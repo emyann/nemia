@@ -58,7 +58,6 @@ const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSum
     agent: null,
     since: null,
     needs: null,
-    blockedByHarness: false,
     waitingFor: null,
     approve: null,
     denied: null,
@@ -66,11 +65,11 @@ const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSum
   })),
   graph: { roots: [], edges: [] },
   waitingOnYou: [],
-  onYou: [],
+  waitingOnYouWords: [],
   after: [],
   waiting: null,
   context: [],
-  heldUntil: [],
+  holdUntil: [],
   holding: null,
   toDecide: null,
   unreadable: null,
@@ -105,7 +104,7 @@ test('atWork and atWorkWords: the sessions at work', async (t) => {
       runs: [],
       word: 'held until a person lifts it',
       advice: 'wf hold r-1 --off',
-      onYou: true,
+      waitingOnYou: true,
     };
     assert.deepEqual(atWork(light([run(['running (working)', 'waiting'], { moving: false, holding })], [])), { runs: 0, sessions: 1 });
   });

@@ -82,7 +82,7 @@ run's status (`assess`'s, as `wf tick` prints it, `(pruned)` beside it for a pru
 waits on you as its note) and for each step's word and note as `wf ls` prints them. A run stopped on
 a person's word and not on anything that broke says what `wf decide` says of it rather than `failed`:
 `awaiting approval` when every step that stops it waits at its gate — a plan's, or the ending's
-before it runs — and `blocked` otherwise (a step signed off blocked or unsigned, a loop out of
+before it runs — and `waiting` otherwise (a step signed off blocked or unsigned, a loop out of
 rounds, a cap reached). `failed` is kept for a run in which a step's task failed or was stopped, or
 its check refused it or did not finish. A step that signed off blocked has what it needs — its
 closeout's `needs`, made one line and clipped at 200 characters — as the first part of its note,
@@ -2352,7 +2352,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   `dev*` folder's is: the run's end is a person's every time.
 - **What it holds, on every pass.** A gated step that signs off — verified by its check first, where it has one — reads `awaiting
   approval`, and nothing after it is filed, whatever its closeout says, until an approval of the try it is on is on disk. It stops
-  what follows as a step signed off `blocked` does: the run's outcome is `blocked`; `wf ls` names it waiting on you as `approve
+  what follows as a step signed off `blocked` does: the run's outcome is `waiting`; `wf ls` names it waiting on you as `approve
   plan`, with the two commands beside it; `wf decide` says `AWAITING APPROVAL`; and a run `--after` it has not landed — a person
   merging its branch is not the approval. No session runs, no run slot is held (`WF_MAX_RUNS`) and nothing is spent while it
   waits. A step that signs off blocked or unsigned, or that its check refuses, is not at its gate: it reads what it reads. Nor is a
@@ -3894,7 +3894,7 @@ holding a concurrency slot forever.
 | `src/inbox/queue-factory.ts` | the factory a queued card asks for — pure: why `wf inbox queue` refuses a card that names no factory, or `default`, as its start would be (`queueFactoryRefusal`) |
 | `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`DEFAULT_FACTORY`, `defaultFactoryRefusal`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), the workflows it offers: a workflow's name (`workflowNameRefusal`) and a start of one not attached (`unattachedRefusal`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
 | `src/run.ts` | the entry `agent-orchestrator/run` — pure: each name it exports re-exported by name from the folders below, and nothing else |
-| `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and the run's one word (`status`): `failed` where a step broke, `awaiting approval` or `blocked` where only a person stops it (`stoppedOnWord`) |
+| `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and the run's one word (`status`): `failed` where a step broke, `awaiting approval` or `waiting` where only a person stops it (`stoppedOnWord`) |
 | `src/round/round.ts` | a loop's rounds — pure: those due (`roundsDue`) and the steps once one is filed (`roundFiled`), what `nemia retry --round` and `nemia approve` of a loop ask and refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`) |
 | `src/cancel/cancel.ts` | what cancelling a run has to do, and what to tell the person who asked (`cancelPlan`) — pure |
 | `src/forgetting/forgetting.ts` | what the engine forgot of a run's tasks, pure: each run's share of one answer (`forgettingOf`), whether nothing is left (`forgettingDone`), and its words (`engineWords`, `uncountedWords`) |

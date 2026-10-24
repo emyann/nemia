@@ -416,7 +416,7 @@ test('an inbox card of a folder team: --repo named at its start is refused, as o
       ),
       `the start says so, rather than leaving a person to look for the work in it:\n${out.join('\n')}`,
     );
-    assert.ok(!fs.existsSync(file), 'started, the card leaves the inbox');
+    assert.ok(fs.existsSync(file), 'started, the card stays in the inbox');
   } finally {
     process.chdir(cwd);
   }

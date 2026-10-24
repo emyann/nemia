@@ -9,7 +9,7 @@ import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { MergeOf, RoundAsk } from '../status/status.ts';
-import type { QueueTry } from '../inbox/index.ts';
+import type { MissedStart } from '../inbox/index.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { Pin } from '../revisions/revisions.ts';
 
@@ -774,9 +774,9 @@ export type RunStore = {
      * The tick's tries of a queued card's start that did not happen, by card name. A file that does not read as one, torn or removed
      * after the listing, is none.
      */
-    readonly tries: () => Map<string, QueueTry>;
+    readonly tries: () => Map<string, MissedStart>;
     /** Write down the tick's try of the card `name`, whole over the one there: the tick's alone. Throws what the filesystem throws. */
-    readonly putTry: (name: string, tried: QueueTry) => void;
+    readonly putTry: (name: string, tried: MissedStart) => void;
     /** Remove the tick's try of the card `name`, there or not: the tick's alone. */
     readonly dropTry: (name: string) => void;
   };

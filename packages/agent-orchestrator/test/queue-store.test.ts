@@ -2,7 +2,7 @@
  * The queue on disk: the cap on runs in flight (`WF_MAX_RUNS`), and inbox cards that start themselves (`nemia inbox queue`), judged by the
  * tick over every run and card in a store of its own — told as a person's stories on `story(t)` and the stage (`staged`): a cap of two
  * runs, a run's momentum, a card that becomes a run at a cap of one, and the queue's failures; and as tables, what the daemon's ceilings
- * refuse and what `nemia inbox queue` refuses. Kept focused: a card started by hand whose removal failed, a record that does not read as
+ * refuse and what `nemia inbox queue` refuses. Kept focused: a card started by hand, kept, never started again, a record that does not read as
  * a run, and a try file the tick reads only as it writes it.
  *
  * What the cap decides is pure, and lives in `src/cap/cap.test.ts`; what a card and the queue's order are, in `src/inbox/inbox.test.ts`;
@@ -725,7 +725,7 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
       b.settle(`${busy.id}-implement`, 'succeeded', SIGNED);
       const freed = await runWith(b.e, tickRun());
       const [old] = fromCard('z-old-c3d4');
-      assert.deepEqual(freed.queue, { card: 'z-old-c3d4', run: old.id, removed: true });
+      assert.deepEqual(freed.queue, { card: 'z-old-c3d4', run: old.id });
       assert.deepEqual([fs.existsSync(file), fromCard(name)], [true, []], 'one card a pass');
     },
   );
@@ -740,7 +740,7 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
   );
 
   await s.test(
-    "once its slot frees, the factory's card starts in its factory, on its one repository: `nemia tick` says `started <card> as <run>`, the card is removed, its run records where it came from and its gate, and its roots are filed on the pass after",
+    "once its slot frees, the factory's card starts in its factory, on its one repository: `nemia tick` says `started <card> as <run>`, the card is kept, listed as started, its run records where it came from and its gate, and its roots are filed on the pass after",
     async (c) => {
       const [old] = fromCard('z-old-c3d4');
       b.settle(`${old.id}-implement`, 'succeeded', SIGNED);
@@ -750,7 +750,12 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
       assert.equal(ticked[0], `started ${name} as ${run.id}`);
       assert.deepEqual(
         [run.brief, run.repo, run.workflowDir, run.factory, run.isolate, run.from, run.gates?.includes('review'), fs.existsSync(file)],
-        ['Cache the views between passes', solo, path.join(solo, 'workflows', 'dev'), 'solo', true, { inbox: name }, true, false],
+        ['Cache the views between passes', solo, path.join(solo, 'workflows', 'dev'), 'solo', true, { inbox: name }, true, true],
+      );
+      assert.deepEqual(
+        [readInbox().find((l) => l.name === name)?.state, /^queued:/m.test(fs.readFileSync(file, 'utf8'))],
+        ['started', false],
+        'the card kept, listed as started, its queued: line taken off',
       );
       const next = await runWith(b.e, tickRun());
       assert.deepEqual(
@@ -818,7 +823,7 @@ test('a card becomes a run: filed with its factory and its gate, queued, it wait
       const [started] = fromCard(card.name);
       assert.deepEqual(
         [pass.queue, started?.repo, started?.workflowDir],
-        [{ card: card.name, run: started.id, removed: true }, daemons, path.join(daemons, 'workflows', 'dev')],
+        [{ card: card.name, run: started.id }, daemons, path.join(daemons, 'workflows', 'dev')],
       );
       await runWith(b.e, cancelRun(started.id));
     },
@@ -874,7 +879,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
 
       const next = await runWith(b.e, tickRun());
       const [behind] = fromCard('behind-c3d4');
-      assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind.id, removed: true }, 'not tried again: the card behind it starts');
+      assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind.id }, 'not tried again: the card behind it starts');
       assert.deepEqual(
         [(await runWith(b.e, tickRun())).queue, fromCard('gone-a1b2')],
         [undefined, []],
@@ -887,7 +892,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       await printedBy(c, ['inbox', 'queue', 'gone-a1b2']);
       const retried = await runWith(b.e, tickRun());
       const [back] = fromCard('gone-a1b2');
-      assert.deepEqual(retried.queue, { card: 'gone-a1b2', run: back.id, removed: true });
+      assert.deepEqual(retried.queue, { card: 'gone-a1b2', run: back.id });
       assert.deepEqual(fs.readdirSync(path.join(ROOT, 'queue')), [], 'its refusal removed once the card no longer read as refused');
     },
   );
@@ -912,7 +917,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
 
       const next = await runWith(b.e, tickRun());
       const [behind] = fromCard('behind-c3d4');
-      assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind.id, removed: true });
+      assert.deepEqual(next.queue, { card: 'behind-c3d4', run: behind.id });
 
       assert.deepEqual(
         await printedBy(c, ['inbox', 'queue', 'gone-a1b2', '--off']),
@@ -952,7 +957,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
 
       const started = await runWith(b.e, tickRun({ repo: dev }));
       const [run] = fromCard(card.name);
-      assert.deepEqual([started.queue, run?.repo], [{ card: card.name, run: run.id, removed: true }, dev]);
+      assert.deepEqual([started.queue, run?.repo], [{ card: card.name, run: run.id }, dev]);
     },
   );
 
@@ -1008,7 +1013,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('---\nworkflow: dev', '---\nworkflow: dev\nfactory: solo'));
       const pass = await runWith(b.e, tickRun({ repo: aRepoWith('dev') }));
       const [run] = fromCard('loose-card');
-      assert.deepEqual([pass.queue, run?.factory, run?.repo], [{ card: 'loose-card', run: run?.id, removed: true }, 'solo', solo]);
+      assert.deepEqual([pass.queue, run?.factory, run?.repo], [{ card: 'loose-card', run: run?.id }, 'solo', solo]);
 
       aCard('default-card', { workflow: 'dev', factory: 'default', queued: at(2) }, 'Build it in the history.');
       const history = await runWith(b.e, tickRun({ repo: solo }));
@@ -1074,10 +1079,10 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
       ['queued-a1b2.md: already queued', '1 in the queue', 'nemia inbox queue queued-a1b2 --off'],
     ],
     [
-      "a card a run's record names as started, its removal failed",
+      "a card a run's record names as started",
       () => queue('kept-a1b2'),
       'Conflict',
-      ['kept-a1b2.md: this card was started as started-already-zz99', 'its removal failed'],
+      ['kept-a1b2.md: this card was started as started-already-zz99', 'nemia inbox add'],
     ],
     [
       'and its start, of the same kind',
@@ -1135,7 +1140,7 @@ test('REFUSED by name at shipped defaults: `nemia inbox queue` of a name with no
 });
 
 test(
-  'a card queued, then started by hand, is not started twice — nor, when its removal failed, by any pass after',
+  'a card queued, then started by hand, is not started twice — nor once its run is forgotten, its queued: line gone — nor, when that line could not be taken off, by any pass after',
   { skip: process.getuid?.() === 0 && 'root removes a file from a folder it may not write' },
   async (t) => {
     emptyStore(undefined);
@@ -1150,6 +1155,13 @@ test(
       [(await runWith(b.e, tickRun())).queue, (await runWith(b.e, tickRun())).queue, fromCard(removed.card.name).length],
       [undefined, undefined, 1],
     );
+    const [byHand] = fromCard(removed.card.name);
+    fs.rmSync(path.join(ROOT, 'runs', `${byHand.id}.json`));
+    assert.deepEqual(
+      [readInbox().find((l) => l.name === removed.card.name)?.state, (await runWith(b.e, tickRun())).queue, fromCard(removed.card.name)],
+      ['filed', undefined, []],
+      'its run forgotten, the card reads filed, and the tick does not start it again',
+    );
 
     const stuck = addToInbox({ text: 'Started by hand, and left behind', workflow: 'dev', repo });
     await printedBy(t, ['inbox', 'queue', stuck.card.name]);
@@ -1159,7 +1171,7 @@ test(
     } finally {
       fs.chmodSync(INBOX, 0o755);
     }
-    assert.deepEqual([fs.existsSync(stuck.file), fromCard(stuck.card.name).length], [true, 1], 'still in the inbox, and started once');
+    assert.deepEqual([fs.existsSync(stuck.file), fromCard(stuck.card.name).length], [true, 1], 'kept, and started once');
     assert.deepEqual(readInbox().find((l) => l.name === stuck.card.name)!.queued, {
       at: /^queued: (.*)$/m.exec(fs.readFileSync(stuck.file, 'utf8'))![1],
       place: null,

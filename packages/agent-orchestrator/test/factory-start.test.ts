@@ -652,14 +652,14 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
   fs.cpSync(path.dirname(build), path.join(repo, 'workflows'), { recursive: true });
 
   await s.test(
-    '`nemia start <card> --factory` starts it in the factory, on its one repository from any directory, and removes it',
+    '`nemia start <card> --factory` starts it in the factory, on its one repository from any directory, and keeps it',
     async () => {
       const card = aCard('build-it', 'Build it.\n');
       const out = await typedFrom(ROOT, ['start', card, '--workflows', build, '--factory', 'pipao', '--no-worktree']);
       const run = readRun(startedId(out));
       assert.deepEqual([run.factory, run.repo, run.from], ['pipao', repo, { inbox: 'build-it' }]);
       assert.ok(out.includes(`factory: pipao, on ${repo}`), out.join('\n'));
-      assert.equal(fs.existsSync(card), false, 'the card is removed');
+      assert.ok(fs.existsSync(card), 'the card is kept');
     },
   );
 
@@ -685,7 +685,7 @@ test('an inbox card started in its factory, or refused with the card kept', asyn
         [run.brief, run.factory, run.workflowDir, run.context, run.from],
         ['Build it by name.', 'pipao', path.join(repo, 'workflows', 'build'), [before.id], { inbox: 'by-its-name' }],
       );
-      assert.equal(fs.existsSync(card), false, 'the card is removed');
+      assert.ok(fs.existsSync(card), 'the card is kept');
       const flags = ['--factory', 'pipao', '--workflows', build, '--no-worktree'];
       const text = readRun(startedId(await typedFrom(elsewhere, ['start', 'no-such-card', ...flags])));
       assert.deepEqual([text.brief, 'from' in text], ['no-such-card', false], 'a name no card has stays a text brief');

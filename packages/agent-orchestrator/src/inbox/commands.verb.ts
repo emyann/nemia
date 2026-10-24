@@ -35,7 +35,8 @@ is said at start:
     Cache the engine's views between passes.
 
   nemia inbox       lists each card: its name, the first line of its body, its workflow and repo when set, and
-                 started as <runId> for a card a run's record says it was started as — a card whose removal failed.
+                 started as <runId> for a card a run's record says it was started as: a started card stays in the
+                 inbox, and is not started again.
                  An entry that does not read as a card is listed with why.
   nemia inbox add   files an idea, text or a file, named with the slug a run id makes of its first line, suffix and
                  all; --workflow, --repo and --factory write the keys, over a file's own.

@@ -26,8 +26,8 @@
  * **The keys are a closed list**, as a plan card's are: a key nothing reads is a constraint nobody enforces.
  *
  * Nothing about a run changes. A card started is a run like any other, whose record carries `from: { inbox: <name> }`, and the card is
- * removed; a card still there whose name a record carries is one whose removal failed, and `nemia inbox` says it was started, composed on
- * read.
+ * kept: it has a life of its own, its `CardState`, read once by the listing (`cardState`) from its file, the records that name it and the
+ * tick's tries, and sent as is.
  *
  * Pure: handed a card's text, the folder's entries and the run records, and whether a path is a directory, never reading one
  * (inbox.store.ts and inbox.verb.ts read them).
@@ -241,8 +241,10 @@ export type InboxListing = {
   gate?: string;
   /** The runs its run is handed as context (`from:`): none on a card that names none, and on an entry that does not read as a card. */
   from: string[];
-  /** The runs whose record's `from` names this card: a card still here was started, and its removal failed. */
+  /** The runs whose record's `from` names this card: the runs it was started as. */
   startedAs: string[];
+  /** Where the card is in its life (`cardState`): computed here once, and read as is by everything above. */
+  state: CardState;
   /** Why the entry does not read as a card: its card's refusal, or not a `.md` file. Null for a card. */
   error: string | null;
   /**
@@ -251,7 +253,7 @@ export type InboxListing = {
    */
   queued?: { at: string; place: number | null };
   /**
-   * On a queued card only, whose start the tick tried and did not make, as the card stands (`QueueTry`): when, on which repository, why,
+   * On a queued card only, whose start the tick tried and did not make, as the card stands (`MissedStart`): when, on which repository, why,
    * and whether the package refused it or something else failed.
    */
   tried?: { at: string; repo: string; why: string; refused: boolean };
@@ -272,7 +274,22 @@ export type InboxListing = {
  * while the start reads the repository, a file that cannot be read — is a failure, not a verdict on the card: it is tried again on the next
  * pass.
  */
-export type QueueTry = { at: string; text: string; repo: string; why: string; refused: boolean };
+export type MissedStart = { at: string; text: string; repo: string; why: string; refused: boolean };
+
+/**
+ * Where a card is in its life, closed: `filed` — in the inbox, to be started by a person; `queued` — waiting for the tick to start it;
+ * `refused` — queued, and the tick's start of it as it stands was refused, so it waits for a person; `started` — a run's record names it.
+ */
+export const CARD_STATES = ['filed', 'queued', 'refused', 'started'] as const;
+export type CardState = (typeof CARD_STATES)[number];
+
+/**
+ * A listed entry's state, from what the listing read of it: `started` when a record names it, whatever it carries; else `refused` when it
+ * is queued and its try as it stands was refused; else `queued` when it is queued; else `filed` — an entry that does not read as a card
+ * among them, its `error` saying why. Pure.
+ */
+export const cardState = (l: Pick<InboxListing, 'startedAs' | 'queued' | 'tried'>): CardState =>
+  l.startedAs.length ? 'started' : l.queued ? (l.tried?.refused ? 'refused' : 'queued') : 'filed';
 
 /** The memo a caller that polls the inbox keeps of what its listing reads of every run: the card it was started from, under its id. */
 export type InboxRuns = RecordMemo<Pick<Run, 'id' | 'from'>>;
@@ -291,7 +308,7 @@ export function inboxListing(
   files: readonly PlanFile[],
   runs: readonly Pick<Run, 'id' | 'from'>[],
   isDirectory: (at: string) => boolean,
-  tries: ReadonlyMap<string, QueueTry> = new Map(),
+  tries: ReadonlyMap<string, MissedStart> = new Map(),
   factories: ReadonlyMap<string, Pick<Factory, 'repos'>> = new Map(),
 ): InboxListing[] {
   const triedOf = (name: string, text: string): Pick<InboxListing, 'tried'> => {
@@ -301,7 +318,7 @@ export function inboxListing(
   const listed = files
     .filter((f) => !f.file.startsWith('.') && !isReadme(f.file))
     .sort((a, b) => a.file.localeCompare(b.file))
-    .map(({ file, text }): InboxListing => {
+    .map(({ file, text }): Omit<InboxListing, 'state'> => {
       if (!file.endsWith('.md')) {
         return {
           name: file,
@@ -356,7 +373,8 @@ export function inboxListing(
           ...(queued !== undefined ? { queued: { at: queued, place: null }, ...triedOf(name, text) } : {}),
         };
       }
-    });
+    })
+    .map((l): InboxListing => ({ ...l, state: cardState(l) }));
   queueOrder(listed).forEach((l, i) => {
     l.queued!.place = i + 1;
   });
@@ -364,12 +382,12 @@ export function inboxListing(
 }
 
 /**
- * The queued cards in the order the tick starts them: by when each was queued, then by name — a card a record says was started left out,
- * since it is never started again. Pure. A card whose start was refused keeps its place, and the tick passes over it (`nextQueued`).
+ * The queued cards in the order the tick starts them: by when each was queued, then by name — a `started` card left out, since it is never
+ * started again, even one whose `queued:` line its start could not take off. Pure. A card whose start was refused keeps its place, and the tick passes over it (`nextQueued`).
  */
 export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
   listing
-    .filter((l) => l.queued && !l.startedAs.length)
+    .filter((l) => l.queued && l.state !== 'started')
     .sort((a, b) => a.queued!.at.localeCompare(b.queued!.at) || a.name.localeCompare(b.name));
 
 /**
@@ -413,13 +431,12 @@ export const nextQueued = (
 ): InboxListing | undefined => queueOrder(listing).find((l) => !(l.tried?.refused && l.tried.repo === queueRepo(l, repo, factories).repo));
 
 /**
- * What the tick did with the queue on a pass (`startQueued` in inbox.verb.ts): started the next card as a run — and whether the card left
- * the inbox, and why not — or tried to, and was refused, in the package's words, or failed for another reason: `again` when it failed as it
+ * What the tick did with the queue on a pass (`startQueued` in inbox.verb.ts): started the next card as a run — and, when its `queued:`
+ * line could not be taken off, why (`queueLeft`) — or tried to, and was refused, in the package's words, or failed for another reason: `again` when it failed as it
  * did on the pass before, on the same repository. `on` is the repository it was tried on, for a card that names none.
  */
 export type QueueStarted =
-  | { card: string; run: string; removed: true; ignoredRepo?: string }
-  | { card: string; run: string; removed: false; why: string; ignoredRepo?: string }
+  | { card: string; run: string; ignoredRepo?: string; queueLeft?: string }
   | { card: string; refused: string; on?: string }
   | { card: string; failed: string; again: boolean; on?: string };
 
@@ -447,9 +464,9 @@ export function queueLine(q: QueueStarted): string {
   if ('failed' in q) {
     return `${q.card} not started${q.on ? ` on ${q.on}` : ''}: ${q.failed} — not a refusal: tried again on the next pass, where it keeps its place, and said again only if it fails otherwise`;
   }
-  const started = q.removed
-    ? `started ${q.card} as ${q.run}`
-    : `started ${q.card} as ${q.run} — still in the inbox: ${q.why}. nemia inbox lists it as started as ${q.run}, and it is not started again: drop it with nemia inbox rm ${q.card}`;
+  const started = q.queueLeft
+    ? `started ${q.card} as ${q.run} — ${q.queueLeft}. nemia inbox lists it as started, and the tick does not start it again while ${q.run}'s record stands: take the line off with nemia inbox queue ${q.card} --off`
+    : `started ${q.card} as ${q.run}`;
   return q.ignoredRepo ? `${started} (${ignoredRepoLine(q.ignoredRepo)})` : started;
 }
 
@@ -658,9 +675,9 @@ export function noWorkflowRefusal(card: Pick<InboxCard, 'file'>, where: string, 
 }
 
 /**
- * Why a card is not started again: a run's record names it (`from`), so it was started, and is still in the inbox because its removal
- * failed. Started again, the idea would run twice.
+ * Why a card is not started again: a run's record names it (`from`), so it was started — a card is started once, and stays in the inbox
+ * as its trace. Started again, the idea would run twice.
  */
 export function startedRefusal(card: Pick<InboxCard, 'name' | 'file'>, where: string, runs: readonly string[]): string {
-  return `${card.file}: this card was started as ${runs.join(', ')} — ${runs.length === 1 ? "that run's record says" : 'their records say'} so — and is still in the inbox because its removal failed. Drop it with nemia inbox rm ${card.name}; to run the idea again, park it again under a name of its own first: nemia inbox add ${where}.`;
+  return `${card.file}: this card was started as ${runs.join(', ')} — ${runs.length === 1 ? "that run's record says" : 'their records say'} so — and a card is started once. To run the idea again, file it again under a name of its own: nemia inbox add ${where}.`;
 }

@@ -4,7 +4,8 @@
  * numbers them by precedence — the agent's instructions, the person's custom instructions, the folder's files, the factory's rules,
  * the step's policy — says the higher number wins, and calls none of them an escape hatch; the README and the page carry the routing
  * rule that says which layer owns a new instruction, and each says that a session is told the precedence, which it now is; the README
- * names the agent's `harnessPrompt:`. The glossary's one-line entry says the same. Each refusal is first made of planted text.
+ * names the agent's `harnessPrompt:`. The meaning of *Instruction layers* in the agents' glossary table
+ * (`packages/agent-orchestrator/src/agents/glossary.json`) says the same. Each refusal is first made of planted text.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -115,7 +116,14 @@ const README = (): string =>
   slice('packages/agent-orchestrator/README.md', "### An agent is a node's attachment", /^#### What an agent says it can do/m);
 const SKILL = (): string => slice('.claude/skills/create-an-agent/SKILL.md', '## The five layers', /^## /m);
 const PAGE = (): string => slice('apps/docs/src/content/docs/agents.mdx', '## What an agent is told: five layers', /^## Sources/m);
-const GLOSSARY = (): string => slice('apps/docs/src/content/docs/glossary.mdx', '- **Instruction layers**', /^- \*\*Intent\*\*/m);
+/** The `meaning` of the term `Instruction layers` in the agents' glossary table. */
+const GLOSSARY = (): string => {
+  const file = 'packages/agent-orchestrator/src/agents/glossary.json';
+  const table = JSON.parse(fs.readFileSync(path.join(REPO, file), 'utf8')) as { terms: Array<{ term: string; meaning: string }> };
+  const row = table.terms.find((t) => t.term === 'Instruction layers');
+  assert.ok(row, `${file} has the term Instruction layers`);
+  return row.meaning;
+};
 
 /** A numbered list of the layers, each item `n. **Name** — words`, built from the names and numbers given. */
 const listOf = (names: readonly string[], numbers?: readonly number[]): string =>
@@ -237,7 +245,7 @@ test('the README and create-an-agent each say custom instructions are built, and
   assert.equal(customLayerRefusal(SKILL()), undefined, 'create-an-agent');
 });
 
-test("the glossary's *Instruction layers* entry says the precedence, and that a session is told it", () => {
+test("the agents' glossary table's *Instruction layers* says the precedence, and that a session is told it", () => {
   const entry = GLOSSARY();
   assert.equal(precedenceRefusal(entry), undefined);
   assert.equal(toldRefusal(entry), undefined);

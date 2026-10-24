@@ -1,0 +1,28 @@
+{
+  "context": "planning",
+  "title": "Planning",
+  "about": "The cards waiting to be started.",
+  "paths": [
+    "packages/agent-orchestrator/src/inbox",
+    "packages/agent-orchestrator/src/plan"
+  ],
+  "terms": [
+    {
+      "term": "Card",
+      "meaning": "a piece of work written as a short markdown brief, started as a run.",
+      "type": "Card",
+      "see": {
+        "label": "From a card to a landing",
+        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+      }
+    },
+    {
+      "term": "Inbox",
+      "meaning": "where cards wait before they are started.",
+      "see": {
+        "label": "From a card to a landing",
+        "href": "/how-a-run-lives/#from-a-card-to-a-landing"
+      }
+    }
+  ]
+}

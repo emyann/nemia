@@ -404,7 +404,9 @@ Codex's and Anthropic's names, and the runtime's own permission modes and sandbo
 packages/agent-runtime: not in the orchestrator's `src` and `bin`, `apps/api/src` or `apps/web/src`. A workflow's words — a workflow,
 a step, a gate, a factory, a closeout, the orchestrator, `wf` and Nemia — stay out of the runtime's `src` and `bin`. This repository's
 team, the agents of `workflows/agents/`, stays out of every package's `src`. A word is matched whole and in any case, comments
-included. Each file that says one today is counted, and the count only shrinks.
+included. Each file that says one today is counted, and the count only shrinks. Each context lists its own words in a
+`glossary.json` at its door, a word and the spellings it retired, and `tools/guards/test/glossary.test.ts` counts each retired spelling
+under its table's paths the same way.
 
 Each rule's test first refuses planted source that breaks it, so none can pass by reading nothing. The contract tests
 read every file git lists outside their package; `turbo.json` makes the apps' `src` and `test`, for the runtime the apps' root

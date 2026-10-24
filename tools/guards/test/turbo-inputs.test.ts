@@ -19,9 +19,10 @@
  * `tools/guards/test/repo-guards.test.ts` reads `CODEOWNERS`, under `.github/`, and the packages' manifests. The citation guard reads
  * every `CLAUDE.md` and every test file, the apps' among them (`claude-md-cites.test.ts`); the licence guard the root's `LICENSE` and
  * `README.md` (`license.test.ts`); the team's guards and the git reads' guard `.claude/settings.json` and the skills (`team-words.test.ts`,
- * `team-portable.test.ts`, `git-reads.test.ts`), the five layers' guard the docs site's pages (`agent-layers-doc.test.ts`); the
- * orchestrator's own files reach this task through its dependency on `agent-orchestrator`. The same list is what
- * `tools/guards/due.ts` reads to say whether CI owes the guards their suite.
+ * `team-portable.test.ts`, `git-reads.test.ts`), the five layers' guard the docs site's pages and the agents' glossary table
+ * (`agent-layers-doc.test.ts`), and the glossary guard every context's table and the apps' source (`glossary.test.ts`); the
+ * orchestrator's own files, and the runtime's through it, reach this task through its dependency on `agent-orchestrator`. The same
+ * list is what `tools/guards/due.ts` reads to say whether CI owes the guards their suite.
  * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
  */
 import { test } from 'node:test';
@@ -35,9 +36,23 @@ const APPS = ['$TURBO_ROOT$/apps/*/src/**', '$TURBO_ROOT$/apps/*/test/**'];
 
 /**
  * The apps' test files, under their `test/` and beside their code to the depth they keep them, which `claude-md-cites.test.ts` resolves
- * a citation to: not the apps' whole source, which would make the guards due on every change to the board.
+ * a citation to. The apps' whole source is an input too (`APP_SOURCES`), so the two globs under `src/` are within it; they stay listed
+ * for the citation guard, which would still read them if the glossary guard stopped reading the apps' source.
  */
 const APP_TESTS = ['$TURBO_ROOT$/apps/*/test/**', '$TURBO_ROOT$/apps/*/src/*.test.ts*', '$TURBO_ROOT$/apps/*/src/*/*.test.ts*'];
+
+/**
+ * What the glossary guard reads in the apps (`glossary.test.ts`): each app's table at its root, and every `.ts` and `.tsx` under it —
+ * its source, its configuration files beside its manifest, and the board's Storybook — where it counts the spellings a table retires.
+ * The guards are due on every change to the board's source for it; the packages' tables and source reach this task through its
+ * dependency on `agent-orchestrator`.
+ */
+const APP_SOURCES = [
+  '$TURBO_ROOT$/apps/*/src/**',
+  '$TURBO_ROOT$/apps/*/*.ts',
+  '$TURBO_ROOT$/apps/web/.storybook/**',
+  '$TURBO_ROOT$/apps/*/glossary.json',
+];
 
 /** Every `CLAUDE.md` of the repository, the root's, the apps' and the packages': what `claude-md-cites.test.ts` reads. */
 const CLAUDE_FILES = ['$TURBO_ROOT$/CLAUDE.md', '$TURBO_ROOT$/apps/*/CLAUDE.md', '$TURBO_ROOT$/packages/*/CLAUDE.md'];
@@ -79,6 +94,7 @@ const INPUTS: Record<string, readonly string[]> = {
     '$TURBO_ROOT$/apps/web/theme/**',
     ...APP_TESTS,
     '$TURBO_ROOT$/apps/*/tsconfig.json',
+    ...APP_SOURCES,
     '$TURBO_ROOT$/apps/docs/src/content/docs/**',
     ...CLAUDE_FILES,
     '$TURBO_ROOT$/README.md',
@@ -134,7 +150,7 @@ test('each test that reads files outside its package lists them among its inputs
   assert.deepEqual(missingInputs(readTurbo()), []);
 });
 
-test("REFUSED: a task that drops the apps' tests or root files, the team, the test-cost tooling, its own files, or its whole inputs", () => {
+test("REFUSED: a task that drops the apps' tests, sources or tables, or root files, the team, the test-cost tooling, its own files, or its whole inputs", () => {
   const dropping = (task: string, glob: string): Turbo => {
     const turbo = readTurbo();
     const inputs = turbo.tasks[task]?.inputs ?? [];
@@ -151,6 +167,11 @@ test("REFUSED: a task that drops the apps' tests or root files, the team, the te
   assert.deepEqual(missingInputs(dropping('guards#test', '$TURBO_ROOT$/.github/**')), [
     'guards#test does not list $TURBO_ROOT$/.github/** among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);
+  for (const glob of APP_SOURCES) {
+    const missing = missingInputs(dropping('guards#test', glob));
+    assert.equal(missing.length, 1, glob);
+    assert.ok(missing[0].includes(glob), missing[0]);
+  }
   assert.deepEqual(missingInputs(dropping('guards#test', '$TURBO_ROOT$/.gitleaks.toml')), [
     'guards#test does not list $TURBO_ROOT$/.gitleaks.toml among its inputs in turbo.json: add it, or turbo replays it from its cache',
   ]);

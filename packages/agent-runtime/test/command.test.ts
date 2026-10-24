@@ -26,7 +26,10 @@ import { builtEngine } from './engine.ts';
 import { story } from './checkpoints.ts';
 import { until, WAITED } from '../src/waits/index.ts';
 
-/** This process's own niceness, which a worker it spawns inherits. */
+/**
+ * This process's own niceness, which a worker it spawns inherits: a test runs at whatever niceness and IO class its parent gave it, so
+ * a niceness is read relative to this one, and an argv the IO class would hide is proven by calling the harness's `command`.
+ */
 const ownNiceness = (): number => Number(spawnSync('ps', ['-o', 'ni=', '-p', String(process.pid)], { encoding: 'utf8' }).stdout.trim());
 
 /** Whether this machine runs the idle IO class under a niceness, as the harness's `prepare` asks it. */

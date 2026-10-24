@@ -9,6 +9,11 @@ its root. A page holds landed material only; a term designed and not built sits 
 
 - **A state machine's diagram is its code's**: a page names it with an empty fence, ```` ```mermaid diagram=<name> ````, and
   `src/mermaid.ts` reads it at build from between its `diagram:<name>` markers in `packages/*/README.md` or `packages/*/docs/`.
+- **The Glossary's terms are the tables' rows**: each context keeps a `glossary.json` at its door, and `src/glossary.ts` draws the
+  page's ```` ```glossary ```` fence, which lists the contexts' ids one a line, as one section per context. A new context's id goes
+  into that fence, in the map's order; a table the fence omits, an id with no table, or an id two tables give fails the build, and
+  `test/glossary.test.ts` refuses a term's type its workspace does not export. `test/names.test.ts` reads the tables' texts as it reads
+  a page.
 - A line beautiful-mermaid would read as nothing fails the build, naming it (`unreadLines`), but the flowchart parser makes a stray word
   a node, so that guard catches a broken edge, not every slip: read the picture.
 - A backticked span with a space in it, or a colon that no digits follow, is read by no check of a page's citations: a command

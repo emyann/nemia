@@ -1,0 +1,100 @@
+{
+  "context": "runtime",
+  "title": "The runtime",
+  "about": "`packages/agent-runtime` runs agent sessions on a harness, durably: its words are what a session is and how it runs.",
+  "paths": [
+    "packages/agent-runtime"
+  ],
+  "terms": [
+    {
+      "term": "A2A",
+      "meaning": "the protocol the runtime uses for every harness; each harness is an A2A agent, and a session is an A2A Task.",
+      "see": {
+        "label": "A2A",
+        "href": "/a2a/"
+      }
+    },
+    {
+      "term": "Admission",
+      "meaning": "a queued task's word to start, given by `admit` or by the engine under its ceiling.",
+      "see": {
+        "label": "Admission",
+        "href": "/runtime/#admission"
+      }
+    },
+    {
+      "term": "Attempt",
+      "meaning": "one start of a task's session; whatever ends it settles the task.",
+      "type": "Attempt",
+      "see": {
+        "label": "An attempt",
+        "href": "/runtime/#an-attempt"
+      }
+    },
+    {
+      "term": "Engine",
+      "meaning": "the runtime's loop: it compares each task's journal with what the harness lists, and asks `decide` what to do.",
+      "see": {
+        "label": "The engine",
+        "href": "/runtime/#the-engine"
+      }
+    },
+    {
+      "term": "Harness",
+      "meaning": "the program a session runs in: Claude Code, Codex, a plain command, or a remote A2A agent.",
+      "see": {
+        "label": "A harness",
+        "href": "/runtime/#a-harness"
+      }
+    },
+    {
+      "term": "Journal",
+      "meaning": "the runtime's durable record of a task, an event a line, which every pass reads again.",
+      "type": "Journal",
+      "see": {
+        "label": "The engine",
+        "href": "/runtime/#the-engine"
+      }
+    },
+    {
+      "term": "Lifecycle",
+      "meaning": "the statechart a runtime task moves along.",
+      "see": {
+        "label": "The lifecycle of a task",
+        "href": "/runtime/#the-lifecycle-of-a-task"
+      }
+    },
+    {
+      "term": "Runtime",
+      "meaning": "`packages/agent-runtime`, which runs agent sessions on a harness, durably.",
+      "see": {
+        "label": "The runtime",
+        "href": "/runtime/"
+      }
+    },
+    {
+      "term": "Session",
+      "meaning": "one agent's conversation on a harness: a job that runs to its end, or a long-lived session that runs until stopped.",
+      "see": {
+        "label": "A job and a long-lived session",
+        "href": "/runtime/#a-job-and-a-long-lived-session"
+      }
+    },
+    {
+      "term": "Subscription",
+      "meaning": "in A2A, a client following one Task's events as they happen.",
+      "see": {
+        "label": "A subscription",
+        "href": "/a2a/#a-subscription"
+      }
+    },
+    {
+      "term": "Task",
+      "meaning": "the runtime's unit of work: a brief filed to run on a harness, with its attempts.",
+      "see": {
+        "label": "A task",
+        "href": "/runtime/#a-task"
+      }
+    }
+  ]
+}

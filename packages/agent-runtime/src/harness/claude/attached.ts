@@ -271,6 +271,9 @@ export const letGoOf = (
 
 /**
  * The attached sessions under `root`: `executable` the Claude Code they run, the SDK's own when absent (a test's stand-in otherwise).
+ *
+ * A session's interrupt file is read on every look, never as a transition: another process's ask survives a restart of the holder,
+ * and an ask that landed after its turn ended is dropped there, never kept for the next turn.
  */
 export const attachedSessions = (root: string, executable?: string, options: { letGoMs?: number } = {}): Attached => {
   const live = new Map<string, Live>();

@@ -1,0 +1,38 @@
+{
+  "context": "nemia",
+  "title": "Nemia and chat",
+  "about": "The store's own agent, how much she is handed, and what keeps her session.",
+  "paths": [
+    "packages/agent-orchestrator/src/nemia",
+    "packages/agent-orchestrator/src/chat",
+    "packages/agent-orchestrator/src/level",
+    "packages/agent-orchestrator/nemia"
+  ],
+  "terms": [
+    {
+      "term": "Keeper",
+      "meaning": "the daemon's part that files Nemia's session while any factory is above `manual`, and stops it once none is.",
+      "see": {
+        "label": "The keeper",
+        "href": "/nemia/#the-keeper"
+      }
+    },
+    {
+      "term": "Level",
+      "meaning": "how much a factory hands over to Nemia: `manual`, `semi-auto` or `auto`.",
+      "type": "Level",
+      "see": {
+        "label": "Her levels",
+        "href": "/nemia/#her-levels"
+      }
+    },
+    {
+      "term": "Nemia's agent",
+      "meaning": "the store's own agent, who works the factories a person hands her.",
+      "see": {
+        "label": "Nemia",
+        "href": "/nemia/"
+      }
+    }
+  ]
+}

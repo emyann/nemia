@@ -2,6 +2,9 @@
  * A test's fakes written with async methods, as the engine takes them: a harness (`AsyncRunner`) as a `RunnerOps`, and a store
  * (`AsyncJournal`) as a `StoreOps`, each rejection an Effect failure with the engine's error on it. Test-only, read by the package's
  * typecheck.
+ *
+ * It imports `src` statically: a test that sets an environment variable read at load (`CLAUDE_CONFIG_DIR`) before a dynamic import of
+ * `src` imports this file dynamically too, or `src` is loaded before the variable is set.
  */
 import { Effect } from 'effect';
 import {

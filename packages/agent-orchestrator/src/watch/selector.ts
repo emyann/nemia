@@ -7,12 +7,17 @@
  * any one of them holds for (OR). It is read by `nemia watch` here, and by every other surface that selects the feed's lines.
  *
  * **The keys are the line's own vocabulary, never its message**: the five labels a filing carries (`FeedLabels`) and the five reserved
- * keys a signed line names — `kind`, `reason`, `type`, `waits` and `source`. The message a person reads is prose, worded anew whenever a
+ * keys a signed line names — `kind`, `reason`, `on` (what a `Waiting` line waits on), `via` (where an `AwaitingAnswer` line's answer is
+ * asked), `type`, `waits` and `source`. The message a person reads is prose, worded anew whenever a
  * status is reworded, so nothing selects on it: `-l message=…` is refused as a key the feed has none of.
  *
  * A label may not take a reserved name (`labelKeysRefusal`), or a line's label would decide what `reason` means to a selector.
+ *
+ * **A former reason still selects what it did** (`FORMER_REASONS`): a clause on `reason` that names one is held of the line's current
+ * reason and of the one it would have been written under (`formerOf`), so `reason=NeedsHuman` and `reason notin (WaitingForSlot)` keep
+ * their meaning in a selector typed or stored before the codes were renamed, which is never rewritten.
  */
-import { involvedOf, upgraded, type FeedLabels, type FeedLine } from '../feed/index.ts';
+import { formerOf, involvedOf, isFormerReason, upgraded, type Codes, type FeedLabels, type FeedLine } from '../feed/index.ts';
 
 /**
  * Every label key of a feed line, each named once. A `Record` of `keyof FeedLabels`, whose keys are required however optional the
@@ -25,7 +30,7 @@ const EVERY_LABEL: Record<keyof FeedLabels, true> = { run: true, factory: true, 
 export const LABEL_KEYS: readonly (keyof FeedLabels)[] = Object.keys(EVERY_LABEL) as (keyof FeedLabels)[];
 
 /** The keys a signed line names of itself, which a selector reads beside the labels: what it is about, and how its writer judged it. */
-export const RESERVED_KEYS: readonly string[] = ['kind', 'reason', 'type', 'waits', 'source'];
+export const RESERVED_KEYS: readonly string[] = ['kind', 'reason', 'on', 'via', 'type', 'waits', 'source'];
 
 /** Every key a selector may name: the labels and the reserved keys, in that order. */
 export const SELECTABLE_KEYS: readonly string[] = [...LABEL_KEYS, ...RESERVED_KEYS];
@@ -189,6 +194,8 @@ export function selectableOf(line: FeedLine): Readonly<Record<string, string>> {
   on.kind = involvedOf(signed).kind;
   for (const [key, value] of [
     ['reason', signed.reason],
+    ['on', signed.on],
+    ['via', signed.via],
     ['type', signed.type],
     ['waits', signed.waits],
     ['source', signed.source],
@@ -206,6 +213,25 @@ function holds(clause: Clause, value: string | undefined): boolean {
   return clause.op === 'in' ? listed : !listed;
 }
 
+/** The values a clause names: its one, or its list. */
+const named = (clause: Clause): readonly string[] =>
+  clause.op === 'exists' ? [] : clause.op === '=' || clause.op === '!=' ? [clause.value] : clause.values;
+
+/**
+ * Whether `clause` holds of `line`, whose keys are `on`: a clause on `reason` naming a former code is held of the line's current reason and
+ * its former one together — one of them listed for `=` and `in`, neither for `!=` and `notin`; every other clause of the key it names.
+ */
+function holdsOf(clause: Clause, line: FeedLine, on: Readonly<Record<string, string>>): boolean {
+  const value = on[clause.key];
+  if (clause.key !== 'reason' || !named(clause).some(isFormerReason)) return holds(clause, value);
+  // A signed line's values, which a newer nemia may have written outside the table: formerOf matches only the codes it knows.
+  const codes = { reason: value, on: on.on, via: on.via } as Codes;
+  const former = value === undefined ? undefined : formerOf(codes, involvedOf(line).kind);
+  const values = [value, former].filter((v): v is string => v !== undefined);
+  const listed = values.some((v) => named(clause).includes(v));
+  return clause.op === '=' || clause.op === 'in' ? listed : clause.op === 'exists' ? value !== undefined : !listed;
+}
+
 /**
  * Whether `line` is selected by `selectors`: every clause of one selector holds of it (AND), and one selector of them does (OR) — and
  * every line where none was given. Pure.
@@ -213,5 +239,5 @@ function holds(clause: Clause, value: string | undefined): boolean {
 export function selects(selectors: Selectors, line: FeedLine): boolean {
   if (selectors.length === 0) return true;
   const on = selectableOf(line);
-  return selectors.some((clauses) => clauses.every((clause) => holds(clause, on[clause.key])));
+  return selectors.some((clauses) => clauses.every((clause) => holdsOf(clause, line, on)));
 }

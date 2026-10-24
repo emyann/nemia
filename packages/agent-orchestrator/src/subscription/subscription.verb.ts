@@ -16,6 +16,7 @@ import { dropSubscription, putSubscription } from './subscription.store.ts';
 import { NEMIA_SUBSCRIPTION } from '../nemia/nemia.ts';
 import { LEVELS, type Level } from '../level/level.ts';
 import { SELECTOR_FORM } from '../watch/selector.ts';
+import { formerHints } from '../feed/index.ts';
 import { retiredWakeRefusal } from './former-wake.ts';
 import {
   DEFAULT_DIGEST_EVERY,
@@ -134,6 +135,7 @@ export const SUBSCRIBE: Command<Subscribed> = {
   class: 'act',
   route: { method: 'POST', path: '/api/subscriptions/:name', status: 201 },
   handler: subscribe,
+  note: ({ subscription: s }) => s.selectors.flatMap(formerHints).map((hint) => `nemia subscribe: ${hint}`),
   print: ({ name, subscription: s }) => [
     `subscribed ${name}: ${s.task} is told at once of a line taken by ${s.selectors.join(' or ')}, and of the rest in a digest every ` +
       `${s.digestEvery} minute${s.digestEvery === 1 ? '' : 's'} with no wake.`,

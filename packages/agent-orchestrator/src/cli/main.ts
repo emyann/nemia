@@ -20,6 +20,7 @@ import {
   keepCursor,
   BOOKMARK_EVERY,
   bookmarkLine,
+  formerHints,
   parseSelectors,
   selects,
   type Selectors,
@@ -339,7 +340,9 @@ function watchFrom(args: Args, cursorFile: string | undefined): number {
  */
 function watchVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
   const how: Watched = { json: args.json === true };
-  const selectors = parseSelectors(Array.isArray(args.selector) ? args.selector : []);
+  const typed = Array.isArray(args.selector) ? args.selector : [];
+  for (const hint of typed.flatMap(formerHints)) console.error(`nemia watch: ${hint}`);
+  const selectors = parseSelectors(typed);
   const cursorFile = typeof args.cursorFile === 'string' ? args.cursorFile : undefined;
   const from = watchFrom(args, cursorFile);
   kept(cursorFile, from);

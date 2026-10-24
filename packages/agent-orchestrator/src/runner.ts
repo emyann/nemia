@@ -223,6 +223,7 @@ export {
   ANSWER_VIA,
   ENGINE_REASON,
   feedLineWords,
+  formerHints,
   PERSON_WAITS,
   PHASE_OF,
   REASON_CODES,

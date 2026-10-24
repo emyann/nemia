@@ -40,7 +40,6 @@ const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL, i: number)
   agent: null,
   since: null,
   needs: null,
-  blockedByHarness: false,
   waitingFor: null,
   approve: null,
   denied: null,

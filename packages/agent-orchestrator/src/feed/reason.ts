@@ -179,14 +179,16 @@ export type Codes = { reason: Reason; on?: WaitOn; via?: AnswerVia };
 /** How one word is recognised: the whole of it (`is`), or its beginning (`starts`), which carries what varies after it. */
 type Rule = ({ is: string; starts?: never } | { starts: string; is?: never }) & { reason: Reason; on?: WaitOn; via?: AnswerVia };
 
-/** A run's words, in the order they are tried: `assess`'s six statuses, and the word of a run the store no longer has. */
+/**
+ * A run's words, in the order they are tried: `assess`'s six statuses, `blocked`, an older feed's word for `waiting`, and the word of a
+ * run the store no longer has.
+ */
 const RUN_WORDS: readonly Rule[] = [
   { is: 'running', reason: 'Running' },
   { is: 'succeeded', reason: 'Succeeded' },
   { is: 'cancelled', reason: 'Cancelled' },
   { is: 'awaiting approval', reason: 'AwaitingApproval' },
   { is: 'waiting', reason: 'AwaitingAnswer' },
-  // A run stopped on a person was `blocked` before card 4c, and a feed of then still says it.
   { is: 'blocked', reason: 'AwaitingAnswer' },
   { is: REMOVED, reason: 'Removed' },
   { is: LINE_WORDS.CancelAsked, reason: 'CancelAsked' },

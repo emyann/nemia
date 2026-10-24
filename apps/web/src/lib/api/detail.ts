@@ -408,7 +408,6 @@ export type RunDetail = RunCodes & {
       /** The lines a person types for what the step's controls do: its approval, a try in its session, and words said to it. */
       commands: { approve: string; retry: string; say: string };
       needs: string | null;
-      blockedByHarness: boolean;
       /** As on `RunSummary`: what the harness says the session waits for, and what a person does about it. */
       waitingFor: StepNeeds['waitingFor'];
       approve: string | null;

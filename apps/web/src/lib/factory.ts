@@ -21,9 +21,9 @@ import { ENDED } from './words.ts';
  * finished", or on Runs.
  *
  * A run started `--after` runs that have not landed is in flight while each may still land: it moves, since the tick files its roots when
- * they do, and its card is a ghost until it starts (`waitsOnRuns`). Not once one never will without a person (`waiting.waitingOnYou`) — no such
- * run, a cancelled one, a branch gone — though `assess`, which knows nothing of the gate, still calls it running: nothing of it moves until
- * a person acts, and it waits on them.
+ * they do, and its card is a ghost until it starts (`waitsOnRuns`). Not once one never will without a person (`waiting.waitingOnYou`) — no
+ * such run, a cancelled one, a branch gone — though `assess`, which knows nothing of the gate, still calls it running: nothing of it moves
+ * until a person acts, and it waits on them.
  *
  * So is a run a person holds until runs land (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
  * steps say, and the tick lifts the hold when those runs land, though nothing of it is filed before then. Not once only a person lifts it
@@ -51,8 +51,8 @@ export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide 
 /**
  * Whether the run waits on a person: a step does (`waitingOnYou`) — at its gate anywhere in the run, or signed off blocked — or a run it
  * waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for, either way — or a hold on it only a person lifts
- * (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on nobody,
- * whatever its steps last said.
+ * (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on
+ * nobody, whatever its steps last said.
  */
 export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
   !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));

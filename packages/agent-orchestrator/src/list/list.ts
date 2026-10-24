@@ -567,8 +567,8 @@ export const shownStatus = (s: Pick<Listing['steps'][number], 'status' | 'waits'
 const NEEDS_HUMAN = 'needs-human';
 
 /**
- * Each row of a step waiting on a person (`waitingOnYou`) whose closeout asks questions, with how many (`asks`); every other as it is. None on a
- * run cancelled, pruned or held, which waits on no one.
+ * Each row of a step waiting on a person (`waitingOnYou`) whose closeout asks questions, with how many (`asks`); every other as it is. None
+ * on a run cancelled, pruned or held, which waits on no one.
  */
 function asking(
   rows: Listing['steps'],

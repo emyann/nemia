@@ -26,7 +26,6 @@ const step = (name: string, over: Partial<Step> = {}): Step =>
     status: 'succeeded',
     note: null,
     needs: null,
-    blockedByHarness: false,
     approve: null,
     lastLine: null,
     asked: null,

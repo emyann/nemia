@@ -82,7 +82,6 @@ const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSum
     agent: null,
     since: null,
     needs: null,
-    blockedByHarness: false,
     waitingFor: null,
     approve: null,
     denied: null,

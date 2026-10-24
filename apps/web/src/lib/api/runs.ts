@@ -115,7 +115,7 @@ export type RunSummary = {
   /**
    * `note` is what the CLI's `ls` prints beside the status — the try or round a step is on, or the one due — and null where it prints
    * nothing. `roundDue`: whether a looping step's next round is due, which the note words. `agent`: the agent the step is given, null for
-   * none; `since`: when its task at work started, null while none runs. `needs` and `blockedByHarness` are what a person has to know to
+   * none; `since`: when its task at work started, null while none runs. `needs` and `waitingFor` are what a person has to know to
    * act on it (`StepNeeds`). `phase` and `reason` are where the step stands, as codes, which the board groups and colours by, with `on`
    * and `via` qualifying a `Waiting` and an `AwaitingAnswer` (`StepCodes`); `message` is what the CLI's `ls` prints for it, shown and
    * never compared; `verdict` its check's, as codes, null for a step its check did not judge. `status` is `message` under its old name,

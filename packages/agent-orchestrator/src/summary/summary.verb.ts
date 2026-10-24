@@ -127,7 +127,8 @@ export type RunSummary = {
    *
    * A run waiting on runs moves: the tick files its roots once they land. Not one waiting on a run that never lands without a
    * person — no such run, a cancelled one, a result branch gone (`RunWaiting.waitingOnYou`): nothing the tick reads will change on its own.
-   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.waitingOnYou`), and files nothing until then.
+   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.waitingOnYou`), and files nothing
+   * until then.
    */
   moving: boolean;
   /**
@@ -338,7 +339,6 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
       agent: agentOf(name),
       since: null,
       needs: null,
-      blockedByHarness: false,
       waitingFor: null,
       approve: null,
       denied: null,

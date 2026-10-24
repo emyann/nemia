@@ -179,7 +179,6 @@ function runWith(note: string | null): RunDetail {
         roundDue: false,
         commands: { approve: 'nemia approve r-1 review', retry: 'nemia retry r-1 review', say: 'nemia say r-1 review' },
         needs: null,
-        blockedByHarness: false,
         waitingFor: null,
         approve: null,
         denied: null,
@@ -539,7 +538,7 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
  * theme waiting at its gate, an ending, on you.
  */
 function summaryRun(): RunSummary {
-  const none = { needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, sessionUnread: null };
+  const none = { needs: null, waitingFor: null, approve: null, denied: null, sessionUnread: null };
   const step = (name: string, status: Word, extra = {}) => ({
     name,
     taskId: `t-${name}`,
@@ -2320,7 +2319,7 @@ const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in C
 /** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
 function needing(
   status: Word,
-  needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'waitingFor' | 'lastLine' | 'denied'>>,
+  needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'waitingFor' | 'lastLine' | 'denied'>>,
   over: { waitingOnYou: string[]; cancelledAt?: string | null },
 ): RunDetail {
   const run = runOf(status, over);
@@ -2330,7 +2329,6 @@ function needing(
       {
         ...run.steps[0],
         needs: null,
-        blockedByHarness: false,
         waitingFor: null,
         lastLine: null,
         asked: null,
@@ -2360,7 +2358,7 @@ test("a step's node says what it needs: a gate's question after `waits on you`, 
     'nor on a run called off',
   );
 
-  const held = nodeMarkup(needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
+  const held = nodeMarkup(needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
   assert.equal(gateDrawn(held), false, 'blocked by the harness is no gate: the step asked nothing');
   assert.ok(
     held.includes(`<p data-need="harness" title="blocked by the harness: ${WAIT.words} · ${LOGIN}" class="truncate `),
@@ -2371,12 +2369,12 @@ test("a step's node says what it needs: a gate's question after `waits on you`, 
     `the line is the wait alone: thirty-odd characters is all the node has, and \`blocked by the harness: \` would leave \`waiting f…\`\n${held}`,
   );
   assert.doesNotMatch(held, /answer it in Claude Code/, 'where a person answers it is the banner’s');
-  const mute = nodeMarkup(needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] }));
+  const mute = nodeMarkup(needing('needs-human', { lastLine: LOGIN }, { waitingOnYou: [] }));
   assert.ok(
     mute.includes(`title="blocked by the harness: ${LOGIN}"`) && mute.includes(`>blocked by the harness: ${LOGIN}</p>`),
     `a harness that says nothing about what for reads \`blocked by the harness\` and what the session said last, on the line as on hover\n${mute}`,
   );
-  assert.ok(nodeMarkup(needing('needs-human', { blockedByHarness: true }, { waitingOnYou: [] })).includes('>blocked by the harness</p>'));
+  assert.ok(nodeMarkup(needing('needs-human', {}, { waitingOnYou: [] })).includes('>blocked by the harness</p>'));
   assert.doesNotMatch(nodeMarkup(needing('running (working)', {}, { waitingOnYou: [] })), /data-need/);
 });
 
@@ -2721,14 +2719,13 @@ const bannerMarkup = (run: RunDetail) =>
   renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(NeedsBanner, { run })));
 
 test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
-  const base = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
+  const base = needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
   const asks = {
     ...base.steps[0],
     name: 'implement',
     taskId: 't-2',
     ...coded('succeeded · BLOCKED'),
     needs: 'Which database?',
-    blockedByHarness: false,
     waitingFor: null,
     lastLine: null,
   };
@@ -2811,7 +2808,7 @@ test("an agent's question is drawn as its markdown after `asks:`, in the banner 
   assert.ok(textContentOf(asked).includes('review asks: Which database?'), asked);
   assert.doesNotMatch(asked, /\*\*|whitespace-pre/);
 
-  const harness = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: '**not markdown**' }, { waitingOnYou: [] });
+  const harness = needing('needs-human', { waitingFor: WAIT, lastLine: '**not markdown**' }, { waitingOnYou: [] });
   const blocked = await routedWith(createElement(Asked, { run: harness, step: harness.steps[0] }));
   assert.match(
     blocked,
@@ -2851,7 +2848,7 @@ test('a short string in a closeout is drawn as markdown; a number as it is', asy
 
 test('REFUSED: the banner offers no Continue for a session still at work, which the harness did not block, nor on a run called off', () => {
   assert.equal(bannerMarkup(needing('running (working)', {}, { waitingOnYou: [] })), '', 'nothing needed: no banner');
-  const held = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
+  const held = needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
   assert.match(bannerMarkup(held), /<form aria-label="Continue review"/);
   assert.equal(bannerMarkup({ ...held, cancelledAt: at }), '', 'called off: nobody waits for the session');
 });
@@ -2870,7 +2867,6 @@ const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<Run
       {
         ...base.steps[0],
         needs: null,
-        blockedByHarness: false,
         lastLine: null,
         asked: null,
         approve: 'approve review',
@@ -7017,7 +7013,7 @@ test('REFUSED: a schedule whose latest fire was refused draws why, whole, under 
 });
 
 test("REFUSED: a banner that says a person is waited on is drawn in an amount's colour or a failure's — Waiting on you and To decide both read yours", () => {
-  const waiting = bannerMarkup(needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
+  const waiting = bannerMarkup(needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
   const decide = withClient(createElement(ToDecideBanner, { run: endingRun() }));
   for (const [label, html] of [
     ['Waiting on you', waiting],

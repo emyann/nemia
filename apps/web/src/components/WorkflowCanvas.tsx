@@ -114,7 +114,6 @@ function unstartedStep(name: string): RunDetail['steps'][number] {
     roundDue: false,
     commands: { approve: '', retry: '', say: '' },
     needs: null,
-    blockedByHarness: false,
     waitingFor: null,
     approve: null,
     denied: null,

@@ -107,7 +107,7 @@ const WAIT_WORDS: readonly Case[] = [
 ];
 
 /**
- * The words a package before card 4c wrote, which a feed it kept still says: a step not filed was `waiting`, and a run stopped on a
+ * The words an older package wrote, which a feed it kept still says: a step not filed was `waiting`, and a run stopped on a
  * person `blocked`.
  */
 const FORMER_WORDS: readonly Case[] = [

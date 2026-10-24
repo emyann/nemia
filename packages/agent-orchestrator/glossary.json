@@ -289,6 +289,10 @@
         {
           "spelling": "HOLDS_THE_RUN",
           "card": "4b: what holds a run is derived from `PERSON_WAITS` (`holdsTheRun`)"
+        },
+        {
+          "spelling": "blockedByHarness",
+          "card": "4c: a session its harness stopped to ask is said by its codes, `AwaitingAnswer` via `session` (`atHarness`)"
         }
       ]
     },

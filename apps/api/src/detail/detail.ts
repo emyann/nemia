@@ -40,6 +40,7 @@ import {
   tryOf,
   runWith,
   needsOf,
+  atHarness,
   runSaid,
   stepSaid,
   type RunHolding,
@@ -369,7 +370,6 @@ export type RunDetail = {
     commands: StepCommands;
     /** As on `RunSummary` (`StepNeeds`): read off that type, field by field, so a field it gains is declared here too and not only sent. */
     needs: StepNeeds['needs'];
-    blockedByHarness: StepNeeds['blockedByHarness'];
     waitingFor: StepNeeds['waitingFor'];
     approve: StepNeeds['approve'];
     denied: StepNeeds['denied'];
@@ -709,7 +709,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
           roundDue: judged.roundDue.has(name),
           commands: stepCommands(run.id, name),
           ...needs,
-          lastLine: needs.blockedByHarness ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
+          lastLine: atHarness(current) ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
           gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.reason),
           accepted: acceptedOf(run, name),
           said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],

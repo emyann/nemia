@@ -1099,7 +1099,6 @@ const unset: WorkflowStepSpec = {
   disallowedTools: [],
   allowedTools: [],
   denials: null,
-  background: null,
   remote: null,
   deadlineSeconds: null,
   budget: null,
@@ -3662,7 +3661,6 @@ test("a step's node says what its tries cost, of its cap where it has one — in
     /<p data-cost="over" title="What its tries have cost of its \$3 budget: the cap or more — its harness ends a job at its cap, a little past it where a call was under way, and this step finished; nothing waits on a raise"/,
     'and nothing waits on a raise',
   );
-  assert.doesNotMatch(past, /--bg/, 'said of a job, not of a --bg session');
   assert.equal(gateDrawn(past), false, 'a finished step past its cap holds nothing');
 });
 
@@ -4197,7 +4195,7 @@ test('REFUSED: a read-only command an ask rule covers is drawn asking, with the 
   assert.doesNotMatch(
     asking.match(/<code data-read-only="cat"[^>]*>/)![0],
     /line-through|bg-surface-variant/,
-    'on a background session, outside dontAsk, it asks: not struck, and not drawn as running',
+    'where no denier is claimed — a job in a mode not measured — outside dontAsk, it asks: not struck, and not drawn as running',
   );
   assert.ok(
     textsOf(asking).includes(

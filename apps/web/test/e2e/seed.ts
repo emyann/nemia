@@ -1091,10 +1091,7 @@ export const CHECKOUT = {
   missing: { name: 'missing', command: 'nemia-e2e-no-such-mcp-server' },
   /** `Bash(find:*)` refuses one of Claude Code's read-only commands, which the page strikes on a step with Bash. */
   denied: ['Bash(git push:*)', 'mcp__fixture__wipe', 'Bash(find:*)'],
-  /**
-   * `Bash(cat:*)` makes another of them ask, which the page strikes on a dontAsk step and on a job, and marks asking on a background
-   * session.
-   */
+  /** `Bash(cat:*)` makes another of them ask, which the page strikes on a dontAsk step and on a job, as every Claude Code step is. */
   asked: ['Bash(cat:*)'],
   /** What its settings allow: two Bash commands, which WORKFLOWS' review, in dontAsk, may run. */
   allowed: ['Bash(npm test)', 'Bash(git diff:*)'],

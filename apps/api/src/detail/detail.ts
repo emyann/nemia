@@ -96,9 +96,9 @@ import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts
  * raises it (`nemia retry --budget`, `nemia round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of`
  * what the step's tries have cost of it, as `nemia ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is
  * whether they have cost the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word
- * says `over budget` or `budget exhausted` — where another session of it is the way on. A job (`claude -p`) is ended at its cap; a
- * background session (`background: true`, `claude --bg`) keeps none and is not stopped, so such a step — the package refuses a budget
- * beside it, but a frozen record may carry both — can finish past it with nothing waiting on a raise.
+ * says `over budget` or `budget exhausted` — where another session of it is the way on. A Claude Code job, on the Agent SDK, is ended at
+ * its cap; a session an older runtime ran in the background kept none and was not stopped, so a step of a record from then can have
+ * finished past it with nothing waiting on a raise.
  */
 export type StepBudget = { usd: number; said: string; of: string | null; over: boolean };
 
@@ -807,11 +807,11 @@ const MODE_FLAGS: readonly string[] = ['--permission-mode', '-s', '--sandbox'];
 /**
  * The permission mode a task's session runs in (`StepFiled.runsIn`), as its harness decides it from what the engine was filed with.
  *
- * A harness the run brings as a spec — `codex`, `claude-detached` — is asked with its own `command`, a pure function of the request:
- * the mode it would spawn the session with, and again without `tools`, which tells a sandbox the tools narrowed from one the task
- * named. So a rule the engine changes is the rule read here. `claude` is the engine's own harness, a job (`claude -p`) or, filed with
- * `config.background`, a background session (`claude --bg`), whose spawn is no function it exports: either takes the mode filed, or
- * `auto` (`claudePrintFlags` and `claudeOps` in agent-runtime), which the api test holds to the command each spawns. A task filed with
+ * A harness the run brings as a spec — `codex` — is asked with its own `command`, a pure function of the request: the mode it would
+ * spawn the session with, and again without `tools`, which tells a sandbox the tools narrowed from one the task named. So a rule the
+ * engine changes is the rule read here. `claude` is the engine's own harness, every session of it a job on the Agent SDK (or a
+ * long-lived session, `restartPolicy: 'Always'`), whose spawn is no function it exports: it takes the mode filed, or `auto`
+ * (`attachedOptions` in agent-runtime), which the api test holds to the argv the engine's job hands Claude Code. A task filed with
  * no harness ran on the engine's first (`fallback` in its facade). Null for a harness the api cannot ask, or one whose command names no
  * mode.
  */

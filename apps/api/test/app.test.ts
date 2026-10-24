@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from './scratch.ts';
+import { until } from './waits.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
 import {
@@ -21,8 +22,8 @@ import {
   type RunSummary,
 } from 'agent-orchestrator';
 import { runWith } from './shipped-place.ts';
-import { claudeDetached, claudeOps } from 'agent-runtime';
-import { Effect } from 'effect';
+import { Engine } from 'agent-runtime';
+import { Context, Effect, Exit, Layer, Scope } from 'effect';
 import { DEFAULT_ROUNDS } from 'agent-orchestrator/workflow';
 import { PRECEDENCE } from 'agent-orchestrator/run';
 /** A folder nothing is made in: a path under it names a workflow folder that is not there. */
@@ -2333,7 +2334,6 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
       const cases: Array<[id: string, spec: { harness: string; permissionMode?: string; tools?: string[] }, runsIn: object]> = [
         ['r-54-claude', { harness: 'claude' }, { mode: 'auto', by: 'default' }],
         ['r-54-claude-mode', { harness: 'claude', permissionMode: 'dontAsk' }, { mode: 'dontAsk', by: 'filed' }],
-        ['r-54-detached', { harness: 'claude-detached' }, { mode: 'auto', by: 'default' }],
         ['r-54-codex', { harness: 'codex' }, { mode: 'workspace-write', by: 'default' }],
         ['r-54-codex-writes', { harness: 'codex', tools: ['Read', 'Bash'] }, { mode: 'workspace-write', by: 'default' }],
         ['r-54-codex-reads', { harness: 'codex', tools: ['Read', 'Grep'] }, { mode: 'read-only', by: 'tools' }],
@@ -2356,7 +2356,7 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
     },
   );
   await s.test(
-    "the mode the api says a Claude Code task runs in is the one the engine's `claude` spawns it with, as a job and as a background session",
+    "the mode the api says a Claude Code task runs in is the one the engine's `claude` spawns it with, a job on the Agent SDK",
     async (t) => {
       const said = new Map<string, string>();
       for (const [id, permissionMode] of [
@@ -2387,48 +2387,40 @@ test("what a step runs with: the workflow's effort, context and tools, the mode 
         said.set(id, filed.runsIn.mode);
       }
 
-      const bin = scratch('nemia-api-claude-');
-      const argsFile = path.join(bin, 'args');
-      fs.writeFileSync(path.join(bin, 'claude'), `#!/bin/sh\nprintf '%s\\n' "$@" > '${argsFile}'\n`, { mode: 0o755 });
-      const before = process.env.PATH;
-      process.env.PATH = `${bin}${path.delimiter}${before}`;
-      t.after(() => {
-        process.env.PATH = before;
-      });
       const spawnedWith = async (permissionMode: string | undefined) => {
-        await Effect.runPromise(
-          claudeOps({ root: scratch('nemia-api-engine-') }).spawn({
-            name: 'ae/t/1',
-            brief: 'the prompt',
-            cwd: bin,
-            ...(permissionMode ? { config: { permissionMode } } : {}),
-          }),
+        const dir = scratch('nemia-api-claude-');
+        const argsFile = path.join(dir, 'args');
+        const recorder = path.join(dir, 'claude.mjs');
+        fs.writeFileSync(
+          recorder,
+          `import fs from 'node:fs';\nfs.writeFileSync(${JSON.stringify(argsFile)}, process.argv.slice(2).join('\\n'));\nprocess.exit(1);\n`,
         );
-        const args = fs.readFileSync(argsFile, 'utf8').replace(/\n$/, '').split('\n');
-        return args[args.indexOf('--permission-mode') + 1];
+        const scope = Scope.makeUnsafe();
+        t.after(() => Effect.runPromise(Scope.close(scope, Exit.void)));
+        const e = await Effect.runPromise(
+          Layer.build(Engine.layer({ root: path.join(dir, 'engine'), harnesses: { claude: 'claude' }, claudeExecutable: recorder })).pipe(
+            Effect.map((context) => Context.get(context, Engine)),
+            Effect.provideService(Scope.Scope, scope),
+          ),
+        );
+        await Effect.runPromise(
+          e.file({ brief: 'the prompt', cwd: dir, harness: 'claude', ...(permissionMode ? { config: { permissionMode } } : {}) }),
+        );
+        await Effect.runPromise(e.tick());
+        const argv = await until(t, () => fs.existsSync(argsFile) && fs.readFileSync(argsFile, 'utf8'), 'the session spawned', {
+          everyMs: 50,
+        });
+        return argv
+          .split('\n')
+          .find((arg) => arg.startsWith('--permission-mode='))
+          ?.slice('--permission-mode='.length);
       };
       assert.equal(
         said.get('r-59-claude'),
         await spawnedWith(undefined),
-        'filed with no mode: the argv the background runner hands a fake claude on PATH',
+        "filed with no mode: the argv the engine's job on the Agent SDK hands the Claude Code it runs",
       );
       assert.equal(said.get('r-59-claude-mode'), await spawnedWith('dontAsk'), 'filed with one');
-
-      const jobWith = (permissionMode: string | undefined) => {
-        const { args } = claudeDetached.command({
-          name: 'ae/t/1',
-          brief: 'the prompt',
-          cwd: bin,
-          ...(permissionMode ? { config: { permissionMode } } : {}),
-        });
-        return args[args.indexOf('--permission-mode') + 1];
-      };
-      assert.equal(
-        said.get('r-59-claude'),
-        jobWith(undefined),
-        'a job filed with no mode: the flags of claude -p, which a job and claude-detached share (claudePrintFlags)',
-      );
-      assert.equal(said.get('r-59-claude-mode'), jobWith('dontAsk'), 'a job filed with one');
     },
   );
   await s.test(

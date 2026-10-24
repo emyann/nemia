@@ -44,7 +44,7 @@ export function schemaNameRefusal(file: string): string | undefined {
  * `step`, one of them (`resume`, `loop`); `choice`, one of `choices` (`harness`); `harness-word`, one of the words the step's harness takes
  * (`byHarness`: `effort`, `permissionMode`, `sandbox` — a harness absent from `byHarness` takes no such key); `text`, one line (`model`,
  * `check`); `list`, names (`tools`, `disallowedTools`); `count`, a whole number; `dollars`, an amount; `tokens`, a number of tokens, which
- * the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as `choices` has them (`background`, `remote`, `gate`);
+ * the form writes as a person does (`context`, `200k`); `flag`, `true` or `false` as `choices` has them (`remote`, `gate`);
  * `schema`, a file beside the step (`output`). `place` is a `choice` of its words, `git` and `folder`; `workspace` of one, `main`, `slot`
  * of one, `none`, and `denials` of one, `fail`, since a step either says it or says nothing. `agent` is a `choice` of the agents in yours'
  * `agents/`, the only folder the builder writes the steps of.
@@ -77,7 +77,6 @@ export const KINDS: Readonly<Record<StepKey, KeyKind>> = {
   disallowedTools: 'list',
   allowedTools: 'list',
   denials: 'choice',
-  background: 'flag',
   remote: 'flag',
   deadlineSeconds: 'count',
   budget: 'dollars',
@@ -94,10 +93,10 @@ export const KINDS: Readonly<Record<StepKey, KeyKind>> = {
 const EITHER = ['true', 'false'] as const;
 
 /**
- * What a flag may be set to, as the parser reads it: `background:` and `remote:` say either, and `gate:` only `true`, since `false` is a
+ * What a flag may be set to, as the parser reads it: `remote:` says either, and `gate:` only `true`, since `false` is a
  * step without the line.
  */
-const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { background: EITHER, remote: EITHER, gate: ['true'] };
+const FLAGS: Readonly<Partial<Record<StepKey, readonly string[]>>> = { remote: EITHER, gate: ['true'] };
 
 /** The words a key of a fixed list may be set to, the flags' among them; the harness and the agent are offered as the store has them. */
 export const WORDS: Readonly<Partial<Record<StepKey, readonly string[]>>> = {

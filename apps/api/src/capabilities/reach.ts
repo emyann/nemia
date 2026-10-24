@@ -8,8 +8,8 @@
  * settings enable and its agent or its own line names (`mcp:`), whatever its tools; the settings' deny rules and its own
  * `disallowedTools:`; the settings' ask rules; Claude Code's
  * read-only commands, which ask for no rule in any mode (`READ_ONLY_COMMANDS`) unless an ask rule names one; and in `dontAsk`, only what
- * the settings allow of what asks. What asks is denied without a prompt in `dontAsk`, and on a job (`claude -p`, every step but one that
- * says `background: true`), which asks nobody in any mode measured (`askDenierOf`); on a background session in another mode it prompts.
+ * the settings allow of what asks. What asks is denied without a prompt in `dontAsk`, and on a job — every Claude Code step, run on the
+ * Agent SDK, whose session answers a call that would ask by denying it, as no person is there — in any mode measured (`askDenierOf`).
  * Rules are matched as Claude Code's permissions docs say it matches them (code.claude.com/docs/en/permissions): deny, then ask, then
  * allow, whatever their specificity, so a deny takes back every allow whose calls it matches, and an ask rule every allow it matches, which
  * asks, and in `dontAsk` is denied; in a Bash rule `*` is any text, spaces included, and `:*` at the end is a trailing ` *`, which also
@@ -32,8 +32,8 @@ import { runPlaced, type Engine } from '../store.ts';
 import { listWorkflows, type WorkflowListing, type WorkflowSource, type WorkflowStepSpec } from '../workflows/workflows.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
-/** The harnesses that are Claude Code, as the engine names them: its jobs and background sessions (`claude`), and `claude -p` detached. */
-const CLAUDE_CODE: ReadonlySet<string> = new Set(['claude', 'claude-detached']);
+/** The harness that is Claude Code, as the engine names it: every session of it a job on the Agent SDK. */
+const CLAUDE_CODE = 'claude';
 
 /**
  * The modes a job was measured in on Claude Code 2.1.280, each denying what would ask and carrying on (agent-runtime's docs/open-issues.md,
@@ -44,13 +44,11 @@ const JOB_MEASURED: ReadonlySet<string | null> = new Set([null, 'auto', 'dontAsk
 
 /**
  * Why what asks is denied without a prompt on a Claude Code step: `dontAsk`, which denies it in any session; or it runs as a job, which has
- * no one to ask — every `claude` step but a background session (`background: true`), and every `claude-detached` one. Null where it
- * prompts.
+ * no one to ask — every `claude` step, in a mode a job was measured in. Null on another harness, and in a mode not measured.
  */
-export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permissionMode' | 'background'>): 'dontAsk' | 'a job' | null => {
+export const askDenierOf = (harness: string, spec: Pick<WorkflowStepSpec, 'permissionMode'>): 'dontAsk' | 'a job' | null => {
   if (spec.permissionMode === 'dontAsk') return 'dontAsk';
-  const job = harness === 'claude-detached' || (harness === 'claude' && spec.background !== true);
-  return job && JOB_MEASURED.has(spec.permissionMode) ? 'a job' : null;
+  return harness === CLAUDE_CODE && JOB_MEASURED.has(spec.permissionMode) ? 'a job' : null;
 };
 
 /** Where a step's own deny rules are read from. */
@@ -75,8 +73,7 @@ export type ReachedMcpTool = { name: string; denied: DeniedRule | null; asks: De
  * the rule writes it, the narrower deny rules that still refuse some of what it allows (`except`) and the narrower ask rules that still
  * make some of it ask (`asks`); none for a step with no Bash, which `why` says. `dontAsk` is whether the step runs in it, where anything
  * that asks and no rule allows is denied without a prompt. `askDenier` is why what an ask rule makes ask is denied without a prompt instead
- * — `dontAsk`, or `a job`, which asks nobody — and null where it prompts: a background session in another mode, or a job in a mode not
- * measured.
+ * — `dontAsk`, or `a job`, which asks nobody — and null where the page claims neither: a job in a mode not measured.
  */
 export type AllowedFor = {
   rules: string[];
@@ -331,7 +328,7 @@ function stepReach(
 ): StepReach {
   const harness = spec.harness ?? Object.keys(HARNESSES)[0];
   const dontAsk = spec.permissionMode === 'dontAsk';
-  const askDenier = CLAUDE_CODE.has(harness) ? askDenierOf(harness, spec) : null;
+  const askDenier = harness === CLAUDE_CODE ? askDenierOf(harness, spec) : null;
   const reach = {
     workflow: workflow.name,
     from: workflow.from,
@@ -347,7 +344,7 @@ function stepReach(
       mcp: [...named],
     },
   };
-  if (!CLAUDE_CODE.has(harness)) {
+  if (harness !== CLAUDE_CODE) {
     return {
       ...reach,
       claudeCode: false,

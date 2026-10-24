@@ -114,8 +114,6 @@ export type WorkflowStepSpec = {
    * decide nothing.
    */
   denials: 'fail' | null;
-  /** `background:` as written, `true` or `false`: null where the step has no line, and runs as a job (`claude -p`). */
-  background: boolean | null;
   /** `remote:` as written, `true` or `false`: null where the step has no line. */
   remote: boolean | null;
   deadlineSeconds: number | null;
@@ -421,7 +419,6 @@ export const specOf = (step: Workflow): WorkflowStepSpec => ({
   sandbox: step.sandbox ?? null,
   tools: step.tools ?? null,
   denials: step.denials ?? null,
-  background: step.background ?? null,
   remote: step.remote ?? null,
   deadlineSeconds: step.deadlineSeconds ?? null,
   budget: step.budget ?? null,

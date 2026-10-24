@@ -6,6 +6,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { Schema } from 'effect';
 import { ReadRefusal, UnreadAnswer } from '../src/lib/api/read.ts';
 import { agentQuery, agentsQuery, readAgent, type AgentListing, type LibraryAgent } from '../src/lib/api/agents.ts';
 import { skillQuery, skillsQuery, type SkillDetail, type SkillPlace } from '../src/lib/api/skills.ts';
@@ -326,6 +327,10 @@ test("get, the library's reads: each decodes what the api gives, keeps out what 
   await t.test('the step keys the board reads are every key of a step it reads, no fewer and no more', () => {
     assert.deepEqual([...StepKeySchema.literals].sort(), Object.keys(WorkflowStepSpecSchema.fields).sort());
     assert.deepEqual(Object.keys(WorkflowStepSpecSchema.fields).sort(), Object.keys(stepSpec()).sort());
+  });
+  await t.test('REFUSED: `background` is no step key the board reads, as every Claude Code step is a job; `remote` is one', () => {
+    assert.deepEqual([Schema.is(StepKeySchema)('background'), Schema.is(StepKeySchema)('remote')], [false, true]);
+    assert.equal(Object.hasOwn(WorkflowStepSpecSchema.fields, 'background'), false, 'nor a field of a step it reads');
   });
   await t.test('a key the board does not know is dropped, not refused', async (t) => {
     answering(t, [{ ...listedAgent(), colour: 'blue' }]);

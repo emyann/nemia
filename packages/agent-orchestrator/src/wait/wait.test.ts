@@ -322,7 +322,7 @@ test('a hold in words: `holdsOf` says what holds a run, `holdWord` and `holdAdvi
       [{ run: 'a-1', missing: true }],
       'the store has no run a-1 — yours to resolve: nemia hold r-1 --off, or nemia cancel r-1',
     ],
-    ['a hold that names no run', [], "the hold on r-1 names no run, so no run's shipping lifts it — yours to lift: nemia hold r-1 --off"],
+    ['a hold that names no run', [], "the hold on r-1 names no run, so no run's landing lifts it — yours to lift: nemia hold r-1 --off"],
   ];
   for (const [what, waits, line] of advice) {
     await t.test(`holdAdvice: ${what}`, () => assert.equal(holdAdvice(r, waits), line));

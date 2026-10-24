@@ -15,7 +15,7 @@ export const hasStarted = (run: Run): boolean => Object.values(run.steps).some((
  * Whether the gate applies to this run, and a parent is read at all: it waits on runs, nobody has called it off, and nothing of it has
  * been filed. None for a run with no `after`; none for a cancelled run, which files nothing anyway; and none for a
  * run that has started — whose parents are never read again, so a parent's branch deleted after the merge (`nemia decide`'s "drop it", a
- * `git branch -d` after shipping) cannot un-ready it.
+ * `git branch -d` after landing) cannot un-ready it.
  */
 export const gated = (run: Run): boolean => Boolean(run.after?.length) && !run.cancelledAt && !hasStarted(run);
 
@@ -152,7 +152,7 @@ export function holdWord(waits: readonly Wait[], said: Pick<Hold, 'why' | 'by'> 
  */
 export function holdAdvice(run: Run, waits: readonly Wait[]): string {
   const off = `nemia hold ${run.id} --off`;
-  if (!waits.length) return `the hold on ${run.id} names no run, so no run's shipping lifts it — yours to lift: ${off}`;
+  if (!waits.length) return `the hold on ${run.id} names no run, so no run's landing lifts it — yours to lift: ${off}`;
   if (waits.every((w) => w.landed)) return `the next tick lifts the hold, and ${run.id} goes on; nothing to decide yet`;
   const never = waits.filter(neverLands);
   if (!never.length) {
@@ -259,7 +259,7 @@ export function holdRefusal(
  * Why `nemia start --after` will not start this run, in words that name the fix — or null. Pure: handed each parent as `parentOf` reads it,
  * and asked before anything is written.
  *
- * Refused: an id given twice; a run the store does not have; a run on another repository, or shipping onto another base branch — it would
+ * Refused: an id given twice; a run the store does not have; a run on another repository, or landing on another base branch — it would
  * never land on this run's, or this run would never start from a base with its work; a run that worked on its base branch itself
  * (`--no-worktree`), which has no result branch to land; a cancelled run, which `nemia decide` never calls landed, whatever git says of
  * its branch; and one whose result branch is gone, and whose commit git cannot find on the base — this run would wait for ever on either. A

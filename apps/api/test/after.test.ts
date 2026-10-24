@@ -1,15 +1,15 @@
 /**
  * A run that waits on a run (`nemia start --after`), as the board reads it: `after` as the record froze it, and `waiting` — the runs its
  * roots wait on, in the package's words — on the list, the detail and the decision, each held to what `nemia ls` and `nemia decide` say.
- * Off a real repository, where a parent ships by its branch being merged, and in a scratch store, `WF_ROOT` set before the orchestrator is
+ * Off a real repository, where a parent lands by its branch being merged, and in a scratch store, `WF_ROOT` set before the orchestrator is
  * imported, as it locates its store when it loads.
  *
- * The runs: `a-shipped`, the diamond's top, its step signed off and its result branch merged into main; `b-running`, started after it and
+ * The runs: `a-landed`, the diamond's top, its step signed off and its result branch merged into main; `b-running`, started after it and
  * still working, its branch not merged; `c-cancelled`, called off before anything of it was filed; `x-gone`, signed off on a branch deleted
  * unmerged before any tick recorded its tip. Their children, none filed: `d-waits`, `e-cancelled-parent`, `f-no-such-parent`,
- * `g-parents-shipped`, `h-gone-parent`; and `i-started`, a child that started, whose parents are never read again. On the engine's feed,
- * `b-running` and `i-started` were filed an hour and more after they were created, as a run started `--after` runs is once they ship;
- * `a-shipped`'s and `x-gone`'s filings are not on it, as in a store whose feed does not record them. A pass has read where their branches
+ * `g-parents-landed`, `h-gone-parent`; and `i-started`, a child that started, whose parents are never read again. On the engine's feed,
+ * `b-running` and `i-started` were filed an hour and more after they were created, as a run started `--after` runs is once they land;
+ * `a-landed`'s and `x-gone`'s filings are not on it, as in a store whose feed does not record them. A pass has read where their branches
  * stand (`passStanding`), which the list reads off `standing.json`.
  */
 import { observations, root } from './harness.ts';
@@ -110,20 +110,20 @@ function writeRun(id: string, fields: { after?: string[]; steps?: object; cancel
 
 const cancelledAt = '2026-09-14T00:20:00.000Z';
 
-branch('wf/a-shipped/implement', true);
+branch('wf/a-landed/implement', true);
 signedOff('t-a');
-writeRun('a-shipped', { steps: { implement: { taskId: 't-a', workspace: repo, branch: 'wf/a-shipped/implement' } } });
+writeRun('a-landed', { steps: { implement: { taskId: 't-a', workspace: repo, branch: 'wf/a-landed/implement' } } });
 branch('wf/b-running/implement', false);
 working('t-b');
-writeRun('b-running', { after: ['a-shipped'], steps: { implement: { taskId: 't-b', workspace: repo, branch: 'wf/b-running/implement' } } });
+writeRun('b-running', { after: ['a-landed'], steps: { implement: { taskId: 't-b', workspace: repo, branch: 'wf/b-running/implement' } } });
 writeRun('c-cancelled', { cancelledAt });
 signedOff('t-x');
 writeRun('x-gone', { steps: { implement: { taskId: 't-x', workspace: repo, branch: 'wf/x-gone/implement' } } });
 
-writeRun('d-waits', { after: ['a-shipped', 'b-running'] });
+writeRun('d-waits', { after: ['a-landed', 'b-running'] });
 writeRun('e-cancelled-parent', { after: ['c-cancelled'] });
 writeRun('f-no-such-parent', { after: ['no-such-run'] });
-writeRun('g-parents-shipped', { after: ['a-shipped'] });
+writeRun('g-parents-landed', { after: ['a-landed'] });
 writeRun('h-gone-parent', { after: ['x-gone'] });
 working('t-i');
 writeRun('i-started', { after: ['b-running'], steps: { implement: { taskId: 't-i', workspace: repo, branch: 'wf/i-started/implement' } } });
@@ -161,20 +161,20 @@ const asWaits = (waiting: Listed['waiting']): Wait[] =>
 test('a run waiting on runs, read on the list, its page and its decision as `nemia ls` and `nemia decide` say: what it waits on, whether it moves, when it started', async (t) => {
   const s = story(t);
   await s.test(
-    "the list carries each run's `after` as the record froze it, and `waiting` in `nemia ls`'s words: a root says `waiting on <run>`, and a parent that never ships says why",
+    "the list carries each run's `after` as the record froze it, and `waiting` in `nemia ls`'s words: a root says `waiting on <run>`, and a parent that never lands says why",
     async () => {
       const runs = await listedRuns();
       const d = runs.get('d-waits')!;
-      assert.deepEqual(d.after, ['a-shipped', 'b-running']);
+      assert.deepEqual(d.after, ['a-landed', 'b-running']);
       assert.deepEqual(
         d.waiting,
         {
           runs: [{ run: 'b-running', missing: false, cancelledAt: null, gone: [] }],
           word: 'waiting on b-running',
-          advice: 'nothing of d-waits is filed until nemia decide says b-running has shipped onto main; nothing to decide yet',
+          advice: 'nothing of d-waits is filed until nemia decide says b-running has landed on main; nothing to decide yet',
           onYou: false,
         },
-        'a-shipped has shipped, so only b-running is waited on',
+        'a-landed has landed, so only b-running is waited on',
       );
       assert.deepEqual(
         d.steps.map((s) => [s.name, s.status]),
@@ -185,7 +185,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
       assert.deepEqual(e.waiting, {
         runs: [{ run: 'c-cancelled', missing: false, cancelledAt, gone: [] }],
         word: 'waiting on c-cancelled (cancelled)',
-        advice: `c-cancelled was cancelled at ${cancelledAt}, and a cancelled run never ships — yours to resolve: nemia cancel e-cancelled-parent, or start the work again without --after c-cancelled`,
+        advice: `c-cancelled was cancelled at ${cancelledAt}, and a cancelled run never lands — yours to resolve: nemia cancel e-cancelled-parent, or start the work again without --after c-cancelled`,
         onYou: true,
       });
       assert.deepEqual(runs.get('f-no-such-parent')!.waiting?.runs, [{ run: 'no-such-run', missing: true, cancelledAt: null, gone: [] }]);
@@ -196,16 +196,16 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
       assert.equal(runs.get('h-gone-parent')!.waiting?.word, 'waiting on x-gone (wf/x-gone/implement gone)');
 
       assert.deepEqual(
-        [runs.get('g-parents-shipped')!.after, runs.get('g-parents-shipped')!.waiting],
-        [['a-shipped'], null],
-        'every parent shipped: nothing to wait on, and the next tick files the roots',
+        [runs.get('g-parents-landed')!.after, runs.get('g-parents-landed')!.waiting],
+        [['a-landed'], null],
+        'every parent landed: nothing to wait on, and the next tick files the roots',
       );
       assert.deepEqual(
         [runs.get('i-started')!.after, runs.get('i-started')!.waiting],
         [['b-running'], null],
         'started: its parents are not read, whatever they say',
       );
-      assert.deepEqual([runs.get('a-shipped')!.after, runs.get('a-shipped')!.waiting], [[], null], 'started without --after');
+      assert.deepEqual([runs.get('a-landed')!.after, runs.get('a-landed')!.waiting], [[], null], 'started without --after');
     },
   );
   await s.test(
@@ -217,10 +217,10 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         'd-waits',
         'e-cancelled-parent',
         'f-no-such-parent',
-        'g-parents-shipped',
+        'g-parents-landed',
         'h-gone-parent',
         'i-started',
-        'a-shipped',
+        'a-landed',
         'b-running',
         'c-cancelled',
       ]) {
@@ -238,22 +238,22 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
           assert.equal(
             api.waiting?.onYou,
             !waitAdvice(runStore.runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
-            `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still ship`,
+            `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still land`,
           );
         }
       }
     },
   );
   await s.test(
-    'a run waiting on runs moves — the tick files its roots once they ship — unless one never ships without a person, when it moves no more',
+    'a run waiting on runs moves — the tick files its roots once they land — unless one never lands without a person, when it moves no more',
     async () => {
       const runs = await listedRuns();
       const moving = Object.fromEntries(
-        ['d-waits', 'g-parents-shipped', 'e-cancelled-parent', 'f-no-such-parent', 'h-gone-parent'].map((id) => [id, runs.get(id)!.moving]),
+        ['d-waits', 'g-parents-landed', 'e-cancelled-parent', 'f-no-such-parent', 'h-gone-parent'].map((id) => [id, runs.get(id)!.moving]),
       );
       assert.deepEqual(moving, {
         'd-waits': true,
-        'g-parents-shipped': true,
+        'g-parents-landed': true,
         'e-cancelled-parent': false,
         'f-no-such-parent': false,
         'h-gone-parent': false,
@@ -290,34 +290,34 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
     async () => {
       const runs = await listedRuns();
       const started = (id: string) => [runs.get(id)!.createdAt, runs.get(id)!.startedAt];
-      assert.deepEqual(started('b-running'), [at, filedB], 'waited on a-shipped for an hour: that hour is not time at work');
+      assert.deepEqual(started('b-running'), [at, filedB], 'waited on a-landed for an hour: that hour is not time at work');
       assert.deepEqual(started('i-started'), [at, filedI]);
       assert.deepEqual(
-        started('a-shipped'),
+        started('a-landed'),
         [at, at],
         'started, and its filing not on the feed: when it was created, the only time there is',
       );
-      for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-shipped', 'c-cancelled'])
+      for (const id of ['d-waits', 'e-cancelled-parent', 'g-parents-landed', 'c-cancelled'])
         assert.equal(
           runs.get(id)!.startedAt,
           null,
-          `${id}: waiting on runs that may still ship or never will, or its parents shipped and the tick yet to file it: not started`,
+          `${id}: waiting on runs that may still land or never will, or its parents landed and the tick yet to file it: not started`,
         );
-      for (const id of ['b-running', 'i-started', 'a-shipped', 'd-waits']) {
+      for (const id of ['b-running', 'i-started', 'a-landed', 'd-waits']) {
         const detail = (await (await app.request(`/api/runs/${id}`)).json()) as RunDetail;
         assert.equal(detail.startedAt, runs.get(id)!.startedAt, id);
       }
     },
   );
   await s.test(
-    'reading the runs a run waits on observes no harness again: the list and the detail observe once, a shipped parent among them',
+    'reading the runs a run waits on observes no harness again: the list and the detail observe once, a landed parent among them',
     async () => {
       const before = observations();
       await listedRuns();
       assert.equal(
         observations() - before,
         0,
-        "the list: a-shipped's tasks, read to ask its nemia decide as its branch is on main, come off the views the request already read; the tasks in flight are Codex's, and only the harnesses of the runs' own tasks are looked at, Claude Code's registry never",
+        "the list: a-landed's tasks, read to ask its nemia decide as its branch is on main, come off the views the request already read; the tasks in flight are Codex's, and only the harnesses of the runs' own tasks are looked at, Claude Code's registry never",
       );
       const again = observations();
       assert.equal((await app.request('/api/runs/d-waits')).status, 200);
@@ -339,9 +339,9 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
       assert.equal(body.waiting.advice, waitAdvice(run, waiting), id);
     }
     assert.deepEqual(
-      await (await app.request('/api/runs/g-parents-shipped/decision')).json(),
+      await (await app.request('/api/runs/g-parents-landed/decision')).json(),
       { running: true },
-      'every parent shipped, and not yet filed: it runs, and there is nothing to decide yet',
+      'every parent landed, and not yet filed: it runs, and there is nothing to decide yet',
     );
   });
 });

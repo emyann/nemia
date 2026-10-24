@@ -553,7 +553,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
     'POST /api/runs takes `after` and passes it to `startRun`, which freezes it on the record as `nemia start --after` does — and the board reads the run waiting on it',
     async () => {
       parents();
-      const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it ships.', after: ['p-running'] });
+      const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it lands.', after: ['p-running'] });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
       assert.deepEqual(runStore.runs.read(id).after, ['p-running']);

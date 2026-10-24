@@ -14,4 +14,4 @@ export { firstPiece } from './text.ts';
 export { pathOf } from './path.ts';
 export { firstRefusal } from './event-schema.ts';
 export { firstOf, quote, VALUE_QUOTE, WORDS_QUOTE } from './quote.ts';
-export type { LifecycleStep } from './path.ts';
+export type { LifecycleTransition } from './path.ts';

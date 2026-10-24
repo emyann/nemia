@@ -3,6 +3,12 @@
  */
 import { denialText, type Attempt, type Event, type State, type TaskView, type Usage } from '../index.ts';
 
+/** The sessions a pass left running, by harness, as `ae tick` and `ae up` print them: `claude:2 codex:1`, or empty where none runs. */
+export const runningText = (running: Readonly<Record<string, number>>): string =>
+  Object.entries(running)
+    .map(([h, n]) => `${h}:${n}`)
+    .join(' ');
+
 /** `text` up to its first line break, or the whole of it where there is none. */
 const firstLine = (text: string): string => {
   const at = text.indexOf('\n');

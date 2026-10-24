@@ -139,6 +139,7 @@ const VERBS = [
   'tallied',
   'tick',
   'transcript',
+  'up',
   'view',
   'watch',
 ];
@@ -184,11 +185,11 @@ test('one store, two engines — one built once, one provided its layer for each
     assert.deepEqual(heardByService, heardByPromise);
     assert.equal(heardByService.event.kind, 'filed');
 
-    const tickedByService = await firstOf<TickReport>((onTick, onError) => effect((e) => e.start({ intervalMs: 1, onTick, onError })));
+    const tickedByService = await firstOf<TickReport>((onTick, onError) => effect((e) => e.up({ intervalMs: 1, onTick, onError })));
     const tickedByPromise = await firstOf<TickReport>(async (onTick, onError) =>
       Effect.runSync(built.start({ intervalMs: 1, onTick, onError })),
     );
-    assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [2, 2]);
+    assert.deepEqual([tickedByService.tasks, tickedByPromise.tasks], [2, 2], '`up` through the service, and `start`, its old name');
     assert.equal(sessions.size, 0, 'queued, neither started');
   });
 

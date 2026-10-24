@@ -11,7 +11,7 @@ import { Effect, ManagedRuntime } from 'effect';
 import { admissionHook, Engine as EngineService, refusalWords, type EngineOptions, type EngineShape } from '../index.ts';
 import { refusedText, retiredKeyRefusal, type CodexArgs, type ForgetReport, type HarnessArgs } from '../index.ts';
 import type { SweepReport, TaskSpec } from '../index.ts';
-import { attemptLine, entryLine, limitLines, taskLine } from './lines.ts';
+import { attemptLine, entryLine, limitLines, runningText, taskLine } from './lines.ts';
 import { compactAsked, compactLines } from './compact.ts';
 
 /**
@@ -286,7 +286,7 @@ export function parseBrief(text: string, fallbackCwd: string): TaskSpec {
 
 const HELP = `ae — an engine for agent sessions
 
-  ae start <brief.md|"text">   file a task
+  ae file <brief.md|"text">    file a task (ae start, its old name, still does)
   ae tick                      one reconcile pass
   ae up [ms]                   reconcile on a timer
   ae ls                        every task, desired vs observed
@@ -398,13 +398,23 @@ const show = async (engine: EngineShape, id: string): Promise<void> => {
   for (const a of v.state.attempts) console.log(attemptLine(a));
 };
 
+/**
+ * `ae file <brief.md|"text">`: the brief at the path `arg`, or `arg` itself as one, parsed and filed; the help, given nothing. `ae start`
+ * is its old spelling, still taken, so scripts already written keep working.
+ */
+const fileBrief = async (engine: EngineShape, arg: string | undefined): Promise<void> => {
+  if (!arg) return console.log(HELP);
+  const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : arg;
+  const spec = parseBrief(text, process.cwd());
+  const id = await run('file', engine.file(spec));
+  console.log(`${id}  filed → ${spec.cwd}`);
+  console.log(`run 'ae tick' (or 'ae up') to start it`);
+};
+
 /** `ae tick`: one pass, and a line for what it did, each move it refused and each task it left out. */
 const tickOnce = async (engine: EngineShape): Promise<void> => {
   const r = await run('tick', engine.tick());
-  const load =
-    Object.entries(r.running)
-      .map(([h, n]) => `${h}:${n}`)
-      .join(' ') || 'idle';
+  const load = runningText(r.running) || 'idle';
   console.log(`${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
   for (const m of r.refused) console.log(refusedText(m));
   for (const why of r.unreadable) console.error(`left out: ${why}`);
@@ -567,16 +577,15 @@ const up = async (engine: EngineShape, every: number): Promise<void> => {
   let leftOut = new Set<string>();
   await new Promise<void>(() => {
     Effect.runSync(
-      engine.start({
+      engine.up({
         intervalMs: every,
         onTick: (r) => {
           for (const why of r.unreadable) if (!leftOut.has(why)) console.error(`left out: ${why}`);
           leftOut = new Set(r.unreadable);
           if (!r.actions) return;
-          const load = Object.entries(r.running)
-            .map(([h, n]) => `${h}:${n}`)
-            .join(' ');
-          console.log(`${new Date().toISOString().slice(11, 19)}  ${r.actions} action(s) over ${r.tasks} task(s)  [${load}]`);
+          console.log(
+            `${new Date().toISOString().slice(11, 19)}  ${r.actions} action(s) over ${r.tasks} task(s)  [${runningText(r.running)}]`,
+          );
         },
         onError: (e) => console.error(String(e)),
       }),
@@ -620,15 +629,12 @@ export async function main(argv: string[]): Promise<void> {
   if (await wroteToSession(engine, argv)) return;
 
   switch (verb) {
-    case 'start': {
-      if (!arg) return console.log(HELP);
-      const text = fs.existsSync(arg) ? fs.readFileSync(arg, 'utf8') : arg;
-      const spec = parseBrief(text, process.cwd());
-      const id = await run('file', engine.file(spec));
-      console.log(`${id}  filed → ${spec.cwd}`);
-      console.log(`run 'ae tick' (or 'ae up') to start it`);
-      return;
-    }
+    case 'start':
+      console.error('ae: `ae start` is `ae file` now, and still files for now: type `ae file <brief.md|"text">`.');
+      return fileBrief(engine, arg);
+
+    case 'file':
+      return fileBrief(engine, arg);
 
     case 'ls':
       return listTasks(engine);

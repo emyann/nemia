@@ -628,7 +628,7 @@ export const testEngine = (): TestEngine => {
       close: unkept('close'),
       watch: unkept('watch'),
       tallied: unkept('tallied'),
-      start: unkept('start'),
+      ...((loop) => ({ up: loop, start: loop }))(unkept('up')),
       sweep: unkept('sweep'),
       removeBody: unkept('removeBody'),
       compact: unkept('compact'),

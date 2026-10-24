@@ -42,7 +42,7 @@ import { deniedFacts } from './denied.ts';
 import { instantNow } from './now.ts';
 
 /**
- * The lifecycle `step` moves a task by: the shipped one (`lifecycle.ts`) unless a test provides another, which is how a
+ * The lifecycle `reconcile` moves a task by: the shipped one (`lifecycle.ts`) unless a test provides another, which is how a
  * refused edge is planted to prove the pass reports it. Exported by neither entry, as the machine is not.
  */
 export const Lifecycle = Context.Reference<Move>('engine/Lifecycle', { defaultValue: () => transition });
@@ -195,19 +195,19 @@ const closedOut = (state: State, observed: ReadonlyMap<string, Sighting>): Reado
   return new Map(observed).set(name, { ...seen, state: 'completed' });
 };
 
-/** A `step` or `settleTask` handed what it no longer takes, and why. Nothing was read or written. */
-export class StepRefused extends Schema.TaggedError<StepRefused>()('StepRefused', {
+/** A `reconcile` or `settleTask` handed what it no longer takes, and why. Nothing was read or written. */
+export class ReconcileRefused extends Schema.TaggedError<ReconcileRefused>()('ReconcileRefused', {
   message: Schema.String,
 }) {}
 
 /**
- * Why `step` refuses what it was handed past the task and the observation, or `undefined` when it was handed nothing more:
- * a caller built against a `step` that took the ceiling's `slots` third would otherwise have them dropped without a word.
+ * Why `reconcile` refuses what it was handed past the task and the observation, or `undefined` when it was handed nothing more:
+ * a caller built against a `reconcile` that took the ceiling's `slots` third would otherwise have them dropped without a word.
  */
-export const stepRefusalOf = (extra: readonly unknown[]): string | undefined =>
+export const reconcileRefusalOf = (extra: readonly unknown[]): string | undefined =>
   extra.length === 0
     ? undefined
-    : `step takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots, and a ceiling is the engine's own now. ${CEILING_INSTEAD}`;
+    : `reconcile takes a task and an observation, and was handed ${extra.length} more: its third argument was the ceiling's slots, and a ceiling is the engine's own now. ${CEILING_INSTEAD}`;
 
 /**
  * Why `settleTask` refuses its `maxSteps`, or `undefined`: a count of steps is a whole number above nought, and nothing
@@ -220,7 +220,10 @@ export const settleRefusalOf = (maxSteps: unknown, extra: readonly unknown[]): s
     : // oxlint-disable-next-line typescript/no-base-to-string -- `String` is reached only once an object and a function are ruled out
       `settleTask takes a task, an observation and a number of steps above nought, and was handed ${extra.length ? `${extra.length} more` : `a maxSteps of ${typeof maxSteps === 'object' || typeof maxSteps === 'function' ? JSON.stringify(maxSteps) : String(maxSteps)}`}: its third argument was the ceiling's slots, and a ceiling is the engine's own now. ${CEILING_INSTEAD}`;
 
-/** Nothing left unread: what `step` and `settleTask` decide on, handed an observation and no more. */
+/** What one look saw of the sessions, by name: what `reconcile` and `settleTask` are handed. */
+type Observed = ReadonlyMap<string, Sighting>;
+
+/** Nothing left unread: what `reconcile` and `settleTask` decide on, handed an observation and no more. */
 const ALL_READ: ReadonlySet<string> = new Set();
 
 /**
@@ -228,12 +231,12 @@ const ALL_READ: ReadonlySet<string> = new Set();
  *
  * `observed` is passed in rather than read here: one `claude agents` call serves a whole pass, which is the difference
  * between a board that scales and one that shells out per task. Typed to take two arguments, and counts them all the same:
- * a third, as an untyped caller may still pass the ceiling's slots, fails with `StepRefused` (`stepRefusalOf`), nothing read.
+ * a third, as an untyped caller may still pass the ceiling's slots, fails with `ReconcileRefused` (`reconcileRefusalOf`), nothing read.
  */
-export const step = Effect.fn('step')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
-  const refused = stepRefusalOf([...arguments].slice(2));
-  if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
-  return yield* stepOn(taskId, observed, ALL_READ);
+export const reconcile = Effect.fn('reconcile')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
+  const refused = reconcileRefusalOf([...arguments].slice(2));
+  if (refused) return yield* Effect.fail(new ReconcileRefused({ message: refused }));
+  return yield* reconcileOn(taskId, observed, ALL_READ);
 });
 
 /** What the sighting `seen` an attempt ended on says of it, as its `ended` event carries it, each key written, undefined or not. */
@@ -268,7 +271,7 @@ const spawnRequestOf = (taskId: string, state: State, name: string, n: number): 
 };
 
 /**
- * A step, told which names the pass's observation could not read (`Now.unread`): the pass's own, which `step`'s door does not
+ * `reconcile`, told which names the pass's observation could not read (`Now.unread`): the pass's own, which `reconcile`'s door does not
  * take. Folds the task's journal, asks `decide` for one action, and carries it out. The actions, in the order an attempt
  * meets them:
  *
@@ -299,7 +302,7 @@ const spawnRequestOf = (taskId: string, state: State, name: string, n: number): 
  *    a fact `decide` never reads. `decide` ends a stopped or timed-out attempt before it settles, so only a journal an older
  *    runtime wrote settles over an open one, and the id is written for the task that journal is replayed into.
  */
-const stepOn = Effect.fn('stepOn')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
+const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed: Observed, unread: ReadonlySet<string>) {
   const journal = yield* Journal;
   const runner = yield* Runner;
 
@@ -424,16 +427,16 @@ const wroteAny = (noted: readonly Event[], actions: readonly Action[]): boolean 
  * It stops at the first action that does not change our own journal (`PROGRESSES`), because `observed` is a snapshot:
  * `stop` asks the harness for something whose result we can only learn by looking again, so looping on it would re-send
  * the request against a state we have not re-read. The next pass sees `stopped` and settles. Assume nothing; record what
- * was observed. Refused with `StepRefused`, nothing read, for a `maxSteps` that is not a whole number above nought or any
+ * was observed. Refused with `ReconcileRefused`, nothing read, for a `maxSteps` that is not a whole number above nought or any
  * argument after it (`settleRefusalOf`).
  */
 export const settleTask = Effect.fn('settleTask')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>, maxSteps = 8) {
   const refused = settleRefusalOf(maxSteps, [...arguments].slice(3));
-  if (refused) return yield* Effect.fail(new StepRefused({ message: refused }));
+  if (refused) return yield* Effect.fail(new ReconcileRefused({ message: refused }));
   return yield* settleOn(taskId, observed, ALL_READ, maxSteps);
 });
 
-/** `settleTask`, told which names the pass could not read, as `stepOn` is. */
+/** `settleTask`, told which names the pass could not read, as `reconcileOn` is. */
 const settleOn = Effect.fn('settleOn')(function* (
   taskId: string,
   observed: ReadonlyMap<string, Sighting>,
@@ -442,7 +445,7 @@ const settleOn = Effect.fn('settleOn')(function* (
 ) {
   const taken: Action[] = [];
   for (let i = 0; i < maxSteps; i++) {
-    const action = yield* stepOn(taskId, observed, unread);
+    const action = yield* reconcileOn(taskId, observed, unread);
     taken.push(action);
     if (!PROGRESSES.has(action.do)) break;
   }

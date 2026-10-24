@@ -720,6 +720,7 @@ export const UNKEPT = [
   'watch',
   'tallied',
   'start',
+  'up',
   'sweep',
   'removeBody',
   'compact',

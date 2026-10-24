@@ -73,8 +73,8 @@ export type { EngineOptions, HarnessConfig, Pooled, TaskSpec, TickReport, Engine
  */
 export { configRefusal } from './service/harnesses.ts';
 
-export { file, FileRefused, requestStop, StopRefused, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/index.ts';
-export { view, viewOfState, tick, TickRefused, step, settleTask, StepRefused, GRACE_MS } from './core/engine/index.ts';
+export { file, FileRefused, StopRefused, answer, close, InputRefused, admit, AdmitRefused } from './core/engine/index.ts';
+export { view, viewOfState, tick, TickRefused, reconcile, settleTask, ReconcileRefused, GRACE_MS } from './core/engine/index.ts';
 export type { Filing } from './core/engine/index.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';
 export { refusedText, retiredKeyRefusal } from './core/engine/index.ts';
@@ -154,7 +154,7 @@ export { TASK_PHASES } from './core/index.ts';
  * draw; never the machine or its move.
  */
 export { lifecycleGraph } from './core/index.ts';
-export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleStep, LifecycleVerb } from './core/index.ts';
+export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleTransition, LifecycleVerb } from './core/index.ts';
 export { denialText, fold, nameFor } from './core/index.ts';
 export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { fenceReach, unruledIn, type FenceReach } from './harness/reach.ts';

@@ -183,14 +183,18 @@ const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN
 /** A monotonic reading as the daemon writes one beside a stamp (`Monotonic`): its boot's id, and whole milliseconds. */
 const MonotonicSchema = Schema.Struct({ boot: Schema.String.check(Schema.isNonEmpty()), ms: Schema.Finite });
 
+/** What a daemon serves on its own port, by harness name: opaque cards. */
+const Cards = Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Unknown));
+
 /**
  * `daemon.json` as a daemon writes it (`DaemonFile`). A pid that is not a positive whole number is not read as one: `kill(0)` and
  * `kill(-n)` signal process groups, not a process. `passedAt` may be absent, and is read as `null`. A key it does not name is dropped: the
- * file is the daemon's alone, and written whole by it.
+ * file is the daemon's alone, and written whole by it. The kind and the cards' key a daemon wrote before `up` and `serves` are still
+ * read, so a lease written before is held, and never written (`upgraded`).
  */
 const DaemonFileSchema = Schema.Struct({
   pid: Schema.Int.check(Schema.isGreaterThan(0)),
-  by: Schema.optionalKey(Schema.Literals(['api', 'wf up'])),
+  by: Schema.optionalKey(Schema.Literals(['api', 'up', 'wf up'])),
   url: Schema.optionalKey(Schema.String),
   startedAt: When,
   startedMono: Schema.optionalKey(MonotonicSchema),
@@ -210,15 +214,23 @@ const DaemonFileSchema = Schema.Struct({
       commit: Schema.optionalKey(Schema.String),
     }),
   ),
-  holder: Schema.optionalKey(Schema.Record(Schema.String, Schema.Record(Schema.String, Schema.Unknown))),
+  serves: Schema.optionalKey(Cards),
+  holder: Schema.optionalKey(Cards),
 });
+
+/**
+ * The file as read, in today's words: a `by` absent or of the earlier spelling is a `nemia up`'s, `up`; the cards under `holder` are
+ * held as `serves`, and the `holder` key is dropped, so the next write carries only `serves`.
+ */
+const upgraded = ({ by, holder, serves, ...file }: typeof DaemonFileSchema.Type): DaemonFile => {
+  const cards = serves ?? holder;
+  return { ...file, by: by === 'api' ? 'api' : 'up', passedAt: file.passedAt ?? null, ...(cards ? { serves: cards } : {}) };
+};
 
 /** The file as a daemon writes it, or undefined when the text does not read as one (`DaemonFileSchema`). */
 export function parseDaemonFile(text: string): DaemonFile | undefined {
   const decoded = Schema.decodeUnknownResult(DaemonFileSchema)(jsonOr(text));
-  if (Result.isFailure(decoded)) return undefined;
-  const file = decoded.success;
-  return { ...file, passedAt: file.passedAt ?? null };
+  return Result.isFailure(decoded) ? undefined : upgraded(decoded.success);
 }
 
 /**
@@ -429,10 +441,10 @@ export function heldUrl(url: string): boolean {
  * The cards carry nothing secret, and this file is no place for one: the token a viewer needs is the holder engine's own, kept 0600
  * in its store, and asked for there (`holderTokenOf`).
  */
-export function heldHolder(cards: Record<string, Record<string, unknown>>): boolean {
+export function heldServes(cards: Record<string, Record<string, unknown>>): boolean {
   const file = readDaemon()?.file;
   if (file?.pid !== process.pid || file.stoppedAt) return false;
-  writeDaemon({ ...file, holder: cards });
+  writeDaemon({ ...file, serves: cards });
   return true;
 }
 
@@ -445,10 +457,10 @@ export function heldHolder(cards: Record<string, Record<string, unknown>>): bool
  * this process's own port, which it must never dial — it answers that follow off its own engine, and a viewer that dialled itself
  * would ask its own port for a session it already holds.
  */
-export function holderOnStore(now: Instant = instantNow()): Record<string, Record<string, unknown>> | undefined {
+export function servesOnStore(now: Instant = instantNow()): Record<string, Record<string, unknown>> | undefined {
   const standing = daemonStanding(now);
   if (standing.kind !== 'ticking' || standing.file.pid === process.pid) return undefined;
-  return standing.file.holder;
+  return standing.file.serves;
 }
 
 /**

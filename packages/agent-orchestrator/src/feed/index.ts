@@ -20,7 +20,7 @@ export {
   lineAsRead,
   publishedOf,
   REMOVED,
-  SIGNAL_WORDS,
+  LINE_WORDS,
   startedLine,
   STORE,
   upgraded,
@@ -43,8 +43,8 @@ export type {
   Once,
   Reason,
   RunLine,
-  SignalSource,
-  SignalType,
+  LineSource,
+  LineType,
   StoreLine,
 } from './feed.ts';
 export { DENIED, isOnce, kindsOf, messageOf, reasonOf, REASONS, REASON_CODES, sourceOf, typeOf, waitsOf } from './reason.ts';

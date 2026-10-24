@@ -190,7 +190,7 @@ const UPGRADE: Command<Upgraded> = {
     unknown: (arg) => `nemia upgrade does not take ${arg}: ${SHAPE}.`,
   },
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   only: { side: 'cli', why: 'builds for minutes and restarts the daemon that serves the api' },
   handler: (args) => upgrade(args),
   print: (data) => data.lines,

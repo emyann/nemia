@@ -5,14 +5,14 @@ import type { CommandClass } from './class.ts';
 import { TABLE as COMMANDS } from '../command/commands.verb.ts';
 
 /** A fixture table, one command of each class. */
-const TABLE: { name: string; nemia: CommandClass }[] = [
-  { name: 'ls', nemia: 'read' },
-  { name: 'hold', nemia: 'hers' },
-  { name: 'approve', nemia: 'answers' },
-  { name: 'cancel', nemia: 'prompts' },
-  { name: 'tick', nemia: 'out' },
-  { name: 'level', nemia: { bare: 'read', sets: 'prompts', setsBy: ['manual'] } },
-  { name: 'agents custom', nemia: { bare: 'read', sets: 'prompts', setsBy: ['--clear'], readsBy: ['--repo'] } },
+const TABLE: { name: string; class: CommandClass }[] = [
+  { name: 'ls', class: 'read' },
+  { name: 'hold', class: 'act' },
+  { name: 'approve', class: 'answer' },
+  { name: 'cancel', class: 'ask' },
+  { name: 'tick', class: 'none' },
+  { name: 'level', class: { bare: 'read', sets: 'ask', setsBy: ['manual'] } },
+  { name: 'agents custom', class: { bare: 'read', sets: 'ask', setsBy: ['--clear'], readsBy: ['--repo'] } },
 ];
 
 test('her fence is derived from the classes: reads, her writes and answers run unasked, a prompt asks, out is denied, a setter asks set', () => {
@@ -36,7 +36,7 @@ test('her fence is derived from the classes: reads, her writes and answers run u
 
 test('REFUSED to run unasked: a command reclassed as a prompt asks, and one reclassed out is denied, by its class alone', () => {
   const fence = nemiaFence(
-    TABLE.map((c) => (c.name === 'hold' ? { ...c, nemia: 'prompts' as const } : c.name === 'ls' ? { ...c, nemia: 'out' as const } : c)),
+    TABLE.map((c) => (c.name === 'hold' ? { ...c, class: 'ask' as const } : c.name === 'ls' ? { ...c, class: 'none' as const } : c)),
   );
   assert.ok(fence.ask.includes('Bash(nemia hold:*)'));
   assert.ok(fence.deny.includes('Bash(nemia ls:*)'));

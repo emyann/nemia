@@ -126,7 +126,7 @@ export const AGENTS_COPY: Command<AgentCopied> = {
     ],
   ),
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   route: { method: 'POST', path: '/api/agents/yours/copy', status: 200 },
   handler: (args, _env, home = HOME) =>
     tried(() => {

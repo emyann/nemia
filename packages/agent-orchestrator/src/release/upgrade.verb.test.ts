@@ -395,10 +395,10 @@ test('REFUSED: a failed build pauses nothing and signals nothing, even where the
   fs.rmSync(UNIT, { force: true });
 });
 
-test("nemia upgrade is classed prompts and is the CLI's alone; Nemia's fence asks for it until the person's list grants it", () => {
+test("nemia upgrade is classed ask and is the CLI's alone; Nemia's fence asks for it until the person's list grants it", () => {
   const [command] = RELEASES;
   assert.equal(command.name, 'upgrade');
-  assert.equal(command.nemia, 'prompts');
+  assert.equal(command.class, 'ask');
   assert.equal(command.writes, true);
   assert.equal(command.only?.side, 'cli');
   const fence = nemiaFence(TABLE);

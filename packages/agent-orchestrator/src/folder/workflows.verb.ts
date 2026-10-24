@@ -147,7 +147,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
     ],
   ),
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   route: [
     { method: 'POST', path: '/api/workflows/:from', status: 201, hand: WRITE_HAND },
     { method: 'PUT', path: '/api/workflows/:from/:name', status: 200, hand: WRITE_HAND },
@@ -206,7 +206,7 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
     [versionFlag('workflows remove', 'the folder'), REPO],
   ),
   writes: true,
-  nemia: 'prompts',
+  class: 'ask',
   route: {
     method: 'DELETE',
     path: '/api/workflows/:from/:name',
@@ -231,7 +231,7 @@ export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
   help: ['the workflow folders named, each loaded'],
   spec: apiSpec([{ key: 'dirs', takes: 'many', kind: 'name' }], ['repo', 'factory']),
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: { method: 'GET', path: '/api/workflows', status: 200 },
   only: {
     side: 'api',
@@ -270,7 +270,7 @@ export const WORKFLOWS_STEP: Command<{ step: Workflow | null; steps: string[] }>
     ['dir', 'repo', 'factory'],
   ),
   writes: false,
-  nemia: 'read',
+  class: 'read',
   route: { method: 'GET', path: '/api/workflows/:from/:name/:step', status: 200 },
   only: {
     side: 'api',

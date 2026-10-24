@@ -29,14 +29,17 @@ import { PAUSE_WAIT } from '../list/list.ts';
  */
 export type InvolvedKind = 'Run' | 'Step' | 'Daemon' | 'Store';
 
-/** How serious a signal is, as Kubernetes types an `Event`: routine news, or something gone wrong. */
-export type SignalType = 'Normal' | 'Warning';
+/** How serious a line is, as Kubernetes types an `Event`: routine news, or something gone wrong. */
+export type LineType = 'Normal' | 'Warning';
 
 /**
  * Who a line is the deed of: the tick's own judgement, the runtime's journal read through the client, a person's verb, or a daemon that
  * took the store. A property of the reason (`sourceOf`), since a machine selects on it — and so the table's, not a branch in the stamp.
  */
-export type SignalSource = 'tick' | 'runtime' | 'person' | 'daemon';
+export const LINE_SOURCES = ['tick', 'runtime', 'person', 'daemon'] as const;
+
+/** One of `LINE_SOURCES`. */
+export type LineSource = (typeof LINE_SOURCES)[number];
 
 /** What a line of the feed says of a thing, without its time: the word the tick judged, and the note beside it. */
 export type Said = { word: string; note?: string };
@@ -46,7 +49,7 @@ export type Said = { word: string; note?: string };
  * (`source`, the tick's where it names none) and whether it is a one-shot — a fact written exactly once per occurrence rather than a word
  * that stands until it changes, counted off the feed's own lines and never a thing's last word (`isOnce`, `foldFeed`).
  */
-type Entry = { kinds: readonly InvolvedKind[]; type: SignalType; waits?: true; source?: SignalSource; once?: true };
+type Entry = { kinds: readonly InvolvedKind[]; type: LineType; waits?: true; source?: LineSource; once?: true };
 
 /** The word a run's line says once its record is gone from the store (`nemia rm`): the fold forgets the run on reading it. */
 export const REMOVED = 'removed';
@@ -67,7 +70,7 @@ export const DENIED = 'denied: ';
  * match found its words anywhere inside a line's word, so `failed`, `blocked` or `needs:` in one of these would break the identity for a
  * fact the owner said waits on nobody — which is why a refused spawn is `nothing started` and not `spawn failed`.
  */
-export const SIGNAL_WORDS = {
+export const LINE_WORDS = {
   Approved: 'approved',
   CancelAsked: 'cancel asked',
   HoldPut: 'hold put',
@@ -133,7 +136,7 @@ export const REASON_CODES = Object.keys(REASONS) as readonly Reason[];
 const entryOf = (reason: Reason): Entry => REASONS[reason];
 
 /** How serious a reason is, by the table: what a line's `type` says. */
-export const typeOf = (reason: Reason): SignalType => entryOf(reason).type;
+export const typeOf = (reason: Reason): LineType => entryOf(reason).type;
 
 /** The kinds a reason is written of, by the table: what a line's `involved.kind` may be where it names that reason. */
 export const kindsOf = (reason: Reason): readonly InvolvedKind[] => entryOf(reason).kinds;
@@ -142,7 +145,7 @@ export const kindsOf = (reason: Reason): readonly InvolvedKind[] => entryOf(reas
  * Who a line of `reason` is the deed of, by the table: the tick's where the table names none, so a reason added without a source is the
  * tick's judgement, which is what every word it judges is.
  */
-export const sourceOf = (reason: Reason): SignalSource => entryOf(reason).source ?? 'tick';
+export const sourceOf = (reason: Reason): LineSource => entryOf(reason).source ?? 'tick';
 
 /**
  * Whether `reason` is a one-shot: a fact written exactly once per occurrence — a call denied, a person's act, a spawn refused, a session
@@ -177,9 +180,9 @@ const RUN_WORDS: readonly Rule[] = [
   { is: 'awaiting approval', reason: 'AwaitingApproval' },
   { is: 'blocked', reason: 'Blocked' },
   { is: REMOVED, reason: 'Removed' },
-  { is: SIGNAL_WORDS.CancelAsked, reason: 'CancelAsked' },
-  { is: SIGNAL_WORDS.HoldPut, reason: 'HoldPut' },
-  { is: SIGNAL_WORDS.HoldLifted, reason: 'HoldLifted' },
+  { is: LINE_WORDS.CancelAsked, reason: 'CancelAsked' },
+  { is: LINE_WORDS.HoldPut, reason: 'HoldPut' },
+  { is: LINE_WORDS.HoldLifted, reason: 'HoldLifted' },
   { starts: 'failed', reason: 'Failed' },
 ];
 
@@ -210,17 +213,17 @@ const STEP_WORDS: readonly Rule[] = [
   { starts: 'failed', reason: 'Failed' },
   { is: 'stopped', reason: 'Stopped' },
   { is: 'unsigned', reason: 'Unsigned' },
-  { is: SIGNAL_WORDS.Approved, reason: 'Approved' },
-  { is: SIGNAL_WORDS.SpawnFailed, reason: 'SpawnFailed' },
-  { is: SIGNAL_WORDS.SessionLost, reason: 'SessionLost' },
-  { is: SIGNAL_WORDS.ClosedOut, reason: 'ClosedOut' },
+  { is: LINE_WORDS.Approved, reason: 'Approved' },
+  { is: LINE_WORDS.SpawnFailed, reason: 'SpawnFailed' },
+  { is: LINE_WORDS.SessionLost, reason: 'SessionLost' },
+  { is: LINE_WORDS.ClosedOut, reason: 'ClosedOut' },
   { is: 'unknown', reason: 'Unknown' },
 ];
 
 /** The store's words: its pause put and lifted, each a person's verb, said once per pause (`storeOnce`). */
 const STORE_WORDS: readonly Rule[] = [
-  { is: SIGNAL_WORDS.StorePaused, reason: 'StorePaused' },
-  { is: SIGNAL_WORDS.StoreResumed, reason: 'StoreResumed' },
+  { is: LINE_WORDS.StorePaused, reason: 'StorePaused' },
+  { is: LINE_WORDS.StoreResumed, reason: 'StoreResumed' },
 ];
 
 /** Whether `rule` recognises `word`: the whole word, or its beginning. */

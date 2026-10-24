@@ -238,7 +238,7 @@ test("get, the Factory's and the inbox's reads: each decodes what the api gives,
       }
 
       const none = daemon({ kind: 'none', ticking: false, pid: null, cwd: null, every: null, startedAt: null, passedAt: null });
-      const silent = { ...none, lastHeardAt: null, stoppedAt: null, staleAfterMs: null, identity: null, line: 'no wf up' };
+      const silent = { ...none, lastHeardAt: null, stoppedAt: null, staleAfterMs: null, identity: null, line: 'nemia up: none ticking' };
       for (const d of [daemon(), silent]) {
         answering(t, d);
         assert.deepEqual(await readDaemon(), d);

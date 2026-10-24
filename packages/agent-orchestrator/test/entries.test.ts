@@ -347,6 +347,7 @@ const PINNED: Record<string, string[]> = {
     'roundAskFile',
     'roundBudgetRefusal',
     'roundDueNote',
+    'renamedIn',
     'routeList',
     'runCostLines',
     'runGraph',

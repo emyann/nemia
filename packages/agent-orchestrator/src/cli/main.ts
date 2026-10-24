@@ -63,8 +63,8 @@ import {
   ensureDaemon,
   liveDemandHost,
   type DemandHost,
+  renamedIn,
 } from '../runner.ts';
-import { renamedIn } from '../command/command.ts';
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { admitRun, agentsCustomRun, policyProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';

@@ -7264,8 +7264,8 @@ test("Nemia's face is her blobatar on its plate, dimmed in dark, and wears the e
 
 test('the run page draws one tag per kind the run is behind on, and the verb to type; nothing at all for a run with none', () => {
   const drawn = renderToStaticMarkup(createElement(KindsBehind, { run: behind() }));
-  assert.match(drawn, /agent coder: rev 5, ledger at 6/, 'what a filing after this would take, as the ledger holds it');
-  assert.match(drawn, /skill look: implement ran on rev 1, ledger at 2/, 'and what a step that already ran ran on');
+  assert.match(drawn, /agent coder: rev 5, files at rev 6/, 'what a filing after this would take, as the files hold it now');
+  assert.match(drawn, /skill look: implement ran on rev 1, files at rev 2/, 'and what a step that already ran ran on');
   assert.match(drawn, /nemia refresh r-1/, 'the verb to type, as the api said it');
   assert.match(drawn, /data-kinds-behind="2"/);
 

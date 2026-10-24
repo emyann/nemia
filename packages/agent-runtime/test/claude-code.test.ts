@@ -211,6 +211,19 @@ test(
     });
 
     await s.test(
+      'a background session given a closed list of skills is refused before anything starts: `claude --bg` has no flag or setting that closes them',
+      async () => {
+        fs.rmSync(path.join(f.dir, 'bg-args'), { force: true });
+        const refused = await Effect.runPromise(
+          Effect.flip(ops.spawn({ name: 'ae/b/2', brief: 'go', cwd: f.dir, config: { background: true, enabledSkills: ['plug:review'] } })),
+        );
+        assert.equal(refused._tag, 'RunnerError');
+        assert.equal(refused.refused, true, 'nothing started, and waiting will not change that');
+        assert.equal(f.read('bg-args'), undefined, 'no `claude --bg` was spawned');
+      },
+    );
+
+    await s.test(
       'observeFor asks `claude agents` only when a session expected is not a job: none for jobs alone or nothing, one for a background session; observe always',
       async () => {
         fs.writeFileSync(

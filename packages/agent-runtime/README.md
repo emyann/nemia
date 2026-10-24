@@ -726,7 +726,7 @@ a harness the engine does not have (it used to run on the fallback, silently), c
 it cannot use, a retired `maxAttempts` or `resume`, an empty brief, cwd, model, resumeFrom or effort, a `cwd` that is
 not absolute (the process that ticks a task need not be the one that filed it, and a detached worker
 once resolved a relative one twice; `ae start` resolves it for you), a `tools` that
-is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `checkoutMcp` that is not a list of server names or is on a harness that loads none (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` that is not a whole number from -2147483648 to 2147483647 (below), and a word the
+is not a list of names, a `disallowedTools` that is not a list of permission rules, an `mcp` that is not a map of `.mcp.json` servers (below), a `checkoutMcp` that is not a list of server names or is on a harness that loads none (below), an `enabledSkills` that is neither `'default'` nor a list of skill names, or a list on a harness that cannot close a session's skills (below), a `budgetUsd` that is not dollars above 0 or that its harness would not keep (below), a `contextTokens` that is not a whole number of tokens its harness takes, or any on a harness with no window to set (below), a `remoteControl` that is not true or false or that its harness has no flag for (below), a `background` that is not true or false or on a harness with no such mode (below), a `claude` that is not Claude Code's flags, names one the runtime gives itself, or is on a harness that is not Claude Code (below), a `priority` that is not a whole number from -2147483648 to 2147483647 (below), and a word the
 task's harness does not have. Those words belong to the
 harness, so each harness says them — `refuses` on a `HarnessSpec`, the lists beside `claudeOps` —
 and `domain.ts` never learns them:
@@ -923,7 +923,17 @@ adds nothing, and the operator's own servers still load. The `command` harness, 
 server, refuses the argument (`HarnessSpec.checkoutMcp`), and a remote agent refuses it with every
 other argument.
 
-`ae start` has no `mcp` or `checkoutMcp` key: a brief's values are one line each, so both are the API's for now.
+**`enabledSkills` says which skills a session is given**: a list of the harness's names for them — a skill's own name, or
+`<plugin>:<name>` — and every other skill, the harness's built-in ones, the user's, the project's and a plugin's, is hidden from
+the session and refused when it is called; `'default'`, or absent, is the harness's own set. Claude Code holds a list only
+through the Agent SDK (`Options.skills`), so a job of `claude` and a long-lived session it holds attached take one, and
+`claude --bg` and `claude -p` refuse it: the installed Claude Code has no flag and no settings key that closes a session's
+skills (`skillOverrides` turns named skills off, `disableBundledSkills` drops the bundled ones alone). A long-lived session that
+falls back to `--bg`, as no holder holds it, is refused at spawn, `unstartable`, rather than started holding every skill. A
+`HarnessSpec` takes one where it declares `enabledSkills`; Codex does not, and a remote agent refuses it with every other
+argument. `file()` refuses a value that is neither `'default'` nor a list of names, and a name twice.
+
+`ae start` has no `mcp`, `checkoutMcp` or `enabledSkills` key: a brief's values are one line each, so they are the API's for now.
 
 ### Settings: the checkout's, never the operator's
 

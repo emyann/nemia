@@ -286,15 +286,6 @@ export type StepAgent = {
    * nothing, and on a record frozen before the key, whose list is the step's own line whole.
    */
   agentDenies?: string[];
-  /**
-   * Every skill name the run's folder could see when `nemia start` froze it — each bare name the lookup found, and each `folder:name`
-   * written on any agent's or any step's `skills:` line in the folder, with its bare form — which the step's session is told to turn off
-   * (`skillOverrides`, `sessionSettings`), so it is listed its own plugin's skills alone and no other of Nemia's. Computed once for the
-   * folder (`parseFolder`), not per step: a `folder:name` another step names is a name this step must not be listed either. An override
-   * reaches no plugin's skill, so what the step is given survives it. Absent on a record frozen before the key, whose session is listed
-   * what it was; the harness's own bundled skills are governed by `disableBundledSkills`, which this sets neither way.
-   */
-  offSkills?: string[];
   harnessPrompt?: HarnessPrompt;
   /**
    * The MCP servers the step's sessions load, by the names the checkout's `.mcp.json` gives them, its agent's `mcp:` line first, then those

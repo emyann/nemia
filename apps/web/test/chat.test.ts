@@ -1,5 +1,5 @@
 /**
- * Nemia's chat where it is pure: the merge of her stream's events by their id, where she is as her face reads it, her steps folded
+ * Nemia's chat where it is pure: the merge of her stream's events by their id, where she is as her face reads it, her calls folded
  * into a turn and that fold mapped onto the one shape the family draws (`chatItems`), the links read out of her words, how an ask of
  * hers is drawn and what is left of one, which of her messages are new, and a message the api would not take, kept in this browser and
  * sent once. Each rule with a fixture that breaks it.
@@ -30,7 +30,7 @@ import {
   type ChatFollowed,
   type ChatItem,
   type ChatMessage,
-  type ChatStep,
+  type ChatCall,
 } from '../src/lib/chatFollowing.ts';
 import { turnWords } from '../src/lib/conversation.ts';
 import { CHAT_OUTBOX_KEY, editKept, forgetKept, keepUnsent, parseKept, readKept, sendingOnce } from '../src/lib/chatOutbox.ts';
@@ -50,9 +50,9 @@ const message = (id: string, second: number, from: 'agent' | 'person' | 'keeper'
   text,
 });
 
-/** One step of hers. */
-const step = (id: string, second: number, state: ChatStep['state'], sentence = 'Read the inbox'): ChatStep => ({
-  kind: 'step',
+/** One tool call of hers. */
+const call = (id: string, second: number, state: ChatCall['state'], sentence = 'Read the inbox'): ChatCall => ({
+  kind: 'call',
   id,
   at: at(second),
   tool: 'Read',
@@ -98,19 +98,19 @@ test('mergeChatEvents and changedChat: an event of her chat is replaced by its i
   await t.test(
     'an event of her chat is replaced by its id alone: the same id twice is one event, the same words under two ids are two',
     () => {
-      const first = mergeChatEvents([], [step('t:1:a', 1, 'running'), message('m:1:b', 2, 'agent', 'One.')]);
-      const moved = mergeChatEvents(first, [step('t:1:a', 1, 'done')]);
+      const first = mergeChatEvents([], [call('t:1:a', 1, 'running'), message('m:1:b', 2, 'agent', 'One.')]);
+      const moved = mergeChatEvents(first, [call('t:1:a', 1, 'done')]);
       assert.deepEqual(
         moved.map((e) => e.id),
         ['t:1:a', 'm:1:b'],
-        'the step is replaced where it stands, never drawn twice',
+        'the call is replaced where it stands, never drawn twice',
       );
-      assert.equal((moved[0] as ChatStep).state, 'done', 'with its later state');
+      assert.equal((moved[0] as ChatCall).state, 'done', 'with its later state');
       const twice = mergeChatEvents([], [message('k:1:x', 3, 'keeper', 'Same words'), message('p:1:y', 4, 'person', 'Same words')]);
       assert.equal(twice.length, 2, 'the same words under two ids are two events');
     },
   );
-  await t.test('REFUSED: a merge keyed by the kind beside the id, as a step transcript is, draws a step whose state moved twice', () => {
+  await t.test('REFUSED: a merge keyed by the kind beside the id, as a step transcript is, draws a call whose state moved twice', () => {
     const keyed = (known: readonly ChatEvent[], incoming: readonly ChatEvent[]): ChatEvent[] => {
       const merged = [...known];
       const where = new Map(merged.map((e, i) => [`${e.kind}:${e.id}:${JSON.stringify(e)}`, i]));
@@ -122,9 +122,9 @@ test('mergeChatEvents and changedChat: an event of her chat is replaced by its i
       }
       return merged;
     };
-    const known = [step('t:1:a', 1, 'running')];
-    assert.equal(keyed(known, [step('t:1:a', 1, 'done')]).length, 2, 'the mutant draws the step twice');
-    assert.equal(mergeChatEvents(known, [step('t:1:a', 1, 'done')]).length, 1, 'the rule draws it once');
+    const known = [call('t:1:a', 1, 'running')];
+    assert.equal(keyed(known, [call('t:1:a', 1, 'done')]).length, 2, 'the mutant draws the call twice');
+    assert.equal(mergeChatEvents(known, [call('t:1:a', 1, 'done')]).length, 1, 'the rule draws it once');
   });
   await t.test('a change is taken one at a time: the presence of the later frame wins, and the events of both are held', () => {
     const held = [
@@ -309,10 +309,10 @@ test('her chat followed on one stream: what it does not read is dropped, where s
       stream.send('presence', up, '1.0.0.0.0');
       assert.deepEqual(now().presence, up);
       assert.equal(now().cursor, '1.0.0.0.0');
-      stream.send('chat', step('t:1:a', 1, 'running'), '1.1.0.0.0');
-      stream.send('chat', step('t:1:a', 1, 'done'), '1.2.0.0.0');
-      assert.equal(now().events.length, 1, 'the step is one event, its state moved');
-      assert.equal((now().events[0] as ChatStep).state, 'done');
+      stream.send('chat', call('t:1:a', 1, 'running'), '1.1.0.0.0');
+      stream.send('chat', call('t:1:a', 1, 'done'), '1.2.0.0.0');
+      assert.equal(now().events.length, 1, 'the call is one event, its state moved');
+      assert.equal((now().events[0] as ChatCall).state, 'done');
       assert.equal(now().cursor, '1.2.0.0.0');
     },
   );
@@ -322,7 +322,7 @@ test('her chat followed on one stream: what it does not read is dropped, where s
     stream.send('chat', { ...asked('question', []), questions: [{ question: 'Which?', header: 'H', options: [{ label: 'One' }] }] });
     stream.send('chat', { ...asked('proposal', []), questions: 'none' });
     assert.deepEqual(now().events, before);
-    assert.equal(now().events.length, 1, 'the step alone');
+    assert.equal(now().events.length, 1, 'the call alone');
   });
 
   await s.test("an ask her stream sends is read whole — its questions, the choices and the person's answer on it", () => {
@@ -331,7 +331,7 @@ test('her chat followed on one stream: what it does not read is dropped, where s
     const events = now().events;
     assert.deepEqual(
       events.map((event) => event.kind),
-      ['step', 'question', 'proposal'],
+      ['call', 'question', 'proposal'],
     );
     const [, one, two] = events;
     assert.deepEqual(one?.kind === 'question' ? one.questions : [], [EXPLAINED], 'the questions are read as she asked them');
@@ -400,13 +400,13 @@ test('presenceOf, composerWords and composerButton: where she is, and what the c
 
 test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page draws them', async (t) => {
   await t.test(
-    'her consecutive steps fold into one turn, in the order they came, and a turn with a step at work or waiting is running',
+    'her consecutive calls fold into one turn, in the order they came, and a turn with a call at work or waiting is running',
     () => {
       const folded = foldChat([
         message('p:1', 1, 'person', 'What is waiting on me?'),
-        step('t:1:a', 2, 'done', 'Read the inbox'),
-        step('t:1:b', 3, 'done', 'Read the factories'),
-        step('t:1:c', 136, 'done', 'Read the runs that wait'),
+        call('t:1:a', 2, 'done', 'Read the inbox'),
+        call('t:1:b', 3, 'done', 'Read the factories'),
+        call('t:1:c', 136, 'done', 'Read the runs that wait'),
         message('m:1:d', 140, 'agent', 'Two gates.'),
       ]);
       assert.deepEqual(
@@ -415,21 +415,21 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
       );
       const turn = folded[1] as Extract<ChatItem, { kind: 'turn' }>;
       assert.deepEqual(
-        turn.steps.map((s) => s.sentence),
+        turn.calls.map((c) => c.sentence),
         ['Read the inbox', 'Read the factories', 'Read the runs that wait'],
         'the turn keeps the order they came in',
       );
       assert.equal(turn.running, false);
-      assert.equal(turnWords(turn.ms, turn.steps.length), 'Worked for 2m 14s · 3 steps');
-      const live = foldChat([step('t:1:a', 2, 'done'), step('t:1:b', 3, 'running')])[0] as Extract<ChatItem, { kind: 'turn' }>;
-      assert.equal(live.running, true, 'a turn whose step is at work is still running');
+      assert.equal(turnWords(turn.ms, turn.calls.length), 'Worked for 2m 14s · 3 steps');
+      const live = foldChat([call('t:1:a', 2, 'done'), call('t:1:b', 3, 'running')])[0] as Extract<ChatItem, { kind: 'turn' }>;
+      assert.equal(live.running, true, 'a turn whose call is at work is still running');
       assert.equal(
-        (foldChat([step('t:1:a', 2, 'waits')])[0] as Extract<ChatItem, { kind: 'turn' }>).running,
+        (foldChat([call('t:1:a', 2, 'waits')])[0] as Extract<ChatItem, { kind: 'turn' }>).running,
         true,
-        'and one whose step waits on a person',
+        'and one whose call waits on a person',
       );
-      const apart = foldChat([step('t:1:a', 2, 'done'), message('m:1:b', 3, 'agent', 'Done.'), step('t:1:c', 4, 'done')]);
-      assert.equal(apart.filter((item) => item.kind === 'turn').length, 2, 'steps either side of her words are two turns');
+      const apart = foldChat([call('t:1:a', 2, 'done'), message('m:1:b', 3, 'agent', 'Done.'), call('t:1:c', 4, 'done')]);
+      assert.equal(apart.filter((item) => item.kind === 'turn').length, 2, 'calls either side of her words are two turns');
     },
   );
   await t.test('the line that says what is new is drawn over the first of her messages the person has not read', () => {
@@ -480,8 +480,8 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
     'her adapter maps her events onto the one shape the family draws: each kind, in the order they came, with what it carries',
     () => {
       const items = chatItems([
-        step('t:1:a', 2, 'done', 'Read the inbox'),
-        step('t:1:b', 136, 'waits', 'Waits for your approval'),
+        call('t:1:a', 2, 'done', 'Read the inbox'),
+        call('t:1:b', 136, 'waits', 'Waits for your approval'),
         message('m:1:c', 140, 'agent', 'Two gates: [the run](/runs/r-1) and [the card](/inbox/c-2).'),
         message('p:1:d', 141, 'person', 'Land the first.'),
         message('k:1:e', 142, 'keeper', 'She was told what you wrote.'),
@@ -501,7 +501,7 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
         'the ids her events carry, in the order they came',
       );
       const work = items[0];
-      if (work.kind !== 'work') throw new Error('her consecutive steps are one turn');
+      if (work.kind !== 'work') throw new Error('her consecutive calls are one turn');
       assert.deepEqual(
         work.lines.map((line) => [line.id, line.tool, line.sentence, line.state]),
         [
@@ -514,7 +514,7 @@ test('foldChat, newFrom, linksOf, drawnAs and chatItems: her events as the page 
       assert.equal(
         work.lines.every((line) => line.input === undefined && line.result === undefined),
         true,
-        'her steps open on nothing',
+        'her calls open on nothing',
       );
 
       const hers = items[1];

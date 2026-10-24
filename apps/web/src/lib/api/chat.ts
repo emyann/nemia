@@ -10,8 +10,8 @@ import { get, send } from './read.ts';
 /** Mirrors the package's `ChatFrom`: who a message is from — her, the person, or the keeper, whose words are a quiet marker. */
 export type ChatFrom = 'agent' | 'person' | 'keeper';
 
-/** Mirrors the package's `StepState`: done, at work, failed, not begun, or waiting on the person. */
-export type ChatStepState = 'done' | 'running' | 'error' | 'pending' | 'waits';
+/** Mirrors the package's `CallState`: done, at work, failed, not begun, or waiting on the person. */
+export type ChatCallState = 'done' | 'running' | 'error' | 'pending' | 'waits';
 
 /** Mirrors the package's `AskOption`: one choice of a question, its explanation, and whether her words marked it recommended. */
 export type AskOption = { label: string; description: string; recommended: boolean };
@@ -41,13 +41,13 @@ export type AskEvent = {
 
 /**
  * Mirrors the package's `ChatEvent`, unique by its `id`: a `message`, the person's carrying when it was delivered (`delivered`, null
- * while it waits in her outbox); a `step`, one tool call with its sentence, a `fact` and its state; a `session` line where one of her
+ * while it waits in her outbox); a `call`, one tool call with its sentence, a `fact` and its state; a `session` line where one of her
  * sessions ended and the next began; a `question` and a `proposal`, each an `AskEvent` — a call of hers waiting on the person, the
  * proposal her one-question ask.
  */
 export type ChatEvent =
   | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null }
-  | { kind: 'step'; id: string; at: string; tool: string; sentence: string; fact?: string; state: ChatStepState }
+  | { kind: 'call'; id: string; at: string; tool: string; sentence: string; fact?: string; state: ChatCallState }
   | { kind: 'session'; id: string; at: string; attempt: number }
   | ({ kind: 'question' } & AskEvent)
   | ({ kind: 'proposal' } & AskEvent);
@@ -55,8 +55,8 @@ export type ChatEvent =
 /** Decodes a `ChatFrom`. */
 const ChatFromSchema = Schema.Literals(['agent', 'person', 'keeper']);
 
-/** Decodes a `ChatStepState`. */
-const ChatStepStateSchema = Schema.Literals(['done', 'running', 'error', 'pending', 'waits']);
+/** Decodes a `ChatCallState`. */
+const ChatCallStateSchema = Schema.Literals(['done', 'running', 'error', 'pending', 'waits']);
 
 /** Decodes an `AskOption`. */
 const AskOptionSchema = Schema.Struct({
@@ -91,13 +91,13 @@ const ASK_FIELDS = {
  */
 const ChatEventSchema = Schema.Union([
   Schema.Struct({
-    kind: Schema.Literal('step'),
+    kind: Schema.Literal('call'),
     id: Schema.String,
     at: Schema.String,
     tool: Schema.String,
     sentence: Schema.String,
     fact: Schema.optionalKey(Schema.String),
-    state: ChatStepStateSchema,
+    state: ChatCallStateSchema,
   }),
   Schema.Struct({
     kind: Schema.Literal('message'),

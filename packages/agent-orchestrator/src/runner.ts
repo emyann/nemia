@@ -527,6 +527,6 @@ export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/r
 export { ledgerOf, topsOf } from './revisions/revisions.store.ts';
 export { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
-export type { ChatEvent, ChatFrom, Presence, StepState } from './chat/chat.ts';
+export type { CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';
 export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';

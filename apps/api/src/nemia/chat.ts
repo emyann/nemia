@@ -79,7 +79,7 @@ async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): 
  * - `GET /api/nemia/chat?before=<id>&limit=<n>` — a page of her history, oldest first: `{ events, before, cursor, presence }`, the
  *   last `limit` events (50 where none is asked, at most 200) before the event `before`, or the last ones; `before` the id to ask for
  *   the page older, null at the first; `cursor` where a stream resumes; `presence` `{ up, answering, waitsOnYou, unread }`. An event is
- *   a `message` (`from` her, the person, whose `delivered` is null until she was told, or the keeper's quiet marker), a `step`, a
+ *   a `message` (`from` her, the person, whose `delivered` is null until she was told, or the keeper's quiet marker), a `call`, a
  *   `session` line where one of her sessions ended and the next began, a `question` or a `proposal`. 422 for a limit or a `before`
  *   that is none.
  * - `GET /api/nemia/chat/stream` — the same followed, as server-sent events read again every `CHAT_BEAT_MS`: `presence` first and

@@ -2,7 +2,7 @@
  * Nemia's chat as the panel holds it, and everything about it that is pure, so a node test proves it without a browser: the followed
  * state (`ChatFollowed`), the merge of the stream's events by their id (`mergeChatEvents`), what each of its frames does
  * (`changedChat`, `followChat`), the one translation of the api's presence and her level into the board's (`presenceOf`), her
- * consecutive steps folded into a turn (`foldChat`) and that fold mapped onto the one shape both conversations draw (`chatItems`, her
+ * consecutive calls folded into a turn (`foldChat`) and that fold mapped onto the one shape both conversations draw (`chatItems`, her
  * adapter onto `lib/conversation.ts`, a step's session having one of its own), the links read out of
  * her words (`linksOf`), how an ask of hers is drawn (`drawnAsk`) and what is left to answer of one of several questions
  * (`askLeft`, `askAnswered`, `asksOpen`), which of them the composer's own words answer (`askInWords`, `wordsAnswer`), and
@@ -18,8 +18,8 @@ import { follow, type Followed, type Follower, type Frames, type StreamLike } fr
 import type { Presence } from './presence.ts';
 import type { Level } from './api/nemia.ts';
 
-/** One step of hers, as her chat gives it. */
-export type ChatStep = Extract<ChatEvent, { kind: 'step' }>;
+/** One tool call of hers, as her chat gives it. */
+export type ChatCall = Extract<ChatEvent, { kind: 'call' }>;
 
 /** Her message, the person's, or the keeper's marker. */
 export type ChatMessage = Extract<ChatEvent, { kind: 'message' }>;
@@ -101,7 +101,7 @@ export const unreadChat = (loading: boolean): ChatFollowed => ({
 /**
  * `known` with `incoming` merged in: an event whose `id` is already known is replaced where it stands, and one that is not is appended.
  * By the id alone, unlike a step's transcript, which pairs a result with its call and so keys on the kind beside it: her chat gives an
- * event one id for its life, and a step whose state moved from running to done is that same step, drawn once.
+ * event one id for its life, and a call whose state moved from running to done is that same call, drawn once.
  */
 export function mergeChatEvents(known: readonly ChatEvent[], incoming: readonly ChatEvent[]): ChatEvent[] {
   const merged = [...known];
@@ -190,43 +190,43 @@ export const presenceOf = (api: ChatPresence, level: Level | undefined, notSent:
   unread: api.unread,
 });
 
-/** A block of her talk: one event drawn as itself, or her consecutive steps folded into one turn. */
+/** A block of her talk: one event drawn as itself, or her consecutive calls folded into one turn. */
 export type ChatItem = { kind: 'event'; event: ChatEvent } | ChatTurn;
 
 /**
- * Her steps between two of anything else, as one turn: its `id` the first step's, its steps in the order they came, `running` while
- * one of them is at work or waits on the person, and `ms` from the first step to the last.
+ * Her calls between two of anything else, as one turn: its `id` the first call's, its calls in the order they came, `running` while
+ * one of them is at work or waits on the person, and `ms` from the first call to the last.
  */
-export type ChatTurn = { kind: 'turn'; id: string; steps: ChatStep[]; running: boolean; ms: number };
+export type ChatTurn = { kind: 'turn'; id: string; calls: ChatCall[]; running: boolean; ms: number };
 
-/** The milliseconds from the first of `steps` to the last, 0 where either moment does not parse. */
-const spanOf = (steps: readonly ChatStep[]): number => {
-  const ms = Date.parse(steps[steps.length - 1].at) - Date.parse(steps[0].at);
+/** The milliseconds from the first of `calls` to the last, 0 where either moment does not parse. */
+const spanOf = (calls: readonly ChatCall[]): number => {
+  const ms = Date.parse(calls[calls.length - 1].at) - Date.parse(calls[0].at);
   return Number.isFinite(ms) && ms > 0 ? ms : 0;
 };
 
-/** The steps gathered so far as a turn. */
-const turnOf = (steps: ChatStep[]): ChatTurn => ({
+/** The calls gathered so far as a turn. */
+const turnOf = (calls: ChatCall[]): ChatTurn => ({
   kind: 'turn',
-  id: steps[0].id,
-  steps,
-  running: steps.some((step) => step.state === 'running' || step.state === 'waits'),
-  ms: spanOf(steps),
+  id: calls[0].id,
+  calls,
+  running: calls.some((call) => call.state === 'running' || call.state === 'waits'),
+  ms: spanOf(calls),
 });
 
 /**
- * Her chat drawn as blocks, in the order it came: each run of consecutive steps folded into one turn (`turnOf`), everything else as
- * itself. A turn still running is drawn open, with its last step alive; a finished one folds into its one line (`turnWords`).
+ * Her chat drawn as blocks, in the order it came: each run of consecutive calls folded into one turn (`turnOf`), everything else as
+ * itself. A turn still running is drawn open, with its last call alive; a finished one folds into its one line (`turnWords`).
  */
 export function foldChat(events: readonly ChatEvent[]): ChatItem[] {
   const out: ChatItem[] = [];
-  let steps: ChatStep[] = [];
+  let calls: ChatCall[] = [];
   const close = () => {
-    if (steps.length) out.push(turnOf(steps));
-    steps = [];
+    if (calls.length) out.push(turnOf(calls));
+    calls = [];
   };
   for (const event of events) {
-    if (event.kind === 'step') steps.push(event);
+    if (event.kind === 'call') calls.push(event);
     else {
       close();
       out.push({ kind: 'event', event });
@@ -287,13 +287,13 @@ export function linksOf(text: string): { text: string; links: ChatLink[] } {
   return { text: plain, links };
 }
 
-/** One of her steps as a line of a turn: her events carry no input and no result, so a line of hers opens on nothing. */
-const lineOf = (step: ChatStep): ConversationLine => ({
-  id: step.id,
-  tool: step.tool,
-  sentence: step.sentence,
-  ...(step.fact === undefined ? {} : { fact: step.fact }),
-  state: step.state,
+/** One of her calls as a line of a turn: her events carry no input and no result, so a line of hers opens on nothing. */
+const lineOf = (call: ChatCall): ConversationLine => ({
+  id: call.id,
+  tool: call.tool,
+  sentence: call.sentence,
+  ...(call.fact === undefined ? {} : { fact: call.fact }),
+  state: call.state,
 });
 
 /** Her words, the person's own, or the keeper's quiet line: hers as markdown with her links named beside it (`linksOf`). */
@@ -307,8 +307,8 @@ function saidOf(message: ChatMessage): ConversationItem<ChatAsk> {
 }
 
 /**
- * Her chat on the one shape the family draws (`lib/conversation.ts`), her adapter onto it: her consecutive steps folded into one `work`
- * item a line a step (`foldChat`), her words and the person's into `said`, the keeper's framing and the rule between two of her
+ * Her chat on the one shape the family draws (`lib/conversation.ts`), her adapter onto it: her consecutive calls folded into one `work`
+ * item a line a call (`foldChat`), her words and the person's into `said`, the keeper's framing and the rule between two of her
  * sessions into `note`, and a question or a proposal of hers into `own`, carrying the event her talk draws itself (`drawnAsk`). An
  * event the board has no drawing for is left out. Pure: a node test proves the whole mapping without a browser.
  */
@@ -316,7 +316,7 @@ export function chatItems(events: readonly ChatEvent[]): ConversationItem<ChatAs
   const out: ConversationItem<ChatAsk>[] = [];
   for (const item of foldChat(events)) {
     if (item.kind === 'turn') {
-      out.push({ kind: 'work', id: item.id, lines: item.steps.map(lineOf), running: item.running, ms: item.ms });
+      out.push({ kind: 'work', id: item.id, lines: item.calls.map(lineOf), running: item.running, ms: item.ms });
       continue;
     }
     const event = item.event;

@@ -2409,8 +2409,8 @@ stateDiagram-v2
   filed --> kept: NOT_SUBSCRIBED / subscribe
   filed --> stopped: SETTLED_OUTSIDE / nothing
   kept --> stopped: SETTLED_OUTSIDE / nothing
-  kept --> kept: CUSTOM_CHANGED / tell
-  kept --> kept: OUTBOX_OWED / deliver
+  kept --> kept: CUSTOM_CHANGED / sayCustom
+  kept --> kept: OUTBOX_OWED / sayOutbox
   stopped --> stopped: SUBSCRIBED / drop
   leaving --> off: OPEN_OR_SUBSCRIBED / stop, drop
   due --> off: RAISE_ENDED / nothing
@@ -2466,18 +2466,18 @@ reaches her open long-lived session within one keeper beat, through the runtime'
 
 - **Owed, level-triggered**: while she is `kept`, each beat reads the person's words for her as they read now and compares them with
   those her session was last filed or told with, the keeper's record (`customChanged`, `$WF_ROOT/nemia/told.json`, denied her as
-  `prompt.md` is); where they differ, `nemiaDue` owes `tell`. Her shipped instruction is never compared: a change to it alone tells her
+  `prompt.md` is); where they differ, `nemiaDue` owes `sayCustom`. Her shipped instruction is never compared: a change to it alone tells her
   nothing. A session filed before the keeper kept the record is judged by the words her filed instruction ends with, and is never told a
   removal of words it is unknown she had. Nothing is carried between beats, so a restart owes what the files say. In any other state no
-  tell is owed, and the words are not read, so words that do not read never hold a stop.
-- **Told, then recorded** (`tellHer`, `src/nemia/keep.verb.ts`): the words as read once (`toldCustom`: the new words whole, or that she
+  `sayCustom` is owed, and the words are not read, so words that do not read never hold a stop.
+- **Told, then recorded** (`sayCustom`, `src/nemia/keep.verb.ts`): the words as read once (`toldCustom`: the new words whole, or that she
   has none), said to her task, and only once the runtime took them her filed instruction written with them, so an attempt started again
-  reads them too, and the words recorded as told. A refused `say` writes nothing, and the tell is owed again on the next beat.
+  reads them too, and the words recorded as told. A refused `say` writes nothing, and `sayCustom` is owed again on the next beat.
 - **Said in its words**: `nemia agents custom nemia` prints that her open session is told at the keeper's next beat, where a hired
   agent's says a run already started keeps its words; the board's panel says a save or a clear is told to her open session.
-- **Her instruction** (`nemia/nemia.md`) says that the keeper's tell replaces the words she was started with.
+- **Her instruction** (`nemia/nemia.md`) says that what the keeper says of a change replaces the words she was started with.
 
-Tested in `src/nemia/nemia.test.ts` (a tell owed in `kept` alone; its words; the edge drawn), `src/nemia/keep.verb.test.ts` (told once
+Tested in `src/nemia/nemia.test.ts` (a `sayCustom` owed in `kept` alone; its words; the edge drawn), `src/nemia/keep.verb.test.ts` (told once
 to her open task, never by a filing or a stop, and a clear; a refused `say`; words that do not read; her shipped instruction changed alone; a session kept before the record), `test/nemia-told.test.ts` (on
 the runtime: the words in her live session's inbox, one attempt, never stopped), `test/agents-cli.test.ts` (her print) and
 `apps/web/test/components.test.ts` (her panel's words).

@@ -10,6 +10,17 @@
   ],
   "terms": [
     {
+      "term": "Call",
+      "meaning": "one tool call of hers in her chat, with its sentence, its fact and where it stands: done, running, failed, not begun, or waiting on the person.",
+      "type": "CallState",
+      "retired": [
+        {
+          "spelling": "StepState",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        }
+      ]
+    },
+    {
       "term": "Keeper",
       "meaning": "the daemon's part that files Nemia's session while any factory is above `manual`, and stops it once none is.",
       "see": {
@@ -33,6 +44,33 @@
         "label": "Nemia",
         "href": "/nemia/"
       }
+    },
+    {
+      "term": "Say",
+      "meaning": "putting words into her open session, through the runtime's `say`: the keeper's two acts, `sayCustom` (the person's custom words, once they changed) and `sayOutbox` (the person's chat words), and `chatSay`, which puts the person's words in her chat's outbox. The marks on disk keep the name `delivered`.",
+      "type": "NemiaAct",
+      "retired": [
+        {
+          "spelling": "tell",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        },
+        {
+          "spelling": "deliver",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        },
+        {
+          "spelling": "tellHer",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        },
+        {
+          "spelling": "deliverOutbox",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        },
+        {
+          "spelling": "chatSend",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        }
+      ]
     }
   ]
 }

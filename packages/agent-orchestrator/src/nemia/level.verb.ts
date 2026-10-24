@@ -240,7 +240,7 @@ export const LEVEL: Command<NemiaLevel> = {
     'rounds, a cap) is asked of you, and a write that cannot be undone or',
     'changes your settings or a factory; the rest is hers. auto is semi-auto,',
     "but an answer your confirmed list allows in the run's state is given",
-    'unasked (nemia auto <agent>), in a session of hers filed since auto came:',
+    'unasked (nemia policy <agent>), in a session of hers filed since auto came:',
     'one kept from before asks every answer until filed again (manual, then',
     'auto once it is off). A factory at manual is left alone, and her session',
     'stops once none is above manual',

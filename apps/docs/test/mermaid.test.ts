@@ -98,6 +98,31 @@ test('unreadLines finds each line the renderer drops, in a flowchart, a state di
   assert.deepEqual(unreadLines('flowchart TD\n  %% a note\n\n  a[A card] --> b(A run)\n  b --> c'), []);
 });
 
+test('unreadLines finds the line an entity-relation diagram drops, a }o among them, and none in a whole one', () => {
+  const model = [
+    'erDiagram',
+    '  Task {',
+    '    TaskId id PK',
+    '    number restarts "optional"',
+    '  }',
+    '  Attempt {',
+    '    AttemptNumber n',
+    '  }',
+    '  Session {',
+    '    string harness',
+    '  }',
+    '  Try {',
+    '    TaskId taskId FK',
+    '  }',
+    '  Task ||--o{ Attempt : attempts',
+    '  Task ||--|| Session : session',
+    '  Task |o--o| Session : held',
+    '  TaskId ||--o{ Try : taskId',
+  ].join('\n');
+  assert.deepEqual(unreadLines(model), []);
+  assert.deepEqual(unreadLines(`${model}\n  Try }o--|| TaskId : taskId`), ['Try }o--|| TaskId : taskId'], 'the renderer reads no }o');
+});
+
 test('a hand-drawn flowchart and both code-drawn diagrams render, each into an SVG holding its own words', () => {
   const flow = drawnPage(ROOT, null, 'flowchart LR\n  card[A card] --> landing[A landing]') as Html;
   assert.equal(flow.type, 'html');

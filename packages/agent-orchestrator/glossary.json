@@ -141,6 +141,41 @@
       }
     },
     {
+      "term": "Policy",
+      "meaning": "an agent's rules at `auto`: the answers it may give unasked, which the person confirms, read and written by `nemia policy`. `nemia auto`, its former name, still runs with a hint; the package's `auto` folder and the store's keep their name, so no confirmed rule is orphaned.",
+      "type": "PolicyList",
+      "retired": [
+        {
+          "spelling": "AutoList",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "autoListOf",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "AUTO_ENTRIES",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "AUTO_PROPOSE",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "AUTO_CONFIRM",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "AUTO_DROP",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        },
+        {
+          "spelling": "autoProposeRun",
+          "card": "decision 14 part B: the chat's tool call is a call, and the auto commands are policy"
+        }
+      ]
+    },
+    {
       "term": "Reason",
       "meaning": "why a step stands where it does, as the feed's closed code (`Reason`), set where the listing builds the step's row and never parsed back out of its sentence; a run's is a `RunReason`.",
       "type": "StepReason",
@@ -168,8 +203,14 @@
       }
     },
     {
+      "term": "RunId",
+      "meaning": "a run's id, as `nemia start` mints it from the brief: lowercase letters, digits and dashes.",
+      "type": "RunId"
+    },
+    {
       "term": "Step",
       "meaning": "one markdown file of a workflow: who does it, what it may do, and what must finish first.",
+      "type": "Step",
       "see": {
         "label": "A step",
         "href": "/workflows/#a-step"
@@ -185,6 +226,16 @@
       }
     },
     {
+      "term": "StepName",
+      "meaning": "a step's name: its file's name in its workflow's folder, without its extension.",
+      "type": "StepName"
+    },
+    {
+      "term": "TaskId",
+      "meaning": "the runtime's id of the task a step's try ran as, which run-core holds by the runtime's key and never checks.",
+      "type": "TaskId"
+    },
+    {
       "term": "Tick",
       "meaning": "one pass of the daemon: it reads the world, decides (`assess`), acts, and carries nothing to the next pass.",
       "see": {
@@ -195,6 +246,7 @@
     {
       "term": "Try",
       "meaning": "one filing of a step as a new runtime task, the way a Kubernetes Job makes a new Pod: a retry, a nudge, a round or a person's `nemia retry` files the next try, and each earlier one is kept on the record (`EarlierTry`) with its cause. A try is never the runtime's attempt, which is a restart inside one task.",
+      "type": "Try",
       "see": {
         "label": "Trying again",
         "href": "/workflows/#trying-again"
@@ -210,6 +262,11 @@
       }
     },
     {
+      "term": "TryNumber",
+      "meaning": "a try's number within its step, from 1.",
+      "type": "TryNumber"
+    },
+    {
       "term": "Waiting",
       "meaning": "only a wait on a person: the phase of a step or a run that a person must act on, at a gate, a question, a loop out of rounds, a budget, an unsigned or refused try; its reasons are `AwaitingApproval`, `AwaitingAnswer` (`via` session or closeout), `AwaitingRound` and the stops beside them. Reason `Waiting` is a wait on a thing, phase pending.",
       "type": "StepPhase"
@@ -222,6 +279,11 @@
         "label": "Workflows",
         "href": "/workflows/"
       }
+    },
+    {
+      "term": "WorkflowName",
+      "meaning": "a workflow's name: its folder's.",
+      "type": "WorkflowName"
     }
   ]
 }

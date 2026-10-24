@@ -6,7 +6,7 @@
  * read again each time.
  *
  * Pure. The files are `chat.store.ts`'s, the reads and the person's writes `chat.verb.ts`, and the delivery the keeper's
- * (`deliver.verb.ts`).
+ * (`say.verb.ts`).
  */
 import { Invalid } from '../refusal/refusal.ts';
 import type { EnginePhase } from '../views/views-words.ts';
@@ -14,19 +14,19 @@ import type { EnginePhase } from '../views/views-words.ts';
 /** Who a message is from: the task's agent (`agent`), the person, or the keeper, whose words are a quiet marker. */
 export type ChatFrom = 'agent' | 'person' | 'keeper';
 
-/** Where a step stands: done, at work, failed, not begun, or waiting on the person. */
-export type StepState = 'done' | 'running' | 'error' | 'pending' | 'waits';
+/** Where a tool call stands: done, at work, failed, not begun, or waiting on the person. */
+export type CallState = 'done' | 'running' | 'error' | 'pending' | 'waits';
 
 /**
  * One event of a chat, unique by its `id`:
  * a `message`, the person's carrying when it was delivered (`delivered`, the said's time, null while it waits in the outbox);
- * a `step`, one tool call, its `sentence`, a `fact` (its duration) and its `state`;
+ * a `call`, one tool call, its `sentence`, a `fact` (its duration) and its `state`;
  * a `session` line where one attempt ended and the next began;
  * a `question` and a `proposal`, named in the shape and built by nothing yet.
  */
 export type ChatEvent =
   | { kind: 'message'; id: string; at: string; from: ChatFrom; text: string; delivered?: string | null }
-  | { kind: 'step'; id: string; at: string; tool: string; sentence: string; fact?: string; state: StepState }
+  | { kind: 'call'; id: string; at: string; tool: string; sentence: string; fact?: string; state: CallState }
   | { kind: 'session'; id: string; at: string; attempt: number }
   | ({ kind: 'question' } & AskEvent)
   | ({ kind: 'proposal' } & AskEvent);
@@ -162,13 +162,13 @@ const durationOf = (from: string, to: string): string | undefined => {
   return ms < 1000 ? `${ms} ms` : ms < 60_000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60_000)} min`;
 };
 
-/** A tool call as a step: done or failed by its result, else at work, or waiting on the person where the task needs one. */
-function stepOf(attempt: number, use: SourceEvent, result: SourceEvent | undefined, open: StepState): ChatEvent {
+/** A tool call: done or failed by its result, else at work, or waiting on the person where the task needs one. */
+function callOf(attempt: number, use: SourceEvent, result: SourceEvent | undefined, open: CallState): ChatEvent {
   const name = use.tool?.name ?? 'tool';
   const fact = result === undefined ? undefined : durationOf(use.at, result.at);
-  const state: StepState = result === undefined ? open : result.result?.isError ? 'error' : 'done';
+  const state: CallState = result === undefined ? open : result.result?.isError ? 'error' : 'done';
   return {
-    kind: 'step',
+    kind: 'call',
     id: `t:${attempt}:${use.id}`,
     at: use.at,
     tool: name,
@@ -179,17 +179,17 @@ function stepOf(attempt: number, use: SourceEvent, result: SourceEvent | undefin
 }
 
 /**
- * The chat events one transcript event is: the agent's text a message, a tool call a step, words a person wrote into the session's own
+ * The chat events one transcript event is: the agent's text a message, a tool call a `call`, words a person wrote into the session's own
  * face (`origin: { kind: 'human' }`, the other face her session gives a person) a message of theirs, so the board reads as one
  * conversation whichever face it was written from; everything else none. Words the host pushed on her input carry no origin and are
  * drawn from the outbox, where they were written, so one sent message is one bubble.
  */
-function eventsOf(attempt: number, e: SourceEvent, results: ReadonlyMap<string, SourceEvent>, open: StepState): ChatEvent[] {
+function eventsOf(attempt: number, e: SourceEvent, results: ReadonlyMap<string, SourceEvent>, open: CallState): ChatEvent[] {
   if (e.role === 'assistant' && e.kind === 'text' && (e.text ?? '').trim() !== '')
     return [{ kind: 'message', id: `m:${attempt}:${e.id}`, at: e.at, from: 'agent', text: e.text ?? '' }];
   if (e.role === 'user' && e.kind === 'text' && e.origin?.kind === 'human' && (e.text ?? '').trim() !== '')
     return [{ kind: 'message', id: `h:${attempt}:${e.id}`, at: e.at, from: 'person', text: e.text ?? '' }];
-  if (e.kind === 'tool_use') return [stepOf(attempt, e, results.get(e.id), open)];
+  if (e.kind === 'tool_use') return [callOf(attempt, e, results.get(e.id), open)];
   return [];
 }
 
@@ -213,7 +213,7 @@ const saidEvent = (said: SourceSaid, claims: ReadonlyMap<string, OutboxEntry>): 
 };
 
 /** One session's events, each said to it placed after the transcript event it followed, or first where it followed none. */
-function sessionEvents(session: ChatSession, said: readonly SourceSaid[], claims: ReadonlyMap<string, OutboxEntry>, open: StepState) {
+function sessionEvents(session: ChatSession, said: readonly SourceSaid[], claims: ReadonlyMap<string, OutboxEntry>, open: CallState) {
   const results = new Map(session.events.filter((e) => e.kind === 'tool_result').map((e) => [e.id, e]));
   const ids = new Set(session.events.map((e) => `${e.kind} ${e.id}`));
   const own = said.filter((s) => s.attempt === session.attempt);
@@ -289,7 +289,7 @@ function placedInTime(own: readonly ChatEvent[], marks: readonly ChatEvent[]): C
   return out;
 }
 
-/** The suffix a recommended choice's label carries, as the question tool's own words tell her to write it. */
+/** The suffix a recommended choice's label carries, as the question tool's own words ask her to write it. */
 const RECOMMENDED = /\s*\(recommended\)\s*$/i;
 
 /** One choice as the board draws it: its label without the suffix she marked it with, and `recommended` where it carried one. */

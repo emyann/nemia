@@ -51,7 +51,7 @@ export {
   touchedLines,
 } from './branches/index.ts';
 export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
-export { isRepositoryRun, placeOf, answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
+export { answerIn, deniedWords, harnessWaitLine, isRepositoryRun, placeOf, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
  * their step's session waits on them (`harnessWaitLine`). Re-exported because the api cannot import agent-runtime — it is not a
@@ -84,9 +84,8 @@ export {
   pruningBytes,
   sizeOf,
 } from './run.ts';
-export type { Pruned, PrunedFiles, PruneFacts, Pruning } from './run.ts';
+export type { FeedSaid, FeedWords, FolderRun, Hold, PlaceKind, Pruned, PrunedFiles, PruneFacts, Pruning, RepositoryRun } from './run.ts';
 export { BY_CAP, heldRefusal, holdAdvice, holdRefusal, holdsOf, holdWord, oneLine, WHY_CAP } from './run.ts';
-export type { Hold, FolderRun, RepositoryRun, PlaceKind } from './run.ts';
 export {
   acceptAsk,
   acceptanceOf,
@@ -234,10 +233,8 @@ export {
   STEP_PHASES,
   STEP_REASONS,
 } from './feed/index.ts';
-export type { AnswerVia, Reason, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './feed/index.ts';
-export type { FeedLine, FeedPublished } from './feed/index.ts';
+export type { AnswerVia, FeedLine, FeedPublished, Reason, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './feed/index.ts';
 export { formerHints } from './former-reason/former-reason.ts';
-export type { FeedSaid, FeedWords } from './run.ts';
 export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_SELECTORS, subscriptionNameRefusal, watchedLine } from './subscription/index.ts';
 export {
   LABEL_KEYS,
@@ -487,9 +484,10 @@ export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.v
 export type { FactoryRules } from './rules/rules.verb.ts';
 export type { FactoryInstruction } from './factory/instruction.verb.ts';
 export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
-export { AUTO_PROPOSE } from './auto/auto.verb.ts';
+export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
+export { renamedIn } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Approved } from './gate/gate.verb.ts';
@@ -542,8 +540,14 @@ export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from 
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
 export { ledgerOf } from './revisions/revisions.store.ts';
 export { driftNow } from './revisions/pin.verb.ts';
-export { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
+export { chatAnswer, chatHistory, chatRead, chatSay, chatSince, chatStop } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
-export type { ChatEvent, ChatFrom, Presence, StepState } from './chat/chat.ts';
-export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion } from './chat/chat.ts';
+export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';
+
+import * as RunModel from './record/record.model.ts';
+/**
+ * Run-core's model as Schemas (`docs/model.md`): its ids, checked on create and nominal on read, its entities and the run's
+ * invariants, which the Run door (S2) will decode through. One namespace, imported and exported by name.
+ */
+export { RunModel };

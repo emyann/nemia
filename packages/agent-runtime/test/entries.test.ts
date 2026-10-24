@@ -38,6 +38,7 @@ const PINNED: Record<string, string[]> = {
     'QuotaRefused',
     'McpStateRefused',
     'McpSignInRefused',
+    'RuntimeModel',
     'SIGN_IN_STATES',
     'MCP_STATES',
     'signsInMcp',

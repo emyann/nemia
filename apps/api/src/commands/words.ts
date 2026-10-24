@@ -6,7 +6,7 @@ import { Schema } from 'effect';
 import { factoryNameRefusal, inboxNameRefusal } from 'agent-orchestrator';
 import { decodeBody, valueAt, type BodyIssue, type Words } from '../body.ts';
 import type { Guarded } from '../guard.ts';
-import { AGENTS_COPY, AGENTS_CUSTOM, AUTO_CONFIRM, AUTO_DROP } from './library.ts';
+import { AGENTS_COPY, AGENTS_CUSTOM, POLICY_CONFIRM, POLICY_DROP } from './library.ts';
 import { LEVEL, SUBSCRIBE, UNSUBSCRIBE } from './sessions.ts';
 import { FACTORY_RULES_WORDS } from '../factories/rules.ts';
 import { FACTORY_SCHEDULE, FACTORY_UNSCHEDULE } from '../factories/schedules.ts';
@@ -634,8 +634,8 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   subscribe: SUBSCRIBE,
   unsubscribe: UNSUBSCRIBE,
   level: LEVEL,
-  'auto confirm': AUTO_CONFIRM,
-  'auto drop': AUTO_DROP,
+  'policy confirm': POLICY_CONFIRM,
+  'policy drop': POLICY_DROP,
   rm: RM,
   prune: PRUNE,
   'inbox queue': INBOX_QUEUE,

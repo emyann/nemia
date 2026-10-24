@@ -3113,11 +3113,12 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   accepted by a person over what it found), `withinBudget` (no step past its budget) and `nothingOpen` (no question, nothing the
   closeout needs, and no other step waiting on a person). The rule that
   ships, "decide when all agree", approves when all five hold; it is in force until the person confirms a list, which replaces it,
-  seeded with it, marked Default. **`nemia auto <agent>`** reads the list in force, the agent's proposal and the custom instruction;
-  **`nemia auto propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
-  generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia auto confirm <agent> <id> --words
-  '<words>'`** and **`nemia auto drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
-  calls them. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
+  seeded with it, marked Default. **`nemia policy <agent>`** reads the list in force, the agent's proposal and the custom instruction;
+  **`nemia policy propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
+  generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia policy confirm <agent> <id> --words
+  '<words>'`** and **`nemia policy drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
+  calls them. `nemia auto …`, the group's former name, still runs as `nemia policy …`, with a hint on stderr naming it, and admission
+  reads it as the new name; the store's folder `auto/` keeps its name, so no confirmed rule is orphaned. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
   under that id reads otherwise. A rule nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that
   does not read allows nothing. Auto holds in a session of hers filed since it shipped (`--auto` on her admission): one kept from before
   asks every answer until it is filed again.
@@ -3131,7 +3132,7 @@ session at the keeper's next beat, through the runtime's `say`, with no restart,
 instruction (above), which she reads before acting in it. Her machine and what was built: `docs/features.md`, *Nemia at Semi-auto*.
 
 Her chat, `src/chat/`, keeps only what nobody else holds, under `$WF_ROOT/nemia/chat/`: the person's words (`outbox.jsonl`) and read
-mark (`read.json`), written by the api's routes (`chatSend`, `chatRead`), and the keeper's marks of what it delivered
+mark (`read.json`), written by the api's routes (`chatSay`, `chatRead`), and the keeper's marks of what it delivered
 (`delivered.jsonl`). The rest is projected on every read (`projectChat`): her words and her tool calls from her transcripts, attempt
 by attempt with a line between them, and what was said to her from the runtime's `said`, the person's where a mark claims it, else
 the keeper's quiet marker. The keeper delivers while she is kept and her session live, framed as the person's
@@ -4009,9 +4010,10 @@ for the same reason, and so does the `wf` command.
 | `workflows/` | your workflows, beside the repository's, as the board lists them |
 
 `assess()` is pure and has no idea the runtime exists — the same split as the runtime's `decide`, one layer up. Every
-file in `src/` and `bin/` is of one of four kinds, and `test/boundary.test.ts` fails the suite on a file of none. A file
-in a feature folder (`src/<feature>/`) says its kind by its name — `x.store.ts` a store, `x.verb.ts` a controller, any
-other name pure — and `src/cli/` is the CLI's; a file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or
+file in `src/` and `bin/` is of one of five kinds, and `test/boundary.test.ts` fails the suite on a file of none. A file
+in a feature folder (`src/<feature>/`) says its kind by its name — `x.store.ts` a store, `x.verb.ts` a controller,
+`x.model.ts` a model (a context's entities as Effect Schemas, `docs/model.md`), any other name pure — and `src/cli/` is the
+CLI's; a file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or
 `CLIENT`. **Pure** files (`tick/assess.ts`, `workflow.ts`, `check/check.ts` and the rest) import no runtime, read no disk,
 spawn nothing, and import no file of the other kinds. **Store** files are the I/O beneath the controllers: they import
 no runtime, never a controller and not the client, and load as a tree — `record/places.store.ts`, `skills/read.store.ts`

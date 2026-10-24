@@ -51,7 +51,10 @@ export const NO_FACTS: Facts = {
   spend: Number.POSITIVE_INFINITY,
 };
 
-/** The folder of the store the rules for auto are kept in, one writer to each of its files (`auto.store.ts`). */
+/**
+ * The folder of the store the rules for auto are kept in, one writer to each of its files (`auto.store.ts`). It keeps its name though the
+ * commands that write it are `nemia policy`: a folder renamed would orphan every rule a person confirmed.
+ */
 export const AUTO_FOLDER = 'auto';
 
 /** The id of the rule that ships. */

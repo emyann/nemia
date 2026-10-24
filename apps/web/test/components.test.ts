@@ -7294,9 +7294,9 @@ type ConversationLine = import('../src/lib/conversation.ts').ConversationLine;
 const { dockWords } = await import('../src/lib/presence.ts');
 type ChatEvent = import('../src/lib/api.ts').ChatEvent;
 
-/** One step of hers. */
-const chatStep = (id: string, state: 'done' | 'running' | 'waits', second: number): Extract<ChatEvent, { kind: 'step' }> => ({
-  kind: 'step',
+/** One tool call of hers. */
+const chatCall = (id: string, state: 'done' | 'running' | 'waits', second: number): Extract<ChatEvent, { kind: 'call' }> => ({
+  kind: 'call',
   id,
   at: new Date(Date.UTC(2026, 9, 15, 21, 40, second)).toISOString(),
   tool: 'Read',
@@ -7304,28 +7304,28 @@ const chatStep = (id: string, state: 'done' | 'running' | 'waits', second: numbe
   state,
 });
 
-/** The family's turn over `steps` of hers, through her adapter onto the one shape it draws. */
-const workOf = (steps: Extract<ChatEvent, { kind: 'step' }>[]) => {
-  const [item] = chatItems(steps);
-  if (item.kind !== 'work') throw new Error('her consecutive steps fold into one turn of the family');
+/** The family's turn over `calls` of hers, through her adapter onto the one shape it draws. */
+const workOf = (calls: Extract<ChatEvent, { kind: 'call' }>[]) => {
+  const [item] = chatItems(calls);
+  if (item.kind !== 'work') throw new Error('her consecutive calls fold into one turn of the family');
   return item;
 };
 
 test('a turn at work draws its lines, the one that waits on a person in yours; a finished turn folds and lays out nothing it holds', () => {
-  const live = workOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'waits', 4)]);
+  const live = workOf([chatCall('t:1', 'done', 0), chatCall('t:2', 'waits', 4)]);
   const running = renderToStaticMarkup(createElement(Worked, { work: live, marks: 'chat' }));
   assert.match(running, /data-chat-turn="running"/);
-  assert.match(running, /data-status="yours"[^>]*data-chat-step="waits"/, 'a step that waits on a person is the look’s own state');
+  assert.match(running, /data-status="yours"[^>]*data-chat-step="waits"/, 'a call that waits on a person is the look’s own state');
   assert.match(running, /border-l-2 border-yours/);
-  const over = workOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'done', 134)]);
+  const over = workOf([chatCall('t:1', 'done', 0), chatCall('t:2', 'done', 134)]);
   const folded = renderToStaticMarkup(createElement(Worked, { work: over, marks: 'chat' }));
   assert.match(folded, /data-chat-turn="folded"/);
-  assert.match(folded, /Worked for 2m 14s · 2 steps/);
-  assert.doesNotMatch(folded, /data-chat-step=/, 'a closed fold lays out none of its steps');
+  assert.match(folded, /Worked for 2m 14s · 2 calls/);
+  assert.doesNotMatch(folded, /data-chat-step=/, 'a closed fold lays out none of its calls');
 });
 
 test('REFUSED: a family part that writes one conversation’s marks: the prefix its caller names is the one it writes', () => {
-  const work = workOf([chatStep('t:1', 'done', 0), chatStep('t:2', 'running', 4)]);
+  const work = workOf([chatCall('t:1', 'done', 0), chatCall('t:2', 'running', 4)]);
   const session = renderToStaticMarkup(createElement(Worked, { work, marks: 'session' }));
   assert.match(session, /data-session-turn="running"/);
   assert.match(session, /data-session-step="running"/);

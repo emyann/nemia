@@ -86,7 +86,7 @@ const twoSessions = (over: Partial<ChatSources> = {}): ChatSources => ({
 });
 
 const shape = (events: readonly ChatEvent[]) =>
-  events.map((e) => (e.kind === 'message' ? `${e.from}:${e.text}` : e.kind === 'step' ? `step:${e.state}:${e.sentence}` : e.kind));
+  events.map((e) => (e.kind === 'message' ? `${e.from}:${e.text}` : e.kind === 'call' ? `call:${e.state}:${e.sentence}` : e.kind));
 
 /** One question as the runtime says her call asked it: a recommended choice marked in its label, as the question tool asks. */
 const RAW = {
@@ -137,11 +137,11 @@ const refusedBy = (f: () => unknown, ...facts: string[]) =>
   });
 
 test("`projectChat`: what the board draws of her sessions, the keeper's words and the person's", async (t) => {
-  await t.test("history across two sessions: the agent's words and steps, a line between them, newest last, and no user line", () => {
+  await t.test("history across two sessions: the agent's words and calls, a line between them, newest last, and no user line", () => {
     assert.deepEqual(shape(projectChat(twoSessions())), [
       'agent:Hello.',
-      'step:done:Bash: nemia ls',
-      'step:error:Read: /x',
+      'call:done:Bash: nemia ls',
+      'call:error:Read: /x',
       'session',
       'agent:Back.',
     ]);
@@ -149,15 +149,15 @@ test("`projectChat`: what the board draws of her sessions, the keeper's words an
     three.sessions = [...three.sessions, { attempt: 3, startedAt: at(20), events: [] }];
     assert.equal(projectChat(three).filter((e) => e.kind === 'session').length, 2, 'three sessions, two lines');
   });
-  await t.test('a step done carries its duration; the last one open is running, or waits where the task needs the person', () => {
-    const done = projectChat(twoSessions()).find((e) => e.kind === 'step');
-    assert.equal(done?.kind === 'step' && done.fact, '2.0 s');
+  await t.test('a call done carries its duration; the last one open is running, or waits where the task needs the person', () => {
+    const done = projectChat(twoSessions()).find((e) => e.kind === 'call');
+    assert.equal(done?.kind === 'call' && done.fact, '2.0 s');
     const open = (phase: ChatSources['phase']) =>
       projectChat({
         ...twoSessions(),
         sessions: [{ attempt: 1, startedAt: at(0), events: [use('u9', 1, 'Bash', {}), use('u8', 2, 'Bash', {})] }],
         phase,
-      }).map((e) => (e.kind === 'step' ? e.state : ''));
+      }).map((e) => (e.kind === 'call' ? e.state : ''));
     assert.deepEqual(open('working'), ['pending', 'running']);
     assert.deepEqual(open('needs-human'), ['pending', 'waits']);
   });
@@ -177,9 +177,9 @@ test("`projectChat`: what the board draws of her sessions, the keeper's words an
       const claimed = projectChat(twoSessions({ said, outbox, delivered: [{ id: 'o1', said: at(12), attempt: 2 }] }));
       assert.deepEqual(shape(claimed), [
         'agent:Hello.',
-        'step:done:Bash: nemia ls',
+        'call:done:Bash: nemia ls',
         'keeper:Woken: gate on 473Y',
-        'step:error:Read: /x',
+        'call:error:Read: /x',
         'session',
         'agent:Back.',
         'person:Merge it.',
@@ -187,7 +187,7 @@ test("`projectChat`: what the board draws of her sessions, the keeper's words an
       assert.equal(claimed.at(-1)?.kind === 'message' && claimed.at(-1)?.id, 'p:o1');
       const swapped = projectChat(twoSessions({ said, outbox, delivered: [{ id: 'o1', said: at(3), attempt: 1 }] }));
       assert.deepEqual(
-        shape(swapped).filter((s) => !s.startsWith('step') && s !== 'session'),
+        shape(swapped).filter((s) => !s.startsWith('call') && s !== 'session'),
         ['agent:Hello.', 'person:Merge it.', 'agent:Back.', `keeper:${framed}`],
       );
     },
@@ -200,9 +200,9 @@ test("`projectChat`: what the board draws of her sessions, the keeper's words an
     const stopped = twoSessions({ stops: [{ at: at(3), attempt: 1 }] });
     assert.deepEqual(shape(projectChat(stopped)), [
       'agent:Hello.',
-      'step:done:Bash: nemia ls',
+      'call:done:Bash: nemia ls',
       'keeper:Stopped',
-      'step:error:Read: /x',
+      'call:error:Read: /x',
       'session',
       'agent:Back.',
     ]);
@@ -210,7 +210,7 @@ test("`projectChat`: what the board draws of her sessions, the keeper's words an
     assert.deepEqual(marker, { kind: 'message', id: 'x:1:' + at(3), at: at(3), from: 'keeper', text: 'Stopped' });
     assert.deepEqual(
       [...new Set(projectChat(stopped).map((e) => e.kind))].sort(),
-      ['message', 'session', 'step'],
+      ['call', 'message', 'session'],
       'no sixth kind of chat event appears',
     );
     const later = twoSessions({ stops: [{ at: at(12), attempt: 2 }] });
@@ -241,7 +241,7 @@ test('`chatPage`: a page across the session line, and the pages it refuses', asy
     const last = chatPage(events, undefined, 2);
     assert.deepEqual(shape(last.events), ['session', 'agent:Back.']);
     const older = chatPage(events, last.before ?? undefined, 10);
-    assert.deepEqual(shape(older.events), ['agent:Hello.', 'step:done:Bash: nemia ls', 'step:error:Read: /x']);
+    assert.deepEqual(shape(older.events), ['agent:Hello.', 'call:done:Bash: nemia ls', 'call:error:Read: /x']);
     assert.equal(older.before, null);
   });
   await t.test('REFUSED: a page of a size that is none, or before an id the chat does not hold', () => {

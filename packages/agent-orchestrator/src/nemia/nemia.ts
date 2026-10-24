@@ -80,11 +80,11 @@ export type HerTask = { settled: boolean; stopRequested: boolean };
 export type NemiaState = 'off' | 'due' | 'untrusted' | 'filed' | 'kept' | 'stopped' | 'leaving';
 
 /**
- * What the keeper does on a beat: file her task, subscribe it, stop it, drop her subscription, tell her open task her custom words,
- * deliver the person's chat words to her session, write down the questions of hers that wait on the person (`record`), and carry
- * their answers to them (`answer`).
+ * What the keeper does on a beat: file her task, subscribe it, stop it, drop her subscription, say her custom words to her open task
+ * (`sayCustom`), say the person's chat words to her session (`sayOutbox`), write down the questions of hers that wait on the person
+ * (`record`), and carry their answers to them (`answer`).
  */
-export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop' | 'tell' | 'deliver' | 'record' | 'answer';
+export type NemiaAct = 'file' | 'subscribe' | 'stop' | 'drop' | 'sayCustom' | 'sayOutbox' | 'record' | 'answer';
 
 /**
  * What the keeper reads of the levels and her folder: whether any factory, the default one included, is above `manual` now; her task's
@@ -126,8 +126,8 @@ export function nemiaState(keeping: Keeping, task: HerTask | undefined, subscrib
 
 /**
  * What the keeper owes on a beat, in order: at `due`, file; at `filed`, subscribe, dropping first a subscription left for another task or
- * without her floor; at `kept`, tell her the person's custom words where they are not those her task was filed with (`stale`), then
- * deliver the person's chat words where some are owed and her session is live (`owed`, `up`), write down the questions her live session
+ * without her floor; at `kept`, say the person's custom words to her where they are not those her task was filed with (`stale`), then
+ * say the person's chat words where some are owed and her session is live (`owed`, `up`), write down the questions her live session
  * holds open and mark what became of a question it no longer holds (`record`, where her task's view says one waits, `asking`, or the
  * chat holds one whose mark does not say what became of its call, `closing`), and carry the person's answers where one is
  * owed (`answered`); at `leaving`, stop the open task and drop
@@ -143,8 +143,8 @@ export function nemiaDue(keeping: Keeping, task: HerTask | undefined, subscribed
   if (state === 'leaving') return [...(isOpen(task) ? (['stop'] as const) : []), ...dropped];
   if (state !== 'kept') return [];
   return [
-    ...(keeping.stale === true ? (['tell'] as const) : []),
-    ...(keeping.owed === true && keeping.up === true ? (['deliver'] as const) : []),
+    ...(keeping.stale === true ? (['sayCustom'] as const) : []),
+    ...(keeping.owed === true && keeping.up === true ? (['sayOutbox'] as const) : []),
     ...((keeping.asking === true || keeping.closing === true) && keeping.up === true ? (['record'] as const) : []),
     ...(keeping.answered === true && keeping.up === true ? (['answer'] as const) : []),
   ];
@@ -187,7 +187,7 @@ export type NemiaGraph = { initial: NemiaState; states: NemiaState[]; final: Nem
 const STATES: NemiaState[] = ['off', 'due', 'untrusted', 'filed', 'kept', 'stopped', 'leaving'];
 
 /**
- * The keeper's moves, her folder's trust read each beat, a change of her custom words told, the person's chat words delivered, a stop or
+ * The keeper's moves, her folder's trust read each beat, a change of her custom words said, the person's chat words said, a stop or
  * end from outside, which it never undoes, and the end of the last raise above `manual` as it passes.
  */
 const EDGES: NemiaEdge[] = [
@@ -197,8 +197,8 @@ const EDGES: NemiaEdge[] = [
   { from: 'filed', to: 'kept', event: 'NOT_SUBSCRIBED', action: 'subscribe' },
   { from: 'filed', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
   { from: 'kept', to: 'stopped', event: 'SETTLED_OUTSIDE', action: 'nothing' },
-  { from: 'kept', to: 'kept', event: 'CUSTOM_CHANGED', action: 'tell' },
-  { from: 'kept', to: 'kept', event: 'OUTBOX_OWED', action: 'deliver' },
+  { from: 'kept', to: 'kept', event: 'CUSTOM_CHANGED', action: 'sayCustom' },
+  { from: 'kept', to: 'kept', event: 'OUTBOX_OWED', action: 'sayOutbox' },
   { from: 'stopped', to: 'stopped', event: 'SUBSCRIBED', action: 'drop' },
   { from: 'leaving', to: 'off', event: 'OPEN_OR_SUBSCRIBED', action: 'stop, drop' },
   { from: 'due', to: 'off', event: 'RAISE_ENDED', action: 'nothing' },
@@ -210,7 +210,7 @@ const EDGES: NemiaEdge[] = [
 /**
  * The person's verbs: `nemia level` putting some factory above `manual` (the store's level, a factory's default or a raise), whatever
  * her folder's trust, which the keeper reads, and putting none above it (a level set, or a raise ended early); and `nemia agents custom
- * nemia` setting or clearing her custom words, which the next beat tells her. Nothing else raises a level: the level is the person's.
+ * nemia` setting or clearing her custom words, which the next beat says to her. Nothing else raises a level: the level is the person's.
  */
 export const NEMIA_VERBS: NemiaVerb[] = [
   { verb: 'level (a factory above manual)', from: ['off', 'untrusted', 'stopped', 'leaving'], to: 'due', guard: 'always', by: 'person' },

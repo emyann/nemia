@@ -2363,7 +2363,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   moves it into `done/` with the spent ask — and the new try is approved with a new `wf approve`.
 - **An ending that stopped on the base branch sends the work back through the loop.** A `workspace: main` ending a person approved,
   which then signed off blocked, failed, was stopped or reached its budget, has two ways on, and `wf decide` prints both with when to
-  take each. Ship again — `wf retry <run> ship` — for what was not the work: a dirty checkout, a flaky test; its try runs on that word,
+  take each. Land again — `wf retry <run> ship` — for what was not the work: a dirty checkout, a flaky test; its try runs on that word,
   with no new approval. Send the work back — `wf retry <run> review --message "<objection>"`, to the loop step the ending waits on — when
   the work does not hold on the base as it is now: review is filed with the objection and what the ending said, and its `again: true` is
   a round on the run's branch, where merging the base in is the work's to do. The ending's try moves behind (`cause: 'back'`) in the same

@@ -353,7 +353,7 @@ test("the gate's commands are never empty, by what the ending waits on and where
     },
   );
   await t.test(
-    'an ending that ran on its approval and stopped on the base branch offers both ways on: ship again, and a send-back through the loop with its words',
+    'an ending that ran on its approval and stopped on the base branch offers both ways on: land again, and a send-back through the loop with its words',
     async () => {
       const id = 'r-stopped';
       const loop = [

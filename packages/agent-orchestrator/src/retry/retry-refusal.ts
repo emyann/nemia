@@ -82,7 +82,7 @@ type Judged = Asked &
  * and a step the run is about to try again itself, because `retries:` still covers its refusal — that step is not waiting on a person.
  *
  * An ending that stopped on the base branch (`endingStopped`) has two ways on that take the same try of it, so one waiting refuses the
- * other: shipping again would act on the work being changed, and a send-back would take back the try a person asked to ship again on.
+ * other: landing again would act on the work being changed, and a send-back would take back the try a person asked to land again on.
  * A send-back from it goes through the folder's loop, to the looping step it waits on, and a folder with none is told it has no such way.
  * An ending at its gate with nothing of it filed has no try to replace: it is offered its approval, and the send-back of the work it would
  * act on (`sendBackTo`).
@@ -215,7 +215,7 @@ function pauseAskRefusal(c: Judged): string | undefined {
   return `try ${next} of ${name} is asked by nemia pause --now (at ${pending.at}), which stopped its ${ran}: it is tried once the store is resumed (nemia resume), or set aside if it ended on its own first. Wait for it: nemia ls ${run.id}.`;
 }
 
-/** An ask already waiting: for this try — one no tick honours, or one it will — or a send-back or a ship again that takes the same try. */
+/** An ask already waiting: for this try — one no tick honours, or one it will — or a send-back or a try to land again that takes the same try. */
 function pendingRefusal(c: Judged): string | undefined {
   const paused = pauseAskRefusal(c);
   if (paused !== undefined) return paused;
@@ -270,12 +270,12 @@ function stoppedEndingRefusal(c: Judged): string | undefined {
   if (through.length) {
     return (
       `${stoppedWords(c, stoppedAt)}, and the work goes back through the folder's loop, not to ${name}: send it back to ${through.join(' or ')}, which is filed again with your objection and what ${stoppedAt.name} said, and may ask for a round of the work — ` +
-      `${through.map((t) => `nemia retry ${run.id} ${t} --message "<objection>"`).join(' or ')}. Or ship again, for what was not the work — a dirty checkout, a flaky test: ${again}.`
+      `${through.map((t) => `nemia retry ${run.id} ${t} --message "<objection>"`).join(' or ')}. Or land again, for what was not the work — a dirty checkout, a flaky test: ${again}.`
     );
   }
   return (
     `${stoppedWords(c, stoppedAt)}, and this workflow has no loop before it to send the work back through: a send-back files the looping step an ending waits on, whose \`again: true\` gives the work a round, and ${stoppedAt.after.join(', ') || 'nothing'} ${stoppedAt.after.length > 1 ? 'do' : 'does'} not loop. ` +
-    `Ship again, for what was not the work — a dirty checkout, a flaky test: ${again}. For work that does not hold on the base branch, call this run off (nemia cancel ${run.id}) and start one for the work on the base branch as it is now (nemia start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`
+    `Land again, for what was not the work — a dirty checkout, a flaky test: ${again}. For work that does not hold on the base branch, call this run off (nemia cancel ${run.id}) and start one for the work on the base branch as it is now (nemia start); a folder that gives its ending a \`loop:\` step to wait on can send work back.`
   );
 }
 
@@ -339,7 +339,7 @@ function wordlessRefusal(c: Judged): string | undefined {
     const ending = steps.find((s) => s.name === back[0])!;
     return (
       `${name}'s work went on to ${ending.name}, and ${stoppedWords(c, ending)}: a try of ${name} sends the work back from there, and one with no words tells its session nothing to change. ` +
-      `${say} — or ship again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${ending.name}.`
+      `${say} — or land again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${ending.name}.`
     );
   }
   const ending = steps.find(

@@ -303,7 +303,7 @@ export function landingRefusedOn(record: StepRecord | undefined, sha: string): s
 }
 
 /**
- * What to do with a loop whose work merges cleanly: approve the ending at its gate, ship a stopped one again, or nothing.
+ * What to do with a loop whose work merges cleanly: approve the ending at its gate, land a stopped one again, or nothing.
  *
  * It names an approval without asking whether the ending is gated, because an ungated one never reaches here: `followerRefusal` runs
  * first, and its `routed` holds the merge off for exactly the state this would answer — an ungated ending not yet filed. Filed, it is
@@ -313,7 +313,7 @@ export function landingRefusedOn(record: StepRecord | undefined, sha: string): s
 function cleanNext(steps: readonly Workflow[], run: Run, looping: Workflow, reads: MergeReads): string {
   const ending = endingAfter(steps, looping);
   if (!ending) return `see where the run stands: nemia decide ${run.id}`;
-  if (run.steps[ending.name]?.taskId && reads.stopped(ending)) return `ship it again: nemia retry ${run.id} ${ending.name}`;
+  if (run.steps[ending.name]?.taskId && reads.stopped(ending)) return `land it again: nemia retry ${run.id} ${ending.name}`;
   return `approve the landing: nemia approve ${run.id} ${ending.name}`;
 }
 

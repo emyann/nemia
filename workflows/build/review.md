@@ -34,8 +34,8 @@ the suite, the types, the lint, the whole e2e and the build on the commit implem
 it judged. Your brief hands you its exit and the end of its output under `## What implement's check said`, that verdict in it; a check
 that did not pass is a finding, and so is a round whose suite nothing ran.
 
-**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `gh pr view 7` and
-`gh pr checks 7`, the number that address ends on. A red, cancelled or absent `ci` is a finding, as is a pull request whose head is not
+**Read the pull request and its checks**, read-only, by the address implement named in its `artifacts` as a value: `gh pr view <n> --json state,mergeable,headRefOid,title,body,url`
+(its plain form, with no fields named, fails on GitHub's deprecation of Projects classic) and `gh pr checks <n>`, `<n>` the number that address ends on. A red, cancelled or absent `ci` is a finding, as is a pull request whose head is not
 the commit you are reviewing. You open, edit, merge and close none: those are refused you, and a person's.
 
 Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`,

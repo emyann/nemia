@@ -10,9 +10,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomBytes } from 'node:crypto';
 import { Result, Schema } from 'effect';
-import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_TYPES } from '../factory/factory.ts';
+import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory/factory.ts';
 import { firstRefusal, HOME } from '../record/record.store.ts';
-import { REVISIONS_POLICIES } from '../factory/factory.ts';
 
 /** The folder the store keeps a factory's own files in, beside its `<name>.json`. */
 const folderOf = (name: string): string => path.join(HOME, 'factories', name);

@@ -3,7 +3,7 @@ import { Schema } from 'effect';
 
 /** Mirrors `Usage` in apps/api/src/detail/usage.ts: a count nobody measured is absent, never 0. */
 export type Usage = {
-  turns?: number;
+  responses?: number;
   toolCalls?: number;
   inputTokens?: number;
   outputTokens?: number;
@@ -25,7 +25,7 @@ const Count = Schema.optionalKey(Schema.Number);
 
 /** Decodes a `Usage`. */
 export const UsageSchema = Schema.Struct({
-  turns: Count,
+  responses: Count,
   toolCalls: Count,
   inputTokens: Count,
   outputTokens: Count,

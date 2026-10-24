@@ -15,6 +15,9 @@
  *   Claude Code's behaviour): a session held on `query()` with its servers on `Options.mcpServers`, its agent prompt on
  *   `Options.systemPrompt`'s `append` and auto-memory off in `Options.settings` reports the one server it was given, the word only
  *   the appended prompt names, Claude Code's own instructions before that prompt, and leaves no `MEMORY.md` behind.
+ * - An attached session's skills: given `enabledSkills` naming one plugin skill, Claude Code lists it that skill alone (the transcript's
+ *   `skill_listing`, what the model reads, not `init`'s `skills`, which lists every skill either way); its control, on `'default'`, is
+ *   listed the built-in ones beside it.
  * - An attached session's cost across its processes: a resumed query's first result carries on the total its parent saved as it
  *   exited, and a session cut by its holder's let-go prints the turn it was cut in, saves its total, and its resume carries it on
  *   (`docs/harness.md`). What it read is said as diagnostics; what the let-go rests on is asserted.
@@ -1756,6 +1759,96 @@ test(
       await Effect.runPromise(Scope.close(scope, Exit.void));
       const id = readRun(filesOf(root, name).run)?.sessionId;
       if (id) {
+        for (const verb of ['stop', 'rm']) {
+          try {
+            execFileSync('claude', [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });
+          } catch {}
+        }
+      }
+    }
+  },
+);
+
+const SKILLS_BRIEF =
+  'Call no tool but the one that gives your closing statement. In skills, give the name of every skill you are told you can use, as ' +
+  'you are told it; an empty list for none.';
+const SKILLS_CLOSEOUT = {
+  type: 'object',
+  properties: { skills: { type: 'array', items: { type: 'string' } } },
+  required: ['skills'],
+  additionalProperties: false,
+};
+/** The one plugin skill both sessions are given: the frozen copy's shape, `nemia-<agent>:<name>`. */
+const PLUGIN_SKILL = 'nemia-aeprobe:say-the-word';
+
+/** The skills Claude Code listed to the model in the session `id`'s transcript (its `skill_listing`), and how many it counted. */
+const skillListing = (id: string | undefined): { count?: number; names: string[] } | undefined => {
+  const file = id ? claudeTranscriptFile(id) : undefined;
+  if (file === undefined || !fs.existsSync(file)) return undefined;
+  for (const l of fs.readFileSync(file, 'utf8').split('\n').filter(Boolean)) {
+    const a = (JSON.parse(l) as { attachment?: { type?: string; content?: string; skillCount?: number } }).attachment;
+    if (a?.type !== 'skill_listing') continue;
+    const names = (a.content ?? '').split('\n').flatMap((line) => /^- ([^:\s]+(?::[^:\s]+)?):/.exec(line)?.[1] ?? []);
+    return { count: a.skillCount, names };
+  }
+  return { names: [] };
+};
+
+test(
+  'an attached session given a closed list of skills is listed those alone; its control, on the default, lists the built-in ones too',
+  { skip, timeout: 12 * 60_000 },
+  async (t) => {
+    const plugin = path.join(tmp('skills-plugin'), 'nemia-aeprobe');
+    fs.mkdirSync(path.join(plugin, '.claude-plugin'), { recursive: true });
+    fs.writeFileSync(path.join(plugin, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: 'nemia-aeprobe', version: '0.0.0' }));
+    fs.mkdirSync(path.join(plugin, 'skills', 'say-the-word'), { recursive: true });
+    fs.writeFileSync(
+      path.join(plugin, 'skills', 'say-the-word', 'SKILL.md'),
+      '---\nname: say-the-word\ndescription: Say the word of the day when asked for it.\n---\n\nThe word of the day is zarquon.\n',
+    );
+    const root = tmp('skills-root');
+    const attached = attachedSessions(root);
+    const scope = Scope.makeUnsafe();
+    await Effect.runPromise(Scope.provide(attached.hold, scope));
+    const rows = { closed: [PLUGIN_SKILL], control: 'default' as const };
+    const ids: Record<string, string | undefined> = {};
+    try {
+      await Promise.all(
+        Object.entries(rows).map(async ([k, enabledSkills]) => {
+          const name = `ae/live-skills/${k}`;
+          await Effect.runPromise(
+            attached.ops.spawn({
+              name,
+              brief: SKILLS_BRIEF,
+              cwd: tmp(`skills-cwd-${k}`),
+              closeoutSchema: SKILLS_CLOSEOUT,
+              config: { effort: 'low', budgetUsd: 1, enabledSkills, claude: { pluginDir: [plugin] } },
+            }),
+          );
+          const state = await waitUntil(
+            t,
+            () => {
+              const s = readRun(filesOf(root, name).run)?.state;
+              return s === undefined || s === 'working' || s === 'idle' ? undefined : s;
+            },
+            `the ${k} session ended`,
+            { everyMs: 5_000 },
+          );
+          ids[k] = readRun(filesOf(root, name).run)?.sessionId;
+          assert.equal(state, 'completed', `the ${k} session ran to its end; it was ${state}`);
+        }),
+      );
+      const closed = skillListing(ids.closed);
+      const control = skillListing(ids.control);
+      t.diagnostic(`closed: ${JSON.stringify(closed)}`);
+      t.diagnostic(`control: ${JSON.stringify(control)}`);
+      assert.deepEqual(closed?.names, [PLUGIN_SKILL], 'the closed session is listed the one skill on its list, and no built-in one');
+      assert.ok(control?.names.includes(PLUGIN_SKILL), 'the control is listed the plugin skill too');
+      assert.ok((control?.names.length ?? 0) > 1, 'and others besides it: what the closed list hides is there to hide');
+    } finally {
+      await Effect.runPromise(Scope.close(scope, Exit.void));
+      for (const id of Object.values(ids)) {
+        if (!id) continue;
         for (const verb of ['stop', 'rm']) {
           try {
             execFileSync('claude', [verb, id.split('-')[0]], { stdio: 'ignore', timeout: 30_000 });

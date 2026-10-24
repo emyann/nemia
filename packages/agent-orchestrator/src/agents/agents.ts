@@ -16,9 +16,8 @@
  *   so a session loads them as `nemia-<agent>:<name>`; and, for `harnessPrompt: no-coding`, `output-styles/no-coding.md`, a style that says
  *   `keep-coding-instructions: false`, chosen by its namespaced name, since a bare one is echoed and not applied.
  *
- * A session is left listed its own plugin's skills and no other of Nemia's: `sessionSettings` turns off every skill name the run could see
- * when it was frozen (`StepAgent.offSkills`), and an override reaches no plugin's skill. The harness's own bundled skills are governed by
- * `disableBundledSkills`, which nothing here sets, so they are listed beside the step's own.
+ * A session is given its own plugin's skills and no other, the harness's built-in ones included: its task names them, a closed list
+ * (`enabledSkillsOf`), rather than a list of names turned off.
  *
  * The step's brief is then its own note alone (`briefBody`): the instructions are in Claude Code's prompt. A codex step is handed them in
  * its brief, and so is a step that continues another's session (`resume:`), whose prompt stays that session's, and a step on a remote A2A
@@ -51,7 +50,7 @@ import {
 import { headedLayers, stepFrom } from '../workflow/index.ts';
 import type { AgentSkill } from '../skills/skills.ts';
 import { frontmatterOrNull, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
-import { isRemoteHarness } from '../harness/harness.ts';
+import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 
 /**
  * The keys an agent file sets: the job it holds (`role:`, as `Product engineer`; its own name is its file's); what it is for, in a line;
@@ -597,7 +596,7 @@ export type SkillAgain = { name: string; text: string } | { name: string; missin
  */
 export const unrendered = (step: Workflow, skills: readonly SkillAgain[] = []): Workflow => {
   if (!step.agent) return step;
-  const { instructions: _i, customInstructions: _c, factoryRules: _r, skills: _s, offSkills: _o, harnessPrompt: _p, ...agent } = step.agent;
+  const { instructions: _i, customInstructions: _c, factoryRules: _r, skills: _s, harnessPrompt: _p, ...agent } = step.agent;
   if (!skills.length) return { ...step, agent };
   return {
     ...step,
@@ -676,31 +675,32 @@ export const pluginManifest = (agent: string): string =>
 export const namesPlugin = (step: Workflow): boolean => Boolean(step.agent?.skills?.length || step.agent?.harnessPrompt === 'no-coding');
 
 /**
- * The settings a rendered step's session is given (`--settings`), or `undefined` when it needs none: the style chosen (`no-coding`), and
- * every skill name the run could see turned `off` by `skillOverrides` — the folder-wide off-list frozen at `nemia start`
- * (`StepAgent.offSkills`), and the names the agent itself carries, under each bare name and, for one named with its folder, under the
- * name its line writes too. Claude Code applies no override to a plugin's skills, so the session keeps the frozen copies,
- * `nemia-<agent>:<bare name>`, and is listed no other skill of Nemia's: not the repository's own skills folder, not a nested folder's,
- * and not one another step of the same folder names. A hard default of every factory, with no key to turn it off.
- *
- * The harness's own bundled skills are another matter, governed by `disableBundledSkills`: this sets no such key and enumerates no
- * bundled name, so a session is listed its plugin's skills and the harness's bundled ones. A record frozen before the off-list carries
- * none, and its session is listed what it was.
+ * The settings a rendered step's session is given (`--settings`), or `undefined` when it needs none: the style chosen (`no-coding`).
+ * Which skills the session holds is no setting: the step's task names them (`enabledSkillsOf`).
  */
 function sessionSettings(agent: StepAgent): string | undefined {
-  const hidden = [...new Set([...(agent.offSkills ?? []), ...(agent.skills ?? [])].flatMap((name) => [bareSkillOf(name), name]))];
-  const settings = {
-    ...(agent.harnessPrompt === 'no-coding' && { outputStyle: `${pluginOf(agent.name)}:${NO_CODING_STYLE}` }),
-    ...(hidden.length && { skillOverrides: Object.fromEntries(hidden.map((name) => [name, 'off'])) }),
-  };
-  return Object.keys(settings).length ? JSON.stringify(settings) : undefined;
+  return agent.harnessPrompt === 'no-coding' ? JSON.stringify({ outputStyle: `${pluginOf(agent.name)}:${NO_CODING_STYLE}` }) : undefined;
 }
+
+/**
+ * The skills a step's session is given, and no other (the runtime's `enabledSkills`): the frozen copies its plugin holds, each as the
+ * session loads it, `nemia-<agent>:<bare name>` — its agent's and those its `skills:` line adds — so every other skill, the harness's
+ * built-in ones, the person's, the repository's and another plugin's, is hidden from it and refused. `[]` for a step whose agent is not
+ * rendered (`rendersAgent`): one with no agent or no skill, one that continues another's session, and one whose rendered folder is gone
+ * and is told its skills whole in its brief (`unrendered`). A session run as a background one or on a harness the run names besides the
+ * default holds no closed list, and is given the harness's own skills (`'default'`), with no list of names turned off. Pure.
+ */
+export const enabledSkillsOf = (step: Workflow): string[] | 'default' => {
+  if (step.background || (step.harness ?? DEFAULT_HARNESS) !== DEFAULT_HARNESS) return 'default';
+  if (!rendersAgent(step)) return [];
+  const plugin = pluginOf(step.agent!.name);
+  return [...new Set((step.agent!.skills ?? []).map((name) => `${plugin}:${bareSkillOf(name)}`))];
+};
 
 /**
  * The flags a rendered step is filed with, as the runtime's `config.claude` takes them, `dir` its rendered folder: the prompt appended, or
  * in place of Claude Code's (`replace`); the plugin, when there are skills or a style in it; and its session's settings
- * (`sessionSettings`): the style chosen (`no-coding`), and every skill name the run could see turned off, so the session is listed the
- * plugin's alone.
+ * (`sessionSettings`): the style chosen (`no-coding`).
  * Undefined for a step not rendered (`rendersAgent`), which is filed with none.
  */
 export function renderedFlags(

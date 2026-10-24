@@ -2,6 +2,7 @@
  * The folder's drift the run page shows: how the workflow folder has moved away from the steps the run started with (`driftOf`). The
  * kinds a run is behind the files on are the orchestrator's (`driftNow`), held in its own `test/revisions.test.ts`.
  */
+import '../../test/harness.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Run } from 'agent-orchestrator/run';

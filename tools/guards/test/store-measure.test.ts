@@ -151,8 +151,6 @@ test("the fence tells git's reads from its writes, refuses a spawn but git's rea
     assert.throws(() => spawnSync('true'), 'a spawn of anything but git on a pass');
     assert.throws(() => spawnSync('git', ['worktree', 'add', '/w']), 'a git write');
     assert.equal(spawnSync('git', ['--version']).status, 0, "a read of git's");
-    assert.doesNotThrow(() => spawnSync('claude', ['agents', '--all', '--json']), "Claude Code's list of its sessions");
-    assert.throws(() => spawnSync('claude', ['agents', 'stop', 'x']), 'any other call of claude');
     fs.writeFileSync(path.join(copy, 'in-the-copy'), 'x');
     assert.throws(() => fs.writeFileSync(outside, 'x'), 'a write outside the copy');
     fence.arm('read');
@@ -162,10 +160,10 @@ test("the fence tells git's reads from its writes, refuses a spawn but git's rea
     fence.uninstall();
   }
   assert.ok(!fs.existsSync(outside));
-  assert.equal(fence.refusals.length, 4);
+  assert.equal(fence.refusals.length, 3);
   assert.deepEqual(
     fence.refusals.map((r) => r.kind),
-    ['spawn', 'spawn', 'spawn', 'write'],
+    ['spawn', 'spawn', 'write'],
   );
   assert.ok(fence.spawned.some((s) => s.verdict === 'other' && s.on === 'read'));
   fs.writeFileSync(outside, 'x');

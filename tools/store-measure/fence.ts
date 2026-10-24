@@ -6,8 +6,7 @@
  *
  * A pass on a copy of the store acts on the real repositories its records name (`packages/agent-orchestrator/CLAUDE.md`, *The tick*):
  * the place refuses its writes, and the fence refuses a git that writes, a write outside the copy and a signal to a process this one
- * did not start, on every read; on a pass (`arm('pass')`) it refuses any child but a read of git or Claude Code's list of its sessions
- * (`claudeListing`) besides. Each refusal is kept
+ * did not start, on every read; on a pass (`arm('pass')`) it refuses any child but a read of git besides. Each refusal is kept
  * (`refusals`), and the report refuses itself while one is there.
  */
 import childProcess from 'node:child_process';
@@ -211,14 +210,7 @@ export function gitVerdict(args: readonly string[]): 'read' | 'write' {
 export type FenceMode = 'read' | 'pass';
 
 /** A child process the fence saw: what ran, its verdict, and what the fence was armed for. */
-export type Spawned = { command: string; verdict: 'git read' | 'git write' | 'claude read' | 'other'; on: FenceMode };
-
-/**
- * Whether `words`, given to `claude`, list Claude Code's sessions and nothing else (`claude agents --all --json`): the runtime's view
- * of a held session reads that list on a pass, as the daemon's pass does, and it starts, stops and writes nothing.
- */
-export const claudeListing = (words: readonly string[]): boolean =>
-  words[0] === 'agents' && words.slice(1).every((w) => w === '--all' || w === '--json');
+export type Spawned = { command: string; verdict: 'git read' | 'git write' | 'other'; on: FenceMode };
 
 /** What the fence refused: a child process, a write to the disk, or a signal, with what it was and what the fence was armed for. */
 export type Refusal = { kind: 'spawn' | 'write' | 'signal' | 'engine'; what: string; on: FenceMode };
@@ -338,15 +330,8 @@ function fenceSpawns(state: FenceState): void {
         function (this: unknown, ...args: unknown[]) {
           if (state.mode !== undefined) {
             const { file, words } = commandOf(name, args);
-            const base = path.basename(file);
-            const verdict: Spawned['verdict'] =
-              base === 'git'
-                ? gitVerdict(words) === 'read'
-                  ? 'git read'
-                  : 'git write'
-                : base === 'claude' && claudeListing(words)
-                  ? 'claude read'
-                  : 'other';
+            const git = path.basename(file) === 'git';
+            const verdict: Spawned['verdict'] = git ? (gitVerdict(words) === 'read' ? 'git read' : 'git write') : 'other';
             const command = [path.basename(file), ...words].join(' ');
             state.spawned.push({ command, verdict, on: state.mode });
             if (verdict === 'git write' || (verdict === 'other' && state.mode === 'pass')) throw refused(state, 'spawn', command);

@@ -64,7 +64,7 @@ export function RunSteps({
   cancelled: boolean;
   held: boolean;
   names?: boolean;
-  wrap?: (bar: ReactNode, step: { name: string; state: StepState }) => ReactNode;
+  wrap?: (bar: ReactNode, step: { name: string; state: StepState; status: string }) => ReactNode;
 }) {
   const drawn = railStates(steps, cancelled, held);
   return (

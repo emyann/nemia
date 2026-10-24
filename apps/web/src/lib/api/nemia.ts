@@ -4,6 +4,7 @@
  */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
 import { BridgeSchema, type Bridge } from './bridge.ts';
 import { get, ReadRefusal, send } from './read.ts';
@@ -52,36 +53,42 @@ export type NemiaMemory = { dir: string; facts: readonly string[]; fact: { name:
 const LevelSchema = Schema.Literals(['manual', 'semi-auto', 'auto']);
 
 /** Decodes a `FactoryLevel`. */
-const FactoryLevelSchema = Schema.Struct({
-  factory: Schema.String,
-  level: LevelSchema,
-  default: LevelSchema,
-  own: Schema.NullOr(LevelSchema),
-  raise: Schema.NullOr(Schema.Struct({ level: LevelSchema, until: Schema.String })),
-}) satisfies Schema.Schema<FactoryLevel>;
+const FactoryLevelSchema = decodes<FactoryLevel>()(
+  Schema.Struct({
+    factory: Schema.String,
+    level: LevelSchema,
+    default: LevelSchema,
+    own: Schema.NullOr(LevelSchema),
+    raise: Schema.NullOr(Schema.Struct({ level: LevelSchema, until: Schema.String })),
+  }),
+);
 
 /** Decodes a `NemiaLevel`. */
-const NemiaLevelSchema = Schema.Struct({
-  level: LevelSchema,
-  since: Schema.NullOr(Schema.String),
-  task: Schema.NullOr(Schema.String),
-  phase: Schema.NullOr(Schema.String),
-  sessionId: Schema.NullOr(Schema.String),
-  reach: Schema.Array(Schema.String),
-  bridge: Schema.NullOr(BridgeSchema),
-  stopped: Schema.Boolean,
-  spend: Schema.NullOr(Schema.Struct({ usd: Schema.Number, measured: Schema.Number, unmeasured: Schema.Number })),
-  allows: Schema.Array(Schema.String),
-  factories: Schema.Array(FactoryLevelSchema),
-  trust: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<NemiaLevel>;
+const NemiaLevelSchema = decodes<NemiaLevel>()(
+  Schema.Struct({
+    level: LevelSchema,
+    since: Schema.NullOr(Schema.String),
+    task: Schema.NullOr(Schema.String),
+    phase: Schema.NullOr(Schema.String),
+    sessionId: Schema.NullOr(Schema.String),
+    reach: Schema.Array(Schema.String),
+    bridge: Schema.NullOr(BridgeSchema),
+    stopped: Schema.Boolean,
+    spend: Schema.NullOr(Schema.Struct({ usd: Schema.Number, measured: Schema.Number, unmeasured: Schema.Number })),
+    allows: Schema.Array(Schema.String),
+    factories: Schema.Array(FactoryLevelSchema),
+    trust: Schema.NullOr(Schema.String),
+  }),
+);
 
 /** Decodes a `NemiaMemory`. */
-const NemiaMemorySchema = Schema.Struct({
-  dir: Schema.String,
-  facts: Schema.Array(Schema.String),
-  fact: Schema.NullOr(Schema.Struct({ name: Schema.String, text: Schema.String })),
-}) satisfies Schema.Schema<NemiaMemory>;
+const NemiaMemorySchema = decodes<NemiaMemory>()(
+  Schema.Struct({
+    dir: Schema.String,
+    facts: Schema.Array(Schema.String),
+    fact: Schema.NullOr(Schema.Struct({ name: Schema.String, text: Schema.String })),
+  }),
+);
 
 /** Where Nemia is: polled at `pace`, the keeper's beat, since the feed says nothing of her session. */
 export const levelQuery = queryOptions({

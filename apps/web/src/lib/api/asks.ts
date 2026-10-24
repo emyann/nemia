@@ -4,6 +4,7 @@
  */
 
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { send } from './read.ts';
 
 /**
@@ -14,12 +15,14 @@ import { send } from './read.ts';
 export type Said = { at: string; attempt: number; text: string; after: { kind: string; id: string } | null };
 
 /** Decodes a `Said`. */
-const SaidSchema = Schema.Struct({
-  at: Schema.String,
-  attempt: Schema.Number,
-  text: Schema.String,
-  after: Schema.NullOr(Schema.Struct({ kind: Schema.String, id: Schema.String })),
-}) satisfies Schema.Schema<Said>;
+const SaidSchema = decodes<Said>()(
+  Schema.Struct({
+    at: Schema.String,
+    attempt: Schema.Number,
+    text: Schema.String,
+    after: Schema.NullOr(Schema.Struct({ kind: Schema.String, id: Schema.String })),
+  }),
+);
 
 /**
  * Mirrors `Answer` in agent-orchestrator's question/question.ts: a person's answer to one question a step asks, by its title — the labels
@@ -34,44 +37,52 @@ export type RetryMode = 'nudge' | 'fresh' | 'recheck';
 export type AskedTry = { try: number; file: string; stopFirst: boolean };
 
 /** Decodes an `AskedTry`. */
-const AskedTrySchema = Schema.Struct({
-  try: Schema.Number,
-  file: Schema.String,
-  stopFirst: Schema.Boolean,
-}) satisfies Schema.Schema<AskedTry>;
+const AskedTrySchema = decodes<AskedTry>()(
+  Schema.Struct({
+    try: Schema.Number,
+    file: Schema.String,
+    stopFirst: Schema.Boolean,
+  }),
+);
 
 /** What an ask for a round answers: the looping step, the round asked for, and its ask file. */
 export type AskedRound = { step: string; round: number; file: string };
 
 /** Decodes an `AskedRound`. */
-const AskedRoundSchema = Schema.Struct({
-  step: Schema.String,
-  round: Schema.Number,
-  file: Schema.String,
-}) satisfies Schema.Schema<AskedRound>;
+const AskedRoundSchema = decodes<AskedRound>()(
+  Schema.Struct({
+    step: Schema.String,
+    round: Schema.Number,
+    file: Schema.String,
+  }),
+);
 
 /** What an approval answers: the try approved, when, its words — null for none — and the approval's file. */
 export type Approved = { try: number; at: string; message: string | null; file: string };
 
 /** Decodes an `Approved`. */
-const ApprovedSchema = Schema.Struct({
-  try: Schema.Number,
-  at: Schema.String,
-  message: Schema.NullOr(Schema.String),
-  file: Schema.String,
-}) satisfies Schema.Schema<Approved>;
+const ApprovedSchema = decodes<Approved>()(
+  Schema.Struct({
+    try: Schema.Number,
+    at: Schema.String,
+    message: Schema.NullOr(Schema.String),
+    file: Schema.String,
+  }),
+);
 
 /** What an acceptance answers: the looping step, the try accepted, when, its words, and the acceptance's file. */
 export type Accepted = { step: string; try: number; at: string; message: string; file: string };
 
 /** Decodes an `Accepted`. */
-const AcceptedSchema = Schema.Struct({
-  step: Schema.String,
-  try: Schema.Number,
-  at: Schema.String,
-  message: Schema.String,
-  file: Schema.String,
-}) satisfies Schema.Schema<Accepted>;
+const AcceptedSchema = decodes<Accepted>()(
+  Schema.Struct({
+    step: Schema.String,
+    try: Schema.Number,
+    at: Schema.String,
+    message: Schema.String,
+    file: Schema.String,
+  }),
+);
 
 /**
  * Ask for another try of a step, as the CLI's `retry` does: the api calls the package's `retry()`, which writes the ask and nothing else,

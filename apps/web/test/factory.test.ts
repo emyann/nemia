@@ -38,6 +38,7 @@ import {
   widenLayout,
   type Span,
 } from '../src/lib/factory.ts';
+import { ENDED } from '../src/lib/words.ts';
 import { runsIn } from '../src/lib/factories.ts';
 import { tilesOf } from '../src/lib/flow.ts';
 import { instantWhole } from '../src/lib/instant.ts';
@@ -1136,7 +1137,7 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
   await t.test(
     "where a run stands, in the start form's word: called off, waiting on you — a step, or a run it waits on that never ships — in flight, or finished",
     () => {
-      assert.equal(standingOf(run([], { status: 'cancelled', cancelledAt })), 'cancelled');
+      assert.equal(standingOf(run([], { status: 'cancelled', cancelledAt })), ENDED.cancelled.word);
       assert.equal(
         standingOf(run(['waiting on p (cancelled)'], { after: ['p'], waiting: waitingOn(true) })),
         'waiting on you',

@@ -8,6 +8,7 @@ import { costText, pastBudget } from '../lib/cost';
 import { isGate, stepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
+import { PERSON } from '../lib/words';
 
 /**
  * `index` is the step's place in the run's order, which is the order the CLI's `ls` lists it in. `waitingOnYou` is whether the
@@ -111,20 +112,7 @@ export function StepNode({
         </p>
       )}
 
-      {gate && (
-        <p
-          title={need ? nodeNeed(need, step) : undefined}
-          className="truncate border-t border-border bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
-        >
-          <span className="font-semibold">waiting on you</span>
-          {need && (
-            <span data-need={need.kind}>
-              {' · '}
-              {nodeNeed(need, step)}
-            </span>
-          )}
-        </p>
-      )}
+      {gate && <GateBand word={PERSON[state].rail} need={need ? { kind: need.kind, said: nodeNeed(need, step) } : null} />}
       {!gate && need && (
         <p
           data-need={need.kind}
@@ -361,9 +349,23 @@ function BuildingNode({
   );
 }
 
+/** A gate's band under its node: the rail's word for the state, then what it waits for, whole on hover. */
+function GateBand({ word, need }: { word: string; need: { kind: Need['kind']; said: string } | null }) {
+  return (
+    <p
+      data-gate-band
+      title={need?.said}
+      className="truncate border-t border-border bg-yours-container px-3 py-1 text-body-small text-on-yours-container"
+    >
+      <span className="font-semibold">{word}</span>
+      {need && <span data-need={need.kind}>{` · ${need.said}`}</span>}
+    </p>
+  );
+}
+
 /**
- * What a gate's node says after `waiting on you`: what approving does in a line (`approve ship to run it`, `approve plan's hand-off`),
- * whose whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
+ * What a gate's band says after the rail's word (`waits on you`): what approving does in a line (`approve ship to run it`, `approve
+ * plan's hand-off`), whose whole — and the answer — is the inspector's, a click away. A question is said as it was asked.
  */
 const nodeNeed = (need: Need, step: StepNodeData['step']): string =>
   need.kind === 'approve'

@@ -202,7 +202,7 @@ function Output({ step, state, selected }: { step: Step; state: StepState; selec
     : step.status.endsWith('closeout unreadable')
       ? 'It gave a closeout that could not be read.'
       : isLive(state) || state === 'waiting' || state === 'waiting-for-slot'
-        ? 'No closeout yet: the step has not signed off.'
+        ? 'No closeout yet: the step has yet to sign off.'
         : 'No closeout: the step ended without one.';
   return <TryCloseouts tries={step.tries} selected={selected} none={none} />;
 }

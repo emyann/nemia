@@ -1,6 +1,7 @@
 /** Your store, as the api reads it (`GET /api/store`, apps/api/src/workflows/yours.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 
 /**
@@ -10,13 +11,15 @@ import { get } from './read.ts';
 export type YourStore = { workflows: string; agents: string; skills: string; fileFactory: string; turnOnNemia: string };
 
 /** Decodes a `YourStore`. */
-const YourStoreSchema = Schema.Struct({
-  workflows: Schema.String,
-  agents: Schema.String,
-  skills: Schema.String,
-  fileFactory: Schema.String,
-  turnOnNemia: Schema.String,
-}) satisfies Schema.Schema<YourStore>;
+const YourStoreSchema = decodes<YourStore>()(
+  Schema.Struct({
+    workflows: Schema.String,
+    agents: Schema.String,
+    skills: Schema.String,
+    fileFactory: Schema.String,
+    turnOnNemia: Schema.String,
+  }),
+);
 
 /** Your store, read once a page: it moves only when the api restarts on another root. */
 export const storeQuery = queryOptions({

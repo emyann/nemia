@@ -1,6 +1,7 @@
 /** Every run, as the Runs page and the Factory list them (`GET /api/runs`, apps/api/src/runs/runs.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { pace } from '../feed.ts';
 import { get, send } from './read.ts';
 import { RunGraphSchema, type RunGraph } from './graph.ts';
@@ -125,51 +126,53 @@ export type RunSummary = {
 };
 
 /** Decodes a `RunSummary`: each key the board reads, of its type and words; a key it does not know is dropped. */
-const RunSummarySchema = Schema.Struct({
-  id: Schema.String,
-  repo: Schema.NullOr(Schema.String),
-  factory: Schema.NullOr(Schema.String),
-  place: PlaceKindSchema,
-  work: Schema.NullOr(Schema.String),
-  brief: Schema.String,
-  workflowDir: Schema.String,
-  workflowPage: Schema.NullOr(WorkflowPageAddressSchema),
-  try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
-  createdAt: Schema.String,
-  startedAt: Schema.NullOr(Schema.String),
-  cancelledAt: Schema.NullOr(Schema.String),
-  pruned: Schema.NullOr(Schema.Struct({ said: Schema.String })),
-  after: StringsSchema,
-  context: StringsSchema,
-  waiting: Schema.NullOr(RunWaitingSchema),
-  heldUntil: StringsSchema,
-  holding: Schema.NullOr(RunHoldingSchema),
-  status: RunStatusSchema,
-  moving: Schema.Boolean,
-  cost: Schema.NullOr(SpentSchema),
-  atWork: Schema.NullOr(AtWorkSchema),
-  tokens: Schema.NullOr(RunTokensSchema),
-  steps: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({
-        name: Schema.String,
-        taskId: Schema.NullOr(Schema.String),
-        branch: Schema.NullOr(Schema.String),
-        status: Schema.String,
-        note: Schema.NullOr(Schema.String),
-        roundDue: Schema.Boolean,
-        agent: Schema.NullOr(Schema.String),
-        since: Schema.NullOr(Schema.String),
-        ...StepNeedsFields,
-      }),
+const RunSummarySchema = decodes<RunSummary>()(
+  Schema.Struct({
+    id: Schema.String,
+    repo: Schema.NullOr(Schema.String),
+    factory: Schema.NullOr(Schema.String),
+    place: PlaceKindSchema,
+    work: Schema.NullOr(Schema.String),
+    brief: Schema.String,
+    workflowDir: Schema.String,
+    workflowPage: Schema.NullOr(WorkflowPageAddressSchema),
+    try: Schema.NullOr(Schema.Struct({ agent: Schema.String })),
+    createdAt: Schema.String,
+    startedAt: Schema.NullOr(Schema.String),
+    cancelledAt: Schema.NullOr(Schema.String),
+    pruned: Schema.NullOr(Schema.Struct({ said: Schema.String })),
+    after: StringsSchema,
+    context: StringsSchema,
+    waiting: Schema.NullOr(RunWaitingSchema),
+    heldUntil: StringsSchema,
+    holding: Schema.NullOr(RunHoldingSchema),
+    status: RunStatusSchema,
+    moving: Schema.Boolean,
+    cost: Schema.NullOr(SpentSchema),
+    atWork: Schema.NullOr(AtWorkSchema),
+    tokens: Schema.NullOr(RunTokensSchema),
+    steps: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          name: Schema.String,
+          taskId: Schema.NullOr(Schema.String),
+          branch: Schema.NullOr(Schema.String),
+          status: Schema.String,
+          note: Schema.NullOr(Schema.String),
+          roundDue: Schema.Boolean,
+          agent: Schema.NullOr(Schema.String),
+          since: Schema.NullOr(Schema.String),
+          ...StepNeedsFields,
+        }),
+      ),
     ),
-  ),
-  graph: RunGraphSchema,
-  waitingOnYou: StringsSchema,
-  onYou: StringsSchema,
-  toDecide: Schema.NullOr(RunToDecideSchema),
-  unreadable: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<RunSummary>;
+    graph: RunGraphSchema,
+    waitingOnYou: StringsSchema,
+    onYou: StringsSchema,
+    toDecide: Schema.NullOr(RunToDecideSchema),
+    unreadable: Schema.NullOr(Schema.String),
+  }),
+);
 
 /**
  * Every run. Read again on each event of the workflow feed (`useFeed`), and every 5 s while the feed is not followed — every minute while
@@ -217,14 +220,16 @@ export type OpenRuns = {
 };
 
 /** Decodes a `RunClock`. */
-const RunClockSchema = Schema.Struct({
-  wallMs: Schema.Number,
-  sessionsMs: Schema.Number,
-  checksMs: Schema.Number,
-  personMs: Schema.Number,
-  slotMs: Schema.Number,
-  restMs: Schema.Number,
-}) satisfies Schema.Schema<RunClock>;
+const RunClockSchema = decodes<RunClock>()(
+  Schema.Struct({
+    wallMs: Schema.Number,
+    sessionsMs: Schema.Number,
+    checksMs: Schema.Number,
+    personMs: Schema.Number,
+    slotMs: Schema.Number,
+    restMs: Schema.Number,
+  }),
+);
 
 /** The keys a listed row adds to the whole list's (`ListedRun`). */
 const ListedFields = {
@@ -235,22 +240,26 @@ const ListedFields = {
 };
 
 /** Decodes a `ListedRun`. */
-const ListedRunSchema = Schema.Struct(ListedFields) satisfies Schema.Schema<ListedRun>;
+const ListedRunSchema = decodes<ListedRun>()(Schema.Struct(ListedFields));
 
 /** Decodes a `WaitingRun`: the listed row with its clock, its steps' costs and when its present wait began. */
-const WaitingRunSchema = Schema.Struct({
-  ...ListedFields,
-  stepCosts: Schema.NullOr(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, cost: Schema.NullOr(SpentSchema) })))),
-  waitingSince: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<WaitingRun>;
+const WaitingRunSchema = decodes<WaitingRun>()(
+  Schema.Struct({
+    ...ListedFields,
+    stepCosts: Schema.NullOr(Schema.mutable(Schema.Array(Schema.Struct({ step: Schema.String, cost: Schema.NullOr(SpentSchema) })))),
+    waitingSince: Schema.NullOr(Schema.String),
+  }),
+);
 
 /** Decodes an `OpenRuns`: a waiting row with its costs and its wait besides, each row with its wall time and its clock. */
-const OpenRunsSchema = Schema.Struct({
-  asOf: Schema.String,
-  counts: Schema.Struct({ waiting: Schema.Number, inFlight: Schema.Number, finished: Schema.Number }),
-  waiting: Schema.mutable(Schema.Array(WaitingRunSchema)),
-  inFlight: Schema.mutable(Schema.Array(ListedRunSchema)),
-}) satisfies Schema.Schema<OpenRuns>;
+const OpenRunsSchema = decodes<OpenRuns>()(
+  Schema.Struct({
+    asOf: Schema.String,
+    counts: Schema.Struct({ waiting: Schema.Number, inFlight: Schema.Number, finished: Schema.Number }),
+    waiting: Schema.mutable(Schema.Array(WaitingRunSchema)),
+    inFlight: Schema.mutable(Schema.Array(ListedRunSchema)),
+  }),
+);
 
 /**
  * The light answer (`GET /api/runs-open`): the runs that wait and move with the counts, of every factory, or of `factory` alone
@@ -281,24 +290,26 @@ export type FinishedRun = RunSummary & { wallMs: number; finishedAt: string; out
 export type FinishedPage = { asOf: string; total: number; page: number; size: number; pages: number; runs: FinishedRun[] };
 
 /** Decodes a `FinishedPage`: each row the list's (`RunSummarySchema`) with its three facts and its clock. */
-const FinishedPageSchema = Schema.Struct({
-  asOf: Schema.String,
-  total: Schema.Number,
-  page: Schema.Number,
-  size: Schema.Number,
-  pages: Schema.Number,
-  runs: Schema.mutable(
-    Schema.Array(
-      Schema.Struct({
-        ...RunSummarySchema.fields,
-        wallMs: Schema.Number,
-        finishedAt: Schema.String,
-        outcome: Schema.Literals(['succeeded', 'failed', 'cancelled', 'undecided']),
-        clock: Schema.NullOr(RunClockSchema),
-      }),
+const FinishedPageSchema = decodes<FinishedPage>()(
+  Schema.Struct({
+    asOf: Schema.String,
+    total: Schema.Number,
+    page: Schema.Number,
+    size: Schema.Number,
+    pages: Schema.Number,
+    runs: Schema.mutable(
+      Schema.Array(
+        Schema.Struct({
+          ...RunSummarySchema.fields,
+          wallMs: Schema.Number,
+          finishedAt: Schema.String,
+          outcome: Schema.Literals(['succeeded', 'failed', 'cancelled', 'undecided']),
+          clock: Schema.NullOr(RunClockSchema),
+        }),
+      ),
     ),
-  ),
-}) satisfies Schema.Schema<FinishedPage>;
+  }),
+);
 
 /** How many finished runs a page of the board holds. */
 export const FINISHED_SIZE = 9;
@@ -326,11 +337,13 @@ export const finishedRunsQuery = (factory: string | undefined, page: number) =>
 export type Concluded = { run: string; shipped: boolean; section: string };
 
 /** Decodes a `Concluded`. */
-const ConcludedSchema = Schema.Struct({
-  run: Schema.String,
-  shipped: Schema.Boolean,
-  section: Schema.String,
-}) satisfies Schema.Schema<Concluded>;
+const ConcludedSchema = decodes<Concluded>()(
+  Schema.Struct({
+    run: Schema.String,
+    shipped: Schema.Boolean,
+    section: Schema.String,
+  }),
+);
 
 /** What a run would hand as context now (`GET /api/runs/:runId/concluded`): read again with the runs, since a source in flight moves on. */
 export const concludedQuery = (id: string) =>
@@ -340,10 +353,10 @@ export const concludedQuery = (id: string) =>
   });
 
 /** What a removal answers: the run removed. */
-const RemovedSchema = Schema.Struct({ id: Schema.String, removed: Schema.Literal(true) }) satisfies Schema.Schema<{
+const RemovedSchema = decodes<{
   id: string;
   removed: true;
-}>;
+}>()(Schema.Struct({ id: Schema.String, removed: Schema.Literal(true) }));
 
 /**
  * Remove a try's run, as the CLI's `rm` removes it: its record, and the folders it worked in. The api removes only a try, and not one still
@@ -356,10 +369,10 @@ export const removeRun = (id: string): Promise<{ id: string; removed: true }> =>
   });
 
 /** What a lift answers: the run whose hold is lifted. The hold that was is dropped: nothing reads it. */
-const LiftedSchema = Schema.Struct({ id: Schema.String, lifted: Schema.Literal(true) }) satisfies Schema.Schema<{
+const LiftedSchema = decodes<{
   id: string;
   lifted: true;
-}>;
+}>()(Schema.Struct({ id: Schema.String, lifted: Schema.Literal(true) }));
 
 /**
  * Lift a person's hold on a run, as the CLI's `hold <run> --off` lifts it: the hold's file removed, and the run goes on at the next tick.
@@ -378,16 +391,18 @@ export type Hold = { at: string; until: string[]; why?: string; by?: string };
 export type Held = { id: string; lifted: false; hold: Hold };
 
 /** Decodes a `Held`: `why` and `by` absent where the hold has none. */
-const HeldSchema = Schema.Struct({
-  id: Schema.String,
-  lifted: Schema.Literal(false),
-  hold: Schema.Struct({
-    at: Schema.String,
-    until: StringsSchema,
-    why: Schema.optionalKey(Schema.String),
-    by: Schema.optionalKey(Schema.String),
+const HeldSchema = decodes<Held>()(
+  Schema.Struct({
+    id: Schema.String,
+    lifted: Schema.Literal(false),
+    hold: Schema.Struct({
+      at: Schema.String,
+      until: StringsSchema,
+      why: Schema.optionalKey(Schema.String),
+      by: Schema.optionalKey(Schema.String),
+    }),
   }),
-}) satisfies Schema.Schema<Held>;
+);
 
 /**
  * Hold a run until the runs `until` names ship, as the CLI's `hold <run> --until <run>… --why <words>` holds it, `why` sent only where it

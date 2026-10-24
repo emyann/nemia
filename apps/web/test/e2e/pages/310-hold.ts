@@ -76,6 +76,7 @@ export default {
       await expectCount(step.getByRole('button', { name: 'Approve', exact: true }), 0, `and ${gated}'s section offers no Approve`);
       await expectCount(page.locator('section[aria-label="Decide"]'), 0, 'and the page no Decide section');
       await expectCount(page.getByText('waiting on you', { exact: true }), 0, 'and nothing on it says it waits on you');
+      await expectCount(page.locator('[data-gate-band]'), 0, 'and no step of it has a gate band');
       await settled(page);
       await photograph(page, path.join(OUT, `hold-run-${theme}.png`), { fullPage: true });
     } finally {

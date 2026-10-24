@@ -29,8 +29,8 @@ export default {
     );
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     await expectVisible(
-      graph.locator('.react-flow__node[data-id="implement"] [data-state="waiting"]', { hasText: DIAMOND.words.orphan }),
-      "its root's chip is waiting, in wf ls's words",
+      graph.locator('.react-flow__node[data-id="implement"] [data-state="waiting"]', { hasText: 'to come' }),
+      "its root's chip is waiting, in a person's word: to come",
     );
     await settled(page);
   },

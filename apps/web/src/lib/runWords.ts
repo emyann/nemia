@@ -1,13 +1,15 @@
 /**
  * The runs page's plain words, without React: the one sentence a waiting run says, by the kind of its wait; how a finished run ended; a
  * wall time as a fact to the minute; and what a run's rail of steps says aloud. Each sentence is built from the row's steps and their
- * names alone: what the api advises a person to type is never repeated here. Pure.
+ * names alone: what the api advises a person to type is never repeated here. The words themselves are `words.ts`'s; this reads the row
+ * and composes them. Pure.
  */
 import { format, formatDistanceStrict, isSameDay, isSameYear } from 'date-fns';
 import type { RunOutcome, RunSummary } from './api/runs.ts';
 import type { Hue } from './meaning.ts';
 import { stepState, type StepState } from './status.ts';
 import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
+import { ANY_WAIT, ENDED, OPENS, PERSON, RUN_WAITS, stateWordsOf, type Wait as Waited, type WaitWords } from './words.ts';
 
 /** Every kind of wait on a person the page has a sentence for. */
 export const WAIT_KINDS = ['approve', 'blocked', 'check', 'unfinished', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
@@ -52,7 +54,7 @@ export type WaitingRow = Pick<RunSummary, 'cancelledAt' | 'holding' | 'waiting' 
 export type OpenedRow = WaitingRow & { steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status' | 'taskId'>> };
 
 /** A wait: its kind, the step that waits, none for a wait of the run's own, and how many of the run's steps are done. */
-export type Wait = { kind: WaitKind; step: string | null; done: number };
+export type Wait = Waited & { kind: WaitKind };
 
 /** How the api ends the word of a step whose check did not finish: no exit, so no verdict on the work. */
 const UNFINISHED = /\(unfinished\)$/;
@@ -84,70 +86,34 @@ export function waitOf(row: WaitingRow): Wait | null {
   return row.waiting?.onYou ? { kind: 'after', step: null, done } : null;
 }
 
-/** A count up to twelve in a word, capitalised; in digits past it. */
-const COUNTED = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten', 'Eleven', 'Twelve'];
-
-/** How many steps are done, as a sentence and its space; nothing for none. */
-const doneSaid = (done: number): string =>
-  done === 0 ? '' : done === 1 ? 'One step is done. ' : `${COUNTED[done] ?? String(done)} steps are done. `;
-
-/** A step's name as a sentence starts with it. */
-const named = (step: string | null): string => (step ? step.charAt(0).toUpperCase() + step.slice(1) : 'A step');
-
-/** Each kind's sentence, from the wait. */
-const SENTENCES: Record<WaitKind, (wait: Wait) => string> = {
-  approve: (wait) => `${doneSaid(wait.done)}${named(wait.step)} waits for your approval.`,
-  blocked: (wait) => `${named(wait.step)} stopped and needs your word to go on.`,
-  check: (wait) => `The check refused ${named(wait.step)}'s work. Try it again or call the run off.`,
-  unfinished: (wait) => `${named(wait.step)}'s check did not finish, so nothing judged its work. Run the check again.`,
-  unsigned: (wait) => `${named(wait.step)} ended without signing its work. Try it again.`,
-  denied: (wait) => `${named(wait.step)} was refused a tool it called. Try it again.`,
-  rounds: (wait) => `${named(wait.step)} is out of rounds. Give it another or decide its result.`,
-  budget: (wait) => `${named(wait.step)} is past its budget. Say whether it may spend more.`,
-  hold: () => 'You hold this run. It moves once you lift the hold.',
-  after: () => 'It waits on a run that will not finish without you.',
-};
-
-/** What a waiting row says of a wait the board has no kind for. */
-export const WAITS = 'It waits on you.';
+/**
+ * The words of a wait of `kind`: a wait of the run's own (`RUN_WAITS`), else the words of the first state whose wait is that kind
+ * (`waitKindOf`), both budgets' being the same.
+ */
+function wordsOf(kind: WaitKind): WaitWords {
+  if (kind === 'hold' || kind === 'after' || kind === 'unfinished') return RUN_WAITS[kind];
+  const state = (Object.keys(waitKindOf) as StepState[]).find((s) => waitKindOf[s] === kind);
+  const words = state && PERSON[state];
+  return words?.tag && words.sentence && words.open ? { tag: words.tag, sentence: words.sentence, open: words.open } : ANY_WAIT;
+}
 
 /** The sentence of a wait of `kind`. */
-export const sentenceOf = (wait: Wait): string => SENTENCES[wait.kind](wait);
+export const sentenceOf = (wait: Wait): string => wordsOf(wait.kind).sentence(wait);
 
 /** The one sentence a waiting run says: its wait's (`waitOf`), or that it waits on you where the board has no kind for it. */
 export function waitSentence(row: WaitingRow): string {
   const wait = waitOf(row);
-  return wait ? sentenceOf(wait) : WAITS;
+  return wait ? sentenceOf(wait) : ANY_WAIT.sentence({ step: null, done: 0 });
 }
-
-/** What a waiting card's tag says of each kind of wait, in two or three words; `approve` and `blocked` name the step. */
-const TAGS: Record<WaitKind, (wait: Wait) => string> = {
-  approve: (wait) => (wait.step ? `approve ${wait.step}` : 'approve'),
-  blocked: (wait) => (wait.step ? `answer ${wait.step}` : 'answer'),
-  check: () => 'check refused',
-  unfinished: () => 'check unfinished',
-  unsigned: () => 'not signed',
-  denied: () => 'tool refused',
-  rounds: () => 'out of rounds',
-  budget: () => 'past budget',
-  hold: () => 'held by you',
-  after: () => 'waits on a run',
-};
-
-/** What a waiting card's tag says of a wait the board has no kind for. */
-export const WAITS_TAG = 'waits on you';
 
 /** The few words of a waiting run's tag: what is asked of the person (`approve land`). */
 export function waitTag(row: WaitingRow): string {
   const wait = waitOf(row);
-  return wait ? TAGS[wait.kind](wait) : WAITS_TAG;
+  return wait ? wordsOf(wait.kind).tag(wait) : ANY_WAIT.tag({ step: null, done: 0 });
 }
 
 /** The states of a step a run is past. */
 const PAST: readonly StepState[] = ['verified', 'unverified'];
-
-/** What a waiting card's button says where the card names nothing to read: it opens the run's page. */
-export const OPENS = 'Open the run';
 
 /**
  * The step whose work a person reads at the gate of `gated` on `row`: the gated step itself where it has run (its task is filed), else
@@ -161,23 +127,6 @@ function readAt(row: OpenedRow, gated: string | null): string | null {
   return done.pop()?.name ?? null;
 }
 
-/** What a waiting card's button says of each kind of wait: what there is to read where it is one thing, else `OPENS`. */
-const OPEN_WORDS: Record<WaitKind, (wait: Wait, row: OpenedRow) => string> = {
-  approve: (wait, row) => {
-    const step = readAt(row, wait.step);
-    return step ? `Read the ${step}` : OPENS;
-  },
-  blocked: () => 'Read the question',
-  check: () => 'Read the check',
-  unfinished: () => 'Read the check',
-  unsigned: () => OPENS,
-  denied: () => OPENS,
-  rounds: () => OPENS,
-  budget: () => OPENS,
-  hold: () => OPENS,
-  after: () => OPENS,
-};
-
 /**
  * The words of a waiting card's button, by the kind of its wait (`waitOf`): `Read the design` at a gate, `Read the question`,
  * `Read the check`, and `Open the run` for every other kind and for a wait the board has no kind for. The button opens the run's page
@@ -185,7 +134,7 @@ const OPEN_WORDS: Record<WaitKind, (wait: Wait, row: OpenedRow) => string> = {
  */
 export function openWord(row: OpenedRow): string {
   const wait = waitOf(row);
-  return wait ? OPEN_WORDS[wait.kind](wait, row) : OPENS;
+  return wait ? wordsOf(wait.kind).open(wait, readAt(row, wait.step)) : OPENS;
 }
 
 /** What a row in flight says it does now: the word of the step it is on, and a note of which step, its place, and how long. */
@@ -201,21 +150,17 @@ export function nowOf(row: WaitingRow): Now | null {
   const at = states.findIndex((step) => !PAST.includes(step.state));
   const step = states[at];
   if (!step) return null;
-  return { word: railWord[step.state], note: `${step.name} (${at + 1} of ${states.length})` };
+  return { word: stateWordsOf(step.state, step.status).rail, note: `${step.name} (${at + 1} of ${states.length})` };
 }
 
 /** How a finished run ended, as the page says it: a word, its whole sentence, and the hue it is drawn in. */
 export type Ended = { word: string; title: string; hue: Hue };
 
-const ENDED: Record<RunOutcome, Ended> = {
-  succeeded: { word: 'done', title: 'Every step of it is done.', hue: 'sage' },
-  cancelled: { word: 'cancelled', title: 'Somebody called it off.', hue: 'grey' },
-  failed: { word: 'failed', title: 'It stopped on a step that failed.', hue: 'failure' },
-  undecided: { word: 'undecided', title: 'Nobody has decided its result.', hue: 'yours' },
-};
+/** The hue each outcome is drawn in. */
+const ENDED_HUE: Record<RunOutcome, Hue> = { succeeded: 'sage', cancelled: 'grey', failed: 'failure', undecided: 'yours' };
 
 /** How a finished run of `outcome` ended. */
-export const endedWords = (outcome: RunOutcome): Ended => ENDED[outcome];
+export const endedWords = (outcome: RunOutcome): Ended => ({ ...ENDED[outcome], hue: ENDED_HUE[outcome] });
 
 /** `ms` of wall time to the minute: `under a minute`, `27m`, `3h 12m`, `2d 4h`, a part of none left out. */
 export function sinceWords(ms: number): string {
@@ -253,38 +198,15 @@ export function agoWords(at: Date, now: Date): string {
   return Math.abs(now.getTime() - at.getTime()) < 60_000 ? JUST_NOW : formatDistanceStrict(at, now, { addSuffix: true });
 }
 
-/** What the rail says of a step in each state. */
-export const railWord: Record<StepState, string> = {
-  working: 'at work',
-  'needs-human': 'asks you',
-  checking: 'being checked',
-  verified: 'verified',
-  unverified: 'done',
-  blocked: 'waits for you',
-  'awaiting-approval': 'waits for you',
-  exhausted: 'waits for you',
-  'over-budget': 'waits for you',
-  'budget-exhausted': 'waits for you',
-  denied: 'to try again',
-  unsigned: 'to try again',
-  failed: 'failed',
-  'failed-check': 'failed its check',
-  waiting: 'to come',
-  'waiting-for-slot': 'to come',
-  held: 'held',
-  cancelled: 'called off',
-  unreadable: 'unreadable',
-  unknown: 'unknown',
-};
-
 /** A run's steps as the rail draws them: each by its name and its state. */
 export const railStates = (
   steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>,
   cancelled: boolean,
   held: boolean,
-): Array<{ name: string; state: StepState }> => steps.map((step) => ({ name: step.name, state: stepState(step.status, cancelled, held) }));
+): Array<{ name: string; state: StepState; status: string }> =>
+  steps.map((step) => ({ name: step.name, state: stepState(step.status, cancelled, held), status: step.status }));
 
-/** What the rail says aloud: each step and its word, in the run's order: `design verified, land waits for you`, a step a
+/** What the rail says aloud: each step and its word, in the run's order: `design verified, land waits on you`, a step a
  * check verified told from one done on its own word. */
 export const railSaid = (
   steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'status'>>,
@@ -292,11 +214,11 @@ export const railSaid = (
   held: boolean,
 ): string =>
   railStates(steps, cancelled, held)
-    .map((step) => `${step.name} ${railWord[step.state]}`)
+    .map((step) => `${step.name} ${stateWordsOf(step.state, step.status).rail}`)
     .join(', ');
 
 /** A bar of the rail as a button says it: its step's name and the rail's word for its state, `implement, at work`. */
-export const barSaid = (name: string, state: StepState): string => `${name}, ${railWord[state]}`;
+export const barSaid = (name: string, state: StepState, status: string): string => `${name}, ${stateWordsOf(state, status).rail}`;
 
 /**
  * The parts of a date as a person reads it in `timeZone`, theirs by default: its year, its month in three letters and its day; each

@@ -29,6 +29,8 @@ const LOOP_ROOM = 70;
 export function unstartedRun(workflow: WorkflowListing): RunDetail {
   return {
     id: `${workflow.from}:${workflow.name}`,
+    kinds: [],
+    refresh: '',
     brief: '',
     decide: '',
     repo: '',

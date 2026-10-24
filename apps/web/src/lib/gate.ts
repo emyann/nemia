@@ -152,7 +152,7 @@ export function gateFacts(run: Pick<RunDetail, 'steps' | 'cost'>, decision: Deci
       ? `; a person accepted the work as it stands, with ${findings === 1 ? 'it' : 'them'} open: ${looping.accepted.message}`
       : null;
     const said = !closeout
-      ? `${looping.name} has not signed off`
+      ? `${looping.name} has yet to sign off`
       : output.again === false
         ? `${looping.name} asks no further round${findings ? `, and left ${findings} finding${findings === 1 ? '' : 's'}` : ''}`
         : findings !== null

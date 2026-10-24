@@ -25,7 +25,7 @@ export const AT_WORK = [
   { name: 'land', status: 'waiting' },
 ];
 
-/** A run whose second step its check refused. */
+/** A run whose second step failed its check. */
 export const REFUSED = [
   { name: 'design', status: 'verified ✓' },
   { name: 'implement', status: 'failed ✗ check (exit 1)' },

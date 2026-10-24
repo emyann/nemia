@@ -49,6 +49,9 @@ export const answerError: ErrorHandler = (err, c) => {
 /** The code this process runs, as the lease records it: an install's kind, folder, tag and commit, not its source; a checkout's folder. */
 const RELEASE = leaseRelease(runningRelease());
 
+/** What `GET /api/version` answers. */
+export type VersionAnswer = { version: string; release: typeof RELEASE };
+
 /**
  * Every service the api reads, live, over `env`: the settings read from it on each request (`ApiConfig`), the package's engine
  * (`Engine`) and the store's root, read from `env` (`StoreRoot`, `storeRootLayer`: `WF_ROOT`), an MCP asker and a quota asker with

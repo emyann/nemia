@@ -1,6 +1,7 @@
 /** The subscription's quota (`GET /api/quota`, apps/api/src/factory/quota.ts). */
 import { queryOptions } from '@tanstack/react-query';
 import { Schema } from 'effect';
+import { decodes } from './decodes.ts';
 import { get } from './read.ts';
 
 /**
@@ -11,14 +12,16 @@ import { get } from './read.ts';
 export type QuotaWindow = { key: string; label: string; usedPercentage: number; resetsAt: string | null; reset: boolean; marked: boolean };
 
 /** Decodes a `QuotaWindow`. */
-const QuotaWindowSchema = Schema.Struct({
-  key: Schema.String,
-  label: Schema.String,
-  usedPercentage: Schema.Number,
-  resetsAt: Schema.NullOr(Schema.String),
-  reset: Schema.Boolean,
-  marked: Schema.Boolean,
-}) satisfies Schema.Schema<QuotaWindow>;
+const QuotaWindowSchema = decodes<QuotaWindow>()(
+  Schema.Struct({
+    key: Schema.String,
+    label: Schema.String,
+    usedPercentage: Schema.Number,
+    resetsAt: Schema.NullOr(Schema.String),
+    reset: Schema.Boolean,
+    marked: Schema.Boolean,
+  }),
+);
 
 /** A list of windows, as a decoded answer holds it. */
 const QuotaWindowsSchema = Schema.mutable(Schema.Array(QuotaWindowSchema));
@@ -43,18 +46,20 @@ export type Quota = {
 };
 
 /** Decodes a `Quota`. */
-const QuotaSchema = Schema.Struct({
-  state: Schema.Literals(['fresh', 'asking', 'no-plan', 'unanswered', 'no-claude', 'timeout', 'failed', 'unknown']),
-  askedAt: Schema.NullOr(Schema.String),
-  ageMs: Schema.NullOr(Schema.Number),
-  againAt: Schema.NullOr(Schema.String),
-  subscription: Schema.NullOr(Schema.String),
-  windows: QuotaWindowsSchema,
-  last: Schema.NullOr(Schema.Struct({ askedAt: Schema.String, windows: QuotaWindowsSchema })),
-  keepMs: Schema.Number,
-  markAt: Schema.Number,
-  said: Schema.NullOr(Schema.String),
-}) satisfies Schema.Schema<Quota>;
+const QuotaSchema = decodes<Quota>()(
+  Schema.Struct({
+    state: Schema.Literals(['fresh', 'asking', 'no-plan', 'unanswered', 'no-claude', 'timeout', 'failed', 'unknown']),
+    askedAt: Schema.NullOr(Schema.String),
+    ageMs: Schema.NullOr(Schema.Number),
+    againAt: Schema.NullOr(Schema.String),
+    subscription: Schema.NullOr(Schema.String),
+    windows: QuotaWindowsSchema,
+    last: Schema.NullOr(Schema.Struct({ askedAt: Schema.String, windows: QuotaWindowsSchema })),
+    keepMs: Schema.Number,
+    markAt: Schema.Number,
+    said: Schema.NullOr(Schema.String),
+  }),
+);
 
 /**
  * The subscription's quota, read again every minute — the api asks Claude Code at most once a keep, however often it is read — and every

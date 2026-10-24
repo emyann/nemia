@@ -127,7 +127,7 @@ export default {
     );
     for (const [run, standing] of [
       [DIAMOND.orphan, 'waiting on you'],
-      [DIAMOND.cancelled, 'cancelled'],
+      [DIAMOND.cancelled, 'called off'],
       [DIAMOND.bottom, 'in flight'],
       [DIAMOND.running, 'in flight'],
       [DIAMOND.top, 'finished'],

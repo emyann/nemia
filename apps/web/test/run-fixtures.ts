@@ -510,7 +510,7 @@ export const waitingRun = (
   ...extra,
 });
 
-/** A run two revisions behind on one agent, with one step that already ran on the older one: what the run page draws the drift from. */
+/** A run behind on an agent, and on a skill a step already ran on the older one of: what the run page draws the drift from. */
 export const behind = (): RunDetail =>
   detail({
     kinds: [

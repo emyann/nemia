@@ -76,6 +76,9 @@ holds what every change needs.
   (`apps/docs/src/glossary.ts`). Read the table of the context you change before you name something there. A renamed word keeps its
   old spelling as `retired` on its row, and `tools/guards/test/glossary.test.ts` counts that spelling in each file under the table's
   paths, a count that only shrinks (`tools/guards/test/glossary.baseline.ts`).
+- **A field that says a state or a kind at a door is a closed union of its words, never `string`**: a `phase`, `status`, `state`,
+  `kind`, `type` or `reason` an entry of a package's `exports` or a type of the api reaches. A sentence a person reads is a `message`.
+  Held by `tools/guards/test/closed-state.test.ts`, through the TypeScript checker, whose baseline only shrinks.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.

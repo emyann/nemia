@@ -212,6 +212,8 @@ export {
 export type {
   Factory,
   FactoryCondition,
+  FactoryConditionReason,
+  FactoryConditionType,
   FactoryListing,
   FactoryTemplate,
   Hires,
@@ -540,7 +542,8 @@ export type { RunSummary, SummaryHow } from './summary/summary.verb.ts';
 export type { FinishedPage, FinishedRun, ListedRun, OpenRuns, RunClock, RunOutcome, StepCost, WaitingRun } from './runlist/runlist.verb.ts';
 export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from './revisions/revisions.ts';
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
-export { ledgerOf, topsOf } from './revisions/revisions.store.ts';
+export { ledgerOf } from './revisions/revisions.store.ts';
+export { driftNow } from './revisions/pin.verb.ts';
 export { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
 export type { ChatEvent, ChatFrom, Presence, StepState } from './chat/chat.ts';

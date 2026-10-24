@@ -74,6 +74,11 @@
       }
     },
     {
+      "term": "Revisions behind",
+      "meaning": "a Warning line about a run, `RevisionsBehind`, written while a pinned run's next filing would take other revisions than its pins: its note names each kind and name behind, and it is written once per drift.",
+      "type": "Reason"
+    },
+    {
       "term": "Run's line",
       "meaning": "a line of one run, or of one of its steps, naming each by id.",
       "type": "RunLine"

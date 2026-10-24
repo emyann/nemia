@@ -83,8 +83,9 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   `needsOf` (`summary/judged.verb.ts`) and the web's `stepState` still compare `needs-human`. A new runtime phase is translated in `listing` and
   `phaseOfView`; put a new word beside a phase (`waitingOf`), never into it.
 - **A new step status is `working` on the board until `stepState` knows it**.
-- **A revision answered for a kind nobody has resolved has no ledger entry**: compare against what a fresh resolve returns
-  (`refreshedNow`), never `topsOf` of what the record pins, or an edit reads as no drift.
+- **A revision answered for a kind nobody has resolved has no ledger entry, and the ledger's last entry is not what the files hold**:
+  compare against a fresh resolve (`driftNow`, which numbers without a write), by digest, never against the ledger's top, or an edit
+  reads as no drift and a reverted one as behind.
 - **A person's fact that stops a run's asks is read by `assess`**, not only by the verbs and the tick; a line that offers a verb says that
   verb's refusal itself (each producer reads `run.pruned`).
 - **A level-triggered ask cannot simply be deleted once acted on**: the verb it would let through refuses the state the deletion makes.

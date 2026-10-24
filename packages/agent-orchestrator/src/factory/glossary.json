@@ -17,6 +17,24 @@
       }
     },
     {
+      "term": "Condition type",
+      "meaning": "which condition the controller says of a factory made from a template: `Applied`, whether its base holds the template, or `ConflictsPending`, whether an upgrade waits on a person's choice. Its status is `True` or `False`, and the sentence a person reads is its `message`; written by `condition` in `packages/agent-orchestrator/src/applied/applied.verb.ts`.",
+      "type": "FactoryConditionType",
+      "see": {
+        "label": "Factories",
+        "href": "/factories/"
+      }
+    },
+    {
+      "term": "Condition reason",
+      "meaning": "why a factory's condition holds or not, one word: `Rendered`, `Upgraded`, `TemplateInvalid`, `VersionDrift`, `ParamsChanged`, `ContentChanged`, `VersionUnknown` or `UpgradePending` for `Applied`; `NoUpgrade`, `Merged` or `Conflicts` for `ConflictsPending`. A status file holding another word reads as none, and the next pass writes it again; the sentence is its `message`.",
+      "type": "FactoryConditionReason",
+      "see": {
+        "label": "Factories",
+        "href": "/factories/"
+      }
+    },
+    {
       "term": "Factory name",
       "meaning": "a factory's name: its file's in the store, without its extension, a lowercase slug of at most 40 characters.",
       "type": "FactoryName"

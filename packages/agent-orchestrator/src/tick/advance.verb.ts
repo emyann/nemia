@@ -223,7 +223,7 @@ export const unrecordedSteps = Effect.fn('unrecordedSteps')(function* (
  * `facts` are what the metrics record of the run's steps (`StepFact`): each of its tasks the pass reads settled and not counted before
  * (`settledOf`) with the waits they ended, each round granted, each gate wait not timed and each denied call not counted before
  * (`markedOnce`), and each number of the run's timeline once it is over (`timedOnce`); absent where there is none.
- * `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
+ * `waiting` names the runs whose landing this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
  * flight once this pass is done: in flight when the pass read it (`slotNeed`), or filed something — never for a run outside the cap
  * (`takesNoSlot`), whose filings are its own watching, not a run's work. `held` is the slot the cap held its roots at, on a pass that held
  * them.
@@ -624,7 +624,7 @@ const closeHeldOpen = Effect.fnUntraced(function* (run: Run, r: PassReads, close
 
 /**
  * Whether the run files its roots on this pass: the runs it waits on as they stand (`parent`), whether it has started, what it needs of a
- * slot (`slotNeed`), the slot it is held at, the steps it files, and the runs whose shipping it waits on (`waitsOf`).
+ * slot (`slotNeed`), the slot it is held at, the steps it files, and the runs whose landing it waits on (`waitsOf`).
  */
 type Admission = {
   parent: (id: string) => ParentRun;

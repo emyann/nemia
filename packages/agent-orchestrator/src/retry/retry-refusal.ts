@@ -230,11 +230,11 @@ function pendingRefusal(c: Judged): string | undefined {
   if (pending) {
     return `try ${next} of ${name} is already asked for (${modeWord(pending)}, at ${pending.at}), and the next tick honours it once. Wait for it: nemia ls ${run.id}.`;
   }
-  const shipping = back?.map((b) => asks.find((a) => a.step === b && a.try === tryOf(run, b) + 1)).find(Boolean);
-  if (shipping) {
+  const landing = back?.map((b) => asks.find((a) => a.step === b && a.try === tryOf(run, b) + 1)).find(Boolean);
+  if (landing) {
     return (
-      `try ${shipping.try} of ${shipping.step} is asked for (${modeWord(shipping)}, at ${shipping.at}): it does the act again on the work as it stands, and a send-back would take that try back. ` +
-      `Wait for it: nemia ls ${run.id} — or, if the work is what must change, delete that ask — retry-${shipping.step}-${shipping.try}, in the run's .asks directory — and send the work back: ${command} --message "<objection>".`
+      `try ${landing.try} of ${landing.step} is asked for (${modeWord(landing)}, at ${landing.at}): it does the act again on the work as it stands, and a send-back would take that try back. ` +
+      `Wait for it: nemia ls ${run.id} — or, if the work is what must change, delete that ask — retry-${landing.step}-${landing.try}, in the run's .asks directory — and send the work back: ${command} --message "<objection>".`
     );
   }
   if (stoppedAt?.name === name) {

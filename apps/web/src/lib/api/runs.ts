@@ -151,7 +151,7 @@ export type RunSummary = {
    * `waitingOnYou` as the CLI's `ls` names it after `→ waiting on you:`, one entry a step: its name, or for a step at its gate, `approve
    * plan`.
    */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /** What a person has to decide about the run's result (`RunToDecide`); null while there is nothing — which is every run still going. */
   toDecide: RunToDecide | null;
   /**
@@ -210,7 +210,7 @@ const RunSummarySchema = decodes<RunSummary>()(
     ),
     graph: RunGraphSchema,
     waitingOnYou: StringsSchema,
-    onYou: StringsSchema,
+    waitingOnYouWords: StringsSchema,
     toDecide: Schema.NullOr(RunToDecideSchema),
     unreadable: Schema.NullOr(Schema.String),
   }),

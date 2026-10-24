@@ -77,12 +77,12 @@ const stateOn = (row: WaitingRow, step: CodedStep): StepState => stepState(step,
  */
 export function waitOf(row: WaitingRow): Wait | null {
   const done = row.steps.filter((step) => ['verified', 'unverified'].includes(stateOn(row, step))).length;
-  if (row.holding?.onYou) return { kind: 'hold', step: null, done };
+  if (row.holding?.waitingOnYou) return { kind: 'hold', step: null, done };
   for (const step of row.steps) {
     const kind = kindOn(row, step);
     if (kind && row.waitingOnYou.includes(step.name)) return { kind, step: step.name, done };
   }
-  return row.waiting?.onYou ? { kind: 'after', step: null, done } : null;
+  return row.waiting?.waitingOnYou ? { kind: 'after', step: null, done } : null;
 }
 
 /**

@@ -46,7 +46,7 @@ import { instantWhole } from '../src/lib/instant.ts';
 import type { Point } from '../src/lib/layout.ts';
 
 /**
- * A run with one step per status, filed unless it is still waiting, and `status` and `moving` as the api put them; its `onYou`,
+ * A run with one step per status, filed unless it is still waiting, and `status` and `moving` as the api put them; its `waitingOnYouWords`,
  * `wf ls`'s words for who it waits on, is the steps `waitingOnYou` names unless `extra` gives it.
  */
 const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSummary => ({
@@ -90,7 +90,7 @@ const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSum
   })),
   graph: { roots: [], edges: [] },
   waitingOnYou: [],
-  onYou: extra.waitingOnYou ?? [],
+  waitingOnYouWords: extra.waitingOnYou ?? [],
   after: [],
   waiting: null,
   context: [],
@@ -609,7 +609,7 @@ const waitingOn = (onYou: boolean): RunSummary['waiting'] => ({
   advice: onYou
     ? `p was cancelled at ${cancelledAt}, and a cancelled run never lands — yours to resolve: wf cancel r-1, or start the work again without --after p`
     : 'nothing of r-1 is filed until wf decide says p has landed onto main; nothing to decide yet',
-  onYou,
+  waitingOnYou: onYou,
 });
 
 const at = (minutes: number) => new Date(Date.UTC(2026, 8, 14, 0, minutes)).toISOString();
@@ -619,7 +619,7 @@ const waitsOn = (...runs: string[]): RunSummary['waiting'] => ({
   runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })),
   word: `waiting on ${runs.join(', ')}`,
   advice: '',
-  onYou: false,
+  waitingOnYou: false,
 });
 
 /** What a person has to decide, as the api words it (`RunToDecide`): an ending step's gate, or a branch nobody merged. */
@@ -1007,7 +1007,7 @@ test("runClock and clockCounts: a card's and a row's clock, and what its hover s
         runs: [],
         word: 'waiting on 7a87',
         advice: 'nothing of 7fev is filed until wf decide says 7a87 has landed onto main',
-        onYou: false,
+        waitingOnYou: false,
       };
       const onRuns = runClock({ createdAt, startedAt: null, cancelledAt: null, waiting }, now, false);
       assert.deepEqual([onRuns.words, onRuns.at], ['waiting for 4h 29m', createdAt]);
@@ -1018,7 +1018,7 @@ test("runClock and clockCounts: a card's and a row's clock, and what its hover s
         'waiting for 4h 29m',
         'held for a slot, or its parents landed and the next pass yet to file it: nothing to name, and waiting all the same',
       );
-      const onYou = { createdAt, startedAt: null, cancelledAt: null, waiting: { ...waiting, onYou: true } };
+      const onYou = { createdAt, startedAt: null, cancelledAt: null, waiting: { ...waiting, waitingOnYou: true } };
       assert.equal(
         runClock(onYou, now, true).words,
         'waiting for 4h 29m',
@@ -1045,7 +1045,7 @@ const holdingOn = (onYou: boolean): NonNullable<RunSummary['holding']> => ({
   advice: onYou
     ? 'p was cancelled — yours to resolve: wf hold r-1 --off, or wf cancel r-1'
     : 'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p has landed; to go on before then: wf hold r-1 --off',
-  onYou,
+  waitingOnYou: onYou,
 });
 
 test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who it waits on', async (t) => {
@@ -1123,18 +1123,18 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
       id: 'ends',
       status: 'failed',
       waitingOnYou: ['ship'],
-      onYou: ['approve ship'],
+      waitingOnYouWords: ['approve ship'],
       toDecide: approve('ends', 'ship'),
     });
     assert.equal(waitsOnYou(ends), true, 'the step still waits at its gate');
     assert.deepEqual(onYouOf(ends), [], 'and nothing is left to name: the decision is the whole of it');
-    const both = { ...ends, waitingOnYou: ['tokens', 'ship'], onYou: ['tokens', 'approve ship'] };
+    const both = { ...ends, waitingOnYou: ['tokens', 'ship'], waitingOnYouWords: ['tokens', 'approve ship'] };
     assert.deepEqual(onYouOf(both), ['tokens'], "another step waiting on you is still named, beside the ending's own line");
     const ahead = run(['unverified · done'], {
       id: 'ahead',
       status: 'succeeded',
       waitingOnYou: ['implement'],
-      onYou: ['implement'],
+      waitingOnYouWords: ['implement'],
       toDecide: merge('ahead', 'wf/ahead/implement'),
     });
     assert.deepEqual(onYouOf(ahead), ['implement'], 'a branch nobody merged asks for no step, so nothing is filtered');
@@ -1156,10 +1156,18 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
   await t.test(
     "who a run waits on, on the Runs row, is `wf ls`'s words where the api gives them — `approve plan` — and the steps by name from an api that gives none, never a throw",
     () => {
-      const gated = run(['awaiting approval', 'waiting'], { status: 'failed', waitingOnYou: ['step-0'], onYou: ['approve step-0'] });
+      const gated = run(['awaiting approval', 'waiting'], {
+        status: 'failed',
+        waitingOnYou: ['step-0'],
+        waitingOnYouWords: ['approve step-0'],
+      });
       assert.deepEqual(onYouOf(gated), ['approve step-0']);
-      const { onYou: _onYou, ...before } = gated;
-      assert.deepEqual(onYouOf(before), ['step-0'], 'a list without `onYou` is read as the steps `waitingOnYou` names, not refused');
+      const { waitingOnYouWords: _words, ...before } = gated;
+      assert.deepEqual(
+        onYouOf(before),
+        ['step-0'],
+        'a list without `waitingOnYouWords` is read as the steps `waitingOnYou` names, not refused',
+      );
       assert.deepEqual(onYouOf({ ...before, waitingOnYou: [] }), []);
     },
   );
@@ -1214,7 +1222,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         run(['waiting'], {
           after: ['p'],
           waiting: waitingOn(false),
-          holding: { at: cancelledAt, runs: [], word: 'held until a person lifts it', advice: 'wf hold r-1 --off', onYou: true },
+          holding: { at: cancelledAt, runs: [], word: 'held until a person lifts it', advice: 'wf hold r-1 --off', waitingOnYou: true },
         }),
       ),
       false,
@@ -1311,7 +1319,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         id: 'ends',
         status: 'failed',
         waitingOnYou: ['ship'],
-        onYou: ['approve ship'],
+        waitingOnYouWords: ['approve ship'],
         toDecide: approve('ends', 'ship'),
         createdAt: at(0),
       }),
@@ -1342,7 +1350,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         status: 'awaiting approval',
         moving: false,
         waitingOnYou: ['plan'],
-        onYou: ['approve plan'],
+        waitingOnYouWords: ['approve plan'],
         toDecide: null,
         createdAt: at(0),
       }),
@@ -1351,7 +1359,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         status: 'waiting',
         moving: false,
         waitingOnYou: ['step-0'],
-        onYou: ['step-0'],
+        waitingOnYouWords: ['step-0'],
         toDecide: null,
         createdAt: at(1),
       }),
@@ -1360,7 +1368,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         status: 'cancelled',
         cancelledAt,
         waitingOnYou: ['step-0'],
-        onYou: ['step-0'],
+        waitingOnYouWords: ['step-0'],
         toDecide: null,
         createdAt: at(2),
       }),
@@ -1378,7 +1386,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
     );
     assert.equal(waitsOnYou(runs[2]), false, 'a cancelled run waits on nobody');
     assert.equal(standingOf(runs[0]), 'waiting on you');
-    const approved = { ...runs[0], status: 'running' as const, moving: true, waitingOnYou: [], onYou: [] };
+    const approved = { ...runs[0], status: 'running' as const, moving: true, waitingOnYou: [], waitingOnYouWords: [] };
     assert.deepEqual(
       floorRuns([approved], false).map((r) => r.id),
       ['gated'],
@@ -1397,16 +1405,22 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         id: 'gated',
         status: 'failed',
         waitingOnYou: ['plan'],
-        onYou: ['approve plan'],
+        waitingOnYouWords: ['approve plan'],
         toDecide: null,
         createdAt: at(0),
       }),
-      run(['succeeded · BLOCKED'], { id: 'blocked', status: 'failed', waitingOnYou: ['step-0'], onYou: ['step-0'], createdAt: at(1) }),
+      run(['succeeded · BLOCKED'], {
+        id: 'blocked',
+        status: 'failed',
+        waitingOnYou: ['step-0'],
+        waitingOnYouWords: ['step-0'],
+        createdAt: at(1),
+      }),
       run(['unverified · done', 'awaiting approval'], {
         id: 'ends',
         status: 'failed',
         waitingOnYou: ['ship'],
-        onYou: ['approve ship'],
+        waitingOnYouWords: ['approve ship'],
         toDecide: approve('ends', 'ship'),
         createdAt: at(2),
       }),
@@ -1416,7 +1430,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
         status: 'cancelled',
         cancelledAt,
         waitingOnYou: ['step-0'],
-        onYou: ['step-0'],
+        waitingOnYouWords: ['step-0'],
         createdAt: at(4),
       }),
       run([], { id: 'landed', status: 'succeeded', createdAt: at(5) }),

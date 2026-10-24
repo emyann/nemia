@@ -321,7 +321,7 @@ test('a person holds a run until another lands: the list, the page and the decis
         runs: [{ run: 'p-live', missing: false, cancelledAt: null, gone: [], landed: false }],
         word: 'held until p-live lands',
         advice: `nothing of ${GATE} is filed, and nothing is asked of you, until nemia decide says p-live has landed; to go on before then: nemia hold ${GATE} --off`,
-        onYou: false,
+        waitingOnYou: false,
       });
       assert.deepEqual(
         [runs.get('p-live')!.holdUntil, runs.get('p-live')!.holding],
@@ -337,7 +337,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       const runs = await listed();
       for (const id of HELD) {
         const api = runs.get(id)!;
-        assert.deepEqual([api.waitingOnYou, api.onYou, api.toDecide], [[], [], null], id);
+        assert.deepEqual([api.waitingOnYou, api.waitingOnYouWords, api.toDecide], [[], [], null], id);
         const page = await detail(id);
         assert.deepEqual(
           page.steps.map((s) => [s.approve, s.raise, s.asked]),
@@ -358,7 +358,7 @@ test('a person holds a run until another lands: the list, the page and the decis
         try {
           const run = (await listed()).get(id)!;
           assert.deepEqual(
-            [run.holdUntil, run.holding, run.onYou],
+            [run.holdUntil, run.holding, run.waitingOnYouWords],
             [[], null, onYou],
             `${id}: the rule, not the fixture: it waits on you once the hold is lifted`,
           );
@@ -442,12 +442,12 @@ test('a person holds a run until another lands: the list, the page and the decis
     "a hold that lifts only by a person's hand says so (`onYou`) — one naming no run, a run the store has none of, a cancelled run, a run whose branch is gone — and one on a run that may still land, or has, does not",
     async () => {
       const runs = await listed();
-      const onYou = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.holding!.onYou]));
+      const onYou = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.holding!.waitingOnYou]));
       assert.deepEqual(onYou, { live: false, landed: false, cancelled: true, gone: true, missing: true, none: true });
       for (const kind of Object.keys(ON)) {
         const holding = runs.get(`h-on-${kind}`)!.holding!;
         assert.equal(
-          holding.onYou,
+          holding.waitingOnYou,
           holding.advice.includes('yours to'),
           `${kind}: held to nemia decide's own words rather than a copy of its rule: its advice names the way out exactly when a person has to act`,
         );
@@ -582,7 +582,7 @@ test('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a han
       assert.deepEqual(await res.json(), { id: LIFT, lifted: true, hold: { at: HELD_AT, until: ['p-live'] } });
       assert.equal(fs.existsSync(holdFile(LIFT)), false);
       const run = (await listed()).get(LIFT)!;
-      assert.deepEqual([run.holdUntil, run.holding, run.onYou], [[], null, ['approve plan']]);
+      assert.deepEqual([run.holdUntil, run.holding, run.waitingOnYouWords], [[], null, ['approve plan']]);
       const page = await detail(LIFT);
       assert.deepEqual([page.holdUntil, page.holding], [[], null]);
       assert.equal(page.steps.find((s) => s.name === 'plan')!.approve !== null, true);

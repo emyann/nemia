@@ -52,7 +52,7 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
   })),
   graph: { roots: [], edges: [] },
   waitingOnYou: [],
-  onYou: [],
+  waitingOnYouWords: [],
   after: [],
   waiting: null,
   context: [],
@@ -69,7 +69,7 @@ const atGate = (id: string, extra: Partial<RunSummary> = {}): RunSummary => {
     status: 'awaiting approval',
     moving: false,
     waitingOnYou: ['build'],
-    onYou: ['approve build'],
+    waitingOnYouWords: ['approve build'],
   });
   return { ...base, steps: base.steps.map((step) => (step.name === 'build' ? { ...step, approve: 'approve build' } : step)), ...extra };
 };
@@ -83,7 +83,7 @@ const holdOn = (onYou: boolean): RunSummary['holding'] => ({
   runs: [{ run: 'p', missing: onYou, cancelledAt: null, gone: [], landed: false }],
   word: onYou ? 'held until p lands (no such run)' : 'held until p lands',
   advice: 'wf hold r --off',
-  onYou,
+  waitingOnYou: onYou,
 });
 
 /** What a run started after `p` waits on: a run that never lands without a person when `onYou`. */
@@ -91,7 +91,7 @@ const waitOn = (onYou: boolean): RunSummary['waiting'] => ({
   runs: [{ run: 'p', missing: false, cancelledAt: onYou ? '2026-10-01T00:00:00.000Z' : null, gone: [] }],
   word: onYou ? 'waiting on p (cancelled)' : 'waiting on p',
   advice: 'nothing to decide yet',
-  onYou,
+  waitingOnYou: onYou,
 });
 
 test("bellRows, bellHash: the waiting bar's rows, their order, what each waits for and where it opens", async (t) => {

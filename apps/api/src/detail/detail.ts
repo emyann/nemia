@@ -297,7 +297,7 @@ export type RunDetail = {
   read: RunRead | null;
   waitingOnYou: string[];
   /** As on `RunSummary`. */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /** As on `RunSummary` (`RunToDecide`). */
   toDecide: RunToDecide | null;
   /** The steps the run is gated at, in the order they run (`gatesOf`): those its workflow gates, and those it was started with. */
@@ -675,7 +675,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     tokens: runTokens(run, views),
     read: runRead(clock, steps, names),
     waitingOnYou: judged.waitingOnYou,
-    onYou: judged.onYou,
+    waitingOnYouWords: judged.waitingOnYouWords,
     toDecide: judged.toDecide,
     gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,

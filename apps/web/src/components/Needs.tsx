@@ -74,7 +74,7 @@ function NeedWords({ need }: { need: ReturnType<typeof needsOf>[number] }) {
  * the wait: in Claude Code, and never from here. A session the harness blocked is continued from here, as the CLI's `retry` continues it
  * (`Continue`); once that try is asked, the banner says what the tick does with it, in the CLI `ls`'s words: the step's note.
  *
- * Who it waits on is said as the CLI's `ls` says it after `→ waiting on you:` (`onYou`): a step's name, and for a step at its gate,
+ * Who it waits on is said as the CLI's `ls` says it after `→ waiting on you:` (`waitingOnYouWords`): a step's name, and for a step at its gate,
  * `approve plan`, linked to the step's section, where Approve and Send back are. Without the ending step whose gate the to-decide banner
  * says (`onYouOf`), which is above this one and names it: the CLI's `ls` does not ask for the same step twice. A run whose whole `waiting
  * on you` was that step has no banner here at all. A link to a step's section is a hash the browser scrolls to, and no navigation, or given
@@ -88,7 +88,9 @@ function NeedWords({ need }: { need: ReturnType<typeof needsOf>[number] }) {
 export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: string) => void }) {
   const needs = needsOf(run).filter((need) => need.kind !== 'approve');
   const said = onYouOf(run);
-  const asks = run.waitingOnYou.map((step, i) => ({ step, said: run.onYou[i] ?? step })).filter((one) => said.includes(one.said));
+  const asks = run.waitingOnYou
+    .map((step, i) => ({ step, said: run.waitingOnYouWords[i] ?? step }))
+    .filter((one) => said.includes(one.said));
   if (!asks.length && !needs.length) return null;
   const offers = offersOf(run);
   return (

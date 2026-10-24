@@ -320,8 +320,8 @@ function sliceOf(source: string, from: string, to: string): string {
   return source.slice(start, end);
 }
 
-/** Whether a banner's source draws what waits on a person from the yours container: `onYou`, then the form, across line breaks. */
-const onYouReadsYours = (banner: string): boolean => /\.onYou\s*\?\s*container\.yours\s*:/.test(banner);
+/** Whether a banner's source draws what waits on a person from the yours container: `waitingOnYou`, then the form, across line breaks. */
+const onYouReadsYours = (banner: string): boolean => /\.waitingOnYou\s*\?\s*container\.yours\s*:/.test(banner);
 
 test("the meanings of a state's colour: one thing each, read from the look's roles, never a hand-picked hue", async (t) => {
   await t.test(
@@ -399,8 +399,8 @@ test("the meanings of a state's colour: one thing each, read from the look's rol
         assert.equal(onYouReadsYours(banner), true, `${from} draws a wait on a person from container.yours`);
         assert.doesNotMatch(banner, /container\.(?:money|failure|alive)/, `${from} draws no other meaning`);
       }
-      assert.equal(onYouReadsYours('waiting.onYou\n  ? container.yours\n  : filled.grey'), true, 'across a line break');
-      assert.equal(onYouReadsYours('waiting.onYou ? container.money : filled.grey'), false, "an amount's amber is refused");
+      assert.equal(onYouReadsYours('waiting.waitingOnYou\n  ? container.yours\n  : filled.grey'), true, 'across a line break');
+      assert.equal(onYouReadsYours('waiting.waitingOnYou ? container.money : filled.grey'), false, "an amount's amber is refused");
       assert.equal(container.yours, 'bg-yours-container text-on-yours-container');
     },
   );

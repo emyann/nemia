@@ -178,7 +178,7 @@ test("a run at its ending's gate: `to decide` says what the ending would do on t
           ['ship', 'awaiting approval'],
         ],
       );
-      assert.deepEqual([detail.waitingOnYou, detail.onYou], [['ship'], ['approve ship']]);
+      assert.deepEqual([detail.waitingOnYou, detail.waitingOnYouWords], [['ship'], ['approve ship']]);
       assert.deepEqual(
         detail.steps.map((s) => [s.name, s.spec?.workspace ?? null]),
         [

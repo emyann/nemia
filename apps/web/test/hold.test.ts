@@ -26,7 +26,7 @@ test('holdable, holdCandidates: which run is offered a hold, and which runs a ho
   await t.test(
     'REFUSED: a run that cannot be held by what it says of itself is offered none — a folder run, called off, pruned, held, succeeded',
     () => {
-      const holding = { at: 'now', runs: [], word: 'held until r-2 lands', advice: '', onYou: false };
+      const holding = { at: 'now', runs: [], word: 'held until r-2 lands', advice: '', waitingOnYou: false };
       const cases: Array<[string, Partial<Run>]> = [
         ['a folder run', { place: 'folder', repo: null }],
         ['a repository run with no repository said', { repo: null }],

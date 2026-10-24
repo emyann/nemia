@@ -97,14 +97,14 @@ export const spentOf = (spend: Spend): Spent | null =>
  *
  * `runs` are the package's `waitsOf`: each run in `after` that has not landed, as its own `nemia decide` says it, and, for one that never
  * will without a person, why — the store has no such run (`missing`), it was cancelled, or a result branch it recorded is gone. `word` is
- * what `nemia ls` prints on each root (`waitWord`), and `advice` the line `nemia decide` prints under it (`waitAdvice`). `onYou` is whether
+ * what `nemia ls` prints on each root (`waitWord`), and `advice` the line `nemia decide` prints under it (`waitAdvice`). `waitingOnYou` is whether
  * a person has to act — some run of `runs` never lands on its own — which is when `nemia ls` prints `→ waiting on you:` before the advice.
  */
 export type RunWaiting = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
   word: string;
   advice: string;
-  onYou: boolean;
+  waitingOnYou: boolean;
 };
 
 /**
@@ -115,7 +115,7 @@ export type RunWaiting = {
  * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has landed and the next
  * tick has not yet lifted the hold, each of them `landed`. `word` is what `nemia ls` prints under the run (`holdWord`), with the person's
  * why and name when the hold has them, and `advice` the line
- * `nemia decide` prints under it (`holdAdvice`). `onYou` is whether the hold lifts only by a person's hand: it names no run, or a run it
+ * `nemia decide` prints under it (`holdAdvice`). `waitingOnYou` is whether the hold lifts only by a person's hand: it names no run, or a run it
  * names never lands on its own — the rule `nemia ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every
  * verb a step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`) and
  * nothing is offered.
@@ -125,7 +125,7 @@ export type RunHolding = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; landed: boolean }>;
   word: string;
   advice: string;
-  onYou: boolean;
+  waitingOnYou: boolean;
 };
 
 /**
@@ -183,7 +183,7 @@ export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | nul
     runs: waits.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [] })),
     word: waitWord(waits),
     advice: waitAdvice(run, waits),
-    onYou: waits.some(neverLands),
+    waitingOnYou: waits.some(neverLands),
   };
 }
 
@@ -209,7 +209,7 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
     })),
     word: holdWord(holds, run.hold),
     advice: holdAdvice(run, holds),
-    onYou: holdNeedsYou(holds),
+    waitingOnYou: holdNeedsYou(holds),
   };
 }
 
@@ -288,7 +288,7 @@ type Judged = {
   beside: ReadonlyMap<string, { waits?: string; denied?: string }>;
   waitingOnYou: string[];
   /** `waitingOnYou` in `nemia ls`'s words (`onYouWords`), in the page's order: `approve plan` for a step at its gate. */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /**
    * What a person has to decide about the result (`toDecide`), as `listing` reads it off the branch standings it was given; null while
    * there is nothing.
@@ -465,7 +465,7 @@ export const judge = Effect.fn('judge')(function* (
   const waiting = runWaitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);
   const { hold: _, ...unheld } = run;
-  const due = holding && !holding.onYou ? read.assessOf(unheld) : { ready, check, retry, round };
+  const due = holding && !holding.waitingOnYou ? read.assessOf(unheld) : { ready, check, retry, round };
   const tickReads = Boolean(run.workflow ?? folder);
   const waitingOnYou = names.filter((name) => read.waitingOnYou.includes(name));
   return {
@@ -475,13 +475,14 @@ export const judge = Effect.fn('judge')(function* (
     roundDue: new Set(read.steps.filter((s) => s.roundDue).map((s) => s.name)),
     beside: new Map(read.steps.map(({ name, waits, denied }) => [name, { waits, denied }])),
     waitingOnYou,
-    onYou: onYouWords({ steps: read.steps, waitingOnYou }),
+    waitingOnYouWords: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),
     status,
     ...runDoor(runCodes(status, holding !== null, read.steps)),
     moving:
       inFlight(run, read.phaseOf).length > 0 ||
-      (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
+      (tickReads &&
+        ((due.ready.length > 0 && !waiting?.waitingOnYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
     waiting,
     holding,
     asked: new Map(retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),

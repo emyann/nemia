@@ -357,7 +357,7 @@ export type RunDetail = RunCodes & {
   read: RunRead | null;
   waitingOnYou: string[];
   /** As on `RunSummary`. */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /** As on `RunSummary` (`RunToDecide`). */
   toDecide: RunToDecide | null;
   /** The steps the run is gated at, in the order they run: those its workflow gates, and those it was started with. */
@@ -650,7 +650,7 @@ const RunDetailSchema = decodes<RunDetail>()(
     tokens: Schema.NullOr(RunTokensSchema),
     read: Schema.NullOr(RunReadSchema),
     waitingOnYou: StringsSchema,
-    onYou: StringsSchema,
+    waitingOnYouWords: StringsSchema,
     toDecide: Schema.NullOr(RunToDecideSchema),
     gates: StringsSchema,
     warning: Schema.NullOr(Schema.String),

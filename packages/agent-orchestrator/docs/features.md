@@ -2782,10 +2782,10 @@ Left for later:
 The second of the three cards. The api says a held run is held, not waiting on you, in `wf ls`'s and `wf decide`'s words:
 
 - **The list and the detail** carry `holdUntil`, the runs the hold names, and `holding`: each run as `holdsOf` reads it, `word`
-  (`holdWord`), `advice` (`holdAdvice`), and `onYou`, true when only a person can lift the hold: it names no run, or a run that is
+  (`holdWord`), `advice` (`holdAdvice`), and `waitingOnYou`, true when only a person can lift the hold: it names no run, or a run that is
   missing, cancelled or whose branch is gone. A run nobody holds, or one called off, carries `[]` and `null`. The runs a hold names are
   read with `seenBy`, as `--after` reads its runs, so no harness is asked anything more.
-- **Nothing waits on you**: `waitingOnYou`, `onYou` and `toDecide` are empty, as `listing` says, and no step is offered an approval or a
+- **Nothing waits on you**: `waitingOnYou`, `waitingOnYouWords` and `toDecide` are empty, as `listing` says, and no step is offered an approval or a
   raise (`costOf` reads the hold beside the cancel and the prune).
 - **The decision is `{ holding }`**, and `{ waiting, holding }` for a run started `--after` and held as well. It offers no command, since
   `decide` offers nothing on a held run, so `choicesOf` has nothing to offer, and `heldLater`'s words carry no `wf` verb.
@@ -2816,7 +2816,7 @@ The third of the three cards. The board says a held run is held, in the api's wo
 Where it departs from the plan:
 
 - **A held run only a person can lift is not in flight; it waits on you**, as a run whose `--after` runs never ship does. `assess`
-  calls every held run `running`, so `inFlight` leaves out `holding.onYou` by name, and `waitsOnYou` reads it. The plan left this unsaid.
+  calls every held run `running`, so `inFlight` leaves out `holding.waitingOnYou` by name, and `waitsOnYou` reads it. The plan left this unsaid.
 - **The e2e holds GATED until HELD, not until the diamond's running run.** `holdRefusal` refuses a hold across repositories, and those
   two runs are on different ones.
 
@@ -3402,7 +3402,7 @@ What was built:
 - **A run's detail** carries `gates` (`gatesOf`), and each step a `gate`, null for a step with none: `{ awaiting, approval }`. `awaiting` is
   `wf ls`'s word `awaiting approval`. `approval` is `approvalOf`'s `{ try, at, message }` for the try the step is on.
 - **The list and the detail** carry the need: `approve` on each step (`StepNeeds`), `approve plan` in `onYouWords`' words, for a step at
-  its gate that waits on you. It is null once the step is approved or sent back, and on a run called off. Each run also carries `onYou`:
+  its gate that waits on you. It is null once the step is approved or sent back, and on a run called off. Each run also carries `waitingOnYouWords`:
   `waitingOnYou` as `wf ls` names it after `→ waiting on you:`.
 - **The decision's commands** offer `approve` and `send back` for a step waiting at its gate, parsed from `gateLines`. Without them a gated
   run with no result branch yet said `None yet: the run is still moving` while it waited on you. The e2e's first screenshot showed it.
@@ -3415,8 +3415,8 @@ What was built:
 - **The word.** `awaiting approval` is a state of its own on the board (`awaiting-approval`): amber, and a human gate on the canvas, whose
   node says `waiting on you · approve plan`. Before, it fell through to `working`, and the node drew a spinner on a step nobody runs.
 - **The Factory and Runs.** The card lists the need `approve plan` (`Need` kind `approve`, amber). The Runs row says
-  `waiting on you: approve plan`, off `onYou`. Both counts of runs waiting on you include it, since `waitingOnYou` already named the step.
-- **An api started before this change.** From review, round 2: its detail has no `onYou`, and its steps no `approve` or `gate`. The run
+  `waiting on you: approve plan`, off `waitingOnYouWords`. Both counts of runs waiting on you include it, since `waitingOnYou` already named the step.
+- **An api started before this change.** From review, round 2: its detail has no `waitingOnYouWords`, and its steps no `approve` or `gate`. The run
   page drew Approve on every step (`undefined !== null`), aimed at a route that api does not have, and the banner and the Runs row threw.
   `withGraph` now refuses such a detail with its restart words. The gate is offered only when `approve` has words (`gateOffered`). The list
   is read tolerantly instead (`onYouOf`: the step names, as the board said them before), because the Factory polls it and a refusal
@@ -3428,7 +3428,7 @@ What was measured:
   agent-runtime 326 (317 passed, 9 skipped), unchanged by this run. `npm run typecheck` and `npm run build` clean.
 - `apps/api/src/asks/gate.test.ts`, new, 7 tests, at shipped defaults over a seeded store:
   - the detail's `gates` and every step's `gate`, including a gated step not signed off;
-  - `approve` and `onYou` on both endpoints, compared with `onYouWords` over `list`, and none on a run called off;
+  - `approve` and `waitingOnYouWords` on both endpoints, compared with `onYouWords` over `list`, and none on a run called off;
   - the decision's two commands;
   - the guard refusing three sites, three hosts and three content types;
   - bodies refused (400), a run and a step not there (404), and empty or blank words (422), each compared with `approve()`'s own sentence;
@@ -3995,7 +3995,7 @@ What the board calls:
   is one to decide.
 - **`decide(e, id)`** carries `standings: BranchStanding[]` and `toDecide`, beside what it carried.
 - **A gated ending's step** is `awaiting approval` with no task filed: a board that reads a step's task to decide whether to show it must
-  show this one all the same. `onYou` says `approve ship`, through `onYouWords`, and Approve on the run page reaches it — `needsOf` reads
+  show this one all the same. `waitingOnYouWords` says `approve ship`, through `onYouWords`, and Approve on the run page reaches it — `needsOf` reads
   the word, not the task, and `taskOfStep` answers for a step with none — so the api needed no change for the verb. It is also what tells
   such a gate from §6's on the board: a gate awaiting approval with no task is an ending's (`actsOnly` in apps/web).
 - **`resultSteps(steps)`** is the run's result, which `apps/api/src/decide/decision.ts` reads for a run's branches: `terminalSteps` there named, for a

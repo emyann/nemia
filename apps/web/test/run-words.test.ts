@@ -41,14 +41,14 @@ const DONE = [
 
 /** A row of three done steps and `land` saying `word` with its codes, which waits on a person. */
 const landing = (word: Word, extra: Partial<RunSummary> = {}): RunSummary =>
-  summary([...DONE, ['land', word]], { status: 'failed', moving: false, waitingOnYou: ['land'], onYou: [COMMAND], ...extra });
+  summary([...DONE, ['land', word]], { status: 'failed', moving: false, waitingOnYou: ['land'], waitingOnYouWords: [COMMAND], ...extra });
 
-const holding = { at: '2026-09-30T05:00:00.000Z', runs: [], word: `held: ${COMMAND}`, advice: COMMAND, onYou: true };
+const holding = { at: '2026-09-30T05:00:00.000Z', runs: [], word: `held: ${COMMAND}`, advice: COMMAND, waitingOnYou: true };
 const waiting = {
   runs: [{ run: 'r-0', missing: false, cancelledAt: '2026-09-30T05:00:00.000Z', gone: [] }],
   word: 'waiting on r-0 (cancelled)',
   advice: COMMAND,
-  onYou: true,
+  waitingOnYou: true,
 };
 
 /** One row of the light answer per kind of wait, the sentence it says, and the words of its card's button. */
@@ -178,7 +178,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
       const atGate = summary([...DONE, ['land', 'awaiting approval']], { status: 'running', moving: false, holding, waitingOnYou: [] });
       assert.deepEqual(waitOf(atGate), { kind: 'hold', step: null, done: 3 });
       assert.equal(waitSentence(atGate), 'You hold this run. It moves once you lift the hold.');
-      const liftsItself = { ...atGate, holding: { ...holding, onYou: false } };
+      const liftsItself = { ...atGate, holding: { ...holding, waitingOnYou: false } };
       assert.equal(waitOf(liftsItself), null, 'a hold the tick lifts waits on nobody');
       assert.equal(waitOf({ ...liftsItself, waiting })?.kind, 'after', 'and such a run that waits on a run nobody will ship says that');
     },
@@ -210,7 +210,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
   await t.test(
     'REFUSED: a wait on runs that may still ship is no wait on a person, and a step that waits comes before a run waited on',
     () => {
-      const onRuns = summary([['design', 'waiting on r-0']], { moving: true, waiting: { ...waiting, onYou: false } });
+      const onRuns = summary([['design', 'waiting on r-0']], { moving: true, waiting: { ...waiting, waitingOnYou: false } });
       assert.equal(waitOf(onRuns), null);
       assert.equal(waitOf(landing('unsigned', { waiting }))?.kind, 'unsigned');
       assert.equal(waitOf(landing('unsigned', { waiting, holding }))?.kind, 'hold');

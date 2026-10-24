@@ -79,7 +79,7 @@ const RUN: WaitingRun = {
   steps: [step('design', VERIFIED, 0), step('implement', VERIFIED, 1), step('review', VERIFIED, 2), step('land', APPROVAL, 3)],
   graph: { roots: [], edges: [] },
   waitingOnYou: ['land'],
-  onYou: ['approve land'],
+  waitingOnYouWords: ['approve land'],
   toDecide: null,
   unreadable: null,
   wallMs: 7_740_000,

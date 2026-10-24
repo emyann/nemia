@@ -293,6 +293,17 @@
       ]
     },
     {
+      "term": "Waiting on you",
+      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name.",
+      "type": "RunWaiting",
+      "retired": [
+        {
+          "spelling": "onYou",
+          "card": "4c: whether a wait is the person's is `waitingOnYou`, and its words `waitingOnYouWords`"
+        }
+      ]
+    },
+    {
       "term": "Waiting on",
       "meaning": "a wait on a thing, reason `Waiting` with what it waits on (`on`: a run, the limit, the checkout or the pause), phase pending; an assessment names the steps waiting on the repository's checkout (`waitingOnCheckout`, as `waitsOnCheckout` says of a step) and on the store's pause (`waitingOnPause`). Never called held, which is a person's hold alone.",
       "type": "WaitOn",

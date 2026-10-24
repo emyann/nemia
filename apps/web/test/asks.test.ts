@@ -317,7 +317,13 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
   await t.test(
     'REFUSED: nothing is offered on a run a person holds — not Continue for a session the harness blocked, which the api names whatever waits on you, nor anything the api would still name — since the package refuses every one of these verbs on a held run',
     () => {
-      const holding = { at: '2026-09-23T07:00:00.000Z', runs: [], word: 'held until a-1 lands', advice: 'wf hold r --off', onYou: false };
+      const holding = {
+        at: '2026-09-23T07:00:00.000Z',
+        runs: [],
+        word: 'held until a-1 lands',
+        advice: 'wf hold r --off',
+        waitingOnYou: false,
+      };
       const held = step('held', 'needs-human', { blockedByHarness: true });
       const blocked = step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' });
       assert.equal(

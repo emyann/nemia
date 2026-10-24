@@ -155,7 +155,7 @@ function runWith(note: string | null): RunDetail {
     tokens: null,
     read: null,
     waitingOnYou: ['review'],
-    onYou: ['review'],
+    waitingOnYouWords: ['review'],
     toDecide: null,
     gates: [],
     warning: null,
@@ -254,7 +254,7 @@ function runOf(
   { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null },
 ): RunDetail {
   const run = runWith(note);
-  return { ...run, cancelledAt, waitingOnYou, onYou: waitingOnYou, steps: [{ ...run.steps[0], ...coded(status) }] };
+  return { ...run, cancelledAt, waitingOnYou, waitingOnYouWords: waitingOnYou, steps: [{ ...run.steps[0], ...coded(status) }] };
 }
 
 /**
@@ -580,7 +580,7 @@ function summaryRun(): RunSummary {
       edges: [after('implement', 'review'), after('review', 'respond'), after('implement', 'respond'), after('tokens', 'theme')],
     },
     waitingOnYou: ['theme'],
-    onYou: ['approve theme'],
+    waitingOnYouWords: ['approve theme'],
     toDecide: { kind: 'approve', step: 'theme', back: [] },
   } as unknown as RunSummary;
 }
@@ -2732,7 +2732,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
     waitingFor: null,
     lastLine: null,
   };
-  const run: RunDetail = { ...base, waitingOnYou: ['implement'], onYou: ['implement'], steps: [asks, base.steps[0]] };
+  const run: RunDetail = { ...base, waitingOnYou: ['implement'], waitingOnYouWords: ['implement'], steps: [asks, base.steps[0]] };
   const html = bannerMarkup(run);
 
   assert.match(html, /^<section aria-label="Waiting on you"/);
@@ -2863,7 +2863,7 @@ const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<Run
   const base = runOf('awaiting approval', { waitingOnYou: ['review'] });
   return {
     ...base,
-    onYou: ['approve review'],
+    waitingOnYouWords: ['approve review'],
     gates: ['review'],
     ...run,
     steps: [
@@ -2902,12 +2902,12 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
   assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/, 'an ending not filed runs');
   assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no session yet`');
   assert.doesNotMatch(html, /running now/, 'no spinner: nobody runs a step at its gate');
-  assert.equal(gateDrawn(nodeMarkup(atGate({ approve: null }, { waitingOnYou: [], onYou: [], cancelledAt: at }))), false);
+  assert.equal(gateDrawn(nodeMarkup(atGate({ approve: null }, { waitingOnYou: [], waitingOnYouWords: [], cancelledAt: at }))), false);
 });
 
 test("the banner says who the run waits on as `wf ls` does — `approve review`, linked to the step's section, where Approve is — beside a step it names by its name", () => {
   const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
-  const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
+  const run = atGate({}, { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'] });
   const both = bannerMarkup({ ...run, steps: [run.steps[0], theme] });
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
   assert.equal(
@@ -2927,7 +2927,7 @@ test("the banner says who the run waits on as `wf ls` does — `approve review`,
 
 test("in the frame's bar, the banners name a step by a button that opens the step's bar, where a hash would point nowhere", () => {
   const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
-  const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
+  const run = atGate({}, { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'] });
   const onStep = () => {};
   const needs = renderToStaticMarkup(
     createElement(
@@ -3121,7 +3121,7 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
     ...run,
     status: 'failed',
     waitingOnYou: ['ship'],
-    onYou: ['approve ship'],
+    waitingOnYouWords: ['approve ship'],
     toDecide: toShip,
     gates: ['ship'],
     graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'ship', kind: 'after' }] },
@@ -3182,7 +3182,12 @@ test("the ending step's own gate is not asked for twice: the to-decide banner sa
   const run = endingRun();
   assert.equal(bannerMarkup(run), '', 'the whole of what it waits on is the decision');
   const theme = { ...run.steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), closeout: null, approve: null, gate: null };
-  const both = bannerMarkup({ ...run, steps: [...run.steps, theme], waitingOnYou: ['ship', 'theme'], onYou: ['approve ship', 'theme'] });
+  const both = bannerMarkup({
+    ...run,
+    steps: [...run.steps, theme],
+    waitingOnYou: ['ship', 'theme'],
+    waitingOnYouWords: ['approve ship', 'theme'],
+  });
   assert.match(both, /^<section aria-label="Waiting on you"/, 'another step waiting on you is still said, beside the decision');
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
   assert.equal(
@@ -3436,7 +3441,7 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
 /** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`); null for none. */
 const waitingOnRuns = (runs: string[]): RunSummary['waiting'] =>
   runs.length
-    ? { runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })), word: '', advice: '', onYou: false }
+    ? { runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })), word: '', advice: '', waitingOnYou: false }
     : null;
 
 test('the edges between cards are drawn only for live waits: dashed, out of one handle into the other, never moving — and a line of what the focused card reads, faint and dotted, with no arrow', () => {
@@ -4426,7 +4431,7 @@ const HOLDING = {
   word: 'held until p-1 lands',
   advice:
     'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p-1 has landed; to go on before then: wf hold r-1 --off',
-  onYou: false,
+  waitingOnYou: false,
 };
 
 test('on a run a person holds, a step at its gate is drawn held — no human gate, no waiting on you — and said held, and a step at work is drawn at work', () => {
@@ -4455,7 +4460,7 @@ test("a held run's rail draws its gate and the steps not filed held, and its wor
   const held = {
     ...summaryRun(),
     waitingOnYou: [],
-    onYou: [],
+    waitingOnYouWords: [],
     toDecide: null,
     holdUntil: ['p-1'],
     holding: HOLDING,
@@ -4475,7 +4480,7 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
           runs: held.map((h) => ({ ...h, missing: false, cancelledAt: null, gone: [] })),
           word: '',
           advice: '',
-          onYou: false,
+          waitingOnYou: false,
         }
       : null,
   });
@@ -5626,7 +5631,10 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
   const { RunBar } = await import('../src/components/RunBar.tsx');
   const { titleOf: runTitle } = await import('../src/lib/factory.ts');
   const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
-  const base = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'], brief: 'Make the **floor** clear.' });
+  const base = atGate(
+    {},
+    { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'], brief: 'Make the **floor** clear.' },
+  );
   const run = { ...base, steps: [base.steps[0], theme] };
   const html = await pagedWith(createElement(RunBar, { run: run.id }), [[['runs', run.id], run]]);
   assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);

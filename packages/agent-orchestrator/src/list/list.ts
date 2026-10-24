@@ -567,19 +567,19 @@ export const shownStatus = (s: Pick<Listing['steps'][number], 'status' | 'waits'
 const NEEDS_HUMAN = 'needs-human';
 
 /**
- * Each row of a step waiting on a person (`onYou`) whose closeout asks questions, with how many (`asks`); every other as it is. None on a
+ * Each row of a step waiting on a person (`waitingOnYou`) whose closeout asks questions, with how many (`asks`); every other as it is. None on a
  * run cancelled, pruned or held, which waits on no one.
  */
 function asking(
   rows: Listing['steps'],
   steps: readonly Workflow[],
   run: Pick<Run, 'cancelledAt' | 'pruned' | 'hold'>,
-  onYou: readonly string[],
+  waitingOnYou: readonly string[],
   closeoutOf: (step: string) => Closeout | { error: string } | undefined,
 ): Listing['steps'] {
   const waits = !run.cancelledAt && !run.pruned && !run.hold;
   return rows.map((row) => {
-    const step = waits && onYou.includes(row.name) ? steps.find((s) => s.name === row.name) : undefined;
+    const step = waits && waitingOnYou.includes(row.name) ? steps.find((s) => s.name === row.name) : undefined;
     const asks = step ? askedQuestions(step, closeoutOf(row.name)).flatMap((a) => a.questions).length : 0;
     return asks ? { ...row, asks } : row;
   });
@@ -619,10 +619,10 @@ export const onYouWords = (l: {
 function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }: Listing, result: readonly string[]): string[] {
   const lines: string[] = [];
   if (toDecide) lines.push(`   → to decide: ${toDecideWords(run, toDecide)}`);
-  const onYou = onYouWords({ steps, waitingOnYou }).filter(
+  const waitingWords = onYouWords({ steps, waitingOnYou }).filter(
     (said) => !(toDecide?.kind === 'approve' && said === `approve ${toDecide.step}`),
   );
-  if (onYou.length) lines.push(`   → waiting on you: ${onYou.join(', ')}  —  nemia decide ${run.id}`);
+  if (waitingWords.length) lines.push(`   → waiting on you: ${waitingWords.join(', ')}  —  nemia decide ${run.id}`);
   if (waiting.some((w) => w.missing || w.cancelledAt || w.gone?.length)) lines.push(`   → waiting on you: ${waitAdvice(run, waiting)}`);
   if (holding) {
     const never = !holding.length || holding.some((w) => w.missing || w.cancelledAt || w.gone?.length);

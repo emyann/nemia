@@ -142,13 +142,13 @@ export const RunTokensSchema = decodes<RunTokens>()(
 /**
  * Mirrors `RunWaiting` in agent-orchestrator: what a run started `--after` still waits on, in the package's words. `runs` are each
  * run not landed, and why one never will without a person (`missing`, `cancelledAt`, `gone`); `word` is what the CLI's `ls` prints on its
- * roots — `waiting on a-1x2y (cancelled)` — and `advice` the line the CLI's `decide` prints under it; `onYou` whether a person has to act.
+ * roots — `waiting on a-1x2y (cancelled)` — and `advice` the line the CLI's `decide` prints under it; `waitingOnYou` whether a person has to act.
  */
 export type RunWaiting = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
   word: string;
   advice: string;
-  onYou: boolean;
+  waitingOnYou: boolean;
 };
 
 /** Decodes a `RunWaiting`. */
@@ -161,7 +161,7 @@ export const RunWaitingSchema = decodes<RunWaiting>()(
     ),
     word: Schema.String,
     advice: Schema.String,
-    onYou: Schema.Boolean,
+    waitingOnYou: Schema.Boolean,
   }),
 );
 
@@ -169,7 +169,7 @@ export const RunWaitingSchema = decodes<RunWaiting>()(
  * Mirrors `RunHolding` in agent-orchestrator: a person's hold on a run (the CLI's `hold <run> --until <run>`), in the package's
  * words. `at` is when it was put; `runs` each run it names that has not landed, and why one never will without a person — or, in the
  * moment every one has landed and the next tick has not yet lifted the hold, each of them `landed`. `word` is what the CLI's `ls` prints
- * (`held until a-1x2y lands`), `advice` the line the CLI's `decide` prints under it, which names the CLI's `hold <run> --off`; `onYou`
+ * (`held until a-1x2y lands`), `advice` the line the CLI's `decide` prints under it, which names the CLI's `hold <run> --off`; `waitingOnYou`
  * whether only a person's hand lifts it. While it stands no step waits on you and nothing is offered: every verb that would release work is
  * refused.
  */
@@ -178,7 +178,7 @@ export type RunHolding = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; landed: boolean }>;
   word: string;
   advice: string;
-  onYou: boolean;
+  waitingOnYou: boolean;
 };
 
 /** Decodes a `RunHolding`. */
@@ -198,7 +198,7 @@ export const RunHoldingSchema = decodes<RunHolding>()(
     ),
     word: Schema.String,
     advice: Schema.String,
-    onYou: Schema.Boolean,
+    waitingOnYou: Schema.Boolean,
   }),
 );
 

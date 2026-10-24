@@ -407,7 +407,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         /** Neither step it froze waits on the other: every step is a root, as on the run's page. */
         graph: { roots: ['implement', 'review'], edges: [] },
         waitingOnYou: [],
-        onYou: [],
+        waitingOnYouWords: [],
         /** Called off: nothing to decide about a result nobody is waiting for. */
         toDecide: null,
         /** Every task of it reads, or has no journal at all: judged. */
@@ -462,7 +462,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         tokens: null,
         read: null,
         waitingOnYou: ['implement'],
-        onYou: ['implement'],
+        waitingOnYouWords: ['implement'],
         /** Failed at implement: not a run at its result, so there is nothing about the result to decide. */
         toDecide: null,
         /** Gated at no step: no gate to wait at. */

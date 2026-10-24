@@ -126,8 +126,8 @@ export type RunSummary = {
    * fan-out as failed once one step is final without letting its followers run, while a sibling still works.
    *
    * A run waiting on runs moves: the tick files its roots once they land. Not one waiting on a run that never lands without a
-   * person — no such run, a cancelled one, a result branch gone (`RunWaiting.onYou`): nothing the tick reads will change on its own.
-   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.onYou`), and files nothing until then.
+   * person — no such run, a cancelled one, a result branch gone (`RunWaiting.waitingOnYou`): nothing the tick reads will change on its own.
+   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.waitingOnYou`), and files nothing until then.
    */
   moving: boolean;
   /**
@@ -192,7 +192,7 @@ export type RunSummary = {
    * `waitingOnYou` as `nemia ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and
    * for a step at its gate, what is asked of you, `approve plan`.
    */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /**
    * What a person has to decide about the run's result, when the run is at it and nobody has (`RunToDecide`); null while there is nothing.
    */
@@ -266,7 +266,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     })),
     graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: judged.waitingOnYou,
-    onYou: judged.onYou,
+    waitingOnYouWords: judged.waitingOnYouWords,
     toDecide: judged.toDecide,
     unreadable: null,
   };
@@ -346,7 +346,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     })),
     graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: [],
-    onYou: [],
+    waitingOnYouWords: [],
     toDecide: null,
     unreadable: said,
   };

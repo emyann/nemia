@@ -85,8 +85,14 @@
     },
     {
       "term": "Waiting on you",
-      "meaning": "`waitingOnYou`: the steps of a run that wait on a person, in order.",
-      "type": "RunDetail"
+      "meaning": "`waitingOnYou`: the steps of a run that wait on a person, in order; `waitingOnYouWords`, the same steps as `nemia ls` names them (`approve plan` for a step at its gate); and, on a run's `--after` wait and its hold, `waitingOnYou` whether only a person ends it.",
+      "type": "RunDetail",
+      "retired": [
+        {
+          "spelling": "onYou",
+          "card": "4c: the words of what waits on you are `waitingOnYouWords`, and whether a wait is yours `waitingOnYou`"
+        }
+      ]
     }
   ]
 }

@@ -63,7 +63,7 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
     tokens: null,
     read: null,
     waitingOnYou: [],
-    onYou: [],
+    waitingOnYouWords: [],
     toDecide: null,
     gates: [],
     warning: null,

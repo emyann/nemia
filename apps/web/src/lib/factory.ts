@@ -21,16 +21,16 @@ import { ENDED } from './words.ts';
  * finished", or on Runs.
  *
  * A run started `--after` runs that have not landed is in flight while each may still land: it moves, since the tick files its roots when
- * they do, and its card is a ghost until it starts (`waitsOnRuns`). Not once one never will without a person (`waiting.onYou`) — no such
+ * they do, and its card is a ghost until it starts (`waitsOnRuns`). Not once one never will without a person (`waiting.waitingOnYou`) — no such
  * run, a cancelled one, a branch gone — though `assess`, which knows nothing of the gate, still calls it running: nothing of it moves until
  * a person acts, and it waits on them.
  *
  * So is a run a person holds until runs land (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
  * steps say, and the tick lifts the hold when those runs land, though nothing of it is filed before then. Not once only a person lifts it
- * (`holding.onYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
+ * (`holding.waitingOnYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
  */
 export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & Held): boolean =>
-  run.moving || (run.status === 'running' && !run.waiting?.onYou && !run.holding?.onYou);
+  run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou);
 
 /**
  * The runs of the light answer as one list: those that wait on a person, then those in flight, each run once. Every run the board calls
@@ -51,11 +51,11 @@ export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide 
 /**
  * Whether the run waits on a person: a step does (`waitingOnYou`) — at its gate anywhere in the run, or signed off blocked — or a run it
  * waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for, either way — or a hold on it only a person lifts
- * (`holding.onYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on nobody,
+ * (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on nobody,
  * whatever its steps last said.
  */
 export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
-  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou) || Boolean(run.holding?.onYou));
+  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
 
 /**
  * Whether a run waits on runs, and on nothing else: started `--after` runs not landed, each of which may still land, with nothing of it
@@ -67,16 +67,16 @@ export const waitsOnRuns = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'
 
 /**
  * Who a run waits on, as the CLI's `ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's
- * `onYou`; and for a run given without `onYou`, the steps by name (`waitingOnYou`).
+ * `waitingOnYouWords`; and for a run given without `waitingOnYouWords`, the steps by name (`waitingOnYou`).
  *
  * Without the ending step whose gate the to-decide line already says, as the CLI's `ls` prints it (cli/main.ts): that line is above, it
  * names the step and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the
  * whole of what is asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
  */
 export const onYouOf = (
-  run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readonly string[]; toDecide?: RunToDecide | null },
+  run: Pick<RunSummary, 'waitingOnYou'> & { waitingOnYouWords?: readonly string[]; toDecide?: RunToDecide | null },
 ): readonly string[] => {
-  const said = run.onYou ?? run.waitingOnYou;
+  const said = run.waitingOnYouWords ?? run.waitingOnYou;
   const decide = toDecideOf(run);
   return decide?.kind === 'approve' ? said.filter((one) => one !== `approve ${decide.step}`) : said;
 };

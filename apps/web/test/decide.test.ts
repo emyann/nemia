@@ -233,7 +233,7 @@ test("decidableRun, decisionStamp: when a run's decision is asked for and read a
   await t.test(
     'a decision is read again when a hold is written, lifted, or its runs land — the hold is what the api answers for a held run',
     () => {
-      const holding = (word: string) => ({ at: '2026-09-23T07:00:00.000Z', runs: [], word, advice: '', onYou: false });
+      const holding = (word: string) => ({ at: '2026-09-23T07:00:00.000Z', runs: [], word, advice: '', waitingOnYou: false });
       const unheld = decisionStamp(fanOut('running (working)'));
       const held = decisionStamp({ ...fanOut('running (working)'), holding: holding('held until a-1 lands') });
       assert.notEqual(held, unheld, 'a hold written');

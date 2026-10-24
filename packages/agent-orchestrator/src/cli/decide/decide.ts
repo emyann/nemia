@@ -312,38 +312,38 @@ function printRefusals(run: Decided['run'], decision: Awaiting): void {
  * verified, the ending's wait for the checkout, and what the next tick does once more.
  */
 function printStops({ run, overBudgetLine, offers }: Decided, decision: Awaiting, heldOut: string): void {
-  const onYou = run.pruned ? '' : ', waiting on you';
-  if (decision.awaitingAnswer.length) console.log(`  BLOCKED${onYou}: ${decision.awaitingAnswer.join(', ')}`);
+  const onYouNote = run.pruned ? '' : ', waiting on you';
+  if (decision.awaitingAnswer.length) console.log(`  BLOCKED${onYouNote}: ${decision.awaitingAnswer.join(', ')}`);
   if (decision.exhausted.length)
     console.log(
-      `  ROUNDS EXHAUSTED${onYou}: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`,
+      `  ROUNDS EXHAUSTED${onYouNote}: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`,
     );
   if (overBudgetLine) console.log(`  ${overBudgetLine}`);
   if (decision.budgetExhausted.length)
     console.log(
-      `  BUDGET EXHAUSTED${onYou}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`,
+      `  BUDGET EXHAUSTED${onYouNote}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`,
     );
   if (decision.denied.length)
     console.log(
-      `  DENIED${onYou}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`,
+      `  DENIED${onYouNote}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`,
     );
-  printAwaitingApproval(run, decision.awaitingApproval, onYou);
+  printAwaitingApproval(run, decision.awaitingApproval, onYouNote);
   if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
   if (heldOut) console.log(heldOut);
   if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
 }
 
 /** The gated steps waiting for approval: those that signed off at their gate, then the ending that has not run. */
-function printAwaitingApproval(run: Decided['run'], awaitingApproval: string[], onYou: string): void {
+function printAwaitingApproval(run: Decided['run'], awaitingApproval: string[], onYouNote: string): void {
   const handedOn = awaitingApproval.filter((name) => run.steps[name]?.taskId);
   const unrun = awaitingApproval.filter((name) => !run.steps[name]?.taskId);
   if (handedOn.length)
     console.log(
-      `  AWAITING APPROVAL${onYou}: ${handedOn.join(', ')}  — signed off at its gate; nothing after it ${run.pruned ? 'was filed, and pruned, it cannot be approved' : 'is filed until you approve it, or send it back'}`,
+      `  AWAITING APPROVAL${onYouNote}: ${handedOn.join(', ')}  — signed off at its gate; nothing after it ${run.pruned ? 'was filed, and pruned, it cannot be approved' : 'is filed until you approve it, or send it back'}`,
     );
   if (unrun.length)
     console.log(
-      `  AWAITING APPROVAL${onYou}: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run${run.pruned ? ', and pruned, it cannot be approved' : ', and your approval is what runs it'}`,
+      `  AWAITING APPROVAL${onYouNote}: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run${run.pruned ? ', and pruned, it cannot be approved' : ', and your approval is what runs it'}`,
     );
 }
 

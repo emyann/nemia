@@ -147,14 +147,14 @@ export function StepTiles({
           const step = byName.get(name);
           if (!step) return null;
           const state = stepState(step, cancelled, held);
-          const onYou = run.waitingOnYou.includes(name);
-          const need = needOf(step, onYou, cancelled);
+          const yours = run.waitingOnYou.includes(name);
+          const need = needOf(step, yours, cancelled);
           const read = details.get(name);
           const attempt = read
             ? (attemptLine(read.attempts, isLive(state), now) ?? (read.taskId === null ? 'not filed yet' : 'no session yet'))
             : null;
           const cost = read ? costText(read) : null;
-          const gated = onYou && isGate(state, cancelled);
+          const gated = yours && isGate(state, cancelled);
           return (
             <AriaButton
               key={pill.id}

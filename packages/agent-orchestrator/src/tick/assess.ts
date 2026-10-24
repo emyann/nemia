@@ -30,7 +30,7 @@ export type Assessment = {
   check: string[];
   /** Steps to try again, and how: a check `retries:` still covers, or a person's `nemia retry`. File these. */
   retry: Retry[];
-  /** Loops to go round again: a looping step that said `again: true` with rounds left, or a person's `nemia round`. File these. */
+  /** Loops to go round again: a looping step that said `again: true` with rounds left, or a person's `nemia retry --round`. File these. */
   round: Round[];
   /** Steps that cannot run, because something they wait on stops what follows it (`stopsFollowers`). */
   unreachable: string[];
@@ -90,7 +90,7 @@ export type Assessment = {
  * @param verdictOf What each step's current check exited with, read only for a check that did not pass (`refusedCheck`). Left out, no
  *   check has refused, so no try of `retries:` is due.
  * @param asks What people asked for with `nemia retry`, and the run has not consumed yet.
- * @param roundAsks What people asked for with `nemia round`, and the run has not consumed yet.
+ * @param roundAsks What people asked for with `nemia retry --round`, and the run has not consumed yet.
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): what makes a person's try of such a step due, to
  *   stop it first.
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, no step is over.

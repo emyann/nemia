@@ -1411,7 +1411,7 @@ function seedLoop(id: string, round: number, again: boolean) {
   writeRun({ ...r2, id, workflowDir: path.join(NOWHERE, 'no-such-workflow'), workflow: looped, steps });
 }
 
-/** A person's ask, as `nemia retry` and `nemia round` leave one: a file of its own beside the run's record, named for what it asks. */
+/** A person's ask, as `nemia retry` and `nemia retry --round` leave one: a file of its own beside the run's record, named for its ask. */
 function askFor(id: string, name: string, ask: object) {
   const dir = path.join(root, 'runs', `${id}.asks`);
   fs.mkdirSync(dir, { recursive: true });
@@ -1732,7 +1732,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
           ['review'],
           [
             ['implement', 'unverified · done', 'round 3 of 3'],
-            ['review', 'rounds exhausted', 'round 3 of 3, and it asked again — once more: nemia round r-30 review'],
+            ['review', 'rounds exhausted', 'round 3 of 3, and it asked again — once more: nemia retry r-30 review --round'],
           ],
           'at its cap, and it asked again: a person decides, and no tick files a thing',
         ],
@@ -1743,7 +1743,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
           [],
           [
             ['implement', 'unverified · done', 'round 3 of 3'],
-            ['review', 'rounds exhausted', 'round 4 asked (nemia round) — the next tick files implement'],
+            ['review', 'rounds exhausted', 'round 4 asked (nemia retry --round) — the next tick files implement'],
           ],
           'a person asked for round 4: the next tick files it, and nobody is waited on',
         ],
@@ -1819,7 +1819,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
           true,
           [],
           [
-            ['implement', 'succeeded · BLOCKED', 'try 2 asked (--nudge) — the next tick files it'],
+            ['implement', 'succeeded · BLOCKED', 'try 2 asked (--continue) — the next tick files it'],
             ['review', 'pending', null],
           ],
           'signed off blocked, and a person asked for another try: the next tick files it, and nobody is waited on',

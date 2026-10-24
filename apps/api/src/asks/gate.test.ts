@@ -144,7 +144,7 @@ const approveRefuses = async (step: string, message?: string, run = R): Promise<
 };
 
 /** What POST …/approve answers when it takes an approval (202). */
-type Approved = { try: number; at: string; message: string | null; file: string };
+type Approved = { step: string; try: number; at: string; message: string | null; file: string };
 const detail = async (id = R) => (await (await app().request(`/api/runs/${id}`)).json()) as RunDetail;
 const commandsOf = async (id = R): Promise<DecideCommand[]> =>
   ((await (await app().request(`/api/runs/${id}/decision`)).json()) as Decidable).commands;
@@ -375,14 +375,14 @@ test('a person approves a gate on the board: the need on the list and the detail
   );
 
   await s.test(
-    "an approval as the board sends it is the package's: 202 with the try, when, the words and its file — the file as `nemia approve` writes it, the record untouched",
+    "an approval as the board sends it is the package's: 202 with the step, the try, when, the words and its file — the file as `nemia approve` writes it, the record untouched",
     async () => {
       const res = await approveOver('plan', { message: 'Ship the second reading.' });
       assert.equal(res.status, 202, await res.clone().text());
       took = (await res.json()) as Approved;
       assert.deepEqual(
         { ...took, at: undefined },
-        { try: 1, at: undefined, message: 'Ship the second reading.', file: approvalFile(R, 'plan', 1) },
+        { step: 'plan', try: 1, at: undefined, message: 'Ship the second reading.', file: approvalFile(R, 'plan', 1) },
       );
       assert.ok(!Number.isNaN(Date.parse(took.at)), took.at);
       assert.deepEqual(JSON.parse(fs.readFileSync(approvalFile(R, 'plan', 1), 'utf8')), {
@@ -504,7 +504,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
 
   await s.test('its approval is refused while the send-back is asked for (409), and nothing more is written', async () => {
     const error = await refusedWith(await approveOver('plan', { message: 'Ship it.' }, BOARD, id), 409, 'asked for');
-    assert.ok(error.startsWith('try 2 of plan is already asked for (--nudge, at '), error);
+    assert.ok(error.startsWith('try 2 of plan is already asked for (--continue, at '), error);
     assert.equal(error, await approveRefuses('plan', 'Ship it.', id));
     assert.deepEqual(asked(id), ['retry-plan-2']);
   });

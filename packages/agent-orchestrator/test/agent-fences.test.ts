@@ -3424,8 +3424,8 @@ test('REFUSED: a command of the fence reclassed, an ask rule of the fence taken 
 test('REFUSED to run unasked: an approval, a round, an accept, a raised cap and a retry of what waits ask by her admission, whatever the person allows', () => {
   const answers = [
     'nemia approve r-1 design',
-    'nemia round r-1 --message m',
-    'nemia accept r-1 design',
+    'nemia retry r-1 --round --message m',
+    'nemia approve r-1 review --message m',
     'nemia retry r-1 design',
     'nemia retry r-1 check --budget 5',
     'nemia retry r-9 check',

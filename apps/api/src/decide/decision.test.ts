@@ -496,8 +496,8 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
           .filter((c: { label: string }) => c.label !== 'land it' && c.label !== 'drop it')
           .map(({ label, command, step }: DecideCommand) => ({ label, command, step })),
         [
-          { label: 'once more', command: 'nemia round r-d9 review', step: 'review' },
-          { label: 'accept', command: 'nemia accept r-d9 review --message "<why>"', step: 'review' },
+          { label: 'once more', command: 'nemia retry r-d9 review --round', step: 'review' },
+          { label: 'accept', command: 'nemia approve r-d9 review --message "<why>"', step: 'review' },
           { label: 'once more', command: 'nemia retry r-d9 implement', step: 'implement' },
         ],
         'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
@@ -511,7 +511,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
       assert.ok(accept?.said, JSON.stringify(body.commands));
       assert.match(
         accept.said,
-        /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia accept r-d9 review --message "<why>"$/,
+        /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia approve r-d9 review --message "<why>"$/,
       );
 
       const stepsOf = async () => (await detailOf('r-d9')).steps;

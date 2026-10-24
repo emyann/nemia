@@ -826,7 +826,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
       status: 'stopped',
     });
     assert.match(stopped, /was stopped before it signed off/);
-    assert.match(stopped, /`nemia retry --nudge`/);
+    assert.match(stopped, /`nemia retry --continue`/);
     assert.doesNotMatch(stopped, /What the check said/, 'no check, nothing it said');
   });
   await t.test("the run's sign-off nudge is told in its owner's words, pinned; a new session is told who filed it", () => {
@@ -985,7 +985,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
           via: 'session',
           phase: 'waiting',
           branch: null,
-          note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
+          note: 'try 2 asked (--continue) — stopping its blocked session, then the tick files it',
         },
         [],
       ],
@@ -1039,7 +1039,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
           reason: 'Running',
           phase: 'running',
           branch: null,
-          note: 'try 2 asked (--nudge) — stopping its session, then the tick files it',
+          note: 'try 2 asked (--continue) — stopping its session, then the tick files it',
         },
         [],
       ],
@@ -1071,7 +1071,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       assert.deepEqual(assess(STEPS, r, stopped, nothingSigned, asked, () => undefined, [askFor(2)], [], blockedOf).retry, [
         { step: 'implement', try: 2, mode: 'nudge', by: 'ask' },
       ]);
-    assert.equal(noteOf('stopped').note, 'try 2 asked (--nudge) — the next tick files it');
+    assert.equal(noteOf('stopped').note, 'try 2 asked (--continue) — the next tick files it');
   });
   await t.test('a refused check `retries:` covers is due with no stop', () => {
     const r1 = run({}, { steps: { implement: { taskId: 't1', check: { taskId: 'c1' } }, review: { taskId: null } } });
@@ -1131,7 +1131,7 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
       via: 'session',
       phase: 'waiting',
       branch: null,
-      note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
+      note: 'try 2 asked (--continue) — stopping its blocked session, then the tick files it',
       waits: 'waiting for a permission prompt',
     });
   });
@@ -1158,7 +1158,7 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
       verdictOf: () => 'unfinished',
       asks: [answered],
     });
-    assert.equal(l.steps[0].note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
+    assert.equal(l.steps[0].note, 'try 2 asked (--continue, with your answer) — the next tick files it');
   });
   const nudged = onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'nudge' }], 'c1');
   await t.test('a try a person answered says so on `nemia ls`, read off the ask, never the record', () => {
@@ -1245,12 +1245,13 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
       const before = briefOf(told);
       const after = briefOf(told, text);
       assert.doesNotMatch(before, /Your answer|--message/, 'a try without one: no empty section');
-      const who = `A person asked for this try: \`nemia retry --${mode}\`.`;
+      const flag = mode === 'nudge' ? 'continue' : mode;
+      const who = `A person asked for this try: \`nemia retry --${flag}\`.`;
       const where = resumed
         ? "This is the last try's session, continued. Finish the work, then sign off again."
         : 'read the change, not an account of it.';
       const expected = before
-        .replace(who, `A person asked for this try: \`nemia retry --${mode} --message\`, with what they said below.`)
+        .replace(who, `A person asked for this try: \`nemia retry --${flag} --message\`, with what they said below.`)
         .replace(where, `${where}\n\n## Your answer\n\n\`\`\`text\n${text}\n\`\`\``);
       assert.notEqual(expected, before);
       assert.equal(after, expected, 'the sentence on whose word names the message, the section after where the step is, nothing else');

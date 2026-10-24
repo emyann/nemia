@@ -19,7 +19,7 @@ not an account of it.
 
 ## Merge main
 
-A person asked for this (`nemia merge`): the work no longer merges cleanly onto `main`, which moved since. Merge it in,
+A person asked for this (`nemia refresh --base`): the work no longer merges cleanly onto `main`, which moved since. Merge it in,
 at the commit their trial merge read:
 
     git merge def4567890

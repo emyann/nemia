@@ -1,13 +1,13 @@
 /**
  * `assess`, `listing`, `decision` and a brief on a loop's rounds and a step's budget. A loop: `again: true` with rounds left files the
- * next, at the cap a person decides — `nemia round` once more, or `nemia accept` the work as it stands — and from round 2 the target
- * owes its replies; what its steps are told (`composeBrief` of each round: the findings handed to the target as data, the replies handed
- * to a new review, the words of an acceptance to the step after the loop) and the closeout its target is filed with. A `budget:` across
- * tries: over it a step is held for a person, who raises the cap with `--budget` above what it spent, and ended by its harness at it a
- * step reads budget exhausted; what a person is told of spend and budget (`nemia ls`' costs, `nemia decide`'s cost line, what a step
+ * next, at the cap a person decides — `nemia retry --round` once more, or `nemia approve` the work as it stands — and from round 2 the
+ * target owes its replies; what its steps are told (`composeBrief` of each round: the findings handed to the target as data, the replies
+ * handed to a new review, the words of an acceptance to the step after the loop) and the closeout its target is filed with. A `budget:`
+ * across tries: over it a step is held for a person, who raises the cap with `--budget` above what it spent, and ended by its harness at it
+ * a step reads budget exhausted; what a person is told of spend and budget (`nemia ls`' costs, `nemia decide`'s cost line, what a step
  * blocked or broken past its budget is named for and offered, what a try past a budget is told). Where a loop meets a budget: `again:
- * true` files no round while a step of the loop is over its budget, `nemia round --budget` lets it go round, an accepted loop is over
- * nobody's budget, and a pruned run is offered neither. Pure: no disk, no engine, no clock.
+ * true` files no round while a step of the loop is over its budget, `nemia retry --round --budget` lets it go round, an accepted loop is
+ * over nobody's budget, and a pruned run is offered neither. Pure: no disk, no engine, no clock.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -299,7 +299,7 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
       l.steps.map((s) => [s.status, s.note]),
       [
         ['verified ✓', 'round 3 of 3'],
-        ['rounds exhausted', 'round 3 of 3, and it asked again — once more: nemia round r-1 review'],
+        ['rounds exhausted', 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round'],
         ['pending', undefined],
       ],
     );
@@ -310,8 +310,8 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
     assert.ok(d.kind === 'awaiting', d.kind);
     assert.deepEqual([d.outcome, d.exhausted, d.failed, d.awaitingAnswer, d.unsigned], ['waiting', ['review'], [], [], []]);
     assert.deepEqual(roundLines(LOOP, r, d), [
-      'review: it asked for round 4, and `rounds: 3` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia round r-1 review',
-      'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  nemia accept r-1 review --message "<why>"',
+      'review: it asked for round 4, and `rounds: 3` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia retry r-1 review --round',
+      'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  nemia approve r-1 review --message "<why>"',
     ]);
     assert.deepEqual(retryLines(LOOP, r, d, ALL_SUCCEEDED, said, asked), [], 'not a try: its work is signed');
   });
@@ -320,8 +320,8 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
     names(
       tried,
       'review asked for another round on the last one `rounds: 3` allows',
-      'nemia round r-1 review',
-      'nemia accept r-1 review --message "<why>"',
+      'nemia retry r-1 review --round',
+      'nemia approve r-1 review --message "<why>"',
     );
   });
   await t.test('`rounds: 1`: the first round is the last', () => {
@@ -331,7 +331,7 @@ test('REFUSED at the cap: `again: true` on round 3 of 3 files nothing and reads 
   });
 });
 
-test("a person's `nemia round` takes an exhausted loop once more, once", async (t) => {
+test("a person's `nemia retry --round` takes an exhausted loop once more, once", async (t) => {
   const said = saidIn(3, true);
   const none = () => undefined;
   await t.test('the ask for the next round files it, and nobody is waited on', () => {
@@ -339,7 +339,7 @@ test("a person's `nemia round` takes an exhausted loop once more, once", async (
       { step: 'review', target: 'implement', round: 4, by: 'ask' },
     ]);
     const l = listedInRound(inRound(3), said, { verdictOf: none, asks: [], roundAsks: [roundAskFor(4)] });
-    assert.deepEqual([l.steps[1].note, l.waitingOnYou], ['round 4 asked (nemia round) — the next tick files implement', []]);
+    assert.deepEqual([l.steps[1].note, l.waitingOnYou], ['round 4 asked (nemia retry --round) — the next tick files implement', []]);
   });
   await t.test('not the next round, or a loop not out of rounds: nothing is due', () => {
     assert.deepEqual(assess(LOOP, inRound(3), ALL_SUCCEEDED, said, asked, none, [], [roundAskFor(5)]).round, []);
@@ -353,7 +353,7 @@ test("a person's `nemia round` takes an exhausted loop once more, once", async (
   });
 });
 
-test("a person's `nemia accept` ends a loop out of rounds on their word, as if it had said `again: false`", async (t) => {
+test("a person's `nemia approve` ends a loop out of rounds on their word, as if it had said `again: false`", async (t) => {
   const said = saidIn(3, true);
   const r = inRound(3, acceptedTry(3));
   await t.test('keyed by the try it was given on; the loop reads over, the step after it filed, the run running', () => {
@@ -612,7 +612,7 @@ test('composeBrief of a round for the target: the findings, as data, and not the
   await t.test("a round past the cap on a person's word says so", () => {
     assert.match(
       round(inRound(3), 3, 4, 'ask', true),
-      /^## Round 4, past rounds: 3\n\nreview asked for another round after the 3 its `rounds:` allows, and a person said once more \(`nemia round`\)\./,
+      /^## Round 4, past rounds: 3\n\nreview asked for another round after the 3 its `rounds:` allows, and a person said once more \(`nemia retry --round`\)\./,
     );
   });
 });
@@ -695,7 +695,7 @@ test('composeBrief after an accepted loop: `## Accepted`, then `## From review` 
     const brief = composeBrief(LOOP[2], inRound(3, acceptedTry(3)), LOOP, said);
     assert.match(brief, /\n## Accepted\n/);
     assert.match(brief, /review judged this work and asked for another round after the 3 `rounds: 3` allows\./);
-    assert.match(brief, /\(`nemia accept`, try 3, at 2026-09-20T14:05:00\.000Z\)/);
+    assert.match(brief, /\(`nemia approve`, try 3, at 2026-09-20T14:05:00\.000Z\)/);
     assert.ok(brief.includes(ENOUGH));
     assert.match(brief, /\n## From review\n/);
     assert.ok(brief.includes('a producer with no findings reads as done'));
@@ -848,7 +848,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget', async (t) => {
   await t.test('an ask left waiting without a raise is named; one that carries enough is waited for', () => {
     names(
       refusal({ mode: 'nudge', budget: 10 }, [askFor(3)]),
-      'try 3 of implement is asked for (--nudge, at ',
+      'try 3 of implement is asked for (--continue, at ',
       'without a --budget above $4.25',
       '$4.25 of its $3 budget',
       'retry-implement-3',
@@ -912,7 +912,7 @@ test('a step blocked under its cap takes a `--budget` above it, not past its cap
     assert.deepEqual(due([{ ...askFor(2), budget: 20 }]), []);
     names(
       refusal({ mode: 'nudge', budget: 40 }, [{ ...askFor(2), budget: 20 }]),
-      'try 2 of implement is asked for (--nudge, at ',
+      'try 2 of implement is asked for (--continue, at ',
       'with --budget 20, not above $20',
       'retry-implement-2',
       '.asks',
@@ -930,7 +930,7 @@ test('a step blocked under its cap takes a `--budget` above it, not past its cap
     ]);
     names(
       left,
-      'try 2 of implement is asked for (--nudge, at ',
+      'try 2 of implement is asked for (--continue, at ',
       'with --budget 10',
       'no `budget:`',
       'retry-implement-2',
@@ -1259,7 +1259,7 @@ test('retrySection: a try past a budget is told why its last try ended, and that
   await t.test('unsigned, past its cap: why it ended, then the budget reached and raised', () => {
     assert.match(
       brief('unsigned', 10),
-      /^\n## Try 2\n\nThe last try ended without the closeout the run asked for, [^\n]*\nAnd this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap\.\nA person asked for this try: `nemia retry --nudge --budget 10`, raising this step's budget to \$10\./,
+      /^\n## Try 2\n\nThe last try ended without the closeout the run asked for, [^\n]*\nAnd this step's tries had together cost its budget or more, so the run filed nothing more for it until a person raised the cap\.\nA person asked for this try: `nemia retry --continue --budget 10`, raising this step's budget to \$10\./,
     );
   });
   for (const [status, sentence] of [
@@ -1389,7 +1389,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
         ['over budget $4.25 of $3', undefined],
         [
           'over budget — implement $4.25 of $3',
-          'round 1 of 3, and it asked again, past a budget — once more: nemia round r-1 review --budget <amount>',
+          'round 1 of 3, and it asked again, past a budget — once more: nemia retry r-1 review --round --budget <amount>',
         ],
         ['pending', undefined],
       ],
@@ -1405,7 +1405,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
       'OVER BUDGET, waiting on you: implement ($4.25 of $3), review (held: its round would file implement again, which has cost $4.25 of its $3 budget)  — the run files nothing more for them on its own; nothing after them ran',
     );
     assert.deepEqual(roundLines(BUDGETED_LOOP, r, d, spent), [
-      'review: it asked for round 2, and implement has cost $4.25 of its $3 budget. Its findings are below. Once more, its cap raised above $4.25 — implement continued, then a new review:  nemia round r-1 review --budget <amount>',
+      'review: it asked for round 2, and implement has cost $4.25 of its $3 budget. Its findings are below. Once more, its cap raised above $4.25 — implement continued, then a new review:  nemia retry r-1 review --round --budget <amount>',
     ]);
     assert.deepEqual(retryLines(BUDGETED_LOOP, r, d, ALL_SUCCEEDED, said, asked, spent), []);
   });
@@ -1428,7 +1428,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
       'implement did its work',
       'past its budget',
       "a person's call, not another try",
-      'nemia round r-1 review --budget <amount>.',
+      'nemia retry r-1 review --round --budget <amount>.',
     );
   });
   for (const under of [loopSpends({ i1: 2.5 }), () => undefined] as SpendOf[]) {
@@ -1460,7 +1460,7 @@ test('a round asked past a budget holds no step of its loop on the pass before i
       words: l.steps.map((s) => s.status),
     };
   };
-  await t.test('after `nemia round --budget`: the round due, nothing over budget, nobody waited on, nothing offered', () => {
+  await t.test('after `nemia retry --round --budget`: the round due, nothing over budget, nobody waited on, nothing offered', () => {
     const raised = seen([{ ...roundAskFor(2), budget: 10 }]);
     assert.deepEqual(
       raised.a.round.map((x) => [x.step, x.raise]),
@@ -1473,7 +1473,7 @@ test('a round asked past a budget holds no step of its loop on the pass before i
     assert.deepEqual(raised.l.waitingOnYou, []);
     assert.deepEqual(
       [raised.l.steps[1].note, raised.l.steps.map((s) => s.cost)],
-      ['round 2 asked (nemia round --budget 10) — the next tick files implement', ['$4.25', '$0.50', undefined]],
+      ['round 2 asked (nemia retry --round --budget 10) — the next tick files implement', ['$4.25', '$0.50', undefined]],
     );
     assert.deepEqual(raised.d, { kind: 'running', waiting: ['review'] });
     assert.deepEqual([overBudgetLine(BUDGETED_LOOP, r, raised.d, spent), roundLines(BUDGETED_LOOP, r, raised.d, spent)], [undefined, []]);
@@ -1518,22 +1518,22 @@ test('at the cap and past a budget: rounds exhausted, its once more asking for `
     const d = decidedInLoop(BUDGETED_LOOP, r, said, { spent });
     assert.deepEqual(d.kind === 'awaiting' && [d.exhausted, d.overBudget], [['review'], []]);
     assert.deepEqual(roundLines(BUDGETED_LOOP, r, d, spent), [
-      'review: it asked for round 4, and `rounds: 3` are spent, and implement has cost $3.50 of its $3 budget. Its findings are below. Once more, its cap raised above $3.50 — implement continued, then a new review:  nemia round r-1 review --budget <amount>',
-      'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  nemia accept r-1 review --message "<why>"',
+      'review: it asked for round 4, and `rounds: 3` are spent, and implement has cost $3.50 of its $3 budget. Its findings are below. Once more, its cap raised above $3.50 — implement continued, then a new review:  nemia retry r-1 review --round --budget <amount>',
+      'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  nemia approve r-1 review --message "<why>"',
     ]);
     assert.equal(
       listedInLoop(BUDGETED_LOOP, r, said, { spent }).steps[1].note,
-      'round 3 of 3, and it asked again — once more: nemia round r-1 review --budget <amount>',
+      'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round --budget <amount>',
     );
   });
   await t.test('a loop with no step over its budget offers the round without one', () => {
     assert.deepEqual(roundLines(LOOP, r, decidedInLoop(LOOP, r, said, { spent }), spent), [
-      'review: it asked for round 4, and `rounds: 3` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia round r-1 review',
-      'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  nemia accept r-1 review --message "<why>"',
+      'review: it asked for round 4, and `rounds: 3` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia retry r-1 review --round',
+      'review: enough — go on with what is there; its findings stay on the record, and ship is filed and handed them with your words:  nemia approve r-1 review --message "<why>"',
     ]);
     assert.equal(
       listedInLoop(LOOP, r, said, { spent }).steps[1].note,
-      'round 3 of 3, and it asked again — once more: nemia round r-1 review',
+      'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round',
     );
   });
 });

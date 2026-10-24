@@ -8,9 +8,10 @@ import { OUT, store } from '../world.ts';
 
 export default {
   /**
-   * A try a merge replaced (`nemia merge`), on the loop's page: LOOPING's record is written as the tick writes a merge filed — implement's
-   * second try moved behind with `cause: 'merge'`, never `round` — and implement's Details list its third try as a merge, on the round it
-   * was on. The record is put back as seeded before the page ends, said on the feed, so every page after it reads the store as seeded.
+   * A try a merge replaced (`nemia refresh --base`), on the loop's page: LOOPING's record is written as the tick writes a merge filed —
+   * implement's second try moved behind with `cause: 'merge'`, never `round` — and implement's Details list its third try as a merge, on
+   * the round it was on. The record is put back as seeded before the page ends, said on the feed, so every page after it reads the store
+   * as seeded.
    */
   name: 'merge-try',
   route: `/runs/${LOOPING.id}`,

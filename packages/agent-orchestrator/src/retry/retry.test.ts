@@ -432,7 +432,7 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
       'without --budget: nemia retry r-1 implement.',
     );
     const waited = refusalOf(onTry(), waiting, { mode: 'nudge', budget: 5 }, [askFor(2)]);
-    names(waited, 'try 2 of implement is already asked for', '(--nudge, at 2026-09-13T10:00:00.000Z)', 'nemia ls r-1');
+    names(waited, 'try 2 of implement is already asked for', '(--continue, at 2026-09-13T10:00:00.000Z)', 'nemia ls r-1');
     assert.ok(!waited!.includes('`budget:`'), 'an ask already waiting is said first, before the --budget the step would refuse');
   });
   await t.test('let through: each way a step waiting on you can be tried', () => {

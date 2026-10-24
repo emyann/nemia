@@ -410,14 +410,14 @@ test('an approval `nemia approve` would not write is refused in its words; one i
   });
 });
 
-test('an acceptance with no words, blank words or no time is refused in `nemia accept`’s words', () => {
+test('an acceptance with no words, blank words or no time is refused in `nemia approve`’s words', () => {
   assert.equal(acceptanceIn(ask('c1', { message: 'fine' }), 'implement', 3), 'it says no time it was given');
   assert.equal(
     acceptanceIn(ask('c2', { at: AT }), 'implement', 3),
     'it says nothing of why the work is good enough with its findings open',
   );
   assert.match(String(acceptanceIn(ask('c3', { at: AT, message: ' ' }), 'implement', 3)), /^its message is empty, /);
-  assert.equal(acceptanceIn(ask('c5', 'null'), 'implement', 3), 'it is not an acceptance nemia accept wrote');
+  assert.equal(acceptanceIn(ask('c5', 'null'), 'implement', 3), 'it is not an acceptance nemia approve wrote');
   assert.deepEqual(acceptanceIn(ask('c4', { at: AT, message: 'fine' }), 'implement', 3), {
     step: 'implement',
     try: 3,
@@ -429,7 +429,7 @@ test('an acceptance with no words, blank words or no time is refused in `nemia a
 test('a round ask whose budget is not dollars above zero is refused; one with no time or a time that is no text reads as before', () => {
   assert.equal(roundAskIn(ask('r1', { at: AT, budget: 0 }), 'implement', 4), 'its budget is not an amount of dollars above zero');
   assert.equal(roundAskIn(ask('r2', { at: AT, budget: '5' }), 'implement', 4), 'its budget is not an amount of dollars above zero');
-  assert.equal(roundAskIn(ask('r3', 'null'), 'implement', 4), 'it is not an ask nemia round wrote');
+  assert.equal(roundAskIn(ask('r3', 'null'), 'implement', 4), 'it is not an ask nemia retry --round wrote');
   assert.deepEqual(roundAskIn(ask('r4', {}), 'implement', 4), { step: 'implement', round: 4, at: '' });
   assert.deepEqual(roundAskIn(ask('r5', { at: 12, budget: 2.5 }), 'implement', 4), { step: 'implement', round: 4, budget: 2.5, at: '' });
 });

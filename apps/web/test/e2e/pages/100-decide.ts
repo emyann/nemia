@@ -114,7 +114,7 @@ export default {
       throw new Refused(`the send-back is written as wf retry --message writes it, for ${back} — ${ask} holds ${JSON.stringify(asked)}`);
     }
     if (fs.readdirSync(asks).length !== 1) throw new Refused(`and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);
-    const note = 'try 2 asked (--nudge, with your answer) — the next tick files it';
+    const note = 'try 2 asked (--continue, with your answer) — the next tick files it';
     await expectVisible(
       page.locator(`article > section#step-${back} [data-note]`, { hasText: note }),
       `${back}'s section says what wf ls says of the try asked`,

@@ -193,7 +193,7 @@ const board = () => {
 
 /**
  * `implement ⇄ review → ship`, as the team's dev is, with its `dev/ship.md` as the ending, whose `after: review` is
- * what this folder has: what a person types `nemia round` at once the loop has handed on.
+ * what this folder has: what a person types `nemia retry --round` at once the loop has handed on.
  */
 const loopingFolder = (rounds = 3): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
@@ -573,7 +573,7 @@ for (const [said, exitCode, words] of [
     assert.deepEqual(
       readRun(id).steps.ship.landed,
       { aborted: words, ...(exitCode === undefined ? {} : { refusedOn: base }) },
-      'the base `nemia merge` reads, on a refusal alone',
+      'the base `nemia refresh --base` reads, on a refusal alone',
     );
     assert.ok(pass.notes.includes(`ship: ${words}, so the run aborted its merge; nothing landed on main`), pass.notes.join('\n'));
     const shipLine = (await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!;
@@ -727,7 +727,7 @@ const mainMoves = (repo: string): string => {
   return git(repo, 'rev-parse', 'HEAD');
 };
 
-/** A refusal of `nemia merge`: exit 2, in `words`, and no ask written. */
+/** A refusal of `nemia refresh --base`: exit 2, in `words`, and no ask written. */
 const mergeRefused = (id: string, words: RegExp) => (err: Error & { exitCode?: number }) => {
   assert.equal(err.exitCode, 2);
   assert.match(err.message, words);
@@ -758,7 +758,7 @@ test('REFUSED at shipped defaults: a merge whose trial read no commit of the bas
   try {
     await assert.rejects(
       runWith(e, mergeRun(id)),
-      mergeRefused(id, new RegExp(`^git cannot read main in ${repo}\\. Check the repository, then: nemia merge ${id}\\.$`)),
+      mergeRefused(id, new RegExp(`^git cannot read main in ${repo}\\. Check the repository, then: nemia refresh ${id} --base\\.$`)),
     );
     assert.deepEqual(
       (await runWith(e, decideRun(id))).commands.filter((c) => c.label === 'merge'),

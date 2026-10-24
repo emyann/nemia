@@ -167,8 +167,8 @@ export type Workflow = {
   /**
    * The most the step's tries may cost together, in dollars — `budget: 5`, `budget: 2.50`. Absent: no cap. The run reads what each
    * ended try cost off the engine, and once they have together cost it or more, files nothing more for the step on its own — no `retries:`
-   * try, no round of a loop it is in — until a person raises it (`nemia retry --budget`, `nemia round --budget`). On `claude`, whose
-   * sessions are jobs on the Agent SDK, what is left of it is handed to the engine as `config.budgetUsd` too — a harness argument the
+   * try, no round of a loop it is in — until a person raises it (`nemia retry --budget`, `nemia retry --round --budget`). On `claude`,
+   * whose sessions are jobs on the Agent SDK, what is left of it is handed to the engine as `config.budgetUsd` too — a harness argument the
    * runtime judges nothing of — and the harness ends a session once the tries together reach it (`budgetUsdFor`). Refused on codex, which
    * has none.
    */
@@ -457,7 +457,7 @@ export const REFUSED: Record<string, string> = {
   maxAttempts:
     'the runtime makes one attempt at a session and tries nothing again on its own, so a count of attempts has nothing' +
     " to count. Trying again is the run's: `retries: N` files the step again after its check refuses it, and `nemia retry <run> <step>`" +
-    ' asks for a try of one that failed, was lost or could not start (`--nudge` continues its session, `--fresh` starts clean). Delete the line',
+    ' asks for a try of one that failed, was lost or could not start (`--continue` continues its session, `--fresh` starts clean). Delete the line',
   background:
     'every Claude Code session runs on the Agent SDK: a step runs as a job, which runs its brief to its end, and a session that must' +
     " outlive a brief is the runtime's long-lived task (`restartPolicy: 'Always'`), which no step files. Delete the line: the step runs" +

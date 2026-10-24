@@ -180,8 +180,8 @@ const landingSettled = (
 
 /**
  * The base a landing's check refused the merge on (`refusedOn`): the checkout's HEAD, where the merge was staged, once the check exited
- * non-zero (`refusedCheck`) — nothing for a check that did not finish, or with no HEAD read. What lets `nemia merge` file a merge of work
- * that merges cleanly onto that base and breaks on it (`mergeAsk`). Pure.
+ * non-zero (`refusedCheck`) — nothing for a check that did not finish, or with no HEAD read. What lets `nemia refresh --base` file a merge
+ * of work that merges cleanly onto that base and breaks on it (`mergeAsk`). Pure.
  */
 const refusedBase = (head: string | undefined, check: TaskPhase, verdict: Verdict | undefined): { refusedOn?: string } =>
   head && refusedCheck(check, verdict) ? { refusedOn: head } : {};

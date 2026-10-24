@@ -1,7 +1,7 @@
 /**
- * The table of what `nemia merge` refuses while its loop stands as it is (`mergeAsk`): a loop that goes round again on its own word, a
- * step of the loop that stopped, and a round still at work. Pure: the merge itself, on disk and on real git, is told in `ship.test.ts`
- * and `merge-round-walk.boundary.test.ts`.
+ * The table of what `nemia refresh --base` refuses while its loop stands as it is (`mergeAsk`): a loop that goes round again on its own
+ * word, a step of the loop that stopped, and a round still at work. Pure: the merge itself, on disk and on real git, is told in
+ * `ship.test.ts` and `merge-round-walk.boundary.test.ts`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -21,7 +21,7 @@ const reads = (standing: Record<string, StepStatus>, goesRound = false): MergeRe
   goesRound: () => goesRound,
 });
 
-/** What `nemia merge r-1` answers over `reads`: its refusal, or a failure naming the ask it made instead. */
+/** What `nemia refresh r-1 --base` answers over `reads`: its refusal, or a failure naming the ask it made instead. */
 const refusalOf = (given: MergeReads): string => {
   const answer = mergeAsk(LOOP, LOOPING, undefined, given, [], () => assert.fail('no trial merge is made'), '2026-01-01T00:00:00Z');
   assert.ok('refusal' in answer, `refused, not asked: ${JSON.stringify(answer)}`);
@@ -30,7 +30,7 @@ const refusalOf = (given: MergeReads): string => {
 
 test('`mergeAsk` refuses while the loop cannot take a merge as it stands, naming the verb that moves it', async (t) => {
   await t.test('REFUSED: the loop goes round again on its own word: merge once it ends', () => {
-    names(refusalOf(reads({ implement: 'verified', review: 'verified' }, true)), 'round 2', 'nemia merge r-1 review');
+    names(refusalOf(reads({ implement: 'verified', review: 'verified' }, true)), 'round 2', 'nemia refresh r-1 review --base');
   });
   await t.test("REFUSED: the loop's target stopped in the round: try it again, or see why", () => {
     names(

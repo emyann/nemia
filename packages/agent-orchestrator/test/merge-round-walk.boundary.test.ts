@@ -114,7 +114,7 @@ const board = () => {
 
 /**
  * `implement ⇄ review → ship`, as the team's dev is, with its `dev/ship.md` as the ending, whose `after: review` is
- * what this folder has: what a person types `nemia round` at once the loop has handed on.
+ * what this folder has: what a person types `nemia retry --round` at once the loop has handed on.
  */
 const loopingFolder = (rounds = 3): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
@@ -221,7 +221,7 @@ test("a merge send-back leaves the round count unchanged: the loop's target merg
   const listed = await runWith(e, list(e, readRun(id)));
   assert.equal(
     listed.steps.find((s) => s.name === 'implement')!.note,
-    'try 2, merged the base, on your word (nemia merge), the round unchanged',
+    'try 2, merged the base, on your word (nemia refresh --base), the round unchanged',
     'nemia ls says a merge, never a round',
   );
 

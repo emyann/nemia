@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, type Spec } from './command.ts';
+import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, renamedIn, type Spec } from './command.ts';
 import { COMMANDS, TABLE } from './commands.verb.ts';
 
 const SPEC: Spec = {
@@ -170,7 +170,7 @@ test("a text flag's value left out — empty, or a word starting -- — is refus
 });
 
 test("retry's command line keeps today's refusals", () => {
-  names(refusalOf(['r-1', 'impl', '--fresh', '--recheck'], RETRY.spec), 'nemia retry', '--nudge, --fresh, --model <m>, --recheck');
+  names(refusalOf(['r-1', 'impl', '--fresh', '--recheck'], RETRY.spec), 'nemia retry', '--continue, --fresh, --model <m>, --recheck');
   names(
     refusalOf(['r-1', 'impl', '--message', '--fresh'], RETRY.spec),
     '--message takes',
@@ -356,38 +356,44 @@ test("the table's help is today's, word for word", () => {
       '  nemia template unpack <archive> <dir>',
       "                               write the folder a template's archive holds at <dir>/<name>, each file's",
       '                               bytes and mode as packed',
-      '  nemia retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
+      '  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
       '                               try a step waiting on you again, once, on the next tick:',
-      '                               --nudge (default) continues its session, told what happened;',
+      '                               --continue (default) continues its session, told what happened;',
       '                               --fresh a new session on its branch; --model <m> the same, on m;',
       '                               --recheck runs its check again, and files no session;',
+      '                               --round: once more — a loop out of rounds goes round again, once,',
+      '                               the step it loops to continued, then a new reviewer; the step is the',
+      '                               one that closes the loop, left out where the run has one loop;',
       '                               --message "<answer>" goes into the try\'s brief, as ## Your answer:',
       '                               for a step that signed off blocked, the answer to its needs — or',
-      '                               what you have to say to any step you try again; not with --recheck.',
-      '                               The next argument is the answer, whatever it starts with; an answer',
-      "                               that is only one of these flags' names goes as --message=<answer>;",
-      '                               --budget <amount>: for a step with a budget: that waits on you, its',
+      '                               what you have to say to any step you try again; not with --recheck',
+      '                               or --round. The next argument is the answer, whatever it starts with;',
+      "                               an answer that is only one of these flags' names goes as --message=<answer>;",
+      '                               --budget <amount>: for a step with a budget that waits on you, its',
       '                               cap raised to that many dollars, above its cap and what it has cost;',
+      '                               with --round, the cap of a step of the loop over its budget;',
       '                               --answer <n>=<letter>: answer question n, numbered as nemia decide',
       '                               <runId> prints them, with the option its letter names; once for each',
       '                               question: "<n>=a,c" chooses several where it takes several,',
       '                               "<n>=a: <words>" adds your own words, "<n>: <words>" says words',
       '                               alone; --message is then the note under your answers',
-      '  nemia approve <runId> <step> [--answer <n>=<letter>]... [--message "<words>"]',
+      '  nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--message "<words>"]',
       '                               let a step waiting at its gate hand on: what waits on it is filed on',
       '                               the next tick, and every step after the gate is handed your words',
       '                               under ## Approved. To send it back instead, with what to change:',
       '                               nemia retry <runId> <step> --message "<objection>"',
+      '                               Of a loop out of rounds — the step that closes it, or the run alone',
+      '                               where it has one loop — enough: the loop ends on your words, with its',
+      '                               findings open, --message "<why>" required. What waits on the looping',
+      '                               step is filed as if it had said again: false, and every step after',
+      '                               the loop is handed your words and those findings under ## Accepted.',
+      '                               To go round once more instead: nemia retry <runId> [<step>] --round',
       '                               --answer <n>=<letter>: answer question n, numbered as nemia decide',
       '                               <runId> prints them, with the option its letter names; once for each',
       '                               question: "<n>=a,c" chooses several where it takes several,',
       '                               "<n>=a: <words>" adds your own words, "<n>: <words>" says words',
       '                               alone; --message is then the note under your answers',
-      '  nemia round <runId> [<step>] [--budget <amount>]',
-      '                               once more: a loop out of rounds goes round again, once, on the',
-      '                               next tick — the step it loops to continued, then a new reviewer;',
-      '                               --budget raises the cap of a step of the loop over its budget',
-      '  nemia refresh <runId>',
+      '  nemia refresh <runId> [<step>] [--base]',
       '                               take the new revisions: a run keeps the workflow, agents, skills and',
       '                               factory rules it resolved when it started, and this pins it to the',
       '                               ones they hold now, so every filing after it — a new step, a retry,',
@@ -396,17 +402,11 @@ test("the table's help is today's, word for word", () => {
       '                               a run that has filed nothing, which resolves afresh at its first filing',
       '                               anyway, of one already on the newest revision of every kind, and of one',
       '                               whose factory follows revisions (nemia factory revisions), whose every',
-      '                               filing takes them with no refresh',
-      '  nemia accept <runId> [<step>] --message "<why>"',
-      '                               enough: a loop out of rounds ends on your word, with its findings',
-      '                               open. What waits on the looping step is filed on the next tick as',
-      '                               if it had said again: false — a gated ending goes to its gate —',
-      '                               and every step after the loop is handed your words and those',
-      '                               findings under ## Accepted. The other answer to nemia round',
-      '  nemia merge <runId> [<step>]',
-      "                               merge the base: a loop's work that no longer merges cleanly",
-      '                               goes back to merge it, once, on the next tick — on the round',
-      '                               it is on, which the merge does not spend',
+      '                               filing takes them with no refresh;',
+      "                               --base: take the base instead — a loop's work that no longer merges",
+      '                               cleanly goes back to merge it, once, on the next tick, on the round it',
+      '                               is on, which the merge does not spend; the step is the one that closes',
+      '                               the loop, left out where the run has one loop',
       '  nemia say <runId> <step> "<words>"',
       "                               tell a step's running session something, through its harness: the",
       "                               engine journals the words on the step's task, nemia ls notes the step",
@@ -952,4 +952,32 @@ test('a command line refuses a flag the api alone takes, as one the command does
   assert.equal(refusalOf(['x', '--words', 'hi'], CARD), 'UNKNOWN --words');
   assert.equal(refusalOf(['x', '--words=hi'], CARD), 'UNKNOWN --words=hi');
   assert.deepEqual(parseArgv(CARD, ['x', '--file', 'f.md']), { name: 'x', file: 'f.md' });
+});
+
+test('a former word or flag is run as what it became, with a hint, and a line in the new words is left as given', async (t) => {
+  const rows: Array<[string, readonly string[], readonly string[] | undefined]> = [
+    ['a group renamed', ['auto', 'show', 'grace'], ['policy', 'show', 'grace']],
+    [
+      'round, absorbed by retry with --round',
+      ['round', 'r1', 'review', '--budget', '5'],
+      ['retry', 'r1', 'review', '--round', '--budget', '5'],
+    ],
+    ['merge, absorbed by refresh with --base', ['merge', 'r1'], ['refresh', 'r1', '--base']],
+    ['accept, absorbed by approve', ['accept', 'r1', 'review', '--message', 'x'], ['approve', 'r1', 'review', '--message', 'x']],
+    ["retry's --nudge, now --continue", ['retry', 'r1', 'implement', '--nudge'], ['retry', 'r1', 'implement', '--continue']],
+    [
+      "a message that says a flag's name stays the message",
+      ['accept', 'r1', '--message', '--round'],
+      ['approve', 'r1', '--message', '--round'],
+    ],
+    ['a line in the new words', ['retry', 'r1', '--round'], undefined],
+    ['--nudge on another command is not renamed', ['say', 'r1', 's', '--nudge'], undefined],
+  ];
+  for (const [name, typed, now] of rows)
+    await t.test(name, () => {
+      const renamed = renamedIn(typed);
+      assert.deepEqual(renamed.words, now ?? typed);
+      assert.equal(renamed.hint !== undefined, now !== undefined, 'a hint is said exactly when a former spelling was typed');
+      if (now !== undefined) assert.ok(renamed.hint!.includes(['nemia', ...now].join(' ')), 'the hint names the line to type now');
+    });
 });

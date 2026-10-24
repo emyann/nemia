@@ -95,9 +95,9 @@ import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts
 
 /**
  * A step's cap, and what its tries have cost of it. `usd` is the cap in force (`budgetOf`): the `budget:` the run froze, until a person
- * raises it (`nemia retry --budget`, `nemia round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of`
- * what the step's tries have cost of it, as `nemia ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is
- * whether they have cost the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word
+ * raises it (`nemia retry --budget`, `nemia retry --round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and
+ * `of` what the step's tries have cost of it, as `nemia ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over`
+ * is whether they have cost the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word
  * says `over budget` or `budget exhausted` — where another session of it is the way on. A Claude Code job, on the Agent SDK, is ended at
  * its cap; a session an older runtime ran in the background kept none and was not stopped, so a step of a record from then can have
  * finished past it with nothing waiting on a raise.
@@ -106,9 +106,10 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
 
 /**
  * A raise of a step's cap the package takes, and how it is asked for: `retry` — `nemia retry --budget`, the board's `POST …/retry` — for a
- * step over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `nemia round --budget`, `POST …/round` — for a
- * looping step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more than, as the
- * package refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars (`dollars`).
+ * step over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `nemia retry --round --budget`, `POST …/round`
+ * — for a looping step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more
+ * than, as the package refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars
+ * (`dollars`).
  *
  * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
  * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
@@ -132,7 +133,7 @@ export type StepApproval = { try: number; at: string; message: string | null };
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
 /**
- * A person's acceptance of a loop out of rounds, on the try its looping step is on (`acceptanceOf`), off their file (`nemia accept`): the
+ * A person's acceptance of a loop out of rounds, on the try its looping step is on (`acceptanceOf`), off their file (`nemia approve`): the
  * try, when, and the words given. The step's closeout still says `again: true` — the acceptance does not rewrite what the reviewer said —
  * so whoever reads the step's last word needs this beside it, or a gate after the loop reads as if another round were still asked for.
  */
@@ -379,7 +380,7 @@ export type RunDetail = {
      * not have is gated only where the run was started with its gate.
      */
     gate: StepGate | null;
-    /** For a looping step a person ended out of rounds (`nemia accept`), their acceptance of the try it is on; null for any other step. */
+    /** For a looping step a person ended out of rounds (`nemia approve`), their acceptance of the try it is on; null for any other step. */
     accepted: StepAcceptance | null;
     /**
      * For a step the harness blocked, what its session said last, as the engine's `transcript` reads it: its last `text` or `system`
@@ -498,8 +499,8 @@ function costOf(
 /**
  * The raise of a step's cap the package takes (`StepRaise`), or null. A try's, where `retryable` carries one — a settled step over its
  * budget or ended at it, that a try takes on — and it may be tried; else a round's, for a looping step over its budget or out of rounds
- * whose loop has a step over its budget (`loopOver`): `nemia round --budget` has to pass the most any of them has cost, as `roundAsk`
- * refuses less.
+ * whose loop has a step over its budget (`loopOver`): `nemia retry --round --budget` has to pass the most any of them has cost, as
+ * `roundAsk` refuses less.
  */
 function raiseOf(run: Run, step: Workflow, steps: readonly Workflow[], views: Views, spendOf: SpendOf): StepRaise | null {
   const phase = (taskId: string) => phaseOfView(views.get(taskId));

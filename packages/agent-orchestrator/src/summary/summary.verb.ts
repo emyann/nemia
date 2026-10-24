@@ -156,7 +156,7 @@ export type RunSummary = {
    *
    * `status` is what `nemia ls` prints for the step — see `judge` for the one word it corrects. `note` is what `nemia ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
-   * `round 2 of 3`, `round 3 asked (nemia round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
+   * `round 2 of 3`, `round 3 asked (nemia retry --round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
    * round is due, which its note words. `agent`: the agent the step is given, a hire's included, as the workflow it is judged by
    * resolves it (`judgedSteps`); null for a step given none. `since`: when the step's task still at work started (`atWork` of the step
    * alone), null while none of its tasks runs.

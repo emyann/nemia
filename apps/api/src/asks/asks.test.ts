@@ -283,7 +283,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
       const run = await detail();
       const implement = run.steps.find((s) => s.name === 'implement')!;
-      assert.equal(implement.note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
+      assert.equal(implement.note, 'try 2 asked (--continue, with your answer) — the next tick files it');
       assert.equal(implement.note, words.steps.find((s) => s.name === 'implement')?.note, 'as `nemia ls` has it: a note beside the step');
       assert.deepEqual(implement.asked, {
         try: 2,
@@ -299,7 +299,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       const again = await ask('implement', { mode: 'fresh', message: 'MySQL.' });
       assert.equal(again.status, 409);
       const { error } = (await again.json()) as { error: string };
-      assert.ok(error.startsWith('try 2 of implement is already asked for (--nudge, at '), error);
+      assert.ok(error.startsWith('try 2 of implement is already asked for (--continue, at '), error);
       assert.deepEqual(asked(), ['retry-implement-2']);
 
       const recheck = await ask('theme', { mode: 'recheck' });
@@ -356,7 +356,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       const noteOf = (name: string) => words.steps.find((s) => s.name === name)?.note;
       const run = await detail();
       const held = run.steps.find((s) => s.name === 'held')!;
-      assert.equal(held.note, 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it');
+      assert.equal(held.note, 'try 2 asked (--continue) — stopping its blocked session, then the tick files it');
       assert.equal(
         held.note,
         noteOf('held'),
@@ -383,7 +383,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       const again = await ask('held', { mode: 'nudge' });
       assert.equal(again.status, 409, "asked once: a second Continue is refused in the package's words");
       const { error } = (await again.json()) as { error: string };
-      assert.ok(error.startsWith('try 2 of held is already asked for (--nudge, at '), error);
+      assert.ok(error.startsWith('try 2 of held is already asked for (--continue, at '), error);
       assert.equal(standIn().stopped.length, 0, 'and still nothing is stopped');
     },
   );

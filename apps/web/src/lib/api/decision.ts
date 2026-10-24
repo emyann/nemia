@@ -264,7 +264,7 @@ export type Decidable = {
    */
   awaiting: { branches: string[]; direct: boolean } | null;
   /**
-   * At an ending's gate, or an ending whose landing a check refused: the runs in flight on the base its branches collide with, and in
+   * At an ending's gate, or an ending whose landing failed its check: the runs in flight on the base its branches collide with, and in
    * which files, and the semantic conflict; null for any other decision.
    */
   collisions: Collisions | null;

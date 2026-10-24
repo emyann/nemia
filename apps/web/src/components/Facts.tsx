@@ -60,7 +60,7 @@ function FactWords({ runId, fact }: { runId: string; fact: GateFact }) {
 
 /**
  * The trial merges an ending's decision read (`Collisions`), in the run's Decide section: the runs in flight on the base and the semantic
- * conflict, in the gate's words, which a landing its check refused waits at no gate to show.
+ * conflict, in the gate's words, which a landing that failed its check waits at no gate to show.
  */
 export function TrialMerges({ runId, collisions }: { runId: string; collisions: Collisions }) {
   return (
@@ -370,7 +370,7 @@ const REBUILT_TITLE =
   'A resumed session should read its context from the cache. It wrote it again instead, at twenty times the price of a read: the cache was rebuilt.';
 
 /**
- * The command a step is judged by, and once its check refused, what it exited with and the last lines of
+ * The command a step is judged by, and once it failed its check, what it exited with and the last lines of
  * each stream: its output first, where a test runner says what failed, then its stderr.
  */
 export function Check({ check: { command, refused } }: { check: StepCheck }) {

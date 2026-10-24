@@ -98,5 +98,5 @@ export const Done: StoryObj = { render: () => <StepCard facts={DONE} /> };
 /** A step to come: when it starts, the rounds it may run, and its budget. */
 export const ToCome: StoryObj = { render: () => <StepCard facts={TO_COME} /> };
 
-/** A step its check refused: when it failed, and why. */
+/** A step that failed its check: when it failed, and why. */
 export const Failed: StoryObj = { render: () => <StepCard facts={FAILED} /> };

@@ -151,7 +151,7 @@ export const StepLogSchema = decodes<StepLog>()(Schema.Struct({ lines: StringsSc
 
 /**
  * Mirrors `StepCheck` in apps/api/src/steps/logs.ts: the command a step is judged by, from the workflow the run
- * froze, its task and verdict — `passed`, `exit 1`, `unfinished`, `checking` — and once its check refused, the
+ * froze, its task and verdict — `passed`, `exit 1`, `unfinished`, `checking` — and once it failed its check, the
  * exit in the CLI `ls`'s words and the end of each stream. `stdout` is null on an earlier try's check, whose output the api does not read.
  */
 export type StepCheck = {

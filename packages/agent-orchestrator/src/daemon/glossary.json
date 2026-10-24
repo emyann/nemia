@@ -1,0 +1,31 @@
+{
+  "context": "operations",
+  "title": "Operations",
+  "about": "The daemon and what keeps a store running: pausing, pruning, the disk, the cap and a call's admission.",
+  "paths": [
+    "packages/agent-orchestrator/src/daemon",
+    "packages/agent-orchestrator/src/pause",
+    "packages/agent-orchestrator/src/prune",
+    "packages/agent-orchestrator/src/disk",
+    "packages/agent-orchestrator/src/cap",
+    "packages/agent-orchestrator/src/admission"
+  ],
+  "terms": [
+    {
+      "term": "Admission",
+      "meaning": "a call's admission: a command asked before a session's tool call, which allows it, asks the person, or denies it.",
+      "see": {
+        "label": "What she is allowed to do",
+        "href": "/nemia/#what-she-is-allowed-to-do"
+      }
+    },
+    {
+      "term": "Daemon",
+      "meaning": "the process that ticks the store's runs, one per store; the api's process is the daemon.",
+      "see": {
+        "label": "Two loops",
+        "href": "/how-a-run-lives/#two-loops-both-level-triggered"
+      }
+    }
+  ]
+}

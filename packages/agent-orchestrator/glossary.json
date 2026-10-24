@@ -1,0 +1,125 @@
+{
+  "context": "run-core",
+  "title": "The run core",
+  "about": "`packages/agent-orchestrator` reads workflows and runs their steps: its words are a workflow, a run and how a tick moves it. Its retired spellings are counted in the whole package, the contexts nested in it included.",
+  "paths": [
+    "packages/agent-orchestrator"
+  ],
+  "terms": [
+    {
+      "term": "Budget",
+      "meaning": "the most a step's tries may cost together, in dollars.",
+      "see": {
+        "label": "What a step may spend",
+        "href": "/workflows/#what-a-step-may-spend"
+      }
+    },
+    {
+      "term": "Check",
+      "meaning": "a command the run executes after a step signs off; its exit code, not the agent's word, decides whether the run goes on.",
+      "see": {
+        "label": "The check",
+        "href": "/workflows/#the-check"
+      }
+    },
+    {
+      "term": "Closeout",
+      "meaning": "how a step signs off: its outcome, its summary, and the fields its workflow asks of it.",
+      "type": "Closeout",
+      "see": {
+        "label": "The closeout",
+        "href": "/workflows/#the-closeout"
+      }
+    },
+    {
+      "term": "Gate",
+      "meaning": "a property of a step: nothing after it is started until a person approves.",
+      "see": {
+        "label": "A gate",
+        "href": "/workflows/#a-gate"
+      }
+    },
+    {
+      "term": "Landing",
+      "meaning": "the end of a run: the merge of its branch staged on the base, checked on the merged tree, and committed when the check passes.",
+      "type": "Landing",
+      "see": {
+        "label": "The landing",
+        "href": "/workflows/#the-landing"
+      }
+    },
+    {
+      "term": "Loop",
+      "meaning": "a reviewing step's way to send the work back to an earlier step, for at most its rounds.",
+      "see": {
+        "label": "A loop and its rounds",
+        "href": "/workflows/#a-loop-and-its-rounds"
+      }
+    },
+    {
+      "term": "Nemia",
+      "meaning": "the system as a whole, and its command `nemia`.",
+      "retired": [
+        {
+          "spelling": "wf",
+          "card": "slice-4: the command table and the rename to nemia"
+        }
+      ],
+      "see": {
+        "label": "Nemia",
+        "href": "/nemia/"
+      }
+    },
+    {
+      "term": "Orchestrator",
+      "meaning": "`packages/agent-orchestrator`, which reads workflows and runs their steps.",
+      "see": {
+        "label": "The orchestrator",
+        "href": "/map/#the-orchestrator"
+      }
+    },
+    {
+      "term": "Round",
+      "meaning": "one more try of a loop's steps, when a reviewer asks for more.",
+      "type": "Round",
+      "see": {
+        "label": "A loop and its rounds",
+        "href": "/workflows/#a-loop-and-its-rounds"
+      }
+    },
+    {
+      "term": "Run",
+      "meaning": "one go of a workflow on a card: its record, its steps' tries, and the branch its work is on.",
+      "type": "Run",
+      "see": {
+        "label": "How a run lives",
+        "href": "/how-a-run-lives/"
+      }
+    },
+    {
+      "term": "Step",
+      "meaning": "one markdown file of a workflow: who does it, what it may do, and what must finish first.",
+      "see": {
+        "label": "A step",
+        "href": "/workflows/#a-step"
+      }
+    },
+    {
+      "term": "Tick",
+      "meaning": "one pass of the daemon: it reads the world, decides (`assess`), acts, and carries nothing to the next pass.",
+      "see": {
+        "label": "Two loops",
+        "href": "/how-a-run-lives/#two-loops-both-level-triggered"
+      }
+    },
+    {
+      "term": "Workflow",
+      "meaning": "a folder of markdown files, one file a step.",
+      "type": "Workflow",
+      "see": {
+        "label": "Workflows",
+        "href": "/workflows/"
+      }
+    }
+  ]
+}

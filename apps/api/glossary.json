@@ -1,0 +1,32 @@
+{
+  "context": "api",
+  "title": "The api",
+  "about": "`apps/api` puts the workflows behind HTTP.",
+  "paths": [
+    "apps/api"
+  ],
+  "terms": [
+    {
+      "term": "Api",
+      "meaning": "`apps/api`, the workflows behind HTTP, and the system's public interface.",
+      "see": {
+        "label": "The api",
+        "href": "/map/#the-api"
+      }
+    },
+    {
+      "term": "Command text",
+      "meaning": "the `nemia …` line the api hands the board for a person to copy.",
+      "retired": [
+        {
+          "spelling": "wf",
+          "card": "slice-4: the command table and the rename to nemia"
+        }
+      ],
+      "see": {
+        "label": "The api",
+        "href": "/map/#the-api"
+      }
+    }
+  ]
+}

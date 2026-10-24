@@ -1,0 +1,29 @@
+{
+  "context": "feed",
+  "title": "Feed",
+  "about": "The store's stream of what happened, and who follows it.",
+  "paths": [
+    "packages/agent-orchestrator/src/feed",
+    "packages/agent-orchestrator/src/subscription"
+  ],
+  "terms": [
+    {
+      "term": "Feed",
+      "meaning": "the store's stream of what happened, written by the daemon alone, which the board and Nemia follow.",
+      "type": "FeedLine",
+      "see": {
+        "label": "Who writes what",
+        "href": "/how-a-run-lives/#who-writes-what"
+      }
+    },
+    {
+      "term": "Subscription",
+      "meaning": "Nemia's subscription, `nemia`, is the orchestrator's own: it wakes her on the lines of the store's feed its selectors take.",
+      "type": "Subscription",
+      "see": {
+        "label": "Her subscription",
+        "href": "/nemia/#her-subscription"
+      }
+    }
+  ]
+}

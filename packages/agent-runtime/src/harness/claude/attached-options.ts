@@ -81,7 +81,10 @@ const promptText = (key: string, cwd: string, file: string): string => {
  * The session's system prompt, as `Options.systemPrompt` takes it (`sdk.d.ts:2451-2461`): Claude Code's own preset with the agent's
  * prompt appended to it (`appendSystemPromptFile`), the prompt file's text alone in place of Claude Code's (`systemPromptFile`), or
  * the bare preset where the task names neither — asked for even then, because the SDK sends an empty system prompt when
- * `systemPrompt` is unasked, and a `claude -p` job has Claude Code's own.
+ * `systemPrompt` is unasked, and a `claude -p` job has Claude Code's own. The prompt reaches the CLI as `appendSystemPrompt` on the
+ * `initialize` request, never as `--append-system-prompt-file`. A resumed session keeps the prompt it was recorded with (the option's
+ * own `snapshot`, which defaults on, `sdk.d.ts:2350-2461`), so a prompt file edited mid-session reaches no live session until
+ * it is compacted.
  *
  * Refused, naming both keys and the harness that takes both flags, where a task gives both: the SDK has the one option where the CLI
  * had two flags, and what Claude Code does given both is unmeasured, so the runtime does not choose for the person.
@@ -105,6 +108,9 @@ const promptOf = (cwd: string, append: string | undefined, replace: string | und
  * with the session's auto-memory off in them (`memorylessSettings`), as the SDK's own `settings` option takes them (an object, or a
  * file's path as given, which the runtime does not rewrite), and its prompt files apart as the SDK's own `systemPrompt`
  * (`promptOf`), each of those paths taken from `cwd` where it is relative.
+ *
+ * The settings go apart because `Options.settings` overwrites a `settings` left on `extraArgs`, and `extraArgs` stringifies its
+ * values (`sdk.mjs`): an object left in that bag would reach the CLI as `[object Object]`.
  */
 const extraOf = (
   cwd: string,

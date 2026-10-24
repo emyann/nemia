@@ -342,7 +342,7 @@ export type RunDetail = RunCodes & {
   fromNote?: string;
   waiting: RunWaiting | null;
   /** As on `RunSummary`. */
-  heldUntil: string[];
+  holdUntil: string[];
   /** As on `RunSummary`. */
   holding: RunHolding | null;
   status: RunStatus;
@@ -640,7 +640,7 @@ const RunDetailSchema = decodes<RunDetail>()(
     from: Schema.optionalKey(Schema.Struct({ inbox: Schema.String })),
     fromNote: Schema.optionalKey(Schema.String),
     waiting: Schema.NullOr(RunWaitingSchema),
-    heldUntil: StringsSchema,
+    holdUntil: StringsSchema,
     holding: Schema.NullOr(RunHoldingSchema),
     status: RunStatusSchema,
     ...RunCodesFields,

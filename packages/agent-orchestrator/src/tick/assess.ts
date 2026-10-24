@@ -55,7 +55,7 @@ export type Assessment = {
    * The runs a person holds this one until (`Run.hold`), while the hold stands: the run is `running`, and nothing is due — no step, check,
    * try or round — nor asked of anyone (`toDecide`). What is in flight runs on. Absent on a run nobody holds.
    */
-  heldUntil?: string[];
+  holdUntil?: string[];
   /**
    * What waits on the store's pause (`Run.pause`) on this pass: every step whose session, try, round or check the pass would file, by
    * name (`steps`), and the steps among them whose check is what waits (`checks`). Nothing of them is filed, and the run counts against the
@@ -72,7 +72,7 @@ export type Assessment = {
  * - A cancelled run files nothing more, however its predecessors ended: no step, no check, no try, no round.
  * - A pruned run honours no person's ask, since its worktrees are gone (`mayFile`): an ask written by hand is no try due. A held run
  *   honours none until the hold lifts, files nothing and asks nothing of a person; it is `running`, since a hold is no decision about the
- *   work, with `heldUntil`, and keeps `unreachable`, since what can never run is a fact about the steps.
+ *   work, with `holdUntil`, and keeps `unreachable`, since what can never run is a fact about the steps.
  * - A step about to be tried again, and a looping step whose loop goes round again, is `running`: what waits on it waits. No step of a
  *   round due is `over budget` (`roundSpans`): the round is what a person raised the cap for.
  * - An ending step that `waitsOnCheckout` is not filed, neither a first session nor a person's try of it, since two sessions trial merging
@@ -150,7 +150,7 @@ export function assess(
       : 'running';
 
   if (run.hold)
-    return { ready: [], check: [], retry: [], round: [], unreachable, waitingOnCheckout: [], status: 'running', heldUntil: run.hold.until };
+    return { ready: [], check: [], retry: [], round: [], unreachable, waitingOnCheckout: [], status: 'running', holdUntil: run.hold.until };
   const decide = toDecide(steps, run, overall, (name) => status.get(name) ?? 'pending', standings);
   const assessed: Assessment = {
     ready,

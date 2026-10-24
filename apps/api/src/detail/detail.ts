@@ -269,7 +269,7 @@ export type RunDetail = {
   fromNote?: string;
   waiting: RunWaiting | null;
   /** As on `RunSummary`. */
-  heldUntil: string[];
+  holdUntil: string[];
   /** As on `RunSummary` (`RunHolding`). */
   holding: RunHolding | null;
   /** As on `RunSummary`: the list's word, `awaiting approval` or `blocked` for a run a person alone stops, never `failed`. */
@@ -666,7 +666,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     ...handedRuns(run),
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,
-    heldUntil: judged.holding ? run.hold!.until : [],
+    holdUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
     ...runSaid(judged),
     moving: judged.moving,

@@ -320,7 +320,7 @@ export const detail = (extra: Partial<RunDetail> = {}): RunDetail => ({
     onYou: false,
   },
   context: [],
-  heldUntil: ['r-0'],
+  holdUntil: ['r-0'],
   holding: {
     at: '2026-09-30T05:00:00.000Z',
     runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],
@@ -493,7 +493,7 @@ export const summary = (steps: ReadonlyArray<readonly [string, Word]>, extra: Pa
   after: [],
   waiting: null,
   context: [],
-  heldUntil: [],
+  holdUntil: [],
   holding: null,
   toDecide: null,
   unreadable: null,

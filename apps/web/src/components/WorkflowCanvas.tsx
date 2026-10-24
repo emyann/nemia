@@ -50,7 +50,7 @@ export function unstartedRun(workflow: WorkflowListing): RunDetail {
     after: [],
     waiting: null,
     context: [],
-    heldUntil: [],
+    holdUntil: [],
     holding: null,
     status: 'running',
     phase: 'running',

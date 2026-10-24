@@ -94,7 +94,7 @@ const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSum
   after: [],
   waiting: null,
   context: [],
-  heldUntil: [],
+  holdUntil: [],
   holding: null,
   toDecide: null,
   unreadable: null,
@@ -1167,13 +1167,13 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
     'a run held until runs that may still land is in flight; one only a person lifts is not, and waits on you — as a run waiting `--after` runs',
     () => {
       const gated = { status: 'running' as const, moving: false, waitingOnYou: [] as string[], waiting: null };
-      const lifts = run(['awaiting approval', 'waiting'], { ...gated, heldUntil: ['p'], holding: holdingOn(false) });
+      const lifts = run(['awaiting approval', 'waiting'], { ...gated, holdUntil: ['p'], holding: holdingOn(false) });
       assert.deepEqual(
         [inFlight(lifts), waitsOnYou(lifts)],
         [true, false],
         'a step held at its gate, which `assess` calls running with nothing moving and nothing waiting on you, until runs that may ship: in flight',
       );
-      const yours = run(['awaiting approval', 'waiting'], { ...gated, heldUntil: ['p'], holding: holdingOn(true) });
+      const yours = run(['awaiting approval', 'waiting'], { ...gated, holdUntil: ['p'], holding: holdingOn(true) });
       assert.deepEqual(
         [inFlight(yours), waitsOnYou(yours)],
         [false, true],
@@ -1188,7 +1188,7 @@ test('inFlight, standingOf, waitsOnYou and onYouOf: where a run stands, and who 
         ...gated,
         status: 'cancelled',
         cancelledAt,
-        heldUntil: ['p'],
+        holdUntil: ['p'],
         holding: holdingOn(true),
       });
       assert.deepEqual([inFlight(off), waitsOnYou(off)], [false, false], 'a run called off waits on nobody, held or not');
@@ -1434,8 +1434,8 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
     () => {
       const runs = [
         run([], { id: 'p', status: 'succeeded', createdAt: at(0) }),
-        run(['awaiting approval'], { id: 'h', status: 'running', heldUntil: ['p'], holding: holdingOn(false), createdAt: at(1) }),
-        run(['awaiting approval'], { id: 'q', status: 'running', heldUntil: ['gone'], holding: holdingOn(true), createdAt: at(2) }),
+        run(['awaiting approval'], { id: 'h', status: 'running', holdUntil: ['p'], holding: holdingOn(false), createdAt: at(1) }),
+        run(['awaiting approval'], { id: 'q', status: 'running', holdUntil: ['gone'], holding: holdingOn(true), createdAt: at(2) }),
       ];
       assert.deepEqual(
         floorRuns(runs, false).map((r) => r.id),
@@ -1444,7 +1444,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
       );
       const lifted = runs.map((r) => ({
         ...r,
-        heldUntil: [],
+        holdUntil: [],
         holding: null,
         status: r.id === 'p' ? ('succeeded' as const) : ('failed' as const),
       }));
@@ -1484,7 +1484,7 @@ test('runEdges and contextEdges: the edges drawn between cards', async (t) => {
     );
     const landed = { ...holdingOn(false), runs: [{ run: 'a', missing: false, cancelledAt: null, gone: [], landed: true }] };
     assert.deepEqual(
-      runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', heldUntil: ['a'], holding: landed })]),
+      runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', holdUntil: ['a'], holding: landed })]),
       [],
     );
   });
@@ -1515,8 +1515,8 @@ test('runEdges and contextEdges: the edges drawn between cards', async (t) => {
       const edges = runEdges([
         run(['verified ✓'], { id: 'a' }),
         run(['running (working)'], { id: 'b' }),
-        run(['awaiting approval'], { id: 'h', heldUntil: ['a', 'b'], holding: held('a', 'b', 'a', 'off-the-floor', 'h') }),
-        run(['waiting'], { id: 'd', after: ['a'], waiting: waitsOn('a'), heldUntil: ['a'], holding: held('a') }),
+        run(['awaiting approval'], { id: 'h', holdUntil: ['a', 'b'], holding: held('a', 'b', 'a', 'off-the-floor', 'h') }),
+        run(['waiting'], { id: 'd', after: ['a'], waiting: waitsOn('a'), holdUntil: ['a'], holding: held('a') }),
         run(['waiting'], { id: 'e' }),
       ]);
       assert.deepEqual(
@@ -1529,7 +1529,7 @@ test('runEdges and contextEdges: the edges drawn between cards', async (t) => {
         'h, started and held until a and b, has two edges to come; d, after a and held until it, one, the `after` one; e, held by nobody, none',
       );
       assert.deepEqual(
-        runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', heldUntil: [] })]),
+        runEdges([run(['verified ✓'], { id: 'a' }), run(['awaiting approval'], { id: 'h', holdUntil: [] })]),
         [],
         'lifted, the api lists no run, and the edge goes',
       );

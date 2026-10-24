@@ -1,5 +1,5 @@
 /**
- * A run a person holds (`nemia hold <run> --until <run>`), as the board reads it: `heldUntil` and `holding` — the hold in the package's
+ * A run a person holds (`nemia hold <run> --until <run>`), as the board reads it: `holdUntil` and `holding` — the hold in the package's
  * words — on the list and the detail, a decision that is the hold and offers nothing, no step waiting on you and no raise, and every verb
  * the board sends refused in the package's words (`heldRefusal`). Each held to what `nemia ls` and `nemia decide` say of the same run.
  *
@@ -289,7 +289,7 @@ const asked = (id: string): string[] => {
 test('a person holds a run until another lands: the list, the page and the decision say the hold as `nemia ls` and `nemia decide` do, nothing waits on you, every verb is refused, and it moves while the hold may lift on its own', async (t) => {
   const s = story(t);
   await s.test(
-    "the list carries each held run's `heldUntil` and `holding` in `nemia ls`'s words — the runs it waits on as `list` reads them, `word` its `holdWord`, `advice` its `holdAdvice` — and the detail the same",
+    "the list carries each held run's `holdUntil` and `holding` in `nemia ls`'s words — the runs it waits on as `list` reads them, `word` its `holdWord`, `advice` its `holdAdvice` — and the detail the same",
     async () => {
       const runs = await listed();
       const e = engine();
@@ -297,7 +297,7 @@ test('a person holds a run until another lands: the list, the page and the decis
         const api = runs.get(id)!;
         const run = runStore.runs.read(id);
         const cli = await runWith(e, list(e, run));
-        assert.deepEqual(api.heldUntil, run.hold!.until, id);
+        assert.deepEqual(api.holdUntil, run.hold!.until, id);
         assert.ok(api.holding, id);
         assert.equal(api.holding.at, HELD_AT, id);
         assert.deepEqual(asWaits(api.holding), cli.holding, id);
@@ -311,8 +311,8 @@ test('a person holds a run until another lands: the list, the page and the decis
         );
         const page = await detail(id);
         assert.deepEqual(
-          { heldUntil: page.heldUntil, holding: page.holding, moving: page.moving },
-          { heldUntil: api.heldUntil, holding: api.holding, moving: api.moving },
+          { holdUntil: page.holdUntil, holding: page.holding, moving: page.moving },
+          { holdUntil: api.holdUntil, holding: api.holding, moving: api.moving },
           id,
         );
       }
@@ -324,11 +324,11 @@ test('a person holds a run until another lands: the list, the page and the decis
         onYou: false,
       });
       assert.deepEqual(
-        [runs.get('p-live')!.heldUntil, runs.get('p-live')!.holding],
+        [runs.get('p-live')!.holdUntil, runs.get('p-live')!.holding],
         [[], null],
         'a run nobody holds says so with an empty list and a null, not a missing field',
       );
-      assert.deepEqual([(await detail('p-live')).heldUntil, (await detail('p-live')).holding], [[], null]);
+      assert.deepEqual([(await detail('p-live')).holdUntil, (await detail('p-live')).holding], [[], null]);
     },
   );
   await s.test(
@@ -358,7 +358,7 @@ test('a person holds a run until another lands: the list, the page and the decis
         try {
           const run = (await listed()).get(id)!;
           assert.deepEqual(
-            [run.heldUntil, run.holding, run.onYou],
+            [run.holdUntil, run.holding, run.onYou],
             [[], null, onYou],
             `${id}: the rule, not the fixture: it waits on you once the hold is lifted`,
           );
@@ -499,9 +499,9 @@ test('a person holds a run until another lands: the list, the page and the decis
   );
   await s.test('a held run called off reads as called off: no hold, nothing waiting on you, and nothing to decide', async () => {
     const run = (await listed()).get(CANCELLED)!;
-    assert.deepEqual([run.status, run.heldUntil, run.holding, run.waitingOnYou, run.moving], ['cancelled', [], null, [], false]);
+    assert.deepEqual([run.status, run.holdUntil, run.holding, run.waitingOnYou, run.moving], ['cancelled', [], null, [], false]);
     const page = await detail(CANCELLED);
-    assert.deepEqual([page.heldUntil, page.holding], [[], null]);
+    assert.deepEqual([page.holdUntil, page.holding], [[], null]);
     assert.deepEqual(await decisionOf(CANCELLED), { nothing: `cancelled at ${at(40)} — nothing to decide` });
     assert.equal((await runWith(engine(), list(engine(), runStore.runs.read(CANCELLED)))).holding, undefined);
   });
@@ -582,9 +582,9 @@ test('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a han
       assert.deepEqual(await res.json(), { id: LIFT, lifted: true, hold: { at: HELD_AT, until: ['p-live'] } });
       assert.equal(fs.existsSync(holdFile(LIFT)), false);
       const run = (await listed()).get(LIFT)!;
-      assert.deepEqual([run.heldUntil, run.holding, run.onYou], [[], null, ['approve plan']]);
+      assert.deepEqual([run.holdUntil, run.holding, run.onYou], [[], null, ['approve plan']]);
       const page = await detail(LIFT);
-      assert.deepEqual([page.heldUntil, page.holding], [[], null]);
+      assert.deepEqual([page.holdUntil, page.holding], [[], null]);
       assert.equal(page.steps.find((s) => s.name === 'plan')!.approve !== null, true);
       const decided = await decisionOf(LIFT);
       assert.ok('commands' in decided, JSON.stringify(decided));

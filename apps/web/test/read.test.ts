@@ -47,7 +47,7 @@ const row = (extra: object = {}): RunSummary => ({
     onYou: false,
   },
   context: [],
-  heldUntil: [],
+  holdUntil: [],
   holding: {
     at: '2026-09-30T05:00:00.000Z',
     runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],

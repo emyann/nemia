@@ -2781,7 +2781,7 @@ Left for later:
 
 The second of the three cards. The api says a held run is held, not waiting on you, in `wf ls`'s and `wf decide`'s words:
 
-- **The list and the detail** carry `heldUntil`, the runs the hold names, and `holding`: each run as `holdsOf` reads it, `word`
+- **The list and the detail** carry `holdUntil`, the runs the hold names, and `holding`: each run as `holdsOf` reads it, `word`
   (`holdWord`), `advice` (`holdAdvice`), and `onYou`, true when only a person can lift the hold: it names no run, or a run that is
   missing, cancelled or whose branch is gone. A run nobody holds, or one called off, carries `[]` and `null`. The runs a hold names are
   read with `seenBy`, as `--after` reads its runs, so no harness is asked anything more.
@@ -2807,7 +2807,7 @@ The third of the three cards. The board says a held run is held, in the api's wo
   once only a person can lift the hold, and then counts as waiting on you (`waitsOnYou`). It draws no Approve: `gateOfSummary` and
   `offersOf` are null and empty on a held run, since the package refuses those verbs. **The run's page** has a Held section beside
   Waiting on runs. **The Runs list** says the word on the run's row.
-- **An edge `hold:<run>-><held>`** comes from each run in `heldUntil` that is on the floor, drawn as an `--after` edge is. It stays dashed
+- **An edge `hold:<run>-><held>`** comes from each run in `holdUntil` that is on the floor, drawn as an `--after` edge is. It stays dashed
   while the hold stands, and is left out where an `--after` edge already joins the two runs. `floorRuns` brings a finished run that a held
   run is held until onto the floor, so the edge has a card to leave from.
 - **The e2e's `hold` page** holds GATED until HELD, as `wf hold` would write it, reads the card, the edge and the run's page, and then

@@ -69,8 +69,14 @@
     },
     {
       "term": "Hold",
-      "meaning": "only a person's hold of a run until other runs land (`nemia hold`): the run is pending, reason `Waiting`, `on` run.",
-      "type": "Run"
+      "meaning": "only a person's hold of a run until other runs land (`nemia hold`): the run is pending, reason `Waiting`, `on` run; the runs the hold waits for are its `holdUntil`, on the assessment, the summary and the api's `RunDetail`.",
+      "type": "Run",
+      "retired": [
+        {
+          "spelling": "heldUntil",
+          "card": "4c: what a hold waits for is `holdUntil`"
+        }
+      ]
     },
     {
       "term": "Landed",

@@ -142,7 +142,7 @@ function runWith(note: string | null): RunDetail {
     after: [],
     waiting: null,
     context: [],
-    heldUntil: [],
+    holdUntil: [],
     holding: null,
     status: 'failed',
     phase: 'failed',
@@ -4431,7 +4431,7 @@ const HOLDING = {
 
 test('on a run a person holds, a step at its gate is drawn held — no human gate, no waiting on you — and said held, and a step at work is drawn at work', () => {
   for (const status of ['awaiting approval', 'rounds exhausted', 'succeeded · BLOCKED'] as const) {
-    const held = nodeMarkup({ ...runOf(status, { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] });
+    const held = nodeMarkup({ ...runOf(status, { waitingOnYou: [] }), holding: HOLDING, holdUntil: ['p-1'] });
     assert.equal(
       gateDrawn(held),
       false,
@@ -4446,7 +4446,7 @@ test('on a run a person holds, a step at its gate is drawn held — no human gat
     );
   }
   assert.match(
-    nodeMarkup({ ...runOf('running (working)', { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] }),
+    nodeMarkup({ ...runOf('running (working)', { waitingOnYou: [] }), holding: HOLDING, holdUntil: ['p-1'] }),
     /data-state="working"/,
   );
 });
@@ -4457,7 +4457,7 @@ test("a held run's rail draws its gate and the steps not filed held, and its wor
     waitingOnYou: [],
     onYou: [],
     toDecide: null,
-    heldUntil: ['p-1'],
+    holdUntil: ['p-1'],
     holding: HOLDING,
   } as unknown as RunSummary;
   const html = railMarkup(held);

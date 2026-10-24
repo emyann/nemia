@@ -97,7 +97,7 @@ export type RunSummary = {
    * The runs a person holds this one until (`nemia hold <run> --until <run>`), as its hold file names them: none for a run nobody holds, or
    * one called off.
    */
-  heldUntil: string[];
+  holdUntil: string[];
   /**
    * The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. While it stands nothing of the run is
    * filed and nothing is asked of anyone: no step waits on you, and no verb is offered, as `nemia ls` says it.
@@ -246,7 +246,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     after: run.after ?? [],
     context: run.context ?? [],
     waiting: judged.waiting,
-    heldUntil: judged.holding ? run.hold!.until : [],
+    holdUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
     ...runSaid(judged),
     moving: judged.moving,
@@ -314,7 +314,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     after: run.after ?? [],
     context: run.context ?? [],
     waiting: null,
-    heldUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
+    holdUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
     holding: null,
     status: 'running',
     phase: 'running',

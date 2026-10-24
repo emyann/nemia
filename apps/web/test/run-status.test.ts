@@ -54,7 +54,7 @@ const stopped = (status: RunStatus, waitingOnYou: string[]) => ({
   cancelledAt: null,
   pruned: null,
   holding: null,
-  heldUntil: [],
+  holdUntil: [],
   waiting: null,
   toDecide: null,
   moving: false,
@@ -77,13 +77,13 @@ test("a run's status, read by each reader: a gate, a question and a break are th
         assert.deepEqual(
           {
             holdable: holdable(run),
-            heldUntilOffered: holdCandidates(other, [run]).length,
+            holdUntilOffered: holdCandidates(other, [run]).length,
             decidable: decidableRun(run),
             inFlight: inFlight(run),
             prunable: Boolean(prunable(run)),
             stamped: (JSON.parse(decisionStamp(run)) as unknown[])[0],
           },
-          { holdable: true, heldUntilOffered: 1, decidable: true, inFlight: false, prunable: true, stamped: run.status },
+          { holdable: true, holdUntilOffered: 1, decidable: true, inFlight: false, prunable: true, stamped: run.status },
           run.status,
         );
       }

@@ -70,7 +70,7 @@ const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSum
   after: [],
   waiting: null,
   context: [],
-  heldUntil: [],
+  holdUntil: [],
   holding: null,
   toDecide: null,
   unreadable: null,

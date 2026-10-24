@@ -56,7 +56,7 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
   after: [],
   waiting: null,
   context: [],
-  heldUntil: [],
+  holdUntil: [],
   holding: null,
   toDecide: null,
   unreadable: null,
@@ -96,9 +96,9 @@ const waitOn = (onYou: boolean): RunSummary['waiting'] => ({
 
 test("bellRows, bellHash: the waiting bar's rows, their order, what each waits for and where it opens", async (t) => {
   await t.test('REFUSED: a run held until a run that may still land waits on nobody, and is not on the bell', () => {
-    const held = run('held', { heldUntil: ['p'], holding: holdOn(false) });
+    const held = run('held', { holdUntil: ['p'], holding: holdOn(false) });
     assert.equal(bellRuns([held]).length, 0);
-    const lifted = run('stuck', { heldUntil: ['p'], holding: holdOn(true) });
+    const lifted = run('stuck', { holdUntil: ['p'], holding: holdOn(true) });
     assert.deepEqual(
       bellRuns([held, lifted]).map((row) => [row.run, row.waitsFor]),
       [['stuck', ['held until p lands (no such run)']]],

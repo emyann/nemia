@@ -65,7 +65,7 @@ const RUN: WaitingRun = {
   after: [],
   context: [],
   waiting: null,
-  heldUntil: [],
+  holdUntil: [],
   holding: null,
   status: 'awaiting approval',
   phase: 'waiting',

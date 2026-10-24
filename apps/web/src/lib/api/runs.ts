@@ -82,7 +82,7 @@ export type RunSummary = {
    * The runs a person holds this one until (the CLI's `hold`), as its hold file names them: the edges from their cards to its card, as
    * `after`'s are. None for a run nobody holds.
    */
-  heldUntil: string[];
+  holdUntil: string[];
   /** The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. */
   holding: RunHolding | null;
   /**
@@ -180,7 +180,7 @@ const RunSummarySchema = decodes<RunSummary>()(
     after: StringsSchema,
     context: StringsSchema,
     waiting: Schema.NullOr(RunWaitingSchema),
-    heldUntil: StringsSchema,
+    holdUntil: StringsSchema,
     holding: Schema.NullOr(RunHoldingSchema),
     status: RunStatusSchema,
     phase: RunPhaseSchema,

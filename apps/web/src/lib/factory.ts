@@ -197,7 +197,7 @@ export function runClock(
 
 type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after' | 'waitingOnYou' | 'cancelledAt'> & {
   toDecide?: RunToDecide | null;
-  heldUntil?: readonly string[];
+  holdUntil?: readonly string[];
   holding?: RunSummary['holding'];
 };
 

@@ -44,7 +44,7 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
     ...(first.budget !== undefined ? { budget: first.budget } : {}),
     at: new Date().toISOString(),
   };
-  const written = yield* tried(() => runStore.asks.write(id, { kind: 'round', ask }));
+  const written = yield* tried(() => runStore.asks.write(id, { kind: 'retry', of: 'round', ask }));
   const file = written.where;
   if (!written.written) {
     const now = answer((yield* tried(() => runStore.asks.read(id))).rounds);
@@ -91,7 +91,7 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
   const first = answer(run, (yield* tried(() => runStore.asks.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   const acceptance: Acceptance = { step: first.step, try: first.try, at: new Date().toISOString(), message: message! };
-  const written = yield* tried(() => runStore.asks.write(id, { kind: 'accept', ask: acceptance }));
+  const written = yield* tried(() => runStore.asks.write(id, { kind: 'approve', of: 'loop', ask: acceptance }));
   const file = written.where;
   if (!written.written) {
     const { stray } = written;

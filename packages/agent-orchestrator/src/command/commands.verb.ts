@@ -3,7 +3,7 @@
  * answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the same
  * entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`nemia start`, `START`, and `nemia plan`,
  * `PLAN`, which the CLI alone runs), the inbox (`INBOXES`), the factories (`FACTORIES`, their schedules among them), their templates
- * (`TEMPLATES`), a person's asks of a run — `nemia retry`, `nemia approve`, `nemia round`, `nemia accept` and `nemia say` — the runs and
+ * (`TEMPLATES`), a person's asks of a run — `nemia retry`, `nemia approve`, `nemia refresh` and `nemia say` — the runs and
  * their steps (`nemia ls`, `runsListed`), three reads the api alone serves: a run's decision (`decideRun`), whether its branches still
  * merge (`MERGES`) and the run slots (`slotsOf`), the agents of both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents
  * card`, `agentCardRead`) and its custom instructions (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia
@@ -20,13 +20,11 @@ import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { APPROVE } from '../gate/commands.verb.ts';
 import { ANSWER_HELP, answerFlag, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
-import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { messageRefusal, type RetryHow } from '../retry/index.ts';
 import { retryRun } from '../retry/retry.verb.ts';
 import { rootGiven, StoreRoot } from '../config/root.store.ts';
-import { acceptWordsRefusal } from '../round/round.ts';
-import { acceptRun, roundRun } from '../round/round.verb.ts';
+import { roundRun } from '../round/round.verb.ts';
 import { saidLines } from '../say/say.ts';
 import { sayRun } from '../say/say.verb.ts';
 import { budgetRefusal, budgetWord } from '../status/status.ts';
@@ -46,7 +44,8 @@ import { AGENTS_CUSTOM } from '../agents/custom.verb.ts';
 import { LIBRARY_ENTRIES } from '../agents/library.verb.ts';
 import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
 import { MERGES } from '../branches/merges.verb.ts';
-import { MERGE } from '../merge/merge.verb.ts';
+import { mergeRun } from '../merge/merge.verb.ts';
+import { mergeAskedLine } from '../merge/merge.ts';
 import { WORKFLOW_ENTRIES } from '../folder/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { TEMPLATES } from '../template/template.verb.ts';
@@ -84,41 +83,76 @@ function howOf(args: Args): RetryHow {
   };
 }
 
-/** The run's id and the step's name, as `nemia retry`, `nemia approve` and `nemia say` take them first. */
+/** The run's id and the step's name, as `nemia say` takes them first. */
 const RUN_STEP = [
   { key: 'runId', takes: 'required', kind: 'name' },
   { key: 'step', takes: 'required', kind: 'name' },
 ] as const;
 
-/** The run's id, and the step that closes the loop when the run has more than one, as `nemia round` and `nemia accept` take them. */
+/** The run's id and the step, as `nemia retry`, `nemia approve` and `nemia refresh` take them: no step for a run's only loop. */
 const RUN_LOOP = [
   { key: 'runId', takes: 'required', kind: 'name' },
   { key: 'step', takes: 'optional', kind: 'name' },
 ] as const;
 
-/** `nemia retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to. */
-const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
+/** Why a flag the api takes on a route of its own is no key of a body: the route fixes it. */
+const OWN_ROUTE = (route: string): Flag['only'] => ({
+  side: 'cli',
+  why: `the api serves it on a route of its own, ${route}, which names no step in its path and fixes it`,
+});
+
+/** The refusal of `nemia retry --round` given what another round does not take: answers, words, or a way to try a step. */
+function roundRefusal(args: Args): string | null {
+  const line = commandLine(RETRY, args, { round: true, budget: amountIn(args, 'budget') });
+  if (typedOf(args).length || textOf(args, 'message') !== undefined || textOf(args, 'model') !== undefined)
+    return `nemia retry --round asks for another round of a loop, which takes no answers, words or model: ${line}. To try one step again with them, name it without --round: nemia retry <runId> <step> --message "<answer>".`;
+  return null;
+}
+
+/** The refusal of `nemia retry` naming no step and no round: the step to try again, or `--round` for a loop's. */
+function stepRefusal(args: Args): string | null {
+  if (textOf(args, 'step') !== undefined) return null;
+  const runId = textOf(args, 'runId') ?? '<runId>';
+  return `nemia retry takes the step to try again: nemia retry ${runId} <step>. For another round of a loop out of rounds, say --round: nemia retry ${runId} [<step>] --round.`;
+}
+
+/**
+ * `nemia retry`: another try of a step asked for, the next tick files it once, and the file the ask is written to; or, with `--round`,
+ * another round of a loop out of rounds (what `nemia round` was, decision 7), its cap raised with `--budget`.
+ */
+const RETRY: Command<{
+  try?: number;
+  file: string;
+  stopFirst?: boolean;
+  step?: string;
+  round?: number;
+  budget?: number;
+}> = {
   name: 'retry',
   usage:
-    '<runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
+    '<runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]',
   help: [
     'try a step waiting on you again, once, on the next tick:',
-    '--nudge (default) continues its session, told what happened;',
+    '--continue (default) continues its session, told what happened;',
     '--fresh a new session on its branch; --model <m> the same, on m;',
     '--recheck runs its check again, and files no session;',
+    '--round: once more — a loop out of rounds goes round again, once,',
+    'the step it loops to continued, then a new reviewer; the step is the',
+    'one that closes the loop, left out where the run has one loop;',
     '--message "<answer>" goes into the try\'s brief, as ## Your answer:',
     'for a step that signed off blocked, the answer to its needs — or',
-    'what you have to say to any step you try again; not with --recheck.',
-    'The next argument is the answer, whatever it starts with; an answer',
-    "that is only one of these flags' names goes as --message=<answer>;",
-    '--budget <amount>: for a step with a budget: that waits on you, its',
+    'what you have to say to any step you try again; not with --recheck',
+    'or --round. The next argument is the answer, whatever it starts with;',
+    "an answer that is only one of these flags' names goes as --message=<answer>;",
+    '--budget <amount>: for a step with a budget that waits on you, its',
     'cap raised to that many dollars, above its cap and what it has cost;',
+    'with --round, the cap of a step of the loop over its budget;',
     ...ANSWER_HELP,
   ],
   spec: {
-    positionals: RUN_STEP,
+    positionals: RUN_LOOP,
     flags: [
-      { flag: '--nudge', kind: 'switch', sets: { mode: 'nudge' }, way: true },
+      { flag: '--continue', kind: 'switch', sets: { mode: 'nudge' }, way: true },
       { flag: '--fresh', kind: 'switch', sets: { mode: 'fresh' }, way: true },
       { flag: '--recheck', kind: 'switch', sets: { mode: 'recheck' }, way: true },
       {
@@ -129,6 +163,7 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
         way: true,
         takes: '--model takes the model to run the new session on: nemia retry <runId> <step> --model <m>',
       },
+      { flag: '--round', kind: 'switch', key: 'round', way: true, only: OWN_ROUTE('POST /api/runs/:runId/round') },
       {
         flag: '--message',
         kind: 'text',
@@ -148,22 +183,33 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
     ],
     defaults: { mode: 'nudge' },
     unknown: (arg) =>
-      `nemia retry does not take ${arg}. It takes one of --nudge, --fresh, --model <m>, --recheck, and --message "<answer>" and --budget <amount>.`,
-    oneWay: 'nemia retry asks for one try, one way: pick one of --nudge, --fresh, --model <m>, --recheck.',
+      `nemia retry does not take ${arg}. It takes one of --continue, --fresh, --model <m>, --recheck, --round, and --message "<answer>" and --budget <amount>.`,
+    oneWay: 'nemia retry asks for one try, one way: pick one of --continue, --fresh, --model <m>, --recheck, --round.',
     apart: (flag) =>
       `--message takes what to tell the step, and ${flag} is one of nemia retry's own flags, so the answer was left out: nemia retry <runId> <step> --message "<answer>". If ${flag} is the whole answer, give it as --message=${flag}.`,
   },
   check: (args) =>
-    messageRefusal(howOf(args), commandLine(RETRY, args)) ??
-    recheckAnswerRefusal(args, commandLine(RETRY, args)) ??
-    budgetRefusal(howOf(args), commandLine(RETRY, args)),
+    args.round === true
+      ? roundRefusal(args)
+      : (stepRefusal(args) ??
+        messageRefusal(howOf(args), commandLine(RETRY, args)) ??
+        recheckAnswerRefusal(args, commandLine(RETRY, args)) ??
+        budgetRefusal(howOf(args), commandLine(RETRY, args))),
   writes: true,
   ticks: true,
   class: 'answer',
-  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
+  route: [
+    { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
+    { method: 'POST', path: '/api/runs/:runId/round', status: 202, sets: { round: true, mode: 'nudge' } },
+  ],
   apiTakes: ['answers'],
+  apiKeys: ['try', 'file', 'stopFirst', 'step', 'round'],
   handler: Effect.fnUntraced(function* (args: Args, _env, home) {
     const { runId, step } = named(args);
+    if (args.round === true) {
+      const { ask, file } = yield* roundRun(runId, textOf(args, 'step'), amountIn(args, 'budget'));
+      return { step: ask.step, round: ask.round, file, ...(ask.budget !== undefined ? { budget: ask.budget } : {}) };
+    }
     const how = howOf(args);
     const typed = typedOf(args);
     const message = typed.length ? { message: yield* typedAnswers(runId, step, typed, { note: how.message }) } : {};
@@ -172,10 +218,16 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
     );
     return { try: ask.try, file, stopFirst };
   }),
-  print({ try: tryNo, file, stopFirst }, args) {
+  print({ try: tryNo, file, stopFirst, step: looping, round: n, budget }, args) {
     const { runId, step } = named(args);
+    if (args.round === true)
+      return [
+        `${runId}  asked: round ${n} of ${looping}'s loop${budget !== undefined ? `, its cap raised to ${budgetWord(budget)}` : ''} — the next tick files it, once`,
+        `   ${file}`,
+      ];
     const ask = howOf(args);
-    const how = `${ask.model ? `--model ${ask.model}` : `--${ask.mode}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
+    const way = ask.mode === 'nudge' ? 'continue' : ask.mode;
+    const how = `${ask.model ? `--model ${ask.model}` : `--${way}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
     const then = stopFirst
       ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped'
       : 'the next tick files it, once';
@@ -186,57 +238,25 @@ const RETRY: Command<{ try: number; file: string; stopFirst: boolean }> = {
   },
 };
 
-/** `nemia round`: another round of a loop out of rounds asked for, its cap raised with `--budget`, and the file the ask is written to. */
-const ROUND: Command<{ step: string; round: number; file: string; budget?: number }> = {
-  name: 'round',
-  usage: '<runId> [<step>] [--budget <amount>]',
-  help: [
-    'once more: a loop out of rounds goes round again, once, on the',
-    'next tick — the step it loops to continued, then a new reviewer;',
-    '--budget raises the cap of a step of the loop over its budget',
-  ],
-  spec: {
-    positionals: RUN_LOOP,
-    flags: [
-      {
-        flag: '--budget',
-        kind: 'amount',
-        key: 'budget',
-        takes: 'the most a step of the loop may cost together, in dollars, above what it has cost',
-        form: 'nemia round <runId> [<step>] --budget <amount>',
-        twice:
-          'nemia round takes --budget once: the cap to raise the steps of the loop over their budget to, in dollars — nemia round <runId> [<step>] --budget <amount>.',
-      },
-    ],
-    unknown: () =>
-      'nemia round takes the run and, when the run has more than one loop, the step that closes the one to go round: nemia round <runId> [<step>] — and --budget <amount>, to raise the cap of a step of the loop over its budget.',
-  },
-  writes: true,
-  ticks: true,
-  class: 'answer',
-  route: { method: 'POST', path: '/api/runs/:runId/round', status: 202 },
-  apiKeys: ['step', 'round', 'file'],
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const { ask, file } = yield* roundRun(named(args).runId, textOf(args, 'step'), amountIn(args, 'budget'));
-    return { step: ask.step, round: ask.round, file, ...(ask.budget !== undefined ? { budget: ask.budget } : {}) };
-  }),
-  print({ step, round: n, file, budget }, args) {
-    return [
-      `${named(args).runId}  asked: round ${n} of ${step}'s loop${budget !== undefined ? `, its cap raised to ${budgetWord(budget)}` : ''} — the next tick files it, once`,
-      `   ${file}`,
-    ];
-  },
-};
-
 /**
- * `nemia refresh`: a run asked to take the new revisions of the kinds it resolved, and the drift it was asked on.
+ * `nemia refresh`: a run asked to take the new revisions of the kinds it resolved, and the drift it was asked on; or, with `--base`, a
+ * loop's work sent back to merge its base branch, on the round it is on (what `nemia merge` was, decision 7).
  *
  * It takes, it does not reload: the next pass re-pins the run and renders its steps' agent files again, so every filing after it — a new
  * step, a retry, a round — is filed on the revisions the world holds now. Nothing already filed is re-run.
  */
-const REFRESH: Command<{ drift: readonly Drift[] }> = {
+const REFRESH: Command<{
+  drift?: readonly Drift[];
+  step?: string;
+  target?: string;
+  onto?: string;
+  sha?: string;
+  round?: number;
+  file?: string;
+  said?: string;
+}> = {
   name: 'refresh',
-  usage: '<runId>',
+  usage: '<runId> [<step>] [--base]',
   help: [
     'take the new revisions: a run keeps the workflow, agents, skills and',
     'factory rules it resolved when it started, and this pins it to the',
@@ -246,74 +266,46 @@ const REFRESH: Command<{ drift: readonly Drift[] }> = {
     'a run that has filed nothing, which resolves afresh at its first filing',
     'anyway, of one already on the newest revision of every kind, and of one',
     'whose factory follows revisions (nemia factory revisions), whose every',
-    'filing takes them with no refresh',
-  ],
-  spec: {
-    positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
-    flags: [],
-    unknown: (arg) => `nemia refresh takes one run's id: not ${arg}.`,
-    missing: 'nemia refresh takes the run to pin to the new revisions: nemia refresh <runId>.',
-  },
-  writes: true,
-  ticks: true,
-  class: 'act',
-  route: { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 },
-  apiKeys: ['drift'],
-  handler: Effect.fnUntraced(function* (args: Args) {
-    return { drift: yield* refreshRun(named(args).runId) };
-  }),
-  print: ({ drift }, args) => [
-    `${named(args).runId}  asked: the new revisions — the next tick takes them, and every filing after it is on them`,
-    ...drift.map((d) => `   ${driftWords(d)}`),
-  ],
-};
-
-/**
- * `nemia accept`: a loop out of rounds closed on its last try as it stands, its findings open, and the file the acceptance is written to.
- */
-const ACCEPT: Command<{ step: string; try: number; at: string; message: string; file: string; waited: boolean }> = {
-  name: 'accept',
-  usage: '<runId> [<step>] --message "<why>"',
-  help: [
-    'enough: a loop out of rounds ends on your word, with its findings',
-    'open. What waits on the looping step is filed on the next tick as',
-    'if it had said again: false — a gated ending goes to its gate —',
-    'and every step after the loop is handed your words and those',
-    'findings under ## Accepted. The other answer to nemia round',
+    'filing takes them with no refresh;',
+    "--base: take the base instead — a loop's work that no longer merges",
+    'cleanly goes back to merge it, once, on the next tick, on the round it',
+    'is on, which the merge does not spend; the step is the one that closes',
+    'the loop, left out where the run has one loop',
   ],
   spec: {
     positionals: RUN_LOOP,
-    flags: [
-      {
-        flag: '--message',
-        kind: 'text',
-        key: 'message',
-        takes:
-          '--message takes why the work is good enough with its findings open, quoted: nemia accept <runId> [<step>] --message "<why>".',
-        twice: 'nemia accept takes --message once: put all your words in it, quoted — nemia accept <runId> [<step>] --message "<why>".',
-      },
-    ],
-    unknown: () =>
-      'nemia accept takes the run and, when the run has more than one loop, the step that closes the one to end: nemia accept <runId> [<step>] --message "<why>".',
+    flags: [{ flag: '--base', kind: 'switch', key: 'base', only: OWN_ROUTE('POST /api/runs/:runId/merge') }],
+    unknown: (arg) =>
+      `nemia refresh takes one run's id, and with --base the step that closes the loop whose work merges: not ${arg}. nemia refresh <runId>, or nemia refresh <runId> [<step>] --base.`,
+    missing: 'nemia refresh takes the run to pin to the new revisions: nemia refresh <runId>.',
   },
-  check: (args) => acceptWordsRefusal(textOf(args, 'message'), commandLine(ACCEPT, args)),
+  check: (args) =>
+    args.base !== true && textOf(args, 'step') !== undefined
+      ? `nemia refresh takes a step only with --base, which merges the base into the work of the loop it closes: nemia refresh ${textOf(args, 'runId') ?? '<runId>'} ${textOf(args, 'step')} --base. The new revisions are the whole run's: nemia refresh ${textOf(args, 'runId') ?? '<runId>'}.`
+      : null,
   writes: true,
   ticks: true,
-  class: 'answer',
-  route: { method: 'POST', path: '/api/runs/:runId/steps/:step/accept', status: 202 },
-  apiKeys: ['step', 'try', 'at', 'message', 'file'],
+  class: 'act',
+  route: [
+    { method: 'POST', path: '/api/runs/:runId/refresh', status: 202 },
+    { method: 'POST', path: '/api/runs/:runId/merge', status: 202, sets: { base: true } },
+  ],
+  apiKeys: ['drift', 'step', 'target', 'onto', 'sha', 'round', 'file'],
   handler: Effect.fnUntraced(function* (args: Args) {
     const { runId } = named(args);
-    const { acceptance, file } = yield* acceptRun(runId, textOf(args, 'step'), textOf(args, 'message'));
-    const waited = stepsOf(runStore.runs.read(runId)).some((s) => s.after.includes(acceptance.step));
-    return { step: acceptance.step, try: acceptance.try, at: acceptance.at, message: acceptance.message, file, waited };
+    if (args.base !== true) return { drift: yield* refreshRun(runId) };
+    const { run, ask, file } = yield* mergeRun(runId, textOf(args, 'step'));
+    const looping = stepsOf(run).find((s) => s.name === ask.step)!;
+    const { target, onto, sha } = ask.merge;
+    return { step: ask.step, target, onto, sha, round: ask.round, file, said: mergeAskedLine(ask, looping) };
   }),
-  print({ step, try: tryNo, file, waited }, args) {
-    return [
-      `${named(args).runId}  accepted: try ${tryNo} of ${step} as it stands, its findings open — ${waited ? 'the next tick files what waits on it' : 'nothing waits on it: its run can be decided'}`,
-      `   ${file}`,
-    ];
-  },
+  print: ({ drift, said, file }, args) =>
+    args.base === true
+      ? [`${named(args).runId}  ${said ?? ''}`, `   ${file ?? ''}`]
+      : [
+          `${named(args).runId}  asked: the new revisions — the next tick takes them, and every filing after it is on them`,
+          ...(drift ?? []).map((d) => `   ${driftWords(d)}`),
+        ],
 };
 
 /**
@@ -524,10 +516,7 @@ export const COMMANDS: readonly Command[] = [
   ...TEMPLATES,
   RETRY,
   APPROVE,
-  ROUND,
   REFRESH,
-  ACCEPT,
-  MERGE,
   SAY,
   LS,
   ...READS,

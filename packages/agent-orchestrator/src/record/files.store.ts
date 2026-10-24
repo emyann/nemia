@@ -10,7 +10,7 @@ import { Schema } from 'effect';
 import { pauseFile, readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
 import { inboxNameOf, type MissedStart } from '../inbox/index.ts';
-import type { AskKey, AskKind, AsksRead, AskWritten, PersonAsk, Pruned, Run, RunStore } from './record.ts';
+import type { AskKey, AskOf, AsksRead, AskWritten, PersonRequest, Pruned, Run, RunStore } from './record.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';
 import {
@@ -56,38 +56,38 @@ import { mergeSpent } from '../merge/merge.ts';
 import { keptRecords, type RecordMemo } from '../rest/index.ts';
 import { verifiesRest } from '../config/config.store.ts';
 
-/** Each kind of ask: the file it is written at, by run, step and number, and its reader, as the tick reads it. */
+/** Each ask, by which it is: the file it is written at, by run, step and number, and its reader, as the tick reads it. */
 const ASKS: Record<
-  AskKind,
+  AskOf,
   { file: (id: string, step: string, n: number) => string; read: (file: string, step: string, n: number) => unknown }
 > = {
-  retry: { file: askFile, read: askIn },
+  try: { file: askFile, read: askIn },
   round: { file: roundAskFile, read: roundAskIn },
-  approve: { file: approvalFile, read: approvalIn },
-  accept: { file: acceptFile, read: acceptanceIn },
-  merge: { file: mergeAskFile, read: mergeAskIn },
+  gate: { file: approvalFile, read: approvalIn },
+  loop: { file: acceptFile, read: acceptanceIn },
+  base: { file: mergeAskFile, read: mergeAskIn },
 };
 
 /** The file of the ask `key` of the run `id`. */
-const askWhere = (id: string, { kind, step, n }: AskKey): string => ASKS[kind].file(id, step, n);
+const askWhere = (id: string, { of, step, n }: AskKey): string => ASKS[of].file(id, step, n);
 
 /**
  * Write a person's ask at its name (`writeAsk`), the ask alone; and, when a file already stands there, why it is no ask of its kind: its
  * reader's words, or null when it reads as one or is gone since.
  */
-function writePersonAsk(id: string, person: PersonAsk): AskWritten {
-  const { kind, ask } = person;
+function writePersonAsk(id: string, person: PersonRequest): AskWritten {
+  const { of, ask } = person;
   const [step, n] =
-    person.kind === 'merge' ? [person.ask.merge.target, person.ask.merge.try] : [ask.step, 'round' in ask ? ask.round : ask.try];
-  const where = askWhere(id, { kind, step, n });
+    person.of === 'base' ? [person.ask.merge.target, person.ask.merge.try] : [ask.step, 'round' in ask ? ask.round : ask.try];
+  const where = askWhere(id, { of, step, n });
   if (writeAsk(where, askHeld(person))) return { written: true, where };
-  const read = ASKS[kind].read(where, step, n);
+  const read = ASKS[of].read(where, step, n);
   return { written: false, where, stray: typeof read === 'string' && lstatOf(where) ? read : null };
 }
 
 /** What a person's ask file holds: the ask as its verb gave it, but a merge's, which holds its loop, round, base, commit and time. */
-function askHeld(person: PersonAsk): Parameters<typeof writeAsk>[1] {
-  if (person.kind !== 'merge') return person.ask;
+function askHeld(person: PersonRequest): Parameters<typeof writeAsk>[1] {
+  if (person.of !== 'base') return person.ask;
   const { step, round, at, merge } = person.ask;
   return { loop: step, round, onto: merge.onto, sha: merge.sha, at, ...(merge.landing ? { landing: merge.landing } : {}) };
 }

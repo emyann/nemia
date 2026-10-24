@@ -13,6 +13,7 @@ const { REGENERATE, verbsSkill, verbsSkillOf } = await import('../src/nemia/verb
 const { TABLE } = await import('../src/command/commands.verb.ts');
 const { CLI_VERBS } = await import('../src/command/command.ts');
 const { VERBS } = await import('../src/cli/main.ts');
+const { ANSWERS, PENDING, REFUSED_FLAGS, REFUSED_WORDS } = await import('./command-words.ts');
 
 const SKILL = path.join(import.meta.dirname, '..', 'nemia', 'skills', 'verbs', 'SKILL.md');
 
@@ -84,6 +85,27 @@ test('a command that reads bare is listed as a read, with the words that make it
 
 test('a class the person answers is listed with what it answers, and the skill that brings it first', () => {
   const answers = sectionOf(verbsSkill(), 'Answers what waits');
-  for (const name of ['approve', 'retry', 'round', 'accept']) assert.ok(lists(answers, name), `${name} answers what waits`);
+  const listed = [...answers.matchAll(/^ {2}nemia (\S+)/gm)].map((m) => m[1]);
+  assert.deepEqual(listed.sort(), [...ANSWERS].sort(), 'approve and retry alone answer what waits');
   assert.match(answers, /`bring-what-waits` skill/);
+  assert.match(answers, /--round/, 'another round is said as retry --round');
+  assert.match(answers, /--continue/, "a try that continues its session is said as retry's --continue");
+});
+
+test('the skill lists no verb named by a refused word but those pending, and no renamed flag', () => {
+  const pending = new Set(PENDING.map((p) => p.name));
+  const usages = [...verbsSkill().matchAll(/^ {2}nemia (.+)$/gm)].map((m) => m[1]);
+  const named = TABLE.map((c) => c.name).filter((n) => usages.some((u) => u === n || u.startsWith(`${n} `)));
+  assert.deepEqual(
+    named.filter((n) => !pending.has(n) && n.split(' ').some((w) => REFUSED_WORDS.includes(w))),
+    [],
+  );
+  assert.deepEqual(
+    usages.filter((u) => REFUSED_FLAGS.some((f) => u.includes(f))),
+    [],
+  );
+  assert.ok(
+    usages.some((u) => u.startsWith('refresh ') && u.includes('--base')),
+    'the base is taken by refresh --base',
+  );
 });

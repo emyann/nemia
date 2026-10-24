@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { branchFates, forgetLine, forgetRefusal, heldWorktree, idRefusal, runWorktrees, type Forgot } from './forget.ts';
+import { branchFates, forgetLine, forgetRefusal, heldWorktree, idRefusal, runWorktrees, type AskName, type Forgot } from './forget.ts';
 import type { RepositoryRun, Run, RoundAsk, StepRecord, TaskPhase } from '../run.ts';
 import type { Held } from '../place/place.ts';
 import type { Closeout } from '../closeout/closeout.ts';
@@ -50,7 +50,9 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Par
 const askFor = (n: number, mode: RetryMode = 'nudge'): RetryAsk => ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' });
 const roundAskFor = (round: number): RoundAsk => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' });
 /** Where an ask's file is, as the store says it. */
-const at = (a: { kind: string; step: string; n: number }) => `/wf/runs/r-1.asks/${a.kind}-${a.step}-${a.n}`;
+/** The file each ask is named by, as the store names it: a try's `retry-…`, a round's `round-…`, a merge of the base's `merge-…`. */
+const FILE_OF = { try: 'retry', round: 'round', base: 'merge' } as const;
+const at = (a: AskName) => `/wf/runs/r-1.asks/${FILE_OF[a.of]}-${a.step}-${a.n}`;
 const until = (id: string) => ({ hold: { at: '2026-01-01T01:00:00Z', until: [id] } });
 /** A run held until r-1 lands. */
 const heldBy = (id: string) => run({ implement: 't9' }, { id, ...until('r-1') });

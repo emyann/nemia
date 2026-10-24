@@ -10,6 +10,7 @@ import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { atLeast, type Level } from '../level/level.ts';
 import { allowedBy, AUTO_ANSWERS, NO_FACTS, type AutoRule, type Facts } from '../auto/index.ts';
 import type { CommandClass } from './class.ts';
+import type { ApproveForm } from '../gate/form.verb.ts';
 
 /**
  * An entry of the table as admission reads it: its name, its class, whether it is asked every time, the side it is served on, and how its
@@ -152,14 +153,19 @@ function scopeOf(line: string, table: readonly Entry[], scope: Scope): Admission
 /** Whether a command's words raise a step's cap. */
 const raises = (args: readonly string[]): boolean => args.some((a) => a === '--budget' || a.startsWith('--budget='));
 
+/** Whether a retry's words ask for another round of a loop (`--round`, what `nemia round` was), which is always the person's. */
+const rounds = (args: readonly string[]): boolean => args.includes('--round');
+
 /**
- * Why a typed answer is asked of the person, or undefined where it waits on no one. A retry asks where it raises a cap (`--budget`), names
- * no run and step, or tries a step `waitOf` says waits on the person; any other answer always asks, since it only answers what waits.
+ * Why a typed answer is asked of the person, or undefined where it waits on no one. A retry asks where it raises a cap (`--budget`), asks
+ * for another round (`--round`), names no run and step, or tries a step `waitOf` says waits on the person; any other answer always asks,
+ * since it only answers what waits.
  */
 function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) => string | undefined): string | undefined {
   const line = ['nemia', name, ...args].join(' ');
   if (name !== 'retry') return `${line} answers what waits on you: it is yours to give.`;
   if (raises(args)) return `${line} raises a step's cap: a budget is yours to raise.`;
+  if (rounds(args)) return `${line} takes another round of a loop out of rounds: a round is yours to give.`;
   const [runId, step] = args.filter((a) => !a.startsWith('-'));
   if (runId === undefined || step === undefined) return `${line} names no run and step, so admission cannot read what it tries.`;
   const waits = waitOf(runId, step);
@@ -168,13 +174,15 @@ function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) =>
 
 /**
  * What admission reads at `auto`, for the agent it is handed: the person's list in force for it (`list`); the level of a run's factory,
- * undefined where the run does not read (`levelOf`); and the facts of a run at the call, for a step, undefined where they do not read
- * (`factsOf`). Read at the call, and carried to no other.
+ * undefined where the run does not read (`levelOf`); the facts of a run at the call, for a step, undefined where they do not read
+ * (`factsOf`); and the yes an approval of a step gives, at its gate or to a loop out of rounds, undefined where it does not read
+ * (`formOf`). Read at the call, and carried to no other.
  */
 export type Auto = {
   list: readonly AutoRule[];
   levelOf: (runId: string) => Level | undefined;
   factsOf: (runId: string, step: string) => Facts | undefined;
+  formOf: (runId: string, step: string) => ApproveForm | undefined;
 };
 
 /** The run and step a typed answer names, read by its entry's spec, or undefined where its words do not parse or name none. */
@@ -195,12 +203,16 @@ export function answerOf(typed: Typed, table: readonly Entry[]): { runId: string
 
 /**
  * Whether a rule of the person's list lets the typed answer through unasked: an answer a rule may give (`AUTO_ANSWERS`), raising no cap,
- * naming a run and a step, the run's factory at `auto`, and a rule that allows it in the run's facts at the call (`allowedBy`).
+ * asking for no round, naming a run and a step — an approval, one at the step's gate, never a loop's end (`formOf`), which was `nemia
+ * accept` and is the person's every time — the run's factory at `auto`, and a rule that allows it in the run's facts at the call
+ * (`allowedBy`).
  */
 function autoAllows(typed: Typed, table: readonly Entry[], auto: Auto | undefined): boolean {
-  if (auto === undefined || !(AUTO_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args)) return false;
+  if (auto === undefined || !(AUTO_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args) || rounds(typed.args))
+    return false;
   const answer = answerOf(typed, table);
   if (answer === undefined) return false;
+  if (typed.name === 'approve' && auto.formOf(answer.runId, answer.step) !== 'gate') return false;
   const level = auto.levelOf(answer.runId);
   if (level === undefined || !atLeast(level, 'auto')) return false;
   const facts = auto.factsOf(answer.runId, answer.step) ?? NO_FACTS;

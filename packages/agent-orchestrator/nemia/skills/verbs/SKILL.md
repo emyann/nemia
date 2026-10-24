@@ -203,7 +203,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off
-  nemia refresh <runId>
+  nemia refresh <runId> [<step>] [--base]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the
                                ones they hold now, so every filing after it — a new step, a retry,
@@ -212,11 +212,11 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                a run that has filed nothing, which resolves afresh at its first filing
                                anyway, of one already on the newest revision of every kind, and of one
                                whose factory follows revisions (nemia factory revisions), whose every
-                               filing takes them with no refresh
-  nemia merge <runId> [<step>]
-                               merge the base: a loop's work that no longer merges cleanly
-                               goes back to merge it, once, on the next tick — on the round
-                               it is on, which the merge does not spend
+                               filing takes them with no refresh;
+                               --base: take the base instead — a loop's work that no longer merges
+                               cleanly goes back to merge it, once, on the next tick, on the round it
+                               is on, which the merge does not spend; the step is the one that closes
+                               the loop, left out where the run has one loop
   nemia say <runId> <step> "<words>"
                                tell a step's running session something, through its harness: the
                                engine journals the words on the step's task, nemia ls notes the step
@@ -420,41 +420,41 @@ Each asks the person at a prompt every time it runs: say what it does before you
 Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose with their words as `--message`: its prompt is their decision, asked once. `nemia retry` asks only of a step that waits on the person, or with `--budget`.
 
 ```text
-  nemia retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
+  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
                                try a step waiting on you again, once, on the next tick:
-                               --nudge (default) continues its session, told what happened;
+                               --continue (default) continues its session, told what happened;
                                --fresh a new session on its branch; --model <m> the same, on m;
                                --recheck runs its check again, and files no session;
+                               --round: once more — a loop out of rounds goes round again, once,
+                               the step it loops to continued, then a new reviewer; the step is the
+                               one that closes the loop, left out where the run has one loop;
                                --message "<answer>" goes into the try's brief, as ## Your answer:
                                for a step that signed off blocked, the answer to its needs — or
-                               what you have to say to any step you try again; not with --recheck.
-                               The next argument is the answer, whatever it starts with; an answer
-                               that is only one of these flags' names goes as --message=<answer>;
-                               --budget <amount>: for a step with a budget: that waits on you, its
+                               what you have to say to any step you try again; not with --recheck
+                               or --round. The next argument is the answer, whatever it starts with;
+                               an answer that is only one of these flags' names goes as --message=<answer>;
+                               --budget <amount>: for a step with a budget that waits on you, its
                                cap raised to that many dollars, above its cap and what it has cost;
+                               with --round, the cap of a step of the loop over its budget;
                                --answer <n>=<letter>: answer question n, numbered as nemia decide
                                <runId> prints them, with the option its letter names; once for each
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
-  nemia approve <runId> <step> [--answer <n>=<letter>]... [--message "<words>"]
+  nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--message "<words>"]
                                let a step waiting at its gate hand on: what waits on it is filed on
                                the next tick, and every step after the gate is handed your words
                                under ## Approved. To send it back instead, with what to change:
                                nemia retry <runId> <step> --message "<objection>"
+                               Of a loop out of rounds — the step that closes it, or the run alone
+                               where it has one loop — enough: the loop ends on your words, with its
+                               findings open, --message "<why>" required. What waits on the looping
+                               step is filed as if it had said again: false, and every step after
+                               the loop is handed your words and those findings under ## Accepted.
+                               To go round once more instead: nemia retry <runId> [<step>] --round
                                --answer <n>=<letter>: answer question n, numbered as nemia decide
                                <runId> prints them, with the option its letter names; once for each
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
-  nemia round <runId> [<step>] [--budget <amount>]
-                               once more: a loop out of rounds goes round again, once, on the
-                               next tick — the step it loops to continued, then a new reviewer;
-                               --budget raises the cap of a step of the loop over its budget
-  nemia accept <runId> [<step>] --message "<why>"
-                               enough: a loop out of rounds ends on your word, with its findings
-                               open. What waits on the looping step is filed on the next tick as
-                               if it had said again: false — a gated ending goes to its gate —
-                               and every step after the loop is handed your words and those
-                               findings under ## Accepted. The other answer to nemia round
 ```

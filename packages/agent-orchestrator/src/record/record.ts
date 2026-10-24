@@ -580,24 +580,31 @@ export function unloadedWords(runId: string, why: string, by: string): string {
 export type AsksRead = { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] };
 
 /**
- * The kinds of ask a person writes: a try (`nemia retry`), a round (`nemia round`), an approval (`nemia approve`), an acceptance (`nemia
- * accept`), a merge of the base (`nemia merge`).
+ * The verb a person's ask answers with: a try or a round (`nemia retry`, `--round` for a round), a yes at a gate or to a loop out of
+ * rounds (`nemia approve`), the base brought into a loop's work (`nemia refresh --base`).
  */
-export type AskKind = 'retry' | 'round' | 'approve' | 'accept' | 'merge';
+export type AskKind = 'retry' | 'approve' | 'refresh';
 
 /**
- * Which ask: its kind, its step, and its number — the try it names, or the round a round ask asks for; for a merge, the loop's target and
- * its try that merges.
+ * Which ask of its verb, as its file is named: a try (`retry-…`), a round (`round-…`), an approval at a gate (`approve-…`), a loop out of
+ * rounds ended as it stands (`accept-…`), a merge of the base (`merge-…`). The files keep the names they had, so no ask on disk is
+ * orphaned.
  */
-export type AskKey = { kind: AskKind; step: string; n: number };
+export type AskOf = 'try' | 'round' | 'gate' | 'loop' | 'base';
 
-/** A person's ask, of its kind, as its verb writes it. */
-export type PersonAsk =
-  | { kind: 'retry'; ask: RetryAsk }
-  | { kind: 'round'; ask: RoundAsk }
-  | { kind: 'approve'; ask: Approval }
-  | { kind: 'accept'; ask: Acceptance }
-  | { kind: 'merge'; ask: RoundAsk & { merge: MergeOf } };
+/**
+ * Which ask: which of its verb (`of`), its step, and its number — the try it names, or the round a round ask asks for; for a merge, the
+ * loop's target and its try that merges.
+ */
+export type AskKey = { of: AskOf; step: string; n: number };
+
+/** A person's request beside a run, of its verb and which, as its verb writes it. */
+export type PersonRequest =
+  | { kind: 'retry'; of: 'try'; ask: RetryAsk }
+  | { kind: 'retry'; of: 'round'; ask: RoundAsk }
+  | { kind: 'approve'; of: 'gate'; ask: Approval }
+  | { kind: 'approve'; of: 'loop'; ask: Acceptance }
+  | { kind: 'refresh'; of: 'base'; ask: RoundAsk & { merge: MergeOf } };
 
 /**
  * What a merge ask's file holds (`mergeAskIn`): the looping step, the round it is on, the base branch, its commit, when it was asked, and
@@ -702,7 +709,7 @@ export type RunStore = {
      * Write a person's ask, whole and exclusively, keyed by its kind, its step and its number: never over a file at its name, which is
      * answered as `written: false`, with why that file is no ask of its kind (`AskWritten`).
      */
-    readonly write: (id: string, ask: PersonAsk) => AskWritten;
+    readonly write: (id: string, ask: PersonRequest) => AskWritten;
     /** Where a person finds the ask `key` of the run: the path a message names for them to read or remove. */
     readonly where: (id: string, key: AskKey) => string;
   };

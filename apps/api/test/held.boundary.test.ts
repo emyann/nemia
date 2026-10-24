@@ -126,7 +126,7 @@ test('each try of a held task a person answered is its own turn: the try answere
   const [answered, going] = plan.tries;
   assert.deepEqual(
     [answered.status, answered.attempts.count, answered.attempts.latest?.ended, answered.closeout?.needs],
-    ['succeeded', 1, 'done', BLOCKED.needs],
+    ['succeeded', 1, 'succeeded', BLOCKED.needs],
     'the turn answered, as it signed',
   );
   assert.deepEqual(

@@ -389,7 +389,7 @@ test('an engine over the former words: a fake that speaks them, and a journal wr
           at: at(3),
           attempt: 1,
           sessionId: 's-1',
-          observed: 'succeeded',
+          observed: 'done',
           reason: 'harness',
           nativeId: 'native-1',
           closeout: { outcome: 'done' },

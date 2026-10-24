@@ -156,7 +156,7 @@ test("the journal's words, run by run: each written as the engine wrote it befor
     assert.deepEqual(b.asked, [['spawn', spawnAsked]]);
   });
 
-  await t.test("a stored end in the former word, `observed: 'succeeded'`, folds to an attempt that ended `succeeded`", async () => {
+  await t.test("a stored end in the former word, `observed: 'done'`, folds to an attempt that ended `succeeded`", async () => {
     const b = board();
     const at = new Date().toISOString();
     b.tasks.set('t-former', [

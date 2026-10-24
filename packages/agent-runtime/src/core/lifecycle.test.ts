@@ -87,7 +87,7 @@ const journalled = (action: Action, ms: number): Event[] => {
           reason: action.reason,
           nativeId: action.nativeId,
           closeout: action.closeout,
-          ...(action.stated !== undefined ? { stated: action.stated } : {}),
+          ...(action.closedOut !== undefined ? { closedOut: action.closedOut } : {}),
         },
       ];
     case 'settle':

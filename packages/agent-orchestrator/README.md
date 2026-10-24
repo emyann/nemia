@@ -693,7 +693,7 @@ Claude Code's flags for it in the engine's `config.claude` (docs/spike-2026-09-2
 - `mcp:` — the MCP servers its sessions load, by the names the checkout's `.mcp.json` gives them, comma-separated: `mcp: playwright`.
   A session loads the servers its agent and its step name and no other: where neither has a line it loads none, and neither does a
   step with no agent.
-  The run hands the runtime the names alone (`checkoutMcp`), which reads those entries from the session's checkout when it starts it; a
+  The run hands the runtime the names alone (`projectMcp`), which reads those entries from the session's checkout when it starts it; a
   name that file does not declare refuses the session at its start, saying so. A Codex step is handed the same entries as
   `-c mcp_servers=…`. Loading a server allows none of its tools: the agent's fence still decides. Refused at load: a line that names
   no server, an empty name, a name twice, and any name on a step a remote agent runs, which loads what its operator configured. A
@@ -1504,7 +1504,7 @@ gated ship runs the line whole on the merged tree.
 | `waiting on r-xyz` | not filed: the run was started `--after` a run that has not shipped, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
 | the engine's phase: `working`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
-| `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`stated: false`; a journal from before stage 4a says `failed`, `unsigned`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares, or its closeout named a file the run does not have | **never runs** — the run nudges it once a round first, below |
+| `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`closedOut: false`; a journal from before stage 4a says `failed`, `unsigned`, which the engine reads back as `former: 'unsigned'`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares, or its closeout named a file the run does not have | **never runs** — the run nudges it once a round first, below |
 | `succeeded · BLOCKED` | it signed off `blocked` | **never runs** |
 | `checking` | signed off; its check is due or running | waits |
 | `verified ✓` | its check exited 0 | is filed |
@@ -1563,7 +1563,7 @@ retries: 1
   session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
   is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
-  — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `stated: false`, and
+  — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `closedOut: false`, and
   the run reads that as `unsigned` (`closeoutAsked`) — that said nothing is continued once:
   the next tick files the next try as a nudge on no one's word (`then: 'signoff'` on the record), with the same
   schema, model, effort, context window, tools and permission mode as the session it continues, told in
@@ -1573,9 +1573,10 @@ retries: 1
   `wf ls` says `try 2, nudged to sign off by the run`, `wf decide` `UNSIGNED: implement (nudged to sign off once
   by the run, and unsigned again)`. A person's ask for that try comes first. Not nudged: a step over its budget,
   a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
-  engine said `unsigned` for `done`, and any `done` recorded with no `stated` key. Why the run and not the engine: an
-  engine allowance was per task, so a person's try would earn another in the same round; each engine attempt got the
-  whole cap; and it restarted a session the harness failed too. The runtime makes one attempt per start since
+  engine said `unsigned` for `done`, any `done` recorded with no `closedOut` key, and a session that broke (a `failed`
+  end with `closedOut: false` and no `former`). Why the run and not the engine: an engine allowance was per task,
+  so a person's try would earn another in the same round; each engine attempt got the whole cap; and it restarted a
+  session the harness failed too. The runtime makes one attempt per start since
   2026-09-23, and `maxAttempts:` is refused.
 - **A closeout that names a file the run does not have is refused, and is no check.** On the pass that first reads a step's
   task signed, after it collected what the closeout named and before it judges the run, the tick reads each file of
@@ -1999,9 +2000,9 @@ kept nowhere:
 
   implement
     check  npm test  →  exit 0 ✓
-    used  29 turns · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s
+    used  29 responses · 93 tool calls · 6.35M in · 112k out · api 8m06s · tools 2s
     cost  $3.01 · read 21.4M · wrote 412k · peak 167k · budget $5
-    timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 29 turns · …  cost $3.01
+    timeline  try 1        filed 08:00:00Z  spawned 08:00:12Z  ended 08:19:54Z  queued 12s  ran 19m42s  used 29 responses · …  cost $3.01
               try 1 check  filed 08:19:56Z  spawned 08:19:57Z  ended 08:20:55Z  queued 1s  ran 58s
 
   cost  run $3.01

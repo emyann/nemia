@@ -9,7 +9,7 @@ import type { HarnessSpec } from '../detached/detached.ts';
 import { CODEX_START, codexOutput, codexPartials } from './stream.ts';
 import { CODEX_DEFAULT_SANDBOX, CODEX_EFFORTS, CODEX_SANDBOXES } from './vocabulary.ts';
 import { codexRolloutEvents, codexRolloutFile } from './transcript.ts';
-import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedCheckoutMcp } from '../mcp.ts';
+import { codexMcpServerNames, codexMcpServers, mcpRefuses, pickedProjectMcp } from '../mcp.ts';
 
 /**
  * The project paths a Codex config trusts.
@@ -85,16 +85,16 @@ const sseRefusal = (mcp: Record<string, McpServer> | undefined): string | undefi
 };
 
 /**
- * The entries a task's `checkoutMcp` picks from its checkout's `.mcp.json`, as servers Codex can be handed, or `undefined` for a
+ * The entries a task's `projectMcp` picks from its checkout's `.mcp.json`, as servers Codex can be handed, or `undefined` for a
  * task that names none. Refused: an entry not in the shape a task's own `mcp` takes (`mcpRefuses`), which Codex's table cannot
  * say, and an SSE server.
  */
 const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => {
-  const names = r.config?.checkoutMcp;
+  const names = r.config?.projectMcp;
   if (!names?.length) return undefined;
-  const picked = pickedCheckoutMcp(r.cwd, names);
+  const picked = pickedProjectMcp(r.cwd, names);
   const refused = mcpRefuses(picked) ?? sseRefusal(picked as Record<string, McpServer>);
-  if (refused) throw new Error(`${refused} It is an entry of ${path.resolve(r.cwd, '.mcp.json')}, picked by \`checkoutMcp\`.`);
+  if (refused) throw new Error(`${refused} It is an entry of ${path.resolve(r.cwd, '.mcp.json')}, picked by \`projectMcp\`.`);
   return picked as Record<string, McpServer>;
 };
 
@@ -138,7 +138,7 @@ const codexPicked = (r: SpawnRequest): Record<string, McpServer> | undefined => 
 export const codex: HarnessSpec = {
   name: 'codex',
   codexArgs: true,
-  checkoutMcp: true,
+  projectMcp: true,
   env: true,
   mounts: { readOnly: true },
   command: (r, io) => ({

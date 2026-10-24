@@ -6,7 +6,7 @@
  * So for those we detach a worker per session and maintain the registry ourselves, as a directory
  * of run files (`bin/ae-worker.ts` writes them).
  *
- * **What this costs, stated plainly**: a heartbeat. A worker that is killed leaves a run file that
+ * **What this costs, said plainly**: a heartbeat. A worker that is killed leaves a run file that
  * says `working` forever, and nothing on disk distinguishes that from a session thinking hard. So
  * the worker beats every 5s and `observe` calls a stale beat dead. That is a lease, in the only
  * form a lease has ever taken. It is the price of not having somebody else's registry to read,
@@ -157,11 +157,11 @@ export type HarnessSpec = {
    */
   env?: true;
   /**
-   * The harness can leave the checkout's `.mcp.json` out of a session, whole or but for the entries a task's `config.checkoutMcp`
+   * The harness can leave the checkout's `.mcp.json` out of a session, whole or but for the entries a task's `config.projectMcp`
    * names, and loads those it names. Absent: `file()` refuses a task that carries it rather than start a session with servers it
    * did not ask for, or without those it did.
    */
-  checkoutMcp?: true;
+  projectMcp?: true;
   /**
    * The harness gives a session exactly the skills a task's `config.enabledSkills` lists, and hides and refuses every other. Absent:
    * `file()` refuses a task with a list rather than start a session that holds skills it was not given.
@@ -220,13 +220,13 @@ export type HarnessIO = {
   /** Directories to treat as trusted for this run. Codex loads a project's rules only when trusted. */
   trustedDirs?: string[];
   /**
-   * Present when the session has MCP servers of the task's: its `mcp` and the entries its `checkoutMcp` picks, written as an MCP
+   * Present when the session has MCP servers of the task's: its `mcp` and the entries its `projectMcp` picks, written as an MCP
    * config (`{"mcpServers": …}`).
    */
   mcpConfigFile?: string;
   /** The checkout's own `.mcp.json`, when there is one. Found by a spec's `prepare`, which reads the disk. */
-  checkoutMcpConfig?: string;
-  /** The entries a task's `checkoutMcp` picked from its checkout's `.mcp.json`, for a harness that takes servers as arguments. */
+  projectMcpConfig?: string;
+  /** The entries a task's `projectMcp` picked from its checkout's `.mcp.json`, for a harness that takes servers as arguments. */
   pickedMcp?: Record<string, McpServer>;
   /** `ionice -c3` runs on this machine, so a command can be put in the idle IO class. Found by a spec's `prepare`. */
   idleIo?: true;

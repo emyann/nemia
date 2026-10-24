@@ -357,6 +357,9 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
   });
 });
 
+/** An end an old journal wrote `failed`, `unsigned`, as the runtime reads it back: no statement, and the former reason. */
+const formerUnsigned = { ended: 'failed', reason: 'harness', closedOut: false, former: 'unsigned' };
+
 /** The engine's view of `t1`, settled `settled`, one attempt per end given; asked for a closeout unless `closeout` is false. */
 const viewed = (settled: string, ends: Array<Record<string, unknown>>, closeout = true) =>
   new Map([
@@ -396,12 +399,7 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
   const lsOf = (phase: ListedPhase, askedCloseout: (id: string) => boolean | 'unsigned') =>
     listing({ steps: STEPS, run: r, phaseOf: shown({ t1: phase }), closeoutOf: none, askedCloseout }).waitingOnYou;
   await t.test('a journal from before stage 4a part 2: quiet then lost reads failed and is not waited on you', () => {
-    const lostLast = closeoutAsked(
-      viewed('failed', [
-        { ended: 'failed', reason: 'unsigned' },
-        { ended: 'failed', reason: 'lost' },
-      ]),
-    );
+    const lostLast = closeoutAsked(viewed('failed', [formerUnsigned, { ended: 'failed', reason: 'lost' }]));
     assert.equal(lostLast('t1'), true, 'asked, and of two attempts in order, the last ended for another reason');
     assert.equal(stepStatus(STEPS[0], r, failed, none, lostLast), 'failed');
     const broke = decision(STEPS, r, failed, nothingShipped, none, lostLast);
@@ -409,24 +407,16 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     assert.deepEqual(lsOf('failed', lostLast), []);
   });
   await t.test('the other way round, lost then quiet, it reads unsigned; quiet twice is quiet', () => {
-    const quietLast = closeoutAsked(
-      viewed('failed', [
-        { ended: 'failed', reason: 'lost' },
-        { ended: 'failed', reason: 'unsigned' },
-      ]),
-    );
+    const quietLast = closeoutAsked(viewed('failed', [{ ended: 'failed', reason: 'lost' }, formerUnsigned]));
     assert.equal(quietLast('t1'), 'unsigned');
     assert.equal(stepStatus(STEPS[0], r, failed, none, quietLast), 'unsigned');
     assert.deepEqual(lsOf('failed', quietLast), ['implement']);
-    const twice = viewed('failed', [
-      { ended: 'failed', reason: 'unsigned' },
-      { ended: 'failed', reason: 'unsigned' },
-    ]);
+    const twice = viewed('failed', [formerUnsigned, formerUnsigned]);
     assert.equal(closeoutAsked(twice)('t1'), 'unsigned', 'quiet twice is quiet');
   });
-  const unstated = { ended: 'succeeded', reason: 'harness', stated: false };
+  const unstated = { ended: 'succeeded', reason: 'harness', closedOut: false };
   const endingsOf = (v: ReturnType<typeof viewed>) => v.get('t1')!.state.attempts.map((a) => endWords(v.get('t1')!.state, a));
-  await t.test('since stage 4a: `done` with `stated: false` reads unsigned, and `failed · unsigned` on endWords', () => {
+  await t.test('since stage 4a: `done` with `closedOut: false` reads unsigned, and `failed · unsigned` on endWords', () => {
     const quiet = viewed('succeeded', [unstated]);
     assert.equal(closeoutAsked(quiet)('t1'), 'unsigned');
     assert.equal(stepStatus(STEPS[0], r, phases({ t1: 'succeeded' }), none, closeoutAsked(quiet)), 'unsigned');
@@ -434,15 +424,24 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     assert.equal(closeoutAsked(viewed('succeeded', [{ ended: 'failed', reason: 'lost' }, unstated]))('t1'), 'unsigned', 'the LAST');
     assert.deepEqual(endingsOf(quiet), [{ ended: 'failed', reason: 'unsigned' }]);
   });
-  await t.test("an old journal's `reason: 'unsigned'` reads the same words", () => {
-    const legacy = viewed('failed', [{ ended: 'failed', reason: 'unsigned' }]);
+  await t.test("an old journal's `reason: 'unsigned'`, read back as `former: 'unsigned'`, reads the same words", () => {
+    const legacy = viewed('failed', [formerUnsigned]);
     assert.deepEqual([closeoutAsked(legacy)('t1'), endingsOf(legacy)], ['unsigned', [{ ended: 'failed', reason: 'unsigned' }]]);
   });
-  await t.test('a `done` with no `stated` key, or with a statement, is neither; nor a task asked for no statement', () => {
+  await t.test("a CRASH: `failed` with `closedOut: false` and no `former` is no missing statement, and its words are the runtime's", () => {
+    const crashed = viewed('failed', [{ ended: 'failed', reason: 'harness', closedOut: false }]);
+    assert.deepEqual([closeoutAsked(crashed)('t1'), endingsOf(crashed)], [true, [{ ended: 'failed', reason: 'harness' }]]);
+  });
+  await t.test('a `done` with no `closedOut` key, or with a statement, is neither; nor a task asked for no statement', () => {
     const before = viewed('succeeded', [{ ended: 'succeeded', reason: 'harness' }]);
     assert.deepEqual([closeoutAsked(before)('t1'), endingsOf(before)], [true, [{ ended: 'succeeded', reason: 'harness' }]]);
     const signed = viewed('succeeded', [
-      { ended: 'succeeded', reason: 'harness', stated: true, closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } },
+      {
+        ended: 'succeeded',
+        reason: 'harness',
+        closedOut: true,
+        closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null },
+      },
     ]);
     assert.deepEqual([closeoutAsked(signed)('t1'), endingsOf(signed)], [true, [{ ended: 'succeeded', reason: 'harness' }]]);
     const unasked = viewed('succeeded', [unstated], false);
@@ -456,7 +455,12 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     assert.equal(closeoutOf(none, r, 'implement'), undefined);
     assert.equal(closeoutOf(viewed('pending', []), r, 'implement'), undefined, 'a view with no attempt has said nothing either');
     const signed = viewed('succeeded', [
-      { ended: 'succeeded', reason: 'harness', stated: true, closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null } },
+      {
+        ended: 'succeeded',
+        reason: 'harness',
+        closedOut: true,
+        closeout: { outcome: 'done', summary: 'did it', artifacts: [], needs: null },
+      },
     ]);
     const closeout = closeoutOf(signed, r, 'implement');
     assert.equal(closeout && 'outcome' in closeout ? closeout.outcome : closeout, 'done', 'and one that signed has');
@@ -473,7 +477,7 @@ test("closeoutAsked and endWords: UNSIGNED is the LAST attempt's word, off what 
     ],
     [
       'BUDGET: cut while its harness called it done, with no statement — the cap is why, before unsigned',
-      { ended: 'succeeded', reason: 'harness', stated: false, limit: 'budget' },
+      { ended: 'succeeded', reason: 'harness', closedOut: false, limit: 'budget' },
       { ended: 'failed', reason: 'budget' },
     ],
     ["no limit is the runtime's words", { ended: 'failed', reason: 'harness' }, { ended: 'failed', reason: 'harness' }],
@@ -1540,7 +1544,7 @@ test("closeoutOf, deniedOf and closeoutAsked of a task held open: its current tu
     closeout: BLOCKED,
     denials: [{ tool: 'Skill', what: 'look' }],
   };
-  const unsigned = { n: 1, ended: 'failed', reason: 'unsigned', nativeId: 'n' };
+  const unsigned = { n: 1, ended: 'failed', reason: 'harness', closedOut: false, former: 'unsigned', nativeId: 'n' };
   const held = { id: 'r', steps: { plan: { taskId: 't' } } } as never;
   const answered = new Map([['t', view([signed], 1)]]);
   const waiting = new Map([['t', view([signed], 0, 'input-required')]]);

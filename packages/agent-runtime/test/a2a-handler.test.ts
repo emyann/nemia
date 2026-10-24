@@ -92,7 +92,7 @@ const harness = (
           release: (session: Sighting, task: { worktree?: string | boolean }) =>
             Effect.suspend(() => {
               asked.push(['release', [session, task]]);
-              return Effect.succeed(session.state === 'completed' ? { turns: 3, costUsd: 0.25 } : undefined);
+              return Effect.succeed(session.state === 'completed' ? { responses: 3, costUsd: 0.25 } : undefined);
             }),
           quota: Effect.suspend(() => {
             asked.push(['quota', undefined]);
@@ -811,7 +811,7 @@ test("the card and the runtime's extension: each method offered as the driver ha
     assert.deepEqual(await h.handler.sessionLogs({ sessionId: 's-1' }, ctx), { logs: 'logs of s-1' });
     const done: Sighting = { sessionId: 's-1', state: 'completed' };
     assert.deepEqual(await h.handler.releaseSession({ session: done, task: { worktree: true } }, ctx), {
-      usage: { turns: 3, costUsd: 0.25 },
+      usage: { responses: 3, costUsd: 0.25 },
     });
     assert.deepEqual(await h.handler.releaseSession({ session: { sessionId: 's-2', state: 'canceled' }, task: {} }, ctx), { usage: null });
     assert.deepEqual(
@@ -903,7 +903,7 @@ test('listTasks in pages: sorted by name, one observe a listing, filtered, and a
         sessionId: `s-${i}`,
         state: i % 5 === 0 ? 'input-required' : 'working',
         nativeId: `n-${i}`,
-        usage: { turns: i },
+        usage: { responses: i },
       });
     }
     const seen: string[] = [];

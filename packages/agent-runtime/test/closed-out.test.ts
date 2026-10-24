@@ -3,11 +3,11 @@
  * that keeps a registry and records what it was asked to run, and a transcript file where Claude Code keeps one.
  *
  * The Claude runner reports how long a session has been quiet, and `decide` — which alone knows whether a statement was
- * asked for — ends that attempt saying whether one came: `stated`, on the `ended` event. The runtime judges nothing on it:
- * the orchestrator's `closeoutAsked` reads `stated: false` as unsigned and files the one sign-off nudge per round
+ * asked for — ends that attempt saying whether one came: `closedOut`, on the `ended` event. The runtime judges nothing on it:
+ * the orchestrator's `closeoutAsked` reads `closedOut: false` as unsigned and files the one sign-off nudge per round
  * (`agent-orchestrator/test/store.test.ts`). So what is pinned here is the fact, and that the runtime continues nothing on
- * it. A task that asked for nothing ends on quiet with no `stated` key at all. The registry's own `done` is a second door
- * to the same fact: a session it lists `done` with no statement has stated nothing either.
+ * it. A task that asked for nothing ends on quiet with no `closedOut` key at all. The registry's own `done` is a second door
+ * to the same fact: a session it lists `done` with no statement has closed out with nothing either.
  */
 import { Effect } from 'effect';
 import { test } from 'node:test';
@@ -17,7 +17,7 @@ import path from 'node:path';
 import { scratch } from './scratch.ts';
 import { seenFor } from './sighting.ts';
 
-const tmp = (label: string) => scratch(`ae-unsigned-${label}-`);
+const tmp = (label: string) => scratch(`ae-closed-out-${label}-`);
 
 /** Where Claude Code keeps transcripts: read when the runner is loaded, so set before the runner's import. */
 const config = tmp('config');
@@ -120,9 +120,9 @@ const settledNote = async (engine: ReturnType<typeof builtEngine>, id: string) =
   return entry?.event.kind === 'settled' ? entry.event.note : undefined;
 };
 
-test('a session that ends without the closing statement its task asked for, at shipped defaults: `stated: false` on its end, and nothing continued', async (t) => {
+test('a session that ends without the closing statement its task asked for, at shipped defaults: `closedOut: false` on its end, and nothing continued', async (t) => {
   await t.test(
-    "a task that asked for a closeout, whose session goes quiet without one, ends saying so — `stated: false` — and the runtime continues nothing: the nudge is the layer above's",
+    "a task that asked for a closeout, whose session goes quiet without one, ends saying so — `closedOut: false` — and the runtime continues nothing: the nudge is the layer above's",
     async () => {
       const claude = fakeClaude();
       await onPath(claude.bin, async () => {
@@ -142,9 +142,9 @@ test('a session that ends without the closing statement its task asked for, at s
         const v = await Effect.runPromise(engine.view(id));
         const [first] = v.state.attempts;
         assert.deepEqual(
-          [first?.ended, first?.reason, first?.stated, first?.closeout],
+          [first?.ended, first?.reason, first?.closedOut, first?.closeout],
           ['succeeded', 'harness', false, undefined],
-          'ended as quiet ends, and said to have stated nothing: the fact the orchestrator reads as unsigned',
+          'ended as quiet ends, and said to have closed out with nothing: the fact the orchestrator judges',
         );
         assert.deepEqual(claude.rows(), [], 'its session let go');
 
@@ -180,7 +180,7 @@ test('a session that ends without the closing statement its task asked for, at s
   });
 
   await t.test(
-    "quiet after a statement of its own succeeds with it; quiet after only its parent's statement, resumed, has stated nothing",
+    "quiet after a statement of its own succeeds with it; quiet after only its parent's statement, resumed, has closed out with nothing",
     async () => {
       const claude = fakeClaude();
       await onPath(claude.bin, async () => {
@@ -199,7 +199,7 @@ test('a session that ends without the closing statement its task asked for, at s
         const v = await Effect.runPromise(engine.view(said));
         assert.equal(v.state.settled, 'succeeded');
         assert.deepEqual(v.state.attempts[0]?.closeout, { outcome: 'done' });
-        assert.equal(v.state.attempts[0]?.stated, true);
+        assert.equal(v.state.attempts[0]?.closedOut, true);
 
         const inherited = await Effect.runPromise(
           engine.file({
@@ -217,7 +217,7 @@ test('a session that ends without the closing statement its task asked for, at s
         await seenFor(root, other.name, other.sessionId, 10 * MINUTES);
         await Effect.runPromise(engine.tick());
         const w = await Effect.runPromise(engine.view(inherited));
-        assert.equal(w.state.attempts[0]?.stated, false, "a parent's statement is not this attempt's");
+        assert.equal(w.state.attempts[0]?.closedOut, false, "a parent's statement is not this attempt's");
         assert.equal(
           w.state.attempts[0]?.closeout,
           undefined,
@@ -228,7 +228,7 @@ test('a session that ends without the closing statement its task asked for, at s
   );
 
   await t.test(
-    "THE HARNESS'S `done` without a statement is said to have stated nothing too, for a task that asked for one: the second door, reported — and a task that asked for nothing is told of nothing",
+    "THE HARNESS'S `done` without a statement is said to have closed out with nothing too, for a task that asked for one: the second door, reported — and a task that asked for nothing is told of nothing",
     async () => {
       const claude = fakeClaude();
       await onPath(claude.bin, async () => {
@@ -246,7 +246,7 @@ test('a session that ends without the closing statement its task asked for, at s
 
         const v = await Effect.runPromise(engine.view(asked));
         assert.deepEqual(
-          v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.stated]),
+          v.state.attempts.map((a) => [a.ended, a.reason, a.closeout, a.closedOut]),
           [['succeeded', 'harness', undefined, false]],
           'it never said it had finished, and the record says so',
         );
@@ -257,7 +257,7 @@ test('a session that ends without the closing statement its task asked for, at s
           w.state.attempts.map((a) => [a.ended, a.reason]),
           [['succeeded', 'harness']],
         );
-        assert.equal('stated' in w.state.attempts[0], false);
+        assert.equal('closedOut' in w.state.attempts[0], false);
       });
     },
   );

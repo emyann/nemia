@@ -71,7 +71,7 @@ const signedOff = (taskId: string) =>
     ]),
   );
 /** A `measured` line whose usage no runtime wrote, as a person's or another program's edit leaves one. */
-const MISWRITTEN = { kind: 'measured', at, attempt: 1, usage: { turns: 'three' } };
+const MISWRITTEN = { kind: 'measured', at, attempt: 1, usage: { responses: 'three' } };
 
 const PLAIN = [{ name: 'implement', after: [], body: 'Implement it.', harness: 'codex' }];
 
@@ -126,7 +126,7 @@ test('a run whose task journal holds an entry no runtime wrote is answered off i
       assert.equal(runs.get('r-sibling')!.factory, null, 'and a record that names none is the default factory, null');
 
       const bad = runs.get('r-bad')!;
-      const said = `${journal('r-bad-implement')}), entry 6 is a \`measured\` event, and its \`usage.turns\` is "three", where the runtime writes number.`;
+      const said = `${journal('r-bad-implement')}), entry 6 is a \`measured\` event, and its \`usage.responses\` is "three", where the runtime writes number.`;
       assert.ok(
         bad.unreadable?.startsWith(
           `r-bad's record reads, but the journal of its task r-bad-implement does not: r-bad-implement's journal (${said}`,

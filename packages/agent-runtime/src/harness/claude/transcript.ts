@@ -471,7 +471,7 @@ export const transcriptUsage = (jsonl: string, since: number, file?: string): Us
   const compacted = compactions > 0;
   const first = counted[0];
   return {
-    turns: responses.size,
+    responses: responses.size,
     toolCalls: toolCalls.size,
     ...(all && !compacted
       ? {

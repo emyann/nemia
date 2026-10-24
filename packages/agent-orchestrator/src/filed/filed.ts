@@ -131,10 +131,10 @@ export const inputsMounts = (
 /**
  * The MCP servers a step's sessions load, as a config holds them: the names its frozen agent gives (`StepAgent.mcp`), split against the
  * factory's record (`splitServers`) — a name the factory records rides the task's own `mcp`, as the servers themselves, and is left out
- * of `checkoutMcp`; the rest stay `checkoutMcp`, names of the checkout's `.mcp.json`.
+ * of `projectMcp`; the rest stay `projectMcp`, names of the checkout's `.mcp.json`.
  *
- * The factory comes first, and the name is *removed* from `checkoutMcp` rather than left on both: a name on both lists trips the
- * runtime's own "one would hide the other" refusal (`checkoutMcpRefusalOf`) and refuses the step instead of resolving it.
+ * The factory comes first, and the name is *removed* from `projectMcp` rather than left on both: a name on both lists trips the
+ * runtime's own "one would hide the other" refusal (`projectMcpRefusalOf`) and refuses the step instead of resolving it.
  *
  * None for a step with no agent, and no key at all for an agent frozen before it named any, whose sessions load the whole file as they
  * did.
@@ -142,11 +142,11 @@ export const inputsMounts = (
 const serversOf = (
   step: Pick<Workflow, 'agent'>,
   record: FactoryServers | undefined,
-): { checkoutMcp?: string[]; mcp?: Record<string, FactoryServer> } => {
-  if (step.agent === undefined) return { checkoutMcp: [] };
+): { projectMcp?: string[]; mcp?: Record<string, FactoryServer> } => {
+  if (step.agent === undefined) return { projectMcp: [] };
   if (step.agent.mcp === undefined) return {};
   const { mcp, checkout } = splitServers(step.agent.mcp, record);
-  return { checkoutMcp: checkout, ...(mcp === undefined ? {} : { mcp }) };
+  return { projectMcp: checkout, ...(mcp === undefined ? {} : { mcp }) };
 };
 
 /** `mounts` as a config holds them: the key, or none for no folder. */

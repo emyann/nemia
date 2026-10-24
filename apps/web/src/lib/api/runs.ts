@@ -431,7 +431,7 @@ const HeldSchema = decodes<Held>()(
 );
 
 /**
- * Hold a run until the runs `until` names ship, as the CLI's `hold <run> --until <run>… --why <words>` holds it, `why` sent only where it
+ * Hold a run until the runs `until` names land, as the CLI's `hold <run> --until <run>… --why <words>` holds it, `why` sent only where it
  * says something; who put it is the user the api runs as. Rejects with the api's refusal in full — the package's words for a run it will
  * not hold, or a run to wait on it will not take — or its own about the request.
  */

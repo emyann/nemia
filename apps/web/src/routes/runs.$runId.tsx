@@ -463,7 +463,7 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
 }
 
 /**
- * A person's hold on the run (the CLI's `hold`), as the CLI's `decide` says it: until which runs ship, what that means and how to lift it,
+ * A person's hold on the run (the CLI's `hold`), as the CLI's `decide` says it: until which runs land, what that means and how to lift it,
  * and each run it is held until, linked where it is there. At rest, in the grey container, and in the yours container
  * once only a person lifts it. While it stands no step offers an answer — the package refuses each — so this is the one thing on the page
  * asked of anyone.

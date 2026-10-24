@@ -25,8 +25,8 @@ import { ENDED } from './words.ts';
  * run, a cancelled one, a branch gone — though `assess`, which knows nothing of the gate, still calls it running: nothing of it moves until
  * a person acts, and it waits on them.
  *
- * So is a run a person holds until runs ship (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
- * steps say, and the tick lifts the hold when those runs ship, though nothing of it is filed before then. Not once only a person lifts it
+ * So is a run a person holds until runs land (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
+ * steps say, and the tick lifts the hold when those runs land, though nothing of it is filed before then. Not once only a person lifts it
  * (`holding.onYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
  */
 export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & Held): boolean =>
@@ -158,7 +158,7 @@ const rowWords = (run: Clocked, now: number): string => {
  * still runs started added as `now` moves. The title gives the start, the end or that it still goes, and the wall time between.
  *
  * Counted from when it started (`startedAt`, its first filing), never from when it was created: a run started `--after` runs is created,
- * then waits, doing nothing, until they ship, and that wait is not time at work. Until it starts it says it is waiting, for as long as it
+ * then waits, doing nothing, until they land, and that wait is not time at work. Until it starts it says it is waiting, for as long as it
  * has — what it waits on is the card's line above (`waiting.word`), and the title's — and a run called off before it started never did.
  * A run the api could not judge has no time at work, and says when it started.
  */

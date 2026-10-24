@@ -133,7 +133,7 @@ export const PERSON: Record<StepState, PersonWords> = {
   },
   held: {
     rail: 'held',
-    meaning: 'A person holds the run until other runs ship, so nothing of it starts and nothing is asked of you until the hold lifts.',
+    meaning: 'A person holds the run until other runs land, so nothing of it starts and nothing is asked of you until the hold lifts.',
     ...NONE,
   },
   cancelled: { rail: 'called off', meaning: 'The run was called off.', ...NONE },

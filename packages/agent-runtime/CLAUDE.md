@@ -49,6 +49,11 @@ down is in `docs/architecture.md`, *Who owns what*.
   that entry and to the files that find a harness's own home). A runner or an engine a test makes with no root is refused by name
   (`test/scratch.test.ts`), which catches a rootless literal cast past the typecheck inline; a literal bound and cast on another line
   and then handed over by name is what neither reaches, said in `rootlessRunners`.
+- **The source is under `noUncheckedIndexedAccess`, and lint refuses a `!` in it**: an index or dictionary read is `T | undefined`, and the
+  code says what its absence means — a refusal, the miss the function already gives, a destructured regex group. Never `!`, a cast, or a
+  default the contract does not give. A dictionary read keeps its `Object.hasOwn` through `own` (`src/core/own.ts`): `r[k] === undefined`
+  lets `toString` through. The tests are on `test/tsconfig.json`, the flag off, where an absent element already fails the test at its
+  line; `agent-orchestrator/test/index-reads.test.ts` holds the flag, the source in its config and the lint block.
 - **A flag only Claude Code has goes under `config.claude`**, never a named argument; a key moved there is read at its old place off a
   journal (`upgrade`) and refused there (`FORMER_ARGS`). Pin the argv before a move and compare after.
 - **An optional verb renamed on its way through a seam is dropped by every adapter that takes the old type**: keep the old verb beside

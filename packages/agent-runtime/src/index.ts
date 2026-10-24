@@ -29,9 +29,12 @@
  * - filing work, asking about it and stopping it, verb by verb (`filing.ts`, `engine.ts`);
  * - the feed: how an upper layer reacts without polling a task (`journal.ts`);
  * - the harnesses: bring your own (`Runner`, and each runner the package ships);
+ * - the model (`core/model.ts`), as one namespace, and its printer;
  * - the vocabulary (`domain.ts`), with the words each harness takes, as lists: what an upper layer
  *   that checks a task before filing it holds its own copy to, and the lifecycle as plain data for a page to draw.
  */
+
+import * as RuntimeModel from './core/model.ts';
 
 export {
   Engine,
@@ -156,6 +159,13 @@ export { TASK_PHASES } from './core/index.ts';
 export { lifecycleGraph } from './core/index.ts';
 export type { LifecycleEdge, LifecycleGraph, LifecycleState, LifecycleTransition, LifecycleVerb } from './core/index.ts';
 export { denialText, fold, nameFor } from './core/index.ts';
+/**
+ * The runtime's model as Schemas (`docs/model.md`): its ids, checked on create and nominal on read, its entities and the task's
+ * invariant, and `runtimeModelDiagram`, which prints them; and the printer that draws a model's `erDiagram` (`erDiagram`, `ErModel`).
+ * One namespace, imported and exported by name, as every barrel here re-exports (`test/layout.test.ts`).
+ */
+export { RuntimeModel };
+export { erDiagram, type ErModel } from './core/er.ts';
 export { CLAUDE_AUTO_DROPPED, CLAUDE_CONTEXT_TOKENS, CLAUDE_EFFORTS, CLAUDE_PERMISSION_MODES } from './harness/claude/index.ts';
 export { fenceReach, unruledIn, type FenceReach } from './harness/reach.ts';
 export { CODEX_EFFORTS, CODEX_SANDBOXES } from './harness/codex/vocabulary.ts';

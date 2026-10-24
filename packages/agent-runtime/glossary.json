@@ -32,12 +32,22 @@
       }
     },
     {
+      "term": "Attempt number",
+      "meaning": "an attempt's number within its task: a task's attempts number from 1 with no gap.",
+      "type": "AttemptNumber"
+    },
+    {
       "term": "Engine",
       "meaning": "the runtime's loop: it compares each task's journal with what the harness lists, and asks `decide` what to do.",
       "see": {
         "label": "The engine",
         "href": "/runtime/#the-engine"
       }
+    },
+    {
+      "term": "Execution place",
+      "meaning": "where a task's session runs: the host, the only place there is, so a task names none.",
+      "type": "ExecutionPlace"
     },
     {
       "term": "Harness",
@@ -48,6 +58,11 @@
       }
     },
     {
+      "term": "Harness arguments",
+      "meaning": "what a task gives its harness — model, tools, mounts and the rest — carried to it, never read by `decide`.",
+      "type": "HarnessArgs"
+    },
+    {
       "term": "Journal",
       "meaning": "the runtime's durable record of a task, an event a line, which every pass reads again.",
       "type": "Journal",
@@ -55,6 +70,11 @@
         "label": "The engine",
         "href": "/runtime/#the-engine"
       }
+    },
+    {
+      "term": "Journal entry",
+      "meaning": "an event of a task's journal, with the task it belongs to, in any shape a runtime has written.",
+      "type": "JournalEntry"
     },
     {
       "term": "Lifecycle",
@@ -74,6 +94,11 @@
           "card": "the runtime says where a task stands in one closed set (decisions 2 and 11 of the language work)"
         }
       ]
+    },
+    {
+      "term": "Mount",
+      "meaning": "a folder beyond a task's `cwd` its session may reach, and whether it may only read it.",
+      "type": "Mount"
     },
     {
       "term": "Outcome",
@@ -119,7 +144,13 @@
       "see": {
         "label": "A job and a long-lived session",
         "href": "/runtime/#a-job-and-a-long-lived-session"
-      }
+      },
+      "type": "Session"
+    },
+    {
+      "term": "Session id",
+      "meaning": "the harness's own id for a session, the one `--resume` takes: the runtime reads it and never checks it.",
+      "type": "SessionId"
     },
     {
       "term": "Store",
@@ -145,7 +176,13 @@
       "see": {
         "label": "A task",
         "href": "/runtime/#a-task"
-      }
+      },
+      "type": "Task"
+    },
+    {
+      "term": "Task id",
+      "meaning": "a task's id, the name of its journal file: checked on create, read as any string.",
+      "type": "TaskId"
     }
   ]
 }

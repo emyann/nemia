@@ -37,7 +37,7 @@ read it, then write it into yours from there:
 An agent the person already has, in another factory's repository or in their library, is recruited with the `recruit-or-create` skill, not
 written again. To start from one that exists, copy it there and change the copy. To change one in yours, write it again with `--version`,
 the version it was read at: a write without one, of a name there already, is refused naming the version it is at now — read it again, and
-write your change on what it holds. `nemia agents remove` and `nemia workflows remove` take one back, at its version too.
+write your change on what it holds. `nemia agents rm` and `nemia workflows rm` take one back, at its version too.
 
 **Two things no verb writes**: a workflow's own `*.schema.json`, beside its steps, and a skill's files beside its SKILL.md. Draft those
 in the same folder, show the person each, and ask them to place it — on the board, or copied into yours by hand. Keep a pending fact
@@ -74,7 +74,7 @@ Words a person adds to one agent without rewriting it are its custom instruction
 
 ## 7. Try an agent on a short brief
 
-Before work depends on an agent, try it: `nemia agents try yours <name> --brief "<words>"`, on a brief small enough to read in a minute.
+Before work depends on an agent, try it: `nemia agents run yours <name> --brief "<words>"`, on a brief small enough to read in a minute.
 A try is yours to run unasked: one step of that agent, in a folder of its own, capped at a dollar, one at a time an agent. Say that you
 started it, follow it with `nemia ls`, and bring what it did.
 

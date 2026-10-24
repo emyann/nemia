@@ -255,7 +255,7 @@ const retryRefuses = async (step: string, how: RetryHow, run = R): Promise<strin
   return assert.fail(`retry() asked for ${step} (${JSON.stringify(how)}), and should have refused`);
 };
 
-/** What the package's `roundRun` refuses, word for word: what `nemia round` prints. */
+/** What the package's `roundRun` refuses, word for word: what `nemia retry --round` prints. */
 const roundRefuses = async (step: string | undefined, budget: number | undefined): Promise<string> => {
   try {
     await runWith(engine(), roundRun(R, step, budget));
@@ -333,7 +333,9 @@ test("a raise the package refuses, by POST …/retry and POST …/round: its sta
       const word = await askRound({ step: 'review', budget: 'five' });
       assert.equal(word.status, 400);
       assert.ok(
-        ((await word.json()) as Refused).error.startsWith(`\`budget\` is the cap to raise to, as \`nemia round ${R} --budget <amount>\``),
+        ((await word.json()) as Refused).error.startsWith(
+          `\`budget\` is the cap to raise to, as \`nemia retry ${R} --round --budget <amount>\``,
+        ),
       );
       for (const body of [{ step: 42 }, { step: '' }, ['review']]) {
         const res = await askRound(body);
@@ -341,7 +343,7 @@ test("a raise the package refuses, by POST …/retry and POST …/round: its sta
       }
       const { error: named } = (await (await askRound({ step: 42 })).json()) as Refused;
       assert.ok(named.startsWith('`step` names the looping step'), named);
-      for (const fact of [`\`nemia round ${R} <step>\``, "This request's was 42: `"])
+      for (const fact of [`\`nemia retry ${R} <step> --round\``, "This request's was 42: `"])
         assert.ok(named.includes(fact), `${fact} in ${named}`);
       nothingWritten('a round body that is not one');
     },
@@ -547,7 +549,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       );
       assert.deepEqual(
         once.map((c) => c.command),
-        [`nemia round ${R} review --budget <amount>`, `nemia retry ${R} tokens --budget <amount>`],
+        [`nemia retry ${R} review --round --budget <amount>`, `nemia retry ${R} tokens --budget <amount>`],
       );
     },
   );
@@ -570,7 +572,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
         );
         assert.deepEqual(said.offers, []);
         assert.deepEqual(
-          body.commands.filter((c) => /^nemia (retry|round|accept|approve) /.test(c.command)),
+          body.commands.filter((c) => /^nemia (retry|approve) /.test(c.command)),
           [],
           JSON.stringify(body.commands),
         );
@@ -587,7 +589,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
           'the marker nemia prune --unmerged writes beside the record, which nothing removes: taken back, so what follows reads R as it was',
         );
         assert.deepEqual([run.waitingOnYou, run.steps.map((s) => s.raise)], [[], [null, null, null]]);
-        assert.doesNotMatch(JSON.stringify(run.steps.map((s) => s.note)), /nemia (retry|round|accept|approve) /);
+        assert.doesNotMatch(JSON.stringify(run.steps.map((s) => s.note)), /nemia (retry|approve) /);
       } finally {
         fs.rmSync(marker);
       }
@@ -620,8 +622,8 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
         words.steps.map(({ name, note }) => ({ name, note: note ?? null })),
         'as nemia ls has them: notes beside the steps',
       );
-      assert.equal(stepOf(run, 'tokens').note, 'try 3 asked (--nudge, --budget 5) — the next tick files it');
-      assert.equal(stepOf(run, 'review').note, 'round 3 asked (nemia round --budget 3) — the next tick files implement');
+      assert.equal(stepOf(run, 'tokens').note, 'try 3 asked (--continue, --budget 5) — the next tick files it');
+      assert.equal(stepOf(run, 'review').note, 'round 3 asked (nemia retry --round --budget 3) — the next tick files implement');
       assert.deepEqual(run.waitingOnYou, words.waitingOnYou);
       assert.ok(!run.waitingOnYou.includes('tokens') && !run.waitingOnYou.includes('review'), run.waitingOnYou.join(', '));
       fs.rmSync(asksDir, { recursive: true, force: true });

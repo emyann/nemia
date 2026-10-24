@@ -267,7 +267,7 @@ const asWaits = (holding: RunHolding | null | undefined): Wait[] =>
   }));
 
 /** A `nemia` verb that would release work, anywhere in what a surface says. */
-const VERBS = /nemia (approve|retry|round|accept) /;
+const VERBS = /nemia (approve|retry) /;
 const HELD = [GATE, LOOP, BUDGET, BLOCKS, ...Object.keys(ON).map((kind) => `h-on-${kind}`), AFTER];
 
 /** What the package refuses, word for word: what the verb prints at the command line. */
@@ -385,7 +385,7 @@ test('a person holds a run until another lands: the list, the page and the decis
       }
       const offered: Record<string, RegExp> = {
         [GATE]: /^nemia approve h-gate plan$/,
-        [LOOP]: /^nemia (round|accept) h-loop review/,
+        [LOOP]: /^nemia (retry h-loop review --round|approve h-loop review )/,
         [BUDGET]: /^nemia retry h-budget palette --budget/,
         [BLOCKS]: /^nemia retry h-blocked implement$/,
       };

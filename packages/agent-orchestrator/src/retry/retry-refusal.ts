@@ -305,8 +305,8 @@ function statusRefusal(c: Judged): string {
     verified: `${name} is verified: its check passed, and there is nothing to try again.`,
     unverified: `${name} signed off done and declares no check: what waits on it has been filed, and there is nothing to try again.`,
     blocked: `${name} signed off blocked and its session has not ended, so a new try would run beside it. Wait for it to settle: nemia ls ${run.id}.`,
-    exhausted: `${name} asked for another round on the last one \`rounds: ${capOf(step)}\` allows: its work is signed, and what happens next is a person's call, not another try. Go round once more — nemia round ${run.id} ${name} — or take the work as it stands, its findings open: nemia accept ${run.id} ${name} --message "<why>".`,
-    'over budget': `${name} did its work, and its loop asks for a round that would file ${loopOf(steps, name)?.name === name ? 'a step of it' : 'it'} again, past its budget: going round is a person's call, not another try. Raise the cap with the round: nemia round ${run.id} ${loopOf(steps, name)?.name ?? name} --budget <amount>.`,
+    exhausted: `${name} asked for another round on the last one \`rounds: ${capOf(step)}\` allows: its work is signed, and what happens next is a person's call, not another try. Go round once more — nemia retry ${run.id} ${name} --round — or take the work as it stands, its findings open: nemia approve ${run.id} ${name} --message "<why>".`,
+    'over budget': `${name} did its work, and its loop asks for a round that would file ${loopOf(steps, name)?.name === name ? 'a step of it' : 'it'} again, past its budget: going round is a person's call, not another try. Raise the cap with the round: nemia retry ${run.id} ${loopOf(steps, name)?.name ?? name} --round --budget <amount>.`,
   };
   return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
 }

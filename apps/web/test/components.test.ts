@@ -47,7 +47,7 @@ type TaskPart = import('../src/lib/api.ts').TaskPart;
 type StateFlowEdge = import('../src/components/StateEdge.tsx').StateFlowEdge;
 type EdgeMarker = import('@xyflow/react').EdgeMarker;
 
-const exhaustedNote = 'round 3 of 3, and it asked again — once more: wf round r-1 review';
+const exhaustedNote = 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round';
 
 /** The one element's `title`, unescaped as a browser reads it. */
 const titleOf = (html: string): string | undefined =>
@@ -309,8 +309,8 @@ test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked 
 
 test('a step a person has sent round or asked to retry is no gate from the moment they ask: the canvas draws what the api says', () => {
   const asked: Array<[status: Word, note: string]> = [
-    ['rounds exhausted', 'round 4 asked (wf round) — the next tick files implement'],
-    ['succeeded · BLOCKED', 'try 2 asked (--nudge) — the next tick files it'],
+    ['rounds exhausted', 'round 4 asked (nemia retry --round) — the next tick files implement'],
+    ['succeeded · BLOCKED', 'try 2 asked (--continue) — the next tick files it'],
   ];
   for (const [status, note] of asked) {
     const pending = nodeMarkup(runOf(status, { note, waitingOnYou: [] }));
@@ -351,7 +351,10 @@ function loopRun(notes: { implement: string | null; review: string | null }, rev
 }
 
 test("the loop's edge goes back to its target, whatever the steps' specs lack", () => {
-  const run = loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' });
+  const run = loopRun({
+    implement: 'round 3 of 3',
+    review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round',
+  });
 
   const edges = stepEdges(run, 'r-1/');
   const shape = ({ id, source, target, type, sourceHandle, targetHandle, label, data }: StateFlowEdge) => ({
@@ -444,7 +447,7 @@ const legendMarkup = (): string => renderToStaticMarkup(createElement(ReactFlowP
 
 test("a loop's edge is drawn from under its looping step, dashed, into its target with the arrow and the round beside it", () => {
   const [, back] = stepEdges(
-    loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' }),
+    loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round' }),
   );
   const html = withMotion(false, () => edgeMarkup(back));
   const d = pathOf(html);
@@ -2408,7 +2411,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
     { step: 'theme', kind: 'try-again', recheck: true, unfinished: false },
     { step: 'lint', kind: 'try-again', recheck: true, unfinished: true },
     { step: 'docs', kind: 'try-again', recheck: false, unfinished: false },
-    { step: 'plan', kind: 'asked', try: 2, note: 'try 2 asked (--nudge, with your answer) — the next tick files it' },
+    { step: 'plan', kind: 'asked', try: 2, note: 'try 2 asked (--continue, with your answer) — the next tick files it' },
   ]);
   assert.match(html, /^<section aria-label="Answer"/);
   const rows = new Map(
@@ -2491,7 +2494,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
 
   assert.deepEqual(
     textsOf(rows.get('plan')!.html),
-    ['plan', 'try 2 asked (--nudge, with your answer) — the next tick files it'],
+    ['plan', 'try 2 asked (--continue, with your answer) — the next tick files it'],
     'asked: what `wf ls` says of it',
   );
   assert.deepEqual(buttons('plan'), [], 'and nothing to press');
@@ -2649,11 +2652,11 @@ test("the Decide section's accept row takes a reason and presses it; every other
     collisions: null,
     awaiting: null,
     commands: [
-      { label: 'once more', command: 'nemia round r-1 review', said: null, step: 'review' },
+      { label: 'once more', command: 'nemia retry r-1 review --round', said: null, step: 'review' },
       {
         label: 'accept',
-        command: 'nemia accept r-1 review --message "<why>"',
-        said: 'review: enough — go on with what is there:  nemia accept r-1 review --message "<why>"',
+        command: 'nemia approve r-1 review --message "<why>"',
+        said: 'review: enough — go on with what is there:  nemia approve r-1 review --message "<why>"',
         step: 'review',
       },
     ],
@@ -2664,7 +2667,7 @@ test("the Decide section's accept row takes a reason and presses it; every other
   const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
   const row = /<li data-command="accept"[\s\S]*?<\/li>/.exec(commands)![0];
   assert.match(row, /data-step="review"/);
-  assert.match(row, /<code[^>]*>nemia accept r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/);
+  assert.match(row, /<code[^>]*>nemia approve r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/);
   assert.match(row, /<form aria-label="Accept review as it stands"/);
   const label = /<label for="([^"]+)"[^>]*>Why review&#x27;s work is good enough as it stands<\/label>/.exec(row);
   assert.ok(label, row);
@@ -2672,7 +2675,7 @@ test("the Decide section's accept row takes a reason and presses it; every other
   assert.match(
     row,
     /<button type="submit" disabled=""[^>]*>Accept as it stands<\/button>/,
-    'blank, the button waits for a reason, as `wf accept` waits for `--message`',
+    'blank, the button waits for a reason, as `nemia approve` waits for `--message`',
   );
   assert.deepEqual(
     [.../<li data-command="once more"[\s\S]*?<\/li>/.exec(commands)![0].matchAll(/<button [^>]*>/g)].map((m) =>
@@ -2764,7 +2767,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
     'no commands to copy, and no sentence that the board cannot continue it',
   );
 
-  const note = 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it';
+  const note = 'try 2 asked (--continue) — stopping its blocked session, then the tick files it';
   const held = { ...base.steps[0], note, asked: { try: 2, mode: 'nudge' as const, model: null, message: null, stopFirst: true } };
   const asked = bannerMarkup({ ...run, steps: [asks, held] });
   assert.ok(

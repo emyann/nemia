@@ -248,7 +248,7 @@ test("gateOfStep, gateFacts, needWords: the inspector's gate, the facts under it
           state: undefined,
           step: 'review',
         },
-        'a loop a person ended out of rounds (`wf accept`) still has `again: true` in its closeout: the fact says whose word ended it, with their words, not "asks another round"',
+        'a loop a person ended out of rounds (`nemia approve`) still has `again: true` in its closeout: the fact says whose word ended it, with their words, not "asks another round"',
       );
       const one = [
         { ...accepted[0], closeout: { outcome: 'succeeded', output: { again: true, findings: [{}] } } as unknown as Step['closeout'] },

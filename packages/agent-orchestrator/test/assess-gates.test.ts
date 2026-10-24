@@ -524,7 +524,7 @@ test("triedFrom and retrySection: a send-back's brief says why the step is back"
     });
     assert.match(
       brief,
-      /^\n## Try 2\n\nThe last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below\. When you sign off again, it waits there again\.\nA person asked for this try: `nemia retry --nudge --message`, with what they said below\./,
+      /^\n## Try 2\n\nThe last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below\. When you sign off again, it waits there again\.\nA person asked for this try: `nemia retry --continue --message`, with what they said below\./,
     );
     assert.ok(brief.includes('## Your answer\n\n```text\nstore the flag before you parse it\n```'), brief);
   });
@@ -587,7 +587,7 @@ test('REFUSED at a gate, pass after pass: a wordless ask for the next try is not
     names(
       retryRefusal(PLANNED, atPlan(), 'plan', withWords, PLAN_DONE, signedDone, asked, () => undefined, [wordless]),
       'try 2 of plan is asked for',
-      '(--nudge, at 2026-09-16T23:00:00.000Z)',
+      '(--continue, at 2026-09-16T23:00:00.000Z)',
       'with no words',
       'plan is awaiting approval',
       'retry-plan-2',
@@ -597,7 +597,7 @@ test('REFUSED at a gate, pass after pass: a wordless ask for the next try is not
   });
 });
 
-test("roundAsk at a gate: a round of a loop at its gate is a person's word, not `nemia round`'s", async (t) => {
+test("roundAsk at a gate: a round of a loop at its gate is a person's word, not `nemia retry --round`'s", async (t) => {
   const LOOPING: OutputSchema = {
     type: 'object',
     properties: { again: { type: 'boolean' } },

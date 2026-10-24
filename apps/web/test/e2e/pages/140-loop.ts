@@ -36,8 +36,8 @@ export default {
       'the check-affecting files in full say they are not known, in the sentence alone',
     );
     await expectVisible(
-      decide.locator('[data-command="once more"] code', { hasText: `nemia round ${LOOPING.id} ${LOOPING.exhausted}` }),
-      `once more: the wf round that takes ${LOOPING.exhausted}'s loop round again, as a line`,
+      decide.locator('[data-command="once more"] code', { hasText: `nemia retry ${LOOPING.id} ${LOOPING.exhausted} --round` }),
+      `once more: the nemia retry --round that takes ${LOOPING.exhausted}'s loop round again, as a line`,
     );
     const graph = page.locator(`section[aria-label="The run's steps as a graph"]`);
     const node = (name: string) => graph.locator(`.react-flow__node[data-id="${name}"]`);

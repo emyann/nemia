@@ -286,14 +286,14 @@ test("diffLine, changeOf, acceptStepOf: a diff's lines, a file among the changes
     'the board presses `accept` on the step the api names beside it, never on one read off its text, and on no other row',
     () => {
       const accept = (command: string, step: string | null) => ({ label: 'accept' as const, command, step });
-      assert.equal(acceptStepOf(accept('nemia accept r-1 review --message "<why>"', 'review')), 'review');
+      assert.equal(acceptStepOf(accept('nemia approve r-1 review --message "<why>"', 'review')), 'review');
       assert.equal(
-        acceptStepOf(accept('nemia accept r-1 implement --message "<why>"', 'review')),
+        acceptStepOf(accept('nemia approve r-1 implement --message "<why>"', 'review')),
         'review',
         'REFUSED: the step is the one the api names, not the one the text spells',
       );
       assert.equal(acceptStepOf({ label: 'once more', step: 'review' }), null, 'every other row only copies');
-      assert.equal(acceptStepOf(accept('nemia accept r-1 review --message "<why>"', null)), null, 'names no step');
+      assert.equal(acceptStepOf(accept('nemia approve r-1 review --message "<why>"', null)), null, 'names no step');
     },
   );
   await t.test(
@@ -301,8 +301,8 @@ test("diffLine, changeOf, acceptStepOf: a diff's lines, a file among the changes
     async (t) => {
       const merge = {
         label: 'merge',
-        command: 'nemia merge r-1 review',
-        said: "review: implement's work conflicts with main. Merge main into it — implement continued, then a new review, on round 1, which the merge does not spend:  nemia merge r-1 review",
+        command: 'nemia refresh r-1 review --base',
+        said: "review: implement's work conflicts with main. Merge main into it — implement continued, then a new review, on round 1, which the merge does not spend:  nemia refresh r-1 review --base",
         step: 'review',
       } as const;
       const before = globalThis.fetch;

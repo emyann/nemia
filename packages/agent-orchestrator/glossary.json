@@ -7,6 +7,21 @@
   ],
   "terms": [
     {
+      "term": "Approve",
+      "meaning": "a person's yes at a step's gate, or, with `--message`, to a loop out of rounds, which ends it as it stands, its findings open: `nemia approve`, one of the two verbs that answer a waiting step.",
+      "type": "AskKind",
+      "retired": [
+        {
+          "spelling": "accept",
+          "card": "decision 7: two verbs answer a waiting step, approve and retry"
+        }
+      ],
+      "see": {
+        "label": "A loop and its rounds",
+        "href": "/workflows/#a-loop-and-its-rounds"
+      }
+    },
+    {
       "term": "Blocked",
       "meaning": "only a closeout's outcome: the agent signed off unable to go on without an answer, which its step says as reason `AwaitingAnswer`, `via` closeout.",
       "type": "Closeout"
@@ -186,7 +201,7 @@
     },
     {
       "term": "Round",
-      "meaning": "one more try of a loop's steps, when a reviewer asks for more.",
+      "meaning": "one more try of a loop's steps, when a reviewer asks for more, or a person past its last (`nemia retry --round`).",
       "type": "Round",
       "see": {
         "label": "A loop and its rounds",

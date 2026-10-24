@@ -58,7 +58,7 @@ export const holdsOpenOn = (step: Pick<Workflow, 'harness'>): boolean => (step.h
 export const spentApprovals = (run: Run): Approval[] => (run.approvals ?? []).filter((a) => a.try < tryOf(run, a.step));
 
 /**
- * What a person accepted of a loop on the try its looping step is on (`nemia accept`). One for an earlier try was spent by the try after
+ * What a person accepted of a loop on the try its looping step is on (`nemia approve`). One for an earlier try was spent by the try after
  * it. Pure.
  */
 export const acceptanceOf = (run: Run, step: string): Acceptance | undefined =>
@@ -565,8 +565,8 @@ export const runSpend = (run: Run, spendOf: SpendOf): Spend =>
   addSpend(Object.keys(run.steps).map((name) => stepSpend(run, name, spendOf)));
 
 /**
- * The cap in force on a step: the last a person raised it to (`EarlierTry.budget`: `nemia retry --budget`, `nemia round --budget`), else
- * its `budget:`.
+ * The cap in force on a step: the last a person raised it to (`EarlierTry.budget`: `nemia retry --budget`, `nemia retry --round --budget`),
+ * else its `budget:`.
  */
 export const budgetOf = (step: Workflow, record: StepRecord | undefined): number | undefined =>
   [...(record?.tries ?? [])].reverse().find((t) => t.budget !== undefined)?.budget ?? step.budget;
@@ -674,8 +674,8 @@ export function budgetRefusal(how: RetryHow, command = 'nemia retry <runId> <ste
 
 /**
  * A loop going round again: the looping step, the step its `loop:` runs again, the round to file, and on whose word — the looping step's
- * `again: true` with rounds left, a person's `nemia round` once they are spent, or a person's `nemia merge`, which files the loop again on
- * the round it is on (`mergeDue`).
+ * `again: true` with rounds left, a person's `nemia retry --round` once they are spent, or a person's `nemia refresh --base`, which files
+ * the loop again on the round it is on (`mergeDue`).
  */
 export type Round = {
   step: string;
@@ -683,8 +683,8 @@ export type Round = {
   round: number;
   by: 'again' | 'ask' | 'merge';
   /**
-   * On a person's round past a step of the loop's budget (`nemia round --budget`): the cap, and the steps of the loop it is raised for —
-   * those over it.
+   * On a person's round past a step of the loop's budget (`nemia retry --round --budget`): the cap, and the steps of the loop it is raised
+   * for — those over it.
    */
   budget?: number;
   raise?: string[];
@@ -695,9 +695,9 @@ export type Round = {
 };
 
 /**
- * What a person's `nemia merge` asks: the step that merges (the loop's target), its try that does, the base branch, and its commit; and,
- * where the work merges cleanly onto that commit and the ending's check refused the merged tree there, that landing (`landing`): the
- * ending and its check's task, whose failing tests the target is told.
+ * What a person's `nemia refresh --base` asks: the step that merges (the loop's target), its try that does, the base branch, and its
+ * commit; and, where the work merges cleanly onto that commit and the ending's check refused the merged tree there, that landing
+ * (`landing`): the ending and its check's task, whose failing tests the target is told.
  */
 export type MergeOf = { target: string; try: number; onto: string; sha: string; landing?: MergeLanding };
 
@@ -705,8 +705,9 @@ export type MergeOf = { target: string; try: number; onto: string; sha: string; 
 export type MergeLanding = { step: string; check: string };
 
 /**
- * A person's `nemia round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when. A
- * person's `nemia merge` is one too, with `merge`: the looping step, the round it is on, which the merge leaves as it is (`mergeAskIn`).
+ * A person's `nemia retry --round`, as its ask file says it: the looping step, the round it asks for, the cap `--budget` raises, and when.
+ * A person's `nemia refresh --base` is one too, with `merge`: the looping step, the round it is on, which the merge leaves as it is
+ * (`mergeAskIn`).
  */
 export type RoundAsk = { step: string; round: number; budget?: number; at: string; merge?: MergeOf };
 
@@ -739,8 +740,8 @@ export const owesReplies = (steps: readonly Workflow[], run: Run, name: string):
   isLoopTarget(steps, name) && roundOf(run, name) > 1 && !merged(run.steps[name]);
 
 /**
- * Whether a step of a loop is on the tries a merge filed (`nemia merge`): the last try a round or a merge moved behind it was a merge's,
- * whatever tries came after it within the round.
+ * Whether a step of a loop is on the tries a merge filed (`nemia refresh --base`): the last try a round or a merge moved behind it was a
+ * merge's, whatever tries came after it within the round.
  */
 export const merged = (record: StepRecord | undefined): boolean =>
   [...(record?.tries ?? [])].reverse().find((t) => t.cause === 'round' || t.cause === 'merge')?.cause === 'merge';
@@ -771,8 +772,8 @@ export const owedFields = (step: Workflow, run: Run, steps: readonly Workflow[])
 /**
  * The steps the rounds due now file again: each looping step's loop (`loopSpan`), the looping step included. Pure. None of them reads `over
  * budget` on the pass before its round is filed — in `assess`, `nemia ls` or `nemia decide` — since a round held on a budget is due only
- * once a person raised the cap above what was spent (`nemia round --budget`), and held, the run read as waiting on that person for a tick
- * after they had answered.
+ * once a person raised the cap above what was spent (`nemia retry --round --budget`), and held, the run read as waiting on that person for
+ * a tick after they had answered.
  */
 export const roundSpans = (steps: readonly Workflow[], rounds: readonly Round[]): Set<string> =>
   new Set(

@@ -164,7 +164,7 @@ export interface ListingInput {
   readonly verdictOf?: (step: string) => Verdict | undefined;
   /** What people asked for with `nemia retry`, and the run has not consumed yet. */
   readonly asks?: readonly RetryAsk[];
-  /** What people asked for with `nemia round`, and the run has not consumed yet. */
+  /** What people asked for with `nemia retry --round`, and the run has not consumed yet. */
   readonly roundAsks?: readonly RoundAsk[];
   /** Every ask that carried a message, waiting or consumed (`readAnswers`): what says a step's try was answered (`answerOf`). */
   readonly answers?: readonly RetryAsk[];
@@ -241,7 +241,7 @@ export interface ListingInput {
  * where the branch stands (`resultOnBase`).
  *
  * A step's note says, in order: its try, or the try, round or send-back due — a try the checkout holds back
- * says so (`waitsOnCheckout`) — or that a person accepted its loop (`nemia accept`), never their words, which
+ * says so (`waitsOnCheckout`) — or that a person accepted its loop (`nemia approve`), never their words, which
  * are free text in a padded column; at its gate, the approval and the send-back; what the run did with an
  * ending's merge (`landed`), unless it found nothing staged; how many times it was spoken to; and what it
  * was denied. Its cost goes beside its word once measured, unless the word already shows it.

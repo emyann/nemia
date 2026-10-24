@@ -7,7 +7,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { branchFates, forgetLine, forgetRefusal, heldWorktree, idRefusal, runWorktrees, type Forgot } from './forget.ts';
+import { branchFates, forgetLine, forgetRefusal, heldWorktree, idRefusal, runWorktrees, type AskName, type Forgot } from './forget.ts';
 import type { RepositoryRun, Run, RoundAsk, StepRecord, TaskPhase } from '../run.ts';
 import type { Held } from '../place/place.ts';
 import type { Closeout } from '../closeout/closeout.ts';
@@ -50,7 +50,9 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Par
 const askFor = (n: number, mode: RetryMode = 'nudge'): RetryAsk => ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' });
 const roundAskFor = (round: number): RoundAsk => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' });
 /** Where an ask's file is, as the store says it. */
-const at = (a: { kind: string; step: string; n: number }) => `/wf/runs/r-1.asks/${a.kind}-${a.step}-${a.n}`;
+/** The file each ask is named by, as the store names it: a try's `retry-…`, a round's `round-…`, a merge of the base's `merge-…`. */
+const FILE_OF = { try: 'retry', round: 'round', base: 'merge' } as const;
+const at = (a: AskName) => `/wf/runs/r-1.asks/${FILE_OF[a.of]}-${a.step}-${a.n}`;
 const until = (id: string) => ({ hold: { at: '2026-01-01T01:00:00Z', until: [id] } });
 /** A run held until r-1 lands. */
 const heldBy = (id: string) => run({ implement: 't9' }, { id, ...until('r-1') });
@@ -200,7 +202,7 @@ test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other 
     inOrder(
       forgetRefusal(STEPS, unsigned, p, [], none, asked, undefined, [askFor(2)]),
       'try 2 of implement is due',
-      '(nemia retry --nudge)',
+      '(nemia retry --continue)',
       'nemia cancel r-1',
     );
     const recheck = forgetRefusal(STEPS, unsigned, p, [], none, asked, undefined, [askFor(2, 'recheck')], [], undefined, at);
@@ -344,13 +346,13 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
     );
   });
 
-  await t.test('a step ready and a check due are one line of what is due; a round asked for is due by `nemia round`', () => {
+  await t.test('a step ready and a check due are one line of what is due; a round asked for is due by `nemia retry --round`', () => {
     const checked = [step('a'), { ...step('b'), check: 'npm test' }];
     inOrder(forgetRefusal(checked, run({ a: null, b: 't2' }), signed, [], signedDone, asked), 'a is ready to be filed', "b's check is due");
     names(
       forgetRefusal(LOOP, inRound(3), ALL_SUCCEEDED, [], saidIn(3, true), asked, undefined, [], [roundAskFor(4)]),
       "round 4 of review's loop is due",
-      '(nemia round)',
+      '(nemia retry --round)',
     );
   });
 

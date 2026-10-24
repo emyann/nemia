@@ -277,7 +277,7 @@ export default {
     if (asked?.step !== gated || asked?.try !== 2 || asked?.mode !== 'nudge' || asked?.message !== GATED.objection) {
       throw new Refused(`the send-back is written as wf retry --message writes it — ${ask} holds ${JSON.stringify(asked)}`);
     }
-    const note = 'try 2 asked (--nudge, with your answer) — the next tick files it';
+    const note = 'try 2 asked (--continue, with your answer) — the next tick files it';
     await expectVisible(
       section.locator('[data-note]', { hasText: note }),
       `${gated}'s section says what wf ls says of the try asked (${note})`,

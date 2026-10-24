@@ -295,7 +295,7 @@ test('landingOpen holds the checkout from the filing to the landing, and lets go
 
 test('landedWords says what the run did with the merge: the commit, or why none', async (t) => {
   await t.test('a commit, by its short sha', () =>
-    assert.equal(landedWords({ branch: 'main' }, { commit: '0123456789abcdef' }), 'the run committed its merge onto main as 0123456'),
+    assert.equal(landedWords({ branch: 'main' }, { commit: '0123456789abcdef' }), 'the run landed on main as 0123456'),
   );
   await t.test('an abort, with why', () =>
     assert.equal(

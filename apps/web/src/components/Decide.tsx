@@ -533,7 +533,7 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
 }
 
 /**
- * Ship it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one but the CLI's
+ * Land it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one but the CLI's
  * `accept`, which a person who never opens a terminal has no other way to give: its row also takes their reason and presses it
  * (`AcceptCommand`).
  */

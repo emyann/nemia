@@ -59,7 +59,7 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - On whom a run started `--after` waits, and a person's hold on it (the CLI's `hold`), each in the CLI `ls`'s word, yours when only a
  *   person moves   it, with what to do on hover (`WaitingLine`). A hold is said instead of a gate: while it stands, nothing of the run is
  *   asked of anyone.
- * - A run that waits on runs that may still ship, and on nothing else (`waitsOnRuns`), is a ghost until it starts: dimmed and dashed, as
+ * - A run that waits on runs that may still land, and on nothing else (`waitsOnRuns`), is a ghost until it starts: dimmed and dashed, as
  *   the queue lane draws a card not started, each run it waits on a link to that run.
  * - What a person has to know to act, besides the gate's own `approve <step>`: a step's question, or a session the harness blocked, two
  *   lines each, whole on hover, each a link to its step on the run's page.

@@ -51,7 +51,7 @@ export {
   touchedLines,
 } from './branches/index.ts';
 export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, sumUsage, usedLines } from './status/status.ts';
-export { isRepositoryRun, placeOf, answerIn, deniedWords, harnessWaitLine, waitingWords } from './run.ts';
+export { answerIn, deniedWords, harnessWaitLine, isRepositoryRun, placeOf, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
  * their step's session waits on them (`harnessWaitLine`). Re-exported because the api cannot import agent-runtime — it is not a
@@ -158,7 +158,7 @@ export type {
   RunSlot,
   Said,
   SaidTo,
-  Shipped,
+  Landed,
   Spend,
   SpendOf,
   TaskSpend,
@@ -349,7 +349,7 @@ export type {
   HandedOff,
   Held,
   Inventory,
-  Landed,
+  PlaceLanded,
   Made,
   Opened,
   PlaceAnswers,
@@ -443,7 +443,7 @@ export { acceptRun, roundRun } from './round/round.verb.ts';
 export { mergeRun } from './merge/merge.verb.ts';
 export { approveRun } from './gate/gate.verb.ts';
 export { askedNow } from './question/asked.verb.ts';
-export { cancelRun } from './cancel/cancel.verb.ts';
+export { cancelRun, type Cancelled } from './cancel/cancel.verb.ts';
 export { hold, unhold } from './wait/wait.verb.ts';
 export {
   finishingWords,
@@ -494,7 +494,6 @@ export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Approved } from './gate/gate.verb.ts';
 export type { Asked } from './retry/retry.verb.ts';
-export type { Cancelled } from './cancel/cancel.verb.ts';
 export type { Holding } from './wait/wait.verb.ts';
 export type { Told } from './say/say.verb.ts';
 export { forgetRun, runsForgetting } from './forget/forget.verb.ts';
@@ -545,6 +544,5 @@ export { ledgerOf } from './revisions/revisions.store.ts';
 export { driftNow } from './revisions/pin.verb.ts';
 export { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
-export type { CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';
-export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion } from './chat/chat.ts';
+export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';

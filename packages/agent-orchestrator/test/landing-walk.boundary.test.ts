@@ -30,7 +30,7 @@ const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { stagedHere } = await import('../src/place/landing.store.ts');
 
-/** A run this file started on a repository, as `isShipped` reads one: a repository run. */
+/** A run this file started on a repository, as `isLanded` reads one: a repository run. */
 const repositoryRun = (run: Run): RepositoryRun => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;

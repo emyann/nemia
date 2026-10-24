@@ -1,6 +1,6 @@
 import { sidebar } from '../board.ts';
 import { expectCount, expectTexts, expectVisible, settled } from '../checks.ts';
-import { SHIPPED } from '../seed.ts';
+import { LANDED } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
 
 export default {
@@ -8,11 +8,11 @@ export default {
    * The other side of an ending's gate: approved, run in the checkout, and the branch merged — so there is nothing left to decide. The run
    * is pruned since, its files with it: its facts say when, what it freed and what it kept, and its steps still read as they ended.
    */
-  name: 'shipped',
-  route: `/runs/${SHIPPED.id}`,
+  name: 'landed',
+  route: `/runs/${LANDED.id}`,
   expect: async (page) => {
     await sidebar(page);
-    const { ending } = SHIPPED;
+    const { ending } = LANDED;
     const section = page.locator(`article > section#step-${ending}`);
 
     await expectCount(
@@ -27,7 +27,7 @@ export default {
       'and the Decide section says nothing: the branch is already on the base',
     );
 
-    await expectVisible(section.getByText(SHIPPED.merged), `${ending} says what it did (${SHIPPED.merged})`);
+    await expectVisible(section.getByText(LANDED.merged), `${ending} says what it did (${LANDED.merged})`);
     await expectVisible(section.locator('dd', { hasText: /^main$/ }), `and its facts say it ran in the repository's own checkout`);
     await expectVisible(section.locator('dd', { hasText: /^approved, try 1$/ }), 'and that its gate is approved');
     const approval = section.locator(`section[aria-label="The approval of ${ending}"]`);
@@ -44,11 +44,11 @@ export default {
       page.locator('article [data-fact="pruned"] [data-pruned]', { hasText: said }),
       'the run says it was pruned: when, what it removed and freed, and what it kept',
     );
-    await expectVisible(section.getByText(SHIPPED.merged), 'and a pruned run still reads its steps as they ended');
-    const shot = page.locator('article > section#step-review [data-artifact="pruned"]', { hasText: SHIPPED.shot });
+    await expectVisible(section.getByText(LANDED.merged), 'and a pruned run still reads its steps as they ended');
+    const shot = page.locator('article > section#step-review [data-artifact="pruned"]', { hasText: LANDED.shot });
     await expectVisible(
       shot,
-      `review's ${SHIPPED.shot} reads as removed by a prune of its files, not drawn as a path as if it had never been made`,
+      `review's ${LANDED.shot} reads as removed by a prune of its files, not drawn as a path as if it had never been made`,
     );
     await expectVisible(shot.getByText(/ — its files were removed at .+, by a prune of its files$/), 'with when, and by what');
     const moment = (await page.locator('article [data-fact="pruned"] [data-pruned] time').first().textContent())!.trim();

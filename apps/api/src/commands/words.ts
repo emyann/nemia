@@ -288,9 +288,9 @@ const HOLD: RouteWords = {
         }
       : {
           route: `POST /api/runs/${runId}/hold`,
-          does: 'holds a run until other runs ship',
+          does: 'holds a run until other runs land',
           forAnother: 'hold one',
-          why: 'a held run has nothing more of it filed, and nothing of it asked of a person, until every run it waits on has shipped',
+          why: 'a held run has nothing more of it filed, and nothing of it asked of a person, until every run it waits on has landed',
           reach: "put it on the board's run page",
           instead: "Put it on the board's run page, or with `nemia hold <run> --until <runId>`",
           shape: HOLD_PUT_SHAPE,

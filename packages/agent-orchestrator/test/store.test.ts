@@ -1619,8 +1619,8 @@ test('the programs of `nemia round`, `nemia accept`, `nemia retry`, `nemia appro
   await runWith(b.e, advanceRun(readRun(run.id)));
   await same(
     'nemia approve',
-    () => v.over(b.e, v.approveRun(run.id, 'ship', 'ship it')),
-    () => runWith(b.e, approveRun(run.id, 'ship', 'ship it')),
+    () => v.over(b.e, v.approveRun(run.id, 'ship', 'land it')),
+    () => runWith(b.e, approveRun(run.id, 'ship', 'land it')),
   );
 
   const failed = await started(folder());
@@ -1909,15 +1909,15 @@ test('the programs of the views, given the engine as a service, answer what thei
 
   const repo = aRepo();
   const b = board();
-  const shipped = await aParent(repo, b);
-  b.settle(`${shipped.run.id}-implement`, 'succeeded', SIGNED);
+  const landed = await aParent(repo, b);
+  b.settle(`${landed.run.id}-implement`, 'succeeded', SIGNED);
   const running = await aParent(repo, b);
-  const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [shipped.run.id, running.run.id] }));
-  const ids = [shipped.run.id, running.run.id, 'no-such-run'];
+  const child = await runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [landed.run.id, running.run.id] }));
+  const ids = [landed.run.id, running.run.id, 'no-such-run'];
   const git = await v.live(ids);
   const read = await Promise.all(ids.map((id) => v.over(b.e, v.parentRead(id, git))));
   assert.deepEqual(
-    read.map((p) => p.shipped),
+    read.map((p) => p.landed),
     [true, false, false],
   );
   const lookup = await v.over(b.e, v.parentsRead(readRun(child.id), git));

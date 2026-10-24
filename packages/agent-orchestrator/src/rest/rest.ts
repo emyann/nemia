@@ -41,7 +41,7 @@ export type RestFacts = {
    * run.
    */
   checkoutAsked: boolean;
-  /** The runs it waits on (`waitsOf`): whether they shipped is theirs. */
+  /** The runs it waits on (`waitsOf`): whether they landed is theirs. */
   waiting: readonly unknown[];
   /** Whether it counts against the cap on runs in flight, or the cap holds it: both read other runs. */
   inFlight: boolean;

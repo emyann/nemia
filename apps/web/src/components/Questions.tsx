@@ -8,6 +8,7 @@ import { useId, useState } from 'react';
 import type { Question, QuestionAnswer, RetryMode } from '../lib/api';
 import { askedSaid, type Answer } from '../lib/asks';
 import { cn } from '../lib/utils';
+import { OFFERS } from '../lib/words';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
 import { Markdown } from './Markdown';
 
@@ -182,7 +183,7 @@ export function RecommendButton({
 /** A step whose try a person just asked for, as its row says it until the run is read again: the CLI `ls`'s note. */
 function AskedRow({ step, said }: { step: string; said: string }) {
   return (
-    <li data-offer="asked" data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
+    <li data-asked data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
       <strong>{step}</strong>{' '}
       <span data-note className="font-mono text-body-small text-muted-foreground">
         {said}
@@ -212,7 +213,7 @@ function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; 
  * or words, then asks for the try with the answers, a note beside them if one was written, as the CLI's `retry --message` would carry them
  * — the api checks them against what the step asks now, and its refusal is shown verbatim.
  */
-export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<Answer, { kind: 'answer' }> }) {
+export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<Answer, { case: 'answer' }> }) {
   const [draft, setDraft] = useState<Draft>({});
   const [note, setNote] = useState('');
   const [mode, setMode] = useState<RetryMode>('nudge');
@@ -222,7 +223,8 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
   const left = unanswered(offer.questions, draft);
   return (
     <li
-      data-offer="answer"
+      data-offer={offer.case}
+      data-kind={offer.kind}
       data-questions
       data-step={offer.step}
       className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium"
@@ -232,7 +234,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
         {offer.needs && <span className="text-muted-foreground">: {offer.needs}</span>}
       </p>
       <form
-        aria-label={`Answer ${offer.step}`}
+        aria-label={OFFERS.answer.form(offer.step)}
         className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
@@ -249,7 +251,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
           rows={2}
           value={note}
           onChange={(event) => setNote(event.target.value)}
-          placeholder="A note beside the answers (optional): the next try is told it."
+          placeholder={OFFERS.answer.note}
           className={TEXTAREA}
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -259,7 +261,7 @@ export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<
             title={left.length > 0 ? `Not answered: ${left.join(' · ')}` : undefined}
             className={BUTTON}
           >
-            {ask.isPending ? 'Asking…' : 'Answer and continue'}
+            {ask.isPending ? 'Asking…' : OFFERS.answer.button}
           </button>
           <RecommendButton questions={offer.questions} draft={draft} onDraft={setDraft} />
           <ModeChoice name={`${field}-mode`} step={offer.step} mode={mode} onMode={setMode} />

@@ -6,6 +6,7 @@ import { useId, useState } from 'react';
 import type { Question, QuestionAnswer, RetryMode } from '../lib/api';
 import { askedSaid, raiseTo, type Answer } from '../lib/asks';
 import { cn } from '../lib/utils';
+import { OFFERS } from '../lib/words';
 import { BUTTON, MODES, Refusal, TEXTAREA, useAsk, useRound } from './Ask';
 import { answersFrom, Asks, QuestionFields, RecommendButton, unanswered, type Draft } from './Questions';
 
@@ -32,7 +33,7 @@ const AMOUNT =
  * The amount goes as typed: one the package refuses is refused in its words, and an empty box sends none, which it refuses too. An answer
  * goes as it was typed, as `--message` takes it; something to tell a try is optional, and none is sent when nothing was written.
  */
-export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answer, { kind: 'raise' }> }) {
+export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answer, { case: 'raise' }> }) {
   const [amount, setAmount] = useState(() => String(raiseTo(offer.above)));
   const [message, setMessage] = useState('');
   const [draft, setDraft] = useState<Draft>({});
@@ -54,14 +55,15 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
 
   return (
     <li
-      data-offer="raise"
+      data-offer={offer.case}
+      data-kind={offer.kind}
       data-step={offer.step}
       data-by={offer.by}
       className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium"
     >
       <RaiseHead offer={offer} asks={asks} />
       <form
-        aria-label={`Raise ${offer.step}'s budget`}
+        aria-label={OFFERS.raise.form(offer.step)}
         className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
@@ -106,7 +108,7 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
 }
 
 /** A raise's word, with the amounts; for a step that signed off blocked, what it asks; and what the button below raises. */
-function RaiseHead({ offer, asks }: { offer: Extract<Answer, { kind: 'raise' }>; asks: boolean }) {
+function RaiseHead({ offer, asks }: { offer: Extract<Answer, { case: 'raise' }>; asks: boolean }) {
   return (
     <>
       <p className="break-words">
@@ -117,7 +119,7 @@ function RaiseHead({ offer, asks }: { offer: Extract<Answer, { kind: 'raise' }>;
           <Asks data-asks needs={offer.needs} />
         ) : (
           <p data-asks className="break-words">
-            signed off blocked, and said nothing of what it needs
+            {OFFERS.answer.said}
           </p>
         ))}
       <p className="text-body-small break-words text-muted-foreground">
@@ -193,7 +195,7 @@ function RaiseModes({
 /** A raise once the api has its ask, as the row says it until the run is read again: the try or the round asked. */
 function RaiseAsked({ step, said }: { step: string; said: string }) {
   return (
-    <li data-offer="asked" data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
+    <li data-asked data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
       <strong>{step}</strong>{' '}
       <span data-note className="font-mono text-body-small text-muted-foreground">
         {said}
@@ -203,14 +205,10 @@ function RaiseAsked({ step, said }: { step: string; said: string }) {
 }
 
 /** What a raise's button asks for: a round, its check again, an answer, or a try. */
-const raiseWord = (by: 'retry' | 'round', rechecking: boolean, asks: boolean): string =>
-  by === 'round'
-    ? 'Raise the budget and go round again'
-    : rechecking
-      ? 'Run its check again'
-      : asks
-        ? 'Raise the budget and answer'
-        : 'Raise the budget and try again';
+const raiseWord = (by: 'retry' | 'round', rechecking: boolean, asks: boolean): string => {
+  const { button, buttons } = OFFERS.raise;
+  return by === 'round' ? buttons.round : rechecking ? buttons.recheck : asks ? buttons.answer : button;
+};
 
 /**
  * What a raise's try carries beside the raise: for a step that signed off blocked asking questions as data, the fields to answer them by
@@ -254,12 +252,12 @@ function RaiseWords({
         disabled={rechecking}
         placeholder={
           rechecking
-            ? 'A recheck runs the check again and files no session: there is nobody to tell.'
+            ? OFFERS['try-again'].recheck.placeholder
             : choosing
-              ? 'A note beside the answers (optional): the next try is told it.'
+              ? OFFERS.answer.note
               : asks
-                ? 'Your answer: the next try is told it, under “Your answer”.'
-                : 'Anything to tell it (optional): the next try is told it.'
+                ? OFFERS.answer.placeholder
+                : OFFERS.raise.placeholder
         }
         className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
       />

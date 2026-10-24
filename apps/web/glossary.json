@@ -44,6 +44,21 @@
       ]
     },
     {
+      "term": "Offer",
+      "meaning": "what the board offers a person for a waiting step, in the run's Answer section and its banner: its `kind` is the key of the step's `commands` whose line it presses (`retry`, `approve`, `say`), its `case` why the step waits (`answer`, `try-again`, `denied`, `raise`, `continue`, `enough`), and a person's words for each case are `OFFERS`'. A try already asked is a note beside the step, not an offer.",
+      "type": "Offer",
+      "retired": [
+        {
+          "spelling": "acceptLoop",
+          "card": "the board offers by command (decision 7, slice B): a loop out of rounds is approved through `approveStep`"
+        },
+        {
+          "spelling": "acceptStepOf",
+          "card": "the board offers by command (decision 7, slice B): every Commands row only copies"
+        }
+      ]
+    },
+    {
       "term": "Person word",
       "meaning": "the board's one short word for a step's state, translated from the code's only in `apps/web/src/lib/words.ts`: at work, asks you, being checked, verified, done, waits on you, to try again, failed its check, failed, to come, held, called off, unreadable, unknown; and waits on the pause for a step whose check the store's pause holds.",
       "type": "PersonWords",

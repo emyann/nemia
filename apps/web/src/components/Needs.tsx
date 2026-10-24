@@ -1,13 +1,14 @@
 import { Fragment, type ReactNode } from 'react';
 import type { RunDetail } from '../lib/api';
-import { needsOf, needText, offersOf, stepAnchor } from '../lib/asks';
+import { askedOf, needsOf, needText, offersOf, stepAnchor, type OfferKind } from '../lib/asks';
 import { onYouOf, toDecideOf } from '../lib/factory';
 import { Continue } from './Decide';
 import { Markdown } from './Markdown';
 import { container } from '../lib/meaning';
 
-/** The line that continues `step` from a terminal, as the api answers it on the step (`commands.retry`); none for a step the run lacks. */
-const retryLineOf = (run: RunDetail, step: string): string => run.steps.find((s) => s.name === step)?.commands.retry ?? '';
+/** The line of an offer's command (`kind`) for its step, as the api answers it on the step (`commands`); none for a step the run lacks. */
+const lineOf = (run: RunDetail, offer: { step: string; kind: OfferKind }): string =>
+  run.steps.find((s) => s.name === offer.step)?.commands[offer.kind] ?? '';
 
 /**
  * A banner's link to the step `step`, saying `children`: a button calling `onStep` with the step where one is given, as in the frame's bar,
@@ -118,18 +119,19 @@ export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: s
         <ul className="space-y-2">
           {needs.map((need) => {
             const offer = need.kind === 'harness' ? offers.find((o) => o.step === need.step) : undefined;
+            const asked = need.kind === 'harness' ? askedOf(run, need.step) : null;
             return (
               <li key={need.step} data-need={need.kind} data-step={need.step} className="space-y-1.5">
                 <NeedWords need={need} />
-                {need.kind === 'harness' && need.waitingFor && offer?.kind !== 'asked' && (
+                {need.kind === 'harness' && need.waitingFor && !asked && (
                   <p data-advice className="break-words text-body-small">
                     {need.waitingFor.advice}
                   </p>
                 )}
-                {offer?.kind === 'continue' && <Continue runId={run.id} step={need.step} line={retryLineOf(run, need.step)} />}
-                {offer?.kind === 'asked' && (
+                {offer?.case === 'continue' && <Continue runId={run.id} step={need.step} line={lineOf(run, offer)} />}
+                {asked && (
                   <p data-note className="font-mono text-body-small">
-                    {offer.note ?? `try ${offer.try} asked`}
+                    {asked.note ?? `try ${asked.try} asked`}
                   </p>
                 )}
               </li>

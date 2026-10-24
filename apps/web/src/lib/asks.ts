@@ -112,70 +112,103 @@ export const stepAnchor = (step: string): string => `step-${step}`;
 export const askedIn = (closeout: Pick<StepCloseout, 'questions'> | null | undefined): Question[] =>
   closeout?.questions.flatMap((a) => a.questions) ?? [];
 
+/** What an offer presses: a key of the step's `commands`, the api's line for it (`commands.retry`, `commands.approve`, `commands.say`). */
+export type OfferKind = keyof RunDetail['steps'][number]['commands'];
+
 /**
- * What a run's page offers for a step, each the CLI's `retry` the api asks for (`askTry`):
+ * What a run's page offers for a step, by why it waits (`case`), each with the command it presses (`kind`), whose line is the api's
+ * (`step.commands[kind]`): the board spells no verb itself.
  *
  *   answer     it signed off blocked: an answer to its `needs`, carried into a nudge, or a fresh session — and where its closeout asks
- * questions as data (`StepCloseout.questions`), those, every field's in the schema's order, answered by choosing   try-again  its check
- * refused it, or it ended without its closeout: another session, with something to say if you like — and              where a check did not
- * pass, the check run again; first, when it did not finish   denied     its harness denied its try a call, and it says `denials: fail`:
- * another session, a new one first, as the CLI's `decide` offers it —              the run's `allowedTools:` is frozen, so a try is denied
- * the same call again. `calls` is the line naming them              (`StepNeeds.denied`)   raise      a try of it, or its loop's round, has
- * to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check              that did not finish past it. With its
- * try — the CLI's `retry --budget`, a nudge or a new session, and for a step that signed off              blocked the answer to its `needs`
- * beside it (`--message`), or its check again, which needs no raise — or with its loop's              round, the CLI's `round --budget`.
- * `message` is its word, with the amounts; `unfinished` whether its check did not finish   continue   the harness blocked its session, with
- * nothing signed: a nudge, with something to say if you like, which the package takes              as the CLI's `retry` does — the tick
- * stops the session, then files the try. The banner offers it, beside what the session said last   asked      a person asked for its next
- * try, which the next tick files: the CLI `ls`'s note says so
+ *              questions as data (`StepCloseout.questions`), those, every field's in the schema's order, answered by choosing
+ *   try-again  it was refused by its check, or it ended without its closeout: another session, with something to say if you like —
+ *              and where a check did not pass, the check run again; first, when it did not finish
+ *   denied     its harness denied its try a call, and it says `denials: fail`: another session, a new one first, as the CLI's `decide`
+ *              offers it — the run's `allowedTools:` is frozen, so a try is denied the same call again. `calls` is the line naming them
+ *              (`StepNeeds.denied`)
+ *   raise      a try of it, or its loop's round, has to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check
+ *              that did not finish past it. With its try — the CLI's `retry --budget`, a nudge or a new session, and for a step that
+ *              signed off blocked the answer to its `needs` beside it (`--message`), or its check again, which needs no raise — or with
+ *              its loop's round, the CLI's `retry --round --budget`. `message` is its word, with the amounts; `unfinished` whether its
+ *              check did not finish
+ *   continue   the harness blocked its session, with nothing signed: a nudge, with something to say if you like, which the package takes
+ *              as the CLI's `retry` does — the tick stops the session, then files the try. The banner offers it, beside what the session
+ *              said last
+ *   enough     a loop out of rounds, waiting on you: its work taken as it stands, with your reason — the CLI's `approve` of a loop
  *
- * A raise carries `questions` as an answer does (`askedIn`): what its closeout asks as data, which a raise of a step that signed off
- * blocked answers by choosing, beside the budget, rather than in words.
+ * Every case but `enough` presses `retry`; no case presses `say` yet. A raise carries `questions` as an answer does (`askedIn`): what its
+ * closeout asks as data, which a raise of a step that signed off blocked answers by choosing, beside the budget, rather than in words.
  */
 export type Offer =
-  | { step: string; kind: 'answer'; needs: string | null; questions: Question[] }
-  | { step: string; kind: 'try-again'; recheck: boolean; unfinished: boolean }
-  | { step: string; kind: 'denied'; calls: string | null }
-  | ({ step: string; kind: 'raise'; message: string; needs: string | null; unfinished: boolean; questions: Question[] } & NonNullable<
-      RunDetail['steps'][number]['raise']
-    >)
-  | { step: string; kind: 'continue' }
-  | { step: string; kind: 'asked'; try: number; note: string | null };
+  | { step: string; case: 'answer'; kind: 'retry'; needs: string | null; questions: Question[] }
+  | { step: string; case: 'try-again'; kind: 'retry'; recheck: boolean; unfinished: boolean }
+  | { step: string; case: 'denied'; kind: 'retry'; calls: string | null }
+  | ({
+      step: string;
+      case: 'raise';
+      kind: 'retry';
+      message: string;
+      needs: string | null;
+      unfinished: boolean;
+      questions: Question[];
+    } & NonNullable<RunDetail['steps'][number]['raise']>)
+  | { step: string; case: 'continue'; kind: 'retry' }
+  | { step: string; case: 'enough'; kind: 'approve' };
+
+/** Why a step waits, as its offer says it. */
+export type OfferCase = Offer['case'];
 
 /** What the Decide section offers: every offer but `continue`, which the banner makes beside the need it answers. */
-export type Answer = Exclude<Offer, { kind: 'continue' }>;
+export type Answer = Exclude<Offer, { case: 'continue' }>;
+
+/** A run that can be offered anything: called off or held by a person, it is offered nothing. */
+type Offerable = Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunDetail['holding'] };
 
 /**
- * The offers of a run's page, in the run's order: one per step waiting on you that a try can answer, one per session the harness blocked,
- * and each step a person asked for a try of. A session the harness blocked is not waiting on you in the package's words — it asked nothing
- * — and is offered Continue all the same. A loop out of rounds goes round with the CLI's `round`, among the Decide section's commands, and
- * has none. A step the api carries a raise for (`raise`) is offered that, whatever its word: over its budget its word is `over budget`,
- * whether it signed off blocked, ended unsigned or was refused by its check, and a check that did not finish past its budget reads as any
- * such check — and a try of either that files a session is refused without the raise. None where the package takes none: the target of a
- * loop held on its budget goes again with its looping step's round, whose row that is. Nothing on a run called off, and nothing on a run a
- * person holds (the CLI's `hold`): the package refuses every one of these verbs on it (`heldRefusal`), so an offer would be a button that
- * fails. A run without `holding` is taken for one nobody holds.
+ * The offers of a run's page, in the run's order: one per step waiting on you that a try or an approval can answer, and one per session
+ * the harness blocked. A session the harness blocked is not waiting on you in the package's words — it asked nothing — and is offered
+ * Continue all the same. A loop out of rounds is offered `enough`, its work taken as it stands; going round once more is the Decide
+ * section's command to copy. A step the api carries a raise for (`raise`) is offered that, whatever its word: over its budget its word is
+ * `over budget`, whether it signed off blocked, ended unsigned or was refused by its check, and a check that did not finish past its
+ * budget reads as any such check — and a try of either that files a session is refused without the raise. None where the package takes
+ * none: the target of a loop held on its budget goes again with its looping step's round, whose row that is. None for a step whose next
+ * try a person already asked for: that is a note (`askedOf`). Nothing on a run called off, and nothing on a run a person holds (the CLI's
+ * `hold`): the package refuses every one of these verbs on it (`heldRefusal`), so an offer would be a button that fails. A run without
+ * `holding` is taken for one nobody holds.
  */
-export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunDetail['holding'] }): Offer[] {
+export function offersOf(run: Offerable): Offer[] {
   if (run.cancelledAt !== null || run.holding != null) return [];
   return run.steps.flatMap((step): Offer[] => {
-    if (step.asked) return [{ step: step.name, kind: 'asked', try: step.asked.try, note: step.note }];
-    if (step.blockedByHarness) return [{ step: step.name, kind: 'continue' }];
+    if (step.asked) return [];
+    if (step.blockedByHarness) return [{ step: step.name, case: 'continue', kind: 'retry' }];
     if (!run.waitingOnYou.includes(step.name)) return [];
     const unfinished = step.check?.verdict?.result === 'unfinished';
     if (step.raise) {
       const questions = askedIn(step.closeout);
-      return [{ step: step.name, kind: 'raise', message: step.message, needs: step.needs, unfinished, questions, ...step.raise }];
+      return [
+        { step: step.name, case: 'raise', kind: 'retry', message: step.message, needs: step.needs, unfinished, questions, ...step.raise },
+      ];
     }
     const state = stepState(step, false, false);
     if (state === 'blocked') {
-      return [{ step: step.name, kind: 'answer', needs: step.needs, questions: askedIn(step.closeout) }];
+      return [{ step: step.name, case: 'answer', kind: 'retry', needs: step.needs, questions: askedIn(step.closeout) }];
     }
-    if (state === 'failed-check') return [{ step: step.name, kind: 'try-again', recheck: true, unfinished }];
-    if (state === 'unsigned') return [{ step: step.name, kind: 'try-again', recheck: false, unfinished: false }];
-    if (state === 'denied') return [{ step: step.name, kind: 'denied', calls: step.denied?.words ?? null }];
+    if (state === 'failed-check') return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: true, unfinished }];
+    if (state === 'unsigned') return [{ step: step.name, case: 'try-again', kind: 'retry', recheck: false, unfinished: false }];
+    if (state === 'denied') return [{ step: step.name, case: 'denied', kind: 'retry', calls: step.denied?.words ?? null }];
+    if (state === 'exhausted') return [{ step: step.name, case: 'enough', kind: 'approve' }];
     return [];
   });
+}
+
+/**
+ * The try a person asked for of `step`, which the next tick files, as the CLI `ls`'s note says it — none for a step nobody asked a try
+ * of, and none on a run called off or held, which files nothing. A note beside the step, never an offer: there is nothing left to choose.
+ */
+export function askedOf(run: Offerable, step: string): { try: number; note: string | null } | null {
+  if (run.cancelledAt !== null || run.holding != null) return null;
+  const asked = run.steps.find((s) => s.name === step);
+  return asked?.asked ? { try: asked.asked.try, note: asked.note } : null;
 }
 
 /**
@@ -185,8 +218,7 @@ export function offersOf(run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | '
 export const raiseTo = (above: number): number => Math.floor(above) + 1;
 
 /** What the Decide section offers, in the run's order: every offer but Continue, which the banner makes (`Answer`). */
-export const answersOf = (run: Pick<RunDetail, 'cancelledAt' | 'waitingOnYou' | 'steps'> & { holding?: RunDetail['holding'] }): Answer[] =>
-  offersOf(run).filter((offer): offer is Answer => offer.kind !== 'continue');
+export const answersOf = (run: Offerable): Answer[] => offersOf(run).filter((offer): offer is Answer => offer.case !== 'continue');
 
 /**
  * A try the api has just taken, as the board says it until the run is read again and the step's note says it in the CLI `ls`'s words: what

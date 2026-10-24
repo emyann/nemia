@@ -6,6 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   answersOf,
+  askedOf,
   askedSaid,
   gateOffered,
   needLine,
@@ -163,7 +164,7 @@ test('needOf: what a step needs from a person — its question, its blocked sess
       );
       assert.deepEqual(
         offersOf(run(steps, ['plan', 'theme'])),
-        [{ step: 'theme', kind: 'try-again', recheck: true, unfinished: false }],
+        [{ step: 'theme', case: 'try-again', kind: 'retry', recheck: true, unfinished: false }],
         "a gate's step is answered where its closeout is, not among the answers",
       );
       const note = 'try 2 asked (--continue, with your answer) — the next tick files it';
@@ -171,11 +172,8 @@ test('needOf: what a step needs from a person — its question, its blocked sess
         note,
         asked: { try: 2, mode: 'nudge', model: null, message: 'Store it first.', stopFirst: false },
       });
-      assert.deepEqual(
-        answersOf(run([sent], [])),
-        [{ step: 'plan', kind: 'asked', try: 2, note }],
-        'sent back, its try is asked, which the Decide section says, as for any try asked',
-      );
+      assert.deepEqual(answersOf(run([sent], [])), [], 'sent back, its try is asked: nothing left to offer');
+      assert.deepEqual(askedOf(run([sent], []), 'plan'), { try: 2, note }, 'the Decide section notes it, as any try asked');
       assert.equal(stepAnchor('plan'), 'step-plan');
     },
   );
@@ -183,7 +181,7 @@ test('needOf: what a step needs from a person — its question, its blocked sess
 
 test('offersOf: what the Decide section offers a step, and nothing on a run held or called off', async (t) => {
   await t.test(
-    'what the Decide section offers: an answer to a step that asks, Try again for a refused check — recheck first where it did not finish — or an unsigned step, and the note of a try asked',
+    'what the Decide section offers: an answer to a step that asks, Try again for a refused check — recheck first where it did not finish — or an unsigned step, and approve for a loop out of rounds',
     () => {
       const steps = [
         step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' }),
@@ -206,16 +204,23 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
       assert.deepEqual(
         offersOf(run(steps, waiting)),
         [
-          { step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] },
-          { step: 'quiet', kind: 'answer', needs: null, questions: [] },
-          { step: 'theme', kind: 'try-again', recheck: true, unfinished: false },
-          { step: 'lint', kind: 'try-again', recheck: true, unfinished: true },
-          { step: 'docs', kind: 'try-again', recheck: false, unfinished: false },
-          { step: 'notes', kind: 'denied', calls: 'denied: Write(/tmp/w/notes.md)' },
-          { step: 'plan', kind: 'asked', try: 2, note: 'try 2 asked (--fresh, with your answer) — the next tick files it' },
+          { step: 'implement', case: 'answer', kind: 'retry', needs: 'Which database?', questions: [] },
+          { step: 'quiet', case: 'answer', kind: 'retry', needs: null, questions: [] },
+          { step: 'theme', case: 'try-again', kind: 'retry', recheck: true, unfinished: false },
+          { step: 'lint', case: 'try-again', kind: 'retry', recheck: true, unfinished: true },
+          { step: 'docs', case: 'try-again', kind: 'retry', recheck: false, unfinished: false },
+          { step: 'notes', case: 'denied', kind: 'retry', calls: 'denied: Write(/tmp/w/notes.md)' },
+          { step: 'review', case: 'enough', kind: 'approve' },
         ],
-        "a step denied a call under `denials: fail` is offered a try in a new session, with the calls the api named; review, out of rounds, is `nemia retry --round`'s, among the commands, and tokens, done, waits on nobody: no try for either",
+        'a step denied a call under `denials: fail` is offered a try in a new session, with the calls the api named; review, out of rounds, its approval as it stands; plan, its try asked, nothing; and tokens, done, waits on nobody',
       );
+      assert.deepEqual(
+        askedOf(run(steps, waiting), 'plan'),
+        { try: 2, note: 'try 2 asked (--fresh, with your answer) — the next tick files it' },
+        "plan's try asked is a note, not an offer",
+      );
+      assert.equal(askedOf(run(steps, waiting), 'implement'), null, 'none for a step nobody asked a try of');
+      assert.equal(askedOf(run(steps, waiting, '2026-09-14T07:00:00.000Z'), 'plan'), null, 'nor on a run called off');
       assert.deepEqual(
         offersOf(run([steps[0]], [])),
         [],
@@ -250,11 +255,12 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
       assert.deepEqual(offersOf(run([design, worded], ['design', 'spec'])), [
         {
           step: 'design',
-          kind: 'answer',
+          case: 'answer',
+          kind: 'retry',
           needs: 'Three questions.',
           questions: [asking('Which cut?'), asking('Which name?'), asking('When?')],
         },
-        { step: 'spec', kind: 'answer', needs: 'Postgres or MySQL?', questions: [] },
+        { step: 'spec', case: 'answer', kind: 'retry', needs: 'Postgres or MySQL?', questions: [] },
       ]);
     },
   );
@@ -265,16 +271,16 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
       const implement = step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' });
       assert.deepEqual(
         offersOf(run([held], [])),
-        [{ step: 'held', kind: 'continue' }],
+        [{ step: 'held', case: 'continue', kind: 'retry' }],
         "it asked nothing, so the package's `waitingOnYou` does not name it; the package takes a try of it all the same",
       );
-      assert.deepEqual(offersOf(run([held], ['held'])), [{ step: 'held', kind: 'continue' }]);
+      assert.deepEqual(offersOf(run([held], ['held'])), [{ step: 'held', case: 'continue', kind: 'retry' }]);
       assert.deepEqual(offersOf(run([implement, held], ['implement'])), [
-        { step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] },
-        { step: 'held', kind: 'continue' },
+        { step: 'implement', case: 'answer', kind: 'retry', needs: 'Which database?', questions: [] },
+        { step: 'held', case: 'continue', kind: 'retry' },
       ]);
       assert.deepEqual(answersOf(run([implement, held], ['implement'])), [
-        { step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] },
+        { step: 'implement', case: 'answer', kind: 'retry', needs: 'Which database?', questions: [] },
       ]);
       assert.deepEqual(answersOf(run([held], [])), [], 'no Decide section for it until its try is asked');
 
@@ -285,12 +291,8 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
         note,
         asked: { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true },
       });
-      assert.deepEqual(offersOf(run([asked], [])), [{ step: 'held', kind: 'asked', try: 2, note }]);
-      assert.deepEqual(
-        answersOf(run([asked], [])),
-        [{ step: 'held', kind: 'asked', try: 2, note }],
-        'the Decide section is drawn for it, as for any try asked',
-      );
+      assert.deepEqual(offersOf(run([asked], [])), [], 'once asked, nothing is left to offer');
+      assert.deepEqual(askedOf(run([asked], []), 'held'), { try: 2, note }, 'the note of its try, as for any try asked');
       assert.deepEqual(
         needsOf(run([asked], [])),
         [{ step: 'held', kind: 'harness', waitingFor: null, lastLine: LOGIN }],
@@ -359,8 +361,8 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
       const palette = step('palette', 'over budget $1.50 of $1', { raise: blocked, needs: 'Two questions.', closeout });
       const offers = offersOf(run([palette], ['palette']));
       assert.equal(offers.length, 1);
-      assert.equal(offers[0].kind, 'raise');
-      assert.deepEqual(offers[0].kind === 'raise' && offers[0].questions, [asking('Which cut?'), asking('When?')]);
+      assert.equal(offers[0].case, 'raise');
+      assert.deepEqual(offers[0].case === 'raise' && offers[0].questions, [asking('Which cut?'), asking('When?')]);
     },
   );
   await t.test(
@@ -404,20 +406,22 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
       ];
       const worded = steps.map((each) => each.message);
       const raised = [
-        { step: 'tokens', kind: 'raise', message: worded[0], needs: null, unfinished: false, questions: [], ...byTry },
+        { step: 'tokens', case: 'raise', kind: 'retry', message: worded[0], needs: null, unfinished: false, questions: [], ...byTry },
         {
           step: 'review',
-          kind: 'raise',
+          case: 'raise',
+          kind: 'retry',
           message: worded[1],
           needs: null,
           unfinished: false,
           questions: [],
           ...byRound,
         },
-        { step: 'lint', kind: 'raise', message: worded[2], needs: null, unfinished: false, questions: [], ...ended },
+        { step: 'lint', case: 'raise', kind: 'retry', message: worded[2], needs: null, unfinished: false, questions: [], ...ended },
         {
           step: 'palette',
-          kind: 'raise',
+          case: 'raise',
+          kind: 'retry',
           message: worded[3],
           needs: 'Warm colours, or cool ones?',
           unfinished: false,
@@ -426,7 +430,8 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
         },
         {
           step: 'types',
-          kind: 'raise',
+          case: 'raise',
+          kind: 'retry',
           message: worded[4],
           needs: null,
           unfinished: true,
@@ -440,7 +445,7 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
         "palette, signed off blocked past its budget, keeps its word `over budget` and the closeout's question; types, whose check did not finish past its budget, keeps a check's word and a session refused without the raise all the same",
       );
       assert.deepEqual(
-        answersOf(run(steps, ['tokens'])).map((o) => o.kind),
+        answersOf(run(steps, ['tokens'])).map((o) => o.case),
         ['raise'],
         'a raise is an answer the Decide section offers',
       );
@@ -473,7 +478,8 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
         note,
         asked: { try: 3, mode: 'nudge', model: null, message: null, stopFirst: false },
       });
-      assert.deepEqual(offersOf(run([asked], [])), [{ step: 'tokens', kind: 'asked', try: 3, note }]);
+      assert.deepEqual(offersOf(run([asked], [])), [], 'once its raise is asked, nothing is left to offer');
+      assert.deepEqual(askedOf(run([asked], []), 'tokens'), { try: 3, note });
       assert.deepEqual(
         offersOf(run([step('tokens', 'over budget $4.25 of $3', { raise: byTry })], ['tokens'], '2026-09-15T07:00:00.000Z')),
         [],
@@ -484,7 +490,7 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
       });
       assert.deepEqual(
         offersOf(run([lint], ['lint'])),
-        [{ step: 'lint', kind: 'try-again', recheck: true, unfinished: true }],
+        [{ step: 'lint', case: 'try-again', kind: 'retry', recheck: true, unfinished: true }],
         'a check that did not finish within its budget: the api carries no raise, and the board offers a try again, its recheck first',
       );
     },

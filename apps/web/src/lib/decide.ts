@@ -108,9 +108,3 @@ export function changeOf(touched: Touched | undefined, file: string): { added: n
   return touched.radius.changes.find((c) => c.path === file || (c.from && `${c.from} → ${c.path}` === file));
 }
 
-/**
- * The looping step an `accept` command accepts, as the api names it beside the command (`step`), or null for any other command. The board
- * presses that one itself.
- */
-export const acceptStepOf = (command: Pick<DecideCommand, 'label' | 'step'>): string | null =>
-  command.label === 'accept' ? command.step : null;

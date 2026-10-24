@@ -296,7 +296,7 @@ test("A person reads a step's conversation through its task's life: nothing befo
       );
       assert.equal(
         (await Effect.runPromise(engine().view('t-closed'))).phase,
-        'between attempts',
+        'between-attempts',
         'closed and not yet settled: the engine calls it between attempts until its next pass',
       );
       for (const step of ['held', 'closed']) {
@@ -313,7 +313,7 @@ test("A person reads a step's conversation through its task's life: nothing befo
     },
   );
   await s.test('a held step a person answered is live again, under the same task: its next turn is to run', async () => {
-    assert.equal((await Effect.runPromise(engine().view('t-answered'))).phase, 'between attempts');
+    assert.equal((await Effect.runPromise(engine().view('t-answered'))).phase, 'between-attempts');
     const body = (await (await app.request(url('answered'))).json()) as StepTranscript;
     assert.equal(body.live, true);
     assert.equal(body.events.length, 8);

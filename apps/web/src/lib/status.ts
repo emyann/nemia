@@ -63,8 +63,8 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
  * which (`input-required · BLOCKED`). `waiting on a-1x2y (cancelled), b-3z4w`, a root of a run started `--after` runs that have not
  * shipped, `waiting on the pause`, a step signed off whose check the store's pause keeps from being filed, and `pending` are not filed,
  * as `waiting` is. `waiting for a run slot (2 of 2 in flight)`, and the feed's `waiting for a run
- * slot` without the count, is a root of a run the cap on runs in flight holds: `waiting-for-slot`. Any other word — `running (working)`,
- * `working (quiescent)`, `starting`, `between attempts`, or the CLI's `ls` has that this does not know — is `working`: a step the board
+ * slot` without the count, is a root of a run the cap on runs in flight holds: `waiting-for-slot`. Any other word — `working`,
+ * `quiescent`, `starting`, `between-attempts`, or the CLI's `ls` has that this does not know — is `working`: a step the board
  * cannot name is shown as still going, never as done or as needing you.
  */
 function wordState(status: string, runCancelled: boolean): StepState {

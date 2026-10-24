@@ -116,7 +116,11 @@ test('a run whose task journal holds an entry no runtime wrote is left out of th
   const good = await runPlaced(startRun({ brief: 'the good one', repo: REPO, workflowDir: FOLDER }));
   for (let k = 0; k < 3; k++) await runWith(e, tickRun({ repo: ROOT }));
   const badTask = readRun(bad.id).steps.work.taskId!;
-  assert.match((await Effect.runPromise(e.view(badTask))).phase, /^(working|quiescent)$/, 'both runs at work before the journal is spoiled');
+  assert.match(
+    (await Effect.runPromise(e.view(badTask))).phase,
+    /^(working|quiescent)$/,
+    'both runs at work before the journal is spoiled',
+  );
   assert.match((await Effect.runPromise(e.view(readRun(good.id).steps.work.taskId!))).phase, /^(working|quiescent)$/);
 
   tasks.get(badTask)!.push(MISWRITTEN);

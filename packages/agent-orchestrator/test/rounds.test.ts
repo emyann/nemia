@@ -246,14 +246,14 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     const filed = [...stage.board().filings];
     for (let i = 0; i < 3; i++) {
       const pass = await tick(id);
-      assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.checked, pass.status], [[], [], [], [], 'blocked'], `pass ${i + 1}`);
+      assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.checked, pass.status], [[], [], [], [], 'waiting'], `pass ${i + 1}`);
     }
     assert.deepEqual(stage.board().filings, filed, 'nothing filed at the cap: the ending is never filed');
     const l = await over(list(stage.board().e, readRun(id)));
     assert.deepEqual([l.steps[1].status, l.waitingOnYou], ['rounds exhausted', ['review']]);
     namesFor('the note', l.steps[1].note, 'round 3 of 3', `nemia round ${id} review`);
     const { decision: d, offers, closeouts } = await over(decideRun(id));
-    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.failed], ['blocked', ['review'], []]);
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.failed], ['waiting', ['review'], []]);
     assert.equal(offers.length, 2);
     namesFor('once more', offers[0], 'round 4', '`rounds: 3`', `nemia round ${id} review`);
     namesFor('enough', offers[1], `nemia accept ${id} review --message "<why>"`);
@@ -310,7 +310,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     for (const [written, why] of bad) {
       fs.writeFileSync(accept, written);
       const pass = await tick(id);
-      assert.deepEqual([pass.filed, pass.status], [[], 'blocked'], written);
+      assert.deepEqual([pass.filed, pass.status], [[], 'waiting'], written);
       assert.ok(
         pass.notes.some((n) => n.includes(why)),
         `${written}: ${pass.notes.join(' | ')}`,
@@ -359,7 +359,7 @@ test('three rounds, then a person accepts the work as it stands', async (t) => {
     const held = await over(list(stage.board().e, readRun(id)));
     assert.deepEqual([held.steps[2].status, held.waitingOnYou], ['awaiting approval', ['ship']]);
     const { decision: d, offers, accepted } = await over(decideRun(id));
-    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.awaitingApproval], ['blocked', [], ['ship']]);
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.exhausted, d.awaitingApproval], ['waiting', [], ['ship']]);
     assert.deepEqual(offers, [], 'the loop is over');
     namesFor('accepted', accepted.review, `${at.slice(11, 16)}Z`, ENOUGH);
     await over(approveRun(id, 'ship', 'the findings are filed as follow-up'));
@@ -377,7 +377,7 @@ test('a loop past its budget waits for a person to raise it, then goes round and
     const filed = [...stage.board().filings];
     for (let i = 0; i < 2; i++) {
       const pass = await tick(id);
-      assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.status], [[], [], [], 'blocked'], `pass ${i + 1}`);
+      assert.deepEqual([pass.looped, pass.filed, pass.tried, pass.status], [[], [], [], 'waiting'], `pass ${i + 1}`);
     }
     assert.deepEqual(stage.board().filings, filed, 'no round');
     const l = await over(list(stage.board().e, readRun(id)));

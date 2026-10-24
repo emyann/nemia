@@ -216,7 +216,7 @@ export const RUN_REASON_OF: Record<RunStatus, QualifiedRun> = {
   failed: { reason: 'Failed' },
   cancelled: { reason: 'Cancelled' },
   'awaiting approval': { reason: 'AwaitingApproval' },
-  blocked: { reason: 'AwaitingAnswer' },
+  waiting: { reason: 'AwaitingAnswer' },
 };
 
 /** The phase each run reason stands in: a run a person stops is `waiting`, and a held one `pending`, as a step waiting on a thing is. */
@@ -272,7 +272,7 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
  * Every other status is `RUN_REASON_OF`'s. Pure.
  */
 export function runCodes(status: RunStatus, holding: boolean, steps: readonly CodedStep[] = []): CodedRun {
-  const stop = status === 'blocked' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
+  const stop = status === 'waiting' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
   const q: QualifiedRun =
     status === 'running' && holding ? { reason: 'Waiting', on: 'run' } : stop ? stoppedOn(stop) : RUN_REASON_OF[status];
   return { ...q, phase: RUN_PHASE_OF[q.reason] };

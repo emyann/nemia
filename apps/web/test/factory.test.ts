@@ -1348,7 +1348,7 @@ test('waitsOnRuns and floorRuns: which runs are on the floor, ghosts and finishe
       }),
       run(['succeeded · BLOCKED', 'waiting'], {
         id: 'blocked',
-        status: 'blocked',
+        status: 'waiting',
         moving: false,
         waitingOnYou: ['step-0'],
         onYou: ['step-0'],

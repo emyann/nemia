@@ -65,7 +65,7 @@ const stopped = (status: RunStatus, waitingOnYou: string[]) => ({
 });
 
 const GATE = stopped('awaiting approval', ['land']);
-const QUESTION = stopped('blocked', ['implement']);
+const QUESTION = stopped('waiting', ['implement']);
 const BROKE = stopped('failed', ['implement']);
 
 test("a run's status, read by each reader: a gate, a question and a break are three stopped runs", async (t) => {
@@ -98,7 +98,7 @@ test("a run's status, read by each reader: a gate, a question and a break are th
         ['failed', true],
         ['cancelled', false],
         ['awaiting approval', true],
-        ['blocked', true],
+        ['waiting', true],
       ],
     );
   });

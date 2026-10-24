@@ -225,7 +225,7 @@ test('a declared output travels to the step that reads it', async (t) => {
       for (const [why, said] of ways) {
         stage.board().settle(reviewTask(), 'succeeded', said);
         const p = await pass(id);
-        assert.deepEqual([p.filed, [...p.unreachable].sort(), p.status], [[], ['respond', 'tidy'], 'blocked'], why);
+        assert.deepEqual([p.filed, [...p.unreachable].sort(), p.status], [[], ['respond', 'tidy'], 'waiting'], why);
         assert.match((await listed(id)).statuses[1], /^unsigned/, why);
         const d = await awaiting(id);
         assert.deepEqual(d && d.unsigned, ['review'], why);
@@ -312,7 +312,7 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
     const p = await pass(id);
     assert.deepEqual([p.tried, p.filed, p.unreachable], [[], [], ['review']], 'the run refuses a second nudge');
     assert.deepEqual(await listed(id), { statuses: ['unsigned', 'pending'], onYou: ['implement'] });
-    assert.deepEqual(await awaiting(id), { outcome: 'blocked', unsigned: ['implement'], failed: [] });
+    assert.deepEqual(await awaiting(id), { outcome: 'waiting', unsigned: ['implement'], failed: [] });
   });
   await s.test('a nudge a person asks for is told the last try ended without its closeout', async () => {
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'nudge' }));

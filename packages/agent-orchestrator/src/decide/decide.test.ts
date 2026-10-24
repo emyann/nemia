@@ -29,7 +29,7 @@ const RUN = {
 /** A run awaiting a person on `branches`, with `more` of what it awaits. */
 const awaiting = (more: Partial<Extract<Decision, { kind: 'awaiting' }>> = {}): Decision => ({
   kind: 'awaiting',
-  outcome: 'blocked',
+  outcome: 'waiting',
   branches: ['wf/r-1/implement'],
   failed: [],
   awaitingAnswer: [],

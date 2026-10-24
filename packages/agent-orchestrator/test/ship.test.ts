@@ -972,7 +972,7 @@ test('an ending that stops on its own word, or whose check refuses the merged tr
       const { decision } = await stage.runWith(e, decideRun(id));
       assert.equal(decision.kind, 'awaiting');
       if (decision.kind !== 'awaiting') return;
-      assert.deepEqual([decision.outcome, decision.awaitingAnswer, decision.branches], ['blocked', ['ship'], [branch]]);
+      assert.deepEqual([decision.outcome, decision.awaitingAnswer, decision.branches], ['waiting', ['ship'], [branch]]);
       const printed = await at.printedBy(st, ['decide', id]);
       assert.ok(
         printed.some((l) => l.startsWith(`  branch    ${branch}`)),

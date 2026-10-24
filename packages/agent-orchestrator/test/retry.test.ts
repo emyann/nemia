@@ -1551,7 +1551,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
       const after = await tick(id);
       assert.deepEqual(
         [after.tried, after.filed, after.checked, after.unreachable, after.status],
-        [[], [], [], ['review'], 'blocked'],
+        [[], [], [], ['review'], 'waiting'],
         `pass ${pass}`,
       );
     }
@@ -1564,7 +1564,7 @@ test("a claude job's cap, shared by its tries and raised by a person", async (t)
   });
   await s.test('`nemia decide` offers `--budget`, and the retry is refused without one above what it spent', async () => {
     const { offers, decision: d } = await stage.runWith(b.e, decideRun(id));
-    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.budgetExhausted, d.failed], ['blocked', ['implement'], []]);
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.budgetExhausted, d.failed], ['waiting', ['implement'], []]);
     assert.deepEqual(offers, [
       `implement: budget exhausted, $3.02 of $3. Raise its cap above $3.02 and continue its session:  nemia retry ${id} implement --budget <amount>  (--fresh, or --model <m>, for a new session; retries: 2, 0 spent)`,
     ]);
@@ -1675,7 +1675,7 @@ test("UNSIGNED is read off the LAST attempt of a try's task, on `nemia ls`, `nem
       reasons: ['lost', 'unsigned'],
       asked: 'unsigned',
       word: 'unsigned',
-      outcome: 'blocked',
+      outcome: 'waiting',
       onYou: ['implement'],
       told: 'The last try ended without the closeout the run asked for',
     },

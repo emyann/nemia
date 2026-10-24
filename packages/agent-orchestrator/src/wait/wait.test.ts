@@ -192,7 +192,7 @@ test("a pass records the tips of a finished run's result branches — `tipBranch
     return r;
   };
   await t.test('the result branch of a run succeeded or failed, or stopped on a person, and no other', () => {
-    for (const status of ['succeeded', 'failed', 'awaiting approval', 'blocked'] as const)
+    for (const status of ['succeeded', 'failed', 'awaiting approval', 'waiting'] as const)
       assert.deepEqual(tipBranches(branched(), fan, status), ['wf/r-1/c'], status);
   });
   await t.test('none of a run running or cancelled, --no-worktree, or that worked on its base branch', () => {

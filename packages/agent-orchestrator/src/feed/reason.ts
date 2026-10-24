@@ -185,6 +185,8 @@ const RUN_WORDS: readonly Rule[] = [
   { is: 'succeeded', reason: 'Succeeded' },
   { is: 'cancelled', reason: 'Cancelled' },
   { is: 'awaiting approval', reason: 'AwaitingApproval' },
+  { is: 'waiting', reason: 'AwaitingAnswer' },
+  // A run stopped on a person was `blocked` before card 4c, and a feed of then still says it.
   { is: 'blocked', reason: 'AwaitingAnswer' },
   { is: REMOVED, reason: 'Removed' },
   { is: LINE_WORDS.CancelAsked, reason: 'CancelAsked' },

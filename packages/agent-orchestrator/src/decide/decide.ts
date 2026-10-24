@@ -55,7 +55,7 @@ export type Decision =
   | { kind: 'landed'; branches: string[] }
   | {
       kind: 'awaiting';
-      outcome: 'succeeded' | 'failed' | 'blocked';
+      outcome: 'succeeded' | 'failed' | 'waiting';
       branches: string[];
       /**
        * Steps whose task failed or was stopped — over their budget or not, as each list below names a step by how it ended on its own work.
@@ -228,7 +228,7 @@ export function decision(
           budgetExhausted.length ||
           denied.length ||
           awaitingApproval.length
-        ? 'blocked'
+        ? 'waiting'
         : 'succeeded';
   if (onBase && outcome === 'succeeded') return { kind: 'landed', branches };
   return {

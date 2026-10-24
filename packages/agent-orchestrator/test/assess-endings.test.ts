@@ -971,7 +971,7 @@ test("decision: landed is asked of git and never stored, and a finished run is a
       const cases: Array<[string, Decision, string, string[]]> = [
         ['failed', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), unchanged), 'failed', ['review']],
         ['stopped', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'stopped' }), unchanged), 'failed', ['review']],
-        ['blocked', decision(STEPS, finished(), DONE, unchanged, says('blocked')), 'blocked', []],
+        ['blocked', decision(STEPS, finished(), DONE, unchanged, says('blocked')), 'waiting', []],
         [
           'unsigned',
           decision(
@@ -982,7 +982,7 @@ test("decision: landed is asked of git and never stored, and a finished run is a
             () => undefined,
             () => true,
           ),
-          'blocked',
+          'waiting',
           [],
         ],
       ];
@@ -1072,7 +1072,7 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       const d = decision(ENDS, atEnd(), DONE, ahead, signedDone, asked);
       assert.equal(d.kind, 'awaiting');
       if (d.kind !== 'awaiting') return;
-      assert.deepEqual([d.outcome, d.awaitingApproval, d.branches, d.direct], ['blocked', ['ship'], ['wf/r-1/implement'], false]);
+      assert.deepEqual([d.outcome, d.awaitingApproval, d.branches, d.direct], ['waiting', ['ship'], ['wf/r-1/implement'], false]);
       assert.equal(
         runReady(run({}, { after: ['r-1'] }), () => false),
         false,

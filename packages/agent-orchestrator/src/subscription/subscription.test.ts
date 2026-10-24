@@ -52,7 +52,7 @@ const listed = (status: string, { onYou = false, waits }: { onYou?: boolean; wai
  */
 const linesOf = (
   l: Listing,
-  status: { status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked' },
+  status: { status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting' },
   closeout?: Closeout,
 ): RunLine[] => {
   const words = feedWords(l, {}, status, () => closeout);
@@ -76,7 +76,7 @@ test("which lines wake a subscriber: the default selector over every line the fe
       ['a step at its gate', linesOf(listed('awaiting approval', { onYou: true }), { status: 'awaiting approval' })],
       ['a loop out of rounds', linesOf(listed('rounds exhausted', { onYou: true }), { status: 'running' })],
       ['a session on its prompt', linesOf(listed('needs-human', { waits: 'permission: Bash' }), { status: 'running' })],
-      ['a blocked sign-off', linesOf(listed('succeeded · BLOCKED', { onYou: true }), { status: 'blocked' }, BLOCKED)],
+      ['a blocked sign-off', linesOf(listed('succeeded · BLOCKED', { onYou: true }), { status: 'waiting' }, BLOCKED)],
       ['a check refused', linesOf(listed('failed ✗ check (exit 1)', { onYou: true }), { status: 'failed' })],
     ];
     for (const [what, lines] of waits)
@@ -102,8 +102,8 @@ test("which lines wake a subscriber: the default selector over every line the fe
   await t.test(
     "a run blocked on a loop out of rounds wakes on the run's own line, by its step's reason, and on the step's; a note alone wakes nobody",
     () => {
-      const [run] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'blocked' });
-      assert.deepEqual([run.word, run.note], ['blocked', 'waiting on you: review']);
+      const [run] = linesOf(listed('rounds exhausted', { onYou: true }), { status: 'waiting' });
+      assert.deepEqual([run.word, run.note], ['waiting', 'waiting on you: review']);
       assert.deepEqual(
         { reason: run.reason, type: run.type, waits: run.waits },
         { reason: 'AwaitingRound', type: 'Warning', waits: 'person' },

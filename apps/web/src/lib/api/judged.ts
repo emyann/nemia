@@ -22,11 +22,11 @@ export const PlaceKindSchema = decodes<PlaceKind>()(Schema.Literals(['repository
  * Mirrors `RunStatus` in agent-orchestrator: where `assess` puts the run. `failed` is a run in which a step broke; one a person alone
  * stops is `awaiting approval`, at its gates, or `blocked`, on an answer.
  */
-export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked';
+export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
 
 /** Decodes a `RunStatus`. */
 export const RunStatusSchema = decodes<RunStatus>()(
-  Schema.Literals(['running', 'succeeded', 'failed', 'cancelled', 'awaiting approval', 'blocked']),
+  Schema.Literals(['running', 'succeeded', 'failed', 'cancelled', 'awaiting approval', 'waiting']),
 );
 
 /**

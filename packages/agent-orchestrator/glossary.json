@@ -273,7 +273,7 @@
     },
     {
       "term": "Waiting",
-      "meaning": "only a wait on a person: the phase of a step or a run that a person must act on, at a gate, a question, a loop out of rounds, a budget, an unsigned or refused try; its reasons are `AwaitingApproval`, `AwaitingAnswer` (`via` session or closeout), `AwaitingRound` and the stops beside them. Reason `Waiting` is a wait on a thing, phase pending. A try of a step needs the person's word where its reason says so (`WAITS_ON_PERSON`, keyed by reason, a session asking through its harness standing as `AwaitingAnswer` via session), and a step holds its run where its reason waits on a person and is no `Failed` (`holdsTheRun`).",
+      "meaning": "only a wait on a person: the phase of a step or a run that a person must act on, at a gate, a question, a loop out of rounds, a budget, an unsigned or refused try; its reasons are `AwaitingApproval`, `AwaitingAnswer` (`via` session or closeout), `AwaitingRound` and the stops beside them. A run a person stops at no gate alone has the status `waiting` (`stoppedOnWord`), and its decision the outcome `waiting`; both said `blocked` before card 4c, which a feed line of then still reads as. Reason `Waiting` is a wait on a thing, phase pending. A try of a step needs the person's word where its reason says so (`WAITS_ON_PERSON`, keyed by reason, a session asking through its harness standing as `AwaitingAnswer` via session), and a step holds its run where its reason waits on a person and is no `Failed` (`holdsTheRun`).",
       "type": "StepPhase",
       "retired": [
         {

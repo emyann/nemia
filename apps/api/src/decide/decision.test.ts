@@ -883,7 +883,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     },
   });
   const fanOut = await detailOf('r-d7');
-  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['blocked', true, ['implement']]);
+  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['waiting', true, ['implement']]);
   const decided = await decidable('r-d7');
   assert.deepEqual(
     decided.touched.map((t: { branch: string }) => t.branch),

@@ -43,10 +43,10 @@ export type Assessment = {
   /**
    * The run in one word. `failed` is a run in which a step broke: its task failed or was stopped, or its check refused it or did not
    * finish. A run stopped on a person alone is not `failed`: `awaiting approval` when every step that stops what follows it waits at its
-   * gate, and `blocked` when a person's word is what stops it otherwise — a step that signed off blocked, or unsigned, a loop out of
+   * gate, and `waiting` when a person's word is what stops it otherwise — a step that signed off blocked, or unsigned, a loop out of
    * rounds, a cap reached (`stoppedOnWord`). Each of the three is a run that stopped: it is at rest, and no longer in flight.
    */
-  status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked';
+  status: 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
   /**
    * What a person has to decide about the run's result, when the run is at it and nobody has (`toDecide`). Absent while there is nothing.
    */
@@ -184,7 +184,7 @@ function underPause(run: Run, a: Assessment): Assessment {
 function stoppedOnWord(each: ReadonlyArray<{ status: StepStatus; own: StepStatus }>): Assessment['status'] {
   const stops = each.filter((s) => stopsFollowers(s.status));
   if (stops.some((s) => [s.status, s.own].some((w) => w === 'failed' || w === 'stopped' || w === 'failed (check)'))) return 'failed';
-  return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'blocked';
+  return stops.length && stops.every((s) => s.status === 'awaiting approval') ? 'awaiting approval' : 'waiting';
 }
 
 /** What the run refused of the last try's closeout's envelope (`envelopeRefusals`), as its next try is told it; nothing for none. */

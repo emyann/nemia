@@ -207,7 +207,7 @@ test(
         assert.deepEqual(words(run.id), ['running'], 'the run says it is running, once');
         assert.equal(words(run.id, 'plan').length, 1, 'and each step says its first word, once');
         await ticks(3);
-        assert.deepEqual(words(run.id, 'plan'), ['pending'], 'filed and not yet started is pending as before it was filed: no line');
+        assert.deepEqual(words(run.id, 'plan'), ['pending'], 'filed and not started is still pending: no line');
         const quiet = size();
         await tick();
         assert.equal(size(), quiet, 'a pass that judged nothing new writes nothing');
@@ -855,11 +855,7 @@ test("a step's denials, each a one-shot of the runtime counted by its step and t
     await tick();
     settle(task(run, 'plan'), 'succeeded', SIGNED);
     await ticks(3);
-    assert.equal(
-      words(run.id, 'implement').at(-1),
-      'pending',
-      'implement is pending, filed or not: its task, settled next, is what says it was filed',
-    );
+    assert.equal(words(run.id, 'implement').at(-1), 'pending', 'implement is pending; its task, settled next, is filed');
     settle(task(run, 'implement'), 'succeeded', SIGNED);
     deny(task(run, 'implement'), [{ tool: 'Bash', what: 'git push' }]);
     for (let i = 0; i < 2; i++) await tick({ memo: freshRestMemo() });
@@ -1031,7 +1027,7 @@ test('a run waiting on a person says what it waits on, never failed: an ending a
       const runLine = lines()
         .filter((l) => l.run === run.id && l.step === undefined)
         .at(-1)!;
-      assert.deepEqual({ word: runLine.word, note: runLine.note }, { word: 'blocked', note: 'waiting on you: plan' });
+      assert.deepEqual({ word: runLine.word, note: runLine.note }, { word: 'waiting', note: 'waiting on you: plan' });
     },
   );
   await s.test('a long need is clipped, nemia decide having it whole; a step that signed off done says nothing it needs', async () => {

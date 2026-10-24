@@ -450,7 +450,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         heldUntil: [],
         holding: null,
         /** implement signed off blocked, so review is not filed: the run waits on an answer, and nothing in it failed. */
-        status: 'blocked',
+        status: 'waiting',
         phase: 'waiting',
         reason: 'AwaitingAnswer',
         on: null,
@@ -1558,7 +1558,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
           'no frozen workflow, so judged by its folder as the tick judges it: its step signed off blocked, and the folder gained a step the tick would file',
         ],
         ['r-20', 'failed', 'a check refused, so what waits on that step waits for ever: a step broke'],
-        ['r-8', 'blocked', 'a step signed off blocked: it waits on an answer, and nothing broke'],
+        ['r-8', 'waiting', 'a step signed off blocked: it waits on an answer, and nothing broke'],
         ['r-gate', 'awaiting approval', 'a step signed off at its gate: it waits for a yes, and nothing broke'],
         ['r-2', 'cancelled', 'called off, whatever its steps say'],
       ];
@@ -1637,7 +1637,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       ['r-23', 'cancelled', true, 'called off, its session not stopped yet'],
       ['r-5', 'running', true, 'a step queued for a slot'],
       ['r-6', 'running', true, 'a step the folder gained, which the tick would file'],
-      ['r-8', 'blocked', false, 'a step signed off blocked, and its follower is not filed'],
+      ['r-8', 'waiting', false, 'a step signed off blocked, and its follower is not filed'],
       ['r-21', 'succeeded', false, 'verified, then done on its own word'],
       ['r-2', 'cancelled', false, 'called off, nothing left running'],
       [
@@ -1733,7 +1733,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       await expectJudged([
         [
           'r-30',
-          'blocked',
+          'waiting',
           false,
           ['review'],
           [

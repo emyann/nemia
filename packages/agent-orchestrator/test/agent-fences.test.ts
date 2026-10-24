@@ -35,7 +35,12 @@
  * allow that writes the workspace or runs the suite each read-only step denies on its own line (`ownedDenies`): shadcn's CLI in every
  * spelling an allow reaches (`SHADCN`), whose one read a step runs is the board's pinned `view` (`SHADCN_VIEW_NOTE`), and `npm test`;
  * intake and the janitor, which run no test, a test file's run and turbo's besides (`TESTLESS_AGENTS`, `TEST_RUNS`), and design and
- * review, which run a package's tests, a build carried on turbo's test line (`TEST_BUILDS`).
+ * review, which run a package's tests, a build carried on turbo's test line (`TEST_BUILDS`). Design and review measure by the compiler and
+ * the linter, which the settings allow (`TSC_ALLOW`, `OXLINT_ALLOW`, `MEASURES`), and deny on their own line what would write or watch
+ * (`MEASURE_WRITES`, `MEASURE_DENIES`), a `tsc` without `--noEmit` first being reached by no allow (`NO_EMIT_FIRST`); intake and the
+ * janitor deny both whole (`MEASURELESS_DENIES`). No tsconfig of the checkout makes `--noEmit` write (`buildInfoConfigs`). Every command
+ * a read-only step's note tells it to run is one its fence allows (`toldOf`), and each read-only agent is told, in one paragraph the
+ * four hold equal, to say a refused call its work needs at the top of its sign-off (`REFUSAL_SAID`).
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
  * and review are refused each form of it and Docker by hand, since no allow reaches one (`RENDERS`, `DOCKER`).
  * Implement and land, which run what no deny names, deny the live collector by its two ports on their own line, each beside every deny
@@ -2834,9 +2839,7 @@ const TOLD_SPANS = /`((?:npm|npx|node|git|gh)\s[^`]*)`/g;
 function toldOf(file: string, root = SHIPPED_HOLDERS[0]): Call[] {
   const text = fs.readFileSync(path.join(root, file), 'utf8');
   const body = text.slice(text.indexOf('\n---\n', 3) + 5);
-  const spans = [
-    ...new Set([...body.matchAll(TOLD_SPANS)].map((span) => span[1].replace(/\s+/g, ' ').replace(/<[^<>]+>/g, 'x'))),
-  ];
+  const spans = [...new Set([...body.matchAll(TOLD_SPANS)].map((span) => span[1].replace(/\s+/g, ' ').replace(/<[^<>]+>/g, 'x')))];
   return spans
     .filter((span) => !spans.some((other) => other.startsWith(`${span} `)))
     .map((command) => ({ tool: 'Bash', command }) as const);
@@ -2852,13 +2855,21 @@ test("every command a read-only step's note tells it to run is one its frozen fe
     assert.deepEqual(runs(step, told), told.map(shown), named);
   }
   for (const { named, step } of measuringSteps()) {
-    const told = toldOf(`${named}.md`).map(({ command }) => command);
-    assert.ok(told.some((command) => command.startsWith('npx tsc --noEmit ')), `${named}'s note names a measure by tsc`);
-    assert.ok(told.some((command) => command.startsWith('npx oxlint ')), `${named}'s note names a measure by oxlint`);
+    const told = toldOf(`${named}.md`).map(shown);
+    assert.ok(
+      told.some((call) => call.startsWith('Bash(npx tsc --noEmit ')),
+      `${named}'s note names a measure by tsc`,
+    );
+    assert.ok(
+      told.some((call) => call.startsWith('Bash(npx oxlint ')),
+      `${named}'s note names a measure by oxlint`,
+    );
     assert.deepEqual(runs(step, MEASURES), MEASURES.map(shown), named);
   }
   assert.deepEqual(
-    measuringSteps().map(({ named }) => named).sort(),
+    measuringSteps()
+      .map(({ named }) => named)
+      .sort(),
     ['build/design', 'build/review', 'quick/review'],
   );
 });
@@ -2925,7 +2936,7 @@ function buildInfoConfigs(repo = REPO): string[] {
     .filter((file) => /(?:^|\/)tsconfig[^/]*\.json$/.test(file))
     .filter((file) => {
       const at = path.join(repo, file);
-      const read = ts.readConfigFile(at, ts.sys.readFile);
+      const read = ts.readConfigFile(at, (file) => ts.sys.readFile(file));
       assert.equal(read.error, undefined, `${file} reads as a tsconfig`);
       const { options } = ts.parseJsonConfigFileContent(read.config, ts.sys, path.dirname(at), undefined, at);
       return BUILD_INFO_OPTIONS.some((option) => options[option] === true);
@@ -2933,7 +2944,10 @@ function buildInfoConfigs(repo = REPO): string[] {
 }
 
 test('no tsconfig of the checkout sets incremental or composite, so a measure with --noEmit writes no build-info file', () => {
-  assert.ok(checkoutFiles(REPO).some((file) => file.endsWith('tsconfig.json')), 'the checkout has tsconfigs to read');
+  assert.ok(
+    checkoutFiles(REPO).some((file) => file.endsWith('tsconfig.json')),
+    'the checkout has tsconfigs to read',
+  );
   assert.deepEqual(buildInfoConfigs(), []);
 });
 
@@ -2974,7 +2988,7 @@ test('each read-only agent is told, in one and the same paragraph, to say a refu
   assert.equal(new Set(Object.values(said)).size, 1, 'the four paragraphs are equal');
 });
 
-test("REFUSED: a read-only agent without the paragraph is named, and one whose paragraph drifts makes the four unequal", () => {
+test('REFUSED: a read-only agent without the paragraph is named, and one whose paragraph drifts makes the four unequal', () => {
   const root = scratch('wf-fences-refusal-said-');
   fs.cpSync(SHIPPED_HOLDERS[0], root, { recursive: true });
   const edit = (agent: string, change: (text: string) => string) => {

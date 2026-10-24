@@ -9,7 +9,7 @@ import type { RunSummary } from './api/runs.ts';
 import { meaningOf } from './meaning.ts';
 import { sinceShort, sinceWords, whenWords } from './runWords.ts';
 import { stateDrawn, stepState, type StepState } from './status.ts';
-import { PERSON } from './words.ts';
+import { railOf } from './words.ts';
 
 /** The card's five kinds, one a story: a step at work, at a gate (waiting on a person), done, to come, and failed. */
 export type StepKind = 'work' | 'gate' | 'done' | 'come' | 'failed';
@@ -219,7 +219,7 @@ export function stepCardOf({ run, step, detail, agents, now }: StepCardInput): S
   return {
     kind,
     hue: hueOf(state),
-    tag: { word: PERSON[state].rail, ...TAGS[kind] },
+    tag: { word: railOf(state, row?.status ?? '').rail, ...TAGS[kind] },
     agent: agentOf(row?.agent ?? null, agents),
     step,
     place: own && detail ? placeOf(own, detail.steps, kind) : null,

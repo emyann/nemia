@@ -34,6 +34,9 @@ const headed = (page: Page, state: string) =>
 /** What the package words a step whose check the pause holds, and what it notes beside it. */
 const HELD_WORDS = { status: 'waiting on the pause', note: 'its check is filed on nemia resume' };
 
+/** The person's word the chip draws for that status (`lib/words.ts`). */
+const PAUSE_WORD = 'waits on the pause';
+
 /** Whether `url` is the read of FAKE's run, never one of its steps'. */
 const fakeRead = (url: URL) => url.pathname === `/api/runs/${FAKE.id}`;
 
@@ -57,7 +60,7 @@ async function heldRun(page: Page, theme: string): Promise<void> {
     const node = graph.locator(`.react-flow__node[data-id="${FAKE.refused}"]`);
     await expectTexts(
       node.locator('[data-state="waiting"]'),
-      [HELD_WORDS.status],
+      [PAUSE_WORD],
       'a step whose check the pause holds is drawn waiting on the pause, never checking',
     );
     await settled(page);
@@ -90,7 +93,7 @@ export default {
    * Pause… asks an optional why, and once sent the pause's file holds it and the popover says since when, by whom and why: `Pausing · N`
    * while the seed's sessions are at work, as the api reads them, its popover naming each; once nothing finishes and a landing is held
    * with its merge staged and another step's check held — the api's answer held with `route` — `Paused, 2 checks held`, its popover
-   * naming each; and on the run's page that step's chip is drawn waiting, `waiting on the pause`, the api's read of the run held with
+   * naming each; and on the run's page that step's chip is drawn waiting, `waits on the pause`, the api's read of the run held with
    * `route` as the package words it. Which tasks finish, and which checks are held, is the package's judgement, proven in its own tests
    * (`packages/agent-orchestrator/src/tick/pause.test.ts`). On a phone's screen the button is still there, and its popover fits. Resume,
    * in the popover, takes the file away. The window's size is put back.

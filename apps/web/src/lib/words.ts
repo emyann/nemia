@@ -5,7 +5,7 @@
  * the runtime's: a person hovering over a chip reads what the state means to them, never how it is kept.
  */
 import type { RunOutcome } from './api/runs.ts';
-import type { StepState } from './status.ts';
+import { pauseHolds, type StepState } from './status.ts';
 
 /** A wait on a person, as its words read it: the step that waits, none for a wait of the run's own, and how many steps are done. */
 export type Wait = { step: string | null; done: number };
@@ -144,6 +144,16 @@ export const PERSON: Record<StepState, PersonWords> = {
   },
   unknown: { rail: 'unknown', meaning: 'There is no record of its task.', ...NONE },
 };
+
+/** A step `waiting` whose check the store's pause holds: not to come, since it signed off, but held until the factories resume. */
+const PAUSED: Pick<PersonWords, 'rail' | 'meaning'> = {
+  rail: 'waits on the pause',
+  meaning: 'It signed off, and its check runs once the factories are resumed.',
+};
+
+/** The rail word and meaning of a step by its state, and by its status where a state has a wait of its own (the pause's). */
+export const railOf = (state: StepState, status: string): Pick<PersonWords, 'rail' | 'meaning'> =>
+  state === 'waiting' && pauseHolds(status) ? PAUSED : PERSON[state];
 
 /**
  * The words of the waits a run has of its own, which no step's state says: a hold only a person lifts, a run it waits on that never

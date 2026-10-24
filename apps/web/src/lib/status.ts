@@ -92,6 +92,9 @@ function wordState(status: string, runCancelled: boolean): StepState {
   return 'working';
 }
 
+/** Whether `status` is a step signed off whose check the store's pause keeps from being filed: `waiting` by its state, its own wait. */
+export const pauseHolds = (status: string): boolean => status.split(' · ')[0] === 'waiting on the pause';
+
 /** Final, and a follower may be filed on it — `satisfiesAfter` in agent-orchestrator: verified, or done on its own word. */
 export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified';
 

@@ -76,6 +76,9 @@ test("a chip shows a person's word for the state, never the status; on hover wha
   }
   const cancelled = renderToStaticMarkup(createElement(StatusChip, { status: 'stopped', runCancelled: true, runHeld: false }));
   assert.equal(cancelled.replace(/<[^>]*>/g, ''), 'called off');
+  const paused = renderToStaticMarkup(createElement(StatusChip, { status: 'waiting on the pause', runCancelled: false, runHeld: false }));
+  assert.match(paused, /data-state="waiting"/);
+  assert.notEqual(paused.replace(/<[^>]*>/g, ''), PERSON.waiting.rail, 'a check the pause holds is its own wait, not a step to come');
 });
 
 test('a note under a chip is the note as `wf ls` prints it, and nothing at all for a step without one', () => {

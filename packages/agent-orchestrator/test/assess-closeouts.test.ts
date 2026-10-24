@@ -16,7 +16,6 @@ import {
   inputRefusal,
   inputsLine,
   inputsNote,
-  listing,
   stepStatus,
   type InputFile,
   type RepositoryRun,
@@ -40,7 +39,7 @@ import { lackedOf } from '../src/record/record.ts';
 import { nextTry } from '../src/retry/index.ts';
 import { roundFiled } from '../src/round/round.ts';
 import { sentBack } from '../src/status/status.ts';
-import { names, phases, run, step, STEPS } from './assessed.ts';
+import { listing, names, phases, run, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 const nothingShipped = () => false;
@@ -242,8 +241,8 @@ test('listing of how a step signed off', async (t) => {
     assert.deepEqual(
       live.steps,
       [
-        { name: 'implement', status: 'working', branch: null },
-        { name: 'review', status: 'waiting', branch: null },
+        { name: 'implement', status: 'working', reason: 'Running', phase: 'running', branch: null },
+        { name: 'review', status: 'waiting', reason: 'Waiting', phase: 'pending', branch: null },
       ],
       'still running, and never filed',
     );
@@ -252,8 +251,8 @@ test('listing of how a step signed off', async (t) => {
     assert.deepEqual(
       old.steps,
       [
-        { name: 'implement', status: 'unverified', branch: 'wf/r-1/implement' },
-        { name: 'review', status: 'failed', branch: 'wf/r-1/review' },
+        { name: 'implement', status: 'unverified', reason: 'Unknown', phase: 'pending', branch: 'wf/r-1/implement' },
+        { name: 'review', status: 'failed', reason: 'Failed', phase: 'failed', branch: 'wf/r-1/review' },
       ],
       'a run from before closeouts is settled and silent about how: nothing is inferred, and nothing checked it, so it reads unverified',
     );

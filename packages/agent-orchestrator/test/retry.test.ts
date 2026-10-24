@@ -1065,6 +1065,8 @@ test('`nemia retry` on a step whose session its harness blocked: the tick stops 
     assert.deepEqual((await stage.runWith(b.e, list(b.e, readRun(run.id)))).steps[0], {
       name: 'implement',
       status: 'needs-human',
+      reason: 'NeedsHuman',
+      phase: 'waiting',
       branch: run.branch,
       note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
     });
@@ -1120,6 +1122,8 @@ test('`nemia retry` on a blocked session that works again before any tick: stopp
     assert.deepEqual((await stage.runWith(b.e, list(b.e, readRun(run.id)))).steps[0], {
       name: 'implement',
       status: 'working',
+      reason: 'Running',
+      phase: 'running',
       branch: run.branch,
       note: 'try 2 asked (--nudge) — stopping its session, then the tick files it',
     });
@@ -1231,6 +1235,8 @@ test('telling a running step something with `nemia say`, and the try that contin
     assert.deepEqual((await stage.runWith(b.e, list(b.e, readRun(run.id)))).steps[0], {
       name: 'implement',
       status: 'working',
+      reason: 'Running',
+      phase: 'running',
       branch: run.branch,
       note: 'said to 1×',
     });

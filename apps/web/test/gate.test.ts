@@ -207,7 +207,7 @@ test("gateOfStep, gateFacts, needWords: the inspector's gate, the facts under it
     "the facts under a gate: the round of its loop's cap and the cost, the review's word, each check's verdict, and — once the decision is read — what it touched and whether it merges",
     () => {
       const steps = [
-        step('implement', { tries: [tried(1, 1), tried(2, 2)], check: { verdict: 'passed' } as Step['check'] }),
+        step('implement', { tries: [tried(1, 1), tried(2, 2)], check: { verdict: { result: 'passed', exit: 0 } } as Step['check'] }),
         step('review', {
           spec: { loop: 'implement', rounds: 3 } as Step['spec'],
           tries: [tried(1), tried(2, 2)],
@@ -257,7 +257,7 @@ test("gateOfStep, gateFacts, needWords: the inspector's gate, the facts under it
         gateFacts(detail(one, { cost: null }), null)[1].said,
         /^review left 1 finding; a person accepted the work as it stands, with it open: /,
       );
-      const failed = [step('implement', { check: { verdict: 'failed' } as Step['check'] })];
+      const failed = [step('implement', { check: { verdict: { result: 'failed', exit: 1 } } as Step['check'] })];
       assert.equal(gateFacts(detail(failed), null)[1]?.state, 'bad');
     },
   );

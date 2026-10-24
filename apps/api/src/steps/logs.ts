@@ -1,5 +1,5 @@
 /** A step's session output and its check's, as the board is given them: the end of each, and what a refused check said. */
-import { attemptVerdict, phaseOfView, verdictWord, type Views } from 'agent-orchestrator';
+import { attemptVerdict, checkVerdictOf, phaseOfView, verdictWord, type CheckVerdict, type Views } from 'agent-orchestrator';
 import type { Run } from 'agent-orchestrator/run';
 import type { Workflow } from 'agent-orchestrator/workflow';
 import { engineRead, type Engine } from '../store.ts';
@@ -16,10 +16,10 @@ export type StepCheck = {
   /** The check's task, once the run has filed it. */
   taskId: string | null;
   /**
-   * What the check said of the work: `passed`, `exit 1`, `unfinished` for one that did not finish, `checking` while it runs,
-   * and `unknown` for a task the engine has no record of. Null until the run files it.
+   * What the check said of the work, as codes (`CheckVerdict`): `passed` (exit 0), `failed` with its exit code, `unfinished` for one that
+   * did not finish, `running` while it runs, and `unknown` for a task the engine has no record of. Null until the run files it.
    */
-  verdict: string | null;
+  verdict: CheckVerdict | null;
   refused: {
     exit: string;
     /** Null on an earlier try's check: the page reads the current try's stdout alone, and every try's stderr. */
@@ -95,20 +95,22 @@ const unreadableOutput = (run: Run, taskId: string, err: unknown): string =>
 /**
  * A check of one try, off the engine's view of its task: the command, its verdict, and once it refused, what it exited with and
  * the end of its stderr, read before for every refused check (`refusedStderr`) — its stdout left unread (`StepCheck`). The verdict is
- * the package's `attemptVerdict` on the last attempt of the try's own check, whichever try: its exit code, or `unfinished` for one that
- * recorded none or that its deadline or an operator ended, as the tick, `nemia ls` and `nemia decide` read it.
+ * codes (`checkVerdictOf`), off the phase of its task and the package's `attemptVerdict` on the last attempt of the try's own check,
+ * whichever try: its exit code, or `unfinished` for one that recorded none or that its deadline or an operator ended, as the tick,
+ * `nemia ls` and `nemia decide` read it. `refused.exit` is that verdict in a person's words (`verdictWord`).
  */
 export function checkIn(command: string, taskId: string | undefined, views: Views, stderr: CheckStderr): StepCheck {
   if (!taskId) return { command, taskId: null, verdict: null, refused: null };
   const view = views.get(taskId);
   const phase = phaseOfView(view);
-  const exit = verdictWord(attemptVerdict(view?.state.attempts.at(-1)));
+  const verdict = attemptVerdict(view?.state.attempts.at(-1));
+  const exit = verdictWord(verdict);
   const refused = refusedIn(views)(taskId);
   const said = stderr.get(taskId) ?? NO_LINES;
   return {
     command,
     taskId,
-    verdict: phase === 'unknown' ? 'unknown' : phase === 'succeeded' ? 'passed' : refused ? exit : 'checking',
+    verdict: checkVerdictOf(phase, verdict),
     refused: refused
       ? {
           exit,

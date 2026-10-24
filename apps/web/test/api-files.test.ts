@@ -3,7 +3,8 @@
  * re-exporting file at run time, and a sibling only one level deep: a file may import values from a sibling that imports values from no
  * sibling (the schemas of judged.ts and graph.ts, which runs.ts decodes with), so no runtime import cycle can form among them. A type
  * crosses by `import type`, which is erased; the other values they import are react-query's, effect's, the feed's pace, their reads
- * (read.ts) and `decodes` (decodes.ts); read.ts imports effect alone, and decodes.ts no value at all.
+ * (read.ts), `decodes` (decodes.ts) and the codes of where a step stands (reasons.ts); read.ts imports effect alone, decodes.ts no value at
+ * all, and reasons.ts effect and decodes.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -13,18 +14,22 @@ import path from 'node:path';
 const DIR = path.resolve(import.meta.dirname, '../src/lib/api');
 
 /** What the files under src/lib/api/ may import values from. */
-const ALLOWED = new Set(['@tanstack/react-query', 'effect', '../feed.ts', './read.ts', './decodes.ts']);
+const ALLOWED = new Set(['@tanstack/react-query', 'effect', '../feed.ts', './read.ts', './decodes.ts', './reasons.ts']);
 
 /** What read.ts, the reads every file imports, may import values from. */
 const READ_ALLOWED = new Set(['effect']);
 
-/** What each file every other file imports may import values from: read.ts effect alone, decodes.ts nothing. */
+/**
+ * What each file every other file imports may import values from: read.ts effect alone, decodes.ts nothing, and reasons.ts — the codes
+ * the runs' and the tries' schemas both decode with — effect and decodes.ts.
+ */
 const SHARED: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   ['read.ts', READ_ALLOWED],
   ['decodes.ts', new Set<string>()],
+  ['reasons.ts', new Set(['effect', './decodes.ts'])],
 ]);
 
-/** A specifier naming a sibling under src/lib/api/, other than read.ts and decodes.ts. */
+/** A specifier naming a sibling under src/lib/api/, other than the shared files (`SHARED`). */
 const sibling = (s: string) => /^\.\/[^/]+\.ts$/.test(s) && !SHARED.has(s.slice(2));
 
 /**

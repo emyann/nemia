@@ -20,7 +20,6 @@ import {
   composeBrief,
   costLine,
   decision,
-  listing,
   overBudgetLine,
   owedFields,
   ownStatus,
@@ -56,7 +55,7 @@ import {
 } from '../src/retry/retry-ask.ts';
 import { tryOf } from '../src/record/record.ts';
 import type { OutputSchema, Workflow } from '../src/workflow.ts';
-import { names, namesFor, phases, run, step, STEPS } from './assessed.ts';
+import { listing, names, namesFor, phases, run, step, STEPS } from './assessed.ts';
 import { PRECEDENCE } from '../src/brief/index.ts';
 import type { Verdict } from '../src/check/check.ts';
 
@@ -263,6 +262,8 @@ test('`again: true` with rounds left: a round is due, and what waits on the loop
     assert.deepEqual(l.steps[1], {
       name: 'review',
       status: 'unverified · done',
+      reason: 'Succeeded',
+      phase: 'succeeded',
       branch: null,
       note: 'round 2 of 3 due — review asked again, and the next tick files implement',
       roundDue: true,
@@ -1059,8 +1060,17 @@ test("`nemia ls`' costs: each step's tries' beside its word once measured, and t
     assert.deepEqual(
       [l.steps[0], l.steps[1], l.cost],
       [
-        { name: 'implement', status: 'failed ✗ check (exit 1)', branch: null, note: 'try 3 due — retries: 2, 1 spent', cost: '$2.25' },
-        { name: 'review', status: 'waiting', branch: null },
+        {
+          name: 'implement',
+          status: 'failed ✗ check (exit 1)',
+          reason: 'CheckFailed',
+          phase: 'failed',
+          verdict: { result: 'failed', exit: 1 },
+          branch: null,
+          note: 'try 3 due — retries: 2, 1 spent',
+          cost: '$2.25',
+        },
+        { name: 'review', status: 'waiting', reason: 'Waiting', phase: 'pending', branch: null },
         '$2.25',
       ],
     );
@@ -1079,7 +1089,17 @@ test("`nemia ls`' costs: each step's tries' beside its word once measured, and t
     const over = ls(spends({ t0: 1.75, t1: 2.5 }));
     assert.deepEqual(
       [over.steps[0], over.cost],
-      [{ name: 'implement', status: 'over budget $4.25 of $3', branch: null, note: 'try 2, by retries: 2' }, '$4.25'],
+      [
+        {
+          name: 'implement',
+          status: 'over budget $4.25 of $3',
+          reason: 'OverBudget',
+          phase: 'waiting',
+          branch: null,
+          note: 'try 2, by retries: 2',
+        },
+        '$4.25',
+      ],
     );
   });
   for (const [name, none] of [

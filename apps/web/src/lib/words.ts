@@ -1,11 +1,12 @@
 /**
  * Every word the board says to a person of a step's state, of a run's wait and of how a run ended, in one place: where the board's words
  * differ from the code's (`awaiting-approval` is `waits on you`, `cancelled` is `called off`), they are translated here and nowhere else.
- * `status.ts` parses a status into its state, `runWords.ts` and `stepCard.ts` compose; each reads its words from here. No word here is
+ * `status.ts` reads a step's codes into its state, `runWords.ts` and `stepCard.ts` compose; each reads its words from here. No word here is
  * the runtime's: a person hovering over a chip reads what the state means to them, never how it is kept.
  */
 import type { RunOutcome } from './api/runs.ts';
-import { pauseHolds, type StepState } from './status.ts';
+import type { CheckVerdict, StepReason } from './api/reasons.ts';
+import type { StepState } from './status.ts';
 
 /** A wait on a person, as its words read it: the step that waits, none for a wait of the run's own, and how many steps are done. */
 export type Wait = { step: string | null; done: number };
@@ -151,9 +152,18 @@ export const PAUSED: Pick<PersonWords, 'rail' | 'meaning'> = {
   meaning: 'It signed off, and its check runs once the factories are resumed.',
 };
 
-/** The rail word and meaning of a step by its state, and by its status where a state has a wait of its own (the pause's). */
-export const stateWordsOf = (state: StepState, status: string): Pick<PersonWords, 'rail' | 'meaning'> =>
-  state === 'waiting' && pauseHolds(status) ? PAUSED : PERSON[state];
+/** The rail word and meaning of a step by its state, and by its reason where a state has a wait of its own (the pause's). */
+export const stateWordsOf = (state: StepState, reason: StepReason): Pick<PersonWords, 'rail' | 'meaning'> =>
+  state === 'waiting' && reason === 'WaitingForPause' ? PAUSED : PERSON[state];
+
+/**
+ * A check's verdict as a person reads it, from its codes: `passed`, `exit 1` for the code it failed with (`failed` where it gave none),
+ * `unfinished` for one that did not finish, `checking` while it runs, and `unknown` for a task the engine has no record of.
+ */
+export function verdictWords({ result, exit }: CheckVerdict): string {
+  if (result === 'failed') return exit === null ? 'failed' : `exit ${exit}`;
+  return result === 'running' ? 'checking' : result;
+}
 
 /**
  * The words of the waits a run has of its own, which no step's state says: a hold only a person lifts, a run it waits on that never

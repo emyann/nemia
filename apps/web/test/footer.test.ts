@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { QuotaWindow, RunSummary } from '../src/lib/api.ts';
-import { listed, waitingRun } from './run-fixtures.ts';
+import { coded, listed, waitingRun, type Word } from './run-fixtures.ts';
 import { atWork, atWorkWords, daemonDot, feedWords, quotaShort, staleFrameHeights, versionWords } from '../src/lib/footer.ts';
 import { daemon, quota } from './factory-fixtures.ts';
 
@@ -25,7 +25,7 @@ const win = (extra: Partial<QuotaWindow> = {}): QuotaWindow => ({
 });
 
 /** A run in flight with one step per status, in `factory`, and `extra` over it. */
-const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunSummary => ({
+const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSummary => ({
   id: 'r-1',
   repo: '/code/app',
   factory: null,
@@ -40,6 +40,8 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
   cancelledAt: null,
   pruned: null,
   status: 'running',
+  phase: 'running',
+  reason: 'Running',
   moving: true,
   cost: null,
   atWork: null,
@@ -48,7 +50,7 @@ const run = (statuses: readonly string[], extra: Partial<RunSummary> = {}): RunS
     name: `step-${i}`,
     taskId: `t-${i}`,
     branch: null,
-    status,
+    ...coded(status),
     note: null,
     roundDue: false,
     agent: null,

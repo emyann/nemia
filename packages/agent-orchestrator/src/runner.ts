@@ -542,7 +542,7 @@ export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from 
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
 export { ledgerOf } from './revisions/revisions.store.ts';
 export { driftNow } from './revisions/pin.verb.ts';
-export { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
+export { chatAnswer, chatHistory, chatRead, chatSay, chatSince, chatStop } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
 export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';

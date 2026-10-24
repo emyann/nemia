@@ -129,7 +129,7 @@ const PINNED: Record<string, string[]> = {
     'chatAnswer',
     'chatHistory',
     'chatRead',
-    'chatSend',
+    'chatSay',
     'chatSince',
     'chatStop',
     'checkoutHold',

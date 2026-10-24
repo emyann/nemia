@@ -6,7 +6,7 @@
  * read again each time.
  *
  * Pure. The files are `chat.store.ts`'s, the reads and the person's writes `chat.verb.ts`, and the delivery the keeper's
- * (`deliver.verb.ts`).
+ * (`say.verb.ts`).
  */
 import { Invalid } from '../refusal/refusal.ts';
 import type { EnginePhase } from '../views/views-words.ts';
@@ -289,7 +289,7 @@ function placedInTime(own: readonly ChatEvent[], marks: readonly ChatEvent[]): C
   return out;
 }
 
-/** The suffix a recommended choice's label carries, as the question tool's own words tell her to write it. */
+/** The suffix a recommended choice's label carries, as the question tool's own words ask her to write it. */
 const RECOMMENDED = /\s*\(recommended\)\s*$/i;
 
 /** One choice as the board draws it: its label without the suffix she marked it with, and `recommended` where it carried one. */

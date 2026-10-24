@@ -210,7 +210,7 @@ append is reported (`was given the words, but they could not be journalled`), so
 other order was refused because it would record words that may never have arrived.
 
 A layer above that reconciles its own deliveries against `state.said` reads the same window the other way: the orchestrator's chat
-(`deliverOutbox`, `src/chat/deliver.verb.ts` there) finds no `said` for words the harness took, and says them again. For it the gap
+(`sayOutbox`, `src/chat/say.verb.ts` there) finds no `said` for words the harness took, and says them again. For it the gap
 is a repeat, never a loss; it closes only with this one.
 
 ### 23. `claude.remoteControl` bridges a session, and nothing reads whether it was bridged

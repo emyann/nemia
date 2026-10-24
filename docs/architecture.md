@@ -223,7 +223,7 @@ repository's team (`test/nemia-shipped.test.ts`); how her session runs is the ru
 and the attached runner that rule brings).
 Her chat is the orchestrator's too, written over a long-lived task and a folder (`src/chat/`): projected on every read from her
 transcripts across her attempts and the runtime's `said`, never a copy; what the person writes (`outbox.jsonl`) and their read mark
-(`read.json`) are theirs, written by the api's programs alone, and delivered by the keeper's `deliver` act, the one writer of
+(`read.json`) are theirs, written by the api's programs alone, and said to her by the keeper's `sayOutbox` act, the one writer of
 `delivered.jsonl`, which reconciles with `said` before it says (`test/chat-writers.test.ts`).
 
 **The library's writers** are the orchestrator's: an agent, a skill or a workflow of yours written, or removed, against the version it

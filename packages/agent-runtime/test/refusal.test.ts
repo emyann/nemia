@@ -817,6 +817,44 @@ test('REFUSED: `mayAsk: true` on a session this runtime does not hold attached, 
   );
 });
 
+test("REFUSED: a list in `enabledSkills` on a road that cannot close a session's skills, and taken on Claude Code's SDK roads", async () => {
+  const options = {
+    root: scratch('ae-enabled-skills-'),
+    journal: asyncStore(memoryStore()),
+    harnesses: { claude: 'claude' as const, bg: 'claude-bg' as const, 'claude-detached': claudeDetached, codex },
+  };
+  const engine = builtEngine(Engine.layer(options));
+  const listed = { ...ok, config: { enabledSkills: ['my-plugin:review'] } };
+  const roads: Array<[string, Filing]> = [
+    ['`claude --bg`, as a harness', { ...listed, harness: 'bg' }],
+    [
+      '`claude --bg`, as a background session of `claude` that is no long-lived one',
+      { ...ok, harness: 'claude', config: { ...listed.config, background: true } },
+    ],
+    ['`claude -p`, a spec that does not declare `enabledSkills`', { ...listed, harness: 'claude-detached' }],
+    ['Codex', { ...listed, harness: 'codex' }],
+  ];
+  for (const [road, spec] of roads) {
+    const refused = await Effect.runPromise(Effect.flip(engine.file(spec)));
+    assert.equal(refused._tag, 'FileRefused', road);
+  }
+  assert.ok(
+    await Effect.runPromise(engine.file({ ...listed, harness: 'claude' })),
+    'a job of `claude` runs on the Agent SDK, which takes the list',
+  );
+  assert.ok(
+    await Effect.runPromise(
+      engine.file({ ...ok, harness: 'claude', restartPolicy: 'Always', config: { ...listed.config, background: true } }),
+    ),
+    'a long-lived `claude` session runs attached, on the Agent SDK',
+  );
+  for (const harness of ['bg', 'claude-detached', 'codex']) {
+    assert.ok(await Effect.runPromise(engine.file({ ...ok, harness, config: { enabledSkills: 'default' } })), `'default' on ${harness}`);
+  }
+  assert.ok(claudeBgRefuses(listed), 'a bare `claude --bg` runner refuses the list too');
+  assert.equal(claudeCodeRefuses(listed), undefined, "and Claude Code's job takes it");
+});
+
 test("Claude Code's own runners refuse Codex's arguments, so a runner reached without the engine's door refuses them too", () => {
   const task = { ...ok, config: { codex: { trustFrom: '/repo' } } };
   const says =

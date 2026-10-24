@@ -145,6 +145,12 @@ the orchestrator's code holds a fact today, it is named beside it.
   `claude -p` (2.1.291) prints `system`/`init` first under `--output-format stream-json --verbose`, and one `result` line under
   `--output-format json`; a job's bin prints the SDK's messages in order, whose first is that same `system`/`init` (`readers`,
   `bin/ae-worker.ts`).
+- **`Options.skills` as a list closes an attached session's skills to it; Claude Code's command line has no equivalent** (SDK 0.3.308,
+  CLI 2.1.310, 2026-10-24, `live.test.ts`): a session given one plugin skill (`nemia-aeprobe:say-the-word`, by `--plugin-dir`) is
+  listed that skill alone in its transcript's `skill_listing` (`skillCount: 1`), and its control, identical but on `'default'`, is
+  listed it and the 14 built-in ones (`skillCount: 15`). Read the `skill_listing`, not `init`'s `skills`, which lists every skill
+  either way. No flag or settings key of the CLI closes the list: `skillOverrides` turns off the names it holds and
+  `disableBundledSkills` the bundled ones alone, so a task's `enabledSkills` list is refused on `claude --bg` and `claude-detached`.
 - **Words pushed into a long-lived attached session while the model writes run as a turn of their own; words pushed while a tool call
   runs are folded into the turn in flight and answered by its one result** (SDK 0.3.270, CLI 2.1.301, 2026-10-16): so a turn is
   answered by the `user_message_uuids` on its result (`answered`, `harness/claude/attached-session.ts`), never by counting;

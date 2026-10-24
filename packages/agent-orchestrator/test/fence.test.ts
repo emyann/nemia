@@ -380,10 +380,7 @@ test(
     const args = fs.readFileSync(path.join(dir, 'args'), 'utf8').split('\n');
     assert.equal(sdkArgValue(args, '--permission-mode'), fenceReach('claude')!.given, "the runtime's answer, which the parser reads");
     assert.equal(sdkArgValue(args, '--plugin-dir'), path.join(agents, 'nemia-scribe'));
-    assert.equal(
-      sdkArgValue(args, '--settings'),
-      '{"outputStyle":"nemia-scribe:no-coding","skillOverrides":{"write-a-note":"off","mind-the-tone":"off"},"autoMemoryEnabled":false}',
-    );
+    assert.equal(sdkArgValue(args, '--settings'), '{"outputStyle":"nemia-scribe:no-coding","autoMemoryEnabled":false}');
     assert.deepEqual(
       args.filter((a) => a.startsWith('--append-system-prompt')),
       [],

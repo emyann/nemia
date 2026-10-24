@@ -1,14 +1,13 @@
 /**
  * A skill named with its folder (`app:y`), at `nemia start` and at the folder's check (`loadWorkflows`): a step's line or its agent's
  * names it, the run reads it from that folder of the repository and freezes its files under its bare name, the name the prompt gives
- * and a session lists, while the record, the versions and the settings say it as the line writes it. The settings turn off the folder's
- * whole off-list (`StepAgent.offSkills`), so a step that names no skill of a folder is told to turn off the one another step of its folder
- * names, under both its bare name and the name that line writes. Refused by name, with no run left:
- * a folder that holds no such skill, a read with no repository, and two skills of one bare name in one step — which two steps of one
- * run are each given. The reader's rule is held beside its code (`src/skills/read.store.test.ts`). The shipped build folder gives
- * the design system kit's three skills to its design, implement and review this way: loaded and started at shipped defaults on a copy
- * of the checkout's skills (`checkoutCopy`), and refused by name once a kit skill's folder is renamed. `WF_ROOT` is set before the
- * modules are imported, since they read it as they load.
+ * and a session lists, while the record and the versions say it as the line writes it. A step's session is given its plugin's copies
+ * and no other skill (`enabledSkillsOf`), so a step that names no skill of a folder is given none of the one another step of its folder
+ * names. Refused by name, with no run left: a folder that holds no such skill, a read with no repository, and two skills of one bare
+ * name in one step — which two steps of one run are each given. The reader's rule is held beside its code
+ * (`src/skills/read.store.test.ts`). The shipped build folder gives the design system kit's three skills to its design, implement and
+ * review this way: loaded and started at shipped defaults on a copy of the checkout's skills (`checkoutCopy`), and refused by name once
+ * a kit skill's folder is renamed. `WF_ROOT` is set before the modules are imported, since they read it as they load.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -26,7 +25,7 @@ const { loadWorkflows } = await import('../src/folder/folder.store.ts');
 const { workflowVersion } = await import('../src/folder/version.store.ts');
 const { skillVersion } = await import('../src/skills/read.store.ts');
 const { agentFilesDir, renderedSkillVersions } = await import('../src/agents/agents.store.ts');
-const { renderedFlags } = await import('../src/agents/agents.ts');
+const { enabledSkillsOf } = await import('../src/agents/agents.ts');
 const { readRun } = await import('../src/record/record.store.ts');
 const stand = eachTest(testPlace);
 const runPlaced = runGiven(() => stand().layer);
@@ -117,35 +116,17 @@ for (const [by, workflow] of [
     const prompt = fs.readFileSync(path.join(agentFilesDir(run, 'implement'), 'prompt.md'), 'utf8');
     assert.ok(prompt.includes('`nemia-implementer:implement-a-change`, `nemia-implementer:y`.'), prompt);
     assert.ok(!prompt.includes('app:y'), prompt);
-    assert.equal(
-      renderedFlags(step, agentFilesDir(run, 'implement'))?.settings,
-      JSON.stringify({
-        skillOverrides: {
-          y: 'off',
-          'app:y': 'off',
-          'ask-for-another-round': 'off',
-          git: 'off',
-          'implement-a-change': 'off',
-          'review-a-change': 'off',
-          'trial-merge-a-branch': 'off',
-        },
-      }),
-      'the bare name and the name of the nested folder are both hidden: the frozen copy is the one `y` the session sees',
+    assert.deepEqual(
+      enabledSkillsOf(step),
+      ['nemia-implementer:implement-a-change', 'nemia-implementer:y'],
+      'the session is given the frozen copy as it loads it, under its bare name, and no other skill',
     );
     const review = (readRun(run.id).workflow ?? []).find((s) => s.name === 'review')!;
     assert.deepEqual(review.agent?.skills, ['review-a-change', 'ask-for-another-round'], 'review names no skill of a folder');
     assert.deepEqual(
-      JSON.parse(renderedFlags(review, agentFilesDir(run, 'review'))!.settings!).skillOverrides,
-      {
-        y: 'off',
-        'app:y': 'off',
-        'ask-for-another-round': 'off',
-        git: 'off',
-        'implement-a-change': 'off',
-        'review-a-change': 'off',
-        'trial-merge-a-branch': 'off',
-      },
-      "a step that names no skill of a folder is told to turn off `y` and `app:y` all the same: implement names it, and the off-list is the folder's",
+      enabledSkillsOf(review),
+      ['nemia-reviewer:review-a-change', 'nemia-reviewer:ask-for-another-round'],
+      'a step that names no skill of a folder is given none of it: not `y`, which implement names',
     );
   });
 }

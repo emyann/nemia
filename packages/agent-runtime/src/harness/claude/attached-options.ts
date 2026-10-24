@@ -46,6 +46,7 @@ export type AttachedOptions = Pick<
   | 'extraArgs'
   | 'env'
   | 'includePartialMessages'
+  | 'skills'
 >;
 
 /** One flag's value as `extraArgs` takes it: a string, or null for a switch; refused where it repeats the flag. */
@@ -130,7 +131,11 @@ const extraOf = (
   };
 };
 
-/** The fence: the tools, the denies and allows (`claudeDenies`, `claudeAllows`), and the mounts as added folders. */
+/**
+ * The fence: the tools, the denies and allows (`claudeDenies`, `claudeAllows`), the mounts as added folders, and the skills when the task
+ * closes them (`enabledSkills`): the SDK hides every skill off the list and its Skill tool refuses one, and it allows `Skill(<name>)` for
+ * each on the list itself. `'default'`, or none, leaves `skills` out, which is Claude Code's own set, never `'all'`.
+ */
 const fenceOf = (c: SpawnRequest['config']): AttachedOptions => {
   const denies = claudeDenies(c);
   const allows = claudeAllows(c);
@@ -139,6 +144,7 @@ const fenceOf = (c: SpawnRequest['config']): AttachedOptions => {
     ...(denies.length ? { disallowedTools: denies } : {}),
     ...(allows.length ? { allowedTools: allows } : {}),
     ...(c?.mounts?.length ? { additionalDirectories: c.mounts.map((m) => m.path) } : {}),
+    ...(Array.isArray(c?.enabledSkills) ? { skills: c.enabledSkills } : {}),
   };
 };
 

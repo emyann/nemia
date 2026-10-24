@@ -64,6 +64,37 @@
       }
     },
     {
+      "term": "Reason",
+      "meaning": "the code a machine selects a line on, computed from typed state, never from a word: an `Awaiting*` family for a wait on a person (`AwaitingAnswer` with `via`), and `Waiting` with `on` for a wait on a thing. A former code is still read, on a line on disk and in a stored selector (`FORMER_REASONS`).",
+      "type": "Reason",
+      "retired": [
+        {
+          "spelling": "NeedsHuman",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "RoundsExhausted",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "WaitingForSlot",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "WaitingForCheckout",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "WaitingForPause",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "CheckDenied",
+          "card": "The former wait codes are read no more"
+        }
+      ]
+    },
+    {
       "term": "Subscription",
       "meaning": "Nemia's subscription, `nemia`, is the orchestrator's own: it wakes her on the lines of the store's feed its selectors take.",
       "type": "Subscription",
@@ -71,6 +102,11 @@
         "label": "Her subscription",
         "href": "/nemia/#her-subscription"
       }
+    },
+    {
+      "term": "Waits",
+      "meaning": "`person` on a line that waits on a person: every reason of phase waiting, and `Failed` and `CheckFailed`, from the reason table alone (`PERSON_WAITS`), never from a note.",
+      "type": "PERSON_WAITS"
     }
   ]
 }

@@ -7,6 +7,11 @@
   ],
   "terms": [
     {
+      "term": "Blocked",
+      "meaning": "only a closeout's outcome: the agent signed off unable to go on without an answer, which its step says as reason `AwaitingAnswer`, `via` closeout.",
+      "type": "Closeout"
+    },
+    {
       "term": "Budget",
       "meaning": "the most a step's tries may cost together, in dollars.",
       "see": {
@@ -49,6 +54,11 @@
       }
     },
     {
+      "term": "Hold",
+      "meaning": "only a person's hold of a run until other runs land (`nemia hold`): the run is pending, reason `Waiting`, `on` run.",
+      "type": "Run"
+    },
+    {
       "term": "Landing",
       "meaning": "the end of a run: the merge of its branch staged on the base, checked on the merged tree, and committed when the check passes.",
       "type": "Landing",
@@ -88,8 +98,13 @@
       }
     },
     {
+      "term": "Pending",
+      "meaning": "not filed yet: a step waiting on the steps before it (reason `Pending`), or held back by a thing (reason `Waiting`, `on` a run, the limit, the checkout or the pause).",
+      "type": "WaitOn"
+    },
+    {
       "term": "Phase",
-      "meaning": "where a step stands, in one closed set (pending, running, waiting, succeeded, failed, stopped), and a run in the same with cancelled (`RunPhase`), read off its reason by `PHASE_OF`; phase waiting is a step that waits on a person, never reason `Waiting`, which is a step not filed yet and so phase pending.",
+      "meaning": "where a step stands, in one closed set (pending, running, waiting, succeeded, failed, stopped), and a run in the same with cancelled (`RunPhase`), read off its reason by `PHASE_OF`; phase waiting is a wait on a person and nothing else, and a wait on a thing — reason `Waiting`, with what it waits on (`on`) — is phase pending.",
       "type": "StepPhase",
       "see": {
         "label": "A step",
@@ -164,6 +179,11 @@
         "label": "Trying again",
         "href": "/workflows/#trying-again"
       }
+    },
+    {
+      "term": "Waiting",
+      "meaning": "only a wait on a person: the phase of a step or a run that a person must act on, at a gate, a question, a loop out of rounds, a budget, an unsigned or refused try; its reasons are `AwaitingApproval`, `AwaitingAnswer` (`via` session or closeout), `AwaitingRound` and the stops beside them. Reason `Waiting` is a wait on a thing, phase pending.",
+      "type": "StepPhase"
     },
     {
       "term": "Workflow",

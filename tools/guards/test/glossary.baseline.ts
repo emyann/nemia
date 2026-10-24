@@ -18,8 +18,31 @@
  * `stated`, `unsigned` and `checkoutMcp`, on the day the runtime retired them: each a stored key or literal an older runtime's journal
  * holds, read by `upgrade` and named in its doc (`journal.ts`), the stored schema (`event-schema.ts`) and the filing door's
  * `RENAMED_ARGS` (`args.ts`). They stay while a journal on disk may hold them.
+ *
+ * `NeedsHuman`, `RoundsExhausted`, `WaitingForSlot`, `WaitingForCheckout`, `WaitingForPause` and `CheckDenied`, on the day the feed
+ * retired them (a wait on a person said by the `Awaiting*` codes, a wait on a thing by `Waiting` and `on`): each a key of
+ * `FORMER_REASONS` in `reason.ts`, which reads a line on disk and a stored selector that still names one. They stay while a feed or a
+ * subscription on disk may hold them.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  needshuman: {
+    'packages/agent-orchestrator/src/feed/reason.ts': 2,
+  },
+  roundsexhausted: {
+    'packages/agent-orchestrator/src/feed/reason.ts': 1,
+  },
+  waitingforslot: {
+    'packages/agent-orchestrator/src/feed/reason.ts': 1,
+  },
+  waitingforcheckout: {
+    'packages/agent-orchestrator/src/feed/reason.ts': 1,
+  },
+  waitingforpause: {
+    'packages/agent-orchestrator/src/feed/reason.ts': 1,
+  },
+  checkdenied: {
+    'packages/agent-orchestrator/src/feed/reason.ts': 1,
+  },
   wf: {
     'packages/agent-orchestrator/place/git/verbs/handoff.ts': 2,
     'packages/agent-orchestrator/place/git/verbs/make.ts': 2,

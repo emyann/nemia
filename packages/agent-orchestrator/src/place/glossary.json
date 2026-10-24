@@ -1,7 +1,7 @@
 {
   "context": "place",
   "title": "Place",
-  "about": "Where a run's steps keep their work, and the git place Nemia ships.",
+  "about": "Where a run's steps keep their work, and the git place that comes with Nemia.",
   "paths": [
     "packages/agent-orchestrator/src/place",
     "packages/agent-orchestrator/place"

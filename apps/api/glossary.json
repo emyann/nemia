@@ -29,6 +29,20 @@
       }
     },
     {
+      "term": "Landed",
+      "meaning": "a run's result is on its base, as the package asks it: the `landed` key of a hold's wait, of a run waited on and of a run handed as context, and the decision's `land it`.",
+      "retired": [
+        {
+          "spelling": "shipped",
+          "card": "decision 13a: 'landed' for a run's result on its base"
+        },
+        {
+          "spelling": "ships",
+          "card": "decision 13a: 'landed' for a run's result on its base"
+        }
+      ]
+    },
+    {
       "term": "Phase / reason / message",
       "meaning": "what each step and each try carries at the api: its `phase` and its `reason`, the codes a reader groups and compares, and its `message`, the sentence a person reads and nothing compares; `status` is the message under its old name, kept for one card.",
       "type": "RunDetail",

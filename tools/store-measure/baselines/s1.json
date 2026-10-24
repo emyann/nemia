@@ -5,17 +5,17 @@
     "memoryBytes": 16770084864,
     "node": "v24.20.0",
     "platform": "linux",
-    "load": 4.75
+    "load": 7.17
   },
-  "commit": "69f19411c189541d0d7a9c1cb3d997321be1e24a",
-  "date": "2026-10-24T10:36:00.545Z",
+  "commit": "a7c8e226048b389584ed673f97c483959406bc14",
+  "date": "2026-10-24T11:56:33.290Z",
   "repeat": 5,
   "from": "~/.agent-workflows",
   "engine": "~/.agent-engine",
   "copy": {
-    "files": 89519,
-    "bytes": 1948026209,
-    "ms": 22801.88161,
+    "files": 91527,
+    "bytes": 2018558538,
+    "ms": 26493.715883999997,
     "leftOut": [
       "api.log",
       "daemon.json",
@@ -25,12 +25,12 @@
     ]
   },
   "counts": {
-    "runs": 89,
-    "finishedRuns": 75,
-    "openRuns": 14,
-    "tasks": 7015,
-    "journalBytes": 112641099,
-    "feedLines": 35580,
+    "runs": 92,
+    "finishedRuns": 76,
+    "openRuns": 16,
+    "tasks": 7054,
+    "journalBytes": 113105533,
+    "feedLines": 35783,
     "unreadable": {
       "runs": 0,
       "passLines": 0
@@ -39,69 +39,69 @@
   },
   "asked": {
     "finishedRun": "when-ci-goes-red-the-next-tr-zond",
-    "openRun": "a-field-that-says-a-state-or-zg7f",
-    "feedCursor": 7817739,
+    "openRun": "the-ci-hand-off-names-an-e2e-voex",
+    "feedCursor": 7905963,
     "feedLinesRead": 1000
   },
   "measures": {
     "runList": {
       "cold": {
-        "ms": 1587.7290130000001,
-        "heapMb": 124.312696
+        "ms": 1628.4550799999997,
+        "heapMb": 127.170408
       },
       "warm": {
-        "ms": 125.44343099999969,
-        "heapMb": 1.129216
+        "ms": 130.84726900000533,
+        "heapMb": 1.174856
       }
     },
     "stats": {
       "cold": {
-        "ms": 4708.188062000001,
-        "heapMb": 43.995312
+        "ms": 4571.456827000002,
+        "heapMb": 46.762232
       },
       "warm": {
-        "ms": 403.28423699999985,
-        "heapMb": 0.263296
+        "ms": 492.28851399999985,
+        "heapMb": 0.300632
       }
     },
     "finishedRun": {
       "cold": {
-        "ms": 942.6463240000012,
-        "heapMb": 81.003776
+        "ms": 899.4213820000004,
+        "heapMb": 81.621032
       },
       "warm": {
-        "ms": 17.732250999993994,
-        "heapMb": 0.512488
+        "ms": 16.719683000002988,
+        "heapMb": 0.511816
       }
     },
     "openRun": {
       "cold": {
-        "ms": 1014.0874170000025,
-        "heapMb": 81.223648
+        "ms": 874.4474889999983,
+        "heapMb": 81.22972
       },
       "warm": {
-        "ms": 60.48022199999832,
-        "heapMb": 0.411384
+        "ms": 13.268316999994568,
+        "heapMb": 0.350912
       }
     },
     "feedFromCursor": {
       "cold": {
-        "ms": 28.346762000001036,
-        "heapMb": 0.18096
+        "ms": 28.217967000004137,
+        "heapMb": 0.176144
       },
       "warm": {
-        "ms": 26.32283699999971,
-        "heapMb": 0.071032
+        "ms": 23.719633999993675,
+        "heapMb": 0.075064
       }
     },
     "tickPass": {
       "cold": {
-        "ms": 759.6425020000024,
-        "heapMb": 0.34416
+        "ms": 722.0898880000022,
+        "heapMb": 0.391016
       },
       "warm": {
-        "ms": 222.65850499999942,
-        "heapMb": 0.20308
+        "ms": 209.23827899999742,
+        "heapMb": 0.1732
       }
     }
   },

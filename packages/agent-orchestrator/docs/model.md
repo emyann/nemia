@@ -64,7 +64,7 @@ erDiagram
   Try {
     TaskId taskId FK
     object check "optional"
-    enum then
+    TryCause cause
     string model "optional"
     enum paused "optional"
     number budget "optional"

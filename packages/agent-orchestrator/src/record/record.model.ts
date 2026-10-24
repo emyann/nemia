@@ -62,8 +62,8 @@ export const Try = Schema.Struct({
 export type Try = typeof Try.Type;
 
 /**
- * What the run did with the merge an ending staged (`Landed`, record.ts:478): the commit it made, the abort and why, or nothing
- * touched — exactly one, as the `Landed` union every writer of `landed` is typed by holds it.
+ * What the run did with the merge an ending staged (`LandingRecord`, record.ts:479): the commit it made, the abort and why, or nothing
+ * touched — exactly one, as the `LandingRecord` union every writer of `landed` is typed by holds it.
  */
 export const Landing = Schema.Struct({
   commit: Schema.optional(Schema.String),
@@ -75,7 +75,7 @@ export const Landing = Schema.Struct({
     Schema.makeFilter(
       (l) =>
         [l.commit, l.aborted, l.untouched].filter((v) => v !== undefined).length === 1 ||
-        'a landing is one of `commit`, `aborted` or `untouched`: write the one the pass did (`Landed`, record.ts:478)',
+        'a landing is one of `commit`, `aborted` or `untouched`: write the one the pass did (`LandingRecord`, record.ts:479)',
     ),
   )
   .annotate({ identifier: 'Landing' });

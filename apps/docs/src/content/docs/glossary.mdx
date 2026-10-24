@@ -1,58 +1,25 @@
 ---
 title: Glossary
-description: Nemia's terms, one line each, linked to the page that explains them.
+description: Nemia's terms, one section per part of the product, one line each, linked to the page that explains them.
 ---
 
 import { Badge } from '@astrojs/starlight/components';
 
-Each term has one line and a link to the page that explains it.
+Each part of the product has its section, in the map's order, and each of its terms one line and a link to the page that explains it.
 
-## Terms
-
-- **A2A**: the protocol the runtime uses for every harness; each harness is an A2A agent, and a session is an A2A Task. [A2A](/a2a/)
-- **Admission**: two things. A queued task's word to start, given by `admit` or by the engine under its ceiling. [Admission](/runtime/#admission). A call's admission is a command asked before a session's tool call, which allows it, asks the person, or denies it. [What she is allowed to do](/nemia/#what-she-is-allowed-to-do)
-- **Agent**: who does a step's work: its instructions, its tools, its fence and its skills, written once and named by the steps it works on. [Agents](/agents/)
-- **Api**: `apps/api`, the workflows behind HTTP, and the system's public interface. [The api](/map/#the-api)
-- **Attempt**: one start of a task's session; whatever ends it settles the task. [An attempt](/runtime/#an-attempt)
-- **Board**: `apps/web`, the pages a person looks at, which reach the api over HTTP alone. [The board](/map/#the-board)
-- **Budget**: the most a step's tries may cost together, in dollars. [What a step may spend](/workflows/#what-a-step-may-spend)
-- **Card**: a piece of work written as a short markdown brief, started as a run. [From a card to a landing](/how-a-run-lives/#from-a-card-to-a-landing)
-- **Check**: a command the run executes after a step signs off; its exit code, not the agent's word, decides whether the run goes on. [The check](/workflows/#the-check)
-- **Closeout**: how a step signs off: its outcome, its summary, and the fields its workflow asks of it. [The closeout](/workflows/#the-closeout)
-- **Custom instructions**: what a person adds to an agent they use, one file per agent in their store, without rewriting it. [Five layers](/agents/#what-an-agent-is-told-five-layers)
-- **Daemon**: the process that ticks the store's runs, one per store; the api's process is the daemon. [Two loops](/how-a-run-lives/#two-loops-both-level-triggered)
-- **Engine**: the runtime's loop: it compares each task's journal with what the harness lists, and asks `decide` what to do. [The engine](/runtime/#the-engine)
-- **Factory**: a named grouping in the store: the repositories a body of work is on, the workflows it offers, and the agents it hires into their steps. [Factories](/factories/)
-- **Factory's instruction**: what Nemia is to know about a factory, `NEMIA.md` by default; no step is told it. [Its instruction](/factories/#its-instruction)
-- **Factory's rules**: the rules and policies of one factory, a file kept in your store with it, `~/.agent-workflows/factories/<name>/RULES.md`, told to every agent hired into it. [Its rules](/factories/#its-rules)
-- **Feed**: the store's stream of what happened, written by the daemon alone, which the board and Nemia follow. [Who writes what](/how-a-run-lives/#who-writes-what)
-- **Fence**: what a step's session may not do: the tools it is denied (`disallowedTools`) and the permission mode it runs in. [Tools and the fence](/agents/#tools-and-the-fence)
-- **Folder's files**: the files the harness itself reads in the folder an agent works in, `CLAUDE.md` or `AGENTS.md`, which hold for every agent at work there; the third layer, above the agent's own instructions and below the factory's rules. [Five layers](/agents/#what-an-agent-is-told-five-layers)
-- **Gate**: a property of a step: nothing after it is started until a person approves. [A gate](/workflows/#a-gate)
-- **Harness**: the program a session runs in: Claude Code, Codex, a plain command, or a remote A2A agent. [A harness](/runtime/#a-harness)
-- **Hire**: a factory's choice of the agent that does one step of a workflow. [Hires](/factories/#hires)
-- **Inbox**: where cards wait before they are started. [From a card to a landing](/how-a-run-lives/#from-a-card-to-a-landing)
-- **Instruction layers**: the five layers of what an agent is told, numbered by precedence: its instructions, a person's custom instructions, the folder's files, the factory's rules, and the step's policy. Where two say different things the higher number wins, and the task is above them all, and a session is told so: each layer Nemia composes is headed by its number and its owner, and every brief opens on the precedence in words. [Five layers](/agents/#what-an-agent-is-told-five-layers)
-- **Intent**: a confirmed idea, cut into cards; it is a word of this repository's own team (`workflows/`), not something Nemia ships. [What Nemia is](/)
-- **Journal**: the runtime's durable record of a task, an event a line, which every pass reads again. [The engine](/runtime/#the-engine)
-- **Keeper**: the daemon's part that files Nemia's session while any factory is above `manual`, and stops it once none is. [The keeper](/nemia/#the-keeper)
-- **Landing**: the end of a run: the merge of its branch staged on the base, checked on the merged tree, and committed when the check passes. [The landing](/workflows/#the-landing)
-- **Level**: how much a factory hands over to Nemia: `manual`, `semi-auto` or `auto`. [Her levels](/nemia/#her-levels)
-- **Lifecycle**: the statechart a runtime task moves along. [The lifecycle of a task](/runtime/#the-lifecycle-of-a-task)
-- **Loop**: a reviewing step's way to send the work back to an earlier step, for at most its rounds. [A loop and its rounds](/workflows/#a-loop-and-its-rounds)
-- **Nemia**: the system as a whole, its command `nemia`, and the store's own agent. [Nemia](/nemia/)
-- **Orchestrator**: `packages/agent-orchestrator`, which reads workflows and runs their steps. [The orchestrator](/map/#the-orchestrator)
-- **Round**: one more try of a loop's steps, when a reviewer asks for more. [A loop and its rounds](/workflows/#a-loop-and-its-rounds)
-- **Run**: one go of a workflow on a card: its record, its steps' tries, and the branch its work is on. [How a run lives](/how-a-run-lives/)
-- **Runtime**: `packages/agent-runtime`, which runs agent sessions on a harness, durably. [The runtime](/runtime/)
-- **Session**: one agent's conversation on a harness: a job that runs to its end, or a long-lived session that runs until stopped. [A job and a long-lived session](/runtime/#a-job-and-a-long-lived-session)
-- **Skill**: a folder of instructions and files an agent is given for one kind of work. [Skills](/agents/#skills)
-- **Step**: one markdown file of a workflow: who does it, what it may do, and what must finish first. [A step](/workflows/#a-step)
-- **Subscription**: two things. In A2A, a client following one Task's events as they happen. [A subscription](/a2a/#a-subscription). Nemia's subscription, `nemia`, is the orchestrator's own: it wakes her on the lines of the store's feed its selectors take. [Her subscription](/nemia/#her-subscription)
-- **Task**: the runtime's unit of work: a brief filed to run on a harness, with its attempts. [A task](/runtime/#a-task)
-- **Tick**: one pass of the daemon: it reads the world, decides (`assess`), acts, and carries nothing to the next pass. [Two loops](/how-a-run-lives/#two-loops-both-level-triggered)
-- **Tools**: the only tools a step's session has (`tools`), beside its fence. [Tools and the fence](/agents/#tools-and-the-fence)
-- **Workflow**: a folder of markdown files, one file a step. [Workflows](/workflows/)
+```glossary
+runtime
+run-core
+api
+board
+place
+planning
+factory
+agents
+nemia
+feed
+operations
+```
 
 ## Planned <Badge text="planned" variant="caution" />
 

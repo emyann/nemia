@@ -1,7 +1,9 @@
 /**
  * A page cites only what is there: a path in backticks is a file or a folder from the repository's root, or a package's entry, and a
  * name in backticks is one the code has. The code's names are read as `comments.test.ts` reads them: every identifier and every word
- * of a string in the TypeScript under packages/, apps/, lint/ and tools/, and a string's whole text for a word with hyphens.
+ * of a string in the TypeScript under packages/, apps/, lint/ and tools/, and a string's whole text for a word with hyphens. The
+ * contexts' glossary tables are held as a page is: the Glossary page is drawn from their texts, each context's `about` and each term's
+ * `meaning`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -9,6 +11,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import { tablesIn } from '../src/glossary.ts';
 import { scratch } from './scratch.ts';
 
 const APP = path.join(import.meta.dirname, '..');
@@ -160,7 +163,44 @@ test('the code’s names are read: an identifier, a string’s word and a hyphen
 /** The pages the scan reads: every `.mdx` or `.md` file under the site's content, sorted. */
 const scanned = (): string[] => (fs.readdirSync(PAGES, { recursive: true }) as string[]).filter((f) => /\.mdx?$/.test(f)).sort();
 
-test('the scan reads all eleven pages, and the many spans they cite', () => {
+/** The texts of the glossary tables under `root` the Glossary page draws: each context's `about` and each term's `meaning`, named. */
+const tableTexts = (root: string): Array<{ file: string; text: string }> =>
+  tablesIn(root).flatMap((table) => [
+    { file: `${table.file} about`, text: table.about },
+    ...table.terms.map((term) => ({ file: `${table.file} ${term.term}`, text: term.meaning })),
+  ]);
+
+/** Every text the scan reads, by the name a fault gives it: the pages under the site's content, then the tables' texts under `root`. */
+const scannedTexts = (root: string): Array<{ file: string; text: string }> => [
+  ...scanned().map((p) => ({ file: path.join('src/content/docs', p), text: fs.readFileSync(path.join(PAGES, p), 'utf8') })),
+  ...tableTexts(root),
+];
+
+test('REFUSED: a glossary table whose meaning cites a name the code does not have', () => {
+  const root = scratch('docs-names-table-');
+  execFileSync('git', ['init', '-q'], { cwd: root, stdio: 'ignore' });
+  fs.mkdirSync(path.join(root, 'packages', 'rt'), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, 'packages', 'rt', 'glossary.json'),
+    JSON.stringify({
+      context: 'runtime',
+      title: 'Runtime',
+      about: 'Runs sessions; `assess` is the run core’s.',
+      paths: ['packages/rt'],
+      terms: [{ term: 'Engine', meaning: 'the loop that asks `noSuchFunctionAnywhere` what to do.' }],
+    }),
+  );
+  const fixture: Known = { names: new Set(['assess']), entries: new Set(), exists: () => false };
+  const stale = tableTexts(root).flatMap(({ file, text }) => staleCitations(file, text, fixture));
+  assert.equal(stale.length, 1, `one stale name, the term's: ${stale.join(' | ')}`);
+  assert.match(
+    stale[0],
+    /^packages\/rt\/glossary\.json Engine\b.*`noSuchFunctionAnywhere`/,
+    'the fault names the table, the term and the name',
+  );
+});
+
+test('the scan reads all eleven pages and the glossary tables, and the many spans they cite', () => {
   const pages = scanned();
   assert.deepEqual(
     [
@@ -179,11 +219,11 @@ test('the scan reads all eleven pages, and the many spans they cite', () => {
     [],
     `the scan read ${pages.join(', ')}`,
   );
-  const cited = pages.flatMap((p) => citedIn(fs.readFileSync(path.join(PAGES, p), 'utf8')));
-  assert.ok(cited.length > 200, `the pages cite ${cited.length} spans, far fewer than they hold`);
+  const cited = scannedTexts(ROOT).flatMap(({ text }) => citedIn(text));
+  assert.ok(cited.length > 200, `the pages and the glossary tables cite ${cited.length} spans, far fewer than they hold`);
 });
 
-test('every page cites only paths that exist and names the code has', () => {
+test('every page and every glossary table cites only paths that exist and names the code has', () => {
   const repo = knownOfRepo();
   assert.deepEqual(
     [...ELSEWHERE].filter((word) => repo.names.has(word)),
@@ -191,8 +231,8 @@ test('every page cites only paths that exist and names the code has', () => {
     'the code has these names: take them off ELSEWHERE',
   );
   assert.deepEqual(
-    scanned().flatMap((p) => staleCitations(path.join('src/content/docs', p), fs.readFileSync(path.join(PAGES, p), 'utf8'), repo)),
+    scannedTexts(ROOT).flatMap(({ file, text }) => staleCitations(file, text, repo)),
     [],
-    'cite a path from the repository’s root that is there, and a name the code has',
+    'cite a path from the repository’s root that is there, and a name the code has, on a page or in a glossary table',
   );
 });

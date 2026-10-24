@@ -3,7 +3,11 @@ import { defineConfig } from 'astro/config';
 import { unified } from '@astrojs/markdown-remark';
 import starlight from '@astrojs/starlight';
 import starlightLinksValidator from 'starlight-links-validator';
+import { remarkGlossary } from './src/glossary.ts';
 import { remarkMermaid } from './src/mermaid.ts';
+
+/** The repository's root, where the pages read the package docs' diagrams and the contexts' glossary tables. */
+const root = fileURLToPath(new URL('../..', import.meta.url));
 
 /**
  * Inlines every dependency into the prerender environment on `astro build` alone, where Node cannot load `cookie`'s named
@@ -19,7 +23,14 @@ const prerenderInlinedOnBuild = {
 };
 
 export default defineConfig({
-  markdown: { processor: unified({ remarkPlugins: [[remarkMermaid, { root: fileURLToPath(new URL('../..', import.meta.url)) }]] }) },
+  markdown: {
+    processor: unified({
+      remarkPlugins: [
+        [remarkGlossary, { root }],
+        [remarkMermaid, { root }],
+      ],
+    }),
+  },
   integrations: [
     prerenderInlinedOnBuild,
     starlight({

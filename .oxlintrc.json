@@ -495,8 +495,8 @@
     {
       "files": ["apps/web/src/lib/gate.ts"],
       "rules": {
-        "complexity": ["error", { "max": 27 }],
-        "sonarjs/cognitive-complexity": ["error", 50]
+        "complexity": ["error", { "max": 22 }],
+        "sonarjs/cognitive-complexity": ["error", 42]
       }
     },
     {
@@ -509,13 +509,6 @@
       "files": ["apps/web/src/lib/prune.ts"],
       "rules": {
         "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
-      "files": ["apps/web/src/lib/status.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 28 }],
-        "sonarjs/cognitive-complexity": ["error", 24]
       }
     },
     {

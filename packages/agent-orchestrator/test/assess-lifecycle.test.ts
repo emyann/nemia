@@ -18,7 +18,6 @@ import {
   handOffDue,
   inFlight,
   LINE_NAME,
-  listing,
   retryable,
   stepStatus,
   workspacePlan,
@@ -35,7 +34,7 @@ import { admissionOf } from '../src/admission/index.ts';
 import { TABLE } from '../src/command/commands.verb.ts';
 import { waitsOnPerson } from '../src/retry/index.ts';
 import type { Workflow } from '../src/workflow.ts';
-import { phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
+import { listing, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 /** The engine's own phase words — `working`, `needs-human` — or the feed's `running`. */

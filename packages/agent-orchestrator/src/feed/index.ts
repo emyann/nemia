@@ -60,5 +60,5 @@ export {
   runCodes,
   STEP_PHASES,
   STEP_REASONS,
-} from './phase.ts';
-export type { RunPhase, RunReason, StepPhase, StepReason } from './phase.ts';
+} from '../phase/phase.ts';
+export type { RunPhase, RunReason, StepPhase, StepReason } from '../phase/phase.ts';

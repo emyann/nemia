@@ -1,7 +1,8 @@
 /**
  * A step's tries, earliest first, each with its attempts and how it signed off, as the run's record keeps them — and, of the revisions a
  * try ran on, the two drifts the run page shows: how the workflow folder has moved away from the steps the run started with (`driftOf`),
- * a name-level difference said as a warning, and the kinds the run and its filed steps are behind the ledger on (`kindsOf`).
+ * a name-level difference said as a warning, and the kinds the run and its filed steps are behind the ledger on (`kindsOf`). And what a
+ * person said of the try a step is on: its gate's approval (`gateOf`) and a loop's acceptance (`acceptedOf`).
  */
 import {
   endWords,
@@ -14,10 +15,15 @@ import {
   type Drift,
   type Views,
   wordOf,
+  ENGINE_REASON,
+  PHASE_OF,
 } from 'agent-orchestrator';
 import type { StepPhase, StepReason } from 'agent-orchestrator';
 import {
+  acceptanceOf,
   answerOf,
+  approvalOf,
+  hasGate,
   type Asked,
   askedQuestions,
   declaredOutput,
@@ -32,6 +38,7 @@ import {
 import { LOOP_REPLIES, outputFields, type Workflow } from 'agent-orchestrator/workflow';
 import { artifactOf, valueOf, type StepArtifact, type StepValue } from '../steps/artifacts.ts';
 import { checkIn, type CheckStderr, type StepCheck } from '../steps/logs.ts';
+import type { StepAcceptance, StepGate } from './detail.ts';
 
 /** A loop's target's answer to one finding it was handed, as its closeout gave it. */
 export type StepReply = { finding: string; answer: string; why: string };
@@ -204,9 +211,10 @@ export const turnOfTry = (earlier: readonly EarlierTry[], i: number): number =>
   earlier.slice(0, i).filter((t) => t.taskId === earlier[i].taskId && t.then !== 'recheck').length;
 
 /**
- * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose word, check,
- * closeout and attempts the step already has. Off the views already read (`viewsOf`), with no observation of its own: an earlier refused
- * check's stderr is read before (`refusedStderr`), and its stdout is not read. What a person said to each try is off the answers the
+ * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose codes, word,
+ * check, closeout and attempts the step already has — its check's verdict the step's alone, never a try's. Off the views already read
+ * (`viewsOf`), with no observation of its own: an earlier refused check's stderr is read before (`refusedStderr`), and its stdout is not
+ * read. What a person said to each try is off the answers the
  * request read (the answers `runStore` keeps).
  *
  * An earlier try is read on the turn of its task it was: a held task a person answered keeps each try they answered under its one id, and a
@@ -220,10 +228,13 @@ export function triesOf(
   name: string,
   steps: readonly Workflow[],
   views: Views,
-  current: Pick<StepTry, 'status' | 'check' | 'closeout' | 'unreadable' | 'attempts'>,
+  current: Pick<StepTry, 'phase' | 'reason' | 'message' | 'status' | 'check' | 'closeout' | 'unreadable' | 'attempts'> & {
+    verdict?: unknown;
+  },
   answers: readonly RetryAsk[],
   stderr: CheckStderr,
 ): StepTry[] {
+  const { verdict: _stepVerdict, ...now } = current;
   const step = steps.find((s) => s.name === name) ?? bare(name);
   const record = run.steps[name];
   const earlier = record?.tries ?? [];
@@ -232,6 +243,10 @@ export function triesOf(
   const answerAt = (n: number): string | null =>
     answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers)?.message ?? null;
   const noteOf = (n: number) => tryNote(step, recordAt(n), steps, answerAt(n) !== null) || null;
+  const earlierSaid = (t: EarlierTry, i: number): Pick<StepTry, 'phase' | 'reason' | 'message' | 'status'> => {
+    const word = turnAt(i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId);
+    return { phase: PHASE_OF[ENGINE_REASON[word]], reason: ENGINE_REASON[word], message: word, status: word };
+  };
   return [
     ...earlier.map((t, i): StepTry => ({
       try: i + 1,
@@ -240,7 +255,7 @@ export function triesOf(
       current: false,
       taskId: t.taskId,
       note: noteOf(i + 1),
-      status: turnAt(i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId),
+      ...earlierSaid(t, i),
       attempts: attemptsIn(t.taskId, views, turnAt(i)),
       check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
       closeout: closeoutIn(run, name, step, t.taskId, views, turnAt(i)),
@@ -254,7 +269,7 @@ export function triesOf(
       current: true,
       taskId: record?.taskId ?? null,
       note: noteOf(earlier.length + 1),
-      ...current,
+      ...now,
       answer: answerAt(earlier.length + 1),
     },
   ];
@@ -306,4 +321,26 @@ export function kindsOf(run: Run): readonly Drift[] {
   if (!named.length) return [];
   const tops = topsOf(named);
   return [...kindsDrift(run.pinned, tops), ...stepsDrift(steps, run.pinned, tops)];
+}
+
+/**
+ * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, by its reason (`AwaitingApproval`), and the approval of
+ * the try it is on. Off the record as `runStore` composes it, with each approval its file holds (`approvalOf`): no read of its own.
+ */
+export function gateOf(run: Run, step: Workflow, reason: StepReason): StepGate | null {
+  if (!hasGate(step, run)) return null;
+  const given = approvalOf(run, step.name);
+  return {
+    awaiting: reason === 'AwaitingApproval',
+    approval: given ? { try: given.try, at: given.at, message: given.message ?? null } : null,
+  };
+}
+
+/**
+ * A looping step's acceptance (`StepAcceptance`), off the record as `runStore` composes it, as `gateOf` reads an approval: no read of its
+ * own.
+ */
+export function acceptedOf(run: Run, step: string): StepAcceptance | null {
+  const given = acceptanceOf(run, step);
+  return given ? { try: given.try, at: given.at, message: given.message } : null;
 }

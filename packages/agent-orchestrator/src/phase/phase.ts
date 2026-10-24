@@ -4,10 +4,11 @@
  * not, and nothing parses that sentence back into either.
  *
  * Each table is total over the type it is keyed by, so a status, a reason or an engine word added elsewhere fails the typecheck here
- * until it has its code. Pure data, with type imports alone: `list.ts` reads these, and `reason.ts` reads `list.ts`, so a value import of
- * `reason.ts` from here would close a cycle.
+ * until it has its code. Pure data, with type imports alone: `list.ts` reads these, and the feed (`reason.ts`) reads `list.ts`, so a value
+ * import of the feed from here would close a cycle. A folder of its own for that reason: `list.ts` reads it here, never through the
+ * feed's face; the feed re-exports it.
  */
-import type { Reason } from './reason.ts';
+import type { Reason } from '../feed/index.ts';
 import type { StepStatus } from '../record/record.ts';
 import type { ListedPhase } from '../list/list.ts';
 import type { Assessment } from '../tick/assess.ts';

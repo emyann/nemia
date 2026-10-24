@@ -120,7 +120,7 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * and the 76 modules of the `yaml` package it parses with, none of which touches a disk.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 175, effect: 15 },
+  'agent-orchestrator/run': { all: 176, effect: 15 },
   'agent-orchestrator/workflow': { all: 131, effect: 15 },
 };
 

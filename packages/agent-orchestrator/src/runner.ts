@@ -526,7 +526,7 @@ export {
   workflowsOf,
 } from './summary/reads.verb.ts';
 export type { Filings, TaskView, Unreadable, Views } from './summary/reads.verb.ts';
-export { holdingOf, judge, needsOf, runWaitingOf, spentOf, standingsOf, wordOf } from './summary/judged.verb.ts';
+export { holdingOf, judge, needsOf, runSaid, runWaitingOf, spentOf, standingsOf, stepSaid, wordOf } from './summary/judged.verb.ts';
 export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
 export { restingMemo, restingRead } from './rest/resting.verb.ts';
 export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';

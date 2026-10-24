@@ -15,7 +15,6 @@ import {
   cancelPlan,
   composeBrief,
   decision,
-  listing,
   ownStatus,
   retriesDue,
   retryable,
@@ -51,7 +50,7 @@ import { closeoutAsked, closeoutOf, deniedOf, harnessBlocked } from '../src/view
 import { endWords, phaseOfView } from '../src/views/views-words.ts';
 import type { Verdict } from '../src/check/check.ts';
 import type { Workflow } from '../src/workflow.ts';
-import { names, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
+import { listing, names, phases, run, signedOffOnce, step, STEPS } from './assessed.ts';
 
 const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 const nothingShipped = () => false;
@@ -505,6 +504,9 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     assert.deepEqual(l.steps[0], {
       name: 'implement',
       status: 'failed ✗ check (exit 1)',
+      reason: 'CheckFailed',
+      phase: 'failed',
+      verdict: { result: 'failed', exit: 1 },
       branch: null,
       note: 'try 2 due — retries: 2, 0 spent',
     });
@@ -620,6 +622,9 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     assert.deepEqual(lsOf(r, 'succeeded', undefined).steps[0], {
       name: 'implement',
       status: 'verified ✓',
+      reason: 'CheckPassed',
+      phase: 'succeeded',
+      verdict: { result: 'passed', exit: 0 },
       branch: null,
       note: 'try 2, by retries: 2',
     });
@@ -972,6 +977,8 @@ test("a person's ask on a step whose session its harness blocked, or that works 
         {
           name: 'implement',
           status: 'needs-human',
+          reason: 'NeedsHuman',
+          phase: 'waiting',
           branch: null,
           note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
         },
@@ -1024,6 +1031,8 @@ test("a person's ask on a step whose session its harness blocked, or that works 
         {
           name: 'implement',
           status: 'working',
+          reason: 'Running',
+          phase: 'running',
           branch: null,
           note: 'try 2 asked (--nudge) — stopping its session, then the tick files it',
         },
@@ -1085,7 +1094,7 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
   await t.test('a harness that says nothing, or a caller that asks nothing, reads as before', () => {
     assert.deepEqual(
       lsWith('needs-human', () => undefined),
-      { name: 'implement', status: 'needs-human', branch: null },
+      { name: 'implement', status: 'needs-human', reason: 'NeedsHuman', phase: 'waiting', branch: null },
     );
     assert.equal(
       listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'needs-human' }), closeoutOf: signedOff({}) }).steps[0].status,
@@ -1093,14 +1102,28 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
     );
   });
   await t.test('a phase that is not needs-human takes no word, nor a task that settled', () => {
-    assert.deepEqual(lsWith('working', waiting), { name: 'implement', status: 'working', branch: null });
-    assert.deepEqual(lsWith('succeeded', waiting), { name: 'implement', status: 'unsigned', branch: null });
+    assert.deepEqual(lsWith('working', waiting), {
+      name: 'implement',
+      status: 'working',
+      reason: 'Running',
+      phase: 'running',
+      branch: null,
+    });
+    assert.deepEqual(lsWith('succeeded', waiting), {
+      name: 'implement',
+      status: 'unsigned',
+      reason: 'Unsigned',
+      phase: 'waiting',
+      branch: null,
+    });
   });
   await t.test("the word disturbs nothing judged on it: the blocked step's try is still due, and still stops the session first", () => {
     const l = fullListing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'needs-human' }), asks: [askFor(2)], waitingOf: waiting });
     assert.deepEqual(l.steps[0], {
       name: 'implement',
       status: 'needs-human',
+      reason: 'NeedsHuman',
+      phase: 'waiting',
       branch: null,
       note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
       waits: 'waiting for a permission prompt',
@@ -1277,6 +1300,8 @@ test("`nemia ls` says what a step's current try was denied after its note, never
     assert.deepEqual(implement, {
       name: 'implement',
       status: 'unverified · done',
+      reason: 'Succeeded',
+      phase: 'succeeded',
       branch: null,
       denied: 'denied: Skill(look), Bash(pytest)',
     });

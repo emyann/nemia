@@ -209,12 +209,14 @@ test("`nemia ls` notes a step whose current try's session a person told somethin
   assert.deepEqual(rows(live, { t1: 'working' }, { implement: 2 })[0], {
     name: 'implement',
     status: 'working',
+    reason: 'Running',
+    phase: 'running',
     branch: null,
     note: 'said to 2×',
   });
   assert.deepEqual(
     rows(live, { t1: 'working' }, {})[0],
-    { name: 'implement', status: 'working', branch: null },
+    { name: 'implement', status: 'working', reason: 'Running', phase: 'running', branch: null },
     'no note for a step nobody told',
   );
   const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', then: 'nudge' }] }, review: { taskId: null } } });

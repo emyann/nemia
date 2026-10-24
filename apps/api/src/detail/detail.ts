@@ -40,6 +40,8 @@ import {
   tryOf,
   runWith,
   needsOf,
+  runSaid,
+  stepSaid,
   type RunHolding,
   type RunStatus,
   type RunToDecide,
@@ -50,12 +52,9 @@ import {
   type Drift,
 } from 'agent-orchestrator';
 import {
-  acceptanceOf,
   addSpend,
-  approvalOf,
   budgetOf,
   gatesOf,
-  hasGate,
   isRepositoryRun,
   loopOver,
   overBudget,
@@ -76,6 +75,7 @@ import type { CheckVerdict, RunPhase, RunReason, StepPhase, StepReason } from 'a
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
 import { engineRead, type Engine, judgedOn, workFolderOf } from '../store.ts';
 import {
+  acceptedOf,
   attemptsIn,
   closeoutIn,
   driftOf,
@@ -84,6 +84,7 @@ import {
   type StepCloseout,
   type StepTry,
   type StepUnreadable,
+  gateOf,
   triesOf,
   unreadableIn,
 } from './tries.ts';
@@ -528,28 +529,6 @@ function roundSpend(clock: Timeline, steps: readonly Workflow[], total: Timeline
 }
 
 /**
- * A step's gate (`StepGate`), or null for a step with none: whether it waits at it, in `nemia ls`'s word, and the approval of the try it is
- * on. Off the record as `runStore` composes it, with each approval its file holds (`approvalOf`): no read of its own.
- */
-function gateOf(run: Run, step: Workflow, status: string): StepGate | null {
-  if (!hasGate(step, run)) return null;
-  const given = approvalOf(run, step.name);
-  return {
-    awaiting: status === 'awaiting approval',
-    approval: given ? { try: given.try, at: given.at, message: given.message ?? null } : null,
-  };
-}
-
-/**
- * A looping step's acceptance (`StepAcceptance`), off the record as `runStore` composes it, as `gateOf` reads an approval: no read of its
- * own.
- */
-function acceptedOf(run: Run, step: string): StepAcceptance | null {
-  const given = acceptanceOf(run, step);
-  return given ? { try: given.try, at: given.at, message: given.message } : null;
-}
-
-/**
  * Where the last read of a blocked session's conversation stopped, and what it had said last by then: by task and attempt. One for an app,
  * of its engine's sessions (`ReadMemo`, layer.ts).
  */
@@ -681,7 +660,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     waiting: judged.waiting,
     heldUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
-    status: judged.status,
+    ...runSaid(judged),
     moving: judged.moving,
     cost: judged.cost,
     atWork: atWork(run, views),
@@ -702,7 +681,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
         const judgedContext = steps.find((s) => s.name === name)?.context;
         const needs = needsOf(run, name, views, judged);
         const current = {
-          status: judged.words.get(name)!,
+          ...stepSaid(judged, name),
           check: checks.get(name) ?? null,
           closeout: closeoutIn(run, name, step ?? bare(name), taskId, views),
           unreadable: unreadableIn(taskId, views),
@@ -723,7 +702,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
           commands: stepCommands(run.id, name),
           ...needs,
           lastLine: needs.blockedByHarness ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
-          gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.status),
+          gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.reason),
           accepted: acceptedOf(run, name),
           said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
           asked: askedOf(judged.asked.get(name)),

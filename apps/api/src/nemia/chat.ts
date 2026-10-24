@@ -1,7 +1,7 @@
 /**
  * Nemia's chat on the board: her history a page at a time with where she is, the same followed as server-sent events, the person's
  * words sent, a question of hers answered, their read mark moved, and the turn she is answering stopped. Each is a program of the
- * package's chat (`chatHistory`, `chatSince`, `chatSend`, `chatAnswer`, `chatRead`, `chatStop`)
+ * package's chat (`chatHistory`, `chatSince`, `chatSay`, `chatAnswer`, `chatRead`, `chatStop`)
  * over her place (`nemiaChatPlace`), and no command of the table: a write of the person's files kept out of her own fence.
  */
 import { Schema } from 'effect';
@@ -11,7 +11,7 @@ import {
   chatAnswer,
   chatHistory,
   chatRead,
-  chatSend,
+  chatSay,
   chatSince,
   chatStop,
   nemiaChatPlace,
@@ -27,7 +27,7 @@ import type { Effect } from 'effect';
 /** What `GET /api/nemia/chat` answers: a page of her chat, the cursor and her presence. */
 export type ChatHistoryAnswer = Effect.Success<ReturnType<typeof chatHistory>>;
 /** What `POST /api/nemia/chat/send` answers: the words as her outbox keeps them. */
-export type ChatSentAnswer = Effect.Success<ReturnType<typeof chatSend>>;
+export type ChatSentAnswer = Effect.Success<ReturnType<typeof chatSay>>;
 /** What `POST /api/nemia/chat/stop` answers. */
 export type ChatStopAnswer = Effect.Success<ReturnType<typeof chatStop>>;
 /** What `POST /api/nemia/chat/answer` takes: the ask, and the person's pick for each of its questions. */
@@ -164,7 +164,7 @@ export const nemiaChat = new Hono<ApiEnv>()
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, SEND_BODY, `${route} takes a JSON body: ${SEND_SHAPE}.`, wordsOf(route, 'text', SEND_SHAPE));
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      return c.json(await runPlaced(s.placeService, s.e, chatSend(nemiaChatPlace(), read.body.text)), 201);
+      return c.json(await runPlaced(s.placeService, s.e, chatSay(nemiaChatPlace(), read.body.text)), 201);
     }),
   )
   .post('/api/nemia/chat/stop', (c) =>

@@ -78,6 +78,8 @@ test("the repository's own guards#test inputs, which turbo caches by, are the on
   const folders = dependencyFolders(ROOT);
   for (const file of ['workflows/x.md', '.github/workflows/ci.yml', 'docs/x.md'])
     assert.equal(dueOf([file], inputs, folders).due, true, file);
+  for (const file of ['tools/store-measure/report.ts', 'tools/store-measure/fence.ts'])
+    assert.equal(dueOf([file], inputs, folders).due, true, `${file}: store-measure.test.ts reads it`);
   for (const file of [
     'apps/web/src/x.tsx',
     'apps/web/vite.config.ts',

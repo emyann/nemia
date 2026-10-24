@@ -44,6 +44,33 @@
         "label": "Nemia",
         "href": "/nemia/"
       }
+    },
+    {
+      "term": "Say",
+      "meaning": "putting words into her open session, through the runtime's `say`: the keeper's two acts, `sayCustom` (the person's custom words, once they changed) and `sayOutbox` (the person's chat words), and `chatSay`, which puts the person's words in her chat's outbox. The marks on disk keep the name `delivered`.",
+      "type": "NemiaAct",
+      "retired": [
+        {
+          "spelling": "tell",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        },
+        {
+          "spelling": "deliver",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        },
+        {
+          "spelling": "tellHer",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        },
+        {
+          "spelling": "deliverOutbox",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        },
+        {
+          "spelling": "chatSend",
+          "card": "decision 14 part C: every way of putting words into a session is say"
+        }
+      ]
     }
   ]
 }

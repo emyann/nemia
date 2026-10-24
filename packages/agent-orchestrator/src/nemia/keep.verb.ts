@@ -1,13 +1,12 @@
 /**
- * The keeper of Nemia: each beat, the levels read again (`levelsNow`), her task read off the engine and her subscription off the store,
- * and what is owed done (`nemiaDue`) — her task filed long-lived while any factory is above `manual`, her subscription put once it is open
- * with her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so; and while she is kept, the
- * person's custom words told to her open task (`say`) once they are not those she was last filed or told with (`customChanged`), which
- * are recorded, and her instruction written, only after she was told: a change to her builtin instruction alone tells her nothing; and
- * while she is kept and her session live, the person's chat words delivered to her (`deliverOutbox`), the questions her session holds
- * open written down (`recordAsks`) and the person's answers to them carried to her (`answersDue`).
- * Level-triggered: it carries nothing between beats, so a restart owes what the files and the engine say. A task stopped from outside is
- * never filed again.
+ * The keeper of Nemia: each beat, the levels read again (`levelsNow`), her task read off the engine and her subscription off the store, and
+ * what is owed done (`nemiaDue`) — her task filed long-lived while any factory is above `manual`, her subscription put once it is open with
+ * her floor (`NEMIA_FLOOR`), both taken away once none is, whether a level set or a raise's end made it so; and while she is kept, the
+ * person's custom words said to her open task (`sayCustom`) once they are not those she was last filed or told with (`customChanged`),
+ * which are recorded, and her instruction written, only after she was told: a change to her builtin instruction alone tells her nothing;
+ * and while she is kept and her session live, the person's chat words said to her (`sayOutbox`), the questions her session holds open
+ * written down (`recordAsks`) and the person's answers to them carried to her (`answersDue`). Level-triggered: it carries nothing between
+ * beats, so a restart owes what the files and the engine say. A task stopped from outside is never filed again.
  *
  * A controller: it reaches the runtime through the client (`EngineService`), run by `up` (`daemon/up.verb.ts`) beside the deliverer.
  */
@@ -22,7 +21,7 @@ import { readFactories } from '../factory/factory.store.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { dropSubscription, listSubscriptions, putSubscription } from '../subscription/subscription.store.ts';
 import { EngineService, asked, over, trustedFolder, type Engine } from '../runtime-client.ts';
-import { answersDue, answersOwed, closesOwed, deliverOutbox, outboxOwed, recordAsks } from '../chat/deliver.verb.ts';
+import { answersDue, answersOwed, closesOwed, sayOutbox, outboxOwed, recordAsks } from '../chat/say.verb.ts';
 import { upOf } from '../chat/chat.ts';
 import {
   composePrompt,
@@ -62,7 +61,7 @@ import {
 
 /** What the keeper did, each act counted once done. */
 export const NEMIA_ACTS = Metric.counter('nemia.acts', {
-  description: "the keeper's acts on Nemia's session: filed, subscribed, stopped, dropped, told, delivered",
+  description: "the keeper's acts on Nemia's session: filed, subscribed, stopped, dropped, her custom words said, the outbox said",
 });
 
 /** How often the keeper reads the level, her task and her subscription again. */
@@ -160,7 +159,7 @@ const fileHer = (e: Engine, id: string) =>
  * written with them, so an attempt it starts again reads them too, and the words recorded as told: words she was not told are never
  * written as hers.
  */
-const tellHer = (e: Engine, id: string) =>
+const sayCustom = (e: Engine, id: string) =>
   Effect.gen(function* () {
     const custom = nemiaCustom();
     yield* asked('say', e.say(id, toldCustom(custom)));
@@ -186,8 +185,8 @@ const ACTS: Record<NemiaAct, (e: Engine, id: string) => Effect.Effect<void>> = {
     Effect.sync(() => {
       if (listSubscriptions().some((s) => s.name === NEMIA_SUBSCRIPTION)) dropSubscription(NEMIA_SUBSCRIPTION);
     }),
-  tell: tellHer,
-  deliver: (e, id) => deliverOutbox(id, nemiaDir()).pipe(over(e), Effect.asVoid),
+  sayCustom,
+  sayOutbox: (e, id) => sayOutbox(id, nemiaDir()).pipe(over(e), Effect.asVoid),
   record: (e, id) => recordAsks(id, nemiaDir()).pipe(over(e), Effect.asVoid),
   answer: (e, id) => answersDue(id, nemiaDir()).pipe(over(e), Effect.asVoid),
 };

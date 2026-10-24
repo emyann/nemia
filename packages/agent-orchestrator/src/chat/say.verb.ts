@@ -61,10 +61,10 @@ const unclaimed = (said: readonly SourceSaid[], text: string, since: string, cla
   said.find((s) => s.text === text && s.at >= since && !claimed.has(keyOf(s)));
 
 /**
- * Delivers the outbox of the chat kept in `dir` to the task `taskId`, in order, and stops at the first entry the task does not hear
+ * Says the outbox of the chat kept in `dir` to the task `taskId`, in order, and stops at the first entry the task does not hear
  * now (`SayRefused`, `SayUnsent`), which the next call tries again.
  */
-export const deliverOutbox = Effect.fn('deliverOutbox')(function* (taskId: string, dir: string) {
+export const sayOutbox = Effect.fn('sayOutbox')(function* (taskId: string, dir: string) {
   const e = yield* EngineService;
   const marks = readDelivered(dir);
   const marked = new Set(marks.map((m) => m.id));

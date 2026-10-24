@@ -84,9 +84,8 @@ export {
   pruningBytes,
   sizeOf,
 } from './run.ts';
-export type { Pruned, PrunedFiles, PruneFacts, Pruning } from './run.ts';
+export type { FeedSaid, FeedWords, FolderRun, Hold, PlaceKind, Pruned, PrunedFiles, PruneFacts, Pruning, RepositoryRun } from './run.ts';
 export { BY_CAP, heldRefusal, holdAdvice, holdRefusal, holdsOf, holdWord, oneLine, WHY_CAP } from './run.ts';
-export type { Hold } from './run.ts';
 export {
   acceptAsk,
   acceptanceOf,
@@ -138,7 +137,6 @@ export { envelopeRefusals, outputLines } from './closeout/index.ts';
 export { answersOr, askedQuestions, questionLines } from './question/index.ts';
 export { dueNote, messageRefusal, signoffsSpent } from './retry/index.ts';
 export { atWork, firstFiledAt, runStartedAt, runTokens, timeline, timelineLines, timelineTotalLines } from './timeline/index.ts';
-export type { FolderRun, RepositoryRun, PlaceKind } from './run.ts';
 export type {
   Acceptance,
   Approval,
@@ -235,8 +233,7 @@ export {
   STEP_PHASES,
   STEP_REASONS,
 } from './feed/index.ts';
-export type { Reason, RunPhase, RunReason, StepPhase, StepReason, FeedLine, FeedPublished } from './feed/index.ts';
-export type { FeedSaid, FeedWords } from './run.ts';
+export type { FeedLine, FeedPublished, Reason, RunPhase, RunReason, StepPhase, StepReason } from './feed/index.ts';
 export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_SELECTORS, subscriptionNameRefusal, watchedLine } from './subscription/index.ts';
 export {
   LABEL_KEYS,
@@ -542,7 +539,14 @@ export { driftWords, kindsDrift, revisionNow, REVISION_KINDS, stepsDrift } from 
 export type { Drift, KindName, Pin, Revision, RevisionKind } from './revisions/revisions.ts';
 export { ledgerOf } from './revisions/revisions.store.ts';
 export { driftNow } from './revisions/pin.verb.ts';
-export { chatAnswer, chatHistory, chatRead, chatSend, chatSince, chatStop } from './chat/chat.verb.ts';
+export { chatAnswer, chatHistory, chatRead, chatSay, chatSince, chatStop } from './chat/chat.verb.ts';
 export type { ChatChanges, ChatHistory, ChatPlace, ChatReads } from './chat/chat.verb.ts';
 export type { Ask, AskAnswer, AskEvent, AskOption, AskPick, AskQuestion, CallState, ChatEvent, ChatFrom, Presence } from './chat/chat.ts';
 export { nemiaChatPlace } from './nemia/level.store.ts';
+
+import * as RunModel from './record/record.model.ts';
+/**
+ * Run-core's model as Schemas (`docs/model.md`): its ids, checked on create and nominal on read, its entities and the run's
+ * invariants, which the Run door (S2) will decode through. One namespace, imported and exported by name.
+ */
+export { RunModel };

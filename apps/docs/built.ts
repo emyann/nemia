@@ -1,7 +1,8 @@
 /**
  * What the built site must hold, read from the build that `npm run build` writes, so nothing builds the site a second time to
  * assert it: every page of the sidebar is built, no figure prints its style as an attribute, how a run lives draws its sequence,
- * and each code-drawn state machine has one home — the lifecycle the runtime's page, Nemia's machine hers.
+ * and each code-drawn diagram has one home — the lifecycle the runtime's page, Nemia's machine hers, and the two layers' models the
+ * model's page.
  *
  * Run as `node built.ts [dist]` after `astro build`, it names each fault and exits 1; `faultsOf` is what
  * `test/built.test.ts` makes refuse.
@@ -13,6 +14,7 @@ import path from 'node:path';
 export const PAGES = [
   '',
   'map',
+  'model',
   'runtime',
   'a2a',
   'workflows',
@@ -32,7 +34,7 @@ const said = (page: string): string => page || '/';
 
 /**
  * What the site built into `dist` is wrong about, each fault worded with its fix, or nothing: a page not built, a figure whose
- * style is printed as an attribute, a missing sequence, and a state machine drawn on other than its one page.
+ * style is printed as an attribute, a missing sequence, and a code-drawn diagram drawn on other than its one page.
  */
 export const faultsOf = (dist: string): string[] => {
   const unbuilt = PAGES.filter((page) => !fs.existsSync(path.join(dist, page, 'index.html')));
@@ -52,6 +54,8 @@ export const faultsOf = (dist: string): string[] => {
     ...(figures('how-a-run-lives').length > 0 ? [] : ['how a run lives draws no sequence']),
     ...homeOf('input-required', 'runtime', 'the lifecycle'),
     ...homeOf('untrusted', 'nemia', "Nemia's machine"),
+    ...homeOf('AttemptNumber', 'model', "the runtime's model"),
+    ...homeOf('TryNumber', 'model', "the orchestrator's model"),
   ];
 };
 

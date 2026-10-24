@@ -13,8 +13,8 @@
  *   (`HEAD_SECONDS`) before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
  * - `wait`, which the round's check runs last: it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
  *   for it to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
- *   absent `ci` refuses by name with the Actions URL, the failing jobs, and from each failing job's log the tests that failed with their
- *   diffs, or a bounded tail where no test is named — the next try reads why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
+ *   absent `ci` refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
+ *   test with its diff, an e2e page, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
  *   check's own (`WF_STEP`).
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
@@ -108,9 +108,12 @@ type Pr = { number: number; url: string; isDraft: boolean; baseRefName: string; 
 /** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
 type Ran = { status: number | null; out: string; err: string; missing: boolean };
 
+/** The most bytes a command may print before it is cut off: a test job's whole log runs past `spawnSync`'s default of 1 MiB. */
+const OUTPUT_BYTES = 64 * 1024 * 1024;
+
 /** Run `cmd` with `args`, bounded, reading nothing from stdin. */
 function run(cmd: string, args: string[]): Ran {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND });
+  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND, maxBuffer: OUTPUT_BYTES });
   const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
   return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '').trim() || (r.error?.message ?? ''), missing };
 }
@@ -293,29 +296,45 @@ const unstamped = (line: string): string =>
 /** A line without the prefix a tool gave it (turbo's `pkg:test: `), as `failingLines` in `src/check/check.ts` reads one. */
 const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');
 
+/** A line without the worker's prefix the e2e gives it (`[w1] `), on top of a tool's (`bare`). */
+const unworked = (line: string): string => bare(line).replace(/^\[w\d+\] /, '');
+
 /**
- * Whether `line` names a failing test, as node's reporters print one: `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
- * `✖ failing tests:` the spec reporter lists them again under. The rule of `failingLines` (`src/check/check.ts`), copied, since this
- * script imports nothing of the package.
+ * Whether `line` fails a job: a test node's reporters name, `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
+ * `✖ failing tests:` the spec reporter lists them again under, the rule of `failingLines` (`src/check/check.ts`), copied, since this
+ * script imports nothing of the package — or the e2e's `e2e: FAILED — <page>` (`exitOn`, `apps/web/test/e2e/visit.ts`), a TypeScript
+ * error (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's ` x <rule>: …` (`×` where it draws).
  */
 const failing = (line: string): boolean => {
-  const said = /^\s*((?:✖|not ok ).*)$/.exec(bare(line));
-  return said !== null && !said[1].startsWith('✖ failing tests:');
+  const said = unworked(line);
+  const test = /^\s*((?:✖|not ok ).*)$/.exec(said);
+  if (test !== null) return !test[1].startsWith('✖ failing tests:');
+  return said.startsWith('e2e: FAILED — ') || /^\s*\S.*?(?:\(\d+,\d+\)|:\d+:\d+)(?::| -) error TS\d+: /.test(said) || /^\s*[x×] \S+: /.test(said);
 };
 
 /** Whether `line` ends the lines that tell one failing test: the next test, a pass, a summary, the spec reporter's location line. */
 const ends = (line: string): boolean => /^\s*(?:✔|ℹ|ok |# Subtest|test at )/.test(bare(line)) || failing(line);
 
-/** Whether `line` tells why a test failed: an error's line (`AssertionError …`, `Error: …`) or the diff (`+ actual - expected`, `+`, `-`). */
+/**
+ * Whether `line` tells why a test failed: an error's line (`AssertionError …`, `Error: …`), the diff (`+ actual - expected`, `+`, `-`), or
+ * the location oxlint draws under its rule (`,-[src/a.ts:3:7]`, `╭─[…]`).
+ */
 const detail = (line: string): boolean => {
   const said = bare(line).trim();
-  return /^[+-](?:\s|$)/.test(said) || (/error/i.test(said) && !said.startsWith('at '));
+  return /^[+-](?:\s|$)/.test(said) || /^(?:,-|╭─)\[/.test(said) || (/error/i.test(said) && !said.startsWith('at '));
 };
 
 /**
- * What a failing job's log says of why it failed: each line naming a failing test once, in order, with the lines after it that tell why
- * (`detail`) — the occurrence that tells most, since the spec reporter prints the test bare where it ran and with its error under
- * `✖ failing tests:` — bounded by `JOB_LINES`. A log that names no failing test gives its last `TAIL_LINES` instead.
+ * Whether `line` is GitHub's own after the job's steps ran: the post-job cleanup, the git commands it runs there, the orphans it ends.
+ * A tail drops them, and everything from `Post job cleanup.` on: none of it says why the job failed.
+ */
+const postJob = (line: string): boolean => /^(?:Post job cleanup\.?|\[command\]\/usr\/bin\/git |Cleaning up orphan processes)/.test(line.trim());
+
+/**
+ * What a failing job's log says of why it failed: each line that fails it (`failing`) once, in order, with the lines after it that tell
+ * why (`detail`) — the occurrence that tells most, since the spec reporter prints the test bare where it ran and with its error under
+ * `✖ failing tests:`, and the e2e prints its headline again on each stream — bounded by `JOB_LINES`. A log with no such line gives its
+ * last `TAIL_LINES` before GitHub's post-job lines (`postJob`) instead.
  */
 function failures(log: string): { lines: string[]; tests: boolean } {
   const all = log.split('\n').map(unstamped);
@@ -327,18 +346,20 @@ function failures(log: string): { lines: string[]; tests: boolean } {
       if (ends(next)) break;
       if (detail(next) && after.length < DETAIL_LINES) after.push(next);
     }
-    const key = bare(line).trim();
+    const key = unworked(line).trim();
     if ((told.get(key)?.length ?? -1) <= after.length) told.set(key, [line, ...after]);
   });
-  if (!told.size) return { lines: all.filter((line) => line.trim()).slice(-TAIL_LINES), tests: false };
-  return { lines: [...told.values()].flat().slice(0, JOB_LINES), tests: true };
+  if (told.size) return { lines: [...told.values()].flat().slice(0, JOB_LINES), tests: true };
+  const cleanup = all.findIndex((line) => /^Post job cleanup\.?$/.test(line.trim()));
+  const ran = cleanup === -1 ? all : all.slice(0, cleanup);
+  return { lines: ran.filter((line) => line.trim() && !postJob(line)).slice(-TAIL_LINES), tests: false };
 }
 
 /**
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
  * that names a job, its log read by the job's id (`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs`, which answers where `gh run view
- * --log-failed` prints nothing), headed by the job's name: the failing tests with their diffs (`failures`), or its tail where it names
- * none, bounded by `LOG_LINES` in all. The `ci` context itself, which only gathers the others, comes last. No agent of this team may call
+ * --log-failed` prints nothing), headed by the job's name: the lines that failed it with what tells why (`failures`), or its tail where it
+ * names none, bounded by `LOG_LINES` in all. The `ci` context itself, which only gathers the others, comes last. No agent of this team may call
  * `gh`, so this is the whole of what the next try is handed.
  */
 function why(entries: readonly Entry[]): string[] {
@@ -366,7 +387,7 @@ function why(entries: readonly Entry[]): string[] {
     }
     const said = failures(log.out);
     const lines = said.lines.slice(0, left - 1).map((line) => `  ${line}`);
-    logs.push(said.tests ? `${name} (job ${id}), its failing tests:` : `${name} (job ${id}), the last ${lines.length} lines of its log:`, ...lines);
+    logs.push(said.tests ? `${name} (job ${id}), the lines that failed it:` : `${name} (job ${id}), the last ${lines.length} lines of its log:`, ...lines);
   }
   return ['the jobs that did not pass:', ...named, ...more, ...logs];
 }

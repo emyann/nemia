@@ -6,26 +6,25 @@
  * The declared-imports scan here reads every workspace package's `package.json` and source, the apps' configs and the runtime's files
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too. The vocabulary test here reads this
  * repository's team from `workflows/`, its agents and its workflows' folders (`words.test.ts`), and its whole-repository scans
- * (`names.test.ts`, `others.test.ts`) read the root's and the apps' `CLAUDE.md` among every file. Every package's test script loads
- * the test-cost probe and reporter from `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the
- * packages' docs for the diagrams they draw, every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
- * The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources (`dev-watch.test.ts`).
- * The api's tests read Nemia's builtin servers and skills, the orchestrator's `servers/` and `skills/` (`servers.test.ts`,
- * `sign-in.boundary.test.ts`, `skills.test.ts`).
- * The board's test of the look's parts reads the trigger skill of a change to the board, which names each part
- * (`apps/web/test/look.test.ts`), and its test of a merge reads the root's `CLAUDE.md` and `.gitattributes`
- * (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three.
- * The repository's own guards read the files they hold (`guards#test`): the CI guard reads the Actions workflow, the secret scan's
- * allowlist, the stub secrets of the runtime's `remote-agent.test.ts`, the e2e's page names, the board's generated paths and every
- * workspace's manifest (`tools/guards/test/ci-workflow.test.ts`, `tools/guards/test/ci-scan.boundary.test.ts`), and
- * `tools/guards/test/repo-guards.test.ts` reads `CODEOWNERS`, under `.github/`, and the packages' manifests. The citation guard reads
- * every `CLAUDE.md` and every test file, the apps' among them (`claude-md-cites.test.ts`); the licence guard the root's `LICENSE` and
- * `README.md` (`license.test.ts`); the team's guards and the git reads' guard `.claude/settings.json` and the skills (`team-words.test.ts`,
- * `team-portable.test.ts`, `git-reads.test.ts`), the five layers' guard the docs site's pages and the agents' glossary table
- * (`agent-layers-doc.test.ts`), and the glossary guard every context's table and the apps' source (`glossary.test.ts`); the
- * orchestrator's own files, and the runtime's through it, reach this task through its dependency on `agent-orchestrator`. The same
- * list is what `tools/guards/due.ts` reads to say whether CI owes the guards their suite.
- * `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a task or a glob left out.
+ * (`names.test.ts`, `others.test.ts`) read the root's and the apps' `CLAUDE.md` among every file. Every package's test script loads the
+ * test-cost probe and reporter from `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages'
+ * docs for the diagrams they draw, every source for the names their pages cite, and the paths those pages cite, at the root and under
+ * `docs/` and `workflows/`. The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources
+ * (`dev-watch.test.ts`). The api's tests read Nemia's builtin servers and skills, the orchestrator's `servers/` and `skills/`
+ * (`servers.test.ts`, `sign-in.boundary.test.ts`, `skills.test.ts`). The board's test of the look's parts reads the trigger skill of a
+ * change to the board, which names each part (`apps/web/test/look.test.ts`), and its test of a merge reads the root's `CLAUDE.md` and
+ * `.gitattributes` (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three. The repository's own guards read the files they
+ * hold (`guards#test`): the CI guard reads the Actions workflow, the secret scan's allowlist, the stub secrets of the runtime's
+ * `remote-agent.test.ts`, the e2e's page names, the board's generated paths and every workspace's manifest
+ * (`tools/guards/test/ci-workflow.test.ts`, `tools/guards/test/ci-scan.boundary.test.ts`), and `tools/guards/test/repo-guards.test.ts`
+ * reads `CODEOWNERS`, under `.github/`, and the packages' manifests. The citation guard reads every `CLAUDE.md` and every test file, the
+ * apps' among them (`claude-md-cites.test.ts`); the licence guard the root's `LICENSE` and `README.md` (`license.test.ts`); the team's
+ * guards and the git reads' guard `.claude/settings.json` and the skills (`team-words.test.ts`, `team-portable.test.ts`,
+ * `git-reads.test.ts`), the five layers' guard the docs site's pages and the agents' glossary table (`agent-layers-doc.test.ts`), and the
+ * glossary guard every context's table and the apps' source (`glossary.test.ts`); the orchestrator's own files, and the runtime's through
+ * it, reach this task through its dependency on `agent-orchestrator`. The same list is what `tools/guards/due.ts` reads to say whether CI
+ * owes the guards their suite. `INPUTS` names, for each such task, the globs it must list beside its own files; `missingInputs` refuses a
+ * task or a glob left out.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

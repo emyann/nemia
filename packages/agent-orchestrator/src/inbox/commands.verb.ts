@@ -28,8 +28,8 @@ is said at start:
     workflow: dev              # what runs it, chosen at start when the card does not say
     repo: /home/me/code/app    # the repository it is about, as an absolute path
     queued: 2026-09-16T10:00:00.000Z   # when it was queued to start on its own: nemia inbox queue writes it
-    gate: plan                 # the step whose closeout waits for nemia approve in the run it starts
-    factory: pipao             # the factory it is started in (nemia factory --help); required to start
+    gate: review               # the step whose closeout waits for nemia approve in the run it starts
+    factory: acme              # the factory it is started in (nemia factory --help); required to start
     from: add-cache-a1b2       # runs its run is handed as context, comma-separated: read, never waited on
     ---
     Cache the engine's views between passes.

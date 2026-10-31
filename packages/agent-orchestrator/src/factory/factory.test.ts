@@ -41,7 +41,7 @@ test('factoryNameRefusal: a lowercase slug of up to 40 characters names a factor
   for (const name of ['Nemia', 'a/b', '.x', '-x', '..', '../x', 'a b', 'é', 'a'.repeat(41)])
     await t.test(`REFUSED: ${JSON.stringify(name).slice(0, 14)}`, () => names(factoryNameRefusal(name), `\`${name}\``));
   await t.test('REFUSED: one not lowercase, naming the lowercase', () => names(factoryNameRefusal('Nemia'), 'nemia'));
-  await t.test('REFUSED: one that climbs, naming names that are', () => names(factoryNameRefusal('a/b'), 'pipao', 'nemia-2'));
+  await t.test('REFUSED: one that climbs, naming names that are', () => names(factoryNameRefusal('a/b'), 'acme', 'acme-2'));
   await t.test('REFUSED: an empty one, saying so', () => names(factoryNameRefusal(''), 'empty'));
 });
 

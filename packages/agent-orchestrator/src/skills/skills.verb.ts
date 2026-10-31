@@ -41,7 +41,7 @@ const apiSpec = (positionals: readonly Positional[], keys: readonly string[]): S
 
 /** Each skill folder `skills` names read now (`skillRead`, the skill named by its folder), by folder. */
 export const SKILLS_LIST: Command<Record<string, SkillRead>> = {
-  name: 'skills list',
+  name: 'skills',
   usage: '[<skills> ...]',
   help: ['the skill folders named, each read'],
   spec: apiSpec([{ key: 'skills', takes: 'many', kind: 'name' }], []),
@@ -62,7 +62,7 @@ export type SkillPage = SkillRead & { text: string; version: string | null };
 
 /** The skill `name` whose folder is `dir`, as the api resolved it in the place `from`, read for its page (`SkillPage`). */
 export const SKILLS_READ: Command<SkillPage> = {
-  name: 'skills read',
+  name: 'skills show',
   usage: '<from> <name>',
   help: ['one skill, read for its page'],
   spec: apiSpec(

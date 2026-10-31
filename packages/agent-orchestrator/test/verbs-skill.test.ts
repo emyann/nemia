@@ -58,9 +58,9 @@ test('every command the CLI serves her is listed, and none out of her reach nor 
 
 test('the library’s writers are listed by who answers for them: a write or a removal prompts the person, a try is hers', () => {
   const text = verbsSkill();
-  for (const name of ['agents write', 'agents remove', 'skills write', 'workflows write', 'workflows remove'])
+  for (const name of ['agents write', 'agents rm', 'skills write', 'workflows write', 'workflows rm'])
     assert.ok(lists(sectionOf(text, 'Prompts the person'), name), `${name} prompts the person`);
-  assert.ok(lists(sectionOf(text, 'Yours'), 'agents try'), 'agents try is hers to run unasked');
+  assert.ok(lists(sectionOf(text, 'Yours'), 'agents run'), 'agents run is hers to run unasked');
 });
 
 test('the CLI’s own verbs are said once, each with the entry that classes it', () => {

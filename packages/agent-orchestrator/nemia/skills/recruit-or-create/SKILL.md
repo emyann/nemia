@@ -59,7 +59,7 @@ None fits, or the person wants their own. Write it with them, one question at a 
 
 1. Draft it in your own folder, `drafts/<factory>/agents/<name>.md`, with the result schema its `output:` names beside it, and show it.
 2. `nemia agents write yours --file drafts/<factory>/agents/<name>.md`: it prompts.
-3. `nemia agents try yours <name> --brief "<words>"`, on a brief small enough to read in a minute, and bring what it did.
+3. `nemia agents run yours <name> --brief "<words>"`, on a brief small enough to read in a minute, and bring what it did.
 4. Hire it: `nemia factory hire <factory> <name> --step <workflow>/<step>`.
 
 A schema no verb writes is placed by the person: the `create-a-factory` skill says how to keep it pending until it is there.

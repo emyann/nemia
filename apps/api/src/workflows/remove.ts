@@ -1,5 +1,5 @@
 /**
- * A workflow of yours removed from the board: the folder whole, through the package's entry `workflows remove`, which refuses a folder a
+ * A workflow of yours removed from the board: the folder whole, through the package's entry `workflows rm`, which refuses a folder a
  * run, a queued card or a factory still needs, naming each with the command that frees it (409, by its kind, `app.onError`).
  *
  * The removal carries the `version` the folder was listed at (`workflowVersion`), and the entry refuses it (409) when the folder holds
@@ -17,7 +17,7 @@ import { folderOf } from './workflows.ts';
 import { runPlaced } from '../store.ts';
 
 /** The table's entry a folder of yours is removed through, which refuses a folder changed since it was read. */
-const REMOVE = COMMANDS.find((c) => c.name === 'workflows remove')!;
+const REMOVE = COMMANDS.find((c) => c.name === 'workflows rm')!;
 
 const DELETE_SHAPE = '`{ "version": "<as GET /api/workflows lists it>" }`';
 

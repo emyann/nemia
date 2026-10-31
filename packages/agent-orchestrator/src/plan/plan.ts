@@ -10,7 +10,7 @@
  *     ---
  *     Put the flag on the settings page, now that it is parsed and stored.
  *
- * `nemia plan <folder>` starts every card, parents first (`planOrder`), each `--after` the runs its `after:` names. The waiting is the
+ * `nemia start <folder>` starts every card, parents first (`planOrder`), each `--after` the runs its `after:` names. The waiting is the
  * tick's, and every card is still a decision at its own `nemia decide`. Nothing records the plan: the runs and their `after` are the plan.
  * A `README.md` beside the cards says what the plan is for, and is not a card.
  *
@@ -129,11 +129,11 @@ export type StartCard = { file: string; workflow?: string; after: string[]; body
  * brief, so a brief that happens to start with `---` is not eaten; a block of keys is never taken into one. A key a plan's card lacks
  * is refused by name, an inbox card's among them, naming `nemia inbox add <file>`, whose cards read those keys (`startUnknown`). Pure.
  *
- * `nemia plan` prints `nemia start <card> --after …` for each card it did not start, and this is what makes that command start the card's
- * body. Read as a card, a file is held to what `nemia plan` holds a card to — a key set twice or to nothing, an empty body, an `after:`
- * naming no card or one twice — and refused, naming the file and the ids to give, when its `after:` names cards and `nemia start` was given
- * no `--after` (`after`): started so, it would not wait for the runs it was written to wait for. Which runs those are is `nemia start
- * --after`'s to check, as it does.
+ * `nemia start <folder>` prints `nemia start <card> --after …` for each card it did not start, and this is what makes that command start
+ * the card's body. Read as a card, a file is held to what `nemia start <folder>` holds a card to — a key set twice or to nothing, an empty
+ * body, an `after:` naming no card or one twice — and refused, naming the file and the ids to give, when its `after:` names cards and
+ * `nemia start` was given no `--after` (`after`): started so, it would not wait for the runs it was written to wait for. Which runs those
+ * are is `nemia start --after`'s to check, as it does.
  */
 export function cardToStart(file: string, text: string, after: readonly string[]): StartCard | null {
   let split: { block: string | null; body: string };
@@ -170,7 +170,7 @@ const startUnknown = (file: string, key: string): string =>
 function readCardKeys(file: string, block: string): Partial<Record<CardKey, string>> {
   return frontmatterKeys(file, block, CARD_KEYS, (key) =>
     key === 'repo'
-      ? `${file}: \`repo\` is not a key a plan's card has: a plan works on one repository, the one nemia plan <folder> --repo <r> is given, and a card started by hand works on nemia start's --repo. \`repo:\` is an inbox card's — delete the line, or file the idea in the inbox: nemia inbox add <file> --repo <r>.`
+      ? `${file}: \`repo\` is not a key a plan's card has: a plan works on one repository, the one nemia start <folder> --repo <r> is given, and a card started by hand works on nemia start's --repo. \`repo:\` is an inbox card's — delete the line, or file the idea in the inbox: nemia inbox add <file> --repo <r>.`
       : `${file}: \`${key}\` is not a key a card has. A card's keys are: ${CARD_KEYS.join(', ')} — what runs it, and what lands first; how its steps run is its workflow's to say. Correct the spelling or delete the line — a key nothing reads is a constraint nobody enforces.`,
   );
 }
@@ -207,9 +207,9 @@ export function frontmatterKeys<K extends string>(
 }
 
 /**
- * The cards in the order `nemia plan` starts them: every card after each card its `after:` names, and among the cards that may go next, by
- * name. Refused when that order cannot be: an `after:` naming a card the plan does not have, or the card itself, and cards that wait on
- * each other, named round the cycle — none of them could ever start.
+ * The cards in the order `nemia start <folder>` starts them: every card after each card its `after:` names, and among the cards that may go
+ * next, by name. Refused when that order cannot be: an `after:` naming a card the plan does not have, or the card itself, and cards that
+ * wait on each other, named round the cycle — none of them could ever start.
  */
 export function planOrder(cards: readonly Card[]): Card[] {
   const names = new Set(cards.map((c) => c.name));
@@ -263,12 +263,12 @@ function cycleIn(pending: readonly Card[]): Card[] {
   return walked.slice(walked.indexOf(at));
 }
 
-/** A card `nemia plan` started: the card, the id of its run, and the workflow folder that run froze. */
+/** A card `nemia start <folder>` started: the card, the id of its run, and the workflow folder that run froze. */
 export type Planned = { card: Card; runId: string; workflowDir: string };
 
 /**
- * What `nemia plan` prints, one line per card started, in the order it started them: the card, its run, its workflow as the card names it,
- * and what it waits on — each card by name, with the run `nemia ls` will name.
+ * What `nemia start <folder>` prints, one line per card started, in the order it started them: the card, its run, its workflow as the card
+ * names it, and what it waits on — each card by name, with the run `nemia ls` will name.
  */
 export function planLines(started: readonly Planned[]): string[] {
   const idOf = new Map(started.map((p) => [p.card.name, p.runId]));
@@ -287,10 +287,10 @@ export function planLines(started: readonly Planned[]): string[] {
 const quoted = (p: string): string => `'${p.replace(/'/g, `'\\''`)}'`;
 
 /**
- * Why `nemia plan` stopped part-way, and what to do: the card whose `nemia start` refused and its refusal, the runs already started — which
- * stand, and the tick files as their edges allow — and a `nemia start` for each card not started, parents first, with `--after` the runs
- * its parents have or will have, each path quoted for the shell. `folderOf` is the workflow folder each card's `workflow:` was found at;
- * `dir` is the plan folder. `nemia start` on a card file starts its body (`cardToStart`).
+ * Why `nemia start <folder>` stopped part-way, and what to do: the card whose `nemia start` refused and its refusal, the runs already
+ * started — which stand, and the tick files as their edges allow — and a `nemia start` for each card not started, parents first, with
+ * `--after` the runs its parents have or will have, each path quoted for the shell. `folderOf` is the workflow folder each card's
+ * `workflow:` was found at; `dir` is the plan folder. `nemia start` on a card file starts its body (`cardToStart`).
  */
 export function planStopped(
   stopped: { card: Card; why: string; rest: readonly Card[] },
@@ -306,7 +306,7 @@ export function planStopped(
     return `  nemia start ${quoted(`${opts.dir.replace(/\/$/, '')}/${card.file}`)} --workflows ${quoted(opts.folderOf(card))} --repo ${quoted(opts.repo)}${after}`;
   });
   return [
-    `nemia plan stopped at ${stopped.card.file}: ${stopped.why}`,
+    `nemia start stopped at ${stopped.card.file}: ${stopped.why}`,
     ran,
     `Start the rest by hand, parents first, once what stopped ${stopped.card.file} is fixed — each --after the run of a card it waits on:`,
     ...commands,

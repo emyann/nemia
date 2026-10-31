@@ -1,20 +1,19 @@
 /**
  * The orchestrator's commands, each defined once (`COMMANDS`): its spec (`command.ts`), the one package verb its handler calls, the data it
  * answers, and the lines the CLI prints of that data. The CLI parses, refuses, helps and prints from an entry, and the api serves the same
- * entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`nemia start`, `START`, and `nemia plan`,
- * `PLAN`, which the CLI alone runs), the inbox (`INBOXES`), the factories (`FACTORIES`, their schedules among them), their templates
- * (`TEMPLATES`), a person's asks of a run — `nemia retry`, `nemia approve`, `nemia refresh` and `nemia say` — the runs and
- * their steps (`nemia ls`, `runsListed`), three reads the api alone serves: a run's decision (`decideRun`), whether its branches still
- * merge (`MERGES`) and the run slots (`slotsOf`), the agents of both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents
+ * entry on its route; an entry served on one side alone says so (`only`). Today: a start of work (`nemia start`, `START`, of a brief, and
+ * of a folder of cards at the command line alone), the inbox (`INBOXES`), the factories (`FACTORIES`, their schedules among them), their
+ * templates (`TEMPLATES`), a person's asks of a run — `nemia retry`, `nemia approve`, `nemia refresh` and `nemia say` — the runs and their
+ * steps (`nemia ls`, `runsListed`), three reads the api alone serves: a run's decision (`decideRun`), whether its branches still merge
+ * (`MERGES`) and the run slots (`slotsOf`), the agents of both places (`nemia agents`, `agentsRead`), one agent's card (`nemia agents
  * card`, `agentCardRead`) and its custom instructions (`nemia agents custom`, `AGENTS_CUSTOM`), a run's course (`nemia cancel`, `nemia
  * hold`, `nemia rm`, `nemia prune`), and the store's pause (`nemia pause`, `nemia resume`, and its read the api alone serves):
  * `runs.verb.ts`; Nemia's level and memory (`nemia level`, `nemia memory`: `nemia/`); an agent's rules at auto (`nemia policy`:
  * `POLICY_ENTRIES`); the reads of the store (`nemia show`, `nemia logs`, `nemia stats`: `reads.verb.ts`); the rewrite of a former
- * frontmatter as YAML (`nemia frontmatter rewrite`, `FRONTMATTER_REWRITE`); and what the board
- * alone reads and writes, each served on the api alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation
- * (`PAGES`), the agent and skill libraries (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole
- * table (`TABLE`) adds the commands the CLI serves alone and runs itself, with no handler: `nemia plan`, `nemia tick`, `nemia up` and
- * `nemia watch` (`RAN`).
+ * frontmatter as YAML (`nemia frontmatter rewrite`, `FRONTMATTER_REWRITE`); and what the board alone reads and writes, each served on the
+ * api alone: a card's page (`INBOXES`), a run's page and its steps' files, path and conversation (`PAGES`), the agent and skill libraries
+ * (`LIBRARY_ENTRIES`, `SKILL_ENTRIES`) and the workflow builder (`WORKFLOW_ENTRIES`). The whole table (`TABLE`) adds the commands the CLI
+ * serves alone and runs itself, with no handler: `nemia tick`, `nemia up` and `nemia watch` (`RAN`).
  */
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
@@ -50,7 +49,7 @@ import { WORKFLOW_ENTRIES } from '../folder/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { TEMPLATES } from '../template/template.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';
-import { CONCLUDED, PLAN, START } from '../start/commands.verb.ts';
+import { CONCLUDED, START } from '../start/commands.verb.ts';
 import { CANCEL, PAUSE, PAUSED, PAUSE_NOW, HOLD, PRUNE, RAN, RM, RESUME } from './runs.verb.ts';
 import { SUBSCRIBE, UNSUBSCRIBE } from '../subscription/subscription.verb.ts';
 import { PASSES } from '../meter/passes.verb.ts';
@@ -552,7 +551,7 @@ export const COMMANDS: readonly Command[] = [
 ];
 
 /**
- * The whole table, in the order `nemia`'s help lists them: `nemia start` and `nemia plan`, then every other command with a handler, then
+ * The whole table, in the order `nemia`'s help lists them: `nemia start`, then every other command with a handler, then
  * those the CLI runs itself (`RAN`).
  */
-export const TABLE: readonly (Command | Ran)[] = [COMMANDS[0], PLAN, ...COMMANDS.slice(1), ...RAN, ADMIT];
+export const TABLE: readonly (Command | Ran)[] = [...COMMANDS, ...RAN, ADMIT];

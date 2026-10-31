@@ -1,6 +1,6 @@
 /**
  * The library's writers on the api, held to the one spec the command line parses too: each route of `agents write`, `agents copy`,
- * `agents remove`, `agents try`, `skills write`, `workflows write` and `workflows remove`, sent as the board sends it, hands its entry's
+ * `agents rm`, `agents run`, `skills write`, `workflows write` and `workflows rm`, sent as the board sends it, hands its entry's
  * handler only the keys its spec gives a handler — its positionals and its flags but those the command line alone takes — and is
  * answered as it would be. The package's `test/writers-cli.test.ts` holds the command line to the same keys. And a name yours has taken
  * is refused in the one sentence both ways: by the board's `POST /api/workflows/yours`, and by `nemia workflows write` typed at the
@@ -90,8 +90,8 @@ test("each writer's route hands its handler only the keys its one spec gives a h
   const put = await heldToSpec(t, 'agents write', 200, () =>
     sent('PUT', '/api/agents/yours/scribe', { ...scribe, body: 'Write the notes.', version: versionOf(made, 'agent') }),
   );
-  await heldToSpec(t, 'agents try', 201, () => sent('POST', '/api/agents/yours/scribe/try', { brief: 'Write the notes.' }));
-  await heldToSpec(t, 'agents remove', 200, () => sent('DELETE', '/api/agents/yours/scribe', { version: versionOf(put, 'agent') }));
+  await heldToSpec(t, 'agents run', 201, () => sent('POST', '/api/agents/yours/scribe/try', { brief: 'Write the notes.' }));
+  await heldToSpec(t, 'agents rm', 200, () => sent('DELETE', '/api/agents/yours/scribe', { version: versionOf(put, 'agent') }));
   const elsewhere = scratch('nemia-api-writers-copy-');
   fs.writeFileSync(path.join(elsewhere, 'clerk.md'), '---\ndescription: Use this when notes need filing.\n---\nFile them.\n');
   await heldToSpec(t, 'agents copy', 200, () =>
@@ -123,9 +123,7 @@ test("each writer's route hands its handler only the keys its one spec gives a h
   const changed = await heldToSpec(t, 'workflows write', 200, () =>
     sent('PUT', '/api/workflows/yours/dev', { steps: dev.steps, version: dev.version }),
   );
-  await heldToSpec(t, 'workflows remove', 200, () =>
-    sent('DELETE', '/api/workflows/yours/dev', { version: versionOf(changed, 'workflow') }),
-  );
+  await heldToSpec(t, 'workflows rm', 200, () => sent('DELETE', '/api/workflows/yours/dev', { version: versionOf(changed, 'workflow') }));
 });
 
 test("a name yours has taken, a workflow or a file, is refused in workflowTaken's one sentence by the board's POST and by nemia", async () => {

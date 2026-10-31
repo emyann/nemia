@@ -41,11 +41,33 @@
  * taken with a hint. It stays while a record, an ask file or a caller may still say it. The runtime's own `nudge` is another sense,
  * outside the table's paths.
  *
+ * `agents remove`, `workflows remove`, `policy drop`, `agents try`, `template check` and `factory plan`, on the day decision 8 retired them
+ * (its rows Rm, Run an agent, Lint and Diff in the run core's table): each is left once, as its own row of `RENAMED` (`command.ts`), which
+ * still runs a line that says it, with a hint naming the new spelling. They stay until a later card removes the former spellings.
+ *
  * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
  * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
  * `options.ts`). They stay while a caller may still write them.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  'agents remove': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'agents try': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'factory plan': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'policy drop': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'template check': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'workflows remove': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
   accept: {
     'packages/agent-orchestrator/src/admission/admission.ts': 1,
     'packages/agent-orchestrator/src/brief/brief-sections.ts': 2,

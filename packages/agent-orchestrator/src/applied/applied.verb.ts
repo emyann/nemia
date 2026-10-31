@@ -48,7 +48,7 @@ export const setsOf = (params: FactoryTemplate['params']): string[] =>
 
 /**
  * The template at `source`, a folder or an archive, rendered with `params`, each `<key>=<value>`, its files read off its tree; or why it
- * is not: its problems (`nemia template check`), a parameter refused (`resolveParams`) and what the render refuses (`renderFactory`),
+ * is not: its problems (`nemia template lint`), a parameter refused (`resolveParams`) and what the render refuses (`renderFactory`),
  * every one a line, with the template's version where it was read. Nothing is written.
  */
 export function renderedAt(source: string, sets: readonly string[]): RenderedAt | { problems: string[]; version?: string } {
@@ -83,7 +83,7 @@ const NO_CONFLICTS = condition('ConflictsPending', false, 'NoUpgrade', 'No upgra
 /** The template `source` as `factory` reads it: rendered, or the `Applied` condition that says why it is not. */
 function readTemplate(factory: Factory & { template: FactoryTemplate }): RenderedAt | Condition {
   const { source, version, params } = factory.template;
-  const fix = `nemia template check ${source}`;
+  const fix = `nemia template lint ${source}`;
   let read: RenderedAt | { problems: string[]; version?: string };
   try {
     read = renderedAt(source, setsOf(params));
@@ -99,7 +99,7 @@ function readTemplate(factory: Factory & { template: FactoryTemplate }): Rendere
       'Applied',
       false,
       'VersionDrift',
-      `The template is at version ${read.version}, and ${factory.name} was applied at ${version}: its base and tree are left as they are. Put the template back at ${version}, or upgrade to ${read.version}: nemia factory plan ${factory.name} --to ${read.version}, then nemia factory upgrade ${factory.name} --to ${read.version}.`,
+      `The template is at version ${read.version}, and ${factory.name} was applied at ${version}: its base and tree are left as they are. Put the template back at ${version}, or upgrade to ${read.version}: nemia factory diff ${factory.name} --to ${read.version}, then nemia factory upgrade ${factory.name} --to ${read.version}.`,
     );
   return read;
 }
@@ -122,7 +122,7 @@ function appliedOf(factory: Factory & { template: FactoryTemplate }, base: strin
       'Applied',
       false,
       'ParamsChanged',
-      `The parameters in ${factory.name}'s file differ from those its base was rendered with: its base and tree are left as they are. Put them back, or upgrade with them to the template's next version: nemia factory plan ${factory.name} --to <version>, then nemia factory upgrade ${factory.name} --to <version>.`,
+      `The parameters in ${factory.name}'s file differ from those its base was rendered with: its base and tree are left as they are. Put them back, or upgrade with them to the template's next version: nemia factory diff ${factory.name} --to <version>, then nemia factory upgrade ${factory.name} --to <version>.`,
     );
   return condition(
     'Applied',
@@ -161,7 +161,7 @@ function waiting(factory: Factory & { template: FactoryTemplate }, from: string,
       'Applied',
       false,
       'UpgradePending',
-      `${name} waits to be upgraded from ${from} to ${template.version}: ${count} wait for a choice (nemia factory plan ${name} --to ${template.version} shows each). Its base and tree are left as they are until each has one.`,
+      `${name} waits to be upgraded from ${from} to ${template.version}: ${count} wait for a choice (nemia factory diff ${name} --to ${template.version} shows each). Its base and tree are left as they are until each has one.`,
     ),
     condition(
       'ConflictsPending',

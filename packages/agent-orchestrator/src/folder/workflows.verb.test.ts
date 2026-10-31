@@ -170,7 +170,7 @@ test("REFUSED: a repository's workflow is not removed here, nor a folder nested 
   const fromRepo = WORKFLOWS_REMOVE.handler({ from: 'repo', name: 'shared', version: 'v1', repo }, undefined, ROOT);
   await assert.rejects(runWith(e(), fromRepo), (err: Error) => {
     assert.ok(err instanceof Invalid, `${err.name}: ${err.message}`);
-    assert.ok(err.message.startsWith(`nemia workflows remove refuses `), err.message);
+    assert.ok(err.message.startsWith(`nemia workflows rm refuses `), err.message);
     assert.ok(err.message.includes(`(${path.join(repo, 'workflows')})`), err.message);
     assert.ok(err.message.includes(`only yours is written, in ${yours}`), err.message);
     assert.ok(err.message.includes(`\`cp -r ${theirs} ${yours}/\``), err.message);
@@ -181,7 +181,7 @@ test("REFUSED: a repository's workflow is not removed here, nor a folder nested 
   await refused(
     nested,
     Invalid,
-    "nemia workflows remove: `outer/inner` is not a workflow's name: a workflow is named by its folder, not hidden, with no slash — build, say.",
+    "nemia workflows rm: `outer/inner` is not a workflow's name: a workflow is named by its folder, not hidden, with no slash — build, say.",
   );
   fs.renameSync(theirs, path.join(yours, 'shared'));
   await remove(path.join(yours, 'shared'));
@@ -194,7 +194,7 @@ test('REFUSED: the folders of agents and of skills are no workflow, and both are
     await refused(
       dir,
       Invalid,
-      `nemia workflows remove: ${name}/ holds the agents or the skills beside the workflows, and no workflow has its name. Name the workflow's folder.`,
+      `nemia workflows rm: ${name}/ holds the agents or the skills beside the workflows, and no workflow has its name. Name the workflow's folder.`,
     );
     assert.ok(fs.existsSync(path.join(dir, 'one.md')));
   }

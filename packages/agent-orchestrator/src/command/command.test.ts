@@ -228,7 +228,7 @@ test("the table's help is today's, word for word", () => {
   assert.equal(
     helpOf(TABLE),
     [
-      '  nemia start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]',
+      '  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]',
       '                               --after <runId>: file nothing of this run until nemia decide says that',
       '                               run has landed — finished, and its result branch on the base',
       '                               branch — and start from the base as it is then; once per run.',
@@ -240,7 +240,9 @@ test("the table's help is today's, word for word", () => {
       "                               anything after it is filed, as a step's own gate: true does; once",
       "                               per step. An inbox card's gate: <step> is one more",
       '                               --workflows takes a folder, or a name under <repo>/workflows/: dev',
-      '                               a card of a plan (nemia plan --help) starts its body: --workflows is its',
+      '                               a folder of cards starts a plan, a run per card, parents first, at',
+      '                               the command line alone (nemia start --help)',
+      '                               a card of a plan (nemia start --help) starts its body: --workflows is its',
       '                               workflow: unless given, and its after: needs an --after for each',
       "                               a frontmatter block of keys a plan's card lacks is refused by its key,",
       '                               never taken as the brief: file an inbox card with nemia inbox add <file>',
@@ -259,10 +261,6 @@ test("the table's help is today's, word for word", () => {
       '                               inbox, listed as started: --workflows is its workflow:',
       '                               unless given, --repo its repo:, --factory its factory:, and a card',
       '                               that names no factory either way is refused',
-      '  nemia plan <folder> [--repo .] [--factory <name>]',
-      '                               start a plan: one run per card in the folder, parents first, each',
-      '                               --after the runs of the cards its after: names, in the factory as',
-      '                               nemia start finds it (nemia plan --help)',
       '  nemia concluded <runId>',
       '                               what a run started with --from <runId> would be handed of it, now',
       '  nemia inbox',
@@ -290,7 +288,7 @@ test("the table's help is today's, word for word", () => {
       '  nemia factory apply <name> --template <folder|archive> --repo <path> [--repo <path> ...] [--set <key>=<value> ...] [--no-trust]',
       '                               make a factory from a template that passes its check, its parameters',
       '                               given with --set; the daemon renders its tree',
-      '  nemia factory plan <name> --to <x.y.z> [--template <folder|archive>]',
+      '  nemia factory diff <name> --to <x.y.z> [--template <folder|archive>]',
       "                               preview a templated factory's upgrade: what merges cleanly, and each",
       '                               conflict with its sides; nothing is written',
       '  nemia factory upgrade <name> --to <x.y.z> [--template <folder|archive>] [--downgrade]',
@@ -344,7 +342,7 @@ test("the table's help is today's, word for word", () => {
       '  nemia factory rm <name>',
       "                               remove a factory's file, and the instruction and the rules the store",
       '                               keeps for it',
-      '  nemia template check <folder|archive>',
+      '  nemia template lint <folder|archive>',
       "                               check a template's folder or archive: every problem at once, each at its",
       '                               file and line',
       '  nemia template export <folder> --from <repo> [--factory <name>]',
@@ -471,9 +469,9 @@ test("the table's help is today's, word for word", () => {
       '  nemia agents copy <file> [--as <name>] [--keep <part>]...',
       '                               an agent file copied into your library, with its schema and skills;',
       '                               a part your library holds otherwise stops it: --as or --keep',
-      '  nemia agents remove yours <name> --version <v>',
+      '  nemia agents rm yours <name> --version <v>',
       '                               an agent of yours removed, at the --version it was read at',
-      '  nemia agents try yours <name> --brief <words>',
+      '  nemia agents run yours <name> --brief <words>',
       '                               an agent of yours tried on a short brief, in a folder of its own,',
       '                               capped at $1',
       '  nemia skills write (yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]',
@@ -577,7 +575,7 @@ test("the table's help is today's, word for word", () => {
       '                               words read: from then on, at auto, the answer it names is given unasked',
       '                               where it holds. Refused once the rule reads otherwise. Your first confirm',
       '                               keeps the default beside it. Asked of you every time',
-      '  nemia policy drop <agent> <id>',
+      '  nemia policy rm <agent> <id>',
       '                               take a rule out of force, the default among them: what it allowed is',
       '                               asked of you again. Asked of you every time',
       '  nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]',
@@ -619,7 +617,7 @@ test("the table's help is today's, word for word", () => {
       '  nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]',
       '                               a workflow folder of yours, or of a templated --factory, written from',
       '                               a draft folder; one there already, at the --version it was read at',
-      '  nemia workflows remove yours <name> --version <v>',
+      '  nemia workflows rm yours <name> --version <v>',
       '                               a workflow folder of yours removed, at the --version it was read at',
       '  nemia tick [--stats]',
       '                               one pass: tick the engine, file what became ready — refused while a',
@@ -735,6 +733,13 @@ test('a table breaks its rules: two entries routed on one method and path, of wh
     ),
     ['b is routed on GET /api/x, as a is: give it a path of its own'],
   );
+});
+
+test('a table breaks its rules: an entry named by a former spelling, which the line it names would never reach', () => {
+  const route = { method: 'POST', path: '/api/x', status: 202 } as const;
+  const breaks = commandBreaks([{ name: 'agents remove', route, handler }], []);
+  assert.equal(breaks.length, 1);
+  names(breaks[0], 'agents remove', 'RENAMED');
 });
 
 test('a table breaks its rules: a verb of the CLI is refused only against an entry the CLI serves', () => {
@@ -970,7 +975,11 @@ test('a former word or flag is run as what it became, with a hint, and a line in
       ['accept', 'r1', '--message', '--round'],
       ['approve', 'r1', '--message', '--round'],
     ],
+    ['a former name of two words', ['agents', 'remove', 'x'], ['agents', 'rm', 'x']],
+    ['a renamed group and its renamed verb, put to the name it became at last', ['auto', 'drop', 'r1', '3'], ['policy', 'rm', 'r1', '3']],
+    ['plan, now start with its folder', ['plan', './f', '--repo', '.'], ['start', './f', '--repo', '.']],
     ['a line in the new words', ['retry', 'r1', '--round'], undefined],
+    ['a two-word line in the new words', ['agents', 'rm', 'x'], undefined],
     ['--nudge on another command is not renamed', ['say', 'r1', 's', '--nudge'], undefined],
   ];
   for (const [name, typed, now] of rows)
@@ -980,6 +989,9 @@ test('a former word or flag is run as what it became, with a hint, and a line in
       assert.equal(renamed.hint !== undefined, now !== undefined, 'a hint is said exactly when a former spelling was typed');
       if (now !== undefined) assert.ok(renamed.hint!.includes(['nemia', ...now].join(' ')), 'the hint names the line to type now');
     });
+  await t.test('the hint of a line renamed twice names what was typed', () => {
+    assert.ok(renamedIn(['auto', 'drop', 'r1', '3']).hint!.includes('nemia auto drop'));
+  });
 });
 
 test("a body's former value is read as what it became, with a hint naming what to send now, and a body in the new words is left as given", async (t) => {

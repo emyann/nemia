@@ -1,6 +1,6 @@
 /**
- * `nemia plan`: every card of a plan folder started, parents first (`startPlan`), each through `startRun`. A controller: it reaches the
- * runtime through `start/start.verb.ts`.
+ * `nemia start <folder>`: every card of a plan folder started, parents first (`startPlan`), each through `startRun`. A controller: it
+ * reaches the runtime through `start/start.verb.ts`.
  */
 import { Cause, Effect, Exit } from 'effect';
 import { workflowFolder } from '../folder/folder.store.ts';
@@ -25,10 +25,10 @@ export type PlanStarted = {
 };
 
 /**
- * `nemia plan`: every card of a plan folder started, parents first, each with `startRun` and `after` the runs of the cards its `after:`
- * names — the record `nemia start --after` writes, so the tick, `nemia ls`, `nemia decide` and the board need nothing new; parents first,
- * so every card a card's `after:` names has a run by then. Nothing else is written: no plan
- * record, and no file of its own. The runs and their `after` are the plan.
+ * `nemia start <folder>`: every card of a plan folder started, parents first, each with `startRun` and `after` the runs of the cards its
+ * `after:` names — the record `nemia start --after` writes, so the tick, `nemia ls`, `nemia decide` and the board need nothing new; parents
+ * first, so every card a card's `after:` names has a run by then. Nothing else is written: no plan record, and no file of its own. The runs
+ * and their `after` are the plan.
  *
  * Refused before the first run is started, naming the card and the fix: a folder `parsePlan` refuses; a card whose `workflow:` names no
  * workflow folder (`workflowFolder`, from the plan folder), or one `startRun` would refuse — that refusal, behind the card; and, when a

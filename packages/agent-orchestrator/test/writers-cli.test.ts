@@ -1,6 +1,6 @@
 /**
- * The library's writers at the command line: `nemia agents write`, `agents remove`, `agents try`, `skills write`, `workflows write` and
- * `workflows remove`, each typed as a person types it, on a file or a draft folder they wrote, into yours under a scratch `WF_ROOT`.
+ * The library's writers at the command line: `nemia agents write`, `agents rm`, `agents run`, `skills write`, `workflows write` and
+ * `workflows rm`, each typed as a person types it, on a file or a draft folder they wrote, into yours under a scratch `WF_ROOT`.
  * Held here: each write read back from disk, and each refusal made to refuse at shipped defaults — the place, a version left out, taken
  * or moved on from, a name, a path that is not there, a key the api alone takes — leaving yours as it was; and that the command line hands
  * each entry's handler only the keys the api's body could, read off the entry's one spec.
@@ -179,8 +179,8 @@ test('REFUSED at shipped defaults: a key the api alone takes, typed at the comma
   );
   names(
     await refusedAs(t, 'Invalid', 'agents', 'remove', 'yours', 'plain', '--repo', DRAFTS),
-    /^nemia agents remove takes no --repo: /,
-    'nemia agents remove yours <name> --version <v>',
+    /^nemia agents rm takes no --repo: /,
+    'nemia agents rm yours <name> --version <v>',
   );
   names(
     await refusedAs(t, 'Invalid', 'skills', 'write', 'yours', '--copy', 'tidy'),
@@ -196,7 +196,7 @@ test('REFUSED at shipped defaults: a key the api alone takes, typed at the comma
   );
 });
 
-test('nemia agents remove removes an agent of yours at the version it was read at; REFUSED with none, with one it moved on from, or not there', async (t) => {
+test('nemia agents rm removes an agent of yours at the version it was read at; REFUSED with none, with one it moved on from, or not there', async (t) => {
   const file = drafted('agents/courier.md', '---\ndescription: Use this to carry it.\n---\nCarry it.\n');
   const at = versionIn((await typed(t, 'agents', 'write', 'yours', '--file', file)).out);
   assert.equal(
@@ -207,7 +207,7 @@ test('nemia agents remove removes an agent of yours at the version it was read a
   assert.match(await refused(t, 'agents', 'remove', 'yours', 'nobody', '--version', at), /nobody/);
   names(
     await refusedAs(t, 'Invalid', 'agents', 'remove', 'repo', 'courier', '--version', at),
-    /^nemia agents remove refuses /,
+    /^nemia agents rm refuses /,
     "the repository's agents",
     'only yours is written',
     'copy the file into',
@@ -266,7 +266,7 @@ function draftWorkflow(name: string): string {
   return folder;
 }
 
-test('nemia workflows write writes a draft folder into yours, changes it at its version, and nemia workflows remove removes it at its version', async (t) => {
+test('nemia workflows write writes a draft folder into yours, changes it at its version, and nemia workflows rm removes it at its version', async (t) => {
   const folder = draftWorkflow('notes');
   const made = await typed(t, 'workflows', 'write', 'yours', 'notes', '--folder', folder);
   assert.equal(made.refused, undefined, made.refused);
@@ -340,19 +340,19 @@ test('REFUSED at shipped defaults: a workflow removed with no version, at one it
   );
   names(
     await refusedAs(t, 'Invalid', 'workflows', 'remove', 'yours', 'agents', '--version', at),
-    /^nemia workflows remove: agents\/ holds /,
+    /^nemia workflows rm: agents\/ holds /,
     "Name the workflow's folder",
   );
   names(
     await refusedAs(t, 'Invalid', 'workflows', 'remove', 'repo', 'triage', '--version', at),
-    /^nemia workflows remove refuses /,
+    /^nemia workflows rm refuses /,
     "the repository's workflows",
     'only yours is written',
     'copy the folder into',
   );
 });
 
-test('nemia agents try starts a try of an agent of yours with no repository; REFUSED while it moves, with no brief, for none there, or in the repository', async (t) => {
+test('nemia agents run starts a try of an agent of yours with no repository; REFUSED while it moves, with no brief, for none there, or in the repository', async (t) => {
   const file = drafted('agents/taster.md', '---\ndescription: Use this to taste it.\nmodel: sonnet\n---\nTaste it.\n');
   await typed(t, 'agents', 'write', 'yours', '--file', file);
   const started = await typed(t, 'agents', 'try', 'yours', 'taster', '--brief', '  Taste the soup.  ');
@@ -375,7 +375,7 @@ test('nemia agents try starts a try of an agent of yours with no repository; REF
   assert.match(await refused(t, 'agents', 'try', 'yours', 'nobody', '--brief', 'Do it.'), /^Yours has no agent named 'nobody'/);
   names(
     await refusedAs(t, 'Invalid', 'agents', 'try', 'repo', 'taster', '--brief', 'Do it.'),
-    /^nemia agents try refuses /,
+    /^nemia agents run refuses /,
     "the repository's agents",
     'only yours is written',
     'copy the file into',
@@ -407,14 +407,14 @@ test('the command line hands each writer’s handler only what the api’s body 
   const skill = drafted('skills/spec/SKILL.md', TIDY.replace('name: tidy', 'name: spec'));
   const typedArgs: Record<string, string[]> = {
     'agents write': ['agents', 'write', 'yours', 'spec', '--file', agent, '--version', 'v'],
-    'agents remove': ['agents', 'remove', 'yours', 'spec', '--version', 'v'],
-    'agents try': ['agents', 'try', 'yours', 'spec', '--brief', 'Do it.'],
+    'agents rm': ['agents', 'rm', 'yours', 'spec', '--version', 'v'],
+    'agents run': ['agents', 'run', 'yours', 'spec', '--brief', 'Do it.'],
     'skills write': ['skills', 'write', 'yours', 'spec', '--file', skill, '--version', 'v'],
     'workflows write': ['workflows', 'write', 'yours', 'spec', '--folder', draftWorkflow('spec'), '--version', 'v'],
-    'workflows remove': ['workflows', 'remove', 'yours', 'spec', '--version', 'v'],
+    'workflows rm': ['workflows', 'rm', 'yours', 'spec', '--version', 'v'],
   };
   const writers = (TABLE as readonly Command[]).filter(
-    (c) => c.writes && c.only === undefined && /^(agents|skills|workflows) (write|remove|try)$/.test(c.name),
+    (c) => c.writes && c.only === undefined && /^(agents|skills|workflows) (write|rm|run)$/.test(c.name),
   );
   assert.deepEqual(writers.map((c) => c.name).sort(), Object.keys(typedArgs).sort(), 'the six writers, each typed here');
   for (const command of writers) {

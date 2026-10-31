@@ -69,7 +69,7 @@ import {
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { admitRun, agentsCustomRun, policyProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
-import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
+import { inboxAddRun, inboxQueueRun, startRun } from './start.ts';
 import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
 
 /** How often `nemia watch` reads the lease for its liveness. */
@@ -355,7 +355,7 @@ function watchVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
 export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
 /**
- * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `nemia plan`); `nemia rm` and `nemia prune`,
+ * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
  * `nemia agents custom`, `nemia factory instruct`, `nemia policy propose`, `nemia agents write`, `nemia skills write` and
  * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; and `nemia admit`, whose
@@ -368,7 +368,6 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => 
   ['rm', rmVerb],
   ['prune', pruneVerb],
   ['start', startRun],
-  ['plan', planRun],
   ['inbox add', inboxAddRun],
   ['inbox queue', inboxQueueRun],
   ['agents custom', agentsCustomRun],

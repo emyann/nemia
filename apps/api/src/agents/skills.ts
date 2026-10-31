@@ -132,13 +132,13 @@ export function foundInOf(dir: string, repo: string, home: string): string | nul
 
 /**
  * The board's skill library in the package's table, each entry served on the api alone: the skill folders listed, each read
- * (`skills list`), one skill read for its page (`skills read`), and one of yours written or copied (`skills write`).
+ * (`skills`), one skill read for its page (`skills show`), and one of yours written or copied (`skills write`).
  */
-const LIST = COMMANDS.find((c) => c.name === 'skills list')!;
-const READ = COMMANDS.find((c) => c.name === 'skills read')!;
+const LIST = COMMANDS.find((c) => c.name === 'skills')!;
+const READ = COMMANDS.find((c) => c.name === 'skills show')!;
 const WRITE = COMMANDS.find((c) => c.name === 'skills write')!;
 
-/** Each skill folder of `dirs` read now, through the table's `skills list`, by folder. */
+/** Each skill folder of `dirs` read now, through the table's `skills`, by folder. */
 const readsOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[]) =>
   (await runPlaced(placeService, e, LIST.handler({ skills: dirs }))) as Record<string, SkillRead>;
 

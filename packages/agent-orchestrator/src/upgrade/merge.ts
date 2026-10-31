@@ -5,7 +5,7 @@
  * step; a markdown file's frontmatter by key and its body by line; any other text by line (`diff3Lines`). A conflict is named by its
  * address, its id on the command line: `<path>` for the whole file, `<path>#<key>` for a frontmatter key, `factory.json#hires.<w>/<s>`
  * for a hire, `<path>:<a>-<b>` for base lines. The person's choices are composed into the tree's files (`compose`), and the merge said as
- * `nemia factory plan` prints it (`planLines`). Pure.
+ * `nemia factory diff` prints it (`planLines`). Pure.
  */
 import { diff3Lines, linesOf } from './lines.ts';
 
@@ -357,7 +357,7 @@ export const conflictCut = (conflict: Conflict, max = KEPT_LINES): Conflict => {
     at: conflict.at,
     base: cutSide(conflict.base, max, `applied/${file}`),
     ours: cutSide(conflict.ours, max, `tree/${file}`),
-    theirs: cutSide(conflict.theirs, max, `${file} as the template renders it (nemia factory plan)`),
+    theirs: cutSide(conflict.theirs, max, `${file} as the template renders it (nemia factory diff)`),
   };
 };
 
@@ -370,7 +370,7 @@ function sideLines(name: string, text: string | null): string[] {
   return [`    ${name}:`, ...linesOf(text).map((line) => `      | ${line.replace(/\n$/, '')}`)];
 }
 
-/** What `nemia factory plan` prints of the merge of `name`'s upgrade from `from` to `to`: what merges cleanly, then each conflict. */
+/** What `nemia factory diff` prints of the merge of `name`'s upgrade from `from` to `to`: what merges cleanly, then each conflict. */
 export function planLines(name: string, from: string, to: string, merge: TreeMerge): string[] {
   const lines = [`${name}: ${from} → ${to}`, `merges cleanly: ${merge.merged.length}`];
   for (const merged of merge.merged) lines.push(`  ${merged.at}  from ${FROM[merged.from]}`);

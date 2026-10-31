@@ -92,7 +92,7 @@ function listLines(list: PolicyList): string[] {
     `proposed at ${p.at}${p.stale ? ', before the custom instruction last changed' : ''}:`,
     ...p.rules.map((r) => `  ${r.id}${r.confirmed ? ' (in force)' : ''}: ${r.words}`),
     ...(p.guidance.length ? ['kept as guidance, which the machinery cannot hold:', ...p.guidance.map((g) => `  ${g}`)] : []),
-    `confirm one with nemia policy confirm ${list.agent} <id> --words '<its words, as read here>'; drop one in force with nemia policy drop ${list.agent} <id>.`,
+    `confirm one with nemia policy confirm ${list.agent} <id> --words '<its words, as read here>'; drop one in force with nemia policy rm ${list.agent} <id>.`,
   ];
 }
 
@@ -250,12 +250,12 @@ export const POLICY_CONFIRM: Command<PolicyList> = {
   print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is in force at auto.`, ...listLines(list)],
 };
 
-/** `nemia policy drop <agent> <id>`: a rule taken out of force, the default among them, the person's; asked of them every time. */
+/** `nemia policy rm <agent> <id>`: a rule taken out of force, the default among them, the person's; asked of them every time. */
 export const POLICY_DROP: Command<PolicyList> = {
-  name: 'policy drop',
+  name: 'policy rm',
   usage: '<agent> <id>',
   help: ['take a rule out of force, the default among them: what it allowed is', 'asked of you again. Asked of you every time'],
-  spec: ruleSpec('policy drop'),
+  spec: ruleSpec('policy rm'),
   check: (args) => agentNameRefusal(agentIn(args)) ?? null,
   writes: true,
   class: 'ask',

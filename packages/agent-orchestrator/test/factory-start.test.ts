@@ -177,7 +177,7 @@ function aPlanOf(build: string): string {
   return dir;
 }
 
-/** The runs `nemia plan` started: the records written since `before`. */
+/** The runs `nemia start <folder>` started: the records written since `before`. */
 const plannedRuns = (before: readonly string[]) =>
   runsWritten()
     .filter((f) => f.endsWith('.json') && !before.includes(f))
@@ -399,19 +399,22 @@ test('a factory from nothing to a run: filed, given workflows, hires and a sched
     },
   );
 
-  await s.test('as shipped, `nemia plan` runs every card in the factory alone holding its folder, or in --factory', async (sub) => {
-    asShipped(sub);
-    const before = runsWritten();
-    await typedFrom(a, ['plan', aPlanOf(build)]);
-    const found = plannedRuns(before);
-    assert.equal(found.length, 2);
-    for (const r of found) assert.deepEqual([r.factory, r.repo], ['pipao', a]);
-    const between = runsWritten();
-    await typedFrom(ROOT, ['plan', aPlanOf(build), '--factory', 'mono']);
-    const named = plannedRuns(between);
-    assert.equal(named.length, 2);
-    for (const r of named) assert.deepEqual([r.factory, r.repo], ['mono', readFactory('mono').repos[0]]);
-  });
+  await s.test(
+    'as shipped, `nemia start <folder>` runs every card in the factory alone holding its folder, or in --factory',
+    async (sub) => {
+      asShipped(sub);
+      const before = runsWritten();
+      await typedFrom(a, ['start', aPlanOf(build)]);
+      const found = plannedRuns(before);
+      assert.equal(found.length, 2);
+      for (const r of found) assert.deepEqual([r.factory, r.repo], ['pipao', a]);
+      const between = runsWritten();
+      await typedFrom(ROOT, ['start', aPlanOf(build), '--factory', 'mono']);
+      const named = plannedRuns(between);
+      assert.equal(named.length, 2);
+      for (const r of named) assert.deepEqual([r.factory, r.repo], ['mono', readFactory('mono').repos[0]]);
+    },
+  );
 
   await s.test('`nemia factory rm` removes the file, its rules and its instruction, and nothing of another factory', async () => {
     const rules = writeRules({ name: 'pipao' }, 'Be kind.');
@@ -606,15 +609,18 @@ test('a start in a factory refused step by step, each naming its fix, until it s
     );
   });
 
-  await s.test('REFUSED as shipped: `nemia plan` where no factory, or two, holds the folder, before its first card starts', async (sub) => {
-    asShipped(sub);
-    const plan = aPlanOf(build);
-    await startRefused(() => typedFrom(aRepo(), ['plan', plan]), 'Invalid', '--factory <name>');
-    const shared = aRepo();
-    filed('c', shared);
-    filed('d', shared);
-    await startRefused(() => typedFrom(ROOT, ['plan', plan, '--repo', shared]), 'Invalid', '--factory c, or --factory d');
-  });
+  await s.test(
+    'REFUSED as shipped: `nemia start <folder>` where no factory, or two, holds the folder, before its first card starts',
+    async (sub) => {
+      asShipped(sub);
+      const plan = aPlanOf(build);
+      await startRefused(() => typedFrom(aRepo(), ['start', plan]), 'Invalid', '--factory <name>');
+      const shared = aRepo();
+      filed('c', shared);
+      filed('d', shared);
+      await startRefused(() => typedFrom(ROOT, ['start', plan, '--repo', shared]), 'Invalid', '--factory c, or --factory d');
+    },
+  );
 
   await s.test('REFUSED: `nemia start --factory default`, with WF_DEFAULT_FACTORY_STARTS=1 and as shipped', async (sub) => {
     const typed = ['start', 'x', '--workflows', build, '--factory', 'default', '--no-worktree'];

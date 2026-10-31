@@ -119,10 +119,10 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
  * that the tick never starts it again, even once the run is forgotten.
  *
  * The brief is `brief`, or else the card's body. The workflow is `workflow`, else the card's `workflow:` — found from the inbox folder as
- * `nemia plan` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming the
- * repository's workflows. The factory is `factory`, else the card's `factory:`. The repository is `repo`, else the
- * card's `repo:`, else the factory's one repository, else `callerRepo` (`repoFor`), chosen before the workflow is found in it; `start()`
- * judges the factory. The run is gated at the card's `gate:` and at `gates`, the card's first; a step both name is gated once.
+ * `nemia start <folder>` finds a card's from its plan folder: a name under the repository's `workflows/`, or a path — else refused, naming
+ * the repository's workflows. The factory is `factory`, else the card's `factory:`. The repository is `repo`, else the card's `repo:`, else
+ * the factory's one repository, else `callerRepo` (`repoFor`), chosen before the workflow is found in it; `start()` judges the factory. The
+ * run is gated at the card's `gate:` and at `gates`, the card's first; a step both name is gated once.
  *
  * The record is written first, so taking `queued:` off, should it fail, leaves a card the record keeps out of the queue; it says so in
  * `queueLeft`. A started card is not started again (`startedRefusal`). Refused by name before anything

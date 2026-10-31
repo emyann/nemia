@@ -1,13 +1,14 @@
 import { Fragment, type ReactNode } from 'react';
 import type { RunDetail } from '../lib/api';
-import { needsOf, needText, offersOf, stepAnchor } from '../lib/asks';
+import { askedOf, needsOf, needText, offersOf, stepAnchor, type OfferKind } from '../lib/asks';
 import { onYouOf, toDecideOf } from '../lib/factory';
 import { Continue } from './Decide';
 import { Markdown } from './Markdown';
 import { container } from '../lib/meaning';
 
-/** The line that continues `step` from a terminal, as the api answers it on the step (`commands.retry`); none for a step the run lacks. */
-const retryLineOf = (run: RunDetail, step: string): string => run.steps.find((s) => s.name === step)?.commands.retry ?? '';
+/** The line of an offer's command (`kind`) for its step, as the api answers it on the step (`commands`); none for a step the run lacks. */
+const lineOf = (run: RunDetail, offer: { step: string; kind: OfferKind }): string =>
+  run.steps.find((s) => s.name === offer.step)?.commands[offer.kind] ?? '';
 
 /**
  * A banner's link to the step `step`, saying `children`: a button calling `onStep` with the step where one is given, as in the frame's bar,
@@ -74,12 +75,12 @@ function NeedWords({ need }: { need: ReturnType<typeof needsOf>[number] }) {
  * the wait: in Claude Code, and never from here. A session the harness blocked is continued from here, as the CLI's `retry` continues it
  * (`Continue`); once that try is asked, the banner says what the tick does with it, in the CLI `ls`'s words: the step's note.
  *
- * Who it waits on is said as the CLI's `ls` says it after `→ waiting on you:` (`onYou`): a step's name, and for a step at its gate,
- * `approve plan`, linked to the step's section, where Approve and Send back are. Without the ending step whose gate the to-decide banner
- * says (`onYouOf`), which is above this one and names it: the CLI's `ls` does not ask for the same step twice. A run whose whole `waiting
- * on you` was that step has no banner here at all. A link to a step's section is a hash the browser scrolls to, and no navigation, or given
- * `onStep` a button calling it with the step (`StepLink`). A step at its gate is said in the line alone: its approval is no question to
- * list under it.
+ * Who it waits on is said as the CLI's `ls` says it after `→ waiting on you:` (`waitingOnYouWords`): a step's name, and for a step at its
+ * gate, `approve plan`, linked to the step's section, where Approve and Send back are. Without the ending step whose gate the to-decide
+ * banner says (`onYouOf`), which is above this one and names it: the CLI's `ls` does not ask for the same step twice. A run whose whole
+ * `waiting on you` was that step has no banner here at all. A link to a step's section is a hash the browser scrolls to, and no navigation,
+ * or given `onStep` a button calling it with the step (`StepLink`). A step at its gate is said in the line alone: its approval is no
+ * question to list under it.
  *
  * A question is answered from the Decide section; a session the harness blocked, here. Under such a session, what a person does about the
  * wait, in the package's words (`answerIn`): the harness answers it, and this board does not — Continue only asks the tick for another try.
@@ -88,7 +89,9 @@ function NeedWords({ need }: { need: ReturnType<typeof needsOf>[number] }) {
 export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: string) => void }) {
   const needs = needsOf(run).filter((need) => need.kind !== 'approve');
   const said = onYouOf(run);
-  const asks = run.waitingOnYou.map((step, i) => ({ step, said: run.onYou[i] ?? step })).filter((one) => said.includes(one.said));
+  const asks = run.waitingOnYou
+    .map((step, i) => ({ step, said: run.waitingOnYouWords[i] ?? step }))
+    .filter((one) => said.includes(one.said));
   if (!asks.length && !needs.length) return null;
   const offers = offersOf(run);
   return (
@@ -118,18 +121,19 @@ export function NeedsBanner({ run, onStep }: { run: RunDetail; onStep?: (step: s
         <ul className="space-y-2">
           {needs.map((need) => {
             const offer = need.kind === 'harness' ? offers.find((o) => o.step === need.step) : undefined;
+            const asked = need.kind === 'harness' ? askedOf(run, need.step) : null;
             return (
               <li key={need.step} data-need={need.kind} data-step={need.step} className="space-y-1.5">
                 <NeedWords need={need} />
-                {need.kind === 'harness' && need.waitingFor && offer?.kind !== 'asked' && (
+                {need.kind === 'harness' && need.waitingFor && !asked && (
                   <p data-advice className="break-words text-body-small">
                     {need.waitingFor.advice}
                   </p>
                 )}
-                {offer?.kind === 'continue' && <Continue runId={run.id} step={need.step} line={retryLineOf(run, need.step)} />}
-                {offer?.kind === 'asked' && (
+                {offer?.case === 'continue' && <Continue runId={run.id} step={need.step} line={lineOf(run, offer)} />}
+                {asked && (
                   <p data-note className="font-mono text-body-small">
-                    {offer.note ?? `try ${offer.try} asked`}
+                    {asked.note ?? `try ${asked.try} asked`}
                   </p>
                 )}
               </li>

@@ -1,5 +1,5 @@
 /**
- * The library's writers' ground — `nemia agents write`, `agents remove`, `agents try`, `skills write`, `workflows write` and `workflows
+ * The library's writers' ground — `nemia agents write`, `agents rm`, `agents run`, `skills write`, `workflows write` and `workflows
  * remove`. Where they write: yours, in the store, never a checkout; and, for a writer that takes `--factory`, the tree of a factory made
  * from a template (`factory`). An agent, a workflow or a skill is written into `<home>/workflows/{agents,<name>,skills}`, or the same
  * under the factory's tree, and one named in the repository (`repo`) is refused with the copy a person makes by hand,

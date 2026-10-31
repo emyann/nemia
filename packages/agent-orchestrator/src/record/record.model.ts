@@ -100,8 +100,8 @@ export type Step = typeof Step.Type;
 
 /**
  * A loop asked round again by a person (`RoundAsk`, read off `runs/<id>.asks/round-<step>-<n>` by `roundAskIn` in record.store.ts):
- * the looping step, the round, the cap `--budget` raised, when, and the merge `nemia merge` asks with it. Beside the record, not in
- * it; a loop's own round is a try moved behind with `cause: 'round'`.
+ * the looping step, the round, the cap `--budget` raised, when, and the merge `nemia refresh --base` asks with it. Beside the record, not
+ * in it; a loop's own round is a try moved behind with `cause: 'round'`.
  */
 export const Round = Schema.Struct({
   step: StepName.OnRead,

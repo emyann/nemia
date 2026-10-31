@@ -673,7 +673,7 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
   const early = await refusal(runWith(b.e, roundRun(run.id)));
   assert.match(
     early,
-    /^review asked for round 4, and a person accepted its work as it stands at .*Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — accept-review-3, in the run's \.asks directory — then ask again: nemia round /,
+    /^review asked for round 4, and a person accepted its work as it stands at .*Nothing waiting on it has been filed yet, so to go round once more after all, take that acceptance back first — accept-review-3, in the run's \.asks directory — then ask again: nemia retry \S+ review --round\.$/,
     'before a tick has acted on it, taking the acceptance back is the way back into the loop: nothing was done on its strength',
   );
 
@@ -685,7 +685,7 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
   const late = await refusal(runWith(b.e, roundRun(run.id)));
   assert.match(
     late,
-    /^review asked for round 4, and a person accepted its work as it stands at .* \(nemia accept\), so its loop is over on their word and there is nothing to go round again\. What waits on it has been filed: nemia ls /,
+    /^review asked for round 4, and a person accepted its work as it stands at .* \(nemia approve\), so its loop is over on their word and there is nothing to go round again\. What waits on it has been filed: nemia ls /,
     'once a tick has acted on it, docs has run on the work and taking the word back takes none of that back: the refusal says what there is',
   );
   assert.doesNotMatch(late, /take that acceptance back|\.asks directory/, 'and does not send them to delete it');
@@ -1252,7 +1252,7 @@ const aParent = async (
 const runsWritten = () => fs.readdirSync(path.join(ROOT, 'runs')).length;
 const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 
-test("REFUSED by name at shipped defaults: a file at an ask's name that is not an ask — `nemia retry` and `nemia round` name it and say to delete it, never to wait for an ask no pass honours", async () => {
+test("REFUSED by name at shipped defaults: a file at an ask's name that is not an ask — `nemia retry` and `nemia retry --round` name it and say to delete it, never to wait for an ask no pass honours", async () => {
   const { run, e, filings } = await throughCheck('check: npm test', 'failed', 1);
   const file = path.join(asksDir(run.id), 'retry-implement-2');
   fs.mkdirSync(asksDir(run.id), { recursive: true });
@@ -1290,7 +1290,7 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
     runWith(b.e, roundRun(looping.id)),
     refusedWith(
       new RegExp(
-        `^round 2 of review's loop cannot be asked for: ${escaped(roundFile)} is already there, and it is not an ask — it is not an ask nemia round wrote\\. .*Delete it \\(rm ${escaped(roundFile)}\\), then ask again: nemia round ${escaped(looping.id)} review\\.$`,
+        `^round 2 of review's loop cannot be asked for: ${escaped(roundFile)} is already there, and it is not an ask — it is not an ask nemia retry --round wrote\\. .*Delete it \\(rm ${escaped(roundFile)}\\), then ask again: nemia retry ${escaped(looping.id)} review --round\\.$`,
       ),
     ),
   );
@@ -1388,7 +1388,7 @@ test("REFUSED by the engine: a try's stop of a session that settled since the pa
   assert.deepEqual([first.tried, first.filed], [[], []], 'nothing filed on the read the refusal proved stale');
   assert.ok(
     first.notes.includes(
-      `implement: try 2 — nemia retry --nudge; its harness blocked its session, but the engine did not take the stop (stop: \`${taskId}\` has settled (stopped): there is nothing left to stop.), and the try is filed once it has settled`,
+      `implement: try 2 — nemia retry --continue; its harness blocked its session, but the engine did not take the stop (stop: \`${taskId}\` has settled (stopped): there is nothing left to stop.), and the try is filed once it has settled`,
     ),
     first.notes.join('\n'),
   );
@@ -1579,7 +1579,7 @@ const rejection = (p: Promise<unknown>, what: string): Promise<unknown> =>
     (x: unknown) => x,
   );
 
-test('the programs of `nemia round`, `nemia accept`, `nemia retry`, `nemia approve`, `nemia say` and `nemia cancel`, given the engine as a service, answer what their plain faces answer on the same store: each face runs its program and adds nothing', async (t) => {
+test('the programs of `nemia retry`, with `--round` and without, `nemia approve`, of a loop and at a gate, `nemia say` and `nemia cancel`, given the engine as a service, answer what their plain faces answer on the same store: each face runs its program and adds nothing', async (t) => {
   const v = await verbPrograms();
   const { cancelFile } = await import('../src/record/record.store.ts');
   const at = Date.parse('2026-09-30T08:00:00.000Z');
@@ -1604,13 +1604,13 @@ test('the programs of `nemia round`, `nemia accept`, `nemia retry`, `nemia appro
   await toReview(b, run.id, 3, true);
   await runWith(b.e, advanceRun(readRun(run.id)));
   await same(
-    'nemia round',
+    'nemia retry --round',
     () => v.over(b.e, v.roundRun(run.id)),
     () => runWith(b.e, roundRun(run.id)),
   );
   fs.rmSync(path.join(asksDir(run.id), 'round-review-4'));
   await same(
-    'nemia accept',
+    'nemia approve of a loop',
     () => v.over(b.e, v.acceptRun(run.id, undefined, ENOUGH)),
     () => runWith(b.e, acceptRun(run.id, undefined, ENOUGH)),
   );
@@ -1674,7 +1674,7 @@ test('REFUSED as a typed failure: a run not there is a `Missing`, and a state th
   );
   assert.equal(
     await recovered(b.e, v.acceptRun('no-such-run', undefined, ENOUGH), 'Missing'),
-    'no such run: no-such-run. nemia accept takes a run by its id, as nemia ls lists it: nemia accept <runId> [<step>] --message "<why>".',
+    'no such run: no-such-run. nemia approve takes a run by its id, as nemia ls lists it: nemia approve <runId> [<step>] --message "<why>".',
   );
 
   const run = await started(looped());
@@ -1682,7 +1682,7 @@ test('REFUSED as a typed failure: a run not there is a `Missing`, and a state th
   b.settle(`${run.id}-implement`, 'running');
   const refusals: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, Promise<unknown>]> = [
     ['nemia retry', v.retryRun(run.id, 'implement', { mode: 'fresh' }), runWith(b.e, retryRun(run.id, 'implement', { mode: 'fresh' }))],
-    ['nemia round', v.roundRun(run.id), runWith(b.e, roundRun(run.id))],
+    ['nemia retry --round', v.roundRun(run.id), runWith(b.e, roundRun(run.id))],
     ['nemia approve', v.approveRun(run.id, 'implement', 'ok'), runWith(b.e, approveRun(run.id, 'implement', 'ok'))],
   ];
   for (const [what, program, face] of refusals) {
@@ -1698,8 +1698,8 @@ test("REFUSED as a typed failure: a record the store refuses to read is each pro
   const e = board().e;
   fs.writeFileSync(path.join(ROOT, 'runs', 'garbled.json'), '{ not json');
   const programs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>]> = [
-    ['nemia round', v.roundRun('garbled')],
-    ['nemia accept', v.acceptRun('garbled', undefined, ENOUGH)],
+    ['nemia retry --round', v.roundRun('garbled')],
+    ['nemia approve of a loop', v.acceptRun('garbled', undefined, ENOUGH)],
     ['nemia retry', v.retryRun('garbled', 'implement', { mode: 'fresh' })],
     ['nemia approve', v.approveRun('garbled', 'implement')],
     ['nemia say', v.sayRun('garbled', 'implement', 'hello')],
@@ -1730,8 +1730,8 @@ test('a journal that does not read is a defect of each program, which no `Effect
     view: () => Effect.die(boom),
   };
   const verbs: Array<[string, EffectOf<unknown, Refusal, EngineService | PlaceService | StoreRoot>, () => Promise<unknown>]> = [
-    ['nemia round', v.roundRun(run.id), () => runWith(broken, roundRun(run.id))],
-    ['nemia accept', v.acceptRun(run.id, undefined, ENOUGH), () => runWith(broken, acceptRun(run.id, undefined, ENOUGH))],
+    ['nemia retry --round', v.roundRun(run.id), () => runWith(broken, roundRun(run.id))],
+    ['nemia approve of a loop', v.acceptRun(run.id, undefined, ENOUGH), () => runWith(broken, acceptRun(run.id, undefined, ENOUGH))],
     [
       'nemia retry',
       v.retryRun(run.id, 'implement', { mode: 'fresh' }),

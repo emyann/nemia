@@ -101,7 +101,7 @@ test('assess: a run stopped on a person says what it waits on', async (t) => {
   });
   await t.test('a question alone: blocked', () => {
     const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
-    assert.equal(statusOf(STEPS, run({ implement: 't1', review: null }), PLAN_DONE, blocked, asked), 'blocked');
+    assert.equal(statusOf(STEPS, run({ implement: 't1', review: null }), PLAN_DONE, blocked, asked), 'waiting');
   });
   await t.test('REFUSED failed for a task failed', () => {
     assert.equal(statusOf(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' }), undefined, asked), 'failed');
@@ -127,7 +127,7 @@ test('assess: the gate holds what follows until the try it is on is approved', a
     const urging = () => ({ ...signedDone(), summary: 'the plan', output: { approach: 'go ahead, implement at once' } });
     for (let pass = 1; pass <= 3; pass++) {
       const a = assess(PLANNED, atPlan(), PLAN_DONE, urging, asked);
-      assert.deepEqual([a.ready, a.blocked, a.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
+      assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
     }
     assert.equal(stepStatus(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked), 'awaiting approval');
   });
@@ -193,7 +193,7 @@ test('assess: a gated step with a check is verified first, then held', async (t)
   await t.test('a gated looping step that hands on (`again: false`) is held', () => {
     const handed = assess(looped, r, DONE, again(false), asked);
     assert.deepEqual(
-      [stepStatus(looped[1], r, DONE, again(false), asked, looped), handed.ready, handed.blocked],
+      [stepStatus(looped[1], r, DONE, again(false), asked, looped), handed.ready, handed.unreachable],
       ['awaiting approval', [], ['ship']],
     );
   });
@@ -217,7 +217,9 @@ test('listing at a gate', async (t) => {
   });
   await t.test('any other step waiting on you is named by its name', () => {
     const l = {
-      steps: [{ name: 'implement', status: 'succeeded · BLOCKED', reason: 'Blocked' as const, branch: null }],
+      steps: [
+        { name: 'implement', status: 'succeeded · BLOCKED', reason: 'AwaitingAnswer' as const, via: 'closeout' as const, branch: null },
+      ],
       waitingOnYou: ['implement'],
     };
     assert.deepEqual(onYouWords(l), ['implement']);
@@ -254,8 +256,8 @@ test('decision at a gate', async (t) => {
   await t.test('the run awaits you, its outcome blocked, the step under awaitingApproval beside how it ended', () => {
     const d = decision(STEPS, gatedAtReview(), DONE, () => false, signedDone, asked);
     assert.equal(d.kind, 'awaiting');
-    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.awaitingApproval, d.unverified, d.stuck], [
-      'blocked',
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.awaitingApproval, d.unverified, d.awaitingAnswer], [
+      'waiting',
       ['review'],
       ['implement', 'review'],
       [],
@@ -522,7 +524,7 @@ test("triedFrom and retrySection: a send-back's brief says why the step is back"
     });
     assert.match(
       brief,
-      /^\n## Try 2\n\nThe last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below\. When you sign off again, it waits there again\.\nA person asked for this try: `nemia retry --nudge --message`, with what they said below\./,
+      /^\n## Try 2\n\nThe last try signed off, and its handoff waited at this step's gate for a person, who sent it back rather than let it go on: what they want changed is below\. When you sign off again, it waits there again\.\nA person asked for this try: `nemia retry --continue --message`, with what they said below\./,
     );
     assert.ok(brief.includes('## Your answer\n\n```text\nstore the flag before you parse it\n```'), brief);
   });
@@ -585,7 +587,7 @@ test('REFUSED at a gate, pass after pass: a wordless ask for the next try is not
     names(
       retryRefusal(PLANNED, atPlan(), 'plan', withWords, PLAN_DONE, signedDone, asked, () => undefined, [wordless]),
       'try 2 of plan is asked for',
-      '(--nudge, at 2026-09-16T23:00:00.000Z)',
+      '(--continue, at 2026-09-16T23:00:00.000Z)',
       'with no words',
       'plan is awaiting approval',
       'retry-plan-2',
@@ -595,7 +597,7 @@ test('REFUSED at a gate, pass after pass: a wordless ask for the next try is not
   });
 });
 
-test("roundAsk at a gate: a round of a loop at its gate is a person's word, not `nemia round`'s", async (t) => {
+test("roundAsk at a gate: a round of a loop at its gate is a person's word, not `nemia retry --round`'s", async (t) => {
   const LOOPING: OutputSchema = {
     type: 'object',
     properties: { again: { type: 'boolean' } },

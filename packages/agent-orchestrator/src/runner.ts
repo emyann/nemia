@@ -173,7 +173,7 @@ export {
   workflowReadme,
   workflowsIn,
 } from './folder/folder.store.ts';
-export { cardSkills, isShippedPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
+export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
 export type { Places } from './skills/read.store.ts';
 export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
 export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './agents/custom.store.ts';
@@ -233,7 +233,8 @@ export {
   STEP_PHASES,
   STEP_REASONS,
 } from './feed/index.ts';
-export type { FeedLine, FeedPublished, Reason, RunPhase, RunReason, StepPhase, StepReason } from './feed/index.ts';
+export type { AnswerVia, FeedLine, FeedPublished, Reason, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from './feed/index.ts';
+export { formerHints } from './former-reason/former-reason.ts';
 export { BOOKMARK_EVERY, bookmarkLine, DEFAULT_SELECTORS, subscriptionNameRefusal, watchedLine } from './subscription/index.ts';
 export {
   LABEL_KEYS,
@@ -337,7 +338,7 @@ export { evictedBy } from './rest/index.ts';
 export { removeAgent, writeAgent } from './agents/agents.store.ts';
 export { copySkill, givenSkills, skillDirIn, skillFolders, skillRead, skillText, writeSkill } from './skills/skills.store.ts';
 export { PlaceService, type Place } from './place/place.store.ts';
-export { gitPlaceLayer, shipped, shippedGitPlace } from './place/shipped.store.ts';
+export { builtin, builtinGitPlace, gitPlaceLayer } from './place/builtin.store.ts';
 export { briefNow } from './tick/told.verb.ts';
 export type {
   BranchStood,
@@ -466,7 +467,7 @@ export { COMMANDS, TABLE } from './command/commands.verb.ts';
 export { admitted } from './admission/admit.verb.ts';
 export { PRUNE, RM } from './command/runs.verb.ts';
 export { LOGS, STATS } from './command/reads.verb.ts';
-export { START } from './start/commands.verb.ts';
+export { folderRefusal, START } from './start/commands.verb.ts';
 export { INBOX, INBOX_ADD, INBOX_QUEUE } from './inbox/commands.verb.ts';
 export { FACTORY } from './factory/factory.verb.ts';
 export { FACTORY_INSTRUCT, FACTORY_INSTRUCTION, factoryInstruction } from './factory/instruction.verb.ts';
@@ -475,9 +476,9 @@ export { FACTORY_RULES, factoryRules } from './rules/rules.verb.ts';
 export { FACTORY_SERVERS } from './servers/servers.verb.ts';
 export type { ServerListed, ServersListing } from './servers/servers.verb.ts';
 export { serverNameRefusal } from './servers/index.ts';
-export type { ShippedServer } from './servers/index.ts';
-export { shippedServers } from './servers/servers.store.ts';
-/** A factory's server signed in to and out of from the board, through the engine; the shipped secret stays inside the package. */
+export type { BuiltinServer } from './servers/index.ts';
+export { builtinServers } from './servers/servers.store.ts';
+/** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
 export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-in.verb.ts';
 export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.verb.ts';
 export type { FactoryRules } from './rules/rules.verb.ts';
@@ -524,6 +525,7 @@ export {
 } from './summary/reads.verb.ts';
 export type { Filings, TaskView, Unreadable, Views } from './summary/reads.verb.ts';
 export { holdingOf, judge, needsOf, runSaid, runWaitingOf, spentOf, standingsOf, stepSaid, wordOf } from './summary/judged.verb.ts';
+export { atHarness } from './summary/judged.verb.ts';
 export type { GitAsked, JudgeHow, RunHolding, RunStatus, RunToDecide, RunWaiting, Spent, StepNeeds } from './summary/judged.verb.ts';
 export { restingMemo, restingRead } from './rest/resting.verb.ts';
 export type { RestingMemo, RestingRead } from './rest/resting.verb.ts';

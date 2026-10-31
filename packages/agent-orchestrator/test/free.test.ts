@@ -313,7 +313,7 @@ test(
           const pass = await tick();
           assert.deepEqual(
             ids.map((id) => answerOf(pass, id)?.status),
-            ['awaiting approval', 'blocked', 'running'],
+            ['awaiting approval', 'waiting', 'running'],
             'a gate waiting on a person reads so, and a blocked step blocked: neither failed',
           );
           assert.equal(answerOf(pass, gated.id)?.feed.atRest, true, 'and the gated run is at rest: its status alone keeps it');

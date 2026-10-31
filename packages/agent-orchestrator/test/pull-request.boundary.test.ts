@@ -298,23 +298,62 @@ test('REFUSED: a pull request whose head is another commit, and none open at all
   assert.ok(unopened.err.includes('--body-file "$WF_STEP_FILES/pr-body.md"'), unopened.err);
 });
 
-test('wait polls the ci context until it has a verdict, and passes on a green one', () => {
+test('wait reads mergeable again while GitHub computes it, polls the ci context until it has a verdict, and passes on a green one; REFUSED at once: a conflicting head', () => {
   const at = placed();
+  const head = gitIn(at.repo, 'rev-parse', 'HEAD').trim();
+  const computing = (then: string): Rule => ({
+    when: 'pr list',
+    outs: [listed(head, { mergeable: 'UNKNOWN' }), listed(head, { mergeable: then })],
+  });
   const pending: Rule = { when: 'pr view', outs: [rollup({ status: 'QUEUED' }), rollup({ status: 'IN_PROGRESS' }), GREEN] };
-  at.gh.answers([...passing(at.repo).filter((rule) => rule.when !== 'pr view'), pending]);
-  const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0' });
+  const others = passing(at.repo).filter((rule) => rule.when !== 'pr view' && rule.when !== 'pr list');
+  const quick = { WF_CI_POLL_SECONDS: '0', WF_PR_MERGEABLE_POLL_SECONDS: '0' };
+  at.gh.answers([...others, computing('MERGEABLE'), pending]);
+  const r = pr(at, 'wait', [], quick);
   assert.equal(r.code, 0, r.err);
+  assert.equal(asked(r.calls, 'pr', 'list').length, 2, 'an UNKNOWN mergeable is read again until GitHub has computed it');
   assert.equal(asked(r.calls, 'pr', 'view').length, 3, 'it polled until the verdict');
   assert.match(r.out, /wf ci: `ci` passed on/);
   assert.equal(tip(at.bare!, at.branch), null, 'the wait pushes nothing');
+
+  const torn = placed();
+  torn.gh.answers([...others, computing('CONFLICTING'), pending]);
+  const conflicting = pr(torn, 'wait', [], { ...quick, WF_CI_START_SECONDS: '600', WF_CI_WAIT_SECONDS: '600' });
+  assert.equal(conflicting.code, 1, conflicting.out);
+  assert.equal(asked(conflicting.calls, 'pr', 'view').length, 0, 'no ci is waited for on a head that conflicts with its base');
+  assert.ok(conflicting.err.includes('git merge main-worktree/HEAD'), `it names the merge of the base:\n${conflicting.err}`);
+  assert.ok(conflicting.err.includes('node pull-request.ts open --title'), `and the push of the round again:\n${conflicting.err}`);
 });
 
 /** `lines` as a job's log GitHub serves: each line stamped with the time it was printed. */
 const stamped = (lines: string[]): string => lines.map((line) => `2026-10-24T09:00:00.0000000Z ${line}`).join('\n');
 
-test("REFUSED: a red ci, with the Actions URL, the failing jobs, each job's failing tests and their diffs, and the retry line", () => {
+test('REFUSED: a red ci, with the Actions URL, the failing jobs, the lines that failed each job, and the retry line', () => {
   const at = placed();
   const TESTS_URL = CI_URL.replace('/job/5678', '/job/9012');
+  const CHECKS_URL = CI_URL.replace('/job/5678', '/job/3456');
+  const cleanup = [
+    'Post job cleanup.',
+    '[command]/usr/bin/git version',
+    "Temporarily overriding HOME='<runner>/_temp/x' before making global git config changes",
+    'Cleaning up orphan processes',
+  ];
+  const WORKED = 'e2e: FAILED — the inbox page (/inbox) in the dark theme: a card for the ask — none seen';
+  const pastSpawnBuffer = `[w1] visiting page ${'x'.repeat(1024 * 1024)}`;
+  const E2E = 'e2e: FAILED — the runs page (/runs) in the dark theme: a row for the run — none seen';
+  const checks = stamped([
+    "web:typecheck: src/a.ts(3,7): error TS2322: Type 'string' is not assignable to type 'number'.",
+    "  x eslint(no-unused-vars): Variable 'b' is declared but never used.",
+    '   ,-[src/b.ts:1:7]',
+    ' 1 | const b = 1;',
+    ...Array.from({ length: 40 }, (_, i) => `[w1] visiting page ${i}`),
+    pastSpawnBuffer,
+    `[w1] ${E2E}`,
+    E2E,
+    `[w2] ${WORKED}`,
+    'Process completed with exit code 1.',
+    ...cleanup,
+  ]);
   const tests = stamped([
     ...Array.from({ length: 50 }, (_, i) => `agent-orchestrator:test: ✔ a passing test ${i} (1ms)`),
     'agent-orchestrator:test: ✖ the export is pinned (2ms)',
@@ -329,7 +368,7 @@ test("REFUSED: a red ci, with the Actions URL, the failing jobs, each job's fail
     "agent-orchestrator:test:   - 'moved'",
     'agent-orchestrator:test:       at TestContext.<anonymous> (file:///a.test.ts:3:33)',
   ]);
-  const gathered = stamped(['Every job succeeded', 'test: failure', 'Process completed with exit code 1.']);
+  const gathered = stamped(['Every job succeeded', 'test: failure', 'Process completed with exit code 1.', ...cleanup]);
   at.gh.answers([
     ...passing(at.repo).filter((rule) => rule.when !== 'pr view'),
     {
@@ -338,9 +377,11 @@ test("REFUSED: a red ci, with the Actions URL, the failing jobs, each job's fail
         { status: 'COMPLETED', conclusion: 'FAILURE' },
         { name: 'test agent-orchestrator on node 22', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: TESTS_URL },
         { name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS', detailsUrl: CI_URL },
+        { name: 'e2e and types', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: CHECKS_URL },
       ),
     },
     { when: 'actions/jobs/9012/logs', out: tests },
+    { when: 'actions/jobs/3456/logs', out: checks },
     { when: 'actions/jobs/5678/logs', out: gathered },
   ]);
   const r = pr(at, 'wait', [], { WF_CI_POLL_SECONDS: '0', WF_STEP: 'implement' });
@@ -357,11 +398,20 @@ test("REFUSED: a red ci, with the Actions URL, the failing jobs, each job's fail
   assert.ok(!r.err.includes('2026-10-24T09'), `GitHub's stamps are stripped:\n${r.err}`);
   assert.equal(r.err.split('✖ the export is pinned').length - 1, 1, 'a failure repeated in the summary is told once');
   assert.match(r.err, /Process completed with exit code 1\./, 'a job that names no failing test gives its tail');
+  for (const told of ['error TS2322', 'x eslint(no-unused-vars)', ',-[src/b.ts:1:7]'])
+    assert.ok(r.err.includes(told), `a type or lint error, with its place: ${told}\n${r.err}`);
+  const e2eTold = r.err.split(E2E).length - 1;
+  assert.equal(e2eTold, 1, 'one e2e page, from a log past 1 MiB');
+  assert.ok(r.err.includes(WORKED), 'a page told only behind its worker');
+  assert.ok(!r.err.includes('visiting page'), `a job with a failing line gives no tail:\n${r.err}`);
+  for (const noise of ['Post job cleanup', '[command]/usr/bin/git', 'Temporarily overriding HOME', 'Cleaning up orphan processes'])
+    assert.ok(!r.err.includes(noise), `GitHub's post-job lines are no reason: ${noise}\n${r.err}`);
   assert.ok(r.err.includes(RETRY), r.err);
   assert.deepEqual(
     asked(r.calls, 'api').map((call) => call.argv),
     [
       ['api', 'repos/{owner}/{repo}/actions/jobs/9012/logs'],
+      ['api', 'repos/{owner}/{repo}/actions/jobs/3456/logs'],
       ['api', 'repos/{owner}/{repo}/actions/jobs/5678/logs'],
     ],
     'each failing job is read by its id, the gathering `ci` last',

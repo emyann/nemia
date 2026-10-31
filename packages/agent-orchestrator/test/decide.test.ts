@@ -43,7 +43,7 @@ const {
   touchedLines,
   runWith: runEngine,
   gitPlaceLayer,
-  shippedGitPlace,
+  builtinGitPlace,
 } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
@@ -435,7 +435,7 @@ test("what a branch touched is the place's report: a rename at both ends, a bina
     write(repo, 'NOTES', 'one\n');
   });
 
-  const [moved] = changesOf(shippedGitPlace, run, ['wf/moved']);
+  const [moved] = changesOf(builtinGitPlace, run, ['wf/moved']);
   const r = moved.radius;
   assert.ok(!('error' in r), JSON.stringify(r));
   assert.deepEqual(
@@ -460,7 +460,7 @@ test("what a branch touched is the place's report: a rename at both ends, a bina
   assert.match(moved.inFull as string, /^rename from packages\/x\/test\/add\.test\.ts$/m, 'asked by its path, the place shows a rename');
   assert.match(moved.inFull as string, /^rename to packages\/x\/spec\/add\.test\.ts$/m);
 
-  const [gone] = changesOf(shippedGitPlace, run, ['wf/never']);
+  const [gone] = changesOf(builtinGitPlace, run, ['wf/never']);
   const notKnown = `what this run changed is not known: the place has no branch wf/never in ${repo}`;
   assert.deepEqual(gone, { branch: 'wf/never', radius: { error: notKnown }, inFull: { error: notKnown }, notes: { error: notKnown } });
   assert.equal(lessonLine([gone]), 'lesson  not known — wf/never could not be read');
@@ -473,7 +473,7 @@ test("a branch that touched a lint config lists it as check-affecting, with its 
     write(repo, '.oxlintrc.json', '{ "rules": { "no-console": "off" } }\n');
     write(repo, 'packages/x/src/add.ts', 'export const add = (a, b) => a + b + 0;\n');
   });
-  const [lint] = changesOf(shippedGitPlace, run, ['wf/lint']);
+  const [lint] = changesOf(builtinGitPlace, run, ['wf/lint']);
   assert.ok(!('error' in lint.radius), JSON.stringify(lint.radius));
   assert.deepEqual(lint.radius.checkAffecting, ['.oxlintrc.json']);
   assert.match(lint.inFull as string, /^\+\{ "rules": \{ "no-console": "off" \} \}$/m);
@@ -488,7 +488,7 @@ test("the lesson line reads the base's workspaces: a package's docs/ is a lesson
     write(repo, 'packages/x/src/docs/strings.ts', 'export const title = "Docs";\n');
     write(repo, 'packages/x/docs/features.md', 'what is left\n');
   });
-  const read = (branch: string) => lessonLine(changesOf(shippedGitPlace, run, [branch]));
+  const read = (branch: string) => lessonLine(changesOf(builtinGitPlace, run, [branch]));
   assert.equal(read('wf/source-docs'), 'lesson  nothing written where the next agent reads');
   assert.equal(read('wf/package-docs'), 'lesson  packages/x/docs/features.md +1 −0');
 });
@@ -537,7 +537,7 @@ test('`nemia decide` on a try a person answered: its line says so, and under it 
   assert.ok(!asking.some((l) => /^ {4}your answer: |^ {4}try \d+ needs: |answered\)$/.test(l)), 'nothing answered yet');
 
   await runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', message: 'Keep it.\nThe flag is public.' }));
-  indexOf(await screen(t, e, run.id), '  implement: try 2 asked (--nudge, with your answer) — the next tick files it');
+  indexOf(await screen(t, e, run.id), '  implement: try 2 asked (--continue, with your answer) — the next tick files it');
 
   await runWith(e, advanceRun(readRun(run.id)));
   settle(`${run.id}-implement-try2`, 'succeeded', blocked('And the README, too?'));
@@ -924,7 +924,7 @@ test("a run whose one step works in the checkout is not shown the base branch's 
   write(repo, 'CLAUDE.md', 'a lesson somebody else wrote\n');
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', 'another run, merged');
-  const [{ radius: moved }] = changesOf(shippedGitPlace, repositoryRun(readRun(run.id)), ['main']);
+  const [{ radius: moved }] = changesOf(builtinGitPlace, repositoryRun(readRun(run.id)), ['main']);
   assert.ok(
     !('error' in moved) && moved.changes.length === 2,
     `another run's merge moved main under the run, and that diff reads; what is refused is reading it as this run's work: ${JSON.stringify(moved)}`,
@@ -1227,7 +1227,7 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
     '<id>  add sub',
     '',
     '  still running: implement',
-    '  implement: try 2 asked (--nudge, with your answer) — the next tick files it',
+    '  implement: try 2 asked (--continue, with your answer) — the next tick files it',
     '  nothing to decide yet',
   ]);
   await runWith(e, advanceRun(readRun(run.id)));

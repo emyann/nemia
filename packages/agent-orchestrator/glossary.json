@@ -7,6 +7,26 @@
   ],
   "terms": [
     {
+      "term": "Approve",
+      "meaning": "a person's yes at a step's gate, or, with `--message`, to a loop out of rounds, which ends it as it stands, its findings open: `nemia approve`, one of the two verbs that answer a waiting step.",
+      "type": "AskKind",
+      "retired": [
+        {
+          "spelling": "accept",
+          "card": "decision 7: two verbs answer a waiting step, approve and retry"
+        }
+      ],
+      "see": {
+        "label": "A loop and its rounds",
+        "href": "/workflows/#a-loop-and-its-rounds"
+      }
+    },
+    {
+      "term": "Blocked",
+      "meaning": "only a closeout's outcome: the agent signed off unable to go on without an answer, which its step says as reason `AwaitingAnswer`, `via` closeout.",
+      "type": "Closeout"
+    },
+    {
       "term": "Budget",
       "meaning": "the most a step's tries may cost together, in dollars.",
       "see": {
@@ -55,6 +75,16 @@
       }
     },
     {
+      "term": "Diff",
+      "meaning": "what an upgrade of a templated factory would merge, each conflict named, nothing written: `nemia factory diff`, as kubectl's diff previews an apply. `nemia factory plan`, its former name, still runs with a hint.",
+      "retired": [
+        {
+          "spelling": "factory plan",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
+    },
+    {
       "term": "Door",
       "meaning": "the one way an aggregate is read and written: an Effect service whose methods answer Effects failing with a refusal, with a files layer and a memory one held to one table of walks, each refusing a write that breaks the aggregate's invariants. Its pattern is `src/door/door.store.ts`.",
       "type": "DoorOf"
@@ -66,6 +96,31 @@
         "label": "A gate",
         "href": "/workflows/#a-gate"
       }
+    },
+    {
+      "term": "Group list",
+      "meaning": "the list of a group of commands is the group's bare name: `nemia agents`, `nemia inbox`, and the api's `skills` and `workflows`; `ls` is the runs'.",
+      "retired": [
+        {
+          "spelling": "skills list",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        },
+        {
+          "spelling": "workflows list",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
+    },
+    {
+      "term": "Hold",
+      "meaning": "only a person's hold of a run until other runs land (`nemia hold`): the run is pending, reason `Waiting`, `on` run; the runs the hold waits for are its `holdUntil`, on the assessment, the summary and the api's `RunDetail`.",
+      "type": "Run",
+      "retired": [
+        {
+          "spelling": "heldUntil",
+          "card": "4c: what a hold waits for is `holdUntil`"
+        }
+      ]
     },
     {
       "term": "Landed",
@@ -90,6 +145,16 @@
         "label": "The landing",
         "href": "/workflows/#the-landing"
       }
+    },
+    {
+      "term": "Lint",
+      "meaning": "a template's folder judged against the layout's rules, every problem at its line: `nemia template lint`, as helm's lint, so that a check stays a step's. `nemia template check`, its former name, still runs with a hint.",
+      "retired": [
+        {
+          "spelling": "template check",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
     },
     {
       "term": "Loop",
@@ -122,8 +187,13 @@
       }
     },
     {
+      "term": "Pending",
+      "meaning": "not filed yet: a step waiting on the steps before it (reason `Pending`, status `pending`), or held back by a thing (reason `Waiting`, `on` a run, the limit, the checkout or the pause).",
+      "type": "WaitOn"
+    },
+    {
       "term": "Phase",
-      "meaning": "where a step stands, in one closed set (pending, running, waiting, succeeded, failed, stopped), and a run in the same with cancelled (`RunPhase`), read off its reason by `PHASE_OF`; phase waiting is a step that waits on a person, never reason `Waiting`, which is a step not filed yet and so phase pending.",
+      "meaning": "where a step stands, in one closed set (pending, running, waiting, succeeded, failed, stopped), and a run in the same with cancelled (`RunPhase`), read off its reason by `PHASE_OF`; phase waiting is a wait on a person and nothing else, and a wait on a thing — reason `Waiting`, with what it waits on (`on`) — is phase pending.",
       "type": "StepPhase",
       "see": {
         "label": "A step",
@@ -175,8 +245,26 @@
       }
     },
     {
+      "term": "Rm",
+      "meaning": "the one spelling of a removal: `nemia rm` of a run, `agents rm`, `workflows rm`, `policy rm`, `inbox rm`, `factory rm`; the api answers each on DELETE. `agents remove`, `workflows remove` and `policy drop`, their former names, still run with a hint.",
+      "retired": [
+        {
+          "spelling": "agents remove",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        },
+        {
+          "spelling": "workflows remove",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        },
+        {
+          "spelling": "policy drop",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
+    },
+    {
       "term": "Round",
-      "meaning": "one more try of a loop's steps, when a reviewer asks for more.",
+      "meaning": "one more try of a loop's steps, when a reviewer asks for more, or a person past its last (`nemia retry --round`).",
       "type": "Round",
       "see": {
         "label": "A loop and its rounds",
@@ -193,6 +281,16 @@
       }
     },
     {
+      "term": "Run an agent",
+      "meaning": "a one-off of an agent of yours on a brief, with no repository: `nemia agents run`, as kubectl's run. `nemia agents try`, its former name, still runs with a hint.",
+      "retired": [
+        {
+          "spelling": "agents try",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
+    },
+    {
       "term": "Run door",
       "meaning": "the run's door: its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it, by `RunId`; the files by default, the memory stand-in where a test gives it. The run store (`RunStore`) is what is left of it outside: the inbox, the Card door's seam, and the callers still to move.",
       "type": "RunDoor"
@@ -201,6 +299,26 @@
       "term": "RunId",
       "meaning": "a run's id, as `nemia start` mints it from the brief: lowercase letters, digits and dashes.",
       "type": "RunId"
+    },
+    {
+      "term": "Show",
+      "meaning": "the one spelling of a read of one thing: `nemia show` of a run, the api's `skills show` and `inbox show`.",
+      "retired": [
+        {
+          "spelling": "skills read",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
+    },
+    {
+      "term": "Start",
+      "meaning": "a run of a brief, a card, or a folder of cards (a plan, a run per card, parents first): `nemia start`. `nemia plan <folder>`, its former name, still runs with a hint.",
+      "retired": [
+        {
+          "spelling": "nemia plan",
+          "card": "decision 8: one spelling to list, to read one thing, and to remove"
+        }
+      ]
     },
     {
       "term": "Step",
@@ -213,7 +331,7 @@
     },
     {
       "term": "Step status",
-      "meaning": "the record's own word for a step, inside the orchestrator alone: `REASON_OF` maps each to a reason, and it crosses no door.",
+      "meaning": "the record's own word for a step, inside the orchestrator: `REASON_OF` maps each to a reason, and the reason is what a door says; it crosses one door still, as the api's `StepRaise.own`. A step not filed is `pending`, as its reason says; it was `waiting` before card 4c, and a feed line of then still reads as `Pending`.",
       "type": "StepStatus",
       "see": {
         "label": "A step",
@@ -260,6 +378,52 @@
       "term": "TryNumber",
       "meaning": "a try's number within its step, from 1.",
       "type": "TryNumber"
+    },
+    {
+      "term": "Unreachable",
+      "meaning": "a step that cannot run, because a step it waits on stops what follows it (`stopsFollowers`): an assessment's `unreachable`, and `nemia tick`'s `unreachable:`. Never called blocked, which is a closeout's outcome alone.",
+      "type": "Assessment"
+    },
+    {
+      "term": "Waiting",
+      "meaning": "only a wait on a person: the phase of a step or a run that a person must act on, at a gate, a question, a loop out of rounds, a budget, an unsigned or refused try; its reasons are `AwaitingApproval`, `AwaitingAnswer` (`via` session or closeout), `AwaitingRound` and the stops beside them. A run a person stops at no gate alone has the status `waiting` (`stoppedOnWord`), and its decision the outcome `waiting`; both said `blocked` before card 4c, which a feed line of then still reads as. Reason `Waiting` is a wait on a thing, phase pending. A try of a step needs the person's word where its reason says so (`WAITS_ON_PERSON`, keyed by reason, a session asking through its harness standing as `AwaitingAnswer` via session), and a step holds its run where its reason waits on a person and is no `Failed` (`holdsTheRun`).",
+      "type": "StepPhase",
+      "retired": [
+        {
+          "spelling": "stuck",
+          "card": "4b: decide's steps that signed off blocked are `awaitingAnswer`"
+        },
+        {
+          "spelling": "HOLDS_THE_RUN",
+          "card": "4b: what holds a run is derived from `PERSON_WAITS` (`holdsTheRun`)"
+        },
+        {
+          "spelling": "blockedByHarness",
+          "card": "4c: a session its harness stopped to ask is said by its codes, `AwaitingAnswer` via `session` (`atHarness`)"
+        }
+      ]
+    },
+    {
+      "term": "Waiting on you",
+      "meaning": "whether a wait is the person's: `waitingOnYou` on a run's `--after` wait (`RunWaiting`) and on its hold (`RunHolding`), true where only a person's hand ends it; and the summary's `waitingOnYouWords`, the steps that wait on a person as `nemia ls` names them after `→ waiting on you:` (`onYouWords`), beside `waitingOnYou`, those steps by name.",
+      "type": "RunWaiting",
+      "retired": [
+        {
+          "spelling": "onYou",
+          "card": "4c: whether a wait is the person's is `waitingOnYou`, and its words `waitingOnYouWords`"
+        }
+      ]
+    },
+    {
+      "term": "Waiting on",
+      "meaning": "a wait on a thing, reason `Waiting` with what it waits on (`on`: a run, the limit, the checkout or the pause), phase pending; an assessment names the steps waiting on the repository's checkout (`waitingOnCheckout`, as `waitsOnCheckout` says of a step) and on the store's pause (`waitingOnPause`). Never called held, which is a person's hold alone.",
+      "type": "WaitOn",
+      "retired": [
+        {
+          "spelling": "heldByCheckout",
+          "card": "4b: a step waiting on the checkout `waitsOnCheckout`"
+        }
+      ]
     },
     {
       "term": "Workflow",

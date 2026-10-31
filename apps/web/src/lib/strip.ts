@@ -124,7 +124,7 @@ const agentsOf = (rows: readonly AgentRow[], hired: ReadonlySet<string>): Strip[
 
 /** Whether a step of `run` is at work: a session working or the run's check of it, as the board draws its state (`stepState`). */
 const working = (run: RunSummary, step: RunSummary['steps'][number]): boolean => {
-  const state = stepState(step.phase, step.reason, false, run.holding != null);
+  const state = stepState(step, false, run.holding != null);
   return state === 'working' || state === 'checking';
 };
 

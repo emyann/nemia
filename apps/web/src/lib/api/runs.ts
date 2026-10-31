@@ -16,6 +16,10 @@ import {
   type RunReason,
   type StepPhase,
   type StepReason,
+  type AnswerVia,
+  type WaitOn,
+  AnswerViaSchema,
+  WaitOnSchema,
 } from './reasons.ts';
 import {
   AtWorkSchema,
@@ -78,18 +82,25 @@ export type RunSummary = {
    * The runs a person holds this one until (the CLI's `hold`), as its hold file names them: the edges from their cards to its card, as
    * `after`'s are. None for a run nobody holds.
    */
-  heldUntil: string[];
+  holdUntil: string[];
   /** The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. */
   holding: RunHolding | null;
   /**
-   * The run in one word, as the CLI's `decide` says it: `failed` where a step broke, `awaiting approval` at its gates alone, `blocked`
-   * where a step waits on an answer.
+   * The run in one word, as the CLI's `decide` says it: `failed` where a step broke, `awaiting approval` at its gates alone, `waiting`
+   * where a step waits on a person otherwise.
    */
   status: RunStatus;
   /** Where the run is in its life (`RunPhase`), as a code. */
   phase: RunPhase;
-  /** Why it is in that phase (`RunReason`): `Held` for a running run a person holds. */
+  /**
+   * Why it is in that phase (`RunReason`): `Waiting` for a running run a person holds, and for one a person's word stops the reason of
+   * its first step that waits on them.
+   */
   reason: RunReason;
+  /** What a `Waiting` run waits on (`run`, a hold), null on any other reason. */
+  on: WaitOn | null;
+  /** Where an `AwaitingAnswer` run's answer is asked, its first waiting step's; null on any other reason, and where no step says. */
+  via: AnswerVia | null;
   /**
    * Whether anything of the run still moves: a task the engine holds for it, or a step or check a tick would still file — the roots of a
    * run waiting on runs that may still land among them, and not those of one waiting on a run that never lands without a person.
@@ -104,10 +115,11 @@ export type RunSummary = {
   /**
    * `note` is what the CLI's `ls` prints beside the status — the try or round a step is on, or the one due — and null where it prints
    * nothing. `roundDue`: whether a looping step's next round is due, which the note words. `agent`: the agent the step is given, null for
-   * none; `since`: when its task at work started, null while none runs. `needs` and `blockedByHarness` are what a person has to know to
-   * act on it (`StepNeeds`). `phase` and `reason` are where the step stands, as codes, which the board groups and colours by; `message`
-   * is what the CLI's `ls` prints for it, shown and never compared; `verdict` its check's, as codes, null for a step its check did not
-   * judge. `status` is `message` under its old name, which the api still sends and the board reads nowhere.
+   * none; `since`: when its task at work started, null while none runs. `needs` and `waitingFor` are what a person has to know to
+   * act on it (`StepNeeds`). `phase` and `reason` are where the step stands, as codes, which the board groups and colours by, with `on`
+   * and `via` qualifying a `Waiting` and an `AwaitingAnswer` (`StepCodes`); `message` is what the CLI's `ls` prints for it, shown and
+   * never compared; `verdict` its check's, as codes, null for a step its check did not judge. `status` is `message` under its old name,
+   * which the api still sends and the board reads nowhere.
    */
   steps: Array<
     {
@@ -116,6 +128,8 @@ export type RunSummary = {
       branch: string | null;
       phase: StepPhase;
       reason: StepReason;
+      on: WaitOn | null;
+      via: AnswerVia | null;
       message: string;
       verdict: CheckVerdict | null;
       /** @deprecated `message` under its old name: read `message`. */
@@ -137,7 +151,7 @@ export type RunSummary = {
    * `waitingOnYou` as the CLI's `ls` names it after `→ waiting on you:`, one entry a step: its name, or for a step at its gate, `approve
    * plan`.
    */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /** What a person has to decide about the run's result (`RunToDecide`); null while there is nothing — which is every run still going. */
   toDecide: RunToDecide | null;
   /**
@@ -166,11 +180,13 @@ const RunSummarySchema = decodes<RunSummary>()(
     after: StringsSchema,
     context: StringsSchema,
     waiting: Schema.NullOr(RunWaitingSchema),
-    heldUntil: StringsSchema,
+    holdUntil: StringsSchema,
     holding: Schema.NullOr(RunHoldingSchema),
     status: RunStatusSchema,
     phase: RunPhaseSchema,
     reason: RunReasonSchema,
+    on: Schema.NullOr(WaitOnSchema),
+    via: Schema.NullOr(AnswerViaSchema),
     moving: Schema.Boolean,
     cost: Schema.NullOr(SpentSchema),
     atWork: Schema.NullOr(AtWorkSchema),
@@ -194,7 +210,7 @@ const RunSummarySchema = decodes<RunSummary>()(
     ),
     graph: RunGraphSchema,
     waitingOnYou: StringsSchema,
-    onYou: StringsSchema,
+    waitingOnYouWords: StringsSchema,
     toDecide: Schema.NullOr(RunToDecideSchema),
     unreadable: Schema.NullOr(Schema.String),
   }),

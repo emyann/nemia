@@ -299,21 +299,21 @@ function endingGateRefusal(c: Judged): string | undefined {
 function statusRefusal(c: Judged): string {
   const { steps, step, run, name, status } = c;
   const why: Partial<Record<StepStatus, string>> = {
-    waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: nemia ls ${run.id}.`,
+    pending: `${name} has not been filed yet, so there is no try to replace. Wait for it: nemia ls ${run.id}.`,
     running: `${name} is still running, so there is nothing to try again until it ends. Wait for it: nemia ls ${run.id} (or stop the run: nemia cancel ${run.id}).`,
     checking: `${name}'s check is still due or running, so there is no verdict to act on yet. Wait for it: nemia ls ${run.id}.`,
     verified: `${name} is verified: its check passed, and there is nothing to try again.`,
     unverified: `${name} signed off done and declares no check: what waits on it has been filed, and there is nothing to try again.`,
     blocked: `${name} signed off blocked and its session has not ended, so a new try would run beside it. Wait for it to settle: nemia ls ${run.id}.`,
-    exhausted: `${name} asked for another round on the last one \`rounds: ${capOf(step)}\` allows: its work is signed, and what happens next is a person's call, not another try. Go round once more — nemia round ${run.id} ${name} — or take the work as it stands, its findings open: nemia accept ${run.id} ${name} --message "<why>".`,
-    'over budget': `${name} did its work, and its loop asks for a round that would file ${loopOf(steps, name)?.name === name ? 'a step of it' : 'it'} again, past its budget: going round is a person's call, not another try. Raise the cap with the round: nemia round ${run.id} ${loopOf(steps, name)?.name ?? name} --budget <amount>.`,
+    exhausted: `${name} asked for another round on the last one \`rounds: ${capOf(step)}\` allows: its work is signed, and what happens next is a person's call, not another try. Go round once more — nemia retry ${run.id} ${name} --round — or take the work as it stands, its findings open: nemia approve ${run.id} ${name} --message "<why>".`,
+    'over budget': `${name} did its work, and its loop asks for a round that would file ${loopOf(steps, name)?.name === name ? 'a step of it' : 'it'} again, past its budget: going round is a person's call, not another try. Raise the cap with the round: nemia retry ${run.id} ${loopOf(steps, name)?.name ?? name} --round --budget <amount>.`,
   };
   return why[status] ?? `${name} is ${status}, and there is nothing to try again.`;
 }
 
 /** `--recheck` where no check failed, or on an ending that lands on its check, whose merge the run aborted. */
 function modeRefusal(c: Judged): string | undefined {
-  const { step, run, name, how, command, phaseOf, verdictOf, modes, status, blockedByHarness, sendsBack } = c;
+  const { step, run, name, how, command, phaseOf, verdictOf, modes, status, via, sendsBack } = c;
   if (modes.includes(how.mode)) return undefined;
   if (landsOnCheck(step, run) && status === 'failed (check)') {
     const why = refusedCheck(run.steps[name]?.check ? phaseOf(run.steps[name].check.taskId) : 'unknown', verdictOf(name))
@@ -321,11 +321,12 @@ function modeRefusal(c: Judged): string | undefined {
       : 'did not finish';
     return `--recheck runs a step's check again on the work as it stands, and ${name}'s check was run on the merge ${name} staged in the repository's checkout, which the run aborted when its check ${why}: there is nothing staged for it to judge. Merge and check again, in a new try of ${name}: ${command}.`;
   }
-  const is = blockedByHarness
-    ? 'is running, its session blocked by its harness with nothing signed off'
-    : status === 'denied'
-      ? 'was denied a call by its harness, and its check was never run'
-      : `is ${status}`;
+  const is =
+    via === 'session'
+      ? 'is running, its session blocked by its harness with nothing signed off'
+      : status === 'denied'
+        ? 'was denied a call by its harness, and its check was never run'
+        : `is ${status}`;
   return `--recheck runs a step's check again, and ${name} ${is}: no check of it failed. ${
     sendsBack
       ? `To send it back from its gate, say what to change: nemia retry ${run.id} ${name} --message "<objection>".`

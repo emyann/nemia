@@ -161,7 +161,7 @@ version, and the version above must be the pin. An upgrade re-measures the table
 - A controller that asks where a run's work lives requires the place (`PlaceService` in
   `packages/agent-orchestrator/src/place/place.store.ts`, a service with no default): `startRun` requires it alone, `tickRun` beside the
   engine. `runWith` removes the engine's requirement only, so whoever runs the program gives the place by name
-  (`Effect.provide(gitPlaceLayer)`, `shipped(program)`), and a program given none does not compile. A test gives the test place's
+  (`Effect.provide(gitPlaceLayer)`, `builtin(program)`), and a program given none does not compile. A test gives the test place's
   layer (`runOver(runEngine, () => stand().layer)`, `test/placed.ts`); the git place is named only in a `.boundary.test.ts` file.
 
 ## Logs and traces

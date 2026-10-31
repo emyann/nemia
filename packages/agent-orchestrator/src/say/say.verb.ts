@@ -1,8 +1,8 @@
 /**
  * `nemia say`: tell a step's running session something, through the engine, which journals the words; and why an ask cannot be written
- * where a file that is not one stands (`strayAsk`), which `nemia retry` and `nemia round` say. A controller, reaching the runtime through
- * the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`sayRun`, over `EngineService`), run by a
- * caller with `runWith`.
+ * where a file that is not one stands (`strayAsk`), which `nemia retry` and `nemia retry --round` say. A controller, reaching the runtime
+ * through the client (`runtime-client.ts`): an Effect program that requires the engine as a service (`sayRun`, over `EngineService`), run
+ * by a caller with `runWith`.
  */
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';

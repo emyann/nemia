@@ -1,10 +1,10 @@
 /**
- * The skills an agent of yours can be given, as the board's skill picker lists them, and a skill Nemia ships copied into your library.
+ * The skills an agent of yours can be given, as the board's skill picker lists them, and a builtin skill copied into your library.
  *
  * An agent of yours finds a skill as a start finds it (`lookupRoots`): the store's `workflows/skills/` — your library — then the
  * `.claude/skills/` of the repository the board serves. The first that has a name wins, so a name in both is listed once, in your library.
- * The skills Nemia ships, `workflows/skills/` of the checkout the api runs from, are not among them: an agent of the store never finds one
- * there, so a shipped skill is copied into your library first (`copySkill`, a write of its own, before and apart from any save of the
+ * Nemia's builtin skills, `workflows/skills/` of the checkout the api runs from, are not among them: an agent of the store never finds one
+ * there, so a builtin skill is copied into your library first (`copySkill`, a write of its own, before and apart from any save of the
  * agent).
  *
  * Each skill is listed with its card entry or the package's refusal of it (a SKILL.md with no description can be given to no agent),
@@ -22,7 +22,7 @@ import {
   agentSkillsFound,
   COMMANDS,
   givenSkills as givenRead,
-  isShippedPlace,
+  isBuiltinPlace,
   listAgents,
   loadAgents,
   oneFolder,
@@ -60,9 +60,9 @@ import type { PlaceService } from 'agent-orchestrator';
 
 /**
  * Where a skill is: your library (the store's), the repository the board serves (its `.claude/skills/`, or `workflows/skills/` beside its
- * agents), or what Nemia ships.
+ * agents), or what is built into Nemia.
  */
-export type SkillSource = 'yours' | 'repo' | 'shipped';
+export type SkillSource = 'yours' | 'repo' | 'builtin';
 
 /** One skill as the picker lists it. `entry` is its card entry, or null with `error` saying why no agent can be given it. */
 export type SkillRow = {
@@ -77,22 +77,28 @@ export type SkillRow = {
   cost: SkillCost | null;
   /** The agents of yours that give it. */
   usedBy: string[];
-  /** A shipped skill's name, where an agent of yours already finds a skill of it: in your library, or in the repository. Null elsewhere. */
+  /** A builtin skill's name, where an agent of yours already finds a skill of it: in your library, or in the repository. Null elsewhere. */
   found: 'yours' | 'repo' | null;
 };
 
-/** One place the picker lists, in the order an agent of yours finds a name, the shipped last: its skills by name. */
+/** One place the picker lists, in the order an agent of yours finds a name, the builtin last: its skills by name. */
 export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
 
 /** What a copy answers: the skill as it now reads in your library, and its files by their path in it. */
 export type SkillAdded = { skill: SkillRow; written: string[] };
 
 /**
- * `workflows/skills/` of the checkout the api runs from: the skills Nemia ships, none while the checkout has no such folder. This
- * repository keeps its own team in `workflows/`, so a skill the team puts in `workflows/skills/` lists as shipped: `sourceOf` answers
- * `shipped` before `repo`.
+ * `workflows/skills/` of the checkout the api runs from: Nemia's builtin skills, none while the checkout has no such folder.
+ * This repository keeps its own team in `workflows/`, so a skill the team puts in `workflows/skills/` lists as builtin: `sourceOf`
+ * answers `builtin` before `repo`.
  */
-export const SHIPPED_SKILLS = path.join(HOME_REPO, 'workflows', SKILLS_FOLDER);
+export const BUILTIN_SKILLS = path.join(HOME_REPO, 'workflows', SKILLS_FOLDER);
+
+/**
+ * The place a builtin skill's page was at before it was called builtin: `GET /api/skills/<this>/<name>` answers a permanent redirect to
+ * `/api/skills/builtin/<name>`. It stays while a link or bookmark may still name the former address.
+ */
+const FORMER_BUILTIN = 'shipped';
 
 /** Your library: the store's `workflows/skills/`, where the board copies a skill. */
 export const librarySkills = (home: string): string => path.join(home, 'workflows', SKILLS_FOLDER);
@@ -104,7 +110,7 @@ const skillsOfYours = (repo: string, home: string) => skillsFor(path.join(home, 
 export function sourceOf(dir: string, repo: string, home: string): SkillSource | null {
   const parent = path.dirname(path.resolve(dir));
   if (parent === librarySkills(home)) return 'yours';
-  if (parent === SHIPPED_SKILLS) return 'shipped';
+  if (parent === BUILTIN_SKILLS) return 'builtin';
   if (
     parent === path.join(path.resolve(repo), '.claude', SKILLS_FOLDER) ||
     parent === path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)
@@ -126,13 +132,13 @@ export function foundInOf(dir: string, repo: string, home: string): string | nul
 
 /**
  * The board's skill library in the package's table, each entry served on the api alone: the skill folders listed, each read
- * (`skills list`), one skill read for its page (`skills read`), and one of yours written or copied (`skills write`).
+ * (`skills`), one skill read for its page (`skills show`), and one of yours written or copied (`skills write`).
  */
-const LIST = COMMANDS.find((c) => c.name === 'skills list')!;
-const READ = COMMANDS.find((c) => c.name === 'skills read')!;
+const LIST = COMMANDS.find((c) => c.name === 'skills')!;
+const READ = COMMANDS.find((c) => c.name === 'skills show')!;
 const WRITE = COMMANDS.find((c) => c.name === 'skills write')!;
 
-/** Each skill folder of `dirs` read now, through the table's `skills list`, by folder. */
+/** Each skill folder of `dirs` read now, through the table's `skills`, by folder. */
 const readsOf = async (e: Engine['Service'], placeService: PlaceService['Service'], dirs: readonly string[]) =>
   (await runPlaced(placeService, e, LIST.handler({ skills: dirs }))) as Record<string, SkillRead>;
 
@@ -157,18 +163,18 @@ function yourAgentsSkills(home: string): Array<[string, string[]]> {
 
 /**
  * Every skill the picker lists, by place: yours, then the repository's — each name where an agent of yours finds it, so a name in both is
- * in yours alone — then what Nemia ships, each marked where an agent of yours already finds a skill of its name. A place skill the
- * package ships (`isShippedPlace`), which an agent finds where no place has its name, is in neither of the first two. A name both of one
- * repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is listed
- * in yours with the package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules that
- * do not read — is listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.
+ * in yours alone — then Nemia's builtin skills, each marked where an agent of yours already finds a skill of its name. The package's
+ * builtin place skill (`isBuiltinPlace`), which an agent finds where no place has its name, is in neither of the first two. A name both
+ * of one repository's places for skills have, which happens only when the store is in that repository and nothing says which is given, is
+ * listed in yours with the package's refusal as its `error`. Any other skill the package refuses — a link in it that is not followed, rules
+ * that do not read — is listed in the place its folder is in (`skillDirIn`, `sourceOf`), unread where a link is refused, with that refusal.
  */
 export async function listSkills(
   e: Engine['Service'],
   placeService: PlaceService['Service'],
   repo: string,
   home: string,
-  shipped: string = SHIPPED_SKILLS,
+  builtin: string = BUILTIN_SKILLS,
 ): Promise<SkillPlace[]> {
   const found = skillsOfYours(repo, home);
   const agents = yourAgentsSkills(home);
@@ -177,11 +183,11 @@ export async function listSkills(
     { from: 'yours', dir: librarySkills(home), skills: [] },
     { from: 'repo', dir: path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), skills: [] },
   ];
-  const sorted = [...found.all].filter(([, at]) => typeof at !== 'string' || !isShippedPlace(at)).sort(([a], [b]) => a.localeCompare(b));
+  const sorted = [...found.all].filter(([, at]) => typeof at !== 'string' || !isBuiltinPlace(at)).sort(([a], [b]) => a.localeCompare(b));
   const dirOf = ([name, at]: (typeof sorted)[number]) =>
     at instanceof WorkflowError ? (skillDirIn([places[0].dir, places[1].dir], name) ?? path.join(places[0].dir, name)) : at;
-  const shippedNames = skillFolders(shipped);
-  const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...shippedNames.map((name) => path.join(shipped, name))]);
+  const builtinNames = skillFolders(builtin);
+  const reads = await readsOf(e, placeService, [...sorted.map(dirOf), ...builtinNames.map((name) => path.join(builtin, name))]);
   const where = new Map<string, 'yours' | 'repo'>();
   for (const [name, at] of sorted) {
     const dir = dirOf([name, at]);
@@ -200,11 +206,11 @@ export async function listSkills(
     where.set(name, from);
   }
   places.push({
-    from: 'shipped',
-    dir: shipped,
-    skills: shippedNames.map((name) => {
-      const dir = path.join(shipped, name);
-      return skillRow(name, dir, 'shipped', reads[dir], [], where.get(name) ?? null);
+    from: 'builtin',
+    dir: builtin,
+    skills: builtinNames.map((name) => {
+      const dir = path.join(builtin, name);
+      return skillRow(name, dir, 'builtin', reads[dir], [], where.get(name) ?? null);
     }),
   });
   return places;
@@ -242,7 +248,7 @@ export function givenSkills(skills: readonly string[], found: ReturnType<typeof 
   }));
 }
 
-const COPY_SHAPE = '`{ "copy": "<the name of a skill Nemia ships>" }`';
+const COPY_SHAPE = '`{ "copy": "<the name of a builtin skill>" }`';
 const DRAFT_SHAPE =
   '`{ "name": "<a-name>", "title": "<a title, or null>", "description": "<what it does, one line>", "tags": ["<a word>"] or null, "examples": ["<what a person would ask>"] or null, "preload": true or false, "body": "<its instructions>" }`';
 const POST_SHAPE = `${COPY_SHAPE}, or \`{ "skill": ${DRAFT_SHAPE.slice(1, -1)} }\``;
@@ -264,7 +270,7 @@ const SKILL_KEYS = {
 /** A skill as a request sends it, a key no skill has kept, so it is refused once every key a skill has is read (`skillDraftFrom`). */
 const SKILL_DRAFT = Schema.StructWithRest(Schema.Struct(SKILL_KEYS), [Schema.Record(Schema.String, Schema.Unknown)]);
 
-/** A new skill: one Nemia ships, copied, or one you wrote (`oneOf` says which the request sent). */
+/** A new skill: a builtin one, copied, or one you wrote (`oneOf` says which the request sent). */
 const POST_BODY = Schema.Struct({ copy: Schema.optionalKey(Schema.String), skill: Schema.optionalKey(SKILL_DRAFT) });
 
 /** A skill changed at its version: written whole, or its `preload:` alone (`oneOf` says which the request sent). */
@@ -295,7 +301,7 @@ function draftWords([key]: ReadonlyArray<PropertyKey>, skill: unknown, route: st
 
 /** A POST's `oneOf` sentence. */
 const copyOrSkill = (route: string) => (sent: 'both' | 'neither') =>
-  `${route} takes one of \`copy\` — a skill Nemia ships, copied — and \`skill\` — one you wrote — and this request sent ${sent}. Send ${POST_SHAPE}.`;
+  `${route} takes one of \`copy\` — a builtin skill, copied — and \`skill\` — one you wrote — and this request sent ${sent}. Send ${POST_SHAPE}.`;
 
 /** A PUT's `oneOf` sentence. */
 const skillOrPreload = (route: string) => (sent: 'both' | 'neither') =>
@@ -308,7 +314,7 @@ function postWords(route: string): Words {
     const one = oneOf(body, 'skill', 'copy', copyOrSkill(route));
     if (one) return one;
     if (key === 'skill') return draftWords(rest, valueAt(body, ['skill']), route, POST_SHAPE);
-    return `${route}: \`copy\` is the name of the skill Nemia ships to copy, a string, and this request's was ${JSON.stringify(input)}. Send ${COPY_SHAPE}.`;
+    return `${route}: \`copy\` is the name of the builtin skill to copy, a string, and this request's was ${JSON.stringify(input)}. Send ${COPY_SHAPE}.`;
   };
 }
 
@@ -345,8 +351,8 @@ export type SkillUser = { from: AgentPlace; name: string };
  * One skill on its own page. `skill` is its row as the list has it; `version` what a write of it carries back (`skillVersion`); `draft`
  * what its form is filled from (`skillDraftOf`), or null where its SKILL.md does not read — `skill.error` says why, and `body` is its
  * instructions all the same, so a skill of yours can be mended; `users` the agents, of either place, that give this very folder, as their
- * start would find it; `copyHint` the command that takes it to the other place, since the api writes no checkout — null for what Nemia
- * ships.
+ * start would find it; `copyHint` the command that takes it to the other place, since the api writes no checkout — null for a builtin
+ * skill.
  */
 export type SkillDetail = {
   skill: SkillRow;
@@ -363,14 +369,14 @@ export type SkillSaved = SkillDetail & { written: string[] };
 /**
  * Where the skill `name` of `from` is: your library's folder of it, the repository's — its `.claude/skills/` first, then
  * `workflows/skills/`: the order its page takes, while a start of an agent of the repository's finds `workflows/skills/` first — or
- * what Nemia ships. Null when that place has none.
+ * Nemia's builtin skills. Null when that place has none.
  */
-export function skillDirOf(from: SkillSource, name: string, repo: string, home: string, shipped: string = SHIPPED_SKILLS): string | null {
+export function skillDirOf(from: SkillSource, name: string, repo: string, home: string, builtin: string = BUILTIN_SKILLS): string | null {
   const places =
     from === 'yours'
       ? [librarySkills(home)]
-      : from === 'shipped'
-        ? [shipped]
+      : from === 'builtin'
+        ? [builtin]
         : [path.join(path.resolve(repo), '.claude', SKILLS_FOLDER), path.join(path.resolve(repo), 'workflows', SKILLS_FOLDER)];
   return skillDirIn(places, name);
 }
@@ -401,9 +407,9 @@ export async function skillDetail(
   name: string,
   repo: string,
   home: string,
-  shipped: string = SHIPPED_SKILLS,
+  builtin: string = BUILTIN_SKILLS,
 ): Promise<SkillDetail | null> {
-  const dir = skillDirOf(from, name, repo, home, shipped);
+  const dir = skillDirOf(from, name, repo, home, builtin);
   if (dir === null) return null;
   const users = skillUsers(dir, name, repo);
   const { text, version, ...read } = (await runPlaced(placeService, e, READ.handler({ from, name, dir }))) as SkillPage;
@@ -488,8 +494,9 @@ const repoRefusal = (route: string, name: string | null, repo: string, home: str
  * - `GET /api/skills` — every skill by place (`listSkills`), read from disk on each request, so a skill a person has just written lists as
  *   it is now.
  * - `GET /api/skills/:from/:name` — one skill, on its page (`skillDetail`): where it is, what it says, what it costs a turn, and the agents
- *   that give it. 400 for a place that is not `yours`, `repo` or `shipped`, or a name that is not a skill's; 404 for one the place has not.
- * - `POST /api/skills/:from` — a skill of yours made: written on the board (`skill`), or one Nemia ships copied under its name (`copy`),
+ *   that give it. 400 for a place that is not `yours`, `repo` or `builtin`, or a name that is not a skill's; 404 for one the place has not;
+ *   308 to `builtin` for the place's former name (`FORMER_BUILTIN`).
+ * - `POST /api/skills/:from` — a skill of yours made: written on the board (`skill`), or a builtin one copied under its name (`copy`),
  *   one of the two; refused, in the package's words, where the library has the name already. 201.
  * - `PUT /api/skills/:from/:name` — a skill of yours changed at the `version` it was read at: written whole from its form (`skill`), or its
  *   `preload:` alone, from its switch (`preload`). Either is a change of every agent that gives it. 400 for a form that names the skill
@@ -500,10 +507,11 @@ export const skills = new Hono<ApiEnv>()
   .get('/api/skills/:from/:name', (c) =>
     served(c, async ({ e, placeService, repo, home }) => {
       const { from, name } = c.req.param();
-      if (from !== 'yours' && from !== 'repo' && from !== 'shipped')
+      if (from === FORMER_BUILTIN) return c.redirect(`/api/skills/builtin/${encodeURIComponent(name)}`, 308);
+      if (from !== 'yours' && from !== 'repo' && from !== 'builtin')
         return c.json(
           {
-            error: `GET /api/skills/${from}/${name}: a skill is yours, the repository's or shipped, and this request named ${JSON.stringify(from)}.`,
+            error: `GET /api/skills/${from}/${name}: a skill is yours, repo or builtin, and this request named ${JSON.stringify(from)}.`,
           },
           400,
         );
@@ -513,7 +521,7 @@ export const skills = new Hono<ApiEnv>()
       if (detail === null)
         return c.json(
           {
-            error: `No skill named ${name} in ${from === 'yours' ? 'your library' : from === 'repo' ? "the repository's skills" : 'the skills Nemia ships'}. GET /api/skills lists them.`,
+            error: `No skill named ${name} in ${from === 'yours' ? 'your library' : from === 'repo' ? "the repository's skills" : 'the builtin skills'}. GET /api/skills lists them.`,
           },
           404,
         );
@@ -554,7 +562,7 @@ export const skills = new Hono<ApiEnv>()
       const copied = (await runPlaced(
         placeService,
         e,
-        WRITE.handler({ from, copy: name, shipped: SHIPPED_SKILLS }, undefined, home),
+        WRITE.handler({ from, copy: name, builtin: BUILTIN_SKILLS }, undefined, home),
       )) as SkillCopied;
       const agents = yourAgentsSkills(home)
         .filter(([, given]) => given.includes(name))

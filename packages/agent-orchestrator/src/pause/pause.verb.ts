@@ -71,7 +71,7 @@ export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; b
       interrupted: i.taskId,
       at: now.toISOString(),
     };
-    if (!runStore.asks.write(i.run, { kind: 'retry', ask }).written) {
+    if (!runStore.asks.write(i.run, { kind: 'retry', of: 'try', ask }).written) {
       skipped.push(i);
       continue;
     }

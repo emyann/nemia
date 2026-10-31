@@ -321,8 +321,8 @@ test('a run that waits on a run which never lands, held until one that will, wai
 
   const row = (await open()).waiting.find((run) => run.id === child.id);
   assert.ok(row, 'it waits on a person: the run it waits on was called off');
-  assert.equal(row.waiting?.onYou, true);
-  assert.equal(row.holding?.onYou, false, 'and its hold lifts by itself, once the run it names lands');
+  assert.equal(row.waiting?.waitingOnYou, true);
+  assert.equal(row.holding?.waitingOnYou, false, 'and its hold lifts by itself, once the run it names lands');
   assert.equal(row.waitingSince, null);
 });
 

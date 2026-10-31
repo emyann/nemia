@@ -107,14 +107,14 @@ export const liveOf = (env: NodeJS.ProcessEnv = process.env): Layer.Layer<Servic
  * - workflows/builder.ts — a folder of yours built on the board: made with a first step, and put back from its steps with the schemas
  *   pasted for them; two writes, guarded as a start is, each through the package's entry `workflows write`.
  * - workflows/remove.ts — a folder of yours removed whole, its version checked, guarded as a start is, through the package's entry
- *   `workflows remove`.
+ *   `workflows rm`.
  * - workflows/yours.ts — your store's folders under the store root, and the line that files a factory in it.
  * - agents/agents.ts — the agents beside each place workflows are listed from, each with the nodes that name it; one of yours made, put
- *   back or removed; three writes, guarded as a start is, through the package's entries `agents write` and `agents remove`.
+ *   back or removed; three writes, guarded as a start is, through the package's entries `agents write` and `agents rm`.
  * - custom/custom.ts — a person's custom instructions for an agent, by its name, read through `nemia agents custom`'s entry; written and
  *   cleared on the routes the table generates from it (commands/routes.ts).
  * - agents/skills.ts — the skills an agent of yours can be given, by place; one skill on its page; and one of yours written — made,
- *   changed, or one Nemia ships copied into your library — each a write, guarded as a start is, through the package's entry `skills write`.
+ *   changed, or a builtin one copied into your library — each a write, guarded as a start is, through the package's entry `skills write`.
  * - inbox/inbox.ts — the inbox: its cards listed and one filed, through `nemia inbox`'s and `nemia inbox add`'s entries; one dropped and
  *   one queued on the routes the table generates (commands/routes.ts).
  * - runs/runs.ts — the runs listed, one run in full, and what `nemia decide` shows of it.

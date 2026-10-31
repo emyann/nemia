@@ -19,17 +19,82 @@
  * holds, read by `upgrade` and named in its doc (`journal.ts`), the stored schema (`event-schema.ts`) and the filing door's
  * `RENAMED_ARGS` (`args.ts`). They stay while a journal on disk may hold them.
  *
+ * `NeedsHuman`, `RoundsExhausted`, `WaitingForSlot`, `WaitingForCheckout`, `WaitingForPause` and `CheckDenied`, on the day the feed
+ * retired them (a wait on a person said by the `Awaiting*` codes, a wait on a thing by `Waiting` and `on`): each a key of
+ * `FORMER_REASONS` in `former-reason.ts`, which reads a line on disk and a stored selector that still names one. They stay while a feed
+ * or a subscription on disk may hold them.
+ *
  * `shipped` and `ships`, on the day decision 13a retired them (`Landed` in the run core's, the api's and the board's tables): the run's
- * sense, a run's result on its base, says `landed` everywhere since that card. Every count left is the product's sense, what comes with
- * Nemia (its git place, the skills, servers and rules it lists, a default it is given with), which decision 13b renames to `builtin`
- * (the run core's row of that word) and drives to zero. No old spelling is kept on purpose: nothing on disk or on the wire as input
- * said it.
+ * sense, a run's result on its base, says `landed` everywhere since that card; the product's sense, what comes with Nemia (its git place,
+ * the skills, servers and rules it lists), says `builtin` since decision 13b (its Builtin row in the same three tables). The one count left
+ * is the api's former address of a builtin skill, `/api/skills/shipped/<name>`, which answers a permanent redirect to its `builtin` address
+ * (`FORMER_BUILTIN`, `skills.ts`): it stays while a link or a bookmark may still name it.
+ *
+ * `accept`, on the day decision 7 retired it (`Approve` in the run core's table): `nemia accept` is `nemia approve` of a loop out of
+ * rounds. What is left is the former spelling kept on purpose (`RENAMED`, read by admission and named in its doc), the record's names
+ * for what a loop's end writes (`acceptRun`, `acceptAsk`, the `accept-<step>-<n>` file), and the word's other senses (a trust accepted,
+ * a level's words). The decision's `accept` offer label is `approve` since slice B, as its `merge` is `refresh`.
+ *
+ * `agents remove`, `workflows remove`, `policy drop`, `agents try`, `template check` and `factory plan`, on the day decision 8 retired them
+ * (its rows Rm, Run an agent, Lint and Diff in the run core's table): each is left once, as its own row of `RENAMED` (`command.ts`), which
+ * still runs a line that says it, with a hint naming the new spelling. They stay until a later card removes the former spellings.
  *
  * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
  * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
  * `options.ts`). They stay while a caller may still write them.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  'agents remove': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'agents try': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'factory plan': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'policy drop': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'template check': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  'workflows remove': {
+    'packages/agent-orchestrator/src/command/command.ts': 1,
+  },
+  accept: {
+    'packages/agent-orchestrator/src/admission/admission.ts': 1,
+    'packages/agent-orchestrator/src/brief/brief-sections.ts': 2,
+    'packages/agent-orchestrator/src/command/command.ts': 2,
+    'packages/agent-orchestrator/src/gate/commands.verb.ts': 3,
+    'packages/agent-orchestrator/src/gate/form.verb.ts': 1,
+    'packages/agent-orchestrator/src/gate/gate.ts': 1,
+    'packages/agent-orchestrator/src/nemia/level.verb.ts': 1,
+    'packages/agent-orchestrator/src/record/record.store.ts': 4,
+    'packages/agent-orchestrator/src/record/record.ts': 3,
+    'packages/agent-orchestrator/src/round/round.ts': 7,
+    'packages/agent-orchestrator/src/round/round.verb.ts': 2,
+    'packages/agent-orchestrator/src/status/status.ts': 1,
+    'packages/agent-orchestrator/src/trust/trust.ts': 1,
+  },
+  needshuman: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 2,
+  },
+  roundsexhausted: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  waitingforslot: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  waitingforcheckout: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  waitingforpause: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  checkdenied: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
   wf: {
     'packages/agent-orchestrator/place/git/verbs/handoff.ts': 2,
     'packages/agent-orchestrator/place/git/verbs/make.ts': 2,
@@ -51,89 +116,7 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/workspace/worktree.store.ts': 3,
   },
   shipped: {
-    'apps/api/src/agents/skills.ts': 23,
-    'apps/api/src/layer.ts': 1,
-    'apps/api/src/nemia/chat.ts': 1,
-    'apps/api/src/servers/servers.ts': 5,
-    'apps/api/src/step/step.ts': 1,
-    'apps/api/src/steps/steps.ts': 2,
-    'apps/web/src/components/AgentParts.tsx': 1,
-    'apps/web/src/components/AutoRules.tsx': 1,
-    'apps/web/src/components/FactoryServers.stories.tsx': 6,
-    'apps/web/src/components/FactoryServers.tsx': 16,
-    'apps/web/src/components/SkillPicker.tsx': 1,
-    'apps/web/src/lib/api/auto.ts': 3,
-    'apps/web/src/lib/api/factories.ts': 2,
-    'apps/web/src/lib/api/library.ts': 2,
-    'apps/web/src/lib/api/skills.ts': 2,
-    'apps/web/src/lib/api/workflows.ts': 2,
-    'apps/web/src/lib/gate.ts': 1,
-    'apps/web/src/lib/skills.ts': 7,
-    'apps/web/src/routes/agents_.skills.$from.$skill.tsx': 2,
-    'packages/agent-orchestrator/place/memory/index.ts': 1,
-    'packages/agent-orchestrator/src/agents/agents.ts': 1,
-    'packages/agent-orchestrator/src/auto/auto.verb.ts': 3,
-    'packages/agent-orchestrator/src/check/check.ts': 2,
-    'packages/agent-orchestrator/src/daemon/daemon.ts': 1,
-    'packages/agent-orchestrator/src/factory/factory.store.ts': 1,
-    'packages/agent-orchestrator/src/nemia/keep.verb.ts': 1,
-    'packages/agent-orchestrator/src/nemia/level.store.ts': 1,
-    'packages/agent-orchestrator/src/nemia/nemia.ts': 2,
-    'packages/agent-orchestrator/src/nemia/verbs.verb.ts': 1,
-    'packages/agent-orchestrator/src/place/place.store.ts': 3,
-    'packages/agent-orchestrator/src/place/shipped.store.ts': 1,
-    'packages/agent-orchestrator/src/runner.ts': 3,
-    'packages/agent-orchestrator/src/servers/clients.ts': 2,
-    'packages/agent-orchestrator/src/servers/index.ts': 1,
-    'packages/agent-orchestrator/src/servers/servers.store.ts': 2,
-    'packages/agent-orchestrator/src/servers/sign-in.verb.ts': 1,
-    'packages/agent-orchestrator/src/skills/skills.verb.ts': 3,
-    'packages/agent-orchestrator/src/subscription/former-wake.ts': 4,
-    'packages/agent-orchestrator/src/workflow/step-file.ts': 1,
-  },
-  ships: {
-    'apps/api/src/agents/skills.ts': 14,
-    'apps/api/src/app.ts': 1,
-    'apps/api/src/commands/routes.ts': 1,
-    'apps/api/src/guard.ts': 1,
-    'apps/api/src/nemia/nemia.ts': 1,
-    'apps/api/src/servers/servers.ts': 4,
-    'apps/web/src/components/AgentParts.tsx': 1,
-    'apps/web/src/components/AutoRules.tsx': 1,
-    'apps/web/src/components/FactoryServers.stories.tsx': 1,
-    'apps/web/src/components/FactoryServers.tsx': 4,
-    'apps/web/src/components/Markdown.tsx': 1,
-    'apps/web/src/components/NemiaSettings.tsx': 2,
-    'apps/web/src/components/ServerSignIn.tsx': 1,
-    'apps/web/src/components/SkillForm.tsx': 1,
-    'apps/web/src/components/SkillPicker.tsx': 1,
-    'apps/web/src/lib/api/auto.ts': 3,
-    'apps/web/src/lib/api/factories.ts': 2,
-    'apps/web/src/lib/api/library.ts': 1,
-    'apps/web/src/lib/api/skills.ts': 2,
-    'apps/web/src/lib/skills.ts': 1,
-    'apps/web/src/routes/agents_.skills.$from.$skill.tsx': 1,
-    'packages/agent-orchestrator/src/agents/custom.store.ts': 1,
-    'packages/agent-orchestrator/src/auto/auto.store.ts': 3,
-    'packages/agent-orchestrator/src/auto/auto.ts': 6,
-    'packages/agent-orchestrator/src/auto/auto.verb.ts': 2,
-    'packages/agent-orchestrator/src/nemia/level.store.ts': 5,
-    'packages/agent-orchestrator/src/nemia/level.verb.ts': 2,
-    'packages/agent-orchestrator/src/place/shipped.store.ts': 2,
-    'packages/agent-orchestrator/src/servers/clients.ts': 2,
-    'packages/agent-orchestrator/src/servers/servers.store.ts': 1,
-    'packages/agent-orchestrator/src/servers/servers.ts': 1,
-    'packages/agent-orchestrator/src/servers/sign-in.verb.ts': 1,
-    'packages/agent-orchestrator/src/skills/read.store.ts': 5,
-    'packages/agent-orchestrator/src/skills/skills.store.ts': 2,
-    'packages/agent-orchestrator/src/skills/skills.verb.ts': 4,
-    'packages/agent-orchestrator/src/sources/copy.store.ts': 1,
-    'packages/agent-orchestrator/src/sources/copy.verb.ts': 2,
-    'packages/agent-orchestrator/src/start/start.verb.ts': 1,
-    'packages/agent-orchestrator/src/template/check.ts': 1,
-    'packages/agent-orchestrator/src/template/draft.ts': 2,
-    'packages/agent-orchestrator/src/template/template.store.ts': 1,
-    'packages/agent-orchestrator/src/template/template.verb.ts': 1,
+    'apps/api/src/agents/skills.ts': 1,
   },
   stated: {
     'packages/agent-runtime/src/core/engine/journal.ts': 3,

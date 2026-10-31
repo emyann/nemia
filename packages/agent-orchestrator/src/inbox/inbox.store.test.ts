@@ -488,7 +488,7 @@ test('a person parks ideas in the inbox, lists them, starts them and drops them'
       assert.deepEqual(
         [a.brief, a.workflowDir],
         ['Parse the flag option in cli', dev],
-        'the body, and workflow: dev found as nemia plan finds it',
+        'the body, and workflow: dev found as nemia start <folder> finds it',
       );
       assert.match(a.id, /^parse-the-flag-option-in-cli-[a-z0-9]{4}$/);
       const second = await startedBy(path.join(plan, 'b.md'), '--repo', repo);

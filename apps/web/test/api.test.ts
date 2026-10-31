@@ -190,8 +190,6 @@ function asking(t: { after: (fn: () => void) => void }, status: number, body: st
 
 const { askRound } = await import('../src/lib/api.ts');
 
-const { acceptLoop } = await import('../src/lib/api.ts');
-
 test("each ask of a run's page: posted as the api takes it, read back, and refused in the api's words", async (t) => {
   await t.test(
     "saying something to a step posts the words as JSON and resolves with the engine's entry; a refusal rejects with the api's words, verbatim, and an answer without the entry says so",
@@ -304,7 +302,7 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
         file: '/store/runs/r 1.asks/round-review-3',
       });
       const words =
-        '--budget 2 is not above $2.10, what implement has cost: the round would be held again as soon as it was asked for. Give more than $2.10: wf round r-1 review --budget <amount>.';
+        '--budget 2 is not above $2.10, what implement has cost: the round would be held again as soon as it was asked for. Give more than $2.10: nemia retry r-1 review --round --budget <amount>.';
       answer = () => answered(409, { error: words });
       await assert.rejects(askRound('r-1', { step: 'review', budget: 2 }), (err: Error) => err.message === words);
       answer = () => answered(202, {});
@@ -323,43 +321,6 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
           ['/api/runs/r%201/round', 'POST', 'application/json', { step: 'review', budget: 3 }],
           ['/api/runs/r-1/round', 'POST', 'application/json', { step: 'review', budget: 2 }],
           ['/api/runs/r-1/round', 'POST', 'application/json', { budget: 3 }],
-        ],
-      );
-    },
-  );
-  await t.test(
-    "an acceptance is posted as JSON to the looping step's route with the words as typed, and resolves with what the package wrote; a refusal rejects with the package's words, verbatim, and an answer without the acceptance says so",
-    async (t) => {
-      const at = '2026-09-22T10:00:00.000Z';
-      let answer = () =>
-        answered(202, { step: 'review', try: 3, at, message: 'Good enough.', file: '/store/runs/r 1.asks/accept-review-3' });
-      const sent = starting(t, () => answer());
-      assert.deepEqual(await acceptLoop('r 1', 'review', { message: 'Good enough.' }), {
-        step: 'review',
-        try: 3,
-        at,
-        message: 'Good enough.',
-        file: '/store/runs/r 1.asks/accept-review-3',
-      });
-
-      const words = 'review asked for another round, and `rounds: 2` has one left, so the next tick files round 2 itself.';
-      answer = () => answered(409, { error: words });
-      await assert.rejects(acceptLoop('r-1', 'review', { message: 'Good enough.' }), (err: Error) => err.message === words);
-      answer = () => answered(202, { ok: true });
-      await assert.rejects(
-        acceptLoop('r-1', 'review', { message: 'Good enough.' }),
-        (err: Error) =>
-          err.message.startsWith(
-            'POST /api/runs/r-1/steps/review/accept answered what this board does not read: at step, the value is missing.',
-          ) && /before accepting again/.test(err.message),
-      );
-
-      assert.deepEqual(
-        sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(String(init?.body))]),
-        [
-          ['/api/runs/r%201/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
-          ['/api/runs/r-1/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
-          ['/api/runs/r-1/steps/review/accept', 'POST', 'application/json', { message: 'Good enough.' }],
         ],
       );
     },

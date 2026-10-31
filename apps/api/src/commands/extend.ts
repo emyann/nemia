@@ -44,13 +44,24 @@ function retryHowOf(args: Args): RetryHow {
 }
 
 /**
- * Retry's: a `model`, which is a new session's, goes with `"mode": "fresh"` alone, and a `budget` not above zero is refused in the
- * package's words (`budgetRefusal`), both 400; then the person's `answers`, checked against the questions the step's current closeout
- * asks and written as the try's message (`answeredHow`). Whether the message and the budget may ride on the ask is the command's check.
+ * A round's (`retry --round`, `POST …/round`): a budget not above zero is refused before the round is asked, 400, in the package's words
+ * (`roundBudgetRefusal`). What else a round does not take is the command's check.
+ */
+const roundFold = (run: Run, args: Args): { args: Args } | Refusal => {
+  const notAmount = roundBudgetRefusal(run.id, typeof args.budget === 'number' ? args.budget : undefined);
+  return notAmount ? { status: 400, error: notAmount } : { args };
+};
+
+/**
+ * Retry's: a round's on its path (`roundFold`); else a `model`, which is a new session's, goes with `"mode": "fresh"` alone, and a
+ * `budget` not above zero is refused in the package's words (`budgetRefusal`), both 400; then the person's `answers`, checked against the
+ * questions the step's current closeout asks and written as the try's message (`answeredHow`). Whether the message and the budget may
+ * ride on the ask is the command's check.
  */
 const RETRY: Extension = {
   takes: { answers: ANSWERS },
   async fold({ e, home, run }, command, args, { answers }) {
+    if (args.round === true) return roundFold(run, args);
     const how = retryHowOf(args);
     if (how.model !== undefined && how.mode !== 'fresh') {
       return {
@@ -82,15 +93,6 @@ const APPROVE: Extension = {
   },
 };
 
-/** Round's: a budget not above zero is refused before the round is asked, 400, in the package's words (`roundBudgetRefusal`). */
-const ROUND: Extension = {
-  takes: {},
-  async fold({ run }, _command, args) {
-    const notAmount = roundBudgetRefusal(run.id, typeof args.budget === 'number' ? args.budget : undefined);
-    return notAmount ? { status: 400, error: notAmount } : { args };
-  },
-};
-
 /**
  * Rm's: the board removes only a try, a run started from an agent's page (`tryOf`); any other run is a 409 naming `nemia rm`, which says
  * what it hands off and what it leaves, since a repository run's worktrees and branches are a person's to read before they go.
@@ -107,7 +109,7 @@ const RM: Extension = {
 };
 
 /** The api's extension of each command that has one, by its name. */
-export const EXTENSIONS: Readonly<Record<string, Extension>> = { retry: RETRY, approve: APPROVE, round: ROUND, rm: RM };
+export const EXTENSIONS: Readonly<Record<string, Extension>> = { retry: RETRY, approve: APPROVE, rm: RM };
 
 /** Where a table asks the api for what it does not do, a sentence each: a key a command's `apiTakes` names that no extension takes. */
 export const extensionBreaks = (table: readonly Pick<CommandSpec, 'name' | 'apiTakes'>[]): string[] =>

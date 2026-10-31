@@ -99,26 +99,26 @@ function cliFiles(): { file: string; text: string }[] {
 }
 
 /** The place `main` takes when it is handed none: the one line of the CLI that names the git place. */
-const DEFAULT = /\bplace:\s*Place\s*=\s*shippedGitPlace\b/;
+const DEFAULT = /\bplace:\s*Place\s*=\s*builtinGitPlace\b/;
 
 /** Each naming of the git place in `text`, its imports and `main`'s one default aside: a program given it, its layer, or the place. */
 const placeNamed = (text: string): string[] =>
   text
     .replace(/import\s*(?:type\s*)?\{[^}]*\}\s*from\s*'[^']*';/g, '')
     .replace(DEFAULT, '')
-    .match(/\bshipped\s*\(|\bgitPlaceLayer\b|\bshippedGitPlace\b/g) ?? [];
+    .match(/\bbuiltin\s*\(|\bgitPlaceLayer\b|\bbuiltinGitPlace\b/g) ?? [];
 
-test('REFUSED: a file of `src/cli` that names the git place — a program given it with `shipped(`, its layer, the place itself — but `main`, once, as its default', () => {
-  assert.deepEqual(placeNamed('const data = await runWith(e, shipped(command.handler(args)));'), ['shipped(']);
-  assert.deepEqual(placeNamed('runWith(\n  e,\n  shipped\n  (x),\n)'), ['shipped\n  ('], 'across a line break');
+test('REFUSED: a file of `src/cli` that names the git place — a program given it with `builtin(`, its layer, the place itself — but `main`, once, as its default', () => {
+  assert.deepEqual(placeNamed('const data = await runWith(e, builtin(command.handler(args)));'), ['builtin(']);
+  assert.deepEqual(placeNamed('runWith(\n  e,\n  builtin\n  (x),\n)'), ['builtin\n  ('], 'across a line break');
   assert.deepEqual(placeNamed('Layer.mergeAll(feedHubLayer(), gitPlaceLayer)'), ['gitPlaceLayer']);
-  assert.deepEqual(placeNamed('changesOf(shippedGitPlace, run, branches)'), ['shippedGitPlace']);
+  assert.deepEqual(placeNamed('changesOf(builtinGitPlace, run, branches)'), ['builtinGitPlace']);
   assert.deepEqual(
-    placeNamed('main(argv, given, demand, place: Place = shippedGitPlace) { f(shippedGitPlace); }'),
-    ['shippedGitPlace'],
+    placeNamed('main(argv, given, demand, place: Place = builtinGitPlace) { f(builtinGitPlace); }'),
+    ['builtinGitPlace'],
     'a second naming beside the default',
   );
-  assert.deepEqual(placeNamed("import { shipped, shippedGitPlace } from '../runner.ts';\nconst shipped = run.kind === 'shipped';"), []);
+  assert.deepEqual(placeNamed("import { builtin, builtinGitPlace } from '../runner.ts';\nconst builtin = run.kind === 'builtin';"), []);
 
   const files = cliFiles();
   const mainFile = files.find(({ file }) => file === 'src/cli/main.ts');

@@ -1,6 +1,6 @@
 /**
- * The tables of a loop's rounds and a person's word on them (`round.ts`): what `nemia round` and `nemia accept` take and refuse, which
- * round is due, what filing a round writes, and which asks are spent. Pure: no disk, no engine, no clock.
+ * The tables of a loop's rounds and a person's word on them (`round.ts`): what `nemia retry --round` and `nemia approve` take and refuse,
+ * which round is due, what filing a round writes, and which asks are spent. Pure: no disk, no engine, no clock.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -116,7 +116,7 @@ const spends =
 const refusalOf = (a: { refusal: string } | object): string =>
   'refusal' in a && typeof a.refusal === 'string' ? a.refusal : assert.fail(`taken, and should not have been: ${JSON.stringify(a)}`);
 
-test('acceptAsk: what `nemia accept` takes', async (t) => {
+test('acceptAsk: what `nemia approve` takes', async (t) => {
   const said = saidIn(3, true);
   const r = inRound(3);
   const accept = (r: Run, name: string | undefined, message: string | undefined, more: Partial<{ s: typeof said; w: Workflow[] }> = {}) =>
@@ -126,9 +126,9 @@ test('acceptAsk: what `nemia accept` takes', async (t) => {
     assert.deepEqual(accept(r, undefined, ENOUGH), { step: 'review', try: 3 });
   });
   await t.test('REFUSED: no words, or empty ones, asked for before anything about the run', () => {
-    names(refusalOf(accept(r, 'review', undefined)), 'nemia accept r-1 review --message "<why>"');
-    names(refusalOf(accept(r, undefined, undefined)), 'nemia accept r-1 [<step>] --message "<why>"');
-    names(refusalOf(accept(r, 'review', '   ')), '--message is empty', 'nemia accept r-1 review --message "<why>"');
+    names(refusalOf(accept(r, 'review', undefined)), 'nemia approve r-1 review --message "<why>"');
+    names(refusalOf(accept(r, undefined, undefined)), 'nemia approve r-1 [<step>] --message "<why>"');
+    names(refusalOf(accept(r, 'review', '   ')), '--message is empty', 'nemia approve r-1 review --message "<why>"');
   });
   await t.test('REFUSED: a cancelled run, which files nothing to honour it', () => {
     names(refusalOf(accept(inRound(3, CANCELLED), 'review', ENOUGH)), 'r-1 was cancelled at 2026-01-02T00:00:00Z', 'nemia start');
@@ -142,7 +142,7 @@ test('acceptAsk: what `nemia accept` takes', async (t) => {
     names(
       refusalOf(accept(r, undefined, ENOUGH, { w: TWO })),
       'r-1 has 2 loops, closing at review, proofread',
-      'nemia accept r-1 <step> --message "<why>"',
+      'nemia approve r-1 <step> --message "<why>"',
     );
   });
   await t.test('REFUSED: a try already accepted, and a round already asked for', () => {
@@ -166,7 +166,7 @@ test('acceptAsk: what `nemia accept` takes', async (t) => {
       'review asked for round 3',
       'waits on a budget',
       '`rounds: 3` has one round left',
-      'nemia round r-1 review --budget <amount>',
+      'nemia retry r-1 review --round --budget <amount>',
     );
   });
   await t.test('REFUSED: a loop that ended `again: false`, and a round still running', () => {
@@ -181,7 +181,7 @@ test('acceptAsk: what `nemia accept` takes', async (t) => {
   });
 });
 
-test('roundAsk: what `nemia round` takes and refuses', async (t) => {
+test('roundAsk: what `nemia retry --round` takes and refuses', async (t) => {
   const ask = (
     r: Run,
     said: (name: string) => Closeout | undefined,
@@ -226,12 +226,12 @@ test('roundAsk: what `nemia round` takes and refuses', async (t) => {
     ];
     const answer = roundAsk(two, run({ implement: 'i1', review: 'r1', docs: null, proof: null }), undefined, ALL_SUCCEEDED);
     assert.deepEqual(Object.keys(answer), ['refusal']);
-    names(refusalOf(answer), 'r-1 has 2 loops, closing at review, proof', 'nemia round r-1 <step>');
+    names(refusalOf(answer), 'r-1 has 2 loops, closing at review, proof', 'nemia retry r-1 <step> --round');
   });
   await t.test('REFUSED: an accepted loop, naming the acceptance rather than an unasked sign-off', () => {
     const accepted = refusalOf(roundAsk(LOOP, inRound(3, acceptedTry(3)), 'review', ALL_SUCCEEDED, saidIn(3, true), asked));
-    names(accepted, 'review asked for round 4', '2026-09-20T14:05:00.000Z', '(nemia accept)', 'accept-review-3', '.asks');
-    names(accepted, 'nemia round r-1 review');
+    names(accepted, 'review asked for round 4', '2026-09-20T14:05:00.000Z', '(nemia approve)', 'accept-review-3', '.asks');
+    names(accepted, 'nemia retry r-1 review --round');
     assert.ok(!accepted.includes('without asking'));
   });
 });
@@ -248,9 +248,9 @@ test('roundAsk past a budget: once more only with `--budget` above what the step
       'review asked for round 2',
       'implement has cost $4.25 of its $3 budget',
       'above $4.25',
-      'nemia round r-1 review --budget <amount>',
+      'nemia retry r-1 review --round --budget <amount>',
     );
-    names(refusalOf(ask(4)), '--budget 4 is not above $4.25', 'more than $4.25', 'nemia round r-1 review --budget <amount>');
+    names(refusalOf(ask(4)), '--budget 4 is not above $4.25', 'more than $4.25', 'nemia retry r-1 review --round --budget <amount>');
     assert.deepEqual(ask(10), { step: 'review', round: 2, budget: 10 });
     names(
       refusalOf(ask(10, [roundAskFor(2)])),
@@ -258,7 +258,7 @@ test('roundAsk past a budget: once more only with `--budget` above what the step
       'without a --budget above $4.25',
       '$4.25 of its $3 budget',
       'round-review-2',
-      'nemia round r-1 review --budget <amount>',
+      'nemia retry r-1 review --round --budget <amount>',
     );
   });
   await t.test('at the cap and past a budget: asks for `--budget` too, and takes one', () => {
@@ -269,7 +269,7 @@ test('roundAsk past a budget: once more only with `--budget` above what the step
       refusalOf(bare),
       'review asked for round 4',
       'implement has cost $3.50 of its $3 budget',
-      'nemia round r-1 review --budget <amount>',
+      'nemia retry r-1 review --round --budget <amount>',
     );
     const raised = roundAsk(BUDGETED_LOOP, r, 'review', ALL_SUCCEEDED, saidIn(3, true), asked, [], spent, 5);
     assert.deepEqual(raised, { step: 'review', round: 4, budget: 5 });
@@ -278,7 +278,7 @@ test('roundAsk past a budget: once more only with `--budget` above what the step
     const spent = spends({ i1: 1, i2: 1, i3: 1.5 });
     const unraised = roundAsk(LOOP, inRound(3), 'review', ALL_SUCCEEDED, saidIn(3, true), asked, [], spent, 5);
     assert.deepEqual(Object.keys(unraised), ['refusal']);
-    names(refusalOf(unraised), '--budget', "no step of review's loop is", 'nemia round r-1 review.');
+    names(refusalOf(unraised), '--budget', "no step of review's loop is", 'nemia retry r-1 review --round.');
     assert.deepEqual(roundAsk(LOOP, inRound(3), 'review', ALL_SUCCEEDED, saidIn(3, true), asked, [], spent), { step: 'review', round: 4 });
   });
 });
@@ -286,7 +286,11 @@ test('roundAsk past a budget: once more only with `--budget` above what the step
 test("roundBudgetRefusal: a round's `--budget`", async (t) => {
   for (const budget of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) {
     await t.test(`REFUSED: ${String(budget)}, no dollars above zero`, () => {
-      names(roundBudgetRefusal('r-1', budget), `--budget ${String(budget)} is not an amount`, 'nemia round r-1 [<step>] --budget <amount>');
+      names(
+        roundBudgetRefusal('r-1', budget),
+        `--budget ${String(budget)} is not an amount`,
+        'nemia retry r-1 [<step>] --round --budget <amount>',
+      );
     });
   }
   await t.test('none given, or an amount, is let through', () => {

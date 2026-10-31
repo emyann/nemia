@@ -225,7 +225,7 @@ test('a declared output travels to the step that reads it', async (t) => {
       for (const [why, said] of ways) {
         stage.board().settle(reviewTask(), 'succeeded', said);
         const p = await pass(id);
-        assert.deepEqual([p.filed, [...p.blocked].sort(), p.status], [[], ['respond', 'tidy'], 'blocked'], why);
+        assert.deepEqual([p.filed, [...p.unreachable].sort(), p.status], [[], ['respond', 'tidy'], 'waiting'], why);
         assert.match((await listed(id)).statuses[1], /^unsigned/, why);
         const d = await awaiting(id);
         assert.deepEqual(d && d.unsigned, ['review'], why);
@@ -310,9 +310,9 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
     ended(nudge, 'failed', { ended: 'failed', reason: 'harness', closedOut: false, former: 'unsigned' });
     assert.deepEqual(await askedOf(nudge), ['failed', 'unsigned']);
     const p = await pass(id);
-    assert.deepEqual([p.tried, p.filed, p.blocked], [[], [], ['review']], 'the run refuses a second nudge');
-    assert.deepEqual(await listed(id), { statuses: ['unsigned', 'waiting'], onYou: ['implement'] });
-    assert.deepEqual(await awaiting(id), { outcome: 'blocked', unsigned: ['implement'], failed: [] });
+    assert.deepEqual([p.tried, p.filed, p.unreachable], [[], [], ['review']], 'the run refuses a second nudge');
+    assert.deepEqual(await listed(id), { statuses: ['unsigned', 'pending'], onYou: ['implement'] });
+    assert.deepEqual(await awaiting(id), { outcome: 'waiting', unsigned: ['implement'], failed: [] });
   });
   await s.test('a nudge a person asks for is told the last try ended without its closeout', async () => {
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'nudge' }));
@@ -330,7 +330,7 @@ test('the run nudges no end that is not a missing statement', async (t) => {
       stage.board().settle(task, 'succeeded');
       assert.deepEqual(await askedOf(task), ['succeeded', true]);
       const p = await pass(id);
-      assert.deepEqual([p.filed, p.checked, p.blocked, p.tried], [[], [], ['review'], []]);
+      assert.deepEqual([p.filed, p.checked, p.unreachable, p.tried], [[], [], ['review'], []]);
       assert.deepEqual(
         stage.board().filings.filter((f) => f.startsWith(id)),
         [task],
@@ -347,8 +347,8 @@ test('the run nudges no end that is not a missing statement', async (t) => {
     const { id, task } = await filed(twoSteps());
     stage.board().settle(task, 'failed');
     assert.deepEqual(await askedOf(task), ['failed', true]);
-    assert.deepEqual([(await pass(id)).filed, (await pass(id)).blocked], [[], ['review']]);
-    assert.deepEqual(await listed(id), { statuses: ['failed', 'waiting'], onYou: [] });
+    assert.deepEqual([(await pass(id)).filed, (await pass(id)).unreachable], [[], ['review']]);
+    assert.deepEqual(await listed(id), { statuses: ['failed', 'pending'], onYou: [] });
     assert.deepEqual(await awaiting(id), { outcome: 'failed', unsigned: [], failed: ['implement'] });
     await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'nudge' }));
     assert.deepEqual((await pass(id)).tried, ['implement']);
@@ -792,9 +792,9 @@ test('REFUSED at `nemia start`, before a run is written — exit 2, by kind and 
       ['nemia start does not take --inputs', '--input <file> once per file', '--gate <step>', '--factory <name>', '--brief "<brief>"'],
     ],
     [
-      '`nemia plan --input`',
-      () => stage.main(['plan', plan, '--repo', repo, '--input', a]),
-      ['nemia plan does not take --input', 'nemia start <card.md> --workflows <dir> --input <file>'],
+      '`nemia start <folder> --input`',
+      () => stage.main(['start', plan, '--repo', repo, '--input', a]),
+      ['nemia start <folder> does not take --input', 'nemia start <card.md> --workflows <dir> --input <file>'],
     ],
   ];
   for (const [name, refused, facts] of rows)

@@ -181,7 +181,7 @@ rm "$S"/node_modules; git worktree remove "$S"
 - **Tell a running session something:** `nemia say <run> <step> "…"`. It is handed over, not guaranteed read: a session about to sign off
   may never see it. If the step signs off without it, send the step back with the same words.
 - **Send a landing back:** the gate's send-back goes to review (`nemia retry <run> review --message`). Review is read-only, so tell it to
-  sign off with `again: true` and the findings for implement, which files the next implement round. `nemia round` is only for a loop out
+  sign off with `again: true` and the findings for implement, which files the next implement round. `nemia retry --round` is only for a loop out
   of rounds. Fold small findings and owed changes into a round that must happen anyway (a merge of main), never a round for them alone.
 - A spec, round or send-back the person answered keeps their exact choice; the operator adds only what makes it buildable (the file,
   the fixture, the measure, the data the step's fence kept it from reading).
@@ -338,7 +338,7 @@ English; never push or open a pull request unless asked.
 - **Reads:** `nemia ls`, `nemia decide`, `nemia inbox`, `nemia stats`, `nemia passes`, `GET /api/quota`, the task journals, the check
   logs, the session transcripts; `git log`, `git diff`, `git merge-tree`, `git grep` on any branch.
 - **Acts:** `nemia start` (`--after`, later `--from`), `nemia approve`, `nemia retry` (`--message`, `--recheck`), `nemia say`,
-  `nemia hold` (`--until`, `--why`, `--off`), `nemia pause` and `nemia resume`, `nemia inbox add`, `nemia round`; the daemon restart;
+  `nemia hold` (`--until`, `--why`, `--off`), `nemia pause` and `nemia resume`, `nemia inbox add`, `nemia retry --round`, `nemia refresh --base`; the daemon restart;
   scratch worktrees for verification.
 - **Asks:** a channel to the person that carries questions as data and waits for the answer, on the board and on a phone.
 - **Wakes:** on a subscription to the feed filtered at the source to what needs judgement, with a digest of the rest (slice 5a), never

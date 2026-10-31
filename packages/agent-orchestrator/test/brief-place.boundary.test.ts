@@ -14,7 +14,7 @@ import type { Closeout } from '../src/closeout/closeout.ts';
 import type { BriefPlace } from '../src/brief/brief.ts';
 import { SKILL_SECTIONS, type PlaceSay } from '../src/place/place.ts';
 import type { Place } from '../src/place/place.store.ts';
-import { shippedGitPlace } from '../src/place/shipped.store.ts';
+import { builtinGitPlace } from '../src/place/builtin.store.ts';
 import { placeTold } from '../src/tick/told.verb.ts';
 import { TEAM_DEV } from './team.ts';
 
@@ -59,7 +59,7 @@ type Telling = (run: Run, step: Workflow) => BriefPlace;
 
 /** What `placeTold` tells a step, by `place`, the package's git place when given none. */
 const toldBy =
-  (place: Place = shippedGitPlace): Telling =>
+  (place: Place = builtinGitPlace): Telling =>
   (run, step) =>
     placeTold(run, step, place);
 
@@ -129,7 +129,7 @@ const gitLines = (brief: string): string[] => brief.split('\n').filter((line) =>
 
 /** The package's place, its words Mercurial's: what a place of another tool would say. */
 function hgPlace(): Place {
-  const declared = shippedGitPlace.declared;
+  const declared = builtinGitPlace.declared;
   const hg = (line: string) => line.replaceAll('git', 'hg');
   const say = Object.fromEntries(
     Object.entries(declared.say).map(([key, said]: [string, string | readonly string[]]) => [
@@ -138,7 +138,7 @@ function hgPlace(): Place {
     ]),
   ) as unknown as PlaceSay;
   return {
-    ...shippedGitPlace,
+    ...builtinGitPlace,
     declared: {
       denyWhileLanding: ['Bash(hg commit:*)'],
       say: {
@@ -164,7 +164,7 @@ test('a run is told the words of the place it is given, whatever place its recor
   const run = runOf();
   const named: RepositoryRun = { ...run, placeSkill: { skill: 'git', version: 'a'.repeat(64) } };
   for (const each of [run, named])
-    assert.deepEqual(toldBy()(each, stepNamed('review')), { words: undefined, say: shippedGitPlace.declared.say });
+    assert.deepEqual(toldBy()(each, stepNamed('review')), { words: undefined, say: builtinGitPlace.declared.say });
 });
 
 test("a planted place's words replace every git command of a repository run's briefs", () => {

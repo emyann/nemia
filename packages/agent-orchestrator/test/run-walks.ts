@@ -13,7 +13,7 @@ import type { DoorWalk } from './door-walks.ts';
 import { act, done } from './door-walks.ts';
 import type { RunDoorShape } from '../src/runs/runs.store.ts';
 import { RunId } from '../src/record/record.model.ts';
-import type { PersonAsk, Run } from '../src/record/record.ts';
+import type { PersonRequest, Run } from '../src/record/record.ts';
 
 type Walk = DoorWalk<RunDoorShape>;
 type Door = RunDoorShape;
@@ -74,20 +74,21 @@ const landedTwice = (id: string): Run => {
 };
 
 /** One ask of each kind a person writes, and its key's number. */
-const ASKS: Array<{ asked: PersonAsk; n: number }> = [
-  { asked: { kind: 'retry', ask: { step: 'implement', try: 2, mode: 'fresh', message: 'again', at } }, n: 2 },
-  { asked: { kind: 'round', ask: { step: 'review', round: 3, at } }, n: 3 },
-  { asked: { kind: 'approve', ask: { step: 'implement', try: 1, at, message: 'yes' } }, n: 1 },
-  { asked: { kind: 'accept', ask: { step: 'review', try: 1, at, message: 'good enough' } }, n: 1 },
+const ASKS: Array<{ asked: PersonRequest; n: number }> = [
+  { asked: { kind: 'retry', of: 'try', ask: { step: 'implement', try: 2, mode: 'fresh', message: 'again', at } }, n: 2 },
+  { asked: { kind: 'retry', of: 'round', ask: { step: 'review', round: 3, at } }, n: 3 },
+  { asked: { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, message: 'yes' } }, n: 1 },
+  { asked: { kind: 'approve', of: 'loop', ask: { step: 'review', try: 1, at, message: 'good enough' } }, n: 1 },
   {
     asked: {
-      kind: 'merge',
+      kind: 'refresh',
+      of: 'base',
       ask: { step: 'review', round: 2, at, merge: { target: 'implement', try: 3, onto: 'main', sha: 'a'.repeat(40) } },
     },
     n: 3,
   },
 ];
-const stepOf = (asked: PersonAsk): string => (asked.kind === 'merge' ? asked.ask.merge.target : asked.ask.step);
+const stepOf = (asked: PersonRequest): string => (asked.of === 'base' ? asked.ask.merge.target : asked.ask.step);
 
 const READ: Walk[] = [
   {
@@ -95,7 +96,7 @@ const READ: Walk[] = [
     walk: ({ door }) => {
       made(door, 'w-read');
       const hold = act(door.holds.put(idOf('w-read'), ['other-run'], {}));
-      act(door.asks.write(idOf('w-read'), { kind: 'approve', ask: { step: 'implement', try: 1, at, message: 'yes' } }));
+      act(door.asks.write(idOf('w-read'), { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, message: 'yes' } }));
       const cancelledAt = act(door.runs.cancel(idOf('w-read')));
       const read = act(door.runs.read(idOf('w-read'))) as Run;
       return {
@@ -291,7 +292,7 @@ const RUNS: Record<string, Walk[]> = {
           act(door.runs.prune(idOf(id), { at, worktrees: [] }));
           act(door.holds.put(idOf(id), ['x'], {}));
           act(door.refresh.put(idOf(id)));
-          act(door.asks.write(idOf(id), { kind: 'approve', ask: { step: 'implement', try: 1, at } }));
+          act(door.asks.write(idOf(id), { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } }));
         }
         const removed = act(door.runs.forget(idOf('w-forget')));
         const kept = act(door.runs.read(idOf('w-forget-other'))) as Run;
@@ -367,29 +368,30 @@ const RUNS: Record<string, Walk[]> = {
 const ASK_WALKS: Record<string, Walk[]> = {
   'asks.write': [
     {
-      name: 'an ask of each kind is written once at its name, and a second at that name is refused as no stray',
+      name: 'an ask of each kind is written once where `where` finds it, and a second there is refused as no stray',
       walk: ({ door }) => {
         made(door, 'w-write-asks');
-        return ASKS.map(({ asked, n }) => {
-          const where = act(door.asks.where(idOf('w-write-asks'), { kind: asked.kind, step: stepOf(asked), n }));
-          const first = act(door.asks.write(idOf('w-write-asks'), asked));
-          const again = act(
-            door.asks.write(idOf('w-write-asks'), { ...asked, ask: { ...asked.ask, at: '2026-10-01T00:00:00.000Z' } } as PersonAsk),
+        const wheres = ASKS.map(({ asked, n }) => act(door.asks.where(idOf('w-write-asks'), { of: asked.of, step: stepOf(asked), n })));
+        return ASKS.map(({ asked }, i) => {
+          const first = done(door.asks.write(idOf('w-write-asks'), asked));
+          const again = done(
+            door.asks.write(idOf('w-write-asks'), { ...asked, ask: { ...asked.ask, at: '2026-10-01T00:00:00.000Z' } } as PersonRequest),
           );
-          return [first, again, where];
-        });
+          const stray = again.written ? undefined : again.stray;
+          return [first.written, first.where === wheres[i], again.written, again.where === wheres[i], stray];
+        }).concat([[new Set(wheres).size === ASKS.length]]);
       },
-      says: ASKS.map(({ asked, n }) => {
-        const where = `<root>/runs/w-write-asks.asks/${asked.kind}-${stepOf(asked)}-${n}`;
-        return [{ written: true, where }, { written: false, where, stray: null }, where];
-      }),
+      says: [...ASKS.map(() => [true, true, false, true, null]), [true]],
     },
   ],
   'asks.where': [
     {
-      name: 'an ask is found at its kind, step and number',
-      walk: ({ door }) => act(door.asks.where(idOf('w-where'), { kind: 'retry', step: 'implement', n: 2 })),
-      says: '<root>/runs/w-where.asks/retry-implement-2',
+      name: "an ask is found in its run's asks, by which of its verb it is, its step and its number",
+      walk: ({ door, root }) => {
+        const where = done(door.asks.where(idOf('w-where'), { of: 'try', step: 'implement', n: 2 }));
+        return [where.startsWith(`${root}/runs/w-where.asks/`), where.endsWith('-implement-2')];
+      },
+      says: [true, true],
     },
   ],
   'asks.read': [
@@ -456,7 +458,7 @@ const ASK_WALKS: Record<string, Walk[]> = {
       walk: ({ door }) => {
         made(door, 'w-answers');
         act(door.asks.write(idOf('w-answers'), ASKS[0].asked));
-        act(door.asks.write(idOf('w-answers'), { kind: 'retry', ask: { step: 'review', try: 2, mode: 'fresh', at } }));
+        act(door.asks.write(idOf('w-answers'), { kind: 'retry', of: 'try', ask: { step: 'review', try: 2, mode: 'fresh', at } }));
         return (act(door.asks.answers(idOf('w-answers'))) as Array<{ message?: string }>).map((a) => a.message);
       },
       says: ['again'],

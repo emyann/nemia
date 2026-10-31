@@ -82,8 +82,8 @@ const upgradeTry = (t: unknown): unknown => {
  * that ended without its closeout, once a round, before it waits on a person (`retriesDue`) — or the mode a person asked for, with the
  * model a `--model` named. A recheck replaces only the check, so the try after one has the same `taskId`. Or `round`: the step's loop
  * went round again (`roundFiled`), and the try after it is the next round's. Or `merge`: the loop was filed again on the round it is on,
- * for its target to merge the base (`nemia merge`), which no round counts (`roundIn`). Or `back`: an ending that stopped on the base
- * branch, sent back with its work (`sentBack`), whose next try is filed on a new approval.
+ * for its target to merge the base (`nemia refresh --base`), which no round counts (`roundIn`). Or `back`: an ending that stopped on the
+ * base branch, sent back with its work (`sentBack`), whose next try is filed on a new approval.
  */
 export type EarlierTry = {
   taskId: string;
@@ -195,8 +195,12 @@ export const signoffsSpent = (record: StepRecord | undefined): number => {
 export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = false): boolean =>
   (asked === 'unsigned' || lackedOf(record).length > 0 || refused) && signoffsSpent(record) < 1;
 
-/** How a try was asked for, as a person typed it: `--nudge`, `--fresh`, `--model <m>`, `--recheck`. */
-export const modeWord = (how: { mode: RetryMode; model?: string }): string => (how.model ? `--model ${how.model}` : `--${how.mode}`);
+/**
+ * How a try was asked for, as a person types it: `--continue` (the mode `nudge`, as its file still says it), `--fresh`, `--model <m>`,
+ * `--recheck`.
+ */
+export const modeWord = (how: { mode: RetryMode; model?: string }): string =>
+  how.model ? `--model ${how.model}` : how.mode === 'nudge' ? '--continue' : `--${how.mode}`;
 
 /** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `nemia retry` and what it was typed with. */
 export const tryWord = (r: Retry, step: Workflow): string =>

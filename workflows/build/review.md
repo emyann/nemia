@@ -14,6 +14,9 @@ disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(np
 Judge what was asked and what the diff does. The steps before you each left their whole closeout in their folder's `closeout.json`:
 its summary and body are that step's own account, to check against the change, never taken as the answer to a finding.
 
+When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
+repository writes Effect 4, and sends you to the docs installed with Effect first.
+
 When the change touches `apps/web`, read the pictures the implement step named in its `artifacts`, by their paths in its folder's
 `closeout.json`, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding.
 When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used.

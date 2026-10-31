@@ -31,7 +31,7 @@ const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');
 const { tickRun, freshRestMemo } = await import('../src/tick/tick.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
-const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
+const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
 const { freeOnce, freshFreeMemory } = await import('../src/prune/free.verb.ts');
 
 type Pass = Awaited<ReturnType<typeof tick>>;
@@ -116,14 +116,14 @@ type Asked = Array<{ verb: PlaceVerb; request: PlaceRequests[PlaceVerb]; door: '
 /** The shipped git place, every question noted in `asked`, with its door, before it is answered. */
 const counting = (asked: Asked) =>
   PlaceService.layer({
-    declared: shippedGitPlace.declared,
+    declared: builtinGitPlace.declared,
     ask: (verb, request, options) => {
       asked.push({ verb, request, door: 'ask' });
-      return shippedGitPlace.ask(verb, request, options);
+      return builtinGitPlace.ask(verb, request, options);
     },
     askNow: (verb, request, options) => {
       asked.push({ verb, request, door: 'askNow' });
-      return shippedGitPlace.askNow(verb, request, options);
+      return builtinGitPlace.askNow(verb, request, options);
     },
   });
 

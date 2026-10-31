@@ -23,7 +23,7 @@ import type { RunDecision } from '../src/decide/decision.ts';
 import type { RunDetail } from '../src/detail/detail.ts';
 import { app } from '../src/app.ts';
 import { decideRun, engine, list, passStanding, runStore, type RunSummary, waitAdvice, waitWord } from 'agent-orchestrator';
-import { runWith } from './shipped-place.ts';
+import { runWith } from './builtin-place.ts';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -172,7 +172,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
           runs: [{ run: 'b-running', missing: false, cancelledAt: null, gone: [] }],
           word: 'waiting on b-running',
           advice: 'nothing of d-waits is filed until nemia decide says b-running has landed on main; nothing to decide yet',
-          onYou: false,
+          waitingOnYou: false,
         },
         'a-landed has landed, so only b-running is waited on',
       );
@@ -186,7 +186,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         runs: [{ run: 'c-cancelled', missing: false, cancelledAt, gone: [] }],
         word: 'waiting on c-cancelled (cancelled)',
         advice: `c-cancelled was cancelled at ${cancelledAt}, and a cancelled run never lands — yours to resolve: nemia cancel e-cancelled-parent, or start the work again without --after c-cancelled`,
-        onYou: true,
+        waitingOnYou: true,
       });
       assert.deepEqual(runs.get('f-no-such-parent')!.waiting?.runs, [{ run: 'no-such-run', missing: true, cancelledAt: null, gone: [] }]);
       assert.equal(runs.get('f-no-such-parent')!.waiting?.word, 'waiting on no-such-run (no such run)');
@@ -236,7 +236,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
           assert.equal(api.waiting?.word, waitWord(cli.waiting), id);
           assert.equal(api.waiting?.advice, waitAdvice(runStore.runs.read(id), cli.waiting), id);
           assert.equal(
-            api.waiting?.onYou,
+            api.waiting?.waitingOnYou,
             !waitAdvice(runStore.runs.read(id), cli.waiting).startsWith(`nothing of ${id} is filed until `),
             `${id}: on you exactly when waitAdvice does not say "nothing of <run> is filed until …", which it says while every run waited on may still land`,
           );

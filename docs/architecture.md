@@ -87,7 +87,7 @@ word, never a secret or a token.
 default: the daemon, a CLI command, the api's layer and each test give one by name, and a program given none does not compile
 (`src/place/place.store.test.ts`). Git is one place, in code outside `src` (`packages/agent-orchestrator/place/git`), one object for
 every factory and repository of its process, a question a call that runs git and no process between
-(`test/git-ask.boundary.test.ts`); it is given as `gitPlaceLayer` by `src/place/shipped.store.ts`, the one file of `src` that imports it (`placeBreaks` in `test/boundary.test.ts`),
+(`test/git-ask.boundary.test.ts`); it is given as `gitPlaceLayer` by `src/place/builtin.store.ts`, the one file of `src` that imports it (`placeBreaks` in `test/boundary.test.ts`),
 so no `src` names git (`test/git-calls.test.ts`). The test place is a second one, beside it (`packages/agent-orchestrator/place/memory`,
 `testPlace()`): it answers the same verbs from memory, in real directories and with no process, new for each test, and no file of `src`
 or `bin` imports it: the door gives git alone (`placeBreaks`). A test of another package takes it through the package's
@@ -108,7 +108,7 @@ per run*: a run copies no place and its record names none (`test/start-place.bou
 of the process that asks, the release installed, and a change to the place reaches it at the next restart.
 
 **A loop's rounds** are the orchestrator's, counted off the looping step's tries that went `cause: 'round'` (`roundIn`,
-`src/status/status.ts`): a reviewer's `again: true`, and a person's `nemia round`. A merge of the base (`nemia merge`, `src/merge/`) is
+`src/status/status.ts`): a reviewer's `again: true`, and a person's `nemia retry --round`. A merge of the base (`nemia refresh --base`, `src/merge/`) is
 no round: the loop's target is filed again to merge the base at the commit a trial merge read, its try `cause: 'merge'`, the run's
 `baseRef` moves to that commit, and the reviewer after it reads the merge; a finding of it with `again: true` is a round, counted as any
 (`test/merge-round-walk.boundary.test.ts`, *a merge send-back leaves the round count unchanged*). A merge of work that merges cleanly is refused, pointed to
@@ -116,8 +116,8 @@ the landing — its approval, or, where its review routes an ungated one, the ti
 loop, to `nemia retry`. Unless the ending's last landing check refused
 the merge staged on the base as it is now (`Landed`'s `refusedOn`): the conflict is semantic, and the merge is asked, its target handed
 what the check said (`refusedLanding`, `src/merge/merge.ts`; `test/ship.test.ts`, *the conflict is semantic*, and the refusals for a
-base moved since and a check that did not finish). While a merge is asked, `nemia round` and
-`nemia accept` of its loop are refused, since either would drop it; `nemia decide` offers the merge wherever the verb would take it.
+base moved since and a check that did not finish). While a merge is asked, `nemia retry --round` and
+`nemia approve` of its loop out of rounds are refused, since either would drop it; `nemia decide` offers the merge wherever the verb would take it.
 
 **In the runtime since platform slice 3**: session admission and pools. The runtime admits a queued task under the engine's ceiling
 and its harness's pool, the highest priority first (`agent-runtime/src/core/admission.ts`); the orchestrator hands it the ceiling
@@ -137,7 +137,7 @@ the default factory, and a raise for a stretch that ends by itself, read as it p
 **The rules for auto** are the person's and the orchestrator's (`src/auto/`): an agent's proposal (`auto/<agent>.proposed.json`, written
 by `nemia policy propose` alone) and the person's confirmed list (`auto/<agent>.json`, written by `nemia policy confirm` and `nemia policy
 drop` alone, classed `ask` and asked every time, `asksAlways`; a confirm carries the words the person read, refused once the rule
-reads otherwise), the rule that ships in force while none is confirmed
+reads otherwise), the builtin rule in force while none is confirmed
 (`DEFAULT_AUTO`). Whether a rule allows an answer is pure (`allowedBy` over `Facts`, `src/auto/auto.ts` and `facts.ts`); the facts are
 read off the run by a controller (`seenOf`, `src/admission/seen.verb.ts`), and admission gives unasked what the list allows in a run at
 `auto` (`nemia admit --auto <agent>`), naming no agent of its own.
@@ -218,7 +218,7 @@ whether the session reads it is the runtime's (`agent-runtime/docs/open-issues.m
 forked by `up`) files while any factory is above `manual` and stops once none is, level-triggered off the levels (`nemia level`) and
 her task's view, and subscribes to the feed under the name `nemia`, which no person gives or takes away; her subscription and her
 admission carry her floor, `semi-auto`, so a factory at `manual` is left alone. What she is
-— her instruction, her fence and her skills — ships in the package's `nemia/` folder, outside `src`, and holds no word of this
+— her instruction, her fence and her skills — is built into the package's `nemia/` folder, outside `src`, and holds no word of this
 repository's team (`test/nemia-shipped.test.ts`); how her session runs is the runtime's (`restartPolicy: 'Always'`, Remote Control,
 and the attached runner that rule brings).
 Her chat is the orchestrator's too, written over a long-lived task and a folder (`src/chat/`): projected on every read from her
@@ -378,7 +378,7 @@ A file at the top of `src/` is named in `PURE`, `STORE`, `CONTROLLER` or `CLIENT
 
 A place's code (`place/<name>/`, the git place's `place.ts`, `git.ts` and `verbs/`) is none of the five, and stands beside `src`: it
 imports node's built-ins, `effect`, its own files, and what a place is (`src/place/place.ts`, `src/place/place.store.ts`), and one file
-of `src` alone imports it, `src/place/shipped.store.ts`, which gives it as a layer (`gitPlaceLayer`); every other file asks the place it
+of `src` alone imports it, `src/place/builtin.store.ts`, which gives it as a layer (`gitPlaceLayer`); every other file asks the place it
 is given (`PlaceService`). `placeBreaks` in the same test holds both. The CLI's `main` is handed its place as it is handed its engine,
 the git place where it is handed none, and each command gives its program that one: `test/cli-place.test.ts` refuses a file of
 `src/cli` that names the git place.

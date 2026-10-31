@@ -144,7 +144,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
       child,
       'unknown',
       waits,
-      ['waiting on p-1 (cancelled)', 'waiting on p-1 (cancelled)', 'waiting'],
+      ['waiting on p-1 (cancelled)', 'waiting on p-1 (cancelled)', 'pending'],
       waits,
     ],
     [
@@ -152,7 +152,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
       child,
       'unknown',
       undefined,
-      ['waiting', 'waiting', 'waiting'],
+      ['pending', 'pending', 'pending'],
       undefined,
     ],
     [
@@ -160,7 +160,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
       { ...child, cancelledAt: '2026-09-14T11:00:00Z' },
       'unknown',
       waits,
-      ['waiting', 'waiting', 'waiting'],
+      ['pending', 'pending', 'pending'],
       [],
     ],
     [
@@ -168,7 +168,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
       run({ a: 't1', b: null, c: null }, { after: ['p-1'] }),
       'running',
       waits,
-      ['running', 'waiting', 'waiting'],
+      ['running', 'pending', 'pending'],
       [],
     ],
   ];
@@ -192,7 +192,7 @@ test("a pass records the tips of a finished run's result branches — `tipBranch
     return r;
   };
   await t.test('the result branch of a run succeeded or failed, or stopped on a person, and no other', () => {
-    for (const status of ['succeeded', 'failed', 'awaiting approval', 'blocked'] as const)
+    for (const status of ['succeeded', 'failed', 'awaiting approval', 'waiting'] as const)
       assert.deepEqual(tipBranches(branched(), fan, status), ['wf/r-1/c'], status);
   });
   await t.test('none of a run running or cancelled, --no-worktree, or that worked on its base branch', () => {

@@ -115,10 +115,10 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
 
 /** An agent of yours removed (`removeAgent`), against the `version` it was read at, which a removal without it names. */
 export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
-  name: 'agents remove',
+  name: 'agents rm',
   usage: 'yours <name> --version <v>',
   help: ['an agent of yours removed, at the --version it was read at'],
-  spec: writerSpec('agents remove', 'yours <name> --version <v>', PLACE_AND_NAME, [versionFlag('agents remove', 'the agent'), REPO]),
+  spec: writerSpec('agents rm', 'yours <name> --version <v>', PLACE_AND_NAME, [versionFlag('agents rm', 'the agent'), REPO]),
   writes: true,
   class: 'ask',
   route: {
@@ -131,7 +131,7 @@ export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
     tried(() => {
       const name = writerText(args, 'name') ?? '';
       const repo = writerText(args, 'repo');
-      const dir = yoursOrRefused('nemia agents remove', 'agents', writerText(args, 'from') ?? '', name, repo ?? '', home);
+      const dir = yoursOrRefused('nemia agents rm', 'agents', writerText(args, 'from') ?? '', name, repo ?? '', home);
       return removeAgent(dir, name, { version: writerText(args, 'version') ?? null, ...(repo !== undefined && { repo }) });
     }),
   print: ({ dir, removed }) => [`removed from ${dir}: ${removed.join(', ')}`],
@@ -142,16 +142,16 @@ export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
  * folder team's is; a tick files it. Refused before anything is written, as `tryAgent` says.
  */
 export const AGENTS_TRY: Command<{ id: string }> = {
-  name: 'agents try',
+  name: 'agents run',
   usage: 'yours <name> --brief <words>',
   help: ['an agent of yours tried on a short brief, in a folder of its own,', `capped at $${TRY_BUDGET}`],
-  spec: writerSpec('agents try', 'yours <name> --brief <words>', PLACE_AND_NAME, [
+  spec: writerSpec('agents run', 'yours <name> --brief <words>', PLACE_AND_NAME, [
     {
       flag: '--brief',
       kind: 'text',
       key: 'brief',
-      takes: '--brief takes what the agent is asked to do, a sentence is enough: nemia agents try yours <name> --brief "<words>"',
-      twice: 'nemia agents try takes --brief once: a try is one brief.',
+      takes: '--brief takes what the agent is asked to do, a sentence is enough: nemia agents run yours <name> --brief "<words>"',
+      twice: 'nemia agents run takes --brief once: a try is one brief.',
     },
     apiKey(
       'repo',
@@ -169,7 +169,7 @@ export const AGENTS_TRY: Command<{ id: string }> = {
   },
   handler: (args, _env, home = HOME) =>
     tryAgent({
-      who: 'nemia agents try',
+      who: 'nemia agents run',
       from: writerText(args, 'from') ?? '',
       name: writerText(args, 'name') ?? '',
       brief: writerText(args, 'brief') ?? '',

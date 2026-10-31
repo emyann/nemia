@@ -14,7 +14,7 @@ import { instructionFile, readInstructionAt } from '../factory/instruction.store
 import { readRules, rulesAt } from '../rules/rules.store.ts';
 import { checkedTemplate, exportTemplate, packTemplate, problemLine, unpackTemplate } from './template.store.ts';
 
-export const TEMPLATE_HELP = `nemia template check <folder|archive>
+export const TEMPLATE_HELP = `nemia template lint <folder|archive>
 nemia template export <folder> --from <repo> [--factory <name>]
 nemia template pack <folder> [--out <file>]
 nemia template unpack <archive> <dir>
@@ -24,7 +24,7 @@ RULES.md, the rules its agents are told; workflows/<workflow>/workflow.yaml and 
 agents/<agent>/agent.yaml, instructions.md and output.schema.json; skills/<skill>/SKILL.md and what is beside
 it. Each .yaml holds one document, of apiVersion nemia.dev/v1alpha1.
 
-  nemia template check  reads the folder and refuses every problem at once, each at its file and line,
+  nemia template lint   reads the folder and refuses every problem at once, each at its file and line,
                  sorted by file: a file outside the layout, a document that does not parse, a wrong apiVersion,
                  kind or name, a hire, a skill, an after:, input: or loop: naming nothing the folder holds, a
                  {param:} nemia.yaml does not declare, a harness block's key, word or option its harness lacks
@@ -34,7 +34,7 @@ it. Each .yaml holds one document, of apiVersion nemia.dev/v1alpha1.
   nemia template export writes a new folder from the repository --from: each workflow of its workflows/ —
                  with --factory, only those the factory attaches, and its hires, instruction and rules — the
                  agents their steps name and the skills those agents and steps name, found where a run finds them;
-                 a place skill nemia ships is left out. It prints each part and where it came from, and writes
+                 a builtin place skill is left out. It prints each part and where it came from, and writes
                  nothing while a key has no place in a template, or the draft does not pass its own check.
   nemia template pack   writes a folder that passes its check into one archive, a gzipped tar of the folder
                  any tar opens (tar xzf), at --out, by default <name>-<version>.tgz here; it prints the
@@ -54,20 +54,20 @@ with such entries is refused: pack the folder with nemia template pack.`;
 /** Why the api serves no template: a template is a folder on the machine nemia runs on. */
 const HERE = { side: 'cli', why: 'a template is a folder on the machine nemia runs on; the board reads none yet' } as const;
 
-/** `nemia template check`'s spec: the folder or archive, and nothing else. */
+/** `nemia template lint`'s spec: the folder or archive, and nothing else. */
 const CHECK_SPEC: Spec = {
   positionals: [{ key: 'folder', takes: 'required', kind: 'text' }],
   flags: [],
-  unknown: (arg) => `nemia template check reads one folder or archive, and does not take ${arg}: nemia template check <folder|archive>.`,
-  missing: "nemia template check takes a template's folder or archive: nemia template check <folder|archive>.",
+  unknown: (arg) => `nemia template lint reads one folder or archive, and does not take ${arg}: nemia template lint <folder|archive>.`,
+  missing: "nemia template lint takes a template's folder or archive: nemia template lint <folder|archive>.",
 };
 
 /** The line that says the digest of a template's content. */
 const digestLine = (digest: string | undefined): string => `digest of the content: ${digest ?? 'none'}`;
 
-/** `nemia template check`: the folder or archive passes, with the digest of its content, or every problem it has, refused at once. */
+/** `nemia template lint`: the folder or archive passes, with the digest of its content, or every problem it has, refused at once. */
 const TEMPLATE_CHECK: Command<{ folder: string; digest: string | undefined }> = {
-  name: 'template check',
+  name: 'template lint',
   usage: '<folder|archive>',
   help: ["check a template's folder or archive: every problem at once, each at its", 'file and line'],
   spec: CHECK_SPEC,
@@ -159,7 +159,7 @@ const TEMPLATE_EXPORT: Command<Exported> = {
   print: ({ dir, from }) => [
     ...from.map(({ part, from: at }) => `${part}  ${at}`),
     `written: ${dir}`,
-    `check it: nemia template check ${dir}`,
+    `lint it: nemia template lint ${dir}`,
   ],
 };
 
@@ -215,7 +215,7 @@ const TEMPLATE_UNPACK: Command<{ dir: string; digest: string }> = {
   only: HERE,
   manual: TEMPLATE_HELP,
   handler: (args) => tried(() => unpackTemplate({ archive: textOf(args, 'archive') ?? '', dir: textOf(args, 'dir') ?? '' })),
-  print: ({ dir, digest }) => [`written: ${dir}`, digestLine(digest), `check it: nemia template check ${dir}`],
+  print: ({ dir, digest }) => [`written: ${dir}`, digestLine(digest), `lint it: nemia template lint ${dir}`],
 };
 
 /** `nemia template`'s forms. */

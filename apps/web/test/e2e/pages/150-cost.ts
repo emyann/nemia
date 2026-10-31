@@ -217,7 +217,7 @@ export default {
       'once more: the try with its cap raised, as a line',
     );
     await expectVisible(
-      decide.locator('[data-command="once more"] code', { hasText: `nemia round ${COSTLY.id} ${held.step} --budget <amount>` }),
+      decide.locator('[data-command="once more"] code', { hasText: `nemia retry ${COSTLY.id} ${held.step} --round --budget <amount>` }),
       'once more: the round with its cap raised, as a line',
     );
 

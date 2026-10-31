@@ -70,7 +70,7 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
     at: new Date().toISOString(),
     ...(message !== undefined ? { message } : {}),
   };
-  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', ask: approval });
+  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', of: 'gate', ask: approval });
   const file = written.where;
   if (!written.written) {
     const { stray } = written;

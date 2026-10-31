@@ -18,6 +18,7 @@ import {
   type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
+import { REASON_OF, type QualifiedStep } from '../phase/phase.ts';
 import { envelopeRefusals, type Closeout } from '../closeout/index.ts';
 import {
   aboveWord,
@@ -61,7 +62,7 @@ import { answersOr } from '../question/index.ts';
  * in one conversation.
  *
  * And one try that is not over: a step whose session its harness blocked — the engine's `needs-human`, as
- * `harnessBlocked` says it — and that signed nothing, `blockedByHarness`. It reads `running`, and nothing in it
+ * `harnessBlocked` says it — and that signed nothing: it stands as `AwaitingAnswer` via `session`. It reads `running`, and nothing in it
  * moves without a person. `nudge` and `fresh` may be asked for it, and the tick stops the session before it
  * files the try (`stopFirst`), so no two agents share the conversation. Not `recheck`: nothing of it was
  * checked. Left out, `harnessBlocked` says no session is blocked, and such a step is running, with nothing to try.
@@ -70,9 +71,9 @@ import { answersOr } from '../question/index.ts';
  * `raise`: a session filed for it has to carry a `--budget` above what it has spent, since spending past the cap on anyone's word but a
  * person's raising it is what a cap forbids. A recheck costs nothing, and needs none. So `raise` is on a settled step over its budget, or
  * ended at it, that may be tried: those two statuses, and a `failed (check)` whose check did not finish past its budget, which is offered
- * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `nemia round`'s. Any other step with a
- * cap that may be tried takes a `--budget` too, above its floor (`raiseOf`), which `carries` and `retryRefusal` read: `raise` marks only
- * the steps a session of which must carry one.
+ * the recheck first. A step over budget whose loop's round waits (`held`) has no try: going round is `nemia retry --round`'s. Any other
+ * step with a cap that may be tried takes a `--budget` too, above its floor (`raiseOf`), which `carries` and `retryRefusal` read: `raise`
+ * marks only the steps a session of which must carry one.
  *
  * And a step whose work the run is parked on at an ending step's gate (`waitsAtGate`), with nothing after it filed: the ending has nothing
  * of its own to object to — it has not run — so a send-back there goes to the work, which is this step (`sendBackTo`).
@@ -104,11 +105,11 @@ export function retryable(
   harnessBlocked: (taskId: string) => boolean = () => false,
   spendOf: SpendOf = () => undefined,
   verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): { status: StepStatus; modes: RetryMode[]; blockedByHarness: boolean; sendsBack?: true; back?: string[]; raise?: Raise } {
+): { status: StepStatus; modes: RetryMode[]; sendsBack?: true; back?: string[]; raise?: Raise } & QualifiedStep {
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const taskId = run.steps[step.name]?.taskId;
   const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
-  const blockedByHarness = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
+  const harnessAsks = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
   const tried = status === 'over budget' ? own : status;
   const followers = steps.filter((s) => s.after.includes(step.name));
   const noneFiled = followers.length > 0 && !followers.some((s) => run.steps[s.name]?.taskId);
@@ -139,7 +140,7 @@ export function retryable(
           (tried === 'blocked' && settled) ||
           tried === 'budget exhausted' ||
           tried === 'denied' ||
-          blockedByHarness ||
+          harnessAsks ||
           sendsBack
         ? ['nudge', 'fresh']
         : [];
@@ -147,13 +148,17 @@ export function retryable(
     settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
   return {
     status,
+    ...codesOf(status, harnessAsks),
     modes,
-    blockedByHarness,
     ...(sendsBack ? { sendsBack: true as const } : {}),
     ...(sendsBack && back ? { back } : {}),
     ...(raise ? { raise } : {}),
   };
 }
+
+/** A standing's codes: a session its harness asks the person through is `AwaitingAnswer` via `session`, else its status's reason. */
+const codesOf = (status: StepStatus, harnessAsks: boolean): QualifiedStep =>
+  harnessAsks ? { reason: 'AwaitingAnswer', via: 'session' } : REASON_OF[status];
 
 /**
  * Whether a person's ask carries what a try of its step needs, and nothing it cannot take. A recheck files no session, and carries. An ask
@@ -233,7 +238,7 @@ export const pauseAsksVoid = (
  * `advance` looks for a try a pass filed and never wrote down whatever became of the run after.
  *
  * A person's ask for a step's next try, when the step may be tried again that way. For a step whose task has not settled, with
- * `stopFirst`, since its session is still there to stop — `--nudge` or `--fresh`, the ways `nemia retry` takes for a session its harness
+ * `stopFirst`, since its session is still there to stop — `--continue` or `--fresh`, the ways `nemia retry` takes for a session its harness
  * blocked (`retryable`), whether or not the harness still says so. An ask can only be written for such a step while its harness blocks
  * the session, and the session can work again before a tick stops it, told something by a peer with no `nemia up` running. Left for its
  * task to settle, such an ask would be neither due nor spent, and the step's next failure would file it at once, ahead of `retries:`. So
@@ -289,7 +294,7 @@ export function retriesDue(
   const open = asks.filter((a) => pauseAskDue(run, a, phaseOf));
   for (const step of steps) {
     const record = run.steps[step.name];
-    const { status, modes, blockedByHarness, sendsBack, back, raise } = retryable(
+    const { status, modes, via, sendsBack, back, raise } = retryable(
       step,
       run,
       phaseOf,
@@ -323,7 +328,7 @@ export function retriesDue(
         ...(ask.message !== undefined ? { message: ask.message } : {}),
         ...raisedBy(ask, raise),
         by: askedBy(ask),
-        ...(unsettled ? { stopFirst: true as const, ...(blockedByHarness ? {} : { runsOn: true as const }) } : {}),
+        ...(unsettled ? { stopFirst: true as const, ...(via === 'session' ? {} : { runsOn: true as const }) } : {}),
         ...(back && !unsettled ? { back } : {}),
       });
     } else if (
@@ -380,7 +385,7 @@ function howOf(step: Workflow, last: EarlierTry): string {
   if (last.paused) return `${last.cause === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`;
   if (last.cause === 'recheck') return 'rechecked on your word';
   if (last.cause === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
-  if (last.cause === 'merge') return 'merged the base, on your word (nemia merge), the round unchanged';
+  if (last.cause === 'merge') return 'merged the base, on your word (nemia refresh --base), the round unchanged';
   return last.cause === 'back' ? 'sent back with the work, on your word' : 'nudged on your word';
 }
 

@@ -10,7 +10,7 @@ import type { RetryAsk } from '../retry/index.ts';
 import {
   approvedFirst,
   budgetOf,
-  heldByCheckout,
+  waitsOnCheckout,
   roundSpans,
   runSpend,
   sessionTasks,
@@ -55,14 +55,14 @@ export type Decision =
   | { kind: 'landed'; branches: string[] }
   | {
       kind: 'awaiting';
-      outcome: 'succeeded' | 'failed' | 'blocked';
+      outcome: 'succeeded' | 'failed' | 'waiting';
       branches: string[];
       /**
        * Steps whose task failed or was stopped — over their budget or not, as each list below names a step by how it ended on its own work.
        */
       failed: string[];
-      /** Steps that signed off blocked. */
-      stuck: string[];
+      /** Steps that signed off blocked: each awaits the person's answer (`AwaitingAnswer` via `closeout`). */
+      awaitingAnswer: string[];
       /** Steps whose check refused them: it ran to its end, and did not exit 0. */
       failedCheck: string[];
       /** Steps whose check did not finish — stopped, or killed before it exited (`refusedCheck`). No verdict on the work. */
@@ -110,7 +110,7 @@ export type Landed = boolean | 'unchanged';
  * `running`, and `gateLines` words that window.
  *
  * `running` names what it waits on, each once: a step whose agent or check is still going, one ready, an ending step waiting for the
- * repository's own checkout (`heldByCheckout`), a step the next tick tries again and a loop going round again.
+ * repository's own checkout (`waitsOnCheckout`), a step the next tick tries again and a loop going round again.
  *
  * A run that worked directly on its base branch is never asked whether it landed: git's answer is always yes. Every result branch is
  * asked, not some — a fan-out that ends in two branches has not landed because one did — each once, and none after the first that is
@@ -120,7 +120,7 @@ export type Landed = boolean | 'unchanged';
  *
  * The steps are told apart by how each ended on its own work (`ownStatus`): blocked, a question; failed or stopped, a thing that broke;
  * a check that refused, a thing the run can name; a check that did not finish, one to run again. Being over budget is said beside that,
- * in `overBudget`, never in its place. A loop out of rounds, a cap reached and a call denied broke nothing: each makes the run `blocked`,
+ * in `overBudget`, never in its place. A loop out of rounds, a cap reached and a call denied broke nothing: each makes the run `waiting`,
  * a person's call.
  *
  * @param verdictOf What each step's current check exited with: a refusal and a check that did not finish are told apart.
@@ -170,7 +170,7 @@ export function decision(
           (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name].taskId!))),
       )
       .map((s) => s.name);
-    const waitsForCheckout = checkout ? steps.filter((s) => heldByCheckout(steps, s.name, checkout)).map((s) => s.name) : [];
+    const waitsForCheckout = checkout ? steps.filter((s) => waitsOnCheckout(steps, s.name, checkout)).map((s) => s.name) : [];
     return {
       kind: 'running',
       waiting: [...new Set([...live, ...ready, ...waitsForCheckout, ...retry.map((r) => r.step), ...round.map((r) => r.step)])].sort(),
@@ -204,7 +204,7 @@ export function decision(
       .filter((s) => want.includes(standingOf.get(s.name)!.own))
       .map((s) => s.name)
       .sort();
-  const stuck = named('blocked');
+  const awaitingAnswer = named('blocked');
   const failed = named('failed', 'stopped');
   const checkFailed = named('failed (check)');
   const unfinishedCheck = checkFailed.filter((name) => !refusedCheck(phaseOf(run.steps[name].check!.taskId), verdictOf(name)));
@@ -221,14 +221,14 @@ export function decision(
   const outcome =
     failed.length || checkFailed.length
       ? 'failed'
-      : stuck.length ||
+      : awaitingAnswer.length ||
           unsigned.length ||
           exhausted.length ||
           pastBudget.length ||
           budgetExhausted.length ||
           denied.length ||
           awaitingApproval.length
-        ? 'blocked'
+        ? 'waiting'
         : 'succeeded';
   if (onBase && outcome === 'succeeded') return { kind: 'landed', branches };
   return {
@@ -236,7 +236,7 @@ export function decision(
     outcome,
     branches,
     failed,
-    stuck,
+    awaitingAnswer,
     failedCheck,
     unfinishedCheck,
     unsigned,
@@ -286,28 +286,32 @@ export function runCostLines(run: Run, spendOf: SpendOf): string[] {
 /**
  * A verb `nemia decide` offers a person for one step (`retryOffers`, `roundOffers`, `mergeOffer`): the sentence it prints, and the bare
  * command that sentence ends on — `nemia retry <run> <step>`, with `--recheck`, `--fresh`, `--budget <amount>` or `--message
- * "<objection>"`; `nemia round <run> <step>`, with `--budget <amount>` past a cap; `nemia accept <run> <step> --message "<why>"`; or
- * `nemia merge <run> <step>`.
+ * "<objection>"`; `nemia retry <run> <step> --round`, with `--budget <amount>` past a cap; `nemia approve <run> <step> --message "<why>"`
+ * of a loop out of rounds; or `nemia refresh <run> <step> --base`.
  */
 export type Offer = { step: string; command: string; said: string };
 
 /**
  * A command `nemia decide` offers, and runs none of: land it, drop it, read it for a run worked on its base branch, forget it for a folder
- * run, each once-more (`nemia retry`, `nemia round`), accept and merge (`nemia merge`) with the line it prints it in, and for a step
- * waiting at its gate on you, the approval (`nemia approve`) and a send-back (`nemia retry --message`) for each step it names. `said` is
- * null where the label is all it says; `step`, the step it acts on, null for a command on the whole run.
+ * run, each once-more (`nemia retry`, `nemia retry --round`), approve (`nemia approve` of a loop) and refresh (`nemia refresh --base`)
+ * with the line it prints it in, and for a step waiting at its gate on you, the approval (`nemia approve`) and a send-back (`nemia retry
+ * --message`) for each step it names. `said` is null where the label is all it says; `step`, the step it acts on, null for a command on
+ * the whole run.
  */
 export type DecideCommand = {
-  label: 'land it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'merge' | 'approve' | 'send back' | 'forget it';
+  label: 'land it' | 'drop it' | 'read it' | 'once more' | 'refresh' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
   step: string | null;
 };
 
-/** The label of an offer's command: an acceptance, a merge of the base, a send-back with its objection, or once more. */
+/**
+ * The label of an offer's command, its verb's: an approval (`nemia approve` of a loop out of rounds: a gate's approval is no offer), a
+ * refresh of the base (`nemia refresh --base`), a send-back with its objection, or once more.
+ */
 const labelOf = (command: string): DecideCommand['label'] => {
-  if (command.startsWith('nemia accept ')) return 'accept';
-  if (command.startsWith('nemia merge ')) return 'merge';
+  if (command.startsWith('nemia approve ')) return 'approve';
+  if (command.startsWith('nemia refresh ') && command.endsWith(' --base')) return 'refresh';
   return command.endsWith('--message "<objection>"') ? 'send back' : 'once more';
 };
 
@@ -335,7 +339,7 @@ function gateChoices(steps: readonly Workflow[], run: Run, waiting: readonly str
 }
 
 /**
- * The commands `nemia decide` offers on a run awaiting a person (`Decision`), none on any other: once more, accept or a send-back for each
+ * The commands `nemia decide` offers on a run awaiting a person (`Decision`), none on any other: once more, approve or a send-back for each
  * offer (`offers`, round's then retry's), the approval and its send-backs for each step waiting at its gate on you, then land it and drop
  * it for the branches, or read it for a run worked on its base branch, which has nothing to merge nor a branch to delete. A folder run has
  * none of those: forgetting it (`nemia rm`) is its one command, and nothing about git. A workflow whose step acts on the base branch itself

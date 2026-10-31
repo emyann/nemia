@@ -56,7 +56,10 @@ const cancelledToday = ended('r-off', 'cancelled', DAY + 60 * MIN, 1, { cancelle
 const undecided = ended('r-undecided', 'succeeded', DAY + 90 * MIN, 5, {
   toDecide: { kind: 'result', branches: ['wf/r/ship'], said: 'merge or drop wf/r/ship', command: 'git merge wf/r/ship' },
 });
-const waiting = ended('r-gate', 'awaiting approval', DAY + 3 * 60 * MIN, 2, { waitingOnYou: ['plan'], onYou: ['approve plan'] });
+const waiting = ended('r-gate', 'awaiting approval', DAY + 3 * 60 * MIN, 2, {
+  waitingOnYou: ['plan'],
+  waitingOnYouWords: ['approve plan'],
+});
 const movesAndWaits = summary([['plan', 'needs-human']], {
   id: 'r-both',
   waitingOnYou: ['plan'],

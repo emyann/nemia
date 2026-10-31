@@ -166,6 +166,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
     assert.equal(path.dirname(proposedFile(ROOT, 'nemia')), path.dirname(confirmedFile(ROOT, 'nemia')));
     const list = policyListOf(ROOT, 'nemia');
     assert.equal(list.isDefault, true);
+    assert.equal(list.builtin.id, 'default', 'the builtin rule is offered to be confirmed again');
     assert.deepEqual(
       list.rules.map((r) => r.id),
       ['default'],
@@ -301,7 +302,7 @@ test('The rules on disk refuse, by their kind, writing nothing', async (t) => {
       confirmRule(home, 'nemia', 'tries', TRIES, NOW);
       const { kind, message } = refusal(() => confirmRule(home, 'nemia', 'tries', TRIES, NOW));
       assert.equal(kind, 'Conflict');
-      names(message, 'nemia policy drop nemia tries');
+      names(message, 'nemia policy rm nemia tries');
       assert.equal(refusal(() => confirmedFile(home, '../x')).kind, 'Invalid');
     },
   );

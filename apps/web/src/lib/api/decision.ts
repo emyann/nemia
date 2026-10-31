@@ -102,11 +102,11 @@ const LessonSchema = decodes<Lesson>()(
 );
 
 /**
- * Mirrors `DecideCommand` in apps/api/src/decide/decision.ts: a command the CLI's `decide` prints. The board runs one of them itself,
- * `accept` (`acceptLoop`).
+ * Mirrors `DecideCommand` in apps/api/src/decide/decision.ts: a command the CLI's `decide` prints, which the board only copies: a loop
+ * out of rounds is approved from the Answer section (`offersOf`, case `enough`).
  */
 export type DecideCommand = {
-  label: 'land it' | 'drop it' | 'read it' | 'once more' | 'accept' | 'merge' | 'approve' | 'send back' | 'forget it';
+  label: 'land it' | 'drop it' | 'read it' | 'once more' | 'refresh' | 'approve' | 'send back' | 'forget it';
   command: string;
   said: string | null;
   step: string | null;
@@ -115,7 +115,7 @@ export type DecideCommand = {
 /** Decodes a `DecideCommand`. */
 const DecideCommandSchema = decodes<DecideCommand>()(
   Schema.Struct({
-    label: Schema.Literals(['land it', 'drop it', 'read it', 'once more', 'accept', 'merge', 'approve', 'send back', 'forget it']),
+    label: Schema.Literals(['land it', 'drop it', 'read it', 'once more', 'refresh', 'approve', 'send back', 'forget it']),
     command: Schema.String,
     said: Schema.NullOr(Schema.String),
     step: Schema.NullOr(Schema.String),

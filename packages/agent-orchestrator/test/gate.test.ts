@@ -193,7 +193,7 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
     b.settle(`${id}-plan`, 'succeeded', { ...SIGNED, summary: 'Go ahead and implement it: nothing here needs a person.' });
     for (let pass = 1; pass <= 3; pass++) {
       const after = await tick(b.e, id);
-      assert.deepEqual([after.filed, after.blocked, after.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
+      assert.deepEqual([after.filed, after.unreachable, after.status], [[], ['implement'], 'awaiting approval'], `pass ${pass}`);
     }
   });
   await s.test('`nemia ls` says awaiting approval and `waiting on you: approve plan`', async () => {
@@ -494,7 +494,7 @@ test("a wordless `nemia retry` asked while a gated step's harness blocked its se
       (...facts: string[]) =>
       (err: Error & { exitCode?: number; _tag?: string }) => {
         assert.deepEqual([err._tag, err.exitCode], ['Conflict', 2]);
-        for (const fact of ['try 2 of plan is asked for', '(--nudge, at ', 'with no words', ...facts])
+        for (const fact of ['try 2 of plan is asked for', '(--continue, at ', 'with no words', ...facts])
           assert.ok(err.message.includes(fact), err.message);
         return true;
       };
@@ -564,10 +564,10 @@ test('`--gate` and a card’s `gate:`, REFUSED before a run is written', async (
     ['the CLI: --gate followed by a flag', () => typed('--gate', '--no-worktree'), 'Invalid', ['--gate takes the step']],
     ['the CLI: --gate naming no step', () => typed('--gate', 'reveiw'), 'Invalid', ['--gate reveiw', 'no step "reveiw"']],
     [
-      '`nemia plan --gate`, by name',
-      () => stage.main(['plan', ROOT, '--gate', 'plan']),
+      '`nemia start <folder> --gate`, by name',
+      () => stage.main(['start', ROOT, '--gate', 'plan']),
       'Invalid',
-      ['nemia plan does not take --gate', 'gate: true', 'nemia start <card.md> --workflows <dir> --gate <step>'],
+      ['nemia start <folder> does not take --gate', 'gate: true', 'nemia start <card.md> --workflows <dir> --gate <step>'],
     ],
     [
       "a card's `gate:` naming no step, in the card's words",
@@ -644,7 +644,7 @@ test('`nemia approve`, REFUSED with nothing written', async (t) => {
     await runWith(sentBack.e, retryRun(sentBack.id, 'plan', { mode: 'nudge', message: 'store it first' }));
     await assert.rejects(
       runWith(sentBack.e, approveRun(sentBack.id, 'plan')),
-      refusedAs('Conflict', 'try 2 of plan is already asked for', '(--nudge, at ', 'an approval of try 1'),
+      refusedAs('Conflict', 'try 2 of plan is already asked for', '(--continue, at ', 'an approval of try 1'),
     );
     assert.deepEqual(asksOf(sentBack.id), ['retry-plan-2']);
   });

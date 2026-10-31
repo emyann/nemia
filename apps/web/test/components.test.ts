@@ -25,7 +25,7 @@ const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch 
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { TemplateCard } = await import('../src/components/TemplateCard.tsx');
-const { PERSON } = await import('../src/lib/words.ts');
+const { OFFERS, PERSON } = await import('../src/lib/words.ts');
 const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx');
 const { RunGone } = await import('../src/components/RunGone.tsx');
 const { KindsBehind } = await import('../src/components/KindsBehind.tsx');
@@ -47,7 +47,7 @@ type TaskPart = import('../src/lib/api.ts').TaskPart;
 type StateFlowEdge = import('../src/components/StateEdge.tsx').StateFlowEdge;
 type EdgeMarker = import('@xyflow/react').EdgeMarker;
 
-const exhaustedNote = 'round 3 of 3, and it asked again — once more: wf round r-1 review';
+const exhaustedNote = 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round';
 
 /** The one element's `title`, unescaped as a browser reads it. */
 const titleOf = (html: string): string | undefined =>
@@ -59,27 +59,32 @@ const titleOf = (html: string): string | undefined =>
     .replaceAll('&gt;', '>')
     .replaceAll('&amp;', '&');
 
+/** The codes of a loop out of rounds. */
+const ROUND = { phase: 'waiting', reason: 'AwaitingRound', on: null, via: null } as const;
+
 test("a chip shows a person's word for the state, never the status; on hover what it means, then the step's note it was given", () => {
   const withNote = renderToStaticMarkup(
-    createElement(StatusChip, { phase: 'waiting', reason: 'RoundsExhausted', runCancelled: false, runHeld: false, note: exhaustedNote }),
+    createElement(StatusChip, { codes: ROUND, runCancelled: false, runHeld: false, note: exhaustedNote }),
   );
   assert.match(withNote, /data-state="exhausted"/);
   assert.equal(withNote.replace(/<[^>]*>/g, ''), PERSON.exhausted.rail, 'the rail word is the text');
-  assert.doesNotMatch(withNote.replace(/<[^>]*>/g, ''), /rounds exhausted|RoundsExhausted/, 'neither the status nor the code is shown');
+  assert.doesNotMatch(withNote.replace(/<[^>]*>/g, ''), /rounds exhausted|AwaitingRound/, 'neither the status nor the code is shown');
   assert.equal(titleOf(withNote), `${PERSON.exhausted.meaning}\n${exhaustedNote}`);
 
   for (const note of [null, undefined, '']) {
-    const without = renderToStaticMarkup(
-      createElement(StatusChip, { phase: 'waiting', reason: 'RoundsExhausted', runCancelled: false, runHeld: false, note }),
-    );
+    const without = renderToStaticMarkup(createElement(StatusChip, { codes: ROUND, runCancelled: false, runHeld: false, note }));
     assert.equal(titleOf(without), PERSON.exhausted.meaning, String(note));
   }
   const cancelled = renderToStaticMarkup(
-    createElement(StatusChip, { phase: 'stopped', reason: 'Stopped', runCancelled: true, runHeld: false }),
+    createElement(StatusChip, { codes: { phase: 'stopped', reason: 'Stopped', on: null, via: null }, runCancelled: true, runHeld: false }),
   );
   assert.equal(cancelled.replace(/<[^>]*>/g, ''), 'called off');
   const paused = renderToStaticMarkup(
-    createElement(StatusChip, { phase: 'pending', reason: 'WaitingForPause', runCancelled: false, runHeld: false }),
+    createElement(StatusChip, {
+      codes: { phase: 'pending', reason: 'Waiting', on: 'pause', via: null },
+      runCancelled: false,
+      runHeld: false,
+    }),
   );
   assert.match(paused, /data-state="waiting"/);
   assert.notEqual(paused.replace(/<[^>]*>/g, ''), PERSON.waiting.rail, 'a check the pause holds is its own wait, not a step to come');
@@ -137,18 +142,20 @@ function runWith(note: string | null): RunDetail {
     after: [],
     waiting: null,
     context: [],
-    heldUntil: [],
+    holdUntil: [],
     holding: null,
     status: 'failed',
     phase: 'failed',
     reason: 'Failed',
+    on: null,
+    via: null,
     moving: false,
     cost: null,
     atWork: null,
     tokens: null,
     read: null,
     waitingOnYou: ['review'],
-    onYou: ['review'],
+    waitingOnYouWords: ['review'],
     toDecide: null,
     gates: [],
     warning: null,
@@ -172,7 +179,6 @@ function runWith(note: string | null): RunDetail {
         roundDue: false,
         commands: { approve: 'nemia approve r-1 review', retry: 'nemia retry r-1 review', say: 'nemia say r-1 review' },
         needs: null,
-        blockedByHarness: false,
         waitingFor: null,
         approve: null,
         denied: null,
@@ -247,7 +253,7 @@ function runOf(
   { note = null, waitingOnYou, cancelledAt = null }: { note?: string | null; waitingOnYou: string[]; cancelledAt?: string | null },
 ): RunDetail {
   const run = runWith(note);
-  return { ...run, cancelledAt, waitingOnYou, onYou: waitingOnYou, steps: [{ ...run.steps[0], ...coded(status) }] };
+  return { ...run, cancelledAt, waitingOnYou, waitingOnYouWords: waitingOnYou, steps: [{ ...run.steps[0], ...coded(status) }] };
 }
 
 /**
@@ -302,8 +308,8 @@ test('a loop out of rounds is drawn as a human gate on the canvas, as a blocked 
 
 test('a step a person has sent round or asked to retry is no gate from the moment they ask: the canvas draws what the api says', () => {
   const asked: Array<[status: Word, note: string]> = [
-    ['rounds exhausted', 'round 4 asked (wf round) — the next tick files implement'],
-    ['succeeded · BLOCKED', 'try 2 asked (--nudge) — the next tick files it'],
+    ['rounds exhausted', 'round 4 asked (nemia retry --round) — the next tick files implement'],
+    ['succeeded · BLOCKED', 'try 2 asked (--continue) — the next tick files it'],
   ];
   for (const [status, note] of asked) {
     const pending = nodeMarkup(runOf(status, { note, waitingOnYou: [] }));
@@ -344,7 +350,10 @@ function loopRun(notes: { implement: string | null; review: string | null }, rev
 }
 
 test("the loop's edge goes back to its target, whatever the steps' specs lack", () => {
-  const run = loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' });
+  const run = loopRun({
+    implement: 'round 3 of 3',
+    review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round',
+  });
 
   const edges = stepEdges(run, 'r-1/');
   const shape = ({ id, source, target, type, sourceHandle, targetHandle, label, data }: StateFlowEdge) => ({
@@ -437,7 +446,7 @@ const legendMarkup = (): string => renderToStaticMarkup(createElement(ReactFlowP
 
 test("a loop's edge is drawn from under its looping step, dashed, into its target with the arrow and the round beside it", () => {
   const [, back] = stepEdges(
-    loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: wf round r-1 review' }),
+    loopRun({ implement: 'round 3 of 3', review: 'round 3 of 3, and it asked again — once more: nemia retry r-1 review --round' }),
   );
   const html = withMotion(false, () => edgeMarkup(back));
   const d = pathOf(html);
@@ -532,7 +541,7 @@ test('a running edge carries a dot travelling its own path; an edge done, to com
  * theme waiting at its gate, an ending, on you.
  */
 function summaryRun(): RunSummary {
-  const none = { needs: null, blockedByHarness: false, waitingFor: null, approve: null, denied: null, sessionUnread: null };
+  const none = { needs: null, waitingFor: null, approve: null, denied: null, sessionUnread: null };
   const step = (name: string, status: Word, extra = {}) => ({
     name,
     taskId: `t-${name}`,
@@ -573,7 +582,7 @@ function summaryRun(): RunSummary {
       edges: [after('implement', 'review'), after('review', 'respond'), after('implement', 'respond'), after('tokens', 'theme')],
     },
     waitingOnYou: ['theme'],
-    onYou: ['approve theme'],
+    waitingOnYouWords: ['approve theme'],
     toDecide: { kind: 'approve', step: 'theme', back: [] },
   } as unknown as RunSummary;
 }
@@ -1602,6 +1611,8 @@ const threeTries: StepTry[] = [
     note: null,
     phase: 'succeeded',
     reason: 'Succeeded',
+    on: null,
+    via: null,
     message: 'succeeded',
     status: 'succeeded',
     attempts: ranOnce,
@@ -1624,6 +1635,8 @@ const threeTries: StepTry[] = [
     note: 'try 2, by retries: 1',
     phase: 'succeeded',
     reason: 'Succeeded',
+    on: null,
+    via: null,
     message: 'succeeded',
     status: 'succeeded',
     attempts: ranOnce,
@@ -1641,6 +1654,8 @@ const threeTries: StepTry[] = [
     note: 'round 2 of 3',
     phase: 'running',
     reason: 'Running',
+    on: null,
+    via: null,
     message: 'running (working)',
     status: 'running (working)',
     attempts: { count: 2, latest: { startedAt: tookAt, ended: null, endedAt: null, reason: null } },
@@ -2307,7 +2322,7 @@ const WAIT = { words: 'waiting for a permission prompt', advice: 'answer it in C
 /** The run of one step, `review`, in `status`, with what the api says it needs and who it says is waited on. */
 function needing(
   status: Word,
-  needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'blockedByHarness' | 'waitingFor' | 'lastLine' | 'denied'>>,
+  needs: Partial<Pick<RunDetail['steps'][number], 'needs' | 'waitingFor' | 'lastLine' | 'denied'>>,
   over: { waitingOnYou: string[]; cancelledAt?: string | null },
 ): RunDetail {
   const run = runOf(status, over);
@@ -2317,7 +2332,6 @@ function needing(
       {
         ...run.steps[0],
         needs: null,
-        blockedByHarness: false,
         waitingFor: null,
         lastLine: null,
         asked: null,
@@ -2347,7 +2361,7 @@ test("a step's node says what it needs: a gate's question after `waits on you`, 
     'nor on a run called off',
   );
 
-  const held = nodeMarkup(needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
+  const held = nodeMarkup(needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
   assert.equal(gateDrawn(held), false, 'blocked by the harness is no gate: the step asked nothing');
   assert.ok(
     held.includes(`<p data-need="harness" title="blocked by the harness: ${WAIT.words} · ${LOGIN}" class="truncate `),
@@ -2358,12 +2372,12 @@ test("a step's node says what it needs: a gate's question after `waits on you`, 
     `the line is the wait alone: thirty-odd characters is all the node has, and \`blocked by the harness: \` would leave \`waiting f…\`\n${held}`,
   );
   assert.doesNotMatch(held, /answer it in Claude Code/, 'where a person answers it is the banner’s');
-  const mute = nodeMarkup(needing('needs-human', { blockedByHarness: true, lastLine: LOGIN }, { waitingOnYou: [] }));
+  const mute = nodeMarkup(needing('needs-human', { lastLine: LOGIN }, { waitingOnYou: [] }));
   assert.ok(
     mute.includes(`title="blocked by the harness: ${LOGIN}"`) && mute.includes(`>blocked by the harness: ${LOGIN}</p>`),
     `a harness that says nothing about what for reads \`blocked by the harness\` and what the session said last, on the line as on hover\n${mute}`,
   );
-  assert.ok(nodeMarkup(needing('needs-human', { blockedByHarness: true }, { waitingOnYou: [] })).includes('>blocked by the harness</p>'));
+  assert.ok(nodeMarkup(needing('needs-human', {}, { waitingOnYou: [] })).includes('>blocked by the harness</p>'));
   assert.doesNotMatch(nodeMarkup(needing('running (working)', {}, { waitingOnYou: [] })), /data-need/);
 });
 
@@ -2383,34 +2397,45 @@ test("a step's node says how many calls its current try was denied, whole, and w
   assert.doesNotMatch(nodeMarkup(needing('unverified · done', {}, { waitingOnYou: [] })), /data-denied/);
 });
 
-/** The Decide section's answers for `offers`, rendered inside the query client their asks are made with. */
-const offersMarkup = (offers: Answer[]) =>
+/** Each step's three commands, as the api answers them on a run `r-1`. */
+const commandsOf = (step: string) => ({
+  name: step,
+  commands: { approve: `nemia approve r-1 ${step}`, retry: `nemia retry r-1 ${step}`, say: `nemia say r-1 ${step}` },
+});
+
+/** The Decide section's answers for `offers`, and the notes of `asked`, rendered inside the query client their asks are made with. */
+const offersMarkup = (offers: Answer[], asked: Array<{ step: string; try: number; note: string | null }> = []) =>
   renderToStaticMarkup(
-    createElement(QueryClientProvider, { client: new QueryClient() }, createElement(Answering.Offers, { runId: 'r-1', offers })),
+    createElement(
+      QueryClientProvider,
+      { client: new QueryClient() },
+      createElement(Answering.Offers, { runId: 'r-1', offers, asked, steps: [...offers, ...asked].map((o) => commandsOf(o.step)) }),
+    ),
   );
 
 test("the answers: a box for a step that asks, Try again for a refused check with a recheck, its box closed while a recheck is chosen — and a try asked, `wf ls`'s note", () => {
-  const html = offersMarkup([
-    { step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] },
-    { step: 'theme', kind: 'try-again', recheck: true, unfinished: false },
-    { step: 'lint', kind: 'try-again', recheck: true, unfinished: true },
-    { step: 'docs', kind: 'try-again', recheck: false, unfinished: false },
-    { step: 'plan', kind: 'asked', try: 2, note: 'try 2 asked (--nudge, with your answer) — the next tick files it' },
-  ]);
+  const html = offersMarkup(
+    [
+      { step: 'implement', case: 'answer', kind: 'retry', needs: 'Which database?', questions: [] },
+      { step: 'theme', case: 'try-again', kind: 'retry', recheck: true, unfinished: false },
+      { step: 'lint', case: 'try-again', kind: 'retry', recheck: true, unfinished: true },
+      { step: 'docs', case: 'try-again', kind: 'retry', recheck: false, unfinished: false },
+    ],
+    [{ step: 'plan', try: 2, note: 'try 2 asked (--continue, with your answer) — the next tick files it' }],
+  );
   assert.match(html, /^<section aria-label="Answer"/);
   const rows = new Map(
-    [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
-      m[2],
-      { kind: m[1], html: m[3] },
-    ]),
+    [...html.matchAll(/<li (?:data-offer="([^"]+)" data-kind="([^"]+)"|data-asked="true") data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map(
+      (m) => [m[3], { offer: m[1] ? [m[1], m[2]] : 'asked', html: m[4] }],
+    ),
   );
   assert.deepEqual(
-    [...rows].map(([name, { kind }]) => [name, kind]),
+    [...rows].map(([name, { offer }]) => [name, offer]),
     [
-      ['implement', 'answer'],
-      ['theme', 'try-again'],
-      ['lint', 'try-again'],
-      ['docs', 'try-again'],
+      ['implement', ['answer', 'retry']],
+      ['theme', ['try-again', 'retry']],
+      ['lint', ['try-again', 'retry']],
+      ['docs', ['try-again', 'retry']],
       ['plan', 'asked'],
     ],
   );
@@ -2439,7 +2464,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   );
   assert.match(rows.get('implement')!.html, /<label for="[^"]+" class="sr-only">Your answer to implement<\/label>/);
 
-  assert.equal(said('theme'), 'theme was refused by its check', 'any need but a question is a sentence');
+  assert.equal(said('theme'), `theme ${OFFERS['try-again'].said.refused}`, 'any need but a question is a sentence: a refused check');
   assert.equal(boxes('theme'), 1, 'a refused check: something to tell it if you like');
   assert.deepEqual(buttons('theme'), [['submit', false, 'Try again']]);
   assert.deepEqual(
@@ -2465,12 +2490,10 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
     true,
     `a recheck files no session, so a message on it is refused (\`messageRefusal\`): its box is closed while it is chosen\n${rows.get('lint')!.html}`,
   );
-  assert.match(rows.get('lint')!.html, /placeholder="A recheck runs the check again and files no session: there is nobody to tell\."/);
+  assert.ok(rows.get('lint')!.html.includes(`placeholder="${OFFERS['try-again'].recheck.placeholder}"`), rows.get('lint')!.html);
   assert.deepEqual([closed('implement'), closed('theme'), closed('docs')], [false, false, false]);
-  assert.equal(
-    said('docs'),
-    "docs gave no closeout the run accepts — none, one short of a field it declares, or one naming a file the run does not have; the CLI's decide says which",
-  );
+  assert.equal(unescaped(said('docs')), `docs ${OFFERS['try-again'].said.unsigned}`, 'an unsigned step: no closeout the run accepts');
+  assert.equal(said('lint'), `lint ${OFFERS['try-again'].said.unfinished}`, 'a check that did not finish');
   assert.deepEqual(radios('docs'), [
     ['nudge', true],
     ['fresh', false],
@@ -2478,7 +2501,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
 
   assert.deepEqual(
     textsOf(rows.get('plan')!.html),
-    ['plan', 'try 2 asked (--nudge, with your answer) — the next tick files it'],
+    ['plan', 'try 2 asked (--continue, with your answer) — the next tick files it'],
     'asked: what `wf ls` says of it',
   );
   assert.deepEqual(buttons('plan'), [], 'and nothing to press');
@@ -2489,19 +2512,16 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
 
 test('a step `denials: fail` stopped is offered Try again with a new session first, as `wf decide` offers it, and its row names the calls it was denied', () => {
   const html = offersMarkup([
-    { step: 'notes', kind: 'denied', calls: 'denied: Write(/tmp/w/notes.md)' },
-    { step: 'bare', kind: 'denied', calls: null },
+    { step: 'notes', case: 'denied', kind: 'retry', calls: 'denied: Write(/tmp/w/notes.md)' },
+    { step: 'bare', case: 'denied', kind: 'retry', calls: null },
   ]);
-  const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2], m[3]]));
-  const said = (name: string) => textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]).join(' ');
-  assert.equal(
-    said('notes'),
-    "notes signed off having been denied a call (denied: Write(/tmp/w/notes.md)), and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it",
+  const rows = new Map(
+    [...html.matchAll(/<li data-offer="denied" data-kind="retry" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], m[2]]),
   );
-  assert.equal(
-    said('bare'),
-    "bare signed off having been denied a call, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it",
-  );
+  const said = (name: string) => unescaped(textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]).join(' '));
+  assert.equal(said('notes'), `notes ${OFFERS.denied.said('denied: Write(/tmp/w/notes.md)')}`, 'the calls the api named');
+  assert.equal(said('bare'), `bare ${OFFERS.denied.said(null)}`, 'and none where it named none');
+  assert.notEqual(OFFERS.denied.said('x'), OFFERS.denied.said(null), 'the calls are in the sentence');
   const radios = [...rows.get('notes')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [
     m[2],
     Boolean(m[1]),
@@ -2520,11 +2540,13 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
 
 test('a step asking questions as data is answered by choosing: radios where it takes one, checkboxes where several, the recommended marked, nothing chosen, and a button that waits for every answer', () => {
   const html = offersMarkup([
-    { step: 'design', kind: 'answer', needs: 'Two questions.', questions: [cut, where] },
-    { step: 'spec', kind: 'answer', needs: 'One question.', questions: [where] },
+    { step: 'design', case: 'answer', kind: 'retry', needs: 'Two questions.', questions: [cut, where] },
+    { step: 'spec', case: 'answer', kind: 'retry', needs: 'One question.', questions: [where] },
   ]);
   const rows = new Map(
-    [...html.matchAll(/<li data-offer="answer" data-questions="true" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], m[2]]),
+    [...html.matchAll(/<li data-offer="answer" data-kind="retry" data-questions="true" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map(
+      (m) => [m[1], m[2]],
+    ),
   );
   const design = rows.get('design')!;
   assert.ok(design, html);
@@ -2610,7 +2632,8 @@ test('the Decide section puts the answers first, before what there is to decide,
     { client: new QueryClient() },
     createElement(Answering.Offers, {
       runId: 'r-1',
-      offers: [{ step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] }],
+      offers: [{ step: 'implement', case: 'answer', kind: 'retry', needs: 'Which database?', questions: [] }],
+      steps: [commandsOf('implement')],
     }),
   );
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision, offers }));
@@ -2623,7 +2646,7 @@ test('the Decide section puts the answers first, before what there is to decide,
   assert.match(html, />implement<\/strong> asks:<\/p> <div data-markdown="true"[^>]*><p[^>]*>Which database\?<\/p><\/div>/);
 });
 
-test("the Decide section's accept row takes a reason and presses it; every other row still only copies", () => {
+test('a loop out of rounds is approved as it stands from the Answer section, with a reason, by its own approve line; every Commands row only copies', () => {
   const decision: Decidable = {
     standings: [],
     touched: [],
@@ -2636,37 +2659,50 @@ test("the Decide section's accept row takes a reason and presses it; every other
     collisions: null,
     awaiting: null,
     commands: [
-      { label: 'once more', command: 'nemia round r-1 review', said: null, step: 'review' },
+      { label: 'once more', command: 'nemia retry r-1 review --round', said: null, step: 'review' },
       {
-        label: 'accept',
-        command: 'nemia accept r-1 review --message "<why>"',
-        said: 'review: enough — go on with what is there:  nemia accept r-1 review --message "<why>"',
+        label: 'approve',
+        command: 'nemia approve r-1 review --message "<why>"',
+        said: 'review: enough — go on with what is there:  nemia approve r-1 review --message "<why>"',
         step: 'review',
       },
     ],
   };
-  const html = renderToStaticMarkup(
-    createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DecideSection, { runId: 'r-1', decision })),
+  const offers = createElement(
+    QueryClientProvider,
+    { client: new QueryClient() },
+    createElement(Answering.Offers, {
+      runId: 'r-1',
+      offers: [{ step: 'review', case: 'enough', kind: 'approve' }],
+      steps: [commandsOf('review')],
+    }),
   );
-  const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
-  const row = /<li data-command="accept"[\s\S]*?<\/li>/.exec(commands)![0];
-  assert.match(row, /data-step="review"/);
-  assert.match(row, /<code[^>]*>nemia accept r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/);
-  assert.match(row, /<form aria-label="Accept review as it stands"/);
-  const label = /<label for="([^"]+)"[^>]*>Why review&#x27;s work is good enough as it stands<\/label>/.exec(row);
+  const html = renderToStaticMarkup(
+    createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DecideSection, { runId: 'r-1', decision, offers })),
+  );
+  const answer = /<section aria-label="Answer"[\s\S]*?<\/section>/.exec(html)![0];
+  const row = /<li data-offer="enough" data-kind="approve" data-step="review"[\s\S]*?<\/li>/.exec(answer)![0];
+  assert.match(
+    row,
+    /<code>nemia approve r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/,
+    "the step's approve line, with the reason a loop's requires",
+  );
+  assert.ok(row.includes(`<form aria-label="${OFFERS.enough.form('review')}"`), row);
+  const label = new RegExp(`<label for="([^"]+)"[^>]*>${OFFERS.enough.field('review').replace("'", '&#x27;')}</label>`).exec(row);
   assert.ok(label, row);
   assert.match(row, new RegExp(`<textarea id="${label[1]}"`));
   assert.match(
     row,
-    /<button type="submit" disabled=""[^>]*>Accept as it stands<\/button>/,
-    'blank, the button waits for a reason, as `wf accept` waits for `--message`',
+    new RegExp(`<button type="submit" disabled=""[^>]*>${OFFERS.enough.button}</button>`),
+    'blank, the button waits for a reason, as `nemia approve` of a loop waits for `--message`',
   );
+  const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
   assert.deepEqual(
-    [.../<li data-command="once more"[\s\S]*?<\/li>/.exec(commands)![0].matchAll(/<button [^>]*>/g)].map((m) =>
-      /data-copy="true"/.test(m[0]),
-    ),
-    [true],
+    [...commands.matchAll(/<button [^>]*>/g)].map((m) => /data-copy="true"/.test(m[0])),
+    [true, true],
+    'every Commands row only copies',
   );
+  assert.doesNotMatch(commands, /<form|<textarea/);
 });
 
 test('the tries say `your answer` beside a try a person answered, and above its closeout in the Output tab, selected or folded', () => {
@@ -2708,18 +2744,17 @@ const bannerMarkup = (run: RunDetail) =>
   renderToStaticMarkup(createElement(QueryClientProvider, { client: new QueryClient() }, createElement(NeedsBanner, { run })));
 
 test("the banner continues a session the harness blocked: Continue, and a box for anything to tell it, where the commands to copy were — and once asked, the step's note in `wf ls`'s words", () => {
-  const base = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
+  const base = needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
   const asks = {
     ...base.steps[0],
     name: 'implement',
     taskId: 't-2',
     ...coded('succeeded · BLOCKED'),
     needs: 'Which database?',
-    blockedByHarness: false,
     waitingFor: null,
     lastLine: null,
   };
-  const run: RunDetail = { ...base, waitingOnYou: ['implement'], onYou: ['implement'], steps: [asks, base.steps[0]] };
+  const run: RunDetail = { ...base, waitingOnYou: ['implement'], waitingOnYouWords: ['implement'], steps: [asks, base.steps[0]] };
   const html = bannerMarkup(run);
 
   assert.match(html, /^<section aria-label="Waiting on you"/);
@@ -2751,7 +2786,7 @@ test("the banner continues a session the harness blocked: Continue, and a box fo
     'no commands to copy, and no sentence that the board cannot continue it',
   );
 
-  const note = 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it';
+  const note = 'try 2 asked (--continue) — stopping its blocked session, then the tick files it';
   const held = { ...base.steps[0], note, asked: { try: 2, mode: 'nudge' as const, model: null, message: null, stopFirst: true } };
   const asked = bannerMarkup({ ...run, steps: [asks, held] });
   assert.ok(
@@ -2798,7 +2833,7 @@ test("an agent's question is drawn as its markdown after `asks:`, in the banner 
   assert.ok(textContentOf(asked).includes('review asks: Which database?'), asked);
   assert.doesNotMatch(asked, /\*\*|whitespace-pre/);
 
-  const harness = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: '**not markdown**' }, { waitingOnYou: [] });
+  const harness = needing('needs-human', { waitingFor: WAIT, lastLine: '**not markdown**' }, { waitingOnYou: [] });
   const blocked = await routedWith(createElement(Asked, { run: harness, step: harness.steps[0] }));
   assert.match(
     blocked,
@@ -2838,7 +2873,7 @@ test('a short string in a closeout is drawn as markdown; a number as it is', asy
 
 test('REFUSED: the banner offers no Continue for a session still at work, which the harness did not block, nor on a run called off', () => {
   assert.equal(bannerMarkup(needing('running (working)', {}, { waitingOnYou: [] })), '', 'nothing needed: no banner');
-  const held = needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
+  const held = needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] });
   assert.match(bannerMarkup(held), /<form aria-label="Continue review"/);
   assert.equal(bannerMarkup({ ...held, cancelledAt: at }), '', 'called off: nobody waits for the session');
 });
@@ -2850,14 +2885,13 @@ const atGate = (over: Partial<RunDetail['steps'][number]> = {}, run: Partial<Run
   const base = runOf('awaiting approval', { waitingOnYou: ['review'] });
   return {
     ...base,
-    onYou: ['approve review'],
+    waitingOnYouWords: ['approve review'],
     gates: ['review'],
     ...run,
     steps: [
       {
         ...base.steps[0],
         needs: null,
-        blockedByHarness: false,
         lastLine: null,
         asked: null,
         approve: 'approve review',
@@ -2889,12 +2923,12 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
   assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/, 'an ending not filed runs');
   assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no session yet`');
   assert.doesNotMatch(html, /running now/, 'no spinner: nobody runs a step at its gate');
-  assert.equal(gateDrawn(nodeMarkup(atGate({ approve: null }, { waitingOnYou: [], onYou: [], cancelledAt: at }))), false);
+  assert.equal(gateDrawn(nodeMarkup(atGate({ approve: null }, { waitingOnYou: [], waitingOnYouWords: [], cancelledAt: at }))), false);
 });
 
 test("the banner says who the run waits on as `wf ls` does — `approve review`, linked to the step's section, where Approve is — beside a step it names by its name", () => {
   const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
-  const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
+  const run = atGate({}, { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'] });
   const both = bannerMarkup({ ...run, steps: [run.steps[0], theme] });
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
   assert.equal(
@@ -2914,7 +2948,7 @@ test("the banner says who the run waits on as `wf ls` does — `approve review`,
 
 test("in the frame's bar, the banners name a step by a button that opens the step's bar, where a hash would point nowhere", () => {
   const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
-  const run = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'] });
+  const run = atGate({}, { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'] });
   const onStep = () => {};
   const needs = renderToStaticMarkup(
     createElement(
@@ -3108,7 +3142,7 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
     ...run,
     status: 'failed',
     waitingOnYou: ['ship'],
-    onYou: ['approve ship'],
+    waitingOnYouWords: ['approve ship'],
     toDecide: toShip,
     gates: ['ship'],
     graph: { roots: ['implement'], edges: [{ from: 'implement', to: 'ship', kind: 'after' }] },
@@ -3169,7 +3203,12 @@ test("the ending step's own gate is not asked for twice: the to-decide banner sa
   const run = endingRun();
   assert.equal(bannerMarkup(run), '', 'the whole of what it waits on is the decision');
   const theme = { ...run.steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), closeout: null, approve: null, gate: null };
-  const both = bannerMarkup({ ...run, steps: [...run.steps, theme], waitingOnYou: ['ship', 'theme'], onYou: ['approve ship', 'theme'] });
+  const both = bannerMarkup({
+    ...run,
+    steps: [...run.steps, theme],
+    waitingOnYou: ['ship', 'theme'],
+    waitingOnYouWords: ['approve ship', 'theme'],
+  });
   assert.match(both, /^<section aria-label="Waiting on you"/, 'another step waiting on you is still said, beside the decision');
   const line = /<p>(Waiting on you:[\s\S]*?)<\/p>/.exec(both)![1];
   assert.equal(
@@ -3423,7 +3462,7 @@ test("the Factory's legend adds the edge between two cards, dashed and still as 
 /** What the api says of a card that still waits on `runs` before anything of it is filed (`RunWaiting`); null for none. */
 const waitingOnRuns = (runs: string[]): RunSummary['waiting'] =>
   runs.length
-    ? { runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })), word: '', advice: '', onYou: false }
+    ? { runs: runs.map((run) => ({ run, missing: false, cancelledAt: null, gone: [] })), word: '', advice: '', waitingOnYou: false }
     : null;
 
 test('the edges between cards are drawn only for live waits: dashed, out of one handle into the other, never moving — and a line of what the focused card reads, faint and dotted, with no arrow', () => {
@@ -3937,10 +3976,11 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     questions: [],
   };
   const html = offersMarkup([
-    { step: 'tokens', kind: 'raise', message: 'over budget $4.25 of $3', ...checkRaise },
+    { step: 'tokens', case: 'raise', kind: 'retry', message: 'over budget $4.25 of $3', ...checkRaise },
     {
       step: 'palette',
-      kind: 'raise',
+      case: 'raise',
+      kind: 'retry',
       message: 'over budget $1.50 of $1',
       by: 'retry',
       above: 1.5,
@@ -3951,10 +3991,11 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
       unfinished: false,
       questions: [],
     },
-    { step: 'types', kind: 'raise', message: 'failed ✗ check (unfinished)', ...checkRaise, unfinished: true },
+    { step: 'types', case: 'raise', kind: 'retry', message: 'failed ✗ check (unfinished)', ...checkRaise, unfinished: true },
     {
       step: 'review',
-      kind: 'raise',
+      case: 'raise',
+      kind: 'retry',
       message: 'over budget — implement $2.10 of $2',
       by: 'round',
       above: 2.1,
@@ -3967,7 +4008,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     },
   ]);
   const rows = new Map(
-    [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
+    [...html.matchAll(/<li data-offer="([^"]+)" data-kind="retry" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
       m[2],
       { kind: m[1], html: m[3] },
     ]),
@@ -4413,12 +4454,12 @@ const HOLDING = {
   word: 'held until p-1 lands',
   advice:
     'nothing of r-1 is filed, and nothing is asked of you, until wf decide says p-1 has landed; to go on before then: wf hold r-1 --off',
-  onYou: false,
+  waitingOnYou: false,
 };
 
 test('on a run a person holds, a step at its gate is drawn held — no human gate, no waiting on you — and said held, and a step at work is drawn at work', () => {
   for (const status of ['awaiting approval', 'rounds exhausted', 'succeeded · BLOCKED'] as const) {
-    const held = nodeMarkup({ ...runOf(status, { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] });
+    const held = nodeMarkup({ ...runOf(status, { waitingOnYou: [] }), holding: HOLDING, holdUntil: ['p-1'] });
     assert.equal(
       gateDrawn(held),
       false,
@@ -4433,7 +4474,7 @@ test('on a run a person holds, a step at its gate is drawn held — no human gat
     );
   }
   assert.match(
-    nodeMarkup({ ...runOf('running (working)', { waitingOnYou: [] }), holding: HOLDING, heldUntil: ['p-1'] }),
+    nodeMarkup({ ...runOf('running (working)', { waitingOnYou: [] }), holding: HOLDING, holdUntil: ['p-1'] }),
     /data-state="working"/,
   );
 });
@@ -4442,9 +4483,9 @@ test("a held run's rail draws its gate and the steps not filed held, and its wor
   const held = {
     ...summaryRun(),
     waitingOnYou: [],
-    onYou: [],
+    waitingOnYouWords: [],
     toDecide: null,
-    heldUntil: ['p-1'],
+    holdUntil: ['p-1'],
     holding: HOLDING,
   } as unknown as RunSummary;
   const html = railMarkup(held);
@@ -4462,7 +4503,7 @@ test('a hold is drawn between two cards as an --after edge is: from the run it i
           runs: held.map((h) => ({ ...h, missing: false, cancelledAt: null, gone: [] })),
           word: '',
           advice: '',
-          onYou: false,
+          waitingOnYou: false,
         }
       : null,
   });
@@ -4724,7 +4765,8 @@ test('a raise of a step that signed off blocked asking questions as data draws t
   const html = offersMarkup([
     {
       step: 'palette',
-      kind: 'raise',
+      case: 'raise',
+      kind: 'retry',
       message: 'over budget $1.50 of $1',
       by: 'retry',
       above: 1.5,
@@ -4856,7 +4898,7 @@ const PLACES = [
       },
     ],
   },
-  { from: 'shipped', dir: '/hkb/workflows/skills', skills: [] },
+  { from: 'builtin', dir: '/hkb/workflows/skills', skills: [] },
 ];
 
 /** An agent's form of yours with the skill list read already, as the picker reads it, inside a router: a given skill links to its page. */
@@ -5613,7 +5655,10 @@ test("the run bar: the run's title and id, what it asks of a person, its steps e
   const { RunBar } = await import('../src/components/RunBar.tsx');
   const { titleOf: runTitle } = await import('../src/lib/factory.ts');
   const theme = { ...atGate().steps[0], name: 'theme', ...coded('failed ✗ check (exit 1)'), approve: null, gate: null };
-  const base = atGate({}, { waitingOnYou: ['review', 'theme'], onYou: ['approve review', 'theme'], brief: 'Make the **floor** clear.' });
+  const base = atGate(
+    {},
+    { waitingOnYou: ['review', 'theme'], waitingOnYouWords: ['approve review', 'theme'], brief: 'Make the **floor** clear.' },
+  );
   const run = { ...base, steps: [base.steps[0], theme] };
   const html = await pagedWith(createElement(RunBar, { run: run.id }), [[['runs', run.id], run]]);
   assert.ok(html.includes(`>${runTitle(run)}</h2>`), html);
@@ -6996,7 +7041,7 @@ test('REFUSED: a schedule whose latest fire was refused draws why, whole, under 
 });
 
 test("REFUSED: a banner that says a person is waited on is drawn in an amount's colour or a failure's — Waiting on you and To decide both read yours", () => {
-  const waiting = bannerMarkup(needing('needs-human', { blockedByHarness: true, waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
+  const waiting = bannerMarkup(needing('needs-human', { waitingFor: WAIT, lastLine: LOGIN }, { waitingOnYou: [] }));
   const decide = withClient(createElement(ToDecideBanner, { run: endingRun() }));
   for (const [label, html] of [
     ['Waiting on you', waiting],

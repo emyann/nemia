@@ -322,7 +322,7 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
     names(
       refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [sendBack]),
       'try 2 of plan is already asked for',
-      '(--nudge, at 2026-09-16T23:00:00.000Z)',
+      '(--continue, at 2026-09-16T23:00:00.000Z)',
       'try 1',
       'the next tick sends it back',
     );
@@ -334,7 +334,7 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
     names(
       refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [WORDLESS]),
       'try 2 of plan is asked for',
-      '(--nudge, at 2026-09-16T23:00:00.000Z)',
+      '(--continue, at 2026-09-16T23:00:00.000Z)',
       'with no words',
       'plan is at its gate',
       'retry-plan-2',

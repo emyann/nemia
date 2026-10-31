@@ -42,7 +42,7 @@ const { acceptFile, approvalFile, asksDir, holdFile, markCancelled, pruneFile, r
 const { feedFile } = await import('../feed/feed.store.ts');
 const { runWith: runEngine } = await import('../runtime-client.ts');
 const { PlaceService } = await import('../place/place.store.ts');
-const { meteredPlace } = await import('../place/shipped.store.ts');
+const { meteredPlace } = await import('../place/builtin.store.ts');
 const made = testPlace();
 /** The file's test place, each question of it counted as the pass's `place` phase, as the shipped place counts its own. */
 const place = { ...made, place: meteredPlace(made.place), layer: PlaceService.layer(meteredPlace(made.place)) };
@@ -372,7 +372,7 @@ test('an ask takes a run out, and the try it asks for is filed: a retry, and an 
   const [run] = await started(1);
   touched.add(run.id);
   const before = (await finish([run.id])).rested;
-  assert.equal((await answered(run.id)).status, 'blocked', 'its step signed blocked');
+  assert.equal((await answered(run.id)).status, 'waiting', 'its step signed blocked');
   await runWith(h.e, retryRun(run.id, 'work', { mode: 'fresh' }));
   assert.equal(await rested(), before - 1, 'the ask read');
   assert.equal((await finish()).rested, before, 'the try filed, signed, settled, and the run at rest again');
@@ -630,7 +630,7 @@ test('a finished run whose worktrees are gone owes no hand-off, and rests — su
   );
   assert.deepEqual(await Promise.all([ok, broke, off].map(async (r) => (await answered(r.id)).status)), [
     'succeeded',
-    'blocked',
+    'waiting',
     'cancelled',
   ]);
   const after = await measured();

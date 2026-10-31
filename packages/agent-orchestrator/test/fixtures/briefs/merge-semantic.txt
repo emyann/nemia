@@ -19,7 +19,7 @@ not an account of it.
 
 ## Merge main
 
-A person asked for this (`nemia merge`): the work merges cleanly onto `main` as text, but ship's check refused the
+A person asked for this (`nemia refresh --base`): the work merges cleanly onto `main` as text, but ship's check refused the
 merged tree at `def4567890`, so the conflict is semantic: this change and what `main`
 changed each hold alone, and break together. Merge it in at that commit, without committing:
 

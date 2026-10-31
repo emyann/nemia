@@ -183,9 +183,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   Grace (lead software engineer, who builds a wide card through subagents), Agora (code reviewer), Otto (release engineer), Argus
   (janitor). Grace fills implement in `build` and `quick`; Ada's file stays, for a factory that hires her. And four workflows:
   `intake` (an idea to an intent), `build` (an intent to main, started `--after` the intake run), `quick` (a card that settles its change, whatever its size, to main: implement, then a review
-  whose pass files an ungated land, as `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:
-  the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as shipped
-  (`SHIPPED_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
+  whose pass files an ungated land, as `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia has built in:
+  the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as builtin
+  (`BUILTIN_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
 - `apps/docs/` — the documentation site (Astro Starlight) for a person who will use Nemia: landed material only, the state diagrams read
   from their markers at build; it imports no package (`apps/docs/CLAUDE.md`).

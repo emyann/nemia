@@ -61,7 +61,7 @@ export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' | 'read' = '
  * An ask as `nemia rm` names it: a try (`retry`), a round (`round`) or a merge (`merge`, of the loop's target and its try), of which step,
  * and its number — what `askAt` finds its file by.
  */
-export type AskName = { kind: 'retry' | 'round' | 'merge'; step: string; n: number };
+export type AskName = { of: 'try' | 'round' | 'base'; step: string; n: number };
 
 /**
  * Why `nemia rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every
@@ -117,7 +117,8 @@ export function forgetRefusal(
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
   spendOf: SpendOf = () => undefined,
-  askAt: (ask: AskName) => string = (a) => `${run.id}.asks/${a.kind}-${a.step}-${a.n}`,
+  askAt: (ask: AskName) => string = (a) =>
+    `${run.id}.asks/${a.of === 'try' ? 'retry' : a.of === 'base' ? 'merge' : 'round'}-${a.step}-${a.n}`,
   standings: readonly BranchStanding[] = [],
   verb: 'rm' | 'prune' = 'rm',
   merging: MergeState['merging'] = 'none',
@@ -277,7 +278,9 @@ function dueOf(a: Assessment, steps: readonly Workflow[], waits: boolean): strin
   }
   for (const r of a.round)
     due.push(
-      r.merge ? mergeDueWords(r) : `round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'nemia round'})`,
+      r.merge
+        ? mergeDueWords(r)
+        : `round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'nemia retry --round'})`,
     );
   return due;
 }
@@ -288,16 +291,19 @@ function unheardOf(f: Forgetting, a: Assessment | undefined): AskName[] {
   const unheard: AskName[] = [];
   for (const ask of asks) {
     if (spentAsks(run, [ask]).length || a?.retry.some((r) => askedFor(r) && r.step === ask.step && r.try === ask.try)) continue;
-    unheard.push({ kind: 'retry', step: ask.step, n: ask.try });
+    unheard.push({ of: 'try', step: ask.step, n: ask.try });
   }
   for (const ask of roundAsks) {
     if (spentRoundAsks(run, [ask]).length || a?.round.some((r) => roundHeard(r, ask))) continue;
-    unheard.push(ask.merge ? { kind: 'merge', step: ask.merge.target, n: ask.merge.try } : { kind: 'round', step: ask.step, n: ask.round });
+    unheard.push(ask.merge ? { of: 'base', step: ask.merge.target, n: ask.merge.try } : { of: 'round', step: ask.step, n: ask.round });
   }
   return unheard;
 }
 
-/** Whether the round due `r` is the one a person's ask asked for: its round on `nemia round`, its target's try on `nemia merge`. */
+/**
+ * Whether the round due `r` is the one a person's ask asked for: its round on `nemia retry --round`, its target's try on `nemia refresh
+ * --base`.
+ */
 const roundHeard = (r: Round, ask: RoundAsk): boolean =>
   ask.merge
     ? r.merge?.target === ask.merge.target && r.merge.try === ask.merge.try
@@ -305,15 +311,11 @@ const roundHeard = (r: Round, ask: RoundAsk): boolean =>
 
 /** A merge due, said: what its target merges, and that it spends no round. */
 const mergeDueWords = (r: Round): string =>
-  `the merge of ${r.merge!.onto} into ${r.target}'s work is due (nemia merge), on round ${r.round} of ${r.step}'s loop`;
+  `the merge of ${r.merge!.onto} into ${r.target}'s work is due (nemia refresh --base), on round ${r.round} of ${r.step}'s loop`;
 
 /** An ask no pass files, named. */
 const askNamed = (u: AskName): string =>
-  u.kind === 'retry'
-    ? `try ${u.n} of ${u.step}`
-    : u.kind === 'merge'
-      ? `the merge into ${u.step}'s work`
-      : `round ${u.n} of ${u.step}'s loop`;
+  u.of === 'try' ? `try ${u.n} of ${u.step}` : u.of === 'base' ? `the merge into ${u.step}'s work` : `round ${u.n} of ${u.step}'s loop`;
 
 /** The run's tasks in flight. */
 const liveHeld = (c: Facts): string | undefined => (c.live.length ? andList(c.live) : undefined);

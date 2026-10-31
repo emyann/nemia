@@ -12,7 +12,7 @@
 import type { RunGraph, RunSummary } from './api';
 import { edgesOf, loopPath, movingInto, type EdgeState, type EdgeStep } from './canvas.ts';
 import { layers, stepsOf, type Point } from './layout.ts';
-import { isGate, satisfiesAfter, stepState, type StepState } from './status.ts';
+import { waitsAtGate, satisfiesAfter, stepState, type StepState } from './status.ts';
 
 /**
  * One box of a flow. `step`, a step of the run; `fold`, the columns before or after the ones the rail shows, each step of them;
@@ -69,7 +69,7 @@ export const TILE = { width: 176, height: 88, gap: 32, lane: 12, over: 18, under
 export const flowSteps = (run: Pick<RunSummary, 'steps' | 'cancelledAt'> & { holding?: RunSummary['holding'] }): EdgeStep[] =>
   run.steps.map((step) => ({
     name: step.name,
-    state: stepState(step.phase, step.reason, run.cancelledAt !== null, run.holding != null),
+    state: stepState(step, run.cancelledAt !== null, run.holding != null),
     note: step.note,
     roundDue: step.roundDue,
   }));
@@ -93,7 +93,7 @@ export const UNGRAPHED = "Listed without its steps' graph by an api older than t
 
 /** Where the run is now: at work, or waiting on a person. Nothing is, on a run somebody called off. */
 export const isLiveStep = (state: StepState, cancelled: boolean): boolean =>
-  !cancelled && (movingInto(state) || state === 'needs-human' || isGate(state, false));
+  !cancelled && (movingInto(state) || state === 'needs-human' || waitsAtGate(state, false));
 
 /** The column the rail is centred on: the first with a step live, else the first with a step not done, else the last. */
 export function liveColumn(columns: readonly string[][], stateOf: (name: string) => StepState, cancelled: boolean): number {

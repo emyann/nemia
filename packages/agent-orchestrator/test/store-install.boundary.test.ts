@@ -1,7 +1,7 @@
 /**
  * What a step's worktree is given when it is cut, on git and npm for real: what `.worktreeinclude` lists from the main checkout, a
- * `node_modules` of its own by hard links or by `npm ci`, the lines `nemia start` and `nemia plan` refuse, a worktree a dying pass
- * left, read by its `.git`, and a cancel that lands while `npm ci` runs. The test place models no ignore rule and no link, and no
+ * `node_modules` of its own by hard links or by `npm ci`, the lines `nemia start` and `nemia start <folder>` refuse, a worktree a dying
+ * pass left, read by its `.git`, and a cancel that lands while `npm ci` runs. The test place models no ignore rule and no link, and no
  * stand-in starts `npm`, so these keep the git place; the rest of the run store is walked in store.test.ts.
  *
  * `WF_ROOT` is set before the runner is imported, since it is read as the module loads.
@@ -414,7 +414,7 @@ const aPlan = (files: (dir: string) => Record<string, string>): string => {
   return dir;
 };
 
-test("REFUSED: nemia plan of a card on the repository whose .worktreeinclude its place's open refuses, before any run is written", async () => {
+test("REFUSED: nemia start <folder> of a card on the repository whose .worktreeinclude its place's open refuses, before any run is written", async () => {
   const repo = aRepo();
   fs.writeFileSync(path.join(repo, '.worktreeinclude'), '../x\n');
   const plan = aPlan(() => ({ 'a.md': cardText(`workflow: ${oneStep()}`, 'the root') }));

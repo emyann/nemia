@@ -1,6 +1,6 @@
 /**
  * An agent's rules for `auto` on disk, two files under `<store>/auto/`, each with one writer: the person's confirmed list,
- * `<agent>.json`, written by `nemia policy confirm` and `nemia policy drop` alone (`confirmRule`, `dropRule`); and what the agent proposes,
+ * `<agent>.json`, written by `nemia policy confirm` and `nemia policy rm` alone (`confirmRule`, `dropRule`); and what the agent proposes,
  * `<agent>.proposed.json`, written by `nemia policy propose` alone (`writeProposed`). Each read and written whole, through a hidden file
  * renamed over it, and composed on read by `nemia policy` and admission.
  */
@@ -109,7 +109,7 @@ function writeWhole(file: string, value: unknown): void {
  */
 export function readConfirmed(home: string, agent: string): Confirmed | undefined {
   const file = confirmedFile(home, agent);
-  const fix = `it is yours, written by nemia policy confirm and nemia policy drop alone: move it aside, and confirm the rules again`;
+  const fix = `it is yours, written by nemia policy confirm and nemia policy rm alone: move it aside, and confirm the rules again`;
   const raw = jsonIn(file, fix);
   if (raw === undefined) return undefined;
   const read = Schema.decodeUnknownResult(ConfirmedSchema)(raw);
@@ -136,7 +136,7 @@ export function writeProposed(home: string, agent: string, proposed: Proposed): 
 
 /**
  * Confirms the rule `id` for `agent` in the store `home` at `now`, as the person read it in `words`: the rule it proposed, or the rule
- * that ships (`default`), added to the person's list, which a first confirm seeds with the rule that ships. The list written. Refused,
+ * that is built in (`default`), added to the person's list, which a first confirm seeds with the builtin rule. The list written. Refused,
  * writing nothing: a rule it did not propose (`Missing`), one whose words are no longer `words`, proposed again since (`Conflict`), and one
  * in force already (`Conflict`).
  */
@@ -153,7 +153,7 @@ export function confirmRule(home: string, agent: string, id: string, words: stri
   const rules = readConfirmed(home, agent)?.rules ?? [DEFAULT_AUTO];
   if (rules.some((r) => r.id === id))
     throw new Conflict({
-      message: `the rule ${id} is in force already for ${agent}: drop it first with nemia policy drop ${agent} ${id}.`,
+      message: `the rule ${id} is in force already for ${agent}: drop it first with nemia policy rm ${agent} ${id}.`,
     });
   const confirmed = { since: now.toISOString(), rules: [...rules, id === DEFAULT_ID ? rule : { ...rule, from: 'proposed' as const }] };
   writeWhole(confirmedFile(home, agent), confirmed);
@@ -161,7 +161,7 @@ export function confirmRule(home: string, agent: string, id: string, words: stri
 }
 
 /**
- * Drops the rule `id` from the person's list for `agent` in the store `home` at `now`, the rule that ships among them while they confirmed
+ * Drops the rule `id` from the person's list for `agent` in the store `home` at `now`, the builtin rule among them while they confirmed
  * none. The list written. Refused, writing nothing: a rule not in force (`Missing`).
  */
 export function dropRule(home: string, agent: string, id: string, now: Date): Confirmed {

@@ -2,7 +2,7 @@
  * What the board works out from a run's decision, without React: when to ask for it, the Factory card's line, a group's
  * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are the CLI `decide`'s.
  */
-import type { Decidable, DecideCommand, Group, RunDecision, RunSummary, Touched } from './api';
+import type { Decidable, Group, RunDecision, RunSummary, Touched } from './api';
 import { stepState } from './status.ts';
 
 /**
@@ -28,7 +28,7 @@ export const isDecidable = (decision: RunDecision | undefined): decision is Deci
  */
 export const decisionStamp = (
   run: Pick<RunSummary, 'status' | 'cancelledAt' | 'waitingOnYou'> & { holding?: RunSummary['holding'] } & {
-    steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'phase' | 'reason' | 'message'>>;
+    steps: ReadonlyArray<Pick<RunSummary['steps'][number], 'name' | 'taskId' | 'phase' | 'reason' | 'on' | 'via' | 'message'>>;
   },
 ): string =>
   JSON.stringify([
@@ -36,7 +36,7 @@ export const decisionStamp = (
     run.waitingOnYou,
     run.holding?.word ?? null,
     run.steps.map((s) => {
-      const state = stepState(s.phase, s.reason, run.cancelledAt !== null, false);
+      const state = stepState(s, run.cancelledAt !== null, false);
       const inFlight = s.taskId !== null && (state === 'working' || state === 'needs-human' || state === 'waiting');
       return [s.name, s.taskId, inFlight ? 'in flight' : s.message];
     }),
@@ -107,10 +107,3 @@ export function changeOf(touched: Touched | undefined, file: string): { added: n
   if (!touched || 'error' in touched.radius) return undefined;
   return touched.radius.changes.find((c) => c.path === file || (c.from && `${c.from} → ${c.path}` === file));
 }
-
-/**
- * The looping step an `accept` command accepts, as the api names it beside the command (`step`), or null for any other command. The board
- * presses that one itself.
- */
-export const acceptStepOf = (command: Pick<DecideCommand, 'label' | 'step'>): string | null =>
-  command.label === 'accept' ? command.step : null;

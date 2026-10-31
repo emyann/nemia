@@ -196,14 +196,14 @@ function usersOf(dir: string): string[] {
  * command that frees it.
  */
 export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
-  name: 'workflows remove',
+  name: 'workflows rm',
   usage: 'yours <name> --version <v>',
   help: ['a workflow folder of yours removed, at the --version it was read at'],
   spec: writerSpec(
-    'workflows remove',
+    'workflows rm',
     'yours <name> --version <v>',
     [FROM, { key: 'name', takes: 'required', kind: 'name' }],
-    [versionFlag('workflows remove', 'the folder'), REPO],
+    [versionFlag('workflows rm', 'the folder'), REPO],
   ),
   writes: true,
   class: 'ask',
@@ -215,7 +215,7 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
   },
   handler: (args, _env, home = HOME) =>
     tried(() => {
-      const dir = path.resolve(versionHeld('nemia workflows remove', 'remove', args, home));
+      const dir = path.resolve(versionHeld('nemia workflows rm', 'remove', args, home));
       return removeWorkflow(dir, { home, users: usersOf(dir) });
     }),
   print: ({ dir, removed }) => [`removed ${dir}: ${removed.join(', ')}`],
@@ -226,7 +226,7 @@ export type FolderLoaded = { steps: Workflow[] } | { error: string };
 
 /** Each folder `dirs` names, loaded as a start on `repo` would load it, in the factory named with its hires (`FolderLoaded`), by folder. */
 export const WORKFLOWS_LIST: Command<Record<string, FolderLoaded>> = {
-  name: 'workflows list',
+  name: 'workflows',
   usage: '[<dirs> ...]',
   help: ['the workflow folders named, each loaded'],
   spec: apiSpec([{ key: 'dirs', takes: 'many', kind: 'name' }], ['repo', 'factory']),

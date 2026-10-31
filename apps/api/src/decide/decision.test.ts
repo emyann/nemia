@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { Effect, Layer } from 'effect';
-import { engine, PlaceService, runStore, runWith as runEngine, shippedGitPlace, standingWhen, type Place } from 'agent-orchestrator';
+import { engine, PlaceService, runStore, runWith as runEngine, builtinGitPlace, standingWhen, type Place } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../app.ts';
 import { diffFiles, DIFF_LINES } from './decision.ts';
 
@@ -174,14 +174,14 @@ writeRun({
 function countedStanding() {
   let asks = 0;
   const place: Place = {
-    declared: shippedGitPlace.declared,
+    declared: builtinGitPlace.declared,
     ask: (verb, request, options) => {
       if (verb === 'standing') asks += 1;
-      return shippedGitPlace.ask(verb, request, options);
+      return builtinGitPlace.ask(verb, request, options);
     },
     askNow: (verb, request, options) => {
       if (verb === 'standing') asks += 1;
-      return shippedGitPlace.askNow(verb, request, options);
+      return builtinGitPlace.askNow(verb, request, options);
     },
   };
   return { layer: PlaceService.layer(place), asks: () => asks };
@@ -496,8 +496,8 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
           .filter((c: { label: string }) => c.label !== 'land it' && c.label !== 'drop it')
           .map(({ label, command, step }: DecideCommand) => ({ label, command, step })),
         [
-          { label: 'once more', command: 'nemia round r-d9 review', step: 'review' },
-          { label: 'accept', command: 'nemia accept r-d9 review --message "<why>"', step: 'review' },
+          { label: 'once more', command: 'nemia retry r-d9 review --round', step: 'review' },
+          { label: 'approve', command: 'nemia approve r-d9 review --message "<why>"', step: 'review' },
           { label: 'once more', command: 'nemia retry r-d9 implement', step: 'implement' },
         ],
         'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
@@ -507,11 +507,11 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
         [],
         'every command is one line a person runs, never a sentence',
       );
-      const accept = body.commands.find((c) => c.label === 'accept');
+      const accept = body.commands.find((c) => c.label === 'approve');
       assert.ok(accept?.said, JSON.stringify(body.commands));
       assert.match(
         accept.said,
-        /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia accept r-d9 review --message "<why>"$/,
+        /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia approve r-d9 review --message "<why>"$/,
       );
 
       const stepsOf = async () => (await detailOf('r-d9')).steps;
@@ -651,7 +651,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
       });
 
       const detail = await detailOf('r-d11');
-      assert.deepEqual([detail.steps[0].status, detail.steps[1].status, detail.waitingOnYou], ['denied', 'waiting', ['implement']]);
+      assert.deepEqual([detail.steps[0].status, detail.steps[1].status, detail.waitingOnYou], ['denied', 'pending', ['implement']]);
       const body = await decidable('r-d11');
       const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
       assert.deepEqual(
@@ -883,7 +883,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     },
   });
   const fanOut = await detailOf('r-d7');
-  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['blocked', true, ['implement']]);
+  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['waiting', true, ['implement']]);
   const decided = await decidable('r-d7');
   assert.deepEqual(
     decided.touched.map((t: { branch: string }) => t.branch),

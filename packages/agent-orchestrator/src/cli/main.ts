@@ -20,6 +20,7 @@ import {
   keepCursor,
   BOOKMARK_EVERY,
   bookmarkLine,
+  formerHints,
   parseSelectors,
   selects,
   type Selectors,
@@ -42,7 +43,7 @@ import {
   runMain,
   tickRun,
   runWith,
-  shippedGitPlace,
+  builtinGitPlace,
   PlaceService,
   storeRootLayer,
   wfRoot,
@@ -68,7 +69,7 @@ import {
 import { HELP, placedIn, usage, WF_HINT, type Engine, type Verb } from './flags.ts';
 import { decideVerb } from './decide/decide.ts';
 import { admitRun, agentsCustomRun, policyProposeRun, factoryInstructRun, factoryRulesRun, pruneVerb, rmVerb } from './runs.ts';
-import { inboxAddRun, inboxQueueRun, planRun, startRun } from './start.ts';
+import { inboxAddRun, inboxQueueRun, startRun } from './start.ts';
 import { agentsWriteRun, skillsWriteRun, workflowsWriteRun } from './writers.ts';
 
 /** How often `nemia watch` reads the lease for its liveness. */
@@ -181,7 +182,7 @@ export const watching = (
 type Pass = Effect.Success<ReturnType<typeof tickRun>>;
 
 /**
- * A run's line on `nemia tick`: its status, as the pass judged it — `awaiting approval` or `blocked` for one a person alone stops, `failed`
+ * A run's line on `nemia tick`: its status, as the pass judged it — `awaiting approval` or `waiting` for one a person alone stops, `failed`
  * for one in which a step broke — and what the pass did to it.
  */
 function tickRunLine(r: Pass['runs'][number]): string {
@@ -189,9 +190,9 @@ function tickRunLine(r: Pass['runs'][number]): string {
   const tried = r.tried.length ? `  tried again: ${r.tried.join(', ')}` : '';
   const looped = r.looped.length ? `  round again: ${r.looped.join(', ')}` : '';
   const checked = r.checked.length ? `  checking: ${r.checked.join(', ')}` : '';
-  const blocked = r.blocked.length ? `  blocked: ${r.blocked.join(', ')}` : '';
+  const unreachable = r.unreachable.length ? `  unreachable: ${r.unreachable.join(', ')}` : '';
   const waiting = r.waiting.length ? `  ${waitWord(r.waiting)}` : r.held ? `  ${slotWord(r.held)}` : '';
-  return `${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${blocked}${waiting}`;
+  return `${r.run.id}  ${r.status}${filed}${tried}${looped}${checked}${unreachable}${waiting}`;
 }
 
 /** What `nemia tick` prints of a run: its line (`tickRunLine`), then its notes, a line each. */
@@ -340,7 +341,9 @@ function watchFrom(args: Args, cursorFile: string | undefined): number {
  */
 function watchVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
   const how: Watched = { json: args.json === true };
-  const selectors = parseSelectors(Array.isArray(args.selector) ? args.selector : []);
+  const typed = Array.isArray(args.selector) ? args.selector : [];
+  for (const hint of typed.flatMap(formerHints)) console.error(`nemia watch: ${hint}`);
+  const selectors = parseSelectors(typed);
   const cursorFile = typeof args.cursorFile === 'string' ? args.cursorFile : undefined;
   const from = watchFrom(args, cursorFile);
   kept(cursorFile, from);
@@ -352,7 +355,7 @@ function watchVerb(args: Args, e: Engine, place: Place): void | Promise<void> {
 export const VERBS: ReadonlyMap<string, Verb> = new Map<string, Verb>([['decide', decideVerb]]);
 
 /**
- * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`, `nemia plan`); `nemia rm` and `nemia prune`,
+ * The runner of each command the CLI runs itself, by its name — those it serves alone (`RAN`); `nemia rm` and `nemia prune`,
  * whose runners walk the many runs a command line names through their handlers; and `nemia start`, `nemia inbox add`, `nemia inbox queue`,
  * `nemia agents custom`, `nemia factory instruct`, `nemia policy propose`, `nemia agents write`, `nemia skills write` and
  * `nemia workflows write`, whose runners read the files and folders a command line names before their handlers; and `nemia admit`, whose
@@ -365,7 +368,6 @@ export const RUNS: ReadonlyMap<string, (args: Args, e: Engine, place: Place) => 
   ['rm', rmVerb],
   ['prune', pruneVerb],
   ['start', startRun],
-  ['plan', planRun],
   ['inbox add', inboxAddRun],
   ['inbox queue', inboxQueueRun],
   ['agents custom', agentsCustomRun],
@@ -422,7 +424,7 @@ export async function main(
   argv: string[],
   given?: Engine,
   demand: () => DemandHost = liveDemandHost,
-  place: Place = shippedGitPlace,
+  place: Place = builtinGitPlace,
 ): Promise<void> {
   const renamed = renamedIn(argv);
   if (renamed.hint !== undefined) process.stderr.write(`${renamed.hint}\n`);

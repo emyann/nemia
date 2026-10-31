@@ -1,5 +1,5 @@
 /**
- * A templated factory's upgrade, on disk: `nemia factory plan` writing nothing; `nemia factory upgrade` refusing with nothing written, and
+ * A templated factory's upgrade, on disk: `nemia factory diff` writing nothing; `nemia factory upgrade` refusing with nothing written, and
  * writing only the version wanted into the factory's file; the controller merging three ways, only the status written while a conflict
  * waits, then the tree, the base and the status; `nemia factory resolve` writing the person's choices; the tree swapped only where no one
  * wrote it since the merge read it; a pass stopped between its writes; a run in flight keeping its frozen steps; and the factory's
@@ -137,7 +137,7 @@ test('plan previews what merges cleanly and each conflict, with the line that re
   rewrite(treeDir('planned'), REVIEW, 'budget: 7', 'budget: 9');
   released(dir, '0.2.0', 5);
   const before = bytesUnder(FACTORIES);
-  const printed = await printedBy(t, 'factory', 'plan', 'planned', '--to', '0.2.0');
+  const printed = await printedBy(t, 'factory', 'diff', 'planned', '--to', '0.2.0');
   assert.deepEqual(bytesUnder(FACTORIES), before, 'the plan writes nothing');
   assert.equal(printed[0], 'planned: 0.1.0 → 0.2.0');
   assert.ok(printed.includes('conflicts: 1'), printed.join('\n'));
@@ -232,7 +232,7 @@ test('conflicts wait for a choice with only the status written; resolve writes e
   released(dir, '0.2.0', 5);
   rewrite(dir, README, '# dev\n', '# dev, theirs\n');
   const printed = await printedBy(t, 'factory', 'upgrade', 'clash', '--to', '0.2.0');
-  assert.match(printed[2], /^2 conflicts wait for a choice: nemia factory plan clash --to 0\.2\.0 shows each/);
+  assert.match(printed[2], /^2 conflicts wait for a choice: nemia factory diff clash --to 0\.2\.0 shows each/);
   const tree = bytesUnder(treeDir('clash'));
   const base = bytesUnder(appliedDir('clash'));
   const waiting = reconcileFactory(templated('clash'));

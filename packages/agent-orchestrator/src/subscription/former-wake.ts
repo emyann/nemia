@@ -3,7 +3,7 @@
  *
  * A subscription's filter was once a list of words, and a line woke it where one of them was found in the line's word or led a part of
  * its note, whatever the case: the prose a line's word and note were matched on, which no selector reads. Eight such words were ever
- * shipped — the seven of the package's own default and `denied:` beside them in Nemia's — and `FORMER_WAKE` says what each was really
+ * built in — the seven of the package's own default and `denied:` beside them in Nemia's — and `FORMER_WAKE` says what each was really
  * selecting: a reason of the feed's closed table (`reason.ts`), or the `waits` a note carried. A stored list is turned into selectors
  * every time it is read (`subscription.store.ts`), never rewritten, as the package turns a v0 feed line (`upgraded`) and a renamed step
  * key (`FORMER_KEYS`).
@@ -21,20 +21,20 @@
 import { waitsOf, type Reason } from '../feed/index.ts';
 import { SELECTOR_FORM } from '../watch/selector.ts';
 
-/** What one shipped wake word was really selecting: the reasons whose lines its prose found, or the wait a note it led carried. */
+/** What one builtin wake word was really selecting: the reasons whose lines its prose found, or the wait a note it led carried. */
 type Selecting = { readonly reasons?: readonly Reason[]; readonly waits?: true };
 
 /**
- * Every wake word the package ever shipped, and what it selected. Typed by `Reason`, so a reason renamed in the feed's table fails the
+ * Every wake word the package ever had built in, and what it selected. Typed by `Reason`, so a reason renamed in the feed's table fails the
  * typecheck here rather than leaving a stored subscription quoting a code the feed no longer names.
  *
  * `failed` names two reasons: it was a substring of a word, so it found `failed` and `failed ✗ check (exit 1)` alike.
  */
 export const FORMER_WAKE: Readonly<Record<string, Selecting>> = {
   'awaiting approval': { reasons: ['AwaitingApproval'] },
-  'rounds exhausted': { reasons: ['RoundsExhausted'] },
-  'needs-human': { reasons: ['NeedsHuman'] },
-  blocked: { reasons: ['Blocked'] },
+  'rounds exhausted': { reasons: ['AwaitingRound'] },
+  'needs-human': { reasons: ['AwaitingAnswer'] },
+  blocked: { reasons: ['AwaitingAnswer'] },
   failed: { reasons: ['Failed', 'CheckFailed'] },
   'waiting on you:': { waits: true },
   'needs:': { waits: true },
@@ -68,7 +68,7 @@ const asKeyed = (word: string): string => word.trim().toLowerCase();
 /**
  * The selectors a stored wake list `wake` comes to, and the words of it none names (`unconverted`): `waits=person` where a word of it read
  * a note that waits, and one reason selector for the reasons the rest named, in table order and each once, less every reason that waits
- * where `waits=person` is already there — which is what makes the seven shipped words exactly `['waits=person']` and Nemia's eight exactly
+ * where `waits=person` is already there — which is what makes the seven builtin words exactly `['waits=person']` and Nemia's eight exactly
  * her two selectors.
  *
  * A list no word of which converts comes to no selector at all, which the store reads as a subscription to leave out: an empty list of

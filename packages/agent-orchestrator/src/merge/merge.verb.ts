@@ -1,14 +1,13 @@
 /**
- * `nemia merge`: send a loop's work back to merge its base branch, on the round it is on. It refuses before anything is written, and writes
- * a person's own file — never the run's record, which the tick owns. A controller, reaching the runtime through the client
+ * `nemia refresh --base`: send a loop's work back to merge its base branch, on the round it is on. It refuses before anything is written,
+ * and writes a person's own file — never the run's record, which the tick owns. A controller, reaching the runtime through the client
  * (`runtime-client.ts`): an Effect program that requires the engine as a service (`mergeRun`, over `EngineService`), run by a caller with
- * `runWith`; its entry of the command table (`MERGE`); what `nemia decide` offers (`mergeOffers`); and how the review after a merge reads
- * its own closeout (`closeoutsAfterMerge`).
+ * `runWith`, which the command table's `nemia refresh` calls given `--base`; what `nemia decide` offers (`mergeOffers`); and how the review
+ * after a merge reads its own closeout (`closeoutsAfterMerge`).
  */
 import { Effect } from 'effect';
 import { asked, tried, type Engine } from '../runtime-client.ts';
 import { isRepositoryRun, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
-import type { Args } from '../command/command.ts';
 import { endingStopped, merged, standing, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { roundsDue } from '../round/round.ts';
@@ -18,9 +17,8 @@ import { mergeWordOf } from '../branches/index.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
-import type { Command } from '../command/entry.verb.ts';
 import type { Workflow } from '../step/step.ts';
-import { mergeAsk, mergeAskedLine, mergeOffer, type MergeAsk, type MergeReads, type Tried } from './merge.ts';
+import { mergeAsk, mergeOffer, type MergeAsk, type MergeReads, type Tried } from './merge.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
@@ -86,8 +84,8 @@ export function mergeOffers(
 }
 
 /**
- * Ask that a loop's target merge the run's base branch, on the round the loop is on — `nemia merge` — by writing the ask, and nothing else.
- * The next tick honours it once, and moves the run's base to the commit merged.
+ * Ask that a loop's target merge the run's base branch, on the round the loop is on — `nemia refresh --base` — by writing the ask, and
+ * nothing else. The next tick honours it once, and moves the run's base to the commit merged.
  *
  * Refused before anything is written, with what to do instead (`mergeAsk`): among them a run whose result step closes no loop, pointed to
  * `nemia retry`, work whose trial merge onto the base is clean, pointed to the landing's approval, and a base whose commit the trial
@@ -99,7 +97,7 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
   if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({
-        message: `no such run: ${id}. nemia merge takes a run by its id, as nemia ls lists it: nemia merge <runId> [<step>].`,
+        message: `no such run: ${id}. nemia refresh --base takes a run by its id, as nemia ls lists it: nemia refresh <runId> [<step>] --base.`,
       }),
     );
   const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
@@ -113,13 +111,13 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
   const first = answer((yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   const { ask } = first;
-  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'merge', ask });
+  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'refresh', of: 'base', ask });
   if (!written.written) {
     const now = answer((yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
     const why =
       'refusal' in now
         ? now.refusal
-        : strayAsk(written.where, written.stray, `a merge into ${ask.merge.target}'s work`, `nemia merge ${id} ${ask.step}`);
+        : strayAsk(written.where, written.stray, `a merge into ${ask.merge.target}'s work`, `nemia refresh ${id} ${ask.step} --base`);
     return yield* Effect.fail(
       new Conflict({ message: why ?? `a merge into ${ask.merge.target}'s work is already asked. Wait for it: nemia ls ${id}.` }),
     );
@@ -142,41 +140,3 @@ export const closeoutsAfterMerge = Effect.fnUntraced(function* (
   const own = said === undefined ? undefined : parseCloseout(said);
   return (name: string): Closeout | undefined => (own && name === step.name && !('error' in own) ? own : signedOff(name));
 });
-
-/** The text under `key`, or undefined where none was given. */
-const textOf = (args: Args, key: string): string | undefined => {
-  const value = args[key];
-  return typeof value === 'string' ? value : undefined;
-};
-
-/** `nemia merge`: a loop's target asked to merge the base, on the round the loop is on, and the file the ask is written to. */
-export const MERGE: Command<{ step: string; target: string; onto: string; sha: string; round: number; file: string; said: string }> = {
-  name: 'merge',
-  usage: '<runId> [<step>]',
-  help: [
-    "merge the base: a loop's work that no longer merges cleanly",
-    'goes back to merge it, once, on the next tick — on the round',
-    'it is on, which the merge does not spend',
-  ],
-  spec: {
-    positionals: [
-      { key: 'runId', takes: 'required', kind: 'name' },
-      { key: 'step', takes: 'optional', kind: 'name' },
-    ],
-    flags: [],
-    unknown: () =>
-      'nemia merge takes the run and, when the run has more than one loop, the step that closes the one whose work merges: nemia merge <runId> [<step>].',
-  },
-  writes: true,
-  ticks: true,
-  class: 'act',
-  route: { method: 'POST', path: '/api/runs/:runId/merge', status: 202 },
-  apiKeys: ['step', 'target', 'onto', 'sha', 'round', 'file'],
-  handler: Effect.fnUntraced(function* (args: Args) {
-    const { run, ask, file } = yield* mergeRun(textOf(args, 'runId') ?? '', textOf(args, 'step'));
-    const looping = stepsOf(run).find((s) => s.name === ask.step)!;
-    const { target, onto, sha } = ask.merge;
-    return { step: ask.step, target, onto, sha, round: ask.round, file, said: mergeAskedLine(ask, looping) };
-  }),
-  print: ({ said, file }, args) => [`${textOf(args, 'runId') ?? ''}  ${said}`, `   ${file}`],
-};

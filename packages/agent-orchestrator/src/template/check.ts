@@ -1,5 +1,5 @@
 /**
- * `nemia template check`'s judgement of a folder already read (`ReadFolder`): the layout's and each document's rules (`layout.ts`), then
+ * `nemia template lint`'s judgement of a folder already read (`ReadFolder`): the layout's and each document's rules (`layout.ts`), then
  * what the folder's parts say of each other — a hire, a skill, a sibling step, a parameter or a file named that the folder lacks — and
  * each harness's block against the words the runtime gives that harness (`HARNESS_KNOBS`). Pure: every problem comes back at once.
  */
@@ -298,7 +298,7 @@ function refRefusals(folder: ReadFolder, held: Held): Refusal[] {
 /**
  * Every problem of the template `folder`, by file in order: the layout's and each document's (`layout.ts`), a hire, skill, sibling step,
  * parameter or file named that the folder lacks, a step's words, and each harness's block against the runtime's knobs for it.
- * `placeSkills`: the place skills nemia ships, each a skill the folder need not carry. None for a template that passes.
+ * `placeSkills`: nemia's builtin place skills, each a skill the folder need not carry. None for a template that passes.
  */
 export function checkTemplate(folder: ReadFolder, placeSkills: readonly string[]): Refusal[] {
   const held = heldOf(folder, placeSkills);

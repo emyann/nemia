@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import { Schema } from 'effect';
 import { ReadRefusal, send, UnreadAnswer, WriteRefusal } from '../src/lib/api/read.ts';
 import { liftHold, pruneRun, putHold, removeRun } from '../src/lib/api/runs.ts';
-import { acceptLoop, approveStep, askRound, askTry, sayToStep } from '../src/lib/api/asks.ts';
+import { approveStep, askRound, askTry, sayToStep } from '../src/lib/api/asks.ts';
 import { dropCard, fileCard, queueCard } from '../src/lib/api/inbox.ts';
 import { AgentRefusal, createAgent, removeAgent, tryAgent, type AgentDraft } from '../src/lib/api/agents.ts';
 import { copySkill, saveSkill, SkillRefusal, type SkillDraft } from '../src/lib/api/skills.ts';
@@ -210,7 +210,6 @@ test("each family of writes: its answer decoded, an answer unread refused with w
       askTry('r-1', 'plan', { mode: 'nudge' }),
       askRound('r-1', {}),
       approveStep('r-1', 'plan', {}),
-      acceptLoop('r-1', 'review', { message: 'good enough' }),
       sayToStep('r-1', 'plan', 'hi'),
     ]) {
       const err = await rejection(ask);

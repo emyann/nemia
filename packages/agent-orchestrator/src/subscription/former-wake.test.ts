@@ -19,9 +19,9 @@ const SUBSETS: readonly string[][] = Array.from({ length: 1 << FORMER_NEMIA_WAKE
 test('selectorsOfWake converts a stored wake list to what each word was selecting: the shipped words, the two lists a store holds, a word unknown, every subset', async (t) => {
   await t.test('each shipped word converts to what it was selecting, and a word with no reason to the wait a note carried', () => {
     assert.deepEqual(selectorsOfWake(['awaiting approval']).selectors, ['reason=AwaitingApproval']);
-    assert.deepEqual(selectorsOfWake(['rounds exhausted']).selectors, ['reason=RoundsExhausted']);
-    assert.deepEqual(selectorsOfWake(['needs-human']).selectors, ['reason=NeedsHuman']);
-    assert.deepEqual(selectorsOfWake(['blocked']).selectors, ['reason=Blocked']);
+    assert.deepEqual(selectorsOfWake(['rounds exhausted']).selectors, ['reason=AwaitingRound']);
+    assert.deepEqual(selectorsOfWake(['needs-human']).selectors, ['reason=AwaitingAnswer']);
+    assert.deepEqual(selectorsOfWake(['blocked']).selectors, ['reason=AwaitingAnswer']);
     assert.deepEqual(selectorsOfWake(['denied:']).selectors, ['reason=ToolDenied']);
     assert.deepEqual(selectorsOfWake(['waiting on you:']).selectors, ['waits=person']);
     assert.deepEqual(selectorsOfWake(['needs:']).selectors, ['waits=person']);
@@ -32,13 +32,13 @@ test('selectorsOfWake converts a stored wake list to what each word was selectin
     );
     assert.deepEqual(
       selectorsOfWake([' BLOCKED ']).selectors,
-      ['reason=Blocked'],
+      ['reason=AwaitingAnswer'],
       'a word is keyed as the prose match folded its case and spaces',
     );
     assert.deepEqual(selectorsOfWake(['Needs:']).selectors, ['waits=person'], 'the note words too');
     assert.deepEqual(
       selectorsOfWake(['denied:', 'blocked']).selectors,
-      ['reason in (Blocked,ToolDenied)'],
+      ['reason in (AwaitingAnswer,ToolDenied)'],
       'and the reasons of one list are one selector, in the table’s order whatever the order they were typed in',
     );
   });
@@ -51,7 +51,7 @@ test('selectorsOfWake converts a stored wake list to what each word was selectin
     },
   );
   await t.test('a word the table does not know converts to nothing and is said; the rest of its list still converts', () => {
-    assert.deepEqual(selectorsOfWake(['blocked', 'verified']), { selectors: ['reason=Blocked'], unconverted: ['verified'] });
+    assert.deepEqual(selectorsOfWake(['blocked', 'verified']), { selectors: ['reason=AwaitingAnswer'], unconverted: ['verified'] });
     assert.deepEqual(selectorsOfWake(['verified']), { selectors: [], unconverted: ['verified'] }, 'a list of its own converts to nothing');
     assert.deepEqual(selectorsOfWake([]), { selectors: [], unconverted: [] }, 'and so does an empty list, which woke on no line');
   });
@@ -78,7 +78,7 @@ test('REFUSED: each retired flag, by name, with the selector to type and the key
       const said = retiredWakeRefusal(command, arg) ?? '';
       assert.ok(said.startsWith(`${command} no longer takes ${arg.split('=')[0]}`), said);
       assert.match(said, /-l waits=person/);
-      assert.match(said, /The keys: run, factory, workflow, step, agent, kind, reason, type, waits, source/);
+      assert.match(said, /The keys: run, factory, workflow, step, agent, kind, reason, on, via, type, waits, source/);
     }
   assert.equal(retiredWakeRefusal('nemia watch', '--json'), undefined);
   assert.equal(retiredWakeRefusal('nemia watch', '--wakeful'), undefined, 'a flag that merely begins with one is not it');

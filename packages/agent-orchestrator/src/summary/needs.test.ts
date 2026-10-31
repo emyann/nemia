@@ -47,7 +47,7 @@ const run = {
   steps: { build: { taskId: 't-build' }, review: { taskId: 't-review' } },
 } as unknown as Run;
 
-const starting = { phase: 'running', reason: 'Running', verdict: null } as const;
+const starting = { phase: 'running', reason: 'Running', on: null, via: null, verdict: null } as const;
 
 const judged = {
   codes: new Map([

@@ -336,7 +336,7 @@ const sourceOf = (file: string): string | null => {
  * `noCardLine`'s words, for a name with none, and for a card dropped since the listing read it.
  */
 export const INBOX_CARD: Command<{ card: InboxListing; source: string }> = {
-  name: 'inbox card',
+  name: 'inbox show',
   usage: '<name>',
   help: ['one card, read for its page'],
   spec: {

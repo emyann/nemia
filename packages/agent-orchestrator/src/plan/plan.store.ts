@@ -16,7 +16,7 @@ export function readPlan(dir: string): Card[] {
   try {
     entries = fs.readdirSync(dir);
   } catch {
-    throw new WorkflowError(`no plan folder at ${dir}. A plan is a folder of cards, one <card>.md each: nemia plan <folder> --repo <r>.`);
+    throw new WorkflowError(`no plan folder at ${dir}. A plan is a folder of cards, one <card>.md each: nemia start <folder> --repo <r>.`);
   }
   const files = entries.map((name) => {
     const at = path.join(dir, name);

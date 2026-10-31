@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { policyQuery, confirmRule, dropRule, type PolicyList } from '../src/lib/api/auto.ts';
 
-/** The rule that ships, as the api words it. */
+/** The builtin rule, as the api words it. */
 const DEFAULT = {
   id: 'default',
   answer: 'approve',
@@ -22,7 +22,7 @@ const LIST: PolicyList = {
   file: '/store/auto/nemia.json',
   isDefault: true,
   rules: [DEFAULT],
-  shipped: DEFAULT,
+  builtin: DEFAULT,
   proposed: {
     file: '/store/auto/nemia.proposed.json',
     at: '2026-10-06T12:00:00.000Z',

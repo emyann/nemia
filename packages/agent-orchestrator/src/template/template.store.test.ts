@@ -1,5 +1,5 @@
 /**
- * A template's folder on disk: `nemia template export` of the tests' team into a folder that passes `nemia template check`, what it
+ * A template's folder on disk: `nemia template export` of the tests' team into a folder that passes `nemia template lint`, what it
  * writes read back as it was written, what it refuses with nothing written, and each problem of a folder at its file and line; and
  * `nemia template pack` and `unpack`, the folder back byte for byte with its modes, an archive checked as its folder, and every refusal
  * with nothing written. `WF_ROOT` is set before the import, since the store's modules read it as they load.
@@ -74,8 +74,8 @@ test("the tests' team exports into a folder that passes its check, each part sai
   assert.equal(said.get('agents/reviewer/'), reviewer);
   assert.equal(said.get('skills/review-a-change/'), path.join(repo, 'workflows', 'skills', 'review-a-change'));
   assert.equal(said.get('nemia.yaml hires dev/review: reviewer'), `${path.join(repo, 'workflows', 'dev', 'review.md')}, its agent: line`);
-  assert.match(said.get('skills/git/') ?? '', /left out: a place skill nemia ships/);
-  assert.equal(fs.existsSync(path.join(dir, 'skills', 'git')), false, 'a place skill nemia ships is not carried');
+  assert.match(said.get('skills/git/') ?? '', /left out: a builtin place skill/);
+  assert.equal(fs.existsSync(path.join(dir, 'skills', 'git')), false, 'a builtin place skill is not carried');
   assert.deepEqual(readBack(dir, 'nemia.yaml').spec, {
     version: '0.1.0',
     hires: { 'dev/implement': 'implementer', 'dev/review': 'reviewer', 'dev/ship': 'shipper' },
@@ -391,7 +391,7 @@ test('a link in a folder is refused by name, and so is a file of two documents, 
   assert.match(problems[1].message, /a second document/);
 });
 
-test('nemia template check prints that a folder passes, and refuses one that does not with every problem at its line', async (t) => {
+test('nemia template lint prints that a folder passes, and refuses one that does not with every problem at its line', async (t) => {
   const dir = target();
   exportTemplate({ dir, from: repoWithTeam() });
   const printed: string[] = [];
@@ -399,7 +399,7 @@ test('nemia template check prints that a folder passes, and refuses one that doe
     printed.push(args.join(' '));
   });
   try {
-    await main(['template', 'check', dir], engineOf(engine().layer));
+    await main(['template', 'lint', dir], engineOf(engine().layer));
   } finally {
     log.mock.restore();
   }
@@ -407,7 +407,7 @@ test('nemia template check prints that a folder passes, and refuses one that doe
   assert.match(printed[1], /^digest of the content: sha256:[0-9a-f]{64}$/);
   fs.writeFileSync(path.join(dir, 'nemia.yaml'), fs.readFileSync(path.join(dir, 'nemia.yaml'), 'utf8').replace('v1alpha1', 'v2'));
   await assert.rejects(
-    main(['template', 'check', dir], engineOf(engine().layer)),
+    main(['template', 'lint', dir], engineOf(engine().layer)),
     refusedWith('Invalid', 'with 1 problem', /\nnemia\.yaml:1:\d+: apiVersion /, '"nemia.dev/v2"'),
   );
 });
@@ -553,11 +553,11 @@ test('check reads an archive as the folder it holds, every problem at its line; 
   const archive = path.join(scratch('wf-template-pack-'), 'bad.tgz');
   fs.writeFileSync(archive, packArchive('team', files).archive);
   await assert.rejects(
-    main(['template', 'check', archive], engineOf(engine().layer)),
+    main(['template', 'lint', archive], engineOf(engine().layer)),
     refusedWith('Invalid', 'bad.tgz does not pass', 'with 1 problem', /\nnemia\.yaml:1:\d+: apiVersion /, '"nemia.dev/v2"'),
   );
   await assert.rejects(
-    main(['template', 'check', path.join(dir, 'none')], engineOf(engine().layer)),
+    main(['template', 'lint', path.join(dir, 'none')], engineOf(engine().layer)),
     refusedWith('Missing', 'is neither a folder nor a file', "name a template's folder", 'or an archive'),
   );
 });
@@ -590,5 +590,5 @@ test('nemia template pack and unpack print what they wrote, the digest of its co
   }
   const digest = `digest of the content: ${readTemplate(dir).digest}`;
   const team = path.join(parent, 'team');
-  assert.deepEqual(printed, [`written: ${out}`, digest, `written: ${team}`, digest, `check it: nemia template check ${team}`]);
+  assert.deepEqual(printed, [`written: ${out}`, digest, `written: ${team}`, digest, `lint it: nemia template lint ${team}`]);
 });

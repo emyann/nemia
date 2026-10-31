@@ -53,7 +53,7 @@ export function RunBody({ id, run, error }: { id: string; run: RunDetail | undef
                 className="flex w-full items-center justify-between gap-3 rounded px-2 py-1 text-left hover:bg-muted"
               >
                 <span className="min-w-0 truncate font-mono text-body-small">{step.name}</span>
-                <StatusChip phase={step.phase} reason={step.reason} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
+                <StatusChip codes={step} runCancelled={run.cancelledAt !== null} runHeld={run.holding != null} />
               </button>
             </li>
           ))}

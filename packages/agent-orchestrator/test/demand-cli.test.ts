@@ -34,17 +34,13 @@ const noEngine = () => engineOf(engine().layer);
 /** Each command that ticks, typed with arguments it parses and its check lets through, on runs, cards and folders that are not there. */
 const TICKING: Record<string, string[]> = {
   start: ['start', 'do it', '--workflows', NOWHERE, '--repo', NOWHERE],
-  plan: ['plan', NOWHERE, '--repo', NOWHERE],
   'inbox queue': ['inbox', 'queue', 'no-card'],
   retry: ['retry', 'no-run', 'implement'],
   approve: ['approve', 'no-run', 'design'],
-  round: ['round', 'no-run'],
   refresh: ['refresh', 'no-run'],
-  accept: ['accept', 'no-run', '--message', 'good enough'],
-  merge: ['merge', 'no-run'],
   cancel: ['cancel', 'no-run'],
   resume: ['resume'],
-  'agents try': ['agents', 'try', 'yours', 'nobody', '--brief', 'Do it.'],
+  'agents run': ['agents', 'run', 'yours', 'nobody', '--brief', 'Do it.'],
   'factory upgrade': ['factory', 'upgrade', 'no-factory', '--to', '0.2.0'],
   'factory resolve': ['factory', 'resolve', 'no-factory', 'review.md#rounds', '--ours'],
 };
@@ -87,7 +83,7 @@ async function typed(t: TestContext, argv: string[], host: () => DemandHost): Pr
 /** Whatever a daemon would leave in the store: its log and its lease. */
 const leftInStore = () => ['daemon.log', 'daemon.json'].filter((name) => fs.existsSync(path.join(ROOT, name)));
 
-test('the commands typed here are the fourteen that tick', () => {
+test('the commands typed here are the eleven that tick', () => {
   assert.deepEqual(
     Object.keys(TICKING).sort(),
     TABLE.filter((c) => c.ticks === true)

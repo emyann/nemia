@@ -1,5 +1,5 @@
 /**
- * A plan is a folder of cards: the format, the order `nemia plan` starts them in, and what it prints — pure, as data.
+ * A plan is a folder of cards: the format, the order `nemia start <folder>` starts them in, and what it prints — pure, as data.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -111,10 +111,10 @@ const PARSE: Refused[] = [
   ['a line that is not a key, by its line', () => parsePlan([card('a', 'workflow dev')]), /^a\.md:2: /],
   ['a list on a key of one value, by its line', () => parsePlan([card('a', 'workflow: [dev, ui]')]), /^a\.md:2: /],
   [
-    "`repo:`, an inbox card's key: a plan works on the one repository `nemia plan --repo` is given",
+    "`repo:`, an inbox card's key: a plan works on the one repository `nemia start <folder> --repo` is given",
     () => parsePlan([card('a', 'workflow: dev\nrepo: /home/me/code/app')]),
     /^a\.md: `repo` is not a key a plan's card has/,
-    'nemia plan <folder> --repo <r>',
+    'nemia start <folder> --repo <r>',
     "nemia start's --repo",
     'delete the line',
     'nemia inbox add <file> --repo <r>',
@@ -199,7 +199,7 @@ const PARSE: Refused[] = [
   ],
 ];
 
-/** A card's `after:` started with no --after; what `nemia plan` refuses of a card, refused at `nemia start <card.md>` too. */
+/** A card's `after:` started with no --after; what `nemia start <folder>` refuses of a card, refused at `nemia start <card.md>` too. */
 const START: Refused[] = [
   [
     'a card whose after: names cards, started with no --after, whatever the rest of it says',
@@ -290,7 +290,7 @@ const startedOf = (names: readonly string[]): Planned[] =>
     .filter((c) => names.includes(c.name))
     .map((c) => ({ card: c, runId: IDS[c.name], workflowDir: `/repo/workflows/${c.workflow}` }));
 
-test('`nemia plan` prints a line per card, parents first: the card, its run, its workflow as the card names it, and what it waits on, by card and by run', () => {
+test('`nemia start <folder>` prints a line per card, parents first: the card, its run, its workflow as the card names it, and what it waits on, by card and by run', () => {
   assert.deepEqual(planLines(startedOf(['a', 'b', 'c', 'd'])), [
     'a  parse-the-flag-1x2y  dev         waits on nothing',
     'b  document-it-3z4w     dev         waits on a (parse-the-flag-1x2y)',
@@ -314,7 +314,7 @@ test('a plan stopped part-way says which card refused and why, names the runs th
   };
   const stopped = planStopped({ card: cards[2], why: 'the disk is full', rest: [cards[3]] }, startedOf(['a', 'b']), opts).split('\n');
   assert.equal(stopped.length, 5);
-  assert.equal(stopped[0], 'nemia plan stopped at c.md: the disk is full');
+  assert.equal(stopped[0], 'nemia start stopped at c.md: the disk is full');
   for (const fact of ['stand', 'a (parse-the-flag-1x2y), b (document-it-3z4w)', 'nemia cancel <runId>'])
     assert.ok(stopped[1].includes(fact), fact);
   for (const fact of ['parents first', 'once what stopped c.md is fixed', '--after']) assert.ok(stopped[2].includes(fact), fact);
@@ -328,7 +328,7 @@ test('a plan stopped part-way says which card refused and why, names the runs th
     "--after <c's run id>",
   );
   const none = planStopped({ card: cards[0], why: 'not a git repository', rest: cards.slice(1) }, [], opts).split('\n');
-  assert.equal(none[0], 'nemia plan stopped at a.md: not a git repository');
+  assert.equal(none[0], 'nemia start stopped at a.md: not a git repository');
   assert.equal(none[1], 'It started no run.');
   assert.ok(none[2].includes('once what stopped a.md is fixed'), none[2]);
   startOf(none[3], "'/plans/q3/a.md'", "--workflows '/repo/workflows/dev'", "--repo '/repo'");

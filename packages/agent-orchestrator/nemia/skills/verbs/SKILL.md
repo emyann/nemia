@@ -25,7 +25,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                repositories (nemia factory --help)
   nemia factory ls
                                the same, by its name
-  nemia factory plan <name> --to <x.y.z> [--template <folder|archive>]
+  nemia factory diff <name> --to <x.y.z> [--template <folder|archive>]
                                preview a templated factory's upgrade: what merges cleanly, and each
                                conflict with its sides; nothing is written
   nemia factory servers <factory>
@@ -44,7 +44,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                --store keeps it in the store, --clear reads NEMIA.md in the first
                                folder again
                                reads bare; prompts the person given --path, --store, --clear
-  nemia template check <folder|archive>
+  nemia template lint <folder|archive>
                                check a template's folder or archive: every problem at once, each at its
                                file and line
   nemia ls [<runId>]
@@ -136,8 +136,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                print cursor: <n> and stop; from the start with no cursor. -l: the
                                lines a selector takes, given again for another (key=v, key!=v, "key in
                                (a,b)", "key notin (a,b)", key), over run, factory, workflow, step,
-                               agent, kind, reason, type, waits and source. --cursor-file: keep the
-                               cursor read to in a file, and start from it where it is there.
+                               agent, kind, reason, on, via, type, waits and source. --cursor-file:
+                               keep the cursor read to in a file, and start from it where it is there.
                                --json: one JSON object a line, a feed line with its cursor, and a
                                cursor of its own every 30 seconds while the feed is still. With no -l,
                                every line; -l waits=person takes the lines that wait on a person. A
@@ -160,7 +160,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
 They write, and are yours to run unasked, on your judgement: say what you did.
 
 ```text
-  nemia start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
+  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
                                --after <runId>: file nothing of this run until nemia decide says that
                                run has landed — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
@@ -172,7 +172,9 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                anything after it is filed, as a step's own gate: true does; once
                                per step. An inbox card's gate: <step> is one more
                                --workflows takes a folder, or a name under <repo>/workflows/: dev
-                               a card of a plan (nemia plan --help) starts its body: --workflows is its
+                               a folder of cards starts a plan, a run per card, parents first, at
+                               the command line alone (nemia start --help)
+                               a card of a plan (nemia start --help) starts its body: --workflows is its
                                workflow: unless given, and its after: needs an --after for each
                                a frontmatter block of keys a plan's card lacks is refused by its key,
                                never taken as the brief: file an inbox card with nemia inbox add <file>
@@ -191,10 +193,6 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                inbox, listed as started: --workflows is its workflow:
                                unless given, --repo its repo:, --factory its factory:, and a card
                                that names no factory either way is refused
-  nemia plan <folder> [--repo .] [--factory <name>]
-                               start a plan: one run per card in the folder, parents first, each
-                               --after the runs of the cards its after: names, in the factory as
-                               nemia start finds it (nemia plan --help)
   nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]
                                park an idea as a card in the inbox, named from its first line
   nemia inbox queue <name> [--workflow <w>] [--off]
@@ -203,7 +201,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off
-  nemia refresh <runId>
+  nemia refresh <runId> [<step>] [--base]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the
                                ones they hold now, so every filing after it — a new step, a retry,
@@ -212,17 +210,17 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                a run that has filed nothing, which resolves afresh at its first filing
                                anyway, of one already on the newest revision of every kind, and of one
                                whose factory follows revisions (nemia factory revisions), whose every
-                               filing takes them with no refresh
-  nemia merge <runId> [<step>]
-                               merge the base: a loop's work that no longer merges cleanly
-                               goes back to merge it, once, on the next tick — on the round
-                               it is on, which the merge does not spend
+                               filing takes them with no refresh;
+                               --base: take the base instead — a loop's work that no longer merges
+                               cleanly goes back to merge it, once, on the next tick, on the round it
+                               is on, which the merge does not spend; the step is the one that closes
+                               the loop, left out where the run has one loop
   nemia say <runId> <step> "<words>"
                                tell a step's running session something, through its harness: the
                                engine journals the words on the step's task, nemia ls notes the step
                                said to, and nemia decide prints them under it. A try that continues
                                the session is handed them again, as ## Said to your session
-  nemia agents try yours <name> --brief <words>
+  nemia agents run yours <name> --brief <words>
                                an agent of yours tried on a short brief, in a folder of its own,
                                capped at $1
   nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
@@ -340,7 +338,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia agents copy <file> [--as <name>] [--keep <part>]...
                                an agent file copied into your library, with its schema and skills;
                                a part your library holds otherwise stops it: --as or --keep
-  nemia agents remove yours <name> --version <v>
+  nemia agents rm yours <name> --version <v>
                                an agent of yours removed, at the --version it was read at
   nemia skills write (yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]
                                a skill of yours, or of a templated --factory, written from its
@@ -376,7 +374,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                words read: from then on, at auto, the answer it names is given unasked
                                where it holds. Refused once the rule reads otherwise. Your first confirm
                                keeps the default beside it. Asked of you every time
-  nemia policy drop <agent> <id>
+  nemia policy rm <agent> <id>
                                take a rule out of force, the default among them: what it allowed is
                                asked of you again. Asked of you every time
   nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]
@@ -411,7 +409,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]
                                a workflow folder of yours, or of a templated --factory, written from
                                a draft folder; one there already, at the --version it was read at
-  nemia workflows remove yours <name> --version <v>
+  nemia workflows rm yours <name> --version <v>
                                a workflow folder of yours removed, at the --version it was read at
 ```
 
@@ -420,41 +418,41 @@ Each asks the person at a prompt every time it runs: say what it does before you
 Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose with their words as `--message`: its prompt is their decision, asked once. `nemia retry` asks only of a step that waits on the person, or with `--budget`.
 
 ```text
-  nemia retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
+  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
                                try a step waiting on you again, once, on the next tick:
-                               --nudge (default) continues its session, told what happened;
+                               --continue (default) continues its session, told what happened;
                                --fresh a new session on its branch; --model <m> the same, on m;
                                --recheck runs its check again, and files no session;
+                               --round: once more — a loop out of rounds goes round again, once,
+                               the step it loops to continued, then a new reviewer; the step is the
+                               one that closes the loop, left out where the run has one loop;
                                --message "<answer>" goes into the try's brief, as ## Your answer:
                                for a step that signed off blocked, the answer to its needs — or
-                               what you have to say to any step you try again; not with --recheck.
-                               The next argument is the answer, whatever it starts with; an answer
-                               that is only one of these flags' names goes as --message=<answer>;
-                               --budget <amount>: for a step with a budget: that waits on you, its
+                               what you have to say to any step you try again; not with --recheck
+                               or --round. The next argument is the answer, whatever it starts with;
+                               an answer that is only one of these flags' names goes as --message=<answer>;
+                               --budget <amount>: for a step with a budget that waits on you, its
                                cap raised to that many dollars, above its cap and what it has cost;
+                               with --round, the cap of a step of the loop over its budget;
                                --answer <n>=<letter>: answer question n, numbered as nemia decide
                                <runId> prints them, with the option its letter names; once for each
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
-  nemia approve <runId> <step> [--answer <n>=<letter>]... [--message "<words>"]
+  nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--message "<words>"]
                                let a step waiting at its gate hand on: what waits on it is filed on
                                the next tick, and every step after the gate is handed your words
                                under ## Approved. To send it back instead, with what to change:
                                nemia retry <runId> <step> --message "<objection>"
+                               Of a loop out of rounds — the step that closes it, or the run alone
+                               where it has one loop — enough: the loop ends on your words, with its
+                               findings open, --message "<why>" required. What waits on the looping
+                               step is filed as if it had said again: false, and every step after
+                               the loop is handed your words and those findings under ## Accepted.
+                               To go round once more instead: nemia retry <runId> [<step>] --round
                                --answer <n>=<letter>: answer question n, numbered as nemia decide
                                <runId> prints them, with the option its letter names; once for each
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
-  nemia round <runId> [<step>] [--budget <amount>]
-                               once more: a loop out of rounds goes round again, once, on the
-                               next tick — the step it loops to continued, then a new reviewer;
-                               --budget raises the cap of a step of the loop over its budget
-  nemia accept <runId> [<step>] --message "<why>"
-                               enough: a loop out of rounds ends on your word, with its findings
-                               open. What waits on the looping step is filed on the next tick as
-                               if it had said again: false — a gated ending goes to its gate —
-                               and every step after the loop is handed your words and those
-                               findings under ## Accepted. The other answer to nemia round
 ```

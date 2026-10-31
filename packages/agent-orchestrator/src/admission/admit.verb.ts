@@ -22,6 +22,8 @@ import { admissionOf, answerOf, namedIn, typedIn, type Auto, type Scope } from '
 import { seenOf } from './seen.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { approveForm } from '../gate/form.verb.ts';
+import type { ApproveForm } from '../gate/gate.ts';
 
 /** The usage the refusals of `nemia admit` end on. */
 const ADMIT_FORM = `nemia admit [--at-least ${LEVELS.join('|')}] [--auto <agent>]`;
@@ -117,28 +119,37 @@ function rulesOf(home: string, agent: string): readonly AutoRule[] {
   }
 }
 
+/** The level of the factory of the run `runId`, or undefined where the run or its factory does not read. */
+const levelRead = Effect.fnUntraced(function* (runId: string) {
+  const factory = yield* Effect.result(runFactory(runId));
+  const level = Result.isSuccess(factory) ? yield* Effect.result(levelOfFactory(factory.success)) : undefined;
+  return level && Result.isSuccess(level) ? level.success : undefined;
+});
+
 /**
  * What admission reads at `auto` for the line `line`: `agent`'s rules in force, and for each answer on the line a rule may give, its run's
- * level and its facts at the moment of the call; a run that does not read has neither, and is asked.
+ * level and its facts at the moment of the call, and for an approval the yes it gives (`approveForm`); a run that does not read has none of
+ * them, and is asked.
  */
 const autoRead = Effect.fnUntraced(function* (line: string, table: Parameters<typeof admissionOf>[1], agent: string, home: string) {
   const levels = new Map<string, Level | undefined>();
   const facts = new Map<string, Facts | undefined>();
+  const forms = new Map<string, ApproveForm | undefined>();
   for (const typed of typedIn(line, table).filter((t) => (AUTO_ANSWERS as readonly string[]).includes(t.name))) {
     const answer = answerOf(typed, table);
     if (answer === undefined) continue;
-    if (!levels.has(answer.runId)) {
-      const factory = yield* Effect.result(runFactory(answer.runId));
-      const level = Result.isSuccess(factory) ? yield* Effect.result(levelOfFactory(factory.success)) : undefined;
-      levels.set(answer.runId, level && Result.isSuccess(level) ? level.success : undefined);
-    }
+    if (!levels.has(answer.runId)) levels.set(answer.runId, yield* levelRead(answer.runId));
     const seen = yield* Effect.result(seenOf(answer.runId, answer.step));
     facts.set(`${answer.runId} ${answer.step}`, Result.isSuccess(seen) ? factsOf(seen.success) : undefined);
+    if (typed.name !== 'approve') continue;
+    const form = yield* Effect.result(approveForm(answer.runId, answer.step));
+    forms.set(`${answer.runId} ${answer.step}`, Result.isSuccess(form) ? form.success : undefined);
   }
   return {
     list: rulesOf(home, agent),
     levelOf: (runId) => levels.get(runId),
     factsOf: (runId, step) => facts.get(`${runId} ${step}`),
+    formOf: (runId, step) => forms.get(`${runId} ${step}`),
   } satisfies Auto;
 });
 

@@ -1,8 +1,8 @@
 /**
- * Starting a workflow folder's run: the program `startRun`. It refuses what it can before anything is
- * written, and writes the run's record; nothing is filed here — the tick files a run's first steps on its next pass. `nemia plan` and the
- * inbox start their runs through it. A controller whose program requires nothing: the runtime it reads, through the client
- * (`runtime-client.ts`), is its harnesses, which say which steps a session can be bridged for, and never the engine.
+ * Starting a workflow folder's run: the program `startRun`. It refuses what it can before anything is written, and writes the run's record;
+ * nothing is filed here — the tick files a run's first steps on its next pass. `nemia start <folder>` and the inbox start their runs
+ * through it. A controller whose program requires nothing: the runtime it reads, through the client (`runtime-client.ts`), is its
+ * harnesses, which say which steps a session can be bridged for, and never the engine.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,7 +17,7 @@ import { renderedFlags } from '../agents/agents.ts';
 import { ownOf } from '../tick/told.verb.ts';
 import { isFolderTeam, stepSetRefusal, unallowedRefusal } from '../workflow/index.ts';
 import { formerModesWritten, loadWorkflows } from '../folder/folder.store.ts';
-import { isShippedPlace, skillsFor, type Places } from '../skills/read.store.ts';
+import { isBuiltinPlace, skillsFor, type Places } from '../skills/read.store.ts';
 import { placesOf } from '../folder/lookup.store.ts';
 import { pinsOf } from '../revisions/pin.verb.ts';
 import { workRoot } from '../record/places.store.ts';
@@ -128,8 +128,8 @@ export function stepsToStart(
 }
 
 /**
- * Why a team that says `place: folder` cannot start: a step whose session is given a skill its places resolve to a place skill the package
- * ships (`isShippedPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is.
+ * Why a team that says `place: folder` cannot start: a step whose session is given a skill its places resolve to a builtin place skill
+ * (`isBuiltinPlace`), which acts on a repository a folder run does not have; undefined for a repository team, or where none is.
  */
 function placeSkillRefusal(steps: readonly Workflow[], workflowDir: string, places: Places): string | undefined {
   if (!isFolderTeam(steps)) return undefined;
@@ -137,7 +137,7 @@ function placeSkillRefusal(steps: readonly Workflow[], workflowDir: string, plac
   for (const step of steps) {
     const skill = step.agent?.skills?.find((name) => {
       const at = found.get(name);
-      return typeof at === 'string' && isShippedPlace(at);
+      return typeof at === 'string' && isBuiltinPlace(at);
     });
     if (skill)
       return (

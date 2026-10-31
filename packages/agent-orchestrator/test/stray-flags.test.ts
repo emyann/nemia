@@ -21,7 +21,7 @@ process.env.WF_ROOT = ROOT;
 const { main } = await import('../src/cli/main.ts');
 const { FACTORY_HELP } = await import('../src/factory/factory.verb.ts');
 const { INBOX_HELP } = await import('../src/inbox/commands.verb.ts');
-const { PLAN_HELP } = await import('../src/start/commands.verb.ts');
+const { START_HELP } = await import('../src/start/commands.verb.ts');
 
 const { engineOf } = await import('../src/runtime-client.ts');
 const engine = eachTest(testEngine);
@@ -49,7 +49,6 @@ const START_SAYS =
 /** Each command, the words that fill its required arguments, and what it says of a flag it does not take. */
 const REFUSALS: Array<[string[], string[], string]> = [
   [['start'], ['build it'], `nemia start does not take --nope. ${START_SAYS}`],
-  [['plan'], ['./plan'], 'nemia plan does not take --nope. It takes the plan folder, then --repo <r> and --factory <name>.'],
   [['inbox'], [], `nemia inbox does not take --nope. ${INBOX_SAYS}`],
   [
     ['inbox', 'add'],
@@ -155,11 +154,11 @@ test('REFUSED at shipped defaults: a word nemia inbox or nemia factory has no co
   assert.deepEqual(await refusalOf(['factory', 'frob']), { message: `nemia factory does not take frob. ${FACTORY_SAYS}`, exitCode: 2 });
 });
 
-test('nemia inbox --help, nemia factory --help and nemia plan --help print their own help', async (t) => {
+test('nemia inbox --help, nemia factory --help and nemia start --help print their own help', async (t) => {
   for (const [argv, help] of [
     [['inbox', '--help'], INBOX_HELP],
     [['factory', '--help'], FACTORY_HELP],
-    [['plan', '--help'], PLAN_HELP],
+    [['start', '--help'], START_HELP],
   ] as const) {
     const out: string[] = [];
     const log = t.mock.method(console, 'log', (...args: unknown[]) => {

@@ -1,5 +1,5 @@
 /**
- * A templated factory's upgrade, as the command line asks it: `nemia factory plan` previews the merge of its tree with the template at
+ * A templated factory's upgrade, as the command line asks it: `nemia factory diff` previews the merge of its tree with the template at
  * another version and writes nothing (`FACTORY_PLAN`); `nemia factory upgrade` writes the version wanted, and the template's source where
  * `--template` names one, into the factory's file alone (`FACTORY_UPGRADE`), and the factory controller merges it; `nemia factory resolve`
  * writes the person's choice for one conflict into `resolutions.json` (`FACTORY_RESOLVE`), and the controller merges once each conflict has
@@ -141,23 +141,23 @@ const FROM_TEMPLATE: Flag = {
   twice: 'take --template once: a factory is made from one template.',
 };
 
-/** `nemia factory plan`'s spec: the factory, `--to` and `--template`. */
+/** `nemia factory diff`'s spec: the factory, `--to` and `--template`. */
 const PLAN_SPEC: Spec = {
   positionals: [{ key: 'factory', takes: 'required', kind: 'name' }],
   flags: [TO, FROM_TEMPLATE],
   unknown: (arg) =>
     arg.startsWith('-')
-      ? `nemia factory plan does not take ${arg}. It takes the factory, --to <x.y.z> and --template <folder|archive>.`
-      : `nemia factory plan previews one factory, and ${arg} is a second: nemia factory plan <name> --to <x.y.z>.`,
-  missing: 'nemia factory plan takes the factory to preview: nemia factory plan <name> --to <x.y.z> [--template <folder|archive>].',
+      ? `nemia factory diff does not take ${arg}. It takes the factory, --to <x.y.z> and --template <folder|archive>.`
+      : `nemia factory diff previews one factory, and ${arg} is a second: nemia factory diff <name> --to <x.y.z>.`,
+  missing: 'nemia factory diff takes the factory to preview: nemia factory diff <name> --to <x.y.z> [--template <folder|archive>].',
 };
 
-/** What `nemia factory plan` previews: the factory, the versions, and the merge. */
+/** What `nemia factory diff` previews: the factory, the versions, and the merge. */
 type Planned = { name: string; from: string | undefined; to: string; merge: TreeMerge };
 
-/** `nemia factory plan`: the merge an upgrade would make, what merges cleanly and each conflict; nothing written. */
+/** `nemia factory diff`: the merge an upgrade would make, what merges cleanly and each conflict; nothing written. */
 export const FACTORY_PLAN: Command<Planned> = {
-  name: 'factory plan',
+  name: 'factory diff',
   usage: '<name> --to <x.y.z> [--template <folder|archive>]',
   help: ["preview a templated factory's upgrade: what merges cleanly, and each", 'conflict with its sides; nothing is written'],
   spec: PLAN_SPEC,
@@ -167,7 +167,7 @@ export const FACTORY_PLAN: Command<Planned> = {
   only: HERE,
   handler: (args) =>
     tried(() => {
-      const { factory, from, to, render, base } = upgradeAsked(args, 'nemia factory plan', 'Nothing was written.', false);
+      const { factory, from, to, render, base } = upgradeAsked(args, 'nemia factory diff', 'Nothing was written.', false);
       return { name: factory.name, from, to, merge: mergeOf(factory.name, base, render) };
     }),
   print: ({ name, from, to, merge }) => planLines(name, from ?? UNKNOWN, to, merge),
@@ -214,7 +214,7 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
     `${name}: ${from ?? UNKNOWN} → ${to}`,
     `filed: ${file}`,
     conflicts
-      ? `${conflicts} conflict${conflicts === 1 ? '' : 's'} wait for a choice: nemia factory plan ${name} --to ${to} shows each, and nemia factory resolve its line; the daemon merges once each has one`
+      ? `${conflicts} conflict${conflicts === 1 ? '' : 's'} wait for a choice: nemia factory diff ${name} --to ${to} shows each, and nemia factory resolve its line; the daemon merges once each has one`
       : 'the daemon merges it on its next pass (nemia up)',
   ],
 };
@@ -237,10 +237,10 @@ const RESOLVE_SPEC: Spec = {
     },
   ],
   unknown: (arg) =>
-    `nemia factory resolve does not take ${arg}. It takes the factory, the conflict as nemia factory plan names it, and one of --ours, --theirs and --file <path>.`,
+    `nemia factory resolve does not take ${arg}. It takes the factory, the conflict as nemia factory diff names it, and one of --ours, --theirs and --file <path>.`,
   oneWay: 'nemia factory resolve takes one choice: --ours keeps your tree, --theirs takes the template, --file <path> gives the text.',
   missing:
-    'nemia factory resolve takes the factory and the conflict, as nemia factory plan names it: nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>.',
+    'nemia factory resolve takes the factory and the conflict, as nemia factory diff names it: nemia factory resolve <name> <conflict> --ours|--theirs|--file <path>.',
 };
 
 /** The person's choice the resolve `args` give: ours, theirs, or the text of `--file`, refused where it is not there (`Invalid`). */
@@ -275,13 +275,13 @@ function resolved(args: Args): Resolved {
     });
   if (to === from)
     throw new Conflict({
-      message: `${verb}: no upgrade of ${factory.name} is under way, so it has no conflict to resolve: nemia factory plan ${factory.name} --to <x.y.z>, then nemia factory upgrade. ${notDone}`,
+      message: `${verb}: no upgrade of ${factory.name} is under way, so it has no conflict to resolve: nemia factory diff ${factory.name} --to <x.y.z>, then nemia factory upgrade. ${notDone}`,
     });
   const merge = mergeOf(factory.name, base, renderTo(verb, factory, factory.template.source, to, notDone));
   const at = textOf(args, 'conflict') ?? '';
   if (!merge.conflicts.some((c) => c.at === at))
     throw new Missing({
-      message: `${verb}: ${at} is no conflict of ${factory.name}'s upgrade to ${to}; ${merge.conflicts.length ? `its conflicts: ${merge.conflicts.map((c) => c.at).join(', ')}` : 'it has none'} (nemia factory plan ${factory.name} --to ${to}). ${notDone}`,
+      message: `${verb}: ${at} is no conflict of ${factory.name}'s upgrade to ${to}; ${merge.conflicts.length ? `its conflicts: ${merge.conflicts.map((c) => c.at).join(', ')}` : 'it has none'} (nemia factory diff ${factory.name} --to ${to}). ${notDone}`,
     });
   const choice = choiceOf(args);
   const kept = readResolutions(factory.name);

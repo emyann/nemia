@@ -5,7 +5,7 @@
  * said of the try a step is on: its gate's approval (`gateOf`) and a loop's acceptance (`acceptedOf`).
  */
 import { endWords, type RetryAsk, bare, type TaskView, type Views, wordOf, ENGINE_REASON, PHASE_OF } from 'agent-orchestrator';
-import type { StepPhase, StepReason } from 'agent-orchestrator';
+import type { AnswerVia, StepPhase, StepReason, WaitOn } from 'agent-orchestrator';
 import {
   acceptanceOf,
   answerOf,
@@ -95,6 +95,10 @@ export type StepTry = {
    */
   phase: StepPhase;
   reason: StepReason;
+  /** What a `Waiting` try waits on; null for any other reason. */
+  on: WaitOn | null;
+  /** Where an `AwaitingAnswer` try's answer is asked; null for any other reason. */
+  via: AnswerVia | null;
   message: string;
   /** @deprecated `message` under its old name, kept for one card. */
   status: string;
@@ -215,7 +219,7 @@ export function triesOf(
   name: string,
   steps: readonly Workflow[],
   views: Views,
-  current: Pick<StepTry, 'phase' | 'reason' | 'message' | 'status' | 'check' | 'closeout' | 'unreadable' | 'attempts'> & {
+  current: Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'status' | 'check' | 'closeout' | 'unreadable' | 'attempts'> & {
     verdict?: unknown;
   },
   answers: readonly RetryAsk[],
@@ -230,9 +234,10 @@ export function triesOf(
   const answerAt = (n: number): string | null =>
     answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers)?.message ?? null;
   const noteOf = (n: number) => tryNote(step, recordAt(n), steps, answerAt(n) !== null) || null;
-  const earlierSaid = (t: EarlierTry, i: number): Pick<StepTry, 'phase' | 'reason' | 'message' | 'status'> => {
+  const earlierSaid = (t: EarlierTry, i: number): Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'status'> => {
     const word = turnAt(i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId);
-    return { phase: PHASE_OF[ENGINE_REASON[word]], reason: ENGINE_REASON[word], message: word, status: word };
+    const { reason, on, via } = ENGINE_REASON[word];
+    return { phase: PHASE_OF[reason], reason, on: on ?? null, via: via ?? null, message: word, status: word };
   };
   return [
     ...earlier.map((t, i): StepTry => ({

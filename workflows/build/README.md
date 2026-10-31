@@ -12,7 +12,8 @@ Implement pushes its branch and opens the pull request through `pull-request.ts`
 run's own branch, never another and never the base and never forced, and opens or updates the one pull request of the branch, never a
 draft, printing the address that goes on Grace's closeout as an artifact value. Her check pushes again through the same script and refuses
 unless the pull request's head is the commit it judges — GitHub moves that head a moment after the push, so it is read again for up to
-30 s before the refusal — then waits on the `ci` context (1800 s for it to start, 2400 s whole): CI runs
+30 s before the refusal — then, unless GitHub says the pull request conflicts with its base (refused at once, naming the merge of the
+base, since GitHub runs no `ci` on a conflicting head), waits on the `ci` context (1800 s for it to start, 2400 s whole): CI runs
 the suite, the types, the lint, the whole e2e and the build on that commit, and a red, cancelled or missing `ci` is the check's refusal,
 with the Actions URL, the failing jobs and a bounded tail of their log — no agent of this team may type `gh`, so the script reads it for
 them.
@@ -24,7 +25,8 @@ read, `mergeable`, the `ci` context green at that commit, and no result branch o
 whose subject and body are his (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: GitHub deletes the head
 branch), and fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`). On a refusal he changes nothing and
 signs off `blocked` with the `nemia retry` line it printed. Land's check is then the receipt alone — the pull request `MERGED` with a
-merge commit reachable from HEAD, the checkout clean on the base with no merge in progress, every branch of the run an ancestor of HEAD
+merge commit reachable from HEAD, the checkout clean on the base with no merge in progress, every commit of every branch of the run
+with an equivalent patch on HEAD (`git cherry`, so a part taken as a commit of its own counts as taken)
 — which is what the run needs to record `landed` on the commit that landed. It runs no suite and no e2e: `ci` judged both on the head
 the review read, and the merge commit's first parent is the base.
 

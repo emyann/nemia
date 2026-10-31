@@ -183,7 +183,7 @@ test("assess and stepStatus of a step's check", async (t) => {
     await t.test(`a check that does not exit 0 fails the step, whatever the agent said: ${c}`, () => {
       const p = phases({ t1: 'succeeded', c1: c });
       const a = assess(CHECKED, withCheck('c1'), p, signedDone, asked);
-      assert.deepEqual([a.ready, a.blocked, a.status], [[], ['review'], 'failed']);
+      assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['review'], 'failed']);
       assert.equal(stepStatus(CHECKED[0], withCheck('c1'), p, signedDone, asked), 'failed (check)');
     });
   await t.test('a cancelled run files no check, however due', () => {
@@ -297,7 +297,7 @@ test("listing of a step's check: what the run established, not only what the eng
       closeoutOf: signedOff({ implement: said('done') }),
       askedCloseout: asked,
     });
-    assert.deepEqual(statuses(l), ['failed ✗ check (unfinished)', 'waiting']);
+    assert.deepEqual(statuses(l), ['failed ✗ check (unfinished)', 'pending']);
   });
 });
 
@@ -306,7 +306,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
     const p = phases({ t1: 'succeeded' });
     const none = () => undefined;
     const a = assess(CHECKED, withCheck(null), p, none, asked);
-    assert.deepEqual([a.ready, a.check, a.blocked, a.status], [[], [], ['review'], 'blocked'], 'no signed work to check');
+    assert.deepEqual([a.ready, a.check, a.unreachable, a.status], [[], [], ['review'], 'waiting'], 'no signed work to check');
     assert.equal(stepStatus(CHECKED[0], withCheck(null), p, none, asked), 'unsigned');
     assert.deepEqual(
       assess(STEPS, run({ implement: 't1', review: null }), p, none, asked).ready,
@@ -338,7 +338,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
     });
   await t.test('gone quiet, it waits on you and blocks the run, and a nudge is told it gave none', () => {
     const quietly = decision(STEPS, r, failed, nothingShipped, none, quiet);
-    assert.deepEqual(quietly.kind === 'awaiting' && [quietly.outcome, quietly.unsigned, quietly.failed], ['blocked', ['implement'], []]);
+    assert.deepEqual(quietly.kind === 'awaiting' && [quietly.outcome, quietly.unsigned, quietly.failed], ['waiting', ['implement'], []]);
     assert.deepEqual(
       listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'failed' }), closeoutOf: none, askedCloseout: quiet }).waitingOnYou,
       ['implement'],
@@ -503,7 +503,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   await t.test("a check that checkFailed, with `retries:` left, is due another try on the run's word, waiting on nobody", () => {
     const a = assess(RETRIED, onTry(), checkFailed, signedDone, asked, () => 1);
     assert.deepEqual(a.retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'retries' }]);
-    assert.deepEqual([a.ready, a.blocked, a.status], [[], [], 'running'], 'what waits on it waits; nothing is final yet');
+    assert.deepEqual([a.ready, a.unreachable, a.status], [[], [], 'running'], 'what waits on it waits; nothing is final yet');
     const l = lsOf(onTry(), 'failed', 1);
     assert.deepEqual(l.steps[0], {
       name: 'implement',
@@ -527,7 +527,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   });
   await t.test('REFUSED past `retries:`: no try is due, and the step waits on you as it did before retries', () => {
     const a = assess(RETRIED, onTry(SPENT), checkFailed, signedDone, asked, () => 1);
-    assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
+    assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'failed']);
     assert.deepEqual(lsOf(onTry(SPENT), 'failed', 1).waitingOnYou, ['implement']);
     assert.deepEqual(assess(CHECKED, withCheck('c1'), checkFailed, signedDone, asked, () => 1).retry, [], 'nor at all, with no `retries:`');
     assert.deepEqual(
@@ -555,7 +555,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     await t.test(`a check that did not finish is no refusal, spends no retry, and is offered --recheck: ${why}`, () => {
       const p = phases({ t1: 'succeeded', c1: phase });
       const a = assess(RETRIED, onTry(), p, signedDone, asked, () => verdict);
-      assert.deepEqual([a.retry, a.blocked, a.status], [[], ['review'], 'failed']);
+      assert.deepEqual([a.retry, a.unreachable, a.status], [[], ['review'], 'failed']);
       assert.deepEqual(lsOf(onTry(), phase, verdict).waitingOnYou, ['implement']);
       const d = decision(RETRIED, onTry(), p, nothingShipped, signedDone, asked, () => verdict);
       assert.deepEqual(d.kind === 'awaiting' && [d.failedCheck, d.unfinishedCheck, d.outcome], [[], ['implement'], 'failed']);
@@ -601,7 +601,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   });
   await t.test('a caller that gives no verdict reads a check stopped at its deadline as the tick does', () => {
     const unread = assess(RETRIED, onTry(), checkFailed, signedDone, asked);
-    assert.deepEqual([unread.retry, unread.blocked, unread.status], [[], ['review'], 'failed']);
+    assert.deepEqual([unread.retry, unread.unreachable, unread.status], [[], ['review'], 'failed']);
     assert.deepEqual(
       assess(RETRIED, onTry(), checkFailed, signedDone, asked, () => 'unfinished'),
       unread,
@@ -826,7 +826,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
       status: 'stopped',
     });
     assert.match(stopped, /was stopped before it signed off/);
-    assert.match(stopped, /`nemia retry --nudge`/);
+    assert.match(stopped, /`nemia retry --continue`/);
     assert.doesNotMatch(stopped, /What the check said/, 'no check, nothing it said');
   });
   await t.test("the run's sign-off nudge is told in its owner's words, pinned; a new session is told who filed it", () => {
@@ -956,7 +956,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
   await t.test("the tick's reading: due, to stop the blocked session first, the run still going and waiting on nobody", () => {
     const a = assess(STEPS, r, live, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman);
     assert.deepEqual(
-      [a.retry, a.ready, a.blocked, a.status],
+      [a.retry, a.ready, a.unreachable, a.status],
       [[{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true }], [], [], 'running'],
     );
     assert.deepEqual(
@@ -981,10 +981,11 @@ test("a person's ask on a step whose session its harness blocked, or that works 
         {
           name: 'implement',
           status: 'needs-human',
-          reason: 'NeedsHuman',
+          reason: 'AwaitingAnswer',
+          via: 'session',
           phase: 'waiting',
           branch: null,
-          note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
+          note: 'try 2 asked (--continue) — stopping its blocked session, then the tick files it',
         },
         [],
       ],
@@ -992,7 +993,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
   });
   await t.test("REFUSED before, now honoured: without the harness's word, or once it works again, due as a session that runs on", () => {
     const a = assess(STEPS, r, live, nothingSigned, asked, () => undefined, [askFor(2)]);
-    assert.deepEqual([a.retry, a.ready, a.blocked, a.status], [[stale()], [], [], 'running']);
+    assert.deepEqual([a.retry, a.ready, a.unreachable, a.status], [[stale()], [], [], 'running']);
     assert.deepEqual(
       assess(
         STEPS,
@@ -1038,7 +1039,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
           reason: 'Running',
           phase: 'running',
           branch: null,
-          note: 'try 2 asked (--nudge) — stopping its session, then the tick files it',
+          note: 'try 2 asked (--continue) — stopping its session, then the tick files it',
         },
         [],
       ],
@@ -1070,7 +1071,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       assert.deepEqual(assess(STEPS, r, stopped, nothingSigned, asked, () => undefined, [askFor(2)], [], blockedOf).retry, [
         { step: 'implement', try: 2, mode: 'nudge', by: 'ask' },
       ]);
-    assert.equal(noteOf('stopped').note, 'try 2 asked (--nudge) — the next tick files it');
+    assert.equal(noteOf('stopped').note, 'try 2 asked (--continue) — the next tick files it');
   });
   await t.test('a refused check `retries:` covers is due with no stop', () => {
     const r1 = run({}, { steps: { implement: { taskId: 't1', check: { taskId: 'c1' } }, review: { taskId: null } } });
@@ -1098,7 +1099,7 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
   await t.test('a harness that says nothing, or a caller that asks nothing, reads as before', () => {
     assert.deepEqual(
       lsWith('needs-human', () => undefined),
-      { name: 'implement', status: 'needs-human', reason: 'NeedsHuman', phase: 'waiting', branch: null },
+      { name: 'implement', status: 'needs-human', reason: 'AwaitingAnswer', via: 'session', phase: 'waiting', branch: null },
     );
     assert.equal(
       listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'needs-human' }), closeoutOf: signedOff({}) }).steps[0].status,
@@ -1126,10 +1127,11 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
     assert.deepEqual(l.steps[0], {
       name: 'implement',
       status: 'needs-human',
-      reason: 'NeedsHuman',
+      reason: 'AwaitingAnswer',
+      via: 'session',
       phase: 'waiting',
       branch: null,
-      note: 'try 2 asked (--nudge) — stopping its blocked session, then the tick files it',
+      note: 'try 2 asked (--continue) — stopping its blocked session, then the tick files it',
       waits: 'waiting for a permission prompt',
     });
   });
@@ -1156,7 +1158,7 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
       verdictOf: () => 'unfinished',
       asks: [answered],
     });
-    assert.equal(l.steps[0].note, 'try 2 asked (--nudge, with your answer) — the next tick files it');
+    assert.equal(l.steps[0].note, 'try 2 asked (--continue, with your answer) — the next tick files it');
   });
   const nudged = onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'nudge' }], 'c1');
   await t.test('a try a person answered says so on `nemia ls`, read off the ask, never the record', () => {
@@ -1243,12 +1245,13 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
       const before = briefOf(told);
       const after = briefOf(told, text);
       assert.doesNotMatch(before, /Your answer|--message/, 'a try without one: no empty section');
-      const who = `A person asked for this try: \`nemia retry --${mode}\`.`;
+      const flag = mode === 'nudge' ? 'continue' : mode;
+      const who = `A person asked for this try: \`nemia retry --${flag}\`.`;
       const where = resumed
         ? "This is the last try's session, continued. Finish the work, then sign off again."
         : 'read the change, not an account of it.';
       const expected = before
-        .replace(who, `A person asked for this try: \`nemia retry --${mode} --message\`, with what they said below.`)
+        .replace(who, `A person asked for this try: \`nemia retry --${flag} --message\`, with what they said below.`)
         .replace(where, `${where}\n\n## Your answer\n\n\`\`\`text\n${text}\n\`\`\``);
       assert.notEqual(expected, before);
       assert.equal(after, expected, 'the sentence on whose word names the message, the section after where the step is, nothing else');
@@ -1368,7 +1371,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       () => false,
       denied,
     );
-    assert.deepEqual([a.check, a.retry, a.blocked, a.status], [[], [], ['review'], 'blocked']);
+    assert.deepEqual([a.check, a.retry, a.unreachable, a.status], [[], [], ['review'], 'waiting']);
     assert.deepEqual(
       retriesDue(
         DENYING,
@@ -1396,7 +1399,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       () => false,
       denied,
     );
-    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.denied, d.failed, d.unsigned], ['blocked', ['implement'], [], []]);
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.denied, d.failed, d.unsigned], ['waiting', ['implement'], [], []]);
     const l = fullListing({
       steps: DENYING,
       run: r,
@@ -1415,8 +1418,8 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       retryable(DENYING[0], r, p, signedDone, asked, DENYING, () => false, denied),
       {
         status: 'denied',
+        reason: 'Denied',
         modes: ['nudge', 'fresh'],
-        blockedByHarness: false,
       },
     );
     const refusal = (how: RetryHow) =>

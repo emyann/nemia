@@ -1,6 +1,6 @@
 /**
  * An agent copied into a person's library from its file anywhere (`copyAgent`, `AGENTS_COPY`): the agent, the result schema its `output:`
- * names and every skill it gives that is not a place skill Nemia ships, with the record of where it came from (`writeCopyRecord`). It
+ * names and every skill it gives that is not a builtin place skill, with the record of where it came from (`writeCopyRecord`). It
  * judges the copy through its store (`copy.store.ts`) and writes it through the library's writers, the agent's (`writeAgent`) and a
  * skill's (`copySkill`), which no store may import. A part the library already holds as it is, is reused.
  */
@@ -29,7 +29,7 @@ export type AgentCopied = { name: string; copied: string[]; reused: string[]; re
 
 /**
  * The agent file `file` copied into the library of the store `home`, under `as` or its own name: the agent, the result schema its
- * `output:` names and each skill it gives that is not a place skill Nemia ships, then the record of the copy (`copyRecordFile`). A part the
+ * `output:` names and each skill it gives that is not a builtin place skill, then the record of the copy (`copyRecordFile`). A part the
  * library holds as it is, is reused, and written again by none.
  *
  * Judged whole before a byte is written: a file not there (`Missing`); one the store would not run, a key of another harness's agent

@@ -22,7 +22,17 @@ import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import type { Workflow } from '../step/step.ts';
 import type { CheckVerdict } from '../check/check.ts';
-import { runCodes, type RunPhase, type RunReason, type StepPhase, type StepReason } from '../phase/phase.ts';
+import {
+  runCodes,
+  type AnswerVia,
+  type CodedRun,
+  type CodedStep,
+  type RunPhase,
+  type RunReason,
+  type StepPhase,
+  type StepReason,
+  type WaitOn,
+} from '../phase/phase.ts';
 import { bare, judgedSteps, type Views } from './reads.verb.ts';
 
 /** Where a run stands, as `assess` decides it: `running` until every step is final one way or the other. */
@@ -87,14 +97,15 @@ export const spentOf = (spend: Spend): Spent | null =>
  *
  * `runs` are the package's `waitsOf`: each run in `after` that has not landed, as its own `nemia decide` says it, and, for one that never
  * will without a person, why — the store has no such run (`missing`), it was cancelled, or a result branch it recorded is gone. `word` is
- * what `nemia ls` prints on each root (`waitWord`), and `advice` the line `nemia decide` prints under it (`waitAdvice`). `onYou` is whether
- * a person has to act — some run of `runs` never lands on its own — which is when `nemia ls` prints `→ waiting on you:` before the advice.
+ * what `nemia ls` prints on each root (`waitWord`), and `advice` the line `nemia decide` prints under it (`waitAdvice`). `waitingOnYou` is
+ * whether a person has to act — some run of `runs` never lands on its own — which is when `nemia ls` prints `→ waiting on you:` before the
+ * advice.
  */
 export type RunWaiting = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
   word: string;
   advice: string;
-  onYou: boolean;
+  waitingOnYou: boolean;
 };
 
 /**
@@ -105,17 +116,17 @@ export type RunWaiting = {
  * and, for one that never will without a person, why — as `RunWaiting.runs` has them — or, in the moment every one has landed and the next
  * tick has not yet lifted the hold, each of them `landed`. `word` is what `nemia ls` prints under the run (`holdWord`), with the person's
  * why and name when the hold has them, and `advice` the line
- * `nemia decide` prints under it (`holdAdvice`). `onYou` is whether the hold lifts only by a person's hand: it names no run, or a run it
- * names never lands on its own — the rule `nemia ls` prints the advice by. A hold asks nothing of anyone while it may still lift: every
- * verb a step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`) and
- * nothing is offered.
+ * `nemia decide` prints under it (`holdAdvice`). `waitingOnYou` is whether the hold lifts only by a person's hand: it names no run, or a
+ * run it names never lands on its own — the rule `nemia ls` prints the advice by. A hold asks nothing of anyone while it may still lift:
+ * every verb a step's word would take is refused while it stands (`heldRefusal`), so no step of a held run waits on you (`waitingOnYou`)
+ * and nothing is offered.
  */
 export type RunHolding = {
   at: string;
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; landed: boolean }>;
   word: string;
   advice: string;
-  onYou: boolean;
+  waitingOnYou: boolean;
 };
 
 /**
@@ -123,10 +134,10 @@ export type RunHolding = {
  *
  * `needs` is the closeout's, for a step whose current try signed off blocked: its question. Null for any other step.
  *
- * `blockedByHarness` is whether the harness marked the step's session blocked while it gave no closeout — the engine's
- * `needs-human` — which is no question of the step's, as when a session stops on a login that another process of its
- * harness is refreshing. What the session said last is on the run's detail alone: reading it observes the
- * harness again, and the list is read on every poll of the Factory for one observation.
+ * A step whose harness marked its session blocked is said by its own codes, `AwaitingAnswer` via `session` (the engine's
+ * `needs-human`, `atHarness`), which is no question of the step's, as when a session stops on a login that another process of its
+ * harness is refreshing. What the session said last is on the run's detail alone: reading it observes the harness again, and the list
+ * is read on every poll of the Factory for one observation.
  *
  * `waitingFor` is what that harness says the session waits for, where it says anything (`TaskView.waitingFor`, off the same
  * views — no observation of its own, unlike `lastLine`). Both halves are the package's words, never worded here: `words` is
@@ -150,7 +161,6 @@ export type RunHolding = {
  */
 export type StepNeeds = {
   needs: string | null;
-  blockedByHarness: boolean;
   waitingFor: { words: string; advice: string } | null;
   approve: string | null;
   denied: { words: string; calls: string[] } | null;
@@ -173,7 +183,7 @@ export function runWaitingOf(run: Run, waits: readonly Wait[]): RunWaiting | nul
     runs: waits.map((w) => ({ run: w.run, missing: Boolean(w.missing), cancelledAt: w.cancelledAt ?? null, gone: w.gone ?? [] })),
     word: waitWord(waits),
     advice: waitAdvice(run, waits),
-    onYou: waits.some(neverLands),
+    waitingOnYou: waits.some(neverLands),
   };
 }
 
@@ -199,7 +209,7 @@ export function holdingOf(run: Run, holds: readonly Wait[]): RunHolding | null {
     })),
     word: holdWord(holds, run.hold),
     advice: holdAdvice(run, holds),
-    onYou: holdNeedsYou(holds),
+    waitingOnYou: holdNeedsYou(holds),
   };
 }
 
@@ -214,16 +224,43 @@ export const wordOf =
     wordOfView(views.get(taskId));
 
 /**
- * Where a step stands as codes, as the listing judged it (`Listing`'s `phase`, `reason` and `verdict`): its check's verdict null where it
- * was not judged by one.
+ * Where a step stands as codes, as the listing judged it (`Listing`'s `phase`, `reason`, `on`, `via` and `verdict`): `on` null but on a
+ * `Waiting` step, `via` null but on an `AwaitingAnswer` one, and its check's verdict null where it was not judged by one.
  */
-export type StepCodes = { phase: StepPhase; reason: StepReason; verdict: CheckVerdict | null };
+export type StepCodes = {
+  phase: StepPhase;
+  reason: StepReason;
+  on: WaitOn | null;
+  via: AnswerVia | null;
+  verdict: CheckVerdict | null;
+};
+
+/** A row's codes as a door carries them (`StepCodes`): what qualifies its reason null where nothing does. */
+const doorCodes = (s: CodedStep & { verdict?: CheckVerdict }): StepCodes => ({
+  phase: s.phase,
+  reason: s.reason,
+  on: s.on ?? null,
+  via: s.via ?? null,
+  verdict: s.verdict ?? null,
+});
+
+/** A run's codes as a door carries them: what qualifies its reason null where nothing does. */
+const runDoor = (c: CodedRun): { phase: RunPhase; reason: RunReason; on: WaitOn | null; via: AnswerVia | null } => ({
+  phase: c.phase,
+  reason: c.reason,
+  on: c.on ?? null,
+  via: c.via ?? null,
+});
 
 /** A run's word and codes as a door says them (`RunSummary`): `assess`'s status, and its phase and reason (`runCodes`). */
-export const runSaid = (judged: Pick<Judged, 'status' | 'phase' | 'reason'>): Pick<Judged, 'status' | 'phase' | 'reason'> => ({
+export const runSaid = (
+  judged: Pick<Judged, 'status' | 'phase' | 'reason' | 'on' | 'via'>,
+): Pick<Judged, 'status' | 'phase' | 'reason' | 'on' | 'via'> => ({
   status: judged.status,
   phase: judged.phase,
   reason: judged.reason,
+  on: judged.on,
+  via: judged.via,
 });
 
 /**
@@ -231,9 +268,9 @@ export const runSaid = (judged: Pick<Judged, 'status' | 'phase' | 'reason'>): Pi
  * the name `message` had, kept for one card.
  */
 export const stepSaid = (judged: Pick<Judged, 'codes' | 'words'>, name: string): StepCodes & { message: string; status: string } => {
-  const { phase, reason, verdict } = judged.codes.get(name)!;
+  const { phase, reason, on, via, verdict } = judged.codes.get(name)!;
   const word = judged.words.get(name)!;
-  return { phase, reason, message: word, verdict, status: word };
+  return { phase, reason, on, via, message: word, verdict, status: word };
 };
 
 /**
@@ -251,17 +288,22 @@ type Judged = {
   beside: ReadonlyMap<string, { waits?: string; denied?: string }>;
   waitingOnYou: string[];
   /** `waitingOnYou` in `nemia ls`'s words (`onYouWords`), in the page's order: `approve plan` for a step at its gate. */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /**
    * What a person has to decide about the result (`toDecide`), as `listing` reads it off the branch standings it was given; null while
    * there is nothing.
    */
   toDecide: RunToDecide | null;
-  /** The run in one word, as `assess` judged it: `failed` where a step broke, `awaiting approval` or `blocked` where a person stops it. */
+  /** The run in one word, as `assess` judged it: `failed` where a step broke, `awaiting approval` or `waiting` where a person stops it. */
   status: RunStatus;
-  /** Where the run is in its life, and why, as codes (`runCodes`): `Held` for a running run a person holds (`holding`). */
+  /**
+   * Where the run is in its life, and why, as codes (`runCodes`): `Waiting` on `run` for a running run a person holds (`holding`), and
+   * for a run a person's word stops, the reason and `via` of its first step that waits on them.
+   */
   phase: RunPhase;
   reason: RunReason;
+  on: WaitOn | null;
+  via: AnswerVia | null;
   /**
    * The line `cancelPlan` draws for a finished run, which `status` does not: something in flight, or something a tick would still file — a
    * check, a try, a round due once a loop's looping step settled, or roots `assess` makes ready. Roots of a run waiting on runs are filed
@@ -423,23 +465,24 @@ export const judge = Effect.fn('judge')(function* (
   const waiting = runWaitingOf(run, read.waiting);
   const holding = holdingOf(run, read.holding ?? []);
   const { hold: _, ...unheld } = run;
-  const due = holding && !holding.onYou ? read.assessOf(unheld) : { ready, check, retry, round };
+  const due = holding && !holding.waitingOnYou ? read.assessOf(unheld) : { ready, check, retry, round };
   const tickReads = Boolean(run.workflow ?? folder);
   const waitingOnYou = names.filter((name) => read.waitingOnYou.includes(name));
   return {
     words: new Map(read.steps.map((s) => [s.name, s.status])),
-    codes: new Map(read.steps.map((s) => [s.name, { phase: s.phase, reason: s.reason, verdict: s.verdict ?? null }])),
+    codes: new Map(read.steps.map((s) => [s.name, doorCodes(s)])),
     notes: new Map(read.steps.map((s) => [s.name, s.note ?? null])),
     roundDue: new Set(read.steps.filter((s) => s.roundDue).map((s) => s.name)),
     beside: new Map(read.steps.map(({ name, waits, denied }) => [name, { waits, denied }])),
     waitingOnYou,
-    onYou: onYouWords({ steps: read.steps, waitingOnYou }),
+    waitingOnYouWords: onYouWords({ steps: read.steps, waitingOnYou }),
     toDecide: toDecideOf(run, read.toDecide, steps),
     status,
-    ...runCodes(status, holding !== null),
+    ...runDoor(runCodes(status, holding !== null, read.steps)),
     moving:
       inFlight(run, read.phaseOf).length > 0 ||
-      (tickReads && ((due.ready.length > 0 && !waiting?.onYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
+      (tickReads &&
+        ((due.ready.length > 0 && !waiting?.waitingOnYou) || due.check.length > 0 || due.retry.length > 0 || due.round.length > 0)),
     waiting,
     holding,
     asked: new Map(retry.filter((r) => r.by === 'ask').map((r) => [r.step, r])),
@@ -448,6 +491,10 @@ export const judge = Effect.fn('judge')(function* (
     cost: spentOf(read.spend),
   } satisfies Judged;
 });
+
+/** Whether a step's codes say its harness stopped its session to ask, with no closeout signed off blocked: the engine's `needs-human`. */
+export const atHarness = (codes: { reason: StepReason; via?: AnswerVia | null }): boolean =>
+  codes.reason === 'AwaitingAnswer' && codes.via === 'session';
 
 /**
  * What a person has to know to act on a step (`StepNeeds`), off the views the request already read, with no observation of its own: its
@@ -460,15 +507,14 @@ export const judge = Effect.fn('judge')(function* (
 export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'codes' | 'waitingOnYou' | 'beside'>): StepNeeds {
   const view = run.steps[name]?.taskId ? views.get(run.steps[name].taskId) : undefined;
   const said = view ? closeoutOf(views, run, name) : undefined;
-  const reason = judged.codes.get(name)!.reason;
+  const codes = judged.codes.get(name)!;
+  const reason = codes.reason;
   const atGate = reason === 'AwaitingApproval' && judged.waitingOnYou.includes(name);
-  const blockedByHarness = view?.phase === 'needs-human' && said === undefined;
   const { waits, denied } = judged.beside.get(name) ?? {};
-  const words = blockedByHarness ? waits : undefined;
+  const words = atHarness(codes) ? waits : undefined;
   const attempt = view?.state.attempts.at(-1)?.n;
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
-    blockedByHarness,
     waitingFor: words
       ? {
           words,

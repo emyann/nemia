@@ -248,10 +248,10 @@ const unshadowed = <T extends { from: WorkflowSource }>(found: readonly T[], nam
   found.filter((f, i) => found.findIndex((g) => g.from === f.from && name(g) === name(f)) === i);
 
 /** The table's entries the board's workflows are read through, each served on the api alone. */
-const LIST = COMMANDS.find((c) => c.name === 'workflows list')!;
+const LIST = COMMANDS.find((c) => c.name === 'workflows')!;
 
 /**
- * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires: the table's `workflows list`, by
+ * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires: the table's `workflows`, by
  * folder.
  */
 export const loadedOf = async (
@@ -306,7 +306,7 @@ export async function listWorkflows(
 export const placesOf = (repo: string, home: string): Places => ({ repo, home });
 
 /**
- * One folder as the board lists it, read from disk now, its steps as the table's `workflows list` loaded them (`loaded`): what the listing
+ * One folder as the board lists it, read from disk now, its steps as the table's `workflows` loaded them (`loaded`): what the listing
  * has for it, and what the builder answers a write with. In `factory`, its steps are read with the factory's hires, and those left with no
  * agent named (`unfilled`).
  */

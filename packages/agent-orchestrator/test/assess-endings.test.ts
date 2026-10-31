@@ -238,7 +238,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
     () => {
       const running = atEnd({ steps: { review: { taskId: 't2', workspace: '/wt', branch: 'wf/r-1/implement' } } });
       const p = phases({ t1: 'succeeded', t2: 'running' });
-      assert.equal(stepStatus(SHIP, running, p, signedDone, asked, ENDS), 'waiting');
+      assert.equal(stepStatus(SHIP, running, p, signedDone, asked, ENDS), 'pending');
       assert.deepEqual(assess(ENDS, running, p, signedDone, asked).toDecide, undefined, 'nothing to decide while it runs');
       assert.equal(
         approvalRefusal(ENDS, running, 'ship', undefined, p, signedDone, asked),
@@ -248,7 +248,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
       const broke = phases({ t1: 'succeeded', t2: 'failed' });
       assert.equal(
         stepStatus(SHIP, atEnd(), broke, signedDone, asked, ENDS),
-        'waiting',
+        'pending',
         'a step that broke leaves no gate to approve either',
       );
       assert.deepEqual(
@@ -265,7 +265,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
     const ask: RetryAsk = { step: 'review', try: 2, mode: 'nudge', message: 'the flag is not stored', at: '2026-09-17T09:00:00.000Z' };
     assert.equal(
       approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [ask]),
-      'try 2 of review is asked for (--nudge, at 2026-09-17T09:00:00.000Z), and ship acts on what it changes: approving now would take the result that ask objects to. ' +
+      'try 2 of review is asked for (--continue, at 2026-09-17T09:00:00.000Z), and ship acts on what it changes: approving now would take the result that ask objects to. ' +
         "Approve ship once review has signed off again — or, to take the result as it stands, take that ask back first: retry-review-2, in the run's .asks directory.",
     );
   });
@@ -420,7 +420,7 @@ test("`nemia ls`, `nemia rm` and `nemia cancel` at an ending's gate", async (t) 
 
   await t.test('a run called off holds no ending gate: nothing files it, so its ending reads as the waiting step it is', () => {
     const off = atEnd({ cancelledAt: '2026-09-17T10:00:00.000Z' });
-    assert.equal(stepStatus(SHIP, off, DONE, signedDone, asked, ENDS), 'waiting');
+    assert.equal(stepStatus(SHIP, off, DONE, signedDone, asked, ENDS), 'pending');
     const shownAs = (p: Record<string, TaskPhase>) => (id: string) => p[id] ?? 'unknown';
     const l = listing({
       steps: ENDS,
@@ -429,7 +429,7 @@ test("`nemia ls`, `nemia rm` and `nemia cancel` at an ending's gate", async (t) 
       closeoutOf: signedDone,
       askedCloseout: asked,
     });
-    assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
+    assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
   });
 });
 
@@ -479,7 +479,7 @@ test("an ending's gate does not hold while the work goes round again or is being
         [[2], 'running', undefined],
         'again: true, with rounds left: the round is filed, and the ending is a waiting step, not a merge on offer',
       );
-      assert.equal(stepStatus(SHIP, r, DONE, said(true), asked, looping), 'waiting');
+      assert.equal(stepStatus(SHIP, r, DONE, said(true), asked, looping), 'pending');
       assert.match(
         String(approvalRefusal(looping, r, 'ship', undefined, DONE, said(true), asked)),
         /^ship is not at its gate yet: it ends the run in the repository's own checkout, and its gate holds once review has handed on/,
@@ -491,7 +491,7 @@ test("an ending's gate does not hold while the work goes round again or is being
         closeoutOf: said(true),
         askedCloseout: asked,
       });
-      assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
+      assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
 
       const handed = assess(
         looping,
@@ -569,7 +569,7 @@ test("an ending's gate does not hold while the work goes round again or is being
         verdictOf: () => undefined,
         asks: [ask],
       });
-      assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['waiting', [], undefined]);
+      assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
 
       const d = decision(
         ENDS,
@@ -602,7 +602,7 @@ test("an ending's gate does not hold while the work goes round again or is being
       );
       assert.match(
         String(approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [ask])),
-        /^try 2 of review is asked for \(--nudge, at 2026-09-17T09:00:00\.000Z\), and ship acts on what it changes/,
+        /^try 2 of review is asked for \(--continue, at 2026-09-17T09:00:00\.000Z\), and ship acts on what it changes/,
         'nemia approve refuses in the window',
       );
 
@@ -971,7 +971,7 @@ test("decision: landed is asked of git and never stored, and a finished run is a
       const cases: Array<[string, Decision, string, string[]]> = [
         ['failed', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'failed' }), unchanged), 'failed', ['review']],
         ['stopped', decision(STEPS, finished(), phases({ t1: 'succeeded', t2: 'stopped' }), unchanged), 'failed', ['review']],
-        ['blocked', decision(STEPS, finished(), DONE, unchanged, says('blocked')), 'blocked', []],
+        ['blocked', decision(STEPS, finished(), DONE, unchanged, says('blocked')), 'waiting', []],
         [
           'unsigned',
           decision(
@@ -982,7 +982,7 @@ test("decision: landed is asked of git and never stored, and a finished run is a
             () => undefined,
             () => true,
           ),
-          'blocked',
+          'waiting',
           [],
         ],
       ];
@@ -1072,7 +1072,7 @@ test("an ending's gate and git's word: what is to decide, read off where the res
       const d = decision(ENDS, atEnd(), DONE, ahead, signedDone, asked);
       assert.equal(d.kind, 'awaiting');
       if (d.kind !== 'awaiting') return;
-      assert.deepEqual([d.outcome, d.awaitingApproval, d.branches, d.direct], ['blocked', ['ship'], ['wf/r-1/implement'], false]);
+      assert.deepEqual([d.outcome, d.awaitingApproval, d.branches, d.direct], ['waiting', ['ship'], ['wf/r-1/implement'], false]);
       assert.equal(
         runReady(run({}, { after: ['r-1'] }), () => false),
         false,

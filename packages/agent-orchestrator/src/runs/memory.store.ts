@@ -14,19 +14,20 @@ import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
-import type { AskKey, Hold, PersonAsk, Pruned, Run } from '../record/record.ts';
+import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run } from '../record/record.ts';
 import { RunDoor, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
 export const MEMORY_ROOT = '/memory';
 
 /** The ask's key: the step and number its file is named by (`askWhere`). */
-const keyOf = (person: PersonAsk): AskKey =>
-  person.kind === 'merge'
-    ? { kind: 'merge', step: person.ask.merge.target, n: person.ask.merge.try }
-    : { kind: person.kind, step: person.ask.step, n: 'round' in person.ask ? person.ask.round : person.ask.try };
+const keyOf = (person: PersonRequest): AskKey =>
+  person.of === 'base'
+    ? { of: 'base', step: person.ask.merge.target, n: person.ask.merge.try }
+    : { of: person.of, step: person.ask.step, n: 'round' in person.ask ? person.ask.round : person.ask.try };
 
-const nameOf = ({ kind, step, n }: AskKey): string => `${kind}-${step}-${n}`;
+/** An ask's name in the stand-in, by which of its verb it is: no file is written, so none has to keep its former name. */
+const nameOf = ({ of, step, n }: AskKey): string => `${of}-${step}-${n}`;
 const runsAt = (...parts: string[]): string => path.posix.join(MEMORY_ROOT, 'runs', ...parts);
 
 /** The keys a record holds that are a person's, composed on read and never written into it (`rewriteRun`). */
@@ -37,8 +38,8 @@ const recordOf = (run: Run): Run => {
   return structuredClone(kept) as Run;
 };
 
-/** One ask held, by its key's name (`<kind>-<step>-<n>`), and whether the tick consumed it. */
-type Held = { person: PersonAsk; done: boolean };
+/** One ask held, by its key's name (`<of>-<step>-<n>`), and whether the tick consumed it. */
+type Held = { person: PersonRequest; done: boolean };
 
 /** What a stand-in holds: each run's record, and a person's files beside it, by run id; and each run's stamp, a count of its changes. */
 type State = {
@@ -66,14 +67,14 @@ const stateOf = (): State => ({
 /** A change to what the stand-in holds of `id`: its stamp moves. */
 const touch = (st: State, id: string): void => void st.versions.set(id, (st.versions.get(id) ?? 0) + 1);
 const asksOf = (st: State, id: string): Map<string, Held> => st.asks.get(id) ?? new Map();
-const waiting = (st: State, id: string, kind: PersonAsk['kind']) =>
-  [...asksOf(st, id).values()].filter((h) => !h.done && h.person.kind === kind).map((h) => structuredClone(h.person.ask));
+const waiting = (st: State, id: string, of: AskOf) =>
+  [...asksOf(st, id).values()].filter((h) => !h.done && h.person.of === of).map((h) => structuredClone(h.person.ask));
 
 /** The run `id`, its person's files composed onto it as `readRun` composes them. */
 function readOf(st: State, id: string): Run {
   const record = st.records.get(id);
   if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
-  const [approvals, acceptances] = [waiting(st, id, 'approve'), waiting(st, id, 'accept')];
+  const [approvals, acceptances] = [waiting(st, id, 'gate'), waiting(st, id, 'loop')];
   return {
     ...structuredClone(record),
     ...(st.cancelled.has(id) ? { cancelledAt: st.cancelled.get(id) } : {}),
@@ -142,10 +143,10 @@ function runsOf(st: State): RunsLayer['runs'] {
   };
 }
 
-/** Set aside each ask of `kind` named by `spent` (its step and number): consumed, never edited, as `doneWith` moves a file. */
-function spend(st: State, id: string, kind: PersonAsk['kind'], spent: ReadonlyArray<{ step: string; n: number }>): void {
+/** Set aside each ask of `of` named by `spent` (its step and number): consumed, never edited, as `doneWith` moves a file. */
+function spend(st: State, id: string, of: AskOf, spent: ReadonlyArray<{ step: string; n: number }>): void {
   for (const { step, n } of spent) {
-    const held = asksOf(st, id).get(nameOf({ kind, step, n }));
+    const held = asksOf(st, id).get(nameOf({ of, step, n }));
     if (held && !held.done) {
       held.done = true;
       touch(st, id);
@@ -156,20 +157,20 @@ function spend(st: State, id: string, kind: PersonAsk['kind'], spent: ReadonlyAr
 function asksGroup(st: State): RunsLayer['asks'] {
   return {
     read: (id) => ({
-      asks: waiting(st, id, 'retry') as RetryAsk[],
-      rounds: [...(waiting(st, id, 'round') as RoundAsk[]), ...(waiting(st, id, 'merge') as RoundAsk[])],
+      asks: waiting(st, id, 'try') as RetryAsk[],
+      rounds: [...(waiting(st, id, 'round') as RoundAsk[]), ...(waiting(st, id, 'base') as RoundAsk[])],
       notes: [],
     }),
     answers: (id) =>
       [...asksOf(st, id).values()]
-        .filter((h) => h.person.kind === 'retry' && h.person.ask.message !== undefined)
+        .filter((h) => h.person.of === 'try' && h.person.ask.message !== undefined)
         .map((h) => structuredClone(h.person.ask as RetryAsk)),
     consume: (run, retries, rounds, voided = []) => {
       const tries = [...new Set([...spentAsks(run, retries), ...voided])];
       spend(
         st,
         run.id,
-        'retry',
+        'try',
         tries.map((a) => ({ step: a.step, n: a.try })),
       );
       const plain = rounds.filter((a) => !a.merge);
@@ -182,20 +183,20 @@ function asksGroup(st: State): RunsLayer['asks'] {
       spend(
         st,
         run.id,
-        'approve',
+        'gate',
         spentApprovals(run).map((a) => ({ step: a.step, n: a.try })),
       );
       spend(
         st,
         run.id,
-        'accept',
+        'loop',
         spentAcceptances(run).map((a) => ({ step: a.step, n: a.try })),
       );
       const merges = rounds.filter((a) => a.merge && mergeSpent(run, a));
       spend(
         st,
         run.id,
-        'merge',
+        'base',
         merges.map((a) => ({ step: a.merge!.target, n: a.merge!.try })),
       );
     },

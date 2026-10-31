@@ -1,12 +1,13 @@
 /**
- * The runners of the commands that start work from where they are typed — `nemia start`, `nemia plan`, `nemia inbox add` and `nemia inbox
- * queue`: each reads the files and folders its command line names, hands its entry's handler what it found, and prints what the entry says
- * of it.
+ * The runners of the commands that start work from where they are typed — `nemia start`, of a brief or a folder of cards, `nemia inbox add`
+ * and `nemia inbox queue`: each reads the files and folders its command line names, hands its entry's handler what it found, and prints
+ * what the entry says of it.
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import {
   cardToStart,
+  folderRefusal,
   inboxDir,
   inboxNameAt,
   INBOX_ADD,
@@ -92,22 +93,42 @@ function briefArgs(arg: string, args: Args): Args {
   };
 }
 
-/** `nemia start`: a run of a brief, a plan's card or an inbox card (`START`), and what it prints of it. */
+/**
+ * Whether `arg` reads as a path rather than words: one word that opens with `.`, `/` or `~`, or ends with `/` (Windows' `\\` the same). A
+ * word with a slash only inside it is words: a link, or a branch such as `fix/login`.
+ */
+const pathLike = (arg: string): boolean => !/\s/.test(arg) && (/^[./~\\]/.test(arg) || /[\\/]$/.test(arg));
+
+/**
+ * `nemia start`: a run of a brief, a plan's card or an inbox card (`START`), and what it prints of it; or, for a folder, a run per card of
+ * the plan it holds (`folderRun`). A brief is words or a file, never a folder, so a folder is always a plan; and a brief that reads as a
+ * path (`pathLike`) and names nothing here, nor a card of the inbox, is refused rather than started as words: it is a file or a plan folder
+ * mistyped, or not made yet, as the former spelling of a plan's start only ever meant a folder.
+ */
 export async function startRun(args: Args, e: Engine, place: Place): Promise<void> {
   const arg = textOf(args, 'brief') ?? '';
+  const at = fs.statSync(arg, { throwIfNoEntry: false });
+  if (at?.isDirectory()) return folderRun(arg, args, e, place);
   const card = inboxNameAt(arg);
+  if (at === undefined && card === null && pathLike(arg))
+    usage(
+      `nemia start was given ${arg}, which reads as a path, and there is no file nor plan folder at ${path.resolve(arg)}. Make the folder of cards and start it: nemia start <folder> --repo <r>; or give the file's path as it is, or the brief in words: nemia start "<brief>".`,
+    );
   const asked = card !== null ? cardArgs(card, args) : briefArgs(arg, args);
   const data = await runWith(e, placedIn(place, START.handler(asked)));
   for (const line of START.print(data, asked)) console.log(line);
 }
 
 /**
- * `nemia plan`: a run per card of a plan folder, a line each, in the factory and on the repository a `nemia start` typed here would be
- * (`placeOfStart`); a card that did not start stops the rest, and fails with what it was told.
+ * `nemia start <folder>`: a run per card of a plan folder, a line each, in the factory and on the repository a `nemia start` typed here
+ * would be (`placeOfStart`); refused for a flag the folder says instead (`folderRefusal`); a card that did not start stops the rest, and
+ * fails with what it was told.
  */
-export async function planRun(args: Args, e: Engine, place: Place): Promise<void> {
+async function folderRun(folder: string, args: Args, e: Engine, place: Place): Promise<void> {
+  const refused = folderRefusal(args);
+  if (refused !== undefined) usage(refused);
   const { factory, repo } = placeOfStart(args);
-  const plan = { dir: path.resolve(textOf(args, 'folder') ?? ''), repo: path.resolve(repo) };
+  const plan = { dir: path.resolve(folder), repo: path.resolve(repo) };
   const { started, stopped, folderOf } = await runWith(
     e,
     placedIn(place, startPlan({ ...plan, ...(factory !== undefined ? { factory } : {}) })),

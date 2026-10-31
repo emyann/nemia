@@ -41,20 +41,20 @@ const DONE = [
 
 /** A row of three done steps and `land` saying `word` with its codes, which waits on a person. */
 const landing = (word: Word, extra: Partial<RunSummary> = {}): RunSummary =>
-  summary([...DONE, ['land', word]], { status: 'failed', moving: false, waitingOnYou: ['land'], onYou: [COMMAND], ...extra });
+  summary([...DONE, ['land', word]], { status: 'failed', moving: false, waitingOnYou: ['land'], waitingOnYouWords: [COMMAND], ...extra });
 
-const holding = { at: '2026-09-30T05:00:00.000Z', runs: [], word: `held: ${COMMAND}`, advice: COMMAND, onYou: true };
+const holding = { at: '2026-09-30T05:00:00.000Z', runs: [], word: `held: ${COMMAND}`, advice: COMMAND, waitingOnYou: true };
 const waiting = {
   runs: [{ run: 'r-0', missing: false, cancelledAt: '2026-09-30T05:00:00.000Z', gone: [] }],
   word: 'waiting on r-0 (cancelled)',
   advice: COMMAND,
-  onYou: true,
+  waitingOnYou: true,
 };
 
 /** One row of the light answer per kind of wait, the sentence it says, and the words of its card's button. */
 const ROWS: Record<WaitKind, { row: RunSummary; says: string; opens: string }> = {
   approve: { row: landing('awaiting approval'), says: 'Three steps are done. Land waits for your approval.', opens: 'Read the land' },
-  blocked: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.', opens: 'Read the question' },
+  answer: { row: landing('succeeded · BLOCKED'), says: 'Land stopped and needs your word to go on.', opens: 'Read the question' },
   check: {
     row: landing('failed ✗ check (exit 1)'),
     says: 'Land failed its check. Try it again or call the run off.',
@@ -178,7 +178,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
       const atGate = summary([...DONE, ['land', 'awaiting approval']], { status: 'running', moving: false, holding, waitingOnYou: [] });
       assert.deepEqual(waitOf(atGate), { kind: 'hold', step: null, done: 3 });
       assert.equal(waitSentence(atGate), 'You hold this run. It moves once you lift the hold.');
-      const liftsItself = { ...atGate, holding: { ...holding, onYou: false } };
+      const liftsItself = { ...atGate, holding: { ...holding, waitingOnYou: false } };
       assert.equal(waitOf(liftsItself), null, 'a hold the tick lifts waits on nobody');
       assert.equal(waitOf({ ...liftsItself, waiting })?.kind, 'after', 'and such a run that waits on a run nobody will ship says that');
     },
@@ -210,7 +210,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
   await t.test(
     'REFUSED: a wait on runs that may still ship is no wait on a person, and a step that waits comes before a run waited on',
     () => {
-      const onRuns = summary([['design', 'waiting on r-0']], { moving: true, waiting: { ...waiting, onYou: false } });
+      const onRuns = summary([['design', 'waiting on r-0']], { moving: true, waiting: { ...waiting, waitingOnYou: false } });
       assert.equal(waitOf(onRuns), null);
       assert.equal(waitOf(landing('unsigned', { waiting }))?.kind, 'unsigned');
       assert.equal(waitOf(landing('unsigned', { waiting, holding }))?.kind, 'hold');
@@ -238,7 +238,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
   });
   await t.test("a waiting card's tag names the step where the person acts on one, and says a wait the board has no kind for", () => {
     assert.equal(waitTag(ROWS.approve.row), 'approve land');
-    assert.equal(waitTag(ROWS.blocked.row), 'answer land');
+    assert.equal(waitTag(ROWS.answer.row), 'answer land');
     assert.equal(waitTag(summary([['plan', 'running']], { waitingOnYou: ['plan'] })), PERSON['awaiting-approval'].rail);
   });
 });
@@ -360,10 +360,10 @@ test('railSaid, barSaid, nowOf: what the rail and a run in flight say of its ste
       );
   });
   await t.test("a bar as a button says its step's name and the rail's word for its state", () => {
-    assert.equal(barSaid('implement', 'working', 'Running'), 'implement, at work');
-    assert.equal(barSaid('design', 'awaiting-approval', 'AwaitingApproval'), 'design, waits on you');
-    assert.equal(barSaid('land', 'failed-check', 'CheckFailed'), 'land, failed its check');
-    assert.equal(barSaid('review', 'waiting', 'Waiting'), 'review, to come');
-    assert.equal(barSaid('theme', 'waiting', 'WaitingForPause'), `theme, ${PAUSED.rail}`, 'a check the pause holds');
+    assert.equal(barSaid('implement', 'working', null), 'implement, at work');
+    assert.equal(barSaid('design', 'awaiting-approval', null), 'design, waits on you');
+    assert.equal(barSaid('land', 'failed-check', null), 'land, failed its check');
+    assert.equal(barSaid('review', 'waiting', 'run'), 'review, to come');
+    assert.equal(barSaid('theme', 'waiting', 'pause'), `theme, ${PAUSED.rail}`, 'a check the pause holds');
   });
 });

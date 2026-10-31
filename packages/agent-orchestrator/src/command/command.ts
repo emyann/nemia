@@ -12,21 +12,77 @@ import type { CommandClass } from '../admission/index.ts';
 export const CLI = 'nemia';
 
 /**
- * Each command group renamed, by its former first word: `nemia auto …` is `nemia policy …`. A command line that opens with a former word
- * is still run, as the name it became, and admission reads it as that name too, so the old spelling reaches no rule the new one would not.
+ * Each command renamed, by its former name of one word or two: `nemia auto …` is `nemia policy …`, and a verb another absorbed is that verb
+ * with the flag that says it — `nemia round` is `nemia retry --round`, `nemia merge` is `nemia refresh --base`, `nemia accept` is `nemia
+ * approve` (decision 7). Decision 8 gives a list, a read of one thing and a removal one spelling each, the rows of two words below: a
+ * removal is `rm`, a one-off of an agent `agents run` (kubectl's run), a template's judgement `template lint` (so a check stays a step's),
+ * an upgrade's preview `factory diff`, and a folder of cards `start <folder>`. A command line that opens with a former name
+ * is still run, as the name it became, and admission reads it as that name too, so the old spelling reaches no rule the new one would not;
+ * and no entry of the table is named by a former name (`commandBreaks`), which no line would ever reach.
  */
-export const RENAMED: ReadonlyMap<string, string> = new Map([['auto', 'policy']]);
+export const RENAMED: ReadonlyMap<string, { readonly to: string; readonly flag?: string }> = new Map([
+  ['auto', { to: 'policy' }],
+  ['round', { to: 'retry', flag: '--round' }],
+  ['merge', { to: 'refresh', flag: '--base' }],
+  ['accept', { to: 'approve' }],
+  ['plan', { to: 'start' }],
+  ['agents remove', { to: 'agents rm' }],
+  ['agents try', { to: 'agents run' }],
+  ['workflows remove', { to: 'workflows rm' }],
+  ['policy drop', { to: 'policy rm' }],
+  ['template check', { to: 'template lint' }],
+  ['factory plan', { to: 'factory diff' }],
+]);
+
+/** Each flag renamed, by the command that takes it and its former spelling: `nemia retry --nudge` is `nemia retry --continue`. */
+export const RENAMED_FLAGS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([['retry', new Map([['--nudge', '--continue']])]]);
+
+/** `rest`, the words after a command's name, with `flag` before the first flag among them, or after them where none is. */
+const withFlag = (rest: readonly string[], flag: string | undefined): string[] => {
+  if (flag === undefined) return [...rest];
+  const at = rest.findIndex((w) => w.startsWith('-'));
+  return at === -1 ? [...rest, flag] : [...rest.slice(0, at), flag, ...rest.slice(at)];
+};
+
+/** The former name `words` open with, the longest first, and how many words it is; none where they open with no former name. */
+function formerAt(words: readonly string[], used: ReadonlySet<string>): { key: string; size: number } | undefined {
+  for (const size of [2, 1]) {
+    const key = words.slice(0, size).join(' ');
+    if (words.length >= size && !used.has(key) && RENAMED.has(key)) return { key, size };
+  }
+  return undefined;
+}
 
 /**
- * `words`, a command line's words after the program, its first word put to the name it became where it is a former one (`RENAMED`), and
- * the hint naming what to type now; else `words` as given and no hint.
+ * `words`, a command line's words after the program, its name put to the name it became where it opens with a former one (`RENAMED`, the
+ * longest that matches, then again on what it became, each former name once, so `auto drop` is put to `policy …` and then to `policy rm`),
+ * the flag that says an absorbed verb added before its other flags, and each former flag of the command put to its new spelling
+ * (`RENAMED_FLAGS`); with the hint naming what was typed and what to type now, or `words` as given and no hint.
  */
 export function renamedIn(words: readonly string[]): { words: string[]; hint?: string } {
-  const now = words[0] === undefined ? undefined : RENAMED.get(words[0]);
-  if (now === undefined) return { words: [...words] };
+  let named = [...words];
+  let name = 0;
+  let typed = 0;
+  const added: string[] = [];
+  const used = new Set<string>();
+  for (let at = formerAt(named, used); at !== undefined; at = formerAt(named, used)) {
+    const now = RENAMED.get(at.key)!;
+    used.add(at.key);
+    typed += Math.max(0, at.size - name);
+    const to = now.to.split(' ');
+    named = [...to, ...withFlag(named.slice(at.size), now.flag)];
+    name = to.length;
+    if (now.flag !== undefined) added.push(now.flag);
+  }
+  const flags = RENAMED_FLAGS.get(named.slice(0, name || 1).join(' '));
+  const former = flags === undefined ? [] : named.slice(name || 1).filter((w) => flags.has(w));
+  if (!used.size && !former.length) return { words: [...words] };
+  const rewritten = flags === undefined ? named : [...named.slice(0, name || 1), ...named.slice(name || 1).map((w) => flags.get(w) ?? w)];
+  const was = [...(used.size ? [[CLI, ...words.slice(0, typed)].join(' ')] : []), ...former];
+  const is = [...(used.size ? [[CLI, ...named.slice(0, name), ...added].join(' ')] : []), ...former.map((f) => flags!.get(f)!)];
   return {
-    words: [now, ...words.slice(1)],
-    hint: `${CLI} ${words[0]} is now ${CLI} ${now}: type \`${[CLI, now, ...words.slice(1)].join(' ')}\`; ${words[0]} stays accepted until a later release removes it.`,
+    words: rewritten,
+    hint: `${was.join(' and ')} ${was.length > 1 ? 'are' : 'is'} now ${is.join(' and ')}: type \`${[CLI, ...rewritten].join(' ')}\`; the former spelling stays accepted until a later release removes it.`,
   };
 }
 
@@ -408,10 +464,11 @@ function routedTwice(c: Entry, routed: Map<string, string>): string[] {
 
 /**
  * Where a table of commands breaks its rules, a sentence each: a name defined twice; two entries routed on one method and path, of which
- * the api would serve the first alone; an entry served nowhere — neither routed on the api nor said to be served on one side alone
- * (`only`) — so a gap between the CLI and the api is never left unsaid; a name that is both a command the CLI serves and one of the CLI's
- * own verbs (`verbs`), which the CLI would run twice over — an entry served on the api alone shares a verb's name freely; how an entry runs
- * (`runBreaks`); its words for its sides (`sideBreaks`); and a runner of the CLI (`runners`) that runs no entry the CLI serves.
+ * the api would serve the first alone; an entry served nowhere — neither routed on the api nor said to be served on one side alone (`only`)
+ * — so a gap between the CLI and the api is never left unsaid; a name that is a former one (`RENAMED`), which no line reaches; a name that
+ * is both a command the CLI serves and one of the CLI's own verbs (`verbs`), which the CLI would run twice over — an entry served on the
+ * api alone shares a verb's name freely; how an entry runs (`runBreaks`); its words for its sides (`sideBreaks`); and a runner of the CLI
+ * (`runners`) that runs no entry the CLI serves.
  */
 export function commandBreaks(table: readonly Entry[], verbs: readonly string[], runners: readonly string[] = []): string[] {
   const breaks: string[] = [];
@@ -423,6 +480,10 @@ export function commandBreaks(table: readonly Entry[], verbs: readonly string[],
     breaks.push(...routedTwice(c, routed));
     if (!routeList(c).length && !c.only)
       breaks.push(`${c.name} has no route and no only: give it its route on the api, or say which side alone serves it, and why`);
+    if (RENAMED.has(c.name))
+      breaks.push(
+        `${c.name} is a former name in RENAMED, which runs a line that says it as ${RENAMED.get(c.name)!.to}: name the entry anew`,
+      );
     if (c.only?.side !== 'api' && verbs.includes(c.name))
       breaks.push(`${c.name} is a command of the table and a verb of the CLI: take it out of VERBS`);
     breaks.push(...runBreaks(c, runners), ...sideBreaks(c));

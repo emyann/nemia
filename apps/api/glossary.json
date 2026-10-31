@@ -15,6 +15,21 @@
       }
     },
     {
+      "term": "Builtin",
+      "meaning": "what comes with Nemia, as the api says it: a skill read `from: 'builtin'` (the folder `BUILTIN_SKILLS`), the `builtin` servers of a factory's servers read (`BUILTIN_SERVERS`) and the `builtin` rule of an agent's auto list. The former address `/api/skills/shipped/<name>` answers a 308 to `/api/skills/builtin/<name>`.",
+      "type": "SkillSource",
+      "retired": [
+        {
+          "spelling": "shipped",
+          "card": "decision 13b: 'builtin' for what comes with the product"
+        },
+        {
+          "spelling": "ships",
+          "card": "decision 13b: 'builtin' for what comes with the product"
+        }
+      ]
+    },
+    {
       "term": "Command text",
       "meaning": "the `nemia …` line the api hands the board for a person to copy.",
       "retired": [
@@ -67,6 +82,17 @@
         "label": "The api",
         "href": "/map/#the-api"
       }
+    },
+    {
+      "term": "Waiting on you",
+      "meaning": "`waitingOnYou`: the steps of a run that wait on a person, in order; `waitingOnYouWords`, the same steps as `nemia ls` names them (`approve plan` for a step at its gate); and, on a run's `--after` wait and its hold, `waitingOnYou` whether only a person ends it.",
+      "type": "RunDetail",
+      "retired": [
+        {
+          "spelling": "onYou",
+          "card": "4c: the words of what waits on you are `waitingOnYouWords`, and whether a wait is yours `waitingOnYou`"
+        }
+      ]
     }
   ]
 }

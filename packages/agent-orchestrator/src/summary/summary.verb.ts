@@ -17,7 +17,16 @@ import type { BranchReader } from '../branches/branches.store.ts';
 import { standingReader, standingSnapshot } from '../standing/standing.verb.ts';
 import { type RestingMemo, restingRead } from '../rest/resting.verb.ts';
 import { type RunGraph, runGraph } from './graph.ts';
-import { ENGINE_REASON, PHASE_OF, type RunPhase, type RunReason, type StepPhase, type StepReason } from '../feed/index.ts';
+import {
+  codedStep,
+  ENGINE_REASON,
+  type AnswerVia,
+  type RunPhase,
+  type RunReason,
+  type StepPhase,
+  type StepReason,
+  type WaitOn,
+} from '../feed/index.ts';
 import type { CheckVerdict } from '../check/check.ts';
 import {
   filedTimes,
@@ -88,7 +97,7 @@ export type RunSummary = {
    * The runs a person holds this one until (`nemia hold <run> --until <run>`), as its hold file names them: none for a run nobody holds, or
    * one called off.
    */
-  heldUntil: string[];
+  holdUntil: string[];
   /**
    * The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. While it stands nothing of the run is
    * filed and nothing is asked of anyone: no step waits on you, and no verb is offered, as `nemia ls` says it.
@@ -96,22 +105,30 @@ export type RunSummary = {
   holding: RunHolding | null;
   /**
    * The run in one word, as the feed and `nemia tick` say it: `running`, `succeeded`, `cancelled`; `failed` for a run in which a step
-   * broke; `awaiting approval` for one stopped at its gates alone; `blocked` for one a person's word stops otherwise.
+   * broke; `awaiting approval` for one stopped at its gates alone; `waiting` for one a person's word stops otherwise.
    */
   status: RunStatus;
   /** Where the run is in its life (`RunPhase`), from its reason (`runCodes`): the code a screen groups it by, never parsed from `status`.
    */
   phase: RunPhase;
-  /** Why it is in that phase: the feed's code for its status, `Held` for a running run a person holds (`runCodes`). */
+  /**
+   * Why it is in that phase: the feed's code for its status, `Waiting` on `run` for a running run a person holds, and the reason of its
+   * first step that waits on a person for a run a person's word stops (`runCodes`).
+   */
   reason: RunReason;
+  /** What a `Waiting` run waits on (`run`, a person's hold until other runs land); null for any other reason. */
+  on: WaitOn | null;
+  /** Where an `AwaitingAnswer` run's answer is asked, the step's it stopped on; null for any other reason, or where none is known. */
+  via: AnswerVia | null;
   /**
    * Whether anything of the run still moves: a task the engine holds for it — a step's or a check's, filed
    * and not settled — or a step, a check, a try or a round a tick would still file. `status` does not say: `assess` reads a
    * fan-out as failed once one step is final without letting its followers run, while a sibling still works.
    *
    * A run waiting on runs moves: the tick files its roots once they land. Not one waiting on a run that never lands without a
-   * person — no such run, a cancelled one, a result branch gone (`RunWaiting.onYou`): nothing the tick reads will change on its own.
-   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.onYou`), and files nothing until then.
+   * person — no such run, a cancelled one, a result branch gone (`RunWaiting.waitingOnYou`): nothing the tick reads will change on its own.
+   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.waitingOnYou`), and files nothing
+   * until then.
    */
   moving: boolean;
   /**
@@ -139,7 +156,7 @@ export type RunSummary = {
    *
    * `status` is what `nemia ls` prints for the step — see `judge` for the one word it corrects. `note` is what `nemia ls` prints
    * beside it, for a step tried again or about to be, or in a loop past its first round — `try 2, by retries: 1`,
-   * `round 2 of 3`, `round 3 asked (nemia round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
+   * `round 2 of 3`, `round 3 asked (nemia retry --round) — …` — and null where it prints nothing. `roundDue`: whether a looping step's next
    * round is due, which its note words. `agent`: the agent the step is given, a hire's included, as the workflow it is judged by
    * resolves it (`judgedSteps`); null for a step given none. `since`: when the step's task still at work started (`atWork` of the step
    * alone), null while none of its tasks runs.
@@ -151,6 +168,10 @@ export type RunSummary = {
       branch: string | null;
       phase: StepPhase;
       reason: StepReason;
+      /** What a `Waiting` step waits on (`WaitOn`); null for any other reason. */
+      on: WaitOn | null;
+      /** Where an `AwaitingAnswer` step's answer is asked (`AnswerVia`); null for any other reason. */
+      via: AnswerVia | null;
       message: string;
       verdict: CheckVerdict | null;
       /** @deprecated `message` under its old name, kept for one card: read `message`. */
@@ -172,7 +193,7 @@ export type RunSummary = {
    * `waitingOnYou` as `nemia ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and
    * for a step at its gate, what is asked of you, `approve plan`.
    */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /**
    * What a person has to decide about the run's result, when the run is at it and nobody has (`RunToDecide`); null while there is nothing.
    */
@@ -226,7 +247,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     after: run.after ?? [],
     context: run.context ?? [],
     waiting: judged.waiting,
-    heldUntil: judged.holding ? run.hold!.until : [],
+    holdUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
     ...runSaid(judged),
     moving: judged.moving,
@@ -246,7 +267,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     })),
     graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: judged.waitingOnYou,
-    onYou: judged.onYou,
+    waitingOnYouWords: judged.waitingOnYouWords,
     toDecide: judged.toDecide,
     unreadable: null,
   };
@@ -257,9 +278,15 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
  * A step's codes on a run left unjudged, off its word (`unjudgedWord`): `failed` with `Unknown` for the step a task of which does not read
  * (`unreadable`), which nothing judges; any other the engine's word for its task (`ENGINE_REASON`), `pending` for none filed.
  */
-function unjudgedCodes(word: UnjudgedWord): { phase: StepPhase; reason: StepReason } {
-  if (word === UNREADABLE) return { phase: 'failed', reason: 'Unknown' };
-  return { phase: PHASE_OF[ENGINE_REASON[word]], reason: ENGINE_REASON[word] };
+function unjudgedCodes(word: UnjudgedWord): {
+  phase: StepPhase;
+  reason: StepReason;
+  on: WaitOn | null;
+  via: AnswerVia | null;
+} {
+  if (word === UNREADABLE) return { phase: 'failed', reason: 'Unknown', on: null, via: null };
+  const { phase, reason, on, via } = codedStep(ENGINE_REASON[word]);
+  return { phase, reason, on: on ?? null, via: via ?? null };
 }
 
 /**
@@ -288,11 +315,13 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     after: run.after ?? [],
     context: run.context ?? [],
     waiting: null,
-    heldUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
+    holdUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
     holding: null,
     status: 'running',
     phase: 'running',
     reason: 'Running',
+    on: null,
+    via: null,
     moving: true,
     cost: null,
     atWork: null,
@@ -310,7 +339,6 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
       agent: agentOf(name),
       since: null,
       needs: null,
-      blockedByHarness: false,
       waitingFor: null,
       approve: null,
       denied: null,
@@ -318,7 +346,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     })),
     graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: [],
-    onYou: [],
+    waitingOnYouWords: [],
     toDecide: null,
     unreadable: said,
   };

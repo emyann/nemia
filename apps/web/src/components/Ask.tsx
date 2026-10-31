@@ -1,10 +1,10 @@
 /**
  * A person's ask of a step's next try, as the board's rows make it: the CLI `retry`'s ways, the button and box every ask is made with, the
  * ask itself through the api (`useAsk`), and the api's refusal of it, verbatim (`Refusal`); and the asks of a loop's round (`useRound`)
- * and of its acceptance (`useAccept`).
+ * and of its approval as it stands (`useApprove`).
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { acceptLoop, askRound, askTry, type QuestionAnswer, type RetryMode } from '../lib/api';
+import { approveStep, askRound, askTry, type QuestionAnswer, type RetryMode } from '../lib/api';
 import { runsMoved } from '@/lib/runWrites';
 
 /** Each of the CLI `retry`'s ways, as an answer offers it. */
@@ -52,14 +52,14 @@ export function useAsk(runId: string, step: string, onAsked: () => void) {
 }
 
 /**
- * An acceptance of a loop out of rounds through the api (`acceptLoop`), and the run read again once the api has it — its detail, and the
- * list the Factory's card reads, each by its own key (`exact`): a decision is keyed by the state it was read for, and the next state is a
- * key of its own.
+ * An approval of a loop out of rounds as it stands through the api (`approveStep`), which on a loop ends it as the CLI's `approve` does,
+ * and the run read again once the api has it — its detail, and the list the Factory's card reads, each by its own key (`exact`): a
+ * decision is keyed by the state it was read for, and the next state is a key of its own.
  */
-export function useAccept(runId: string, step: string) {
+export function useApprove(runId: string, step: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (how: { message: string }) => acceptLoop(runId, step, how),
+    mutationFn: (how: { message: string }) => approveStep(runId, step, how),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['runs', runId], exact: true });
       void runsMoved(queryClient);

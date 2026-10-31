@@ -4,7 +4,8 @@
   "about": "The store's stream of what happened, and who follows it.",
   "paths": [
     "packages/agent-orchestrator/src/feed",
-    "packages/agent-orchestrator/src/subscription"
+    "packages/agent-orchestrator/src/subscription",
+    "packages/agent-orchestrator/src/former-reason"
   ],
   "terms": [
     {
@@ -74,6 +75,37 @@
       }
     },
     {
+      "term": "Reason",
+      "meaning": "the code a machine selects a line on, computed from typed state, never from a word: an `Awaiting*` family for a wait on a person (`AwaitingAnswer` with `via`), and `Waiting` with `on` for a wait on a thing. A former code is still read, on a line on disk and in a stored selector (`FORMER_REASONS`).",
+      "type": "Reason",
+      "retired": [
+        {
+          "spelling": "NeedsHuman",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "RoundsExhausted",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "WaitingForSlot",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "WaitingForCheckout",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "WaitingForPause",
+          "card": "The former wait codes are read no more"
+        },
+        {
+          "spelling": "CheckDenied",
+          "card": "The former wait codes are read no more"
+        }
+      ]
+    },
+    {
       "term": "Revisions behind",
       "meaning": "a Warning line about a run, `RevisionsBehind`, written while a pinned run's next filing would take other revisions than its pins: its note names each kind and name behind, and it is written once per drift.",
       "type": "Reason"
@@ -101,6 +133,11 @@
       "term": "Subscription name",
       "meaning": "what a subscription's files are named after: a letter or a digit, then letters, digits, `-` and `_`.",
       "type": "SubscriptionName"
+    },
+    {
+      "term": "Waits",
+      "meaning": "`person` on a line that waits on a person: every reason of phase waiting, and `Failed` and `CheckFailed`, from the reason table alone (`PERSON_WAITS`), never from a note.",
+      "type": "PERSON_WAITS"
     }
   ]
 }

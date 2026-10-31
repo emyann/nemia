@@ -381,7 +381,7 @@ test('a run held until another lands: said by every screen with why and who, not
       const filings = [...b.filings];
       const pass = await tick(b, asking.id);
       assert.deepEqual(
-        [pass.blocked, pass.tried, b.filings],
+        [pass.unreachable, pass.tried, b.filings],
         [['review'], [], filings],
         'a try written by hand beside the hold is no try due: nothing is filed, and what the blocked step stops is still read as stopped',
       );
@@ -838,8 +838,8 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
       '  ROUNDS EXHAUSTED, waiting on you: review  — asked for another round on the last one rounds: allows; its findings are below',
       '',
       '  once more, on the next tick:',
-      '    review: it asked for round 2, and `rounds: 1` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia round <id> review',
-      '    review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia accept <id> review --message "<why>"',
+      '    review: it asked for round 2, and `rounds: 1` are spent. Its findings are below. Once more — implement continued, then a new review:  nemia retry <id> review --round',
+      '    review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia approve <id> review --message "<why>"',
       '',
       '  touched  wf/<id>/run',
       '    nothing — the branch changed no file against the base',
@@ -877,7 +877,7 @@ test('the whole screen of a loop out of rounds, and of the round a person asks f
     '<id>  a loop',
     '',
     '  still running: review',
-    '  review: round 2 asked (nemia round) — the next tick files implement',
+    '  review: round 2 asked (nemia retry --round) — the next tick files implement',
     '  nothing to decide yet',
   ]);
 });

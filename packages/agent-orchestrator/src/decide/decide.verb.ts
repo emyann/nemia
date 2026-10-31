@@ -68,11 +68,11 @@ export type Decided = {
   checks: Record<string, CheckReport>;
   /** The tries the next tick files: asked for, or covered by `retries:`. */
   retrying: Retry[];
-  /** The rounds the next tick files: asked for with `again: true`, or with `nemia round`. */
+  /** The rounds the next tick files: asked for with `again: true`, or with `nemia retry --round`. */
   rounding: Round[];
   /**
-   * For each loop out of rounds, the `nemia round` that goes once more (`roundLines`); for each step a person may try again, the `nemia
-   * retry` (`retryLines`).
+   * For each loop out of rounds, the `nemia retry --round` that goes once more (`roundLines`); for each step a person may try again, the
+   * `nemia retry` (`retryLines`).
    */
   offers: string[];
   /**

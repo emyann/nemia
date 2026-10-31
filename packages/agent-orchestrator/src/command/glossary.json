@@ -1,0 +1,26 @@
+{
+  "context": "commands",
+  "title": "Commands",
+  "about": "The command table, `nemia`'s published language: each verb said once, with its usage, its class and its route on the api, and how a person's answer to a waiting step is written.",
+  "paths": [
+    "packages/agent-orchestrator/src/command"
+  ],
+  "terms": [
+    {
+      "term": "Request",
+      "meaning": "a person's answer beside a run, written for the next pass to file: a try or a round (`retry`), a yes at a gate or to a loop (`approve`), the base brought in (`refresh --base`).",
+      "type": "PersonRequest",
+      "retired": [
+        {
+          "spelling": "PersonAsk",
+          "card": "decision 7: two verbs answer a waiting step, approve and retry"
+        }
+      ]
+    },
+    {
+      "term": "Retry how",
+      "meaning": "the way a step goes again: `--continue` its session (the default), `--fresh` on a new one, or `--recheck` its check alone.",
+      "type": "RetryHow"
+    }
+  ]
+}

@@ -3424,8 +3424,8 @@ test('REFUSED: a command of the fence reclassed, an ask rule of the fence taken 
 test('REFUSED to run unasked: an approval, a round, an accept, a raised cap and a retry of what waits ask by her admission, whatever the person allows', () => {
   const answers = [
     'nemia approve r-1 design',
-    'nemia round r-1 --message m',
-    'nemia accept r-1 design',
+    'nemia retry r-1 --round --message m',
+    'nemia approve r-1 review --message m',
     'nemia retry r-1 design',
     'nemia retry r-1 check --budget 5',
     'nemia retry r-9 check',
@@ -3471,9 +3471,9 @@ test('REFUSED: an edit of the store outside her folder, of her level, her instru
 
 test("REFUSED: a confirm or a drop of the person's rules for auto is asked over every allow, and an edit of their files is denied her", () => {
   const root = herStore();
-  for (const local of [[], ['Bash(nemia:*)', 'Bash(nemia policy:*)', 'Bash(nemia policy confirm:*)', 'Bash(nemia policy drop:*)']]) {
+  for (const local of [[], ['Bash(nemia:*)', 'Bash(nemia policy:*)', 'Bash(nemia policy confirm:*)', 'Bash(nemia policy rm:*)']]) {
     const rules = herRules(root, local);
-    for (const command of ['nemia policy confirm nemia tries', 'nemia policy drop nemia default'])
+    for (const command of ['nemia policy confirm nemia tries', 'nemia policy rm nemia default'])
       assert.equal(verdictOf(rules, command), 'ask', `${command}, local allows ${local.join(', ')}`);
     assert.equal(verdictOf(rules, 'nemia policy nemia'), 'allow', 'the read is hers');
     assert.equal(verdictOf(rules, 'nemia policy propose nemia --file -'), 'allow', 'so is her proposal');

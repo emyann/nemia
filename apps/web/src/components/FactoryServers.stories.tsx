@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import type { FactoryServer, ShippedServer } from '@/lib/api';
+import type { FactoryServer, BuiltinServer } from '@/lib/api';
 import { ServerForm, ServerRow, ServerState } from './FactoryServers';
 import { SignInView } from './ServerSignIn';
 
@@ -24,8 +24,8 @@ const server = (name: string, state: string | null, more: Partial<FactoryServer>
 /** The box a section of the settings page gives its list. */
 const BOX: CSSProperties = { width: 720 };
 
-/** What Nemia ships, as the form offers it: a press fills the fields, so a person types no address and no client id. */
-const SHIPPED: readonly ShippedServer[] = [
+/** Nemia's builtin servers, as the form offers them: a press fills the fields, so a person types no address and no client id. */
+const BUILTIN: readonly BuiltinServer[] = [
   {
     name: 'github',
     type: 'http',
@@ -73,11 +73,11 @@ export const Rows: StoryObj = {
   ),
 };
 
-/** The form as a person meets it: the shipped list to press, and the fields a remote server needs. */
+/** The form as a person meets it: the builtin list to press, and the fields a remote server needs. */
 export const Form: StoryObj = {
   render: () => (
     <div style={BOX}>
-      <ServerForm shipped={SHIPPED} pending={false} onRecord={() => {}} />
+      <ServerForm builtin={BUILTIN} pending={false} onRecord={() => {}} />
     </div>
   ),
 };
@@ -86,7 +86,7 @@ export const Form: StoryObj = {
 export const Writing: StoryObj = {
   render: () => (
     <div style={BOX}>
-      <ServerForm shipped={SHIPPED} pending onRecord={() => {}} />
+      <ServerForm builtin={BUILTIN} pending onRecord={() => {}} />
     </div>
   ),
 };

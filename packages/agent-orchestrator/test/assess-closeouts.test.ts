@@ -160,15 +160,15 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
       [],
       'review must not be filed: the session ended cleanly because the agent stopped on purpose, and only the closeout knows the work is not done',
     );
-    assert.deepEqual(a.blocked, ['review']);
+    assert.deepEqual(a.unreachable, ['review']);
   });
   await t.test('a blocked run is AWAITING you, and is not called failed', () => {
     const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'pick one' });
     const d = decision(STEPS, finished(), DONE, nothingShipped, blocked);
     assert.equal(d.kind, 'awaiting');
-    assert.equal(d.kind === 'awaiting' && d.outcome, 'blocked');
+    assert.equal(d.kind === 'awaiting' && d.outcome, 'waiting');
     assert.deepEqual(d.kind === 'awaiting' && d.failed, [], 'nothing broke');
-    assert.deepEqual(d.kind === 'awaiting' && d.stuck, ['implement', 'review']);
+    assert.deepEqual(d.kind === 'awaiting' && d.awaitingAnswer, ['implement', 'review']);
   });
   await t.test('UNSIGNED: a producer whose closeout lacks a declared field satisfies nothing, and what waits on it is not filed', () => {
     const steps = [step('implement'), REVIEW, READS];
@@ -187,7 +187,7 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
         `${why}: held to it by its own file, whatever the engine recorded of the filing`,
       );
       const a = assess(steps, r, p, signed(said), asked);
-      assert.deepEqual([a.ready, a.blocked, a.status], [[], ['respond'], 'blocked'], why);
+      assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['respond'], 'waiting'], why);
       const d = decision(steps, r, p, nothingShipped, signed(said), asked);
       assert.deepEqual(d.kind === 'awaiting' && d.unsigned, ['review'], why);
     }
@@ -242,7 +242,7 @@ test('listing of how a step signed off', async (t) => {
       live.steps,
       [
         { name: 'implement', status: 'working', reason: 'Running', phase: 'running', branch: null },
-        { name: 'review', status: 'waiting', reason: 'Waiting', phase: 'pending', branch: null },
+        { name: 'review', status: 'pending', reason: 'Pending', phase: 'pending', branch: null },
       ],
       'still running, and never filed',
     );

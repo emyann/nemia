@@ -14,7 +14,8 @@
  *
  * A person's words for a step's state are written once, in `src/lib/words.ts`'s `PERSON`: no other file spells a word of it
  * (`personWordBreaks`), no file says a retired phrasing or `cancelled` to a person (`retiredBreaks`), and no hover says a runtime word
- * (`hoverRuntimeBreaks`).
+ * (`hoverRuntimeBreaks`). A person's words for an offer are written once, in its `OFFERS`: no other file spells a sentence of it
+ * (`offerWordBreaks`).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -22,7 +23,7 @@ import fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import path from 'node:path';
 import ts from 'typescript';
-import { PAUSED, PERSON } from '../src/lib/words.ts';
+import { OFFERS, PAUSED, PERSON } from '../src/lib/words.ts';
 
 const WEB = path.join(import.meta.dirname, '..');
 
@@ -521,6 +522,51 @@ test(`a state's words for a person are written in ${WORDS} alone, as a total Rec
   assert.deepEqual(personWordBreaks(texts, RAILS), []);
   assert.deepEqual(retiredBreaks(texts), []);
   assert.deepEqual(hoverRuntimeBreaks(texts), []);
+});
+
+/** Stands for what an offer's words are given (a step's name, the calls denied), so a sentence is read around it. */
+const GIVEN = '\u0000';
+
+/**
+ * The sentences of `OFFERS`, each of four words or more: every string in it, and every function's fixed parts around what it is given.
+ * A short word (`Try again`, `Continue`) is a button's, which other parts of the board say too.
+ */
+const offerSentences = (words: unknown): string[] => {
+  const pieces =
+    typeof words === 'string'
+      ? [words]
+      : typeof words === 'function'
+        ? String((words as (given: string) => unknown)(GIVEN)).split(GIVEN)
+        : words && typeof words === 'object'
+          ? Object.values(words).flatMap(offerSentences)
+          : [];
+  return [...new Set(pieces.map((piece) => piece.trim()).filter((piece) => piece.split(/\s+/).length >= 4))];
+};
+
+/** Each text outside `WORDS` that says a sentence of `OFFERS`: an offer's words are written there alone, and read from there. */
+const offerWordBreaks = (texts: ReadonlyMap<string, string>, sentences: readonly string[]): string[] =>
+  boardTexts(texts)
+    .filter(([file]) => file !== WORDS)
+    .flatMap(([file, text]) =>
+      saidIn(file, text).flatMap((said) =>
+        sentences
+          .filter((sentence) => said.text.includes(sentence))
+          .map((sentence) => `${file} spells '${sentence}', an offer's words for a person: read it from OFFERS in ${WORDS}`),
+      ),
+    );
+
+const SENTENCES = offerSentences(OFFERS);
+
+test(`an offer's words for a person are written in ${WORDS} alone`, () => {
+  assert.ok(SENTENCES.length >= 10, `the scan has the offers' sentences to look for: ${SENTENCES.length}`);
+  assert.deepEqual(offerWordBreaks(sourceTexts(), SENTENCES), []);
+});
+
+test("REFUSED: an offer's sentence spelled outside the table", () => {
+  const planted = new Map([
+    ['src/components/X.tsx', "case 'answer':\n  return 'signed off blocked, and said nothing of what it needs';\n"],
+  ]);
+  assert.equal(offerWordBreaks(planted, SENTENCES).length, 1);
 });
 
 test('REFUSED: a state word spelled outside the table, a retired phrasing, and a runtime word on hover', () => {

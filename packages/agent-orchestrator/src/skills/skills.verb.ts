@@ -1,8 +1,8 @@
 /**
  * The skill library as entries of the command table: the skill folders the board lists, each read (`SKILLS_LIST`, `skillRead`), and one
- * skill read for its page (`SKILLS_READ`), on the api alone; and a skill of yours written from its SKILL.md or form, or copied from what
- * Nemia ships (`SKILLS_WRITE`, `writeSkill`, `copySkill`), served on both sides. The api resolves which folders a read names, guards each
- * write, and words the board's answer around what each entry answers.
+ * skill read for its page (`SKILLS_READ`), on the api alone; and a skill of yours written from its SKILL.md or form, or copied from Nemia's
+ * builtin skills (`SKILLS_WRITE`, `writeSkill`, `copySkill`), served on both sides. The api resolves which folders a read names, guards
+ * each write, and words the board's answer around what each entry answers.
  */
 import { tried } from '../runtime-client.ts';
 import path from 'node:path';
@@ -41,7 +41,7 @@ const apiSpec = (positionals: readonly Positional[], keys: readonly string[]): S
 
 /** Each skill folder `skills` names read now (`skillRead`, the skill named by its folder), by folder. */
 export const SKILLS_LIST: Command<Record<string, SkillRead>> = {
-  name: 'skills list',
+  name: 'skills',
   usage: '[<skills> ...]',
   help: ['the skill folders named, each read'],
   spec: apiSpec([{ key: 'skills', takes: 'many', kind: 'name' }], []),
@@ -62,7 +62,7 @@ export type SkillPage = SkillRead & { text: string; version: string | null };
 
 /** The skill `name` whose folder is `dir`, as the api resolved it in the place `from`, read for its page (`SkillPage`). */
 export const SKILLS_READ: Command<SkillPage> = {
-  name: 'skills read',
+  name: 'skills show',
   usage: '<from> <name>',
   help: ['one skill, read for its page'],
   spec: apiSpec(
@@ -97,7 +97,7 @@ const writtenLines = (data: SkillWritten | SkillCopied): string[] => [
 ];
 
 /**
- * A skill of yours written into your library (`yourSkillsDir`): copied whole from the folder of skills Nemia ships (`shipped`) under the
+ * A skill of yours written into your library (`yourSkillsDir`): copied whole from the folder of builtin skills (`builtin`) under the
  * name `copy` (`copySkill`), or else written from its change (`change`, as JSON text, which the command line reads off `--file`) at the
  * `version` it was read at, none for a skill made (`writeSkill`). Written to the tree of the factory `--factory` names for the place
  * `factory`. Refused, as `Invalid`, for a place but those two (`yoursOrRefused`).
@@ -124,8 +124,8 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
       versionFlag('skills write', 'the skill'),
       factoryFlag('skills write'),
       apiKey('change', 'the command line reads the skill off --file, into the form the board sends'),
-      apiKey('copy', 'the board copies a skill Nemia ships; the command line writes one a person wrote'),
-      apiKey('shipped', 'the board names the folder of skills Nemia ships, where a copy is read from'),
+      apiKey('copy', 'the board copies a builtin skill; the command line writes one a person wrote'),
+      apiKey('builtin', 'the board names the folder of builtin skills, where a copy is read from'),
     ],
   ),
   writes: true,
@@ -146,7 +146,7 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
         { factory: writerText(args, 'factory'), treeOf: (factory) => templatedTree(factory, 'nemia skills write') },
       );
       const copy = writerText(args, 'copy');
-      if (copy !== undefined) return copySkill(writerText(args, 'shipped') ?? '', library, copy);
+      if (copy !== undefined) return copySkill(writerText(args, 'builtin') ?? '', library, copy);
       const change = JSON.parse(writerText(args, 'change') ?? 'null') as SkillChange;
       return writeSkill(library, change, { version: writerText(args, 'version') ?? null });
     }),

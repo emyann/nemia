@@ -5,7 +5,8 @@
  * the runtime's: a person hovering over a chip reads what the state means to them, never how it is kept.
  */
 import type { RunOutcome } from './api/runs.ts';
-import type { CheckVerdict, StepReason } from './api/reasons.ts';
+import type { CheckVerdict, WaitOn } from './api/reasons.ts';
+import type { OfferCase } from './asks.ts';
 import type { StepState } from './status.ts';
 
 /** A wait on a person, as its words read it: the step that waits, none for a wait of the run's own, and how many steps are done. */
@@ -152,9 +153,9 @@ export const PAUSED: Pick<PersonWords, 'rail' | 'meaning'> = {
   meaning: 'It signed off, and its check runs once the factories are resumed.',
 };
 
-/** The rail word and meaning of a step by its state, and by its reason where a state has a wait of its own (the pause's). */
-export const stateWordsOf = (state: StepState, reason: StepReason): Pick<PersonWords, 'rail' | 'meaning'> =>
-  state === 'waiting' && reason === 'WaitingForPause' ? PAUSED : PERSON[state];
+/** The rail word and meaning of a step by its state, and by what it waits on where a state has a wait of its own (the pause's). */
+export const stateWordsOf = (state: StepState, on: WaitOn | null): Pick<PersonWords, 'rail' | 'meaning'> =>
+  state === 'waiting' && on === 'pause' ? PAUSED : PERSON[state];
 
 /**
  * A check's verdict as a person reads it, from its codes: `passed`, `exit 1` for the code it failed with (`failed` where it gave none),
@@ -189,3 +190,82 @@ export const ENDED: Record<RunOutcome, { word: string; title: string }> = {
   failed: { word: 'failed', title: 'It stopped on a step that failed.' },
   undecided: { word: 'undecided', title: 'Nobody has decided its result.' },
 };
+
+/** A sentence a try is given in its box, the same for each case that asks for one: something to tell it, if anything. */
+const TELL_IT = 'Anything to tell it (optional): the next try is told it.';
+
+/** What a try's box is called, for a case that may tell it something. */
+const toTell = (step: string): string => `What to tell ${step}, if anything`;
+
+/**
+ * A person's words for each offer of a run's page, by why its step waits (`OfferCase`): what its row says after the step's name — null
+ * where it says the step's own words instead (its question, the api's word for a raise) — and the names of its form and its box, the box's
+ * hint and the button. A case's words that only its row reads sit beside them: a try's words for why it ended unsigned, unfinished or
+ * refused, the recheck's, the note beside answers chosen, a raise's buttons, and what a row says once its command is taken.
+ */
+export const OFFERS = {
+  answer: {
+    said: 'signed off blocked, and said nothing of what it needs',
+    form: (step: string) => `Answer ${step}`,
+    field: (step: string) => `Your answer to ${step}`,
+    placeholder: 'Your answer: the next try is told it, under “Your answer”.',
+    note: 'A note beside the answers (optional): the next try is told it.',
+    button: 'Answer and continue',
+  },
+  'try-again': {
+    said: {
+      unsigned:
+        "gave no closeout the run accepts — none, one short of a field it declares, or one naming a file the run does not have; the CLI's decide says which",
+      unfinished: 'has a check that did not finish: no verdict on the work',
+      refused: 'was refused by its check',
+    },
+    form: (step: string) => `Try ${step} again`,
+    field: toTell,
+    placeholder: TELL_IT,
+    button: 'Try again',
+    recheck: {
+      placeholder: 'A recheck runs the check again and files no session: there is nobody to tell.',
+      note: 'Not sent with a recheck: it files no session to read it. Choose a session to send it.',
+    },
+  },
+  denied: {
+    said: (calls: string | null) =>
+      `signed off having been denied a call${calls ? ` (${calls})` : ''}, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it`,
+    form: (step: string) => `Try ${step} again`,
+    field: toTell,
+    placeholder: TELL_IT,
+    button: 'Try again',
+  },
+  raise: {
+    said: null,
+    form: (step: string) => `Raise ${step}'s budget`,
+    field: toTell,
+    placeholder: TELL_IT,
+    button: 'Raise the budget and try again',
+    buttons: { round: 'Raise the budget and go round again', recheck: 'Run its check again', answer: 'Raise the budget and answer' },
+  },
+  continue: {
+    said: 'asks it: the next tick stops its session, and files the try once it has stopped',
+    form: (step: string) => `Continue ${step}`,
+    field: toTell,
+    placeholder: TELL_IT,
+    button: 'Continue',
+  },
+  enough: {
+    said: 'is out of rounds, and waits on you: approve its work as it stands, its findings open, or copy the command that goes round once more',
+    form: (step: string) => `Approve ${step} as it stands`,
+    field: (step: string) => `Why ${step}'s work is good enough as it stands`,
+    placeholder: 'Why the work is good enough with its findings open (required): every step after the loop is handed it.',
+    button: 'Approve as it stands',
+    approved: (step: string) => `of ${step} approved as it stands — what waits on it is filed on the next tick`,
+  },
+} as const satisfies Record<OfferCase, OfferWords & Readonly<Record<string, unknown>>>;
+
+/** What every offer's words hold (`OFFERS`). */
+export interface OfferWords {
+  readonly said: string | null | Readonly<Record<string, string>> | ((calls: string | null) => string);
+  readonly form: (step: string) => string;
+  readonly field: (step: string) => string;
+  readonly placeholder: string;
+  readonly button: string;
+}

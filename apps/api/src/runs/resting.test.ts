@@ -34,7 +34,7 @@ import {
   verifiesRest,
 } from 'agent-orchestrator';
 import { runTasks } from 'agent-orchestrator/run';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 import { names } from '../../test/named.ts';
 
 /** The engine the app's requests read through: its reads are what a poll costs. */
@@ -266,7 +266,7 @@ test('a polled list keeps a run at rest and judges it afresh the moment anything
     await list();
     assert.ok(resting.runs.has('r-ask'));
     const before = await listed('r-ask');
-    assert.equal(before?.status, 'blocked');
+    assert.equal(before?.status, 'waiting');
     write(path.join(root, 'runs', 'r-ask.asks', 'retry-implement-2'), JSON.stringify({ mode: 'fresh', at }));
     const after = await unverified(() => listed('r-ask'));
     assert.notDeepEqual(after, before, 'the ask moved the answer');
@@ -279,7 +279,7 @@ test('a polled list keeps a run at rest and judges it afresh the moment anything
     assert.ok(resting.runs.has('r-fed'));
     blocked('r-fed-implement');
     fed('r-fed-implement');
-    assert.equal((await unverified(() => listed('r-fed')))?.status, 'blocked');
+    assert.equal((await unverified(() => listed('r-fed')))?.status, 'waiting');
   });
   await s.test("a branch tip that moves is judged afresh once a pass reads it: the base branch taking the run's work", async () => {
     aFinishedRun('r-merged');
@@ -381,7 +381,7 @@ test('two requests at once: the first reads the feed and judges the run succeede
     !resting.runs.has('r-raced'),
     'kept nothing: the first request read the feed before the line; the second read on past it while the run was not kept, so took nothing out; and no request will read the line again',
   );
-  assert.equal((await unverified(() => listed('r-raced')))?.status, 'blocked');
+  assert.equal((await unverified(() => listed('r-raced')))?.status, 'waiting');
 
   const alone = await runWith(e, restingRead(e, resting, false, await snapshotGit()));
   alone.keep(findRun('r-raced')!, judged, [], () => new Map());

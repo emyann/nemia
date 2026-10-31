@@ -9,7 +9,7 @@ wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf start ./next.md --repo ~/code/myapp --after r-xyz   # file nothing of it until r-xyz has landed
 wf start ./ui.md --repo ~/code/myapp --input ./mock.png   # copied into the run's inputs/, named on every step's brief
 wf start ./flag.md --repo ~/code/myapp --workflows dev-planned --gate plan   # nothing after plan is filed until you approve it
-wf plan ./plans/flag --repo ~/code/myapp               # a folder of cards: a run each, parents first, with their edges
+wf start ./plans/flag --repo ~/code/myapp              # a folder of cards: a run each, parents first, with their edges
 wf start ./plans/flag/d.md --repo ~/code/myapp --after r-b --after r-c   # one card by hand: its body is the brief
 wf inbox add "Cache the views between passes" --repo ~/code/myapp   # park an idea as a card, to start later
 wf inbox                                               # the cards parked, name and first line each
@@ -26,16 +26,16 @@ wf decide r-xyz      # what it produced, and the choice it leaves you
 wf retry r-xyz implement --recheck   # its check was killed before it finished: run it again
 wf retry r-xyz plan --message "the second reading"   # it signed off blocked with a question: answer it
 wf approve r-xyz plan --message "ship the second reading"   # it waits at its gate: let what follows be filed
-wf round r-xyz       # the review still asks for more after the last round it allows: once more
-wf accept r-xyz --message "the findings are follow-up work"   # or: enough, go on with what is there
+nemia retry r-xyz --round   # the review still asks for more after the last round it allows: once more
+nemia approve r-xyz --message "the findings are follow-up work"   # or: enough, go on with what is there
 wf say r-xyz implement "Widen the scope to apps/api too."   # tell a running step something, on its record
 wf stats --by agent  # what the runs add up to: the last 14 days against the 14 before, a row per day and per step
 ```
 
-**Nemia ships no workflows, agents or skills.** A repository writes its own, one folder each under `<repo>/workflows/`, and a
+**Nemia has no builtin workflows, agents or skills.** A repository writes its own, one folder each under `<repo>/workflows/`, and a
 person theirs under `~/.agent-workflows/workflows/`; the board's builder and its Agents page write both. The names above —
 `dev`, `dev-planned` — are a repository's own folders, not ones this package brings. The tests run the machinery on a small team
-of their own, `test/fixtures/team/`, which is never shipped.
+of their own, `test/fixtures/team/`, which is never built in.
 
 ## Following it: `nemia watch` and `ae watch`
 
@@ -82,7 +82,7 @@ run's status (`assess`'s, as `wf tick` prints it, `(pruned)` beside it for a pru
 waits on you as its note) and for each step's word and note as `wf ls` prints them. A run stopped on
 a person's word and not on anything that broke says what `wf decide` says of it rather than `failed`:
 `awaiting approval` when every step that stops it waits at its gate — a plan's, or the ending's
-before it runs — and `blocked` otherwise (a step signed off blocked or unsigned, a loop out of
+before it runs — and `waiting` otherwise (a step signed off blocked or unsigned, a loop out of
 rounds, a cap reached). `failed` is kept for a run in which a step's task failed or was stopped, or
 its check refused it or did not finish. A step that signed off blocked has what it needs — its
 closeout's `needs`, made one line and clipped at 200 characters — as the first part of its note,
@@ -236,7 +236,7 @@ wf stats --json                            # what GET /api/stats answers
   failed or blocked, a loop that asked for another round nobody accepted — has not finished, nor has a
   cancelled one.
 - **Rounds count only a loop that ended accepted**: its reviewer signed `again: false`, or a person
-  ran `wf accept`. A first-try landing is the `workspace: main` step landing on its first try.
+  approved it out of rounds (`nemia approve --message`). A first-try landing is the `workspace: main` step landing on its first try.
 - **A check is passed, refused or unfinished**: refused only when it ran to its end and exited
   non-zero, as `wf decide` reads it. A gate wait runs from the try's end to its approval; for a try
   that answered an earlier try's session, from the end of that answer's turn (`gateWaitOf`).
@@ -332,8 +332,8 @@ Definition of done — a closed list, so there is a finish line:
 - [x] **declared outputs** — a step's `output:` schema adds fields to its closeout, and a step that
       names it in `input:` is handed those fields as data. The review travels this way, not as a file.
 - [x] **rounds** — `loop:` on a step runs an earlier step again while the step's closeout says
-      `again: true`, at most `rounds:` times, then a person, whose `wf round` is the once more and
-      whose `wf accept` is enough.
+      `again: true`, at most `rounds:` times, then a person, whose `nemia retry --round` is the once more and
+      whose `nemia approve` is enough.
       `after` stays a DAG: a round is one more try of the steps the run already has, counted.
 - [x] **the splitter** — `wf-examples/split` proposes parts that touch disjoint files, and is
       allowed to answer "these cannot be split, run them in sequence".
@@ -1003,8 +1003,8 @@ loop asks for a round that would file it again.
 - **`retries:` files no try of it, and no round of its loop goes, on the run's word.** Spending past the cap on its own word is what a
   cap forbids. A looping step whose round would file a step over its budget reads `over budget` too, naming that step (`over budget —
   implement $4.20 of $3`), so what waits on the loop is not filed.
-- **A person raises the cap:** `wf retry <run> <step> --budget <amount>` for a try, `wf round <run> [<step>] --budget <amount>` for a
-  round. Each is refused by name without `--budget`, or with one not above what the step has cost. A try takes `--budget` on any step
+- **A person raises the cap:** `wf retry <run> <step> --budget <amount>` for a try, `nemia retry <run> [<step>] --round --budget <amount>`
+  for a round. Each is refused by name without `--budget`, or with one not above what the step has cost. A try takes `--budget` on any step
   with a `budget:` that waits on a person — blocked, failed or stopped as much as over its budget — above its cap in force and what it
   has cost: a raise only ever raises. `--budget` on a step with no `budget:` is refused, which has no cap to raise; so is one on a step
   the run tries again itself, and on `--recheck`, which files no session: a recheck costs nothing and needs none. The raise
@@ -1040,7 +1040,7 @@ it is between two engineers. A later step is told:
 - what a step it waits on declared in its closeout — **only if it asks**, with `input:` (below)
 - in a round of a loop, what the loop hands on: the reviewer's findings to the step it loops back to,
   and that step's replies to the next reviewer (*Going round again*)
-- on the first steps of a run that waited on runs (`--after`, or a card of `wf plan`): what those runs
+- on the first steps of a run that waited on runs (`--after`, or a card of `wf start <folder>`): what those runs
   concluded, under `## From run <id>` (below)
 - after a gate a person approved: the approval and the words given with it, under `## Approved`
   ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve))
@@ -1501,7 +1501,7 @@ gated ship runs the line whole on the merged tree.
 | `wf ls` | means | what waits on it |
 |---|---|---|
 | `waiting` | not filed yet | — |
-| `waiting on r-xyz` | not filed: the run was started `--after` a run that has not landed, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
+| `waiting on r-xyz` | not filed: the run was started `--after` a run that has not landed, by hand or as a card of `wf start <folder>` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
 | the engine's phase: `working`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
 | `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`closedOut: false`; a journal from before stage 4a says `failed`, `unsigned`, which the engine reads back as `former: 'unsigned'`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares, or its closeout named a file the run does not have | **never runs** — the run nudges it once a round first, below |
@@ -1511,7 +1511,7 @@ gated ship runs the line whole on the merged tree.
 | `unverified · done` | signed off, and declared no `check:` | is filed, on the step's word |
 | `awaiting approval` | signed off at its gate — verified first, where it has a check — and the try it is on is not approved ([below](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)); or a gated ending step (`workspace: main`) whose work is done, held before it is filed ([below](#the-end-of-a-run-is-a-step-workspace-main-and-the-endings-gate)) — never an ungated one, which its workflow files | **never runs** — until a person approves it: `wf approve`; or sends the work back: `wf retry --message` |
 | `rounds exhausted` | its `loop:` asked for another round on the last one `rounds:` allows | **never runs** — unless a person says once more, or accepts the work as it stands, below |
-| `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `wf round --budget` |
+| `over budget $4.20 of $3` | its tries have together cost its `budget:` or more, and another session of it is the way on — or, on a looping step, a step of its loop is `over budget` ([above](#what-a-step-may-spend-budget)) | **never runs** — unless a person raises the cap: `wf retry --budget`, `nemia retry --round --budget` |
 | `budget exhausted $3.02 of $3` | its harness ended its session at its `budget:` (a job: `claude`) | **never runs** — unless a person raises the cap: `wf retry --budget` |
 | `failed ✗ check (exit 1)` | its check did not exit 0 — `unfinished` if it was stopped first | **never runs** — unless it is tried again, below |
 | `failed`, `stopped` | the engine's verdict on the step's own task | **never runs** |
@@ -1559,7 +1559,7 @@ retries: 1
   stdout and of stderr, and the sentence that it must not weaken the check. At most `n` times. Past that the
   step waits on you, as before. `retries:` spends nothing on a try that failed, was lost or could not start: the
   runtime makes one attempt per start and tries nothing again on its own, so such a try settles `failed` and waits on
-  `wf retry`. A `--nudge` of one whose harness never named its session — it could not start, or was lost — continues the
+  `wf retry`. A `--continue` of one whose harness never named its session — it could not start, or was lost — continues the
   session it was started to continue (`continuesFrom`). A held-open step's answered turn is no different: one that fails,
   is lost or cannot start settles its task `failed`, and the next try is a `-tryN` task of its own, never another answer.
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
@@ -1599,17 +1599,18 @@ retries: 1
   `failed` without an exit code (stopped at its deadline, or lost), said nothing about the work. `retries`
   spends no try on it. `wf ls` already says `failed ✗ check (unfinished)`, and `wf decide` says its check did
   not finish and offers `wf retry <run> <step> --recheck`.
-- **`wf retry <run> <step> [--nudge | --fresh | --model <m> | --recheck] [--message "<answer>"]`** is a person's word for one more
-  try. `--nudge`, the default, continues the step's last session and tells it what happened. `--fresh` starts
+- **`wf retry <run> <step> [--continue | --fresh | --model <m> | --recheck | --round] [--message "<answer>"]`** is a person's word for one more
+  try. `--continue`, the default, continues the step's last session and tells it what happened. `--fresh` starts
   a new session on the same branch, with the whole brief. `--model <m>` does that on `m`. `--recheck` runs the
-  check again on the work as it stands, and files no session. A step may be tried again when it waits on you
+  check again on the work as it stands, and files no session. `--round` asks for a loop's next round instead
+  ([*Going round again*](#going-round-again-loop-and-rounds)). A step may be tried again when it waits on you
   (its check did not pass, it ended unsigned, or it signed off blocked and its session has settled), or when
   its own session failed or was stopped. `--recheck` only applies where a check did not pass. Each refusal
   says what to do instead: a step still running or checking, a verified step, a cancelled run, a try already
   asked for, a step the run is about to try again itself.
 - **A session its harness blocked is tried again the same way.** A session can stop on the harness's own
   trouble, such as "Could not refresh your login because another Claude Code process is refreshing it". The
-  engine then says `needs-human`, and the step has no closeout. `wf retry` takes such a step with `--nudge` or
+  engine then says `needs-human`, and the step has no closeout. `wf retry` takes such a step with `--continue` or
   `--fresh`, and refuses `--recheck`. The ask is written as any other. The next tick asks the engine to stop the
   session and files nothing, and a later pass, once the session has stopped, files the try as it files one for a
   stopped step: a nudge continues the session. A step whose session is still working is refused as before. A
@@ -1635,11 +1636,11 @@ retries: 1
   the next, and a pass that dies before consuming the ask leaves the try on the record, where the ask is
   spent and files nothing. A file at an ask's name that does not read as one (`{}`, a hand edit) is honoured by
   no pass, and `wf ls` shows nothing asked. So `wf retry` refuses to write over it, and the refusal names the
-  file and says to delete it. `wf round` does the same.
+  file and says to delete it. `nemia retry --round` does the same.
 - **A step that asks gets an answer: `--message "<answer>"`.** A session nobody sits beside has no
   AskUserQuestion and no plan mode (plan §4 Q), so a step that needs a person asks the run's way: it signs off
   `blocked`, with the question in `needs`, which ends its session and puts the question on the record. The
-  answer rides on the ask — `message`, in the person's own file — beside `--nudge`, `--fresh` or `--model <m>`,
+  answer rides on the ask — `message`, in the person's own file — beside `--continue`, `--fresh` or `--model <m>`,
   and the next tick carries it into the try's brief inside `## Try <n>`, as `## Your answer`: the text as it was
   written, in a fence longer than any run of backticks in it, so a pasted snippet cannot close the section or
   swallow the contract after it — after on whose word the try is and before what the check said. A step that did not sign off blocked
@@ -1650,11 +1651,11 @@ retries: 1
   and one from before messages reads as it did. The record keeps no message: what `wf ls` and `wf decide` say
   of an answered try is read off the ask file, waiting or in `done/`.
 - **A step at its gate is sent back with `--message`.** A gated step that signed off, and waits for a person's approval — or
-  was approved and nothing after it is filed yet — takes `--nudge` or `--fresh` with the objection, and is refused without
+  was approved and nothing after it is filed yet — takes `--continue` or `--fresh` with the objection, and is refused without
   words or with `--recheck` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)).
 - **An answer to a Claude Code job is its task's next turn.** A `claude` step is filed held open: when it
   signs, the engine's task waits for a word with nothing running, and `wf ls` prints the engine's `input-required` beside the run's
-  word (`input-required · BLOCKED`). A `--nudge` that answers a blocked sign-off, or sends back a step at its gate, is the tick's
+  word (`input-required · BLOCKED`). A `--continue` that answers a blocked sign-off, or sends back a step at its gate, is the tick's
   `answer` to that task — the same task id, in the session that signed, with what is left of the step's cap — and the record gains
   the try as any other. Any other try (`--fresh`, `--model`, `--recheck`, `retries:`, the run's sign-off nudge) closes the waiting
   task and files `-try<n>`. The run closes a task nobody is to answer on the pass that reads it waiting — an ungated step that signed,
@@ -1672,8 +1673,8 @@ retries: 1
   A try is a new runtime task, as a Kubernetes Job makes a new Pod; an attempt is the runtime's restart inside one task. A record
   written before the key was `cause` says it `then`, and reads as `cause`.
 - **`wf ls`** puts the try beside the step's line, without changing the step's word: `try 2 due — retries: 1,
-  0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--nudge, with your answer)`,
-  `try 2 asked (--nudge) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
+  0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--continue, with your answer)`,
+  `try 2 asked (--continue) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
   `stopping its session` beside a session that works again since it was asked), and
   once filed `try 2, by retries: 1` or `try 2, nudged on your word, answered`. A step with a try due is not
   waiting on you. **`wf decide`** names the try each closeout and check belong to — for a try you answered,
@@ -1704,7 +1705,7 @@ its own, and everything below reads the words back off the engine's view of the 
 - **A try that continues the session is handed them again.** Taken is not read: words said in the moment before a job's
   result are journalled and never reach it (agent-runtime's issue 29), and a `--bg` session blocked on a prompt kept them
   queued and lost them when it was continued (issue 16, closed with that road). So a
-  try or a round that continues the session — `wf retry --nudge`, `retries:`, a round, the board's Continue — carries
+  try or a round that continues the session — `wf retry --continue`, `retries:`, a round, the board's Continue — carries
   what was said to the last try's task as `## Said to your session`, inside `## Try <n>` or `## Round <n>`: each
   message with its time, fenced, before `## Your answer`. A new session (`--fresh`, or a nudge with nothing to
   continue) is handed none, as it is handed none of the last one's conversation: say it again with `--message`.
@@ -1755,11 +1756,11 @@ rounds: 3
   handed the round's contract and findings again, off the looping step's try that asked for the round.
 - **At the cap, a person — and they have two answers.** `again: true` on the last round files nothing:
   the step reads `rounds exhausted`, nothing that waits on it runs, and `wf decide` says `ROUNDS
-  EXHAUSTED`, prints the last findings and offers both. **Once more** is `wf round <run>`. Like
-  `wf retry`, it writes an ask, `runs/<id>.asks/round-<step>-<n>`, which the next tick honours once. It
+  EXHAUSTED`, prints the last findings and offers both. **Once more** is `nemia retry <run> --round`. Like
+  any try, it writes an ask, `runs/<id>.asks/round-<step>-<n>`, which the next tick honours once. It
   is refused while a round is running, while the run would go round itself, on a loop that ended with
-  `again: false`, on a step of the loop that stopped (that is `wf retry`'s), and on a cancelled run.
-- **Enough: `wf accept <run> [<step>] --message "<why>"`.** A reviewer that finds anything says `again:
+  `again: false`, on a step of the loop that stopped (that is a try's, without `--round`), and on a cancelled run.
+- **Enough: `nemia approve <run> [<step>] --message "<why>"`**, the approval of a loop out of rounds. A reviewer that finds anything says `again:
   true`, and a large change always has something left to find; a person who has read the findings and
   judged them follow-up work says so, and the steps that wait on the looping step are filed as if it had
   said `again: false` — so a gated ending goes to its gate, `awaiting approval`, and is approved or not
@@ -1776,7 +1777,7 @@ rounds: 3
   that is not one is honoured by no pass, which says so in its notes and leaves the file alone. The board
   accepts through the same function: its `accept` row takes the reason and posts it to the api's
   `POST /api/runs/:id/steps/:step/accept`, which calls `accept()` and shows its refusals in these words.
-- **Taking it back is only a file to delete until a tick has acted on it.** `wf round` on an accepted loop
+- **Taking it back is only a file to delete until a tick has acted on it.** `nemia retry --round` on an accepted loop
   refuses, and what it says depends on that: while nothing waiting on the loop has been filed, nothing has
   been done on the person's word, and the refusal names `accept-<step>-<try>` to delete before asking again.
   Once a tick has filed what waited, deleting that file does not take the step it filed back — it only makes
@@ -1794,7 +1795,7 @@ rounds: 3
   says `round 2 of 3` beside each step of the loop, and `round 2 of 3 due` while the next tick has it
   to file.
 - **A loop past a budget.** A round that would file a step of the loop over its `budget:` is not filed on the looping
-  step's word: both read `over budget`, and `wf round <run> --budget <amount>` raises the cap of each such step for the round —
+  step's word: both read `over budget`, and `nemia retry <run> --round --budget <amount>` raises the cap of each such step for the round —
   refused without it, or with one not above what they have cost. A loop `rounds exhausted` with a step past its budget asks for
   `--budget` with its once more too.
 - **A loop is a chain.** At load the run refuses a `loop:` that names no step this one waits on, a
@@ -1848,7 +1849,7 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
 - **`wf decide` names them under the run's line**: `inputs  mock.png, api.md  —  in <dir>`.
 - **Refused before anything is written**, by name and with the fix: a file that is not there, a directory, anything else
   that is not a regular file, two inputs of one name, one file given twice, and `--input` with no file.
-- **`wf plan` refuses `--input`.** A card has no input files of its own; start that card by hand with its files.
+- **`wf start <folder>` refuses `--input`.** A card has no input files of its own; start that card by hand with its files.
 
 ## A step's files: `runs/<id>/artifacts/<step>/`
 
@@ -2354,13 +2355,13 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   with the fix. At start, `wf start --gate <step>`, once per step, for this run. On an inbox card, `gate: <step>`, one step, for
   the run the card starts, beside any `--gate` its start gives. The last two freeze into `gates` on the run's record, as the
   workflow does. A step named that the workflow does not have is refused at start, naming the steps it has, with nothing written —
-  in the card's words for a card's gate — and so is a `--gate` given twice; `wf plan --gate` is refused by name. `dev-planned` and
+  in the card's words for a card's gate — and so is a `--gate` given twice; `wf start <folder> --gate` is refused by name. `dev-planned` and
   `dev-planned-build` gate their plan at nothing: a folder decides for every run of it, and a plan that reads one way should start
   implement at once. Say `--gate plan`, or `gate: plan` on the card, for the run that should wait. Their `ship` is gated, as every
   `dev*` folder's is: the run's end is a person's every time.
 - **What it holds, on every pass.** A gated step that signs off — verified by its check first, where it has one — reads `awaiting
   approval`, and nothing after it is filed, whatever its closeout says, until an approval of the try it is on is on disk. It stops
-  what follows as a step signed off `blocked` does: the run's outcome is `blocked`; `wf ls` names it waiting on you as `approve
+  what follows as a step signed off `blocked` does: the run's outcome is `waiting`; `wf ls` names it waiting on you as `approve
   plan`, with the two commands beside it; `wf decide` says `AWAITING APPROVAL`; and a run `--after` it has not landed — a person
   merging its branch is not the approval. No session runs, no run slot is held (`WF_MAX_RUNS`) and nothing is spent while it
   waits. A step that signs off blocked or unsigned, or that its check refuses, is not at its gate: it reads what it reads. Nor is a
@@ -2373,7 +2374,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   the try already approved, empty words, and a send-back already asked for, which would spend the approval at once. A file at the
   approval's name that is not one opens no gate: the pass says so, and `wf approve` names it and says to delete it.
 - **Sending back is `wf retry <run> <step> --message "<objection>"`**, as for a step that signed off blocked, on a step at its gate
-  or one approved with nothing after it filed yet — never on an approved step nothing waits on, whose run is over and may be merged. `--nudge` continues its session, told under `## Try <n>` that its handoff waited
+  or one approved with nothing after it filed yet — never on an approved step nothing waits on, whose run is over and may be merged. `--continue` continues its session, told under `## Try <n>` that its handoff waited
   at its gate and was sent back, with the objection as `## Your answer`; `--fresh` starts a new one. It signs off again, and the gate
   holds again. Refused without words, and with `--recheck`: an objection with nothing to change would sign off as it did. The tick
   holds an ask to the same word: a wordless one — taken while the step's harness blocked its session, which then signed off, or
@@ -2387,7 +2388,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   the work does not hold on the base as it is now: review is filed with the objection and what the ending said, and its `again: true` is
   a round on the run's branch, where merging the base in is the work's to do. The ending's try moves behind (`cause: 'back'`) in the same
   write; once the loop settles it waits at its gate, nothing of it run, for a new approval. Refused, naming the fix: no words, a step
-  that is not the loop's, `wf round` of the loop, one way while the other is asked for, and a folder with no loop before its ending.
+  that is not the loop's, `nemia retry --round` of the loop, one way while the other is asked for, and a folder with no loop before its ending.
 - **The tick hands a step's leftovers off once for each try.** What a person leaves in a step's worktree after its hand-off is theirs,
   not committed under the step's name, until the step's next try.
 - **What the steps after it are told.** Every step after an approved gate — the one after it and each after that one, the
@@ -2399,7 +2400,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
 - **The session waits with the gate.** A Claude Code job at its gate is the engine's held task (*Trying again*): nothing runs, a
   send-back is its next turn in the session that signed, and `wf approve` has the tick close it as it files what follows.
 - **`wf cancel` calls a run at its gate off**, as any run: it is not finished, since an approval would file what follows.
-  **`wf rm` refuses a run at its gate**, naming the `wf approve` it waits for, and forgets it once it is called off. `wf round` on a
+  **`wf rm` refuses a run at its gate**, naming the `wf approve` it waits for, and forgets it once it is called off. `nemia retry --round` on a
   loop whose step waits at its gate says to approve it or send it back.
 - **On the board**, a gated step's section on the run page shows what it handed on, with Approve — a box for the words — and Send back,
   the answer box, beside it. The banner and the Factory's card say `approve plan`, and `POST /api/runs/:id/steps/:step/approve` calls
@@ -2538,7 +2539,7 @@ start a run that waits on nothing, and the tick would file it at once.
 A record written before `after` existed waits on nothing.
 
 A run that waited is told what its parents concluded, under `## From run <id>` (*What one step knows of another*,
-above). To start a whole graph of runs at once, write it as a folder of cards: `wf plan`, below.
+above). To start a whole graph of runs at once, write it as a folder of cards: `wf start <folder>`, below.
 
 ## Context without a wait: `wf start --from`
 
@@ -2583,7 +2584,7 @@ hold lifts. So `wf ls` says `→ held until a-1x2y lands` where it would say `�
 says `held until a-1x2y lands; its approval is asked once the hold lifts` where it would offer `wf approve`.
 `wf decide` says the hold, what is still running, and how to go on before the hold lifts:
 `wf hold <run> --off`. On a run that also waits `--after` a run, it says both, and that `--off` lifts the
-hold and not the wait. `wf say` to a step that has settled offers no `wf retry` while the hold stands. `wf approve`, `wf retry`, `wf round` and `wf accept` refuse a held run and name that
+hold and not the wait. `wf say` to a step that has settled offers no `wf retry` while the hold stands. `wf approve` and `wf retry`, with or without `--round`, refuse a held run and name that
 command, and a pass files nothing on an ask written by hand while the hold stands. A run named that will
 never land without a person (`(cancelled)`, `(no such run)`, `(<branch> gone)`) is said beside the hold,
 with the two ways out: lift the hold, or `wf cancel` the run.
@@ -2671,7 +2672,7 @@ is stopped. A file that is there pauses the store whatever it holds. `wf pause` 
 paused, naming who paused it, and `wf resume` a store none stands on; the api serves the same as `POST`,
 `DELETE` and `GET /api/pause`, whose read carries what finishes and what is staged.
 
-## A plan as a folder of cards: `wf plan`
+## A plan as a folder of cards: `wf start <folder>`
 
 A person who describes a plan in prose (parse the flag, then store it and document it, then show it) writes it as
 files, one card per run, and starts it whole:
@@ -2694,7 +2695,7 @@ Show the flag on the settings page. It is parsed and stored by now: read it from
 ```
 
 ```bash
-$ wf plan plans/flag --repo ~/code/myapp
+$ wf start plans/flag --repo ~/code/myapp
 a  parse-the-flag-option-in-cli-eoug  dev  waits on nothing
 b  store-the-flag-in-the-settin-lx98  dev  waits on a (parse-the-flag-option-in-cli-eoug)
 c  document-the-flag-in-the-rea-m4ja  ui   waits on a (parse-the-flag-option-in-cli-eoug)
@@ -2706,7 +2707,7 @@ run 'wf tick' (or 'wf up') to start them
   takes two keys: `workflow:`, a workflow by name under `<repo>/workflows/` or by a path from the plan folder (as
   `wf start --workflows` takes one from where it is typed), and `after:`, the cards whose runs must land first. The
   body is the run's brief. `README.md` says what the plan is for, and is not a card.
-- **The runs and their `after` are the plan.** `wf plan` starts every card with `start()`, parents first, each
+- **The runs and their `after` are the plan.** `wf start <folder>` starts every card with `start()`, parents first, each
   `after` the runs of the cards it names: the record `wf start --after` writes. Nothing downstream is new. The tick
   files a card's run once its parents have landed (*A run that waits on a run*, above), `wf ls` says what each
   waits on, each card's first steps are told what its parents concluded (`## From run <id>`), and every card is a
@@ -2721,15 +2722,16 @@ run 'wf tick' (or 'wf up') to start them
   - a card whose workflow does not load, with the workflow's own refusal behind the card: `b.md: \`workflow: deb\` —
     no workflow folder at …/plans/flag/deb, nor a workflow named deb in ~/code/myapp/workflows. The repository's
     workflows are: dev, ui — …`.
-- **`--repo` is its one flag.** `--after`, `--workflows` and `--no-worktree` are refused by name, since the folder
-  says each, and anything else is refused as `wf start` refuses it.
+- **`--repo` and `--factory` are its flags.** `--after`, `--from`, `--workflows`, `--input`, `--gate`, `--brief` and
+  `--no-worktree` are refused by name, since the folder says each, and anything else is refused as `wf start` refuses it.
+  `wf plan <folder>`, its former spelling, still runs, with a hint naming `wf start <folder>`.
 - **A `wf start` that refuses part-way stops the plan.** Every card was checked first, so this is something that
   changed underneath, or git. The runs it started stand, and it names them. Then it prints a `wf start --after` for
   each card left, parents first, with the run ids it has and `<c's run id>` for a parent not started yet, each path
   quoted for the shell.
 - **`wf start` on a card file starts the card**, as the stopped plan's commands do. The brief is the card's body, below its
   frontmatter, so neither the run's id nor any step's brief carries a `workflow:` line. `--workflows` defaults to the
-  card's `workflow:`, found from its plan folder as `wf plan` finds it. A card whose `after:` names cards is refused
+  card's `workflow:`, found from its plan folder as `wf start <folder>` finds it. A card whose `after:` names cards is refused
   without `--after`, and the refusal names the ids to give; `wf start` checks the ids given, as it checks any `--after`.
   A file that opens with a closed frontmatter block that reads, as YAML or in the former line form, as a map of keys, each a word
   (`KEY_WORD`), is a plan's card, and a block of keys is never taken into a brief: a key a plan's card lacks — an inbox card's `repo:` or `factory:`, a `title:` — is
@@ -2739,7 +2741,7 @@ run 'wf tick' (or 'wf up') to start them
 ## An inbox: cards before they are started — `wf inbox`
 
 An idea about the project had nowhere to be parked. The unit already existed — a card: a workflow, a brief — but a card
-lived only inside a plan folder, started whole by `wf plan`, or was started by hand and left where it was. The old hkb
+lived only inside a plan folder, started whole by `wf start <folder>`, or was started by hand and left where it was. The old hkb
 filed such a note with `hkb new --triage`, and `hkb ls --phase triage` was the inbox; its ADR-015 records that triage was a
 phase pushed into the machinery because a person needed an inbox. Here an unstarted card is a file in a folder, and nothing
 about a run changes.
@@ -2776,7 +2778,7 @@ run 'wf tick' (or 'wf up') to start it
 
   `workflow:` is optional, since an idea often does not know its workflow. `repo:` is a key of its own. An inbox card has no
   `after:`: what it waits on is said at start, with `--after`, once the runs it could wait on are known. A plan's card keeps
-  its rules, and refuses `repo:`: a plan's repository is `wf plan --repo`. A third key, `queued:`, marks a card to start on its
+  its rules, and refuses `repo:`: a plan's repository is `wf start <folder> --repo`. A third key, `queued:`, marks a card to start on its
   own, and `wf inbox queue` writes it ([below](#cards-that-start-themselves-wf-inbox-queue)). A fourth, `gate: <step>`, names
   the step of its workflow whose closeout waits for a person in the run it starts, one step, refused as a list or as a step's
   `true` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)). A fifth, `factory: <name>`, names
@@ -2953,7 +2955,7 @@ be (the workflow's `agents/`, the repository's, the store's).
 ### Every run in a factory
 
 Every start names its factory, or is started in the one whose repository it is on. The entries hold it: `wf start`, `wf start <card>`,
-`wf plan`, the queue's start (`startQueued`) and `POST /api/runs`; `start()` itself takes what it is given.
+`wf start <folder>`, the queue's start (`startQueued`) and `POST /api/runs`; `start()` itself takes what it is given.
 
 ```
 $ cd ~/code/pipao/src
@@ -2962,7 +2964,7 @@ $ wf start "add a flag" --workflows build
 ```
 
 - **A workflow's start that names no factory runs in the one whose repository holds its folder** (`startFactory`,
-  `factoriesHolding`): `--repo`, else the directory `wf start` or `wf plan` is typed in; on the api, `?repo=`, else its own. A
+  `factoriesHolding`): `--repo`, else the directory `wf start` is typed in; on the api, `?repo=`, else its own. A
   repository holds itself and every folder under it, never a sibling that shares its prefix, and the run is on that repository's root.
 - **Refused, `Invalid`, before anything is written**: a folder no factory holds, naming the factories there are, the `--factory`
   (`?factory=` on the api) that names one, and the `wf factory add` and `attach` that file one on it (`noFactoryRefusal`); a folder
@@ -3104,9 +3106,9 @@ Nemia watches every factory of the store for the person: a long-lived session, w
 recommendation, recaps what moved, carries their answer back as a `nemia` verb, and does the rest on her own judgement. She is the person's switch, never a run:
 
 - **`nemia level`** says where she is — her level, her session's phase, how to reach it (`claude attach <id>` in a terminal, then
-  her web link once its bridge is up, from a phone too, or why it is not), and what a person allowed her at a prompt beyond what ships.
+  her web link once its bridge is up, from a phone too, or why it is not), and what a person allowed her at a prompt beyond what is built in.
 - **`nemia level semi-auto`** puts her on: the daemon's keeper files her session in `$WF_ROOT/nemia/` and subscribes it to the feed
-  (the subscription `nemia`, hers alone). Only what waits on the person prompts: an answer to it — `approve`, `round`, `accept`,
+  (the subscription `nemia`, hers alone). Only what waits on the person prompts: an answer to it — `approve` of a gate or of a loop out of rounds, `retry --round`,
   a `retry` of a step at its gate, on its question, out of rounds or at its cap, any `--budget` — is asked of the person by her
   admission (`nemia admit`, a hook asked before each of her shell calls), and so is a write that cannot be undone or changes their
   settings or a factory (`cancel`, `rm`, `factory add`, `level semi-auto`); the rest — a read, `start`, `hold`, `say`, `inbox add`, a
@@ -3116,25 +3118,25 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   session stopped from outside is never filed again; `nemia level semi-auto` starts a fresh one.
 - **`nemia level auto`**, or a factory set or raised to it (`--factory <name> auto`), is Semi-auto with one difference: an answer the
   person's confirmed list allows in the run's current state is given unasked; anything else asks, as at Semi-auto. A rule names the
-  answer (`approve`, `retry`, `accept`), the steps it holds at, a dollar line the run's spend stays under (`under`), and its
+  answer (`approve`, `retry`), the steps it holds at, a dollar line the run's spend stays under (`under`), and its
   conditions over the run's state: `recommends` (the step signed `done`, and each question it asks carries a recommendation),
   `checked` (its check exited 0: a step with no check does not meet it), `accepted` (no loop asks for another round, and none was
   accepted by a person over what it found), `withinBudget` (no step past its budget) and `nothingOpen` (no question, nothing the
-  closeout needs, and no other step waiting on a person). The rule that
-  ships, "decide when all agree", approves when all five hold; it is in force until the person confirms a list, which replaces it,
+  closeout needs, and no other step waiting on a person). The builtin
+  rule, "decide when all agree", approves when all five hold; it is in force until the person confirms a list, which replaces it,
   seeded with it, marked Default. **`nemia policy <agent>`** reads the list in force, the agent's proposal and the custom instruction;
   **`nemia policy propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
   generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia policy confirm <agent> <id> --words
-  '<words>'`** and **`nemia policy drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
+  '<words>'`** and **`nemia policy rm <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
   calls them. `nemia auto …`, the group's former name, still runs as `nemia policy …`, with a hint on stderr naming it, and admission
   reads it as the new name; the store's folder `auto/` keeps its name, so no confirmed rule is orphaned. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
   under that id reads otherwise. A rule nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that
-  does not read allows nothing. Auto holds in a session of hers filed since it shipped (`--auto` on her admission): one kept from before
+  does not read allows nothing. Auto holds in a session of hers filed since auto was built (`--auto` on her admission): one kept from before
   asks every answer until it is filed again.
 - **`nemia memory [<fact>]`** reads what she keeps, one fact a file in `$WF_ROOT/nemia/memory/`. She alone writes it: to prune it, ask
   her.
 
-What she is ships in this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
+What she is is built into this package's `nemia/` folder: her instruction (`nemia.md`, with her fence) and her skills. The person's own words
 for her are their custom instruction (`$WF_ROOT/custom-instructions/nemia.md`, written with `nemia agents custom nemia` or on the
 board's Settings, though no place names her), read as her session is filed; a write or a clear while she is kept is told to her open
 session at the keeper's next beat, through the runtime's `say`, with no restart, then recorded in her filed instruction; a factory's rules are its
@@ -3565,7 +3567,7 @@ reconciles toward it — the same level-triggered rule the engine runs on one la
 Cancelling a run with nothing in flight, one already finished, or one already cancelled are all
 normal things for a person to do, so none of them is an error and each says which it was. A run
 with a step waiting on a person is not finished — at its gate, blocked, unsigned, a refused check,
-out of rounds or budget, denied (`HOLDS_THE_RUN`, the rule `wf ls` says *waiting on you* by) — so
+out of rounds or budget, denied (`holdsTheRun`, the rule `wf ls` says *waiting on you* by) — so
 it is called off: that is how a person sets it aside and keeps its record, and it stops being listed
 as waiting on them. A finished run, one that succeeded or failed with nothing waiting on anyone, is
 deliberately **not** relabelled — a run that succeeded succeeded, and stamping it
@@ -3637,7 +3639,7 @@ merged is kept, and the line says why, unless `--force-unmerged` is given beside
 - **anything a pass would file**: a step ready, a check, a try or a round due, on a run nobody called
   off. A pass may be filing it at that moment, into a worktree about to go. A run waiting on runs
   (`--after`) is held the same way, since it files its roots once they land.
-- **an ask no pass has spent** (`wf retry`, `wf round`), on a run nobody called off. One the next pass
+- **an ask no pass has spent** (`wf retry`, `nemia retry --round`), on a run nobody called off. One the next pass
   files is the case above. One no pass files as the run stands is taken back by deleting its file, which
   the refusal names.
 - **a step waiting at its gate**, on a run nobody called off: an approval would file what waits on it. The refusal names the
@@ -3679,7 +3681,7 @@ What is under `WF_ROOT` (`~/.agent-workflows` by default), and what `wf rm` does
 | `runs/<id>.json` | the run's record | `wf start`; the tick, while it exists | removed, first of its files |
 | `runs/<id>.cancelled` | when it was called off | `wf cancel` | removed |
 | `runs/<id>.pruned` | when `wf prune` removed its worktrees, and each with its size | `wf prune` | removed |
-| `runs/<id>.asks/`, `…/done/` | asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent | `wf retry`, `wf round`, `wf approve`, `wf accept`; the tick moves them | removed |
+| `runs/<id>.asks/`, `…/done/` | asks for a try or a round, approvals at a gate, acceptances of a loop out of rounds, and those spent | `wf retry` (and `--round`), `wf approve`; the tick moves them | removed |
 | `runs/<id>/inputs/` | files given with `wf start --input` | `wf start` | removed |
 | `runs/<id>/work/<step>/given/` | a folder step's copy of the run's inputs and of the folders it waits on | the tick, as it makes the folder | removed with the run |
 | `runs/<id>/artifacts/<step>/` | a step's files | the step; the tick collects into it | removed |
@@ -3778,7 +3780,7 @@ has is refused, not handed off.
 with its size — before it removes anything, so a pass that reads the run mid-prune files nothing into a
 worktree about to go. The mark is a person's fact beside the record, composed on read as a cancellation is.
 `wf ls` prints `(pruned)` beside the run, `wf decide` says when and what it kept, and the board's run page
-has a `pruned` row. `wf retry`, `wf round`, `wf approve` and `wf accept` refuse a pruned run, and neither
+has a `pruned` row. `wf retry` (with or without `--round`) and `wf approve` refuse a pruned run, and neither
 `wf decide`, `wf ls`'s step notes nor the board offer any of them: a step over its budget reads
 `OVER BUDGET: … since the run was pruned at …` with no raise, a loop out of rounds `no round more`, a gate
 `not approved, and never can be`. The run waits on nobody, and the tick files nothing for it, whatever ask
@@ -3897,13 +3899,13 @@ holding a concurrency slot forever.
 | `src/agents/agents.ts` | an agent — pure: its keys (`AGENT_KEYS`), read and written back (`parseAgent`, `renderAgent`), the skills it names and what they cost a turn (`skillTurnCost`), and its card (`agentCard`); and the agent rendered for Claude Code under `runs/<id>/agents/<step>/`: its prompt (`renderedPrompt`), its plugin (`pluginOf`), its flags (`renderedFlags`) and the brief it leaves (`briefBody`) |
 | `src/skills/skills.ts` | a skill on an agent — pure: the entry its card lists (`skillEntryOf`), a SKILL.md written back from a draft (`renderSkill`, `skillDraftOf`), and its `preload:` line (`withPreload`) |
 | `src/folder/folder.store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the steps of a folder of workflows that name an agent (`agentUsers`, beside `workflowsIn`, since it reads step files, not agents), its README's first paragraph (`workflowDescription`) and its whole text (`workflowReadme`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
-| `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
+| `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf start <folder>` starts the cards in, and what it prints |
 | `src/inbox/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/inbox/queue-factory.ts` | the factory a queued card asks for — pure: why `wf inbox queue` refuses a card that names no factory, or `default`, as its start would be (`queueFactoryRefusal`) |
 | `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`DEFAULT_FACTORY`, `defaultFactoryRefusal`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), the workflows it offers: a workflow's name (`workflowNameRefusal`) and a start of one not attached (`unattachedRefusal`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
 | `src/run.ts` | the entry `agent-orchestrator/run` — pure: each name it exports re-exported by name from the folders below, and nothing else |
-| `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and the run's one word (`status`): `failed` where a step broke, `awaiting approval` or `blocked` where only a person stops it (`stoppedOnWord`) |
-| `src/round/round.ts` | a loop's rounds — pure: those due (`roundsDue`) and the steps once one is filed (`roundFiled`), what `wf round` and `wf accept` ask and refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`) |
+| `src/tick/assess.ts` | **`assess`** — pure: which steps are ready, due a check, another try or another round, blocked, done, off each step's standing (`stepStatus`, `status/status.ts`), and the run's one word (`status`): `failed` where a step broke, `awaiting approval` or `waiting` where only a person stops it (`stoppedOnWord`) |
+| `src/round/round.ts` | a loop's rounds — pure: those due (`roundsDue`) and the steps once one is filed (`roundFiled`), what `nemia retry --round` and `nemia approve` of a loop ask and refuse (`roundAsk`, `acceptAsk`), and what `wf ls` and `wf decide` say of a loop (`roundDueNote`, `roundLines`) |
 | `src/cancel/cancel.ts` | what cancelling a run has to do, and what to tell the person who asked (`cancelPlan`) — pure |
 | `src/forgetting/forgetting.ts` | what the engine forgot of a run's tasks, pure: each run's share of one answer (`forgettingOf`), whether nothing is left (`forgettingDone`), and its words (`engineWords`, `uncountedWords`) |
 | `src/forget/forget.ts` | `wf rm` from the run's side — pure: **`forgetRefusal`**, whether a run may be forgotten, which worktrees, branches and check logs are its own (`runWorktrees`, `branchFates`, `checkLogsOf`), and the line that says what was done (`forgetLine`) |
@@ -3952,7 +3954,7 @@ holding a concurrency slot forever.
 | `src/artifacts/artifacts.store.ts` | the files a step hands over, copied out of its workspace (`collectArtifacts`), each it named that the run does not have (`missingArtifacts`; off the disk alone as the step signs off, `filesLacked`; those there for the step after, `filesHanded`), what its files directory holds (`artifactFiles`), a landed ending's check pictures removed (`dropLandedPictures`), and one file of that directory or of a step's folder, read by its name and never by a path (`artifactFile`, `fileIn`) |
 | `src/folder/write.store.ts` | what the board's builder writes: a workflow folder from its steps (`writeWorkflow`), refused where it is no place the board lists (`workflowPlaceRefusal`) |
 | `src/skills/skills.store.ts` | what the board's skill picker and skill page write: a skill copied from another folder of skills (`copySkill`), and a skill made or changed (`writeSkill`), refused as `Missing`, `Conflict` or `Invalid` |
-| `src/skills/read.store.ts` | the skills read: where a workflow's agents and skills are looked for (`lookupRoots`), each skill an agent may give (`skillsFor`, with the place skills the package ships, `PLACE_SKILLS`), a skill's rules (`readSkillRules`), its version (`skillVersion`), an agent card's entries (`cardSkills`) and whether a skill is told whole (`preloads`); at the bottom of the store's tree |
+| `src/skills/read.store.ts` | the skills read: where a workflow's agents and skills are looked for (`lookupRoots`), each skill an agent may give (`skillsFor`, with the package's builtin place skills, `PLACE_SKILLS`), a skill's rules (`readSkillRules`), its version (`skillVersion`), an agent card's entries (`cardSkills`) and whether a skill is told whole (`preloads`); at the bottom of the store's tree |
 | `src/plan/plan.store.ts` | a plan folder's cards read from disk (`readPlan`) |
 | `src/config/config.store.ts` | the `WF_` environment, each variable an Effect `Config` with its default, read by a plain reader that refuses a value the variable does not take by name, exit 2 (`wfRoot`, `maxConcurrent`, `maxRuns`, `verifiesRest`); at the bottom of the store's tree, and reads no disk |
 | `src/inbox/inbox.store.ts` | the inbox's cards read, filed, queued, dropped (`readInbox`, `addToInbox`, `queueInInbox`, `dropFromInbox`) through `runStore.inbox`, and a path named as a card (`inboxNameAt`, which asks `runStore.inbox.nameAt`) |
@@ -3982,8 +3984,8 @@ holding a concurrency slot forever.
 | `src/watch/selector.ts` | the feed's selector grammar — pure: the keys a selector may name (`SELECTABLE_KEYS`, the labels and the five reserved, which no label may take: `labelKeysRefusal`), every malformed form refused by name (`selectorsRefusal`), the parse of checked text (`parseSelectors`), what a line offers a selector (`selectableOf`) and whether it is selected (`selects`) |
 | `src/cli/main.ts` | the verbs' table: `main`, which looks up the command in the table or the verb in `VERBS` and runs it, or prints the help; and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch` — with its liveness (`livenessLines`) — and `wf rm` and `wf prune` |
 | `src/daemon/up.verb.ts` | the daemon's loop, one for its two kinds, the api's process and `wf up`: `up`, which takes the store's lease in its scope and lets it go as the scope closes; `holdUrl`, which writes into the lease where the api serves; and `runMain`, which runs either as the process's command |
-| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts` | what the CLI's verbs and runners share: the help, a verb's shape (`Verb`), a usage refusal, a person's yes; the runners of `wf start`, `wf plan` and `wf inbox add`, which read the files and folders their command line names; and the runners of `wf agents custom`, `wf rm` and `wf prune` |
-| `src/start/commands.verb.ts`, `src/inbox/commands.verb.ts`, `src/factory/factory.verb.ts`, `src/agents/custom.verb.ts` | entries of the command table: `wf start` and `wf plan` (`START`, `PLAN`); `wf inbox`, bare, `add`, `queue` and `rm`, and a card's page, which the api alone serves (`INBOXES`); `wf factory`, bare, `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` (`FACTORIES`); `wf agents custom` (`AGENTS_CUSTOM`) — each its usage, help, arguments, handler and route |
+| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts` | what the CLI's verbs and runners share: the help, a verb's shape (`Verb`), a usage refusal, a person's yes; the runners of `wf start` (a brief, or a folder of cards) and `wf inbox add`, which read the files and folders their command line names; and the runners of `wf agents custom`, `wf rm` and `wf prune` |
+| `src/start/commands.verb.ts`, `src/inbox/commands.verb.ts`, `src/factory/factory.verb.ts`, `src/agents/custom.verb.ts` | entries of the command table: `wf start`, a folder or a brief (`START`); `wf inbox`, bare, `add`, `queue` and `rm`, and a card's page, which the api alone serves (`INBOXES`); `wf factory`, bare, `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` (`FACTORIES`); `wf agents custom` (`AGENTS_CUSTOM`) — each its usage, help, arguments, handler and route |
 | `src/branches/merges.verb.ts`, `src/command/pages.verb.ts`, `src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/folder/workflows.verb.ts` | entries of the command table the api alone serves, each with why (`only`): whether a run's branches still merge (`MERGES`); a run's page and its steps' files, path and conversation (`PAGES`); the agent library's writes, removal, try and read (`LIBRARY_ENTRIES`); the skill library's list, read and writes (`SKILL_ENTRIES`); the workflow builder's reads and writes (`WORKFLOW_ENTRIES`) |
 | `src/cli/decide/decide.ts` | `wf decide`: its help, its one flag, and the screen it prints (`decideVerb`) |
 | `src/cli/exit.ts` | what `nemia` exits with (`exitCodeOf`), imported by each bin, `bin/nemia.ts` and its alias `bin/wf.ts`, before the package |

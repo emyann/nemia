@@ -17,10 +17,10 @@ import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfi
 export type WordedRule = AutoRule & { words: string };
 
 /**
- * An agent's rules, read: the agent, the file of the person's list, whether the rule that ships is in force for want of one (`isDefault`),
+ * An agent's rules, read: the agent, the file of the person's list, whether the builtin rule is in force for want of one (`isDefault`),
  * the rules in force, what the agent proposed, each rule saying whether it is in force, with the words it keeps as guidance and whether the
- * custom instruction changed since (`stale`), or null for nothing proposed; the custom instruction, or null for none; and the rule that
- * ships, with its words, to be confirmed again (`shipped`).
+ * custom instruction changed since (`stale`), or null for nothing proposed; the custom instruction, or null for none; and the builtin
+ * rule, with its words, to be confirmed again (`builtin`).
  */
 export type PolicyList = {
   agent: string;
@@ -35,7 +35,7 @@ export type PolicyList = {
     stale: boolean;
   } | null;
   instruction: string | null;
-  shipped: WordedRule;
+  builtin: WordedRule;
 };
 
 /** The agent's name in `args`. */
@@ -72,7 +72,7 @@ export function policyListOf(home: string, agent: string): PolicyList {
             stale: proposed.digest !== digestOf(instruction),
           },
     instruction: instruction ?? null,
-    shipped: worded(DEFAULT_AUTO),
+    builtin: worded(DEFAULT_AUTO),
   };
 }
 
@@ -92,7 +92,7 @@ function listLines(list: PolicyList): string[] {
     `proposed at ${p.at}${p.stale ? ', before the custom instruction last changed' : ''}:`,
     ...p.rules.map((r) => `  ${r.id}${r.confirmed ? ' (in force)' : ''}: ${r.words}`),
     ...(p.guidance.length ? ['kept as guidance, which the machinery cannot hold:', ...p.guidance.map((g) => `  ${g}`)] : []),
-    `confirm one with nemia policy confirm ${list.agent} <id> --words '<its words, as read here>'; drop one in force with nemia policy drop ${list.agent} <id>.`,
+    `confirm one with nemia policy confirm ${list.agent} <id> --words '<its words, as read here>'; drop one in force with nemia policy rm ${list.agent} <id>.`,
   ];
 }
 
@@ -250,12 +250,12 @@ export const POLICY_CONFIRM: Command<PolicyList> = {
   print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is in force at auto.`, ...listLines(list)],
 };
 
-/** `nemia policy drop <agent> <id>`: a rule taken out of force, the default among them, the person's; asked of them every time. */
+/** `nemia policy rm <agent> <id>`: a rule taken out of force, the default among them, the person's; asked of them every time. */
 export const POLICY_DROP: Command<PolicyList> = {
-  name: 'policy drop',
+  name: 'policy rm',
   usage: '<agent> <id>',
   help: ['take a rule out of force, the default among them: what it allowed is', 'asked of you again. Asked of you every time'],
-  spec: ruleSpec('policy drop'),
+  spec: ruleSpec('policy rm'),
   check: (args) => agentNameRefusal(agentIn(args)) ?? null,
   writes: true,
   class: 'ask',

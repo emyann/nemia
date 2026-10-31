@@ -7,7 +7,7 @@
 import { dollarsOf } from '../keys/index.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { CommandClass } from '../admission/index.ts';
-import { FORMER_MODES } from '../retry/retry-ask.ts';
+import { FORMER_MODES } from '../retry/index.ts';
 
 /** The CLI's name, as every command line the package writes says it. */
 export const CLI = 'nemia';

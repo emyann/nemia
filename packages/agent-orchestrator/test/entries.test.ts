@@ -222,6 +222,7 @@ const PINNED: Record<string, string[]> = {
     'fireAgent',
     'firstFiledAt',
     'firstLine',
+    'folderRefusal',
     'foldersIn',
     'forgetLine',
     'formerKeyLines',

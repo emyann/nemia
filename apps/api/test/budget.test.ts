@@ -648,7 +648,13 @@ test('steps past their budget on their own work: one that signed off blocked is 
       );
       assert.deepEqual(run.waitingOnYou, ['palette', 'lint']);
       assert.deepEqual(palette.raise, { by: 'retry', above: 1.5, said: '$1.50', modes: ['continue', 'fresh'], own: 'blocked' });
-      assert.deepEqual(lint.raise, { by: 'retry', above: 1.2, said: '$1.20', modes: ['continue', 'fresh', 'recheck'], own: 'failed (check)' });
+      assert.deepEqual(lint.raise, {
+        by: 'retry',
+        above: 1.2,
+        said: '$1.20',
+        modes: ['continue', 'fresh', 'recheck'],
+        own: 'failed (check)',
+      });
       assert.equal(palette.needs, PALETTE_NEEDS, "its question is still the closeout's");
       assert.equal(
         (await runWith(engine(), decideRun(R2))).answering.palette,

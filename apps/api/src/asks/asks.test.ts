@@ -202,7 +202,10 @@ test('POST …/retry: what it refuses — a message it will not carry, a step no
     ];
     for (const [body, fact] of bodies) assert.match(await refusedWith(await ask('implement', body), 400, JSON.stringify(body)), fact);
     assert.match(await refusedWith(await ask('implement', { mode: 'continue' }, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);
-    assert.match(await refusedWith(await ask('deploy', { mode: 'continue' }), 404, 'no step'), new RegExp(`^Run '${R}' has no step 'deploy'`));
+    assert.match(
+      await refusedWith(await ask('deploy', { mode: 'continue' }), 404, 'no step'),
+      new RegExp(`^Run '${R}' has no step 'deploy'`),
+    );
     nothingWritten('a body that is not an ask');
   });
 });

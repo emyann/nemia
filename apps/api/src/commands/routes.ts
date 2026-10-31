@@ -199,7 +199,12 @@ async function argsOf(c: Context<ApiEnv>, command: CommandSpec, route: Route, at
  * none: its body (`bodyOf`), or the text a route that reads none was sent (`RouteWords.bodyless`), 400. A delete reads no body. Its
  * arguments are what its path names and its route fixes (`sets`), said over the body's.
  */
-async function storeArgsOf(c: Context<ApiEnv>, command: CommandSpec, route: Route, at: Named): Promise<{ args: Args; hint?: string } | Refusal> {
+async function storeArgsOf(
+  c: Context<ApiEnv>,
+  command: CommandSpec,
+  route: Route,
+  at: Named,
+): Promise<{ args: Args; hint?: string } | Refusal> {
   const bound = { ...c.req.param(), ...fixedOf(route) };
   const bodyless = wordsAt(command.name, at.path).bodyless;
   if (bodyless) {

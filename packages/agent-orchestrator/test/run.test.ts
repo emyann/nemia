@@ -146,7 +146,10 @@ test('REFUSED by `sayRefusal` before the engine is asked: a step the run does no
       'nemia retry r-1 implement --message "<words>"',
     );
   }
-  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] }, review: { taskId: null } } });
+  const onTry2 = run(
+    {},
+    { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] }, review: { taskId: null } } },
+  );
   assert.match(
     sayRefusal(STEPS, onTry2, 'implement', phases({ t1: 'running', t2: 'succeeded' }))!,
     /^implement is not running: try 2's task settled `succeeded`/,
@@ -219,7 +222,10 @@ test("`nemia ls` notes a step whose current try's session a person told somethin
     { name: 'implement', status: 'working', reason: 'Running', phase: 'running', branch: null },
     'no note for a step nobody told',
   );
-  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] }, review: { taskId: null } } });
+  const onTry2 = run(
+    {},
+    { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] }, review: { taskId: null } } },
+  );
   assert.equal(rows(onTry2, { t2: 'working' }, { implement: 1 })[0].note, 'try 2, nudged on your word · said to 1×');
   assert.deepEqual([saidWord(0), saidWord(1), saidWord(3)], ['', 'said to 1×', 'said to 3×']);
 });

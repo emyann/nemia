@@ -1521,7 +1521,10 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
           `nemia approve ${id} ship.`,
         ),
       );
-      const { ask } = await stage.runWith(e(), retryRun(id, 'implement', { mode: 'continue', message: 'sub subtracts the wrong way round' }));
+      const { ask } = await stage.runWith(
+        e(),
+        retryRun(id, 'implement', { mode: 'continue', message: 'sub subtracts the wrong way round' }),
+      );
       assert.deepEqual([ask.step, ask.try], ['implement', 2]);
     },
   );
@@ -1631,7 +1634,10 @@ test('an ending that stopped on the base branch sends the work back through the 
     'the send-back is filed: the reviewer again with the objection and what ship said, the ending not, and nothing merged',
     async () => {
       const { repo, id, base } = stopped;
-      const { ask } = await stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: 'take main, and keep both subs working' }));
+      const { ask } = await stage.runWith(
+        e(),
+        retryRun(id, 'review', { mode: 'continue', message: 'take main, and keep both subs working' }),
+      );
       assert.deepEqual([ask.step, ask.try], ['review', 2]);
       assert.equal(await statusOf(id, 'ship'), 'pending', 'between the ask and the pass, the ending reads as waiting for the work');
       const sent = await at.pass(id);

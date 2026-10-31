@@ -451,7 +451,11 @@ test('a retry ask is held to `nemia retry`’s word, reason by reason; one from 
 
   assert.equal(said({ mode: 'recheck', budget: 3 }), 'it carries a budget and asks for a recheck, which files no session to spend it');
   assert.deepEqual(said({ mode: 'fresh', at: AT }), { step: 'implement', try: 2, mode: 'fresh', at: AT });
-  assert.deepEqual(said({ mode: 'nudge', at: AT }), { step: 'implement', try: 2, mode: 'continue', at: AT }, 'the former `nudge` reads as `continue`');
+  assert.deepEqual(
+    said({ mode: 'nudge', at: AT }),
+    { step: 'implement', try: 2, mode: 'continue', at: AT },
+    'the former `nudge` reads as `continue`',
+  );
   assert.deepEqual(said({ mode: 'continue', model: 'haiku', message: 'go on', budget: 4, at: AT }), {
     step: 'implement',
     try: 2,

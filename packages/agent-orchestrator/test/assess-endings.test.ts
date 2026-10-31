@@ -337,7 +337,15 @@ test("a send-back at an ending's gate goes to the work, and a try of the ending 
       );
       const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
       assert.equal(
-        retryRefusal(ENDS, ran, 'ship', { mode: 'continue' }, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'running' }), signedDone, asked),
+        retryRefusal(
+          ENDS,
+          ran,
+          'ship',
+          { mode: 'continue' },
+          phases({ t1: 'succeeded', t2: 'succeeded', t3: 'running' }),
+          signedDone,
+          asked,
+        ),
         `ship is still running, so there is nothing to try again until it ends. Wait for it: nemia ls r-1 (or stop the run: nemia cancel r-1).`,
         'once approved and filed, it is a step like any other: its own status says what there is to say',
       );

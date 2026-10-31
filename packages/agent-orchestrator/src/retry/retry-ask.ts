@@ -218,8 +218,7 @@ export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = f
  * How a try was asked for, as a person types it: `--continue`, `--fresh`, `--model <m>`,
  * `--recheck`.
  */
-export const modeWord = (how: { mode: RetryMode; model?: string }): string =>
-  how.model ? `--model ${how.model}` : `--${how.mode}`;
+export const modeWord = (how: { mode: RetryMode; model?: string }): string => (how.model ? `--model ${how.model}` : `--${how.mode}`);
 
 /** The note that says a try, and on whose word: `retries:`, an ask to sign off, or `nemia retry` and what it was typed with. */
 export const tryWord = (r: Retry, step: Workflow): string =>

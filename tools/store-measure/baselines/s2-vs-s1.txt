@@ -1,30 +1,30 @@
-# S2 (after the Run door) against S1 (before it)
+# S2 (after the Run door, on the merged tree bc34f61ce) against S1 (before it)
 # node --expose-gc tools/store-measure/report.ts --repeat 5 --json tools/store-measure/baselines/s2.json --compare tools/store-measure/baselines/s1.json
-# load average before the run 0.13, after 1.86; the store grew from 94 runs at s1 to 100 now, so the two compare different stores. No threshold is fixed.
+# 1-minute load average 2.67 before the run, 1.91 after (s1 was taken at 2.14). The store grew from 94 runs at s1 to 100, so the two compare different stores. An earlier run under load 18 gave a tick pass of x2.7: discarded as the machine's, not the door's. No threshold is fixed.
 
-store measure of ~/.agent-workflows (~/.agent-engine), copied: 97566 files, 2212.2 MB in 29 s, without api.log, daemon.json, engine/a2a, wf-up.log, worktrees
-100 runs (94 finished, 6 open), 7207 tasks, 114.6 MB of journals, 36559 feed lines; unreadable: 0 runs, 0 pass lines; invariant refusals: 0
-Intel(R) Core(TM) Ultra 9 275HX, 12 cores, 16770.1 MB, node v24.20.0, load 1.4; commit eddbcb3f592f; 2026-10-31T23:11:20.449Z; median of 5
-runs read: finished the-board-offers-by-command-7t0b, open nudge-becomes-continue-in-th-9xml; feed from byte 8266327, 1000 lines
+store measure of ~/.agent-workflows (~/.agent-engine), copied: 97747 files, 2236.4 MB in 25 s, without api.log, daemon.json, engine/a2a, wf-up.log, worktrees
+100 runs (95 finished, 5 open), 7216 tasks, 114.7 MB of journals, 36614 feed lines; unreadable: 0 runs, 0 pass lines; invariant refusals: 0
+Intel(R) Core(TM) Ultra 9 275HX, 12 cores, 16770.1 MB, node v24.20.0, load 6.72; commit bc34f61ceebf; 2026-10-31T23:36:49.659Z; median of 5
+runs read: finished the-board-offers-by-command-7t0b, open nudge-becomes-continue-in-th-9xml; feed from byte 8292639, 1000 lines
 
 | read | cold ms | cold heap MB | warm ms | warm heap MB |
 | --- | ---: | ---: | ---: | ---: |
-| tickPass | 639.3 | 0.4 | 116.9 | 0.1 |
-| runList | 1441.7 | 140.4 | 57.4 | 1.1 |
-| stats | 4287.3 | 57.0 | 202.4 | 0.3 |
-| finishedRun | 858.2 | 84.8 | 108.5 | 1.1 |
-| openRun | 854.3 | 83.7 | 102.9 | 0.5 |
-| feedFromCursor | 21.1 | 0.2 | 20.0 | 0.1 |
+| tickPass | 647.3 | 0.4 | 111.7 | 0.1 |
+| runList | 1381.4 | 141.4 | 48.2 | 1.2 |
+| stats | 4197.9 | 57.9 | 192.9 | 0.3 |
+| finishedRun | 860.0 | 85.0 | 110.0 | 1.0 |
+| openRun | 847.7 | 84.4 | 108.6 | 0.8 |
+| feedFromCursor | 21.4 | 0.2 | 20.1 | 0.1 |
 
 spawned: git read (pass) ×11; place writes refused: none
 
-against 02b7e095898f of 2026-10-24T12:56:04.626Z: 100 runs now, 94 then; 7207 tasks now, 7116 then
+against 02b7e095898f of 2026-10-24T12:56:04.626Z: 100 runs now, 94 then; 7216 tasks now, 7116 then
 
 | read | cold ms | baseline | ratio | warm ms | baseline | ratio |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| tickPass | 639.3 | 856.6 | ×0.75 | 116.9 | 154.9 | ×0.75 |
-| runList | 1441.7 | 1493.6 | ×0.97 | 57.4 | 106.4 | ×0.54 |
-| stats | 4287.3 | 4640.0 | ×0.92 | 202.4 | 333.6 | ×0.61 |
-| finishedRun | 858.2 | 1116.6 | ×0.77 | 108.5 | 75.1 | ×1.45 |
-| openRun | 854.3 | 989.3 | ×0.86 | 102.9 | 77.4 | ×1.33 |
-| feedFromCursor | 21.1 | 26.0 | ×0.81 | 20.0 | 28.0 | ×0.72 |
+| tickPass | 647.3 | 856.6 | ×0.76 | 111.7 | 154.9 | ×0.72 |
+| runList | 1381.4 | 1493.6 | ×0.92 | 48.2 | 106.4 | ×0.45 |
+| stats | 4197.9 | 4640.0 | ×0.90 | 192.9 | 333.6 | ×0.58 |
+| finishedRun | 860.0 | 1116.6 | ×0.77 | 110.0 | 75.1 | ×1.46 |
+| openRun | 847.7 | 989.3 | ×0.86 | 108.6 | 77.4 | ×1.40 |
+| feedFromCursor | 21.4 | 26.0 | ×0.83 | 20.1 | 28.0 | ×0.72 |

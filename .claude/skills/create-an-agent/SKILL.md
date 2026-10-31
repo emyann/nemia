@@ -25,9 +25,30 @@ attachment*, for the whole format; this is the procedure, and what it cost to le
 
 ## The file
 
-Frontmatter, then its instructions. The other keys are how its sessions run — `harness`, `model`, `effort`, `context`, `permissionMode`
-(`sandbox` on codex), `tools`, `disallowedTools`, `allowedTools`, `remote`, `output` — and a step that names it takes each unless it sets
-its own. Wiring is the step's and refused here: `after`, `input`, `workspace`, `check`, `gate`, `loop`, `budget`, `background`.
+Frontmatter, then its instructions. The other keys are how its sessions run — `harness`, `model`, `effort`, `context`, `remote`,
+`output`, and its fence — and a step that names it takes each unless it sets its own. Wiring is the step's and refused here: `after`,
+`input`, `workspace`, `check`, `gate`, `loop`, `budget`, `background`.
+
+- **The fence goes under its harness's block**: `claude: { fence: { permissionMode, tools, allowedTools, disallowedTools } }`, or
+  `codex: { fence: { sandbox } }`. The block holds `fence` alone, and a block for another harness than the file's is refused. A fence
+  key at the top level is the former spelling, still read; `nemia frontmatter rewrite <folder>` moves it into the block.
+- **Say what a step may override**: `overridable: model, effort, fence, skills`, each word one of `OVERRIDABLE`
+  (`model`, `effort`, `context`, `harness`, `remote`, `output`, `fence`, `skills`, `mcp`). A step that sets anything else is refused at
+  load, naming the key and the agent. With no line a step may override everything, and `nemia start` says to add one.
+
+```yaml
+---
+role: Code reviewer
+harness: claude
+model: opus
+overridable: model, effort, fence
+claude:
+  fence:
+    permissionMode: dontAsk
+    tools: Read, Grep, Glob, Bash
+    allowedTools: Bash(git log:*), Bash(git diff:*)
+---
+```
 
 - **The frontmatter is YAML**, as a step's and a skill's are, every value read as the text written. Quote a value that holds `: ` or
   ` #`, or opens on a YAML sign (`[`, `{`, `*`, `&`, `!`, `|`, `>`, `-`, `?`), as in `description: "Reviews a change: its correctness"`.
@@ -105,8 +126,9 @@ own `skills:`: the session gets the agent's, then the step's, each once. The age
   read or search to Read, Grep or Glob, not Bash.
 - **A role that edits runs `auto`**, and denies by name what it must never do: `Bash(git push)`, `Bash(git push:*)`, `Bash(git branch
   -D:*)`, `Bash(git branch --delete --force:*)`, `Bash(pkill:*)`, `Bash(killall:*)`, `mcp__playwright__browser_run_code_unsafe`.
-- **A step only tightens it.** A step that needs a tool, an allow or a mode its agent's file does not give needs another agent; a
-  step's `disallowedTools:` adds to its agent's: write only the denies the step adds; it can never take one of the agent's away.
+- **A step only tightens it**, and only where `overridable:` names `fence`. A step that needs a tool, an allow or a mode its agent's
+  file does not give needs another agent; a step's `disallowedTools:` adds to its agent's: write only the denies the step adds; it can
+  never take one of the agent's away.
 
 ## Talking with a person
 

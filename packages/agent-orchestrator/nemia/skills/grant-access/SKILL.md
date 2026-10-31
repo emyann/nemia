@@ -8,7 +8,18 @@ The feed carries a line of its own for each call a step's fence refused, as soon
 works: its word is `denied: <call>`, the call by its name alone, and the line says which step and which of its tries it belongs to. One
 denial is one line, however many passes read it, and a call refused twice is two lines. A step on a harness that reports no denial while
 it runs says them only at the end. The fence is its agent's: what it may call unasked (`allowedTools:`), what it may never call (`disallowedTools:`), the tools it is given at all
-(`tools:`), and the folders it may write. A denial is either the fence doing its work, or a grant the agent lacks to do its job.
+(`tools:`), and the folders it may write. Each list sits under the block of the harness the agent runs on, in its frontmatter:
+
+```yaml
+claude:
+  fence:
+    allowedTools: Bash(git diff:*), Bash(npm run lint)
+    disallowedTools: Bash(git push:*)
+```
+
+A file written before may still have the lists at the top level; they read the same. A step may narrow its agent's fence and never widen it,
+so a grant always goes on the agent. A denial is either the fence doing
+its work, or a grant the agent lacks to do its job.
 
 ## Read it
 
@@ -24,7 +35,7 @@ it runs says them only at the end. The fence is its agent's: what it may call un
 
 Say to the person, in a few lines: the run and step, each call denied as the note says it, what the step was doing, and your verdict.
 For a grant, name the narrowest rule that would have let the call through, and where it goes: the line to add to the agent's
-`allowedTools:` (a command by its exact prefix, never a whole tool), or a folder to add to what it may write. Never propose a grant of a
+`allowedTools:`, under its `claude: { fence: … }` block (a command by its exact prefix, never a whole tool), or a folder to add to what it may write. Never propose a grant of a
 call its agent's `disallowedTools:` refuses: say it is kept on purpose.
 
 The person decides. With their word, file the change as a card for the factory's own work (`nemia inbox add`), naming the agent, the rule

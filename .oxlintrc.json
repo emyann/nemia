@@ -385,15 +385,6 @@
       }
     },
     {
-      "files": ["apps/web/src/components/Decide.tsx"],
-      "rules": {
-        "max-lines": ["error", { "max": 516, "skipBlankLines": true, "skipComments": true }],
-        "max-lines-per-function": ["error", { "max": 88, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 26 }],
-        "sonarjs/cognitive-complexity": ["error", 26]
-      }
-    },
-    {
       "files": ["apps/web/src/components/FactoryCanvas.tsx"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 249, "skipBlankLines": true, "skipComments": true }]

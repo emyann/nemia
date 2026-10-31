@@ -14,6 +14,8 @@ import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
 import { closeoutAsked, closeoutReader, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
 
@@ -30,13 +32,13 @@ export type RoundAsked = { run: Run; ask: RoundAsk; file: string };
  * (`tried`).
  */
 export const roundRun = Effect.fn('round')(function* (id: string, stepName?: string, budget?: number) {
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const answer = (asks: readonly RoundAsk[]) =>
     roundAsk(steps, run, stepName, phaseOf, closeoutReader(views, run), closeoutAsked(views), asks, spendReader(views), budget);
 
-  const first = answer((yield* tried(() => runStore.asks.read(id))).rounds);
+  const first = answer((yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   const ask: RoundAsk = {
     step: first.step,
@@ -44,10 +46,10 @@ export const roundRun = Effect.fn('round')(function* (id: string, stepName?: str
     ...(first.budget !== undefined ? { budget: first.budget } : {}),
     at: new Date().toISOString(),
   };
-  const written = yield* tried(() => runStore.asks.write(id, { kind: 'round', ask }));
+  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'round', ask });
   const file = written.where;
   if (!written.written) {
-    const now = answer((yield* tried(() => runStore.asks.read(id))).rounds);
+    const now = answer((yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
     const why =
       'refusal' in now
         ? now.refusal
@@ -76,22 +78,22 @@ export type Accepted = { run: Run; acceptance: Acceptance; file: string };
  * a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
 export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: string, message?: string) {
-  if (!(yield* tried(() => runStore.runs.exists(id))))
+  if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({
         message: `no such run: ${id}. nemia accept takes a run by its id, as nemia ls lists it: nemia accept <runId> [<step>] --message "<why>".`,
       }),
     );
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const answer = (now: Run, rounds: readonly RoundAsk[]) =>
     acceptAsk(steps, now, stepName, message, phaseOf, closeoutReader(views, now), closeoutAsked(views), rounds, spendReader(views));
 
-  const first = answer(run, (yield* tried(() => runStore.asks.read(id))).rounds);
+  const first = answer(run, (yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   const acceptance: Acceptance = { step: first.step, try: first.try, at: new Date().toISOString(), message: message! };
-  const written = yield* tried(() => runStore.asks.write(id, { kind: 'accept', ask: acceptance }));
+  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'accept', ask: acceptance });
   const file = written.where;
   if (!written.written) {
     const { stray } = written;

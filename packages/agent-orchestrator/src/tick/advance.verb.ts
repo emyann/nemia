@@ -67,6 +67,7 @@ import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads, type PassReads } from './file.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
 
 /**
  * Whether any step of this run has a cap in force on it (`budgetOf`: its `budget:`, or the last a person raised it to) — read off the
@@ -390,8 +391,8 @@ export const advancePass = Effect.fn('advancePass')(
       [filed, checked, tried, looped, adopted].some((names) => names.length > 0) ||
       Boolean(tips || heldFirst || handed.marked || lacking.read || landing.landed || marked.length || timed) ||
       Boolean(settled.marks.settlesCounted);
-    pinsWritten(run, pinned, wrote);
-    runStore.asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
+    yield* pinsWritten(run, pinned, wrote);
+    yield* (yield* RunDoor).asks.consume(run, asks, roundAsks, pauseAsksVoid(steps, run, asks, phaseOf, spendOf));
 
     const facts = [...settled.facts, ...roundsGranted(run, steps, looped), ...marked, ...(timed ?? [])];
     const done = { filed, checked, tried, looped, notes, feed, facts };

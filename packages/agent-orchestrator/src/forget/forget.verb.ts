@@ -40,6 +40,8 @@ import { closeWaitingTasks } from '../tick/held.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { engineForgetting, forgetTasks } from '../forgetting/forgetting.verb.ts';
 import { forgettingOf, uncountedWords, type EngineForgetting } from '../forgetting/forgetting.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /** A run's answer when nothing of its worktrees or branches was touched, afresh on each call. */
 const nothing = (): Omit<Forgot, 'id' | 'kind'> => ({ removed: [], handedOff: [], gone: [], left: [], branches: [], files: [] });
@@ -94,7 +96,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   const refusedId = idRefusal(id);
   if (refusedId) return yield* Effect.fail(new Invalid({ message: refusedId }));
   const dir = path.join(HOME, 'worktrees', id);
-  if (!(yield* tried(() => runStore.runs.exists(id)))) return yield* forgetMissing(id, dir);
+  if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id)))) return yield* forgetMissing(id, dir);
   const f = yield* readForgetting(e, id);
   const { run, steps, unfrozen } = f;
   const said = { id, repo: run.repo, base: run.branch, isolate: run.isolate, ...(unfrozen ? { unfrozen } : {}) };
@@ -107,7 +109,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
     return { ...said, kind: 'refused', refusal: inventoryUnread('rm', id, run.repo, read), ...nothing() } satisfies Forgot;
   const place = read && 'inventory' in read ? read : undefined;
   const taskIds = forgottenIds(run);
-  yield* tried(() => runStore.forgetting.write(id, taskIds));
+  yield* (yield* RunDoor).forgetting.write(RunId.read(id), taskIds);
   yield* closeWaitingTasks(e, run, f.views);
   if (!isRepositoryRun(run) || !place) {
     const files = yield* tried(() => removeKeyed(id, Object.keys(run.steps)));
@@ -115,7 +117,7 @@ export const forgetRun = Effect.fn('forget')(function* (id: string, how: ForgetH
   }
   const worktrees = yield* tried(() => removeWorktrees(run, steps, dir, place));
   if (worktrees.left.length) {
-    yield* tried(() => runStore.forgetting.lift(id));
+    yield* (yield* RunDoor).forgetting.lift(RunId.read(id));
     return { ...said, kind: 'held', ...worktrees, branches: [], files: [] } satisfies Forgot;
   }
   const branches = yield* tried(() => deleteBranches(run, how, place, worktrees.handedOff));
@@ -132,7 +134,7 @@ const forgetMissing = Effect.fn('forgetMissing')(function* (id: string, dir: str
   const files = yield* tried(() => removeKeyed(id, undefined));
   const { declared } = yield* PlaceService;
   const left: Forgot['left'] = lstatOf(dir) ? [{ path: dir, orphaned: true, fix: declared.say.orphans }] : [];
-  const taskIds = yield* tried(() => runStore.forgetting.read(id));
+  const taskIds = yield* (yield* RunDoor).forgetting.read(RunId.read(id));
   const engine = taskIds ? { engine: yield* forgetTasks(id, taskIds) } : {};
   const forgot: Forgot = { id, kind: 'missing', ...nothing(), files, left, ...engine };
   return forgot;
@@ -155,10 +157,10 @@ function frozenSteps(run: Run): { steps?: Workflow[]; unfrozen?: string } {
  * every check, try, round and step a pass filed and never wrote down, adopted onto the record in memory.
  */
 const readForgetting = Effect.fn('readForgetting')(function* (e: Engine, id: string) {
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const { steps, unfrozen } = frozenSteps(run);
   const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
-  const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
+  const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = exitVerdicts(views, run);

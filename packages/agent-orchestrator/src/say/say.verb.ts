@@ -9,9 +9,10 @@ import { EngineService, asked, tried, type Engine } from '../runtime-client.ts';
 import { tryOf, type Run } from '../record/record.ts';
 import { sayRefusal, type Said } from './say.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import { Conflict } from '../refusal/refusal.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /**
  * What `nemia say` did: the step's task the words were said to, the try that task is, and the engine's `said` entry, as it journalled it.
@@ -33,7 +34,7 @@ export type Told = { run: Run; taskId: string; try: number; said: Said };
  */
 export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, text: string) {
   const e = yield* EngineService;
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const taskId = run.steps[stepName]?.taskId;
   const phase = taskId ? phaseOfView(yield* asked('view', e.view(taskId))) : 'unknown';

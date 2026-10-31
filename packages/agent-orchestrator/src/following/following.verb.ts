@@ -5,12 +5,13 @@
  */
 import { Effect, Stream } from 'effect';
 import { EngineService, asked, tried, type Engine, type TranscriptEvent } from '../runtime-client.ts';
-import { runStore } from '../record/files.store.ts';
 import { Missing, type Refusal } from '../refusal/refusal.ts';
 import { isRunLine } from '../feed/index.ts';
 import { feedSize } from '../feed/feed.store.ts';
 import { followFeed } from '../feed/feed.verb.ts';
 import { nextOf, type FollowedAttempt, type StepMoment, type StepNow } from './following.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 type Moment = StepMoment<TranscriptEvent>;
 
@@ -27,7 +28,7 @@ type Hold = { unstreamed: boolean };
  */
 const stepNowOf = (e: Engine, runId: string, step: string): Effect.Effect<StepNow, Refusal> =>
   Effect.gen(function* () {
-    const run = yield* tried(() => runStore.runs.read(runId));
+    const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
     const taskId = run.steps[step]?.taskId ?? null;
     if (taskId === null)
       return yield* Effect.fail(

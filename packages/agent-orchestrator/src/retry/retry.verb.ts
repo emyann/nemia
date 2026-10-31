@@ -21,6 +21,8 @@ import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReade
 import { Conflict, Invalid } from '../refusal/refusal.ts';
 import { landingDenies } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /**
  * A person's ask, written: the run, the ask and its file — and `stopFirst`, when the tick stops the step's blocked session before it files
@@ -50,7 +52,7 @@ export const retryRun = Effect.fn('retry')(function* (
   how: RetryHow,
   { stopBlocked = false }: { stopBlocked?: boolean } = {},
 ) {
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const blocked = stopBlocked ? harnessBlocked(views) : () => false;
@@ -70,7 +72,7 @@ export const retryRun = Effect.fn('retry')(function* (
       spendOf,
     );
 
-  const refused = refusal((yield* tried(() => runStore.asks.read(id))).asks);
+  const refused = refusal((yield* (yield* RunDoor).asks.read(RunId.read(id))).asks);
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
   const step = steps.find((s) => s.name === stepName)!;
   const denied = landingDenies(run, yield* PlaceService);
@@ -86,7 +88,7 @@ export const retryRun = Effect.fn('retry')(function* (
     ...(how.budget !== undefined ? { budget: how.budget } : {}),
     at: new Date().toISOString(),
   };
-  const written = yield* tried(() => runStore.asks.write(id, { kind: 'retry', ask }));
+  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'retry', ask });
   const file = written.where;
   if (!written.written) {
     const { stray } = written;

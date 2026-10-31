@@ -267,4 +267,4 @@ function memoryRuns(): RunsLayer {
 }
 
 /** A fresh Run door in memory: no run, and nothing kept between two calls (a test makes one per test). */
-export const runDoorMemory = (): Layer.Layer<RunDoor> => Layer.succeed(RunDoor)(runDoorOver(memoryRuns()));
+export const runDoorMemory = (): Layer.Layer<never> => Layer.succeed(RunDoor)(runDoorOver(memoryRuns()));

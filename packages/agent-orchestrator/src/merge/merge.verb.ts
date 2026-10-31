@@ -13,7 +13,6 @@ import { endingStopped, merged, standing, type RoundAsk, type SpendOf } from '..
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { roundsDue } from '../round/round.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
 import { PlaceService, trialMerges, type Place } from '../place/place.store.ts';
 import { mergeWordOf } from '../branches/index.ts';
 import { strayAsk } from '../say/say.verb.ts';
@@ -23,6 +22,8 @@ import type { Command } from '../command/entry.verb.ts';
 import type { Workflow } from '../step/step.ts';
 import { mergeAsk, mergeAskedLine, mergeOffer, type MergeAsk, type MergeReads, type Tried } from './merge.ts';
 import type { Decision, Offer } from '../decide/decide.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 export type MergeAsked = { run: Run; ask: MergeAsk; file: string };
 
@@ -95,13 +96,13 @@ export function mergeOffers(
  * Fails with a refusal, the verb's or one a read threw (`Missing` for no such run); dies of anything else (`tried`).
  */
 export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: string) {
-  if (!(yield* tried(() => runStore.runs.exists(id))))
+  if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({
         message: `no such run: ${id}. nemia merge takes a run by its id, as nemia ls lists it: nemia merge <runId> [<step>].`,
       }),
     );
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const reads = mergeReads(steps, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), spendReader(views));
@@ -109,12 +110,12 @@ export const mergeRun = Effect.fn('merge')(function* (id: string, stepName?: str
   const place = yield* PlaceService;
   const answer = (asks: readonly RoundAsk[]) => mergeAsk(steps, run, stepName, reads, asks, trialOf(run, place), at);
 
-  const first = answer((yield* tried(() => runStore.asks.read(id))).rounds);
+  const first = answer((yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
   const { ask } = first;
-  const written = yield* tried(() => runStore.asks.write(id, { kind: 'merge', ask }));
+  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'merge', ask });
   if (!written.written) {
-    const now = answer((yield* tried(() => runStore.asks.read(id))).rounds);
+    const now = answer((yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
     const why =
       'refusal' in now
         ? now.refusal

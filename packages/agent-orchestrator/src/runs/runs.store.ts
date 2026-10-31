@@ -24,9 +24,6 @@ export type RunsLayer = Omit<RunStore, 'inbox'>;
 /** The Run door's shape: each method of `RunsLayer` answering an Effect, a run's id taken as `RunId`. */
 export type RunDoorShape = DoorOf<RunsLayer, RunId>;
 
-/** The Run door, as the service a program yields. Given by `runWith` over the files unless the program was given one. */
-export class RunDoor extends Context.Service<RunDoor, RunDoorShape>()('agent-orchestrator/RunDoor') {}
-
 /** A run written back: what the model's `Run` refuses of it, its invariants among it. */
 const runChecked = checked(RunModel, (run: Run) => `run ${run.id}'s record`);
 
@@ -75,5 +72,13 @@ const filesRuns: RunsLayer = {
   },
 };
 
-/** The Run door over the store's files: today's records and a person's files, unchanged on disk. */
-export const runDoorFiles: Layer.Layer<RunDoor> = Layer.succeed(RunDoor)(runDoorOver(filesRuns));
+/**
+ * The Run door, as the service a program yields: a reference whose default is the door over the store's files, so a program given no
+ * door reads and writes today's records, and one given another — a test's `runDoorMemory()` — reads and writes that one. A default
+ * where `StoreRoot` and the place have none, so that no program's requirements and no caller change while the run store's callers move
+ * onto the door (`docs/architecture.md`, *The Run door*).
+ */
+export const RunDoor = Context.Reference<RunDoorShape>('agent-orchestrator/RunDoor', { defaultValue: () => runDoorOver(filesRuns) });
+
+/** The Run door over the store's files, as a layer: what the default already gives, for a program that names it. */
+export const runDoorFiles: Layer.Layer<never> = Layer.succeed(RunDoor)(runDoorOver(filesRuns));

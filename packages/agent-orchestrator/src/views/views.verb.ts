@@ -30,11 +30,12 @@ import { waitedOn, type ParentRun } from '../wait/wait.ts';
 import { decision } from '../decide/decide.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { taskUsage } from '../timeline/index.ts';
-import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { parentRecord, landedOf, type BranchReader } from '../branches/branches.store.ts';
 import { continuesFrom } from '../retry/index.ts';
 import { phaseOfView, unsignedEnd, wordOfView, type EnginePhase } from './views-words.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /**
  * The attempts of a task's current turn: every attempt of a task not held open, and of one held open those since the last answer a
@@ -624,7 +625,7 @@ export const parentRead = Effect.fn('parentOf')(function* (id: string, git: Bran
   const onBase = yield* tried(() => branches.length > 0 && branches.every(landedOf(record, git)));
   if (!onBase) return { ...known, landed: false } satisfies ParentRun;
   const { views, phaseOf } = yield* taskPhasesRead(record);
-  const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
+  const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
   const said = decision(
     steps,
     record,

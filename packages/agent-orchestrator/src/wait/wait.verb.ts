@@ -11,7 +11,6 @@ import { holdRefusal } from './wait.ts';
 import { idRefusal } from '../forget/forget.ts';
 import { assess } from '../tick/assess.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
 import { standingLiveOf } from '../standing/standing.verb.ts';
 import {
   closeoutAsked,
@@ -23,6 +22,8 @@ import {
   taskPhasesRead,
 } from '../views/views.verb.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /** What `nemia hold` did: the run, and the hold that now stands on it. */
 export type Holding = { run: Run; hold: Hold };
@@ -51,13 +52,13 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
     const badUntil = idRefusal(named, 'hold', `nemia hold ${id} --until`);
     if (badUntil) return yield* Effect.fail(new Invalid({ message: `--until ${badUntil}` }));
   }
-  if (!(yield* tried(() => runStore.runs.exists(id))))
+  if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({
         message: `no such run: ${id}. nemia hold takes a run by its id, as nemia ls lists it: nemia hold <runId> --until <runId>.`,
       }),
     );
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const git = yield* standingLiveOf([id, ...until]);
   const read = new Map(
     yield* Effect.all(
@@ -71,7 +72,7 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
     else {
       const steps = yield* tried(() => stepsOf(run));
       const { views, phaseOf } = yield* taskPhasesRead(run);
-      const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
+      const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
       const { status } = assess(
         steps,
         run,
@@ -87,12 +88,12 @@ export const hold = Effect.fn('hold')(function* (id: string, until: readonly str
       if (status === 'succeeded') finished = 'succeeded';
     }
   }
-  const others = yield* tried(() => runStore.runs.list());
+  const others = yield* (yield* RunDoor).runs.list();
   const refused = holdRefusal(run, until, (u) => read.get(u) ?? { landed: false }, others, finished);
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
-  const put = yield* tried(() => runStore.holds.put(id, until, { ...said, by: said.by ?? osUser() }));
+  const put = yield* (yield* RunDoor).holds.put(RunId.read(id), until, { ...said, by: said.by ?? osUser() });
   if (!put) {
-    const again = yield* tried(() => runStore.runs.read(id));
+    const again = yield* (yield* RunDoor).runs.read(RunId.read(id));
     return yield* Effect.fail(
       new Conflict({
         message: holdRefusal(again, until, (u) => read.get(u) ?? { landed: false }, []) ?? `${id} is already held: nemia ls ${id}.`,
@@ -120,11 +121,11 @@ function osUser(): string | undefined {
 export const unhold = Effect.fn('unhold')(function* (id: string) {
   const bad = idRefusal(id, 'hold');
   if (bad) return yield* Effect.fail(new Invalid({ message: bad }));
-  if (!(yield* tried(() => runStore.runs.exists(id))))
+  if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({ message: `no such run: ${id}. nemia hold takes a run by its id, as nemia ls lists it: nemia hold <runId> --off.` }),
     );
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const held = run.hold;
   if (!held)
     return yield* Effect.fail(
@@ -132,7 +133,7 @@ export const unhold = Effect.fn('unhold')(function* (id: string) {
         message: `${id} is not held, so there is no hold to lift. To hold it until other runs land: nemia hold ${id} --until <runId>.`,
       }),
     );
-  if (!(yield* tried(() => runStore.holds.lift(id, held.at))) && (yield* tried(() => runStore.holds.stands(id))))
+  if (!(yield* (yield* RunDoor).holds.lift(RunId.read(id), held.at)) && (yield* (yield* RunDoor).holds.stands(RunId.read(id))))
     return yield* Effect.fail(
       new Conflict({
         message: `${id}'s hold changed as it was lifted: read it again (nemia ls ${id}), then lift it: nemia hold ${id} --off.`,

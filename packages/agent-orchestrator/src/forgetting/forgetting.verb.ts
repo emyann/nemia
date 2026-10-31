@@ -6,7 +6,7 @@
  * pass reads it again until nothing of it is left: nothing is carried between passes.
  */
 import { Cause, Effect, Result } from 'effect';
-import { EngineService, ForgetRefused, tried, type ForgetReport } from '../runtime-client.ts';
+import { EngineService, ForgetRefused, type ForgetReport } from '../runtime-client.ts';
 import { runStore } from '../record/files.store.ts';
 import {
   engineWords,
@@ -17,6 +17,8 @@ import {
   type TaskForgotten,
   type TaskKept,
 } from './forgetting.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /** A task of the engine's report as `EngineAnswer` keeps it: what its harness leaves, every session's together. */
 const forgottenOf = (t: ForgetReport['tasks'][number]): TaskForgotten => ({
@@ -65,7 +67,7 @@ export const engineForgetting = Effect.fn('engineForgetting')(function* (ids: re
 export const forgetTasks = Effect.fn('forgetTasks')(function* (id: string, taskIds: readonly string[]) {
   const forgetting = forgettingOf(yield* engineForgetting(taskIds, { yes: true }), taskIds);
   if (!forgettingDone(forgetting)) return { ...forgetting, marker: runStore.forgetting.where(id) };
-  yield* tried(() => runStore.forgetting.lift(id));
+  yield* (yield* RunDoor).forgetting.lift(RunId.read(id));
   return forgetting;
 });
 
@@ -81,10 +83,10 @@ export type ForgettingLine = { text: string; warn?: true };
 export const finishForgetting = (): Effect.Effect<ForgettingLine[], never, EngineService> =>
   Effect.gen(function* () {
     const said: ForgettingLine[] = [];
-    for (const id of yield* tried(() => runStore.forgetting.list())) {
-      if (yield* tried(() => runStore.runs.exists(id))) continue;
+    for (const id of yield* (yield* RunDoor).forgetting.list()) {
+      if (yield* (yield* RunDoor).runs.exists(RunId.read(id))) continue;
       const marker = runStore.forgetting.where(id);
-      const taskIds = yield* tried(() => runStore.forgetting.read(id));
+      const taskIds = yield* (yield* RunDoor).forgetting.read(RunId.read(id));
       if (!taskIds) {
         said.push({
           text: `${marker} does not read as the tasks nemia rm forgets of ${id}: nothing of it is forgotten; a person removes it: rm ${marker}`,

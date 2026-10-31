@@ -1,12 +1,12 @@
 /**
- * A run a person holds (`nemia hold <run> --until <run>`), as the board reads it: `heldUntil` and `holding` — the hold in the package's
+ * A run a person holds (`nemia hold <run> --until <run>`), as the board reads it: `holdUntil` and `holding` — the hold in the package's
  * words — on the list and the detail, a decision that is the hold and offers nothing, no step waiting on you and no raise, and every verb
  * the board sends refused in the package's words (`heldRefusal`). Each held to what `nemia ls` and `nemia decide` say of the same run.
  *
- * At shipped defaults: the api's own engine over a store this file seeds, with git for real where a run held on ships by its branch being
+ * At shipped defaults: the api's own engine over a store this file seeds, with git for real where a run held on lands by its branch being
  * merged, in the harness's scratch store (`root`), and the harness's fake `claude` (test/harness.ts) first on PATH.
  *
- * The runs held on: `p-live`, still working, its branch not merged, which may ship yet; `p-shipped`, signed off and its branch merged into
+ * The runs held on: `p-live`, still working, its branch not merged, which may land yet; `p-landed`, signed off and its branch merged into
  * main; `p-cancelled`, called off before anything of it was filed; `p-gone`, signed off on a branch deleted unmerged before any tick
  * recorded its tip. A pass has read where their branches stand (`passStanding`), which the list reads off `standing.json`.
  */
@@ -34,7 +34,7 @@ import {
   type RunSummary,
   unhold,
 } from 'agent-orchestrator';
-import { runWith } from './shipped-place.ts';
+import { runWith } from './builtin-place.ts';
 
 type Wait = import('agent-orchestrator').Wait;
 
@@ -138,9 +138,9 @@ const review = { name: 'review', after: ['implement'], body: 'Review it.', harne
 branch('wf/p-live/implement', false);
 working('t-p-live');
 writeRun('p-live', [implement], { implement: { taskId: 't-p-live', branch: 'wf/p-live/implement' } });
-branch('wf/p-shipped/implement', true);
-signedOff('t-p-shipped', DONE);
-writeRun('p-shipped', [implement], { implement: { taskId: 't-p-shipped', branch: 'wf/p-shipped/implement' } });
+branch('wf/p-landed/implement', true);
+signedOff('t-p-landed', DONE);
+writeRun('p-landed', [implement], { implement: { taskId: 't-p-landed', branch: 'wf/p-landed/implement' } });
 const cancelledAt = at(20);
 writeRun('p-cancelled', [implement], { implement: { taskId: null } }, { cancelledAt });
 signedOff('t-p-gone', DONE);
@@ -196,12 +196,12 @@ holdOn(BLOCKS, ['p-live']);
 
 /**
  * `implement → review`, implement signed off, review not filed: the next tick files it once the hold lifts. One for each kind of run a hold
- * can name — one that may still ship, one shipped, one cancelled, one whose branch is gone, one the store has none of — and a hold naming
+ * can name — one that may still land, one landed, one cancelled, one whose branch is gone, one the store has none of — and a hold naming
  * none.
  */
 const ON = {
   live: ['p-live'],
-  shipped: ['p-shipped'],
+  landed: ['p-landed'],
   cancelled: ['p-cancelled'],
   gone: ['p-gone'],
   missing: ['no-such-run'],
@@ -225,10 +225,10 @@ writeRun(
 signedOff(`${CANCELLED}-implement`, DONE);
 holdOn(CANCELLED, ['p-live']);
 
-/** Started `--after p-live`, nothing of it filed, and held until p-shipped as well. */
+/** Started `--after p-live`, nothing of it filed, and held until p-landed as well. */
 const AFTER = 'h-after';
 writeRun(AFTER, [implement], { implement: { taskId: null } }, { after: ['p-live'] });
-holdOn(AFTER, ['p-shipped', 'p-live']);
+holdOn(AFTER, ['p-landed', 'p-live']);
 await runWith(engine(), passStanding(runStore.runs.list()));
 
 /** What the board sends, through vite's proxy: JSON, same-origin, and Host rewritten to the api's. */
@@ -263,11 +263,11 @@ const asWaits = (holding: RunHolding | null | undefined): Wait[] =>
     ...(w.missing ? { missing: true as const } : {}),
     ...(w.cancelledAt ? { cancelledAt: w.cancelledAt } : {}),
     ...(w.gone.length ? { gone: w.gone } : {}),
-    ...(w.shipped ? { shipped: true as const } : {}),
+    ...(w.landed ? { landed: true as const } : {}),
   }));
 
 /** A `nemia` verb that would release work, anywhere in what a surface says. */
-const VERBS = /nemia (approve|retry|round|accept) /;
+const VERBS = /nemia (approve|retry) /;
 const HELD = [GATE, LOOP, BUDGET, BLOCKS, ...Object.keys(ON).map((kind) => `h-on-${kind}`), AFTER];
 
 /** What the package refuses, word for word: what the verb prints at the command line. */
@@ -286,10 +286,10 @@ const asked = (id: string): string[] => {
   return fs.existsSync(dir) ? (fs.readdirSync(dir, { recursive: true }) as string[]).sort() : [];
 };
 
-test('a person holds a run until another ships: the list, the page and the decision say the hold as `nemia ls` and `nemia decide` do, nothing waits on you, every verb is refused, and it moves while the hold may lift on its own', async (t) => {
+test('a person holds a run until another lands: the list, the page and the decision say the hold as `nemia ls` and `nemia decide` do, nothing waits on you, every verb is refused, and it moves while the hold may lift on its own', async (t) => {
   const s = story(t);
   await s.test(
-    "the list carries each held run's `heldUntil` and `holding` in `nemia ls`'s words — the runs it waits on as `list` reads them, `word` its `holdWord`, `advice` its `holdAdvice` — and the detail the same",
+    "the list carries each held run's `holdUntil` and `holding` in `nemia ls`'s words — the runs it waits on as `list` reads them, `word` its `holdWord`, `advice` its `holdAdvice` — and the detail the same",
     async () => {
       const runs = await listed();
       const e = engine();
@@ -297,7 +297,7 @@ test('a person holds a run until another ships: the list, the page and the decis
         const api = runs.get(id)!;
         const run = runStore.runs.read(id);
         const cli = await runWith(e, list(e, run));
-        assert.deepEqual(api.heldUntil, run.hold!.until, id);
+        assert.deepEqual(api.holdUntil, run.hold!.until, id);
         assert.ok(api.holding, id);
         assert.equal(api.holding.at, HELD_AT, id);
         assert.deepEqual(asWaits(api.holding), cli.holding, id);
@@ -311,24 +311,24 @@ test('a person holds a run until another ships: the list, the page and the decis
         );
         const page = await detail(id);
         assert.deepEqual(
-          { heldUntil: page.heldUntil, holding: page.holding, moving: page.moving },
-          { heldUntil: api.heldUntil, holding: api.holding, moving: api.moving },
+          { holdUntil: page.holdUntil, holding: page.holding, moving: page.moving },
+          { holdUntil: api.holdUntil, holding: api.holding, moving: api.moving },
           id,
         );
       }
       assert.deepEqual(runs.get(GATE)!.holding, {
         at: HELD_AT,
-        runs: [{ run: 'p-live', missing: false, cancelledAt: null, gone: [], shipped: false }],
-        word: 'held until p-live ships',
-        advice: `nothing of ${GATE} is filed, and nothing is asked of you, until nemia decide says p-live has shipped; to go on before then: nemia hold ${GATE} --off`,
-        onYou: false,
+        runs: [{ run: 'p-live', missing: false, cancelledAt: null, gone: [], landed: false }],
+        word: 'held until p-live lands',
+        advice: `nothing of ${GATE} is filed, and nothing is asked of you, until nemia decide says p-live has landed; to go on before then: nemia hold ${GATE} --off`,
+        waitingOnYou: false,
       });
       assert.deepEqual(
-        [runs.get('p-live')!.heldUntil, runs.get('p-live')!.holding],
+        [runs.get('p-live')!.holdUntil, runs.get('p-live')!.holding],
         [[], null],
         'a run nobody holds says so with an empty list and a null, not a missing field',
       );
-      assert.deepEqual([(await detail('p-live')).heldUntil, (await detail('p-live')).holding], [[], null]);
+      assert.deepEqual([(await detail('p-live')).holdUntil, (await detail('p-live')).holding], [[], null]);
     },
   );
   await s.test(
@@ -337,7 +337,7 @@ test('a person holds a run until another ships: the list, the page and the decis
       const runs = await listed();
       for (const id of HELD) {
         const api = runs.get(id)!;
-        assert.deepEqual([api.waitingOnYou, api.onYou, api.toDecide], [[], [], null], id);
+        assert.deepEqual([api.waitingOnYou, api.waitingOnYouWords, api.toDecide], [[], [], null], id);
         const page = await detail(id);
         assert.deepEqual(
           page.steps.map((s) => [s.approve, s.raise, s.asked]),
@@ -358,7 +358,7 @@ test('a person holds a run until another ships: the list, the page and the decis
         try {
           const run = (await listed()).get(id)!;
           assert.deepEqual(
-            [run.heldUntil, run.holding, run.onYou],
+            [run.holdUntil, run.holding, run.waitingOnYouWords],
             [[], null, onYou],
             `${id}: the rule, not the fixture: it waits on you once the hold is lifted`,
           );
@@ -385,7 +385,7 @@ test('a person holds a run until another ships: the list, the page and the decis
       }
       const offered: Record<string, RegExp> = {
         [GATE]: /^nemia approve h-gate plan$/,
-        [LOOP]: /^nemia (round|accept) h-loop review/,
+        [LOOP]: /^nemia (retry h-loop review --round|approve h-loop review )/,
         [BUDGET]: /^nemia retry h-budget palette --budget/,
         [BLOCKS]: /^nemia retry h-blocked implement$/,
       };
@@ -439,34 +439,30 @@ test('a person holds a run until another ships: the list, the page and the decis
     },
   );
   await s.test(
-    "a hold that lifts only by a person's hand says so (`onYou`) — one naming no run, a run the store has none of, a cancelled run, a run whose branch is gone — and one on a run that may still ship, or has, does not",
+    "a hold that lifts only by a person's hand says so (`onYou`) — one naming no run, a run the store has none of, a cancelled run, a run whose branch is gone — and one on a run that may still land, or has, does not",
     async () => {
       const runs = await listed();
-      const onYou = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.holding!.onYou]));
-      assert.deepEqual(onYou, { live: false, shipped: false, cancelled: true, gone: true, missing: true, none: true });
+      const onYou = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.holding!.waitingOnYou]));
+      assert.deepEqual(onYou, { live: false, landed: false, cancelled: true, gone: true, missing: true, none: true });
       for (const kind of Object.keys(ON)) {
         const holding = runs.get(`h-on-${kind}`)!.holding!;
         assert.equal(
-          holding.onYou,
+          holding.waitingOnYou,
           holding.advice.includes('yours to'),
           `${kind}: held to nemia decide's own words rather than a copy of its rule: its advice names the way out exactly when a person has to act`,
         );
       }
-      assert.deepEqual(runs.get('h-on-shipped')!.holding!.runs, [
-        { run: 'p-shipped', missing: false, cancelledAt: null, gone: [], shipped: true },
+      assert.deepEqual(runs.get('h-on-landed')!.holding!.runs, [
+        { run: 'p-landed', missing: false, cancelledAt: null, gone: [], landed: true },
       ]);
-      assert.equal(
-        runs.get('h-on-shipped')!.holding!.word,
-        'held until p-shipped ships — it has shipped, and the next tick lifts the hold',
-      );
       assert.deepEqual(runs.get('h-on-cancelled')!.holding!.runs, [
-        { run: 'p-cancelled', missing: false, cancelledAt, gone: [], shipped: false },
+        { run: 'p-cancelled', missing: false, cancelledAt, gone: [], landed: false },
       ]);
       assert.deepEqual(runs.get('h-on-gone')!.holding!.runs, [
-        { run: 'p-gone', missing: false, cancelledAt: null, gone: ['wf/p-gone/implement'], shipped: false },
+        { run: 'p-gone', missing: false, cancelledAt: null, gone: ['wf/p-gone/implement'], landed: false },
       ]);
       assert.deepEqual(runs.get('h-on-missing')!.holding!.runs, [
-        { run: 'no-such-run', missing: true, cancelledAt: null, gone: [], shipped: false },
+        { run: 'no-such-run', missing: true, cancelledAt: null, gone: [], landed: false },
       ]);
       assert.equal(runs.get('h-on-none')!.holding!.word, 'held, on a hold that names no run');
     },
@@ -476,7 +472,7 @@ test('a person holds a run until another ships: the list, the page and the decis
     async () => {
       const runs = await listed();
       const moving = Object.fromEntries(Object.keys(ON).map((kind) => [kind, runs.get(`h-on-${kind}`)!.moving]));
-      assert.deepEqual(moving, { live: true, shipped: true, cancelled: false, gone: false, missing: false, none: false });
+      assert.deepEqual(moving, { live: true, landed: true, cancelled: false, gone: false, missing: false, none: false });
       for (const kind of Object.keys(ON)) assert.equal(runs.get(`h-on-${kind}`)!.status, 'running', kind);
       for (const id of [GATE, LOOP, BUDGET, BLOCKS])
         assert.equal(runs.get(id)!.moving, false, `${id}: a run that would wait on you unheld moves no more for being held`);
@@ -503,9 +499,9 @@ test('a person holds a run until another ships: the list, the page and the decis
   );
   await s.test('a held run called off reads as called off: no hold, nothing waiting on you, and nothing to decide', async () => {
     const run = (await listed()).get(CANCELLED)!;
-    assert.deepEqual([run.status, run.heldUntil, run.holding, run.waitingOnYou, run.moving], ['cancelled', [], null, [], false]);
+    assert.deepEqual([run.status, run.holdUntil, run.holding, run.waitingOnYou, run.moving], ['cancelled', [], null, [], false]);
     const page = await detail(CANCELLED);
-    assert.deepEqual([page.heldUntil, page.holding], [[], null]);
+    assert.deepEqual([page.holdUntil, page.holding], [[], null]);
     assert.deepEqual(await decisionOf(CANCELLED), { nothing: `cancelled at ${at(40)} — nothing to decide` });
     assert.equal((await runWith(engine(), list(engine(), runStore.runs.read(CANCELLED)))).holding, undefined);
   });
@@ -515,11 +511,11 @@ test('a person holds a run until another ships: the list, the page and the decis
       const run = (await listed()).get(AFTER)!;
       assert.ok(run.holding);
       assert.deepEqual(
-        run.holding.runs.map((w) => [w.run, w.shipped]),
+        run.holding.runs.map((w) => [w.run, w.landed]),
         [['p-live', false]],
-        'a hold names what has not shipped',
+        'a hold names what has not landed',
       );
-      assert.equal(run.holding.word, 'held until p-live ships');
+      assert.equal(run.holding.word, 'held until p-live lands');
       const body = await decisionOf(AFTER);
       assert.deepEqual(Object.keys(body).sort(), ['holding', 'waiting']);
       assert.ok('waiting' in body);
@@ -580,15 +576,15 @@ test('a hold lifted on the board is lifted as `nemia hold --off` lifts it, a han
     'a hold lifted on the board is lifted as `nemia hold --off` lifts it: its file gone, the list and the page say no hold, and the gate it hid is offered again',
     async () => {
       holdOn(LIFT, ['p-live']);
-      assert.equal((await listed()).get(LIFT)!.holding?.word, 'held until p-live ships');
+      assert.equal((await listed()).get(LIFT)!.holding?.word, 'held until p-live lands');
       const res = await lift(LIFT);
       assert.equal(res.status, 200);
       assert.deepEqual(await res.json(), { id: LIFT, lifted: true, hold: { at: HELD_AT, until: ['p-live'] } });
       assert.equal(fs.existsSync(holdFile(LIFT)), false);
       const run = (await listed()).get(LIFT)!;
-      assert.deepEqual([run.heldUntil, run.holding, run.onYou], [[], null, ['approve plan']]);
+      assert.deepEqual([run.holdUntil, run.holding, run.waitingOnYouWords], [[], null, ['approve plan']]);
       const page = await detail(LIFT);
-      assert.deepEqual([page.heldUntil, page.holding], [[], null]);
+      assert.deepEqual([page.holdUntil, page.holding], [[], null]);
       assert.equal(page.steps.find((s) => s.name === 'plan')!.approve !== null, true);
       const decided = await decisionOf(LIFT);
       assert.ok('commands' in decided, JSON.stringify(decided));
@@ -686,7 +682,7 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
     "a hold's why and who put it are in `holding.word` on the list and the detail, and in the note of the gate it holds back — the package's words, never the api's — and a lift answers them",
     async () => {
       holdOn(SAID, ['p-live'], { why: 'merge conflicts in five files', by: 'operator' });
-      const words = 'held until p-live ships (why: merge conflicts in five files; by operator)';
+      const words = 'held until p-live lands (why: merge conflicts in five files; by operator)';
       const run = runStore.runs.read(SAID);
       const cli = await runWith(engine(), list(engine(), run));
       const api = (await listed()).get(SAID)!;
@@ -696,7 +692,7 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
       const note = `${words}; its approval is asked once the hold lifts`;
       assert.equal(api.steps.find((s) => s.name === 'plan')!.note, note, "the list's gate note");
       assert.equal((await detail(SAID)).steps.find((s) => s.name === 'plan')!.note, note, "the page's gate note");
-      assert.equal((await listed()).get(GATE)!.holding?.word, 'held until p-live ships', 'a hold older code wrote says the plain line');
+      assert.equal((await listed()).get(GATE)!.holding?.word, 'held until p-live lands', 'a hold older code wrote says the plain line');
       const res = await lift(SAID);
       assert.equal(res.status, 200);
       assert.deepEqual(await res.json(), {
@@ -719,7 +715,7 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
       const by = os.userInfo().username;
       assert.deepEqual(answer, { id: PUT, lifted: false, hold: { at: answer.hold.at, until: ['p-live'], why: 'merge conflicts', by } });
       assert.deepEqual(JSON.parse(fs.readFileSync(holdFile(PUT), 'utf8')), answer.hold, 'the file is the hold the answer says');
-      const words = `held until p-live ships (why: merge conflicts; by ${by})`;
+      const words = `held until p-live lands (why: merge conflicts; by ${by})`;
       const run = runStore.runs.read(PUT);
       assert.equal(holdWord((await runWith(engine(), list(engine(), run))).holding!, run.hold), words, "nemia ls's line");
       assert.equal((await listed()).get(PUT)!.holding?.word, words);
@@ -732,7 +728,7 @@ test("a hold put on the board is put as `nemia hold --until --why --by` puts it,
     const res = await put(PUT, { until: ['p-live'], by: 'operator' });
     assert.equal(res.status, 200);
     assert.equal(((await res.json()) as { hold: { by?: string } }).hold.by, 'operator');
-    assert.equal((await listed()).get(PUT)!.holding?.word, 'held until p-live ships (by operator)');
+    assert.equal((await listed()).get(PUT)!.holding?.word, 'held until p-live lands (by operator)');
     assert.equal((await lift(PUT)).status, 200);
   });
 });
@@ -789,7 +785,7 @@ test('POST /api/runs/:id/hold refuses, writing nothing: arguments `nemia hold` r
     "REFUSED at shipped defaults: a hold `hold` refuses — a run already held, a cancelled run, a run to wait on the store does not have, the run itself, a run that waits on this one — is a 409 in `nemia hold`'s words, and nothing is written",
     async () => {
       const cases: Array<[string, string[], string]> = [
-        [GATE, ['p-shipped'], 'is already held until p-live ships'],
+        [GATE, ['p-landed'], 'is already held until p-live lands'],
         [CANCELLED, ['p-live'], 'was cancelled at'],
         [PUT, ['p-nope'], 'the store has no run p-nope'],
         [PUT, [PUT], 'that is h-put itself'],

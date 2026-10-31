@@ -16,9 +16,9 @@ import { story } from '../../test/checkpoints.ts';
 import { app, runtime } from '../app.ts';
 import { ReadMemo } from '../layer.ts';
 import { workflowVersion as versionIn } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 import { listWorkflows } from './workflows.ts';
-import { engine, shippedGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
+import { engine, builtinGitPlace, hireRefusalOf, loadWorkflows, passStanding, runStore } from 'agent-orchestrator';
 import { AGENTS_FOLDER, STEP_KEY_MEANINGS, STEP_KEYS } from 'agent-orchestrator/workflow';
 /** The scratch repository, set as `HKB_REPO`, which the api reads on each request: a git repository, as `nemia start` reads its HEAD. */
 const repo = scratch('nemia-api-repo-');
@@ -521,7 +521,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
       assert.equal(listed.workflowDir, good, 'the board lists it, with the folder it was started from');
       assert.deepEqual(
         listed.steps.map((s) => s.status),
-        ['waiting', 'waiting'],
+        ['pending', 'pending'],
       );
     },
   );
@@ -552,7 +552,7 @@ test('a person starts runs from the board: the record as `nemia start` writes it
     'POST /api/runs takes `after` and passes it to `startRun`, which freezes it on the record as `nemia start --after` does — and the board reads the run waiting on it',
     async () => {
       parents();
-      const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it ships.', after: ['p-running'] });
+      const res = await post({ workflow: 'good', from: 'repo', brief: 'Once it lands.', after: ['p-running'] });
       assert.equal(res.status, 201, await res.clone().text());
       const { id } = (await res.json()) as { id: string };
       assert.deepEqual(runStore.runs.read(id).after, ['p-running']);
@@ -714,7 +714,7 @@ test('POST /api/runs: what a start refuses, writing nothing, and the name two pl
       write(path.join(clash, 'build.md'), '---\nplace: git\ncheck: npm run build\n---\nBuild it.\n');
       write(path.join(clash, 'build-check.md'), '---\nafter: build\nplace: git\n---\nCheck the build by hand.\n');
       assert.equal(
-        (await listWorkflows(engine(), shippedGitPlace, repo, root)).find((w) => w.name === 'clash')?.error,
+        (await listWorkflows(engine(), builtinGitPlace, repo, root)).find((w) => w.name === 'clash')?.error,
         null,
         "the loader reads this folder; `nemia start` refuses it, as the run files build's check as `build-check`",
       );

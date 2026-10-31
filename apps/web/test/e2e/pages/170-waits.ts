@@ -15,7 +15,7 @@ export default {
       banner.getByText(DIAMOND.words.orphan, { exact: true }),
       `the page says what wf ls says of ${orphan.id}: ${DIAMOND.words.orphan}`,
     );
-    const advice = `${cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never ships — yours to resolve: nemia cancel ${orphan.id}, or start the work again without --after ${cancelled.id}`;
+    const advice = `${cancelled.id} was cancelled at ${cancelledAt()}, and a cancelled run never lands — yours to resolve: nemia cancel ${orphan.id}, or start the work again without --after ${cancelled.id}`;
     await expectVisible(banner.locator('[data-advice]', { hasText: advice }), 'and what wf decide leaves you to do, word for word');
     await expectVisible(banner.locator(`a[href="/runs/${cancelled.id}"]`), `${cancelled.id} is linked to its page`);
     await expectVisible(

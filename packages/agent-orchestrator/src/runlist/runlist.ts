@@ -17,8 +17,8 @@ export type Listed = {
   status: string;
   moving: boolean;
   waitingOnYou: readonly string[];
-  waiting: { onYou: boolean } | null;
-  holding: { onYou: boolean } | null;
+  waiting: { waitingOnYou: boolean } | null;
+  holding: { waitingOnYou: boolean } | null;
   atWork: { endedAt: string | null } | null;
   toDecide: { kind: string } | null;
 };
@@ -48,11 +48,11 @@ export const PAGE_SIZE = 9;
 export const PAGE_MAX = 100;
 
 /**
- * Whether a run waits on a person: nobody called it off, and a step of it waits on one, or a run it waits on never ships without one,
+ * Whether a run waits on a person: nobody called it off, and a step of it waits on one, or a run it waits on never lands without one,
  * or a hold on it only a person lifts.
  */
 const waitsOnPerson = (run: Listed): boolean =>
-  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou) || Boolean(run.holding?.onYou));
+  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
 
 /**
  * The kind of a listed run, asked in this order so each run has one: `waiting`, it waits on a person, though something of it may still
@@ -60,7 +60,7 @@ const waitsOnPerson = (run: Listed): boolean =>
  */
 export const kindOf = (run: Listed): RunKind => {
   if (waitsOnPerson(run)) return 'waiting';
-  if (run.moving || (run.status === 'running' && !run.waiting?.onYou && !run.holding?.onYou)) return 'inFlight';
+  if (run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou)) return 'inFlight';
   return 'finished';
 };
 

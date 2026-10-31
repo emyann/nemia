@@ -138,7 +138,7 @@ export type Status = {
 };
 
 /** What `land` answers: the commit that landed the staged merge, or that the merge was taken back. */
-export type Landed = { readonly commit: string } | { readonly aborted: true };
+export type PlaceLanded = { readonly commit: string } | { readonly aborted: true };
 
 /**
  * One workspace a run left, as `inventory` reads it: where, for which step, on what, and whether it holds anything no commit has — `clean`
@@ -187,7 +187,7 @@ export type PlaceAnswers = {
   readonly standing: Standing;
   readonly trial: Trials;
   readonly status: Status;
-  readonly land: Landed;
+  readonly land: PlaceLanded;
   readonly inventory: Inventory;
   readonly remove: Removed;
   readonly export: Exported;

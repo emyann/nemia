@@ -5,7 +5,7 @@
  * the runtime's: a person hovering over a chip reads what the state means to them, never how it is kept.
  */
 import type { RunOutcome } from './api/runs.ts';
-import type { CheckVerdict, StepReason } from './api/reasons.ts';
+import type { CheckVerdict, WaitOn } from './api/reasons.ts';
 import type { StepState } from './status.ts';
 
 /** A wait on a person, as its words read it: the step that waits, none for a wait of the run's own, and how many steps are done. */
@@ -133,7 +133,7 @@ export const PERSON: Record<StepState, PersonWords> = {
   },
   held: {
     rail: 'held',
-    meaning: 'A person holds the run until other runs ship, so nothing of it starts and nothing is asked of you until the hold lifts.',
+    meaning: 'A person holds the run until other runs land, so nothing of it starts and nothing is asked of you until the hold lifts.',
     ...NONE,
   },
   cancelled: { rail: 'called off', meaning: 'The run was called off.', ...NONE },
@@ -152,9 +152,9 @@ export const PAUSED: Pick<PersonWords, 'rail' | 'meaning'> = {
   meaning: 'It signed off, and its check runs once the factories are resumed.',
 };
 
-/** The rail word and meaning of a step by its state, and by its reason where a state has a wait of its own (the pause's). */
-export const stateWordsOf = (state: StepState, reason: StepReason): Pick<PersonWords, 'rail' | 'meaning'> =>
-  state === 'waiting' && reason === 'WaitingForPause' ? PAUSED : PERSON[state];
+/** The rail word and meaning of a step by its state, and by what it waits on where a state has a wait of its own (the pause's). */
+export const stateWordsOf = (state: StepState, on: WaitOn | null): Pick<PersonWords, 'rail' | 'meaning'> =>
+  state === 'waiting' && on === 'pause' ? PAUSED : PERSON[state];
 
 /**
  * A check's verdict as a person reads it, from its codes: `passed`, `exit 1` for the code it failed with (`failed` where it gave none),
@@ -167,7 +167,7 @@ export function verdictWords({ result, exit }: CheckVerdict): string {
 
 /**
  * The words of the waits a run has of its own, which no step's state says: a hold only a person lifts, a run it waits on that never
- * ships without a person, and a check that did not finish, which refused nothing.
+ * lands without a person, and a check that did not finish, which refused nothing.
  */
 export const RUN_WAITS: Record<'hold' | 'after' | 'unfinished', WaitWords> = {
   hold: { tag: () => 'held by you', sentence: () => 'You hold this run. It moves once you lift the hold.', open: opens },

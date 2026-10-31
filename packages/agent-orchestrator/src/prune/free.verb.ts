@@ -1,5 +1,5 @@
 /**
- * The daemon's retention of worktrees: a run that is finished — shipped, or cancelled — has its worktrees removed with no person's act
+ * The daemon's retention of worktrees: a run that is finished — landed, or cancelled — has its worktrees removed with no person's act
  * (`freeOnce`, one sweep; `free`, the loop the daemon forks). It is `nemia prune <id> --yes` with no flag, asked of each finished run:
  * the same judgement (`judging`), sizing (`sized`) and removal (`freeing`), so what a person's prune keeps is kept and what it refuses
  * is refused. A controller: it reads the runs a pass answered and the disk on every sweep, and carries nothing a restart must not lose.

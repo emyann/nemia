@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Run } from '../src/run.ts';
-import type { PersonAsk } from '../src/record/record.ts';
+import type { PersonRequest } from '../src/record/record.ts';
 import { scratch } from './scratch.ts';
 
 const ROOT = scratch('wf-run-store-');
@@ -251,24 +251,24 @@ test('a pass files nothing for a run whose record is gone', () => {
 });
 
 /** One ask of each kind a person writes, with the path the tick reads it at and its reader's words for a file there that is not one. */
-const asksOfEachKind = (id: string): Array<{ asked: PersonAsk; file: string; stray: (file: string) => unknown }> => [
+const asksOfEachKind = (id: string): Array<{ asked: PersonRequest; file: string; stray: (file: string) => unknown }> => [
   {
-    asked: { kind: 'retry', ask: { step: 'implement', try: 2, mode: 'fresh', message: 'again', at } },
+    asked: { kind: 'retry', of: 'try', ask: { step: 'implement', try: 2, mode: 'fresh', message: 'again', at } },
     file: askFile(id, 'implement', 2),
     stray: (file) => askIn(file, 'implement', 2),
   },
   {
-    asked: { kind: 'round', ask: { step: 'review', round: 3, at } },
+    asked: { kind: 'retry', of: 'round', ask: { step: 'review', round: 3, at } },
     file: roundAskFile(id, 'review', 3),
     stray: (file) => roundAskIn(file, 'review', 3),
   },
   {
-    asked: { kind: 'approve', ask: { step: 'implement', try: 1, at, message: 'yes' } },
+    asked: { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at, message: 'yes' } },
     file: approvalFile(id, 'implement', 1),
     stray: (file) => approvalIn(file, 'implement', 1),
   },
   {
-    asked: { kind: 'accept', ask: { step: 'review', try: 1, at, message: 'good enough' } },
+    asked: { kind: 'approve', of: 'loop', ask: { step: 'review', try: 1, at, message: 'good enough' } },
     file: acceptFile(id, 'review', 1),
     stray: (file) => acceptanceIn(file, 'review', 1),
   },
@@ -277,10 +277,10 @@ const asksOfEachKind = (id: string): Array<{ asked: PersonAsk; file: string; str
 test('an ask of each kind is written at the name the tick reads it by, holding the ask alone, and answered where it is', () => {
   const run = made('r-write-asks');
   for (const { asked, file } of asksOfEachKind(run.id)) {
-    const n = asked.kind === 'round' ? asked.ask.round : asked.kind === 'merge' ? asked.ask.merge.try : asked.ask.try;
-    assert.equal(filesStore.asks.where(run.id, { kind: asked.kind, step: asked.ask.step, n }), file);
+    const n = asked.of === 'round' ? asked.ask.round : asked.of === 'base' ? asked.ask.merge.try : asked.ask.try;
+    assert.equal(filesStore.asks.where(run.id, { of: asked.of, step: asked.ask.step, n }), file);
     assert.deepEqual(filesStore.asks.write(run.id, asked), { written: true, where: file });
-    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), asked.ask, `${asked.kind} is written as the ask alone`);
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), asked.ask, `${asked.of} is written as the ask alone`);
   }
   const read = filesStore.asks.read(run.id);
   assert.equal(read.asks.length, 1);
@@ -291,9 +291,9 @@ test('an ask of each kind is written at the name the tick reads it by, holding t
 test('a merge ask is written at its target and try, holding its loop, round, base and commit, and read back as a round ask of its loop', () => {
   const run = made('r-write-merge');
   const merge = { target: 'implement', try: 3, onto: 'main', sha: 'a'.repeat(40) };
-  const file = filesStore.asks.where(run.id, { kind: 'merge', step: 'implement', n: 3 });
+  const file = filesStore.asks.where(run.id, { of: 'base', step: 'implement', n: 3 });
   assert.match(file, /merge-implement-3$/);
-  assert.deepEqual(filesStore.asks.write(run.id, { kind: 'merge', ask: { step: 'review', round: 2, at, merge } }), {
+  assert.deepEqual(filesStore.asks.write(run.id, { kind: 'refresh', of: 'base', ask: { step: 'review', round: 2, at, merge } }), {
     written: true,
     where: file,
   });
@@ -306,7 +306,7 @@ test('an ask written over one already there is refused as no stray, and the firs
   for (const { asked, file } of asksOfEachKind(run.id)) {
     filesStore.asks.write(run.id, asked);
     const first = fs.readFileSync(file, 'utf8');
-    const again = { ...asked, ask: { ...asked.ask, at: '2026-10-01T00:00:00.000Z' } } as PersonAsk;
+    const again = { ...asked, ask: { ...asked.ask, at: '2026-10-01T00:00:00.000Z' } } as PersonRequest;
     assert.deepEqual(filesStore.asks.write(run.id, again), { written: false, where: file, stray: null });
     assert.equal(fs.readFileSync(file, 'utf8'), first);
   }
@@ -368,7 +368,7 @@ test("a run forgotten loses its record and every person's file and its directory
     filesStore.runs.cancel(id);
     pruned(id);
     filesStore.holds.put(id, ['x'], {});
-    filesStore.asks.write(id, { kind: 'approve', ask: { step: 'implement', try: 1, at } });
+    filesStore.asks.write(id, { kind: 'approve', of: 'gate', ask: { step: 'implement', try: 1, at } });
     fs.mkdirSync(path.join(runsDir(), id, 'artifacts'), { recursive: true });
     fs.writeFileSync(path.join(runsDir(), id, 'artifacts', 'x'), 'x');
   }

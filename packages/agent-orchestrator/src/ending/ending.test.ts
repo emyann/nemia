@@ -121,7 +121,7 @@ test('landingDue commits, aborts, waits or records', async (t) => {
   const { head: _, ...headless } = STAGED;
   const aborts: Array<[string, () => unknown, object]> = [
     [
-      'a check that refused names the base it was staged on, for `nemia merge`',
+      'a check that refused names the base it was staged on, for `nemia refresh --base`',
       () => due(atLanding(), 'checking', 'succeeded', 'failed', STAGED, 'm', 1),
       { ...abort('its check refused the merge (exit 1)'), refusedOn: 'base000' },
     ],
@@ -281,7 +281,7 @@ test('landingOpen holds the checkout from the filing to the landing, and lets go
     ['blocked with its merge left staged', atLanding(), 'blocked', 'succeeded', undefined, 'ours', true],
     ['blocked, the checkout clean', atLanding(), 'blocked', 'succeeded', undefined, 'none', false],
     ['landed', atLanding({}, { landed: { commit: 'merged0' } }), 'verified', 'succeeded', 'succeeded', 'none', false],
-    ['at its gate, nothing filed', atLanding({}, { taskId: null }), 'waiting', 'unknown', undefined, 'none', false],
+    ['at its gate, nothing filed', atLanding({}, { taskId: null }), 'pending', 'unknown', undefined, 'none', false],
   ];
   for (const [name, r, own, ship, check, merging, open] of rows)
     await t.test(name, () => {
@@ -295,7 +295,7 @@ test('landingOpen holds the checkout from the filing to the landing, and lets go
 
 test('landedWords says what the run did with the merge: the commit, or why none', async (t) => {
   await t.test('a commit, by its short sha', () =>
-    assert.equal(landedWords({ branch: 'main' }, { commit: '0123456789abcdef' }), 'the run committed its merge onto main as 0123456'),
+    assert.equal(landedWords({ branch: 'main' }, { commit: '0123456789abcdef' }), 'the run landed on main as 0123456'),
   );
   await t.test('an abort, with why', () =>
     assert.equal(

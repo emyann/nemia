@@ -12,6 +12,50 @@ import type { CommandClass } from '../admission/index.ts';
 export const CLI = 'nemia';
 
 /**
+ * Each command renamed, by its former first word: `nemia auto …` is `nemia policy …`, and a verb another absorbed is that verb with the
+ * flag that says it — `nemia round` is `nemia retry --round`, `nemia merge` is `nemia refresh --base`, `nemia accept` is `nemia approve`
+ * (decision 7). A command line that opens with a former word is still run, as the name it became, and admission reads it as that name
+ * too, so the old spelling reaches no rule the new one would not.
+ */
+export const RENAMED: ReadonlyMap<string, { readonly to: string; readonly flag?: string }> = new Map([
+  ['auto', { to: 'policy' }],
+  ['round', { to: 'retry', flag: '--round' }],
+  ['merge', { to: 'refresh', flag: '--base' }],
+  ['accept', { to: 'approve' }],
+]);
+
+/** Each flag renamed, by the command that takes it and its former spelling: `nemia retry --nudge` is `nemia retry --continue`. */
+export const RENAMED_FLAGS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([['retry', new Map([['--nudge', '--continue']])]]);
+
+/** `rest`, the words after a command's name, with `flag` before the first flag among them, or after them where none is. */
+const withFlag = (rest: readonly string[], flag: string | undefined): string[] => {
+  if (flag === undefined) return [...rest];
+  const at = rest.findIndex((w) => w.startsWith('-'));
+  return at === -1 ? [...rest, flag] : [...rest.slice(0, at), flag, ...rest.slice(at)];
+};
+
+/**
+ * `words`, a command line's words after the program, its first word put to the name it became where it is a former one (`RENAMED`), the
+ * flag that says the absorbed verb added before its other flags, and each former flag of the command put to its new spelling
+ * (`RENAMED_FLAGS`); with the hint naming what to type now, or `words` as given and no hint.
+ */
+export function renamedIn(words: readonly string[]): { words: string[]; hint?: string } {
+  const first = words[0];
+  const now = first === undefined ? undefined : RENAMED.get(first);
+  const named = now === undefined ? [...words] : [now.to, ...withFlag(words.slice(1), now.flag)];
+  const flags = RENAMED_FLAGS.get(named[0] ?? '');
+  const former = flags === undefined ? [] : named.slice(1).filter((w) => flags.has(w));
+  if (now === undefined && !former.length) return { words: [...words] };
+  const rewritten = flags === undefined ? named : [named[0], ...named.slice(1).map((w) => flags.get(w) ?? w)];
+  const was = [...(now !== undefined ? [`${CLI} ${first}`] : []), ...former];
+  const is = [...(now !== undefined ? [`${CLI} ${now.to}${now.flag ? ` ${now.flag}` : ''}`] : []), ...former.map((f) => flags!.get(f)!)];
+  return {
+    words: rewritten,
+    hint: `${was.join(' and ')} ${was.length > 1 ? 'are' : 'is'} now ${is.join(' and ')}: type \`${[CLI, ...rewritten].join(' ')}\`; the former spelling stays accepted until a later release removes it.`,
+  };
+}
+
+/**
  * What a command is handed: each argument by its key — text, dollars for an amount, true for a switch that has a key, every value in order
  * for a flag given once for each — and nothing for one not given.
  */

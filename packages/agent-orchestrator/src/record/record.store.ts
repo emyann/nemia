@@ -231,9 +231,9 @@ export function readPruned(id: string): Pruned | undefined {
 }
 
 /**
- * That a person holds the run until other runs ship (`nemia hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for
+ * That a person holds the run until other runs land (`nemia hold`): `{ at, until, why?, by? }`, a person's fact in a file of its own for
  * the reason `cancelFile` is. Written by `hold` alone, exclusively; removed by `nemia hold --off`, by the tick once every run it names has
- * shipped (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within
+ * landed (`removeHold`), and by `nemia rm` with the run. Composed onto the run on read as `hold`, its `why` and `by` each one line within
  * its cap.
  */
 export const holdFile = (id: string) => path.join(runsDir(), `${id}.hold`);
@@ -252,7 +252,7 @@ function readHold(id: string): Hold | undefined {
 }
 
 /**
- * Write down that this run is held until `until` ship, with the person's `why` and who they are (`by`) when given, and answer with the
+ * Write down that this run is held until `until` land, with the person's `why` and who they are (`by`) when given, and answer with the
  * hold written — or null, when a hold already stands. `wx`, so a hold two people put at once is the first one's, whole, and a hold is
  * never edited: changing what it names or says is `--off` and a new hold.
  */
@@ -270,7 +270,7 @@ export const writeHold = (id: string, until: readonly string[], { why, by }: Pic
 
 /**
  * Lift a hold — the one put at `at`, and only while it still stands: false when the file is gone or holds a hold put since. The tick reads
- * the hold, spends seconds asking git and the engine whether its runs shipped, and lifts it; a person who lifted it and held the run again
+ * the hold, spends seconds asking git and the engine whether its runs landed, and lifts it; a person who lifted it and held the run again
  * in those seconds put a hold the tick never read, and it stays.
  */
 export const removeHold = (id: string, at: string): boolean => {
@@ -358,13 +358,13 @@ export const markCancelled = (id: string): string => {
  * pass that dies after filing the try and before consuming the ask files nothing more, because the next pass
  * finds the try on the board (`adoptTries`) or on the record (`spentAsks`).
  *
- * `nemia round` is the same, in `round-<step>-<n>`: the looping step, and the round it asks for (`adoptRounds`, `spentRoundAsks`); and
- * `nemia merge`, in `merge-<step>-<n>`, read and consumed beside the rest (`readMergeAsks`, `consumeMergeAsks`).
+ * `nemia retry --round` is the same, in `round-<step>-<n>`: the looping step, and the round it asks for (`adoptRounds`, `spentRoundAsks`);
+ * and `nemia refresh --base`, in `merge-<step>-<n>`, read and consumed beside the rest (`readMergeAsks`, `consumeMergeAsks`).
  *
  * `nemia approve` too, in `approve-<step>-<n>`: the gated step, and the try it approves. It is never consumed while it opens the gate — the
  * record holds no approval, and every pass reads the file (`readRun`) — only once a later try of the step spent it (`spentApprovals`).
  *
- * And `nemia accept`, in `accept-<step>-<n>`: the looping step whose loop a person ended as it stands, and the try they accepted. Read and
+ * And `nemia approve`, in `accept-<step>-<n>`: the looping step whose loop a person ended as it stands, and the try they accepted. Read and
  * spent exactly as an approval is (`readAcceptances`, `spentAcceptances`) — every pass reads the file, so the loop stays ended after a
  * restart, and a later try of the step takes it back.
  */
@@ -409,13 +409,13 @@ function readApprovalsNow(id: string, names = fileNames(asksDir(id))): { approva
 }
 
 /**
- * The ask files a person's verbs write (`nemia approve`, `nemia accept`, `nemia round`, `nemia retry`), each checked for what the verb
- * refuses to write, in the order the verb checks it, so a file written by hand is held to the verb's word. `at` is read leniently where the
- * tick never reads it as a time (a round, a retry). A key none of them names is kept, as a newer `nemia` may write one.
+ * The ask files a person's verbs write (`nemia approve` at a gate and of a loop, `nemia retry` with `--round` and without), each checked
+ * for what the verb refuses to write, in the order the verb checks it, so a file written by hand is held to the verb's word. `at` is read
+ * leniently where the tick never reads it as a time (a round, a retry). A key none of them names is kept, as a newer `nemia` may write one.
  */
 const Said = Schema.String.check(Schema.makeFilter((text: string) => text.trim() !== ''));
 export const When = Schema.String.check(Schema.makeFilter((at: string) => !Number.isNaN(Date.parse(at))));
-/** An amount an ask file may carry as its budget: dollars above zero, as `nemia retry --budget` and `nemia round --budget` write one. */
+/** An amount an ask file may carry as its budget: dollars above zero, as `nemia retry --budget`, with `--round` or without, writes one. */
 const Dollars = Schema.Finite.check(Schema.isGreaterThan(0));
 const BUDGET_WORDS = 'its budget is not an amount of dollars above zero';
 
@@ -482,7 +482,7 @@ function readAcceptancesNow(id: string, names = fileNames(asksDir(id))): { accep
     if (!took) continue;
     const file = path.join(asksDir(id), name);
     const read = acceptanceIn(file, took[1], Number(took[2]));
-    if (typeof read === 'string') notes.push(`${file}: ${read}, so it ends no loop — remove it, and accept with nemia accept`);
+    if (typeof read === 'string') notes.push(`${file}: ${read}, so it ends no loop — remove it, and accept with nemia approve`);
     else acceptances.push(read);
   }
   return { acceptances, notes };
@@ -490,7 +490,7 @@ function readAcceptancesNow(id: string, names = fileNames(asksDir(id))): { accep
 
 /**
  * One acceptance file, read: the looping step and the try from its name, when and what was said from what it holds — or why it cannot be
- * read. What `nemia accept` refuses to write is refused here too, so a file written by hand is held to the verb's word: an acceptance with
+ * read. What `nemia approve` refuses to write is refused here too, so a file written by hand is held to the verb's word: an acceptance with
  * no words ends a loop with findings open and tells the steps after it nothing, which is the whole of what it is for.
  */
 export function acceptanceIn(file: string, step: string, n: number): Acceptance | string {
@@ -499,7 +499,7 @@ export function acceptanceIn(file: string, step: string, n: number): Acceptance 
   const read = readAs(AcceptanceFileSchema, held.read);
   if ('refused' in read) {
     if (read.refused === 'at') return 'it says no time it was given';
-    if (read.refused !== 'message') return 'it is not an acceptance nemia accept wrote';
+    if (read.refused !== 'message') return 'it is not an acceptance nemia approve wrote';
     return isText(fieldOf(held.read, 'message'))
       ? 'its message is empty, and an acceptance is nothing but its reason'
       : 'it says nothing of why the work is good enough with its findings open';
@@ -531,7 +531,7 @@ function readAsksNow(id: string): AsksRead {
       else read.asks.push(ask);
     } else if (again) {
       const ask = roundAskIn(file, again[1], Number(again[2]));
-      if (typeof ask === 'string') read.notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia round`);
+      if (typeof ask === 'string') read.notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia retry --round`);
       else read.rounds.push(ask);
     }
   }
@@ -543,7 +543,7 @@ export function roundAskIn(file: string, step: string, round: number): RoundAsk 
   const held = heldIn(file);
   if ('unreadable' in held) return held.unreadable;
   const read = readAs(RoundAskFileSchema, held.read);
-  if ('refused' in read) return read.refused === 'budget' ? BUDGET_WORDS : 'it is not an ask nemia round wrote';
+  if ('refused' in read) return read.refused === 'budget' ? BUDGET_WORDS : 'it is not an ask nemia retry --round wrote';
   const { at, budget } = read.read;
   return { step, round, ...(budget === undefined ? {} : { budget }), at: isText(at) ? at : '' };
 }

@@ -16,7 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -37,14 +37,14 @@ git(repo, 'add', '-A');
 git(repo, 'commit', '-q', '-m', 'base');
 const base = git(repo, 'rev-parse', 'HEAD').trim();
 
-/** A branch off main with one commit of work on it, merged into main when the run it is the result of has `shipped`. */
-function worked(branch: string, shipped = false) {
+/** A branch off main with one commit of work on it, merged into main when the run it is the result of has `landed`. */
+function worked(branch: string, landed = false) {
   git(repo, 'checkout', '-q', '-b', branch);
   write(path.join(repo, `${branch.replaceAll('/', '-')}.txt`), branch);
   git(repo, 'add', '-A');
   git(repo, 'commit', '-q', '-m', `the work of ${branch}`);
   git(repo, 'checkout', '-q', 'main');
-  if (shipped) git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${branch}`, branch);
+  if (landed) git(repo, 'merge', '-q', '--no-ff', '-m', `merge ${branch}`, branch);
 }
 
 const at = '2026-09-28T09:00:00.000Z';

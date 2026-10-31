@@ -8,7 +8,7 @@
  * At shipped defaults: the api's own engine over a store this file seeds, git for real — branches, a merge, a worktree cut for each run —
  * and the harness's fake `claude` (test/harness.ts) first on PATH. The runs it seeds: `p-merged`, `p-unmerged` and `p-running`, repository
  * runs of one step; `p-failed-merged`, whose step failed and whose branch a person merged by hand all the same — on the base, however it
- * got there, so shipped; `p-direct`, which worked on main itself (`--no-worktree`), with no branch of its own to merge, and waits on your
+ * got there, so landed; `p-direct`, which worked on main itself (`--no-worktree`), with no branch of its own to merge, and waits on your
  * decision all the same; and `p-folder`, a folder run whose one step signed off: its folder is its work, and never pruned.
  */
 import { root } from '../../test/harness.ts';
@@ -19,7 +19,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Pruning } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
 import { engine, prune, prunedKept, prunedWords, runStore, type RunSummary } from 'agent-orchestrator';

@@ -50,7 +50,7 @@ export type StepCost = { step: string; cost: Spent | null };
  * A run that waits on a person: beyond every row's `clock`, `stepCosts`, the cost of each of its steps in the summary's order, and
  * `waitingSince`, when its present wait on a person began (`waitingSinceOf`): the end of the waiting step's last try or the placing of
  * a hold only a person lifts, the earliest where several are open. Both null for a run a task of which does not read, or whose record
- * is gone since the list was read; `waitingSince` null too for a wait the record does not date, as one on a run that never ships.
+ * is gone since the list was read; `waitingSince` null too for a wait the record does not date, as one on a run that never lands.
  */
 export type WaitingRun = ListedRun & { stepCosts: StepCost[] | null; waitingSince: string | null };
 
@@ -130,7 +130,7 @@ const listedAt =
 function brokenDown(summary: RunSummary, broken: Broken, home: string): Pick<WaitingRun, 'stepCosts' | 'waitingSince'> {
   const run = broken.byId.get(summary.id);
   if (!run || unreadableOf(run, broken.unreadable)) return { stepCosts: null, waitingSince: null };
-  const held = summary.holding?.onYou ? summary.holding.at : null;
+  const held = summary.holding?.waitingOnYou ? summary.holding.at : null;
   return {
     stepCosts: summary.steps.map(({ name }) => ({
       step: name,

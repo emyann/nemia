@@ -237,10 +237,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
   }, [names, computed, run.id]);
 
   const runHeld = run.holding != null;
-  const states = useMemo(
-    () => new Map(run.steps.map((s) => [s.name, stepState(s.phase, s.reason, runCancelled, runHeld)])),
-    [run, runCancelled, runHeld],
-  );
+  const states = useMemo(() => new Map(run.steps.map((s) => [s.name, stepState(s, runCancelled, runHeld)])), [run, runCancelled, runHeld]);
 
   const nodes = useMemo(() => {
     const indexOf = new Map(run.steps.map((s, i) => [s.name, i]));
@@ -307,7 +304,7 @@ function Canvas({ run, computed }: Props & { computed: ReadonlyMap<string, Point
           pannable
           zoomable
           style={{ width: 128, height: 88 }}
-          nodeColor={(node) => stepMinimapFill[stepState(node.data.step.phase, node.data.step.reason, runCancelled, runHeld)]}
+          nodeColor={(node) => stepMinimapFill[stepState(node.data.step, runCancelled, runHeld)]}
         />
       </ReactFlow>
     </div>

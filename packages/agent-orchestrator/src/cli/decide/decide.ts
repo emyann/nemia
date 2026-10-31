@@ -99,7 +99,7 @@ which files (others, collides), and a merge clean as text whose landing check re
 now (semantic). Then what is left to decide. A workflow whose last step is an ending, gated, says in its own prose
 what happens when the work is done; that prose is printed with the nemia approve that runs it and the nemia
 retry --message that sends the work back. A workflow with no such step ends by handing you a branch, and
-the git commands are printed instead: ship it, drop it. Neither is run.
+the git commands are printed instead: land it, drop it. Neither is run.
 
   --sensitive <globs>  comma-separated globs whose changed files are printed in full instead, for this
                        screen; the touched lines still say which files are check-affecting
@@ -140,11 +140,11 @@ export function decideHow(argv: string[]): { sensitive?: string[] } {
  * others (`--after`), held (`nemia hold`), or held by the cap on runs in flight is offered nothing: its screen says what it waits on, and a
  * hold beside a wait says that lifting it does not start the run. A running run's screen says what a step its harness blocked waits for,
  * and the tries and rounds the next tick files, but a try the repository's checkout holds; an ending waiting for that checkout is said
- * there and on the deciding screen. A shipped run whose ending never ran says so, as `nemia ls` still shows it at its gate. A pruned run
+ * there and on the deciding screen. A landed run whose ending never ran says so, as `nemia ls` still shows it at its gate. A pruned run
  * waits on nobody (`prunedRefusal`): how each step ended is said, and not that it waits on you. A run a task journal of which does not read
  * fails with the runtime's words (`unjudgedOf`). Each step's closeout, in the order the steps run (`namesInOrder`), is read off the
  * engine's record, never a branch, so a dropped branch keeps its review. The top-level markdown files a branch added are printed, 120 lines
- * at most. The git commands to ship or drop are printed only where no step merges (`merges`), never for a run that worked on its base
+ * at most. The git commands to land or drop are printed only where no step merges (`merges`), never for a run that worked on its base
  * branch itself (`--no-worktree`), and a folder run is offered `nemia rm` alone.
  */
 export async function decideVerb(rest: string[], e: Engine, place: Place): Promise<void> {
@@ -209,7 +209,7 @@ function heldOutOf(steps: Steps, checkout: Decided['checkout']): HeldOut {
 
 /**
  * Prints the whole screen of a run with nothing to decide — cancelled, waiting on others, held, held by the cap on runs in flight, running
- * or shipped — and returns undefined; returns the decision of a run awaiting a person, and prints nothing.
+ * or landed — and returns undefined; returns the decision of a run awaiting a person, and prints nothing.
  */
 function standstill(d: Decided, head: string, steps: Steps, out: HeldOut): Awaiting | undefined {
   const { run, decision } = d;
@@ -221,7 +221,7 @@ function standstill(d: Decided, head: string, steps: Steps, out: HeldOut): Await
       `${head}\n\n  ${slotWord(d.held)}\n  nothing of ${run.id} is filed until a run in flight settles, oldest held first; nothing to decide yet`,
     );
   else if (decision.kind === 'running') printRunning(d, decision.waiting, head, steps, out);
-  else if (decision.kind === 'shipped') printShipped(run, decision.branches, head, steps);
+  else if (decision.kind === 'landed') printLanded(run, decision.branches, head, steps);
   else return decision;
   return undefined;
 }
@@ -263,13 +263,13 @@ function printRunning(d: Decided, waiting: string[], head: string, steps: Steps,
   console.log('  nothing to decide yet');
 }
 
-/** The screen of a shipped run: its branches on the base branch, and an ending approved first that never ran. */
-function printShipped(run: Decided['run'], branches: string[], head: string, steps: Steps): void {
+/** The screen of a landed run: its branches on the base branch, and an ending approved first that never ran. */
+function printLanded(run: Decided['run'], branches: string[], head: string, steps: Steps): void {
   const unrun = steps.find((s) => approvedFirst(s, run) && !run.steps[s.name]?.taskId);
   const never = unrun
     ? `\n  ${unrun.name} never ran: nothing is left for it to merge, and nothing waits on you — close the record if you want it closed: nemia cancel ${run.id}`
     : '';
-  console.log(`${head}\n\n  shipped — ${branches.join(', ')} is already on ${run.branch}${never}`);
+  console.log(`${head}\n\n  landed — ${branches.join(', ')} is already on ${run.branch}${never}`);
 }
 
 /**
@@ -312,38 +312,38 @@ function printRefusals(run: Decided['run'], decision: Awaiting): void {
  * verified, the ending's wait for the checkout, and what the next tick does once more.
  */
 function printStops({ run, overBudgetLine, offers }: Decided, decision: Awaiting, heldOut: string): void {
-  const onYou = run.pruned ? '' : ', waiting on you';
-  if (decision.stuck.length) console.log(`  BLOCKED${onYou}: ${decision.stuck.join(', ')}`);
+  const onYouNote = run.pruned ? '' : ', waiting on you';
+  if (decision.awaitingAnswer.length) console.log(`  BLOCKED${onYouNote}: ${decision.awaitingAnswer.join(', ')}`);
   if (decision.exhausted.length)
     console.log(
-      `  ROUNDS EXHAUSTED${onYou}: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`,
+      `  ROUNDS EXHAUSTED${onYouNote}: ${decision.exhausted.join(', ')}  — asked for another round on the last one rounds: allows; its findings are below`,
     );
   if (overBudgetLine) console.log(`  ${overBudgetLine}`);
   if (decision.budgetExhausted.length)
     console.log(
-      `  BUDGET EXHAUSTED${onYou}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`,
+      `  BUDGET EXHAUSTED${onYouNote}: ${decision.budgetExhausted.join(', ')}  — its harness ended its session at its budget:; nothing after it ran`,
     );
   if (decision.denied.length)
     console.log(
-      `  DENIED${onYou}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`,
+      `  DENIED${onYouNote}: ${decision.denied.join(', ')}  — its harness denied its try a call, and denials: fail passes none on; nothing after it ran, and its check was not run`,
     );
-  printAwaitingApproval(run, decision.awaitingApproval, onYou);
+  printAwaitingApproval(run, decision.awaitingApproval, onYouNote);
   if (decision.outcome === 'succeeded' && !decision.unverified.length) console.log(`  every step verified`);
   if (heldOut) console.log(heldOut);
   if (offers.length) console.log(`\n  once more, on the next tick:\n${offers.map((line) => `    ${line}`).join('\n')}`);
 }
 
 /** The gated steps waiting for approval: those that signed off at their gate, then the ending that has not run. */
-function printAwaitingApproval(run: Decided['run'], awaitingApproval: string[], onYou: string): void {
+function printAwaitingApproval(run: Decided['run'], awaitingApproval: string[], onYouNote: string): void {
   const handedOn = awaitingApproval.filter((name) => run.steps[name]?.taskId);
   const unrun = awaitingApproval.filter((name) => !run.steps[name]?.taskId);
   if (handedOn.length)
     console.log(
-      `  AWAITING APPROVAL${onYou}: ${handedOn.join(', ')}  — signed off at its gate; nothing after it ${run.pruned ? 'was filed, and pruned, it cannot be approved' : 'is filed until you approve it, or send it back'}`,
+      `  AWAITING APPROVAL${onYouNote}: ${handedOn.join(', ')}  — signed off at its gate; nothing after it ${run.pruned ? 'was filed, and pruned, it cannot be approved' : 'is filed until you approve it, or send it back'}`,
     );
   if (unrun.length)
     console.log(
-      `  AWAITING APPROVAL${onYou}: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run${run.pruned ? ', and pruned, it cannot be approved' : ', and your approval is what runs it'}`,
+      `  AWAITING APPROVAL${onYouNote}: ${unrun.join(', ')}  — this workflow's ending, at its gate: nothing of it has run${run.pruned ? ', and pruned, it cannot be approved' : ', and your approval is what runs it'}`,
     );
 }
 
@@ -523,16 +523,16 @@ function printCollisions({ collisions }: Decided): void {
 
 /**
  * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `nemia rm` for a
- * folder run, or the git commands to ship or drop.
+ * folder run, or the git commands to land or drop.
  */
 function printChoice({ toDecide, commands, closeouts }: Decided, steps: Steps): void {
   if (toDecide?.kind === 'approve') return printApprove(toDecide, steps, commands, closeouts[toDecide.step]);
   const said = (label: DecideCommand['label']) => commands.find((c) => c.label === label);
   const forget = said('forget it');
   if (forget) return console.log(`\n  done with it   ${forget.command}  — ${forget.said}`);
-  const [ship, drop] = [said('ship it'), said('drop it')];
-  if (ship && drop) {
-    console.log(`\n  ship it   ${ship.command}`);
+  const [land, drop] = [said('land it'), said('drop it')];
+  if (land && drop) {
+    console.log(`\n  land it   ${land.command}`);
     console.log(`  drop it   ${drop.command}`);
   }
 }

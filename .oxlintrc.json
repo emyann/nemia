@@ -361,12 +361,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/summary/judged.verb.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 22 }]
-      }
-    },
-    {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
         "complexity": ["error", { "max": 21 }]
@@ -421,7 +415,7 @@
     {
       "files": ["apps/web/src/components/RunCanvas.tsx"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 88, "skipBlankLines": true, "skipComments": true }]
+        "max-lines-per-function": ["error", { "max": 85, "skipBlankLines": true, "skipComments": true }]
       }
     },
     {

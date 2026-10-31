@@ -60,7 +60,7 @@ const { main } = await import('../src/cli/main.ts');
 type PlaceVerb = import('../src/place/place.ts').PlaceVerb;
 const { gitPlace } = await import('../place/git/place.ts');
 const { stagedHere, landingDenies, landingWords } = await import('../src/place/landing.store.ts');
-const { shippedGitPlace } = await import('../src/place/shipped.store.ts');
+const { builtinGitPlace } = await import('../src/place/builtin.store.ts');
 type Place = import('../src/place/place.store.ts').Place;
 const { filedDenies } = await import('../src/ending/ending.ts');
 const { landingContract } = await import('../src/check/check.ts');
@@ -68,10 +68,10 @@ type PlaceRequests = import('../src/place/place.ts').PlaceRequests;
 
 const { standingLive } = await import('../src/standing/standing.verb.ts');
 
-/** Whether `branch` of `run` is shipped, its standing asked now, as a person's verb asks it (`standingLive`). */
-const isShipped = async (run: RepositoryRun, branch: string) => (await runPlaced(standingLive([run]))).shipped(run, branch);
+/** Whether `branch` of `run` is landed, its standing asked now, as a person's verb asks it (`standingLive`). */
+const isLanded = async (run: RepositoryRun, branch: string) => (await runPlaced(standingLive([run]))).landed(run, branch);
 
-/** A run this file started on a repository, as `isShipped` reads one: a repository run. */
+/** A run this file started on a repository, as `isLanded` reads one: a repository run. */
 const repositoryRun = (run: Run): RepositoryRun => {
   assert.ok(isRepositoryRun(run), `${run.id} works on a repository`);
   return run;
@@ -193,7 +193,7 @@ const board = () => {
 
 /**
  * `implement ⇄ review → ship`, as the team's dev is, with its `dev/ship.md` as the ending, whose `after: review` is
- * what this folder has: what a person types `nemia round` at once the loop has handed on.
+ * what this folder has: what a person types `nemia retry --round` at once the loop has handed on.
  */
 const loopingFolder = (rounds = 3): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-loop-'));
@@ -259,7 +259,7 @@ async function atTheGate(given: Given = {}) {
   return { repo, id: run.id, branch: work.branch!, e, tasks, filings, settle, pass, base: git(repo, 'rev-parse', 'HEAD') };
 }
 
-test("an approved ending with no check of its own is filed, in the repository's own checkout, and the merge its prose describes ships the run", async () => {
+test("an approved ending with no check of its own is filed, in the repository's own checkout, and the merge its prose describes lands the run", async () => {
   const { repo, id, branch, e, tasks, settle, base } = await atTheGate({ dir: uncheckedFolder() });
   const { approval } = await runWith(e, approveRun(id, 'ship', 'Merge it.'));
   assert.deepEqual([approval.step, approval.try], ['ship', 1]);
@@ -311,9 +311,9 @@ test("an approved ending with no check of its own is filed, in the repository's 
   );
   assert.equal(git(repo, 'log', '-1', '--format=%(trailers)'), '', 'with no trailer');
   assert.equal(git(repo, 'status', '--porcelain'), '', 'and nothing is left in the checkout, the message included');
-  assert.equal(await isShipped(repositoryRun(record), branch), true);
+  assert.equal(await isLanded(repositoryRun(record), branch), true);
   const { decision, toDecide, standings } = await runWith(e, decideRun(id));
-  assert.deepEqual([decision.kind, toDecide, standings], ['shipped', undefined, [{ branch, where: 'on' }]]);
+  assert.deepEqual([decision.kind, toDecide, standings], ['landed', undefined, [{ branch, where: 'on' }]]);
   assert.equal(
     git(repo, 'rev-parse', 'HEAD'),
     merged,
@@ -507,7 +507,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
   assert.equal(mergeHead(repo), false);
   assert.deepEqual(readRun(id).steps.ship.landed, { commit: head });
   assert.ok(
-    landed.notes.includes(`ship: its check passed on the merge, and the run committed its merge onto main as ${head.slice(0, 7)}`),
+    landed.notes.includes(`ship: its check passed on the merge, and the run landed on main as ${head.slice(0, 7)}`),
     landed.notes.join('\n'),
   );
   assert.deepEqual(pngsIn(shot.dir), [], 'landed, its pictures of the merged tree are read by nobody: removed on the pass that lands');
@@ -535,12 +535,12 @@ test("an approved ending stages the merge and signs off its message; the run exe
   );
   assert.equal(landed.status, 'succeeded');
   const { decision } = await runWith(e, decideRun(id));
-  assert.equal(decision.kind, 'shipped');
+  assert.equal(decision.kind, 'landed');
   const shipLine = (await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!;
   assert.equal(shipLine.status, 'verified ✓');
   assert.equal(
     shipLine.note,
-    `the run committed its merge onto main as ${head.slice(0, 7)}`,
+    `the run landed on main as ${head.slice(0, 7)}`,
     'nemia ls, and the board after it, say what landed — the commit — where nothing else of a run names it',
   );
 
@@ -573,7 +573,7 @@ for (const [said, exitCode, words] of [
     assert.deepEqual(
       readRun(id).steps.ship.landed,
       { aborted: words, ...(exitCode === undefined ? {} : { refusedOn: base }) },
-      'the base `nemia merge` reads, on a refusal alone',
+      'the base `nemia refresh --base` reads, on a refusal alone',
     );
     assert.ok(pass.notes.includes(`ship: ${words}, so the run aborted its merge; nothing landed on main`), pass.notes.join('\n'));
     const shipLine = (await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!;
@@ -727,7 +727,7 @@ const mainMoves = (repo: string): string => {
   return git(repo, 'rev-parse', 'HEAD');
 };
 
-/** A refusal of `nemia merge`: exit 2, in `words`, and no ask written. */
+/** A refusal of `nemia refresh --base`: exit 2, in `words`, and no ask written. */
 const mergeRefused = (id: string, words: RegExp) => (err: Error & { exitCode?: number }) => {
   assert.equal(err.exitCode, 2);
   assert.match(err.message, words);
@@ -758,7 +758,7 @@ test('REFUSED at shipped defaults: a merge whose trial read no commit of the bas
   try {
     await assert.rejects(
       runWith(e, mergeRun(id)),
-      mergeRefused(id, new RegExp(`^git cannot read main in ${repo}\\. Check the repository, then: nemia merge ${id}\\.$`)),
+      mergeRefused(id, new RegExp(`^git cannot read main in ${repo}\\. Check the repository, then: nemia refresh ${id} --base\\.$`)),
     );
     assert.deepEqual(
       (await runWith(e, decideRun(id))).commands.filter((c) => c.label === 'merge'),
@@ -869,8 +869,8 @@ test("a semantic merge whose check's output the engine cannot give is filed all 
 });
 
 test('REFUSED: a landing session is denied and told what its place says — a planted place that denies `hg commit` gives exactly that, and no git word', async () => {
-  const say = { ...shippedGitPlace.declared.say, stage: 'hg -R {repo} merge {branches}' };
-  const place: Place = { ...shippedGitPlace, declared: { denyWhileLanding: ['Bash(hg commit:*)'], say } };
+  const say = { ...builtinGitPlace.declared.say, stage: 'hg -R {repo} merge {branches}' };
+  const place: Place = { ...builtinGitPlace, declared: { denyWhileLanding: ['Bash(hg commit:*)'], say } };
   const { id, repo, branch } = await atTheGate();
   const run = readRun(id);
   const ship = stepsOf(run).find((s) => s.name === 'ship')!;

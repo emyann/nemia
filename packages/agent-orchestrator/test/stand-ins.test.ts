@@ -57,10 +57,10 @@ const PLANTS: Readonly<Record<string, readonly string[]>> = {
   ],
   'real-place': [
     "const { gitPlaceLayer } = await import('../src/runner.ts');\n",
-    "const {\n  runWith,\n  gitPlaceLayer: real,\n} = await import(\n  '../src/place/shipped.store.ts'\n);\n",
-    "import { shipped } from 'agent-orchestrator';\n",
-    "const runner = await import('../src/runner.ts');\nrun(runner.shippedGitPlace);\n",
-    "import * as o from 'agent-orchestrator';\no.shipped(program);\n",
+    "const {\n  runWith,\n  gitPlaceLayer: real,\n} = await import(\n  '../src/place/builtin.store.ts'\n);\n",
+    "import { builtin } from 'agent-orchestrator';\n",
+    "const runner = await import('../src/runner.ts');\nrun(runner.builtinGitPlace);\n",
+    "import * as o from 'agent-orchestrator';\no.builtin(program);\n",
     "export { gitPlaceLayer } from '../src/runner.ts';\n",
   ],
   'git-place': ["import { gitPlace } from '../place/git/place.ts';\n", "const { asked } = await import('../place/git/verbs/asked.ts');\n"],
@@ -316,7 +316,7 @@ test('the runtime is judged for git and a process alone, where the engine is its
   assert.deepEqual(kindsIn('packages/agent-runtime/test/x.test.ts'), ['git', 'process']);
   assert.deepEqual(kindsIn('apps/api/test/x.test.ts'), ['git', 'process', 'engine', 'hand']);
   assert.deepEqual(kindsIn(`${T}/x.test.ts`), ['git', 'process', 'engine', 'hand']);
-  const api = "import { engine, shipped } from 'agent-orchestrator';\nimport { Engine } from '../src/store.ts';\nEngine.of(engine());\n";
+  const api = "import { engine, builtin } from 'agent-orchestrator';\nimport { Engine } from '../src/store.ts';\nEngine.of(engine());\n";
   assert.deepEqual(reachOf('apps/api/test/x.test.ts', over({ 'apps/api/test/x.test.ts': api })).kinds, ['place', 'engine', 'hand']);
 });
 

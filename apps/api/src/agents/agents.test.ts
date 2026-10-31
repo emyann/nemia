@@ -19,7 +19,7 @@ import { scratch } from '../../test/scratch.ts';
 import { TEAM } from '../../test/team.ts';
 import { Layer } from 'effect';
 import { COMMANDS, clearCustomInstructions, engine, writeCustomInstructions, type AgentsRead, type CardRead } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 import { app, appOf, liveOf } from '../app.ts';
 import { StoreRoot } from '../store.ts';
 import { story } from '../../test/checkpoints.ts';

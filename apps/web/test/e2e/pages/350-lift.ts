@@ -21,7 +21,7 @@ export default {
     const { id, gated } = GATED;
     const until = HELD.id;
     const hold = path.join(store!, 'runs', `${id}.hold`);
-    const word = `held until ${unreadName(until)} ships`;
+    const word = `held until ${unreadName(until)} lands`;
     const holdIt = () => {
       if (fs.existsSync(hold)) throw new Refused(`no hold on ${id} before the page writes one — ${hold} is there`);
       fs.writeFileSync(hold, JSON.stringify({ at: new Date().toISOString(), until: [until] }, null, 2), { flag: 'wx' });

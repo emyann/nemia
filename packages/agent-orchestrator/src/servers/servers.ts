@@ -24,8 +24,8 @@ export type FactoryServer = {
   readonly oauth?: { readonly clientId: string; readonly callbackPort?: number };
 };
 
-/** One server Nemia ships, as the board offers it for an add: its name, and the facts a factory would record of it. */
-export type ShippedServer = FactoryServer & { readonly name: string };
+/** One builtin server of Nemia, as the board offers it for an add: its name, and the facts a factory would record of it. */
+export type BuiltinServer = FactoryServer & { readonly name: string };
 
 /**
  * A factory's server record, as read and written (`servers.store.ts` decodes and writes the file): its servers by name, and every

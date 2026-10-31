@@ -304,7 +304,7 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
         file: '/store/runs/r 1.asks/round-review-3',
       });
       const words =
-        '--budget 2 is not above $2.10, what implement has cost: the round would be held again as soon as it was asked for. Give more than $2.10: wf round r-1 review --budget <amount>.';
+        '--budget 2 is not above $2.10, what implement has cost: the round would be held again as soon as it was asked for. Give more than $2.10: nemia retry r-1 review --round --budget <amount>.';
       answer = () => answered(409, { error: words });
       await assert.rejects(askRound('r-1', { step: 'review', budget: 2 }), (err: Error) => err.message === words);
       answer = () => answered(202, {});

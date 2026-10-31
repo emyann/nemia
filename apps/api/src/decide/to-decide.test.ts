@@ -21,7 +21,7 @@ import type { RunDecision } from './decision.ts';
 import type { RunDetail } from '../detail/detail.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 
 /** The real `git`, behind one first on PATH that notes each call in `gitCalls` and runs it: what says which runs the api asks git about. */
 const realGit = execFileSync('sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
@@ -178,7 +178,7 @@ test("a run at its ending's gate: `to decide` says what the ending would do on t
           ['ship', 'awaiting approval'],
         ],
       );
-      assert.deepEqual([detail.waitingOnYou, detail.onYou], [['ship'], ['approve ship']]);
+      assert.deepEqual([detail.waitingOnYou, detail.waitingOnYouWords], [['ship'], ['approve ship']]);
       assert.deepEqual(
         detail.steps.map((s) => [s.name, s.spec?.workspace ?? null]),
         [
@@ -345,7 +345,7 @@ test("the gate's commands are never empty, by what the ending waits on and where
       );
       for (const { commands } of [wideGate, lone]) {
         assert.deepEqual(
-          commands.filter((c) => c.label === 'ship it' || c.label === 'drop it'),
+          commands.filter((c) => c.label === 'land it' || c.label === 'drop it'),
           [],
           'neither is handed git merge by hand: the ending step is what merges',
         );
@@ -353,7 +353,7 @@ test("the gate's commands are never empty, by what the ending waits on and where
     },
   );
   await t.test(
-    'an ending that ran on its approval and stopped on the base branch offers both ways on: ship again, and a send-back through the loop with its words',
+    'an ending that ran on its approval and stopped on the base branch offers both ways on: land again, and a send-back through the loop with its words',
     async () => {
       const id = 'r-stopped';
       const loop = [
@@ -442,7 +442,7 @@ test("the gate's commands are never empty, by what the ending waits on and where
 test("a finished run's `to decide`, level-triggered: its branch ahead of the base until it is merged by hand, and nothing once its approved ending has run", async (t) => {
   const s = story(t);
   await s.test(
-    'a finished run whose folder says nothing about shipping: `to decide` is its branch ahead of the base, and the command is `nemia decide`',
+    'a finished run whose folder says nothing about landing: `to decide` is its branch ahead of the base, and the command is `nemia decide`',
     async () => {
       const id = 'r-plain';
       const branch = `wf/${id}/implement`;
@@ -488,7 +488,7 @@ test("a finished run's `to decide`, level-triggered: its branch ahead of the bas
       );
       assert.deepEqual(
         commands.map((c) => c.label),
-        ['ship it', 'drop it'],
+        ['land it', 'drop it'],
         'the commands a person runs by hand, which this folder leaves to them',
       );
     },
@@ -506,7 +506,7 @@ test("a finished run's `to decide`, level-triggered: its branch ahead of the bas
         assert.equal(fs.readFileSync(path.join(root, 'runs', `${id}.json`), 'utf8'), record, "and nothing is written on the run's record");
         assert.deepEqual(
           await decisionOf(id),
-          { nothing: `shipped — wf/${id}/implement is already on main` },
+          { nothing: `landed — wf/${id}/implement is already on main` },
           "nemia decide's own answer reads the same way",
         );
       } finally {
@@ -517,7 +517,7 @@ test("a finished run's `to decide`, level-triggered: its branch ahead of the bas
   await s.test(
     'an approved ending that has run leaves nothing to decide: the folder answered for its own branch — its approval with no words, no `message` in it, as `nemia approve` writes one',
     async () => {
-      const id = 'r-shipped';
+      const id = 'r-landed';
       const branch = `wf/${id}/implement`;
       branchOff(repo, branch, 'src/c.ts', 'export const c = 3;\n');
       signedOff(`${id}-implement`, repo);

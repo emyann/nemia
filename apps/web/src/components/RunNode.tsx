@@ -59,7 +59,7 @@ export type RunFlowNode = Node<RunNodeData, 'run'>;
  * - On whom a run started `--after` waits, and a person's hold on it (the CLI's `hold`), each in the CLI `ls`'s word, yours when only a
  *   person moves   it, with what to do on hover (`WaitingLine`). A hold is said instead of a gate: while it stands, nothing of the run is
  *   asked of anyone.
- * - A run that waits on runs that may still ship, and on nothing else (`waitsOnRuns`), is a ghost until it starts: dimmed and dashed, as
+ * - A run that waits on runs that may still land, and on nothing else (`waitsOnRuns`), is a ghost until it starts: dimmed and dashed, as
  *   the queue lane draws a card not started, each run it waits on a link to that run.
  * - What a person has to know to act, besides the gate's own `approve <step>`: a step's question, or a session the harness blocked, two
  *   lines each, whole on hover, each a link to its step on the run's page.
@@ -122,9 +122,9 @@ export function RunNode({
           {run.waiting && <WaitingLine waiting={run.waiting} ghost={look.ghost} />}
           {run.holding && (
             <p
-              data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
+              data-holding={run.holding.waitingOnYou ? 'on-you' : 'on-runs'}
               title={`${run.holding.word}\n${run.holding.advice}`}
-              className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${run.holding.onYou ? 'text-yours' : 'text-muted-foreground'}`}
+              className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${run.holding.waitingOnYou ? 'text-yours' : 'text-muted-foreground'}`}
             >
               {run.holding.word}
             </p>
@@ -259,9 +259,9 @@ function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
 function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }) {
   return (
     <p
-      data-waiting={waiting.onYou ? 'on-you' : 'on-runs'}
+      data-waiting={waiting.waitingOnYou ? 'on-you' : 'on-runs'}
       title={waiting.advice}
-      className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${waiting.onYou ? 'text-yours' : 'text-muted-foreground'}`}
+      className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${waiting.waitingOnYou ? 'text-yours' : 'text-muted-foreground'}`}
     >
       {ghost ? (
         <>

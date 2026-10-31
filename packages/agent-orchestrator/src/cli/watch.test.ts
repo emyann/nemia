@@ -102,21 +102,15 @@ test('livenessLines says the store down once as its daemon falls silent and up o
 /** A run's line of the feed, signed as the tick signs one (`upgraded`), its word and note as given. */
 const line = (word: string, note?: string): FeedLine => upgraded({ at: AT, run: 'r-1', step: 'build', word, ...(note ? { note } : {}) });
 
-const WAKES: FeedLine[] = [
-  line('awaiting approval'),
-  line('rounds exhausted'),
-  line('needs-human'),
-  line('blocked'),
-  line('failed'),
-  line('running', 'waiting on you: approve the plan'),
-  line('done', 'needs: a key for the registry'),
-];
+const WAKES: FeedLine[] = [line('awaiting approval'), line('rounds exhausted'), line('needs-human'), line('blocked'), line('failed')];
 const ROUTINE: FeedLine[] = [
   line('running'),
   line('done', 'landed on main'),
   line('running', 'cost $1.20 · landing'),
   startedLine(5151, { kind: 'none' }, AT, NOW),
   line('denied: Bash(git push)', 'try 1'),
+  line('running', 'waiting on you: approve the plan'),
+  line('done', 'needs: a key for the registry'),
 ];
 
 /** `nemia watch`'s spec, where the retired flags are refused by name. */
@@ -129,7 +123,17 @@ test('what a watch takes and prints of a line: `-l waits=person` in place of the
     assert.deepEqual(kept(['kind=Daemon']), [ROUTINE[3]], 'another selector names other lines');
     assert.deepEqual(kept(['waits=person', 'kind=Daemon']), [...WAKES, ROUTINE[3]], 'or beside it, as -l given again');
     assert.equal(selects(parseSelectors(['waits=person']), ROUTINE[4]), false, 'a tool denial waits on nobody, as it is today');
+    assert.equal(selects(parseSelectors(['waits=person']), ROUTINE[5]), false, 'nor a line whose note alone says a person is waited on');
     assert.deepEqual(kept([]), [...WAKES, ...ROUTINE], 'with none, every line');
+  });
+  await t.test('a former reason and the qualifiers are taken by -l, and select', () => {
+    for (const selector of ['reason=WaitingForSlot', 'on=limit', 'via=closeout'])
+      assert.equal(WATCH.check!({ selector: [selector] }), null, selector);
+    assert.deepEqual(
+      WAKES.filter((l) => selects(parseSelectors(['via=closeout']), l)),
+      [WAKES[3]],
+    );
+    assert.ok(selects(parseSelectors(['reason=NeedsHuman']), WAKES[2]), 'a former code selects the line it was written for');
   });
   await t.test('`--json` prints a line of the feed whole, with the cursor just after it; without, in words', () => {
     const daemon = ROUTINE[3];

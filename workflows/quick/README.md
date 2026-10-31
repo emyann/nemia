@@ -53,16 +53,16 @@ tests on this machine, so the reviewer runs the types and the lint itself; and i
 landing, so `again: true` is the only way back and it names no step.
 
 `rounds: 2`, where build's review has 3: a card that a review has to send back twice is a card that wanted `build`, and the
-second objection leaves the step `exhausted` with the run waiting on a person, who types `nemia round <run> review` for a third or
-`nemia accept <run> review` to take the work as it stands. `budget: 12`, where build's has 16: there is no spec to read, and the review reads
+second objection leaves the step `exhausted` with the run waiting on a person, who types `nemia retry <run> review --round` for a third or
+`nemia approve <run> review --message "<why>"` to take the work as it stands. `budget: 12`, where build's has 16: there is no spec to read, and the review reads
 one step's closeout rather than two. It held before the line bound went and holds without it: quick's 15 review tries to 2026-10-22
 cost $0.67 each on average, and build's 32, which read larger changes beside a spec, $3.85 against their 16 (`nemia stats --workflow
 <workflow> --by step`). A long mechanical diff costs reading, not judgement; a review that runs out on one says so in the run's
 figures, and the budget is a quick card then.
 
 **A finding sends the work back** to implement, on the same branch, with the findings in its brief — the workflow routes that, not the
-reviewer. A person sends it back only through the review: at the review's stop, `nemia round <run> review` for another round or
-`nemia accept <run> review` to take it as it stands; once land has stopped, `nemia retry <run> review --message "<objection>"`, which
+reviewer. A person sends it back only through the review: at the review's stop, `nemia retry <run> review --round` for another round or
+`nemia approve <run> review --message "<why>"` to take it as it stands; once land has stopped, `nemia retry <run> review --message "<objection>"`, which
 files the review again with the objection. `nemia retry <run> implement` is refused once implement is verified and the review filed.
 
 ## The landing, and what a person still does
@@ -81,7 +81,7 @@ one: the review reads implement's pictures in light and dark, and a page or a st
 back through the review's loop with what refused it (`nemia decide <run>` prints the land step's `blocked`): `nemia retry <run> review
 --message "<what failed>"` files the review again with those words, and it sends the work round implement or passes it, which files
 land again. Where it was the fast-forward that was declined, or anything else that was not the work, a person brings the checkout onto
-`origin/<base>` and ships again as it stands, `nemia retry <run> land`, the line the refusal printed. Whoever operates the factory sends it back, by instruction (`NEMIA.md`): no step is filed by
+`origin/<base>` and lands again as it stands, `nemia retry <run> land`, the line the refusal printed. Whoever operates the factory sends it back, by instruction (`NEMIA.md`): no step is filed by
 itself — but an ending its review routes is filed by the tick, with no person in between.
 
 ## The closeouts

@@ -54,7 +54,7 @@ export const RETIRED_KEYS: Record<'maxAttempts' | 'resume', string> = {
 
 /** What to do instead of a retired key: file the task again, or, in a workflow, let the orchestrator try again. */
 export const RETIRED_INSTEAD =
-  "To run the task again, file it again — with `resumeFrom: <session id>` to continue its session. In a workflow, give the step `retries:`, or ask for an attempt with `wf retry <run> <step>` (`--nudge` continues the last attempt's session, `--fresh` starts clean).";
+  "To run the task again, file it again — with `resumeFrom: <session id>` to continue its session. In a workflow, give the step `retries:`, or ask for an attempt with `wf retry <run> <step>` (`--continue` continues the last attempt's session, `--fresh` starts clean).";
 
 /** Why a key a task no longer takes is refused, and what to do instead. */
 export const retiredKeyRefusal = (key: keyof typeof RETIRED_KEYS) => `\`${key}\` is retired: ${RETIRED_KEYS[key]}. ${RETIRED_INSTEAD}`;

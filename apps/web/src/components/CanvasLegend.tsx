@@ -9,8 +9,8 @@ import { READ_LINE, Travelling } from './StateEdge';
  * draws it — dashed and still, moving into a running step, solid, looping back — and the human gate. The moving sample moves as a running
  * edge does, and is as still as one where the person asked for reduced motion.
  *
- * `cards`, on the Factory: the edge between two cards too, from a run to one that waits until it ships (`afterEdges`) — filed `--after`
- * it, or held until it ships (the CLI's `hold`), which are both a wait on that run and drawn alike; the card itself says which; a run that
+ * `cards`, on the Factory: the edge between two cards too, from a run to one that waits until it lands (`afterEdges`) — filed `--after`
+ * it, or held until it lands (the CLI's `hold`), which are both a wait on that run and drawn alike; the card itself says which; a run that
  * has started draws none from its waits. The faint dotted line of a run read as context, drawn for the card hovered or selected
  * (`readEdges`), which waits on nothing. And the ring round a card whose result nobody has decided, which stays on the floor, finished,
  * until a person decides it.
@@ -37,7 +37,7 @@ export function CanvasLegend({ className = '', cards = false }: { className?: st
       <Item sample={<Sample state="to-come" loop />}>loops back</Item>
       {cards && (
         <Item sample={<CardsSample />} title="A run that has started draws no line from its waits.">
-          waits until it ships
+          waits until it lands
         </Item>
       )}
       {cards && (

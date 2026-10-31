@@ -19,11 +19,61 @@
  * holds, read by `upgrade` and named in its doc (`journal.ts`), the stored schema (`event-schema.ts`) and the filing door's
  * `RENAMED_ARGS` (`args.ts`). They stay while a journal on disk may hold them.
  *
+ * `NeedsHuman`, `RoundsExhausted`, `WaitingForSlot`, `WaitingForCheckout`, `WaitingForPause` and `CheckDenied`, on the day the feed
+ * retired them (a wait on a person said by the `Awaiting*` codes, a wait on a thing by `Waiting` and `on`): each a key of
+ * `FORMER_REASONS` in `former-reason.ts`, which reads a line on disk and a stored selector that still names one. They stay while a feed
+ * or a subscription on disk may hold them.
+ *
+ * `shipped` and `ships`, on the day decision 13a retired them (`Landed` in the run core's, the api's and the board's tables): the run's
+ * sense, a run's result on its base, says `landed` everywhere since that card; the product's sense, what comes with Nemia (its git place,
+ * the skills, servers and rules it lists), says `builtin` since decision 13b (its Builtin row in the same three tables). The one count left
+ * is the api's former address of a builtin skill, `/api/skills/shipped/<name>`, which answers a permanent redirect to its `builtin` address
+ * (`FORMER_BUILTIN`, `skills.ts`): it stays while a link or a bookmark may still name it.
+ *
+ * `accept`, on the day decision 7 retired it (`Approve` in the run core's table): `nemia accept` is `nemia approve` of a loop out of
+ * rounds. What is left is the former spelling kept on purpose (`RENAMED`, read by admission and named in its doc), the record's names
+ * for what a loop's end writes (`acceptRun`, `acceptAsk`, the `accept-<step>-<n>` file, the decision's `accept` offer label, which slice B
+ * renames on the board), and the word's other senses (a trust accepted, a level's words).
+ *
  * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
  * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
  * `options.ts`). They stay while a caller may still write them.
  */
 export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  accept: {
+    'packages/agent-orchestrator/src/admission/admission.ts': 1,
+    'packages/agent-orchestrator/src/brief/brief-sections.ts': 2,
+    'packages/agent-orchestrator/src/command/command.ts': 2,
+    'packages/agent-orchestrator/src/decide/decide.ts': 4,
+    'packages/agent-orchestrator/src/gate/commands.verb.ts': 3,
+    'packages/agent-orchestrator/src/gate/form.verb.ts': 1,
+    'packages/agent-orchestrator/src/gate/gate.ts': 1,
+    'packages/agent-orchestrator/src/nemia/level.verb.ts': 1,
+    'packages/agent-orchestrator/src/record/record.store.ts': 4,
+    'packages/agent-orchestrator/src/record/record.ts': 3,
+    'packages/agent-orchestrator/src/round/round.ts': 7,
+    'packages/agent-orchestrator/src/round/round.verb.ts': 2,
+    'packages/agent-orchestrator/src/status/status.ts': 1,
+    'packages/agent-orchestrator/src/trust/trust.ts': 1,
+  },
+  needshuman: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 2,
+  },
+  roundsexhausted: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  waitingforslot: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  waitingforcheckout: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  waitingforpause: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
+  checkdenied: {
+    'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
+  },
   wf: {
     'packages/agent-orchestrator/place/git/verbs/handoff.ts': 2,
     'packages/agent-orchestrator/place/git/verbs/make.ts': 2,
@@ -43,6 +93,9 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/workflow/validate.ts': 1,
     'packages/agent-orchestrator/src/workspace/workspace.ts': 6,
     'packages/agent-orchestrator/src/workspace/worktree.store.ts': 3,
+  },
+  shipped: {
+    'apps/api/src/agents/skills.ts': 1,
   },
   stated: {
     'packages/agent-runtime/src/core/engine/journal.ts': 3,

@@ -8,14 +8,14 @@
  *   approval in `build`, or by the workflow in `quick`, where the review's pass files it: it refuses
  *   anything but this run's own green pull request — not a draft, based on the remote's default branch, its head the tip of the run's
  *   result branch and the sha the reviewer read, `mergeable` MERGEABLE, the `ci` context SUCCESS at that sha, and every other
- *   `wf/<id>/*` tip reachable from it — then merges it with a merge commit whose subject and body are the ones it was given
+ *   `wf/<id>/*` branch taken by it, every commit of the branch having an equivalent patch on the head (`git cherry`) — then merges it with a merge commit whose subject and body are the ones it was given
  *   (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: the repository auto-deletes the head branch), and
  *   fast-forwards the checkout (`git fetch origin && git merge --ff-only origin/<base>`). **Level-triggered**: it reads the world
  *   rather than what a last try left, so a retry after a merge that went through and a fast-forward that was then declined — the one
  *   failure between the two acts — does the fast-forward alone and merges nothing a second time.
  * - `receipt --run <id>`, which the land step's `check:` runs: it refuses unless the pull request is `MERGED` with a merge commit that
- *   is reachable from HEAD, the checkout is clean on the base with no merge in progress, and every `wf/<id>/*` tip is an ancestor of
- *   HEAD — the three facts the run's own `landingDue` needs to record `landed: {commit}` on the commit that landed.
+ *   is reachable from HEAD, the checkout is clean on the base with no merge in progress, and every commit of every `wf/<id>/*` branch
+ *   has an equivalent patch on HEAD — the three facts the run's own `landingDue` needs to record `landed: {commit}` on the commit that landed.
  *
  * The run is given, never read from HEAD: the checkout a landing runs in is on the base branch, not on a run's branch. Refuses, exit 1
  * on stderr with what to do next — the exact `nemia retry` line where a person must act: a run with no result branch here; a dirty
@@ -128,6 +128,27 @@ function base(): string {
   if (!name) throw new Refusal('`gh repo view --json defaultBranchRef` named no default branch: the base of the landing is unknown');
   return name;
 }
+
+/**
+ * The branches of `named` that `head` leaves out, each with its commits whose patch `head` has no equivalent of. A branch is judged by
+ * patch, not ancestry (`git cherry <head> <tip>`, whose `+` lines are those commits): a part taken into the run's branch as a commit
+ * of its own is never an ancestor of the head, yet nothing of it is left out.
+ */
+function leftOut(named: readonly { branch: string; tip: string }[], head: string): { branch: string; commits: string[] }[] {
+  return named
+    .map(({ branch, tip }) => ({
+      branch,
+      commits: git(`what of \`${branch}\` ${head.slice(0, 12)} has no patch of`, 'cherry', head, tip)
+        .split('\n')
+        .filter((line) => line.startsWith('+ '))
+        .map((line) => line.slice(2, 14)),
+    }))
+    .filter((it) => it.commits.length > 0);
+}
+
+/** `left`, each branch with its commits, said in a sentence. */
+const withCommits = (left: readonly { branch: string; commits: string[] }[]): string =>
+  left.map((it) => `\`${it.branch}\` (${it.commits.join(', ')})`).join(', ');
 
 /** The run's result branches in this checkout, each with its tip: `refs/heads/wf/<id>/*`. Refuses a run with none. */
 function tips(id: string): { branch: string; tip: string }[] {
@@ -289,12 +310,12 @@ function judged(pr: Pr, onto: string, named: readonly { branch: string; tip: str
         `work merges its base again and goes round, or a person reads ${pr.url}. Nothing is merged here.`,
     );
   green(pr);
-  const left = named.filter((branch) => !asks('merge-base', '--is-ancestor', branch.tip, pr.headRefOid));
+  const left = leftOut(named, pr.headRefOid);
   if (left.length)
     throw new Refusal(
-      `merging #${pr.number} would leave out ${left.map((branch) => `\`${branch.branch}\``).join(', ')}, which ${
-        left.length === 1 ? 'is' : 'are'
-      } not reachable from ${pr.headRefOid.slice(0, 12)}: the run's result is more than this pull request's head, and a landing that ` +
+      `merging #${pr.number} would leave out ${withCommits(left)}, ${
+        left.length === 1 ? 'a commit' : 'commits'
+      } whose patch ${pr.headRefOid.slice(0, 12)} does not hold: the run's result is more than this pull request's head, and a landing that ` +
         `left a branch out would be recorded as none. A person merges ${andThe(left)} into \`${pr.headRefName}\` and pushes it, or ` +
         `deletes ${left.length === 1 ? 'it' : 'them'} where it holds nothing, then the step is retried`,
     );
@@ -453,15 +474,15 @@ function receipt(args: string[]): string[] {
         `here. \`git fetch origin && git merge --ff-only origin/${onto}\` is what the merge verb does; a person types it, then the ` +
         'step is retried.',
     );
-  const left = named.filter((it) => !asks('merge-base', '--is-ancestor', it.tip, 'HEAD'));
+  const left = leftOut(named, 'HEAD');
   if (left.length)
     throw new Refusal(
-      `${andThe(left)} ${left.length === 1 ? 'is' : 'are'} not an ancestor of this checkout's HEAD, so part of the run's result did ` +
+      `${withCommits(left)} ${left.length === 1 ? 'holds' : 'hold'} a commit whose patch this checkout's HEAD does not hold, so part of the run's result did ` +
         'not land and the run would record a landing that left it out. A person brings it onto the base, then the step is retried.',
     );
   return [
     `#${pr.number} is merged as ${oid.slice(0, 12)}, a merge commit`,
-    `\`${onto}\` here holds it, clean, with every branch of \`wf/${id}/\` an ancestor of HEAD`,
+    `\`${onto}\` here holds it, clean, with every commit of \`wf/${id}/\` on HEAD, by its patch`,
   ];
 }
 

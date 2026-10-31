@@ -25,14 +25,14 @@ process.env.WF_ROOT = ROOT;
 delete process.env.WF_MAX_CONCURRENT;
 delete process.env.WF_MAX_RUNS;
 const stand = eachTest(testPlace);
-const { addFactory, advanceRun, attachWorkflow, startRun, retryRun, runWith: runEngine } = await import('../src/runner.ts');
+const { addFactory, advanceRun, attachWorkflow, driftNow, startRun, retryRun, runWith: runEngine } = await import('../src/runner.ts');
 const runWith = runOver(runEngine, () => stand().layer);
 const runPlaced = runGiven(() => stand().layer);
 const engine = eachTest(testEngine);
 const { engineOf } = await import('../src/runtime-client.ts');
 const { readRun, stepsOf } = await import('../src/record/record.store.ts');
 const { agentFilesDir } = await import('../src/agents/agents.store.ts');
-const { ledgerOf, topsOf } = await import('../src/revisions/revisions.store.ts');
+const { ledgerOf } = await import('../src/revisions/revisions.store.ts');
 const { followPass, passRevisions, pinPass, resolvedNow } = await import('../src/revisions/pin.verb.ts');
 const { refreshRun } = await import('../src/revisions/pin.verb.ts');
 const { metered } = await import('../src/meter/tally.store.ts');
@@ -89,7 +89,7 @@ const pinOf = (pinned: readonly Pin[] | undefined, kind: Pin['kind'], name: stri
 const started = (dir: string, repo: string, how: { after?: string[]; isolate?: boolean; factory?: string } = {}) =>
   runPlaced(startRun({ brief: 'build a thing', repo, workflowDir: dir, isolate: false, ...how }));
 
-/** `branch` merged into `repo`'s checkout and committed, as a person ships a result by hand: what `--after` waits for. */
+/** `branch` merged into `repo`'s checkout and committed, as a person lands a result by hand: what `--after` waits for. */
 const shippedByHand = (repo: string, branch: string): void => {
   stand().world.stage(repo, branch);
   stand().world.commit(repo, `merge ${branch}`);
@@ -114,7 +114,7 @@ test('a run that has filed nothing resolves the folder afresh: an edit made whil
   fs.writeFileSync(t.stepFile, `---\nplace: git\nagent: ${t.agent}\n---\nDo it differently.\n`);
 
   const pass = await runWith(b.e, advanceRun(readRun(run.id)));
-  assert.deepEqual(pass.filed, ['build'], 'the parent shipped, so the first step is filed');
+  assert.deepEqual(pass.filed, ['build'], 'the parent landed, so the first step is filed');
   const after = readRun(run.id);
   assert.equal(pinOf(after.pinned, 'agent', t.agent)!.n, 2, 'the edited agent is pinned at its new revision');
   assert.equal(pinOf(after.pinned, 'workflow', t.name)!.n, 2, 'and so is the folder, whose files and agents it digests');
@@ -180,7 +180,7 @@ test('a run that has filed keeps its pins: the folder edited after its first fil
   assert.deepEqual(
     ledgerOf('agent', t.agent).map((r) => r.n),
     [1],
-    'and nothing of the edit is resolved on its account: a filed run nobody asked pays for no resolve',
+    'and nothing of the edit is numbered on its account: a filed run nobody asked appends nothing to the ledger',
   );
 });
 
@@ -344,6 +344,52 @@ test('a filing whose closeout schema has moved starts a fresh session; one whose
     undefined,
     'the schema moved, so try 2 is a fresh session rather than one asked in the wrong shape',
   );
+});
+
+test("`driftNow` is what the run's next filing would take against its pins, by digest, and writes nothing to the ledger", async (t) => {
+  const b = board();
+  const filed = async (on: Team) => {
+    const run = await started(on.dir, aRepo());
+    await runWith(b.e, advanceRun(readRun(run.id)));
+    return readRun(run.id);
+  };
+  const agentDrift = (run: Parameters<typeof driftNow>[0], name: string) =>
+    driftNow(run).filter((d) => d.kind === 'agent' && d.name === name && d.step === undefined);
+
+  await t.test('an edit later reverted is no drift, though the ledger numbered the edit', async () => {
+    const on = team();
+    const run = await filed(on);
+    const first = fs.readFileSync(on.agentFile, 'utf8');
+    fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nAn edit someone took back.\n`);
+    await started(on.dir, aRepo());
+    assert.deepEqual(
+      ledgerOf('agent', on.agent).map((r) => r.n),
+      [1, 2],
+      'another start numbered the edit',
+    );
+    fs.writeFileSync(on.agentFile, first);
+    assert.deepEqual(driftNow(run), [], 'the files hold the bytes the run pins: nothing is behind');
+  });
+
+  await t.test('content reverted to an older revision is drift, its `now` that older number', async () => {
+    const on = team();
+    const first = fs.readFileSync(on.agentFile, 'utf8');
+    await started(on.dir, aRepo());
+    fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nThe second content.\n`);
+    const run = await filed(on);
+    assert.equal(pinOf(run.pinned, 'agent', on.agent)!.n, 2, 'the run pins the second content');
+    fs.writeFileSync(on.agentFile, first);
+    assert.deepEqual(agentDrift(run, on.agent), [{ kind: 'agent', name: on.agent, pinned: 2, now: 1 }]);
+  });
+
+  await t.test('content nobody resolved reads as the next number, and the ledger stays as it was', async () => {
+    const on = team();
+    const run = await filed(on);
+    fs.writeFileSync(on.agentFile, `---\nskills: ${on.skill}\n---\nNever resolved.\n`);
+    const before = [ledgerOf('agent', on.agent), ledgerOf('workflow', on.name)];
+    assert.deepEqual(agentDrift(run, on.agent), [{ kind: 'agent', name: on.agent, pinned: 1, now: 2 }]);
+    assert.deepEqual([ledgerOf('agent', on.agent), ledgerOf('workflow', on.name)], before, 'nothing was appended');
+  });
 });
 
 test('`nemia refresh` refuses a run that has filed nothing, one already on the newest revision, and no such run — at shipped defaults', async () => {
@@ -732,24 +778,31 @@ test('the pure parts: a revision already given keeps its number, a gap gives no 
   );
 
   const pinned: Pin[] = [{ kind: 'agent', name: 'coder', n: 5, hash: 'e' }];
-  const tops: Pin[] = [{ kind: 'agent', name: 'coder', n: 6, hash: 'f' }];
-  assert.deepEqual(kindsDrift(pinned, tops), [{ kind: 'agent', name: 'coder', pinned: 5, now: 6 }]);
-  assert.deepEqual(kindsDrift(pinned, pinned), [], 'a pin that is the top drifts not at all');
-  assert.deepEqual(kindsDrift(undefined, tops), [], 'a record written before revisions pinned nothing, and drifts not at all');
+  const moved: Pin[] = [{ kind: 'agent', name: 'coder', n: 5, hash: 'f' }];
   assert.deepEqual(
-    stepsDrift([['build', pinned]], tops, tops),
-    [{ kind: 'agent', name: 'coder', pinned: 5, now: 6, step: 'build' }],
-    'a filed step behind the top, where the run has moved past it, says which step ran on it',
+    kindsDrift(pinned, moved),
+    [{ kind: 'agent', name: 'coder', pinned: 5, now: 5 }],
+    'other bytes are drift whatever their number: the digest decides, never the number',
   );
-  assert.deepEqual(stepsDrift([['build', pinned]], pinned, tops), [], "a step whose pin is the run's is left out: the run's line says it");
+  assert.deepEqual(kindsDrift(pinned, [{ ...pinned[0], n: 6 }]), [], 'the same bytes are no drift whatever their number');
+  assert.deepEqual(kindsDrift(undefined, moved), [], 'a record written before revisions pinned nothing, and drifts not at all');
+  assert.deepEqual(
+    stepsDrift([['build', pinned]], moved, moved),
+    [{ kind: 'agent', name: 'coder', pinned: 5, now: 5, step: 'build' }],
+    'a filed step on other bytes than the files, where the run has moved past it, says which step ran on it',
+  );
+  assert.deepEqual(
+    stepsDrift([['build', pinned]], [{ ...pinned[0], n: 9 }], moved),
+    [],
+    "a step on the run's bytes is left out: the run's line says it",
+  );
   assert.notEqual(digestOf([{ a: 1 }]), digestOf([{ a: 2 }]));
   assert.equal(digestOf([{ a: 1 }]), digestOf([{ a: 1 }]), 'the digest is of the content alone');
   assert.equal(digestOf([{ a: 1 }]).length, 16);
 });
 
-test('the ledger reads as empty where its file does not read, and the tops of a kind nobody resolved are none', () => {
+test('the ledger reads as empty where its file does not read', () => {
   assert.deepEqual(ledgerOf('workflow', 'never-resolved'), []);
-  assert.deepEqual(topsOf([{ kind: 'skill', name: 'never-resolved' }]), []);
   const file = path.join(ROOT, 'revisions', 'workflow', 'broken.json');
   fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, 'not json');

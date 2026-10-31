@@ -41,7 +41,7 @@ export type WorkflowPageAddress = { from: WorkflowSource; workflow: string; fact
 export type HiredIn = { factory: string; agent: string };
 
 /**
- * A skill a step's layers give, named as its line writes it, and where it is found: `from`, yours, the repository's or shipped, null
+ * A skill a step's layers give, named as its line writes it, and where it is found: `from`, yours, the repository's or builtin, null
  * where no place the board pages has it; and then `foundIn`, where the repository has it (`foundInOf`), null for one found nowhere.
  */
 export type SkillFrom = { name: string; from: SkillSource | null; foundIn: string | null };

@@ -1,6 +1,6 @@
 /**
  * A factory's MCP servers on the board (servers.ts and the routes the table generates): the record read where the store keeps it, a
- * server recorded and removed, and the servers Nemia ships — in a scratch store whose factory is filed with the package's own verb.
+ * server recorded and removed, and Nemia's builtin servers — in a scratch store whose factory is filed with the package's own verb.
  * Every write is read back from disk, and every refusal is made to refuse, with the record as it was.
  *
  * The states are not read here: a read of one spawns a harness session, which no api test does. What the api answers of a record it
@@ -15,7 +15,6 @@ import path from 'node:path';
 import { addFactory } from 'agent-orchestrator';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
-import { SHIPPED_SERVERS } from './servers.ts';
 
 type FactoryServersRead = import('./servers.ts').FactoryServersRead;
 
@@ -49,16 +48,16 @@ async function refused(res: () => Response | Promise<Response>, status: number):
   return body.error;
 }
 
-test("A person keeps a factory's MCP servers: none recorded, one recorded and read back with its state unread, each refusal leaving the record, the server removed, and the servers Nemia ships offered", async (t) => {
+test("A person keeps a factory's MCP servers: none recorded, one recorded and read back with its state unread, each refusal leaving the record, the server removed, and Nemia's builtin servers offered", async (t) => {
   const s = story(t);
   await s.test('a factory with no record answers an empty list, and no state is unread: there was nothing to read', async () => {
     const read = await answered<FactoryServersRead>(app.request(URL));
     assert.deepEqual(read.servers, []);
     assert.equal(read.unread, null, 'no server, no ask, no spawn');
     assert.deepEqual(
-      read.shipped.map((s) => s.name),
+      read.builtin.map((s) => s.name),
       ['github'],
-      'and the servers Nemia ships, offered whatever the record holds',
+      "and Nemia's builtin servers, offered whatever the record holds",
     );
   });
   await s.test('a server recorded is read back off the record, with its state null while no state was read', async () => {
@@ -112,15 +111,11 @@ test("A person keeps a factory's MCP servers: none recorded, one recorded and re
     assert.equal(held(), null, 'the last server gone, the file is removed rather than left empty');
     assert.deepEqual((await answered<FactoryServersRead>(app.request(URL))).servers, []);
   });
-  await s.test("the shipped folder is the checkout's own, beside the skills it ships, and the read answers what it holds", async () => {
-    assert.ok(
-      SHIPPED_SERVERS.endsWith(path.join('workflows', 'servers')),
-      'read beside workflows/skills, of the checkout the api runs from',
-    );
-    assert.equal(path.isAbsolute(SHIPPED_SERVERS), true, 'named whole, so the read does not depend on where the api was started');
+  await s.test('the read answers what the builtin folder holds, under `builtin` alone', async () => {
     const read = await answered<FactoryServersRead>(app.request(URL));
+    assert.equal('shipped' in read, false, 'the former key is not answered beside it');
     assert.deepEqual(
-      read.shipped,
+      read.builtin,
       [
         {
           name: 'github',

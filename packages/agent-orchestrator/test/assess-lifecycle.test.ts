@@ -115,13 +115,13 @@ test('assess of the DAG: what a pass files, what it blocks, and how the run stan
   await t.test('a failed step blocks what waits on it, and says so rather than hanging', () => {
     const a = assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' }));
     assert.deepEqual(a.ready, []);
-    assert.deepEqual(a.blocked, ['review']);
+    assert.deepEqual(a.unreachable, ['review']);
     assert.equal(a.status, 'failed');
   });
 
   await t.test('a stopped step blocks too — an operator stop is final, not a pause', () => {
     const a = assess(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'stopped' }));
-    assert.deepEqual(a.blocked, ['review']);
+    assert.deepEqual(a.unreachable, ['review']);
     assert.equal(a.status, 'failed');
   });
 
@@ -164,7 +164,7 @@ test('assess of the DAG: what a pass files, what it blocks, and how the run stan
 
   await t.test('cancelled is a fact about the run, not a verdict on its steps', () => {
     const a = assess(STEPS, run({ implement: 't1', review: 't2' }, CANCELLED), phases({ t1: 'succeeded', t2: 'succeeded' }));
-    assert.deepEqual(a.blocked, [], 'nothing is blocked: no step failed, the run was called off');
+    assert.deepEqual(a.unreachable, [], 'nothing is blocked: no step failed, the run was called off');
     assert.equal(a.status, 'cancelled', 'a run whose steps all succeeded before the cancel is still cancelled, not succeeded');
   });
 });
@@ -269,7 +269,7 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
   await t.test('REFUSED to be finished: a run whose step signed off blocked waits on a person, so `nemia cancel` calls it off', () => {
     const p = phases({ t1: 'succeeded' });
     const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
-    assert.equal(assess(STEPS, blockedRun(), p, blocked, asked).status, 'blocked');
+    assert.equal(assess(STEPS, blockedRun(), p, blocked, asked).status, 'waiting');
     assert.deepEqual(
       listing({ steps: STEPS, run: blockedRun(), phaseOf: shown({ t1: 'succeeded' }), closeoutOf: BLOCKED_SAID, askedCloseout: asked })
         .waitingOnYou,

@@ -76,6 +76,21 @@ function world({ extra }: { extra?: string } = {}): World {
   return { repo, bare, base, tip, merged, gh: ghStub() };
 }
 
+/**
+ * A part branch `wf/r-1/part-a` off the base, whose one commit is the result's own patch taken again as a commit of its own
+ * (`cherry-pick -x`, so its sha differs) — as a lead takes a part into the run's branch — and never an ancestor of the head.
+ */
+function takenPart(w: World): string {
+  const at = gitIn(w.repo, 'symbolic-ref', '--short', 'HEAD').trim();
+  gitIn(w.repo, 'switch', '-q', '-c', `wf/${RUN}/part-a`, w.base);
+  gitIn(w.repo, 'cherry-pick', '-x', w.tip);
+  const tip = gitIn(w.repo, 'rev-parse', 'HEAD').trim();
+  gitIn(w.repo, 'switch', '-q', at);
+  const ancestor = spawnSync('git', ['merge-base', '--is-ancestor', tip, w.tip], { cwd: w.repo, timeout: 30_000 }).status;
+  assert.equal(ancestor, 1, 'the part is taken by its patch alone, never by ancestry');
+  return tip;
+}
+
 /** One pull request of this run, as `gh pr list --json` gives it; `more` overrides any field of it. */
 const listed = (w: World, more: Record<string, unknown> = {}): string =>
   JSON.stringify([
@@ -207,7 +222,7 @@ test('receipt passes on the landing the merge made: merged, a merge commit, the 
   const r = land(w, 'receipt', ['--run', RUN]);
   assert.equal(r.code, 0, r.err);
   assert.match(r.out, /wf land: #7 is merged as [0-9a-f]{12}, a merge commit/);
-  assert.match(r.out, /every branch of `wf\/r-1\/` an ancestor of HEAD/);
+  assert.match(r.out, /every commit of `wf\/r-1\/` on HEAD, by its patch/);
   assert.equal(asked(r.calls, 'pr', 'merge').length, merges, 'the receipt merges nothing of its own');
 });
 
@@ -348,14 +363,22 @@ test('REFUSED: a ci that is red, one still running, and a head no ci judged at a
   assert.equal(asked(a.calls, 'pr', 'merge').length, 0);
 });
 
-test("REFUSED: a second result branch of the run the pull request's head does not hold, which a landing would record as none", () => {
+test('REFUSED: a result branch of the run with a commit whose patch the head does not hold; one whose patches it holds is taken', () => {
   const w = world({ extra: `wf/${RUN}/review` });
+  takenPart(w);
+  const extra = gitIn(w.repo, 'rev-parse', `wf/${RUN}/review`).trim();
   w.gh.answers(mergeable(w));
   const r = land(w, 'merge', args());
   assert.equal(r.code, 1, r.out);
-  assert.match(r.err, /merging #7 would leave out `wf\/r-1\/review`/);
-  assert.match(r.err, /a landing that left a branch out would be recorded as none/);
+  assert.ok(r.err.includes(`would leave out \`wf/r-1/review\` (${extra.slice(0, 12)})`), r.err);
+  assert.ok(!r.err.includes('part-a'), 'a branch whose every patch is on the head is not left out');
   assert.equal(asked(r.calls, 'pr', 'merge').length, 0, 'nothing is merged');
+
+  gitIn(w.repo, 'branch', '-D', `wf/${RUN}/review`);
+  w.gh.answers(mergeable(w));
+  const taken = land(w, 'merge', args());
+  assert.equal(taken.code, 0, taken.err);
+  assert.equal(asked(taken.calls, 'pr', 'merge').length, 1, 'the part taken by its patch lands with the rest');
 });
 
 test('REFUSED: a run with no result branch in this checkout, named with the fetch a person types', () => {
@@ -493,11 +516,18 @@ test('REFUSED: a receipt in a checkout the fast-forward did not reach, one that 
   gitIn(left.repo, 'commit', '-qm', 'work off the base');
   gitIn(left.repo, 'branch', '-f', `wf/${RUN}/review`, 'HEAD');
   gitIn(left.repo, 'reset', '-q', '--hard', 'HEAD~1');
+  takenPart(left);
   left.gh.answers(landed(left));
   const l = land(left, 'receipt', ['--run', RUN]);
   assert.equal(l.code, 1, l.out);
-  assert.ok(l.err.includes('`wf/r-1/review` is not an ancestor'), l.err);
+  assert.ok(l.err.startsWith('wf land: `wf/r-1/review` ('), l.err);
+  assert.ok(!l.err.includes('part-a'), 'a branch whose every patch is on HEAD is not left out');
   assert.match(l.err, /the run would record a landing that left it out/);
+
+  gitIn(left.repo, 'branch', '-D', `wf/${RUN}/review`);
+  left.gh.answers(landed(left));
+  const taken = land(left, 'receipt', ['--run', RUN]);
+  assert.equal(taken.code, 0, taken.err);
 });
 
 test('merge after a fast-forward it was declined merges nothing a second time: it reads the pull request merged and fast-forwards alone', () => {

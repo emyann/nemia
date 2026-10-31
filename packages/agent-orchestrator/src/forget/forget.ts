@@ -61,7 +61,7 @@ export function idRefusal(id: string, verb: 'rm' | 'prune' | 'hold' | 'read' = '
  * An ask as `nemia rm` names it: a try (`retry`), a round (`round`) or a merge (`merge`, of the loop's target and its try), of which step,
  * and its number — what `askAt` finds its file by.
  */
-export type AskName = { kind: 'retry' | 'round' | 'merge'; step: string; n: number };
+export type AskName = { of: 'try' | 'round' | 'base'; step: string; n: number };
 
 /**
  * Why `nemia rm` will not forget this run, in words that say what to do instead — or null, when it may. Pure: handed the run with every
@@ -74,7 +74,7 @@ export type AskName = { kind: 'retry' | 'round' | 'merge'; step: string; n: numb
  *   still stopping. Cancelling and forgetting are two decisions, and this never takes the first: a task the engine no longer knows is not
  *   in flight, so a run whose board was cleared is forgotten.
  * - **anything a pass would file** (`assess`): a step ready, a check, a try or a round due, on a run nobody called off. A pass may be
- *   filing it at this moment, into a worktree about to be removed. A run that waits on runs (`gated`) files its roots once they ship, and
+ *   filing it at this moment, into a worktree about to be removed. A run that waits on runs (`gated`) files its roots once they land, and
  *   is held the same way.
  * - **an ask no pass has spent** (`spentAsks`, `spentRoundAsks`), on a run nobody called off: forgetting would drop a person's word
  *   unheard. One a pass files is the case above; one no pass files as the step stands is taken back by deleting its file (`askAt`).
@@ -87,14 +87,14 @@ export type AskName = { kind: 'retry' | 'round' | 'merge'; step: string; n: numb
  *
  * An ending that has not run whose result git already has (`resultOnBase`) is not named at its gate: its approval is refused
  * (`approvalRefusal`). A held run is read as it will stand once its hold lifts: what a pass files then, and the gates a person answers
- * then, hold it too. A cancelled run never ships, so for a run held until it does, the fix named is lifting that hold.
+ * then, hold it too. A cancelled run never lands, so for a run held until it does, the fix named is lifting that hold.
  *
  * A cancelled run whose tasks have settled is forgettable: it files nothing, and its asks are never honoured. `steps` is undefined for a
  * record that froze no workflow and whose folder does not read (`stepsOf`): nothing ready can be judged, and nothing needs to be, since
  * no pass can file anything of it — every pass reads that folder, and dies on it. Its tasks in flight, its asks and the runs that wait on
  * it are judged as any run's.
  *
- * @param others Every other run in the store: whether one waits on this run, and has not started, or is held until it ships.
+ * @param others Every other run in the store: whether one waits on this run, and has not started, or is held until it lands.
  * @param askAt Where an ask's file is, for the command that takes it back.
  * @param standings Where each result branch stands against the base branch, as git says it now (`branchStandings` in branches.store.ts): an
  *   ending whose result git already has holds nothing (`resultOnBase`). Left out, git is not asked, and every gate holds.
@@ -117,7 +117,8 @@ export function forgetRefusal(
   asks: readonly RetryAsk[] = [],
   roundAsks: readonly RoundAsk[] = [],
   spendOf: SpendOf = () => undefined,
-  askAt: (ask: AskName) => string = (a) => `${run.id}.asks/${a.kind}-${a.step}-${a.n}`,
+  askAt: (ask: AskName) => string = (a) =>
+    `${run.id}.asks/${a.of === 'try' ? 'retry' : a.of === 'base' ? 'merge' : 'round'}-${a.step}-${a.n}`,
   standings: readonly BranchStanding[] = [],
   verb: 'rm' | 'prune' = 'rm',
   merging: MergeState['merging'] = 'none',
@@ -168,7 +169,7 @@ type Forgetting = {
 /**
  * The run read once for its reasons: its tasks in flight (`live`), its ending whose merge is not landed (`unlanded`), what a pass would
  * file were it not waiting on runs (`ready`, `waits`), the steps at their gates, what is due, the asks no pass files, the runs that wait on
- * it (`stranded`) or are held until it ships (`holders`), and how a hold on it is said (`lifts`).
+ * it (`stranded`) or are held until it lands (`holders`), and how a hold on it is said (`lifts`).
  */
 type Facts = Forgetting & {
   live: string[];
@@ -277,7 +278,9 @@ function dueOf(a: Assessment, steps: readonly Workflow[], waits: boolean): strin
   }
   for (const r of a.round)
     due.push(
-      r.merge ? mergeDueWords(r) : `round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'nemia round'})`,
+      r.merge
+        ? mergeDueWords(r)
+        : `round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'nemia retry --round'})`,
     );
   return due;
 }
@@ -288,16 +291,19 @@ function unheardOf(f: Forgetting, a: Assessment | undefined): AskName[] {
   const unheard: AskName[] = [];
   for (const ask of asks) {
     if (spentAsks(run, [ask]).length || a?.retry.some((r) => askedFor(r) && r.step === ask.step && r.try === ask.try)) continue;
-    unheard.push({ kind: 'retry', step: ask.step, n: ask.try });
+    unheard.push({ of: 'try', step: ask.step, n: ask.try });
   }
   for (const ask of roundAsks) {
     if (spentRoundAsks(run, [ask]).length || a?.round.some((r) => roundHeard(r, ask))) continue;
-    unheard.push(ask.merge ? { kind: 'merge', step: ask.merge.target, n: ask.merge.try } : { kind: 'round', step: ask.step, n: ask.round });
+    unheard.push(ask.merge ? { of: 'base', step: ask.merge.target, n: ask.merge.try } : { of: 'round', step: ask.step, n: ask.round });
   }
   return unheard;
 }
 
-/** Whether the round due `r` is the one a person's ask asked for: its round on `nemia round`, its target's try on `nemia merge`. */
+/**
+ * Whether the round due `r` is the one a person's ask asked for: its round on `nemia retry --round`, its target's try on `nemia refresh
+ * --base`.
+ */
 const roundHeard = (r: Round, ask: RoundAsk): boolean =>
   ask.merge
     ? r.merge?.target === ask.merge.target && r.merge.try === ask.merge.try
@@ -305,15 +311,11 @@ const roundHeard = (r: Round, ask: RoundAsk): boolean =>
 
 /** A merge due, said: what its target merges, and that it spends no round. */
 const mergeDueWords = (r: Round): string =>
-  `the merge of ${r.merge!.onto} into ${r.target}'s work is due (nemia merge), on round ${r.round} of ${r.step}'s loop`;
+  `the merge of ${r.merge!.onto} into ${r.target}'s work is due (nemia refresh --base), on round ${r.round} of ${r.step}'s loop`;
 
 /** An ask no pass files, named. */
 const askNamed = (u: AskName): string =>
-  u.kind === 'retry'
-    ? `try ${u.n} of ${u.step}`
-    : u.kind === 'merge'
-      ? `the merge into ${u.step}'s work`
-      : `round ${u.n} of ${u.step}'s loop`;
+  u.of === 'try' ? `try ${u.n} of ${u.step}` : u.of === 'base' ? `the merge into ${u.step}'s work` : `round ${u.n} of ${u.step}'s loop`;
 
 /** The run's tasks in flight. */
 const liveHeld = (c: Facts): string | undefined => (c.live.length ? andList(c.live) : undefined);
@@ -327,11 +329,11 @@ function unlandedHeld(c: Facts): string | undefined {
     : `${ending.name} signed off, and the run has not yet checked its merge and committed or aborted it`;
 }
 
-/** What the run files once the runs it waits on have shipped. */
+/** What the run files once the runs it waits on have landed. */
 function waitsHeld(c: Facts): string | undefined {
   const { run, ready, waits } = c;
   if (!waits) return undefined;
-  return `it waits on ${andList(run.after!)}, and files ${andList(ready)} once ${run.after!.length > 1 ? 'they have' : 'it has'} shipped`;
+  return `it waits on ${andList(run.after!)}, and files ${andList(ready)} once ${run.after!.length > 1 ? 'they have' : 'it has'} landed`;
 }
 
 /** What each step at its gate files once approved: itself, when it never ran, or what waits on it. */
@@ -379,12 +381,12 @@ function strandedHeld(c: Facts): string | undefined {
   return `${andList(stranded)} ${one ? 'waits' : 'wait'} on it and ${one ? 'has' : 'have'} not started: forgotten, ${one ? 'it' : 'each'} would read waiting on ${id} (no such run) for ever`;
 }
 
-/** The runs held until this one ships. */
+/** The runs held until this one lands. */
 function holdersHeld(c: Facts): string | undefined {
   const { holders } = c;
   if (!holders.length) return undefined;
   const one = holders.length === 1;
-  return `${andList(holders)} ${one ? 'is' : 'are'} held until it ships: forgotten, ${one ? 'its hold' : 'each hold'} would wait on no such run for ever`;
+  return `${andList(holders)} ${one ? 'is' : 'are'} held until it lands: forgotten, ${one ? 'its hold' : 'each hold'} would wait on no such run for ever`;
 }
 
 /** Why the run is held, each reason in the order a person is told it. */
@@ -421,10 +423,10 @@ function strandedFix(c: Facts): string | undefined {
   const { stranded, id } = c;
   if (!stranded.length) return undefined;
   const one = stranded.length === 1;
-  return `Let ${one ? 'it' : 'them'} start first, on the pass after nemia decide says ${id} has shipped, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `nemia cancel ${s}`).join(', ')}`;
+  return `Let ${one ? 'it' : 'them'} start first, on the pass after nemia decide says ${id} has landed, or call ${one ? 'it' : 'them'} off: ${stranded.map((s) => `nemia cancel ${s}`).join(', ')}`;
 }
 
-/** Let the runs held until this one go on first, or lift their holds — only lift them, when this run was cancelled and never ships. */
+/** Let the runs held until this one go on first, or lift their holds — only lift them, when this run was cancelled and never lands. */
 function holdersFix(c: Facts): string | undefined {
   const { holders, run, id } = c;
   if (!holders.length) return undefined;
@@ -432,7 +434,7 @@ function holdersFix(c: Facts): string | undefined {
   const lift = `${one ? 'the hold' : 'each hold'}: ${holders.map((h) => `nemia hold ${h} --off`).join(', ')}`;
   return run.cancelledAt
     ? `Lift ${lift}`
-    : `Let ${one ? 'it' : 'them'} go on first, on the pass after nemia decide says ${id} has shipped, or lift ${lift}`;
+    : `Let ${one ? 'it' : 'them'} go on first, on the pass after nemia decide says ${id} has landed, or lift ${lift}`;
 }
 
 /** What to do about each reason, in the order a person is told it. */

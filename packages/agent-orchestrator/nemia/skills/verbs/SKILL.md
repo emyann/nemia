@@ -109,7 +109,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                rounds, a cap) is asked of you, and a write that cannot be undone or
                                changes your settings or a factory; the rest is hers. auto is semi-auto,
                                but an answer your confirmed list allows in the run's state is given
-                               unasked (nemia auto <agent>), in a session of hers filed since auto came:
+                               unasked (nemia policy <agent>), in a session of hers filed since auto came:
                                one kept from before asks every answer until filed again (manual, then
                                auto once it is off). A factory at manual is left alone, and her session
                                stops once none is above manual
@@ -117,7 +117,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
   nemia memory [<fact>]
                                what Nemia keeps of the store: bare, her facts' names; given one, its
                                words. Read only: her session alone writes them
-  nemia auto <agent>
+  nemia policy <agent>
                                the agent's rules at auto: the answers it may give unasked, in force once
                                you confirm them, and what it proposed from your custom instruction,
                                with the words the machinery cannot hold, kept as guidance
@@ -136,8 +136,8 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                print cursor: <n> and stop; from the start with no cursor. -l: the
                                lines a selector takes, given again for another (key=v, key!=v, "key in
                                (a,b)", "key notin (a,b)", key), over run, factory, workflow, step,
-                               agent, kind, reason, type, waits and source. --cursor-file: keep the
-                               cursor read to in a file, and start from it where it is there.
+                               agent, kind, reason, on, via, type, waits and source. --cursor-file:
+                               keep the cursor read to in a file, and start from it where it is there.
                                --json: one JSON object a line, a feed line with its cursor, and a
                                cursor of its own every 30 seconds while the feed is still. With no -l,
                                every line; -l waits=person takes the lines that wait on a person. A
@@ -150,7 +150,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                ask where it answers what waits on you;
                                --at-least: deny a call acting on a run or a factory below the level;
                                --auto: let through, for a run of a factory at auto, an answer the agent's
-                               rules you confirmed allow in the run as it stands (nemia auto <agent>)
+                               rules you confirmed allow in the run as it stands (nemia policy <agent>)
   nemia decide <runId> [--sensitive <globs>]
                                what the run produced, and the choice it leaves you (nemia decide --help)
 ```
@@ -162,12 +162,12 @@ They write, and are yours to run unasked, on your judgement: say what you did.
 ```text
   nemia start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
                                --after <runId>: file nothing of this run until nemia decide says that
-                               run has shipped — finished, and its result branch on the base
+                               run has landed — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
                                --from <runId>: hand this run what that run concluded, as context,
-                               and wait on nothing: shipped or still in flight, it is read once,
-                               when this run's steps are filed, and said not shipped, not judged
-                               until it has shipped; once per run.
+                               and wait on nothing: landed or still in flight, it is read once,
+                               when this run's steps are filed, and said not landed, not judged
+                               until it has landed; once per run.
                                --gate <step>: that step's closeout waits for nemia approve before
                                anything after it is filed, as a step's own gate: true does; once
                                per step. An inbox card's gate: <step> is one more
@@ -203,7 +203,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
   nemia inbox from <name> <run>... | --off
                                set the runs a card is handed as context (from:), read and
                                never waited on; --off takes them off
-  nemia refresh <runId>
+  nemia refresh <runId> [<step>] [--base]
                                take the new revisions: a run keeps the workflow, agents, skills and
                                factory rules it resolved when it started, and this pins it to the
                                ones they hold now, so every filing after it — a new step, a retry,
@@ -212,11 +212,11 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                a run that has filed nothing, which resolves afresh at its first filing
                                anyway, of one already on the newest revision of every kind, and of one
                                whose factory follows revisions (nemia factory revisions), whose every
-                               filing takes them with no refresh
-  nemia merge <runId> [<step>]
-                               merge the base: a loop's work that no longer merges cleanly
-                               goes back to merge it, once, on the next tick — on the round
-                               it is on, which the merge does not spend
+                               filing takes them with no refresh;
+                               --base: take the base instead — a loop's work that no longer merges
+                               cleanly goes back to merge it, once, on the next tick, on the round it
+                               is on, which the merge does not spend; the step is the one that closes
+                               the loop, left out where the run has one loop
   nemia say <runId> <step> "<words>"
                                tell a step's running session something, through its harness: the
                                engine journals the words on the step's task, nemia ls notes the step
@@ -226,14 +226,14 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                an agent of yours tried on a short brief, in a folder of its own,
                                capped at $1
   nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
-                               file nothing more of a run until other runs ship, as --after would
+                               file nothing more of a run until other runs land, as --after would
                                have: what is in flight finishes, nothing new is filed, and nothing
-                               is asked of you — nemia ls and nemia decide say held until <run> ships, and
+                               is asked of you — nemia ls and nemia decide say held until <run> lands, and
                                what a step asks is asked once the hold lifts. The tick lifts it when
-                               every run named has shipped. Refused of a run cancelled, pruned,
+                               every run named has landed. Refused of a run cancelled, pruned,
                                finished or already held, and of a run named that is unknown, the run
                                itself, or one that already waits on it, through --after or a hold.
-                               --why: the reason, shown beside held until <run> ships wherever it is
+                               --why: the reason, shown beside held until <run> lands wherever it is
                                said; --by: who puts the hold (default: your OS user).
                                nemia hold <runId> --off: lift the hold now, and the next tick goes on as
                                if it had never been put
@@ -268,10 +268,10 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                this (manual, semi-auto, auto), read as each line is delivered.
   nemia unsubscribe <name>
                                take the subscription <name> away: its task is told nothing more of the feed
-  nemia auto propose <agent> --file <path>|-
+  nemia policy propose <agent> --file <path>|-
                                the agent's proposal: rules from your custom instruction, as JSON,
                                with the words the machinery cannot hold kept as guidance; none is in
-                               force until you confirm it (nemia auto confirm)
+                               force until you confirm it (nemia policy confirm)
 ```
 
 ## Prompts the person
@@ -371,12 +371,12 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                a worktree locked, on no branch, or with changes no commit has;
                                and a finished run not merged unless --unmerged, with --artifacts
                                as without: its files are what a person reads to decide it
-  nemia auto confirm <agent> <id> --words '<words>'
+  nemia policy confirm <agent> <id> --words '<words>'
                                put in force a rule the agent proposed, or the default again, as its
                                words read: from then on, at auto, the answer it names is given unasked
                                where it holds. Refused once the rule reads otherwise. Your first confirm
                                keeps the default beside it. Asked of you every time
-  nemia auto drop <agent> <id>
+  nemia policy drop <agent> <id>
                                take a rule out of force, the default among them: what it allowed is
                                asked of you again. Asked of you every time
   nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]
@@ -420,41 +420,41 @@ Each asks the person at a prompt every time it runs: say what it does before you
 Each answers what waits on the person. Bring the matter first, with the `bring-what-waits` skill, then run the verb they choose with their words as `--message`: its prompt is their decision, asked once. `nemia retry` asks only of a step that waits on the person, or with `--budget`.
 
 ```text
-  nemia retry <runId> <step> [--nudge | --fresh | --model <m> | --recheck] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
+  nemia retry <runId> [<step>] [--continue | --fresh | --model <m> | --recheck | --round] [--answer <n>=<letter>]... [--message "<answer>"] [--budget <amount>]
                                try a step waiting on you again, once, on the next tick:
-                               --nudge (default) continues its session, told what happened;
+                               --continue (default) continues its session, told what happened;
                                --fresh a new session on its branch; --model <m> the same, on m;
                                --recheck runs its check again, and files no session;
+                               --round: once more — a loop out of rounds goes round again, once,
+                               the step it loops to continued, then a new reviewer; the step is the
+                               one that closes the loop, left out where the run has one loop;
                                --message "<answer>" goes into the try's brief, as ## Your answer:
                                for a step that signed off blocked, the answer to its needs — or
-                               what you have to say to any step you try again; not with --recheck.
-                               The next argument is the answer, whatever it starts with; an answer
-                               that is only one of these flags' names goes as --message=<answer>;
-                               --budget <amount>: for a step with a budget: that waits on you, its
+                               what you have to say to any step you try again; not with --recheck
+                               or --round. The next argument is the answer, whatever it starts with;
+                               an answer that is only one of these flags' names goes as --message=<answer>;
+                               --budget <amount>: for a step with a budget that waits on you, its
                                cap raised to that many dollars, above its cap and what it has cost;
+                               with --round, the cap of a step of the loop over its budget;
                                --answer <n>=<letter>: answer question n, numbered as nemia decide
                                <runId> prints them, with the option its letter names; once for each
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
-  nemia approve <runId> <step> [--answer <n>=<letter>]... [--message "<words>"]
+  nemia approve <runId> [<step>] [--answer <n>=<letter>]... [--message "<words>"]
                                let a step waiting at its gate hand on: what waits on it is filed on
                                the next tick, and every step after the gate is handed your words
                                under ## Approved. To send it back instead, with what to change:
                                nemia retry <runId> <step> --message "<objection>"
+                               Of a loop out of rounds — the step that closes it, or the run alone
+                               where it has one loop — enough: the loop ends on your words, with its
+                               findings open, --message "<why>" required. What waits on the looping
+                               step is filed as if it had said again: false, and every step after
+                               the loop is handed your words and those findings under ## Accepted.
+                               To go round once more instead: nemia retry <runId> [<step>] --round
                                --answer <n>=<letter>: answer question n, numbered as nemia decide
                                <runId> prints them, with the option its letter names; once for each
                                question: "<n>=a,c" chooses several where it takes several,
                                "<n>=a: <words>" adds your own words, "<n>: <words>" says words
                                alone; --message is then the note under your answers
-  nemia round <runId> [<step>] [--budget <amount>]
-                               once more: a loop out of rounds goes round again, once, on the
-                               next tick — the step it loops to continued, then a new reviewer;
-                               --budget raises the cap of a step of the loop over its budget
-  nemia accept <runId> [<step>] --message "<why>"
-                               enough: a loop out of rounds ends on your word, with its findings
-                               open. What waits on the looping step is filed on the next tick as
-                               if it had said again: false — a gated ending goes to its gate —
-                               and every step after the loop is handed your words and those
-                               findings under ## Accepted. The other answer to nemia round
 ```

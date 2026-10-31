@@ -38,7 +38,7 @@ export const seenOf = Effect.fnUntraced(function* (runId: string, stepName: stri
       spendOf,
       exitVerdicts(views, run),
     );
-    return WAITS_ON_PERSON[standing.status] || standing.blockedByHarness;
+    return WAITS_ON_PERSON[standing.reason];
   };
   const closeout = closeoutOf(stepName);
   return {

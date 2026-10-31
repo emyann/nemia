@@ -148,21 +148,21 @@ function holdArgsRefusal(args: Args): string | null {
 }
 
 /**
- * `nemia hold`: a run held until other runs ship, or with `--off` its hold lifted now. The api serves both: it puts a hold on
+ * `nemia hold`: a run held until other runs land, or with `--off` its hold lifted now. The api serves both: it puts a hold on
  * `POST /api/runs/:runId/hold`, whose route fixes `off` false so no body lifts through it, and lifts one on `DELETE /api/runs/:runId/hold`.
  */
 export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   name: 'hold',
   usage: '<runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]',
   help: [
-    'file nothing more of a run until other runs ship, as --after would',
+    'file nothing more of a run until other runs land, as --after would',
     'have: what is in flight finishes, nothing new is filed, and nothing',
-    'is asked of you — nemia ls and nemia decide say held until <run> ships, and',
+    'is asked of you — nemia ls and nemia decide say held until <run> lands, and',
     'what a step asks is asked once the hold lifts. The tick lifts it when',
-    'every run named has shipped. Refused of a run cancelled, pruned,',
+    'every run named has landed. Refused of a run cancelled, pruned,',
     'finished or already held, and of a run named that is unknown, the run',
     'itself, or one that already waits on it, through --after or a hold.',
-    '--why: the reason, shown beside held until <run> ships wherever it is',
+    '--why: the reason, shown beside held until <run> lands wherever it is',
     'said; --by: who puts the hold (default: your OS user).',
     'nemia hold <runId> --off: lift the hold now, and the next tick goes on as',
     'if it had never been put',
@@ -568,8 +568,8 @@ const WATCH: Ran = {
     'print cursor: <n> and stop; from the start with no cursor. -l: the',
     'lines a selector takes, given again for another (key=v, key!=v, "key in',
     '(a,b)", "key notin (a,b)", key), over run, factory, workflow, step,',
-    'agent, kind, reason, type, waits and source. --cursor-file: keep the',
-    'cursor read to in a file, and start from it where it is there.',
+    'agent, kind, reason, on, via, type, waits and source. --cursor-file:',
+    'keep the cursor read to in a file, and start from it where it is there.',
     '--json: one JSON object a line, a feed line with its cursor, and a',
     'cursor of its own every 30 seconds while the feed is still. With no -l,',
     'every line; -l waits=person takes the lines that wait on a person. A',

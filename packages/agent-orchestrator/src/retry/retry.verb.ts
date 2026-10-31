@@ -86,7 +86,7 @@ export const retryRun = Effect.fn('retry')(function* (
     ...(how.budget !== undefined ? { budget: how.budget } : {}),
     at: new Date().toISOString(),
   };
-  const written = yield* tried(() => runStore.asks.write(id, { kind: 'retry', ask }));
+  const written = yield* tried(() => runStore.asks.write(id, { kind: 'retry', of: 'try', ask }));
   const file = written.where;
   if (!written.written) {
     const { stray } = written;
@@ -102,7 +102,7 @@ export const retryRun = Effect.fn('retry')(function* (
     run,
     ask,
     file,
-    stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked, spendOf).blockedByHarness,
+    stopFirst: retryable(step, run, phaseOf, closeoutReader(views, run), closeoutAsked(views), steps, blocked, spendOf).via === 'session',
   } satisfies Asked;
 });
 

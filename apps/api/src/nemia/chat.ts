@@ -1,7 +1,7 @@
 /**
  * Nemia's chat on the board: her history a page at a time with where she is, the same followed as server-sent events, the person's
  * words sent, a question of hers answered, their read mark moved, and the turn she is answering stopped. Each is a program of the
- * package's chat (`chatHistory`, `chatSince`, `chatSend`, `chatAnswer`, `chatRead`, `chatStop`)
+ * package's chat (`chatHistory`, `chatSince`, `chatSay`, `chatAnswer`, `chatRead`, `chatStop`)
  * over her place (`nemiaChatPlace`), and no command of the table: a write of the person's files kept out of her own fence.
  */
 import { Schema } from 'effect';
@@ -11,7 +11,7 @@ import {
   chatAnswer,
   chatHistory,
   chatRead,
-  chatSend,
+  chatSay,
   chatSince,
   chatStop,
   nemiaChatPlace,
@@ -27,7 +27,7 @@ import type { Effect } from 'effect';
 /** What `GET /api/nemia/chat` answers: a page of her chat, the cursor and her presence. */
 export type ChatHistoryAnswer = Effect.Success<ReturnType<typeof chatHistory>>;
 /** What `POST /api/nemia/chat/send` answers: the words as her outbox keeps them. */
-export type ChatSentAnswer = Effect.Success<ReturnType<typeof chatSend>>;
+export type ChatSentAnswer = Effect.Success<ReturnType<typeof chatSay>>;
 /** What `POST /api/nemia/chat/stop` answers. */
 export type ChatStopAnswer = Effect.Success<ReturnType<typeof chatStop>>;
 /** What `POST /api/nemia/chat/answer` takes: the ask, and the person's pick for each of its questions. */
@@ -37,7 +37,7 @@ export type ChatAnswerAnswer = Effect.Success<ReturnType<typeof chatAnswer>>;
 /** What `POST /api/nemia/chat/read` answers. */
 export type ChatReadAnswer = Effect.Success<ReturnType<typeof chatRead>>;
 
-/** How often a followed chat is read again, shipped: `Beats.chat`'s default (layer.ts). */
+/** How often a followed chat is read again by default: `Beats.chat`'s default (layer.ts). */
 export const CHAT_BEAT_MS = 2000;
 
 const SEND_SHAPE = '`{ "text": "<what you write to Nemia>" }`';
@@ -93,7 +93,7 @@ async function sent(stream: SSEStreamingApi, read: ChatChanges, shown: string): 
  * - `GET /api/nemia/chat?before=<id>&limit=<n>` — a page of her history, oldest first: `{ events, before, cursor, presence }`, the
  *   last `limit` events (50 where none is asked, at most 200) before the event `before`, or the last ones; `before` the id to ask for
  *   the page older, null at the first; `cursor` where a stream resumes; `presence` `{ up, answering, waitsOnYou, unread }`. An event is
- *   a `message` (`from` her, the person, whose `delivered` is null until she was told, or the keeper's quiet marker), a `step`, a
+ *   a `message` (`from` her, the person, whose `delivered` is null until she was told, or the keeper's quiet marker), a `call`, a
  *   `session` line where one of her sessions ended and the next began, a `question` or a `proposal`. 422 for a limit or a `before`
  *   that is none.
  * - `GET /api/nemia/chat/stream` — the same followed, as server-sent events read again every `CHAT_BEAT_MS`: `presence` first and
@@ -164,7 +164,7 @@ export const nemiaChat = new Hono<ApiEnv>()
       if (refused) return c.json({ error: refused.error }, refused.status);
       const read = await readBody(c.req, SEND_BODY, `${route} takes a JSON body: ${SEND_SHAPE}.`, wordsOf(route, 'text', SEND_SHAPE));
       if ('status' in read) return c.json({ error: read.error }, read.status);
-      return c.json(await runPlaced(s.placeService, s.e, chatSend(nemiaChatPlace(), read.body.text)), 201);
+      return c.json(await runPlaced(s.placeService, s.e, chatSay(nemiaChatPlace(), read.body.text)), 201);
     }),
   )
   .post('/api/nemia/chat/stop', (c) =>

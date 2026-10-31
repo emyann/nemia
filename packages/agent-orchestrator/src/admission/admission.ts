@@ -5,11 +5,12 @@
  * they name (`namedIn`). Pure: the caller reads the state (`admit.verb.ts`).
  */
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
-import { parseArgv, type Spec } from '../command/command.ts';
+import { parseArgv, renamedIn, type Spec } from '../command/command.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { atLeast, type Level } from '../level/level.ts';
 import { allowedBy, AUTO_ANSWERS, NO_FACTS, type AutoRule, type Facts } from '../auto/index.ts';
 import type { CommandClass } from './class.ts';
+import type { ApproveForm } from '../gate/gate.ts';
 
 /**
  * An entry of the table as admission reads it: its name, its class, whether it is asked every time, the side it is served on, and how its
@@ -40,7 +41,8 @@ const PROGRAMS = ['nemia', 'wf'];
 
 /**
  * Each command of `table` typed on the shell line `line`, in order: a word naming the program (`nemia`, by any path, or `wf`), anywhere
- * on the line, then the longest name of a command the command line serves, word for word, and the words after it up to the command's end.
+ * on the line, then the longest name of a command the command line serves, word for word, a renamed group read as its new name
+ * (`renamedIn`), and the words after it up to the command's end.
  */
 export function typedIn(line: string, table: readonly Entry[]): Typed[] {
   const parts = line.match(PARTS) ?? [];
@@ -49,7 +51,7 @@ export function typedIn(line: string, table: readonly Entry[]): Typed[] {
   parts.forEach((part, at) => {
     if (!PROGRAMS.includes(part.slice(part.lastIndexOf('/') + 1))) return;
     const rest = parts.slice(at + 1);
-    const words = rest.slice(0, rest.findIndex(ends) === -1 ? rest.length : rest.findIndex(ends));
+    const words = renamedIn(rest.slice(0, rest.findIndex(ends) === -1 ? rest.length : rest.findIndex(ends))).words;
     const named = served.filter((s) => s.words.every((w, i) => words[i] === w)).sort((a, b) => b.words.length - a.words.length)[0];
     if (named) typed.push({ name: named.entry.name, class: named.entry.class, args: words.slice(named.words.length) });
   });
@@ -151,14 +153,19 @@ function scopeOf(line: string, table: readonly Entry[], scope: Scope): Admission
 /** Whether a command's words raise a step's cap. */
 const raises = (args: readonly string[]): boolean => args.some((a) => a === '--budget' || a.startsWith('--budget='));
 
+/** Whether a retry's words ask for another round of a loop (`--round`, what `nemia round` was), which is always the person's. */
+const rounds = (args: readonly string[]): boolean => args.includes('--round');
+
 /**
- * Why a typed answer is asked of the person, or undefined where it waits on no one. A retry asks where it raises a cap (`--budget`), names
- * no run and step, or tries a step `waitOf` says waits on the person; any other answer always asks, since it only answers what waits.
+ * Why a typed answer is asked of the person, or undefined where it waits on no one. A retry asks where it raises a cap (`--budget`), asks
+ * for another round (`--round`), names no run and step, or tries a step `waitOf` says waits on the person; any other answer always asks,
+ * since it only answers what waits.
  */
 function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) => string | undefined): string | undefined {
   const line = ['nemia', name, ...args].join(' ');
   if (name !== 'retry') return `${line} answers what waits on you: it is yours to give.`;
   if (raises(args)) return `${line} raises a step's cap: a budget is yours to raise.`;
+  if (rounds(args)) return `${line} takes another round of a loop out of rounds: a round is yours to give.`;
   const [runId, step] = args.filter((a) => !a.startsWith('-'));
   if (runId === undefined || step === undefined) return `${line} names no run and step, so admission cannot read what it tries.`;
   const waits = waitOf(runId, step);
@@ -167,13 +174,15 @@ function askedOf({ name, args }: Typed, waitOf: (runId: string, step: string) =>
 
 /**
  * What admission reads at `auto`, for the agent it is handed: the person's list in force for it (`list`); the level of a run's factory,
- * undefined where the run does not read (`levelOf`); and the facts of a run at the call, for a step, undefined where they do not read
- * (`factsOf`). Read at the call, and carried to no other.
+ * undefined where the run does not read (`levelOf`); the facts of a run at the call, for a step, undefined where they do not read
+ * (`factsOf`); and the yes an approval of a step gives, at its gate or to a loop out of rounds, undefined where it does not read
+ * (`formOf`). Read at the call, and carried to no other.
  */
 export type Auto = {
   list: readonly AutoRule[];
   levelOf: (runId: string) => Level | undefined;
   factsOf: (runId: string, step: string) => Facts | undefined;
+  formOf: (runId: string, step: string) => ApproveForm | undefined;
 };
 
 /** The run and step a typed answer names, read by its entry's spec, or undefined where its words do not parse or name none. */
@@ -194,12 +203,16 @@ export function answerOf(typed: Typed, table: readonly Entry[]): { runId: string
 
 /**
  * Whether a rule of the person's list lets the typed answer through unasked: an answer a rule may give (`AUTO_ANSWERS`), raising no cap,
- * naming a run and a step, the run's factory at `auto`, and a rule that allows it in the run's facts at the call (`allowedBy`).
+ * asking for no round, naming a run and a step — an approval, one at the step's gate, never a loop's end (`formOf`), which was `nemia
+ * accept` and is the person's every time — the run's factory at `auto`, and a rule that allows it in the run's facts at the call
+ * (`allowedBy`).
  */
 function autoAllows(typed: Typed, table: readonly Entry[], auto: Auto | undefined): boolean {
-  if (auto === undefined || !(AUTO_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args)) return false;
+  if (auto === undefined || !(AUTO_ANSWERS as readonly string[]).includes(typed.name) || raises(typed.args) || rounds(typed.args))
+    return false;
   const answer = answerOf(typed, table);
   if (answer === undefined) return false;
+  if (typed.name === 'approve' && auto.formOf(answer.runId, answer.step) !== 'gate') return false;
   const level = auto.levelOf(answer.runId);
   if (level === undefined || !atLeast(level, 'auto')) return false;
   const facts = auto.factsOf(answer.runId, answer.step) ?? NO_FACTS;

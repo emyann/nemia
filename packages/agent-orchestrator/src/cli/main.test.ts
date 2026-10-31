@@ -1,6 +1,7 @@
 /**
  * `main`, the verbs' table: the help for a verb it does not know and for one given too little, and the lines of the verbs no other test
- * reads — `nemia cancel`, `nemia show`, `nemia logs` and `nemia accept` — over a store and a repository of their own, on the test place.
+ * reads — `nemia cancel`, `nemia show`, `nemia logs` and `nemia approve` of a loop — over a store and a repository of their own, on the
+ * test place.
  *
  * The root test below types `factory servers default`, and the factory is `default` on purpose. A `factory servers` read is two reads:
  * the factory's own existence (`factoryThere`), and its record. The record is read under the root the handler is given (`rootGiven`,
@@ -125,6 +126,18 @@ test('wf, the alias, writes its one hint line on stderr before the help, and not
   assert.match(WF_HINT, new RegExp(`\\b${CLI} <args>`), 'the hint names what to type next');
 });
 
+test('nemia auto, a renamed group, runs as nemia policy, with one hint line on stderr naming it, and stdout the same', async (t) => {
+  const { e } = board();
+  const hints: string[] = [];
+  t.mock.method(process.stderr, 'write', (chunk: string) => hints.push(chunk) > 0);
+  const now = await typed(t, e, 'policy', 'nemia');
+  assert.deepEqual(hints, [], 'the new name gives no hint');
+  const was = await typed(t, e, 'auto', 'nemia');
+  assert.deepEqual(was.out, now.out, 'the former name prints what the new one prints');
+  assert.equal(hints.length, 1, 'one hint line');
+  assert.match(hints[0], new RegExp(`\`${CLI} policy nemia\``), 'the hint names what to type now');
+});
+
 test('a read is run against the root the process names when it is typed, not one a module pinned as it loaded', async (t) => {
   const { e } = board();
   const other = scratch('wf-main-other-');
@@ -172,7 +185,7 @@ test('the help, once and alone, for no verb, a verb it does not know, and a name
     assert.deepEqual(await typed(t, e, verb), { out: help, err: [] }, `nemia ${verb}`);
 });
 
-test('the help, once and alone, for a verb given too little to act on', async (t) => {
+test('the help, once and alone, for a verb given too little to act on, and for a former spelling given as little, typed on purpose', async (t) => {
   const { e } = board();
   const help = (await typed(t, e)).out;
   for (const argv of [
@@ -183,9 +196,10 @@ test('the help, once and alone, for a verb given too little to act on', async (t
     ['cancel'],
     ['rm'],
     ['decide'],
-    ['retry', 'r-1'],
-    ['retry', 'r-1', '--fresh'],
-    ['approve', 'r-1'],
+    ['retry'],
+    ['retry', '--round'],
+    ['retry', '--round', '--budget'],
+    ['approve'],
     ['round'],
     ['round', '--budget'],
     ['accept'],
@@ -285,7 +299,7 @@ test('REFUSED at shipped defaults: nemia show and nemia logs given a flag where 
     });
 });
 
-test('nemia accept of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {
+test('nemia approve of a loop out of rounds: what it accepted, and the file it wrote', async (t) => {
   const b = board();
   const loop = await runPlaced(startRun({ brief: 'a loop', repo: aRepo(), workflowDir: looping() }));
   await runWith(b.e, advanceRun(readRun(loop.id)));
@@ -297,7 +311,7 @@ test('nemia accept of a loop out of rounds: what it accepted, and the file it wr
   await runWith(b.e, advanceRun(readRun(loop.id)));
   b.settle(readRun(loop.id).steps.review.taskId!, 'succeeded', { ...SIGNED, again: true });
   await runWith(b.e, advanceRun(readRun(loop.id)));
-  const { out, err } = await typed(t, b.e, 'accept', loop.id, '--message', 'as it stands');
+  const { out, err } = await typed(t, b.e, 'approve', loop.id, '--message', 'as it stands');
   assert.deepEqual(err, [offLine(ROOT)]);
   assert.equal(out.length, 2, out.join('\n'));
   assert.match(

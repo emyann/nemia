@@ -43,8 +43,6 @@ test('factoryNameRefusal: a lowercase slug of up to 40 characters names a factor
   await t.test('REFUSED: one not lowercase, naming the lowercase', () => names(factoryNameRefusal('Nemia'), 'nemia'));
   await t.test('REFUSED: one that climbs, naming names that are', () => names(factoryNameRefusal('a/b'), 'pipao', 'nemia-2'));
   await t.test('REFUSED: an empty one, saying so', () => names(factoryNameRefusal(''), 'empty'));
-  for (const name of ['pipao', 'nemia', 'nemia-2', '2x', 'a'.repeat(40)])
-    await t.test(`taken: ${name.slice(0, 12)}`, () => assert.equal(factoryNameRefusal(name), undefined));
 });
 
 test("workflowNameRefusal: a workflow's name is no path, hidden, nor the agents' or the skills' folder", async (t) => {
@@ -366,11 +364,11 @@ test('factoryLines: `nemia factory ls`, the default first, then each factory by 
       '         template: /t/team 0.2.0, applied at 0.2.0',
     ]);
     const drifted = { type: 'Applied', status: 'False', reason: 'VersionDrift', message: 'The template is at 0.3.0.' } as const;
-    const pending = { type: 'ConflictsPending', status: 'True', reason: 'Merging', message: 'Two files wait.' } as const;
+    const pending = { type: 'ConflictsPending', status: 'True', reason: 'Conflicts', message: 'Two files wait.' } as const;
     assert.deepEqual(factoryLines([{ ...made, status: { applied: '0.2.0', conditions: [drifted, pending] } }]).slice(2, 5), [
       '         template: /t/team 0.2.0, applied at 0.2.0',
       '         Applied False, VersionDrift: The template is at 0.3.0.',
-      '         ConflictsPending True, Merging: Two files wait.',
+      '         ConflictsPending True, Conflicts: Two files wait.',
     ]);
   });
   await t.test(

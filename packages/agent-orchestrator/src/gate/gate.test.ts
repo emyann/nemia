@@ -187,7 +187,7 @@ test('gateLines', async (t) => {
       'at its gate on a held run: no command, its approval asked once the hold lifts',
       atPlan({ hold: { at: '2026-09-17T01:00:00.000Z', until: ['r-0'] } }),
       PLAN_DONE,
-      { plan: 'awaiting approval:  held until r-0 ships; its approval is asked once the hold lifts' },
+      { plan: 'awaiting approval:  held until r-0 lands; its approval is asked once the hold lifts' },
     ],
     [
       'at its gate on a pruned run: never approved, and no command offered',
@@ -322,7 +322,7 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
     names(
       refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [sendBack]),
       'try 2 of plan is already asked for',
-      '(--nudge, at 2026-09-16T23:00:00.000Z)',
+      '(--continue, at 2026-09-16T23:00:00.000Z)',
       'try 1',
       'the next tick sends it back',
     );
@@ -334,7 +334,7 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
     names(
       refused(atPlan(), 'plan', PLAN_DONE, signedDone, undefined, [WORDLESS]),
       'try 2 of plan is asked for',
-      '(--nudge, at 2026-09-16T23:00:00.000Z)',
+      '(--continue, at 2026-09-16T23:00:00.000Z)',
       'with no words',
       'plan is at its gate',
       'retry-plan-2',

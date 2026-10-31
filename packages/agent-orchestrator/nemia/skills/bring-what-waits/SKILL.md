@@ -8,6 +8,8 @@ Five things wait on the person, and only these: a step at its gate, a step's que
 and a factory's upgrade. Each is theirs to decide. Bring it in chat so they can decide in one read, with the verb you recommend; then run the verb they
 choose, with their words as `--message` where the verb takes it. The verb prompts them as it runs: that prompt is their decision, asked
 once, since they just gave it in chat. When they decline the prompt, ask what they want instead, and run that verb, which prompts again.
+Two verbs answer what waits: `nemia approve`, of a step at its gate or, with `--message`, of a loop out of rounds; and `nemia retry`,
+one more try or, with `--round`, one more round. `nemia refresh <run> --base` brings the base into a loop's work.
 
 Everything else is yours, and is not brought here: a check that did not finish you run again (`nemia retry <run> <step> --recheck`), a
 check that refused the work you report with its exit code, a hold or a merge you do and say. The `verbs` skill classes every verb.
@@ -34,9 +36,9 @@ Bring it, a short part each:
     each, numbered as `nemia decide <run>` prints them: `nemia approve <run> <step> --answer 1=a --answer "2=b: <words>"`;
   - send it back with what to change: `nemia retry <run> <step> --message "<their objection>"`.
 
-A hold is yours, at its gate too: when the step cannot hand on yet, because what it needs has not shipped, hold the run
+A hold is yours, at its gate too: when the step cannot hand on yet, because what it needs has not landed, hold the run
 (`nemia hold <run> --until <other run> --why "<words>"`) and say so when you bring it. So is a merge, when the loop's work no longer
-merges on its base (`nemia merge <run>`): do it, and say it was done.
+merges on its base (`nemia refresh <run> --base`): do it, and say it was done.
 
 ## A step's question to the person
 
@@ -51,9 +53,9 @@ Bring it:
 - **Recommendation**: the answer you would give to each question, and why, in a sentence.
 
 Answer with the step's session continued and told their answer:
-`nemia retry <run> <step> --nudge --message "<their answers>"`. Where its closeout asks questions, `nemia decide <run>` numbers them and
+`nemia retry <run> <step> --continue --message "<their answers>"`. Where its closeout asks questions, `nemia decide <run>` numbers them and
 letters their options: give each answer by those names, and the step reads them as the board's answers read —
-`nemia retry <run> <step> --answer 1=a --answer "2=a,c" --answer "3: <their words>"`. `--nudge` is the default; `--fresh` starts a new session on its branch
+`nemia retry <run> <step> --answer 1=a --answer "2=a,c" --answer "3: <their words>"`. `--continue` is the default; `--fresh` starts a new session on its branch
 instead, which the person may ask for. Where the step's question asks for budget, or its cap is near, the answer may raise it:
 `nemia retry <run> <step> --budget <amount> --message "<their answers>"`, the amount above its cap. Where `nemia decide` says the step is
 also at its cap, the line it offers carries `--budget <amount>`. A cap is the person's to raise.
@@ -70,11 +72,12 @@ Bring it:
 - **How the rounds went**: whether each round closed findings or the same ones came back.
 - **Cost**: what the loop has spent, against its budget and the person's line.
 - **Recommendation**: one, with its reason in a sentence:
-  - once more: `nemia round <run> <step>`, the step being the looping one, which may be left out when the workflow has one loop;
-  - enough, with the findings left open: `nemia accept <run> <step> --message "<their words>"`.
+  - once more: `nemia retry <run> <step> --round`, the step being the looping one, which may be left out when the workflow has one loop;
+  - enough, with the findings left open: `nemia approve <run> <step> --message "<their words>"`, which approves the loop as it
+    stands.
 
-`nemia round` takes no words: the next round's reviewer reads the findings, not the person. Where their answer carries words for the
-step, say so before you run it. Where a step of the loop is over its budget, `nemia round <run> --budget <amount>` raises its cap with
+`nemia retry --round` takes no words: the next round's reviewer reads the findings, not the person. Where their answer carries words for the
+step, say so before you run it. Where a step of the loop is over its budget, `nemia retry <run> --round --budget <amount>` raises its cap with
 the round: the raise is theirs, so say it in the recommendation.
 
 ## A step at its cap
@@ -93,7 +96,7 @@ Bring it:
 - **Recommendation**: one, with its reason in a sentence:
   - raise the cap and try again: `nemia retry <run> <step> --budget <amount> --message "<their words>"`, the amount above what its
     tries have cost;
-  - for a step of a loop whose next round would run past the cap: `nemia round <run> <step> --budget <amount>`, as above;
+  - for a step of a loop whose next round would run past the cap: `nemia retry <run> <step> --round --budget <amount>`, as above;
   - stop there: `nemia cancel <run>`, which prompts them too.
 
 ## A factory's upgrade

@@ -13,7 +13,7 @@ runs it.
 condition in the workflow.
 
 **It is reached through** the folder itself. A repository keeps its workflows checked in, one folder each under `workflows/` at its
-root, as it keeps its CI; your own sit under `~/.agent-workflows/workflows/` (`WF_ROOT`). Nemia ships no workflow: a factory's are
+root, as it keeps its CI; your own sit under `~/.agent-workflows/workflows/` (`WF_ROOT`). Nemia has no builtin workflow: a factory's are
 its own, written by the people who run it.
 
 ## A step
@@ -102,7 +102,9 @@ does not say. After each round the reviewer's closeout says `again`, yes or no:
   findings as data. It answers each finding, fixed or not and why.
 - `again: false`: the loop is done, and what waits on it starts.
 
-When the rounds run out, a person decides: one more round (`nemia round`), or enough (`nemia accept`).
+When the rounds run out, a person decides, with one of the two verbs that answer a waiting step: one more round
+(`nemia retry <run> --round`), or enough (`nemia approve <run> --message "…"`), which takes the work as it stands. The former
+spellings, `nemia round` and `nemia accept`, still run and print the new one, until a later release removes them.
 
 ## A gate
 
@@ -116,7 +118,7 @@ A gate can also be asked for when a run is started (`--gate <step>`), or on a ca
 
 ## The landing
 
-The end of a run is a step too, its workflow's last: in a workflow that ships to a branch, that step stages the merge. It runs in the
+The end of a run is a step too, its workflow's last: in a workflow that lands on a branch, that step stages the merge. It runs in the
 repository's own checkout (`workspace: main`), has a check, and either has a gate or waits on a step that can send the work back — a
 review, whose `loop:` closes on the work.
 
@@ -133,7 +135,7 @@ accepts.
 ## What a step may spend
 
 `budget` is in dollars: the most a step's tries may cost together, every try and every round. Past it, the step reads `over budget`,
-and the run files nothing more of it on its own word. A person raises the cap with `--budget` on `nemia retry` or `nemia round`. The
+and the run files nothing more of it on its own word. A person raises the cap with `--budget` on `nemia retry`, with `--round` for a round. The
 cost is what the harness priced each attempt at, read by the runtime once the attempt has ended.
 
 ## An example
@@ -141,7 +143,7 @@ cost is what the harness priced each attempt at, read by the runtime once the at
 This repository's own team is a workflow, `workflows/build/`: design, then implement, then review looping back on implement, then
 land. Its steps are `workflows/build/design.md` (gated), `workflows/build/implement.md` (with a check that runs the whole suite),
 `workflows/build/review.md` (`loop: implement`, three rounds) and `workflows/build/land.md` (gated, in the checkout). It is this
-repository's, not something Nemia ships.
+repository's, not something built into Nemia.
 
 ## Sources
 

@@ -16,21 +16,21 @@ import { ENDED } from './words.ts';
  *
  * Nothing here reads a step's words. The status alone is not enough: `assess` reads a fan-out as failed once one step is final without
  * letting its followers run, while a sibling's session still works. A run is finished once it has stopped moving without running:
- * succeeded; failed at a refused check or a step signed off blocked, whose followers read `waiting` and will never be filed; or cancelled,
+ * succeeded; failed at a refused check or a step signed off blocked, whose followers read `pending` and will never be filed; or cancelled,
  * its stop landed. A run such a stop leaves waiting on a person stays on the Factory all the same (`floorRuns`); the rest are under "Show
  * finished", or on Runs.
  *
- * A run started `--after` runs that have not shipped is in flight while each may still ship: it moves, since the tick files its roots when
- * they do, and its card is a ghost until it starts (`waitsOnRuns`). Not once one never will without a person (`waiting.onYou`) — no such
- * run, a cancelled one, a branch gone — though `assess`, which knows nothing of the gate, still calls it running: nothing of it moves until
- * a person acts, and it waits on them.
+ * A run started `--after` runs that have not landed is in flight while each may still land: it moves, since the tick files its roots when
+ * they do, and its card is a ghost until it starts (`waitsOnRuns`). Not once one never will without a person (`waiting.waitingOnYou`) — no
+ * such run, a cancelled one, a branch gone — though `assess`, which knows nothing of the gate, still calls it running: nothing of it moves
+ * until a person acts, and it waits on them.
  *
- * So is a run a person holds until runs ship (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
- * steps say, and the tick lifts the hold when those runs ship, though nothing of it is filed before then. Not once only a person lifts it
- * (`holding.onYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
+ * So is a run a person holds until runs land (the CLI's `hold`), and on the same terms. `assess` calls a held run running whatever its
+ * steps say, and the tick lifts the hold when those runs land, though nothing of it is filed before then. Not once only a person lifts it
+ * (`holding.waitingOnYou`): then it waits on them (`waitsOnYou`). A listing without `holding` is read as holding nothing.
  */
 export const inFlight = (run: Pick<RunSummary, 'status' | 'moving'> & Held): boolean =>
-  run.moving || (run.status === 'running' && !run.waiting?.onYou && !run.holding?.onYou);
+  run.moving || (run.status === 'running' && !run.waiting?.waitingOnYou && !run.holding?.waitingOnYou);
 
 /**
  * The runs of the light answer as one list: those that wait on a person, then those in flight, each run once. Every run the board calls
@@ -50,15 +50,15 @@ export const toDecideOf = (run: { toDecide?: RunToDecide | null }): RunToDecide 
 
 /**
  * Whether the run waits on a person: a step does (`waitingOnYou`) — at its gate anywhere in the run, or signed off blocked — or a run it
- * waits on never ships without one — what the CLI's `ls` prints `→ waiting on you` for, either way — or a hold on it only a person lifts
- * (`holding.onYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on nobody,
- * whatever its steps last said.
+ * waits on never lands without one — what the CLI's `ls` prints `→ waiting on you` for, either way — or a hold on it only a person lifts
+ * (`holding.waitingOnYou`: a run it is held until is cancelled, gone, or not there). Not once it is cancelled: a cancelled run waits on
+ * nobody, whatever its steps last said.
  */
 export const waitsOnYou = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'> & Held): boolean =>
-  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.onYou) || Boolean(run.holding?.onYou));
+  !run.cancelledAt && (run.waitingOnYou.length > 0 || Boolean(run.waiting?.waitingOnYou) || Boolean(run.holding?.waitingOnYou));
 
 /**
- * Whether a run waits on runs, and on nothing else: started `--after` runs not shipped, each of which may still ship, with nothing of it
+ * Whether a run waits on runs, and on nothing else: started `--after` runs not landed, each of which may still land, with nothing of it
  * filed yet (the api's `waiting`, null once a step is filed), and nobody to act (`waitsOnYou`). The floor draws such a run as a ghost, as
  * the queue lane draws a card not started, until it starts. Not a cancelled run, which waits on nobody.
  */
@@ -67,23 +67,23 @@ export const waitsOnRuns = (run: Pick<RunSummary, 'waitingOnYou' | 'cancelledAt'
 
 /**
  * Who a run waits on, as the CLI's `ls` names them after `→ waiting on you:` — `approve plan` for a step at its gate — off the api's
- * `onYou`; and for a run given without `onYou`, the steps by name (`waitingOnYou`).
+ * `waitingOnYouWords`; and for a run given without `waitingOnYouWords`, the steps by name (`waitingOnYou`).
  *
  * Without the ending step whose gate the to-decide line already says, as the CLI's `ls` prints it (cli/main.ts): that line is above, it
  * names the step and the command, and the same step is not asked for twice. A run may then wait on you with nothing here to name — the
  * whole of what is asked is the decision — so a caller that says `waiting on you:` asks whether there is anything to say first.
  */
 export const onYouOf = (
-  run: Pick<RunSummary, 'waitingOnYou'> & { onYou?: readonly string[]; toDecide?: RunToDecide | null },
+  run: Pick<RunSummary, 'waitingOnYou'> & { waitingOnYouWords?: readonly string[]; toDecide?: RunToDecide | null },
 ): readonly string[] => {
-  const said = run.onYou ?? run.waitingOnYou;
+  const said = run.waitingOnYouWords ?? run.waitingOnYou;
   const decide = toDecideOf(run);
   return decide?.kind === 'approve' ? said.filter((one) => one !== `approve ${decide.step}`) : said;
 };
 
 /**
  * Where a run stands, in a word, as the start form offers it to wait on: called off; waiting on you (`waitsOnYou`) — a run that waits on
- * a run that never ships is one, though it has filed nothing and is not in flight; in flight; or finished.
+ * a run that never lands is one, though it has filed nothing and is not in flight; in flight; or finished.
  */
 export const standingOf = (run: Pick<RunSummary, 'cancelledAt' | 'status' | 'moving' | 'waitingOnYou' | 'waiting'>): string =>
   run.cancelledAt ? ENDED.cancelled.word : waitsOnYou(run) ? 'waiting on you' : inFlight(run) ? 'in flight' : 'finished';
@@ -98,7 +98,7 @@ export const waitedMs = (run: Pick<RunSummary, 'createdAt' | 'startedAt'>): numb
 /**
  * Whether a run's clock still counts, second by second: the time at work of a run a task of which still runs (`AtWork.since`), and the
  * wait of a run nothing of which is filed yet and nobody called off — `finished` on the floor for one that waits on a run that never
- * ships, and waiting all the same. A run without the api's time at work counts while it is in flight, as `finished` says.
+ * lands, and waiting all the same. A run without the api's time at work counts while it is in flight, as `finished` says.
  */
 export const clockCounts = (run: Clocked, finished: boolean): boolean => {
   if (run.startedAt === null) return run.cancelledAt === null;
@@ -158,7 +158,7 @@ const rowWords = (run: Clocked, now: number): string => {
  * still runs started added as `now` moves. The title gives the start, the end or that it still goes, and the wall time between.
  *
  * Counted from when it started (`startedAt`, its first filing), never from when it was created: a run started `--after` runs is created,
- * then waits, doing nothing, until they ship, and that wait is not time at work. Until it starts it says it is waiting, for as long as it
+ * then waits, doing nothing, until they land, and that wait is not time at work. Until it starts it says it is waiting, for as long as it
  * has — what it waits on is the card's line above (`waiting.word`), and the title's — and a run called off before it started never did.
  * A run the api could not judge has no time at work, and says when it started.
  */
@@ -197,7 +197,7 @@ export function runClock(
 
 type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'waiting' | 'after' | 'waitingOnYou' | 'cancelledAt'> & {
   toDecide?: RunToDecide | null;
-  heldUntil?: readonly string[];
+  holdUntil?: readonly string[];
   holding?: RunSummary['holding'];
 };
 
@@ -217,7 +217,7 @@ type FloorRun = Pick<RunSummary, 'id' | 'createdAt' | 'status' | 'moving' | 'wai
  * approval or the answer is given; a cancelled run waits on nobody, and is not kept by this. The header's `waiting on you` counts the
  * same runs (`waitsOnYou`), so each one it counts has its card on the floor.
  *
- * The finished card, and not a stub: it is dimmed as a finished card is, it says what the run was for and whether it shipped or was
+ * The finished card, and not a stub: it is dimmed as a finished card is, it says what the run was for and whether it landed or was
  * called off, and it opens into the run's steps — a stub would say only an id, and send a person to Runs to learn the rest. One level: a
  * finished parent brings none of its own parents onto the floor, since it waits on nothing any more.
  */
@@ -231,22 +231,22 @@ type Waits = Pick<RunSummary, 'id' | 'waiting'> & { holding?: RunSummary['holdin
 
 /**
  * The runs a card still waits on, each once: those its roots wait on before anything is filed (`waiting`, the CLI's `--after`), then each
- * a person holds it until that has not shipped (`holding`). None once the run has started and nobody holds it: a wait it was started with
+ * a person holds it until that has not landed (`holding`). None once the run has started and nobody holds it: a wait it was started with
  * is over, and a run it reads as context is never one.
  */
 export const liveWaits = (run: Waits): string[] => [
-  ...new Set([...(run.waiting?.runs ?? []).map((w) => w.run), ...(run.holding?.runs ?? []).filter((h) => !h.shipped).map((h) => h.run)]),
+  ...new Set([...(run.waiting?.runs ?? []).map((w) => w.run), ...(run.holding?.runs ?? []).filter((h) => !h.landed).map((h) => h.run)]),
 ];
 
 /**
- * An edge between two cards on the Factory: from a run to one that still waits on it (`after:`), or that a person holds until it ships
+ * An edge between two cards on the Factory: from a run to one that still waits on it (`after:`), or that a person holds until it lands
  * (`hold:`). Always dashed, to come: a wait that is over draws nothing.
  */
 export type RunEdge = { id: string; source: string; target: string; state: Extract<EdgeState, 'to-come'> };
 
 /**
  * The edges between the cards on the floor that are live waits: one from each run a card's roots still wait on (`waiting`), and one from
- * each run a person holds it until that has not shipped (`holding`), where none already joins the two — each only when both cards are on
+ * each run a person holds it until that has not landed (`holding`), where none already joins the two — each only when both cards are on
  * the floor. A run that has started draws none from its waits, and a run it reads as context none at all (`contextEdges`).
  *
  * Reduced transitively: an edge u→w is dropped when another path u→…→w joins the two among the edges drawn, since the chain says it.

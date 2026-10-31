@@ -20,13 +20,13 @@ export const PlaceKindSchema = decodes<PlaceKind>()(Schema.Literals(['repository
 
 /**
  * Mirrors `RunStatus` in agent-orchestrator: where `assess` puts the run. `failed` is a run in which a step broke; one a person alone
- * stops is `awaiting approval`, at its gates, or `blocked`, on an answer.
+ * stops is `awaiting approval`, at its gates, or `waiting`, on anything else.
  */
-export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'blocked';
+export type RunStatus = 'running' | 'succeeded' | 'failed' | 'cancelled' | 'awaiting approval' | 'waiting';
 
 /** Decodes a `RunStatus`. */
 export const RunStatusSchema = decodes<RunStatus>()(
-  Schema.Literals(['running', 'succeeded', 'failed', 'cancelled', 'awaiting approval', 'blocked']),
+  Schema.Literals(['running', 'succeeded', 'failed', 'cancelled', 'awaiting approval', 'waiting']),
 );
 
 /**
@@ -141,14 +141,15 @@ export const RunTokensSchema = decodes<RunTokens>()(
 
 /**
  * Mirrors `RunWaiting` in agent-orchestrator: what a run started `--after` still waits on, in the package's words. `runs` are each
- * run not shipped, and why one never will without a person (`missing`, `cancelledAt`, `gone`); `word` is what the CLI's `ls` prints on its
- * roots — `waiting on a-1x2y (cancelled)` — and `advice` the line the CLI's `decide` prints under it; `onYou` whether a person has to act.
+ * run not landed, and why one never will without a person (`missing`, `cancelledAt`, `gone`); `word` is what the CLI's `ls` prints on its
+ * roots — `waiting on a-1x2y (cancelled)` — and `advice` the line the CLI's `decide` prints under it; `waitingOnYou` whether a person has
+ * to act.
  */
 export type RunWaiting = {
   runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[] }>;
   word: string;
   advice: string;
-  onYou: boolean;
+  waitingOnYou: boolean;
 };
 
 /** Decodes a `RunWaiting`. */
@@ -161,24 +162,24 @@ export const RunWaitingSchema = decodes<RunWaiting>()(
     ),
     word: Schema.String,
     advice: Schema.String,
-    onYou: Schema.Boolean,
+    waitingOnYou: Schema.Boolean,
   }),
 );
 
 /**
  * Mirrors `RunHolding` in agent-orchestrator: a person's hold on a run (the CLI's `hold <run> --until <run>`), in the package's
- * words. `at` is when it was put; `runs` each run it names that has not shipped, and why one never will without a person — or, in the
- * moment every one has shipped and the next tick has not yet lifted the hold, each of them `shipped`. `word` is what the CLI's `ls` prints
- * (`held until a-1x2y ships`), `advice` the line the CLI's `decide` prints under it, which names the CLI's `hold <run> --off`; `onYou`
- * whether only a person's hand lifts it. While it stands no step waits on you and nothing is offered: every verb that would release work is
- * refused.
+ * words. `at` is when it was put; `runs` each run it names that has not landed, and why one never will without a person — or, in the
+ * moment every one has landed and the next tick has not yet lifted the hold, each of them `landed`. `word` is what the CLI's `ls` prints
+ * (`held until a-1x2y lands`), `advice` the line the CLI's `decide` prints under it, which names the CLI's `hold <run> --off`;
+ * `waitingOnYou` whether only a person's hand lifts it. While it stands no step waits on you and nothing is offered: every verb that would
+ * release work is refused.
  */
 export type RunHolding = {
   at: string;
-  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; shipped: boolean }>;
+  runs: Array<{ run: string; missing: boolean; cancelledAt: string | null; gone: string[]; landed: boolean }>;
   word: string;
   advice: string;
-  onYou: boolean;
+  waitingOnYou: boolean;
 };
 
 /** Decodes a `RunHolding`. */
@@ -192,19 +193,19 @@ export const RunHoldingSchema = decodes<RunHolding>()(
           missing: Schema.Boolean,
           cancelledAt: Schema.NullOr(Schema.String),
           gone: StringsSchema,
-          shipped: Schema.Boolean,
+          landed: Schema.Boolean,
         }),
       ),
     ),
     word: Schema.String,
     advice: Schema.String,
-    onYou: Schema.Boolean,
+    waitingOnYou: Schema.Boolean,
   }),
 );
 
 /**
  * Mirrors `StepNeeds` in agent-orchestrator. `needs`: the closeout's, for a step whose current try signed off blocked.
- * `blockedByHarness`: whether the harness marked its session blocked while it gave no closeout — the engine's `needs-human`. `waitingFor`:
+ * A step whose harness marked its session blocked says so by its codes, `AwaitingAnswer` via `session` (`atHarness`). `waitingFor`:
  * what that harness says the session waits for, in the package's words — `words` the wait, `advice` what a person does about it — null
  * where the harness said nothing, and on the list as on the detail, since it costs no read of its own. What that session said last is on a
  * run's detail alone (`lastLine`): the list reads no conversation. `approve`: what the CLI's `ls` asks of you for a step waiting at its
@@ -215,7 +216,6 @@ export const RunHoldingSchema = decodes<RunHolding>()(
  */
 export type StepNeeds = {
   needs: string | null;
-  blockedByHarness: boolean;
   waitingFor: { words: string; advice: string } | null;
   approve: string | null;
   denied: { words: string; calls: string[] } | null;
@@ -225,7 +225,6 @@ export type StepNeeds = {
 /** The fields of a `StepNeeds`, for the schema of a step that carries them to take in with its own (`RunSummarySchema` in runs.ts). */
 export const StepNeedsFields = {
   needs: Schema.NullOr(Schema.String),
-  blockedByHarness: Schema.Boolean,
   waitingFor: Schema.NullOr(Schema.Struct({ words: Schema.String, advice: Schema.String })),
   approve: Schema.NullOr(Schema.String),
   denied: Schema.NullOr(Schema.Struct({ words: Schema.String, calls: StringsSchema })),

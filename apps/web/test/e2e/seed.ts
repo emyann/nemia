@@ -63,13 +63,14 @@ export const FAKE = {
   /** Who a person has to act for: the step that signed off blocked, and the one whose check refused. */
   waitingOnYou: ['implement', 'theme'],
   /**
-   * The revisions the run resolved, and what the ledger holds now: its agent and its skill have both moved since, and `tokens` ran on
-   * an older revision of the agent than the run is pinned to. The board draws one line per kind, the step's saying it already ran.
+   * The revisions the run resolved, and the ones its next filing would take from the files as they are now (`driftNow`): its agent and
+   * its skill have both moved since, and `theme` ran on an older revision of the agent than the run is pinned to. The board draws one
+   * line per kind, the step's saying it already ran.
    */
   behind: {
-    agent: 'agent coder: rev 5, ledger at 6',
-    skill: 'skill look: rev 1, ledger at 2',
-    ran: 'agent coder: tokens ran on rev 4, ledger at 6',
+    agent: 'agent coder: rev 5, files at rev 7',
+    skill: 'skill look: rev 1, files at rev 3',
+    ran: 'agent coder: theme ran on rev 4, files at rev 7',
     kinds: 3,
   },
   /** `tokens`' lane, which `theme` worked in too: the run's result branch, committed in its repository. */
@@ -338,7 +339,7 @@ export const LOOPING = {
   /** What `wf ls` prints beside each step: the round it is on, and for the loop out of rounds, the command that takes it once more. */
   notes: {
     implement: 'round 3 of 3',
-    review: 'round 3 of 3, and it asked again — once more: nemia round go-round-again-e2e2 review',
+    review: 'round 3 of 3, and it asked again — once more: nemia retry go-round-again-e2e2 review --round',
   },
   /** What each step said in the rounds before the one it is on: round 1, then round 2. */
   earlier: [
@@ -353,7 +354,7 @@ export const LOOPING = {
 /**
  * A fourth run, started last: `implement`'s session is at work, an attached one, its conversation ending on the harness's login refresh
  * race (`line`), and `review` waits on it. The run is running and moves, and in the package's words nobody is waiting on you: the step
- * asked nothing. On the floor by default, in the cell after NEIGHBOUR's; the hold pages hold a run until it ships. Its name is from when
+ * asked nothing. On the floor by default, in the cell after NEIGHBOUR's; the hold pages hold a run until it lands. Its name is from when
  * a Claude Code session could be blocked by its harness, which only a remote agent's can now.
  */
 export const HELD = {
@@ -529,15 +530,15 @@ export const ENDING = {
  * the folder answered for its own branch — and its card is off the Factory's floor with the rest of the finished. It froze `review` with
  * another note than ENDING, the run of its folder before it, did: the store's one change mark (`changed`).
  */
-export const SHIPPED = {
-  id: 'it-shipped-itself-e2e13',
-  title: 'It shipped itself',
+export const LANDED = {
+  id: 'it-landed-itself-e2e13',
+  title: 'It landed itself',
   steps: ['implement', 'review', 'ship'],
   ending: 'ship',
-  branch: 'wf/it-shipped-itself-e2e13/implement',
+  branch: 'wf/it-landed-itself-e2e13/implement',
   /** What ship said it did, which is the account a person reads under the step. */
   merged: 'Merged it onto main with --no-ff, and the check passed.',
-  /** What `wf prune` freed once it shipped: the one worktree its implement and review worked in, as a `node_modules` makes one. */
+  /** What `wf prune` freed once it landed: the one worktree its implement and review worked in, as a `node_modules` makes one. */
   prunedBytes: 1.5 * 1024 ** 3,
   /** And what `--artifacts` freed with it: its files directory, whose screenshot review named. */
   prunedFilesBytes: 48 * 1024 ** 2,
@@ -565,17 +566,17 @@ export const UNMERGED = {
 
 /**
  * Runs that wait on runs (`wf start --after`), on the checkout's repository — a real one (`seedDiamond`), and the one a start from the
- * Workflows page runs in, so the start form offers them. The diamond: `top` shipped first; `shipped` and `running` started from a main
- * that had it, and `shipped` was merged while `running`'s session still works; `bottom` waits on both, so on `running` alone. Beside it,
+ * Workflows page runs in, so the start form offers them. The diamond: `top` landed first; `landed` and `running` started from a main
+ * that had it, and `landed` was merged while `running`'s session still works; `bottom` waits on both, so on `running` alone. Beside it,
  * `cancelled` was called off before anything of it was filed, and `orphan` waits on it: for ever, so on you.
  *
  * Newer than every other run, so the Factory's oldest-first floor still starts with FAKE's card and NEIGHBOUR's beside it.
  */
 export const DIAMOND = {
   top: { id: 'lay-the-diamond-top-e2e4', title: 'Lay the diamond top', after: [] },
-  shipped: { id: 'one-side-shipped-e2e5', title: 'One side, shipped', after: ['lay-the-diamond-top-e2e4'] },
+  landed: { id: 'one-side-landed-e2e5', title: 'One side, landed', after: ['lay-the-diamond-top-e2e4'] },
   running: { id: 'the-other-side-runs-e2e6', title: 'The other side, still running', after: ['lay-the-diamond-top-e2e4'] },
-  bottom: { id: 'the-diamond-bottom-e2e7', title: 'The diamond bottom', after: ['one-side-shipped-e2e5', 'the-other-side-runs-e2e6'] },
+  bottom: { id: 'the-diamond-bottom-e2e7', title: 'The diamond bottom', after: ['one-side-landed-e2e5', 'the-other-side-runs-e2e6'] },
   cancelled: { id: 'called-off-e2e8', title: 'Called off', after: [] },
   orphan: { id: 'waits-on-a-called-off-run-e2e9', title: 'Waits on a called-off run', after: ['called-off-e2e8'] },
   /** What `wf ls` says of each waiting run's root, and the card with it. */
@@ -857,14 +858,14 @@ export function noFactories(root: string): () => void {
 }
 
 /** The diamond's runs, oldest first. */
-export const DIAMOND_RUNS = [DIAMOND.top, DIAMOND.shipped, DIAMOND.running, DIAMOND.bottom, DIAMOND.cancelled, DIAMOND.orphan] as const;
+export const DIAMOND_RUNS = [DIAMOND.top, DIAMOND.landed, DIAMOND.running, DIAMOND.bottom, DIAMOND.cancelled, DIAMOND.orphan] as const;
 
 /**
  * Write DIAMOND into the checkout at `repo` — made a git repository here, its files the base on `main` — and the store at `root`. `top`'s
- * and `shipped`'s result branches are merged into main with `--no-ff`, one after the other, and their steps signed off: each one's own
- * `wf decide` says shipped. `running`'s branch has its work and is not merged, and its session has started and not ended, as NEIGHBOUR's
+ * and `landed`'s result branches are merged into main with `--no-ff`, one after the other, and their steps signed off: each one's own
+ * `wf decide` says landed. `running`'s branch has its work and is not merged, and its session has started and not ended, as NEIGHBOUR's
  * draft: the engine reads it running. Its record was created a minute before its step was filed, as a run started `--after` one is filed on
- * the pass after its parent ships: that minute is its wait, and its card does not count it. `cancelled` is marked as `wf cancel` marks a
+ * the pass after its parent lands: that minute is its wait, and its card does not count it. `cancelled` is marked as `wf cancel` marks a
  * run, in a file beside its record. Times are minutes before `now`.
  */
 export function seedDiamond(repo: string, root: string, now = Date.now()): void {
@@ -946,13 +947,13 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
       ]),
     );
 
-  const { top, shipped, running, bottom, cancelled, orphan } = DIAMOND;
+  const { top, landed, running, bottom, cancelled, orphan } = DIAMOND;
   work(top.id, true);
   signedOff(top, 2.6, 2.5);
   record(top, 2.6, { taskId: task(top), workspace: repo, branch: branchOf(top.id) });
-  work(shipped.id, true);
-  signedOff(shipped, 2.4, 2.3);
-  record(shipped, 2.4, { taskId: task(shipped), workspace: repo, branch: branchOf(shipped.id) });
+  work(landed.id, true);
+  signedOff(landed, 2.4, 2.3);
+  record(landed, 2.4, { taskId: task(landed), workspace: repo, branch: branchOf(landed.id) });
   work(running.id, false);
   write(
     path.join(root, 'engine', 'tasks', `${task(running)}.jsonl`),
@@ -966,7 +967,7 @@ export function seedDiamond(repo: string, root: string, now = Date.now()): void 
 }
 
 /**
- * A run of FACTORIES' `hiring` started `--after` DIAMOND's `running`, a run of the default factory that may still ship: on its factory's
+ * A run of FACTORIES' `hiring` started `--after` DIAMOND's `running`, a run of the default factory that may still land: on its factory's
  * floor, a ghost that names `running` and draws no card of it. Not seeded with the rest, so no count of the store's runs moves: the page
  * that reads it writes it (`seedChained`) and takes it back.
  */
@@ -1074,7 +1075,11 @@ const STEPS = [
   },
   {
     file: 'theme.md',
-    text: `---\nplace: git\nharness: claude\nafter: tokens\ncheck: ${FAKE.check}\n---\nApply them to every page.\n`,
+    /**
+     * The one step that names an agent, `coder`, which gives the skill `look` its session loaded (`seed`): on claude, since codex is handed
+     * no skill of an agent's.
+     */
+    text: `---\nplace: git\nharness: claude\nafter: tokens\nagent: coder\ncheck: ${FAKE.check}\n---\nApply them to every page.\n`,
     frozen: { name: 'theme', after: ['tokens'], body: 'Apply them to every page.', harness: 'claude', check: FAKE.check },
   },
 ];
@@ -1711,15 +1716,15 @@ function seedRepo(repo: string, branch: string): string {
 
 /**
  * Write the three runs whose result is a decision into the store at `root`, and their branches into FAKE's repository at `repo`, cut from
- * `base` on main: ENDING at its ending's gate, SHIPPED with that ending approved and merged, and UNMERGED with a branch nobody took.
+ * `base` on main: ENDING at its ending's gate, LANDED with that ending approved and merged, and UNMERGED with a branch nobody took.
  *
  * Real commits, because what the board says about each is read out of git on every request: where the branch stands against the base, and
  * how much it changed. ENDING's two commits are three files, fourteen lines added and one removed against the base — `stat` — with
  * `CLAUDE.md` among them, so its radius has a lesson line too: eight lines of source, then five of docs and CLAUDE.md's line rewritten.
- * SHIPPED's branch is merged into main with `--no-ff`, as its ending step would have merged it, which is what makes the run read as shipped
+ * LANDED's branch is merged into main with `--no-ff`, as its ending step would have merged it, which is what makes the run read as landed
  * with nothing left to decide.
  *
- * ENDING and SHIPPED are started from one folder: implement, review, then the ending in the repository's own checkout. SHIPPED's ship
+ * ENDING and LANDED are started from one folder: implement, review, then the ending in the repository's own checkout. LANDED's ship
  * was approved with no words, as `wf approve` writes an approval, filed in the checkout, and merged; then pruned, as `wf prune --artifacts`
  * marks a run: its record and branch kept, the worktree and its files gone. UNMERGED's folder says nothing about shipping, so git is what
  * ends it: one step, signed off, and a branch nobody took.
@@ -1772,12 +1777,12 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     ['CLAUDE.md', "# Nemia — contributor guide, with the queue's rule\n"],
   ]);
   commit(
-    SHIPPED.branch,
+    LANDED.branch,
     'Say what shipping is',
     [['workflows/dev/ship.md', '---\nworkspace: main\ngate: true\n---\nMerge it onto the base branch.\n']],
     true,
   );
-  git('merge', '-q', '--no-ff', '-m', `Merge ${SHIPPED.id}`, SHIPPED.branch);
+  git('merge', '-q', '--no-ff', '-m', `Merge ${LANDED.id}`, LANDED.branch);
   commit(
     UNMERGED.branch,
     'Draw the queue on the Factory',
@@ -1865,43 +1870,43 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
     },
   );
 
-  const shippedLane = path.join(root, 'worktrees', SHIPPED.id, 'implement');
-  signedOff(`${SHIPPED.id}-implement`, shippedLane, 'Implement what was asked.', 0.8, 0.6, done('Said what shipping is, in the folder.'));
+  const landedLane = path.join(root, 'worktrees', LANDED.id, 'implement');
+  signedOff(`${LANDED.id}-implement`, landedLane, 'Implement what was asked.', 0.8, 0.6, done('Said what shipping is, in the folder.'));
   signedOff(
-    `${SHIPPED.id}-review`,
-    shippedLane,
-    SHIPPED.review,
+    `${LANDED.id}-review`,
+    landedLane,
+    LANDED.review,
     0.59,
     0.4,
-    done('One reading of it, and nothing to change.', [path.join(root, 'runs', SHIPPED.id, 'artifacts', 'review', SHIPPED.shot)]),
+    done('One reading of it, and nothing to change.', [path.join(root, 'runs', LANDED.id, 'artifacts', 'review', LANDED.shot)]),
   );
-  signedOff(`${SHIPPED.id}-ship`, repo, shipBody, 0.3, 0.2, done(SHIPPED.merged));
-  write(path.join(root, 'runs', `${SHIPPED.id}.asks`, 'approve-ship-1'), JSON.stringify({ step: 'ship', try: 1, at: ago(0.35) }, null, 2));
+  signedOff(`${LANDED.id}-ship`, repo, shipBody, 0.3, 0.2, done(LANDED.merged));
+  write(path.join(root, 'runs', `${LANDED.id}.asks`, 'approve-ship-1'), JSON.stringify({ step: 'ship', try: 1, at: ago(0.35) }, null, 2));
   const prunedAt = ago(0.1);
   write(
-    path.join(root, 'runs', `${SHIPPED.id}.pruned`),
+    path.join(root, 'runs', `${LANDED.id}.pruned`),
     JSON.stringify(
       {
         at: prunedAt,
-        worktrees: [{ path: shippedLane, bytes: SHIPPED.prunedBytes }],
-        artifacts: { at: prunedAt, bytes: SHIPPED.prunedFilesBytes },
+        worktrees: [{ path: landedLane, bytes: LANDED.prunedBytes }],
+        artifacts: { at: prunedAt, bytes: LANDED.prunedFilesBytes },
       },
       null,
       2,
     ),
   );
   shipRun(
-    SHIPPED.id,
-    SHIPPED.title,
+    LANDED.id,
+    LANDED.title,
     'its ending step was approved, ran in the checkout and merged the branch: nothing left to decide.',
-    SHIPPED.branch,
+    LANDED.branch,
     0.8,
     {
-      implement: { taskId: `${SHIPPED.id}-implement`, workspace: shippedLane, branch: SHIPPED.branch },
-      review: { taskId: `${SHIPPED.id}-review`, workspace: shippedLane, branch: SHIPPED.branch },
-      ship: { taskId: `${SHIPPED.id}-ship`, workspace: repo },
+      implement: { taskId: `${LANDED.id}-implement`, workspace: landedLane, branch: LANDED.branch },
+      review: { taskId: `${LANDED.id}-review`, workspace: landedLane, branch: LANDED.branch },
+      ship: { taskId: `${LANDED.id}-ship`, workspace: repo },
     },
-    shipWorkflow.map((step) => (step.name === SHIPPED.changed.name ? { ...step, body: SHIPPED.review } : step)),
+    shipWorkflow.map((step) => (step.name === LANDED.changed.name ? { ...step, body: LANDED.review } : step)),
   );
 
   const aloneDir = path.join(root, 'workflow-alone');
@@ -2092,12 +2097,18 @@ export function writeRegated(root: string, now: number): void {
  * nothing: it reports its input's reads from the cache and writes none, so its usage has the classes and no peak. From round 2,
  * implement gives its answers to the findings it was handed. palette signed off blocked, having spent more than its cap to get there: a
  * question for a person, and a budget to raise with the answer.
+ *
+ * FAKE's folder has `theme`'s agent, `coder`, and the skill it gives, `look`, beside it, where a step's agent is looked for first
+ * (`lookupRoots`): their bytes are none of the hashes their ledgers and the run's pins hold, so the run page's band says each behind,
+ * at the number its next filing would take (`driftNow`), the last of its ledger plus one.
  */
 export function seed(root: string, now = Date.now()): void {
   const ago = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
   const { id } = FAKE;
   const workflowDir = path.join(root, FAKE.workflow);
   for (const step of STEPS) write(path.join(workflowDir, step.file), step.text);
+  write(path.join(root, 'agents', 'coder.md'), '---\nskills: look\n---\nWrite the code.\n');
+  write(path.join(root, 'skills', 'look', 'SKILL.md'), '---\nname: look\ndescription: Look at the board as a person would.\n---\nLook.\n');
 
   const workspace = path.join(root, 'worktrees', id, 'implement');
   const branch = `wf/${id}/implement`;
@@ -2144,9 +2155,14 @@ export function seed(root: string, now = Date.now()): void {
             taskId: `${id}-tokens`,
             workspace: lane,
             branch: laneBranch,
+          },
+          theme: {
+            taskId: `${id}-theme`,
+            workspace: lane,
+            branch: laneBranch,
+            check: { taskId: check },
             pinned: [{ kind: 'agent', name: 'coder', n: 4, hash: 'coder4'.padEnd(16, '0') }],
           },
-          theme: { taskId: `${id}-theme`, workspace: lane, branch: laneBranch, check: { taskId: check } },
         },
       },
       null,

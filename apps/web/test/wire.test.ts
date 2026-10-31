@@ -106,9 +106,9 @@ export type AgentRoleKey = Holds<Same<Board.AgentRoleKey, keyof agents.AgentList
 export type Said = Holds<Same<Board.Said, SaidHeld>>;
 export type QuestionAnswer = Holds<Same<Board.QuestionAnswer, answers.Answer>>;
 
-export type AutoList = Holds<Same<Board.AutoList, nemia.AutoAnswer>>;
-export type AutoRule = Holds<Same<Board.AutoRule, nemia.AutoAnswer['rules'][number]>>;
-export type Condition = Holds<Same<Board.Condition, nemia.AutoAnswer['rules'][number]['when'][number]>>;
+export type PolicyList = Holds<Same<Board.PolicyList, nemia.PolicyAnswer>>;
+export type AutoRule = Holds<Same<Board.AutoRule, nemia.PolicyAnswer['rules'][number]>>;
+export type Condition = Holds<Same<Board.Condition, nemia.PolicyAnswer['rules'][number]['when'][number]>>;
 
 export type Bridge = Holds<Same<Board.Bridge, NonNullable<detail.StepFiled['bridge']>>>;
 
@@ -139,7 +139,7 @@ export type ChatHistory = Holds<Same<Board.ChatHistory, chat.ChatHistoryAnswer>>
 export type ChatEvent = Holds<Same<Board.ChatEvent, ChatEventOf>>;
 export type ChatPresence = Holds<Same<Board.ChatPresence, chat.ChatHistoryAnswer['presence']>>;
 export type ChatFrom = Holds<Same<Board.ChatFrom, Extract<ChatEventOf, { kind: 'message' }>['from']>>;
-export type ChatStepState = Holds<Same<Board.ChatStepState, Extract<ChatEventOf, { kind: 'step' }>['state']>>;
+export type ChatCallState = Holds<Same<Board.ChatCallState, Extract<ChatEventOf, { kind: 'call' }>['state']>>;
 export type AskQuestion = Holds<Same<Board.AskQuestion, AskOf['questions'][number]>>;
 export type AskOption = Holds<Same<Board.AskOption, AskOf['questions'][number]['options'][number]>>;
 export type AskPick = Holds<Same<Board.AskPick, chat.ChatAnswerBody['picks'][number]>>;
@@ -200,7 +200,7 @@ export type FactoryServer = Holds<Same<Board.FactoryServer, ServerOf>>;
 export type FactoryServers = Holds<
   Same<Board.FactoryServers, Omit<servers.FactoryServersRead, 'servers'> & { servers: readonly ServerOf[] }>
 >;
-export type ShippedServer = Holds<Same<Board.ShippedServer, servers.FactoryServersRead['shipped'][number]>>;
+export type BuiltinServer = Holds<Same<Board.BuiltinServer, servers.FactoryServersRead['builtin'][number]>>;
 
 export type RunGraph = Holds<Same<Board.RunGraph, runs.RunPage['graph']>>;
 export type GraphEdge = Holds<Same<Board.GraphEdge, runs.RunPage['graph']['edges'][number]>>;
@@ -219,6 +219,12 @@ export type StepPhase = Holds<Same<Board.StepPhase, runs.RunListing['steps'][num
 export type StepReason = Holds<Same<Board.StepReason, Step['reason']>>;
 export type TryPhase = Holds<Same<Board.StepPhase, tries.StepTry['phase']>>;
 export type TryReason = Holds<Same<Board.StepReason, tries.StepTry['reason']>>;
+export type TryOn = Holds<Same<Board.WaitOn | null, tries.StepTry['on']>>;
+export type TryVia = Holds<Same<Board.AnswerVia | null, tries.StepTry['via']>>;
+export type StepOn = Holds<Same<Board.WaitOn | null, Step['on']>>;
+export type StepVia = Holds<Same<Board.AnswerVia | null, Step['via']>>;
+export type RunOn = Holds<Same<Board.WaitOn | null, runs.RunListing['on']>>;
+export type RunVia = Holds<Same<Board.AnswerVia | null, runs.RunListing['via']>>;
 export type CheckVerdict = Holds<Same<Board.CheckVerdict, NonNullable<logs.StepCheck['verdict']>>>;
 export type StepVerdict = Holds<Same<Board.CheckVerdict, NonNullable<runs.RunListing['steps'][number]['verdict']>>>;
 export type CheckResult = Holds<Same<Board.CheckResult, NonNullable<logs.StepCheck['verdict']>['result']>>;
@@ -408,7 +414,9 @@ const aTry: BoardTry = {
   taskId: 't-1',
   note: null,
   phase: 'waiting',
-  reason: 'Blocked',
+  reason: 'AwaitingAnswer',
+  on: null,
+  via: 'closeout',
   message: 'succeeded · BLOCKED',
   status: 'succeeded · BLOCKED',
   attempts: { count: 1, latest: null },
@@ -433,6 +441,10 @@ test('a step reads its codes, and a reason or a verdict this board does not know
   assert.deepEqual(await readOf(aTry, StepTrySchema), aTry);
   await assert.rejects(readOf({ ...aTry, reason: 'NotAReason' }, StepTrySchema), UnreadAnswer);
   await assert.rejects(readOf({ ...aTry, phase: 'blocked' }, StepTrySchema), UnreadAnswer);
+  await assert.rejects(readOf({ ...aTry, via: 'harness' }, StepTrySchema), UnreadAnswer);
+  await assert.rejects(readOf({ ...aTry, on: 'slot' }, StepTrySchema), UnreadAnswer);
+  const { via: _, ...unqualified } = aTry;
+  await assert.rejects(readOf(unqualified, StepTrySchema), UnreadAnswer, 'a key the board reads is required, null rather than absent');
   await assert.rejects(readOf({ ...aTry, check: { ...aTry.check, verdict: { result: 'exit 1', exit: 1 } } }, StepTrySchema), UnreadAnswer);
   await assert.rejects(readOf({ ...aTry, check: { ...aTry.check, verdict: 'passed' } }, StepTrySchema), UnreadAnswer);
 });

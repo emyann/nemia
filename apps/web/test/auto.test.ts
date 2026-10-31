@@ -5,9 +5,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { autoQuery, confirmRule, dropRule, type AutoList } from '../src/lib/api/auto.ts';
+import { policyQuery, confirmRule, dropRule, type PolicyList } from '../src/lib/api/auto.ts';
 
-/** The rule that ships, as the api words it. */
+/** The builtin rule, as the api words it. */
 const DEFAULT = {
   id: 'default',
   answer: 'approve',
@@ -17,12 +17,12 @@ const DEFAULT = {
 } as const;
 
 /** Her rules, the default in force, one rule proposed and one word kept as guidance. */
-const LIST: AutoList = {
+const LIST: PolicyList = {
   agent: 'nemia',
   file: '/store/auto/nemia.json',
   isDefault: true,
   rules: [DEFAULT],
-  shipped: DEFAULT,
+  builtin: DEFAULT,
   proposed: {
     file: '/store/auto/nemia.proposed.json',
     at: '2026-10-06T12:00:00.000Z',
@@ -51,9 +51,9 @@ function answering(t: { after: (fn: () => void) => void }, body: unknown, status
   return calls;
 }
 
-const readAuto = autoQuery('nemia').queryFn as unknown as () => Promise<AutoList>;
+const readAuto = policyQuery('nemia').queryFn as unknown as () => Promise<PolicyList>;
 
-test('autoQuery, confirmRule, dropRule: her rules read back as the api answers them, and a confirm and a drop sent on their routes', async (t) => {
+test('policyQuery, confirmRule, dropRule: her rules read back as the api answers them, and a confirm and a drop sent on their routes', async (t) => {
   await t.test('her rules read back what the api answered, a key it does not read dropped', async (t) => {
     answering(t, { ...LIST, later: true });
     assert.deepEqual(await readAuto(), LIST);
@@ -67,8 +67,8 @@ test('autoQuery, confirmRule, dropRule: her rules read back as the api answers t
       assert.deepEqual(await confirmRule('nemia', 'tries', 'Try again.'), LIST);
       assert.deepEqual(await dropRule('nemia', 'default'), LIST);
       assert.deepEqual(calls, [
-        { method: 'PUT', path: '/api/auto/nemia/rules/tries', body: { words: 'Try again.' } },
-        { method: 'DELETE', path: '/api/auto/nemia/rules/default', body: {} },
+        { method: 'PUT', path: '/api/policy/nemia/rules/tries', body: { words: 'Try again.' } },
+        { method: 'DELETE', path: '/api/policy/nemia/rules/default', body: {} },
       ]);
     },
   );

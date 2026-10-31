@@ -40,6 +40,7 @@ import {
   tryOf,
   runWith,
   needsOf,
+  atHarness,
   runSaid,
   stepSaid,
   type RunHolding,
@@ -69,8 +70,8 @@ import {
 } from 'agent-orchestrator/run';
 import { loopSpan, remoteNameOf, type Workflow } from 'agent-orchestrator/workflow';
 import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
-import { type RunGraph, runGraph } from 'agent-orchestrator';
-import type { CheckVerdict, RunPhase, RunReason, StepPhase, StepReason } from 'agent-orchestrator';
+import { driftNow, type RunGraph, runGraph } from 'agent-orchestrator';
+import type { AnswerVia, CheckVerdict, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from 'agent-orchestrator';
 
 import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
 import { engineRead, type Engine, judgedOn, workFolderOf } from '../store.ts';
@@ -79,7 +80,6 @@ import {
   attemptsIn,
   closeoutIn,
   driftOf,
-  kindsOf,
   type StepAttempts,
   type StepCloseout,
   type StepTry,
@@ -95,9 +95,9 @@ import { readOf, type RunRead, type StepUsed, totalOf, usedOf } from './usage.ts
 
 /**
  * A step's cap, and what its tries have cost of it. `usd` is the cap in force (`budgetOf`): the `budget:` the run froze, until a person
- * raises it (`nemia retry --budget`, `nemia round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and `of`
- * what the step's tries have cost of it, as `nemia ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over` is
- * whether they have cost the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word
+ * raises it (`nemia retry --budget`, `nemia retry --round --budget`). `said` is the cap as its author writes one (`budgetWord`: `$3`), and
+ * `of` what the step's tries have cost of it, as `nemia ls` puts it in `over budget $4.25 of $3` — null until a cost was measured. `over`
+ * is whether they have cost the cap or more (`overBudget`). Past the cap alone holds nothing: the step is held only where its `status` word
  * says `over budget` or `budget exhausted` — where another session of it is the way on. A Claude Code job, on the Agent SDK, is ended at
  * its cap; a session an older runtime ran in the background kept none and was not stopped, so a step of a record from then can have
  * finished past it with nothing waiting on a raise.
@@ -106,9 +106,10 @@ export type StepBudget = { usd: number; said: string; of: string | null; over: b
 
 /**
  * A raise of a step's cap the package takes, and how it is asked for: `retry` — `nemia retry --budget`, the board's `POST …/retry` — for a
- * step over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `nemia round --budget`, `POST …/round` — for a
- * looping step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more than, as the
- * package refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars (`dollars`).
+ * step over its budget or ended at it that a try takes on (`retryable`'s `raise`); `round` — `nemia retry --round --budget`, `POST …/round`
+ * — for a looping step whose round waits on a step of its loop over its budget (`loopOver`). `above` is what the budget has to be more
+ * than, as the package refuses one that is not — what the tries have cost, or the cap a session was ended at — and `said` that, in dollars
+ * (`dollars`).
  *
  * For a try, `modes` are the ways the package takes it (`retryable`) — `recheck` among them where a check did not pass, which costs nothing
  * and needs no raise — and `own` how the step ended on its own work, its budget aside (`ownStatus`): `blocked` for a step that signed off
@@ -132,7 +133,7 @@ export type StepApproval = { try: number; at: string; message: string | null };
 export type StepGate = { awaiting: boolean; approval: StepApproval | null };
 
 /**
- * A person's acceptance of a loop out of rounds, on the try its looping step is on (`acceptanceOf`), off their file (`nemia accept`): the
+ * A person's acceptance of a loop out of rounds, on the try its looping step is on (`acceptanceOf`), off their file (`nemia approve`): the
  * try, when, and the words given. The step's closeout still says `again: true` — the acceptance does not rewrite what the reviewer said —
  * so whoever reads the step's last word needs this beside it, or a gate after the loop reads as if another round were still asked for.
  */
@@ -270,15 +271,19 @@ export type RunDetail = {
   fromNote?: string;
   waiting: RunWaiting | null;
   /** As on `RunSummary`. */
-  heldUntil: string[];
+  holdUntil: string[];
   /** As on `RunSummary` (`RunHolding`). */
   holding: RunHolding | null;
-  /** As on `RunSummary`: the list's word, `awaiting approval` or `blocked` for a run a person alone stops, never `failed`. */
+  /** As on `RunSummary`: the list's word, `awaiting approval` or `waiting` for a run a person alone stops, never `failed`. */
   status: RunStatus;
   /** As on `RunSummary`. */
   phase: RunPhase;
   /** As on `RunSummary`. */
   reason: RunReason;
+  /** As on `RunSummary`: what a `Waiting` run waits on, else null. */
+  on: WaitOn | null;
+  /** As on `RunSummary`: where an `AwaitingAnswer` run's answer is asked, else null. */
+  via: AnswerVia | null;
   /** As on `RunSummary`. */
   moving: boolean;
   /** As on `RunSummary`. */
@@ -294,7 +299,7 @@ export type RunDetail = {
   read: RunRead | null;
   waitingOnYou: string[];
   /** As on `RunSummary`. */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /** As on `RunSummary` (`RunToDecide`). */
   toDecide: RunToDecide | null;
   /** The steps the run is gated at, in the order they run (`gatesOf`): those its workflow gates, and those it was started with. */
@@ -302,10 +307,11 @@ export type RunDetail = {
   /** Set when the workflow folder cannot be read, or lacks steps the run started with. */
   warning: string | null;
   /**
-   * The kinds this run is behind the revisions ledger on, in `Drift`'s words: one entry per kind and name whose number the ledger has
-   * moved past since the run resolved it — without `step`, what a filing after this would take (`nemia refresh`); with `step`, what a step
-   * that has already been filed ran on, where the run's own pin has moved past it. `[]` for a run on the newest of every kind, and for a
-   * record written before revisions, which pinned nothing.
+   * The kinds this run is behind the files on, in `Drift`'s words (`driftNow`): what the files hold now, resolved on this read without a
+   * write to the ledger and compared by digest — one entry per kind and name whose bytes differ from what the run resolved, `now` being
+   * the number those bytes have, or would be given, which may be lower than `pinned`. Without `step`, what a filing after this would take
+   * (`nemia refresh`); with `step`, what a step that has already been filed ran on, where the run's own pin has moved past it. `[]` for a
+   * run whose next filing would take its pins, for one that has filed nothing, and for a record written before revisions.
    */
   kinds: readonly Drift[];
   /** The line to type to take the new revisions, built off the table (`refreshLine`): what the board shows beside the drift. */
@@ -348,6 +354,10 @@ export type RunDetail = {
     /** As on `RunSummary`: where the step stands, as codes, and the sentence a person reads, never compared. */
     phase: StepPhase;
     reason: StepReason;
+    /** As on `RunSummary`: what a `Waiting` step waits on, else null. */
+    on: WaitOn | null;
+    /** As on `RunSummary`: where an `AwaitingAnswer` step's answer is asked, else null. */
+    via: AnswerVia | null;
     message: string;
     /** As on `RunSummary`: its check's verdict as codes, null for a step not judged by its check. */
     verdict: CheckVerdict | null;
@@ -361,7 +371,6 @@ export type RunDetail = {
     commands: StepCommands;
     /** As on `RunSummary` (`StepNeeds`): read off that type, field by field, so a field it gains is declared here too and not only sent. */
     needs: StepNeeds['needs'];
-    blockedByHarness: StepNeeds['blockedByHarness'];
     waitingFor: StepNeeds['waitingFor'];
     approve: StepNeeds['approve'];
     denied: StepNeeds['denied'];
@@ -371,7 +380,7 @@ export type RunDetail = {
      * not have is gated only where the run was started with its gate.
      */
     gate: StepGate | null;
-    /** For a looping step a person ended out of rounds (`nemia accept`), their acceptance of the try it is on; null for any other step. */
+    /** For a looping step a person ended out of rounds (`nemia approve`), their acceptance of the try it is on; null for any other step. */
     accepted: StepAcceptance | null;
     /**
      * For a step the harness blocked, what its session said last, as the engine's `transcript` reads it: its last `text` or `system`
@@ -490,8 +499,8 @@ function costOf(
 /**
  * The raise of a step's cap the package takes (`StepRaise`), or null. A try's, where `retryable` carries one — a settled step over its
  * budget or ended at it, that a try takes on — and it may be tried; else a round's, for a looping step over its budget or out of rounds
- * whose loop has a step over its budget (`loopOver`): `nemia round --budget` has to pass the most any of them has cost, as `roundAsk`
- * refuses less.
+ * whose loop has a step over its budget (`loopOver`): `nemia retry --round --budget` has to pass the most any of them has cost, as
+ * `roundAsk` refuses less.
  */
 function raiseOf(run: Run, step: Workflow, steps: readonly Workflow[], views: Views, spendOf: SpendOf): StepRaise | null {
   const phase = (taskId: string) => phaseOfView(views.get(taskId));
@@ -658,7 +667,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     ...handedRuns(run),
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,
-    heldUntil: judged.holding ? run.hold!.until : [],
+    holdUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
     ...runSaid(judged),
     moving: judged.moving,
@@ -667,11 +676,11 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     tokens: runTokens(run, views),
     read: runRead(clock, steps, names),
     waitingOnYou: judged.waitingOnYou,
-    onYou: judged.onYou,
+    waitingOnYouWords: judged.waitingOnYouWords,
     toDecide: judged.toDecide,
     gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
-    kinds: kindsOf(run),
+    kinds: driftNow(run),
     refresh: refreshLine(run.id),
     graph: runGraph(steps, names),
     steps: await Promise.all(
@@ -701,7 +710,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
           roundDue: judged.roundDue.has(name),
           commands: stepCommands(run.id, name),
           ...needs,
-          lastLine: needs.blockedByHarness ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
+          lastLine: atHarness(current) ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
           gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.reason),
           accepted: acceptedOf(run, name),
           said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],

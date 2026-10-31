@@ -115,7 +115,7 @@ export const STALE_PASSES = 10;
  * The least a holder must be silent to be taken over: fifteen minutes. A pass has no bound — it files every ready step of every run, each
  * perhaps behind an `npm ci` of up to ten minutes — so silence is not measured from the last pass but from the beat, which a timer writes
  * while the pass awaits. What keeps a timer from firing is the event loop held by synchronous work (a `git`, a `du`), or the process
- * stopped (`^Z`, `SIGSTOP`); the floor leaves those room. At the shipped interval of 4000 ms the floor decides.
+ * stopped (`^Z`, `SIGSTOP`); the floor leaves those room. At the default interval of 4000 ms the floor decides.
  */
 export const STALE_FLOOR_MS = 15 * 60_000;
 

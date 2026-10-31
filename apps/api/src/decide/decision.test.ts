@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { scratch } from '../../test/scratch.ts';
 import { Effect, Layer } from 'effect';
-import { engine, PlaceService, runStore, runWith as runEngine, shippedGitPlace, standingWhen, type Place } from 'agent-orchestrator';
+import { engine, PlaceService, runStore, runWith as runEngine, builtinGitPlace, standingWhen, type Place } from 'agent-orchestrator';
 import { app, appOf, liveOf } from '../app.ts';
 import { diffFiles, DIFF_LINES } from './decision.ts';
 
@@ -174,14 +174,14 @@ writeRun({
 function countedStanding() {
   let asks = 0;
   const place: Place = {
-    declared: shippedGitPlace.declared,
+    declared: builtinGitPlace.declared,
     ask: (verb, request, options) => {
       if (verb === 'standing') asks += 1;
-      return shippedGitPlace.ask(verb, request, options);
+      return builtinGitPlace.ask(verb, request, options);
     },
     askNow: (verb, request, options) => {
       if (verb === 'standing') asks += 1;
-      return shippedGitPlace.askNow(verb, request, options);
+      return builtinGitPlace.askNow(verb, request, options);
     },
   };
   return { layer: PlaceService.layer(place), asks: () => asks };
@@ -320,7 +320,7 @@ test("a finished run's decision: what its branch touched, the lesson, the diffs 
       assert.deepEqual(
         body.commands,
         [
-          { label: 'ship it', command: `git -C ${repo} merge --no-ff ${branch}`, said: null, step: null },
+          { label: 'land it', command: `git -C ${repo} merge --no-ff ${branch}`, said: null, step: null },
           { label: 'drop it', command: `git -C ${repo} branch -D ${branch}`, said: null, step: null },
         ],
         'printed, never run',
@@ -493,11 +493,11 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
       const body = await decidable('r-d9');
       assert.deepEqual(
         body.commands
-          .filter((c: { label: string }) => c.label !== 'ship it' && c.label !== 'drop it')
+          .filter((c: { label: string }) => c.label !== 'land it' && c.label !== 'drop it')
           .map(({ label, command, step }: DecideCommand) => ({ label, command, step })),
         [
-          { label: 'once more', command: 'nemia round r-d9 review', step: 'review' },
-          { label: 'accept', command: 'nemia accept r-d9 review --message "<why>"', step: 'review' },
+          { label: 'once more', command: 'nemia retry r-d9 review --round', step: 'review' },
+          { label: 'accept', command: 'nemia approve r-d9 review --message "<why>"', step: 'review' },
           { label: 'once more', command: 'nemia retry r-d9 implement', step: 'implement' },
         ],
         'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
@@ -511,7 +511,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
       assert.ok(accept?.said, JSON.stringify(body.commands));
       assert.match(
         accept.said,
-        /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia accept r-d9 review --message "<why>"$/,
+        /^review: enough — go on with what is there; its findings stay on the record, and the run ends with them on the record:  nemia approve r-d9 review --message "<why>"$/,
       );
 
       const stepsOf = async () => (await detailOf('r-d9')).steps;
@@ -651,7 +651,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
       });
 
       const detail = await detailOf('r-d11');
-      assert.deepEqual([detail.steps[0].status, detail.steps[1].status, detail.waitingOnYou], ['denied', 'waiting', ['implement']]);
+      assert.deepEqual([detail.steps[0].status, detail.steps[1].status, detail.waitingOnYou], ['denied', 'pending', ['implement']]);
       const body = await decidable('r-d11');
       const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
       assert.deepEqual(
@@ -686,7 +686,7 @@ test('a decision where the place cannot say: a branch it has not is an error on 
       );
       assert.deepEqual(body.lesson, { said: `not known — ${gone} could not be read`, state: 'unknown' });
       assert.deepEqual(body.sensitive, [{ branch: gone, files: [], error: unread }]);
-      assert.equal(body.commands.length, 1, 'no result branch to ship or drop');
+      assert.equal(body.commands.length, 1, 'no result branch to land or drop');
       assert.deepEqual(
         { ...body.commands[0], said: undefined },
         { label: 'once more', command: 'nemia retry r-d3 implement', said: undefined, step: 'implement' },
@@ -862,7 +862,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
   assert.deepEqual(tokens.radius.groups, [{ name: 'packages/x', files: 1, added: 1, removed: 0, binary: 0 }]);
   assert.deepEqual(body.lesson, { said: 'packages/x/docs/notes.md +1 −0', state: 'written' });
   assert.deepEqual(body.sensitive, [{ branch: 'wf/r-d6/tokens', files: [], error: null }]);
-  assert.deepEqual(body.commands, [], '`decision` is still `running`: no ship, drop or once more is offered while its steps move');
+  assert.deepEqual(body.commands, [], '`decision` is still `running`: no land, drop or once more is offered while its steps move');
   assert.equal(body.awaiting, null, 'still running: not yet a run nobody decided');
 
   writeRun({
@@ -883,7 +883,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     },
   });
   const fanOut = await detailOf('r-d7');
-  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['blocked', true, ['implement']]);
+  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['waiting', true, ['implement']]);
   const decided = await decidable('r-d7');
   assert.deepEqual(
     decided.touched.map((t: { branch: string }) => t.branch),
@@ -891,7 +891,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
   );
   assert.deepEqual(
     decided.commands.map((c: { label: string }) => c.label),
-    ['once more', 'ship it', 'drop it'],
+    ['once more', 'land it', 'drop it'],
   );
 });
 

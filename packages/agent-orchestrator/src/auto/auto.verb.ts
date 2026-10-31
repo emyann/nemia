@@ -1,7 +1,7 @@
 /**
- * `nemia auto`, entries of the command table over an agent's rules for `auto`: the list in force read beside what the agent proposed and
- * the custom instruction it read (`AUTO`); a proposal written, the agent's own (`AUTO_PROPOSE`); a rule confirmed or dropped, the person's,
- * asked of them every time an agent calls it (`AUTO_CONFIRM`, `AUTO_DROP`). Any agent's: the name is the one given.
+ * `nemia policy`, entries of the command table over an agent's rules for `auto`: the list in force read beside what the agent proposed
+ * and the custom instruction it read (`POLICY`); a proposal written, the agent's own (`POLICY_PROPOSE`); a rule confirmed or dropped, the
+ * person's, asked of them every time an agent calls it (`POLICY_CONFIRM`, `POLICY_DROP`). Any agent's: the name is the one given.
  */
 import { tried } from '../runtime-client.ts';
 import type { Args, Spec } from '../command/command.ts';
@@ -17,12 +17,12 @@ import { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfi
 export type WordedRule = AutoRule & { words: string };
 
 /**
- * An agent's rules, read: the agent, the file of the person's list, whether the rule that ships is in force for want of one (`isDefault`),
+ * An agent's rules, read: the agent, the file of the person's list, whether the builtin rule is in force for want of one (`isDefault`),
  * the rules in force, what the agent proposed, each rule saying whether it is in force, with the words it keeps as guidance and whether the
- * custom instruction changed since (`stale`), or null for nothing proposed; the custom instruction, or null for none; and the rule that
- * ships, with its words, to be confirmed again (`shipped`).
+ * custom instruction changed since (`stale`), or null for nothing proposed; the custom instruction, or null for none; and the builtin
+ * rule, with its words, to be confirmed again (`builtin`).
  */
-export type AutoList = {
+export type PolicyList = {
   agent: string;
   file: string;
   isDefault: boolean;
@@ -35,7 +35,7 @@ export type AutoList = {
     stale: boolean;
   } | null;
   instruction: string | null;
-  shipped: WordedRule;
+  builtin: WordedRule;
 };
 
 /** The agent's name in `args`. */
@@ -51,7 +51,7 @@ const wordsIn = (args: Args): string => String(args.words ?? '');
 const worded = (rule: AutoRule): WordedRule => ({ ...rule, words: ruleWords(rule) });
 
 /** `agent`'s rules in the store `home`, composed from the person's list, the agent's proposal and its custom instruction. */
-export function autoListOf(home: string, agent: string): AutoList {
+export function policyListOf(home: string, agent: string): PolicyList {
   const confirmed = readConfirmed(home, agent);
   const rules = listInForce(confirmed?.rules);
   const proposed = readProposed(home, agent);
@@ -72,12 +72,12 @@ export function autoListOf(home: string, agent: string): AutoList {
             stale: proposed.digest !== digestOf(instruction),
           },
     instruction: instruction ?? null,
-    shipped: worded(DEFAULT_AUTO),
+    builtin: worded(DEFAULT_AUTO),
   };
 }
 
-/** The lines `nemia auto` prints of an agent's rules. */
-function listLines(list: AutoList): string[] {
+/** The lines `nemia policy` prints of an agent's rules. */
+function listLines(list: PolicyList): string[] {
   const inForce = list.rules.length
     ? list.rules.map((r) => `  ${r.id}${r.from === 'default' ? ' (default)' : ''}: ${r.words}`)
     : ['  none: every answer is asked'];
@@ -85,14 +85,14 @@ function listLines(list: AutoList): string[] {
     `${list.agent}, rules in force at auto${list.isDefault ? ', the default for want of any you confirmed' : ''}:`,
     ...inForce,
   ];
-  if (list.proposed === null) return [...lines, `${list.agent} proposed none: nemia auto propose ${list.agent} --file <path>.`];
+  if (list.proposed === null) return [...lines, `${list.agent} proposed none: nemia policy propose ${list.agent} --file <path>.`];
   const p = list.proposed;
   return [
     ...lines,
     `proposed at ${p.at}${p.stale ? ', before the custom instruction last changed' : ''}:`,
     ...p.rules.map((r) => `  ${r.id}${r.confirmed ? ' (in force)' : ''}: ${r.words}`),
     ...(p.guidance.length ? ['kept as guidance, which the machinery cannot hold:', ...p.guidance.map((g) => `  ${g}`)] : []),
-    `confirm one with nemia auto confirm ${list.agent} <id> --words '<its words, as read here>'; drop one in force with nemia auto drop ${list.agent} <id>.`,
+    `confirm one with nemia policy confirm ${list.agent} <id> --words '<its words, as read here>'; drop one in force with nemia policy drop ${list.agent} <id>.`,
   ];
 }
 
@@ -113,21 +113,21 @@ const ruleSpec = (name: string): Spec => ({
   unknown: (arg) => `nemia ${name} takes an agent's name and a rule's id, not ${arg}: nemia ${name} <agent> <id>.`,
 });
 
-/** `nemia auto <agent>`: an agent's rules for `auto`, the list in force beside its proposal and its custom instruction. */
-export const AUTO: Command<AutoList> = {
-  name: 'auto',
+/** `nemia policy <agent>`: an agent's rules for `auto`, the list in force beside its proposal and its custom instruction. */
+export const POLICY: Command<PolicyList> = {
+  name: 'policy',
   usage: '<agent>',
   help: [
     "the agent's rules at auto: the answers it may give unasked, in force once",
     'you confirm them, and what it proposed from your custom instruction,',
     'with the words the machinery cannot hold, kept as guidance',
   ],
-  spec: agentSpec('auto'),
+  spec: agentSpec('policy'),
   check: (args) => agentNameRefusal(agentIn(args)) ?? null,
   writes: false,
   class: 'read',
-  route: { method: 'GET', path: '/api/auto/:name', status: 200 },
-  handler: (args, _env, home = HOME) => tried(() => autoListOf(home, agentIn(args))),
+  route: { method: 'GET', path: '/api/policy/:name', status: 200 },
+  handler: (args, _env, home = HOME) => tried(() => policyListOf(home, agentIn(args))),
   print: listLines,
 };
 
@@ -164,15 +164,15 @@ export function proposalOf(words: string): { rules: AutoRule[]; guidance: string
 }
 
 /**
- * `nemia auto propose <agent> --file <path>|-`: what the agent proposes from the custom instruction, its own file, over what it proposed.
+ * `nemia policy propose <agent> --file <path>|-`: what the agent proposes from the custom instruction, its own file, over what it proposed.
  */
-export const AUTO_PROPOSE: Command<AutoList> = {
-  name: 'auto propose',
+export const POLICY_PROPOSE: Command<PolicyList> = {
+  name: 'policy propose',
   usage: '<agent> --file <path>|-',
   help: [
     "the agent's proposal: rules from your custom instruction, as JSON,",
     'with the words the machinery cannot hold kept as guidance; none is in',
-    'force until you confirm it (nemia auto confirm)',
+    'force until you confirm it (nemia policy confirm)',
   ],
   spec: {
     positionals: [{ key: 'name', takes: 'required', kind: 'name' }],
@@ -181,14 +181,14 @@ export const AUTO_PROPOSE: Command<AutoList> = {
         flag: '--file',
         kind: 'text',
         key: 'file',
-        takes: '--file takes the file of the proposal, or - to read it from stdin: nemia auto propose <agent> --file <path>',
+        takes: '--file takes the file of the proposal, or - to read it from stdin: nemia policy propose <agent> --file <path>',
       },
     ],
-    unknown: (arg) => `nemia auto propose takes an agent's name and --file <path> (or - for stdin), not ${arg}.`,
+    unknown: (arg) => `nemia policy propose takes an agent's name and --file <path> (or - for stdin), not ${arg}.`,
   },
   check: (args) =>
     agentNameRefusal(agentIn(args)) ??
-    (typeof args.file === 'string' ? null : 'nemia auto propose takes the proposal in --file <path>, or --file - for stdin.'),
+    (typeof args.file === 'string' ? null : 'nemia policy propose takes the proposal in --file <path>, or --file - for stdin.'),
   writes: true,
   class: 'act',
   only: { side: 'cli', why: 'the agent proposes from its own session; the board shows the proposal and confirms its rules' },
@@ -198,7 +198,7 @@ export const AUTO_PROPOSE: Command<AutoList> = {
       const { rules, guidance } = proposalOf(String(args.words ?? ''));
       const digest = digestOf(readCustomInstructions(home, agent));
       writeProposed(home, agent, { at: new Date().toISOString(), rules, guidance, digest });
-      return autoListOf(home, agent);
+      return policyListOf(home, agent);
     }),
   print: (list) => [
     `${list.agent} proposed ${list.proposed?.rules.length ?? 0} rule(s), none in force until confirmed.`,
@@ -207,11 +207,11 @@ export const AUTO_PROPOSE: Command<AutoList> = {
 };
 
 /**
- * `nemia auto confirm <agent> <id> --words <words>`: a rule the agent proposed put in force as the person read it, the person's; asked of
+ * `nemia policy confirm <agent> <id> --words <words>`: a rule the agent proposed put in force as the person read it, the person's; asked of
  * them every time an agent calls it. Refused: a confirm with no words.
  */
-export const AUTO_CONFIRM: Command<AutoList> = {
-  name: 'auto confirm',
+export const POLICY_CONFIRM: Command<PolicyList> = {
+  name: 'policy confirm',
   usage: "<agent> <id> --words '<words>'",
   help: [
     'put in force a rule the agent proposed, or the default again, as its',
@@ -220,53 +220,54 @@ export const AUTO_CONFIRM: Command<AutoList> = {
     'keeps the default beside it. Asked of you every time',
   ],
   spec: {
-    ...ruleSpec('auto confirm'),
+    ...ruleSpec('policy confirm'),
     flags: [
       {
         flag: '--words',
         kind: 'text',
         key: 'words',
-        takes: "--words takes the rule's words as you read them in nemia auto <agent>: nemia auto confirm <agent> <id> --words '<words>'",
+        takes:
+          "--words takes the rule's words as you read them in nemia policy <agent>: nemia policy confirm <agent> <id> --words '<words>'",
       },
     ],
     unknown: (arg) =>
-      `nemia auto confirm takes an agent's name, a rule's id and --words '<words>', not ${arg}: nemia auto confirm <agent> <id> --words '<words>'.`,
+      `nemia policy confirm takes an agent's name, a rule's id and --words '<words>', not ${arg}: nemia policy confirm <agent> <id> --words '<words>'.`,
   },
   check: (args) =>
     agentNameRefusal(agentIn(args)) ??
     (wordsIn(args).trim()
       ? null
-      : `nemia auto confirm takes the rule's words as you read them, so what is confirmed is what you read: --words '<words>', printed by nemia auto ${agentIn(args) || '<agent>'}.`),
+      : `nemia policy confirm takes the rule's words as you read them, so what is confirmed is what you read: --words '<words>', printed by nemia policy ${agentIn(args) || '<agent>'}.`),
   writes: true,
   class: 'ask',
   asksAlways: true,
-  route: { method: 'PUT', path: '/api/auto/:name/rules/:id', status: 200 },
+  route: { method: 'PUT', path: '/api/policy/:name/rules/:id', status: 200 },
   handler: (args, _env, home = HOME) =>
     tried(() => {
       confirmRule(home, agentIn(args), idIn(args), wordsIn(args), new Date());
-      return autoListOf(home, agentIn(args));
+      return policyListOf(home, agentIn(args));
     }),
   print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is in force at auto.`, ...listLines(list)],
 };
 
-/** `nemia auto drop <agent> <id>`: a rule taken out of force, the default among them, the person's; asked of them every time. */
-export const AUTO_DROP: Command<AutoList> = {
-  name: 'auto drop',
+/** `nemia policy drop <agent> <id>`: a rule taken out of force, the default among them, the person's; asked of them every time. */
+export const POLICY_DROP: Command<PolicyList> = {
+  name: 'policy drop',
   usage: '<agent> <id>',
   help: ['take a rule out of force, the default among them: what it allowed is', 'asked of you again. Asked of you every time'],
-  spec: ruleSpec('auto drop'),
+  spec: ruleSpec('policy drop'),
   check: (args) => agentNameRefusal(agentIn(args)) ?? null,
   writes: true,
   class: 'ask',
   asksAlways: true,
-  route: { method: 'DELETE', path: '/api/auto/:name/rules/:id', status: 200 },
+  route: { method: 'DELETE', path: '/api/policy/:name/rules/:id', status: 200 },
   handler: (args, _env, home = HOME) =>
     tried(() => {
       dropRule(home, agentIn(args), idIn(args), new Date());
-      return autoListOf(home, agentIn(args));
+      return policyListOf(home, agentIn(args));
     }),
   print: (list, args) => [`${list.agent}: the rule ${idIn(args)} is out of force; what it allowed is asked again.`, ...listLines(list)],
 };
 
-/** The entries of `nemia auto`, in the order `nemia`'s help lists them. */
-export const AUTO_ENTRIES = [AUTO, AUTO_PROPOSE, AUTO_CONFIRM, AUTO_DROP] as const;
+/** The entries of `nemia policy`, in the order `nemia`'s help lists them. */
+export const POLICY_ENTRIES = [POLICY, POLICY_PROPOSE, POLICY_CONFIRM, POLICY_DROP] as const;

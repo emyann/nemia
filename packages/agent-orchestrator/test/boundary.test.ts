@@ -1,18 +1,20 @@
 /**
  * The package's boundary, as a test rather than a sentence in the README (`docs/architecture.md` says the same rules in prose).
  *
- * **Every file is of one of four kinds, named below.** `PURE` files hold the judgement — `assess` in `tick/assess.ts`, the verdict in
+ * **Every file is of one of five kinds, named below.** `PURE` files hold the judgement — `assess` in `tick/assess.ts`, the verdict in
  * `check.ts`, the format in `workflow.ts` and the folders it re-exports — and import no runtime, read no disk and spawn nothing, which is
  * what lets them be tested as data. `STORE` files are the I/O beneath the controllers: they import no runtime, never a controller and never
  * the client, and load as a tree with no cycle; only the client and the controllers beneath the CLI import them. `CONTROLLER` files use the
  * runtime through the client: `runner.ts`, the package's root, the verbs it re-exports, one feature each, and the CLI above them, which
  * parses, calls and prints, and so reaches the package through `runner.ts` and the format through `workflow.ts` alone — as each bin
- * reaches it through the CLI. The client and the controllers import one another with no cycle. A file in `src/` or `bin/` that no kind
- * names fails the suite: a new file is sorted when it is written.
+ * reaches it through the CLI. The client and the controllers import one another with no cycle. `MODEL` files are a layer's declaration
+ * of its entities as Effect Schemas, beside each context's glossary (`modelBreaks`): they import Effect, other model files and pure
+ * files alone, and no pure file imports one, so the pure entries load none. A file in `src/` or `bin/` that no kind names fails the
+ * suite: a new file is sorted when it is written.
  *
  * **A file in a feature folder takes its kind from its name** (`kindOf`): `<name>.store.ts` is a store, `<name>.verb.ts` a controller,
- * any other `<name>.ts` pure, and every file under `src/cli/` is the CLI. A file at the root of `src` or in `bin` is named in a list
- * below. Tests beside the code (`*.test.ts`) are of no kind and are not read.
+ * `<name>.model.ts` a model, any other `<name>.ts` pure, and every file under `src/cli/` is the CLI. A file at the root of `src` or in
+ * `bin` is named in a list below. Tests beside the code (`*.test.ts`) are of no kind and are not read.
  *
  * **A pure file reaches nothing outside the process**: no disk, no process, no network (`http`, `https`, `net`), nothing of the machine
  * (`os`), bare or as `node:` (`IMPURE`), and it reads neither `process.env` nor `fetch` outside its comment lines (`globalsIn`).
@@ -66,7 +68,10 @@ const isCli = (file: string): boolean => BINS.includes(file) || file.startsWith(
 /** The one file that imports agent-runtime. */
 const CLIENT = 'src/runtime-client.ts';
 
-type Kind = 'PURE' | 'STORE' | 'CONTROLLER' | 'CLIENT';
+type Kind = 'PURE' | 'STORE' | 'CONTROLLER' | 'CLIENT' | 'MODEL';
+
+/** The folder of the printer and the whole diagram: every file in it is a model file. */
+const MODEL_FOLDER = 'src/model/';
 
 /** The kinds a file is named in: a root file by the lists above, a file in a folder by its name, and a test beside the code by none. */
 function kindsOf(file: string): Kind[] {
@@ -75,12 +80,13 @@ function kindsOf(file: string): Kind[] {
     .map(([kind]) => kind as Kind);
   if (listed.length || !/^src\/.+\/[^/]+\.ts$/.test(file) || file.endsWith('.test.ts')) return listed;
   if (file.startsWith(CLI_FOLDER) || file.endsWith('.verb.ts')) return ['CONTROLLER'];
+  if (file.endsWith('.model.ts')) return ['MODEL'];
   return file.endsWith('.store.ts') ? ['STORE'] : ['PURE'];
 }
 
 /** The files of each kind among `sources`, each file of one kind. */
 function kinds(sources: Sources): Record<Kind, string[]> {
-  const out: Record<Kind, string[]> = { PURE: [], STORE: [], CONTROLLER: [], CLIENT: [] };
+  const out: Record<Kind, string[]> = { PURE: [], STORE: [], CONTROLLER: [], CLIENT: [], MODEL: [] };
   for (const file of Object.keys(sources).sort()) {
     const of = kindsOf(file);
     if (of.length === 1) out[of[0]].push(file);
@@ -262,7 +268,7 @@ function unsorted(sources: Sources): string[] {
 
 /**
  * A pure file imports no runtime, no disk, no process, no network, nothing of the machine, no Effect but `PURE_EFFECT`, and no store,
- * controller or client file, and reads neither the environment nor `fetch`.
+ * controller, client or model file, and reads neither the environment nor `fetch`.
  */
 function impurities(sources: Sources): string[] {
   const of = kinds(sources);
@@ -276,10 +282,31 @@ function impurities(sources: Sources): string[] {
           IMPURE_GLOBALS.includes(m) ||
           of.STORE.includes(m) ||
           of.CONTROLLER.includes(m) ||
+          of.MODEL.includes(m) ||
           m === CLIENT,
       )
       .map((m) => `${file} is pure and imports ${m}`),
   );
+}
+
+/**
+ * A model file imports Effect (any of its modules), other model files and pure files, and nothing else — no store, controller or
+ * client file, no runtime, no node module, no global of the process — so a model is a declaration a door adopts, never a door
+ * itself; and `src/model/` holds model files alone.
+ */
+function modelBreaks(sources: Sources): string[] {
+  const of = kinds(sources);
+  const out = of.MODEL.flatMap((file) =>
+    (sources[file] ?? [])
+      .filter((m) => !isEffect(m) && !of.MODEL.includes(m) && !of.PURE.includes(m))
+      .map((m) => `${file} is a model file and imports ${m}: a model imports effect, other model files and pure files alone`),
+  );
+  for (const file of Object.keys(sources).sort())
+    if (file.startsWith(MODEL_FOLDER) && kindsOf(file)[0] !== 'MODEL')
+      out.push(
+        `${file} is in ${MODEL_FOLDER}, which holds model files alone: name it <name>.model.ts, or put it beside the feature it serves`,
+      );
+  return out;
 }
 
 /**
@@ -411,7 +438,7 @@ const isBuiltin = (m: string): boolean => m.startsWith('node:') || builtinModule
 const PLACE_REACHES = ['src/place/place.ts', 'src/place/place.store.ts'];
 
 /** The one file of `src` that imports a place's code, and gives it to whoever composes a program. */
-const PLACE_DOOR = 'src/place/shipped.store.ts';
+const PLACE_DOOR = 'src/place/builtin.store.ts';
 
 /** The one place the door gives: the shipped program is handed no other, and no test place. */
 const DOOR_GIVES = 'place/git/';
@@ -546,6 +573,8 @@ test('a file in a folder takes its kind from its name, and a test beside the cod
   assert.deepEqual(kindsOf('src/retry/index.ts'), ['PURE']);
   assert.deepEqual(kindsOf('src/record/record.store.ts'), ['STORE']);
   assert.deepEqual(kindsOf('src/retry/retry.verb.ts'), ['CONTROLLER']);
+  assert.deepEqual(kindsOf('src/record/record.model.ts'), ['MODEL']);
+  assert.deepEqual(kindsOf('src/model/er.model.ts'), ['MODEL']);
   assert.deepEqual(kindsOf('src/cli/flags.ts'), ['CONTROLLER']);
   assert.deepEqual(kindsOf('src/retry/retry.test.ts'), []);
   assert.deepEqual(kindsOf('src/x.ts'), [], 'a root file is sorted by the lists alone');
@@ -562,6 +591,43 @@ test('REFUSED: a pure file in a folder that reads the disk, a store in a folder 
   assert.deepEqual(clientBreaks({ ...packageSources(), 'src/x/x.verb.ts': ['src/x/x.store.ts'] }), [
     'src/x/x.verb.ts is a controller and reaches src/runtime-client.ts through none of its imports: the controllers reach the runtime through the client',
   ]);
+});
+
+test('model files import effect, other model files and pure files alone, no pure file imports one, and src/model/ holds model files alone', () => {
+  const sources = packageSources();
+  assert.ok(
+    ['src/model/er.model.ts', 'src/record/record.model.ts'].every((f) => f in sources),
+    'the scan reads the model files',
+  );
+  assert.deepEqual(modelBreaks(sources), []);
+  const reached = new Set<string>();
+  const reach = (file: string): void => {
+    if (reached.has(file)) return;
+    reached.add(file);
+    for (const m of sources[file] ?? []) if (m in sources) reach(m);
+  };
+  for (const entry of PURE) reach(entry);
+  assert.deepEqual(
+    [...reached].filter((f) => kindsOf(f)[0] === 'MODEL'),
+    [],
+    'no model file is reachable from agent-orchestrator/run or /workflow, which load no Effect but effect/Data',
+  );
+});
+
+test('REFUSED: a pure file that imports a model file, and a model file that imports a store file, the disk or the runtime, or sits in src/model/ under another name', () => {
+  assert.deepEqual(impurities(adding('src/record/record.ts', 'src/record/record.model.ts')), [
+    'src/record/record.ts is pure and imports src/record/record.model.ts',
+  ]);
+  assert.deepEqual(impurities(adding('src/run.ts', 'src/model/er.model.ts')), ['src/run.ts is pure and imports src/model/er.model.ts']);
+  for (const m of ['src/record/record.store.ts', 'node:fs', 'agent-runtime'])
+    assert.deepEqual(modelBreaks(adding('src/record/record.model.ts', m)), [
+      `src/record/record.model.ts is a model file and imports ${m}: a model imports effect, other model files and pure files alone`,
+    ]);
+  assert.deepEqual(modelBreaks({ ...packageSources(), 'src/model/words.ts': [] }), [
+    'src/model/words.ts is in src/model/, which holds model files alone: name it <name>.model.ts, or put it beside the feature it serves',
+  ]);
+  for (const m of ['effect', 'effect/Schema', 'src/model/brand.model.ts', 'src/record/record.ts', 'src/forget/forget.ts'])
+    assert.deepEqual(modelBreaks(adding('src/record/record.model.ts', m)), [], `${m} is let through`);
 });
 
 test('pure files import no runtime, read no disk, spawn nothing, load no Effect but effect/Data, and reach for no store or controller file', () => {

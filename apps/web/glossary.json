@@ -15,6 +15,35 @@
       }
     },
     {
+      "term": "Builtin",
+      "meaning": "what comes with Nemia, as the board says it: the place `builtin` of a skill, drawn 'Built into Nemia', the builtin servers above a factory's list and an agent's builtin auto rule. The former address `/agents/skills/shipped/<skill>` opens the builtin skill through the api's redirect.",
+      "type": "SkillSource",
+      "retired": [
+        {
+          "spelling": "shipped",
+          "card": "decision 13b: 'builtin' for what comes with the product"
+        },
+        {
+          "spelling": "ships",
+          "card": "decision 13b: 'builtin' for what comes with the product"
+        }
+      ]
+    },
+    {
+      "term": "Landed",
+      "meaning": "a run's result is on its base, as the board says it: a hold or a start that waits until a run lands, a context run not landed, the decision's `land it`.",
+      "retired": [
+        {
+          "spelling": "shipped",
+          "card": "decision 13a: 'landed' for a run's result on its base"
+        },
+        {
+          "spelling": "ships",
+          "card": "decision 13a: 'landed' for a run's result on its base"
+        }
+      ]
+    },
+    {
       "term": "Person word",
       "meaning": "the board's one short word for a step's state, translated from the code's only in `apps/web/src/lib/words.ts`: at work, asks you, being checked, verified, done, waits on you, to try again, failed its check, failed, to come, held, called off, unreadable, unknown; and waits on the pause for a step whose check the store's pause holds.",
       "type": "PersonWords",
@@ -76,6 +105,17 @@
         "label": "Trying again",
         "href": "/workflows/#trying-again"
       }
+    },
+    {
+      "term": "Waits on a person",
+      "meaning": "the states of a step that wait on a person's word (`WAITS_ON_A_PERSON` in `apps/web/src/lib/status.ts`), read by `waitsOnPerson`; of them, the human gates (`AT_A_GATE`: signed off blocked, at its gate, a loop out of rounds, past its budget), read by `waitsAtGate` and drawn with the gate's badge. Neither waits on a run called off. A row's kind of wait (`WaitKind`, `apps/web/src/lib/runWords.ts`) for a step that signed off blocked is `answer`.",
+      "type": "StepState",
+      "retired": [
+        {
+          "spelling": "isGate",
+          "card": "4c: a human gate is read by `waitsAtGate`, of the states `waitsOnPerson` reads"
+        }
+      ]
     }
   ]
 }

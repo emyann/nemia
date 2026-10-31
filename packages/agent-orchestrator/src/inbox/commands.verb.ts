@@ -48,7 +48,7 @@ is said at start:
                  not tried again until it is edited or queued again (or, with no repository named by the card or its
                  factory, nemia up runs in another repository); a start that failed otherwise is said once, and tried
                  again on the next pass.
-  nemia inbox from  sets the runs a card's run is handed as context (from:), each by its id, shipped or still in
+  nemia inbox from  sets the runs a card's run is handed as context (from:), each by its id, landed or still in
                  flight: what each concluded is read when the run's steps are filed, and none is waited on.
                  --off takes the key off.
   nemia inbox rm    drops a card without starting it. A name with no card says so, and which cards there are.
@@ -267,7 +267,7 @@ const runsOf = (args: Args): string[] => (Array.isArray(args.runs) ? args.runs.m
 
 /**
  * `nemia inbox from`: the runs a card's run is handed as context (its `from:`), set, or with `--off` taken off. Context is no wait: the
- * run reads what each concluded when its steps are filed, shipped or in flight, and waits on none (`setFrom`).
+ * run reads what each concluded when its steps are filed, landed or in flight, and waits on none (`setFrom`).
  */
 export const INBOX_FROM: Command<InboxFrom & { name: string; from: string[] }> = {
   name: 'inbox from',

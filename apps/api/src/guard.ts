@@ -4,10 +4,11 @@
  * Twenty-eight writes pass it: a factory signed in to a server (`POST /api/factories/:factory/servers/:server/sign-in`,
  * servers/sign-in.ts) or signed out of one (`DELETE` on the same path), each of which writes the harness's own store, which every
  * session of the factory reads; a start (`POST /api/runs`, workflows.ts), which writes a run's record — and, for an inbox card, removes the
- * card; an ask for another try (`POST /api/runs/:id/steps/:step/retry`, asks.ts) or another round (`POST /api/runs/:id/round`, asks.ts),
- * each of which writes a person's ask file; an approval of a step waiting at its gate (`POST /api/runs/:id/steps/:step/approve`, asks.ts),
- * which writes a person's approval file, or an acceptance of a loop out of rounds as it stands (`POST /api/runs/:id/steps/:step/accept`,
- * asks.ts), which writes a person's acceptance file; words for a step's running session (`POST /api/runs/:id/steps/:step/say`, asks.ts),
+ * card; an ask for another try (`POST /api/runs/:id/steps/:step/retry`, asks.ts) or another round (`POST /api/runs/:id/round`, asks.ts,
+ * kept for `nemia retry --round`), each of which writes a person's ask file; an approval of a step waiting at its gate (`POST
+ * /api/runs/:id/steps/:step/approve`, asks.ts), which writes a person's approval file, or an acceptance of a loop out of rounds as it
+ * stands (`POST /api/runs/:id/steps/:step/accept`, asks.ts, kept for `nemia approve` of a loop), which writes a person's acceptance file;
+ * words for a step's running session (`POST /api/runs/:id/steps/:step/say`, asks.ts),
  * which the engine hands the session and journals; a card filed in the inbox (`POST /api/inbox`, inbox.ts) or dropped from it (`DELETE
  * /api/inbox/:name`, inbox.ts); a card queued to start on its own (`POST /api/inbox/:name/queue`, inbox.ts) or taken off the queue (`DELETE
  * /api/inbox/:name/queue`), each of which writes the store's inbox; and a workflow of yours built on the board — made (`POST
@@ -18,7 +19,7 @@
  * of which writes the store's `workflows/agents/`, what every step naming the agent is told; and a person's custom instructions for an
  * agent written (`PUT /api/custom-instructions/:name`) or cleared (`DELETE /api/custom-instructions/:name`), custom.ts, each of which
  * writes the store's `custom-instructions/`, what every run started after is told after the agent's instructions; and a skill of yours made
- * — written on the board, or one Nemia ships copied into your library (`POST /api/skills/yours`) — or changed, whole or its `preload:`
+ * — written on the board, or a builtin one copied into your library (`POST /api/skills/yours`) — or changed, whole or its `preload:`
  * alone (`PUT /api/skills/yours/:name`), skills.ts, each of which writes the store's `workflows/skills/`, what every agent giving it is
  * told; and an agent of yours tried on a short brief (`POST /api/agents/yours/:name/try`, agents.ts), which writes its try's folder in the
  * store's `tries/` and a run's record, and a try's run removed (`DELETE /api/runs/:id`, commands/routes.ts, the route of `nemia rm`), which

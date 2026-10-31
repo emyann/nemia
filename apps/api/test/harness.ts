@@ -11,7 +11,7 @@
  * It sets the daemon's two ceilings, `WF_MAX_RUNS` and `WF_MAX_CONCURRENT`, to `set-it-in-the-test`, which the package refuses by name: a
  * run's check inherits the daemon's environment, so a test that reads a ceiling sets or deletes it itself. It sets
  * `WF_DEFAULT_FACTORY_STARTS=1`, so a start made in a scratch repository no factory holds, or of a card that names no factory, goes to the
- * default factory: a test of the refusal those starts meet as shipped deletes it first. And it sets `NEMIA_DAEMON_START=off`, so a `nemia`
+ * default factory: a test of the refusal those starts meet by default deletes it first. And it sets `NEMIA_DAEMON_START=off`, so a `nemia`
  * a test spawns, or a command that ticks it types, starts no daemon of this checkout. And it deletes `OTEL_EXPORTER_OTLP_ENDPOINT`: the api
  * is the daemon, and one a test starts would post its spans to the collector the shell names; a test that exports sets the address of a
  * collector it made itself. And neither store is the person's and neither is their home: it points `WF_ROOT`, `AE_ROOT` and `HOME` each at

@@ -11,17 +11,20 @@
  *   unless an open, non-draft pull request for this branch, based on the remote's default branch, has `headRefOid` equal to `HEAD`.
  *   GitHub moves a pull request's head a moment after the push it follows, so that head is read again for a bounded few seconds
  *   (`HEAD_SECONDS`) before the refusal: a head that stays elsewhere is still refused, and says how long it was read for.
- * - `wait`, which the round's check runs last: it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
+ * - `wait`, which the round's check runs last: it refuses at once a pull request GitHub says is `CONFLICTING` with its base, on which
+ *   no `ci` would come, naming the merge of the base that answers it (`mergeable`, read again for up to 15 s while GitHub says
+ *   `UNKNOWN`, `WF_PR_MERGEABLE_SECONDS`); then it polls the `ci` context of that head (`gh pr view --json statusCheckRollup`), 1800 s
  *   for it to start (`WF_CI_START_SECONDS`) and 2400 s whole (`WF_CI_WAIT_SECONDS`), `WF_CI_POLL_SECONDS` the interval; on a red, cancelled or
- *   absent `ci` refuses by name with the Actions URL, the failing jobs, and from each failing job's log the tests that failed with their
- *   diffs, or a bounded tail where no test is named — the next try reads why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
+ *   absent `ci` refuses by name with the Actions URL, the failing jobs, and from each failing job's log the lines that failed it — a
+ *   test with its diff, an e2e page, a type or lint error — or a bounded tail where none is, GitHub's post-job lines left out — the next try reads why CI went red here, since no agent may call `gh` itself — and the `nemia retry <run> <step> --recheck` line, whose step is the
  *   check's own (`WF_STEP`).
  *
  * The branch is read from `HEAD`, never given: a run's branch is `wf/<run>/<leaf>` — `wf/<run>/run` for the run's own line of work, one
  * branch per card, and `wf/<run>/<step>` for a fork beside it or a fan-in's merge — and the run it names is what the refusals print.
  * Refuses, exit 1 on stderr with what to do next: a HEAD that is on no such branch or on the remote's default branch; no `origin`; no
  * `gh` on the PATH or none authenticated; a push git rejects, which is answered by merging the base and never by a force; a draft pull
- * request, or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; and a `ci` that is
+ * request, or one based on another branch; no open pull request where one is owed; a `headRefOid` that is not `HEAD`; a pull request
+ * that conflicts with its base; and a `ci` that is
  * red, cancelled, skipped or never reported.
  */
 import { spawnSync } from 'node:child_process';
@@ -45,6 +48,16 @@ const START_SECONDS = 1800;
  * `pull-request.boundary.test.ts` holds the two numbers against each other.
  */
 const WHOLE_SECONDS = 2400;
+
+/**
+ * How long, in seconds, the wait reads the pull request's `mergeable` again while GitHub answers `UNKNOWN`, which it does while it
+ * computes, before it waits on `ci` all the same; `WF_PR_MERGEABLE_SECONDS` lowers it for a test. A `CONFLICTING` head is refused at
+ * once: GitHub runs no `pull_request` workflow on it, so no `ci` would come.
+ */
+const MERGEABLE_SECONDS = 15;
+
+/** How long the wait sleeps between two reads of `mergeable`, in seconds; `WF_PR_MERGEABLE_POLL_SECONDS` lowers it for a test. */
+const MERGEABLE_POLL_SECONDS = 3;
 
 /** How long the wait sleeps between two polls, in seconds. */
 const POLL_SECONDS = 15;
@@ -103,14 +116,17 @@ type Entry = {
 };
 
 /** A pull request as this script reads one. */
-type Pr = { number: number; url: string; isDraft: boolean; baseRefName: string; headRefOid: string };
+type Pr = { number: number; url: string; isDraft: boolean; baseRefName: string; headRefOid: string; mergeable?: string };
 
 /** What a command printed: its exit, its streams, and whether there was no such command on the PATH. */
 type Ran = { status: number | null; out: string; err: string; missing: boolean };
 
+/** The most bytes a command may print before it is cut off: a test job's whole log runs past `spawnSync`'s default of 1 MiB. */
+const OUTPUT_BYTES = 64 * 1024 * 1024;
+
 /** Run `cmd` with `args`, bounded, reading nothing from stdin. */
 function run(cmd: string, args: string[]): Ran {
-  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND });
+  const r = spawnSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: BOUND, maxBuffer: OUTPUT_BYTES });
   const missing = r.error !== undefined && 'code' in r.error && r.error.code === 'ENOENT';
   return { status: r.status, out: r.stdout ?? '', err: (r.stderr ?? '').trim() || (r.error?.message ?? ''), missing };
 }
@@ -197,7 +213,7 @@ const head = (): string => git('what commit HEAD is', 'rev-parse', 'HEAD');
 
 /** The open pull requests whose head is `branch`. */
 function pulls(branch: string): Pr[] {
-  const text = gh('pr', 'list', '--head', branch, '--state', 'open', '--json', 'number,url,isDraft,baseRefName,headRefOid');
+  const text = gh('pr', 'list', '--head', branch, '--state', 'open', '--json', 'number,url,isDraft,baseRefName,headRefOid,mergeable');
   return parsed<Pr[]>(`the pull requests of ${branch}`, text);
 }
 
@@ -293,29 +309,45 @@ const unstamped = (line: string): string =>
 /** A line without the prefix a tool gave it (turbo's `pkg:test: `), as `failingLines` in `src/check/check.ts` reads one. */
 const bare = (line: string): string => line.replace(/^\S+:\S+: /, '');
 
+/** A line without the worker's prefix the e2e gives it (`[w1] `), on top of a tool's (`bare`). */
+const unworked = (line: string): string => bare(line).replace(/^\[w\d+\] /, '');
+
 /**
- * Whether `line` names a failing test, as node's reporters print one: `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
- * `✖ failing tests:` the spec reporter lists them again under. The rule of `failingLines` (`src/check/check.ts`), copied, since this
- * script imports nothing of the package.
+ * Whether `line` fails a job: a test node's reporters name, `✖` (spec) or `not ok ` (TAP) after its indent — never the heading
+ * `✖ failing tests:` the spec reporter lists them again under, the rule of `failingLines` (`src/check/check.ts`), copied, since this
+ * script imports nothing of the package — or the e2e's `e2e: FAILED — <page>` (`exitOn`, `apps/web/test/e2e/visit.ts`), a TypeScript
+ * error (`<path>(<line>,<col>): error TS<n>: …`) or oxlint's ` x <rule>: …` (`×` where it draws).
  */
 const failing = (line: string): boolean => {
-  const said = /^\s*((?:✖|not ok ).*)$/.exec(bare(line));
-  return said !== null && !said[1].startsWith('✖ failing tests:');
+  const said = unworked(line);
+  const test = /^\s*((?:✖|not ok ).*)$/.exec(said);
+  if (test !== null) return !test[1].startsWith('✖ failing tests:');
+  return said.startsWith('e2e: FAILED — ') || /^\s*\S.*?(?:\(\d+,\d+\)|:\d+:\d+)(?::| -) error TS\d+: /.test(said) || /^\s*[x×] \S+: /.test(said);
 };
 
 /** Whether `line` ends the lines that tell one failing test: the next test, a pass, a summary, the spec reporter's location line. */
 const ends = (line: string): boolean => /^\s*(?:✔|ℹ|ok |# Subtest|test at )/.test(bare(line)) || failing(line);
 
-/** Whether `line` tells why a test failed: an error's line (`AssertionError …`, `Error: …`) or the diff (`+ actual - expected`, `+`, `-`). */
+/**
+ * Whether `line` tells why a test failed: an error's line (`AssertionError …`, `Error: …`), the diff (`+ actual - expected`, `+`, `-`), or
+ * the location oxlint draws under its rule (`,-[src/a.ts:3:7]`, `╭─[…]`).
+ */
 const detail = (line: string): boolean => {
   const said = bare(line).trim();
-  return /^[+-](?:\s|$)/.test(said) || (/error/i.test(said) && !said.startsWith('at '));
+  return /^[+-](?:\s|$)/.test(said) || /^(?:,-|╭─)\[/.test(said) || (/error/i.test(said) && !said.startsWith('at '));
 };
 
 /**
- * What a failing job's log says of why it failed: each line naming a failing test once, in order, with the lines after it that tell why
- * (`detail`) — the occurrence that tells most, since the spec reporter prints the test bare where it ran and with its error under
- * `✖ failing tests:` — bounded by `JOB_LINES`. A log that names no failing test gives its last `TAIL_LINES` instead.
+ * Whether `line` is GitHub's own after the job's steps ran: the post-job cleanup, the git commands it runs there, the orphans it ends.
+ * A tail drops them, and everything from `Post job cleanup.` on: none of it says why the job failed.
+ */
+const postJob = (line: string): boolean => /^(?:Post job cleanup\.?|\[command\]\/usr\/bin\/git |Cleaning up orphan processes)/.test(line.trim());
+
+/**
+ * What a failing job's log says of why it failed: each line that fails it (`failing`) once, in order, with the lines after it that tell
+ * why (`detail`) — the occurrence that tells most, since the spec reporter prints the test bare where it ran and with its error under
+ * `✖ failing tests:`, and the e2e prints its headline again on each stream — bounded by `JOB_LINES`. A log with no such line gives its
+ * last `TAIL_LINES` before GitHub's post-job lines (`postJob`) instead.
  */
 function failures(log: string): { lines: string[]; tests: boolean } {
   const all = log.split('\n').map(unstamped);
@@ -327,18 +359,20 @@ function failures(log: string): { lines: string[]; tests: boolean } {
       if (ends(next)) break;
       if (detail(next) && after.length < DETAIL_LINES) after.push(next);
     }
-    const key = bare(line).trim();
+    const key = unworked(line).trim();
     if ((told.get(key)?.length ?? -1) <= after.length) told.set(key, [line, ...after]);
   });
-  if (!told.size) return { lines: all.filter((line) => line.trim()).slice(-TAIL_LINES), tests: false };
-  return { lines: [...told.values()].flat().slice(0, JOB_LINES), tests: true };
+  if (told.size) return { lines: [...told.values()].flat().slice(0, JOB_LINES), tests: true };
+  const cleanup = all.findIndex((line) => /^Post job cleanup\.?$/.test(line.trim()));
+  const ran = cleanup === -1 ? all : all.slice(0, cleanup);
+  return { lines: ran.filter((line) => line.trim() && !postJob(line)).slice(-TAIL_LINES), tests: false };
 }
 
 /**
  * Why CI went red, for the next try to read: each entry of `entries` that did not pass, by name and verdict with its URL; then, for each
  * that names a job, its log read by the job's id (`gh api repos/{owner}/{repo}/actions/jobs/<id>/logs`, which answers where `gh run view
- * --log-failed` prints nothing), headed by the job's name: the failing tests with their diffs (`failures`), or its tail where it names
- * none, bounded by `LOG_LINES` in all. The `ci` context itself, which only gathers the others, comes last. No agent of this team may call
+ * --log-failed` prints nothing), headed by the job's name: the lines that failed it with what tells why (`failures`), or its tail where it
+ * names none, bounded by `LOG_LINES` in all. The `ci` context itself, which only gathers the others, comes last. No agent of this team may call
  * `gh`, so this is the whole of what the next try is handed.
  */
 function why(entries: readonly Entry[]): string[] {
@@ -366,7 +400,7 @@ function why(entries: readonly Entry[]): string[] {
     }
     const said = failures(log.out);
     const lines = said.lines.slice(0, left - 1).map((line) => `  ${line}`);
-    logs.push(said.tests ? `${name} (job ${id}), its failing tests:` : `${name} (job ${id}), the last ${lines.length} lines of its log:`, ...lines);
+    logs.push(said.tests ? `${name} (job ${id}), the lines that failed it:` : `${name} (job ${id}), the last ${lines.length} lines of its log:`, ...lines);
   }
   return ['the jobs that did not pass:', ...named, ...more, ...logs];
 }
@@ -495,11 +529,37 @@ function unanswered(seen: Seen, pr: Pr, ours: readonly Entry[], entries: readonl
   ].join('\n');
 }
 
+/**
+ * The one open pull request of `branch`, read again while GitHub says its `mergeable` is `UNKNOWN` and the bound is not out; refuses one
+ * GitHub says is `CONFLICTING`, naming the merge that answers it. Any other answer, `UNKNOWN` to the end included, is waited on as before.
+ */
+function unconflicted(branch: string, onto: string): Pr {
+  const whole = seconds('WF_PR_MERGEABLE_SECONDS', MERGEABLE_SECONDS);
+  const poll = seconds('WF_PR_MERGEABLE_POLL_SECONDS', MERGEABLE_POLL_SECONDS);
+  const began = Date.now();
+  for (;;) {
+    const pr = sole(pulls(branch), branch, onto);
+    const said = (pr.mergeable ?? '').toUpperCase();
+    if (said === 'CONFLICTING')
+      throw new Refusal(
+        [
+          `GitHub says #${pr.number} conflicts with its base \`${onto}\`, and it runs no \`pull_request\` workflow on a conflicting ` +
+            `head, so no \`${CONTEXT}\` would come. Merge the base into the run's branch in your session, resolve the conflicts, ` +
+            'commit, and open the round again with the script read from the base:',
+          '  git merge main-worktree/HEAD',
+          `  ${OPEN_LINE}`,
+        ].join('\n'),
+      );
+    if (said !== 'UNKNOWN' || Date.now() - began >= whole * 1000) return pr;
+    sleep(poll);
+  }
+}
+
 /** `wait`: the `ci` context of the pull request's head, waited out and read; its refusal says why CI went red. */
 function wait(): string[] {
   const { branch, run: ofRun, onto } = placed();
-  const pr = sole(pulls(branch), branch, onto);
   const retry = `  Then: nemia retry ${ofRun} ${process.env.WF_STEP || STEP} --recheck`;
+  const pr = unconflicted(branch, onto);
   const whole = seconds('WF_CI_WAIT_SECONDS', WHOLE_SECONDS);
   const start = Math.min(seconds('WF_CI_START_SECONDS', START_SECONDS), whole);
   const poll = seconds('WF_CI_POLL_SECONDS', POLL_SECONDS);

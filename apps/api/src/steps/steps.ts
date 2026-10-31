@@ -260,11 +260,11 @@ async function followed(
 const unpushedWords = (id: string, step: string) =>
   `Step '${step}' of run '${id}' runs a session its harness does not push as it is written: what it said so far is sent, and it is read again every few seconds.`;
 
-/** How often the conversation of a step no live stream can be had of is read again (`readAgain`), shipped: `Beats.step`'s default. */
+/** How often the conversation of a step no live stream can be had of is read again (`readAgain`) by default: `Beats.step`'s default. */
 export const STEP_BEAT_MS = 5_000;
 
 /**
- * The conversation of the step `step` of the run `id` read again every beat (`r.beatMs`, `STEP_BEAT_MS` shipped) for as long as a reader
+ * The conversation of the step `step` of the run `id` read again every beat (`r.beatMs`, `STEP_BEAT_MS` by default) for as long as a reader
  * is there, once its following stopped short of `settled` (`from`, the task it was on, the cursor to read from and why it stopped): why no
  * live stream can be had, said as `unreadable` with `retrying: true` and again only when those words change; then, each beat, the
  * conversation read afresh from the cursor, its events as `transcript`, `settled` once the task has settled, and the following asked for

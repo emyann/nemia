@@ -66,7 +66,7 @@ export type RunSlot = { inFlight: number; cap: number };
  * waits on another run's in one directory, or on the lift, waits on no person, and would otherwise free the very slot it is queued for. A
  * cancelled run counts while the engine is still stopping what it had in flight; one that waits on a person, or has finished, does not.
  *
- * `wants`: it has nothing filed, nobody called it off, the runs it waits on have shipped (`runReady`), and a root is ready — a run slot is
+ * `wants`: it has nothing filed, nobody called it off, the runs it waits on have landed (`runReady`), and a root is ready — a run slot is
  * what it waits for. A run waiting on runs (`--after`) wants none, and counts only once it is filed.
  *
  * Neither, for a run whose workflow takes no slot at all (`takesNoSlot`, `slot: none`): it is a session that watches the runs the cap
@@ -77,16 +77,18 @@ export type RunSlot = { inFlight: number; cap: number };
 export function slotNeed(
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
-  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'held' | 'paused'>,
-  shipped: (runId: string) => boolean,
+  a: Pick<Assessment, 'ready' | 'check' | 'retry' | 'round' | 'waitingOnCheckout' | 'waitingOnPause'>,
+  landed: (runId: string) => boolean,
   steps: readonly Pick<Workflow, 'slot'>[] = [],
 ): { inFlight: boolean; wants: boolean } {
   if (takesNoSlot(steps)) return { inFlight: false, wants: false };
   const started = hasStarted(run);
-  const due = a.ready.length + a.check.length + a.retry.length + a.round.length + a.held.length + (a.paused?.steps.length ?? 0) > 0;
+  const due =
+    a.ready.length + a.check.length + a.retry.length + a.round.length + a.waitingOnCheckout.length + (a.waitingOnPause?.steps.length ?? 0) >
+    0;
   return {
     inFlight: inFlight(run, phaseOf).length > 0 || (started && !run.cancelledAt && due),
-    wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, shipped),
+    wants: !started && !run.cancelledAt && a.ready.length > 0 && runReady(run, landed),
   };
 }
 

@@ -1,15 +1,16 @@
 /**
- * A step's state, from the codes the api carries for it (`phase`, `reason`) — what the run established, not only what its task settled —
- * and how each state is drawn. The board never reads a state out of the sentence beside them (`message`), which is shown as it comes.
- * The words a person reads of a state are `words.ts`'s (`PERSON`): this chooses the state and its colour. `cancelled` is a fact about the
- * run rather than the step: a step to come on a run somebody called off never will, and a step the cancellation stopped is `Stopped`.
+ * A step's state, from the codes the api carries for it (`phase`, `reason`, and `on` and `via`, which qualify a wait and a question) —
+ * what the run established, not only what its task settled — and how each state is drawn. The board never reads a state out of the
+ * sentence beside them (`message`), which is shown as it comes. The words a person reads of a state are `words.ts`'s (`PERSON`): this
+ * chooses the state and its colour. `cancelled` is a fact about the run rather than the step: a step to come on a run somebody called
+ * off never will, and a step the cancellation stopped is `Stopped`.
  *
- * `held` is a fact about the run too: a person holds it until other runs ship (the CLI's `hold`), so a step not filed will not be until the
+ * `held` is a fact about the run too: a person holds it until other runs land (the CLI's `hold`), so a step not filed will not be until the
  * hold lifts, and a step at a human gate asks nothing of anyone while it stands — every verb that would answer it is refused. A step at
  * work, asking through its harness (`needs-human`), checking, or settled keeps its state: what is in flight runs on, and a verdict is a
  * verdict.
  */
-import type { StepPhase, StepReason } from './api/reasons.ts';
+import type { StepCodes, StepReason } from './api/reasons.ts';
 import { container, dashed, filled, hairline, meaningOf, paint, ringed, type Hue } from './meaning.ts';
 
 export type StepState =
@@ -35,16 +36,48 @@ export type StepState =
   | 'unknown';
 
 /**
+ * The states that wait on a person's word: a session asking through its harness, a human gate (`AT_A_GATE`), and work to try again that
+ * only a person can send (a refused try, an unsigned one).
+ */
+const WAITS_ON_A_PERSON: ReadonlySet<StepState> = new Set([
+  'needs-human',
+  'blocked',
+  'awaiting-approval',
+  'exhausted',
+  'over-budget',
+  'budget-exhausted',
+  'unsigned',
+  'denied',
+]);
+
+/**
+ * A human gate: of the states that wait on a person, those final where the run goes no further until a person decides — a step that
+ * signed off blocked, a step waiting at its gate for an approval (the CLI's `approve`), a loop out of rounds (the CLI's `round`), or a step
+ * past its budget, over it or ended at it (`--budget`), whose way on is a person's word to spend more. What the CLI's `decide` calls a
+ * blocked outcome, on the step's own word. Not a session asking through its harness, which is answered in it, nor a refused or unsigned
+ * try, which is work to try again (the CLI's `retry`).
+ */
+const AT_A_GATE: ReadonlySet<StepState> = new Set(
+  [...WAITS_ON_A_PERSON].filter((state) => state !== 'needs-human' && state !== 'unsigned' && state !== 'denied'),
+);
+
+/** Whether a step in `state` waits on a person's word (`WAITS_ON_A_PERSON`). On a run somebody called off, nobody waits any more. */
+export const waitsOnPerson = (state: StepState, runCancelled: boolean): boolean => WAITS_ON_A_PERSON.has(state) && !runCancelled;
+
+/** Whether a step in `state` waits at a human gate (`AT_A_GATE`), drawn with the gate's badge. Not on a run somebody called off. */
+export const waitsAtGate = (state: StepState, runCancelled: boolean): boolean => AT_A_GATE.has(state) && !runCancelled;
+
+/**
  * A step's state from its codes, whether the run was called off, and whether a person holds the run: `held` for a state a hold stops
  * (`HELD_BY_A_HOLD`) on a run not called off. `runHeld` has no default, so the compiler names every caller that has to say it: a caller
  * that forgot the hold would draw a held run's gate as asking a person.
  */
-export function stepState(phase: StepPhase, reason: StepReason, runCancelled: boolean, runHeld: boolean): StepState {
-  const state = codeState(phase, reason, runCancelled);
+export function stepState(codes: StepCodes, runCancelled: boolean, runHeld: boolean): StepState {
+  const state = codeState(codes, runCancelled);
   return runHeld && !runCancelled && HELD_BY_A_HOLD.has(state) ? 'held' : state;
 }
 
-/** What a hold makes `held`: a step not filed yet, and one at a human gate (`isGate`), whose answer is refused while the hold stands. */
+/** What a hold makes `held`: a step not filed yet, and one at a human gate (`waitsAtGate`), whose answer is refused while it stands. */
 const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
   'waiting',
   'waiting-for-slot',
@@ -56,30 +89,27 @@ const HELD_BY_A_HOLD: ReadonlySet<StepState> = new Set([
 ]);
 
 /**
- * The state each reason is drawn as. Total: a reason the api adds fails the typecheck here until it has a state. A step not filed — on
- * another step or run, the checkout, the pause, or nothing yet — is `waiting`, and one the cap on runs in flight holds `waiting-for-slot`;
- * a session that ended on its own word (`Succeeded`) is at most `unverified`; one an operator or a cancel stopped is drawn `cancelled`.
+ * The state each reason is drawn as, before what qualifies it narrows it (`codeState`). Total: a reason the api adds fails the typecheck
+ * here until it has a state. A step not filed — on another step or run, the checkout, the pause, or nothing yet — is `waiting`; a question
+ * is `blocked`, a closeout's; a session that ended on its own word (`Succeeded`) is at most `unverified`; one an operator or a cancel
+ * stopped is drawn `cancelled`.
  */
 export const STATE_OF: Record<StepReason, StepState> = {
   Running: 'working',
-  NeedsHuman: 'needs-human',
   Checking: 'checking',
   CheckPassed: 'verified',
   Succeeded: 'unverified',
-  Blocked: 'blocked',
   AwaitingApproval: 'awaiting-approval',
-  RoundsExhausted: 'exhausted',
+  AwaitingAnswer: 'blocked',
+  AwaitingRound: 'exhausted',
   OverBudget: 'over-budget',
   BudgetExhausted: 'budget-exhausted',
-  CheckDenied: 'denied',
+  Denied: 'denied',
   Unsigned: 'unsigned',
   Failed: 'failed',
   CheckFailed: 'failed-check',
   Pending: 'waiting',
   Waiting: 'waiting',
-  WaitingForCheckout: 'waiting',
-  WaitingForPause: 'waiting',
-  WaitingForSlot: 'waiting-for-slot',
   Stopped: 'cancelled',
   UnreadableCloseout: 'unreadable',
   Unknown: 'unknown',
@@ -87,31 +117,19 @@ export const STATE_OF: Record<StepReason, StepState> = {
 
 /**
  * A step's state from its codes alone, and whether the run was called off: `STATE_OF`, but `unreadable` for a step whose record the api
- * could not judge (`Unknown` in phase `failed`), and `cancelled` for a step to come on a run called off.
+ * could not judge (`Unknown` in phase `failed`), `cancelled` for a step to come on a run called off, `needs-human` for a question its
+ * session asks (`AwaitingAnswer` via `session`), and `waiting-for-slot` for a wait on the limit on runs in flight (`Waiting` on `limit`).
  */
-function codeState(phase: StepPhase, reason: StepReason, runCancelled: boolean): StepState {
+function codeState({ phase, reason, on, via }: StepCodes, runCancelled: boolean): StepState {
   if (phase === 'failed' && reason === 'Unknown') return 'unreadable';
   if (phase === 'pending' && runCancelled) return 'cancelled';
+  if (reason === 'AwaitingAnswer' && via === 'session') return 'needs-human';
+  if (reason === 'Waiting' && on === 'limit') return 'waiting-for-slot';
   return STATE_OF[reason];
 }
 
 /** Final, and a follower may be filed on it — `satisfiesAfter` in agent-orchestrator: verified, or done on its own word. */
 export const satisfiesAfter = (state: StepState): boolean => state === 'verified' || state === 'unverified';
-
-/**
- * A human gate: final, and the run goes no further until a person decides — a step that signed off blocked, a step waiting at its gate for
- * an approval (the CLI's `approve`), a loop out of rounds (the CLI's `round`), or a step past its budget, over it or ended at it
- * (`--budget`), whose way on is a person's word to spend more. What the CLI's `decide` calls a blocked outcome, on the step's own word. Not
- * a refused check nor an unsigned step, which wait on you too but are work to try again (the CLI's `retry`). On a run somebody called off,
- * nobody is waiting for the answer any more.
- */
-export const isGate = (state: StepState, runCancelled: boolean): boolean =>
-  (state === 'blocked' ||
-    state === 'awaiting-approval' ||
-    state === 'exhausted' ||
-    state === 'over-budget' ||
-    state === 'budget-exhausted') &&
-  !runCancelled;
 
 /** How a state is drawn: the hue that says its meaning, the form the hue takes, and what marks it beside its colour. */
 export interface Drawn {
@@ -123,7 +141,7 @@ export interface Drawn {
 const GATE: Drawn = { hue: 'yours', form: 'filled', mark: 'font-semibold' };
 
 /**
- * Each state's meaning, of the look's five, and its form. `yours`, filled and bold, for a state that waits on a person's word (`isGate`),
+ * Each state's meaning, of the look's five, and its form. `yours`, filled and bold, for a state that waits at a human gate (`waitsAtGate`),
  * the only filled accent; `yours` for a session asking, and ringed for work to try again, not a question (`unsigned`, `denied`). `alive`
  * for a session at work. `failure` for a failure and nothing else. The rest is at rest or done: sage for a check that runs, a step that is
  * done (ringed when only its own word says so, and `StatusChip` marks it too) and a step to come, a hairline; grey for a step a person
@@ -160,30 +178,20 @@ export const classOf = ({ hue, form, mark }: Drawn): string =>
 
 /**
  * The states of `table` that break the look's rule, each with why; none for a table that keeps it. A state that waits on a person
- * (`isGate`, a session asking, work to try again) is `yours`; a failure is `failure`, and no other state is; no state is `money`.
+ * (`waitsOnPerson`: a gate, a session asking, work to try again) is `yours`; a failure is `failure`, and no other state is; no state is
+ * `money`.
  */
 export function brokenMeanings(table: Record<StepState, Drawn>): string[] {
   const states = Object.keys(table) as StepState[];
   return states.flatMap((state) => {
     const meaning = meaningOf(table[state].hue);
     if (meaning === 'money') return [`${state} is money: amber is an amount, never a state`];
-    if (WAITS_ON_A_PERSON.has(state)) return meaning === 'yours' ? [] : [`${state} waits on a person and is ${meaning}, not yours`];
+    if (waitsOnPerson(state, false)) return meaning === 'yours' ? [] : [`${state} waits on a person and is ${meaning}, not yours`];
     if (FAILURES.has(state)) return meaning === 'failure' ? [] : [`${state} is a failure and is ${meaning}`];
     if (meaning === 'yours') return [`${state} waits on nobody and is yours`];
     return meaning === 'failure' ? [`${state} is no failure and is drawn as one`] : [];
   });
 }
-
-const WAITS_ON_A_PERSON: ReadonlySet<StepState> = new Set([
-  'needs-human',
-  'blocked',
-  'awaiting-approval',
-  'exhausted',
-  'over-budget',
-  'budget-exhausted',
-  'unsigned',
-  'denied',
-]);
 
 const FAILURES: ReadonlySet<StepState> = new Set(['failed', 'failed-check', 'unreadable']);
 

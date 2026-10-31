@@ -1,5 +1,5 @@
 /**
- * An agent's rules for Auto (`GET /api/auto/:name`, and `PUT` and `DELETE /api/auto/:name/rules/:id`, the routes the package's command
+ * An agent's rules for Auto (`GET /api/policy/:name`, and `PUT` and `DELETE /api/policy/:name/rules/:id`, the routes the package's command
  * table generates): the rules in force, what the agent proposed from the custom instruction, the words it keeps as guidance, and the
  * custom instruction itself; a proposed rule confirmed, and a rule in force dropped, each the person's.
  */
@@ -15,7 +15,7 @@ export type Condition = 'recommends' | 'checked' | 'accepted' | 'withinBudget' |
 /**
  * Mirrors the package's `WordedRule`: a rule's id, the answer it gives unasked (`approve`, `retry`), the steps it holds at (all where left
  * out), the conditions it asks of the run's state (`when`), the dollar line the run's spend stays under for any answer it gives (`under`,
- * none where left out), where it came from (`from`: the rule that ships, or one the agent proposed), and its words, generated from those
+ * none where left out), where it came from (`from`: the builtin rule, or one the agent proposed), and its words, generated from those
  * fields.
  */
 export type AutoRule = {
@@ -29,17 +29,17 @@ export type AutoRule = {
 };
 
 /**
- * Mirrors the package's `AutoList`: the agent, the file of the person's list, whether the rule that ships is in force for want of one they
- * confirmed (`isDefault`), the rules in force, the rule that ships in its words (`shipped`), what the agent proposed (each rule saying
+ * Mirrors the package's `PolicyList`: the agent, the file of the person's list, whether the builtin rule is in force for want of one
+ * they confirmed (`isDefault`), the rules in force, the builtin rule in its words (`builtin`), what the agent proposed (each rule saying
  * whether it is in force, the words kept as guidance, and whether the custom instruction changed since, `stale`) or null, and the custom
  * instruction or null.
  */
-export type AutoList = {
+export type PolicyList = {
   agent: string;
   file: string;
   isDefault: boolean;
   rules: readonly AutoRule[];
-  shipped: AutoRule;
+  builtin: AutoRule;
   proposed: {
     file: string;
     at: string;
@@ -61,14 +61,14 @@ const RULE_FIELDS = {
   words: Schema.String,
 };
 
-/** Decodes an `AutoList`. */
-const AutoListSchema = decodes<AutoList>()(
+/** Decodes an `PolicyList`. */
+const PolicyListSchema = decodes<PolicyList>()(
   Schema.Struct({
     agent: Schema.String,
     file: Schema.String,
     isDefault: Schema.Boolean,
     rules: Schema.Array(Schema.Struct(RULE_FIELDS)),
-    shipped: Schema.Struct(RULE_FIELDS),
+    builtin: Schema.Struct(RULE_FIELDS),
     proposed: Schema.NullOr(
       Schema.Struct({
         file: Schema.String,
@@ -83,30 +83,30 @@ const AutoListSchema = decodes<AutoList>()(
 );
 
 /** `agent`'s rules for Auto: polled slowly, since the agent proposes from its session. */
-export const autoQuery = (agent: string) =>
+export const policyQuery = (agent: string) =>
   queryOptions({
-    queryKey: ['auto', agent],
-    queryFn: () => get(`/api/auto/${encodeURIComponent(agent)}`, AutoListSchema),
+    queryKey: ['policy', agent],
+    queryFn: () => get(`/api/policy/${encodeURIComponent(agent)}`, PolicyListSchema),
     refetchInterval: () => pace(30_000),
   });
 
 /** Where a rule of `agent`'s is written. */
-const rulePath = (agent: string, id: string): string => `/api/auto/${encodeURIComponent(agent)}/rules/${encodeURIComponent(id)}`;
+const rulePath = (agent: string, id: string): string => `/api/policy/${encodeURIComponent(agent)}/rules/${encodeURIComponent(id)}`;
 
 /**
  * Confirms the rule `id` that `agent` proposed, or the default again, as `words`, the words the person read: from then on, at Auto, its
  * answer is given unasked where it holds. Resolves with the rules after the write; rejects with the api's refusal: a rule not proposed,
  * one that reads otherwise since, or one in force already.
  */
-export const confirmRule = (agent: string, id: string, words: string): Promise<AutoList> =>
-  send('PUT', rulePath(agent, id), AutoListSchema, {
+export const confirmRule = (agent: string, id: string, words: string): Promise<PolicyList> =>
+  send('PUT', rulePath(agent, id), PolicyListSchema, {
     body: { words },
     may: 'The rule may be in force, or read otherwise: read the rules again before confirming it again.',
   });
 
 /** Drops the rule `id` of `agent`'s from force, the default among them. Rejects with the api's refusal: a rule not in force. */
-export const dropRule = (agent: string, id: string): Promise<AutoList> =>
-  send('DELETE', rulePath(agent, id), AutoListSchema, {
+export const dropRule = (agent: string, id: string): Promise<PolicyList> =>
+  send('DELETE', rulePath(agent, id), PolicyListSchema, {
     body: {},
     may: 'The rule may be out of force: read the rules again before dropping it again.',
   });

@@ -419,7 +419,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     const task = await keptAnew(t);
     const [filings, stops, told] = [b.filings.length, b.stopped.length, b.said.length];
     writeCustom('Answer in Spanish.\n');
-    assert.deepEqual(await beat(), ['tell']);
+    assert.deepEqual(await beat(), ['sayCustom']);
     assert.deepEqual(
       b.said.slice(told).map((one) => one.taskId),
       [task],
@@ -431,7 +431,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     assert.ok(fs.readFileSync(promptFile(), 'utf8').trimEnd().endsWith('Answer in Spanish.'), 'her filed instruction now holds them');
     assert.deepEqual(await beat(), [], 'told once: level-triggered off the record of what she was told');
     fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
-    assert.deepEqual(await beat(), ['tell']);
+    assert.deepEqual(await beat(), ['sayCustom']);
     assert.match(b.said.at(-1)!.text, /removed their custom instruction/);
     assert.equal(fs.readFileSync(promptFile(), 'utf8'), `${readNemia().body.trim()}\n`, 'her shipped instruction alone');
     assert.deepEqual(await beat(), []);
@@ -444,7 +444,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     appendOutbox(nemiaDir(), { id: 'kept-o1', at: new Date().toISOString(), text: 'Hi' });
     assert.deepEqual(await beat(), [], 'kept, her session not live: kept for later');
     b.settle(task, 'working');
-    assert.deepEqual(await beat(), ['deliver']);
+    assert.deepEqual(await beat(), ['sayOutbox']);
     assert.deepEqual(
       b.said.slice(told).map((one) => [one.taskId, one.text]),
       [[task, framedForHer('Hi')]],
@@ -452,7 +452,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     assert.deepEqual(await beat(), [], 'delivered once: level-triggered off the marks');
   });
   await s.test(
-    'REFUSED: a tell the runtime refuses leaves her filed instruction and what she was told as they were, owed again on the next beat',
+    'REFUSED: a sayCustom the runtime refuses leaves her filed instruction and what she was told as they were, owed again on the next beat',
     async () => {
       const b = stage.board();
       const task = await keptAnew(t);
@@ -468,7 +468,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
       assert.equal(fs.readFileSync(promptFile(), 'utf8'), filed, 'nothing written of words she was not told');
       assert.equal(fs.readFileSync(toldFile(), 'utf8'), record, 'nothing recorded of words she was not told');
       assert.equal(b.said.length, told);
-      assert.deepEqual(await beat(), ['tell'], 'owed again');
+      assert.deepEqual(await beat(), ['sayCustom'], 'owed again');
       assert.deepEqual(
         b.said.slice(told).map((one) => one.taskId),
         [task],
@@ -505,7 +505,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     assert.deepEqual(await beat(), [], 'no custom words then or now: nothing to tell');
     assert.equal(b.said.length, told, 'never told she removed words she never had');
     writeCustom('Answer in Dutch.\n');
-    assert.deepEqual(await beat(), ['tell'], 'the words changed: told');
+    assert.deepEqual(await beat(), ['sayCustom'], 'the words changed: told');
     fs.writeFileSync(promptFile(), 'An older instruction of hers.\n\nAnswer in Dutch.\n');
     assert.deepEqual(await beat(), [], 'the same words, under another instruction: nothing to tell');
     assert.equal(b.said.length, told + 1);
@@ -521,7 +521,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
       fs.rmSync(toldFile());
       assert.deepEqual(await beat(), [], 'her instruction ends with the words as they read: nothing to tell');
       writeCustom('Answer in Greek.\n');
-      assert.deepEqual(await beat(), ['tell'], 'other words than those she was filed with: told');
+      assert.deepEqual(await beat(), ['sayCustom'], 'other words than those she was filed with: told');
       assert.equal(fs.readFileSync(toldFile(), 'utf8'), '{"words":"Answer in Greek."}\n', 'and recorded');
       fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
       fs.rmSync(toldFile());
@@ -538,7 +538,7 @@ test("Kept, she is told what changed: the person's custom words once, never by a
     assert.equal(fs.readFileSync(toldFile(), 'utf8'), '{"words":"Answer in Polish."}\n', 'filed with them');
     const told = b.said.length;
     fs.rmSync(customInstructionsFile(ROOT, 'nemia'));
-    assert.deepEqual(await beat(), ['tell']);
+    assert.deepEqual(await beat(), ['sayCustom']);
     assert.match(b.said.at(-1)!.text, /removed their custom instruction/);
     assert.equal(b.said.length, told + 1);
     await level({ level: 'manual' });

@@ -77,7 +77,7 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
     const holding = detail().holding;
     const waiting = detail().waiting;
     assert.ok(holding && waiting);
-    for (const answer of [decidable(), { holding }, { waiting }, { running: true }, { nothing: 'shipped' }] as RunDecision[]) {
+    for (const answer of [decidable(), { holding }, { waiting }, { running: true }, { nothing: 'landed' }] as RunDecision[]) {
       answering(t, answer);
       assert.deepEqual(await readDecision(), answer);
     }

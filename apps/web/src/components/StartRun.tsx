@@ -133,7 +133,7 @@ export function StartRun({
 
 /**
  * That run `id` was started, linked to its page, and when its steps are filed: on the daemon's next pass, once each of `after` has
- * shipped.
+ * landed.
  */
 function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
   return (
@@ -145,7 +145,7 @@ function StartedLine({ id, after }: { id: string; after: readonly string[] }) {
       . Nothing is filed until the daemon&apos;s next pass
       {after.length > 0 && (
         <>
-          , and {after.join(' and ')} {after.length > 1 ? 'have' : 'has'} shipped
+          , and {after.join(' and ')} {after.length > 1 ? 'have' : 'has'} landed
         </>
       )}
       .
@@ -206,7 +206,7 @@ export function AfterPicker({
         After
       </legend>
       <p className="text-body-small text-muted-foreground">
-        Waits until it ships: nothing of it is filed until each has shipped, and it is handed what each concluded.
+        Waits until it lands: nothing of it is filed until each has landed, and it is handed what each concluded.
       </p>
       {error ? (
         <p className="text-body-small text-failure">Could not list the runs to wait on: {error.message}</p>

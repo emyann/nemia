@@ -22,7 +22,7 @@ import { holdsOpen } from '../gate/gate.ts';
 import { checkTaskId, isRepositoryRun, stepTaskId, tryOf, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
 import { budgetOf, landsOnCheck, sentBack, stepStatus, type RoundAsk, type SpendOf } from '../status/status.ts';
 import { hasStarted, runReady, waitedOn, waitsOf, type ParentRun, type Wait } from '../wait/wait.ts';
-import { followPass, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
+import { behindNow, followPass, pinPass, pinsWritten, type PinnedPass } from '../revisions/pin.verb.ts';
 import { handOffDue } from '../workspace/workspace.ts';
 import { filesDue } from '../artifacts/artifacts.ts';
 import { inParts } from '../brief/index.ts';
@@ -223,7 +223,7 @@ export const unrecordedSteps = Effect.fn('unrecordedSteps')(function* (
  * `facts` are what the metrics record of the run's steps (`StepFact`): each of its tasks the pass reads settled and not counted before
  * (`settledOf`) with the waits they ended, each round granted, each gate wait not timed and each denied call not counted before
  * (`markedOnce`), and each number of the run's timeline once it is over (`timedOnce`); absent where there is none.
- * `waiting` names the runs whose shipping this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
+ * `waiting` names the runs whose landing this run's roots wait on (`waitsOf`). `inFlight` says the run counts against the cap on runs in
  * flight once this pass is done: in flight when the pass read it (`slotNeed`), or filed something — never for a run outside the cap
  * (`takesNoSlot`), whose filings are its own watching, not a run's work. `held` is the slot the cap held its roots at, on a pass that held
  * them.
@@ -235,7 +235,7 @@ export type Advanced = {
   tried: string[];
   looped: string[];
   status: Assessment['status'];
-  blocked: string[];
+  unreachable: string[];
   notes: string[];
   waiting: Wait[];
   inFlight: boolean;
@@ -279,13 +279,13 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *   reads it landed, and no try of it is filed over a merge still staged.
  * - holds this run's ending while another run's works in the repository's checkout (`checkoutHold`), read from the world on this pass,
  *   what it has filed included, so the order a pass takes the runs in decides nothing.
- * - lifts a person's hold on the pass that reads every run it names shipped (`keptParent`), and goes on on that pass. A lift sticks, as a
+ * - lifts a person's hold on the pass that reads every run it names landed (`keptParent`), and goes on on that pass. A lift sticks, as a
  *   start after `--after` does; only the hold this pass read is lifted (`removeHold`), so one put again since stays; and one that names
  *   no run is never lifted here (`holdAdvice`).
  * - closes each step's task held open that waits for a word nobody is to give (`holdsOpen`): an ungated step that signed off, a gate a
  *   person approved, a run called off. What waits on it is filed on this same pass, since the run reads it settled once it signed
  *   (`phaseOfView`); a close the engine refuses is a note, and asked again by the next pass.
- * - files a run's roots only while it has nothing filed, once every run it waits on (`--after`) has shipped (`runReady`), and while the
+ * - files a run's roots only while it has nothing filed, once every run it waits on (`--after`) has landed (`runReady`), and while the
  *   cap on runs in flight leaves it a slot (`runAdmitted`); a run that has started never reads its parents again.
  * - words the feed (`feedWords`) off what it read before it filed anything, and reads nothing again for it: a step it files reaches the
  *   feed on the next pass, as the engine's `pending`.
@@ -306,7 +306,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  * - hands the metrics the run's timeline on the first pass that reads it over with nothing in flight, and marks it (`runTimed`,
  *   `timedOnce`).
  * - keeps the tip of each result branch as git has it (`tipsSeen`), written only when a tip moved, so git can still be asked whether a
- *   branch a person deleted after its merge is on the base (`BranchReader.shipped`).
+ *   branch a person deleted after its merge is on the base (`BranchReader.landed`).
  * - writes the record (`rewriteRun`) only where the pass changed it and only while it is there, then consumes the asks it holds
  *   (`consumeAsks`), never before: an ask a pass died before consuming is consumed by the next. An ask `nemia pause --now` wrote that is
  *   void on this pass (`pauseAsksVoid`) is consumed with them, paused or not.
@@ -323,7 +323,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  *
  * A check is filed on the `check` harness, so it outlives the pass, has a deadline, and is stopped by a cancel; its command is the one
  * the run froze, never the workspace's it judges. It is filed once, with no attempt again: a suite run until it passes would let a
- * flaky suite decide what ships. An ending's check gets no `WF_BASE_REF`: it judges the merge staged in the checkout against HEAD, and
+ * flaky suite decide what lands. An ending's check gets no `WF_BASE_REF`: it judges the merge staged in the checkout against HEAD, and
  * installs first what that merge's lockfile asks for (`checkoutParts`). Nothing is ready on a check in the pass that files it.
  *
  * A run that waited on runs cuts its roots, and every worktree and diff after, from its base branch as it stands on the pass that files
@@ -340,7 +340,8 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
 export const advancePass = Effect.fn('advancePass')(
   function* (e: Engine, run: Run, slot?: RunSlot, pass?: PassRead) {
     yield* Effect.annotateCurrentSpan({ run: run.id });
-    const took = pinPass(run, new Date().toISOString(), pass?.revisions);
+    const revisions = pass?.revisions;
+    const took = pinPass(run, new Date().toISOString(), revisions);
     const { reads, askNotes } = yield* readPass(e, run);
     const { steps, phaseOf, signedOff, asked, verdictOf, sessionBlocked, spendOf, asks, roundAsks } = reads;
     const adopted = yield* adoptAll(e, run, reads);
@@ -364,8 +365,16 @@ export const advancePass = Effect.fn('advancePass')(
     const closer = closerOf(e, reads.views);
     const closeNotes = yield* closeHeldOpen(run, reads, closer);
     const admission = yield* admit(e, run, slot, reads, assessed, parents);
-    const feed = wordFeed(run, reads, assessed, admission, checkout, lift.lifted);
-    const { followed, pinned, ...due } = followedDue(run, took, assessed, admission, pass?.revisions);
+    const feed = wordFeed(
+      run,
+      reads,
+      assessed,
+      admission,
+      checkout,
+      lift.lifted,
+      behindNow(run, assessed.status === 'succeeded', revisions),
+    );
+    const { followed, pinned, ...due } = followedDue(run, took, assessed, admission, revisions);
 
     const notes: string[] = [...askNotes, ...handed.collected, ...lacking.notes, ...landing.notes, ...lift.notes, ...closeNotes];
     notes.unshift(...took.notes);
@@ -564,21 +573,21 @@ const handedOffBy = Effect.fnUntraced(function* (place: Place, workspace: string
 });
 
 /**
- * Lift a person's hold once every run it names has shipped, each read through `parents`, and only the hold this pass read (`removeHold`):
+ * Lift a person's hold once every run it names has landed, each read through `parents`, and only the hold this pass read (`removeHold`):
  * answers with its note, and with the moment the hold it lifted was put (`lifted`), which the feed writes as this pass's own deed and not
  * a person's (`holdOnce`) — by the time it is worded the hold is off the record, and nothing but this knows who took it off.
  */
 const liftHold = Effect.fnUntraced(function* (e: Engine, run: Run, parents: Parents) {
   const nothing: { notes: string[]; lifted?: string } = { notes: [] };
   if (!run.hold || run.cancelledAt || !run.hold.until.length) return nothing;
-  let shipped = true;
-  for (const id of run.hold.until) if (!(shipped = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).shipped)) break;
-  if (!shipped || !runStore.holds.lift(run.id, run.hold.at)) return nothing;
+  let landed = true;
+  for (const id of run.hold.until) if (!(landed = (yield* keptParent(id, parents.git, parents.read).pipe(over(e))).landed)) break;
+  if (!landed || !runStore.holds.lift(run.id, run.hold.at)) return nothing;
   const { until, at } = run.hold;
   delete run.hold;
   return {
     notes: [
-      `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} shipped`,
+      `the hold is lifted: ${until.length > 1 ? `${until.slice(0, -1).join(', ')} and ${until.at(-1)} have` : `${until[0]} has`} landed`,
     ],
     lifted: at,
   };
@@ -615,7 +624,7 @@ const closeHeldOpen = Effect.fnUntraced(function* (run: Run, r: PassReads, close
 
 /**
  * Whether the run files its roots on this pass: the runs it waits on as they stand (`parent`), whether it has started, what it needs of a
- * slot (`slotNeed`), the slot it is held at, the steps it files, and the runs whose shipping it waits on (`waitsOf`).
+ * slot (`slotNeed`), the slot it is held at, the steps it files, and the runs whose landing it waits on (`waitsOf`).
  */
 type Admission = {
   parent: (id: string) => ParentRun;
@@ -627,7 +636,7 @@ type Admission = {
 };
 
 /**
- * Admit the run's ready steps: while it has nothing filed, once every run it waits on, read through `parents`, has shipped and the cap
+ * Admit the run's ready steps: while it has nothing filed, once every run it waits on, read through `parents`, has landed and the cap
  * leaves it a slot.
  */
 const admit = Effect.fnUntraced(function* (
@@ -640,10 +649,10 @@ const admit = Effect.fnUntraced(function* (
 ) {
   const parent = yield* parentsRead(run, parents.git, parents.read).pipe(over(e));
   const starting = !hasStarted(run);
-  const need = slotNeed(run, r.phaseOf, assessed, (id) => parent(id).shipped, r.steps);
+  const need = slotNeed(run, r.phaseOf, assessed, (id) => parent(id).landed, r.steps);
   const admitted = runAdmitted(run, slot, r.steps);
   const held = need.wants && !admitted ? slot : undefined;
-  const ready = runReady(run, (id) => parent(id).shipped) && admitted ? assessed.ready : [];
+  const ready = runReady(run, (id) => parent(id).landed) && admitted ? assessed.ready : [];
   const admission: Admission = { parent, starting, need, held, ready, waiting: waitsOf(run, parent) };
   return admission;
 });
@@ -710,7 +719,7 @@ function answerOf(
   const { steps, views, phaseOf, asks } = r;
   const { held, waiting } = admission;
   const { filed, checked, tried, looped, notes, feed } = done;
-  const { status, blocked } = assessed;
+  const { status, unreachable } = assessed;
   const inFlight = !takesNoSlot(steps) && (admission.need.inFlight || [filed, checked, tried, looped].some((names) => names.length > 0));
   const ending = steps.find((s) => s.workspace === 'main');
   const facts: RestFacts = {
@@ -735,7 +744,7 @@ function answerOf(
     tried,
     looped,
     status,
-    blocked,
+    unreachable,
     notes,
     waiting,
     inFlight,

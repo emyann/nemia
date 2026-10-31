@@ -1,6 +1,6 @@
 /**
  * The board's skill entries (`SKILLS_LIST`, `SKILLS_READ`, `SKILLS_WRITE`), served on the api alone: a skill written from its form, read
- * back for its page and in the list, and a skill Nemia ships copied into your library; and a copy over a skill of that name refused in the
+ * back for its page and in the list, and a builtin skill copied into your library; and a copy over a skill of that name refused in the
  * package's words whole. `WF_ROOT` is set before the import, since the store reads it as it loads.
  */
 import { test } from 'node:test';
@@ -24,12 +24,12 @@ const runWith = runOver(runEngine, () => stand().layer);
 const e = () => engineOf(engine().layer);
 const library = path.join(ROOT, 'workflows', 'skills');
 
-/** A folder of skills, as Nemia ships one, holding the skill `name`. */
-function shippedWith(name: string): string {
-  const shipped = path.join(scratch('wf-skills-shipped-'), 'skills');
-  fs.mkdirSync(path.join(shipped, name), { recursive: true });
-  fs.writeFileSync(path.join(shipped, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Tidy a change before review.\n---\nTidy it.\n`);
-  return shipped;
+/** A folder of builtin skills, holding the skill `name`. */
+function builtinWith(name: string): string {
+  const builtin = path.join(scratch('wf-skills-builtin-'), 'skills');
+  fs.mkdirSync(path.join(builtin, name), { recursive: true });
+  fs.writeFileSync(path.join(builtin, name, 'SKILL.md'), `---\nname: ${name}\ndescription: Tidy a change before review.\n---\nTidy it.\n`);
+  return builtin;
 }
 
 test('a skill written from its form reads back for its page and in the list, at the version its write answered', async () => {
@@ -47,10 +47,10 @@ test('a skill written from its form reads back for its page and in the list, at 
 });
 
 test("REFUSED: a copy over a skill your library has, in the package's words whole; the copy before it is Nemia's skill whole", async () => {
-  const shipped = shippedWith('tidy');
-  const copied = await runWith(e(), SKILLS_WRITE.handler({ from: 'yours', library, copy: 'tidy', shipped }));
+  const builtin = builtinWith('tidy');
+  const copied = await runWith(e(), SKILLS_WRITE.handler({ from: 'yours', library, copy: 'tidy', builtin }));
   assert.deepEqual(copied, { dir: path.join(library, 'tidy'), name: 'tidy', written: ['SKILL.md'] });
-  await assert.rejects(runWith(e(), SKILLS_WRITE.handler({ from: 'yours', library, copy: 'tidy', shipped })), (err: Error) => {
+  await assert.rejects(runWith(e(), SKILLS_WRITE.handler({ from: 'yours', library, copy: 'tidy', builtin })), (err: Error) => {
     assert.equal(
       err.message,
       `skills/tidy is there already, in ${library}, and a copy would write over it. Give it as it is, or remove that folder first.`,

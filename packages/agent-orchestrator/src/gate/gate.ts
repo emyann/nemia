@@ -139,14 +139,14 @@ export function approvalRefusal(
     if (resultOnBase(standings)) {
       return (
         `${standings.map((s) => branchWord(run, s)).join(', ')}, so there is nothing left for ${name} to merge: approving would file it to merge what the base branch already has. ` +
-        `The run has shipped as git reads it — nemia decide ${run.id} says so, and a run started --after it goes on without ${name}. Nothing waits on you; if you want the record closed: nemia cancel ${run.id}.`
+        `The run has landed as git reads it — nemia decide ${run.id} says so, and a run started --after it goes on without ${name}. Nothing waits on you; if you want the record closed: nemia cancel ${run.id}.`
       );
     }
   }
   if (status === 'awaiting approval') return null;
   const then = `Its gate holds once it has signed off${step.check ? ' and passed its check' : ''}: approve it then (nemia ls ${run.id}).`;
   const why: Partial<Record<StepStatus, string>> = {
-    waiting: `${name} has not signed off yet: it has not been filed. ${then}`,
+    pending: `${name} has not signed off yet: it has not been filed. ${then}`,
     running: `${name} has not signed off yet: it is still running. ${then}`,
     checking: `${name} has signed off, and its check is still due or running: a gated step is verified first, then held. Approve it once its check has passed (nemia ls ${run.id}).`,
     blocked: `${name} has not signed off its work: it signed off blocked, so there is nothing to approve. Answer it: nemia retry ${run.id} ${name} --message "<answer>".`,
@@ -155,9 +155,31 @@ export function approvalRefusal(
     failed: `${name} has not signed off: its session failed first, so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
     stopped: `${name} has not signed off: its session was stopped first, so there is nothing to approve. Try it again: nemia retry ${run.id} ${name}.`,
     denied: `${name} signed off, and its harness denied its try a call, which \`denials: fail\` does not pass on: there is nothing to approve. See what it was denied: nemia decide ${run.id}.`,
-    exhausted: `${name} has handed nothing on: it asked for another round on the last one \`rounds:\` allows. Go round once more — nemia round ${run.id} ${name} — and approve what a later round hands on, or take the work as it stands and approve that: nemia accept ${run.id} ${name} --message "<why>".`,
+    exhausted: `${name} has handed nothing on: it asked for another round on the last one \`rounds:\` allows. Go round once more — nemia retry ${run.id} ${name} --round — and approve what a later round hands on, or take the work as it stands and approve that: nemia approve ${run.id} ${name} --message "<why>".`,
     verified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
     unverified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
   };
   return why[status] ?? `${name} is ${status}, not awaiting approval, so there is nothing to approve. See why: nemia decide ${run.id}.`;
+}
+
+/** The yes an approval gives: at a step's gate, or to a loop out of rounds. */
+export type ApproveForm = 'gate' | 'loop';
+
+/**
+ * The yes `nemia approve` gives on `name` of `run`, given whether that step waits at its gate now (`atGate`, read only where it decides):
+ * to a loop where no step is named — a step at its gate is always named — or where the step closes a loop and is gated at no step; at its
+ * gate where it is gated and closes no loop, and where it is not there, which the gate's own refusal names. A step both gated and closing
+ * a loop is approved at its gate while it waits there, and its loop ended otherwise. Pure.
+ */
+export function approveFormOf(
+  steps: readonly Workflow[],
+  run: Pick<Run, 'gates'>,
+  name: string | undefined,
+  atGate: () => boolean,
+): ApproveForm {
+  if (name === undefined) return 'loop';
+  const step = steps.find((s) => s.name === name);
+  if (step === undefined || !step.loop) return 'gate';
+  if (!hasGate(step, run)) return 'loop';
+  return atGate() ? 'gate' : 'loop';
 }

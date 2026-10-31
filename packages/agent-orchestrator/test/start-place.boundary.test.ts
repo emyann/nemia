@@ -19,7 +19,7 @@ const ROOT = scratch('wf-start-place-');
 process.env.WF_ROOT = ROOT;
 const { startRun } = await import('../src/start/start.verb.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
-const { gitPlaceLayer, shippedGitPlace } = await import('../src/place/shipped.store.ts');
+const { gitPlaceLayer, builtinGitPlace } = await import('../src/place/builtin.store.ts');
 const { runFile } = await import('../src/record/record.store.ts');
 const { runStore } = await import('../src/record/files.store.ts');
 const { Invalid } = await import('../src/refusal/refusal.ts');
@@ -120,7 +120,7 @@ test('REFUSED: a start whose place refuses its open is refused in the words of t
   const before = written();
   const asked: string[] = [];
   const refusing = PlaceService.layer(
-    placeOver(shippedGitPlace, {
+    placeOver(builtinGitPlace, {
       open: (request) => {
         asked.push(request.root);
         return { refused: 'this place takes no run today: ask again tomorrow' };

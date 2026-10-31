@@ -93,8 +93,8 @@ const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(
  * producer's deliberate product, like the file; its summary is its account, and stays with the person.
  *
  * One level up, a run that waited on runs is handed what they concluded, summaries included, on its roots
- * (`## From run <id>`): by then a person has read those summaries and shipped the work — see `fromRunSection`. A run handed others as
- * context (`--from`) is handed theirs the same way, after, each labelled shipped or not shipped, not judged — see `contextSection`.
+ * (`## From run <id>`): by then a person has read those summaries and landed the work — see `fromRunSection`. A run handed others as
+ * context (`--from`) is handed theirs the same way, after, each labelled landed or not landed, not judged — see `contextSection`.
  *
  * And a step after a gate is handed the approval that let it be filed, and the words given with it (`## Approved`): a person's decision
  * on the record, which the step after the gate and every step after that one read — see `approvedSection`.
@@ -129,7 +129,7 @@ const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(
  * @param deps What the run made of this worktree's `node_modules` when it cut it (`provisionDeps` in worktree.store.ts).
  * @param retry For a step tried again: the try, and what became of the one before it (`retrySection`).
  * @param round For a loop's target filed as its next round: the round, and what the looping step asked (`roundSection`).
- * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them ship, or was handed runs as context
+ * @param parents For a root of a run that waited on runs (`--after`), filed on the pass that saw them land, or was handed runs as context
  *   (`--from`): what each concluded (`handedSection`), the runs waited on first, gathered by file.verb.ts. Given to no other step: a run
  *   with neither, and every step after a root, is composed without it.
  * @param inputsDir The directory the run copied `nemia start --input` files into (`inputsDir` in record.store.ts): named, with

@@ -1,6 +1,6 @@
 /**
  * `nemia level`: the person's switch for Nemia, an entry of the command table. Bare, where she is: the store's level and each factory's,
- * her session's phase, how to reach it, and what a person allowed her at a prompt beyond what ships. Given `auto`, `semi-auto` or
+ * her session's phase, how to reach it, and what a person allowed her at a prompt beyond what is built in. Given `auto`, `semi-auto` or
  * `manual`, the store's level, or with `--factory` a factory's default, a raise of it for a stretch (`--for`) or the raise ended
  * (`--end`), written for the keeper (`keep.verb.ts`) to act on at its next beat. The api serves the write on the route the table
  * generates, and the read by a route of its own, which calls the same handler.
@@ -197,7 +197,7 @@ function levelLines(data: NemiaLevel): string[] {
   const trust = data.trust === null ? [] : [trustLine(data.trust)];
   const reach = data.reach.length ? ['reach her:', ...data.reach.map((line) => `  ${line}`)] : [];
   const allows = data.allows.length
-    ? ['allowed at a prompt, beyond what ships (her folder’s local settings):', ...data.allows.map((rule) => `  ${rule}`)]
+    ? ['allowed at a prompt, beyond what is built in (her folder’s local settings):', ...data.allows.map((rule) => `  ${rule}`)]
     : [];
   return [head, ...factories, ...session, ...trust, ...spent, ...stopped, ...reach, ...allows];
 }
@@ -240,7 +240,7 @@ export const LEVEL: Command<NemiaLevel> = {
     'rounds, a cap) is asked of you, and a write that cannot be undone or',
     'changes your settings or a factory; the rest is hers. auto is semi-auto,',
     "but an answer your confirmed list allows in the run's state is given",
-    'unasked (nemia auto <agent>), in a session of hers filed since auto came:',
+    'unasked (nemia policy <agent>), in a session of hers filed since auto came:',
     'one kept from before asks every answer until filed again (manual, then',
     'auto once it is off). A factory at manual is left alone, and her session',
     'stops once none is above manual',

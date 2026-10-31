@@ -43,9 +43,9 @@ const phases = (m: Record<string, TaskPhase>) => (id: string) => m[id] ?? 'unkno
 const signed = () => ({ outcome: 'done' as const, summary: 's', artifacts: [], needs: undefined });
 const asked = () => true;
 
-test('`assess` under the pause: nothing is due that would start new work, each named in `paused`, the rest judged as without it', async (t) => {
+test('`assess` under the pause: nothing is due that would start new work, each named in `waitingOnPause`, the rest judged as without it', async (t) => {
   await t.test(
-    'under the pause a step ready and a check due are not due, and are named in `paused`; the rest is judged as without it',
+    'under the pause a step ready and a check due are not due, and are named in `waitingOnPause`; the rest is judged as without it',
     () => {
       const steps = [step('implement', [], { check: 'npm test' }), step('review', ['implement']), step('docs')];
       const r = run({ implement: { taskId: 't1' }, review: { taskId: null }, docs: { taskId: null } });
@@ -56,7 +56,7 @@ test('`assess` under the pause: nothing is due that would start new work, each n
         ...free,
         ready: [],
         check: [],
-        paused: { steps: ['docs', 'implement'], checks: ['implement'] },
+        waitingOnPause: { steps: ['docs', 'implement'], checks: ['implement'] },
       });
     },
   );
@@ -67,7 +67,7 @@ test('`assess` under the pause: nothing is due that would start new work, each n
     const free = assess(steps, r, phases({ t1: 'failed' }), signed, asked, undefined, [ask]);
     assert.equal(free.retry.length, 1, 'without it, the try is due');
     const held = assess(steps, { ...r, pause: PAUSE }, phases({ t1: 'failed' }), signed, asked, undefined, [ask]);
-    assert.deepEqual(held, { ...free, retry: [], paused: { steps: ['implement'], checks: [] } });
+    assert.deepEqual(held, { ...free, retry: [], waitingOnPause: { steps: ['implement'], checks: [] } });
     assert.equal(held.status, 'running', 'a run asked to go on is not failed while it waits for the lift');
   });
   await t.test('under the pause a round its loop asks for is not due, and the looping step is still running', () => {
@@ -81,7 +81,7 @@ test('`assess` under the pause: nothing is due that would start new work, each n
       'without it, the round is due',
     );
     const held = assess(steps, { ...r, pause: PAUSE }, phases({ t1: 'succeeded', t2: 'succeeded' }), again, asked);
-    assert.deepEqual(held, { ...free, round: [], paused: { steps: ['review'], checks: [] } });
+    assert.deepEqual(held, { ...free, round: [], waitingOnPause: { steps: ['review'], checks: [] } });
     assert.equal(held.status, 'running', 'a run whose loop goes round again is not over while it waits for the lift');
   });
   await t.test('a run the pause holds nothing of is judged as without it', () => {

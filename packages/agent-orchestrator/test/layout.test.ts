@@ -3,8 +3,9 @@
  * barrel re-exports by name, and a feature folder is small, named for its feature, and read from outside through its face.
  *
  * A feature folder holds at most six source files, tests beside them not counted. Its face is its `index.ts`, or its one pure file when
- * it has no `index.ts`; a file outside the folder imports the folder's pure code through the face alone, and a store or a verb by its own
- * path. The CLI's folder, `src/cli/`, is controllers and has no face. The kinds themselves are held by `boundary.test.ts`.
+ * it has no `index.ts`; a file outside the folder imports the folder's pure code through the face alone, and a store, a verb or a model
+ * by its own path. A folder holding a context's glossary leaves its one `<folder>.model.ts` out of its six. The CLI's folder,
+ * `src/cli/`, is controllers and has no face. The kinds themselves are held by `boundary.test.ts`.
  *
  * Each rule is made to refuse a planted source first: a rule that reads nothing passes too.
  */
@@ -64,9 +65,12 @@ const folderOf = (file: string): string | undefined => {
   return dir.startsWith('src/') ? dir : undefined;
 };
 
-/** A folder's pure code: every file that is not a store, a verb or a test, outside the CLI's folder, which is controllers. */
+/**
+ * A folder's pure code: every file that is not a store, a verb, a model or a test, outside the CLI's folder, which is controllers. A
+ * model is imported by its own path, as a store or a verb is.
+ */
 const isFolderPure = (file: string): boolean =>
-  folderOf(file) !== undefined && !/\.(store|verb|test)\.ts$/.test(file) && !file.startsWith('src/cli/');
+  folderOf(file) !== undefined && !/\.(store|verb|model|test)\.ts$/.test(file) && !file.startsWith('src/cli/');
 
 /** The most source files a feature folder holds, its `index.ts` included and its tests not. */
 const FOLDER_MAX = 6;
@@ -134,10 +138,29 @@ const starExports = (file: string, text: string): string[] =>
     (m) => `${file} re-exports all of ${m[1]}: re-export by name`,
   );
 
-/** Each feature folder past `FOLDER_MAX` source files, and each folder or file whose name says no feature. */
-function folderBreaks(files: readonly string[]): string[] {
+/** The folders under `src/` that hold a context's glossary (`glossary.json`), by path from the package. */
+const glossaryFolders = (): Set<string> =>
+  new Set(
+    fs
+      .readdirSync(path.join(PKG, 'src'), { recursive: true, encoding: 'utf8' })
+      .map((f) => f.split(path.sep).join('/'))
+      .filter((f) => path.posix.basename(f) === 'glossary.json')
+      .map((f) => path.posix.dirname(`src/${f}`)),
+  );
+
+/** Whether `file` is the context's own model, `<folder>/<folder>.model.ts` in a folder holding a glossary: not counted in its six. */
+const isContextModel = (file: string, glossaries: ReadonlySet<string>): boolean => {
+  const folder = folderOf(file);
+  return folder !== undefined && glossaries.has(folder) && file === `${folder}/${path.posix.basename(folder)}.model.ts`;
+};
+
+/**
+ * Each feature folder past `FOLDER_MAX` source files, and each folder or file whose name says no feature. A folder holding a
+ * glossary leaves its one `<folder>.model.ts` out of the count: the context's model stands beside its words.
+ */
+function folderBreaks(files: readonly string[], glossaries: ReadonlySet<string> = glossaryFolders()): string[] {
   const sizes = new Map<string, number>();
-  for (const file of files.filter((f) => !isTest(f))) {
+  for (const file of files.filter((f) => !isTest(f) && !isContextModel(f, glossaries))) {
     const folder = folderOf(file);
     if (folder !== undefined) sizes.set(folder, (sizes.get(folder) ?? 0) + 1);
   }
@@ -339,6 +362,27 @@ test('REFUSED: a seventh source file in a folder, and a folder or a file named f
   assert.deepEqual(folderBreaks(['src/common-words/words.ts', 'src/feed/sharedness.ts']), [], 'a name that only starts so: let through');
 });
 
+test("REFUSED: a seventh file beside a context's model, and a second model counted; one <folder>.model.ts beside a glossary is not", () => {
+  const six = ['a.ts', 'b.ts', 'index.ts', 'a.store.ts', 'a.verb.ts', 'b.verb.ts'].map((f) => `src/inbox/${f}`);
+  const glossaries = new Set(['src/inbox']);
+  assert.deepEqual(folderBreaks([...six, 'src/inbox/inbox.model.ts'], glossaries), [], 'six and the context’s model: let through');
+  assert.deepEqual(folderBreaks([...six, 'src/inbox/inbox.model.ts', 'src/inbox/c.ts'], glossaries), [
+    'src/inbox/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
+  ]);
+  assert.deepEqual(folderBreaks([...six, 'src/inbox/inbox.model.ts', 'src/inbox/card.model.ts'], glossaries), [
+    'src/inbox/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them',
+  ]);
+  assert.deepEqual(
+    folderBreaks([...six, 'src/inbox/inbox.model.ts'], new Set()),
+    ['src/inbox/ holds 7 source files, past 6: a folder that needs more holds two features — split it along them'],
+    'a folder with no glossary counts its model',
+  );
+  assert.ok(
+    ['src/inbox', 'src/factory', 'src/place', 'src/agents', 'src/feed'].every((f) => glossaryFolders().has(f)),
+    'the folders holding a glossary are read off the disk',
+  );
+});
+
 test("REFUSED on the source: a seventh source file in the CLI's folder", () => {
   const files = sourceFiles();
   assert.deepEqual(
@@ -376,6 +420,8 @@ test("REFUSED: a file outside a folder importing the folder's pure code past its
       "import { composeBrief } from '../brief/brief.ts';",
     ].join('\n'),
     'src/run.ts': "import type { Retry } from './retry/retry.ts';",
+    'src/retry/retry.model.ts': "import { retryable } from './index.ts';",
+    'src/meter/meter.verb.ts': "import { Retry } from '../retry/retry.model.ts';",
     'bin/wf.ts': "import { main } from '../src/cli/main.ts';",
   };
   const files = Object.keys(planted);

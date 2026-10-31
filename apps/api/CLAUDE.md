@@ -21,10 +21,10 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
 - **A run's tasks are every step's, every check's, and every earlier try's and its check's** (`runTasks` in the package's `record/record.ts`); `list(taskIds)`
   looks at no harness when nothing among them is in flight.
 - **A run whose task's journal does not read is answered off its record** (`judgedOrNot` in the package's `summary/summary.verb.ts`), never judged, and not kept:
-  `list` names the task in `unreadable`, and a parent's task read to see if it shipped rejects with the `JournalError`.
+  `list` names the task in `unreadable`, and a parent's task read to see if it landed rejects with the `JournalError`.
 - **A transcript of an attempt in flight asks its harness**: read it on a run's detail, never on the list the Factory polls.
-- **Read a `Wait` by the key you mean**: a hold's `Wait` carries `shipped`, which an `--after` wait never does (`holdNeedsYou`, not
-  `neverShips`, in the package's `summary/judged.verb.ts`).
+- **Read a `Wait` by the key you mean**: a hold's `Wait` carries `landed`, which an `--after` wait never does (`holdNeedsYou`, not
+  `neverLands`, in the package's `summary/judged.verb.ts`).
 - **A remote agent's address is shown as origin and path, never whole** (`remoteOf` in `detail/detail.ts`): a query string can carry a key.
 - **A list a page turns into a sentence carries everything the sentence is about** (`folderFiles` in `steps/artifacts.ts` lists what it cannot
   serve by path), and leaves out only what the run itself put there (`GIVEN`).
@@ -49,7 +49,7 @@ from the orchestrator; what it holds today below its layer is in `docs/architect
   and the test place (`agent-orchestrator/testing`), given to the app with `appOver(engine, stand)` (`Engine.over` under it) and to a
   package program with `runOver` (`test/placed.ts`); a task is filed on the stand-in and moved with `settle`, never a journal written by
   hand. A test that needs the real engine or the git place — a Claude Code file the harness reads, a journal entry the stand-in has no
-  model of — is `<what>.boundary.test.ts`, and runs its programs with the `runWith` of `test/shipped-place.ts`; any other file that still
+  model of — is `<what>.boundary.test.ts`, and runs its programs with the `runWith` of `test/builtin-place.ts`; any other file that still
   does is on the orchestrator's `test/stand-ins.baseline.ts`, which only shrinks.
 - **In a test, what a statement means goes into the test's name, an assertion's message, or a JSDoc on a property.**
 - **What a route holds is taken with `acquireRelease` and let go as its scope closes** (`followFeed` under `feedEvents`, `serverAsk`): a release

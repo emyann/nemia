@@ -1,8 +1,8 @@
 /**
  * A run's record, as data: its shape (`Run`, a `RepositoryRun` or a `FolderRun`), the facts a person files beside it (`Hold`, `Approval`,
- * `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`, `Landed`), the try it
- * is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's judgement shares (`andList`,
- * `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through (`RunStore`).
+ * `Acceptance`, `Pruned`), the words a step's status is said in (`StepStatus`), a step's own record (`StepRecord`, `LandingRecord`), the
+ * try it is on (`tryOf`) and the task ids a run files (`runTasks`), and the small words every part of the run's judgement shares
+ * (`andList`, `fenced`, `oneLine`, `prunedWords`, …); and the store's interface a run is read and written through (`RunStore`).
  * Pure: `record.store.ts` reads and writes the record.
  */
 import type { Verdict } from '../check/check.ts';
@@ -98,7 +98,7 @@ type RunBase = {
   workflow?: Workflow[];
   /**
    * The runs this one waits on (`nemia start --after`), frozen at start like the workflow: none of its steps is filed until
-   * every one of them has shipped (`runReady`). Absent on a run that waits on none.
+   * every one of them has landed (`runReady`). Absent on a run that waits on none.
    */
   after?: string[];
   /**
@@ -150,7 +150,7 @@ type RunBase = {
    */
   approvals?: Approval[];
   /**
-   * What people accepted at a loop out of rounds (`nemia accept`), each in a file of its own beside the approvals —
+   * What people accepted at a loop out of rounds (`nemia approve`), each in a file of its own beside the approvals —
    * `runs/<id>.asks/accept-<step>-<try>` — composed on read like them, and never written into the record. An acceptance ends the loop on a
    * person's word where the looping step asked for another round it has no rounds left for: what waits on it is filed as if it had said
    * `again: false`, with its findings still on the record (`acceptanceOf`). One for an earlier try is spent. Absent when there are none.
@@ -189,7 +189,7 @@ type RunBase = {
   runTimed?: boolean;
   /**
    * Each result branch's commit, as this run's own tick last saw it once the run had finished (`tipsSeen`): what `nemia decide` offers to
-   * ship. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
+   * land. Kept so that once a person has deleted the branch after the merge, git can still be asked whether that commit is on the base
    * (the place's `standing`, `standingNow`) — by this run's own `nemia decide`, and by a run that waits on it. Absent until the run has
    * finished.
    */
@@ -210,11 +210,11 @@ type RunBase = {
    */
   pruned?: Pruned;
   /**
-   * That a person holds the run until other runs ship (`nemia hold <run> --until <run>…`), and since when — composed on read from a file of
+   * That a person holds the run until other runs land (`nemia hold <run> --until <run>…`), and since when — composed on read from a file of
    * its own, `runs/<id>.hold`, as `cancelledAt` is, and never written into the record. While it stands the run files nothing new, and no
    * verb offers or takes an approval, a try, a round or an acceptance (`heldRefusal`): what is in flight runs on, and what a step asks
-   * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has shipped, as `--after` reads
-   * shipped (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
+   * stays on its record, to be asked once the hold lifts. The tick lifts it once every run it names has landed, as `--after` reads
+   * landed (`removeHold`); `nemia hold <run> --off` lifts it by hand. Absent on a run nobody holds.
    */
   hold?: Hold;
   /**
@@ -246,7 +246,7 @@ type RunBase = {
 };
 
 /**
- * A person's hold on a run, as its file says it: when it was put, the runs it waits on to ship, in the order they were named, the
+ * A person's hold on a run, as its file says it: when it was put, the runs it waits on to land, in the order they were named, the
  * person's words for why (`why`, absent when none were given) and who put it (`by`, absent on a file older code wrote), each one line.
  */
 export type Hold = { at: string; until: string[]; why?: string; by?: string };
@@ -274,7 +274,7 @@ export type PrunedFiles = { at: string; bytes: number };
 export type Approval = { step: string; try: number; at: string; message?: string };
 
 /**
- * A person's word at a loop out of rounds, as its file says it (`nemia accept`): the looping step, the try it accepts, when, and what they
+ * A person's word at a loop out of rounds, as its file says it (`nemia approve`): the looping step, the try it accepts, when, and what they
  * said — the words every step after the loop is handed under `## Accepted`, beside the findings the loop left open (`acceptedSection`).
  *
  * `message` is required, where an approval's is not: an approval says yes to work a step handed on, and an acceptance says yes to work a
@@ -287,7 +287,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  * Where one step stands. ONE vocabulary, shared by `assess`, `listing` and `decision`, so the DAG,
  * `nemia ls` and `nemia decide` cannot disagree about a step.
  *
- *   waiting          not filed
+ *   pending          not filed
  *   running          filed, and not settled — or a task the engine cannot find
  *   blocked          it signed off `blocked`: it finished its session, not the work
  *   unsigned         it ended without the closeout it was asked for, or without a field its `output:` declares, or its closeout
@@ -303,8 +303,8 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  *   over budget      its tries have together cost its `budget:` or more, so nothing is left to spend, and the way on is another session
  *                    of it — its last try ended without letting what waits on it run (a check that did not finish is not that: it
  *                    runs again for nothing), or its loop asks for a round that would file it again — or, on a looping step that asked
- *                    for one, a step of its loop is. Never a step of a loop whose round is due: `nemia round --budget` raised the cap
- *                    (`roundSpans`)
+ *                    for one, a step of its loop is. Never a step of a loop whose round is due: `nemia retry --round --budget` raised the
+ *                    cap (`roundSpans`)
  *   budget exhausted its harness ended its session at the step's `budget:` (a `claude` job: the runtime's `limit: 'budget'` on the
  *                    attempt)
  *   denied           it signed off, and its harness denied its try a call, on a step that says `denials: fail`: nothing after it is
@@ -317,7 +317,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  * ended, never that the work is done.
  */
 export type StepStatus =
-  | 'waiting'
+  | 'pending'
   | 'running'
   | 'blocked'
   | 'unsigned'
@@ -428,7 +428,7 @@ export type StepRecord = {
    * What the run did with the merge an ending that lands on its check staged (`landingDue`): the commit it made, or why it made none. Once
    * for each try.
    */
-  landed?: Landed;
+  landed?: LandingRecord;
   /**
    * What the run read of the files the closeout of a task of the step named (`FilesRead`): written by the tick on the pass that first
    * read the task signed (`filesDue`), whether or not a file lacked, so the files of a task are read once. The step whose current task
@@ -437,7 +437,7 @@ export type StepRecord = {
    */
   filesRead?: FilesRead;
   /**
-   * The agent and skill revisions the step's current try was filed on (`stepPins`): what a step that has shipped says it ran on, which the
+   * The agent and skill revisions the step's current try was filed on (`stepPins`): what a step that has landed says it ran on, which the
    * board reads beside the run's own pins once a refresh has moved those past it. Written at each filing, so a try filed again says the
    * revisions that try took. Absent on a step nothing has filed, and on a record written before revisions.
    */
@@ -474,9 +474,9 @@ export const lackedOf = (record: StepRecord | undefined): LackedFile[] =>
  * What the run did with an ending's staged merge (`landingDue`): committed it onto the base branch, or not — aborted, or found nothing to
  * commit — and why; or, for an ending that stopped on its own word with nothing staged, nothing at all (`untouched`), written down so that
  * what a person stages in the checkout after it is theirs. An abort of a merge its check refused names the base it was staged on
- * (`refusedOn`), which `nemia merge` reads (`mergeAsk`).
+ * (`refusedOn`), which `nemia refresh --base` reads (`mergeAsk`).
  */
-export type Landed = { commit: string } | { aborted: string; refusedOn?: string } | { untouched: string };
+export type LandingRecord = { commit: string } | { aborted: string; refusedOn?: string } | { untouched: string };
 
 /**
  * Whether a check that did not pass REFUSED the work, rather than not finishing.
@@ -580,24 +580,31 @@ export function unloadedWords(runId: string, why: string, by: string): string {
 export type AsksRead = { asks: RetryAsk[]; rounds: RoundAsk[]; notes: string[] };
 
 /**
- * The kinds of ask a person writes: a try (`nemia retry`), a round (`nemia round`), an approval (`nemia approve`), an acceptance (`nemia
- * accept`), a merge of the base (`nemia merge`).
+ * The verb a person's ask answers with: a try or a round (`nemia retry`, `--round` for a round), a yes at a gate or to a loop out of
+ * rounds (`nemia approve`), the base brought into a loop's work (`nemia refresh --base`).
  */
-export type AskKind = 'retry' | 'round' | 'approve' | 'accept' | 'merge';
+export type AskKind = 'retry' | 'approve' | 'refresh';
 
 /**
- * Which ask: its kind, its step, and its number — the try it names, or the round a round ask asks for; for a merge, the loop's target and
- * its try that merges.
+ * Which ask of its verb, as its file is named: a try (`retry-…`), a round (`round-…`), an approval at a gate (`approve-…`), a loop out of
+ * rounds ended as it stands (`accept-…`), a merge of the base (`merge-…`). The files keep the names they had, so no ask on disk is
+ * orphaned.
  */
-export type AskKey = { kind: AskKind; step: string; n: number };
+export type AskOf = 'try' | 'round' | 'gate' | 'loop' | 'base';
 
-/** A person's ask, of its kind, as its verb writes it. */
-export type PersonAsk =
-  | { kind: 'retry'; ask: RetryAsk }
-  | { kind: 'round'; ask: RoundAsk }
-  | { kind: 'approve'; ask: Approval }
-  | { kind: 'accept'; ask: Acceptance }
-  | { kind: 'merge'; ask: RoundAsk & { merge: MergeOf } };
+/**
+ * Which ask: which of its verb (`of`), its step, and its number — the try it names, or the round a round ask asks for; for a merge, the
+ * loop's target and its try that merges.
+ */
+export type AskKey = { of: AskOf; step: string; n: number };
+
+/** A person's request beside a run, of its verb and which, as its verb writes it. */
+export type PersonRequest =
+  | { kind: 'retry'; of: 'try'; ask: RetryAsk }
+  | { kind: 'retry'; of: 'round'; ask: RoundAsk }
+  | { kind: 'approve'; of: 'gate'; ask: Approval }
+  | { kind: 'approve'; of: 'loop'; ask: Acceptance }
+  | { kind: 'refresh'; of: 'base'; ask: RoundAsk & { merge: MergeOf } };
 
 /**
  * What a merge ask's file holds (`mergeAskIn`): the looping step, the round it is on, the base branch, its commit, when it was asked, and
@@ -702,7 +709,7 @@ export type RunStore = {
      * Write a person's ask, whole and exclusively, keyed by its kind, its step and its number: never over a file at its name, which is
      * answered as `written: false`, with why that file is no ask of its kind (`AskWritten`).
      */
-    readonly write: (id: string, ask: PersonAsk) => AskWritten;
+    readonly write: (id: string, ask: PersonRequest) => AskWritten;
     /** Where a person finds the ask `key` of the run: the path a message names for them to read or remove. */
     readonly where: (id: string, key: AskKey) => string;
   };
@@ -710,7 +717,7 @@ export type RunStore = {
     /** Lift the hold put at `at`, and only while it still stands: false when it is gone or a hold was put since. */
     readonly lift: (id: string, at: string) => boolean;
     /**
-     * Hold the run until the runs `until` ship, with a person's `why` and who they are (`by`) when given: the hold written, or null when
+     * Hold the run until the runs `until` land, with a person's `why` and who they are (`by`) when given: the hold written, or null when
      * one already stands, which is kept.
      */
     readonly put: (id: string, until: readonly string[], said: Pick<Hold, 'why' | 'by'>) => Hold | null;

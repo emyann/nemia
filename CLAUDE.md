@@ -76,6 +76,9 @@ holds what every change needs.
   (`apps/docs/src/glossary.ts`). Read the table of the context you change before you name something there. A renamed word keeps its
   old spelling as `retired` on its row, and `tools/guards/test/glossary.test.ts` counts that spelling in each file under the table's
   paths, a count that only shrinks (`tools/guards/test/glossary.baseline.ts`).
+- **A field that says a state or a kind at a door is a closed union of its words, never `string`**: a `phase`, `status`, `state`,
+  `kind`, `type` or `reason` an entry of a package's `exports` or a type of the api reaches. A sentence a person reads is a `message`.
+  Held by `tools/guards/test/closed-state.test.ts`, through the TypeScript checker, whose baseline only shrinks.
 - **Level-triggered.** A tick reads the world, decides, acts, and carries nothing between passes. A guard that only fires on a
   transition is wrong after a restart.
 - **Prose is not a constraint.** If the packages need an agent to do something, the machinery refuses the alternative.
@@ -180,9 +183,9 @@ What the `create-an-agent` skill, being generic, does not say here:
   Grace (lead software engineer, who builds a wide card through subagents), Agora (code reviewer), Otto (release engineer), Argus
   (janitor). Grace fills implement in `build` and `quick`; Ada's file stays, for a factory that hires her. And four workflows:
   `intake` (an idea to an intent), `build` (an intent to main, started `--after` the intake run), `quick` (a card that settles its change, whatever its size, to main: implement, then a review
-  whose pass files an ungated land, as `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia ships:
-  the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as shipped
-  (`SHIPPED_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
+  whose pass files an ungated land, as `workflows/quick/README.md` says) and `janitor` (on demand: the stats to inbox cards, none started). What Nemia has built in:
+  the git place `place/git` (`packages/agent-orchestrator/place/git`: its skill, and its code, given as `gitPlaceLayer`), the skills the api lists as builtin
+  (`BUILTIN_SKILLS`, the checkout's `workflows/skills/`, none today), and Nemia's own agent once the Nemia slices build it. A person's
   factories get no workflow or agent from the package.
 - `apps/docs/` — the documentation site (Astro Starlight) for a person who will use Nemia: landed material only, the state diagrams read
   from their markers at build; it imports no package (`apps/docs/CLAUDE.md`).
@@ -195,6 +198,10 @@ What the `create-an-agent` skill, being generic, does not say here:
   (`compare.ts`), a session's measure; held by `tools/guards/test/coverage.test.ts` and its boundary.
 - `tools/journal-bytes/` — what a copy of a runtime store's journals cost, by event kind, the share that is a copy, and the heap a
   full read holds, before and after a refile through bodies (`node --expose-gc tools/journal-bytes/report.ts <root> [--refile <dir>]`).
+- `tools/store-measure/` — what the store's reads cost, cold and warm: a tick pass, the run list, the stats, a run's page and the feed from
+  a cursor, on a copy of both stores in a temp folder with the run count beside them, never the live store
+  (`node --expose-gc tools/store-measure/report.ts [--repeat N] [--json <file>] [--compare <baseline.json>]`); the baseline before the
+  Run door is `tools/store-measure/baselines/s1.json`. A session's measure, held by `tools/guards/test/store-measure.test.ts`.
 - `tools/observe/` — the side Grafana for building Nemia, never shipped: `docker compose -f tools/observe/compose.yaml up -d`, the daemon
   started with `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318` (the live daemon alone: a probe goes to a held throwaway,
   `node tools/observe/render/render.ts --hold`, at the collector address it prints), and its six dashboards held to the code's names by

@@ -29,7 +29,7 @@ const code = (text: string) => <code className="font-mono text-body-small break-
 
 /**
  * One skill: the agents that give it, each linked; what it costs a turn and the switch that loads it every turn; and its form — to edit,
- * when it is yours; to read, when it is the repository's or one Nemia ships, which the board does not write. Save and the switch each write
+ * when it is yours; to read, when it is the repository's or a builtin one, which the board does not write. Save and the switch each write
  * it back against the version it was read at, and each changes every agent that gives it.
  *
  * The form is drawn from the skill as read, but for a file that moved under unsaved words (`drawnSkill`), and drawn anew under each new
@@ -203,8 +203,8 @@ function Elsewhere({ detail }: { detail: SkillDetail }) {
           {code(detail.copyHint)}.
         </>
       )}
-      {from === 'shipped' && (
-        <>Shipped with Nemia, and read here: an agent of yours is given a copy in your library, made from its page's skills.</>
+      {from === 'builtin' && (
+        <>Built into Nemia, and read here: an agent of yours is given a copy in your library, made from its page's skills.</>
       )}
     </p>
   );

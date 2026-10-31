@@ -20,7 +20,7 @@ not an account of it.
 ## A merge of main, round 1 of 3
 
 This step closes a loop (`loop: implement`), and this is no new round: implement merged `main` into the change, on a person's
-word (`nemia merge`), at `abc123`. Read the merge, not the change again:
+word (`nemia refresh --base`), at `abc123`. Read the merge, not the change again:
 
 - What the merge resolved: `git show --remerge-diff` of the merge commit (`git log --merges -1`), and what `main` changed in the
   files the change touches.
@@ -67,7 +67,7 @@ asks you for it in the required shape when you finish — in Claude Code, by cal
 - `outcome`: `"done"` if you finished the work; `"blocked"` if you cannot honestly finish. A step
   that reports success it did not have is worse than one that stops and says why.
 - `apiVersion`: `"nemia/v1"`.
-- `summary`: one line of at most 120 characters on what you did, for the person who decides what ships. A longer
+- `summary`: one line of at most 120 characters on what you did, for the person who decides what lands. A longer
   one is cut, and the whole of it leads the body.
 - `body`: markdown, everything the summary has no room for; `null` when there is nothing more.
 - `artifacts`: files you wrote for someone else to read, each `{"path"}`, such as `RESPONSE.md`. Leave them in this

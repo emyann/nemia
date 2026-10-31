@@ -12,7 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { gitPlace } from '../place/git/place.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
-import { shippedOver } from '../src/branches/branches.ts';
+import { landedOver } from '../src/branches/branches.ts';
 import { knownOf, toldOf } from '../src/standing/standing.verb.ts';
 import { scratch } from './scratch.ts';
 import { columnsListed, plantedGit } from './planted-git.ts';
@@ -179,7 +179,7 @@ function within(dir: string, commit: string, base: string): 'yes' | 'no' | 'unkn
 }
 
 /**
- * Whether `branch`, cut at `baseRef`, is shipped onto `main`, asked of git one question at a time: on `main` by its name, or gone and its
+ * Whether `branch`, cut at `baseRef`, is landed on `main`, asked of git one question at a time: on `main` by its name, or gone and its
  * recorded `tip` on `main`; `true` with work past `baseRef`, `unchanged` with none.
  */
 function shippedByGit(dir: string, { branch, tip, baseRef }: { branch: string; tip?: string; baseRef: string }) {
@@ -190,7 +190,7 @@ function shippedByGit(dir: string, { branch, tip, baseRef }: { branch: string; t
   return within(dir, tip, 'main') === 'yes' ? landed(tip) : false;
 }
 
-test('a branch is shipped by its standing exactly when git asked one question at a time says so, a gone one never merged included', () => {
+test('a branch is landed by its standing exactly when git asked one question at a time says so, a gone one never merged included', () => {
   const repo = repository();
   git(repo.dir, 'switch', '-q', '-c', 'wf/r/u', repo.cut);
   const unmerged = commit(repo.dir, 'u.txt', 'u\n');
@@ -198,7 +198,7 @@ test('a branch is shipped by its standing exactly when git asked one question at
   git(repo.dir, 'branch', '-q', '-D', 'wf/r/u');
   const branches = [...asked(repo), { branch: 'wf/r/u', tip: unmerged, baseRef: repo.cut }];
   const answer = answerOf(standing({ repo: repo.dir, base: 'main', branches }));
-  const said = branches.map((_, i) => shippedOver(answer.branches[i]));
+  const said = branches.map((_, i) => landedOver(answer.branches[i]));
   assert.deepEqual(said, [true, false, 'unchanged', true, false, false, false]);
   assert.deepEqual(
     said,
@@ -389,7 +389,7 @@ test('a branch read off its base and landed since, its tip unchanged, is asked o
   const planted = plantedGit(ENV);
   const again = answerOf(standing({ repo: repo.dir, base: 'main', branches: told }, planted.env));
   assert.deepEqual(again, answerOf(standing({ repo: repo.dir, base: 'main', branches: asked(repo) })));
-  assert.deepEqual([again.branches[1].onBase, again.branches[1].pastBase, shippedOver(again.branches[1])], ['yes', true, true]);
+  assert.deepEqual([again.branches[1].onBase, again.branches[1].pastBase, landedOver(again.branches[1])], ['yes', true, true]);
   assert.deepEqual(
     planted.said().filter((line) => line === `merge-base --is-ancestor ${tip} ${repo.cut}`),
     [`merge-base --is-ancestor ${tip} ${repo.cut}`],

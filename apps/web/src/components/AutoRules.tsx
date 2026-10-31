@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { autoQuery, confirmRule, dropRule, type AutoList, type AutoRule } from '../lib/api';
+import { policyQuery, confirmRule, dropRule, type PolicyList, type AutoRule } from '../lib/api';
 import { clockWord } from '../lib/quota';
 import { useNow } from '../lib/useNow';
 import { CustomInstructions, SESSION } from './CustomInstructions';
@@ -10,7 +10,7 @@ import { CustomInstructions, SESSION } from './CustomInstructions';
 /** A write of a rule: `confirm` puts it in force as its `words` read, `drop` takes it out. */
 type RuleAsk = { verb: 'confirm'; id: string; words: string } | { verb: 'drop'; id: string };
 
-/** The id of the rule that ships, which a person puts back after a drop. */
+/** The id of the builtin rule, which a person puts back after a drop. */
 const DEFAULT_ID = 'default';
 
 /**
@@ -21,7 +21,7 @@ const DEFAULT_ID = 'default';
  */
 export function AutoRules({ agent }: { agent: string }) {
   const queryClient = useQueryClient();
-  const query = autoQuery(agent);
+  const query = policyQuery(agent);
   const { data, error } = useQuery(query);
   const write = useMutation({
     mutationFn: (rule: RuleAsk) => (rule.verb === 'confirm' ? confirmRule(agent, rule.id, rule.words) : dropRule(agent, rule.id)),
@@ -60,7 +60,7 @@ export function AutoRules({ agent }: { agent: string }) {
 }
 
 /** The parts of an agent's rules, read. */
-function AutoParts({ list, pending, onAsk }: { list: AutoList; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
+function AutoParts({ list, pending, onAsk }: { list: PolicyList; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
   return (
     <>
       <InForce list={list} pending={pending} onAsk={onAsk} />
@@ -92,7 +92,7 @@ function Rule({ rule, children }: { rule: AutoRule; children?: ReactNode }) {
 }
 
 /** The rules in force, the default marked; a Drop each, and the default offered back once dropped. */
-function InForce({ list, pending, onAsk }: { list: AutoList; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
+function InForce({ list, pending, onAsk }: { list: PolicyList; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
   return (
     <Sub heading={list.isDefault ? 'In force: the default, since you confirmed none' : 'In force'} data-auto-in-force>
       {list.rules.length ? (
@@ -122,7 +122,7 @@ function InForce({ list, pending, onAsk }: { list: AutoList; pending: boolean; o
             size="sm"
             data-auto-default-back
             isDisabled={pending}
-            onPress={() => onAsk({ verb: 'confirm', id: DEFAULT_ID, words: list.shipped.words })}
+            onPress={() => onAsk({ verb: 'confirm', id: DEFAULT_ID, words: list.builtin.words })}
           >
             Put the default back
           </Button>
@@ -133,7 +133,7 @@ function InForce({ list, pending, onAsk }: { list: AutoList; pending: boolean; o
 }
 
 /** What she proposed, a Confirm each but on one in force, whether your instruction changed since, and the words kept as guidance. */
-function Proposed({ list, pending, onAsk }: { list: AutoList; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
+function Proposed({ list, pending, onAsk }: { list: PolicyList; pending: boolean; onAsk: (rule: RuleAsk) => void }) {
   const now = useNow(60_000);
   const proposed = list.proposed;
   if (proposed === null)

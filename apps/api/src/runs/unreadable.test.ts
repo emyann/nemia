@@ -2,7 +2,7 @@
  * A task whose journal holds an entry no runtime wrote costs the runs that read it, never the list: `GET /api/runs` answers every other
  * run as it would, and the run whose task does not read off its record, saying why in the runtime's words (`unjudged` in runs.ts) — as the
  * tick leaves such a run where it is and counts it in flight. So does a run waiting on it, whose parent's task is read to see if it
- * shipped. A run's own page refuses in those words, and the cap on runs in flight counts both, unjudged, as the tick counts them. A pass
+ * landed. A run's own page refuses in those words, and the cap on runs in flight counts both, unjudged, as the tick counts them. A pass
  * has read where the runs' branches stand (`passStanding`), which the list reads off `standing.json`.
  *
  * At shipped defaults: the api's own engine over a store this file seeds, the harness's fake `claude` (test/harness.ts) first on PATH.
@@ -17,7 +17,7 @@ import path from 'node:path';
 import type { Ceilings } from '../factory/ceilings.ts';
 import { app } from '../app.ts';
 import { engine, passStanding, runStore, type RunSummary } from 'agent-orchestrator';
-import { runWith } from '../../test/shipped-place.ts';
+import { runWith } from '../../test/builtin-place.ts';
 
 const git = (repo: string, ...args: string[]) =>
   execFileSync(
@@ -38,8 +38,8 @@ git(repo, 'add', '-A');
 git(repo, 'commit', '-q', '-m', 'base');
 const base = git(repo, 'rev-parse', 'HEAD').trim();
 
-/** A branch off main with one commit of work on it, merged into main: the run it is the result of has shipped. */
-function shipped(branch: string) {
+/** A branch off main with one commit of work on it, merged into main: the run it is the result of has landed. */
+function landed(branch: string) {
   git(repo, 'checkout', '-q', '-b', branch);
   write(path.join(repo, `${branch.replaceAll('/', '-')}.txt`), branch);
   git(repo, 'add', '-A');
@@ -95,11 +95,11 @@ function writeRun(id: string, steps: Record<string, object>, more: object = {}) 
   );
 }
 
-shipped('wf/r-good/implement');
+landed('wf/r-good/implement');
 signedOff('r-good-implement');
 writeRun('r-good', { implement: { taskId: 'r-good-implement', branch: 'wf/r-good/implement' } }, { factory: 'pipao' });
 
-shipped('wf/r-bad/implement');
+landed('wf/r-bad/implement');
 signedOff('r-bad-implement');
 fs.appendFileSync(journal('r-bad-implement'), jsonl([MISWRITTEN]));
 writeRun('r-bad', { implement: { taskId: 'r-bad-implement', branch: 'wf/r-bad/implement' } }, { factory: 'pipao' });

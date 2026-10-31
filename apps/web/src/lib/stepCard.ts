@@ -212,7 +212,7 @@ function agentOf(name: string | null, agents: StepCardInput['agents']): StepCard
 }
 
 /** The codes of a step the run's row does not list: one the engine has no record of, to come. */
-const UNLISTED = { phase: 'pending', reason: 'Unknown' } as const;
+const UNLISTED = { phase: 'pending', reason: 'Unknown', on: null, via: null } as const;
 
 /**
  * The card of the step `step` of `run`: what the run's row knows at once (its state, its agent), and once the run's own answer is read,
@@ -220,14 +220,15 @@ const UNLISTED = { phase: 'pending', reason: 'Unknown' } as const;
  */
 export function stepCardOf({ run, step, detail, agents, now }: StepCardInput): StepCardFacts {
   const row = run.steps.find((s) => s.name === step);
-  const { phase, reason } = row ?? UNLISTED;
-  const state = stepState(phase, reason, run.cancelledAt !== null, run.holding != null);
+  const codes = row ?? UNLISTED;
+  const { phase } = codes;
+  const state = stepState(codes, run.cancelledAt !== null, run.holding != null);
   const own = detail?.steps.find((s) => s.name === step);
   const kind = kindOf(phase, state, Boolean(own && own.tries.length > 0));
   return {
     kind,
     hue: hueOf(state),
-    tag: { word: stateWordsOf(state, reason).rail, ...TAGS[kind] },
+    tag: { word: stateWordsOf(state, codes.on).rail, ...TAGS[kind] },
     agent: agentOf(row?.agent ?? null, agents),
     step,
     place: own && detail ? placeOf(own, detail.steps, kind) : null,

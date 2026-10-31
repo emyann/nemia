@@ -1,5 +1,5 @@
 /**
- * A factory's server signed in to and out of, from the board: the server read off the factory's record, the shipped secret picked for
+ * A factory's server signed in to and out of, from the board: the server read off the factory's record, the builtin secret picked for
  * its client (`shippedSecretOf`), and the engine asked to hold the sign-in (`mcpSignIn`), read it (`mcpSignInState`) or clear it
  * (`mcpSignOut`). The secret is handed to the engine and to nothing else: no answer here carries it.
  *
@@ -32,8 +32,8 @@ const kindOf = (e: { readonly message: string; readonly held: boolean }) =>
   e.held ? new Conflict({ message: e.message }) : new Invalid({ message: e.message });
 
 /**
- * A sign-in to `server` of `factory` started: the address the person opens, and when it stops waiting. A server of a client Nemia
- * ships is handed that client's secret, which the engine stores in the harness's own store first; any other is handed none.
+ * A sign-in to `server` of `factory` started: the address the person opens, and when it stops waiting. A server of a client built
+ * into Nemia is handed that client's secret, which the engine stores in the harness's own store first; any other is handed none.
  */
 export const serverSignIn = Effect.fn('serverSignIn')(function* (factory: string, server: string, home: string) {
   const found = yield* recorded(factory, server, home, 'signed in to');

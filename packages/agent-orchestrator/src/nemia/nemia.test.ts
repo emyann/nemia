@@ -1,7 +1,7 @@
 /**
  * Nemia's machine, pure: the keeper's decision table (`nemiaDue`, `nemiaState`) — what it owes at each state, a task stopped from outside
- * never filed again, a tell, a delivery and an ask carried only while she is kept and up — her custom words judged changed and the words
- * that tell her, a word that is no level, her task's id, her diagram drawing each edge and each verb, her selectors waking her alone on
+ * never filed again, a sayCustom, a sayOutbox and an ask carried only while she is kept and up — her custom words judged changed and the
+ * words said to her, a word that is no level, her task's id, her diagram drawing each edge and each verb, her selectors waking her alone on
  * a denied call, and her settings turning the daemon's start off. The keeper acting on the table, on the engine's stand-in, is told in
  * `test/nemia-keeper.test.ts`.
  */
@@ -47,7 +47,7 @@ test('`nemiaDue` and `nemiaState`: what the keeper owes, and where she stands, a
   });
   await t.test('a changed custom instruction is told while she is kept, and in no other state', () => {
     const STALE: Keeping = { ...SEMI, stale: true };
-    assert.deepEqual(nemiaDue(STALE, OPEN, HERS), ['tell']);
+    assert.deepEqual(nemiaDue(STALE, OPEN, HERS), ['sayCustom']);
     assert.deepEqual(nemiaDue({ ...SEMI, stale: false }, OPEN, HERS), [], 'her filed words are the ones that compose now');
     assert.deepEqual(nemiaDue(STALE, OPEN, undefined), ['subscribe'], 'filed: subscribed first, told on a later beat');
     assert.deepEqual(nemiaDue(STALE, OPEN, OLDER), ['drop', 'subscribe']);
@@ -57,8 +57,8 @@ test('`nemiaDue` and `nemiaState`: what the keeper owes, and where she stands, a
   });
   await t.test("REFUSED: the person's chat words are delivered only while she is kept and her session is live", () => {
     const OWED = { ...SEMI, owed: true, up: true };
-    assert.deepEqual(nemiaDue(OWED, OPEN, HERS), ['deliver']);
-    assert.deepEqual(nemiaDue({ ...OWED, stale: true }, OPEN, HERS), ['tell', 'deliver'], 'told first, then delivered');
+    assert.deepEqual(nemiaDue(OWED, OPEN, HERS), ['sayOutbox']);
+    assert.deepEqual(nemiaDue({ ...OWED, stale: true }, OPEN, HERS), ['sayCustom', 'sayOutbox'], 'told first, then delivered');
     assert.deepEqual(nemiaDue({ ...OWED, up: false }, OPEN, HERS), [], 'kept but down: kept for later');
     assert.deepEqual(nemiaDue({ ...OWED, owed: false }, OPEN, HERS), [], 'nothing owed');
     assert.deepEqual(nemiaDue(OWED, OPEN, undefined), ['subscribe'], 'filed: not yet kept');
@@ -170,7 +170,6 @@ test('her diagram draws every edge and each verb from every state it is taken fr
     graph.verbs.map((v) => v.verb),
     ['level (a factory above manual)', 'level (none above manual)', 'agents custom nemia (set or clear)'],
   );
-  assert.ok(drawn.includes('  kept --> kept: CUSTOM_CHANGED / tell'));
   assert.ok(drawn.includes('  untrusted --> due: FOLDER_TRUSTED / nothing'));
   assert.ok(
     graph.verbs.every((v) => v.guard === 'always'),

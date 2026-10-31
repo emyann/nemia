@@ -10,9 +10,9 @@
  * the feed was signed, and a one-shot offered by its word — and `feed.test.ts` and `test/assessed.ts` hold the codes the listing sets
  * to what it reads off the same word.
  *
- * **The codes are the owner's.** The 41 entries below — 11 of a run, 27 of a step, 1 of a daemon, 2 of the store, 36 distinct codes,
- * five of them shared between a run and a step — were named at their slices' design gates, and a rename breaks every selector and every
- * stored subscription that quotes one.
+ * **The codes are the owner's.** The 43 entries below — 17 of a run, 23 of a step, 1 of a daemon, 2 of the store, 32 distinct codes,
+ * eleven of them shared between a run and a step — were named at their slices' design gates. A code renamed is still read under its
+ * former name (`FORMER_REASONS`, below), on a line on disk and in a stored selector, so a rename breaks none.
  *
  * **Recognition is ordered** (`reasonOf`): the prefix `denied: ` of a one-shot before the bare `denied` of a check a person refused; the
  * suffix `· BLOCKED` before the word it is suffixed to, since a step that signed off blocked waits on a person whatever its session came
@@ -25,6 +25,7 @@
  */
 import { SLOT_WAIT } from '../cap/cap.ts';
 import { PAUSE_WAIT } from '../list/list.ts';
+import { PERSON_WAITS, type AnswerVia, type WaitOn } from '../phase/phase.ts';
 
 /**
  * The kinds of thing the feed writes a line about: a run, one of its steps, a daemon that took the store, or the store itself — its
@@ -48,11 +49,11 @@ export type LineSource = (typeof LINE_SOURCES)[number];
 export type Said = { word: string; note?: string };
 
 /**
- * What the feed knows of one reason: the kinds it is written of, how serious it is, whether it waits on a person, who it is the deed of
+ * What the feed knows of one reason: the kinds it is written of, how serious it is, who it is the deed of
  * (`source`, the tick's where it names none) and whether it is a one-shot — a fact written exactly once per occurrence rather than a word
  * that stands until it changes, counted off the feed's own lines and never a thing's last word (`isOnce`, `foldFeed`).
  */
-type Entry = { kinds: readonly InvolvedKind[]; type: LineType; waits?: true; source?: LineSource; once?: true };
+type Entry = { kinds: readonly InvolvedKind[]; type: LineType; source?: LineSource; once?: true };
 
 /** The word a run's line says once its record is gone from the store (`nemia rm`): the fold forgets the run on reading it. */
 export const REMOVED = 'removed';
@@ -64,14 +65,13 @@ export const DAEMON_STARTED = 'daemon started';
 export const DENIED = 'denied: ';
 
 /**
- * The word each of a person's acts, each of the two runtime faults and a step's closeout read says, the one place it is spelled: the owner
- * named the first six at their slice's design gate and `closed out` on its card, and `reason.test.ts` holds each literally beside the rule
- * below that reads it back.
+ * The word each of a person's acts, each of the two runtime faults, a step's closeout read and a pinned run behind its files say, the one
+ * place it is spelled: the owner named the first six at their slice's design gate, `closed out` on its card and `revisions behind` at
+ * its design's, and `reason.test.ts` holds each literally beside the rule below that reads it back.
  *
- * **None of them may carry a word a subscriber was woken by.** The prose match is retired, but `reason.test.ts` still holds `waitsOf`
- * identical to it over every word the package writes (`FORMER_DEFAULT_WAKE`, and the selectors `selectorsOfWake` converts it to): that
- * match found its words anywhere inside a line's word, so `failed`, `blocked` or `needs:` in one of these would break the identity for a
- * fact the owner said waits on nobody — which is why a refused spawn is `nothing started` and not `spawn failed`.
+ * **None of them may carry a word a subscriber was woken by**: the retired prose match found its words anywhere inside a line's word, so
+ * `failed`, `blocked` or `needs:` in one of these would have woken a subscriber for a fact the owner said waits on nobody — which is why a
+ * refused spawn is `nothing started` and not `spawn failed`.
  */
 export const LINE_WORDS = {
   Approved: 'approved',
@@ -83,37 +83,34 @@ export const LINE_WORDS = {
   ClosedOut: 'closed out',
   StorePaused: 'store paused',
   StoreResumed: 'store resumed',
+  RevisionsBehind: 'revisions behind',
 } as const satisfies Partial<Record<keyof typeof REASONS, string>>;
 
 /**
- * Every reason a line of the feed names, with the kinds it belongs to, its type, whether it waits on a person, whose deed it is
- * (`source`) and whether it is a one-shot (`once`). Closed: a word this table does not recognise is `Unknown`, never a new code, and a
- * code is added only by the owner naming it.
+ * Every reason a line of the feed names, with the kinds it belongs to, its type, whose deed it is (`source`) and whether it is a
+ * one-shot (`once`). Whether it waits on a person is no entry's: it is the phases' (`PERSON_WAITS`, `waitsOf`). Closed: a word this
+ * table does not recognise is `Unknown`, never a new code, and a code is added only by the owner naming it. A code it no longer names
+ * is read through `FORMER_REASONS`, below.
  */
 export const REASONS = {
   Running: { kinds: ['Run', 'Step'], type: 'Normal' },
   Succeeded: { kinds: ['Run', 'Step'], type: 'Normal' },
-  Failed: { kinds: ['Run', 'Step'], type: 'Warning', waits: true },
+  Failed: { kinds: ['Run', 'Step'], type: 'Warning' },
   Cancelled: { kinds: ['Run'], type: 'Normal' },
-  AwaitingApproval: { kinds: ['Run', 'Step'], type: 'Normal', waits: true },
-  Blocked: { kinds: ['Run', 'Step'], type: 'Warning', waits: true },
-  Held: { kinds: ['Run'], type: 'Normal' },
+  AwaitingApproval: { kinds: ['Run', 'Step'], type: 'Normal' },
+  AwaitingAnswer: { kinds: ['Run', 'Step'], type: 'Normal' },
+  AwaitingRound: { kinds: ['Run', 'Step'], type: 'Warning' },
   Removed: { kinds: ['Run'], type: 'Normal' },
   Pending: { kinds: ['Step'], type: 'Normal' },
-  Waiting: { kinds: ['Step'], type: 'Normal' },
-  WaitingForSlot: { kinds: ['Step'], type: 'Normal' },
-  WaitingForCheckout: { kinds: ['Step'], type: 'Normal' },
-  WaitingForPause: { kinds: ['Step'], type: 'Normal' },
-  NeedsHuman: { kinds: ['Step'], type: 'Normal', waits: true },
-  RoundsExhausted: { kinds: ['Step'], type: 'Warning', waits: true },
+  Waiting: { kinds: ['Run', 'Step'], type: 'Normal' },
   Checking: { kinds: ['Step'], type: 'Normal' },
   CheckPassed: { kinds: ['Step'], type: 'Normal' },
-  CheckFailed: { kinds: ['Step'], type: 'Warning', waits: true },
-  CheckDenied: { kinds: ['Step'], type: 'Warning' },
-  BudgetExhausted: { kinds: ['Step'], type: 'Warning' },
-  OverBudget: { kinds: ['Step'], type: 'Warning' },
+  CheckFailed: { kinds: ['Step'], type: 'Warning' },
+  Denied: { kinds: ['Run', 'Step'], type: 'Warning' },
+  BudgetExhausted: { kinds: ['Run', 'Step'], type: 'Warning' },
+  OverBudget: { kinds: ['Run', 'Step'], type: 'Warning' },
   Stopped: { kinds: ['Step'], type: 'Warning' },
-  Unsigned: { kinds: ['Step'], type: 'Warning' },
+  Unsigned: { kinds: ['Run', 'Step'], type: 'Warning' },
   UnreadableCloseout: { kinds: ['Step'], type: 'Warning' },
   ToolDenied: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
   Approved: { kinds: ['Step'], type: 'Normal', source: 'person', once: true },
@@ -123,6 +120,7 @@ export const REASONS = {
   SpawnFailed: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
   SessionLost: { kinds: ['Step'], type: 'Warning', source: 'runtime', once: true },
   ClosedOut: { kinds: ['Step'], type: 'Normal', once: true },
+  RevisionsBehind: { kinds: ['Run'], type: 'Warning', once: true },
   Unknown: { kinds: ['Step'], type: 'Warning' },
   DaemonStarted: { kinds: ['Daemon'], type: 'Normal', source: 'daemon' },
   StorePaused: { kinds: ['Store'], type: 'Normal', source: 'person', once: true },
@@ -172,20 +170,31 @@ const DONE_END = `${PART}done`;
 /** What `nemia ls` adds to a pruned run's word, and the feed with it: a decoration of the message, and no reason of its own. */
 const PRUNED = ' (pruned)';
 
-/** How one word is recognised: the whole of it (`is`), or its beginning (`starts`), which carries what varies after it. */
-type Rule = { is: string; starts?: never; reason: Reason } | { starts: string; is?: never; reason: Reason };
+/**
+ * A reason with what qualifies it, as a line carries it: `on`, what a `Waiting` line waits on, and `via`, where an `AwaitingAnswer`
+ * line's answer is asked. The feed's loose form of the phases' `QualifiedStep`, since a line of any kind carries it.
+ */
+export type Codes = { reason: Reason; on?: WaitOn; via?: AnswerVia };
 
-/** A run's words, in the order they are tried: `assess`'s six statuses, and the word of a run the store no longer has. */
+/** How one word is recognised: the whole of it (`is`), or its beginning (`starts`), which carries what varies after it. */
+type Rule = ({ is: string; starts?: never } | { starts: string; is?: never }) & { reason: Reason; on?: WaitOn; via?: AnswerVia };
+
+/**
+ * A run's words, in the order they are tried: `assess`'s six statuses, `blocked`, an older feed's word for `waiting`, and the word of a
+ * run the store no longer has.
+ */
 const RUN_WORDS: readonly Rule[] = [
   { is: 'running', reason: 'Running' },
   { is: 'succeeded', reason: 'Succeeded' },
   { is: 'cancelled', reason: 'Cancelled' },
   { is: 'awaiting approval', reason: 'AwaitingApproval' },
-  { is: 'blocked', reason: 'Blocked' },
+  { is: 'waiting', reason: 'AwaitingAnswer' },
+  { is: 'blocked', reason: 'AwaitingAnswer' },
   { is: REMOVED, reason: 'Removed' },
   { is: LINE_WORDS.CancelAsked, reason: 'CancelAsked' },
   { is: LINE_WORDS.HoldPut, reason: 'HoldPut' },
   { is: LINE_WORDS.HoldLifted, reason: 'HoldLifted' },
+  { is: LINE_WORDS.RevisionsBehind, reason: 'RevisionsBehind' },
   { starts: 'failed', reason: 'Failed' },
 ];
 
@@ -197,21 +206,21 @@ const RUN_WORDS: readonly Rule[] = [
 const STEP_WORDS: readonly Rule[] = [
   { is: 'pending', reason: 'Pending' },
   { is: 'running', reason: 'Running' },
-  { starts: SLOT_WAIT, reason: 'WaitingForSlot' },
-  { is: PAUSE_WAIT, reason: 'WaitingForPause' },
-  { starts: 'waiting on the checkout', reason: 'WaitingForCheckout' },
-  { is: 'waiting', reason: 'Waiting' },
-  { starts: 'waiting on ', reason: 'Waiting' },
-  { starts: 'needs-human', reason: 'NeedsHuman' },
+  { starts: SLOT_WAIT, reason: 'Waiting', on: 'limit' },
+  { is: PAUSE_WAIT, reason: 'Waiting', on: 'pause' },
+  { starts: 'waiting on the checkout', reason: 'Waiting', on: 'checkout' },
+  { is: 'waiting', reason: 'Pending' },
+  { starts: 'waiting on ', reason: 'Waiting', on: 'run' },
+  { starts: 'needs-human', reason: 'AwaitingAnswer', via: 'session' },
   { is: 'awaiting approval', reason: 'AwaitingApproval' },
-  { is: 'rounds exhausted', reason: 'RoundsExhausted' },
+  { is: 'rounds exhausted', reason: 'AwaitingRound' },
   { is: 'checking', reason: 'Checking' },
   { is: 'verified ✓', reason: 'CheckPassed' },
   { starts: 'failed ✗ check', reason: 'CheckFailed' },
-  { is: 'denied', reason: 'CheckDenied' },
+  { is: 'denied', reason: 'Denied' },
   { starts: 'budget exhausted', reason: 'BudgetExhausted' },
   { starts: 'over budget', reason: 'OverBudget' },
-  { is: 'blocked', reason: 'Blocked' },
+  { is: 'blocked', reason: 'AwaitingAnswer', via: 'closeout' },
   { is: 'succeeded', reason: 'Succeeded' },
   { starts: 'failed', reason: 'Failed' },
   { is: 'stopped', reason: 'Stopped' },
@@ -233,52 +242,49 @@ const STORE_WORDS: readonly Rule[] = [
 const matches = (rule: Rule, word: string): boolean => (rule.is !== undefined ? word === rule.is : word.startsWith(rule.starts));
 
 /**
- * Whether a run's note is a hold's (`holdWord`), which every wording of one begins with: a held run's word is `running`, and `Held` is
- * what tells it from a run with work in flight.
+ * Whether a run's note is a hold's (`holdWord`), which every wording of one begins with: a held run's word is `running`, and `Waiting` on
+ * `run` is what tells it from a run with work in flight. Read only off a line written before the feed was signed.
  */
 const isHeld = (note: string | undefined): boolean => note !== undefined && note.startsWith('held');
 
+/** The codes a rule names: its reason, and what qualifies it where it says. */
+const codesOfRule = ({ reason, on, via }: Rule): Codes => ({ reason, ...(on ? { on } : {}), ...(via ? { via } : {}) });
+
 /**
- * The reason `said` names, of a thing of `kind`, read off its word: for a line that carries no reason of its own — a v0 line, upgraded on
+ * The codes `said` names, of a thing of `kind`, read off its word: for a line that carries no reason of its own — a v0 line, upgraded on
  * read, and a one-shot offered by its word (`oncePast`). A run's and a step's word are never read back here: their line carries the code
  * the listing set (`feedWords`). Total: a word no rule recognises is `Unknown`, so a word reworded somewhere else in the package costs a
  * selector its meaning and never costs the feed a line. Pure.
  *
  * A daemon says one word and the type system holds it to that word (`startedLine`), so a daemon's line is `DaemonStarted`.
  */
-export function reasonOf(said: Said, kind: InvolvedKind): Reason {
-  if (kind === 'Daemon') return 'DaemonStarted';
+export function codesOf(said: Said, kind: InvolvedKind): Codes {
+  if (kind === 'Daemon') return { reason: 'DaemonStarted' };
   const { word } = said;
-  if (kind === 'Store') return STORE_WORDS.find((rule) => matches(rule, word))?.reason ?? 'Unknown';
-  if (word.startsWith(DENIED)) return 'ToolDenied';
-  if (word.endsWith(BLOCKED_END)) return 'Blocked';
+  if (kind === 'Store') return { reason: STORE_WORDS.find((rule) => matches(rule, word))?.reason ?? 'Unknown' };
+  if (word.startsWith(DENIED)) return { reason: 'ToolDenied' };
+  if (word.endsWith(BLOCKED_END)) return { reason: 'AwaitingAnswer', via: 'closeout' };
   const said0 = word.split(PART)[0];
   const base = kind === 'Run' && said0.endsWith(PRUNED) ? said0.slice(0, -PRUNED.length) : said0;
-  if (kind === 'Run' && base === 'running' && isHeld(said.note)) return 'Held';
+  if (kind === 'Run' && base === 'running' && isHeld(said.note)) return { reason: 'Waiting', on: 'run' };
   const found = (kind === 'Run' ? RUN_WORDS : STEP_WORDS).find((rule) => matches(rule, base));
-  if (found) return found.reason;
-  if (word.endsWith(UNREADABLE_END)) return 'UnreadableCloseout';
-  if (word.endsWith(DONE_END)) return 'Succeeded';
-  return 'Unknown';
+  if (found) return codesOfRule(found);
+  if (word.endsWith(UNREADABLE_END)) return { reason: 'UnreadableCloseout' };
+  if (word.endsWith(DONE_END)) return { reason: 'Succeeded' };
+  return { reason: 'Unknown' };
 }
 
-/**
- * The parts of a note that wait on a person wherever one leads a note: who a run waits on (`onYouWords`), and what a step that signed off
- * blocked needs (`needsNote`). Every other wait is the reason's own.
- */
-const WAITING_NOTES: readonly string[] = ['waiting on you:', 'needs:'];
+/** The reason `said` names, of a thing of `kind`, read off its word: `codesOf`'s, without what qualifies it. Pure. */
+export const reasonOf = (said: Said, kind: InvolvedKind): Reason => codesOf(said, kind).reason;
 
 /**
- * Whether a line of `reason`, with `note` beside it, waits on a person: the reason's own flag, or a note that leads with one of
- * `WAITING_NOTES`. Pure.
+ * Whether a line of `reason` waits on a person: exactly the reasons of `PERSON_WAITS` — every reason of phase `waiting`, and `Failed`
+ * and `CheckFailed` — and never a word of its note. Pure.
  *
- * This is the one guarantee a watcher has: the lines that wait are exactly the lines the retired wake words woke a subscriber on, and
- * exactly the lines the selectors they convert to take (`selectorsOfWake`); `reason.test.ts` holds the three to each other over every
- * word the package writes — so the words could go and the answer stayed.
+ * A watcher's guarantee: no stop wakes fewer people than the retired wake words woke, which `reason.test.ts` holds as a superset over
+ * every word the package writes (`FORMER_DEFAULT_WAKE`, and the selectors `selectorsOfWake` converts it to).
  */
-export const waitsOf = (reason: Reason, note?: string): boolean =>
-  entryOf(reason).waits === true ||
-  (note ?? '').split(PART).some((part) => WAITING_NOTES.some((waiting) => part.trim().toLowerCase().startsWith(waiting)));
+export const waitsOf = (reason: Reason): boolean => PERSON_WAITS.has(reason);
 
 /**
  * What a person reads of `said`: the word, and the note after it — `awaiting approval · approve it: nemia approve r-1 plan`. The one

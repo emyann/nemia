@@ -36,6 +36,7 @@ import {
 import { scratch } from '../../test/scratch.ts';
 import { listing as coded } from '../../test/assessed.ts';
 import { reasonOf } from './reason.ts';
+import { codedStep, runCodes, type CodedStep } from '../phase/phase.ts';
 
 const ROOT = scratch('wf-feed-');
 const FEED = path.join(ROOT, 'feed.jsonl');
@@ -811,8 +812,8 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
     const a = feedWords(held, run, { status: 'running' });
     assert.deepEqual(a.run, { word: 'running', reason: 'Running' });
     assert.deepEqual(
-      a.steps.map((s) => [s.word, s.reason]),
-      [['waiting for a run slot', 'WaitingForSlot']],
+      a.steps.map((s) => [s.word, s.reason, s.on]),
+      [['waiting for a run slot', 'Waiting', 'limit']],
     );
     const other = listing({
       steps,
@@ -836,8 +837,8 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       "a run stopped on a person's word, and not on anything that broke, says what it stopped on",
     );
     assert.deepEqual(
-      feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'blocked' }).run,
-      { word: 'blocked (pruned)', reason: 'Blocked' },
+      feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'waiting' }).run,
+      { word: 'waiting (pruned)', reason: 'AwaitingAnswer' },
       'pruned too',
     );
     assert.deepEqual(
@@ -857,7 +858,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       [
         'a root the cap holds',
         { steps: plan, run: unfiled, phaseOf: () => 'unknown', closeoutOf: () => undefined, slot: { inFlight: 2, cap: 2 } },
-        'WaitingForSlot',
+        'Waiting/limit',
       ],
       [
         'a root waiting on a run',
@@ -868,12 +869,12 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
           closeoutOf: () => undefined,
           waits: [{ run: 'r-0' }],
         },
-        'Waiting',
+        'Waiting/run',
       ],
       [
         'an ending the checkout holds',
         { steps: ship, run: unfiled, phaseOf: () => 'unknown', closeoutOf: () => undefined, checkout: { run: 'r-2', step: 'ship' } },
-        'WaitingForCheckout',
+        'Waiting/checkout',
       ],
       ['a task filed and not started', { steps: plan, run: filed, phaseOf: () => 'pending', closeoutOf: () => undefined }, 'Pending'],
       ['a session at work, in a live word', { steps: plan, run: filed, phaseOf: () => 'working', closeoutOf: () => undefined }, 'Running'],
@@ -881,7 +882,22 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       [
         'a session its harness blocked, with what it waits for',
         { steps: plan, run: filed, phaseOf: () => 'needs-human', closeoutOf: () => undefined, waitingOf: () => 'permission prompt' },
-        'NeedsHuman',
+        'AwaitingAnswer/session',
+      ],
+      [
+        'a step that signed off blocked',
+        { steps: plan, run: filed, phaseOf: () => 'succeeded', closeoutOf: () => ({ outcome: 'blocked', needs: 'x' }) as never },
+        'AwaitingAnswer/closeout',
+      ],
+      [
+        'a step waiting on the steps before it',
+        {
+          steps: [...plan, { name: 'build', after: ['plan'], brief: 'build it' }] as unknown as Parameters<typeof listing>[0]['steps'],
+          run: unfiled,
+          phaseOf: () => 'unknown',
+          closeoutOf: () => undefined,
+        },
+        'Pending',
       ],
       [
         'a word the feed names no reason of, signed done',
@@ -907,21 +923,23 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
     for (const [why, input, reason] of rows)
       await t.test(why, () =>
         assert.deepEqual(
-          coded(input).steps.map((s) => s.reason),
+          coded(input)
+            .steps.map((s) => [s.reason, s.on ?? s.via].filter(Boolean).join('/'))
+            .slice(-1),
           [reason],
           'the row says the reason its word names',
         ),
       );
-    await t.test("the run's reason is the one its word and note name, a held run's `Held`", () => {
+    await t.test("the run's reason is the one its word and note name, a held run's `Waiting` on run", () => {
       const l = listing({ steps: plan, run: filed, phaseOf: () => 'running', closeoutOf: () => undefined });
       const hold = { at: '2026-09-22T10:00:00.000Z', until: ['r-0'] };
       const cases: Array<[Pick<Run, 'pruned' | 'hold'>, Parameters<typeof feedWords>[2]['status'], string]> = [
         [{}, 'running', 'Running'],
-        [{ hold }, 'running', 'Held'],
+        [{ hold }, 'running', 'Waiting'],
         [{ hold }, 'cancelled', 'Cancelled'],
         [{ hold }, 'awaiting approval', 'AwaitingApproval'],
         [{ pruned: { at: '', worktrees: [] } }, 'succeeded', 'Succeeded'],
-        [{}, 'blocked', 'Blocked'],
+        [{}, 'waiting', 'AwaitingAnswer'],
         [{}, 'failed', 'Failed'],
       ];
       for (const [run, status, reason] of cases) {
@@ -929,6 +947,21 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
         assert.deepEqual([said.reason, reasonOf(said, 'Run')], [reason, reason], `${status}${run.hold ? ', held' : ''}`);
       }
     });
+  });
+  await t.test("a run a person's word stops says its first waiting step's reason, and a held run waits on runs", () => {
+    const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running' | 'Unsigned'): CodedStep => codedStep({ reason });
+    assert.deepEqual(runCodes('running', true), { reason: 'Waiting', on: 'run', phase: 'pending' });
+    assert.deepEqual(runCodes('waiting', false, [step('Running'), step('OverBudget'), step('AwaitingApproval')]), {
+      reason: 'OverBudget',
+      phase: 'waiting',
+    });
+    assert.deepEqual(runCodes('waiting', false, [step('AwaitingApproval'), step('Unsigned')]), { reason: 'Unsigned', phase: 'waiting' });
+    assert.deepEqual(runCodes('waiting', false, [codedStep({ reason: 'AwaitingAnswer', via: 'closeout' })]), {
+      reason: 'AwaitingAnswer',
+      via: 'closeout',
+      phase: 'waiting',
+    });
+    assert.deepEqual(runCodes('awaiting approval', false, [step('AwaitingApproval')]).reason, 'AwaitingApproval');
   });
   await t.test("the feed's word for a step waiting on a person is the word `nemia ls` prints, with what its harness waits for", () => {
     const steps = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0]['steps'];

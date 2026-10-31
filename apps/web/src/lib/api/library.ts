@@ -35,11 +35,11 @@ export const AgentSkillSchema = decodes<AgentSkill>()(
   }),
 );
 
-/** Where a skill is: your library (the store's `workflows/skills/`), the repository the board serves, or what Nemia ships. */
-export type SkillSource = 'yours' | 'repo' | 'shipped';
+/** Where a skill is: your library (the store's `workflows/skills/`), the repository the board serves, or what is built into Nemia. */
+export type SkillSource = 'yours' | 'repo' | 'builtin';
 
 /** Decodes a `SkillSource`. */
-export const SkillSourceSchema = decodes<SkillSource>()(Schema.Literals(['yours', 'repo', 'shipped']));
+export const SkillSourceSchema = decodes<SkillSource>()(Schema.Literals(['yours', 'repo', 'builtin']));
 
 /**
  * Mirrors `SkillCost` in the package: what a skill costs a turn, about, at four characters a token. Named, a turn carries its listing (its

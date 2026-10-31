@@ -1,6 +1,6 @@
 /**
  * Nemia's `verbs` skill, generated from the command table (`TABLE`) and each command's class (`CommandClass`): every verb the CLI serves
- * her, by who answers for it, with its usage and help as `nemia`'s help prints them (`helpOf`). Shipped as `nemia/skills/verbs/SKILL.md`,
+ * her, by who answers for it, with its usage and help as `nemia`'s help prints them (`helpOf`). Built in as `nemia/skills/verbs/SKILL.md`,
  * and held to the table by `test/verbs-skill.test.ts`, which names `REGENERATE` when the file drifts.
  */
 import type { CommandClass } from '../admission/index.ts';

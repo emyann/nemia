@@ -46,7 +46,7 @@ export function renamedValues(command: string, body: unknown): { body: unknown; 
   if (keys === undefined || typeof body !== 'object' || body === null || Array.isArray(body)) return { body };
   const renamed = [...keys].flatMap(([key, values]) => {
     const was: unknown = Reflect.get(body, key);
-    return typeof was === 'string' && Object.hasOwn(values, was) ? [{ key, was, is: values[was]! }] : [];
+    return typeof was === 'string' && Object.hasOwn(values, was) ? [{ key, was, is: values[was] }] : [];
   });
   if (!renamed.length) return { body };
   const said = (value: (p: { key: string; was: string; is: string }) => string) =>

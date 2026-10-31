@@ -11,6 +11,7 @@ export {
   spentAsks,
   TRY_CAUSES,
   FORMER_MODES,
+  upgradeAsk,
   upgradeMode,
   tryWord,
   turnsOf,

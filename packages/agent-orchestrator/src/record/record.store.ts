@@ -12,7 +12,7 @@ import { Result, Schema, SchemaIssue } from 'effect';
 import { BY_CAP, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { spentRoundAsks } from '../round/round.ts';
-import { spentAsks, TRY_CAUSES, upgradeMode, upgradeTries, type RetryAsk } from '../retry/index.ts';
+import { spentAsks, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
@@ -556,12 +556,6 @@ function askRefusal(refused: string, held: unknown): string {
   if (refused === 'interrupted') return 'the task it names as interrupted is not an id';
   return `it asks for no mode nemia retry knows (${JSON.stringify(fieldOf(held, 'mode'))})`;
 }
-
-/** An ask file's JSON with its mode in the word it has now (`upgradeMode`), before its schema reads it: an older ask says a former mode. */
-const upgradeAsk = (read: unknown): unknown =>
-  typeof read === 'object' && read !== null && !Array.isArray(read) && Object.hasOwn(read, 'mode')
-    ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) }
-    : read;
 
 /**
  * One ask file, read: the step and the try from its name, how, when and what was said from what it holds — or why it cannot be read.

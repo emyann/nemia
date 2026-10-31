@@ -115,7 +115,7 @@ export const adoptChecks = Effect.fn('adoptChecks')(function* (
  * Looked for only where a try is due (`retriesDue`, cancelled or not): an ask for the step's next try, or a refused check `retries:`
  * covers. A run waiting on a person with nothing asked costs no look.
  *
- * A person's continue a pass gave as an answer to the step's task held open, and died before writing down, shows as a task with more answers
+ * A continue a pass gave as an answer to the step's task held open, and died before writing down, shows as a task with more answers
  * than the record has turns (`answersIn`, `turnsOf`): the answered task reads running, so the ask reads as one to stop it first. It is
  * adopted as the turn it is, and nothing is stopped and nothing filed.
  */
@@ -314,7 +314,7 @@ export const advanceRun = Effect.fn('advance')(function* (run: Run, slot?: RunSl
  * A try goes on in the workspace and on the branch the step had, under its next try's id; an ending the work is sent back from moves behind
  * in the same write, so it waits for the work again (`sentBack`). A try of a step whose task has not settled — its session blocked by its
  * harness, or asked for while it was and working again since — stops the session and files nothing; a later pass, once the task has
- * settled, files the try. A recheck files no session, only its check, under the new try's id. A person's continue of a step whose task is held
+ * settled, files the try. A recheck files no session, only its check, under the new try's id. A continue of a step whose task is held
  * open and waits for their word is that task's next turn, in the session that signed, under the same id (`answerHeld`); any other try, and
  * every round, of a task that waits closes it first and is filed as a task of its own. A continue with no session left starts a new
  * one, and its brief says so. A new session of a loop's target within a round is handed the round's findings off the looping step's try

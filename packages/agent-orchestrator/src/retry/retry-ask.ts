@@ -48,6 +48,10 @@ export const continuesFrom = (
  */
 export type TryCause = 'retries' | 'signoff' | RetryMode | 'round' | 'merge' | 'back';
 
+/** An ask file's JSON with its mode in the word it has now (`upgradeMode`), before its schema reads it. Pure. */
+export const upgradeAsk = (read: unknown): unknown =>
+  isObject(read) && !Array.isArray(read) && Object.hasOwn(read, 'mode') ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) } : read;
+
 /** Every `TryCause`, as the record's schema reads one. */
 export const TRY_CAUSES = [
   'retries',
@@ -93,7 +97,7 @@ const upgradeTry = (t: unknown): unknown => {
  * A try that is over, kept on the step's record behind the one that replaced it.
  *
  * `cause` is what replaced it (`TryCause`; a record written before it said `then`, read as `cause`, `upgradeTries`): `retries`, the
- * run re-filing the step itself after its check refused — its session continued on the workflow's word — or `signoff`, the run continuing a session
+ * run re-filing the step itself after its check refused — continued on the workflow's word — or `signoff`, the run continuing a session
  * that ended without its closeout, once a round, before it waits on a person (`retriesDue`) — or the mode a person asked for, with the
  * model a `--model` named. A recheck replaces only the check, so the try after one has the same `taskId`. Or `round`: the step's loop
  * went round again (`roundFiled`), and the try after it is the next round's. Or `merge`: the loop was filed again on the round it is on,
@@ -137,8 +141,8 @@ export type RetryHow = { mode: RetryMode; model?: string; message?: string; budg
 
 /**
  * A try to file on this pass: of which step, its number, how, on whose word — `retries:`, a person's `ask`, `signoff`, the run's one
- * continuation a round of a session that ended without its closeout, or `pause`, the ask `nemia pause --now` wrote for the task it stopped — and,
- * for a person's, what they said with it.
+ * continuation a round of a session that ended without its closeout, or `pause`, the ask `nemia pause --now` wrote for the task it stopped
+ * — and, for a person's, what they said with it.
  *
  * `stopFirst` on a person's try of a step whose task has not settled (`retriesDue`): the pass asks the engine to stop that session — once,
  * as the engine's `stopRequested` says — and files nothing. A later pass, once the task has settled, reads the try due as one of a stopped
@@ -251,8 +255,8 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
 /**
  * The model a step's current try runs on: the one a `nemia retry --model` named for the new session it started, carried by every try that
  * continued that session since — a continue, a `retries:` try, a sign-off ask, a round — and the step's own where none did. A recheck is
- * the same try. What a continuation is filed with, since a model is part of the prompt the session cached: a continue after `--model sonnet`
- * on the step's `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
+ * the same try. What a continuation is filed with, since a model is part of the prompt the session cached: a continue after `--model
+ * sonnet` on the step's `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
  */
 export function sessionModel(step: Workflow, record: StepRecord | undefined): string | undefined {
   for (const t of [...(record?.tries ?? [])].reverse()) {

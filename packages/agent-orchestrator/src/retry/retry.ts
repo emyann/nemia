@@ -80,8 +80,8 @@ import { answersOr } from '../question/index.ts';
  *
  * And a gated step that signed off, while nothing after it is filed: `awaiting approval`, or approved and not yet handed on — which a step
  * nothing waits on never is: approved, it has handed on, since there is nothing left to file. A try of it is
- * a send-back from its gate (`sendsBack`) — `continue` or `fresh`, with what to change, which `retryRefusal` holds it to — and the try after
- * it is on a try its approval does not name, so an approval given before the send-back is spent by it.
+ * a send-back from its gate (`sendsBack`) — `continue` or `fresh`, with what to change, which `retryRefusal` holds it to — and the try
+ * after it is on a try its approval does not name, so an approval given before the send-back is spent by it.
  *
  * And the looping step an ending waits on, once that ending has been filed and stopped on the base branch (`endingStopped`): a try of it
  * sends the work back from there through the folder's loop — the step filed again with what the person and the ending said, free to ask for
@@ -250,7 +250,7 @@ export const pauseAsksVoid = (
  * nothing at all — a session that said anything reads `failed`, not `unsigned` (`ownStatus`) — its session continued once (`signoff`),
  * told it ended without calling `StructuredOutput`, that its work stands and it should change nothing and sign off, finishing first if
  * it had not, and signing off anyway saying what stops it if it cannot (`retrySection`). Once a round (`signoffsSpent`), never in a
- * loop: a sign-off ask that ends unsigned again leaves the step `unsigned`, on a person. Keyed on what the engine recorded (`closeoutAsked`:
+ * loop: a sign-off ask that ends unsigned again leaves the step `unsigned`, on a person. Keyed on what the engine wrote (`closeoutAsked`:
  * `closedOut: false`, or an old journal's `former: 'unsigned'`), not on the step's word `unsigned`, which also covers a closeout short
  * of a declared field — a statement given, which a reminder to give one would not mend — a `done` whose end says nothing of a
  * statement, and a `failed` end with `closedOut: false` and no `former`, a session that broke. Nor is a step

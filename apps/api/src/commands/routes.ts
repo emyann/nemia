@@ -232,7 +232,8 @@ const namedBy = (c: Context<ApiEnv>): Named => ({
 
 /**
  * A routed command's handler: the guard where it writes, a name its path names (400), its arguments, its check (422), and its handler's
- * data at its route's status — with a `hint` naming what to send now where the body said a former value (`renamedValues`) —, the app's memos of the runs each read projects handed with them (`ReadMemo.records`), so a read that polls
+ * data at its route's status — with a `hint` naming what to send now where the body said a former value (`renamedValues`) —, the app's
+ * memos of the runs each read projects handed with them (`ReadMemo.records`), so a read that polls
  * — the factories' listing — answers a run whose record has not moved from memory — or, where the command throws a refusal in place
  * of data that did nothing (`apiRefusal`), that refusal, answered by `app.onError`; or 502 in its words, where it has words for a
  * failure (`RouteWords.failed`).
@@ -294,7 +295,7 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  * yet done: the next tick honours the ask once, as it does one made at the command line. A write that fails otherwise is a 502 naming the
  * command that asks the same way.
  *
- * - `POST /api/runs/:id/steps/:step/retry` — another try of a step: the answer to a step that signed off blocked, a continue, a recheck. Made
+ * - `POST /api/runs/:id/steps/:step/retry` — another try of a step: the answer to a step signed off blocked, a continue, a recheck. Made
  *   by `retryRun`, `nemia retry`'s own, which writes the ask file and nothing else. Refuses a message or a budget that cannot ride on the
  *   ask (`messageRefusal`, `budgetRefusal` — a budget on a recheck, which files no session to spend it) with 422 before the run is read,
  *   and a step that may not be tried again that way (`retryRefusal`) with 409 after. A step whose session its harness blocked, with nothing

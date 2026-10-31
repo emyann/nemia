@@ -122,7 +122,7 @@ export type OfferKind = keyof RunDetail['steps'][number]['commands'];
  * What a run's page offers for a step, by why it waits (`case`), each with the command it presses (`kind`), whose line is the api's
  * (`step.commands[kind]`): the board spells no verb itself.
  *
- *   answer     it signed off blocked: an answer to its `needs`, carried into its session continued, or a fresh session — and where its closeout asks
+ *   answer     it signed off blocked: an answer to its `needs`, carried into a continue, or a fresh session — and where its closeout asks
  *              questions as data (`StepCloseout.questions`), those, every field's in the schema's order, answered by choosing
  *   try-again  it was refused by its check, or it ended without its closeout: another session, with something to say if you like —
  *              and where a check did not pass, the check run again; first, when it did not finish

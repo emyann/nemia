@@ -156,7 +156,7 @@ const stopFirst = Effect.fnUntraced(function* (f: Filing, r: Retry, taskId: stri
   );
 });
 
-/** Whether a try is a person's continue that answers the step's task held open, in the session that signed, rather than a task of its own. */
+/** Whether a try is a person's continue answering the step's task held open, in the session that signed, rather than a task of its own. */
 const answersHeld = (f: Filing, r: Retry, step: Workflow, record: StepRecord): boolean => {
   const { run, reads } = f;
   return (

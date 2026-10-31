@@ -7,7 +7,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {
   cardToStart,
-  folderRefusal,
   inboxDir,
   inboxNameAt,
   INBOX_ADD,
@@ -24,6 +23,7 @@ import {
   workflowFolder,
   type Args,
 } from '../runner.ts';
+import { folderRefusal } from '../start/commands.verb.ts';
 import { usage, placedIn, type Engine } from './flags.ts';
 
 /** The text under `key`, or undefined where none was given. */

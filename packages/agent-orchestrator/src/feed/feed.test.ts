@@ -837,8 +837,8 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
       "a run stopped on a person's word, and not on anything that broke, says what it stopped on",
     );
     assert.deepEqual(
-      feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'blocked' }).run,
-      { word: 'blocked (pruned)', reason: 'AwaitingAnswer' },
+      feedWords(held, { pruned: { at: '', worktrees: [] } }, { status: 'waiting' }).run,
+      { word: 'waiting (pruned)', reason: 'AwaitingAnswer' },
       'pruned too',
     );
     assert.deepEqual(
@@ -939,7 +939,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
         [{ hold }, 'cancelled', 'Cancelled'],
         [{ hold }, 'awaiting approval', 'AwaitingApproval'],
         [{ pruned: { at: '', worktrees: [] } }, 'succeeded', 'Succeeded'],
-        [{}, 'blocked', 'AwaitingAnswer'],
+        [{}, 'waiting', 'AwaitingAnswer'],
         [{}, 'failed', 'Failed'],
       ];
       for (const [run, status, reason] of cases) {
@@ -951,12 +951,12 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
   await t.test("a run a person's word stops says its first waiting step's reason, and a held run waits on runs", () => {
     const step = (reason: 'OverBudget' | 'AwaitingApproval' | 'Running' | 'Unsigned'): CodedStep => codedStep({ reason });
     assert.deepEqual(runCodes('running', true), { reason: 'Waiting', on: 'run', phase: 'pending' });
-    assert.deepEqual(runCodes('blocked', false, [step('Running'), step('OverBudget'), step('AwaitingApproval')]), {
+    assert.deepEqual(runCodes('waiting', false, [step('Running'), step('OverBudget'), step('AwaitingApproval')]), {
       reason: 'OverBudget',
       phase: 'waiting',
     });
-    assert.deepEqual(runCodes('blocked', false, [step('AwaitingApproval'), step('Unsigned')]), { reason: 'Unsigned', phase: 'waiting' });
-    assert.deepEqual(runCodes('blocked', false, [codedStep({ reason: 'AwaitingAnswer', via: 'closeout' })]), {
+    assert.deepEqual(runCodes('waiting', false, [step('AwaitingApproval'), step('Unsigned')]), { reason: 'Unsigned', phase: 'waiting' });
+    assert.deepEqual(runCodes('waiting', false, [codedStep({ reason: 'AwaitingAnswer', via: 'closeout' })]), {
       reason: 'AwaitingAnswer',
       via: 'closeout',
       phase: 'waiting',

@@ -343,7 +343,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         after: [],
         context: [],
         waiting: null,
-        heldUntil: [],
+        holdUntil: [],
         holding: null,
         status: 'cancelled',
         phase: 'cancelled',
@@ -375,7 +375,6 @@ test("a store's runs read on the list and on a run's page: each summarized with 
             agent: null,
             since: null,
             needs: null,
-            blockedByHarness: false,
             waitingFor: null,
             approve: null,
             denied: null,
@@ -389,15 +388,14 @@ test("a store's runs read on the list and on a run's page: each summarized with 
             reason: 'Pending',
             on: null,
             via: null,
-            message: 'waiting',
+            message: 'pending',
             verdict: null,
-            status: 'waiting',
+            status: 'pending',
             note: null,
             roundDue: false,
             agent: null,
             since: null,
             needs: null,
-            blockedByHarness: false,
             waitingFor: null,
             approve: null,
             denied: null,
@@ -407,7 +405,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         /** Neither step it froze waits on the other: every step is a root, as on the run's page. */
         graph: { roots: ['implement', 'review'], edges: [] },
         waitingOnYou: [],
-        onYou: [],
+        waitingOnYouWords: [],
         /** Called off: nothing to decide about a result nobody is waiting for. */
         toDecide: null,
         /** Every task of it reads, or has no journal at all: judged. */
@@ -447,10 +445,10 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         after: [],
         context: [],
         waiting: null,
-        heldUntil: [],
+        holdUntil: [],
         holding: null,
         /** implement signed off blocked, so review is not filed: the run waits on an answer, and nothing in it failed. */
-        status: 'blocked',
+        status: 'waiting',
         phase: 'waiting',
         reason: 'AwaitingAnswer',
         on: null,
@@ -462,7 +460,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         tokens: null,
         read: null,
         waitingOnYou: ['implement'],
-        onYou: ['implement'],
+        waitingOnYouWords: ['implement'],
         /** Failed at implement: not a run at its result, so there is nothing about the result to decide. */
         toDecide: null,
         /** Gated at no step: no gate to wait at. */
@@ -526,7 +524,6 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       commands: { approve: 'nemia approve r-2 implement', retry: 'nemia retry r-2 implement', say: 'nemia say r-2 implement' },
       /** Its question, off its closeout; no session the harness blocked, so no last line; nothing asked of it yet. */
       needs: 'Which database?',
-      blockedByHarness: false,
       waitingFor: null,
       approve: null,
       denied: null,
@@ -563,8 +560,8 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       reason: 'Pending',
       on: null,
       via: null,
-      message: 'waiting',
-      status: 'waiting',
+      message: 'pending',
+      status: 'pending',
       check: null,
       closeout: null,
       unreadable: null,
@@ -608,7 +605,6 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         roundDue: false,
         commands: { approve: 'nemia approve r-2 review', retry: 'nemia retry r-2 review', say: 'nemia say r-2 review' },
         needs: null,
-        blockedByHarness: false,
         waitingFor: null,
         approve: null,
         denied: null,
@@ -641,7 +637,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     const run = await listed('r-2');
     assert.deepEqual(
       run.steps.map((s: { status: string }) => s.status),
-      ['succeeded · BLOCKED', 'waiting'],
+      ['succeeded · BLOCKED', 'pending'],
     );
     assert.deepEqual(run.waitingOnYou, ['implement']);
   });
@@ -844,7 +840,6 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       roundDue: false,
       commands: { approve: 'nemia approve r-6 original', retry: 'nemia retry r-6 original', say: 'nemia say r-6 original' },
       needs: 'Which database?',
-      blockedByHarness: false,
       waitingFor: null,
       approve: null,
       denied: null,
@@ -873,10 +868,10 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       tries: firstTry(originalTry),
       timeline: settledTimeline('t-6'),
     });
-    assert.deepEqual([review.body, review.spec?.after, review.status], ['Review it.', ['replacement'], 'waiting']);
+    assert.deepEqual([review.body, review.spec?.after, review.status], ['Review it.', ['replacement'], 'pending']);
     assert.deepEqual(
       [replacement.body, replacement.taskId, replacement.status, replacement.closeout],
-      ['Do the original thing.', null, 'waiting', null],
+      ['Do the original thing.', null, 'pending', null],
     );
 
     const summary = await listed('r-6');
@@ -884,8 +879,8 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       summary.steps.map((s: { name: string; status: string }) => [s.name, s.status]),
       [
         ['original', 'succeeded · BLOCKED'],
-        ['review', 'waiting'],
-        ['replacement', 'waiting'],
+        ['review', 'pending'],
+        ['replacement', 'pending'],
       ],
     );
     assert.deepEqual(summary.waitingOnYou, ['original']);
@@ -1158,7 +1153,6 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
         'agent',
         'since',
         'needs',
-        'blockedByHarness',
         'waitingFor',
         'approve',
         'denied',
@@ -1491,7 +1485,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       ['docs', 'unverified · done'],
       ['notes', 'unsigned'],
       ['plan', 'starting'],
-      ['ship', 'waiting'],
+      ['ship', 'pending'],
     ];
     const detail = await detailOf('r-20');
     const summary = await listed('r-20');
@@ -1558,7 +1552,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
           'no frozen workflow, so judged by its folder as the tick judges it: its step signed off blocked, and the folder gained a step the tick would file',
         ],
         ['r-20', 'failed', 'a check refused, so what waits on that step waits for ever: a step broke'],
-        ['r-8', 'blocked', 'a step signed off blocked: it waits on an answer, and nothing broke'],
+        ['r-8', 'waiting', 'a step signed off blocked: it waits on an answer, and nothing broke'],
         ['r-gate', 'awaiting approval', 'a step signed off at its gate: it waits for a yes, and nothing broke'],
         ['r-2', 'cancelled', 'called off, whatever its steps say'],
       ];
@@ -1599,7 +1593,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       [
         ['a', 'failed ✗ check (exit 1)'],
         ['b', 'starting'],
-        ['c', 'waiting'],
+        ['c', 'pending'],
       ],
       "one root's check refused while its sibling's session still runs, and c, which waits on both, will never be filed",
     );
@@ -1637,7 +1631,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       ['r-23', 'cancelled', true, 'called off, its session not stopped yet'],
       ['r-5', 'running', true, 'a step queued for a slot'],
       ['r-6', 'running', true, 'a step the folder gained, which the tick would file'],
-      ['r-8', 'blocked', false, 'a step signed off blocked, and its follower is not filed'],
+      ['r-8', 'waiting', false, 'a step signed off blocked, and its follower is not filed'],
       ['r-21', 'succeeded', false, 'verified, then done on its own word'],
       ['r-2', 'cancelled', false, 'called off, nothing left running'],
       [
@@ -1733,7 +1727,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       await expectJudged([
         [
           'r-30',
-          'blocked',
+          'waiting',
           false,
           ['review'],
           [
@@ -1826,7 +1820,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
           [],
           [
             ['implement', 'succeeded · BLOCKED', 'try 2 asked (--continue) — the next tick files it'],
-            ['review', 'waiting', null],
+            ['review', 'pending', null],
           ],
           'signed off blocked, and a person asked for another try: the next tick files it, and nobody is waited on',
         ],

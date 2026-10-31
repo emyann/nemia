@@ -153,6 +153,7 @@ const PINNED: Record<string, string[]> = {
     'judgedSteps',
     'judgedUnlessUnreadable',
     'needsOf',
+    'atHarness',
     'pauseWords',
     'heldLines',
     'heldWords',

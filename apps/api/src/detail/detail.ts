@@ -40,6 +40,7 @@ import {
   tryOf,
   runWith,
   needsOf,
+  atHarness,
   runSaid,
   stepSaid,
   type RunHolding,
@@ -270,10 +271,10 @@ export type RunDetail = {
   fromNote?: string;
   waiting: RunWaiting | null;
   /** As on `RunSummary`. */
-  heldUntil: string[];
+  holdUntil: string[];
   /** As on `RunSummary` (`RunHolding`). */
   holding: RunHolding | null;
-  /** As on `RunSummary`: the list's word, `awaiting approval` or `blocked` for a run a person alone stops, never `failed`. */
+  /** As on `RunSummary`: the list's word, `awaiting approval` or `waiting` for a run a person alone stops, never `failed`. */
   status: RunStatus;
   /** As on `RunSummary`. */
   phase: RunPhase;
@@ -298,7 +299,7 @@ export type RunDetail = {
   read: RunRead | null;
   waitingOnYou: string[];
   /** As on `RunSummary`. */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /** As on `RunSummary` (`RunToDecide`). */
   toDecide: RunToDecide | null;
   /** The steps the run is gated at, in the order they run (`gatesOf`): those its workflow gates, and those it was started with. */
@@ -370,7 +371,6 @@ export type RunDetail = {
     commands: StepCommands;
     /** As on `RunSummary` (`StepNeeds`): read off that type, field by field, so a field it gains is declared here too and not only sent. */
     needs: StepNeeds['needs'];
-    blockedByHarness: StepNeeds['blockedByHarness'];
     waitingFor: StepNeeds['waitingFor'];
     approve: StepNeeds['approve'];
     denied: StepNeeds['denied'];
@@ -667,7 +667,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     ...handedRuns(run),
     ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
     waiting: judged.waiting,
-    heldUntil: judged.holding ? run.hold!.until : [],
+    holdUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
     ...runSaid(judged),
     moving: judged.moving,
@@ -676,7 +676,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     tokens: runTokens(run, views),
     read: runRead(clock, steps, names),
     waitingOnYou: judged.waitingOnYou,
-    onYou: judged.onYou,
+    waitingOnYouWords: judged.waitingOnYouWords,
     toDecide: judged.toDecide,
     gates: gatesOf(steps, run),
     warning: folder.steps ? driftOf(run, folder.steps) : folder.warning,
@@ -710,7 +710,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
           roundDue: judged.roundDue.has(name),
           commands: stepCommands(run.id, name),
           ...needs,
-          lastLine: needs.blockedByHarness ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
+          lastLine: atHarness(current) ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
           gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.reason),
           accepted: acceptedOf(run, name),
           said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],

@@ -132,7 +132,7 @@ export type CodedRun = QualifiedRun & { phase: RunPhase };
  * added to `StepStatus` fails the typecheck here until it has a reason.
  */
 export const REASON_OF: Record<StepStatus, QualifiedStep> = {
-  waiting: { reason: 'Pending' },
+  pending: { reason: 'Pending' },
   running: { reason: 'Running' },
   blocked: { reason: 'AwaitingAnswer', via: 'closeout' },
   unsigned: { reason: 'Unsigned' },
@@ -207,7 +207,7 @@ export const codedStep = (q: QualifiedStep): CodedStep => ({ ...q, phase: PHASE_
 type RunStatus = Assessment['status'];
 
 /**
- * The reason each of `assess`'s statuses names. A running run a person holds is `Waiting` on `run`, and a `blocked` run takes its first
+ * The reason each of `assess`'s statuses names. A running run a person holds is `Waiting` on `run`, and a `waiting` run takes its first
  * waiting step's reason, which the caller knows and this does not (`runCodes`).
  */
 export const RUN_REASON_OF: Record<RunStatus, QualifiedRun> = {
@@ -216,7 +216,7 @@ export const RUN_REASON_OF: Record<RunStatus, QualifiedRun> = {
   failed: { reason: 'Failed' },
   cancelled: { reason: 'Cancelled' },
   'awaiting approval': { reason: 'AwaitingApproval' },
-  blocked: { reason: 'AwaitingAnswer' },
+  waiting: { reason: 'AwaitingAnswer' },
 };
 
 /** The phase each run reason stands in: a run a person stops is `waiting`, and a held one `pending`, as a step waiting on a thing is. */
@@ -266,13 +266,13 @@ const stoppedOn = (step: CodedStep): QualifiedRun =>
     : { reason: step.reason as Exclude<RunReason, 'Waiting' | 'AwaitingAnswer'> };
 
 /**
- * A run's codes. A running run a person holds is `Waiting` on `run`. A `blocked` run carries the reason (and `via`) of its first step,
- * in the order `steps` gives them (the workflow's), whose phase is `waiting` and that is no gate — a run is blocked when some stop is
+ * A run's codes. A running run a person holds is `Waiting` on `run`. A `waiting` run carries the reason (and `via`) of its first step,
+ * in the order `steps` gives them (the workflow's), whose phase is `waiting` and that is no gate — a run is `waiting` when some stop is
  * not a gate, so a gate before it does not say why; every such reason is a run's too; `AwaitingAnswer` with no `via` where none is.
  * Every other status is `RUN_REASON_OF`'s. Pure.
  */
 export function runCodes(status: RunStatus, holding: boolean, steps: readonly CodedStep[] = []): CodedRun {
-  const stop = status === 'blocked' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
+  const stop = status === 'waiting' ? steps.find((s) => s.phase === 'waiting' && s.reason !== 'AwaitingApproval') : undefined;
   const q: QualifiedRun =
     status === 'running' && holding ? { reason: 'Waiting', on: 'run' } : stop ? stoppedOn(stop) : RUN_REASON_OF[status];
   return { ...q, phase: RUN_PHASE_OF[q.reason] };

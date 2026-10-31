@@ -48,12 +48,12 @@ const RUN_STATUS = {
   failed: 'Failed',
   cancelled: 'Cancelled',
   'awaiting approval': 'AwaitingApproval',
-  blocked: 'AwaitingAnswer',
+  waiting: 'AwaitingAnswer',
 } satisfies Record<Assessment['status'], Reason>;
 
 /** Every status a step stands at, in the word `nemia ls` prints for it. Exhaustive over `StepStatus`. */
 const STEP_STATUS = {
-  waiting: { word: 'waiting', reason: 'Pending' },
+  pending: { word: 'pending', reason: 'Pending' },
   running: { word: 'running', reason: 'Running' },
   blocked: { word: 'blocked', reason: 'AwaitingAnswer', via: 'closeout' },
   unsigned: { word: 'unsigned', reason: 'Unsigned' },
@@ -104,6 +104,15 @@ const WAIT_WORDS: readonly Case[] = [
   { kind: 'Step', word: checkoutWord({ run: 'r-2', step: 'land' }), reason: 'Waiting', on: 'checkout' },
   { kind: 'Step', word: waitWord([{ run: 'r-2' }]), reason: 'Waiting', on: 'run' },
   { kind: 'Step', word: waitWord([{ run: 'r-2' }, { run: 'r-3' }]), reason: 'Waiting', on: 'run' },
+];
+
+/**
+ * The words an older package wrote, which a feed it kept still says: a step not filed was `waiting`, and a run stopped on a
+ * person `blocked`.
+ */
+const FORMER_WORDS: readonly Case[] = [
+  { kind: 'Step', word: 'waiting', reason: 'Pending' },
+  { kind: 'Run', word: 'blocked', reason: 'AwaitingAnswer' },
 ];
 
 /** A run's own lines: its statuses, pruned and not, a hold, who it waits on, and the word of a run the store no longer has. */
@@ -161,6 +170,7 @@ const CASES: readonly Case[] = [
   ...PHASE_WORDS,
   ...SAID_WORDS,
   ...WAIT_WORDS,
+  ...FORMER_WORDS,
   ...ONE_SHOTS,
   ...ACT_WORDS,
   ...STORE_LINES,
@@ -217,7 +227,7 @@ test('reasonOf names a reason for every word the package writes, only of a kind 
     );
     for (const reason of STEP_REASONS.filter((r) => PHASE_OF[r] === 'waiting'))
       reached.add(
-        `${runCodes('blocked', false, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
+        `${runCodes('waiting', false, [codedStep(reason === 'AwaitingAnswer' ? { reason, via: 'session' } : ({ reason } as QualifiedStep))]).reason}/Run`,
       );
     const entries = REASON_CODES.flatMap((reason) => kindsOf(reason).map((kind) => `${reason}/${kind}`));
     assert.equal(entries.length, 43, 'the table the owner named has 43 entries');

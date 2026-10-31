@@ -40,12 +40,16 @@ const listed = (more: Partial<Listed> = {}): Listed => ({
 test('a run is waiting where the bell counts it, though it still moves; in flight where it moves or runs; finished otherwise', () => {
   assert.equal(kindOf(listed({ status: 'failed', waitingOnYou: ['plan'] })), 'waiting', 'a step at its gate');
   assert.equal(kindOf(listed({ status: 'failed', moving: true, waitingOnYou: ['plan'] })), 'waiting', 'it moves and waits: waiting, once');
-  assert.equal(kindOf(listed({ status: 'running', waiting: { onYou: true } })), 'waiting', 'a run it waits on never lands');
-  assert.equal(kindOf(listed({ status: 'running', holding: { onYou: true } })), 'waiting', 'a hold only a person lifts');
+  assert.equal(kindOf(listed({ status: 'running', waiting: { waitingOnYou: true } })), 'waiting', 'a run it waits on never lands');
+  assert.equal(kindOf(listed({ status: 'running', holding: { waitingOnYou: true } })), 'waiting', 'a hold only a person lifts');
   assert.equal(kindOf(listed({ status: 'running' })), 'inFlight');
   assert.equal(kindOf(listed({ status: 'failed', moving: true })), 'inFlight', 'a fan-out read failed while a sibling works');
-  assert.equal(kindOf(listed({ status: 'running', moving: true, waiting: { onYou: false } })), 'inFlight', 'runs that may still land');
-  assert.equal(kindOf(listed({ status: 'running', moving: true, holding: { onYou: false } })), 'inFlight', 'a hold that may lift');
+  assert.equal(
+    kindOf(listed({ status: 'running', moving: true, waiting: { waitingOnYou: false } })),
+    'inFlight',
+    'runs that may still land',
+  );
+  assert.equal(kindOf(listed({ status: 'running', moving: true, holding: { waitingOnYou: false } })), 'inFlight', 'a hold that may lift');
   assert.equal(kindOf(listed()), 'finished');
   assert.equal(kindOf(listed({ status: 'failed' })), 'finished');
 });

@@ -82,7 +82,7 @@ test('`nemia tick` prints `awaiting approval` for a run at its gate and `blocked
     lines,
     [
       `${gated}  awaiting approval  unreachable: implement`,
-      `${asking}  blocked  unreachable: implement`,
+      `${asking}  waiting  unreachable: implement`,
       `${broke}  failed  unreachable: implement`,
     ],
     printed.join('\n'),

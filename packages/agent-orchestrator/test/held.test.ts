@@ -522,7 +522,7 @@ test('`nemia cancel` calls off a run whose step signed off blocked, with no gate
 
 test('`nemia cancel` reads a closeout that does not read as the run does: an unsigned step waiting on you, so the run is called off', async () => {
   const { run, e } = await signedPlan({}, ['not a closeout']);
-  assert.deepEqual(await statuses(e, run.id), { plan: 'unsigned · closeout unreadable', implement: 'waiting' });
+  assert.deepEqual(await statuses(e, run.id), { plan: 'unsigned · closeout unreadable', implement: 'pending' });
   assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, ['plan']);
   const { plan } = await runWith(e, cancelRun(run.id));
   assert.deepEqual(plan, { kind: 'cancel', stop: [] });

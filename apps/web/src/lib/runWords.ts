@@ -13,7 +13,7 @@ import { timeOfDay, unreadable, UNREADABLE, zoneOf } from './timeOfDay.ts';
 import { ANY_WAIT, ENDED, OPENS, PERSON, RUN_WAITS, stateWordsOf, type Wait as Waited, type WaitWords } from './words.ts';
 
 /** Every kind of wait on a person the page has a sentence for. */
-export const WAIT_KINDS = ['approve', 'blocked', 'check', 'unfinished', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
+export const WAIT_KINDS = ['approve', 'answer', 'check', 'unfinished', 'unsigned', 'denied', 'rounds', 'budget', 'hold', 'after'] as const;
 
 /** A kind of wait on a person. */
 export type WaitKind = (typeof WAIT_KINDS)[number];
@@ -29,7 +29,7 @@ export const waitKindOf: Record<StepState, WaitKind | null> = {
   checking: null,
   verified: null,
   unverified: null,
-  blocked: 'blocked',
+  blocked: 'answer',
   'awaiting-approval': 'approve',
   exhausted: 'rounds',
   'over-budget': 'budget',
@@ -77,12 +77,12 @@ const stateOn = (row: WaitingRow, step: CodedStep): StepState => stepState(step,
  */
 export function waitOf(row: WaitingRow): Wait | null {
   const done = row.steps.filter((step) => ['verified', 'unverified'].includes(stateOn(row, step))).length;
-  if (row.holding?.onYou) return { kind: 'hold', step: null, done };
+  if (row.holding?.waitingOnYou) return { kind: 'hold', step: null, done };
   for (const step of row.steps) {
     const kind = kindOn(row, step);
     if (kind && row.waitingOnYou.includes(step.name)) return { kind, step: step.name, done };
   }
-  return row.waiting?.onYou ? { kind: 'after', step: null, done } : null;
+  return row.waiting?.waitingOnYou ? { kind: 'after', step: null, done } : null;
 }
 
 /**

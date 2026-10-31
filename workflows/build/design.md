@@ -15,6 +15,9 @@ than one run of this workflow usually is, say so, and how to cut it into intents
 Say in the spec how each part shows that what it builds holds, so the implementer's parts carry it: on a rewrite of tests, the source
 line each kept or absorbed assertion guards, broken once and seen failing; on a feature, the test written first and seen failing.
 
+When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
+repository writes Effect 4, and sends you to the docs installed with Effect first.
+
 When the change touches `apps/web`, read `.claude/skills/shadcn/SKILL.md` with Read for how the board's components are meant to be used,
 never with the Skill tool, which your fence refuses.
 

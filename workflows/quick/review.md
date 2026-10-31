@@ -44,6 +44,9 @@ Your fence refuses what would write or watch: a `tsc` whose first option is not 
 any case and after one dash or two, so the refusal goes by its first letters and takes `--inlineSourceMap` and `--inlineSources` with
 `--incremental`.
 
+When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
+repository writes Effect 4, and sends you to the docs installed with Effect first.
+
 When the change touches `apps/web`, read the pictures the implement step named in its `artifacts`, by their paths in its folder's
 `closeout.json`, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding:
 nobody else will look at the board before this lands.

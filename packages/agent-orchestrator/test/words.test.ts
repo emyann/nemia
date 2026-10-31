@@ -11,22 +11,28 @@
  *   Refused in the runtime's `src` and `bin`, but a word the runtime's glossary retires (`RETIRED`), which its own guard counts
  *   (`tools/guards/test/glossary.test.ts`) so that no file is held to the same word twice. A sign-in is no end: `signed` or `signs`
  *   before `in`, `out` or `into` is not counted (`SIGN_IN`), so "signed in to a server" is said and "the session that signed" is not.
- * - **This repository's team stays out of the packages** (`teamOf`): the name of each agent of `workflows/agents/`, read as the test
- *   runs, so a new agent is refused with no edit here. Refused in every package's `src`. A name that is plain English (`PLAIN_NAMES`)
+ * - **This repository's team stays out of the product** (`teamOf`): the name of each agent of `workflows/agents/`, read as the test
+ *   runs, so a new agent is refused with no edit here, and the owner's factory's name (`FACTORY_NAMES`), which no team file holds.
+ *   Refused in every package's `src`, `test`, `bin` and `place` and every app's `src` and `test`, tests included: a product test that
+ *   passes only with our team present is the same debt as product code that names it. A name that is plain English (`PLAIN_NAMES`)
  *   counts only as a quoted literal or a path segment.
+ * - **Nor does the product read the team's folder** (`teamPathsIn`): a path into `workflows/<a team workflow>` of this checkout (the
+ *   folders `workflowsIn` finds there, read as the test runs, and `servers`, which was the team's), spelt as a path or as the segments
+ *   of a join, and the checkout's `workflows/` reached from `REPO`, `HOME_REPO` or `import.meta.dirname`. Refused where the team's names
+ *   are. A product's own `workflows/` — a store's library, a fixture repository's — is no path into the team's, and is not counted.
  *
  * A word is matched whole and in any case, comments included (`wordsIn`): a hyphen or a dot ends it, so `claude-code` and
- * `CLAUDE.md` say it, and a longer name (`claudeArgs`, `$claude`) does not. Tests, the board's vendored components and its generated
- * route tree are not read.
+ * `CLAUDE.md` say it, and a longer name (`claudeArgs`, `$claude`) does not. The board's vendored components and its generated route
+ * tree are not read, nor tests but by the team's two rules, nor this file and the team's baseline, whose fixtures must say the names.
  *
  * Each file that says such a word today is a known exception, counted file by file (`HARNESS_WORDS`, `WORKFLOW_WORDS`,
- * `LAYER_ABOVE_WORDS`, `TEAM_NAMES`),
+ * `LAYER_ABOVE_WORDS`, and the team's `TEAM_NAMES` and `TEAM_PATHS` in `team-names.baseline.ts`),
  * and the count only shrinks. Each entry names the card that removes its words (`CARDS`), else the move in words and where it goes
  * (`MOVES`). `ratchetBreaks` refuses a file no entry holds, a count above the measure or below it, an entry for a file gone or clean, and
  * an entry with no card, an unknown card, or a move with nowhere to go. A change that takes a word out of a file lowers its count in the
  * same commit.
  *
- * The test reads files outside this package: `turbo.json` makes the apps' sources, the runtime and `workflows/agents/` inputs of this
+ * The test reads files outside this package: `turbo.json` makes the apps' sources and tests, the runtime and `workflows/` inputs of this
  * package's tests; after a change to `workflows/`, `npx turbo run test --force`.
  */
 import { test } from 'node:test';
@@ -34,7 +40,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { CLAUDE_PERMISSION_MODES, CODEX_SANDBOXES } from 'agent-runtime';
+import { workflowsIn } from '../src/folder/folder.store.ts';
 import { scratch } from './scratch.ts';
+import { TEAM_NAMES, TEAM_PATHS } from './team-names.baseline.ts';
 
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
@@ -83,6 +91,12 @@ const SIGN_IN = /(?<![\w$])(signed|signs)[\s-]+(?:in|out|into)(?![\w$])/gi;
 
 /** The team's names that are plain English, counted only as a quoted literal or a path segment. */
 const PLAIN_NAMES: readonly string[] = ['grace'];
+
+/**
+ * The owner's factory, named in no file of `workflows/` (a factory is a person's record in their store, not a file of the team), so
+ * held here: the one team word this guard cannot read from the team.
+ */
+const FACTORY_NAMES: readonly string[] = ['pipao'];
 
 /** The cards and slices filed to remove a word from a layer, by the id an entry names. */
 const CARDS: Readonly<Record<string, string>> = {
@@ -150,8 +164,8 @@ const MOVES = {
   },
 } satisfies Record<string, Move>;
 
-type Entry = { count: number; card: string } | ({ count: number } & Move);
-type Baseline = Readonly<Record<string, Entry>>;
+export type Entry = { count: number; card: string } | ({ count: number } & Move);
+export type Baseline = Readonly<Record<string, Entry>>;
 
 /** Each file outside the runtime that says a harness's word today, with its count and what removes them. */
 const HARNESS_WORDS: Baseline = {
@@ -256,11 +270,6 @@ const WORKFLOW_WORDS: Baseline = {
 /** Each runtime file that says the layer above's word for an end, the store or an attempt today, its count and what removes them. */
 const LAYER_ABOVE_WORDS: Baseline = {};
 
-/** Each package file that names an agent of the team today, with its count and what removes them. */
-const TEAM_NAMES: Baseline = {
-  'packages/agent-orchestrator/src/factory/factory.ts': { count: 2, ...MOVES.team },
-};
-
 /** A rule: the words it refuses, where, what it calls them, and what a file that says one does instead. */
 type Rule = { what: string; dirs: readonly string[]; fix: string };
 
@@ -284,26 +293,44 @@ const LAYER_ABOVE_RULE: Rule = {
 
 const TEAM_RULE: Rule = {
   what: 'team names',
-  dirs: fs.readdirSync(path.join(ROOT, 'packages')).map((p) => `packages/${p}/src`),
-  fix: "the team is this repository's, never the packages': name no agent of workflows/agents/ in their source",
+  dirs: [
+    ...fs.readdirSync(path.join(ROOT, 'packages')).flatMap((p) => ['src', 'test', 'bin', 'place'].map((d) => `packages/${p}/${d}`)),
+    ...fs.readdirSync(path.join(ROOT, 'apps')).flatMap((a) => ['src', 'test'].map((d) => `apps/${a}/${d}`)),
+  ],
+  fix: "the team is this repository's, never the product's: name a fixture agent of test/fixtures/team (implementer, reviewer, shipper) and a factory no team holds (acme), or move the test beside the team's script in workflows/",
 };
 
-/** The files the scan leaves out: tests, and the board's vendored and generated files. */
-const skipped = (file: string): boolean =>
-  file.endsWith('.test.ts') ||
-  file.split('/').includes('test') ||
-  file.startsWith('apps/web/src/components/ui/') ||
-  file === 'apps/web/src/routeTree.gen.ts';
+const TEAM_PATHS_RULE: Rule = {
+  what: "paths into the team's workflows/",
+  dirs: TEAM_RULE.dirs,
+  fix: "the product reads no file of this repository's team: build the folder the test needs from test/fixtures/team, or move the test beside the team's script in workflows/",
+};
 
-/** Every `.ts` and `.tsx` under `dirs`, by its path from the root, with its text. */
-const textsOf = (dirs: readonly string[]): Map<string, string> =>
+/** This guard and the team's baseline, whose fixtures and entries say the team's names and paths on purpose. */
+const TEAM_GUARD_FILES: ReadonlySet<string> = new Set([
+  'packages/agent-orchestrator/test/words.test.ts',
+  'packages/agent-orchestrator/test/team-names.baseline.ts',
+]);
+
+/** The board's vendored and generated files, which no rule reads. */
+const vendored = (file: string): boolean =>
+  file.startsWith('apps/web/src/components/ui/') || file === 'apps/web/src/routeTree.gen.ts' || file.split('/').includes('node_modules');
+
+/** The files a layer's rule leaves out: tests, and the board's vendored and generated files. */
+const skipped = (file: string): boolean => file.endsWith('.test.ts') || file.split('/').includes('test') || vendored(file);
+
+/** The files the team's rules leave out: the board's vendored and generated files, and this guard's own two. Tests are read. */
+const teamSkipped = (file: string): boolean => vendored(file) || TEAM_GUARD_FILES.has(file);
+
+/** Every `.ts` and `.tsx` under `dirs` that `skip` keeps, by its path from the root, with its text. */
+const textsOf = (dirs: readonly string[], skip: (file: string) => boolean = skipped): Map<string, string> =>
   new Map(
     dirs
       .filter((dir) => fs.existsSync(path.join(ROOT, dir)))
       .flatMap((dir) =>
         fs.readdirSync(path.join(ROOT, dir), { recursive: true, encoding: 'utf8' }).map((f) => `${dir}/${f.split(path.sep).join('/')}`),
       )
-      .filter((f) => /\.tsx?$/.test(f) && !skipped(f))
+      .filter((f) => /\.tsx?$/.test(f) && !skip(f))
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]),
   );
@@ -339,6 +366,30 @@ function wordsIn(text: string, words: readonly string[], plain: readonly string[
 }
 
 const matches = (text: string, pattern: RegExp): number => [...text.matchAll(pattern)].length;
+
+/** A quoted segment of a join. */
+const QUOTED = (word: string): string => `['"\`]${word}['"\`]`;
+
+/**
+ * How many times `text` names a path into the team's `workflows/`, given the team's `folders` (each a workflow of it, or a folder it
+ * held): `workflows/<folder>` as a path, but under a `src/` (the api's own `src/workflows/`); `'workflows', '<folder>'` as the segments
+ * of a join; and the checkout's `workflows/` itself, joined to `REPO`, `HOME_REPO` or `import.meta.dirname` climbing by `..`, or
+ * templated after `${REPO}`, once each where no folder follows it (which the first two count). A join of another root — a store's,
+ * a fixture repository's — is the product's own folder, and not counted.
+ */
+function teamPathsIn(text: string, folders: readonly string[]): number {
+  if (folders.length === 0) return 0;
+  const folder = `(?:${folders.map(escaped).join('|')})`;
+  const noFolder = `(?!\\s*,\\s*${QUOTED(folder)}|/${folder}(?![\\w$-]))`;
+  const patterns = [
+    new RegExp(`(?<![\\w.$-])(?<!src/)workflows/${folder}(?![\\w$-])`, 'g'),
+    new RegExp(`${QUOTED('workflows')}\\s*,\\s*${QUOTED(folder)}`, 'g'),
+    new RegExp(`(?<![\\w$])(?:REPO|HOME_REPO)\\s*,\\s*${QUOTED('workflows')}${noFolder}`, 'g'),
+    new RegExp(`import\\.meta\\.dirname\\s*,\\s*(?:${QUOTED('\\.\\.')}\\s*,\\s*)+${QUOTED('workflows')}${noFolder}`, 'g'),
+    new RegExp(`\\$\\{(?:REPO|HOME_REPO)\\}/workflows(?![\\w$-])${noFolder}`, 'g'),
+  ];
+  return patterns.reduce((n, p) => n + matches(text, p), 0);
+}
 
 /**
  * How many times `text` says the layer above's word: `LAYER_ABOVE` whole but a sign-in (`SIGN_IN`), and `A_TRY` — of `LAYER_ABOVE`, the
@@ -403,19 +454,36 @@ function ratchetBreaks(rule: Rule, counts: Record<string, number>, baseline: Bas
 
 const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
 
-/** Every breach of the four rules over `texts` of each, against their baselines; the layer above's words read where a workflow's are. */
-function breaches(texts: { harness: Map<string, string>; workflow: Map<string, string>; team: Map<string, string> }, team: string[]) {
+/** Every breach of the five rules over `texts` of each, against their baselines; the layer above's words read where a workflow's are. */
+function breaches(
+  texts: { harness: Map<string, string>; workflow: Map<string, string>; team: Map<string, string> },
+  team: string[],
+  folders: readonly string[] = TEAM_FOLDERS,
+) {
   return [
     ...ratchetBreaks(HARNESS_RULE, measured(texts.harness, HARNESS), HARNESS_WORDS, onDisk),
     ...ratchetBreaks(WORKFLOW_RULE, measured(texts.workflow, WORKFLOW), WORKFLOW_WORDS, onDisk),
     ...ratchetBreaks(LAYER_ABOVE_RULE, measuredBy(texts.workflow, layerAboveIn), LAYER_ABOVE_WORDS, onDisk),
-    ...ratchetBreaks(TEAM_RULE, measured(texts.team, team, PLAIN_NAMES), TEAM_NAMES, onDisk),
+    ...ratchetBreaks(TEAM_RULE, measured(texts.team, [...team, ...FACTORY_NAMES], PLAIN_NAMES), TEAM_NAMES, onDisk),
+    ...ratchetBreaks(
+      TEAM_PATHS_RULE,
+      measuredBy(texts.team, (text) => teamPathsIn(text, folders)),
+      TEAM_PATHS,
+      onDisk,
+    ),
   ];
 }
 
-const repository = () => ({ harness: textsOf(HARNESS_RULE.dirs), workflow: textsOf(WORKFLOW_RULE.dirs), team: textsOf(TEAM_RULE.dirs) });
+const repository = () => ({
+  harness: textsOf(HARNESS_RULE.dirs),
+  workflow: textsOf(WORKFLOW_RULE.dirs),
+  team: textsOf(TEAM_RULE.dirs, teamSkipped),
+});
 
 const TEAM = teamOf(path.join(ROOT, 'workflows', 'agents'));
+
+/** The team's folders under `workflows/`: each workflow of it, read as the test runs, and `servers`, which it held until it moved. */
+const TEAM_FOLDERS = [...workflowsIn(path.join(ROOT, 'workflows')), 'servers'];
 
 /** Each word of `plain` that none of the runtime's `lists` holds: a plain word left behind when the runtime dropped it. */
 const stalePlain = (plain: readonly string[], lists: readonly (readonly string[])[]): string[] =>
@@ -510,12 +578,15 @@ test('REFUSED: a new agent of the team, with no edit to the test', () => {
   const root = scratch('words-team-');
   const agents = path.join(root, 'workflows', 'agents');
   fs.mkdirSync(agents, { recursive: true });
-  for (const name of [...TEAM, 'zed']) fs.writeFileSync(path.join(agents, `${name}.md`), `---\nname: ${name}\n---\n`);
-  fs.writeFileSync(path.join(agents, 'zed.schema.json'), '{}');
+  for (const name of [...TEAM, 'quillon']) fs.writeFileSync(path.join(agents, `${name}.md`), `---\nname: ${name}\n---\n`);
+  fs.writeFileSync(path.join(agents, 'quillon.schema.json'), '{}');
   const team = teamOf(agents);
-  assert.deepEqual(team, [...TEAM, 'zed'].sort());
+  assert.deepEqual(team, [...TEAM, 'quillon'].sort());
   const texts = repository();
-  const said = new Map([...texts.team, ['packages/agent-orchestrator/src/x/x.ts', '/** Hands the work to Zed. */\nexport const x = 1;\n']]);
+  const said = new Map([
+    ...texts.team,
+    ['packages/agent-orchestrator/src/x/x.ts', '/** Hands the work to Quillon. */\nexport const x = 1;\n'],
+  ]);
   assert.deepEqual(breaches({ ...texts, team: said }, team), [
     `packages/agent-orchestrator/src/x/x.ts holds 1 team names: ${TEAM_RULE.fix}; never add them here`,
   ]);
@@ -543,5 +614,56 @@ test('REFUSED: a count above or below the baseline, an entry gone or clean, one 
   assert.deepEqual(breaks({ 'src/a.ts': 2 }, { count: 2, move: 'a move', to: '' }), unnamed);
   assert.deepEqual(breaks({ 'src/a.ts': 2 }, { count: 2, card: 'zzzz' }), [
     "src/a.ts's entry for harness words names zzzz, a card CARDS does not know: name a filed card, or the move and where it goes",
+  ]);
+});
+
+test("the team's rules read every package's and app's source and tests, but this guard's own two files and the board's vendored ones", () => {
+  const read = [...repository().team.keys()];
+  for (const file of [
+    'packages/agent-orchestrator/test/scratch.ts',
+    'packages/agent-orchestrator/src/factory/factory.test.ts',
+    'packages/agent-runtime/test/scratch.ts',
+    'apps/api/test/harness.ts',
+    'apps/web/test/gate.test.ts',
+    'apps/web/src/lib/gate.ts',
+  ])
+    assert.ok(read.includes(file), `${file} is read`);
+  for (const file of TEAM_GUARD_FILES) assert.ok(!read.includes(file), `${file} says the names on purpose and is not read`);
+  assert.ok(!read.some(vendored), "the board's vendored components and route tree are not read");
+  assert.deepEqual(TEAM_FOLDERS, ['build', 'intake', 'janitor', 'quick', 'servers'], "the team's folders, read from workflows/");
+});
+
+test("the paths matcher counts a path into the team's workflows/, and not a product's own workflows/", () => {
+  const folders = ['build', 'quick'];
+  const counted = [
+    'git show main:workflows/build/landing.ts',
+    "path.join(repo, 'workflows', 'quick')",
+    "path.join(REPO, 'workflows')",
+    "path.join(import.meta.dirname, '..', '..', 'workflows')",
+    '`${HOME_REPO}/workflows`',
+  ];
+  for (const text of counted) assert.equal(teamPathsIn(text, folders), 1, text);
+  const notCounted = [
+    "path.join(home, 'workflows', 'agents')",
+    "'../workflows/dev'",
+    "path.join(ROOT, 'workflows')",
+    'apps/api/src/workflows/builder.ts and apps/api/src/workflows/build.ts',
+    "'workflows/builder'",
+  ];
+  for (const text of notCounted) assert.equal(teamPathsIn(text, folders), 0, text);
+});
+
+test("REFUSED: a product test that names the team, the owner's factory or a path into the team's workflows/", () => {
+  const texts = repository();
+  const planted = (file: string, text: string): string[] =>
+    breaches({ ...texts, team: new Map([...texts.team, [file, text]]) }, TEAM).map((b) => b.slice(0, b.indexOf(':')));
+  assert.deepEqual(planted('packages/agent-orchestrator/test/x.test.ts', "const lead = 'grace';\n"), [
+    'packages/agent-orchestrator/test/x.test.ts holds 1 team names',
+  ]);
+  assert.deepEqual(planted('packages/agent-orchestrator/src/x/x.ts', '/** Started in pipao. */\n'), [
+    'packages/agent-orchestrator/src/x/x.ts holds 1 team names',
+  ]);
+  assert.deepEqual(planted('apps/web/test/x.test.ts', "const script = 'workflows/build/landing.ts';\n"), [
+    "apps/web/test/x.test.ts holds 1 paths into the team's workflows/",
   ]);
 });

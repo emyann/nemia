@@ -55,6 +55,11 @@
       }
     },
     {
+      "term": "Door",
+      "meaning": "the one way an aggregate is read and written: an Effect service whose methods answer Effects failing with a refusal, with a files layer and a memory one held to one table of walks, each refusing a write that breaks the aggregate's invariants. Its pattern is `src/door/door.store.ts`.",
+      "type": "DoorOf"
+    },
+    {
       "term": "Gate",
       "meaning": "a property of a step: nothing after it is started until a person approves.",
       "see": {
@@ -186,6 +191,11 @@
         "label": "How a run lives",
         "href": "/how-a-run-lives/"
       }
+    },
+    {
+      "term": "Run door",
+      "meaning": "the run's door: its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it, by `RunId`; the files by default, the memory stand-in where a test gives it. The run store (`RunStore`) is what is left of it outside: the inbox, the Card door's seam, and the callers still to move.",
+      "type": "RunDoor"
     },
     {
       "term": "RunId",

@@ -17,7 +17,7 @@ import { asNamed } from '../workflow.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import type { AsksRead, MergeAskHeld } from './record.ts';
-import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
+import { Invalid, Missing } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
 import { wfRoot } from '../config/config.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
@@ -730,16 +730,11 @@ const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hol
 
 /**
  * A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, a person's file. Exclusive (`wx`): a
- * record already at the id is refused as `Conflict` and left as it is, so two starts that minted one id make one run.
+ * record already at the id is left as it is, and the write throws `EEXIST`, which the Run door answers as `Conflict`.
  */
 export const writeRun = ({ pause: _, ...run }: Run) => {
   fs.mkdirSync(runsDir(), { recursive: true });
-  try {
-    fs.writeFileSync(runFile(run.id), recordText(run), { flag: 'wx' });
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
-    throw new Conflict({ message: `run ${run.id} already exists: start it under a new id, or forget the one there with nemia rm ${run.id}` });
-  }
+  fs.writeFileSync(runFile(run.id), recordText(run), { flag: 'wx' });
 };
 
 /**

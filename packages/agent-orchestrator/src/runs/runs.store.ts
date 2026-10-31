@@ -7,12 +7,13 @@
  * Two layers: the files (`runDoorFiles`, over `filesStore`, so a record is the very bytes it was), which `runWith` gives a program that
  * was given none, and the memory stand-in (`runDoorMemory`, `memory.store.ts`), which a test gives its program. Both are built by
  * `runDoorOver`, so each write is checked the one way on both: a new run decodes through the model's `Run` (`record/record.model.ts`)
- * with its id as `RunId.OnCreate` checks it, and a run written back through `Run`, its invariants among it — each try named by its step and number, no run waiting on itself, a landing with one outcome — or `Invalid`
- * names the check broken and nothing is written. A record already at a new run's id is `Conflict`. The walks of `test/run-walks.ts`
- * hold both layers to one table.
+ * with its id as `RunId.OnCreate` checks it, and a run written back through `Run`, its invariants among it — each try named by its
+ * step and number, no run waiting on itself, a landing with one outcome — or `Invalid` names the check broken and nothing is written.
+ * A record already at a new run's id is `Conflict`. The walks of `test/run-walks.ts` hold both layers to one table.
  */
 import { Context, Effect, Layer } from 'effect';
 import { doorOf, checked, type DoorOf } from '../door/door.store.ts';
+import { Conflict } from '../refusal/refusal.ts';
 import { filesStore } from '../record/files.store.ts';
 import { Run as RunModel, RunId } from '../record/record.model.ts';
 import type { Run, RunStore } from '../record/record.ts';
@@ -54,8 +55,25 @@ export function runDoorOver(layer: RunsLayer): RunDoorShape {
   };
 }
 
-/** The run store's files but the inbox: what the files layer is over. */
-const { inbox: _, ...filesRuns } = filesStore;
+/** A record already at the id of a new run, as a refusal: the files say so by `EEXIST`, the memory by its own. */
+export const runTaken = (id: string): Conflict =>
+  new Conflict({ message: `run ${id} already exists: start it under a new id, or forget the one there with nemia rm ${id}` });
+
+/** The run store's files but the inbox, a new run's record refused as `runTaken` when one is there: what the files layer is over. */
+const { inbox: _, ...files } = filesStore;
+const filesRuns: RunsLayer = {
+  ...files,
+  runs: {
+    ...files.runs,
+    create: (run) => {
+      try {
+        files.runs.create(run);
+      } catch (err) {
+        throw (err as NodeJS.ErrnoException).code === 'EEXIST' ? runTaken(run.id) : err;
+      }
+    },
+  },
+};
 
 /** The Run door over the store's files: today's records and a person's files, unchanged on disk. */
 export const runDoorFiles: Layer.Layer<RunDoor> = Layer.succeed(RunDoor)(runDoorOver(filesRuns));

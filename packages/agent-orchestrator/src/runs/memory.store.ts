@@ -9,13 +9,13 @@
  */
 import path from 'node:path';
 import { Layer } from 'effect';
-import { Conflict, Missing } from '../refusal/refusal.ts';
+import { Missing } from '../refusal/refusal.ts';
 import { mergeSpent } from '../merge/merge.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import type { AskKey, Hold, PersonAsk, Pruned, Run } from '../record/record.ts';
-import { RunDoor, runDoorOver, type RunsLayer } from './runs.store.ts';
+import { RunDoor, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
 export const MEMORY_ROOT = '/memory';
@@ -108,10 +108,7 @@ function runsOf(st: State): RunsLayer['runs'] {
     list: (_said, kept) => ids().map((id) => kept?.(id) ?? read(id)),
     find: (id) => (st.records.has(id) ? read(id) : undefined),
     create: (run) => {
-      if (st.records.has(run.id))
-        throw new Conflict({
-          message: `run ${run.id} already exists: start it under a new id, or forget the one there with nemia rm ${run.id}`,
-        });
+      if (st.records.has(run.id)) throw runTaken(run.id);
       st.records.set(run.id, recordOf(run));
       touch(st, run.id);
     },

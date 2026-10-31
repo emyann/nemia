@@ -93,8 +93,11 @@ function briefArgs(arg: string, args: Args): Args {
   };
 }
 
-/** Whether `arg` reads as a path rather than words: one word, with a slash in it. */
-const pathLike = (arg: string): boolean => !/\s/.test(arg) && /[\\/]/.test(arg);
+/**
+ * Whether `arg` reads as a path rather than words: one word that opens with `.`, `/` or `~`, or ends with `/` (Windows' `\\` the same). A
+ * word with a slash only inside it is words: a link, or a branch such as `fix/login`.
+ */
+const pathLike = (arg: string): boolean => !/\s/.test(arg) && (/^[./~\\]/.test(arg) || /[\\/]$/.test(arg));
 
 /**
  * `nemia start`: a run of a brief, a plan's card or an inbox card (`START`), and what it prints of it; or, for a folder, a run per card of

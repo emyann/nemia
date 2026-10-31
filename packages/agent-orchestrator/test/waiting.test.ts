@@ -735,6 +735,17 @@ test('REFUSED by name at shipped defaults: `nemia start <folder>` starts nothing
   }
 });
 
+test('a brief of one word with a slash in it that reads as no path, a link or a branch, starts a run of its words', async (t) => {
+  const repo = aRepo();
+  const flow = oneStep();
+  for (const brief of ['https://github.com/o/r/issues/12', 'fix/login'])
+    await t.test(brief, async () => {
+      const before = runsWritten();
+      await printedBy(t, () => stage.main(['start', brief, '--workflows', flow, '--repo', repo]));
+      assert.equal(runsWritten(), before + 1, 'one run started');
+    });
+});
+
 test('a `start()` that refuses part-way stops the plan: the runs already started stand, with their edges, and it says which card refused and which are left', async () => {
   const repo = aRepo();
   const flow = oneStep();

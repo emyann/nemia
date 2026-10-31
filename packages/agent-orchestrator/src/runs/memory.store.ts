@@ -4,7 +4,7 @@
  * program, runDoorMemory())` — where it needs a run to exist and nothing of the disk; the walks of `test/run-walks.ts` hold it to what
  * the files answer. A run's paths (`where`, `forget`) are under `MEMORY_ROOT`, named as the files name them under `WF_ROOT`.
  *
- * Reached through `agent-orchestrator/testing` alone: no file of `src` imports it (`test/boundary.test.ts`, `STAND_INS`). What it holds no
+ * A test's alone: no file of `src` imports it (`test/boundary.test.ts`, `STAND_INS`). What it holds no
  * file for, it answers as a store with none: no files directory, and no pause.
  */
 import path from 'node:path';
@@ -19,9 +19,6 @@ import { RunDoor, runDoorOver, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
 export const MEMORY_ROOT = '/memory';
-
-/** One ask held, by its key's name (`<kind>-<step>-<n>`), and whether the tick consumed it. */
-type Held = { person: PersonAsk; done: boolean };
 
 /** The ask's key: the step and number its file is named by (`askWhere`). */
 const keyOf = (person: PersonAsk): AskKey =>
@@ -40,169 +37,236 @@ const recordOf = (run: Run): Run => {
   return structuredClone(kept) as Run;
 };
 
+/** One ask held, by its key's name (`<kind>-<step>-<n>`), and whether the tick consumed it. */
+type Held = { person: PersonAsk; done: boolean };
+
+/** What a stand-in holds: each run's record, and a person's files beside it, by run id; and each run's stamp, a count of its changes. */
+type State = {
+  records: Map<string, Run>;
+  cancelled: Map<string, string>;
+  pruned: Map<string, Pruned>;
+  holds: Map<string, Hold>;
+  refresh: Map<string, { at: string }>;
+  asks: Map<string, Map<string, Held>>;
+  forgetting: Map<string, string[]>;
+  versions: Map<string, number>;
+};
+
+const stateOf = (): State => ({
+  records: new Map(),
+  cancelled: new Map(),
+  pruned: new Map(),
+  holds: new Map(),
+  refresh: new Map(),
+  asks: new Map(),
+  forgetting: new Map(),
+  versions: new Map(),
+});
+
+/** A change to what the stand-in holds of `id`: its stamp moves. */
+const touch = (st: State, id: string): void => void st.versions.set(id, (st.versions.get(id) ?? 0) + 1);
+const asksOf = (st: State, id: string): Map<string, Held> => st.asks.get(id) ?? new Map();
+const waiting = (st: State, id: string, kind: PersonAsk['kind']) =>
+  [...asksOf(st, id).values()].filter((h) => !h.done && h.person.kind === kind).map((h) => structuredClone(h.person.ask));
+
+/** The run `id`, its person's files composed onto it as `readRun` composes them. */
+function readOf(st: State, id: string): Run {
+  const record = st.records.get(id);
+  if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
+  const [approvals, acceptances] = [waiting(st, id, 'approve'), waiting(st, id, 'accept')];
+  return {
+    ...structuredClone(record),
+    ...(st.cancelled.has(id) ? { cancelledAt: st.cancelled.get(id) } : {}),
+    ...(st.pruned.has(id) ? { pruned: structuredClone(st.pruned.get(id)!) } : {}),
+    ...(st.holds.has(id) ? { hold: structuredClone(st.holds.get(id)!) } : {}),
+    ...(approvals.length ? { approvals } : {}),
+    ...(acceptances.length ? { acceptances } : {}),
+  } as Run;
+}
+
+/** Remove what the stand-in holds of `id`, answering each name removed as the files name it under `WF_ROOT`. */
+function forgetOf(st: State, id: string): string[] {
+  const removed: string[] = [];
+  const named: Array<[Map<string, unknown>, string]> = [
+    [st.records, `${id}.json`],
+    [st.cancelled, `${id}.cancelled`],
+    [st.pruned, `${id}.pruned`],
+    [st.holds, `${id}.hold`],
+    [st.refresh, `${id}.refresh`],
+    [st.asks, `${id}.asks/`],
+  ];
+  for (const [held, name] of named) if (held.delete(id)) removed.push(`runs/${name}`);
+  st.versions.delete(id);
+  return removed;
+}
+
+function runsOf(st: State): RunsLayer['runs'] {
+  const read = (id: string) => readOf(st, id);
+  const ids = (): string[] => [...st.records.keys()].sort();
+  return {
+    read,
+    list: (_said, kept) => ids().map((id) => kept?.(id) ?? read(id)),
+    find: (id) => (st.records.has(id) ? read(id) : undefined),
+    create: (run) => {
+      if (st.records.has(run.id))
+        throw new Conflict({
+          message: `run ${run.id} already exists: start it under a new id, or forget the one there with nemia rm ${run.id}`,
+        });
+      st.records.set(run.id, recordOf(run));
+      touch(st, run.id);
+    },
+    rewrite: (run) => {
+      if (!st.records.has(run.id)) return false;
+      st.records.set(run.id, recordOf(run));
+      touch(st, run.id);
+      return true;
+    },
+    stamps: () => new Map([...st.versions].filter(([id]) => st.records.has(id)).map(([id, v]) => [id, String(v)])),
+    exists: (id) => st.records.has(id),
+    taken: (id) => [st.records, st.cancelled, st.pruned, st.holds, st.refresh, st.asks].some((m) => m.has(id)),
+    calledOff: (id) => st.cancelled.has(id) || st.pruned.has(id) || st.holds.has(id),
+    cancel: (id) => {
+      if (!st.cancelled.has(id)) {
+        st.cancelled.set(id, new Date().toISOString());
+        touch(st, id);
+      }
+      return st.cancelled.get(id)!;
+    },
+    forget: (id) => forgetOf(st, id),
+    ids,
+    filesAt: () => undefined,
+    dropFiles: () => null,
+    prune: (id, marker) => {
+      if (marker) st.pruned.set(id, structuredClone(marker));
+      else st.pruned.delete(id);
+      touch(st, id);
+    },
+    pruned: (id) => (st.pruned.has(id) ? structuredClone(st.pruned.get(id)!) : undefined),
+  };
+}
+
+/** Set aside each ask of `kind` named by `spent` (its step and number): consumed, never edited, as `doneWith` moves a file. */
+function spend(st: State, id: string, kind: PersonAsk['kind'], spent: ReadonlyArray<{ step: string; n: number }>): void {
+  for (const { step, n } of spent) {
+    const held = asksOf(st, id).get(nameOf({ kind, step, n }));
+    if (held && !held.done) {
+      held.done = true;
+      touch(st, id);
+    }
+  }
+}
+
+function asksGroup(st: State): RunsLayer['asks'] {
+  return {
+    read: (id) => ({
+      asks: waiting(st, id, 'retry') as RetryAsk[],
+      rounds: [...(waiting(st, id, 'round') as RoundAsk[]), ...(waiting(st, id, 'merge') as RoundAsk[])],
+      notes: [],
+    }),
+    answers: (id) =>
+      [...asksOf(st, id).values()]
+        .filter((h) => h.person.kind === 'retry' && h.person.ask.message !== undefined)
+        .map((h) => structuredClone(h.person.ask as RetryAsk)),
+    consume: (run, retries, rounds, voided = []) => {
+      const tries = [...new Set([...spentAsks(run, retries), ...voided])];
+      spend(
+        st,
+        run.id,
+        'retry',
+        tries.map((a) => ({ step: a.step, n: a.try })),
+      );
+      const plain = rounds.filter((a) => !a.merge);
+      spend(
+        st,
+        run.id,
+        'round',
+        spentRoundAsks(run, plain).map((a) => ({ step: a.step, n: a.round })),
+      );
+      spend(
+        st,
+        run.id,
+        'approve',
+        spentApprovals(run).map((a) => ({ step: a.step, n: a.try })),
+      );
+      spend(
+        st,
+        run.id,
+        'accept',
+        spentAcceptances(run).map((a) => ({ step: a.step, n: a.try })),
+      );
+      const merges = rounds.filter((a) => a.merge && mergeSpent(run, a));
+      spend(
+        st,
+        run.id,
+        'merge',
+        merges.map((a) => ({ step: a.merge!.target, n: a.merge!.try })),
+      );
+    },
+    write: (id, person) => {
+      const name = nameOf(keyOf(person));
+      const where = runsAt(`${id}.asks`, name);
+      const held = st.asks.get(id) ?? new Map<string, Held>();
+      if (held.has(name)) return { written: false, where, stray: null };
+      held.set(name, { person: structuredClone(person), done: false });
+      st.asks.set(id, held);
+      touch(st, id);
+      return { written: true, where };
+    },
+    where: (id, key) => runsAt(`${id}.asks`, nameOf(key)),
+  };
+}
+
+function holdsOf(st: State): RunsLayer['holds'] {
+  return {
+    lift: (id, at) => {
+      if (st.holds.get(id)?.at !== at) return false;
+      st.holds.delete(id);
+      touch(st, id);
+      return true;
+    },
+    put: (id, until, { why, by }) => {
+      if (st.holds.has(id)) return null;
+      const hold: Hold = { at: new Date().toISOString(), until: [...until], ...(why ? { why } : {}), ...(by ? { by } : {}) };
+      st.holds.set(id, hold);
+      touch(st, id);
+      return structuredClone(hold);
+    },
+    stands: (id) => st.holds.has(id),
+  };
+}
+
+function refreshOf(st: State): RunsLayer['refresh'] {
+  return {
+    put: (id) => {
+      if (st.refresh.has(id)) return null;
+      const ask = { at: new Date().toISOString() };
+      st.refresh.set(id, ask);
+      touch(st, id);
+      return { ...ask };
+    },
+    lift: (id) => {
+      const was = st.refresh.delete(id);
+      if (was) touch(st, id);
+      return was;
+    },
+    stands: (id) => st.refresh.has(id),
+  };
+}
+
+function forgettingOf(st: State): RunsLayer['forgetting'] {
+  return {
+    write: (id, taskIds) => void st.forgetting.set(id, [...taskIds]),
+    read: (id) => (st.forgetting.has(id) ? [...st.forgetting.get(id)!] : undefined),
+    list: () => [...st.forgetting.keys()].sort(),
+    lift: (id) => void st.forgetting.delete(id),
+    where: (id) => path.posix.join(MEMORY_ROOT, 'forgetting', `${id}.json`),
+  };
+}
+
 /** A fresh stand-in's plain methods: the `RunsLayer` the door is over. */
 function memoryRuns(): RunsLayer {
-  const records = new Map<string, Run>();
-  const cancelled = new Map<string, string>();
-  const pruned = new Map<string, Pruned>();
-  const holds = new Map<string, Hold>();
-  const refresh = new Map<string, { at: string }>();
-  const asks = new Map<string, Map<string, Held>>();
-  const forgetting = new Map<string, string[]>();
-  const versions = new Map<string, number>();
-  const touch = (id: string): void => void versions.set(id, (versions.get(id) ?? 0) + 1);
-  const asksOf = (id: string): Map<string, Held> => asks.get(id) ?? new Map();
-  const waiting = (id: string, kind: PersonAsk['kind']) =>
-    [...asksOf(id).values()].filter((h) => !h.done && h.person.kind === kind).map((h) => h.person.ask);
-
-  const read = (id: string): Run => {
-    const record = records.get(id);
-    if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
-    const [approvals, acceptances] = [waiting(id, 'approve'), waiting(id, 'accept')];
-    return {
-      ...structuredClone(record),
-      ...(cancelled.has(id) ? { cancelledAt: cancelled.get(id) } : {}),
-      ...(pruned.has(id) ? { pruned: structuredClone(pruned.get(id)!) } : {}),
-      ...(holds.has(id) ? { hold: structuredClone(holds.get(id)!) } : {}),
-      ...(approvals.length ? { approvals } : {}),
-      ...(acceptances.length ? { acceptances } : {}),
-    } as Run;
-  };
-  const ids = (): string[] => [...records.keys()].sort();
-  const spend = (id: string, kind: PersonAsk['kind'], spent: ReadonlyArray<{ step: string; n: number }>): void => {
-    for (const { step, n } of spent) {
-      const held = asksOf(id).get(nameOf({ kind, step, n }));
-      if (held && !held.done) {
-        held.done = true;
-        touch(id);
-      }
-    }
-  };
-
-  return {
-    runs: {
-      read,
-      list: (_said, kept) => ids().map((id) => kept?.(id) ?? read(id)),
-      find: (id) => (records.has(id) ? read(id) : undefined),
-      create: (run) => {
-        if (records.has(run.id))
-          throw new Conflict({ message: `run ${run.id} already exists: start it under a new id, or forget the one there with nemia rm ${run.id}` });
-        records.set(run.id, recordOf(run));
-        touch(run.id);
-      },
-      rewrite: (run) => {
-        if (!records.has(run.id)) return false;
-        records.set(run.id, recordOf(run));
-        touch(run.id);
-        return true;
-      },
-      stamps: () => new Map([...versions].filter(([id]) => records.has(id)).map(([id, v]) => [id, String(v)])),
-      exists: (id) => records.has(id),
-      taken: (id) => [records, cancelled, pruned, holds, refresh, asks].some((m) => m.has(id)),
-      calledOff: (id) => cancelled.has(id) || pruned.has(id) || holds.has(id),
-      cancel: (id) => {
-        if (!cancelled.has(id)) {
-          cancelled.set(id, new Date().toISOString());
-          touch(id);
-        }
-        return cancelled.get(id)!;
-      },
-      forget: (id) => {
-        const removed: string[] = [];
-        const drop = (held: Map<string, unknown>, name: string): void => {
-          if (held.delete(id)) removed.push(`runs/${name}`);
-        };
-        drop(records, `${id}.json`);
-        drop(cancelled, `${id}.cancelled`);
-        drop(pruned, `${id}.pruned`);
-        drop(holds, `${id}.hold`);
-        drop(refresh, `${id}.refresh`);
-        drop(asks, `${id}.asks/`);
-        versions.delete(id);
-        return removed;
-      },
-      ids,
-      filesAt: () => undefined,
-      dropFiles: () => null,
-      prune: (id, marker) => {
-        if (marker) pruned.set(id, structuredClone(marker));
-        else pruned.delete(id);
-        touch(id);
-      },
-      pruned: (id) => (pruned.has(id) ? structuredClone(pruned.get(id)!) : undefined),
-    },
-    asks: {
-      read: (id) => {
-        const rounds: RoundAsk[] = [...(waiting(id, 'round') as RoundAsk[]), ...(waiting(id, 'merge') as RoundAsk[])];
-        return { asks: structuredClone(waiting(id, 'retry') as RetryAsk[]), rounds: structuredClone(rounds), notes: [] };
-      },
-      answers: (id) =>
-        [...asksOf(id).values()]
-          .filter((h) => h.person.kind === 'retry' && h.person.ask.message !== undefined)
-          .map((h) => structuredClone(h.person.ask as RetryAsk)),
-      consume: (run, retries, rounds, voided = []) => {
-        spend(run.id, 'retry', [...new Set([...spentAsks(run, retries), ...voided])].map((a) => ({ step: a.step, n: a.try })));
-        const plain = rounds.filter((a) => !a.merge);
-        spend(run.id, 'round', spentRoundAsks(run, plain).map((a) => ({ step: a.step, n: a.round })));
-        spend(run.id, 'approve', spentApprovals(run).map((a) => ({ step: a.step, n: a.try })));
-        spend(run.id, 'accept', spentAcceptances(run).map((a) => ({ step: a.step, n: a.try })));
-        spend(
-          run.id,
-          'merge',
-          rounds.filter((a) => a.merge && mergeSpent(run, a)).map((a) => ({ step: a.merge!.target, n: a.merge!.try })),
-        );
-      },
-      write: (id, person) => {
-        const key = keyOf(person);
-        const where = runsAt(`${id}.asks`, nameOf(key));
-        const held = asks.get(id) ?? new Map<string, Held>();
-        if (held.has(nameOf(key))) return { written: false, where, stray: null };
-        held.set(nameOf(key), { person: structuredClone(person), done: false });
-        asks.set(id, held);
-        touch(id);
-        return { written: true, where };
-      },
-      where: (id, key) => runsAt(`${id}.asks`, nameOf(key)),
-    },
-    holds: {
-      lift: (id, at) => {
-        if (holds.get(id)?.at !== at) return false;
-        holds.delete(id);
-        touch(id);
-        return true;
-      },
-      put: (id, until, { why, by }) => {
-        if (holds.has(id)) return null;
-        const hold: Hold = { at: new Date().toISOString(), until: [...until], ...(why ? { why } : {}), ...(by ? { by } : {}) };
-        holds.set(id, hold);
-        touch(id);
-        return structuredClone(hold);
-      },
-      stands: (id) => holds.has(id),
-    },
-    refresh: {
-      put: (id) => {
-        if (refresh.has(id)) return null;
-        const ask = { at: new Date().toISOString() };
-        refresh.set(id, ask);
-        touch(id);
-        return { ...ask };
-      },
-      lift: (id) => {
-        const was = refresh.delete(id);
-        if (was) touch(id);
-        return was;
-      },
-      stands: (id) => refresh.has(id),
-    },
-    forgetting: {
-      write: (id, taskIds) => void forgetting.set(id, [...taskIds]),
-      read: (id) => (forgetting.has(id) ? [...forgetting.get(id)!] : undefined),
-      list: () => [...forgetting.keys()].sort(),
-      lift: (id) => void forgetting.delete(id),
-      where: (id) => path.posix.join(MEMORY_ROOT, 'forgetting', `${id}.json`),
-    },
-  };
+  const st = stateOf();
+  return { runs: runsOf(st), asks: asksGroup(st), holds: holdsOf(st), refresh: refreshOf(st), forgetting: forgettingOf(st) };
 }
 
 /** A fresh Run door in memory: no run, and nothing kept between two calls (a test makes one per test). */

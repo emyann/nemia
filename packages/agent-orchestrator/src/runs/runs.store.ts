@@ -5,10 +5,9 @@
  * (S3) and stays on `runStore` as its seam.
  *
  * Two layers: the files (`runDoorFiles`, over `filesStore`, so a record is the very bytes it was), which `runWith` gives a program that
- * was given none, and the memory stand-in (`runDoorMemory`, `memory.store.ts`), which a test gives its program through
- * `agent-orchestrator/testing`. Both are built by `runDoorOver`, so each write is checked the one way on both: a new run decodes through
- * the model's `Run` (`record/record.model.ts`) with its id as `RunId.OnCreate` checks it, and a run written back through `Run`, its
- * invariants among it — each try named by its step and number, no run waiting on itself, a landing with one outcome — or `Invalid`
+ * was given none, and the memory stand-in (`runDoorMemory`, `memory.store.ts`), which a test gives its program. Both are built by
+ * `runDoorOver`, so each write is checked the one way on both: a new run decodes through the model's `Run` (`record/record.model.ts`)
+ * with its id as `RunId.OnCreate` checks it, and a run written back through `Run`, its invariants among it — each try named by its step and number, no run waiting on itself, a landing with one outcome — or `Invalid`
  * names the check broken and nothing is written. A record already at a new run's id is `Conflict`. The walks of `test/run-walks.ts`
  * hold both layers to one table.
  */

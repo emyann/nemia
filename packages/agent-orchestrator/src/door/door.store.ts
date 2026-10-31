@@ -32,18 +32,11 @@ export type DoorOf<T, I extends string> = {
  * A layer's plain value of synchronous methods as a door: each method's act run by `fromThrow` when the Effect runs, never when it is
  * built, so a read is made where the program yields it.
  */
-export function doorOf<T extends Record<string, Record<string, (...args: never[]) => unknown>>, I extends string>(
-  layer: T,
-): DoorOf<T, I> {
+export function doorOf<T extends Record<string, Record<string, (...args: never[]) => unknown>>, I extends string>(layer: T): DoorOf<T, I> {
   return Object.fromEntries(
     Object.entries(layer).map(([group, methods]) => [
       group,
-      Object.fromEntries(
-        Object.entries(methods).map(([name, method]) => [
-          name,
-          (...args: never[]) => fromThrow(() => (method as (...a: never[]) => unknown)(...args)),
-        ]),
-      ),
+      Object.fromEntries(Object.entries(methods).map(([name, method]) => [name, (...args: never[]) => fromThrow(() => method(...args))])),
     ]),
   ) as DoorOf<T, I>;
 }

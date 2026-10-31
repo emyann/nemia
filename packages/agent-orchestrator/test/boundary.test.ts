@@ -166,8 +166,8 @@ const STORE_SHARED: Record<string, readonly string[]> = {
 };
 
 /**
- * The doors' memory stand-ins: store files no file of `src` imports, the tests reaching each through `agent-orchestrator/testing`
- * (`place/memory/index.ts`), so the shipped program never holds its runs in memory.
+ * The doors' memory stand-ins: store files no file of `src` imports, only a test, so the shipped program never holds its runs in
+ * memory.
  */
 const STAND_INS: readonly string[] = ['src/runs/memory.store.ts'];
 
@@ -341,7 +341,7 @@ function treeBreaks(sources: Sources): string[] {
     if (STAND_INS.includes(file)) {
       for (const [user, imports] of Object.entries(sources))
         if (imports.includes(file))
-          out.push(`${user} imports ${file}, a stand-in: a test gives it through agent-orchestrator/testing, and no file of src imports it`);
+          out.push(`${user} imports ${file}, a stand-in: a test gives it to its program, and no file of src imports it`);
       continue;
     }
     if (![CLIENT, ...beneath].some((user) => (sources[user] ?? []).includes(file)))
@@ -607,7 +607,7 @@ test('REFUSED: a pure file in a folder that reads the disk, a store in a folder 
   ]);
 });
 
-test('REFUSED: a file of src that imports a door\'s memory stand-in', () => {
+test("REFUSED: a file of src that imports a door's memory stand-in", () => {
   assert.deepEqual(treeBreaks(packageSources()), [], 'the shipped program imports no stand-in');
   const broken = treeBreaks(adding('src/tick/tick.verb.ts', 'src/runs/memory.store.ts'));
   assert.equal(broken.length, 1);

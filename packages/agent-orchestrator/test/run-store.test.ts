@@ -24,6 +24,10 @@ import { scratch } from './scratch.ts';
 const ROOT = scratch('wf-run-store-');
 process.env.WF_ROOT = ROOT;
 const { filesStore } = await import('../src/record/files.store.ts');
+const { RunDoor, runDoorFiles } = await import('../src/runs/runs.store.ts');
+const { act, doorFrom, walksOn } = await import('./door-walks.ts');
+const { RUN_WALKS, aRun } = await import('./run-walks.ts');
+const { RunId } = await import('../src/record/record.model.ts');
 const { mayFileOf } = await import('../src/tick/advance.verb.ts');
 const { resumePause, putPause } = await import('../src/pause/pause.store.ts');
 const {
@@ -41,30 +45,11 @@ const {
   roundAskIn,
   runFile,
   runsDir,
-  writeAsk,
   writeHold,
 } = await import('../src/record/record.store.ts');
 
 const PKG = path.join(import.meta.dirname, '..');
 const at = '2026-09-30T09:00:00.000Z';
-
-/** A repository run's record as the tick writes one today, frozen steps and all. */
-const aRun = (id: string): Run => ({
-  id,
-  repo: '/repo',
-  workspace: '/repo',
-  baseRef: 'abc123',
-  branch: 'main',
-  isolate: true,
-  brief: 'add a flag',
-  workflowDir: '/repo/workflows/dev',
-  workflow: [
-    { name: 'implement', after: [], body: 'do it', harness: 'claude' },
-    { name: 'review', after: ['implement'], body: 'read it', harness: 'claude' },
-  ],
-  steps: { implement: { taskId: `${id}-implement`, workspace: '/w/implement', branch: `wf/${id}/implement` }, review: { taskId: null } },
-  createdAt: '2026-09-01T00:00:00.000Z',
-});
 
 /** A run made in the store under `id`. */
 const made = (id: string): Run => {
@@ -76,27 +61,25 @@ const made = (id: string): Run => {
 /** A prune marker, as `nemia prune` writes one. */
 const pruned = (id: string): void => fs.writeFileSync(pruneFile(id), JSON.stringify({ at, worktrees: [] }, null, 2));
 
-test('a run made is read back with the hold, the approval and the cancellation beside it composed onto it', () => {
-  const run = made('r-read');
-  writeHold(run.id, ['other-run']);
-  writeAsk(approvalFile(run.id, 'implement', 1), { step: 'implement', try: 1, at, message: 'yes' });
-  const cancelledAt = markCancelled(run.id);
-  const read = filesStore.runs.read(run.id);
-  assert.equal(read.brief, 'add a flag');
-  assert.deepEqual(read.hold?.until, ['other-run']);
-  assert.deepEqual(read.approvals, [{ step: 'implement', try: 1, at, message: 'yes' }]);
-  assert.equal(read.cancelledAt, cancelledAt);
+/** The Run door over the files of this file's store. */
+const door = doorFrom(RunDoor, runDoorFiles);
+
+for (const [name, body] of walksOn(RUN_WALKS, () => ({ door, root: ROOT, layer: 'files' }))) test(name, body);
+
+test('a record stored under an id runId would not mint still reads through the door, and is written back (RunId on read is nominal)', () => {
+  const id = 'Old_Id';
+  fs.mkdirSync(runsDir(), { recursive: true });
+  fs.writeFileSync(runFile(id), JSON.stringify(aRun(id), null, 2));
+  const read = act(door.runs.read(RunId.read(id)));
+  assert.ok(!('refused' in read), 'a stored id is read as it is');
+  assert.equal(act(door.runs.rewrite(read)), true);
 });
 
-test('a record removed is not written back: rewrite answers false and makes no file', () => {
-  const run = made('r-gone');
-  fs.rmSync(runFile(run.id));
-  assert.equal(filesStore.runs.rewrite(run), false);
-  assert.equal(fs.existsSync(runFile(run.id)), false);
-  assert.deepEqual(
-    fs.readdirSync(runsDir()).filter((name) => name.startsWith(`${run.id}.`)),
-    [],
-  );
+test('a new run at an id with a record is refused before a byte of the first is written over (wx)', () => {
+  const run = made('r-exclusive');
+  const text = fs.readFileSync(runFile(run.id), 'utf8');
+  assert.deepEqual(act(door.runs.create({ ...run, brief: 'another' })), { refused: 'Conflict' });
+  assert.equal(fs.readFileSync(runFile(run.id), 'utf8'), text);
 });
 
 test('a record read and written back moves no byte, a key no nemia writes included', () => {
@@ -106,36 +89,6 @@ test('a record read and written back moves no byte, a key no nemia writes includ
   fs.writeFileSync(runFile(id), text);
   assert.equal(filesStore.runs.rewrite(filesStore.runs.read(id)), true);
   assert.equal(fs.readFileSync(runFile(id), 'utf8'), text);
-});
-
-test("a run written back carries none of a person's files composed onto it", () => {
-  const run = made('r-one-writer');
-  writeHold(run.id, ['other-run']);
-  writeAsk(approvalFile(run.id, 'implement', 1), { step: 'implement', try: 1, at });
-  writeAsk(acceptFile(run.id, 'review', 1), { step: 'review', try: 1, at, message: 'good enough' });
-  pruned(run.id);
-  const read = filesStore.runs.read(run.id);
-  assert.ok(read.hold && read.approvals && read.acceptances && read.pruned, 'every file is composed onto the run read');
-  assert.equal(filesStore.runs.rewrite(read), true);
-  const written = JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')) as Record<string, unknown>;
-  for (const key of ['hold', 'approvals', 'acceptances', 'pruned'])
-    assert.equal(key in written, false, `${key} is written into the record`);
-});
-
-test('a plain run is not called off', () => {
-  assert.equal(filesStore.runs.calledOff(made('r-plain').id), false);
-});
-
-test('a cancelled run is called off', () => {
-  const run = made('r-cancelled');
-  markCancelled(run.id);
-  assert.equal(filesStore.runs.calledOff(run.id), true);
-});
-
-test('a held run is called off', () => {
-  const run = made('r-held');
-  writeHold(run.id, ['other-run']);
-  assert.equal(filesStore.runs.calledOff(run.id), true);
 });
 
 test('every run is called off while the store is paused, and none once the pause is lifted', () => {
@@ -169,20 +122,6 @@ test("the store's pause is composed onto every run read and listed, and written 
   assert.equal('pause' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
 });
 
-test('a pruned run is called off', () => {
-  const run = made('r-pruned');
-  pruned(run.id);
-  assert.equal(filesStore.runs.calledOff(run.id), true);
-});
-
-test('a run exists while its record is there, and an id never made does not', () => {
-  const run = made('r-exists');
-  assert.equal(filesStore.runs.exists(run.id), true);
-  fs.rmSync(runFile(run.id));
-  assert.equal(filesStore.runs.exists(run.id), false);
-  assert.equal(filesStore.runs.exists('r-never-made'), false);
-});
-
 test('a record that is not JSON is left out of the list and said, and the other runs are listed', () => {
   made('r-listed');
   fs.writeFileSync(runFile('r-not-json'), '{ not json');
@@ -196,40 +135,6 @@ test('a record that is not JSON is left out of the list and said, and the other 
   } finally {
     fs.rmSync(runFile('r-not-json'));
   }
-});
-
-test("an ask moves its run's stamp, is read, is consumed once the record holds its try, and is still answered from", () => {
-  const run = made('r-asks');
-  const before = filesStore.runs.stamps().get(run.id);
-  assert.ok(before);
-  assert.equal(writeAsk(askFile(run.id, 'implement', 2), { step: 'implement', try: 2, mode: 'fresh', message: 'try it again', at }), true);
-  assert.notEqual(filesStore.runs.stamps().get(run.id), before);
-  const { asks, rounds, notes } = filesStore.asks.read(run.id);
-  assert.deepEqual(notes, []);
-  assert.deepEqual(asks, [{ step: 'implement', try: 2, mode: 'fresh', message: 'try it again', at }]);
-  filesStore.asks.consume(run, asks, rounds);
-  assert.equal(fs.existsSync(askFile(run.id, 'implement', 2)), true, 'an ask for a try the record does not hold stays');
-  const tried = {
-    ...run,
-    steps: { ...run.steps, implement: { ...run.steps.implement, tries: [{ taskId: `${run.id}-implement`, cause: 'fresh' as const }] } },
-  };
-  filesStore.asks.consume(tried, asks, rounds);
-  assert.equal(fs.existsSync(askFile(run.id, 'implement', 2)), false);
-  assert.equal(fs.existsSync(path.join(asksDir(run.id), 'done', 'retry-implement-2')), true);
-  assert.deepEqual(
-    filesStore.asks.answers(run.id).map((a) => a.message),
-    ['try it again'],
-  );
-});
-
-test('a hold is lifted only as it was put: not one put at another time, and the one standing', () => {
-  const run = made('r-lift');
-  const hold = writeHold(run.id, ['other-run']);
-  assert.ok(hold);
-  assert.equal(filesStore.holds.lift(run.id, '2020-01-01T00:00:00.000Z'), false);
-  assert.equal(fs.existsSync(holdFile(run.id)), true);
-  assert.equal(filesStore.holds.lift(run.id, hold.at), true);
-  assert.equal(fs.existsSync(holdFile(run.id)), false);
 });
 
 test('a pass files for a run until a person holds it, and not again in that pass once the hold is lifted', () => {
@@ -301,17 +206,6 @@ test('a merge ask is written at its target and try, holding its loop, round, bas
   assert.deepEqual(filesStore.asks.read(run.id).rounds, [{ step: 'review', round: 2, at, merge }]);
 });
 
-test('an ask written over one already there is refused as no stray, and the first stays byte for byte', () => {
-  const run = made('r-write-twice');
-  for (const { asked, file } of asksOfEachKind(run.id)) {
-    filesStore.asks.write(run.id, asked);
-    const first = fs.readFileSync(file, 'utf8');
-    const again = { ...asked, ask: { ...asked.ask, at: '2026-10-01T00:00:00.000Z' } } as PersonAsk;
-    assert.deepEqual(filesStore.asks.write(run.id, again), { written: false, where: file, stray: null });
-    assert.equal(fs.readFileSync(file, 'utf8'), first);
-  }
-});
-
 test("an ask written where a file that is not one stands is refused with the tick's words for it", () => {
   const run = made('r-write-stray');
   for (const { asked, file, stray } of asksOfEachKind(run.id)) {
@@ -323,15 +217,6 @@ test("an ask written where a file that is not one stands is refused with the tic
   }
 });
 
-test('a hold is put once: a second put answers null and the first stands', () => {
-  const run = made('r-put');
-  const hold = filesStore.holds.put(run.id, ['other-run'], { why: 'wait for it', by: 'ann' });
-  assert.ok(hold);
-  assert.deepEqual(hold.until, ['other-run']);
-  assert.equal(filesStore.holds.put(run.id, ['third-run'], {}), null);
-  assert.deepEqual(filesStore.runs.read(run.id).hold, hold);
-});
-
 test('a hold file stands while it is there, read as a hold or not, and not once it is gone', () => {
   const run = made('r-stands');
   assert.equal(filesStore.holds.stands(run.id), false);
@@ -339,26 +224,6 @@ test('a hold file stands while it is there, read as a hold or not, and not once 
   assert.equal(filesStore.holds.stands(run.id), true);
   fs.rmSync(holdFile(run.id));
   assert.equal(filesStore.holds.stands(run.id), false);
-});
-
-test('a run cancelled twice keeps the first time, and is read with it', () => {
-  const run = made('r-cancel');
-  const first = filesStore.runs.cancel(run.id);
-  assert.equal(filesStore.runs.cancel(run.id), first);
-  assert.equal(filesStore.runs.read(run.id).cancelledAt, first);
-});
-
-test('a prune marker put is read back and calls the run off, and taken back it does neither', () => {
-  const run = made('r-prune');
-  const marker = { at, worktrees: [{ path: '/w/implement', bytes: 12 }], artifacts: { at, bytes: 3 } };
-  filesStore.runs.prune(run.id, marker);
-  assert.deepEqual(filesStore.runs.read(run.id).pruned, marker);
-  assert.deepEqual(filesStore.runs.pruned(run.id), marker, 'and by its own reader, which reads no record');
-  assert.equal(filesStore.runs.calledOff(run.id), true);
-  filesStore.runs.prune(run.id, undefined);
-  assert.equal(filesStore.runs.read(run.id).pruned, undefined);
-  assert.equal(filesStore.runs.pruned(run.id), undefined);
-  assert.equal(filesStore.runs.calledOff(run.id), false);
 });
 
 test("a run forgotten loses its record and every person's file and its directory, in order, and another run keeps its own", () => {

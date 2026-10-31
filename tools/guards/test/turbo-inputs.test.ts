@@ -10,6 +10,8 @@
  * `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages' docs for the diagrams they draw,
  * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
  * The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources (`dev-watch.test.ts`).
+ * The api's tests read Nemia's builtin servers and skills, the orchestrator's `servers/` and `skills/` (`servers.test.ts`,
+ * `sign-in.boundary.test.ts`, `skills.test.ts`).
  * The board's test of the look's parts reads the trigger skill of a change to the board, which names each part
  * (`apps/web/test/look.test.ts`), and its test of a merge reads the root's `CLAUDE.md` and `.gitattributes`
  * (`apps/web/test/e2e-merge.test.ts`), so the web's test lists all three.
@@ -113,7 +115,7 @@ const INPUTS: Record<string, readonly string[]> = {
   'api#test': [
     '$TURBO_DEFAULT$',
     '$TURBO_ROOT$/tools/**',
-    ...['src', 'place'].map((dir) => `$TURBO_ROOT$/packages/*/${dir}/**`),
+    ...['src', 'place', 'servers', 'skills'].map((dir) => `$TURBO_ROOT$/packages/*/${dir}/**`),
     '$TURBO_ROOT$/packages/*/package.json',
   ],
   'web#test': ['$TURBO_DEFAULT$', '$TURBO_ROOT$/tools/**', BOARD_SKILL, '$TURBO_ROOT$/CLAUDE.md', '$TURBO_ROOT$/.gitattributes'],

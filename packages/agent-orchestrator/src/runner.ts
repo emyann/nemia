@@ -174,6 +174,7 @@ export {
   workflowsIn,
 } from './folder/folder.store.ts';
 export { cardSkills, isBuiltinPlace, lookupRoots, oneFolder, preloads, skillsFor, skillVersion } from './skills/read.store.ts';
+export { BUILTIN_SKILLS } from './skills/read.store.ts';
 export type { Places } from './skills/read.store.ts';
 export { agentsFor, agentVersion, customInstructionsFile, loadAgents, readCustomInstructions } from './agents/read.store.ts';
 export { clearCustomInstructions, customInstructionsFor, writeCustomInstructions } from './agents/custom.store.ts';
@@ -477,7 +478,7 @@ export { FACTORY_SERVERS } from './servers/servers.verb.ts';
 export type { ServerListed, ServersListing } from './servers/servers.verb.ts';
 export { serverNameRefusal } from './servers/index.ts';
 export type { BuiltinServer } from './servers/index.ts';
-export { builtinServers } from './servers/servers.store.ts';
+export { BUILTIN_SERVERS, builtinServers } from './servers/servers.store.ts';
 /** A factory's server signed in to and out of from the board, through the engine; the builtin secret stays inside the package. */
 export { serverSignIn, serverSignInState, serverSignOut } from './servers/sign-in.verb.ts';
 export type { ServerSignInStarted, ServerSignInState } from './servers/sign-in.verb.ts';

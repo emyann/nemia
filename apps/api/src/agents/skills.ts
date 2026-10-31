@@ -3,7 +3,7 @@
  *
  * An agent of yours finds a skill as a start finds it (`lookupRoots`): the store's `workflows/skills/` — your library — then the
  * `.claude/skills/` of the repository the board serves. The first that has a name wins, so a name in both is listed once, in your library.
- * Nemia's builtin skills, `workflows/skills/` of the checkout the api runs from, are not among them: an agent of the store never finds one
+ * Nemia's builtin skills, the orchestrator package's `skills/`, are not among them: an agent of the store never finds one
  * there, so a builtin skill is copied into your library first (`copySkill`, a write of its own, before and apart from any save of the
  * agent).
  *
@@ -20,6 +20,7 @@ import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   agentSkillsFound,
+  BUILTIN_SKILLS,
   COMMANDS,
   givenSkills as givenRead,
   isBuiltinPlace,
@@ -50,7 +51,6 @@ import {
   type SkillDraft,
 } from 'agent-orchestrator/workflow';
 import { readBody, valueAt, type BodyIssue, type Words } from '../body.ts';
-import { HOME_REPO } from '../capabilities/capabilities.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
@@ -87,12 +87,8 @@ export type SkillPlace = { from: SkillSource; dir: string; skills: SkillRow[] };
 /** What a copy answers: the skill as it now reads in your library, and its files by their path in it. */
 export type SkillAdded = { skill: SkillRow; written: string[] };
 
-/**
- * `workflows/skills/` of the checkout the api runs from: Nemia's builtin skills, none while the checkout has no such folder.
- * This repository keeps its own team in `workflows/`, so a skill the team puts in `workflows/skills/` lists as builtin: `sourceOf`
- * answers `builtin` before `repo`.
- */
-export const BUILTIN_SKILLS = path.join(HOME_REPO, 'workflows', SKILLS_FOLDER);
+/** Nemia's builtin skills: the orchestrator package's `skills/`, none while the package has no such folder. */
+export { BUILTIN_SKILLS };
 
 /**
  * The place a builtin skill's page was at before it was called builtin: `GET /api/skills/<this>/<name>` answers a permanent redirect to

@@ -90,6 +90,8 @@
         "$TURBO_ROOT$/tools/**",
         "$TURBO_ROOT$/packages/*/src/**",
         "$TURBO_ROOT$/packages/*/place/**",
+        "$TURBO_ROOT$/packages/*/servers/**",
+        "$TURBO_ROOT$/packages/*/skills/**",
         "$TURBO_ROOT$/packages/*/package.json"
       ]
     },

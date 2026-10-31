@@ -113,7 +113,7 @@ export const SubAgent: StoryObj = {
         <TraceCollapsible defaultExpanded>
           <TraceCollapsibleTrigger>
             <Line icon={<UsersIcon />} fact="2m 10s">
-              Agora reviewed the change
+              Reviewer reviewed the change
             </Line>
           </TraceCollapsibleTrigger>
           <TraceCollapsibleContent>

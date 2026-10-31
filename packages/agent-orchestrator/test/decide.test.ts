@@ -543,7 +543,7 @@ test('`nemia decide` on a try a person answered: its line says so, and under it 
   settle(`${run.id}-implement-try2`, 'succeeded', blocked('And the README, too?'));
   await runWith(e, advanceRun(readRun(run.id)));
   const lines = await screen(t, e, run.id);
-  const head = indexOf(lines, '  implement  BLOCKED  (try 2, nudged on your word, answered)');
+  const head = indexOf(lines, '  implement  BLOCKED  (try 2, continued on your word, answered)');
   const question = indexOf(lines, '    try 1 needs: Rename --flag, or keep it?');
   assert.deepEqual(lines.slice(question + 1, question + 3), ['    your answer: Keep it.', '    The flag is public.']);
   assert.ok(
@@ -667,7 +667,7 @@ test("UNSIGNED after the run's own nudge: `nemia decide` and `nemia ls` say the 
   const lines = await screen(t, e, run.id);
   indexOf(
     lines,
-    '  UNSIGNED: implement (nudged to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran',
+    '  UNSIGNED: implement (asked to sign off once by the run, and unsigned again)  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran',
   );
   const out: string[] = [];
   const log = t.mock.method(console, 'log', (...args: unknown[]) => {
@@ -679,7 +679,7 @@ test("UNSIGNED after the run's own nudge: `nemia decide` and `nemia ls` say the 
     log.mock.restore();
   }
   assert.ok(
-    out.some((l) => /^ {3}implement +unsigned .*try 2, nudged to sign off by the run/.test(l)),
+    out.some((l) => /^ {3}implement +unsigned .*try 2, asked to sign off by the run/.test(l)),
     out.join('\n'),
   );
 });
@@ -1248,7 +1248,7 @@ test('the whole screen of a running run, of a try asked for, of a step blocked w
     '  ── in full: the check-affecting files — what a change could edit to make its check pass ───',
     '  none',
     '',
-    '  implement  BLOCKED  (try 2, nudged on your word, answered)',
+    '  implement  BLOCKED  (try 2, continued on your word, answered)',
     '    used  not measured',
     '    cost  this try not measured · not measured over 2 tries',
     '    timeline  try 1  filed 00:00:00Z  spawned 00:00:12Z  ended 00:05:00Z  queued 12s  ran 4m48s  used not measured',

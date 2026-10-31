@@ -254,9 +254,9 @@ export const pauseAsksVoid = (
  * `closedOut: false`, or an old journal's `former: 'unsigned'`), not on the step's word `unsigned`, which also covers a closeout short
  * of a declared field — a statement given, which a reminder to give one would not mend — a `done` whose end says nothing of a
  * statement, and a `failed` end with `closedOut: false` and no `former`, a session that broke. Nor is a step
- * over its budget nudged: its status is `over budget`, and the run spends nothing more on it on its own word.
+ * over its budget continued: its status is `over budget`, and the run spends nothing more on it on its own word.
  *
- * And a step `unsigned` because its closeout named a file the run did not have (`lackedOf`) is nudged the same way, under the same one
+ * And a step `unsigned` because its closeout named a file the run did not have (`lackedOf`) is continued the same way, under the same one
  * ask a round (`signoffDue`): its session continued, told each file, why, and to write it or take the name off. One that names a file
  * the run does not have again stays `unsigned`, on a person; so is one whose envelope the run refused (`envelopeRefusals`).
  *
@@ -359,7 +359,7 @@ const STOPPED_FIRST: readonly RetryMode[] = ['continue', 'fresh'];
 /**
  * How a step's record reached the try it is on, for `nemia ls` and `nemia decide`: `try 2, by retries: 2` — and for a step of a loop past
  * its first round, the round, before any try within it: `round 2 of 3`, `round 2 of 3, try 3, by retries: 1`. Empty on a first try.
- * A try a person asked for with a message says so, last: `try 2, nudged on your word, answered` — `answered` is the caller's
+ * A try a person asked for with a message says so, last: `try 2, continued on your word, answered` — `answered` is the caller's
  * reading of the ask files (`answerOf`), since the record keeps no message. A cap a person raised is said beside the try it was raised
  * for: `budget $5`.
  */
@@ -381,12 +381,12 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
  */
 function howOf(step: Workflow, last: EarlierTry): string {
   if (last.cause === 'retries') return `by retries: ${step.retries ?? 0}`;
-  if (last.cause === 'signoff') return 'nudged to sign off by the run';
+  if (last.cause === 'signoff') return 'asked to sign off by the run';
   if (last.paused) return `${last.cause === 'recheck' ? 'rechecked' : 'continued'} after nemia pause --now`;
   if (last.cause === 'recheck') return 'rechecked on your word';
   if (last.cause === 'fresh') return `fresh${last.model ? ` on ${last.model}` : ''}, on your word`;
   if (last.cause === 'merge') return 'merged the base, on your word (nemia refresh --base), the round unchanged';
-  return last.cause === 'back' ? 'sent back with the work, on your word' : 'nudged on your word';
+  return last.cause === 'back' ? 'sent back with the work, on your word' : 'continued on your word';
 }
 
 /** What a new session of a step over its budget needs, beside an offer that files one: a `--budget` above what its tries have cost. */

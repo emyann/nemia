@@ -1037,7 +1037,7 @@ test('a blocked step answered with `nemia retry --message`', async (t) => {
   });
   await s.test('`nemia ls` says the try running was answered, read off the consumed ask; it is honoured once', async () => {
     ended(try2(), 'working');
-    assert.equal((await stage.runWith(b.e, list(b.e, readRun(run.id)))).steps[0].note, 'try 2, nudged on your word, answered');
+    assert.equal((await stage.runWith(b.e, list(b.e, readRun(run.id)))).steps[0].note, 'try 2, continued on your word, answered');
     assert.deepEqual(readAnswers(run.id), [{ ...ask }]);
     await tick(run.id);
     assert.equal(b.filings.filter((f) => f === try2()).length, 1);
@@ -1489,7 +1489,10 @@ test("a claude step over its `budget:`, its cap raised by a person's `--budget`"
     ended(`${try2()}-check`, 'failed', { exitCode: 1 });
     assert.deepEqual((await tick(run.id)).tried, []);
     const again = await stage.runWith(b.e, list(b.e, readRun(run.id)));
-    assert.deepEqual([again.steps[0].status, again.steps[0].note], ['over budget $10.25 of $10', 'try 2, nudged on your word, budget $10']);
+    assert.deepEqual(
+      [again.steps[0].status, again.steps[0].note],
+      ['over budget $10.25 of $10', 'try 2, continued on your word, budget $10'],
+    );
   });
   await s.test(
     'a nudge past a budget of a step that ended without its closeout is told why, beside the budget raised, not in its place',

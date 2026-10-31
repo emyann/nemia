@@ -226,7 +226,7 @@ test("`nemia ls` notes a step whose current try's session a person told somethin
     {},
     { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] }, review: { taskId: null } } },
   );
-  assert.equal(rows(onTry2, { t2: 'working' }, { implement: 1 })[0].note, 'try 2, nudged on your word · said to 1×');
+  assert.equal(rows(onTry2, { t2: 'working' }, { implement: 1 })[0].note, 'try 2, continued on your word · said to 1×');
   assert.deepEqual([saidWord(0), saidWord(1), saidWord(3)], ['', 'said to 1×', 'said to 3×']);
 });
 

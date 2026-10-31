@@ -344,7 +344,7 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
       () => undefined,
       () => 'unsigned',
     );
-    names(said, 'the run nudges implement itself', 'try 2', 'nemia ls r-1');
+    names(said, 'the run continues implement itself', 'try 2', 'nemia ls r-1');
   });
   await t.test('a check still due or running', () => {
     assert.match(refusalOf(onTry(), { t1: 'succeeded', c1: 'running' })!, /check is still due or running/);

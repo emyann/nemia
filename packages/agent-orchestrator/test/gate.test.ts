@@ -312,7 +312,7 @@ test('a send-back from a gate spends the approval given before it', async (t) =>
     for (let pass = 1; pass <= 3; pass++) assert.deepEqual((await tick(gate.e, id)).filed, [], `pass ${pass}`);
     const l = await runWith(gate.e, list(gate.e, readRun(id)));
     assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
-    assert.ok(l.steps[0].note?.startsWith('try 2, nudged on your word, answered · approve it: nemia approve '), l.steps[0].note);
+    assert.ok(l.steps[0].note?.startsWith('try 2, continued on your word, answered · approve it: nemia approve '), l.steps[0].note);
   });
   await s.test('the spent approval, put back by hand, opens nothing: it names try 1', async () => {
     fs.copyFileSync(path.join(asksDir(id), 'done', 'approve-plan-1'), path.join(asksDir(id), 'approve-plan-1'));

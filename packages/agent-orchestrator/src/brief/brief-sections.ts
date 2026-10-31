@@ -126,7 +126,7 @@ function endingSection(step: Workflow, e: EndingStopped): string[] {
 /**
  * What the run's sign-off ask tells a session that ended without its closeout (`retriesDue`, `by: 'signoff'`), in its owner's words,
  * pinned by a test. It names the tool, `StructuredOutput`, and says to change nothing (agent-runtime's open issue 25). It is the only
- * continuation: the engine reports an end without its statement and nudges nothing.
+ * continuation: the engine reports an end without its statement and continues nothing.
  */
 export const SIGNOFF = [
   'Your last turn ended without calling `StructuredOutput`, and this step asks for a closing statement: nothing that waits',

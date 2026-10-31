@@ -437,7 +437,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
         implement.tries.map((t: { try: number; answer: string | null; note: string | null }) => [t.try, t.answer, t.note]),
         [
           [1, null, null],
-          [2, 'Postgres.', 'try 2, nudged on your word, answered'],
+          [2, 'Postgres.', 'try 2, continued on your word, answered'],
         ],
         'the answer read off the ask as the tick leaves it once it filed the try: consumed, into done/',
       );

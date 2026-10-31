@@ -416,7 +416,7 @@ test('files a closeout names', async (t) => {
       assert.equal(stage.board().tasks.has(`${task}-try3`), false);
       assert.equal(stage.board().tasks.has(`${task}-try2-check`), false);
       const screen = await printedBy(sub, ['decide', id]);
-      assert.match(screen, /UNSIGNED: implement \(nudged to sign off once by the run, and unsigned again\)/);
+      assert.match(screen, /UNSIGNED: implement \(asked to sign off once by the run, and unsigned again\)/);
       assert.ok(screen.includes("implement's closeout named a file the run does not have:"), screen);
       assert.ok(screen.includes(`- \`${gone}\`: it is not a file in \`${files}\`.`), screen);
       assert.ok(screen.includes(`nemia retry ${id} implement`), screen);

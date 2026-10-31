@@ -1561,7 +1561,7 @@ retries: 1
   `## Try <n>` that it ended without calling `StructuredOutput`, that the work stands and it should change
   nothing and sign off now, finishing first if it had not, and signing off anyway saying what stops it if it
   cannot. Once a round, never in a loop: a sign-off ask that ends unsigned too leaves the step `unsigned`, on you, and
-  `wf ls` says `try 2, nudged to sign off by the run`, `wf decide` `UNSIGNED: implement (nudged to sign off once
+  `wf ls` says `try 2, asked to sign off by the run`, `wf decide` `UNSIGNED: implement (asked to sign off once
   by the run, and unsigned again)`. A person's ask for that try comes first. Not nudged: a step over its budget,
   a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
   engine said `unsigned` for `done`, any `done` recorded with no `closedOut` key, and a session that broke (a `failed`
@@ -1576,7 +1576,7 @@ retries: 1
   is filed, so a suite is never spent on it, and nothing after it starts. Six reasons refuse, each the step's to answer by
   writing the file where its brief says or taking the name off: `not there`, `missing`, `directory`, `escapes`, `outside`,
   `configuration`. Two never do, being the run's own: `not collected` (a file in the workspace whose copy the run did not
-  make) and `not known` (the place did not say); `wf decide` says them as before. The run nudges such a step under the same
+  make) and `not known` (the place did not say); `wf decide` says them as before. The run continues such a step under the same
   one sign-off ask a round as a session that gave no closeout (`cause: 'signoff'`): its session continued, told in `## Try <n>` each
   file, why, a near name its files directory holds (the same last name in another case or folder), and the two fixes. A
   nudged try that names a missing file again leaves the step `unsigned`, on you: `wf decide` names each file and why under
@@ -1667,7 +1667,7 @@ retries: 1
   0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--continue, with your answer)`,
   `try 2 asked (--continue) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
   `stopping its session` beside a session that works again since it was asked), and
-  once filed `try 2, by retries: 1` or `try 2, nudged on your word, answered`. A step with a try due is not
+  once filed `try 2, by retries: 1` or `try 2, continued on your word, answered`. A step with a try due is not
   waiting on you. **`wf decide`** names the try each closeout and check belong to — for a try you answered,
   with what the try before it needed and your answer under it — and under *try again* gives the `wf retry` for
   each step that can take one; under a blocked step's `needs`, the `wf retry --message` that answers it.

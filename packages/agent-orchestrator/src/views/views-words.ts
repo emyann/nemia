@@ -94,7 +94,7 @@ export const waitsForWord =
  * Whether a task's attempt ended without the closing statement its task asked for — the orchestrator's judgement, off what the runtime
  * reports: its harness let the session go `succeeded` with `closedOut: false`; or an old journal ended it `failed` for that, which the
  * runtime reads back as `former: 'unsigned'`. A `failed` end with `closedOut: false` and no `former` is a session that broke, not a
- * missing statement, and is never nudged; nor is an end with no `closedOut` key: a `succeeded` with no closeout on a journal that says
+ * missing statement, and is never continued; nor is an end with no `closedOut` key: a `succeeded` with no closeout on a journal that says
  * nothing of it is not unsigned.
  */
 export const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined): boolean =>

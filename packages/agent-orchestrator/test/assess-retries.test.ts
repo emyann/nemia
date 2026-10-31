@@ -680,7 +680,7 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
   await t.test('`nemia retry` is refused: the run nudges it itself', () => {
     names(
       retryRefusal(STEPS, r, 'implement', { mode: 'continue' }, failed, none, unsignedEnd),
-      'the run nudges implement itself',
+      'the run continues implement itself',
       'try 2',
       'nemia ls r-1',
     );
@@ -688,12 +688,12 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
   await t.test('filed, the try is behind it as signoff, and the run says a nudge was tried', () => {
     assert.deepEqual(nudged.steps.implement.tries, [{ taskId: 't1', cause: 'signoff' }]);
     assert.equal(signoffsSpent(nudged.steps.implement), 1);
-    assert.equal(tryNote(STEPS[0], nudged.steps.implement), 'try 2, nudged to sign off by the run');
+    assert.equal(tryNote(STEPS[0], nudged.steps.implement), 'try 2, asked to sign off by the run');
   });
   await t.test('never twice in a round: the nudge ended unsigned too, and the step is yours', () => {
     assert.deepEqual(retriesDue(STEPS, nudged, phases({ t2: 'failed' }), none, unsignedEnd), []);
     assert.deepEqual(lsOf(nudged, { t2: 'failed' }).waitingOnYou, ['implement']);
-    assert.equal(lsOf(nudged, { t2: 'failed' }).steps[0].note, 'try 2, nudged to sign off by the run');
+    assert.equal(lsOf(nudged, { t2: 'failed' }).steps[0].note, 'try 2, asked to sign off by the run');
   });
   const after = (cause: 'continue' | 'round') => ({
     ...nudged,
@@ -1171,8 +1171,8 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
         closeoutOf: signedOff({ implement: said('done') }),
         answers,
       }).steps[0].note;
-    assert.equal(listed([answered]), 'try 2, nudged on your word, answered');
-    assert.equal(listed(), 'try 2, nudged on your word', 'no ask read, nothing said');
+    assert.equal(listed([answered]), 'try 2, continued on your word, answered');
+    assert.equal(listed(), 'try 2, continued on your word', 'no ask read, nothing said');
   });
   await t.test('answerOf: only for the try it asked for, filed the way it asked', () => {
     assert.equal(answerOf(nudged, 'implement', [{ ...answered, try: 3 }]), undefined, 'not answered: the next try');

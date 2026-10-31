@@ -410,7 +410,7 @@ function runTriesItself(c: Judged): string | undefined {
     const why = lackedOf(run.steps[name]).length
       ? 'its closeout named a file the run does not have'
       : 'its session ended without the closeout it was asked for';
-    return `the run nudges ${name} itself: ${why}, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: nemia ls ${run.id}.`;
+    return `the run continues ${name} itself: ${why}, once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: nemia ls ${run.id}.`;
   }
   if (itself) {
     const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);

@@ -307,9 +307,9 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  * finished, so the run does not say it for it, and does not spend a suite on work nobody signed. The
  * runtime ends a session that goes quiet, or that its harness ends `done`, without it as its harness
  * ended it, and says so — `closedOut: false` — and settles the task `succeeded`; this layer judges it
- * (`closeoutAsked`) and nudges it once a round (`retriesDue`). A task an old journal ended `failed`
+ * (`closeoutAsked`) and continues it once a round (`retriesDue`). A task an old journal ended `failed`
  * for it, read back as `former: 'unsigned'`, is this word too: read as `failed`, the run would be called failed rather than
- * waiting on you, and a nudged try told its session broke rather than that it gave no closeout. Only
+ * waiting on you, and a continued try told its session broke rather than that it gave no closeout. Only
  * a `failed` task — one a person stopped is `stopped`. A task that settled `succeeded` with nothing
  * said is `unsigned` too. An unreadable closeout counts as none: the run cannot read that the work is
  * done. A task never asked for a closeout is not held to one.

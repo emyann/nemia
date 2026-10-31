@@ -1621,7 +1621,7 @@ test('an ending that stopped on the base branch sends the work back through the 
     '`nemia decide` offers no merge where the work merges cleanly onto the base: a base that merges cleanly is landed again, never merged',
     async () => {
       assert.deepEqual(
-        (await stage.runWith(e(), decideRun(stopped.id))).commands.filter((c) => c.label === 'merge'),
+        (await stage.runWith(e(), decideRun(stopped.id))).commands.filter((c) => c.label === 'refresh'),
         [],
       );
     },
@@ -1808,22 +1808,22 @@ test('an ending that stopped on the base branch sends the work back through the 
     async () => {
       stopped = await at.stoppedOnBase();
       const { repo, id } = stopped;
-      const merges = async () => (await stage.runWith(e(), decideRun(id))).commands.filter((c) => c.label === 'merge');
+      const merges = async () => (await stage.runWith(e(), decideRun(id))).commands.filter((c) => c.label === 'refresh');
       assert.deepEqual(await merges(), [], 'a base that merges cleanly is landed again, never merged');
       at.mainMoves(repo);
       const decided = await stage.runWith(e(), decideRun(id));
       assert.deepEqual(
-        decided.commands.filter((c) => c.label === 'merge'),
+        decided.commands.filter((c) => c.label === 'refresh'),
         [
           {
-            label: 'merge',
+            label: 'refresh',
             command: `nemia refresh ${id} review --base`,
             said: `review: implement's work conflicts with main. Merge main into it — implement continued, then a new review, on round 1, which the merge does not spend:  nemia refresh ${id} review --base`,
             step: 'review',
           },
         ],
       );
-      assert.ok(decided.offers.includes(decided.commands.find((c) => c.label === 'merge')!.said!), decided.offers.join('\n'));
+      assert.ok(decided.offers.includes(decided.commands.find((c) => c.label === 'refresh')!.said!), decided.offers.join('\n'));
       await stage.runWith(e(), mergeRun(id));
       assert.deepEqual(await merges(), [], 'nor once it is asked');
     },
@@ -2055,10 +2055,10 @@ test('`nemia refresh --base` of the base into the work: refused where nothing co
     async (st) => {
       const { id, base } = refused;
       assert.deepEqual(
-        (await stage.runWith(e(), decideRun(id))).commands.filter((c) => c.label === 'merge'),
+        (await stage.runWith(e(), decideRun(id))).commands.filter((c) => c.label === 'refresh'),
         [
           {
-            label: 'merge',
+            label: 'refresh',
             command: `nemia refresh ${id} review --base`,
             said: `review: implement's work merges cleanly onto main, but ship's check refused the merged tree at ${base.slice(0, 7)}: the conflict is semantic. Merge main into it and fix what broke — implement continued, then a new review, on round 1, which the merge does not spend:  nemia refresh ${id} review --base`,
             step: 'review',

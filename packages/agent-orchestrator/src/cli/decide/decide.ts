@@ -525,8 +525,8 @@ function printCollisions({ collisions }: Decided): void {
  * What is left to decide, as the run's commands say it (`Decided.commands`): the gated step to approve or send back, `nemia rm` for a
  * folder run, or the git commands to land or drop.
  */
-function printChoice({ toDecide, commands, closeouts }: Decided, steps: Steps): void {
-  if (toDecide?.kind === 'approve') return printApprove(toDecide, steps, commands, closeouts[toDecide.step]);
+function printChoice({ run, toDecide, commands, closeouts }: Decided, steps: Steps): void {
+  if (toDecide?.kind === 'approve') return printApprove(run.id, toDecide, steps, commands, closeouts[toDecide.step]);
   const said = (label: DecideCommand['label']) => commands.find((c) => c.label === label);
   const forget = said('forget it');
   if (forget) return console.log(`\n  done with it   ${forget.command}  — ${forget.said}`);
@@ -540,9 +540,11 @@ function printChoice({ toDecide, commands, closeouts }: Decided, steps: Steps): 
 /**
  * The step at its gate: that it signed off, or that it is the ending not yet run, with the first paragraph of its own note (`ownNote`)
  * where it has one; then its approval — with an `--answer` for each question its closeout `said` asks — and the send-backs after it, as the
- * run's commands say them.
+ * run's commands say them. The approval is the gate's own line, `nemia approve <run> <step>` word for word: a loop out of rounds is
+ * labelled `approve` too, its line ending in `--message "<why>"`.
  */
 function printApprove(
+  runId: string,
   toDecide: Extract<Decided['toDecide'], { kind: 'approve' }>,
   steps: Steps,
   commands: readonly DecideCommand[],
@@ -553,7 +555,7 @@ function printApprove(
   console.log(`\n  to decide  ${step.name}${toDecide.filed ? ' has signed off and waits for your word:' : unrun}`);
   const [paragraph] = toDecide.says === null ? [] : ownNote(step).split(/\n[ \t]*\n/);
   for (const line of paragraph?.split('\n') ?? []) console.log(`    ${line}`);
-  const at = commands.findIndex((c) => c.label === 'approve' && c.command.endsWith(` ${step.name}`));
+  const at = commands.findIndex((c) => c.label === 'approve' && c.command === `nemia approve ${runId} ${step.name}`);
   if (at < 0) return;
   console.log(`\n  approve it    ${commands[at].command} ${answersOr(step, said, '[--message "<words>"]')}`);
   for (const back of commands.slice(at + 1)) {

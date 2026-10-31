@@ -32,8 +32,8 @@
  *
  * `accept`, on the day decision 7 retired it (`Approve` in the run core's table): `nemia accept` is `nemia approve` of a loop out of
  * rounds. What is left is the former spelling kept on purpose (`RENAMED`, read by admission and named in its doc), the record's names
- * for what a loop's end writes (`acceptRun`, `acceptAsk`, the `accept-<step>-<n>` file, the decision's `accept` offer label, which slice B
- * renames on the board), and the word's other senses (a trust accepted, a level's words).
+ * for what a loop's end writes (`acceptRun`, `acceptAsk`, the `accept-<step>-<n>` file), and the word's other senses (a trust accepted,
+ * a level's words). The decision's `accept` offer label is `approve` since slice B, as its `merge` is `refresh`.
  *
  * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
  * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
@@ -44,7 +44,6 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/admission/admission.ts': 1,
     'packages/agent-orchestrator/src/brief/brief-sections.ts': 2,
     'packages/agent-orchestrator/src/command/command.ts': 2,
-    'packages/agent-orchestrator/src/decide/decide.ts': 4,
     'packages/agent-orchestrator/src/gate/commands.verb.ts': 3,
     'packages/agent-orchestrator/src/gate/form.verb.ts': 1,
     'packages/agent-orchestrator/src/gate/gate.ts': 1,

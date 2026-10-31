@@ -761,7 +761,7 @@ test('REFUSED at shipped defaults: a merge whose trial read no commit of the bas
       mergeRefused(id, new RegExp(`^git cannot read main in ${repo}\\. Check the repository, then: nemia refresh ${id} --base\\.$`)),
     );
     assert.deepEqual(
-      (await runWith(e, decideRun(id))).commands.filter((c) => c.label === 'merge'),
+      (await runWith(e, decideRun(id))).commands.filter((c) => c.label === 'refresh'),
       [],
     );
   } finally {

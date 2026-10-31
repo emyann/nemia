@@ -1,6 +1,6 @@
 /**
- * What a person asks of a run from the board — a try, a round, an approval, an acceptance, words to a session (the command table's
- * routes, apps/api/src/commands/routes.ts).
+ * What a person asks of a run from the board — a try, a round, an approval (a gate's, or a loop's as it stands), words to a session
+ * (the command table's routes, apps/api/src/commands/routes.ts).
  */
 
 import { Schema } from 'effect';
@@ -70,20 +70,6 @@ const ApprovedSchema = decodes<Approved>()(
   }),
 );
 
-/** What an acceptance answers: the looping step, the try accepted, when, its words, and the acceptance's file. */
-export type Accepted = { step: string; try: number; at: string; message: string; file: string };
-
-/** Decodes an `Accepted`. */
-const AcceptedSchema = decodes<Accepted>()(
-  Schema.Struct({
-    step: Schema.String,
-    try: Schema.Number,
-    at: Schema.String,
-    message: Schema.String,
-    file: Schema.String,
-  }),
-);
-
 /**
  * Ask for another try of a step, as the CLI's `retry` does: the api calls the package's `retry()`, which writes the ask and nothing else,
  * and the next tick files the try. Resolves with the try asked for, its ask file, and the package's `stopFirst` — the tick stops the step's
@@ -129,6 +115,9 @@ export const askRound = (runId: string, how: { step?: string; budget?: number })
  * With `answers`, a person's answers to the questions the step asks at its gate: the api checks them against what the step asks now and
  * writes them, `message` their note, as the approval's words — or refuses them, and nothing is approved.
  *
+ * On a loop out of rounds it takes the loop's work as it stands, as the CLI's `approve` of a loop does: `message` is then required, why
+ * the work is good enough with its findings open, and the package refuses it missing or empty.
+ *
  * Sent as `application/json`, which the api requires of it, as of an ask. Sending the step back is an ask for a try with words (`askTry`).
  */
 export const approveStep = (
@@ -139,22 +128,6 @@ export const approveStep = (
   send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/approve`, ApprovedSchema, {
     body: how,
     may: "The approval may be written: look at the step on the run's page before approving again.",
-  });
-
-/**
- * Accept the work of a loop out of rounds as it stands, as the CLI's `accept` does — with `message`, `--message`, why the work is good
- * enough with its findings open, which every step after the loop is handed, and which the package requires: the api calls the package's
- * `accept()`, which writes the acceptance and nothing else, and the next tick files what waits on the looping step. Resolves with the step,
- * the try accepted, when, the words and the acceptance's file; rejects with the api's refusal in full — the package's words for words
- * missing or empty, or for a loop that may not be accepted — or the api's own about the request; and an answer the board does not read,
- * saying the acceptance may be written.
- *
- * Sent as `application/json`, which the api requires of it, as of an approval. Going round once more is `askRound`.
- */
-export const acceptLoop = (runId: string, step: string, how: { message: string }): Promise<Accepted> =>
-  send('POST', `/api/runs/${encodeURIComponent(runId)}/steps/${encodeURIComponent(step)}/accept`, AcceptedSchema, {
-    body: how,
-    may: "The acceptance may be written: look at the looping step on the run's page before accepting again.",
   });
 
 /**

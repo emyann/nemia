@@ -1,4 +1,4 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight } from 'lucide-react';
 import {
@@ -13,28 +13,35 @@ import {
   type SensitiveDiff,
   type Touched,
 } from '../lib/api';
-import { answersOf, askedSaid, type Answer } from '../lib/asks';
-import { acceptStepOf, barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
+import { answersOf, askedOf, askedSaid, type Answer } from '../lib/asks';
+import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, type DiffLine } from '../lib/decide';
 import { cn } from '../lib/utils';
-import { BUTTON, MODES, Refusal, TEXTAREA, useAccept, useAsk } from './Ask';
+import { BUTTON, MODES, Refusal, TEXTAREA, useAsk } from './Ask';
 import { CommandLine } from './CommandLine';
 import { Facts, HEADING, pathRow, readRows, TrialMerges } from './Facts';
-import { Asks, QuestionsForm } from './Questions';
+import { AskedRow, Asks, QuestionsForm } from './Questions';
+import { EnoughRow } from './Enough';
 import { RaiseRow } from './Raise';
 import { container, dashed, hairline, ringed } from '../lib/meaning';
+import { OFFERS } from '../lib/words';
 
 /**
  * The Decide section of a run's page: the answer each step waiting on you can be given (`answersOf`), then what the CLI's `decide` shows a
  * person — read once for the run's state (`decisionQuery`), only while the run has something to decide, and shown when the api says
  * there is. The answers keep their place in one frame while the decision is read, refused or drawn, so a row keeps what was typed in it
- * and the refusal of its ask. A run that still runs with a try asked — of a session the harness blocked, continued from the banner — has
- * that try's note and nothing to decide. An api that refuses says why, here.
+ * and the refusal of its ask. A step whose next try a person asked for has that try's note there (`askedOf`) — a run that still runs
+ * with a try asked of a session the harness blocked, continued from the banner, has that note and nothing to decide. An api that
+ * refuses says why, here.
  */
 export function Decide({ run }: { run: RunDetail }) {
   const decidable = decidableRun(run);
   const { data, error } = useQuery({ ...decisionQuery(run.id, decisionStamp(run)), enabled: decidable });
   const offers = answersOf(run);
-  const answers = offers.length > 0 ? <Offers runId={run.id} offers={offers} /> : null;
+  const asked = run.steps.flatMap((step) => {
+    const one = askedOf(run, step.name);
+    return one ? [{ step: step.name, ...one }] : [];
+  });
+  const answers = offers.length + asked.length > 0 ? <Offers runId={run.id} offers={offers} asked={asked} steps={run.steps} /> : null;
   const body =
     decidable && error ? (
       <p className="text-body-medium text-failure">
@@ -59,8 +66,9 @@ function DecideFrame({ children }: { children: ReactNode }) {
       <div className="space-y-1">
         <h2 className="font-semibold">Decide</h2>
         <p className="text-body-small text-muted-foreground">
-          What there is to decide on this run. Copy a command to run it yourself; the board runs one of them, accepting a loop's work as it
-          stands with your reason. An answer given here asks for a try, or a round; each row says what the tick does with it.
+          What there is to decide on this run. Copy a command to run it yourself. An answer given here runs its step's command, as the
+          command line would: a try, a round, or approving a loop's work as it stands with your reason; each row says what the tick does
+          with it.
         </p>
       </div>
       {children}
@@ -71,7 +79,7 @@ function DecideFrame({ children }: { children: ReactNode }) {
 /**
  * What there is to decide, in the CLI `decide`'s order: the OVER BUDGET line where a step is held on its budget, what each branch touched
  * and the lesson line, the check-affecting files in full, what the run consumed and cost, and the commands — copyable, and none of them run
- * from here but the CLI's `accept`, which the board presses with a person's reason (`AcceptCommand`). `offers` go first. The OVER BUDGET
+ * from here: what the board presses is an answer's (`Offers`). `offers` go first. The OVER BUDGET
  * line says why each step past its budget is held, as the CLI's `decide` prints it first: its own amounts, or the step its loop's round
  * would file. A folder run has no branch and nothing to merge, so nothing is said of one: where its work is instead, as the CLI's `decide`
  * says.
@@ -123,55 +131,68 @@ function DecisionParts({ runId, decision, run = null }: DecisionProps) {
         <Facts rows={[['used', total.used], ['cost', total.cost], ...readRows(total), ['every try', cost]]} />
       </section>
 
-      <Commands runId={runId} commands={commands} />
+      <Commands commands={commands} />
     </>
   );
 }
 
+/** A step whose next try a person asked for, as the Answer section notes it (`askedOf`). */
+type AskedNote = { step: string; try: number; note: string | null };
+
 /**
- * What the board can ask for each step waiting on you (`offersOf`), a row a step: a step whose closeout asks questions as data is answered
- * by choosing (`QuestionsForm`). Each ask is the CLI `retry`'s, made by the api through the
- * package's `retry()`, which writes the ask and nothing else; the next tick files the try.
+ * What the board can answer for each step waiting on you (`offersOf`), a row a step, each pressing the step's own command (`kind`) with
+ * the words its case says (`OFFERS`): a step whose closeout asks questions as data is answered by choosing (`QuestionsForm`), a raise
+ * with its amount (`RaiseRow`), a loop out of rounds approved as it stands (`EnoughRow`), every other a try (`OfferRow`). Each is made by
+ * the api through the package's own verb, which writes the ask and nothing else; the next tick files what follows. Then a note for each
+ * step whose next try is already asked.
  */
-export function Offers({ runId, offers }: { runId: string; offers: readonly Answer[] }) {
+export function Offers({
+  runId,
+  offers,
+  asked = [],
+  steps,
+}: {
+  runId: string;
+  offers: readonly Answer[];
+  asked?: readonly AskedNote[];
+  steps: readonly Pick<RunDetail['steps'][number], 'name' | 'commands'>[];
+}) {
+  const lineOf = (offer: Answer): string => steps.find((s) => s.name === offer.step)?.commands[offer.kind] ?? '';
   return (
     <section aria-label="Answer" className="space-y-2">
-      <h3 className={HEADING}>Answer — each asks for a try of its step, or a round of its loop, as the command line would</h3>
+      <h3 className={HEADING}>Answer — each runs its step's command, as the command line would: a try, a round, or an approval</h3>
       <ul className="space-y-3">
         {offers.map((offer) =>
-          offer.kind === 'raise' ? (
+          offer.case === 'raise' ? (
             <RaiseRow key={offer.step} runId={runId} offer={offer} />
-          ) : offer.kind === 'answer' && offer.questions.length > 0 ? (
+          ) : offer.case === 'answer' && offer.questions.length > 0 ? (
             <QuestionsForm key={offer.step} runId={runId} offer={offer} />
+          ) : offer.case === 'enough' ? (
+            <EnoughRow key={offer.step} runId={runId} offer={offer} line={lineOf(offer)} />
           ) : (
             <OfferRow key={offer.step} runId={runId} offer={offer} />
           ),
         )}
+        {asked.map((one) => (
+          <AskedRow key={one.step} step={one.step} said={one.note ?? `try ${one.try} asked`} />
+        ))}
       </ul>
     </section>
   );
 }
 
 /** What a step needs, as its row says it after its name, when it is not a question: a question is drawn as the markdown it is (`Asks`). */
-function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string {
-  switch (offer.kind) {
-    case 'answer':
-      return 'signed off blocked, and said nothing of what it needs';
-    case 'try-again':
-      return !offer.recheck
-        ? "gave no closeout the run accepts — none, one short of a field it declares, or one naming a file the run does not have; the CLI's decide says which"
-        : offer.unfinished
-          ? 'has a check that did not finish: no verdict on the work'
-          : 'was refused by its check';
-    case 'denied':
-      return `signed off having been denied a call${offer.calls ? ` (${offer.calls})` : ''}, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it`;
-  }
+function offerSaid(offer: Extract<Answer, { case: 'answer' | 'try-again' | 'denied' }>): string {
+  if (offer.case === 'answer') return OFFERS.answer.said;
+  if (offer.case === 'denied') return OFFERS.denied.said(offer.calls);
+  const { said } = OFFERS['try-again'];
+  return !offer.recheck ? said.unsigned : offer.unfinished ? said.unfinished : said.refused;
 }
 
 /**
  * One step's answer: what it needs, then the box and the button that ask — an answer to a step that signed off blocked, `Try again` for a
- * refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the api has the ask, the run is read again and the
- * row says what the CLI's `ls` says: `try 2 asked (…) — the next tick files it`; a step waiting on you again later starts afresh.
+ * refused check or an unsigned step — and the api's refusal beside them, verbatim. Once the api has the ask, the row says what the tick
+ * does with it, until the run is read again and the step's note says what the CLI's `ls` says: `try 2 asked (…) — the next tick files it`.
  *
  * As the CLI's `decide` offers it, a check that did not finish is run again first, since the run spent no retry on it, and a denied step
  * gets a new session first, since the one it had was denied and carries on the same permissions. A recheck files no session, so it carries
@@ -179,39 +200,33 @@ function offerSaid(offer: Exclude<Answer, { kind: 'asked' | 'raise' }>): string 
  * it; something to tell a try is optional, and none is sent when nothing was written or with a recheck, whatever the closed box still
  * holds.
  */
-export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answer, { kind: 'raise' }> }) {
+export function OfferRow({ runId, offer }: { runId: string; offer: Extract<Answer, { case: 'answer' | 'try-again' | 'denied' }> }) {
   const [message, setMessage] = useState('');
   const [mode, setMode] = useState<RetryMode>(
-    offer.kind === 'try-again' && offer.unfinished ? 'recheck' : offer.kind === 'denied' ? 'fresh' : 'nudge',
+    offer.case === 'try-again' && offer.unfinished ? 'recheck' : offer.case === 'denied' ? 'fresh' : 'nudge',
   );
   const field = useId();
   const rechecking = mode === 'recheck';
   const ask = useAsk(runId, offer.step, () => setMessage(''));
-  const { reset } = ask;
-  useEffect(() => {
-    if (offer.kind === 'asked') reset();
-  }, [offer.kind, reset]);
+  const words = OFFERS[offer.case];
+  const recheck = OFFERS['try-again'].recheck;
 
-  if (offer.kind === 'asked' || ask.isSuccess) {
-    return (
-      <li data-offer="asked" data-step={offer.step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
-        <strong>{offer.step}</strong>{' '}
-        <span data-note className="font-mono text-body-small text-muted-foreground">
-          {offer.kind === 'asked' ? (offer.note ?? `try ${offer.try} asked`) : ask.isSuccess ? askedSaid(ask.data) : null}
-        </span>
-      </li>
-    );
-  }
+  if (ask.isSuccess) return <AskedRow step={offer.step} said={askedSaid(ask.data)} />;
 
   const modes: RetryMode[] =
-    offer.kind === 'try-again' && offer.recheck
+    offer.case === 'try-again' && offer.recheck
       ? ['nudge', 'fresh', 'recheck']
-      : offer.kind === 'denied'
+      : offer.case === 'denied'
         ? ['fresh', 'nudge']
         : ['nudge', 'fresh'];
   return (
-    <li data-offer={offer.kind} data-step={offer.step} className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium">
-      {offer.kind === 'answer' && offer.needs ? (
+    <li
+      data-offer={offer.case}
+      data-kind={offer.kind}
+      data-step={offer.step}
+      className="space-y-2 rounded border border-yours bg-card p-3 text-body-medium"
+    >
+      {offer.case === 'answer' && offer.needs ? (
         <Asks data-said step={offer.step} needs={offer.needs} />
       ) : (
         <p data-said className="break-words">
@@ -219,40 +234,34 @@ export function OfferRow({ runId, offer }: { runId: string; offer: Exclude<Answe
         </p>
       )}
       <form
-        aria-label={offer.kind === 'answer' ? `Answer ${offer.step}` : `Try ${offer.step} again`}
+        aria-label={words.form(offer.step)}
         className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
-          const said = !rechecking && (offer.kind === 'answer' || message.trim()) ? { message } : {};
+          const said = !rechecking && (offer.case === 'answer' || message.trim()) ? { message } : {};
           ask.mutate({ mode, ...said });
         }}
       >
         <label htmlFor={field} className="sr-only">
-          {offer.kind === 'answer' ? `Your answer to ${offer.step}` : `What to tell ${offer.step}, if anything`}
+          {words.field(offer.step)}
         </label>
         <textarea
           id={field}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
-          rows={offer.kind === 'answer' ? 3 : 2}
+          rows={offer.case === 'answer' ? 3 : 2}
           disabled={rechecking}
-          placeholder={
-            offer.kind === 'answer'
-              ? 'Your answer: the next try is told it, under “Your answer”.'
-              : rechecking
-                ? 'A recheck runs the check again and files no session: there is nobody to tell.'
-                : 'Anything to tell it (optional): the next try is told it.'
-          }
+          placeholder={rechecking ? recheck.placeholder : words.placeholder}
           className={cn(TEXTAREA, 'disabled:cursor-not-allowed disabled:opacity-50')}
         />
         {rechecking && message.trim() && (
           <p data-recheck-note className="text-body-small text-muted-foreground">
-            Not sent with a recheck: it files no session to read it. Choose a session to send it.
+            {recheck.note}
           </p>
         )}
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <button type="submit" disabled={ask.isPending || (offer.kind === 'answer' && !message.trim())} className={BUTTON}>
-            {ask.isPending ? 'Asking…' : offer.kind === 'answer' ? 'Answer and continue' : 'Try again'}
+          <button type="submit" disabled={ask.isPending || (offer.case === 'answer' && !message.trim())} className={BUTTON}>
+            {ask.isPending ? 'Asking…' : words.button}
           </button>
           <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
             <legend className="sr-only">How to try {offer.step} again</legend>
@@ -291,7 +300,7 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
   return (
     <div data-continue className="space-y-2">
       <form
-        aria-label={`Continue ${step}`}
+        aria-label={OFFERS.continue.form(step)}
         className="space-y-2"
         onSubmit={(event) => {
           event.preventDefault();
@@ -299,22 +308,22 @@ export function Continue({ runId, step, line }: { runId: string; step: string; l
         }}
       >
         <label htmlFor={field} className="sr-only">
-          {`What to tell ${step}, if anything`}
+          {OFFERS.continue.field(step)}
         </label>
         <textarea
           id={field}
           value={message}
           onChange={(event) => setMessage(event.target.value)}
           rows={2}
-          placeholder="Anything to tell it (optional): the next try is told it."
+          placeholder={OFFERS.continue.placeholder}
           className={TEXTAREA}
         />
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <button type="submit" disabled={ask.isPending} className={BUTTON}>
-            {ask.isPending ? 'Asking…' : 'Continue'}
+            {ask.isPending ? 'Asking…' : OFFERS.continue.button}
           </button>
           <p className="text-body-small">
-            as <code>{line}</code> asks it: the next tick stops its session, and files the try once it has stopped
+            as <code>{line}</code> {OFFERS.continue.said}
           </p>
         </div>
       </form>
@@ -533,79 +542,24 @@ export function LessonChip({ lesson }: { lesson: Lesson }) {
 }
 
 /**
- * Land it, drop it, once more: each command on a line of its own with a button that copies it. Nothing here runs one but the CLI's
- * `accept`, which a person who never opens a terminal has no other way to give: its row also takes their reason and presses it
- * (`AcceptCommand`).
+ * Land it, drop it, once more: each command on a line of its own with a button that copies it. The board runs none of them: what it
+ * presses is an answer's, in the Answer section (`Offers`).
  */
-export function Commands({ runId, commands }: { runId: string; commands: readonly DecideCommand[] }) {
+export function Commands({ commands }: { commands: readonly DecideCommand[] }) {
   return (
     <section aria-label="Commands" className="space-y-2">
-      <h3 className={HEADING}>Commands — copy one to run it; the board runs only accept, with your reason</h3>
+      <h3 className={HEADING}>Commands — copy one to run it</h3>
       {commands.length ? (
         <ul className="space-y-2">
-          {commands.map((c) => {
-            const accepts = acceptStepOf(c);
-            return accepts ? (
-              <AcceptCommand key={`${c.label} ${c.command}`} runId={runId} step={accepts} command={c} />
-            ) : (
-              <li key={`${c.label} ${c.command}`} data-command={c.label} className="space-y-0.5">
-                <CommandLine command={c} />
-              </li>
-            );
-          })}
+          {commands.map((c) => (
+            <li key={`${c.label} ${c.command}`} data-command={c.label} className="space-y-0.5">
+              <CommandLine command={c} />
+            </li>
+          ))}
         </ul>
       ) : (
         <p className="text-body-medium text-muted-foreground">None yet: the run is still moving.</p>
       )}
     </section>
-  );
-}
-
-/**
- * The CLI's `accept` as a button: the command to copy, as every row has it, and a box for the reason — required, as `--message` is, so the
- * button waits for it, and sent as typed — and the button that accepts the loop's work as it stands through the api (`acceptLoop`), which
- * calls the package's `accept()`. What may be accepted is the package's to say: its refusal shows beside the button, verbatim. Once the api
- * has it, what the tick does with it, until the run is read again and the loop is offered no more.
- */
-export function AcceptCommand({ runId, step, command }: { runId: string; step: string; command: DecideCommand }) {
-  const [message, setMessage] = useState('');
-  const field = useId();
-  const accept = useAccept(runId, step);
-  return (
-    <li data-command={command.label} data-step={step} className="space-y-2">
-      <div className="space-y-0.5">
-        <CommandLine command={command} />
-      </div>
-      {accept.isSuccess ? (
-        <p data-accepted className="pl-18 font-mono text-body-small">
-          try {accept.data.try} of {step} accepted as it stands — what waits on it is filed on the next tick
-        </p>
-      ) : (
-        <form
-          aria-label={`Accept ${step} as it stands`}
-          className="space-y-2 pl-18"
-          onSubmit={(event) => {
-            event.preventDefault();
-            accept.mutate({ message });
-          }}
-        >
-          <label htmlFor={field} className="sr-only">
-            {`Why ${step}'s work is good enough as it stands`}
-          </label>
-          <textarea
-            id={field}
-            value={message}
-            onChange={(event) => setMessage(event.target.value)}
-            rows={3}
-            placeholder="Why the work is good enough with its findings open (required): every step after the loop is handed it."
-            className={TEXTAREA}
-          />
-          <button type="submit" disabled={accept.isPending || !message.trim()} className={BUTTON}>
-            {accept.isPending ? 'Accepting…' : 'Accept as it stands'}
-          </button>
-          {accept.isError && <Refusal error={accept.error} not="Not accepted" />}
-        </form>
-      )}
-    </li>
   );
 }

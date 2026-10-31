@@ -97,7 +97,7 @@ export type RunSummary = {
    * The runs a person holds this one until (`nemia hold <run> --until <run>`), as its hold file names them: none for a run nobody holds, or
    * one called off.
    */
-  heldUntil: string[];
+  holdUntil: string[];
   /**
    * The hold, in the package's words (`RunHolding`); null for a run nobody holds, and one called off. While it stands nothing of the run is
    * filed and nothing is asked of anyone: no step waits on you, and no verb is offered, as `nemia ls` says it.
@@ -105,7 +105,7 @@ export type RunSummary = {
   holding: RunHolding | null;
   /**
    * The run in one word, as the feed and `nemia tick` say it: `running`, `succeeded`, `cancelled`; `failed` for a run in which a step
-   * broke; `awaiting approval` for one stopped at its gates alone; `blocked` for one a person's word stops otherwise.
+   * broke; `awaiting approval` for one stopped at its gates alone; `waiting` for one a person's word stops otherwise.
    */
   status: RunStatus;
   /** Where the run is in its life (`RunPhase`), from its reason (`runCodes`): the code a screen groups it by, never parsed from `status`.
@@ -126,8 +126,9 @@ export type RunSummary = {
    * fan-out as failed once one step is final without letting its followers run, while a sibling still works.
    *
    * A run waiting on runs moves: the tick files its roots once they land. Not one waiting on a run that never lands without a
-   * person — no such run, a cancelled one, a result branch gone (`RunWaiting.onYou`): nothing the tick reads will change on its own.
-   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.onYou`), and files nothing until then.
+   * person — no such run, a cancelled one, a result branch gone (`RunWaiting.waitingOnYou`): nothing the tick reads will change on its own.
+   * A held run the same: it moves as it would unheld while the hold may lift on its own (`RunHolding.waitingOnYou`), and files nothing
+   * until then.
    */
   moving: boolean;
   /**
@@ -192,7 +193,7 @@ export type RunSummary = {
    * `waitingOnYou` as `nemia ls` names it after `→ waiting on you:` (`onYouWords`), one entry a step, in its order: the step's name — and
    * for a step at its gate, what is asked of you, `approve plan`.
    */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /**
    * What a person has to decide about the run's result, when the run is at it and nobody has (`RunToDecide`); null while there is nothing.
    */
@@ -246,7 +247,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     after: run.after ?? [],
     context: run.context ?? [],
     waiting: judged.waiting,
-    heldUntil: judged.holding ? run.hold!.until : [],
+    holdUntil: judged.holding ? run.hold!.until : [],
     holding: judged.holding,
     ...runSaid(judged),
     moving: judged.moving,
@@ -266,7 +267,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     })),
     graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: judged.waitingOnYou,
-    onYou: judged.onYou,
+    waitingOnYouWords: judged.waitingOnYouWords,
     toDecide: judged.toDecide,
     unreadable: null,
   };
@@ -314,7 +315,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     after: run.after ?? [],
     context: run.context ?? [],
     waiting: null,
-    heldUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
+    holdUntil: run.hold && !run.cancelledAt ? run.hold.until : [],
     holding: null,
     status: 'running',
     phase: 'running',
@@ -338,7 +339,6 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
       agent: agentOf(name),
       since: null,
       needs: null,
-      blockedByHarness: false,
       waitingFor: null,
       approve: null,
       denied: null,
@@ -346,7 +346,7 @@ function unjudged(run: Run, views: Views, unreadable: Unreadable, said: string, 
     })),
     graph: runGraph(judgedSteps(run, folder), names),
     waitingOnYou: [],
-    onYou: [],
+    waitingOnYouWords: [],
     toDecide: null,
     unreadable: said,
   };

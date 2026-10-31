@@ -5,7 +5,7 @@ import { gateNodeLine } from '../lib/gate';
 import { attemptLine, isLive, LOOP_SOURCE, LOOP_TARGET } from '../lib/canvas';
 import { contextText } from '../lib/builder';
 import { costText, pastBudget } from '../lib/cost';
-import { isGate, stepState } from '../lib/status';
+import { waitsAtGate, stepState } from '../lib/status';
 import { useNow } from '../lib/useNow';
 import { StatusChip } from './StatusChip';
 import { PERSON } from '../lib/words';
@@ -29,7 +29,7 @@ export type StepFlowNode = Node<StepNodeData, 'step'>;
  * `w-56` is narrower than the layering's column, which leaves room for the arrow between columns.
  *
  * - Its attempt's time moves every second while it counts, and every 30 s otherwise.
- * - It is drawn as a human gate when it is one (`isGate`), a step that signed off blocked or a loop out of rounds, and the run's
+ * - It is drawn as a human gate when it is one (`waitsAtGate`), a step that signed off blocked or a loop out of rounds, and the run's
  *   `waitingOnYou` names it: a step a person has sent round or asked to retry keeps its word until the tick files what they asked for,
  *   and is no gate from the moment they ask, as the page's banner says.
  * - What its tries have cost, of its cap where it has one, in amber once they have cost it or more. It is held on its budget only when its
@@ -54,7 +54,7 @@ export function StepNode({
   const live = isLive(state);
   const now = useNow(live ? 1_000 : 30_000);
   const running = state === 'working';
-  const gate = waitingOnYou && isGate(state, runCancelled);
+  const gate = waitingOnYou && waitsAtGate(state, runCancelled);
   const need = needOf(step, waitingOnYou, runCancelled);
   const { spec } = step;
   const cost = costText(step);

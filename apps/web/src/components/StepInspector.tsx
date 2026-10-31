@@ -2,7 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react';
 import { Link } from '@tanstack/react-router';
 import type { RunDetail, StepTry } from '../lib/api';
 import { duration, isLive } from '../lib/canvas';
-import { isGate, stepState, type StepState } from '../lib/status';
+import { waitsAtGate, stepState, type StepState } from '../lib/status';
 import { gateOfStep } from '../lib/gate';
 import { foldTranscript, sessionToRead } from '../lib/transcript';
 import { useStepTranscript } from '../lib/useStepTranscript';
@@ -217,7 +217,7 @@ const ACTIVITY_TURNS = 30;
  */
 function Activity({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
-  const following = useStepTranscript(run.id, step.name, sessionToRead(step), isGate(stepState(step, cancelled, false), cancelled));
+  const following = useStepTranscript(run.id, step.name, sessionToRead(step), waitsAtGate(stepState(step, cancelled, false), cancelled));
   const turns = useMemo(() => foldTranscript(following.events), [following.events]);
   const tail = turns.slice(-ACTIVITY_TURNS);
 

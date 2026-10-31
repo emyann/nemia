@@ -651,7 +651,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
       });
 
       const detail = await detailOf('r-d11');
-      assert.deepEqual([detail.steps[0].status, detail.steps[1].status, detail.waitingOnYou], ['denied', 'waiting', ['implement']]);
+      assert.deepEqual([detail.steps[0].status, detail.steps[1].status, detail.waitingOnYou], ['denied', 'pending', ['implement']]);
       const body = await decidable('r-d11');
       const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
       assert.deepEqual(
@@ -883,7 +883,7 @@ test("a run `assess` calls running while a step waits on a person is decided on:
     },
   });
   const fanOut = await detailOf('r-d7');
-  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['blocked', true, ['implement']]);
+  assert.deepEqual([fanOut.status, fanOut.moving, fanOut.waitingOnYou], ['waiting', true, ['implement']]);
   const decided = await decidable('r-d7');
   assert.deepEqual(
     decided.touched.map((t: { branch: string }) => t.branch),

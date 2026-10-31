@@ -211,7 +211,7 @@ test('`listing` handed a run slot: the roots of a held run say `waiting for a ru
     const held = listed(fresh, {});
     assert.deepEqual(
       [held.steps.map((s) => s.status), held.slot, held.waitingOnYou],
-      [['waiting for a run slot (2 of 2 in flight)', 'waiting'], slot, []],
+      [['waiting for a run slot (2 of 2 in flight)', 'pending'], slot, []],
     );
   });
   await t.test('no slot handed, no key', () => {
@@ -225,7 +225,7 @@ test('`listing` handed a run slot: the roots of a held run say `waiting for a ru
   });
   await t.test('a run called off', () => {
     const cancelled = listed(run({ implement: null, review: null }, CANCELLED), {});
-    assert.deepEqual([cancelled.steps[0].status, cancelled.slot], ['waiting', undefined]);
+    assert.deepEqual([cancelled.steps[0].status, cancelled.slot], ['pending', undefined]);
   });
   await t.test('a run waiting on a run', () => {
     const waits = listed(run({ implement: null, review: null }, { after: ['a-1x2y'] }), {}, [{ run: 'a-1x2y' }]);

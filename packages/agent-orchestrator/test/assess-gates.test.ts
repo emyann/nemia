@@ -101,7 +101,7 @@ test('assess: a run stopped on a person says what it waits on', async (t) => {
   });
   await t.test('a question alone: blocked', () => {
     const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
-    assert.equal(statusOf(STEPS, run({ implement: 't1', review: null }), PLAN_DONE, blocked, asked), 'blocked');
+    assert.equal(statusOf(STEPS, run({ implement: 't1', review: null }), PLAN_DONE, blocked, asked), 'waiting');
   });
   await t.test('REFUSED failed for a task failed', () => {
     assert.equal(statusOf(STEPS, run({ implement: 't1', review: null }), phases({ t1: 'failed' }), undefined, asked), 'failed');
@@ -257,7 +257,7 @@ test('decision at a gate', async (t) => {
     const d = decision(STEPS, gatedAtReview(), DONE, () => false, signedDone, asked);
     assert.equal(d.kind, 'awaiting');
     assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.awaitingApproval, d.unverified, d.awaitingAnswer], [
-      'blocked',
+      'waiting',
       ['review'],
       ['implement', 'review'],
       [],

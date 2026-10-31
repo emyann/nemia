@@ -65,7 +65,7 @@ const SaidSchema = decodes<Said>()(
 
 /** Mirrors `StepStatus` in agent-orchestrator's record/record.ts: a step's word, as the package and the CLI's `ls` say it. */
 export type StepStatus =
-  | 'waiting'
+  | 'pending'
   | 'running'
   | 'blocked'
   | 'unsigned'
@@ -84,7 +84,7 @@ export type StepStatus =
 /** Decodes a `StepStatus`. */
 const StepStatusSchema = decodes<StepStatus>()(
   Schema.Literals([
-    'waiting',
+    'pending',
     'running',
     'blocked',
     'unsigned',
@@ -342,7 +342,7 @@ export type RunDetail = RunCodes & {
   fromNote?: string;
   waiting: RunWaiting | null;
   /** As on `RunSummary`. */
-  heldUntil: string[];
+  holdUntil: string[];
   /** As on `RunSummary`. */
   holding: RunHolding | null;
   status: RunStatus;
@@ -357,7 +357,7 @@ export type RunDetail = RunCodes & {
   read: RunRead | null;
   waitingOnYou: string[];
   /** As on `RunSummary`. */
-  onYou: string[];
+  waitingOnYouWords: string[];
   /** As on `RunSummary` (`RunToDecide`). */
   toDecide: RunToDecide | null;
   /** The steps the run is gated at, in the order they run: those its workflow gates, and those it was started with. */
@@ -408,7 +408,6 @@ export type RunDetail = RunCodes & {
       /** The lines a person types for what the step's controls do: its approval, a try in its session, and words said to it. */
       commands: { approve: string; retry: string; say: string };
       needs: string | null;
-      blockedByHarness: boolean;
       /** As on `RunSummary`: what the harness says the session waits for, and what a person does about it. */
       waitingFor: StepNeeds['waitingFor'];
       approve: string | null;
@@ -640,7 +639,7 @@ const RunDetailSchema = decodes<RunDetail>()(
     from: Schema.optionalKey(Schema.Struct({ inbox: Schema.String })),
     fromNote: Schema.optionalKey(Schema.String),
     waiting: Schema.NullOr(RunWaitingSchema),
-    heldUntil: StringsSchema,
+    holdUntil: StringsSchema,
     holding: Schema.NullOr(RunHoldingSchema),
     status: RunStatusSchema,
     ...RunCodesFields,
@@ -650,7 +649,7 @@ const RunDetailSchema = decodes<RunDetail>()(
     tokens: Schema.NullOr(RunTokensSchema),
     read: Schema.NullOr(RunReadSchema),
     waitingOnYou: StringsSchema,
-    onYou: StringsSchema,
+    waitingOnYouWords: StringsSchema,
     toDecide: Schema.NullOr(RunToDecideSchema),
     gates: StringsSchema,
     warning: Schema.NullOr(Schema.String),

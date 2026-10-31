@@ -1,6 +1,6 @@
 import type { RunSummary } from './api/runs.ts';
 
-type Holdable = Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'holding' | 'heldUntil' | 'status'> & { pruned: object | null };
+type Holdable = Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'holding' | 'holdUntil' | 'status'> & { pruned: object | null };
 
 type Candidate = Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'pruned' | 'status' | 'toDecide'>;
 
@@ -15,7 +15,7 @@ export const holdable = (run: Holdable): boolean =>
   run.cancelledAt === null &&
   run.pruned === null &&
   run.holding === null &&
-  run.heldUntil.length === 0 &&
+  run.holdUntil.length === 0 &&
   run.status !== 'succeeded' &&
   run.status !== 'cancelled';
 

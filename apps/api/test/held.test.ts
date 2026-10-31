@@ -118,7 +118,7 @@ test('a step whose task is held open reads as waiting on a person, never as a se
           run.steps.map(({ name, status, needs }) => ({ name, status, needs })),
           [
             { name: 'plan', status: 'input-required · BLOCKED', needs: BLOCKED.needs },
-            { name: 'implement', status: 'waiting', needs: null },
+            { name: 'implement', status: 'pending', needs: null },
           ],
         );
         assert.deepEqual(
@@ -135,7 +135,7 @@ test('a step whose task is held open reads as waiting on a person, never as a se
       for (const run of [await detail('h-gate'), await summary('h-gate')]) {
         assert.deepEqual(
           run.steps.map((s) => s.status),
-          ['awaiting approval', 'waiting'],
+          ['awaiting approval', 'pending'],
         );
         assert.deepEqual(run.waitingOnYou, ['plan']);
       }

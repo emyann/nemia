@@ -10,7 +10,7 @@ import { StatusChip, StepNote } from '@/components/StatusChip';
 import { loadRun, runGone, runQuery, type RunDetail, type Said } from '@/lib/api';
 import { titleOf } from '@/lib/factory';
 import { mergeSaid, sayable } from '@/lib/say';
-import { isGate, stepState } from '@/lib/status';
+import { waitsAtGate, stepState } from '@/lib/status';
 import { foldTranscript, heardIn, sessionToRead, withSaid, type Turn } from '@/lib/transcript';
 import { useStepTranscript, type Following } from '@/lib/useStepTranscript';
 
@@ -97,7 +97,7 @@ function SessionRead({ runId, name }: { runId: string; name: string }) {
  */
 function Session({ run, step }: { run: RunDetail; step: Step }) {
   const cancelled = run.cancelledAt !== null;
-  const following = useStepTranscript(run.id, step.name, sessionToRead(step), isGate(stepState(step, cancelled, false), cancelled));
+  const following = useStepTranscript(run.id, step.name, sessionToRead(step), waitsAtGate(stepState(step, cancelled, false), cancelled));
   const [sent, setSent] = useState<{ taskId: string | null; said: Said[] }>({ taskId: step.taskId, said: [] });
   const said = useMemo(() => mergeSaid(step.said, sent.taskId === step.taskId ? sent.said : []), [step.said, step.taskId, sent]);
   const turns = useMemo(() => {

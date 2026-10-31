@@ -166,7 +166,7 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
     const blocked = () => ({ outcome: 'blocked' as const, summary: 's', artifacts: [], needs: 'pick one' });
     const d = decision(STEPS, finished(), DONE, nothingShipped, blocked);
     assert.equal(d.kind, 'awaiting');
-    assert.equal(d.kind === 'awaiting' && d.outcome, 'blocked');
+    assert.equal(d.kind === 'awaiting' && d.outcome, 'waiting');
     assert.deepEqual(d.kind === 'awaiting' && d.failed, [], 'nothing broke');
     assert.deepEqual(d.kind === 'awaiting' && d.awaitingAnswer, ['implement', 'review']);
   });
@@ -187,7 +187,7 @@ test('assess, stepStatus and decision of how a step signed off', async (t) => {
         `${why}: held to it by its own file, whatever the engine recorded of the filing`,
       );
       const a = assess(steps, r, p, signed(said), asked);
-      assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['respond'], 'blocked'], why);
+      assert.deepEqual([a.ready, a.unreachable, a.status], [[], ['respond'], 'waiting'], why);
       const d = decision(steps, r, p, nothingShipped, signed(said), asked);
       assert.deepEqual(d.kind === 'awaiting' && d.unsigned, ['review'], why);
     }
@@ -242,7 +242,7 @@ test('listing of how a step signed off', async (t) => {
       live.steps,
       [
         { name: 'implement', status: 'working', reason: 'Running', phase: 'running', branch: null },
-        { name: 'review', status: 'waiting', reason: 'Pending', phase: 'pending', branch: null },
+        { name: 'review', status: 'pending', reason: 'Pending', phase: 'pending', branch: null },
       ],
       'still running, and never filed',
     );

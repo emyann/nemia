@@ -297,7 +297,7 @@ test("listing of a step's check: what the run established, not only what the eng
       closeoutOf: signedOff({ implement: said('done') }),
       askedCloseout: asked,
     });
-    assert.deepEqual(statuses(l), ['failed ✗ check (unfinished)', 'waiting']);
+    assert.deepEqual(statuses(l), ['failed ✗ check (unfinished)', 'pending']);
   });
 });
 
@@ -306,7 +306,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
     const p = phases({ t1: 'succeeded' });
     const none = () => undefined;
     const a = assess(CHECKED, withCheck(null), p, none, asked);
-    assert.deepEqual([a.ready, a.check, a.unreachable, a.status], [[], [], ['review'], 'blocked'], 'no signed work to check');
+    assert.deepEqual([a.ready, a.check, a.unreachable, a.status], [[], [], ['review'], 'waiting'], 'no signed work to check');
     assert.equal(stepStatus(CHECKED[0], withCheck(null), p, none, asked), 'unsigned');
     assert.deepEqual(
       assess(STEPS, run({ implement: 't1', review: null }), p, none, asked).ready,
@@ -338,7 +338,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
     });
   await t.test('gone quiet, it waits on you and blocks the run, and a nudge is told it gave none', () => {
     const quietly = decision(STEPS, r, failed, nothingShipped, none, quiet);
-    assert.deepEqual(quietly.kind === 'awaiting' && [quietly.outcome, quietly.unsigned, quietly.failed], ['blocked', ['implement'], []]);
+    assert.deepEqual(quietly.kind === 'awaiting' && [quietly.outcome, quietly.unsigned, quietly.failed], ['waiting', ['implement'], []]);
     assert.deepEqual(
       listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'failed' }), closeoutOf: none, askedCloseout: quiet }).waitingOnYou,
       ['implement'],
@@ -1371,7 +1371,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       () => false,
       denied,
     );
-    assert.deepEqual([a.check, a.retry, a.unreachable, a.status], [[], [], ['review'], 'blocked']);
+    assert.deepEqual([a.check, a.retry, a.unreachable, a.status], [[], [], ['review'], 'waiting']);
     assert.deepEqual(
       retriesDue(
         DENYING,
@@ -1399,7 +1399,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       () => false,
       denied,
     );
-    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.denied, d.failed, d.unsigned], ['blocked', ['implement'], [], []]);
+    assert.deepEqual(d.kind === 'awaiting' && [d.outcome, d.denied, d.failed, d.unsigned], ['waiting', ['implement'], [], []]);
     const l = fullListing({
       steps: DENYING,
       run: r,

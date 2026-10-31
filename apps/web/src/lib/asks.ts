@@ -10,9 +10,12 @@ import type { Question, RunDetail, RunSummary, RunToDecide, StepCloseout } from 
 import { stepState } from './status.ts';
 
 /** A step as the list gives it, or as a run's detail does, with what a session the harness blocked said last. */
-type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'blockedByHarness' | 'waitingFor' | 'approve'> & {
+type NeedsStep = Pick<RunSummary['steps'][number], 'name' | 'needs' | 'reason' | 'via' | 'waitingFor' | 'approve'> & {
   lastLine?: string | null;
 };
+
+/** Whether a step's harness stopped its session to ask, and no closeout signed off blocked: codes `AwaitingAnswer` via `session`. */
+export const atHarness = (step: Pick<NeedsStep, 'reason' | 'via'>): boolean => step.reason === 'AwaitingAnswer' && step.via === 'session';
 
 /**
  * What one step needs from a person: the question it signed off blocked with; that the harness blocked its session — with what that harness
@@ -37,7 +40,7 @@ export const harnessSaid = (need: Extract<Need, { kind: 'harness' }>): string =>
  */
 export function needOf(step: NeedsStep, waitingOnYou: boolean, runCancelled: boolean): Need | null {
   if (runCancelled) return null;
-  if (step.blockedByHarness) return { step: step.name, kind: 'harness', waitingFor: step.waitingFor, lastLine: step.lastLine ?? null };
+  if (atHarness(step)) return { step: step.name, kind: 'harness', waitingFor: step.waitingFor, lastLine: step.lastLine ?? null };
   if (step.approve && waitingOnYou) return { step: step.name, kind: 'approve', said: step.approve };
   if (step.needs && waitingOnYou) return { step: step.name, kind: 'asks', needs: step.needs };
   return null;
@@ -180,7 +183,7 @@ export function offersOf(run: Offerable): Offer[] {
   if (run.cancelledAt !== null || run.holding != null) return [];
   return run.steps.flatMap((step): Offer[] => {
     if (step.asked) return [];
-    if (step.blockedByHarness) return [{ step: step.name, case: 'continue', kind: 'retry' }];
+    if (atHarness(step)) return [{ step: step.name, case: 'continue', kind: 'retry' }];
     if (!run.waitingOnYou.includes(step.name)) return [];
     const unfinished = step.check?.verdict?.result === 'unfinished';
     if (step.raise) {

@@ -44,16 +44,16 @@ const row = (extra: object = {}): RunSummary => ({
     runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [] }],
     word: 'waiting on r-0',
     advice: 'wait',
-    onYou: false,
+    waitingOnYou: false,
   },
   context: [],
-  heldUntil: [],
+  holdUntil: [],
   holding: {
     at: '2026-09-30T05:00:00.000Z',
     runs: [{ run: 'r-0', missing: false, cancelledAt: null, gone: [], landed: false }],
     word: 'held until r-0 lands',
     advice: 'wf hold r-1 --off',
-    onYou: true,
+    waitingOnYou: true,
   },
   status: 'running',
   phase: 'pending',
@@ -92,7 +92,6 @@ const row = (extra: object = {}): RunSummary => ({
       agent: null,
       since: null,
       needs: 'a decision',
-      blockedByHarness: false,
       waitingFor: { words: 'a permission', advice: 'answer it' },
       approve: null,
       denied: { words: 'denied: Skill(look)', calls: ['Skill(look)'] },
@@ -107,7 +106,7 @@ const row = (extra: object = {}): RunSummary => ({
     ],
   },
   waitingOnYou: ['implement'],
-  onYou: ['implement'],
+  waitingOnYouWords: ['implement'],
   toDecide: {
     kind: 'approve',
     step: 'ship',
@@ -202,9 +201,9 @@ test('REFUSED: a row whose steps are not an array', async (t) => {
 
 test('REFUSED: a step without a key the board reads, and a value quoted to 60 characters', async (t) => {
   const [step] = row().steps;
-  const { blockedByHarness: _, ...without } = step;
+  const { waitingFor: _, ...without } = step;
   answering(t, [row({ steps: [without] })]);
-  await assert.rejects(readRuns(), unread('[0].steps[0].blockedByHarness', 'is missing'));
+  await assert.rejects(readRuns(), unread('[0].steps[0].waitingFor', 'is missing'));
 
   const { via: __, ...unqualified } = step;
   answering(t, [row({ steps: [unqualified] })]);

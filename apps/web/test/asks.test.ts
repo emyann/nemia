@@ -1,6 +1,6 @@
 /**
  * What a step needs from a person, as the board says it, and what the run's page offers to answer it with (lib/asks.ts): off the api's
- * `needs`, `blockedByHarness`, `lastLine`, `asked` and `waitingOnYou` alone.
+ * `needs`, the codes `reason` and `via`, `lastLine`, `asked` and `waitingOnYou` alone.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -36,7 +36,6 @@ const step = (name: string, word: Word, over: Partial<Step> = {}): Step =>
     ...coded(word),
     note: null,
     needs: null,
-    blockedByHarness: false,
     waitingFor: null,
     approve: null,
     denied: null,
@@ -57,8 +56,8 @@ test('needOf: what a step needs from a person — its question, its blocked sess
       const steps = [
         step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' }),
         step('theme', 'failed ✗ check (exit 1)'),
-        step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN, waitingFor: WAIT }),
-        step('silent', 'needs-human', { blockedByHarness: true }),
+        step('held', 'needs-human', { lastLine: LOGIN, waitingFor: WAIT }),
+        step('silent', 'needs-human', {}),
         step('plan', 'succeeded · BLOCKED', {
           needs: 'Which plan?',
           note: 'try 2 asked (--continue, with your answer) — the next tick files it',
@@ -98,7 +97,11 @@ test('needOf: what a step needs from a person — its question, its blocked sess
         "a step's node has one narrow line: it says the wait alone, and every other need as it reads anywhere else",
       );
 
-      const listed = needOf({ name: 'held', needs: null, blockedByHarness: true, waitingFor: WAIT, approve: null }, false, false);
+      const listed = needOf(
+        { name: 'held', needs: null, reason: 'AwaitingAnswer', via: 'session', waitingFor: WAIT, approve: null },
+        false,
+        false,
+      );
       assert.deepEqual(listed, { step: 'held', kind: 'harness', waitingFor: WAIT, lastLine: null });
       assert.equal(
         needLine(listed),
@@ -267,7 +270,7 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
   await t.test(
     "a session the harness blocked is offered Continue, whether or not the api names it as waiting on you — and once asked, the note of its try, in the Decide section too; Continue itself is the banner's",
     () => {
-      const held = step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN });
+      const held = step('held', 'needs-human', { lastLine: LOGIN });
       const implement = step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' });
       assert.deepEqual(
         offersOf(run([held], [])),
@@ -286,7 +289,6 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
 
       const note = 'try 2 asked (--continue) — stopping its blocked session, then the tick files it';
       const asked = step('held', 'needs-human', {
-        blockedByHarness: true,
         lastLine: LOGIN,
         note,
         asked: { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true },
@@ -305,7 +307,7 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
     () => {
       assert.deepEqual(offersOf(run([step('working', 'running (working)')], [])), []);
       assert.deepEqual(offersOf(run([step('working', 'running (working)')], ['working'])), []);
-      const held = step('held', 'needs-human', { blockedByHarness: true, lastLine: LOGIN });
+      const held = step('held', 'needs-human', { lastLine: LOGIN });
       assert.deepEqual(offersOf(run([held], [], '2026-09-14T07:00:00.000Z')), []);
     },
   );
@@ -319,8 +321,14 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
   await t.test(
     'REFUSED: nothing is offered on a run a person holds — not Continue for a session the harness blocked, which the api names whatever waits on you, nor anything the api would still name — since the package refuses every one of these verbs on a held run',
     () => {
-      const holding = { at: '2026-09-23T07:00:00.000Z', runs: [], word: 'held until a-1 lands', advice: 'wf hold r --off', onYou: false };
-      const held = step('held', 'needs-human', { blockedByHarness: true });
+      const holding = {
+        at: '2026-09-23T07:00:00.000Z',
+        runs: [],
+        word: 'held until a-1 lands',
+        advice: 'wf hold r --off',
+        waitingOnYou: false,
+      };
+      const held = step('held', 'needs-human', {});
       const blocked = step('implement', 'succeeded · BLOCKED', { needs: 'Which database?' });
       assert.equal(
         offersOf(run([held, blocked], ['implement'])).length,

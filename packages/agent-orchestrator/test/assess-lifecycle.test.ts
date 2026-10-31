@@ -269,7 +269,7 @@ test('cancelPlan and inFlight: what `nemia cancel` stops, and whether a run is f
   await t.test('REFUSED to be finished: a run whose step signed off blocked waits on a person, so `nemia cancel` calls it off', () => {
     const p = phases({ t1: 'succeeded' });
     const blocked = (name: string) => (name === 'implement' ? said('blocked') : undefined);
-    assert.equal(assess(STEPS, blockedRun(), p, blocked, asked).status, 'blocked');
+    assert.equal(assess(STEPS, blockedRun(), p, blocked, asked).status, 'waiting');
     assert.deepEqual(
       listing({ steps: STEPS, run: blockedRun(), phaseOf: shown({ t1: 'succeeded' }), closeoutOf: BLOCKED_SAID, askedCloseout: asked })
         .waitingOnYou,

@@ -440,8 +440,8 @@ function WaitingOnRuns({ run }: { run: RunDetail }) {
   return (
     <section
       aria-label="Waiting on runs"
-      data-on-you={waiting.onYou}
-      className={`space-y-1 rounded px-3 py-2 text-body-medium ${waiting.onYou ? container.yours : 'bg-muted text-foreground'}`}
+      data-on-you={waiting.waitingOnYou}
+      className={`space-y-1 rounded px-3 py-2 text-body-medium ${waiting.waitingOnYou ? container.yours : 'bg-muted text-foreground'}`}
     >
       <p className="font-mono">{waiting.word}</p>
       <p data-advice>{waiting.advice}</p>
@@ -474,8 +474,8 @@ function HeldUntil({ run }: { run: RunDetail }) {
   return (
     <section
       aria-label="Held"
-      data-on-you={holding.onYou}
-      className={`space-y-1 rounded px-3 py-2 text-body-medium ${holding.onYou ? container.yours : container.grey}`}
+      data-on-you={holding.waitingOnYou}
+      className={`space-y-1 rounded px-3 py-2 text-body-medium ${holding.waitingOnYou ? container.yours : container.grey}`}
     >
       <p className="font-mono">{holding.word}</p>
       <p data-advice>{holding.advice}</p>

@@ -93,14 +93,24 @@ function briefArgs(arg: string, args: Args): Args {
   };
 }
 
+/** Whether `arg` reads as a path rather than words: one word, with a slash in it. */
+const pathLike = (arg: string): boolean => !/\s/.test(arg) && /[\\/]/.test(arg);
+
 /**
  * `nemia start`: a run of a brief, a plan's card or an inbox card (`START`), and what it prints of it; or, for a folder, a run per card of
- * the plan it holds (`folderRun`). A brief is words or a file, never a folder, so a folder is always a plan.
+ * the plan it holds (`folderRun`). A brief is words or a file, never a folder, so a folder is always a plan; and a brief that reads as a
+ * path (`pathLike`) and names nothing here, nor a card of the inbox, is refused rather than started as words: it is a file or a plan folder
+ * mistyped, or not made yet, as the former spelling of a plan's start only ever meant a folder.
  */
 export async function startRun(args: Args, e: Engine, place: Place): Promise<void> {
   const arg = textOf(args, 'brief') ?? '';
-  if (fs.statSync(arg, { throwIfNoEntry: false })?.isDirectory()) return folderRun(arg, args, e, place);
+  const at = fs.statSync(arg, { throwIfNoEntry: false });
+  if (at?.isDirectory()) return folderRun(arg, args, e, place);
   const card = inboxNameAt(arg);
+  if (at === undefined && card === null && pathLike(arg))
+    usage(
+      `nemia start was given ${arg}, which reads as a path, and there is no file nor plan folder at ${path.resolve(arg)}. Make the folder of cards and start it: nemia start <folder> --repo <r>; or give the file's path as it is, or the brief in words: nemia start "<brief>".`,
+    );
   const asked = card !== null ? cardArgs(card, args) : briefArgs(arg, args);
   const data = await runWith(e, placedIn(place, START.handler(asked)));
   for (const line of START.print(data, asked)) console.log(line);

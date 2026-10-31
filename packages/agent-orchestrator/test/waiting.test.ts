@@ -702,6 +702,13 @@ test('REFUSED by name at shipped defaults: `nemia start <folder>` starts nothing
     ['a folder inside the plan', { 'drafts/': '' }, [plan, '--repo', repo], 'Invalid', ['drafts/', plan, 'not a card']],
     ['a folder with no card', {}, [empty, '--repo', repo], 'Invalid', [empty, 'no cards', 'README.md']],
     [
+      'no folder',
+      {},
+      [path.join(ROOT, 'no-such-plan'), '--repo', repo],
+      'Invalid',
+      ['no file nor plan folder', 'no-such-plan', 'nemia start <folder>'],
+    ],
+    [
       '--after: the folder says it',
       {},
       [plan, '--repo', repo, '--after', 'r-xyz'],

@@ -545,3 +545,52 @@ test('a run function imported through runner.ts is refused, naming runner.ts as 
 test("no file of src but the store's own imports a run's functions from record.store.ts or through runner.ts", () => {
   assert.deepEqual(refusals(sourcesOfSrc()), []);
 });
+
+/** The run store's run groups as `src`'s code uses them, comment lines left out, by file: what `RUN_DOOR_DEBT` counts. */
+function seamUses(sources: Record<string, string>): Map<string, number> {
+  const uses = new Map<string, number>();
+  for (const [file, text] of Object.entries(sources)) {
+    if (file === 'src/record/files.store.ts') continue;
+    const code = text
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+      .join('\n');
+    const n = [...code.matchAll(/\brunStore\s*\.\s*(?:runs|asks|holds|refresh|forgetting)\b/g)].length;
+    if (n) uses.set(file, n);
+  }
+  return uses;
+}
+
+/** Why the uses of `sources` break the baseline `debt`: a file it does not name, a count grown, a count fallen. */
+function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<string, number>>): string[] {
+  const uses = seamUses(sources);
+  const out: string[] = [];
+  for (const [file, n] of uses) {
+    const owed = debt[file] ?? 0;
+    if (n > owed)
+      out.push(
+        `${file} uses the run store ${n} time(s) where test/run-door.baseline.ts names ${owed}: yield RunDoor (src/runs/runs.store.ts) instead`,
+      );
+    if (n < owed)
+      out.push(`${file} uses the run store ${n} time(s): lower its count in test/run-door.baseline.ts to ${n}, which only shrinks`);
+  }
+  for (const file of Object.keys(debt))
+    if (!uses.has(file)) out.push(`${file} uses the run store no more: take its line out of test/run-door.baseline.ts`);
+  return out;
+}
+
+test('no file of src uses the run store but as test/run-door.baseline.ts counts it, and the count only shrinks', async () => {
+  const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
+  assert.deepEqual(debtBreaks(sourcesOfSrc(), RUN_DOOR_DEBT), []);
+});
+
+test('REFUSED: a converted file that uses the run store again, and a count the baseline holds above what is left', async () => {
+  const { RUN_DOOR_DEBT } = await import('./run-door.baseline.ts');
+  const sources = sourcesOfSrc();
+  const again = {
+    ...sources,
+    'src/cancel/cancel.verb.ts': `${sources['src/cancel/cancel.verb.ts']}\nconst x = runStore.runs.read('a');\n`,
+  };
+  assert.equal(debtBreaks(again, RUN_DOOR_DEBT).length, 1);
+  assert.equal(debtBreaks(sources, { ...RUN_DOOR_DEBT, 'src/try/try.verb.ts': 2 }).length, 1);
+});

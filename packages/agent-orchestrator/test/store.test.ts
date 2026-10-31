@@ -147,12 +147,12 @@ const engineWith = (phase: Record<string, TaskPhase>, hold?: Promise<void>, clos
 };
 
 test('a cancel that lands mid-tick survives the tick', async () => {
-  const run = aRun('r-race', { implement: { taskId: 't1' }, review: { taskId: null } });
+  const run = aRun('r-race', { implement: { taskId: 'r-race-implement' }, review: { taskId: null } });
   writeRun(run);
 
   let release!: () => void;
   const { e } = engineWith(
-    { t1: 'succeeded' },
+    { 'r-race-implement': 'succeeded' },
     new Promise<void>((r) => {
       release = r;
     }),

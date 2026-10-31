@@ -4,3 +4,7 @@
  */
 export { testPlace, type TestPlace } from './place.ts';
 export type { Tree, World } from './world.ts';
+
+/** The Run door's memory stand-in (`src/runs/memory.store.ts`): a fresh layer of `RunDoor` per call, given to a test's program. */
+export { runDoorMemory, MEMORY_ROOT } from '../../src/runs/memory.store.ts';
+export { RunDoor, type RunDoorShape } from '../../src/runs/runs.store.ts';

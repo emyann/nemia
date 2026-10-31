@@ -17,7 +17,7 @@ import { asNamed } from '../workflow.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
 import type { AsksRead, MergeAskHeld } from './record.ts';
-import { Invalid, Missing } from '../refusal/refusal.ts';
+import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { Pins } from '../revisions/revisions.store.ts';
 import { wfRoot } from '../config/config.store.ts';
 import { countRecord, readText, within } from '../meter/tally.store.ts';
@@ -728,10 +728,18 @@ export const restStamps = (): Map<string, string> =>
 /** A record as it is written, by both writers: its frozen steps under the names their keys have now. */
 const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause'>): string => JSON.stringify(run, null, 2);
 
-/** A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, a person's file. */
+/**
+ * A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, a person's file. Exclusive (`wx`): a
+ * record already at the id is refused as `Conflict` and left as it is, so two starts that minted one id make one run.
+ */
 export const writeRun = ({ pause: _, ...run }: Run) => {
   fs.mkdirSync(runsDir(), { recursive: true });
-  fs.writeFileSync(runFile(run.id), recordText(run));
+  try {
+    fs.writeFileSync(runFile(run.id), recordText(run), { flag: 'wx' });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    throw new Conflict({ message: `run ${run.id} already exists: start it under a new id, or forget the one there with nemia rm ${run.id}` });
+  }
 };
 
 /**

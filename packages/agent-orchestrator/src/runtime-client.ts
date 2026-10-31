@@ -40,6 +40,8 @@ import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 import { exportIntervalRefusalOf, sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
 import type { EnginePhase } from './views/views-words.ts';
+import { fromThrow } from './door/door.store.ts';
+import { RunDoor, runDoorFiles } from './runs/runs.store.ts';
 
 /**
  * Whether two unions hold the same words: `true` only when each is assignable to the other, `false` otherwise, so a `true` annotation
@@ -245,8 +247,7 @@ const orRefusal = (err: unknown): Effect.Effect<never, Refusal> => (isRefusal(er
  * A synchronous read of the store or of git, in a controller's program: what `read` returns, or the refusal it threw as the program's
  * failure (`orRefusal`); anything else it threw, the program dies of.
  */
-export const tried = <A>(read: () => A): Effect.Effect<A, Refusal> =>
-  Effect.try({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
+export const tried: <A>(read: () => A) => Effect.Effect<A, Refusal> = fromThrow;
 
 /**
  * The engine's verb `verb`, `effect`, in a controller's program: what it succeeds with; a refusal of the runtime it dies of in the
@@ -260,9 +261,19 @@ export const asked = <A, E>(verb: string, effect: Effect.Effect<A, E>): Effect.E
  * the program failed with, or with whatever else it died of, as it was thrown. It logs at Warn and above unless the program sets its
  * own level: a command run once says what it did in its own lines, so the feed's Info lines a tick writes (`emitFeed`) are said by a
  * process that lives (`nemia up`, the api) alone, and a warning or an error is said wherever it comes from.
+ *
+ * The Run door (`RunDoor`) is given over the store's files (`runDoorFiles`) outside the program, so a door the program was given itself
+ * wins: a test's memory stand-in (`runDoorMemory`). A default where `StoreRoot` and the place have none, so that no caller of `runWith`
+ * changes while the run store's callers move onto the door (`docs/architecture.md`, *The Run door*).
  */
-export const runWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService>): Promise<A> =>
-  Effect.runPromise(program.pipe(Effect.provide(EngineService.layer(e)), Effect.provideService(References.MinimumLogLevel, 'Warn')));
+export const runWith = <A, E>(e: Engine, program: Effect.Effect<A, E, EngineService | RunDoor>): Promise<A> =>
+  Effect.runPromise(
+    program.pipe(
+      Effect.provide(EngineService.layer(e)),
+      Effect.provide(runDoorFiles),
+      Effect.provideService(References.MinimumLogLevel, 'Warn'),
+    ),
+  );
 
 /**
  * `program` over the engine `e` in place of the one in its context: what a pass hands a read the engine it reads through

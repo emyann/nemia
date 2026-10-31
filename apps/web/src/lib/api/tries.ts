@@ -233,7 +233,7 @@ export const StepAttemptsSchema = decodes<StepAttempts>()(
 export type StepTry = {
   try: number;
   round: number;
-  cause: 'retries' | 'nudge' | 'fresh' | 'recheck' | 'round' | 'merge' | 'signoff' | 'back' | null;
+  cause: 'retries' | 'continue' | 'fresh' | 'recheck' | 'round' | 'merge' | 'signoff' | 'back' | null;
   current: boolean;
   taskId: string | null;
   note: string | null;
@@ -258,7 +258,7 @@ export const StepTrySchema = decodes<StepTry>()(
   Schema.Struct({
     try: Schema.Number,
     round: Schema.Number,
-    cause: Schema.NullOr(Schema.Literals(['retries', 'nudge', 'fresh', 'recheck', 'round', 'merge', 'signoff', 'back'])),
+    cause: Schema.NullOr(Schema.Literals(['retries', 'continue', 'fresh', 'recheck', 'round', 'merge', 'signoff', 'back'])),
     current: Schema.Boolean,
     taskId: Schema.NullOr(Schema.String),
     note: Schema.NullOr(Schema.String),

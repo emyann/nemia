@@ -400,7 +400,7 @@ function budgetMisgiven(c: Judged): string | undefined {
   return `--budget ${how.budget} is not above ${aboveWord(floor)}, ${what}: ${why}. Give more than ${aboveWord(floor)}: ${command} --budget <amount>.`;
 }
 
-/** A step the run is about to try again itself: a nudge to sign off, or a try `retries:` still covers. */
+/** A step the run is about to try again itself: an ask to sign off, or a try `retries:` still covers. */
 function runTriesItself(c: Judged): string | undefined {
   const { steps, step, run, name, phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf, next } = c;
   const itself = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf).find(

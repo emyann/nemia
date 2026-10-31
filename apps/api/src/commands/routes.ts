@@ -14,6 +14,7 @@ import {
   generated,
   type Positional,
   type Route,
+  renamedValues,
   routeList,
 } from 'agent-orchestrator';
 import { isRefusal } from 'agent-orchestrator';
@@ -164,11 +165,12 @@ async function bodyOf(c: Context<ApiEnv>, command: CommandSpec, at: Named, route
   const words = wordsAt(command.name, at.path);
   const json = await jsonOf(c, words.said, words, at);
   if ('status' in json) return json;
-  const foreign = foreignKey(command, route, COMMANDS, json.value, words.shape);
+  const { body, hint } = renamedValues(command.name, json.value);
+  const foreign = foreignKey(command, route, COMMANDS, body, words.shape);
   if (foreign) return foreign;
   const options = words.strict ? ({ onExcessProperty: 'error' } as const) : undefined;
-  const read = decodeBody(bodySchema(command, Object.keys(c.req.param()), route), json.value, words.issue(at), options);
-  return 'status' in read ? read : split(command, read.body);
+  const read = decodeBody(bodySchema(command, Object.keys(c.req.param()), route), body, words.issue(at), options);
+  return 'status' in read ? read : { ...split(command, read.body), ...(hint === undefined ? {} : { hint }) };
 }
 
 /**
@@ -186,9 +188,10 @@ async function argsOf(c: Context<ApiEnv>, command: CommandSpec, route: Route, at
   const args: Args = { ...read.args, ...fixedOf(route), ...bound };
   const found = !at.step && typeof args.step === 'string' ? located(at, args.step, s.home) : named;
   if ('status' in found) return found;
+  const hint = 'hint' in read ? read.hint : undefined;
   const extension = EXTENSIONS[command.name];
-  if (!extension) return { args };
-  return extension.fold({ e: s.e, home: s.home, run: found.run }, command, args, read.taken);
+  const folded = extension ? await extension.fold({ e: s.e, home: s.home, run: found.run }, command, args, read.taken) : { args };
+  return 'status' in folded || hint === undefined ? folded : { ...folded, hint };
 }
 
 /**
@@ -196,7 +199,7 @@ async function argsOf(c: Context<ApiEnv>, command: CommandSpec, route: Route, at
  * none: its body (`bodyOf`), or the text a route that reads none was sent (`RouteWords.bodyless`), 400. A delete reads no body. Its
  * arguments are what its path names and its route fixes (`sets`), said over the body's.
  */
-async function storeArgsOf(c: Context<ApiEnv>, command: CommandSpec, route: Route, at: Named): Promise<{ args: Args } | Refusal> {
+async function storeArgsOf(c: Context<ApiEnv>, command: CommandSpec, route: Route, at: Named): Promise<{ args: Args; hint?: string } | Refusal> {
   const bound = { ...c.req.param(), ...fixedOf(route) };
   const bodyless = wordsAt(command.name, at.path).bodyless;
   if (bodyless) {
@@ -205,7 +208,8 @@ async function storeArgsOf(c: Context<ApiEnv>, command: CommandSpec, route: Rout
   }
   if (route.method === 'DELETE') return { args: bound };
   const read = await bodyOf(c, command, at, route);
-  return 'status' in read ? read : { args: { ...read.args, ...bound } };
+  if ('status' in read) return read;
+  return { args: { ...read.args, ...bound }, ...('hint' in read && read.hint !== undefined ? { hint: read.hint } : {}) };
 }
 
 /** A flag keyed `repo` that the CLI alone takes: on the api, the repository the request is served on (`Served.repo`). */
@@ -228,7 +232,7 @@ const namedBy = (c: Context<ApiEnv>): Named => ({
 
 /**
  * A routed command's handler: the guard where it writes, a name its path names (400), its arguments, its check (422), and its handler's
- * data at its route's status, the app's memos of the runs each read projects handed with them (`ReadMemo.records`), so a read that polls
+ * data at its route's status — with a `hint` naming what to send now where the body said a former value (`renamedValues`) —, the app's memos of the runs each read projects handed with them (`ReadMemo.records`), so a read that polls
  * — the factories' listing — answers a run whose record has not moved from memory — or, where the command throws a refusal in place
  * of data that did nothing (`apiRefusal`), that refusal, answered by `app.onError`; or 502 in its words, where it has words for a
  * failure (`RouteWords.failed`).
@@ -253,7 +257,8 @@ const route = (command: Command, at: Route) => (c: Context<ApiEnv>) =>
       const data = await runPlaced(s.placeService, s.e, command.handler(args, s.env, s.home, { records: s.memo.records }));
       const refusal = command.apiRefusal?.(data, args);
       if (refusal) throw refusal;
-      return c.json(answerOf(command, data), at.status);
+      const answer = answerOf(command, data);
+      return c.json('hint' in read && read.hint !== undefined ? { ...answer, hint: read.hint } : answer, at.status);
     } catch (err) {
       if (isRefusal(err) || !words.failed) throw err;
       return c.json({ error: words.failed(named, err instanceof Error ? err.message : String(err)) }, 502);
@@ -289,7 +294,7 @@ export const wordBreaks = (table: readonly Pick<CommandSpec, 'name' | 'route'>[]
  * yet done: the next tick honours the ask once, as it does one made at the command line. A write that fails otherwise is a 502 naming the
  * command that asks the same way.
  *
- * - `POST /api/runs/:id/steps/:step/retry` — another try of a step: the answer to a step that signed off blocked, a nudge, a recheck. Made
+ * - `POST /api/runs/:id/steps/:step/retry` — another try of a step: the answer to a step that signed off blocked, a continue, a recheck. Made
  *   by `retryRun`, `nemia retry`'s own, which writes the ask file and nothing else. Refuses a message or a budget that cannot ride on the
  *   ask (`messageRefusal`, `budgetRefusal` — a budget on a recheck, which files no session to spend it) with 422 before the run is read,
  *   and a step that may not be tried again that way (`retryRefusal`) with 409 after. A step whose session its harness blocked, with nothing

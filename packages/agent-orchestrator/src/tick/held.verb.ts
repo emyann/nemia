@@ -41,7 +41,7 @@ export const closeHeld = Effect.fn('closeHeld')(function* (e: Engine, taskId: st
 
 /**
  * Answer a task held open that waits for a word (`e.answer`), with a turn's cap where there is one — the turn's own `config`, laid over
- * the filing's by the runtime: undefined once answered, as `closeHeld`. `text` is a nudge's brief, which the runtime hands the session it
+ * the filing's by the runtime: undefined once answered, as `closeHeld`. `text` is a continue's brief, which the runtime hands the session it
  * continues as the turn's words; the tools, the model and the fence stay the task's, as filed.
  */
 export const answerHeld = Effect.fn('answerHeld')(function* (e: Engine, taskId: string, text: string, budgetUsd: number | undefined) {

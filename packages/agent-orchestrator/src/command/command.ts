@@ -7,6 +7,7 @@
 import { dollarsOf } from '../keys/index.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { CommandClass } from '../admission/index.ts';
+import { FORMER_MODES } from '../retry/retry-ask.ts';
 
 /** The CLI's name, as every command line the package writes says it. */
 export const CLI = 'nemia';
@@ -26,6 +27,35 @@ export const RENAMED: ReadonlyMap<string, { readonly to: string; readonly flag?:
 
 /** Each flag renamed, by the command that takes it and its former spelling: `nemia retry --nudge` is `nemia retry --continue`. */
 export const RENAMED_FLAGS: ReadonlyMap<string, ReadonlyMap<string, string>> = new Map([['retry', new Map([['--nudge', '--continue']])]]);
+
+/**
+ * Each value renamed, by the command that takes it, the key that carries it and its former spelling: a retry's mode `nudge` is
+ * `continue` (`FORMER_MODES`), as its flag `--nudge` is `--continue`. A body the api is sent that says a former value is read as the
+ * value it became (`renamedValues`).
+ */
+export const RENAMED_VALUES: ReadonlyMap<string, ReadonlyMap<string, Readonly<Record<string, string>>>> = new Map([
+  ['retry', new Map([['mode', FORMER_MODES]])],
+]);
+
+/**
+ * `body`, a request's body for `command`, each key's former value (`RENAMED_VALUES`) put to the value it became; with the hint naming what
+ * to send now, or `body` as given and no hint. What is not an object is handed back as it is, for the body's schema to refuse.
+ */
+export function renamedValues(command: string, body: unknown): { body: unknown; hint?: string } {
+  const keys = RENAMED_VALUES.get(command);
+  if (keys === undefined || typeof body !== 'object' || body === null || Array.isArray(body)) return { body };
+  const renamed = [...keys].flatMap(([key, values]) => {
+    const was: unknown = Reflect.get(body, key);
+    return typeof was === 'string' && Object.hasOwn(values, was) ? [{ key, was, is: values[was]! }] : [];
+  });
+  if (!renamed.length) return { body };
+  const said = (value: (p: { key: string; was: string; is: string }) => string) =>
+    renamed.map((p) => `"${p.key}": "${value(p)}"`).join(' and ');
+  return {
+    body: { ...body, ...Object.fromEntries(renamed.map((p) => [p.key, p.is])) },
+    hint: `${said((p) => p.was)} ${renamed.length > 1 ? 'are' : 'is'} now ${said((p) => p.is)}: send that; the former spelling stays accepted until a later release removes it.`,
+  };
+}
 
 /** `rest`, the words after a command's name, with `flag` before the first flag among them, or after them where none is. */
 const withFlag = (rest: readonly string[], flag: string | undefined): string[] => {

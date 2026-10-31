@@ -32,7 +32,7 @@ import { neverApproved } from '../prune/prune.ts';
 import { answersOr } from '../question/index.ts';
 
 /**
- * For a new session of a loop's target within a round past the first — a fresh try, or a nudge with no session left to continue — the
+ * For a new session of a loop's target within a round past the first — a fresh try, or a continue with no session left to continue — the
  * round's contract and findings, as the round's first try was given them. It owes `replies` (`owesReplies`), and a session that was never
  * handed the findings could honestly answer only an empty list, which would read as signed. A try that continues the session has them
  * already, and is given nothing more. `closeoutOf` answers for the looping step with its try that asked (`askingTry`, in `advance`). The
@@ -58,7 +58,7 @@ export type RetryBriefing = {
   by: Retry['by'];
   mode: RetryMode;
   model?: string;
-  /** Whether this try continues the last one's session. A nudge whose last try left no session to continue starts a new one. */
+  /** Whether this try continues the last one's session. A continue whose last try left no session to continue starts a new one. */
   resumed: boolean;
   /**
    * Where the last try stood on its own work (`ownStatus`): why it is being tried again. Not `over budget`, which is why nothing was filed
@@ -124,9 +124,9 @@ function endingSection(step: Workflow, e: EndingStopped): string[] {
 }
 
 /**
- * What the run's sign-off nudge tells a session that ended without its closeout (`retriesDue`, `by: 'signoff'`), in its owner's words,
+ * What the run's sign-off ask tells a session that ended without its closeout (`retriesDue`, `by: 'signoff'`), in its owner's words,
  * pinned by a test. It names the tool, `StructuredOutput`, and says to change nothing (agent-runtime's open issue 25). It is the only
- * nudge: the engine reports an end without its statement and nudges nothing.
+ * continuation: the engine reports an end without its statement and nudges nothing.
  */
 export const SIGNOFF = [
   'Your last turn ended without calling `StructuredOutput`, and this step asks for a closing statement: nothing that waits',
@@ -165,7 +165,7 @@ const refusedSaid = (refused: readonly string[]): string =>
 const notAccepted = (r: RetryBriefing): string | undefined =>
   r.lacks?.length ? lacksSaid(r.lacks) : r.refused?.length ? refusedSaid(r.refused) : undefined;
 
-/** What the run's own nudge tells the session it continues: why its closeout was not accepted (`notAccepted`), else `SIGNOFF`. */
+/** What the run's own sign-off ask tells the session it continues: why its closeout was not accepted (`notAccepted`), else `SIGNOFF`. */
 const signoffSaid = (r: RetryBriefing): string => notAccepted(r) ?? SIGNOFF;
 
 /** Who filed a try the store's pause stopped (`by: 'pause'`): the run, once resumed, and no person. */
@@ -181,7 +181,7 @@ const NEW_SESSION_IN_FOLDER =
   'This is a new session. An earlier one worked on this step in this folder, and what it left is still here.\n' +
   'You have not been given its reasoning, on purpose: read what it left, not an account of it.';
 
-/** Who filed a try, as its brief says it: the run — by `retries:`, a sign-off nudge or the pause — or a person, by their `nemia retry`. */
+/** Who filed a try, as its brief says it: the run — by `retries:`, a sign-off ask or the pause — or a person, by their `nemia retry`. */
 const whoOf = (step: Workflow, r: RetryBriefing): string => {
   if (r.by === 'retries') return `The run filed this try itself: this step declares \`retries: ${step.retries ?? 0}\`.`;
   if (r.by === 'signoff') return 'The run filed this try itself, once in a round, before it waits on a person.';
@@ -222,7 +222,7 @@ const whyEnded = (r: RetryBriefing): string =>
  * asked for the try said with it, as they wrote it, in a fence longer than any run of backticks in it (`fenced`) —
  * then, for a check that did not pass, what the check said, as data (`refusalSection`). The fence is what keeps the
  * brief's structure the run's: a pasted snippet that leaves a fence open, or a line that reads as a heading, would
- * otherwise swallow or split the sections after it, and on a nudge those are the only instructions left. The answer is
+ * otherwise swallow or split the sections after it, and on a continue those are the only instructions left. The answer is
  * beside why the step is back, and before the evidence: a step that signed off blocked reads the answer to its `needs`
  * first. A try without a message is given no `## Your answer`.
  *
@@ -231,7 +231,7 @@ const whyEnded = (r: RetryBriefing): string =>
  * earlier session's — and, like any step after another, is not given that session's reasoning. What the check printed
  * travels: it is evidence the run gathered, not an account. So does what the session was denied, as data.
  *
- * A budget a person raised is said beside why the last try ended, never in its place. The run's own sign-off nudge to a
+ * A budget a person raised is said beside why the last try ended, never in its place. The run's own sign-off ask to a
  * session it continues is `SIGNOFF` alone, in place of why and who — or, where the closeout it gave named files the run did
  * not have, those files and what to do about each (`lacksSaid`), which any other try of such a step is told as its why; a
  * new session is told as any try is. A try sent back from an ending that stopped on the base branch is told why in the

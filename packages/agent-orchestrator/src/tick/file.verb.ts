@@ -1,7 +1,7 @@
 /**
  * What a pass files, and what it files a step with: the tries due (`fileTries`), the rounds (`fileRounds`), the checks (`fileChecks`) and
  * the ready steps (`fileReady`), in the order `advanceRun` calls them, each under the id the run derives and asking the store first
- * whether it may file (`mayFileOf`), a nudge answering a task held open through `answerHeld` (`held.verb.ts`); the fields of a filing
+ * whether it may file (`mayFileOf`), a continue answering a task held open through `answerHeld` (`held.verb.ts`); the fields of a filing
  * that only a local harness reads (`localFields`), the step as it is told (`toldOf`, told.verb.ts); what its roots are handed of other runs
  * is `handedOf`'s (`handed.verb.ts`). A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
@@ -156,13 +156,13 @@ const stopFirst = Effect.fnUntraced(function* (f: Filing, r: Retry, taskId: stri
   );
 });
 
-/** Whether a try is a person's nudge that answers the step's task held open, in the session that signed, rather than a task of its own. */
+/** Whether a try is a person's continue that answers the step's task held open, in the session that signed, rather than a task of its own. */
 const answersHeld = (f: Filing, r: Retry, step: Workflow, record: StepRecord): boolean => {
   const { run, reads } = f;
   return (
     f.closer.awaitsWord(record.taskId) &&
     r.by === 'ask' &&
-    r.mode === 'nudge' &&
+    r.mode === 'continue' &&
     Boolean(sessionIn(reads.views, record.taskId!)) &&
     holdsOpen(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf, reads.verdictOf)
   );
@@ -225,7 +225,7 @@ const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow
   const files = artifactsDir(run, r.step);
   fs.mkdirSync(files, { recursive: true });
   const remote = isRemoteHarness(step.harness);
-  const resumeFrom = resumeOn(r.mode === 'nudge' && !remote ? sessionIn(reads.views, record.taskId!) : undefined, step, f, record);
+  const resumeFrom = resumeOn(r.mode === 'continue' && !remote ? sessionIn(reads.views, record.taskId!) : undefined, step, f, record);
   const refusal = record.check && step.check ? yield* refusalRead(step.check, record.check.taskId).pipe(over(asRead(f))) : undefined;
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));

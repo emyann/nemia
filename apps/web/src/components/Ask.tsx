@@ -9,7 +9,7 @@ import { runsMoved } from '@/lib/runWrites';
 
 /** Each of the CLI `retry`'s ways, as an answer offers it. */
 export const MODES: Record<RetryMode, string> = {
-  nudge: 'continue its session',
+  continue: 'continue its session',
   fresh: 'a new session',
   recheck: 'its check again, and no session',
 };

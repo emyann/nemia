@@ -48,7 +48,7 @@ export type RouteWords = {
 
 /** The body `POST …/retry` takes: `nemia retry`'s flags, as JSON. */
 const RETRY_SHAPE =
-  '`{ "mode": "nudge" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>", "budget"?: <amount>, "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }] }`';
+  '`{ "mode": "continue" | "fresh" | "recheck", "model"?: "<m>", "message"?: "<answer>", "budget"?: <amount>, "answers"?: [{ "question": "<title>", "chose": ["<label>"], "own"?: "<words>" }] }`';
 
 /** The body `POST …/round` takes: `nemia retry --round`'s arguments, as JSON. */
 const ROUND_SHAPE = '`{ "step"?: "<looping step>", "budget"?: <amount> }`';
@@ -78,7 +78,7 @@ const budgetWords = (budget: unknown, as: string, shape: string): string =>
 /** Why `POST …/retry`'s body is not an ask (400), by the first key its schema refused. */
 const retryWords = ({ path: [key], input }: BodyIssue): string => {
   if (key === 'mode')
-    return `\`mode\` is how to try the step again, as \`nemia retry\` takes it: "nudge" continues its session, told what happened; "fresh" starts a new session on its branch; "recheck" runs its check again and files no session. This request's was ${JSON.stringify(input) ?? 'left out'}: ${RETRY_SHAPE}.`;
+    return `\`mode\` is how to try the step again, as \`nemia retry\` takes it: "continue" continues its session, told what happened; "fresh" starts a new session on its branch; "recheck" runs its check again and files no session. This request's was ${JSON.stringify(input) ?? 'left out'}: ${RETRY_SHAPE}.`;
   if (key === 'model')
     return `\`model\` names the model a new session runs on, as \`nemia retry --model <m>\` does: a name, or left out for the step's own. This request's was ${JSON.stringify(input)}.`;
   if (key === 'message')

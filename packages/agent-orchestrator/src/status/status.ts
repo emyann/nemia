@@ -750,7 +750,7 @@ export const merged = (record: StepRecord | undefined): boolean =>
  * The looping step, and its try that asked for the round a loop's target is on — or undefined when the target owes no `replies`.
  *
  * The looping step's own place is unfiled until the target is verified, so the closeout whose findings the target owes answers to is
- * behind it, on this try. `advance` reads it from there for a new session of the target within the round — a fresh try, or a nudge with
+ * behind it, on this try. `advance` reads it from there for a new session of the target within the round — a fresh try, or a continue with
  * no session left to continue — which would otherwise be asked for replies to findings nobody handed it.
  */
 export function askingTry(steps: readonly Workflow[], run: Run, name: string): { looping: Workflow; taskId: string } | undefined {

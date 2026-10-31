@@ -63,7 +63,7 @@ import { answersOr } from '../question/index.ts';
  *
  * And one try that is not over: a step whose session its harness blocked — the engine's `needs-human`, as
  * `harnessBlocked` says it — and that signed nothing: it stands as `AwaitingAnswer` via `session`. It reads `running`, and nothing in it
- * moves without a person. `nudge` and `fresh` may be asked for it, and the tick stops the session before it
+ * moves without a person. `continue` and `fresh` may be asked for it, and the tick stops the session before it
  * files the try (`stopFirst`), so no two agents share the conversation. Not `recheck`: nothing of it was
  * checked. Left out, `harnessBlocked` says no session is blocked, and such a step is running, with nothing to try.
  *
@@ -80,7 +80,7 @@ import { answersOr } from '../question/index.ts';
  *
  * And a gated step that signed off, while nothing after it is filed: `awaiting approval`, or approved and not yet handed on — which a step
  * nothing waits on never is: approved, it has handed on, since there is nothing left to file. A try of it is
- * a send-back from its gate (`sendsBack`) — `nudge` or `fresh`, with what to change, which `retryRefusal` holds it to — and the try after
+ * a send-back from its gate (`sendsBack`) — `continue` or `fresh`, with what to change, which `retryRefusal` holds it to — and the try after
  * it is on a try its approval does not name, so an approval given before the send-back is spent by it.
  *
  * And the looping step an ending waits on, once that ending has been filed and stopped on the base branch (`endingStopped`): a try of it
@@ -132,8 +132,8 @@ export function retryable(
   const modes: RetryMode[] =
     tried === 'failed (check)'
       ? landsOnCheck(step, run)
-        ? ['nudge', 'fresh']
-        : ['nudge', 'fresh', 'recheck']
+        ? ['continue', 'fresh']
+        : ['continue', 'fresh', 'recheck']
       : tried === 'unsigned' ||
           tried === 'failed' ||
           tried === 'stopped' ||
@@ -142,7 +142,7 @@ export function retryable(
           tried === 'denied' ||
           harnessAsks ||
           sendsBack
-        ? ['nudge', 'fresh']
+        ? ['continue', 'fresh']
         : [];
   const raise =
     settled && modes.length && (status === 'budget exhausted' || overBudget(step, run, spendOf)) ? raiseOf(step, run, spendOf) : undefined;
@@ -244,20 +244,20 @@ export const pauseAsksVoid = (
  * task to settle, such an ask would be neither due nor spent, and the step's next failure would file it at once, ahead of `retries:`. So
  * the engine's record of the task decides, as it does everywhere here, not what the harness said when the ask was written; `runsOn`
  * marks a session the harness no longer calls blocked. Otherwise a check that REFUSED (`refusedCheck`), while `retries:` has tries left:
- * the step re-filed as a nudge. Past them, or for a check that did not finish, nothing is due — the step waits on the person.
+ * the step re-filed, its session continued. Past them, or for a check that did not finish, nothing is due — the step waits on the person.
  *
  * And a session that ended `unsigned` — quiet, or `done` by its harness, without the closing statement it was asked for — that said
  * nothing at all — a session that said anything reads `failed`, not `unsigned` (`ownStatus`) — its session continued once (`signoff`),
  * told it ended without calling `StructuredOutput`, that its work stands and it should change nothing and sign off, finishing first if
  * it had not, and signing off anyway saying what stops it if it cannot (`retrySection`). Once a round (`signoffsSpent`), never in a
- * loop: a nudge that ends unsigned again leaves the step `unsigned`, on a person. Keyed on what the engine recorded (`closeoutAsked`:
+ * loop: a sign-off ask that ends unsigned again leaves the step `unsigned`, on a person. Keyed on what the engine recorded (`closeoutAsked`:
  * `closedOut: false`, or an old journal's `former: 'unsigned'`), not on the step's word `unsigned`, which also covers a closeout short
  * of a declared field — a statement given, which a reminder to give one would not mend — a `done` whose end says nothing of a
  * statement, and a `failed` end with `closedOut: false` and no `former`, a session that broke. Nor is a step
  * over its budget nudged: its status is `over budget`, and the run spends nothing more on it on its own word.
  *
  * And a step `unsigned` because its closeout named a file the run did not have (`lackedOf`) is nudged the same way, under the same one
- * nudge a round (`signoffDue`): its session continued, told each file, why, and to write it or take the name off. One that names a file
+ * ask a round (`signoffDue`): its session continued, told each file, why, and to write it or take the name off. One that names a file
  * the run does not have again stays `unsigned`, on a person; so is one whose envelope the run refused (`envelopeRefusals`).
  *
  * An ask names one try, by number, so it is honoured once: an ask for a try the record already holds is
@@ -337,9 +337,9 @@ export function retriesDue(
       refusedCheck(phaseOf(record.check.taskId), verdictOf(step.name)) &&
       retriesSpent(record) < (step.retries ?? 0)
     ) {
-      due.push({ step: step.name, try: next, mode: 'nudge', by: 'retries' });
+      due.push({ step: step.name, try: next, mode: 'continue', by: 'retries' });
     } else if (status === 'unsigned' && signoffDue(record, askedCloseout(record.taskId), refusedOf(closeoutOf(step.name)))) {
-      due.push({ step: step.name, try: next, mode: 'nudge', by: 'signoff' });
+      due.push({ step: step.name, try: next, mode: 'continue', by: 'signoff' });
     }
   }
   return due.filter((r) => !due.some((o) => o.back?.includes(r.step)));
@@ -354,7 +354,7 @@ const askedBy = (ask: RetryAsk): 'ask' | 'pause' => (ask.interrupted === undefin
 /**
  * The ways a person's try of a step whose task has not settled may be asked for: those `retryable` takes for a session its harness blocked.
  */
-const STOPPED_FIRST: readonly RetryMode[] = ['nudge', 'fresh'];
+const STOPPED_FIRST: readonly RetryMode[] = ['continue', 'fresh'];
 
 /**
  * How a step's record reached the try it is on, for `nemia ls` and `nemia decide`: `try 2, by retries: 2` — and for a step of a loop past
@@ -376,7 +376,7 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
 }
 
 /**
- * How a try was asked for, as `tryNote` says it: by `retries:`, the run's sign-off nudge, the pause, or a person's word — its mode, or a
+ * How a try was asked for, as `tryNote` says it: by `retries:`, the run's sign-off ask, the pause, or a person's word — its mode, or a
  * merge of the base.
  */
 function howOf(step: Workflow, last: EarlierTry): string {

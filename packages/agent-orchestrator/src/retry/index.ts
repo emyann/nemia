@@ -10,6 +10,8 @@ export {
   signoffsSpent,
   spentAsks,
   TRY_CAUSES,
+  FORMER_MODES,
+  upgradeMode,
   tryWord,
   turnsOf,
   upgradeTries,

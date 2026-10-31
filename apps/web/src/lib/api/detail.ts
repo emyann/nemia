@@ -51,7 +51,7 @@ import {
 import { RunReadSchema, StepUsedSchema, type RunRead, type StepUsed } from './usage.ts';
 
 /** Decodes a `RetryMode` (asks.ts, which hands out writes and so no schema). */
-const RetryModeSchema = decodes<RetryMode>()(Schema.Literals(['nudge', 'fresh', 'recheck']));
+const RetryModeSchema = decodes<RetryMode>()(Schema.Literals(['continue', 'fresh', 'recheck']));
 
 /** Decodes a `Said` (asks.ts). */
 const SaidSchema = decodes<Said>()(

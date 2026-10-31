@@ -10,11 +10,21 @@ import type { Workflow } from '../step/step.ts';
 /**
  * How a person asks for another try of a step, with `nemia retry`.
  *
- *   nudge    the last try's session, continued and told what happened — what `retries:` files too
+ *   continue the last try's session, continued and told what happened — what `retries:` files too
  *   fresh    a new session on the same branch; on another model, when the ask names one
  *   recheck  the step's check, run again on the work as it stands, and no session at all
  */
-export type RetryMode = 'nudge' | 'fresh' | 'recheck';
+export type RetryMode = 'continue' | 'fresh' | 'recheck';
+
+/**
+ * Each mode's former spelling, by the mode it is now: a record, an ask file or a caller written before decision 7 says `nudge` for
+ * `continue`. Read through `upgradeMode`, never written.
+ */
+export const FORMER_MODES = { nudge: 'continue' } as const satisfies Readonly<Record<string, RetryMode>>;
+
+/** A mode or a try's cause under the word it has now: a former spelling (`FORMER_MODES`) as its mode, anything else as it is. Pure. */
+export const upgradeMode = (value: unknown): unknown =>
+  typeof value === 'string' && Object.hasOwn(FORMER_MODES, value) ? FORMER_MODES[value as keyof typeof FORMER_MODES] : value;
 
 /**
  * The session a try continues, off the attempts of the task before it: the harness's own id for the last attempt's session — what
@@ -42,7 +52,7 @@ export type TryCause = 'retries' | 'signoff' | RetryMode | 'round' | 'merge' | '
 export const TRY_CAUSES = [
   'retries',
   'signoff',
-  'nudge',
+  'continue',
   'fresh',
   'recheck',
   'round',
@@ -67,18 +77,23 @@ export const upgradeTries = (raw: unknown): unknown => {
 
 const isObject = (value: unknown): value is object => typeof value === 'object' && value !== null;
 
-/** One try under `cause`: its former `then` moved there, where it holds no `cause` of its own, and dropped. */
+/**
+ * One try under `cause`, in the word it has now: its former `then` moved there, where it holds no `cause` of its own, and dropped; a
+ * former mode (`upgradeMode`) said as the mode it is.
+ */
 const upgradeTry = (t: unknown): unknown => {
-  if (!isObject(t) || !Object.hasOwn(t, 'then')) return t;
-  const { then, ...rest } = t as { then: unknown };
-  return Object.hasOwn(rest, 'cause') ? rest : { ...rest, cause: then };
+  if (!isObject(t)) return t;
+  const { then, ...rest } = t as { then?: unknown; cause?: unknown };
+  const cause = Object.hasOwn(rest, 'cause') ? rest.cause : then;
+  if (!Object.hasOwn(t, 'then') && upgradeMode(cause) === cause) return t;
+  return { ...rest, cause: upgradeMode(cause) };
 };
 
 /**
  * A try that is over, kept on the step's record behind the one that replaced it.
  *
  * `cause` is what replaced it (`TryCause`; a record written before it said `then`, read as `cause`, `upgradeTries`): `retries`, the
- * run re-filing the step itself after its check refused — a nudge on the workflow's word — or `signoff`, the run continuing a session
+ * run re-filing the step itself after its check refused — its session continued on the workflow's word — or `signoff`, the run continuing a session
  * that ended without its closeout, once a round, before it waits on a person (`retriesDue`) — or the mode a person asked for, with the
  * model a `--model` named. A recheck replaces only the check, so the try after one has the same `taskId`. Or `round`: the step's loop
  * went round again (`roundFiled`), and the try after it is the next round's. Or `merge`: the loop was filed again on the round it is on,
@@ -122,7 +137,7 @@ export type RetryHow = { mode: RetryMode; model?: string; message?: string; budg
 
 /**
  * A try to file on this pass: of which step, its number, how, on whose word — `retries:`, a person's `ask`, `signoff`, the run's one
- * nudge a round to a session that ended without its closeout, or `pause`, the ask `nemia pause --now` wrote for the task it stopped — and,
+ * continuation a round of a session that ended without its closeout, or `pause`, the ask `nemia pause --now` wrote for the task it stopped — and,
  * for a person's, what they said with it.
  *
  * `stopFirst` on a person's try of a step whose task has not settled (`retriesDue`): the pass asks the engine to stop that session — once,
@@ -178,7 +193,7 @@ export const retriesSpent = (record: StepRecord | undefined): number => {
 };
 
 /**
- * The sign-off nudges the run has filed for a step in the round it is on: at most one (`retriesDue`). Counted as `retriesSpent` counts,
+ * The sign-off asks the run has filed for a step in the round it is on: at most one (`retriesDue`). Counted as `retriesSpent` counts,
  * from the step's record — so a restart, a person's try in between, or a second tick never files another — and new at each round.
  */
 export const signoffsSpent = (record: StepRecord | undefined): number => {
@@ -188,7 +203,7 @@ export const signoffsSpent = (record: StepRecord | undefined): number => {
 };
 
 /**
- * Whether the run nudges an `unsigned` step itself, once a round (`signoffsSpent`): its session ended without the closeout it was asked
+ * Whether the run continues an `unsigned` step itself, once a round (`signoffsSpent`): its session ended without the closeout it was asked
  * for (`asked`, the engine's word), its closeout named a file the run did not have (`lackedOf`), or its envelope was `refused`
  * (`envelopeRefusals`). Not a closeout short of a declared field alone, which a reminder would not mend.
  */
@@ -196,15 +211,15 @@ export const signoffDue = (record: StepRecord, asked: CloseoutAsked, refused = f
   (asked === 'unsigned' || lackedOf(record).length > 0 || refused) && signoffsSpent(record) < 1;
 
 /**
- * How a try was asked for, as a person types it: `--continue` (the mode `nudge`, as its file still says it), `--fresh`, `--model <m>`,
+ * How a try was asked for, as a person types it: `--continue`, `--fresh`, `--model <m>`,
  * `--recheck`.
  */
 export const modeWord = (how: { mode: RetryMode; model?: string }): string =>
-  how.model ? `--model ${how.model}` : how.mode === 'nudge' ? '--continue' : `--${how.mode}`;
+  how.model ? `--model ${how.model}` : `--${how.mode}`;
 
-/** The note that says a try, and on whose word: `retries:`, a nudge to sign off, or `nemia retry` and what it was typed with. */
+/** The note that says a try, and on whose word: `retries:`, an ask to sign off, or `nemia retry` and what it was typed with. */
 export const tryWord = (r: Retry, step: Workflow): string =>
-  `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'a nudge to sign off, once a round' : askedWord(r)}`;
+  `${r.step}: try ${r.try} — ${r.by === 'retries' ? `retries: ${step.retries}` : r.by === 'signoff' ? 'an ask to sign off, once a round' : askedWord(r)}`;
 
 /**
  * A try asked for, as `tryWord` says it: by `nemia pause --now`, which stopped its session or check, or by `nemia retry` as it was typed.
@@ -235,8 +250,8 @@ export function nextTry(record: StepRecord, retry: Retry, taskId?: string): Step
 
 /**
  * The model a step's current try runs on: the one a `nemia retry --model` named for the new session it started, carried by every try that
- * continued that session since — a nudge, a `retries:` nudge, a sign-off nudge, a round — and the step's own where none did. A recheck is
- * the same try. What a continuation is filed with, since a model is part of the prompt the session cached: a nudge after `--model sonnet`
+ * continued that session since — a continue, a `retries:` try, a sign-off ask, a round — and the step's own where none did. A recheck is
+ * the same try. What a continuation is filed with, since a model is part of the prompt the session cached: a continue after `--model sonnet`
  * on the step's `opus` would rebuild it. Only a fresh try — `--fresh`, or `--model` — starts a session on another.
  */
 export function sessionModel(step: Workflow, record: StepRecord | undefined): string | undefined {
@@ -266,7 +281,7 @@ export const spentAsks = (run: Run, asks: readonly RetryAsk[]): RetryAsk[] => as
 export const dueNote = (step: Workflow, run: Run, r: Retry): string => {
   if (r.by === 'ask') return askedNote(r);
   if (r.by === 'signoff')
-    return `try ${r.try} due — a nudge to sign off, once a round: ${lackedOf(run.steps[step.name]).length ? 'its closeout named a file the run does not have' : 'its session ended without its closeout'}`;
+    return `try ${r.try} due — an ask to sign off, once a round: ${lackedOf(run.steps[step.name]).length ? 'its closeout named a file the run does not have' : 'its session ended without its closeout'}`;
   if (r.by === 'pause') return pausedNote(r);
   return `try ${r.try} due — retries: ${step.retries ?? 0}, ${retriesSpent(run.steps[step.name])} spent`;
 };

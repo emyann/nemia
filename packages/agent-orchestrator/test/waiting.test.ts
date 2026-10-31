@@ -258,7 +258,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
   );
   await s.test('`nemia ls` says D waits on B and C, and the tick does the waiting: a is filed, and nothing of b, c or d', async () => {
     await aPass();
-    assert.deepEqual(await statuses(ids.d), [`waiting on ${ids.b}, ${ids.c}`, 'waiting']);
+    assert.deepEqual(await statuses(ids.d), [`waiting on ${ids.b}, ${ids.c}`, 'pending']);
     const ls = await printedBy(t, () => stage.main(['ls', ids.d]));
     assert.ok(
       ls.some((l) => /^ {3}implement +/.test(l) && l.trim().endsWith(`waiting on ${ids.b}, ${ids.c}`)),
@@ -354,7 +354,7 @@ test('a diamond plan: a, then b and c after it, then d after both — each files
         assert.deepEqual([r.filed, board().filings, r.waiting], [[], filings, [{ run: ids.c }]], `pass ${pass + 1}`);
       }
       await aPass();
-      assert.deepEqual(await statuses(ids.d), [`waiting on ${ids.c}`, 'waiting']);
+      assert.deepEqual(await statuses(ids.d), [`waiting on ${ids.c}`, 'pending']);
     },
   );
   await s.test("a's branch deleted after its merge: c, which has started, is never gated again — its review is filed", async () => {
@@ -413,7 +413,7 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
 
       const ls = (await printedBy(t, () => stage.main(['ls', child.id]))).join('\n');
       assert.match(ls, new RegExp(`^ {3}implement +waiting on ${p.run.id} \\(cancelled\\) *$`, 'm'));
-      assert.match(ls, /^ {3}review +waiting *$/m);
+      assert.match(ls, /^ {3}review +pending *$/m);
       const onYou = ls.split('\n').find((l) => l.includes('→ waiting on you: '));
       namesFor(
         '`nemia ls` says how to resolve it',
@@ -434,7 +434,7 @@ test('a parent that will not land — cancelled, failed with nothing committed, 
       assert.equal(screen.length, 3);
 
       assert.equal((await stage.runWith(board().e, cancelRun(child.id))).plan.kind, 'cancel');
-      assert.deepEqual(await statuses(child.id), ['waiting', 'waiting'], 'a person resolves it: the child called off waits on nothing');
+      assert.deepEqual(await statuses(child.id), ['pending', 'pending'], 'a person resolves it: the child called off waits on nothing');
       assert.deepEqual([(await tick(child.id)).filed, board().filings], [[], filings]);
     },
   );
@@ -567,7 +567,7 @@ test('REFUSED by name at `nemia start --after`, as the store and git stand: a re
     await aPass();
     assert.deepEqual(await statuses(child.id), [
       `waiting on ${dropped.run.id} (${dropped.branch} gone), ${unseen.run.id} (${unseen.branch} gone)`,
-      'waiting',
+      'pending',
     ]);
   });
   const refusals: Array<[string, string, string[]]> = [

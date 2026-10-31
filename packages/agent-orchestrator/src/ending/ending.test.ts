@@ -281,7 +281,7 @@ test('landingOpen holds the checkout from the filing to the landing, and lets go
     ['blocked with its merge left staged', atLanding(), 'blocked', 'succeeded', undefined, 'ours', true],
     ['blocked, the checkout clean', atLanding(), 'blocked', 'succeeded', undefined, 'none', false],
     ['landed', atLanding({}, { landed: { commit: 'merged0' } }), 'verified', 'succeeded', 'succeeded', 'none', false],
-    ['at its gate, nothing filed', atLanding({}, { taskId: null }), 'waiting', 'unknown', undefined, 'none', false],
+    ['at its gate, nothing filed', atLanding({}, { taskId: null }), 'pending', 'unknown', undefined, 'none', false],
   ];
   for (const [name, r, own, ship, check, merging, open] of rows)
     await t.test(name, () => {

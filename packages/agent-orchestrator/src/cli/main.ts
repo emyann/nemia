@@ -182,7 +182,7 @@ export const watching = (
 type Pass = Effect.Success<ReturnType<typeof tickRun>>;
 
 /**
- * A run's line on `nemia tick`: its status, as the pass judged it — `awaiting approval` or `blocked` for one a person alone stops, `failed`
+ * A run's line on `nemia tick`: its status, as the pass judged it — `awaiting approval` or `waiting` for one a person alone stops, `failed`
  * for one in which a step broke — and what the pass did to it.
  */
 function tickRunLine(r: Pass['runs'][number]): string {

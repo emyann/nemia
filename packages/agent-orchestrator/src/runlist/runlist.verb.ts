@@ -130,7 +130,7 @@ const listedAt =
 function brokenDown(summary: RunSummary, broken: Broken, home: string): Pick<WaitingRun, 'stepCosts' | 'waitingSince'> {
   const run = broken.byId.get(summary.id);
   if (!run || unreadableOf(run, broken.unreadable)) return { stepCosts: null, waitingSince: null };
-  const held = summary.holding?.onYou ? summary.holding.at : null;
+  const held = summary.holding?.waitingOnYou ? summary.holding.at : null;
   return {
     stepCosts: summary.steps.map(({ name }) => ({
       step: name,

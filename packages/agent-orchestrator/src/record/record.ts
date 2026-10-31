@@ -287,7 +287,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  * Where one step stands. ONE vocabulary, shared by `assess`, `listing` and `decision`, so the DAG,
  * `nemia ls` and `nemia decide` cannot disagree about a step.
  *
- *   waiting          not filed
+ *   pending          not filed
  *   running          filed, and not settled — or a task the engine cannot find
  *   blocked          it signed off `blocked`: it finished its session, not the work
  *   unsigned         it ended without the closeout it was asked for, or without a field its `output:` declares, or its closeout
@@ -317,7 +317,7 @@ export type Acceptance = { step: string; try: number; at: string; message: strin
  * ended, never that the work is done.
  */
 export type StepStatus =
-  | 'waiting'
+  | 'pending'
   | 'running'
   | 'blocked'
   | 'unsigned'

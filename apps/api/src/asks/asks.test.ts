@@ -1,7 +1,7 @@
 /**
- * What a step needs from a person, and the board's answer to it: `needs` and `blockedByHarness` on each step, `answer` on a try a
- * person answered, and POST /api/runs/:id/steps/:step/retry, which asks for another try as `nemia retry` does — through the package's
- * `retryRun`, given the harness's word as `nemia retry` gives it, and refused in the package's words.
+ * What a step needs from a person, and the board's answer to it: `needs` and the codes (`AwaitingAnswer` via `session`) on each step,
+ * `answer` on a try a person answered, and POST /api/runs/:id/steps/:step/retry, which asks for another try as `nemia retry` does — through
+ * the package's `retryRun`, given the harness's word as `nemia retry` gives it, and refused in the package's words.
  *
  * One table of what the route refuses, nothing written and no session stopped, then one story: a person answering a blocked step,
  * rechecking a refused check, continuing the sessions the harness blocked, and reading the answered try once the tick took it. The
@@ -230,12 +230,14 @@ test("a blocked session's last line is what it said last — its last `text` or 
     event('s-1', 3, 'system', 'system', '  Session idle\n'),
     event('a-1', 4, 'assistant', 'tool_use'),
   ]);
+  standIn().plantTranscript('t-implement', 1, [event('a-1', 2, 'assistant', 'text', 'Which database?')]);
+  const WAITED = ['held', 'idle', 'silent', 'implement'];
   const lastLines = async () =>
-    Object.fromEntries((await detail()).steps.filter((step) => step.blockedByHarness).map((step) => [step.name, step.lastLine]));
+    Object.fromEntries((await detail()).steps.filter((step) => WAITED.includes(step.name)).map((step) => [step.name, step.lastLine]));
   assert.deepEqual(
     await lastLines(),
-    { held: login, idle: 'Session idle', silent: null },
-    "held's last text, past the call before it; idle's system line, trimmed, past the call after it; silent, with nothing said, none",
+    { held: login, idle: 'Session idle', silent: null, implement: null },
+    "held's last text, past the call before it; idle's system line, trimmed, past the call after it; silent, with nothing said, none; and none for a step its closeout blocked, though its session said something",
   );
   assert.equal(
     (await summary()).steps.some((step) => Object.hasOwn(step, 'lastLine')),
@@ -361,7 +363,11 @@ test('a person answers a blocked step, rechecks a refused check and continues th
         'as `nemia ls` has it until a tick stops the session: the note says the session is stopped first',
       );
       assert.deepEqual(held.asked, { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true });
-      assert.deepEqual([held.status, held.blockedByHarness], ['needs-human', true], 'still blocked: no tick has stopped it');
+      assert.deepEqual(
+        [held.status, held.reason, held.via],
+        ['needs-human', 'AwaitingAnswer', 'session'],
+        'still blocked: no tick has stopped it',
+      );
       const idle = run.steps.find((s) => s.name === 'idle')!;
       assert.equal(idle.note, 'try 2 asked (--fresh, with your answer) — stopping its blocked session, then the tick files it');
       assert.equal(idle.note, noteOf('idle'));

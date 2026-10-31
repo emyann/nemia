@@ -361,12 +361,6 @@
       }
     },
     {
-      "files": ["packages/agent-orchestrator/src/summary/judged.verb.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 22 }]
-      }
-    },
-    {
       "files": ["apps/api/src/workflows/workflows.ts"],
       "rules": {
         "complexity": ["error", { "max": 21 }]

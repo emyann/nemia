@@ -122,9 +122,9 @@ export function RunNode({
           {run.waiting && <WaitingLine waiting={run.waiting} ghost={look.ghost} />}
           {run.holding && (
             <p
-              data-holding={run.holding.onYou ? 'on-you' : 'on-runs'}
+              data-holding={run.holding.waitingOnYou ? 'on-you' : 'on-runs'}
               title={`${run.holding.word}\n${run.holding.advice}`}
-              className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${run.holding.onYou ? 'text-yours' : 'text-muted-foreground'}`}
+              className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${run.holding.waitingOnYou ? 'text-yours' : 'text-muted-foreground'}`}
             >
               {run.holding.word}
             </p>
@@ -259,9 +259,9 @@ function lookOf(run: RunSummary, finished: boolean, inspected: boolean): Look {
 function WaitingLine({ waiting, ghost }: { waiting: RunWaiting; ghost: boolean }) {
   return (
     <p
-      data-waiting={waiting.onYou ? 'on-you' : 'on-runs'}
+      data-waiting={waiting.waitingOnYou ? 'on-you' : 'on-runs'}
       title={waiting.advice}
-      className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${waiting.onYou ? 'text-yours' : 'text-muted-foreground'}`}
+      className={`mt-1 line-clamp-2 font-mono text-body-small break-words ${waiting.waitingOnYou ? 'text-yours' : 'text-muted-foreground'}`}
     >
       {ghost ? (
         <>

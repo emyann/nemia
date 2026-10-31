@@ -299,7 +299,7 @@ function endingGateRefusal(c: Judged): string | undefined {
 function statusRefusal(c: Judged): string {
   const { steps, step, run, name, status } = c;
   const why: Partial<Record<StepStatus, string>> = {
-    waiting: `${name} has not been filed yet, so there is no try to replace. Wait for it: nemia ls ${run.id}.`,
+    pending: `${name} has not been filed yet, so there is no try to replace. Wait for it: nemia ls ${run.id}.`,
     running: `${name} is still running, so there is nothing to try again until it ends. Wait for it: nemia ls ${run.id} (or stop the run: nemia cancel ${run.id}).`,
     checking: `${name}'s check is still due or running, so there is no verdict to act on yet. Wait for it: nemia ls ${run.id}.`,
     verified: `${name} is verified: its check passed, and there is nothing to try again.`,

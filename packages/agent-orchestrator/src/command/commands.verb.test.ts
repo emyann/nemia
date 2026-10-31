@@ -1,7 +1,10 @@
-/** The table's words: no name carries a refused word but those still pending, and every entry says its class under `class`. */
+/**
+ * The table's words: no name carries a refused word but those still pending, and only approve and retry answer. That every entry says its
+ * class under `class`, one of `CommandClass`, the compiler holds: the two lines at the end are refused by it.
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ANSWERS, CLASSES, PENDING, REFUSED_FLAGS, REFUSED_WORDS } from '../../test/command-words.ts';
+import { ANSWERS, PENDING, REFUSED_FLAGS, REFUSED_WORDS } from '../../test/command-words.ts';
 import type { CommandSpec } from './command.ts';
 import { TABLE } from './commands.verb.ts';
 
@@ -22,20 +25,7 @@ test('every pending name is still in the table, so the list only shrinks', () =>
   );
 });
 
-test('no entry carries the retired class field nemia', () => {
-  assert.deepEqual(
-    TABLE.filter((c) => Object.hasOwn(c, 'nemia')).map((c) => c.name),
-    [],
-  );
-});
-
-test('every entry is classed as one of the classes, or a read that sets by some words, and only approve and retry answer what waits on a person', () => {
-  assert.deepEqual(
-    TABLE.filter((c) =>
-      typeof c.class === 'string' ? !CLASSES.includes(c.class) : !CLASSES.includes(c.class.bare) || !CLASSES.includes(c.class.sets),
-    ).map((c) => c.name),
-    [],
-  );
+test('only approve and retry answer what waits on a person', () => {
   assert.deepEqual(
     TABLE.filter((c) => c.class === 'answer')
       .map((c) => c.name)

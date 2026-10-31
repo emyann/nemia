@@ -267,7 +267,7 @@ test('a template moved to another version is drift: the base and tree are left a
   assert.deepEqual(listed().status, { applied: '0.1.0', conditions: status.conditions });
   const { message: drift, ...drifted } = status.conditions[0];
   assert.deepEqual(drifted, { type: 'Applied', status: 'False', reason: 'VersionDrift' });
-  assert.ok(drift.includes('nemia factory plan drifted --to 0.2.0'), drift);
+  assert.ok(drift.includes('nemia factory diff drifted --to 0.2.0'), drift);
   assert.ok(drift.includes('nemia factory upgrade drifted --to 0.2.0'), drift);
   assert.equal(status.digest, first.digest);
   assert.doesNotMatch(fs.readFileSync(path.join(treeDir('drifted'), 'workflows/dev/review.md'), 'utf8'), /^rounds: 5$/m);
@@ -289,7 +289,7 @@ test("parameters changed in the factory's file, or the template's files changed 
   const changed = reconcileFactory(templated('moved'));
   const { message: moved, ...params } = changed.conditions[0];
   assert.deepEqual(params, { type: 'Applied', status: 'False', reason: 'ParamsChanged' });
-  assert.ok(moved.includes('nemia factory plan moved --to <version>'), moved);
+  assert.ok(moved.includes('nemia factory diff moved --to <version>'), moved);
   assert.ok(moved.includes('nemia factory upgrade moved --to <version>'), moved);
   assert.deepEqual([changed.digest, changed.params], [first.digest, first.params]);
   assert.match(review(appliedDir('moved')), /^budget: 7$/m);

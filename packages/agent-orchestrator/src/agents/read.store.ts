@@ -3,7 +3,7 @@
  * agents of one folder (`loadAgents`), an agent's version, where the file of a person's custom instructions is in their store, with
  * its words or the refusal of them, and the record of an agent copied into their library (`readCopyRecord`) with where its source's
  * skills are found (`sourceSkills`). A store file one level above the bottom of the tree beneath the controllers: of the store it imports
- * only the skills read (`skills/read.store.ts`, `test/boundary.test.ts`), so the workflow folder read (`folder/folder.store.ts`) and the
+ * only the skill reads (`skills/read.store.ts`, `test/boundary.test.ts`), so the workflow folder read (`folder/folder.store.ts`) and the
  * one writer of custom instructions (`custom.store.ts`) both read through it.
  */
 import { createHash } from 'node:crypto';

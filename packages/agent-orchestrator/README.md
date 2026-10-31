@@ -9,7 +9,7 @@ wf start ./brief.md --repo ~/code/myapp --workflows ./workflows
 wf start ./next.md --repo ~/code/myapp --after r-xyz   # file nothing of it until r-xyz has landed
 wf start ./ui.md --repo ~/code/myapp --input ./mock.png   # copied into the run's inputs/, named on every step's brief
 wf start ./flag.md --repo ~/code/myapp --workflows dev-planned --gate plan   # nothing after plan is filed until you approve it
-wf plan ./plans/flag --repo ~/code/myapp               # a folder of cards: a run each, parents first, with their edges
+wf start ./plans/flag --repo ~/code/myapp              # a folder of cards: a run each, parents first, with their edges
 wf start ./plans/flag/d.md --repo ~/code/myapp --after r-b --after r-c   # one card by hand: its body is the brief
 wf inbox add "Cache the views between passes" --repo ~/code/myapp   # park an idea as a card, to start later
 wf inbox                                               # the cards parked, name and first line each
@@ -1031,7 +1031,7 @@ it is between two engineers. A later step is told:
 - what a step it waits on declared in its closeout — **only if it asks**, with `input:` (below)
 - in a round of a loop, what the loop hands on: the reviewer's findings to the step it loops back to,
   and that step's replies to the next reviewer (*Going round again*)
-- on the first steps of a run that waited on runs (`--after`, or a card of `wf plan`): what those runs
+- on the first steps of a run that waited on runs (`--after`, or a card of `wf start <folder>`): what those runs
   concluded, under `## From run <id>` (below)
 - after a gate a person approved: the approval and the words given with it, under `## Approved`
   ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve))
@@ -1492,7 +1492,7 @@ gated ship runs the line whole on the merged tree.
 | `wf ls` | means | what waits on it |
 |---|---|---|
 | `waiting` | not filed yet | — |
-| `waiting on r-xyz` | not filed: the run was started `--after` a run that has not landed, by hand or as a card of `wf plan` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
+| `waiting on r-xyz` | not filed: the run was started `--after` a run that has not landed, by hand or as a card of `wf start <folder>` — `(cancelled)`, `(no such run)` or `(<branch> gone)` beside one that never will without a person ([below](#a-run-that-waits-on-a-run-wf-start---after)) | — |
 | `waiting for a run slot (2 of 2 in flight)` | not filed: `WF_MAX_RUNS` runs are in flight, and the tick files this run's roots once one settles, oldest held first ([below](#how-much-runs-at-once-wf_max_concurrent-and-wf_max_runs)) | — |
 | the engine's phase: `working`, `needs-human` — and, beside a `needs-human`, what its harness says it waits for: `needs-human: waiting for a permission prompt` | still going — `needs-human` with no closeout is a session its harness blocked, which `wf retry` takes ([below](#trying-again-retries-and-wf-retry)) | waits |
 | `unsigned` | it ended without the closeout it was asked for — its session went quiet, or its harness said `done`, and the engine recorded no statement (`closedOut: false`; a journal from before stage 4a says `failed`, `unsigned`, which the engine reads back as `former: 'unsigned'`, and one from before 2026-09-19 may say `succeeded`) — or without a field its `output:` declares, or its closeout named a file the run does not have | **never runs** — the run nudges it once a round first, below |
@@ -1840,7 +1840,7 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
 - **`wf decide` names them under the run's line**: `inputs  mock.png, api.md  —  in <dir>`.
 - **Refused before anything is written**, by name and with the fix: a file that is not there, a directory, anything else
   that is not a regular file, two inputs of one name, one file given twice, and `--input` with no file.
-- **`wf plan` refuses `--input`.** A card has no input files of its own; start that card by hand with its files.
+- **`wf start <folder>` refuses `--input`.** A card has no input files of its own; start that card by hand with its files.
 
 ## A step's files: `runs/<id>/artifacts/<step>/`
 
@@ -2346,7 +2346,7 @@ what a gate needs — a closeout to read, and a run that files nothing until it 
   with the fix. At start, `wf start --gate <step>`, once per step, for this run. On an inbox card, `gate: <step>`, one step, for
   the run the card starts, beside any `--gate` its start gives. The last two freeze into `gates` on the run's record, as the
   workflow does. A step named that the workflow does not have is refused at start, naming the steps it has, with nothing written —
-  in the card's words for a card's gate — and so is a `--gate` given twice; `wf plan --gate` is refused by name. `dev-planned` and
+  in the card's words for a card's gate — and so is a `--gate` given twice; `wf start <folder> --gate` is refused by name. `dev-planned` and
   `dev-planned-build` gate their plan at nothing: a folder decides for every run of it, and a plan that reads one way should start
   implement at once. Say `--gate plan`, or `gate: plan` on the card, for the run that should wait. Their `ship` is gated, as every
   `dev*` folder's is: the run's end is a person's every time.
@@ -2530,7 +2530,7 @@ start a run that waits on nothing, and the tick would file it at once.
 A record written before `after` existed waits on nothing.
 
 A run that waited is told what its parents concluded, under `## From run <id>` (*What one step knows of another*,
-above). To start a whole graph of runs at once, write it as a folder of cards: `wf plan`, below.
+above). To start a whole graph of runs at once, write it as a folder of cards: `wf start <folder>`, below.
 
 ## Context without a wait: `wf start --from`
 
@@ -2663,7 +2663,7 @@ is stopped. A file that is there pauses the store whatever it holds. `wf pause` 
 paused, naming who paused it, and `wf resume` a store none stands on; the api serves the same as `POST`,
 `DELETE` and `GET /api/pause`, whose read carries what finishes and what is staged.
 
-## A plan as a folder of cards: `wf plan`
+## A plan as a folder of cards: `wf start <folder>`
 
 A person who describes a plan in prose (parse the flag, then store it and document it, then show it) writes it as
 files, one card per run, and starts it whole:
@@ -2686,7 +2686,7 @@ Show the flag on the settings page. It is parsed and stored by now: read it from
 ```
 
 ```bash
-$ wf plan plans/flag --repo ~/code/myapp
+$ wf start plans/flag --repo ~/code/myapp
 a  parse-the-flag-option-in-cli-eoug  dev  waits on nothing
 b  store-the-flag-in-the-settin-lx98  dev  waits on a (parse-the-flag-option-in-cli-eoug)
 c  document-the-flag-in-the-rea-m4ja  ui   waits on a (parse-the-flag-option-in-cli-eoug)
@@ -2698,7 +2698,7 @@ run 'wf tick' (or 'wf up') to start them
   takes two keys: `workflow:`, a workflow by name under `<repo>/workflows/` or by a path from the plan folder (as
   `wf start --workflows` takes one from where it is typed), and `after:`, the cards whose runs must land first. The
   body is the run's brief. `README.md` says what the plan is for, and is not a card.
-- **The runs and their `after` are the plan.** `wf plan` starts every card with `start()`, parents first, each
+- **The runs and their `after` are the plan.** `wf start <folder>` starts every card with `start()`, parents first, each
   `after` the runs of the cards it names: the record `wf start --after` writes. Nothing downstream is new. The tick
   files a card's run once its parents have landed (*A run that waits on a run*, above), `wf ls` says what each
   waits on, each card's first steps are told what its parents concluded (`## From run <id>`), and every card is a
@@ -2713,15 +2713,16 @@ run 'wf tick' (or 'wf up') to start them
   - a card whose workflow does not load, with the workflow's own refusal behind the card: `b.md: \`workflow: deb\` —
     no workflow folder at …/plans/flag/deb, nor a workflow named deb in ~/code/myapp/workflows. The repository's
     workflows are: dev, ui — …`.
-- **`--repo` is its one flag.** `--after`, `--workflows` and `--no-worktree` are refused by name, since the folder
-  says each, and anything else is refused as `wf start` refuses it.
+- **`--repo` and `--factory` are its flags.** `--after`, `--from`, `--workflows`, `--input`, `--gate`, `--brief` and
+  `--no-worktree` are refused by name, since the folder says each, and anything else is refused as `wf start` refuses it.
+  `wf plan <folder>`, its former spelling, still runs, with a hint naming `wf start <folder>`.
 - **A `wf start` that refuses part-way stops the plan.** Every card was checked first, so this is something that
   changed underneath, or git. The runs it started stand, and it names them. Then it prints a `wf start --after` for
   each card left, parents first, with the run ids it has and `<c's run id>` for a parent not started yet, each path
   quoted for the shell.
 - **`wf start` on a card file starts the card**, as the stopped plan's commands do. The brief is the card's body, below its
   frontmatter, so neither the run's id nor any step's brief carries a `workflow:` line. `--workflows` defaults to the
-  card's `workflow:`, found from its plan folder as `wf plan` finds it. A card whose `after:` names cards is refused
+  card's `workflow:`, found from its plan folder as `wf start <folder>` finds it. A card whose `after:` names cards is refused
   without `--after`, and the refusal names the ids to give; `wf start` checks the ids given, as it checks any `--after`.
   A file that opens with a closed frontmatter block that reads, as YAML or in the former line form, as a map of keys, each a word
   (`KEY_WORD`), is a plan's card, and a block of keys is never taken into a brief: a key a plan's card lacks — an inbox card's `repo:` or `factory:`, a `title:` — is
@@ -2731,7 +2732,7 @@ run 'wf tick' (or 'wf up') to start them
 ## An inbox: cards before they are started — `wf inbox`
 
 An idea about the project had nowhere to be parked. The unit already existed — a card: a workflow, a brief — but a card
-lived only inside a plan folder, started whole by `wf plan`, or was started by hand and left where it was. The old hkb
+lived only inside a plan folder, started whole by `wf start <folder>`, or was started by hand and left where it was. The old hkb
 filed such a note with `hkb new --triage`, and `hkb ls --phase triage` was the inbox; its ADR-015 records that triage was a
 phase pushed into the machinery because a person needed an inbox. Here an unstarted card is a file in a folder, and nothing
 about a run changes.
@@ -2768,7 +2769,7 @@ run 'wf tick' (or 'wf up') to start it
 
   `workflow:` is optional, since an idea often does not know its workflow. `repo:` is a key of its own. An inbox card has no
   `after:`: what it waits on is said at start, with `--after`, once the runs it could wait on are known. A plan's card keeps
-  its rules, and refuses `repo:`: a plan's repository is `wf plan --repo`. A third key, `queued:`, marks a card to start on its
+  its rules, and refuses `repo:`: a plan's repository is `wf start <folder> --repo`. A third key, `queued:`, marks a card to start on its
   own, and `wf inbox queue` writes it ([below](#cards-that-start-themselves-wf-inbox-queue)). A fourth, `gate: <step>`, names
   the step of its workflow whose closeout waits for a person in the run it starts, one step, refused as a list or as a step's
   `true` ([*A gate*](#a-gate-a-handoff-that-waits-for-a-person--gate---gate-and-wf-approve)). A fifth, `factory: <name>`, names
@@ -2945,7 +2946,7 @@ be (the workflow's `agents/`, the repository's, the store's).
 ### Every run in a factory
 
 Every start names its factory, or is started in the one whose repository it is on. The entries hold it: `wf start`, `wf start <card>`,
-`wf plan`, the queue's start (`startQueued`) and `POST /api/runs`; `start()` itself takes what it is given.
+`wf start <folder>`, the queue's start (`startQueued`) and `POST /api/runs`; `start()` itself takes what it is given.
 
 ```
 $ cd ~/code/pipao/src
@@ -2954,7 +2955,7 @@ $ wf start "add a flag" --workflows build
 ```
 
 - **A workflow's start that names no factory runs in the one whose repository holds its folder** (`startFactory`,
-  `factoriesHolding`): `--repo`, else the directory `wf start` or `wf plan` is typed in; on the api, `?repo=`, else its own. A
+  `factoriesHolding`): `--repo`, else the directory `wf start` is typed in; on the api, `?repo=`, else its own. A
   repository holds itself and every folder under it, never a sibling that shares its prefix, and the run is on that repository's root.
 - **Refused, `Invalid`, before anything is written**: a folder no factory holds, naming the factories there are, the `--factory`
   (`?factory=` on the api) that names one, and the `wf factory add` and `attach` that file one on it (`noFactoryRefusal`); a folder
@@ -3117,7 +3118,7 @@ recommendation, recaps what moved, carries their answer back as a `nemia` verb, 
   seeded with it, marked Default. **`nemia policy <agent>`** reads the list in force, the agent's proposal and the custom instruction;
   **`nemia policy propose <agent> --file <path>|-`** writes what the agent proposes from the custom instruction, its rules in words
   generated from their fields and the words the machinery cannot hold kept as guidance; **`nemia policy confirm <agent> <id> --words
-  '<words>'`** and **`nemia policy drop <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
+  '<words>'`** and **`nemia policy rm <agent> <id>`** are the person's, on the board's Settings, and asked of them every time an agent
   calls them. `nemia auto …`, the group's former name, still runs as `nemia policy …`, with a hint on stderr naming it, and admission
   reads it as the new name; the store's folder `auto/` keeps its name, so no confirmed rule is orphaned. A confirm carries the rule's words as the person read them, and is refused (`Conflict`), writing nothing, once the rule
   under that id reads otherwise. A rule nobody confirmed allows nothing, a try that raises a step's cap is always asked, and a list that
@@ -3889,7 +3890,7 @@ holding a concurrency slot forever.
 | `src/agents/agents.ts` | an agent — pure: its keys (`AGENT_KEYS`), read and written back (`parseAgent`, `renderAgent`), the skills it names and what they cost a turn (`skillTurnCost`), and its card (`agentCard`); and the agent rendered for Claude Code under `runs/<id>/agents/<step>/`: its prompt (`renderedPrompt`), its plugin (`pluginOf`), its flags (`renderedFlags`) and the brief it leaves (`briefBody`) |
 | `src/skills/skills.ts` | a skill on an agent — pure: the entry its card lists (`skillEntryOf`), a SKILL.md written back from a draft (`renderSkill`, `skillDraftOf`), and its `preload:` line (`withPreload`) |
 | `src/folder/folder.store.ts` | the format read from disk: a folder's steps (`loadWorkflows`), the steps of a folder of workflows that name an agent (`agentUsers`, beside `workflowsIn`, since it reads step files, not agents), its README's first paragraph (`workflowDescription`) and its whole text (`workflowReadme`), the workflows a folder holds (`workflowsIn`), and a workflow folder found by a path or by its name under `<repo>/workflows/` (`workflowFolder`) |
-| `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf plan` starts the cards in, and what it prints |
+| `src/plan/plan.ts` | a plan — pure: parse a folder of cards, and refuse a key a card does not have, a card with no workflow or no brief, and an `after:` that dangles or goes round; the order `wf start <folder>` starts the cards in, and what it prints |
 | `src/inbox/inbox.ts` | the inbox — pure: an inbox card, and refuse a key it does not have, a key set to nothing, a `repo:` that is not an absolute directory and a `queued:` that is not a time or has no workflow; the card `wf inbox add` writes, and the one `wf inbox queue` writes (`queuedText`, `queueRefusal`); a name that would leave the folder; what `wf inbox` lists, `started as` composed from the records and a queued card's place and refusal; the queue's order (`queueOrder`, `nextQueued`); and which path is a card of the inbox |
 | `src/inbox/queue-factory.ts` | the factory a queued card asks for — pure: why `wf inbox queue` refuses a card that names no factory, or `default`, as its start would be (`queueFactoryRefusal`) |
 | `src/factory/factory.ts` | a factory — pure: its name, a lowercase slug (`FACTORY_NAME`, `factoryNameRefusal`), the one default factory, which is no file and is read, never written (`DEFAULT_FACTORY`, `defaultFactoryRefusal`), what `wf factory ls` prints (`factoryLines`, `noFactoryLine`), the workflows it offers: a workflow's name (`workflowNameRefusal`) and a start of one not attached (`unattachedRefusal`), and its hires: their shape (`hireRefusal`), one workflow's (`fillsOf`), and the steps they leave unfilled (`unfilledRefusal`) |
@@ -3974,8 +3975,8 @@ holding a concurrency slot forever.
 | `src/watch/selector.ts` | the feed's selector grammar — pure: the keys a selector may name (`SELECTABLE_KEYS`, the labels and the five reserved, which no label may take: `labelKeysRefusal`), every malformed form refused by name (`selectorsRefusal`), the parse of checked text (`parseSelectors`), what a line offers a selector (`selectableOf`) and whether it is selected (`selects`) |
 | `src/cli/main.ts` | the verbs' table: `main`, which looks up the command in the table or the verb in `VERBS` and runs it, or prints the help; and the runners of the commands the CLI runs itself (`RUNS`): `wf tick`, `wf up` and `wf watch` — with its liveness (`livenessLines`) — and `wf rm` and `wf prune` |
 | `src/daemon/up.verb.ts` | the daemon's loop, one for its two kinds, the api's process and `wf up`: `up`, which takes the store's lease in its scope and lets it go as the scope closes; `holdUrl`, which writes into the lease where the api serves; and `runMain`, which runs either as the process's command |
-| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts` | what the CLI's verbs and runners share: the help, a verb's shape (`Verb`), a usage refusal, a person's yes; the runners of `wf start`, `wf plan` and `wf inbox add`, which read the files and folders their command line names; and the runners of `wf agents custom`, `wf rm` and `wf prune` |
-| `src/start/commands.verb.ts`, `src/inbox/commands.verb.ts`, `src/factory/factory.verb.ts`, `src/agents/custom.verb.ts` | entries of the command table: `wf start` and `wf plan` (`START`, `PLAN`); `wf inbox`, bare, `add`, `queue` and `rm`, and a card's page, which the api alone serves (`INBOXES`); `wf factory`, bare, `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` (`FACTORIES`); `wf agents custom` (`AGENTS_CUSTOM`) — each its usage, help, arguments, handler and route |
+| `src/cli/flags.ts`, `src/cli/start.ts`, `src/cli/runs.ts` | what the CLI's verbs and runners share: the help, a verb's shape (`Verb`), a usage refusal, a person's yes; the runners of `wf start` (a brief, or a folder of cards) and `wf inbox add`, which read the files and folders their command line names; and the runners of `wf agents custom`, `wf rm` and `wf prune` |
+| `src/start/commands.verb.ts`, `src/inbox/commands.verb.ts`, `src/factory/factory.verb.ts`, `src/agents/custom.verb.ts` | entries of the command table: `wf start`, a folder or a brief (`START`); `wf inbox`, bare, `add`, `queue` and `rm`, and a card's page, which the api alone serves (`INBOXES`); `wf factory`, bare, `ls`, `add`, `attach`, `detach`, `hire`, `fire` and `rm` (`FACTORIES`); `wf agents custom` (`AGENTS_CUSTOM`) — each its usage, help, arguments, handler and route |
 | `src/branches/merges.verb.ts`, `src/command/pages.verb.ts`, `src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/folder/workflows.verb.ts` | entries of the command table the api alone serves, each with why (`only`): whether a run's branches still merge (`MERGES`); a run's page and its steps' files, path and conversation (`PAGES`); the agent library's writes, removal, try and read (`LIBRARY_ENTRIES`); the skill library's list, read and writes (`SKILL_ENTRIES`); the workflow builder's reads and writes (`WORKFLOW_ENTRIES`) |
 | `src/cli/decide/decide.ts` | `wf decide`: its help, its one flag, and the screen it prints (`decideVerb`) |
 | `src/cli/exit.ts` | what `nemia` exits with (`exitCodeOf`), imported by each bin, `bin/nemia.ts` and its alias `bin/wf.ts`, before the package |

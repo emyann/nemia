@@ -1,6 +1,6 @@
 /**
  * The words of the routes that write a person's agents: an agent's custom instructions written or cleared, an agent file copied into
- * the library, and an agent's rule for auto put in force and taken out (`nemia policy confirm`, `nemia policy drop`), the person's, from
+ * the library, and an agent's rule for auto put in force and taken out (`nemia policy confirm`, `nemia policy rm`), the person's, from
  * the board. A confirm takes the rule's words as the person read them, and a drop no body but none or `{}`; a name that is no agent's
  * is refused before either.
  */
@@ -86,7 +86,7 @@ const ruleGuard = (at: Named, off: boolean): Guarded => ({
     : 'at auto, the agent gives the answer the rule names unasked wherever the run meets its conditions',
   reach: off ? "drop it on the agent's settings on the board" : "confirm it on the agent's settings on the board",
   instead: off
-    ? `Drop it with \`nemia policy drop ${at.name} <id>\``
+    ? `Drop it with \`nemia policy rm ${at.name} <id>\``
     : `Confirm it with \`nemia policy confirm ${at.name} <id> --words '<words>'\``,
   shape: off ? '`{}`' : CONFIRM_SHAPE,
 });

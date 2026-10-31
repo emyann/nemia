@@ -1,8 +1,8 @@
 /**
- * Starting a workflow folder's run: the program `startRun`. It refuses what it can before anything is
- * written, and writes the run's record; nothing is filed here — the tick files a run's first steps on its next pass. `nemia plan` and the
- * inbox start their runs through it. A controller whose program requires nothing: the runtime it reads, through the client
- * (`runtime-client.ts`), is its harnesses, which say which steps a session can be bridged for, and never the engine.
+ * Starting a workflow folder's run: the program `startRun`. It refuses what it can before anything is written, and writes the run's record;
+ * nothing is filed here — the tick files a run's first steps on its next pass. `nemia start <folder>` and the inbox start their runs
+ * through it. A controller whose program requires nothing: the runtime it reads, through the client (`runtime-client.ts`), is its
+ * harnesses, which say which steps a session can be bridged for, and never the engine.
  */
 import fs from 'node:fs';
 import path from 'node:path';

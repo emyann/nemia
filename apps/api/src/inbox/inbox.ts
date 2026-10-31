@@ -90,8 +90,8 @@ export type InboxQueueAnswer = {
  */
 export type InboxFromAnswer = { name: string; file: string; from: string[]; was: string[] };
 
-/** One card read for its page (`inbox card`), an entry of the package's table the api serves alone: on `GET /api/inbox/:name`. */
-const CARD = COMMANDS.find((c) => c.name === 'inbox card')!;
+/** One card read for its page (`inbox show`), an entry of the package's table the api serves alone: on `GET /api/inbox/:name`. */
+const CARD = COMMANDS.find((c) => c.name === 'inbox show')!;
 
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
@@ -258,7 +258,7 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Fili
  * - `GET /api/inbox/:name` — one card, for its page (`InboxCardPage`). A name that would leave the inbox, or a hidden one, is refused in
  *   the package's words (400) before anything is read; a card is found among the entries the inbox lists, never by a path joined from what
  *   was sent, and a card before a stray file of the same name (`notes.md` and `notes` both list as `notes`), through the package's entry
- *   (`inbox card`). 404 for a card not there, or dropped since the listing read it, the package's `Missing` naming the cards that are.
+ *   (`inbox show`). 404 for a card not there, or dropped since the listing read it, the package's `Missing` naming the cards that are.
  *   Its keys are as the listing reads them: `queued` is when it was queued (the listing carries its place too), null when unset.
  * - `POST /api/inbox` — `nemia inbox add "<idea>" --workflow <name> --repo <path>`, through its entry's handler: a card filed, under the
  *   slug of its first line (201, `InboxFiled`). The body and its workflow are refused as `filingOf` says. With `factory`, the card is

@@ -2,7 +2,7 @@
  * An agent of yours tried on a short brief, judged before anything is written, in this order: the place (`yoursOnlyRefusal`), the brief,
  * the agent's file, what the try could not run (`untriedOf`), a skill only the repository has (`repoSkillsRefusal`), and a try of it still
  * moving; then its folder written (`tryFolder`) and a run of it started with no repository (`startRun`) — a tick files it. The command line
- * and the api's route both run it, through the table's `agents try`.
+ * and the api's route both run it, through the table's `agents run`.
  */
 import path from 'node:path';
 import { Effect } from 'effect';

@@ -25,7 +25,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                repositories (nemia factory --help)
   nemia factory ls
                                the same, by its name
-  nemia factory plan <name> --to <x.y.z> [--template <folder|archive>]
+  nemia factory diff <name> --to <x.y.z> [--template <folder|archive>]
                                preview a templated factory's upgrade: what merges cleanly, and each
                                conflict with its sides; nothing is written
   nemia factory servers <factory>
@@ -44,7 +44,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
                                --store keeps it in the store, --clear reads NEMIA.md in the first
                                folder again
                                reads bare; prompts the person given --path, --store, --clear
-  nemia template check <folder|archive>
+  nemia template lint <folder|archive>
                                check a template's folder or archive: every problem at once, each at its
                                file and line
   nemia ls [<runId>]
@@ -160,7 +160,7 @@ They write nothing: run them unasked, as often as you need. One that sets with s
 They write, and are yours to run unasked, on your judgement: say what you did.
 
 ```text
-  nemia start <brief.md|card.md|"text"> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
+  nemia start <brief.md|card.md|"text"|folder> [--workflows ./workflows] [--repo .] [--no-worktree] [--after <runId> ...] [--from <runId> ...] [--input <file> ...] [--gate <step> ...] [--factory <name>] [--brief "<brief>"]
                                --after <runId>: file nothing of this run until nemia decide says that
                                run has landed — finished, and its result branch on the base
                                branch — and start from the base as it is then; once per run.
@@ -172,7 +172,9 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                anything after it is filed, as a step's own gate: true does; once
                                per step. An inbox card's gate: <step> is one more
                                --workflows takes a folder, or a name under <repo>/workflows/: dev
-                               a card of a plan (nemia plan --help) starts its body: --workflows is its
+                               a folder of cards starts a plan, a run per card, parents first, at
+                               the command line alone (nemia start --help)
+                               a card of a plan (nemia start --help) starts its body: --workflows is its
                                workflow: unless given, and its after: needs an --after for each
                                a frontmatter block of keys a plan's card lacks is refused by its key,
                                never taken as the brief: file an inbox card with nemia inbox add <file>
@@ -191,10 +193,6 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                inbox, listed as started: --workflows is its workflow:
                                unless given, --repo its repo:, --factory its factory:, and a card
                                that names no factory either way is refused
-  nemia plan <folder> [--repo .] [--factory <name>]
-                               start a plan: one run per card in the folder, parents first, each
-                               --after the runs of the cards its after: names, in the factory as
-                               nemia start finds it (nemia plan --help)
   nemia inbox add "<idea>"|<file> [--workflow <name>] [--repo <path>] [--factory <name>]
                                park an idea as a card in the inbox, named from its first line
   nemia inbox queue <name> [--workflow <w>] [--off]
@@ -222,7 +220,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                engine journals the words on the step's task, nemia ls notes the step
                                said to, and nemia decide prints them under it. A try that continues
                                the session is handed them again, as ## Said to your session
-  nemia agents try yours <name> --brief <words>
+  nemia agents run yours <name> --brief <words>
                                an agent of yours tried on a short brief, in a folder of its own,
                                capped at $1
   nemia hold <runId> --until <runId> [--until <runId> ...] [--why "<words>"] [--by <name>]
@@ -340,7 +338,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia agents copy <file> [--as <name>] [--keep <part>]...
                                an agent file copied into your library, with its schema and skills;
                                a part your library holds otherwise stops it: --as or --keep
-  nemia agents remove yours <name> --version <v>
+  nemia agents rm yours <name> --version <v>
                                an agent of yours removed, at the --version it was read at
   nemia skills write (yours | factory) [<name>] --file <SKILL.md> [--factory <name>] [--version <v>]
                                a skill of yours, or of a templated --factory, written from its
@@ -376,7 +374,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
                                words read: from then on, at auto, the answer it names is given unasked
                                where it holds. Refused once the rule reads otherwise. Your first confirm
                                keeps the default beside it. Asked of you every time
-  nemia policy drop <agent> <id>
+  nemia policy rm <agent> <id>
                                take a rule out of force, the default among them: what it allowed is
                                asked of you again. Asked of you every time
   nemia service install [--env KEY=VALUE ...] [--name <name>] [--take-over <pid>]
@@ -411,7 +409,7 @@ Each asks the person at a prompt every time it runs: say what it does before you
   nemia workflows write (yours | factory) <name> --folder <draft> [--factory <name>] [--version <v>]
                                a workflow folder of yours, or of a templated --factory, written from
                                a draft folder; one there already, at the --version it was read at
-  nemia workflows remove yours <name> --version <v>
+  nemia workflows rm yours <name> --version <v>
                                a workflow folder of yours removed, at the --version it was read at
 ```
 

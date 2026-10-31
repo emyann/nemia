@@ -643,7 +643,7 @@ export const WORDS: Readonly<Record<string, RouteWords>> = {
   unsubscribe: UNSUBSCRIBE,
   level: LEVEL,
   'policy confirm': POLICY_CONFIRM,
-  'policy drop': POLICY_DROP,
+  'policy rm': POLICY_DROP,
   rm: RM,
   prune: PRUNE,
   'inbox queue': INBOX_QUEUE,

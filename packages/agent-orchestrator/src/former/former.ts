@@ -6,9 +6,33 @@
  * frozen on a run record under an old name (`asNamed`).
  */
 import { LIST_KEYS, refuse, splitFrontmatter, type StepAgent, type StepKey, type Workflow } from '../step/step.ts';
-import { flatValue, frontmatterOrNull, readFrontmatter, type FrontmatterEntry } from '../frontmatter/frontmatter.ts';
+import {
+  flatValue,
+  frontmatterOrNull,
+  readFrontmatter,
+  withKey,
+  type FrontmatterEntry,
+  type FrontmatterValue,
+} from '../frontmatter/frontmatter.ts';
 import { ALLOW_EXAMPLE, BUDGET_EXAMPLE, DISALLOW_EXAMPLE, TOOLS_EXAMPLE } from '../keys/index.ts';
 import type { AgentOwnKey, HarnessPrompt, RoleKey } from '../agents/agents.ts';
+import { fenceKeysOf, HARNESS_FENCE_KEYS } from '../template/layout.ts';
+import { DEFAULT_HARNESS } from '../harness/harness.ts';
+import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
+
+/**
+ * The fence keys a file once wrote at the top level, each now under its harness's block: `permissionMode:`, `tools:`, `allowedTools:` and
+ * `disallowedTools:` under `claude: { fence: … }`, and `sandbox:` under `codex: { fence: … }` (`fenceKeysOf`). A top-level line is still
+ * read as the key in the block of the file's harness (`readKeys`); `nemia start` names each file that writes one (`formerFenceLine`), and
+ * `nemia frontmatter rewrite` moves it (`fenceMoved`). Nothing writes one: `renderStep` and `renderAgent` write the block (`fencedPairs`).
+ */
+export const FORMER_FENCE_KEYS: readonly string[] = HARNESS_FENCE_KEYS;
+
+/** Whether `key` names a harness, whose block a file's frontmatter may hold. */
+export const isHarnessBlock = (key: string): boolean => fenceKeysOf(key) !== undefined;
+
+/** The harness block a frontmatter holds, `<harness>: { fence: … }`: the harness, the line it opens on and the fence keys it sets. */
+export type FenceBlock = { harness: string; line: number; keys: string[] };
 
 /**
  * A key's former name, and the name it has now: `disallow:` and `allow:` are the former names of `disallowedTools:` and `allowedTools:`,
@@ -115,21 +139,33 @@ const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, writte
  * key under its former name (`FORMER_KEYS`) is read as the key, and `spelled` says under which name, so a refusal quotes the line as
  * written. A key set twice, under either name, is refused rather than last-one-wins: both values are something the author meant, and a
  * step would wait on half of what it was written to wait on.
+ *
+ * A harness's block, `claude: { fence: { permissionMode: dontAsk, tools: [Read] } }`, is read into the same keys, each a key of that
+ * harness's fence (`fenceKeysOf`), and handed back as `block`: whether it is the file's harness is the caller's to judge
+ * (`fenceBlockRefusal`). A fence key at the top level is its former spelling (`FORMER_FENCE_KEYS`), still read; one written both ways is
+ * refused, naming both. A block holding anything but `fence`, a fence key the harness does not take, and two blocks are refused.
  */
 export function readKeys<K extends string>(
   step: string,
   block: string,
   refusal: (key: string) => string | undefined,
-): { meta: Partial<Record<K, string>>; spelled: Spelled } {
+): { meta: Partial<Record<K, string>>; spelled: Spelled; block?: FenceBlock } {
   const meta: Partial<Record<K, string>> = {};
   const spelled: Spelled = {};
-  for (const entry of readFrontmatter(step, block).entries) {
-    const written = entry.key;
+  let fenced: FenceBlock | undefined;
+  const set = (entry: FrontmatterEntry, written: string, inBlock: string | undefined) => {
     const key = keyNamed(written);
     const refused = refusal(key);
     if (refused !== undefined) refuse(refused);
     if (Object.hasOwn(meta, key)) {
       const first = spelled[key] ?? key;
+      const blocked = fenced?.keys.includes(key);
+      if (inBlock !== undefined || blocked) {
+        const harness = inBlock ?? fenced!.harness;
+        refuse(
+          `${step}: \`${key}\` is set twice, at the top level and under \`${harness}: { fence: … }\` — the top-level line is its former spelling, and reads as the block's. Keep the block's and delete the other line: nemia frontmatter rewrite <folder> moves a top-level fence key into its block.`,
+        );
+      }
       if (first !== written) {
         refuse(
           `${step}: \`${key}\` is set twice, as \`${first}:\` and as \`${written}:\` — \`${first === key ? written : first}:\` is its former name, and reads as \`${key}:\`. Keep the \`${key}:\` line and delete the other.`,
@@ -139,13 +175,87 @@ export function readKeys<K extends string>(
         `${step}: \`${written}\` is set twice, and a step that says two things says nothing. Keep one line${key === 'after' ? ' and list every step on it: `after: a, b`' : ''}.`,
       );
     }
-    const value = flatValue(step, entry, LIST_KEYS.includes(key));
+    const value = flatValue(step, { ...entry, key }, LIST_KEYS.includes(key));
     if (!value) refuse(noValue(step, key, written));
     meta[key as K] = value;
     if (written !== key) spelled[key] = written;
+    if (inBlock !== undefined) fenced!.keys.push(key);
+  };
+  for (const entry of readFrontmatter(step, block).entries) {
+    if (isHarnessBlock(entry.key) && typeof entry.value === 'object' && !Array.isArray(entry.value)) {
+      const harness = entry.key;
+      if (fenced !== undefined) refuse(twoBlocks(step, fenced.harness, harness));
+      fenced = { harness, line: entry.line, keys: [] };
+      const map = entry.value as Readonly<Record<string, FrontmatterValue>>;
+      const other = Object.keys(map).find((key) => key !== 'fence');
+      if (other !== undefined) refuse(blockKeyRefused(step, harness, other));
+      const fence = map.fence;
+      if (fence === undefined) continue;
+      if (typeof fence !== 'object' || Array.isArray(fence)) refuse(fenceNotMap(step, harness));
+      const takes = fenceKeysOf(harness)!;
+      for (const [key, value] of Object.entries(fence as Readonly<Record<string, FrontmatterValue>>)) {
+        if (!takes.includes(key)) refuse(fenceKeyRefused(step, harness, key, takes));
+        set({ key, value, line: entry.line }, key, harness);
+      }
+      continue;
+    }
+    set(entry, entry.key, undefined);
   }
-  return { meta, spelled };
+  return { meta, spelled, ...(fenced && { block: fenced }) };
 }
+
+/** Refused: two harness blocks in one file, which runs on one harness. */
+const twoBlocks = (file: string, first: string, second: string): string =>
+  `${file}: \`${first}:\` and \`${second}:\` are both set, and a file runs on one harness, whose block holds its fence. Keep the block of the harness it runs on — its \`harness:\` line, \`${DEFAULT_HARNESS}\` without one — and delete the other.`;
+
+/** Refused: a key under a harness's block other than `fence`. */
+const blockKeyRefused = (file: string, harness: string, key: string): string =>
+  `${file}: \`${harness}: { ${key}: … }\` — a harness's block in a step or agent file holds its \`fence\` alone. Write \`${key}:\` at the top level, or delete it.`;
+
+/** Refused: a harness's `fence` that is not a map of its keys. */
+const fenceNotMap = (file: string, harness: string): string =>
+  `${file}: \`${harness}: { fence: … }\` is a map of the harness's fence keys — ${fenceKeysOf(harness)!.join(', ')} — each on a line of its own, indented under \`fence:\`.`;
+
+/** Refused: a key in a harness's fence that the harness does not take. */
+const fenceKeyRefused = (file: string, harness: string, key: string, takes: readonly string[]): string =>
+  `${file}: \`${harness}: { fence: { ${key}: … } }\` — ${harness}'s fence takes ${takes.map((k) => `\`${k}\``).join(', ')}, and not \`${key}\`. Correct the key, or move it into the block of the harness that takes it.`;
+
+/**
+ * Why a file's harness block (`readKeys`) is refused, or `undefined` when it is the block of `harness`, the harness the file runs on — its
+ * own `harness:` line, its agent's, or the default. A block for another harness would fence a session that never starts.
+ */
+export function fenceBlockRefusal(file: string, block: FenceBlock | undefined, harness: string): string | undefined {
+  if (block === undefined || block.harness === harness) return undefined;
+  return `${file}:${block.line}: \`${block.harness}: { fence: … }\` fences a session on ${block.harness}, and this file runs on ${harness}. Name the block \`${harness}:\` with ${harness}'s fence keys${fenceKeysOf(harness) ? ` (${fenceKeysOf(harness)!.join(', ')})` : ''}, or set \`harness: ${block.harness}\`.`;
+}
+
+/**
+ * Pairs a writer hands `renderFrontmatter`, with each fence key (`FORMER_FENCE_KEYS`) moved under the block of the harness whose fence
+ * takes it (`fenceKeysOf`) — `permissionMode` and the tool lists under `claude:`, `sandbox` under `codex:` — written where the first of
+ * them was: `[harness, { fence: { … } }]`. Each value is as the pair had it. What `renderStep` and `renderAgent` write, so nothing writes a
+ * fence key at the top level; the parser refuses a block for a harness the file does not run on (`fenceBlockRefusal`).
+ */
+export function fencedPairs(pairs: ReadonlyArray<readonly [string, FrontmatterValue]>): Array<readonly [string, FrontmatterValue]> {
+  const blocks = new Map<string, Record<string, FrontmatterValue>>();
+  const out: Array<readonly [string, FrontmatterValue]> = [];
+  for (const [key, value] of pairs) {
+    const harness = FORMER_FENCE_KEYS.includes(key) ? harnessTaking(key) : undefined;
+    if (harness === undefined) {
+      out.push([key, value]);
+      continue;
+    }
+    if (!blocks.has(harness)) {
+      blocks.set(harness, {});
+      out.push([harness, { fence: blocks.get(harness)! }]);
+    }
+    blocks.get(harness)![key] = value;
+  }
+  return out;
+}
+
+/** The harness whose fence takes key `key` (`fenceKeysOf`): each fence key is one harness's. */
+const harnessTaking = (key: string): string | undefined =>
+  Object.keys(HARNESS_KNOBS).find((harness) => fenceKeysOf(harness)!.includes(key));
 
 /** Why a key written with no value is refused, and what to write: the command, the tools or the dollars it takes, or the line deleted. */
 const noValue = (step: string, key: string, written: string): string =>
@@ -174,14 +284,67 @@ function frontmatterOf(text: string): { entries: FrontmatterEntry[]; former: boo
 /**
  * The value a file's frontmatter gives `key`, read as the parser reads it (`readFrontmatter`): its text, a list as the comma string — or
  * `undefined` for a file with no such key, an empty one, one that holds a map, or whose frontmatter never closes or reads in neither form
- * (the parser refuses it). Never throws: for a listing, which names what a file says before the parser judges it. `agent : coder` names
- * `coder`.
+ * (the parser refuses it). A fence key (`FORMER_FENCE_KEYS`) is read under a harness's block, `claude: { fence: … }`, where the top level
+ * has none, unless `top` asks for the top-level line alone. Never throws: for a listing, which names what a file says before the parser
+ * judges it. `agent : coder` names `coder`.
  */
-export function frontmatterKey(text: string, key: string): string | undefined {
-  const value = frontmatterOf(text)?.entries.find((entry) => entry.key === key)?.value;
+export function frontmatterKey(text: string, key: string, top = false): string | undefined {
+  const entries = frontmatterOf(text)?.entries ?? [];
+  const found = entries.find((entry) => entry.key === key)?.value;
+  const value =
+    found !== undefined || top || !FORMER_FENCE_KEYS.includes(key)
+      ? found
+      : entries.flatMap((entry) => (isHarnessBlock(entry.key) ? [fenceOfBlock(entry.value)?.[key]] : [])).find((v) => v !== undefined);
   if (typeof value === 'string') return value || undefined;
   if (Array.isArray(value) && value.every((item) => typeof item === 'string')) return value.join(', ') || undefined;
   return undefined;
+}
+
+/** The fence map a harness block's value holds, or `undefined` for one that holds none. */
+const fenceOfBlock = (value: FrontmatterValue): Readonly<Record<string, FrontmatterValue>> | undefined => {
+  if (typeof value !== 'object' || Array.isArray(value)) return undefined;
+  const fence = (value as Readonly<Record<string, FrontmatterValue>>).fence;
+  return typeof fence === 'object' && !Array.isArray(fence) ? (fence as Readonly<Record<string, FrontmatterValue>>) : undefined;
+};
+
+/** The fence keys a file's frontmatter still writes at the top level (`FORMER_FENCE_KEYS`), in the order it writes them. */
+export function formerFenceIn(text: string): string[] {
+  return (frontmatterOf(text)?.entries ?? []).flatMap(({ key }) => (FORMER_FENCE_KEYS.includes(key) ? [key] : []));
+}
+
+/** What `nemia start` says of a file that still writes fence key `key` at the top level (`formerFenceIn`). The one writer of it. */
+export const formerFenceLine = (file: string, key: string): string =>
+  `${file}: \`${key}:\` at the top level is read as the fence of the file's harness, \`<harness>: { fence: { ${key}: … } }\`. The former line is still read; move it into the block: nemia frontmatter rewrite <folder>, or save the file from the board.`;
+
+/**
+ * What `nemia start` says of an agent file with no `overridable:` line, whose steps may override everything a step may change of its agent
+ * (`offerRefusal`). The one writer of it.
+ */
+export const overridableLine = (file: string): string =>
+  `${file}: no \`overridable:\` line, so a step may override every key it takes from this agent, its fence narrowed, skills and MCP servers added. Say what a step may override — \`overridable: [model, fence, skills]\` — and a step that writes anything else is refused at load.`;
+
+/**
+ * A file's text with each top-level fence key (`FORMER_FENCE_KEYS`) moved into the block of the harness it runs on — `harness`, its own
+ * line's or its agent's — every value as it was, and `changed`. A file whose fence is already in its block is returned as it is. What
+ * `nemia frontmatter rewrite` writes after the line form. Refused where the block cannot be written so it reads back the same.
+ */
+export function fenceMoved(name: string, text: string, harness: string): { text: string; changed: boolean } {
+  const { block } = splitFrontmatter(name, text);
+  if (block === null) return { text, changed: false };
+  const read = readFrontmatter(name, block);
+  const top = read.entries.filter(({ key }) => FORMER_FENCE_KEYS.includes(key));
+  if (read.former || !top.length) return { text, changed: false };
+  const fence: Record<string, FrontmatterValue> = {};
+  for (const { key, value } of top) {
+    const codexMode = key === 'permissionMode' && harness === 'codex';
+    fence[codexMode ? 'sandbox' : key] = codexMode && typeof value === 'string' ? sandboxNamed(value) : value;
+  }
+  const at = read.entries.find(({ key }) => isHarnessBlock(key));
+  let moved = top.reduce((written, { key }) => withKey(name, written, key, undefined), block);
+  const existing = at === undefined ? {} : (fenceOfBlock(at.value) ?? {});
+  moved = withKey(name, moved, at?.key ?? harness, { fence: { ...existing, ...fence } });
+  const open = text.indexOf(block);
+  return { text: `${text.slice(0, open)}${moved}${text.slice(open + block.length)}`, changed: true };
 }
 
 /**

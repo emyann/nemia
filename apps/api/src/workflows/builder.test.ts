@@ -23,7 +23,7 @@ import {
   HARNESSES,
   parseFolder,
   parseWorkflow,
-  POLICY_KEYS,
+  OVERRIDE_KEYS,
   REMOTE_REFUSED_KEYS,
   renderStep,
   STEP_KEY_MEANINGS,
@@ -262,7 +262,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
         ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox', 'skills', 'mcp'],
         "the policy keys, which the builder groups as the step's policy over its agent: the fence keys and the skills and servers it adds",
       );
-      assert.deepEqual(form.policyKeys, [...POLICY_KEYS], "the package's list, never one of the api's own");
+      assert.deepEqual(form.policyKeys, [...OVERRIDE_KEYS], "the package's list, never one of the api's own");
       for (const own of agentOnly)
         assert.equal(
           form.roleKeys.includes(own as never),

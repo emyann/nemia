@@ -245,6 +245,16 @@ const agentTaken = (name: string, version: string | null): string =>
   `${AGENTS_FOLDER}/${name}.md is there already. Give the new agent another name, or open it and change it${takenAt(version)}.`;
 
 /**
+ * `draft` with the `overridable:` line the file at `at` has, where the draft does not say the line (`AgentDraft.overridable` absent): a
+ * page that does not know the line saves the agent without widening what its steps may override. `null` in the draft takes it out.
+ */
+function keptOffer(draft: AgentDraft, at: string | undefined): AgentDraft {
+  if (draft.overridable !== undefined || at === undefined || !fs.existsSync(at)) return draft;
+  const kept = frontmatterKey(fs.readFileSync(at, 'utf8'), 'overridable');
+  return kept === undefined ? draft : { ...draft, overridable: kept };
+}
+
+/**
  * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir`
  * is a folder of agents, `<workflows>/agents`, and a run is not changed by any of it: a run froze its folder, and the agents its steps
  * name, at `nemia start`, so a write changes what a later `nemia start` freezes and nothing else.
@@ -320,7 +330,7 @@ export function writeAgent(
     const theirs = repoUsers(at, old, repo);
     if (theirs.length) refuse(inUseByRepo(old, theirs, repo!, `renaming it to ${name}`), Conflict, theirs);
   }
-  const text = renderAgent(draft);
+  const text = renderAgent(keptOffer(draft, version === null ? undefined : file(old)));
   const given = SIDECARS.map((kind) => ({ ...kind, sidecar: schema ?? null, named: frontmatterKey(text, kind.key) }));
   for (const { key, what, a, suggest, sidecar, named: mine } of given) {
     if (!sidecar) continue;

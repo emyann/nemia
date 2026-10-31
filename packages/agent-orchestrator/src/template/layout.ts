@@ -190,10 +190,17 @@ type Shape =
   | { readonly list: Shape }
   | { readonly fields: Readonly<Record<string, Shape>>; readonly required?: readonly string[]; readonly rest?: Shape };
 
-/** The fence keys of every harness: each one's own key and its tool lists. */
-export const FENCE_KEYS: readonly string[] = [
+/**
+ * The fence keys of every harness: each one's own key and its tool lists. One list for the package, read by the template and by the
+ * markdown readers, which take a harness's fence under its block (`<harness>: { fence: … }`, `fenceKeysOf`).
+ */
+export const HARNESS_FENCE_KEYS: readonly string[] = [
   ...new Set(Object.values(HARNESS_KNOBS).flatMap((knobs) => [knobs.fence.key, ...knobs.fence.lists])),
 ];
+
+/** The fence keys harness `harness`'s block takes, its own key then its tool lists, or `undefined` for a name that is no harness. */
+export const fenceKeysOf = (harness: string): readonly string[] | undefined =>
+  Object.hasOwn(HARNESS_KNOBS, harness) ? [HARNESS_KNOBS[harness].fence.key, ...HARNESS_KNOBS[harness].fence.lists] : undefined;
 
 /** The keys a harness's block holds. */
 export const PROFILE_KEYS = ['model', 'effort', 'context', 'fence', 'options'] as const;
@@ -203,7 +210,7 @@ const PROFILE: Shape = {
     model: 'words',
     effort: 'words',
     context: 'words',
-    fence: { fields: Object.fromEntries(FENCE_KEYS.map((key) => [key, isList(key) ? 'strings' : 'string'])) },
+    fence: { fields: Object.fromEntries(HARNESS_FENCE_KEYS.map((key) => [key, isList(key) ? 'strings' : 'string'])) },
     options: { fields: {}, rest: 'option' },
   },
 };

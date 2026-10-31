@@ -103,7 +103,7 @@ test("every agent of the tests' team renders to a file that reads back as the sa
 
 test('a render writes the role and the description first, the keys in their order, and an unset key not at all', () => {
   const text = renderAgent({ name: 'a', description: 'Use it.', keys: { tools: 'Read', model: 'opus', effort: null }, body: '  Do it.  ' });
-  assert.equal(text, '---\ndescription: Use it.\nmodel: opus\ntools: Read\n---\nDo it.\n');
+  assert.equal(text, '---\ndescription: Use it.\nmodel: opus\nclaude:\n  fence:\n    tools: Read\n---\nDo it.\n');
   const held = renderAgent({ name: 'iris', role: 'Product engineer', description: 'Use it.', keys: { model: 'opus' }, body: 'Ask.' });
   assert.equal(held, '---\nrole: Product engineer\ndescription: Use it.\nmodel: opus\n---\nAsk.\n');
   assert.equal(parseAgent('iris', held).role, 'Product engineer');

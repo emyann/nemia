@@ -365,6 +365,7 @@ export const LIST_KEYS: readonly string[] = [
   'allowedTools',
   'tally',
   'from',
+  'overridable',
   'disallow',
   'allow',
 ];

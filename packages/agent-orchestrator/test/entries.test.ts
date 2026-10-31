@@ -776,7 +776,7 @@ const PINNED: Record<string, string[]> = {
     'parseFolder',
     'parseWorkflow',
     'PLACES',
-    'POLICY_KEYS',
+    'OVERRIDE_KEYS',
     'readFrontmatter',
     'readmeDescription',
     'remoteNameOf',

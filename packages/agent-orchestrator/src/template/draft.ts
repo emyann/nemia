@@ -11,7 +11,7 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillNamesOf, toolsOf } from '../keys/index.ts';
 import { FACTORY_RULES_FILE } from '../rules/rules.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
-import { API_VERSION, FENCE_KEYS, type Profile, type Step } from './layout.ts';
+import { API_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step } from './layout.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
 export type StepSource = { name: string; keys: Readonly<Record<string, string>>; body: string; file: string };
@@ -90,7 +90,7 @@ const PLACED = new Set<string>([
   ...WORDS,
   ...COUNTED,
   ...BLOCK_KEYS,
-  ...FENCE_KEYS,
+  ...HARNESS_FENCE_KEYS,
 ]);
 
 /** A list as today's lines write one: comma-separated, each trimmed. */
@@ -109,7 +109,7 @@ const isWordKey = (key: string): boolean => Object.values(HARNESS_KNOBS).some((k
  */
 function blockOf(file: string, keys: Readonly<Record<string, string | undefined>>, harness: string): Profile | undefined {
   const fence: Record<string, string | readonly string[]> = {};
-  for (const key of FENCE_KEYS) {
+  for (const key of HARNESS_FENCE_KEYS) {
     const written = keys[key];
     if (written === undefined) continue;
     if (isWordKey(key)) fence[HARNESS_KNOBS[harness]?.fence.key ?? key] = written;

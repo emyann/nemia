@@ -39,6 +39,8 @@ const { emitFeed, FEED_FOLLOW_LINES, FEED_FOLLOWERS, feedHubLayer } = await impo
 const { addFactory } = await import('../src/factory/factory.store.ts');
 const { writeFactoryLevel } = await import('../src/level/level.store.ts');
 const { over, engineOf } = await import('../src/runtime-client.ts');
+const { RunDoor } = await import('../src/runs/runs.store.ts');
+const { runDoorMemory } = await import('../src/runs/memory.store.ts');
 const { runWith } = await import('../src/runner.ts');
 const { main } = await import('../src/cli/main.ts');
 const stage = staged({ runWith, main, engineOf });
@@ -128,14 +130,20 @@ const digestChecks = (): number => Effect.runSync(Metric.value(SUBSCRIPTION_DIGE
  * The deliverer over `e` on the stage's clock, in a runtime of `layer`'s where one is given: started, and stopped once test `t` ends.
  * `rests()` is how many of the clock's rests are asked and not yet woken; `quiet(n)` waits until `n` are, each of its fibers at rest — the
  * subscriptions' read, and each subscription's digest check and beat; `cut(n)` takes away the `n` rests of a subscription's deliverer the
- * deliverer stopped itself, as one gone is stopped, never woken.
+ * deliverer stopped itself, as one gone is stopped, never woken. Given `runs`, a Run door's layer, the deliverer reads a run's factory
+ * there rather than off the files.
  */
-const delivering = (t: TestContext, e: Parameters<typeof over>[0], rt?: ManagedRuntime.ManagedRuntime<never, never>) => {
+const delivering = (
+  t: TestContext,
+  e: Parameters<typeof over>[0],
+  rt?: ManagedRuntime.ManagedRuntime<never, never>,
+  runs: Layer.Layer<never> = Layer.empty,
+) => {
   const clock = stage.clock();
   let fiber: Fiber.Fiber<never> | undefined;
   let stopped = 0;
   const start = () => {
-    const program = over(e)(deliver()).pipe(Effect.provide(clock.layer), Effect.provide(Logger.layer([])));
+    const program = over(e)(deliver()).pipe(Effect.provide(clock.layer), Effect.provide(Logger.layer([])), Effect.provide(runs));
     fiber = rt ? rt.runFork(program) : Effect.runFork(program);
   };
   const stop = async () => {
@@ -507,22 +515,26 @@ test(
   },
 );
 
-/** Writes the run `id`'s record, started in the factory `factory`. */
-function writeRun(id: string, factory: string) {
-  fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-  const record = {
-    id,
-    workspace: ROOT,
-    brief: `The brief of ${id}`,
-    createdAt: '2026-10-06T08:00:00.000Z',
-    workflowDir: path.join(ROOT, 'no-such-workflow'),
-    place: { kind: 'folder' },
-    workflow: [{ name: 'build', after: [], body: 'Build it.', harness: 'codex' }],
-    steps: {},
-    factory,
-  };
-  fs.writeFileSync(path.join(ROOT, 'runs', `${id}.json`), JSON.stringify(record));
-}
+/** Plants the run `id`'s record through the Run door `door`, started in the factory `factory`: the deliverer reads it for its level. */
+const plantRun = (door: Layer.Layer<never>, id: string, factory: string) =>
+  Effect.runPromise(
+    Effect.provide(
+      Effect.flatMap(RunDoor, (d) =>
+        d.runs.create({
+          id,
+          workspace: ROOT,
+          brief: `The brief of ${id}`,
+          createdAt: '2026-10-06T08:00:00.000Z',
+          workflowDir: path.join(ROOT, 'no-such-workflow'),
+          place: { kind: 'folder' },
+          workflow: [{ name: 'build', after: [], body: 'Build it.', harness: 'codex' }],
+          steps: {},
+          factory,
+        }),
+      ),
+      door,
+    ),
+  );
 
 test(
   "a subscription scoped by a floor is told only of the runs of factories at it or above, and every one carries a daemon's line and the store's",
@@ -530,20 +542,21 @@ test(
   async (t) => {
     const s = story(t);
     const { e } = engineFor();
+    const door = runDoorMemory();
     let d: ReturnType<typeof delivering>;
     await s.test(
       'REFUSED: a subscription scoped by a floor is told nothing of a run whose factory is below it; one unscoped is told of both',
       async () => {
         for (const name of ['pipao', 'hkb']) addFactory({ name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
         writeFactoryLevel('hkb', { level: 'semi-auto', since: '2026-10-06T08:00:00.000Z' });
-        writeRun('r-pipao', 'pipao');
-        writeRun('r-hkb', 'hkb');
+        await plantRun(door, 'r-pipao', 'pipao');
+        await plantRun(door, 'r-hkb', 'hkb');
         const from = feedSize();
         const floored = await longLived('t-floored');
         const everything = await longLived('t-everything');
         kept(t, 'floored', { task: floored, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from, scope: { atLeast: 'semi-auto' } });
         kept(t, 'everything', { task: everything, selectors: [...DEFAULT_SELECTORS], digestEvery: 60, from });
-        d = delivering(t, e);
+        d = delivering(t, e, undefined, door);
         await d.quiet(5);
         appended(line('r-pipao', 'running'), line('r-pipao', 'awaiting approval'), line('r-gone', 'awaiting approval'));
         appended(line('r-hkb', 'awaiting approval'));

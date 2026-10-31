@@ -1,6 +1,7 @@
 /**
  * Run-core's model (`record.model.ts`): each id checked on create by its writer's own rule and nominal on read, each invariant of a
- * run refused on its planted breach, and every record the tests' builders and the run's pure writers make decoded through `Run`.
+ * run refused on its planted breach. That every record the run's writers make decodes is the Run door's write check, on every write of
+ * every test (`src/runs/runs.store.ts`, the invariant rows of `test/run-walks.ts`).
  * Refusals are asserted by the fact, never by their words.
  */
 import { test } from 'node:test';
@@ -8,9 +9,6 @@ import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
 import { Landing, Run, RunId, StepName } from './record.model.ts';
 import { runId } from './record.store.ts';
-import { stepTaskId } from './record.ts';
-import { nextTry } from '../retry/index.ts';
-import { sentBack } from '../run.ts';
 import { run } from '../../test/assessed.ts';
 
 const decodes = (value: unknown): boolean => Schema.is(Run)(value);
@@ -90,44 +88,4 @@ test('a landing is one of a commit, an abort or nothing touched', async (t) => {
     [{ commit: 'fed789', untouched: 'both' }, false],
   ];
   for (const [value, ok] of rows) await t.test(JSON.stringify(value), () => assert.equal(Schema.is(Landing)(value), ok));
-});
-
-test("every record the tests' builders and the run's writers make decodes through Run", async (t) => {
-  const r = run({ implement: stepTaskId({ id: 'r-1' }, 'implement'), review: null });
-  const retried = nextTry(r.steps.implement, { step: 'implement', try: 2, mode: 'fresh', by: 'ask' }, stepTaskId(r, 'implement', 2));
-  const rechecked = nextTry(retried, { step: 'implement', try: 3, mode: 'recheck', by: 'ask' });
-  const records: Array<[string, unknown]> = [
-    ['run(): a step filed, a step waiting', r],
-    [
-      'run() with every optional field a start writes',
-      run(
-        { implement: null },
-        {
-          after: ['r-0'],
-          context: ['r-0'],
-          gates: ['implement'],
-          factory: 'acme',
-          inputs: ['spec.md'],
-          from: { inbox: 'a-card' },
-          mounts: [{ path: '/other', readOnly: true }],
-        },
-      ),
-    ],
-    [
-      'a folder run',
-      {
-        ...run({ implement: null }),
-        repo: undefined,
-        baseRef: undefined,
-        branch: undefined,
-        isolate: undefined,
-        place: { kind: 'folder' },
-      },
-    ],
-    ['nextTry(): a try filed fresh', { ...r, steps: { ...r.steps, implement: retried } }],
-    ['nextTry(): then a recheck, the same task kept', { ...r, steps: { ...r.steps, implement: rechecked } }],
-    ['sentBack(): the try behind, none in its place', { ...r, steps: { ...r.steps, implement: sentBack(rechecked) } }],
-    ['a landed ending', run({ ship: 'r-1-ship' }, { steps: { ship: { taskId: 'r-1-ship', landed: { commit: 'fed789' } } } })],
-  ];
-  for (const [what, record] of records) await t.test(what, () => assert.equal(decodes(record), true));
 });

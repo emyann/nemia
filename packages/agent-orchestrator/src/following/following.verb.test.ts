@@ -6,12 +6,13 @@
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import path from 'node:path';
 import { Cause, Effect, Exit, Layer, Logger, ManagedRuntime, Stream } from 'effect';
 import type { Engine } from '../runtime-client.ts';
 import { nextOf, type StepMoment } from './following.ts';
 import { scratch } from '../../test/scratch.ts';
+import { eachTest } from '../../test/placed.ts';
+import type { Run } from '../record/record.ts';
 import { bell, until, WAITED } from 'agent-runtime/testing';
 
 const ROOT = scratch('wf-following-');
@@ -19,24 +20,37 @@ process.env.WF_ROOT = ROOT;
 const { followStep } = await import('./following.verb.ts');
 const { emitFeed, feedHubLayer } = await import('../feed/feed.verb.ts');
 const { EngineService } = await import('../runtime-client.ts');
+const { RunDoor } = await import('../runs/runs.store.ts');
+const { runDoorMemory } = await import('../runs/memory.store.ts');
+const { RunId } = await import('../record/record.model.ts');
 
-/** The step's record: a run `id` whose step `implement` is on the task `taskId`, or none filed. */
-function writeRun(id: string, taskId: string | null): void {
-  fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-  fs.writeFileSync(
-    path.join(ROOT, 'runs', `${id}.json`),
-    JSON.stringify({
-      id,
-      workspace: ROOT,
-      brief: `The brief of ${id}`,
-      createdAt: '2026-10-07T12:00:00.000Z',
-      workflowDir: path.join(ROOT, 'no-such-workflow'),
-      place: { kind: 'folder' },
-      workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
-      steps: { implement: { taskId } },
-    }),
+/** The Run door of the test running now, in memory: the step's record a test plants, and the one `followStep` reads. */
+const door = eachTest(runDoorMemory);
+
+/**
+ * The step's record, planted through the test's door: a run `id` whose step `implement` is on the task `taskId`, or none filed; its tries
+ * before, each filed as `stepTaskId` names it. Planted again, the record is written back over the one there.
+ */
+const plantRun = (id: string, taskId: string | null, tries: { taskId: string; cause: string }[] = []) => {
+  const run = {
+    id,
+    workspace: ROOT,
+    brief: `The brief of ${id}`,
+    createdAt: '2026-10-07T12:00:00.000Z',
+    workflowDir: path.join(ROOT, 'no-such-workflow'),
+    place: { kind: 'folder' },
+    workflow: [{ name: 'implement', after: [], body: 'Implement it.' }],
+    steps: { implement: { taskId, ...(tries.length ? { tries } : {}) } },
+  } as Run;
+  return Effect.runPromise(
+    Effect.provide(
+      Effect.flatMap(RunDoor, (d) =>
+        Effect.flatMap(d.runs.exists(RunId.read(id)), (there) => (there ? Effect.asVoid(d.runs.rewrite(run)) : d.runs.create(run))),
+      ),
+      door(),
+    ),
   );
-}
+};
 
 type Event = { id: string; at: string; kind: string; text: string };
 const said = (id: string): Event => ({ id, at: '2026-10-07T12:00:00.000Z', kind: 'text', text: id });
@@ -89,7 +103,7 @@ const followed = (t: Task) =>
 
 /** A runtime with the feed's hub and no logger, over the engine `e`: let go once the test `t` ends. */
 function runtimeOf(t: TestContext, e: Engine) {
-  const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(), Logger.layer([]), EngineService.layer(e)));
+  const rt = ManagedRuntime.make(Layer.mergeAll(feedHubLayer(), Logger.layer([]), EngineService.layer(e), door()));
   t.after(() => rt.dispose());
   return rt;
 }
@@ -129,7 +143,7 @@ test(
   "a step followed goes on to its task's next attempt after the step's line of the feed, saying moved, and ends once its task settles",
   WAITED,
   async (t) => {
-    writeRun('r-1', 'r-1-implement');
+    await plantRun('r-1', 'r-1-implement');
     const task: Task = {
       attempts: [
         [
@@ -185,7 +199,7 @@ test(
 );
 
 test("a step followed goes on to its try's task, saying moved, once the step's line says so", WAITED, async (t) => {
-  writeRun('r-3', 'r-3-implement');
+  await plantRun('r-3', 'r-3-implement');
   const first: Task = {
     attempts: [
       [
@@ -215,7 +229,7 @@ test("a step followed goes on to its try's task, saying moved, once the step's l
   );
   first.ended = 1;
   first.settled = 'failed';
-  writeRun('r-3', 'r-3-implement-try2');
+  await plantRun('r-3', 'r-3-implement-try2', [{ taskId: 'r-3-implement', cause: 'retries' }]);
   await line(rt, 'r-3', 'implement', 'running');
   await until(
     t,
@@ -241,7 +255,7 @@ test(
   "a step whose task is filed with no attempt yet waits for the step's next line of the feed, then follows its first attempt to its end",
   WAITED,
   async (t) => {
-    writeRun('r-6', 'r-6-implement');
+    await plantRun('r-6', 'r-6-implement');
     const task: Task = { attempts: [], ended: 0, settled: null, history: [] };
     const { e, views } = engineOver(new Map([['r-6-implement', task]]));
     const rt = runtimeOf(t, e);
@@ -275,7 +289,7 @@ test(
   "a step opened held on a person, its attempt ended, is said streamed, then follows the next attempt from its task's start, saying moved",
   WAITED,
   async (t) => {
-    writeRun('r-7', 'r-7-implement');
+    await plantRun('r-7', 'r-7-implement');
     const task: Task = {
       attempts: [[{ kind: 'events', events: [said('a-1')], cursor: 'c1' }]],
       ended: 1,
@@ -317,7 +331,7 @@ test("a try whose attempt has ended is not followed: the following waits for the
 });
 
 test('a step whose harness does not stream is said not streamed, and the following ends there', async (t) => {
-  writeRun('r-4', 'r-4-implement');
+  await plantRun('r-4', 'r-4-implement');
   const { e } = engineOver(new Map([['r-4-implement', { attempts: [[]], ended: 0, settled: null, history: [] }]]), ['r-4-implement']);
   const got: StepMoment<Event>[] = [];
   assert.ok(Exit.isSuccess(await follow(runtimeOf(t, e), 'r-4', got).ended));
@@ -325,7 +339,7 @@ test('a step whose harness does not stream is said not streamed, and the followi
 });
 
 test('REFUSED: a step with no task filed, as Missing, in words saying when to follow it', async (t) => {
-  writeRun('r-5', null);
+  await plantRun('r-5', null);
   const { e } = engineOver(new Map());
   const exit = await follow(runtimeOf(t, e), 'r-5', []).ended;
   assert.ok(Exit.isFailure(exit));

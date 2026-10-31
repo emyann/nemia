@@ -62,7 +62,7 @@ test('REFUSED: anything due, and anything the pass did, is a pass the next must 
   for (const key of ['ready', 'check', 'waitingOnCheckout'] as const)
     assert.equal(atRest({ ...RESTING, due: { ...RESTING.due, [key]: ['work'] } }), false, key);
   assert.equal(
-    atRest({ ...RESTING, due: { ...RESTING.due, retry: [{ step: 'work', try: 2, by: 'ask', mode: 'nudge' }] } }),
+    atRest({ ...RESTING, due: { ...RESTING.due, retry: [{ step: 'work', try: 2, by: 'ask', mode: 'continue' }] } }),
     false,
     'retry',
   );
@@ -97,7 +97,7 @@ test("restBlockers names each clause that holds a run out, and none of a run at 
     ['acted', { acted: true }],
     ['due.ready', { due: { ...RESTING.due, ready: ['work'] } }],
     ['due.check', { due: { ...RESTING.due, check: ['work'] } }],
-    ['due.retry', { due: { ...RESTING.due, retry: [{ step: 'work', try: 2, by: 'ask', mode: 'nudge' }] } }],
+    ['due.retry', { due: { ...RESTING.due, retry: [{ step: 'work', try: 2, by: 'ask', mode: 'continue' }] } }],
     ['due.round', { due: { ...RESTING.due, round: [{ step: 'review', target: 'work', round: 2, by: 'again' }] } }],
     ['due.waitingOnCheckout', { due: { ...RESTING.due, waitingOnCheckout: ['work'] } }],
     ['notes', { notes: ['work: said'] }],

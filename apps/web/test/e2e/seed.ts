@@ -2621,7 +2621,7 @@ export function seed(root: string, now = Date.now()): void {
             workspace: tokensLane,
             branch: `wf/${COSTLY.id}/tokens`,
             check: { taskId: cost('tokens-try2-check') },
-            tries: [{ taskId: cost('tokens'), check: { taskId: cost('tokens-check') }, cause: 'nudge' }],
+            tries: [{ taskId: cost('tokens'), check: { taskId: cost('tokens-check') }, cause: 'continue' }],
           },
           palette: { taskId: cost('palette'), workspace: paletteLane, branch: `wf/${COSTLY.id}/palette` },
         },

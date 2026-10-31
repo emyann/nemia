@@ -281,7 +281,7 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
       assert.deepEqual(raced, [{ filed: 0, asksKept: true }], 'a pass run while it still stops files nothing and sets no ask aside');
       assert.deepEqual(
         askOf(runs.session.id, 'work', 2),
-        { step: 'work', try: 2, mode: 'nudge', interrupted: task('session'), at: new Date().toISOString() },
+        { step: 'work', try: 2, mode: 'continue', interrupted: task('session'), at: new Date().toISOString() },
         'a session is nudged',
       );
       assert.equal(askOf(runs.checking.id, 'work', 2).mode, 'recheck', 'a check is run again');
@@ -367,7 +367,7 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
       const stopped = stops.find((x) => x.taskId.startsWith(`${runs.session.id}-`))!.taskId;
       const resumed = readRun(runs.session.id).steps.work;
       assert.notEqual(resumed.taskId, stopped, "the session's try 2 filed");
-      assert.deepEqual(resumed.tries, [{ taskId: stopped, cause: 'nudge', paused: true }]);
+      assert.deepEqual(resumed.tries, [{ taskId: stopped, cause: 'continue', paused: true }]);
       const stoppedAttempt = b.tasks.get(resumed.tries[0].taskId)!.attempt;
       assert.equal(b.tasks.get(resumed.taskId!)!.spec.resumeFrom, stoppedAttempt?.nativeId, 'continuing the session it stopped');
       const checked = stops.find((x) => x.taskId.startsWith(`${runs.checking.id}-`))!.taskId;

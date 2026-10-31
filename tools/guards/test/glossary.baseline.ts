@@ -35,6 +35,12 @@
  * for what a loop's end writes (`acceptRun`, `acceptAsk`, the `accept-<step>-<n>` file), and the word's other senses (a trust accepted,
  * a level's words). The decision's `accept` offer label is `approve` since slice B, as its `merge` is `refresh`.
  *
+ * `nudge`, on the day decision 7's slice C retired it (`Try` in the run core's table): a retry's mode and a try's cause are `continue`.
+ * What is left is the former spelling kept on purpose — `FORMER_MODES` (`retry-ask.ts`), through which a record and an ask file read, and
+ * `RENAMED_FLAGS` and `RENAMED_VALUES` (`command.ts`), through which `nemia retry --nudge` and an api body's `"mode": "nudge"` are
+ * taken with a hint. It stays while a record, an ask file or a caller may still say it. The runtime's own `nudge` is another sense,
+ * outside the table's paths.
+ *
  * `claude-detached` and `claude-bg`, on the day every Claude Code session moved onto the Agent SDK: each a harness name a former
  * runtime took, said now only by the refusal that names the fix to a task or an engine still giving it (`harness-refusal.ts`,
  * `options.ts`). They stay while a caller may still write them.
@@ -54,6 +60,10 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/round/round.verb.ts': 2,
     'packages/agent-orchestrator/src/status/status.ts': 1,
     'packages/agent-orchestrator/src/trust/trust.ts': 1,
+  },
+  nudge: {
+    'packages/agent-orchestrator/src/command/command.ts': 4,
+    'packages/agent-orchestrator/src/retry/retry-ask.ts': 2,
   },
   needshuman: {
     'packages/agent-orchestrator/src/former-reason/former-reason.ts': 2,

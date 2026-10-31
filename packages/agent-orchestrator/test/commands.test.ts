@@ -107,7 +107,7 @@ test('each command is served on the api where it was before the table, the lift 
         'retry',
         [
           { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
-          { method: 'POST', path: '/api/runs/:runId/round', status: 202, sets: { round: true, mode: 'nudge' } },
+          { method: 'POST', path: '/api/runs/:runId/round', status: 202, sets: { round: true, mode: 'continue' } },
         ],
       ],
       [

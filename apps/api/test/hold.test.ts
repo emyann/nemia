@@ -425,9 +425,9 @@ test('a person holds a run until another lands: the list, the page and the decis
     async () => {
       const cases: Array<[string, string, unknown]> = [
         [GATE, `/api/runs/${GATE}/steps/plan/approve`, { message: 'Ship it.' }],
-        [GATE, `/api/runs/${GATE}/steps/plan/retry`, { mode: 'nudge', message: 'Store it first.' }],
-        [BLOCKS, `/api/runs/${BLOCKS}/steps/implement/retry`, { mode: 'nudge', message: 'Warm ones.' }],
-        [BUDGET, `/api/runs/${BUDGET}/steps/palette/retry`, { mode: 'nudge', message: 'Warm ones.', budget: 5 }],
+        [GATE, `/api/runs/${GATE}/steps/plan/retry`, { mode: 'continue', message: 'Store it first.' }],
+        [BLOCKS, `/api/runs/${BLOCKS}/steps/implement/retry`, { mode: 'continue', message: 'Warm ones.' }],
+        [BUDGET, `/api/runs/${BUDGET}/steps/palette/retry`, { mode: 'continue', message: 'Warm ones.', budget: 5 }],
         [LOOP, `/api/runs/${LOOP}/round`, { step: 'review' }],
         [LOOP, `/api/runs/${LOOP}/steps/review/accept`, { message: 'The findings are follow-up work.' }],
       ];
@@ -478,7 +478,7 @@ test('a person holds a run until another lands: the list, the page and the decis
         assert.equal(runs.get(id)!.moving, false, `${id}: a run that would wait on you unheld moves no more for being held`);
 
       const ask = path.join(root, 'runs', `${BLOCKS}.asks`, 'retry-implement-2');
-      write(ask, JSON.stringify({ mode: 'nudge' }));
+      write(ask, JSON.stringify({ mode: 'continue' }));
       try {
         const page = await detail(BLOCKS);
         assert.equal(

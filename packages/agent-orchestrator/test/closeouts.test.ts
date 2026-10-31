@@ -315,7 +315,7 @@ test('an unsigned step is nudged once, then waits on you', async (t) => {
     assert.deepEqual(await awaiting(id), { outcome: 'waiting', unsigned: ['implement'], failed: [] });
   });
   await s.test('a nudge a person asks for is told the last try ended without its closeout', async () => {
-    await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'nudge' }));
+    await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue' }));
     assert.deepEqual((await pass(id)).tried, ['implement']);
     const brief = briefOf(readRun(id).steps.implement.taskId!);
     assert.ok(brief.includes('The last try ended without the closeout the run asked for'), brief);
@@ -350,7 +350,7 @@ test('the run nudges no end that is not a missing statement', async (t) => {
     assert.deepEqual([(await pass(id)).filed, (await pass(id)).unreachable], [[], ['review']]);
     assert.deepEqual(await listed(id), { statuses: ['failed', 'pending'], onYou: [] });
     assert.deepEqual(await awaiting(id), { outcome: 'failed', unsigned: [], failed: ['implement'] });
-    await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'nudge' }));
+    await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue' }));
     assert.deepEqual((await pass(id)).tried, ['implement']);
     const brief = briefOf(readRun(id).steps.implement.taskId!);
     assert.ok(brief.includes("The last try's session ended `failed` before it signed off."), brief);
@@ -427,7 +427,7 @@ test('files a closeout names', async (t) => {
   await s.test(
     "a person's nudge whose closeout names files all there is checked, and the record holds nothing of the closeouts before",
     async () => {
-      await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'nudge' }));
+      await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue' }));
       assert.deepEqual((await pass(id)).tried, ['implement']);
       for (const file of [kept(), removed()]) fs.writeFileSync(file, 'png');
       stage.board().settle(`${task}-try3`, 'succeeded', signed(kept(), removed()));
@@ -508,7 +508,7 @@ test("what a run accepts of a closeout's files, and what it refuses", async (t) 
       stage.board().settle(task, 'succeeded', signed());
       assert.deepEqual((await pass(id)).checked, ['implement']);
       stage.board().settle(`${task}-check`, 'failed', undefined, 1);
-      await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'nudge' }));
+      await stage.runWith(stage.board().e, retryRun(id, 'implement', { mode: 'continue' }));
       await pass(id);
       stage
         .board()

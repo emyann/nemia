@@ -207,7 +207,7 @@ test("each family of writes: its answer decoded, an answer unread refused with w
     const words = 'plan is not waiting at its gate: it is running.';
     answering(t, { error: words }, 422);
     for (const ask of [
-      askTry('r-1', 'plan', { mode: 'nudge' }),
+      askTry('r-1', 'plan', { mode: 'continue' }),
       askRound('r-1', {}),
       approveStep('r-1', 'plan', {}),
       sayToStep('r-1', 'plan', 'hi'),

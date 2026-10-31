@@ -557,7 +557,7 @@ function askRefusal(refused: string, held: unknown): string {
   return `it asks for no mode nemia retry knows (${JSON.stringify(fieldOf(held, 'mode'))})`;
 }
 
-/** An ask file's JSON with its mode in the word it has now (`upgradeMode`), before its schema reads it: an older ask says `nudge`. */
+/** An ask file's JSON with its mode in the word it has now (`upgradeMode`), before its schema reads it: an older ask says a former mode. */
 const upgradeAsk = (read: unknown): unknown =>
   typeof read === 'object' && read !== null && !Array.isArray(read) && Object.hasOwn(read, 'mode')
     ? { ...read, mode: upgradeMode(Reflect.get(read, 'mode')) }

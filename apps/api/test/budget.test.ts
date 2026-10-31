@@ -122,7 +122,7 @@ write(
       tokens: {
         taskId: 't-tokens-2',
         check: { taskId: 't-tokens-2-check' },
-        tries: [{ taskId: 't-tokens-1', check: { taskId: 't-tokens-1-check' }, cause: 'nudge' }],
+        tries: [{ taskId: 't-tokens-1', check: { taskId: 't-tokens-1-check' }, cause: 'continue' }],
       },
     },
   }),
@@ -273,14 +273,14 @@ test("a raise the package refuses, by POST …/retry and POST …/round: its sta
     "REFUSED at shipped defaults: a try's budget that is not an amount — 0, below it, a word — is a 400; a budget on a recheck a 422",
     async () => {
       for (const budget of [0, -1]) {
-        const how: RetryHow = { mode: 'nudge', budget };
+        const how: RetryHow = { mode: 'continue', budget };
         const res = await askTry('tokens', how);
         assert.equal(res.status, 400, String(budget));
         const { error } = (await res.json()) as Refused;
         assert.ok(error.startsWith(`--budget ${budget} is not an amount.`), error);
       }
       for (const budget of ['five', '5', null]) {
-        const res = await askTry('tokens', { mode: 'nudge', budget });
+        const res = await askTry('tokens', { mode: 'continue', budget });
         assert.equal(res.status, 400, JSON.stringify(budget));
         const { error } = (await res.json()) as Refused;
         assert.ok(error.startsWith('`budget` is the cap to raise to'), error);
@@ -303,9 +303,9 @@ test("a raise the package refuses, by POST …/retry and POST …/round: its sta
     "REFUSED at shipped defaults: a try's raise not above what the step has cost, none, or of a step not held on its try, is a 409 in `retryRefusal`'s words, verbatim",
     async () => {
       const refusals: Array<[RetryHow, string[]]> = [
-        [{ mode: 'nudge', budget: 4 }, ['--budget 4 is not above $4.25', "what tokens's tries have cost"]],
+        [{ mode: 'continue', budget: 4 }, ['--budget 4 is not above $4.25', "what tokens's tries have cost"]],
         [{ mode: 'fresh', budget: 4.25 }, ['--budget 4.25 is not above $4.25', "what tokens's tries have cost"]],
-        [{ mode: 'nudge' }, ['tokens is over budget: ', 'its tries have cost $4.25 of its $3 budget', 'until a person raises the cap.']],
+        [{ mode: 'continue' }, ['tokens is over budget: ', 'its tries have cost $4.25 of its $3 budget', 'until a person raises the cap.']],
       ];
       for (const [how, [start, ...facts]] of refusals) {
         const res = await askTry('tokens', how);
@@ -315,9 +315,9 @@ test("a raise the package refuses, by POST …/retry and POST …/round: its sta
         assert.ok(error.startsWith(start), error);
         for (const fact of facts) assert.ok(error.includes(fact), `${fact} in ${error}`);
       }
-      const implement = await askTry('implement', { mode: 'nudge', budget: 5 });
+      const implement = await askTry('implement', { mode: 'continue', budget: 5 });
       assert.equal(implement.status, 409, "a raise of a step that is not held on its try: implement goes again with review's round");
-      assert.equal(((await implement.json()) as Refused).error, await retryRefuses('implement', { mode: 'nudge', budget: 5 }));
+      assert.equal(((await implement.json()) as Refused).error, await retryRefuses('implement', { mode: 'continue', budget: 5 }));
       nothingWritten('a raise the package refuses');
     },
   );
@@ -509,7 +509,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       assert.equal(review.budget, null, 'review has no `budget:`');
       assert.deepEqual(
         tokens.raise,
-        { by: 'retry', above: 4.25, said: '$4.25', modes: ['nudge', 'fresh', 'recheck'], own: 'failed (check)' },
+        { by: 'retry', above: 4.25, said: '$4.25', modes: ['continue', 'fresh', 'recheck'], own: 'failed (check)' },
         'tokens is raised with its try, in the ways the package takes it, its check again among them, which needs no raise, and with how it ended on its own work',
       );
       assert.ok(review.raise);
@@ -577,7 +577,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
           JSON.stringify(body.commands),
         );
         assert.match(
-          await retryRefuses('tokens', { mode: 'nudge', budget: 10 }),
+          await retryRefuses('tokens', { mode: 'continue', budget: 10 }),
           /^r-cost was pruned at 2026-09-15T07:00:00\.000Z: /,
           "each raise is refused in the verb's own words, which the decision does not contradict",
         );
@@ -600,11 +600,11 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
   await s.test(
     "a raise as the board sends it is the package's ask: a try's and a round's, 202, the budget on the ask and nothing else written — and the step waits on nobody",
     async () => {
-      const res = await askTry('tokens', { mode: 'nudge', budget: 5 });
+      const res = await askTry('tokens', { mode: 'continue', budget: 5 });
       assert.equal(res.status, 202, await res.clone().text());
       assert.deepEqual(await res.json(), { try: 3, file: askFile(R, 'tokens', 3), stopFirst: false });
       const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(R, 'tokens', 3), 'utf8'));
-      assert.deepEqual(written, { step: 'tokens', try: 3, mode: 'nudge', budget: 5 });
+      assert.deepEqual(written, { step: 'tokens', try: 3, mode: 'continue', budget: 5 });
       assert.ok(!Number.isNaN(Date.parse(when)), when);
 
       const rounded = await askRound({ step: 'review', budget: 3 });
@@ -647,8 +647,8 @@ test('steps past their budget on their own work: one that signed off blocked is 
         'its word is over budget however it ended: how it ended is on the raise',
       );
       assert.deepEqual(run.waitingOnYou, ['palette', 'lint']);
-      assert.deepEqual(palette.raise, { by: 'retry', above: 1.5, said: '$1.50', modes: ['nudge', 'fresh'], own: 'blocked' });
-      assert.deepEqual(lint.raise, { by: 'retry', above: 1.2, said: '$1.20', modes: ['nudge', 'fresh', 'recheck'], own: 'failed (check)' });
+      assert.deepEqual(palette.raise, { by: 'retry', above: 1.5, said: '$1.50', modes: ['continue', 'fresh'], own: 'blocked' });
+      assert.deepEqual(lint.raise, { by: 'retry', above: 1.2, said: '$1.20', modes: ['continue', 'fresh', 'recheck'], own: 'failed (check)' });
       assert.equal(palette.needs, PALETTE_NEEDS, "its question is still the closeout's");
       assert.equal(
         (await runWith(engine(), decideRun(R2))).answering.palette,
@@ -663,7 +663,7 @@ test('steps past their budget on their own work: one that signed off blocked is 
     async () => {
       const refusals: Array<[RetryHow, string[]]> = [
         [
-          { mode: 'nudge', message: answer },
+          { mode: 'continue', message: answer },
           ['palette is over budget: ', 'its tries have cost $1.50 of its $1 budget', 'until a person raises the cap.'],
         ],
         [{ mode: 'fresh', message: answer, budget: 1.5 }, ['--budget 1.5 is not above $1.50', "what palette's tries have cost"]],
@@ -683,13 +683,13 @@ test('steps past their budget on their own work: one that signed off blocked is 
   await s.test(
     'the answer and the raise, as the board sends them, are one ask, 202; the refused check is rechecked with no budget',
     async () => {
-      const answered = await askTry('palette', { mode: 'nudge', budget: 2, message: answer }, BOARD, R2);
+      const answered = await askTry('palette', { mode: 'continue', budget: 2, message: answer }, BOARD, R2);
       assert.equal(answered.status, 202, await answered.clone().text());
       assert.deepEqual(await answered.json(), { try: 2, file: askFile(R2, 'palette', 2), stopFirst: false });
       const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(R2, 'palette', 2), 'utf8'));
       assert.deepEqual(
         written,
-        { step: 'palette', try: 2, mode: 'nudge', message: answer, budget: 2 },
+        { step: 'palette', try: 2, mode: 'continue', message: answer, budget: 2 },
         'one ask, the next try filed with it',
       );
       assert.ok(!Number.isNaN(Date.parse(when)), when);

@@ -141,7 +141,7 @@ test('a step answered five times over keeps working: each answer a try of the sa
     );
     assert.deepEqual((await runWith(e, list(e, readRun(run.id)))).waitingOnYou, ['supervise'], `answer ${n}: it waits on you`);
 
-    await runWith(e, retryRun(run.id, 'supervise', { mode: 'nudge', message: `yes, merge r-${n}` }));
+    await runWith(e, retryRun(run.id, 'supervise', { mode: 'continue', message: `yes, merge r-${n}` }));
     const filed = await runWith(e, advanceRun(readRun(run.id)));
     const next = `${run.id}-supervise-try${n + 1}`;
     assert.deepEqual(filed.tried, ['supervise'], `answer ${n} files try ${n + 1}`);
@@ -173,7 +173,7 @@ test('a pass over a step answered again and again reads what it is working on, n
     const taskId = n === 1 ? `${run.id}-supervise` : `${run.id}-supervise-try${n}`;
     settle(taskId, 'succeeded', { outcome: 'blocked', summary: `round ${n}`, artifacts: [], needs: 'Merge it?' });
     await runWith(e, advanceRun(readRun(run.id)));
-    await runWith(e, retryRun(run.id, 'supervise', { mode: 'nudge', message: `yes (${n})` }));
+    await runWith(e, retryRun(run.id, 'supervise', { mode: 'continue', message: `yes (${n})` }));
     await runWith(e, advanceRun(readRun(run.id)));
   };
 

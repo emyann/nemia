@@ -262,7 +262,7 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
   );
 
   await t.test('REFUSED while the work is being sent back: approving an ending would take a result the objection is about', () => {
-    const ask: RetryAsk = { step: 'review', try: 2, mode: 'nudge', message: 'the flag is not stored', at: '2026-09-17T09:00:00.000Z' };
+    const ask: RetryAsk = { step: 'review', try: 2, mode: 'continue', message: 'the flag is not stored', at: '2026-09-17T09:00:00.000Z' };
     assert.equal(
       approvalRefusal(ENDS, atEnd(), 'ship', undefined, DONE, signedDone, asked, () => undefined, [ask]),
       'try 2 of review is asked for (--continue, at 2026-09-17T09:00:00.000Z), and ship acts on what it changes: approving now would take the result that ask objects to. ' +
@@ -277,9 +277,9 @@ test("a send-back at an ending's gate goes to the work, and a try of the ending 
     () => {
       const review = ENDS[1];
       const at = retryable(review, atEnd(), DONE, signedDone, asked, ENDS);
-      assert.deepEqual([at.status, at.modes, at.sendsBack], ['unverified', ['nudge', 'fresh'], true]);
+      assert.deepEqual([at.status, at.modes, at.sendsBack], ['unverified', ['continue', 'fresh'], true]);
       assert.equal(
-        retryRefusal(ENDS, atEnd(), 'review', { mode: 'nudge' }, DONE, signedDone, asked),
+        retryRefusal(ENDS, atEnd(), 'review', { mode: 'continue' }, DONE, signedDone, asked),
         "ship is at its gate, not review: ship ends the run in the repository's own checkout, nothing of it has run, and the send-back from that gate goes to review, the work it would act on. " +
           'A try with no words tells its session nothing to change, so it would sign off as it did. Say what to change: nemia retry r-1 review --message "<objection>" — or approve the ending, which is what files it: nemia approve r-1 ship.',
         'the step at the gate is ship, not review, and both commands it names are honoured: nemia approve r-1 review is refused, review has no gate',
@@ -297,7 +297,7 @@ test("a send-back at an ending's gate goes to the work, and a try of the ending 
         'the command it does not name',
       );
       assert.equal(
-        retryRefusal(ENDS, atEnd(), 'review', { mode: 'nudge', message: 'the flag is not stored' }, DONE, signedDone, asked),
+        retryRefusal(ENDS, atEnd(), 'review', { mode: 'continue', message: 'the flag is not stored' }, DONE, signedDone, asked),
         null,
       );
       const filed = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
@@ -324,7 +324,7 @@ test("a send-back at an ending's gate goes to the work, and a try of the ending 
         'there is no try of a step nothing of which has run',
       );
       assert.equal(
-        retryRefusal(ENDS, atEnd(), 'ship', { mode: 'nudge' }, DONE, signedDone, asked),
+        retryRefusal(ENDS, atEnd(), 'ship', { mode: 'continue' }, DONE, signedDone, asked),
         "ship is at its gate, and nothing of it has run: it ends the run in the repository's own checkout, and your approval is what files it, so there is no try of it to replace. " +
           'Approve it: nemia approve r-1 ship — or send the work back: nemia retry r-1 review --message "<objection>".',
       );
@@ -337,7 +337,7 @@ test("a send-back at an ending's gate goes to the work, and a try of the ending 
       );
       const ran = atEnd({ steps: { ship: { taskId: 't3', workspace: '/repo', branch: 'main' } }, approvals: [approval('ship', 1)] });
       assert.equal(
-        retryRefusal(ENDS, ran, 'ship', { mode: 'nudge' }, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'running' }), signedDone, asked),
+        retryRefusal(ENDS, ran, 'ship', { mode: 'continue' }, phases({ t1: 'succeeded', t2: 'succeeded', t3: 'running' }), signedDone, asked),
         `ship is still running, so there is nothing to try again until it ends. Wait for it: nemia ls r-1 (or stop the run: nemia cancel r-1).`,
         'once approved and filed, it is a step like any other: its own status says what there is to say',
       );
@@ -541,7 +541,7 @@ test("an ending's gate does not hold while the work goes round again or is being
       const ask: RetryAsk = {
         step: 'review',
         try: 2,
-        mode: 'nudge',
+        mode: 'continue',
         message: 'sub subtracts the wrong way round',
         at: '2026-09-17T09:00:00.000Z',
       };
@@ -780,15 +780,15 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
               workspace: '/repo',
               branch: 'main',
               tries: [
-                { taskId: 't0', cause: 'nudge' },
-                { taskId: 't0b', cause: 'nudge' },
-                { taskId: 't0c', cause: 'nudge' },
+                { taskId: 't0', cause: 'continue' },
+                { taskId: 't0b', cause: 'continue' },
+                { taskId: 't0c', cause: 'continue' },
               ],
             },
           },
         },
       );
-      const briefing: RetryBriefing = { try: 4, by: 'ask', mode: 'nudge', resumed: false, status: 'blocked', message: 'Merge it.' };
+      const briefing: RetryBriefing = { try: 4, by: 'ask', mode: 'continue', resumed: false, status: 'blocked', message: 'Merge it.' };
       const brief = composeBrief(watcher, r, [watcher], () => undefined, FILES, undefined, briefing);
       assert.match(
         brief,

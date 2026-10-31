@@ -294,7 +294,7 @@ test('a run held until another lands: said by every screen with why and who, not
         refusedNaming('Conflict', held, 'an approval would release', `nemia hold ${atGate.id} --off`),
       );
       await assert.rejects(
-        stage.runWith(b.e, retryRun(atGate.id, 'implement', { mode: 'nudge', message: 'change it' })),
+        stage.runWith(b.e, retryRun(atGate.id, 'implement', { mode: 'continue', message: 'change it' })),
         refusedNaming('Conflict', held, 'a retry would release'),
       );
       await aPass(b.e);
@@ -377,7 +377,7 @@ test('a run held until another lands: said by every screen with why and who, not
       assert.equal(readRun(asking.id).steps.implement.taskId, `${asking.id}-implement`, 'the step and its closeout are untouched');
       const asks = path.join(ROOT, 'runs', `${asking.id}.asks`);
       fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
+      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
       const filings = [...b.filings];
       const pass = await tick(b, asking.id);
       assert.deepEqual(

@@ -50,7 +50,7 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Par
     },
   );
 /** A person's ask for implement's try `n`. */
-const askFor = (n: number, mode: RetryMode = 'nudge', model?: string): RetryAsk => ({
+const askFor = (n: number, mode: RetryMode = 'continue', model?: string): RetryAsk => ({
   step: 'implement',
   try: n,
   mode,
@@ -92,14 +92,14 @@ test("sessionModel: a continued try runs on the model its session was started on
   const on = (...tries: EarlierTry[]): StepRecord => ({ taskId: 'now', tries });
   const rows: Array<[string, Workflow, StepRecord | undefined, string | undefined]> = [
     ["the first try: the step's model", OPUS, undefined, 'opus'],
-    ['a step with no model: the harness default, every try', step('implement'), on({ taskId: 'a', cause: 'nudge' }), undefined],
+    ['a step with no model: the harness default, every try', step('implement'), on({ taskId: 'a', cause: 'continue' }), undefined],
     ["a `--model` try's model", OPUS, on({ taskId: 'a', cause: 'fresh', model: 'sonnet' }), 'sonnet'],
     [
       "a `--model` try's, past nudges, rounds, retries and rechecks",
       OPUS,
       on(
         { taskId: 'a', cause: 'fresh', model: 'sonnet' },
-        { taskId: 'b', cause: 'nudge' },
+        { taskId: 'b', cause: 'continue' },
         { taskId: 'c', cause: 'round' },
         { taskId: 'd', cause: 'retries' },
         { taskId: 'e', cause: 'recheck' },
@@ -109,7 +109,7 @@ test("sessionModel: a continued try runs on the model its session was started on
     [
       "a bare `--fresh` after it goes back to the step's",
       OPUS,
-      on({ taskId: 'a', cause: 'fresh', model: 'sonnet' }, { taskId: 'b', cause: 'fresh' }, { taskId: 'c', cause: 'nudge' }),
+      on({ taskId: 'a', cause: 'fresh', model: 'sonnet' }, { taskId: 'b', cause: 'fresh' }, { taskId: 'c', cause: 'continue' }),
       'opus',
     ],
   ];
@@ -124,7 +124,7 @@ test('nextTry: the try a step moves behind', async (t) => {
     check: { taskId: 'r-1-implement-check' },
   };
   await t.test('a nudge files a new task behind the old: the step keeps its workspace and branch', () => {
-    assert.deepEqual(nextTry(record, { step: 'implement', try: 2, mode: 'nudge', by: 'retries' }, 'r-1-implement-try2'), {
+    assert.deepEqual(nextTry(record, { step: 'implement', try: 2, mode: 'continue', by: 'retries' }, 'r-1-implement-try2'), {
       taskId: 'r-1-implement-try2',
       workspace: '/wt',
       branch: 'wf/r-1/implement',
@@ -150,8 +150,8 @@ test('nextTry: the try a step moves behind', async (t) => {
     assert.equal(record.tries, undefined, 'the record it was given is not written into');
   });
   await t.test('the try a pause filed keeps its mode, is marked paused, and is said as the pause', () => {
-    const paused = nextTry(pauseRun('t1').steps.implement, { step: 'implement', try: 2, mode: 'nudge', by: 'pause' }, 't2');
-    assert.deepEqual(paused.tries, [{ taskId: 't1', cause: 'nudge', paused: true }]);
+    const paused = nextTry(pauseRun('t1').steps.implement, { step: 'implement', try: 2, mode: 'continue', by: 'pause' }, 't2');
+    assert.deepEqual(paused.tries, [{ taskId: 't1', cause: 'continue', paused: true }]);
     assert.equal(tryNote(IMPLEMENT, paused), 'try 2, continued after nemia pause --now');
   });
 });
@@ -173,7 +173,7 @@ const pauseRun = (taskId: string, check?: string): Run => ({
 });
 
 /** The ask a pause writes for try 2 of implement: a nudge of the session it stopped, or a recheck of the check. */
-const pauseAsk = (interrupted: string, mode: 'nudge' | 'recheck' = 'nudge'): RetryAsk => ({
+const pauseAsk = (interrupted: string, mode: 'continue' | 'recheck' = 'continue'): RetryAsk => ({
   step: 'implement',
   try: 2,
   mode,
@@ -182,7 +182,7 @@ const pauseAsk = (interrupted: string, mode: 'nudge' | 'recheck' = 'nudge'): Ret
 });
 
 /** A person's ask of the same try and mode: what is due where a pause's is not, so each fixture refuses on the rule alone. */
-const ownAsk = (mode: 'nudge' | 'recheck' = 'nudge'): RetryAsk => ({ step: 'implement', try: 2, mode, at: '2026-10-04T12:00:00Z' });
+const ownAsk = (mode: 'continue' | 'recheck' = 'continue'): RetryAsk => ({ step: 'implement', try: 2, mode, at: '2026-10-04T12:00:00Z' });
 
 const pauseDue = (r: Run, phaseOf: (id: string) => TaskPhase, ask: RetryAsk, spendOf?: SpendOf, verdict?: number) =>
   retriesDue(
@@ -203,7 +203,7 @@ const overOne: SpendOf = (id) => (id === 't1' ? { usd: 2, measured: 1, unmeasure
 test('a pause ask (retriesDue, pauseAskVoid): due only on the very task it stopped, void once it ended otherwise', async (t) => {
   await t.test('due on the session it stopped, once settled stopped, on the pause word and with no stop first', () => {
     const p = phases({ t1: 'stopped' });
-    assert.deepEqual(pauseDue(pauseRun('t1'), p, pauseAsk('t1')), [{ step: 'implement', try: 2, mode: 'nudge', by: 'pause' }]);
+    assert.deepEqual(pauseDue(pauseRun('t1'), p, pauseAsk('t1')), [{ step: 'implement', try: 2, mode: 'continue', by: 'pause' }]);
     assert.equal(pauseAskVoid(IMPLEMENT, pauseRun('t1'), pauseAsk('t1'), p), false);
   });
   await t.test('not due while its session still runs, and not void: a person ask would stop it first', () => {
@@ -262,22 +262,22 @@ test('dueNote: what `nemia ls` says of a try due, by who asked for it', async (t
       'the run sign-off nudge',
       IMPLEMENT,
       r,
-      { step: 'implement', try: 2, mode: 'nudge', by: 'signoff' },
+      { step: 'implement', try: 2, mode: 'continue', by: 'signoff' },
       ['try 2 due', 'ended without its closeout'],
     ],
     [
       'the sign-off nudge of a closeout that named a file the run lacks',
       IMPLEMENT,
       lacking,
-      { step: 'implement', try: 2, mode: 'nudge', by: 'signoff' },
+      { step: 'implement', try: 2, mode: 'continue', by: 'signoff' },
       ['named a file the run does not have'],
     ],
-    ['a pause ask', IMPLEMENT, r, { step: 'implement', try: 2, mode: 'nudge', by: 'pause' }, ['try 2 due', 'nemia pause --now']],
+    ['a pause ask', IMPLEMENT, r, { step: 'implement', try: 2, mode: 'continue', by: 'pause' }, ['try 2 due', 'nemia pause --now']],
     [
       'a try `retries:` files',
       checked,
       r,
-      { step: 'implement', try: 2, mode: 'nudge', by: 'retries' },
+      { step: 'implement', try: 2, mode: 'continue', by: 'retries' },
       ['try 2 due', 'retries: 2, 0 spent'],
     ],
   ];
@@ -290,7 +290,7 @@ const refusalOverPause = (r: Run, phaseOf: (id: string) => TaskPhase, asks: read
     [{ ...IMPLEMENT, ...(spendOf ? { budget: 1 } : {}) }],
     r,
     'implement',
-    { mode: 'nudge', ...(budget !== undefined ? { budget } : {}) },
+    { mode: 'continue', ...(budget !== undefined ? { budget } : {}) },
     phaseOf,
     undefined,
     undefined,
@@ -304,7 +304,7 @@ const refusalOverPause = (r: Run, phaseOf: (id: string) => TaskPhase, asks: read
 const refusalOf = (
   r: Run,
   p: Record<string, TaskPhase>,
-  how: RetryHow = { mode: 'nudge' },
+  how: RetryHow = { mode: 'continue' },
   asks: RetryAsk[] = [],
   name = 'implement',
   verdict: Verdict | undefined = 'unfinished',
@@ -330,7 +330,7 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
     );
   });
   await t.test('a step the run tries again itself', () => {
-    const said = refusalOf(onTry(), { t1: 'succeeded', c1: 'failed' }, { mode: 'nudge' }, [], 'implement', 1);
+    const said = refusalOf(onTry(), { t1: 'succeeded', c1: 'failed' }, { mode: 'continue' }, [], 'implement', 1);
     names(said, 'the run tries implement', '`retries: 2` has 2 left', 'try 2', 'nemia ls r-1');
     names(said, 'the run tries implement again itself');
   });
@@ -339,7 +339,7 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
       STEPS,
       failedRun(),
       'implement',
-      { mode: 'nudge' },
+      { mode: 'continue' },
       phases({ t1: 'failed' }),
       () => undefined,
       () => 'unsigned',
@@ -387,22 +387,22 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
     names(denied, '--recheck', 'implement was denied a call', 'nemia retry r-1 implement (or --fresh)');
   });
   await t.test('a step the workflow does not have', () => {
-    assert.match(refusalOf(onTry(), waiting, { mode: 'nudge' }, [], 'deploy')!, /no step "deploy" — its steps are implement, review/);
+    assert.match(refusalOf(onTry(), waiting, { mode: 'continue' }, [], 'deploy')!, /no step "deploy" — its steps are implement, review/);
   });
   await t.test('a step not filed yet', () => {
     names(
-      refusalOf(failedRun(), { t1: 'running' }, { mode: 'nudge' }, [], 'review', 'unfinished', STEPS),
+      refusalOf(failedRun(), { t1: 'running' }, { mode: 'continue' }, [], 'review', 'unfinished', STEPS),
       'review has not been filed yet',
       'nemia ls r-1',
     );
   });
   await t.test('a step that signed off blocked whose session has not ended', () => {
-    const said = retryRefusal(RETRIED, failedRun(), 'implement', { mode: 'nudge' }, phases({ t1: 'running' }), signedBlocked, asked);
+    const said = retryRefusal(RETRIED, failedRun(), 'implement', { mode: 'continue' }, phases({ t1: 'running' }), signedBlocked, asked);
     assert.match(said!, /signed off blocked and its session has not ended/);
   });
   await t.test('a `--model` an `auto` step would drop', () => {
     names(
-      refusalOf(failedRun(), { t1: 'failed' }, { mode: 'nudge', model: 'haiku' }, [], 'implement', 'unfinished', STEPS),
+      refusalOf(failedRun(), { t1: 'failed' }, { mode: 'continue', model: 'haiku' }, [], 'implement', 'unfinished', STEPS),
       '`--model haiku`',
       'no `permissionMode:`',
       'nemia retry r-1 implement --model sonnet',
@@ -419,7 +419,7 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
       'without --model: nemia retry r-1 implement.',
     );
     names(
-      refusalOf(failedRun(), { t1: 'failed' }, { mode: 'nudge', budget: 5 }, [], 'implement', 'unfinished', remote),
+      refusalOf(failedRun(), { t1: 'failed' }, { mode: 'continue', budget: 5 }, [], 'implement', 'unfinished', remote),
       '`--budget 5`',
       '`harness: a2a:reviewer`',
       'without --budget: nemia retry r-1 implement.',
@@ -427,20 +427,20 @@ test('retryRefusal: what `nemia retry` refuses, and what it says to do instead',
   });
   await t.test('a `--budget` on a step with no `budget:`, after an ask already waiting', () => {
     names(
-      refusalOf(onTry(), waiting, { mode: 'nudge', budget: 5 }),
+      refusalOf(onTry(), waiting, { mode: 'continue', budget: 5 }),
       'implement has no `budget:`',
       'without --budget: nemia retry r-1 implement.',
     );
-    const waited = refusalOf(onTry(), waiting, { mode: 'nudge', budget: 5 }, [askFor(2)]);
+    const waited = refusalOf(onTry(), waiting, { mode: 'continue', budget: 5 }, [askFor(2)]);
     names(waited, 'try 2 of implement is already asked for', '(--continue, at 2026-09-13T10:00:00.000Z)', 'nemia ls r-1');
     assert.ok(!waited!.includes('`budget:`'), 'an ask already waiting is said first, before the --budget the step would refuse');
   });
   await t.test('let through: each way a step waiting on you can be tried', () => {
-    for (const mode of ['nudge', 'fresh', 'recheck'] as const)
+    for (const mode of ['continue', 'fresh', 'recheck'] as const)
       assert.equal(refusalOf(onTry(), waiting, { mode }), null, `${mode}: waiting on you, it may be asked each way it can be tried`);
   });
   await t.test('let through: a refusal past retries, a stopped session, a blocked and settled step', () => {
-    assert.equal(refusalOf(onTry(SPENT), { t1: 'succeeded', c1: 'failed' }, { mode: 'nudge' }, [], 'implement', 1), null);
+    assert.equal(refusalOf(onTry(SPENT), { t1: 'succeeded', c1: 'failed' }, { mode: 'continue' }, [], 'implement', 1), null);
     assert.equal(refusalOf(failedRun(), { t1: 'stopped' }), null, 'a session the harness stopped');
     const settled = retryRefusal(RETRIED, failedRun(), 'implement', { mode: 'fresh' }, phases({ t1: 'succeeded' }), signedBlocked, asked);
     assert.equal(settled, null, 'blocked, and settled');
@@ -453,7 +453,7 @@ test('retryRefusal of a `--message`: refused by name before anything about the r
     retryRefusal(RETRIED, r, 'implement', how, phases(p), signedDone, asked, () => 'unfinished');
   await t.test('an empty answer', () => {
     for (const message of ['', '   ', '\n\t'])
-      names(refusal({ mode: 'nudge', message }), '--message is empty', 'nemia retry r-1 implement --message "<answer>"');
+      names(refusal({ mode: 'continue', message }), '--message is empty', 'nemia retry r-1 implement --message "<answer>"');
   });
   await t.test('one on --recheck', () => {
     names(
@@ -472,7 +472,7 @@ test('retryRefusal of a `--message`: refused by name before anything about the r
     assert.match(messageRefusal({ mode: 'recheck', message: 'x' })!, /\(nemia retry <runId> <step> --recheck\)/);
   });
   await t.test('let through: each way that files a session takes a message, on a step that did not sign off blocked', () => {
-    for (const how of [{ mode: 'nudge' }, { mode: 'fresh' }, { mode: 'fresh', model: 'opus' }] as const)
+    for (const how of [{ mode: 'continue' }, { mode: 'fresh' }, { mode: 'fresh', model: 'opus' }] as const)
       assert.equal(refusal({ ...how, message: 'main has the fix for the flake' }), null, JSON.stringify(how));
   });
 });
@@ -512,7 +512,7 @@ const namesFor = (why: string, said: string | null, facts: string[]) => {
 
 test('retrySection: what a try is told of why it was filed', async (t) => {
   await t.test('a try the pause filed: the pause stopped its session and the run filed the try, never a person', () => {
-    const brief = retrySection(IMPLEMENT, { try: 2, by: 'pause', mode: 'nudge', resumed: true, status: 'stopped' });
+    const brief = retrySection(IMPLEMENT, { try: 2, by: 'pause', mode: 'continue', resumed: true, status: 'stopped' });
     assert.match(
       brief,
       /The store was paused at once \(`nemia pause --now`\), which stopped this session before it signed off; once resumed, the run filed/,

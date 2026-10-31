@@ -160,7 +160,7 @@ test('POST …/retry: what it refuses — a message it will not carry, a step no
     'REFUSED at shipped defaults: an empty message, and a message on a recheck, are 422s, each naming the flag it is of',
     async () => {
       for (const [step, how, fact] of [
-        ['implement', { mode: 'nudge', message: '' }, /^--message is empty/],
+        ['implement', { mode: 'continue', message: '' }, /^--message is empty/],
         ['implement', { mode: 'fresh', message: '  \n ' }, /^--message is empty/],
         ['theme', { mode: 'recheck', message: 'Look again.' }, /^--message carries[^]*--recheck files no session/],
       ] as const)
@@ -173,9 +173,9 @@ test('POST …/retry: what it refuses — a message it will not carry, a step no
     'REFUSED at shipped defaults: a step not waiting on a person, a session still working however it is asked, a recheck of a session the harness blocked, and a recheck with no check that failed are 409s, each naming why',
     async () => {
       const cases: Array<[string, RetryHow, RegExp]> = [
-        ['tokens', { mode: 'nudge' }, /^tokens signed off done and declares no check/],
-        ['review', { mode: 'nudge', message: 'Start.' }, /^review has not been filed yet/],
-        ['working', { mode: 'nudge' }, /^working is still running/],
+        ['tokens', { mode: 'continue' }, /^tokens signed off done and declares no check/],
+        ['review', { mode: 'continue', message: 'Start.' }, /^review has not been filed yet/],
+        ['working', { mode: 'continue' }, /^working is still running/],
         ['working', { mode: 'fresh', message: 'Start again.' }, /^working is still running/],
         ['held', { mode: 'recheck' }, /^--recheck [^]* held is running, its session blocked/],
         ['implement', { mode: 'recheck' }, /^--recheck [^]* implement is blocked: no check/],
@@ -190,19 +190,19 @@ test('POST …/retry: what it refuses — a message it will not carry, a step no
   await t.test('REFUSED: a body that is not an ask (400), naming the key, and a run or a step that does not exist (404)', async () => {
     const bodies: Array<[unknown, RegExp]> = [
       ['not json', /^POST …\/retry takes a JSON body/],
-      [['nudge'], /^POST …\/retry takes a JSON object/],
+      [['continue'], /^POST …\/retry takes a JSON object/],
       [{}, /^`mode`[^]*was left out/],
       [{ mode: 'again' }, /^`mode`[^]*was "again"/],
-      [{ mode: 'nudge', model: 'opus' }, /^`model`[^]*goes with "mode": "fresh"/],
+      [{ mode: 'continue', model: 'opus' }, /^`model`[^]*goes with "mode": "fresh"/],
       [{ mode: 'fresh', model: '' }, /^`model`[^]*was ""/],
-      [{ mode: 'nudge', message: 42 }, /^`message`[^]*was 42/],
+      [{ mode: 'continue', message: 42 }, /^`message`[^]*was 42/],
       [{ mode: 'fresh', model: 3 }, /^`model`[^]*`nemia retry --model <m>`[^]*was 3\.$/],
       [{ mode: 'fresh', model: '  ' }, /^`model`[^]*was "  "\.$/],
-      [{ mode: 'nudge', budget: 'five' }, /^`budget`[^]*`nemia retry --budget <amount>`[^]*was "five": `/],
+      [{ mode: 'continue', budget: 'five' }, /^`budget`[^]*`nemia retry --budget <amount>`[^]*was "five": `/],
     ];
     for (const [body, fact] of bodies) assert.match(await refusedWith(await ask('implement', body), 400, JSON.stringify(body)), fact);
-    assert.match(await refusedWith(await ask('implement', { mode: 'nudge' }, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);
-    assert.match(await refusedWith(await ask('deploy', { mode: 'nudge' }), 404, 'no step'), new RegExp(`^Run '${R}' has no step 'deploy'`));
+    assert.match(await refusedWith(await ask('implement', { mode: 'continue' }, BOARD, 'r-nope'), 404, 'no run'), /^No run 'r-nope'/);
+    assert.match(await refusedWith(await ask('deploy', { mode: 'continue' }), 404, 'no step'), new RegExp(`^Run '${R}' has no step 'deploy'`));
     nothingWritten('a body that is not an ask');
   });
 });
@@ -271,11 +271,11 @@ test('a person answers a blocked step, rechecks a refused check and continues th
     "an answer as the board sends it is the package's ask: 202 with the try, its file and no `stopFirst`, the run's record untouched, and the step reads `try 2 asked` and waits on nobody — a second ask refused, a refused check rechecked",
     async () => {
       tasks = tasksOf();
-      const res = await ask('implement', { mode: 'nudge', message: 'Postgres, the one in docker-compose.yml.' });
+      const res = await ask('implement', { mode: 'continue', message: 'Postgres, the one in docker-compose.yml.' });
       assert.equal(res.status, 202, await res.clone().text());
       assert.deepEqual(await res.json(), { try: 2, file: askFile(R, 'implement', 2), stopFirst: false });
       const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(R, 'implement', 2), 'utf8'));
-      assert.deepEqual(written, { step: 'implement', try: 2, mode: 'nudge', message: 'Postgres, the one in docker-compose.yml.' });
+      assert.deepEqual(written, { step: 'implement', try: 2, mode: 'continue', message: 'Postgres, the one in docker-compose.yml.' });
       assert.ok(!Number.isNaN(Date.parse(when)), when);
       assert.deepEqual(asked(), ['retry-implement-2']);
       assert.equal(fs.readFileSync(recordFile, 'utf8'), record, "the api wrote nothing of the run's record");
@@ -287,7 +287,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       assert.equal(implement.note, words.steps.find((s) => s.name === 'implement')?.note, 'as `nemia ls` has it: a note beside the step');
       assert.deepEqual(implement.asked, {
         try: 2,
-        mode: 'nudge',
+        mode: 'continue',
         model: null,
         message: 'Postgres, the one in docker-compose.yml.',
         stopFirst: false,
@@ -324,12 +324,14 @@ test('a person answers a blocked step, rechecks a refused check and continues th
     async () => {
       const res = await ask('held', { mode: 'nudge' });
       assert.equal(res.status, 202, await res.clone().text());
-      assert.deepEqual(await res.json(), { try: 2, file: askFile(R, 'held', 2), stopFirst: true });
+      const { hint, ...answered } = (await res.json()) as { hint?: string };
+      assert.deepEqual(answered, { try: 2, file: askFile(R, 'held', 2), stopFirst: true }, 'the former `nudge` is answered as `continue`');
+      assert.ok(hint?.includes('"mode": "continue"'), `the answer's hint names the value to send now: ${hint}`);
       const { at: when, ...written } = JSON.parse(fs.readFileSync(askFile(R, 'held', 2), 'utf8'));
       assert.deepEqual(
         written,
-        { step: 'held', try: 2, mode: 'nudge' },
-        "Continue, as the board's banner sends it with nothing written: a nudge, and no message",
+        { step: 'held', try: 2, mode: 'continue' },
+        'Continue, sent in its former spelling with nothing written: written as `continue`, and no message',
       );
       assert.ok(!Number.isNaN(Date.parse(when)), when);
       const fresh = await ask('idle', { mode: 'fresh', message: 'Sign in again first.' });
@@ -362,7 +364,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
         noteOf('held'),
         'as `nemia ls` has it until a tick stops the session: the note says the session is stopped first',
       );
-      assert.deepEqual(held.asked, { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true });
+      assert.deepEqual(held.asked, { try: 2, mode: 'continue', model: null, message: null, stopFirst: true });
       assert.deepEqual(
         [held.status, held.reason, held.via],
         ['needs-human', 'AwaitingAnswer', 'session'],
@@ -380,7 +382,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       );
       assert.deepEqual(run.waitingOnYou, words.waitingOnYou);
 
-      const again = await ask('held', { mode: 'nudge' });
+      const again = await ask('held', { mode: 'continue' });
       assert.equal(again.status, 409, "asked once: a second Continue is refused in the package's words");
       const { error } = (await again.json()) as { error: string };
       assert.ok(error.startsWith('try 2 of held is already asked for (--continue, at '), error);
@@ -410,7 +412,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
           ],
           steps: {
             /** Signed off blocked, answered with a nudge, and signed off done on the try that answer filed. */
-            implement: { taskId: 't-a-implement-try2', tries: [{ taskId: 't-a-implement', cause: 'nudge' }] },
+            implement: { taskId: 't-a-implement-try2', tries: [{ taskId: 't-a-implement', cause: 'continue' }] },
             /** Tried again fresh on a person's word, with nothing said: no answer. */
             plan: { taskId: 't-a-plan-try2', tries: [{ taskId: 't-a-plan', cause: 'fresh' }] },
           },
@@ -422,7 +424,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       signedOff('t-a-plan-try2', { outcome: 'done', summary: 'Planned it.', artifacts: [] });
       write(
         path.join(root, 'runs', `${A}.asks`, 'done', 'retry-implement-2'),
-        JSON.stringify({ mode: 'nudge', message: 'Postgres.', at: at(30) }),
+        JSON.stringify({ mode: 'continue', message: 'Postgres.', at: at(30) }),
       );
       write(path.join(root, 'runs', `${A}.asks`, 'done', 'retry-plan-2'), JSON.stringify({ mode: 'fresh', at: at(30) }));
 

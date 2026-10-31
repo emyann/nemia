@@ -274,7 +274,7 @@ export default {
     if (sent.status() !== 202) throw new Refused(`the api takes the send-back — it answered ${sent.status()}: ${await sent.text()}`);
     const ask = path.join(asks, `retry-${gated}-2`);
     const asked = fs.existsSync(ask) ? JSON.parse(fs.readFileSync(ask, 'utf8')) : undefined;
-    if (asked?.step !== gated || asked?.try !== 2 || asked?.mode !== 'nudge' || asked?.message !== GATED.objection) {
+    if (asked?.step !== gated || asked?.try !== 2 || asked?.mode !== 'continue' || asked?.message !== GATED.objection) {
       throw new Refused(`the send-back is written as wf retry --message writes it — ${ask} holds ${JSON.stringify(asked)}`);
     }
     const note = 'try 2 asked (--continue, with your answer) — the next tick files it';

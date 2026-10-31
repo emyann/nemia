@@ -74,6 +74,6 @@ test('a brief composed without costs says none, and is as it was', () => {
 });
 
 test("a try that continues the last session is not told the costs again: it was, on the session's first brief", () => {
-  const brief = briefOf(COSTS, { try: 2, by: 'retries', mode: 'nudge', resumed: true, status: 'failed' });
+  const brief = briefOf(COSTS, { try: 2, by: 'retries', mode: 'continue', resumed: true, status: 'failed' });
   assert.equal(brief.includes('## What runs of this workflow cost'), false, brief);
 });

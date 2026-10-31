@@ -188,7 +188,7 @@ const ANSWERED = {
   id: 'r-3',
   workflowDir: '/w/intake',
   createdAt: at('09:59'),
-  steps: { ask: { taskId: 'ask', tries: [{ taskId: 'ask', cause: 'nudge' }] } },
+  steps: { ask: { taskId: 'ask', tries: [{ taskId: 'ask', cause: 'continue' }] } },
   approvals: [{ step: 'ask', try: 2, at: at('10:29') }],
 } as unknown as Run;
 const turn = (n: number, spawned: string, ended: string, outcome = 'done') => ({

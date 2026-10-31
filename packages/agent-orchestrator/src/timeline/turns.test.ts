@@ -32,18 +32,18 @@ const attempt = (turn: number, spawned: string, ended: string | null, closeout?:
 const tries = (causes: TryCause[], current = 'T'): TurnTry[] => [...causes.map((cause) => ({ taskId: 'T', cause })), { taskId: current }];
 
 test('a try that answers an earlier try on its task is that many turns in', () => {
-  assert.equal(turnOf(tries(['nudge']), 1), 1);
-  assert.equal(turnOf(tries(['nudge', 'nudge']), 2), 2);
-  assert.equal(turnOf(tries(['nudge']), 0), null, 'the try that filed the session is no turn of another');
+  assert.equal(turnOf(tries(['continue']), 1), 1);
+  assert.equal(turnOf(tries(['continue', 'continue']), 2), 2);
+  assert.equal(turnOf(tries(['continue']), 0), null, 'the try that filed the session is no turn of another');
 });
 
 test('REFUSED: a try a recheck reached, and one on a task of its own, are no turn; a recheck behind a turn is not counted in it', () => {
   assert.equal(turnOf(tries(['recheck']), 1), null, 'a recheck ran the check again, and no turn');
-  const mixed = tries(['nudge', 'recheck']);
+  const mixed = tries(['continue', 'recheck']);
   assert.equal(turnOf(mixed, 1), 1);
   assert.equal(turnOf(mixed, 2), null, 'the latest try behind it was replaced by a recheck');
-  assert.equal(turnOf(tries(['recheck', 'nudge']), 2), 1, 'the recheck behind it is no turn');
-  assert.equal(turnOf(tries(['nudge'], 'U'), 1), null, 'a task of its own');
+  assert.equal(turnOf(tries(['recheck', 'continue']), 2), 1, 'the recheck behind it is no turn');
+  assert.equal(turnOf(tries(['continue'], 'U'), 1), null, 'a task of its own');
 });
 
 test("a turn's span is the end of the turn before it, its own first spawn and its last end; a turn the runtime skipped has none", () => {
@@ -85,8 +85,8 @@ test('a session that signed off blocked twice and was answered twice: what it ra
       ask: {
         taskId: 'T',
         tries: [
-          { taskId: 'T', cause: 'nudge' },
-          { taskId: 'T', cause: 'nudge' },
+          { taskId: 'T', cause: 'continue' },
+          { taskId: 'T', cause: 'continue' },
         ],
       },
     },

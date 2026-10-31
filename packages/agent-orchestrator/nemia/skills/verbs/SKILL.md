@@ -250,7 +250,7 @@ They write, and are yours to run unasked, on your judgement: say what you did.
                                --why: the reason, said wherever the pause is; --by: who pauses it
                                (default: your OS user)
                                --now: pause at once — each step session or check at work, but a
-                               landing, is asked to stop and tried again on nemia resume: a nudge of
+                               landing, is asked to stop and tried again on nemia resume: a continue of
                                its session, or a recheck. A pause that stands is kept as it was.
                                --yes: with --now, act; without it, --now only says what it would
                                interrupt

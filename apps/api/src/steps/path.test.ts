@@ -75,9 +75,9 @@ writeRun('r-held', {
   implement: {
     taskId: 'r-held-1',
     tries: [
-      { taskId: 'r-held-1', cause: 'nudge' },
+      { taskId: 'r-held-1', cause: 'continue' },
       { taskId: 'r-held-1', cause: 'recheck' },
-      { taskId: 'r-held-1', cause: 'nudge' },
+      { taskId: 'r-held-1', cause: 'continue' },
     ],
   },
 });

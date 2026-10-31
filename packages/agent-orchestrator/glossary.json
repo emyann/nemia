@@ -266,8 +266,14 @@
     },
     {
       "term": "Try",
-      "meaning": "one filing of a step as a new runtime task, the way a Kubernetes Job makes a new Pod: a retry, a nudge, a round or a person's `nemia retry` files the next try, and each earlier one is kept on the record (`EarlierTry`) with its cause. A try is never the runtime's attempt, which is a restart inside one task.",
+      "meaning": "one filing of a step as a new runtime task, the way a Kubernetes Job makes a new Pod: a retry, a continued session, a round or a person's `nemia retry` files the next try, and each earlier one is kept on the record (`EarlierTry`) with its cause. A try is never the runtime's attempt, which is a restart inside one task.",
       "type": "Try",
+      "retired": [
+        {
+          "spelling": "nudge",
+          "card": "decision 7, slice C: nudge becomes continue in the store and on the wire"
+        }
+      ],
       "see": {
         "label": "Trying again",
         "href": "/workflows/#trying-again"
@@ -275,7 +281,7 @@
     },
     {
       "term": "Try cause",
-      "meaning": "why a try was moved behind the next: `retries`, `signoff`, `nudge`, `fresh`, `recheck`, `round`, `merge` or `back`, one closed set (`TRY_CAUSES`). A record's former `then` reads as `cause`.",
+      "meaning": "why a try was moved behind the next: `retries`, `signoff`, `continue`, `fresh`, `recheck`, `round`, `merge` or `back`, one closed set (`TRY_CAUSES`). A record's former `then` reads as `cause`, and its former `nudge` as `continue`.",
       "type": "TryCause",
       "see": {
         "label": "Trying again",

@@ -1292,7 +1292,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       const { first, second } = two;
       const { ask } = await stage.runWith(
         e(),
-        retryRun(second.id, 'ship', { mode: 'nudge', message: 'the check was green here; run it again' }),
+        retryRun(second.id, 'ship', { mode: 'continue', message: 'the check was green here; run it again' }),
       );
       assert.deepEqual([ask.step, ask.try], ['ship', 2], 'allowed, for a settled step that signed off blocked, and held');
       for (const pass of [1, 2]) {
@@ -1492,7 +1492,7 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
       gate = await at.atTheGate();
       const { id } = gate;
       await assert.rejects(
-        stage.runWith(e(), retryRun(id, 'ship', { mode: 'nudge' })),
+        stage.runWith(e(), retryRun(id, 'ship', { mode: 'continue' })),
         refusedAs(
           'Conflict',
           'ship is at its gate',
@@ -1511,7 +1511,7 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
     async () => {
       const { id } = gate;
       await assert.rejects(
-        stage.runWith(e(), retryRun(id, 'implement', { mode: 'nudge' })),
+        stage.runWith(e(), retryRun(id, 'implement', { mode: 'continue' })),
         refusedAs(
           'Conflict',
           'ship is at its gate, not implement',
@@ -1521,7 +1521,7 @@ test("a send-back at the ending's gate goes to the work, merges nothing, and the
           `nemia approve ${id} ship.`,
         ),
       );
-      const { ask } = await stage.runWith(e(), retryRun(id, 'implement', { mode: 'nudge', message: 'sub subtracts the wrong way round' }));
+      const { ask } = await stage.runWith(e(), retryRun(id, 'implement', { mode: 'continue', message: 'sub subtracts the wrong way round' }));
       assert.deepEqual([ask.step, ask.try], ['implement', 2]);
     },
   );
@@ -1631,7 +1631,7 @@ test('an ending that stopped on the base branch sends the work back through the 
     'the send-back is filed: the reviewer again with the objection and what ship said, the ending not, and nothing merged',
     async () => {
       const { repo, id, base } = stopped;
-      const { ask } = await stage.runWith(e(), retryRun(id, 'review', { mode: 'nudge', message: 'take main, and keep both subs working' }));
+      const { ask } = await stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: 'take main, and keep both subs working' }));
       assert.deepEqual([ask.step, ask.try], ['review', 2]);
       assert.equal(await statusOf(id, 'ship'), 'pending', 'between the ask and the pass, the ending reads as waiting for the work');
       const sent = await at.pass(id);
@@ -1692,11 +1692,11 @@ test('an ending that stopped on the base branch sends the work back through the 
       const again = `a dirty checkout, a flaky test: nemia retry ${id} ship.`;
       const halted = 'ship stopped on the base branch (blocked)';
       await assert.rejects(
-        stage.runWith(e(), retryRun(id, 'review', { mode: 'nudge' })),
+        stage.runWith(e(), retryRun(id, 'review', { mode: 'continue' })),
         refusedAs('Conflict', "review's work went on to ship", halted, 'a try of review sends the work back', 'no words', back, again),
       );
       await assert.rejects(
-        stage.runWith(e(), retryRun(id, 'implement', { mode: 'nudge', message: 'take main' })),
+        stage.runWith(e(), retryRun(id, 'implement', { mode: 'continue', message: 'take main' })),
         refusedAs('Conflict', halted, "through the folder's loop, not to implement", 'send it back to review', back, again),
       );
       await assert.rejects(
@@ -1704,18 +1704,18 @@ test('an ending that stopped on the base branch sends the work back through the 
         refusedAs('Conflict', 'review signed off', '(`again: false`)', halted, 'its `again: true` is the round', back, again),
       );
       assert.ok(!at.asksOf(id).includes('round-review-2'), 'and no ask was written');
-      const { ask } = await stage.runWith(e(), retryRun(id, 'ship', { mode: 'nudge', message: 'the checkout is clean now' }));
+      const { ask } = await stage.runWith(e(), retryRun(id, 'ship', { mode: 'continue', message: 'the checkout is clean now' }));
       await assert.rejects(
-        stage.runWith(e(), retryRun(id, 'review', { mode: 'nudge', message: 'take main' })),
+        stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: 'take main' })),
         refusedNaming(`try 2 of ship is asked for (--continue, at ${ask.at})`, 'a send-back would take that try back'),
         'the two ways on take the same try of the ending: one asked refuses the other, each way round',
       );
       fs.rmSync(path.join(ROOT, 'runs', `${id}.asks`, 'retry-ship-2'));
-      const sending = await stage.runWith(e(), retryRun(id, 'review', { mode: 'nudge', message: 'take main' }));
+      const sending = await stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: 'take main' }));
       const sentBack = `the work is being sent back from ship (nemia retry ${id} review, at ${sending.ask.at})`;
       const wait = `Wait for it: nemia ls ${id}.`;
       await assert.rejects(
-        stage.runWith(e(), retryRun(id, 'ship', { mode: 'nudge' })),
+        stage.runWith(e(), retryRun(id, 'ship', { mode: 'continue' })),
         refusedAs('Conflict', sentBack, 'ship returns to its gate once it settles', wait),
       );
     },
@@ -1746,7 +1746,7 @@ test('an ending that stopped on the base branch sends the work back through the 
     "a send-back composes with `nemia retry --round` in a loop out of rounds, as the incident's was: review's `again: true` reads exhausted, a round takes it once more, and ship waits at its gate for a new approval",
     async () => {
       const { id } = await at.stoppedOnBase(at.loopingFolder(1));
-      await stage.runWith(e(), retryRun(id, 'review', { mode: 'nudge', message: 'take main' }));
+      await stage.runWith(e(), retryRun(id, 'review', { mode: 'continue', message: 'take main' }));
       await at.pass(id);
       settle(`${id}-review-try2`, 'succeeded', { ...SIGNED, again: true });
       const spent = await at.pass(id);
@@ -1776,7 +1776,7 @@ test('an ending that stopped on the base branch sends the work back through the 
     async () => {
       const { id } = await at.stoppedOnBase(at.folder());
       await assert.rejects(
-        stage.runWith(e(), retryRun(id, 'implement', { mode: 'nudge', message: 'take main' })),
+        stage.runWith(e(), retryRun(id, 'implement', { mode: 'continue', message: 'take main' })),
         refusedAs(
           'Conflict',
           'ship stopped on the base branch (blocked)',
@@ -1789,7 +1789,7 @@ test('an ending that stopped on the base branch sends the work back through the 
         ),
       );
       assert.equal(readRun(id).steps.implement.tries, undefined, 'and nothing was asked');
-      await stage.runWith(e(), retryRun(id, 'ship', { mode: 'nudge', message: 'the checkout is clean now' }));
+      await stage.runWith(e(), retryRun(id, 'ship', { mode: 'continue', message: 'the checkout is clean now' }));
       assert.deepEqual((await at.pass(id)).tried, ['ship'], 'landing again is a try of the ending, filed without a new approval');
       assert.ok(tasks.get(`${id}-ship-try2`));
       const { repo, branch } = readRun(id) as unknown as { repo: string; branch: string };
@@ -1898,7 +1898,7 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
       assert.equal(await statusOf(id, 'ship'), 'awaiting approval');
       const { ask } = await stage.runWith(
         e(),
-        retryRun(id, 'review', { mode: 'nudge', message: "the second finding is this run's after all" }),
+        retryRun(id, 'review', { mode: 'continue', message: "the second finding is this run's after all" }),
       );
       assert.deepEqual([ask.step, ask.try], ['review', 2]);
       const sent = await at.pass(id);

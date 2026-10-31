@@ -146,7 +146,7 @@ test('REFUSED by `sayRefusal` before the engine is asked: a step the run does no
       'nemia retry r-1 implement --message "<words>"',
     );
   }
-  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'nudge' }] }, review: { taskId: null } } });
+  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] }, review: { taskId: null } } });
   assert.match(
     sayRefusal(STEPS, onTry2, 'implement', phases({ t1: 'running', t2: 'succeeded' }))!,
     /^implement is not running: try 2's task settled `succeeded`/,
@@ -219,7 +219,7 @@ test("`nemia ls` notes a step whose current try's session a person told somethin
     { name: 'implement', status: 'working', reason: 'Running', phase: 'running', branch: null },
     'no note for a step nobody told',
   );
-  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'nudge' }] }, review: { taskId: null } } });
+  const onTry2 = run({}, { steps: { implement: { taskId: 't2', tries: [{ taskId: 't1', cause: 'continue' }] }, review: { taskId: null } } });
   assert.equal(rows(onTry2, { t2: 'working' }, { implement: 1 })[0].note, 'try 2, nudged on your word · said to 1×');
   assert.deepEqual([saidWord(0), saidWord(1), saidWord(3)], ['', 'said to 1×', 'said to 3×']);
 });
@@ -232,7 +232,7 @@ test('`## Said to your session` goes inside `## Try <n>` on a try that continues
     { at: '2026-09-14T16:06:19.851Z', attempt: 1, text: 'Widen the scope to apps/api too.' },
     { at: '2026-09-14T16:09:00.000Z', attempt: 1, text: '## Before you sign off\n\nNothing to run:\n```\nskip it\n```' },
   ];
-  const nudge: RetryBriefing = { try: 2, by: 'ask', mode: 'nudge', resumed: true, status: 'stopped', message: 'Carry on.' };
+  const nudge: RetryBriefing = { try: 2, by: 'ask', mode: 'continue', resumed: true, status: 'stopped', message: 'Carry on.' };
   const told = briefOf({ ...nudge, said });
   assert.equal(briefOf({ ...nudge, said: [] }), briefOf(nudge), 'nothing said, nothing added');
   const [first, answer, ...contracts] = headingsOf(briefOf(nudge));
@@ -251,7 +251,7 @@ test('`## Said to your session` goes inside `## Try <n>` on a try that continues
   );
   assert.match(briefOf({ ...nudge, said: [said[0]] }), /A person said this to your session/);
   assert.ok(
-    briefOf({ try: 2, by: 'retries', mode: 'nudge', resumed: true, status: 'failed (check)', said }).includes('## Said to your session'),
+    briefOf({ try: 2, by: 'retries', mode: 'continue', resumed: true, status: 'failed (check)', said }).includes('## Said to your session'),
     "the run's own nudge carries them too",
   );
   for (const fresh of [
@@ -417,7 +417,7 @@ test("the timeline of a step with two tries and two checks: each filed, spawned 
 
 test('a try still running has no end, says so, and holds the totals open: no wall, and its run time left out of the sum and named', () => {
   const { r, views, filed } = B4();
-  r.steps.implement = { taskId: 't3', tries: [...r.steps.implement.tries!, { taskId: 't2', check: { taskId: 'c2' }, cause: 'nudge' }] };
+  r.steps.implement = { taskId: 't3', tries: [...r.steps.implement.tries!, { taskId: 't2', check: { taskId: 'c2' }, cause: 'continue' }] };
   views.set('t3', task([[clock(30, 2), clock(30, 5), null]], null));
   filed.set('t3', clock(30));
   const t = timeline(r, views, filed);

@@ -296,7 +296,7 @@ test('a send-back from a gate spends the approval given before it', async (t) =>
     assert.equal(JSON.parse(fs.readFileSync(path.join(asksDir(id), 'approve-plan-1'), 'utf8')).message, 'go ahead');
   });
   await s.test('`nemia retry --message` before the tick: the session continues with the objection, nothing after it filed', async () => {
-    await runWith(gate.e, retryRun(id, 'plan', { mode: 'nudge', message: 'Store the flag before you parse it.' }));
+    await runWith(gate.e, retryRun(id, 'plan', { mode: 'continue', message: 'Store the flag before you parse it.' }));
     const back = await tick(gate.e, id);
     assert.deepEqual([back.tried, back.filed], [['plan'], []]);
     const brief = gate.tasks.get(try2())!.spec.brief;
@@ -449,7 +449,7 @@ test('a parent whose last step waits at its gate has not landed, though a person
   );
   await s.test('REFUSED: approved, its one step has handed on, so a send-back is refused and nothing is written or filed', async () => {
     await assert.rejects(
-      runWith(b.e, retryRun(parent, 'implement', { mode: 'nudge', message: 'one more thing' })),
+      runWith(b.e, retryRun(parent, 'implement', { mode: 'continue', message: 'one more thing' })),
       (err: Error & { exitCode?: number; _tag?: string }) => {
         assert.deepEqual([err._tag, err.exitCode], ['Conflict', 2]);
         assert.ok(err.message.startsWith('implement signed off done') && err.message.includes('nothing to try again'), err.message);
@@ -472,7 +472,7 @@ test("a wordless `nemia retry` asked while a gated step's harness blocked its se
   await s.test('a wordless try of a blocked session is allowed, stopping it first', async () => {
     await tick(b.e, id);
     b.settle(`${id}-plan`, 'needs-human');
-    const { ask, stopFirst } = await runWith(b.e, retryRun(id, 'plan', { mode: 'nudge' }, { stopBlocked: true }));
+    const { ask, stopFirst } = await runWith(b.e, retryRun(id, 'plan', { mode: 'continue' }, { stopBlocked: true }));
     assert.deepEqual([ask.try, ask.message, stopFirst], [2, undefined, true]);
   });
   await s.test('REFUSED: it signs off before any tick, and pass after pass nothing is tried, filed or stopped', async () => {
@@ -499,7 +499,7 @@ test("a wordless `nemia retry` asked while a gated step's harness blocked its se
         return true;
       };
     await assert.rejects(runWith(b.e, approveRun(id, 'plan')), naming('at its gate', 'retry-plan-2', 'then approve it'));
-    await assert.rejects(runWith(b.e, retryRun(id, 'plan', { mode: 'nudge', message: 'store it first' })), naming('awaiting approval'));
+    await assert.rejects(runWith(b.e, retryRun(id, 'plan', { mode: 'continue', message: 'store it first' })), naming('awaiting approval'));
     assert.ok(fs.existsSync(file), 'left where it is, for a person to take back');
   });
   await s.test('with the ask deleted, the approval files what follows', async () => {
@@ -641,7 +641,7 @@ test('`nemia approve`, REFUSED with nothing written', async (t) => {
   });
   await t.test('REFUSED while a send-back is asked for', async () => {
     const sentBack = await heldAtGate();
-    await runWith(sentBack.e, retryRun(sentBack.id, 'plan', { mode: 'nudge', message: 'store it first' }));
+    await runWith(sentBack.e, retryRun(sentBack.id, 'plan', { mode: 'continue', message: 'store it first' }));
     await assert.rejects(
       runWith(sentBack.e, approveRun(sentBack.id, 'plan')),
       refusedAs('Conflict', 'try 2 of plan is already asked for', '(--continue, at ', 'an approval of try 1'),

@@ -123,7 +123,7 @@ const spends =
 /** Nothing signed off. */
 const nothingSigned = () => undefined;
 /** A person's ask for implement's try `n`. */
-const askFor = (n: number, mode: RetryMode = 'nudge', model?: string): RetryAsk => ({
+const askFor = (n: number, mode: RetryMode = 'continue', model?: string): RetryAsk => ({
   step: 'implement',
   try: n,
   mode,
@@ -332,7 +332,7 @@ test('UNSIGNED: a step asked for a closeout that ended without one', async (t) =
     composeBrief(STEPS[0], r, STEPS, undefined, undefined, undefined, {
       try: 2,
       by: 'ask',
-      mode: 'nudge',
+      mode: 'continue',
       resumed: true,
       status: stepStatus(STEPS[0], r, failed, none, askedCloseout),
     });
@@ -502,7 +502,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     });
   await t.test("a check that checkFailed, with `retries:` left, is due another try on the run's word, waiting on nobody", () => {
     const a = assess(RETRIED, onTry(), checkFailed, signedDone, asked, () => 1);
-    assert.deepEqual(a.retry, [{ step: 'implement', try: 2, mode: 'nudge', by: 'retries' }]);
+    assert.deepEqual(a.retry, [{ step: 'implement', try: 2, mode: 'continue', by: 'retries' }]);
     assert.deepEqual([a.ready, a.unreachable, a.status], [[], [], 'running'], 'what waits on it waits; nothing is final yet');
     const l = lsOf(onTry(), 'failed', 1);
     assert.deepEqual(l.steps[0], {
@@ -538,7 +538,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
   });
   await t.test("a person's tries do not spend what the run may spend on its own", () => {
     const yours: EarlierTry[] = [
-      { ...SPENT[0], cause: 'nudge' },
+      { ...SPENT[0], cause: 'continue' },
       { ...SPENT[1], cause: 'fresh' },
     ];
     assert.deepEqual(
@@ -597,7 +597,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
         over,
       );
     assert.equal(refusal({ mode: 'recheck' }), null, 'its check again needs no --budget');
-    names(refusal({ mode: 'nudge' }), 'nemia retry r-1 implement --recheck', 'nemia retry r-1 implement --budget <amount>');
+    names(refusal({ mode: 'continue' }), 'nemia retry r-1 implement --recheck', 'nemia retry r-1 implement --budget <amount>');
   });
   await t.test('a caller that gives no verdict reads a check stopped at its deadline as the tick does', () => {
     const unread = assess(RETRIED, onTry(), checkFailed, signedDone, asked);
@@ -671,15 +671,15 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
   const lsOf = (x: Run, phase: Record<string, ListedPhase>) =>
     listing({ steps: STEPS, run: x, phaseOf: shown(phase), closeoutOf: none, askedCloseout: unsignedEnd });
   await t.test('due on its own: the run is moving, waiting on nobody, and says the nudge is due', () => {
-    assert.deepEqual(due(r), [{ step: 'implement', try: 2, mode: 'nudge', by: 'signoff' }]);
+    assert.deepEqual(due(r), [{ step: 'implement', try: 2, mode: 'continue', by: 'signoff' }]);
     const a = assess(STEPS, r, failed, none, unsignedEnd);
     assert.deepEqual([a.retry.map((x) => x.by), a.status], [['signoff'], 'running']);
     assert.deepEqual(lsOf(r, { t1: 'failed' }).waitingOnYou, [], 'nor does nemia ls put it on you');
-    assert.equal(dueNote(STEPS[0], r, due(r)[0]), 'try 2 due — a nudge to sign off, once a round: its session ended without its closeout');
+    assert.equal(dueNote(STEPS[0], r, due(r)[0]), 'try 2 due — an ask to sign off, once a round: its session ended without its closeout');
   });
   await t.test('`nemia retry` is refused: the run nudges it itself', () => {
     names(
-      retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, failed, none, unsignedEnd),
+      retryRefusal(STEPS, r, 'implement', { mode: 'continue' }, failed, none, unsignedEnd),
       'the run nudges implement itself',
       'try 2',
       'nemia ls r-1',
@@ -695,7 +695,7 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
     assert.deepEqual(lsOf(nudged, { t2: 'failed' }).waitingOnYou, ['implement']);
     assert.equal(lsOf(nudged, { t2: 'failed' }).steps[0].note, 'try 2, nudged to sign off by the run');
   });
-  const after = (cause: 'nudge' | 'round') => ({
+  const after = (cause: 'continue' | 'round') => ({
     ...nudged,
     steps: {
       implement: {
@@ -709,7 +709,7 @@ test('UNSIGNED: the run nudges a step to sign off ITSELF, once a round, before i
     },
   });
   await t.test("a person's try in between spends nothing, and does not free another; a round is new work", () => {
-    assert.deepEqual(retriesDue(STEPS, after('nudge'), phases({ t3: 'failed' }), none, unsignedEnd), []);
+    assert.deepEqual(retriesDue(STEPS, after('continue'), phases({ t3: 'failed' }), none, unsignedEnd), []);
     assert.deepEqual(
       retriesDue(STEPS, after('round'), phases({ t3: 'failed' }), none, unsignedEnd).map((x) => [x.by, x.try]),
       [['signoff', 4]],
@@ -773,7 +773,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
       {
         try: 2,
         by: 'retries',
-        mode: 'nudge',
+        mode: 'continue',
         resumed: true,
         status: 'failed (check)',
         refusal,
@@ -821,7 +821,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
     const stopped = composeBrief(step('implement'), run({ implement: 't1' }), STEPS, undefined, undefined, undefined, {
       try: 2,
       by: 'ask',
-      mode: 'nudge',
+      mode: 'continue',
       resumed: true,
       status: 'stopped',
     });
@@ -841,7 +841,7 @@ test("composeBrief of a step's check and of its tries", async (t) => {
       ].join('\n'),
     );
     const r = run({ implement: 't1', review: null });
-    const briefing = (resumed: boolean): RetryBriefing => ({ try: 2, by: 'signoff', mode: 'nudge', resumed, status: 'unsigned' });
+    const briefing = (resumed: boolean): RetryBriefing => ({ try: 2, by: 'signoff', mode: 'continue', resumed, status: 'unsigned' });
     const brief = composeBrief(STEPS[0], r, STEPS, undefined, undefined, undefined, briefing(true));
     assert.ok(brief.startsWith(`## Try 2\n\n${SIGNOFF}\n`), brief);
     assert.match(brief, /## When you are finished/, 'with the closeout contract after it, as on every try');
@@ -909,7 +909,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
   const stale = (extra: Partial<RetryAsk> = {}) => ({
     step: 'implement',
     try: 2,
-    mode: 'nudge',
+    mode: 'continue',
     by: 'ask',
     stopFirst: true,
     runsOn: true,
@@ -919,10 +919,10 @@ test("a person's ask on a step whose session its harness blocked, or that works 
     "REFUSED before, now accepted: blocked with nothing signed, a nudge or a fresh session may be asked on the harness's word",
     () => {
       for (const how of [
-        { mode: 'nudge' },
+        { mode: 'continue' },
         { mode: 'fresh' },
         { mode: 'fresh', model: 'opus' },
-        { mode: 'nudge', message: 'logged in again: carry on' },
+        { mode: 'continue', message: 'logged in again: carry on' },
       ] as RetryHow[])
         assert.equal(refusal(how), null, JSON.stringify(how));
     },
@@ -936,20 +936,20 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       'nemia retry r-1 implement (or --fresh)',
     );
     names(
-      refusal({ mode: 'nudge' }, () => false),
+      refusal({ mode: 'continue' }, () => false),
       'implement is still running',
       'nemia ls r-1',
       'nemia cancel r-1',
     );
     assert.match(
-      refusal({ mode: 'nudge' }, needsHuman, signedDone)!,
+      refusal({ mode: 'continue' }, needsHuman, signedDone)!,
       /^implement is still running/,
       'a session that signed off and runs on',
     );
-    assert.match(retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, live, nothingSigned, asked)!, /^implement is still running/);
+    assert.match(retryRefusal(STEPS, r, 'implement', { mode: 'continue' }, live, nothingSigned, asked)!, /^implement is still running/);
     for (const blockedOf of [undefined, () => false])
       assert.match(
-        retryRefusal(STEPS, r, 'implement', { mode: 'nudge' }, live, nothingSigned, asked, () => undefined, [], blockedOf)!,
+        retryRefusal(STEPS, r, 'implement', { mode: 'continue' }, live, nothingSigned, asked, () => undefined, [], blockedOf)!,
         /^implement is still running, so there is nothing to try again until it ends/,
       );
   });
@@ -957,7 +957,7 @@ test("a person's ask on a step whose session its harness blocked, or that works 
     const a = assess(STEPS, r, live, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman);
     assert.deepEqual(
       [a.retry, a.ready, a.unreachable, a.status],
-      [[{ step: 'implement', try: 2, mode: 'nudge', by: 'ask', stopFirst: true }], [], [], 'running'],
+      [[{ step: 'implement', try: 2, mode: 'continue', by: 'ask', stopFirst: true }], [], [], 'running'],
     );
     assert.deepEqual(
       decision(STEPS, r, live, nothingShipped, nothingSigned, asked, () => undefined, [askFor(2)], [], needsHuman),
@@ -1069,14 +1069,14 @@ test("a person's ask on a step whose session its harness blocked, or that works 
     const stopped = phases({ t1: 'stopped' });
     for (const blockedOf of [needsHuman, () => false])
       assert.deepEqual(assess(STEPS, r, stopped, nothingSigned, asked, () => undefined, [askFor(2)], [], blockedOf).retry, [
-        { step: 'implement', try: 2, mode: 'nudge', by: 'ask' },
+        { step: 'implement', try: 2, mode: 'continue', by: 'ask' },
       ]);
     assert.equal(noteOf('stopped').note, 'try 2 asked (--continue) — the next tick files it');
   });
   await t.test('a refused check `retries:` covers is due with no stop', () => {
     const r1 = run({}, { steps: { implement: { taskId: 't1', check: { taskId: 'c1' } }, review: { taskId: null } } });
     assert.deepEqual(assess(RETRIED, r1, phases({ t1: 'succeeded', c1: 'failed' }), signedDone, asked, () => 1).retry, [
-      { step: 'implement', try: 2, mode: 'nudge', by: 'retries' },
+      { step: 'implement', try: 2, mode: 'continue', by: 'retries' },
     ]);
   });
 });
@@ -1142,10 +1142,10 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
   const answered: RetryAsk = { ...askFor(2), message: 'the second reading' };
   await t.test('rides on the ask to the try it files: due with it; no message, no key', () => {
     assert.deepEqual(assess(RETRIED, onTry(), p, signedDone, asked, () => undefined, [answered]).retry, [
-      { step: 'implement', try: 2, mode: 'nudge', message: 'the second reading', by: 'ask' },
+      { step: 'implement', try: 2, mode: 'continue', message: 'the second reading', by: 'ask' },
     ]);
     assert.deepEqual(assess(RETRIED, onTry(), p, signedDone, asked, () => undefined, [askFor(2)]).retry, [
-      { step: 'implement', try: 2, mode: 'nudge', by: 'ask' },
+      { step: 'implement', try: 2, mode: 'continue', by: 'ask' },
     ]);
   });
   await t.test('said beside the step while it waits', () => {
@@ -1160,7 +1160,7 @@ test("a person's answer (`--message`): on the ask, in the brief, and on `nemia l
     });
     assert.equal(l.steps[0].note, 'try 2 asked (--continue, with your answer) — the next tick files it');
   });
-  const nudged = onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'nudge' }], 'c1');
+  const nudged = onTry([{ taskId: 't0', check: { taskId: 'c0' }, cause: 'continue' }], 'c1');
   await t.test('a try a person answered says so on `nemia ls`, read off the ask, never the record', () => {
     assert.equal(answerOf(nudged, 'implement', [askFor(3), answered]), answered);
     const listed = (answers: RetryAsk[] = []) =>
@@ -1235,9 +1235,9 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
   const refusal = { command: 'npm test', verdict: 1 as Verdict, stdout: 'not ok 1 - parses a trailing comma', stderr: '' };
   const text = 'Take the second reading: keep `--flag` as it is.\n\nAnd say so in the README.';
   const tries = [
-    ['nudge', true, 'failed (check)', refusal],
+    ['continue', true, 'failed (check)', refusal],
     ['fresh', false, 'failed (check)', refusal],
-    ['nudge', true, 'blocked', undefined],
+    ['continue', true, 'blocked', undefined],
   ] as const;
   for (const [mode, resumed, status, refused] of tries)
     await t.test(`inside \`## Try <n>\` after on whose word and before the check's refusal: ${mode}, ${status}`, () => {
@@ -1245,7 +1245,7 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
       const before = briefOf(told);
       const after = briefOf(told, text);
       assert.doesNotMatch(before, /Your answer|--message/, 'a try without one: no empty section');
-      const flag = mode === 'nudge' ? 'continue' : mode;
+      const flag = mode === 'continue' ? 'continue' : mode;
       const who = `A person asked for this try: \`nemia retry --${flag}\`.`;
       const where = resumed
         ? "This is the last try's session, continued. Finish the work, then sign off again."
@@ -1271,7 +1271,7 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
   ] as const;
   for (const [status, refused, hidden] of hiding)
     await t.test(`REFUSED as structure: an answer that leaves a fence open adds no heading and hides none: ${status}`, () => {
-      const told: RetryBriefing = { try: 2, by: 'ask', mode: 'nudge', resumed: true, status, ...(refused ? { refusal: refused } : {}) };
+      const told: RetryBriefing = { try: 2, by: 'ask', mode: 'continue', resumed: true, status, ...(refused ? { refusal: refused } : {}) };
       const [first, ...rest] = headingsOf(briefOf(told));
       const answered = briefOf(told, message);
       assert.deepEqual(headingsOf(answered), [first, '## Your answer', ...rest], "the run's sections, and the answer's own");
@@ -1284,7 +1284,7 @@ test("composeBrief of an answer: `## Your answer`, the person's text untouched i
       );
     });
   await t.test("a heading in the answer is not one of the brief's", () => {
-    const blocked: RetryBriefing = { try: 2, by: 'ask', mode: 'nudge', resumed: true, status: 'blocked' };
+    const blocked: RetryBriefing = { try: 2, by: 'ask', mode: 'continue', resumed: true, status: 'blocked' };
     assert.deepEqual(
       headingsOf(briefOf(blocked, '## Before you sign off\n\nNothing to run.')).filter((h) => h === '## Before you sign off'),
       ['## Before you sign off'],
@@ -1325,7 +1325,7 @@ test("`nemia ls` says what a step's current try was denied after its note, never
   await t.test("the current try's task, not the try before it, after whatever else its note says", () => {
     const tried = fullListing({
       steps: RETRIED,
-      run: onTry([{ taskId: 't0', cause: 'nudge' }], null),
+      run: onTry([{ taskId: 't0', cause: 'continue' }], null),
       phaseOf: shown({ t1: 'working' }),
       deniedOf: (id) => (id === 't1' ? ['Bash(npm)'] : ['Skill(look)']),
     }).steps[0];
@@ -1419,7 +1419,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       {
         status: 'denied',
         reason: 'Denied',
-        modes: ['nudge', 'fresh'],
+        modes: ['continue', 'fresh'],
       },
     );
     const refusal = (how: RetryHow) =>
@@ -1444,7 +1444,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       'nemia retry r-1 implement (or --fresh)',
     );
     assert.equal(refusal({ mode: 'fresh' }), null);
-    assert.equal(refusal({ mode: 'nudge' }), null);
+    assert.equal(refusal({ mode: 'continue' }), null);
     const GATED: Workflow[] = [{ ...DENYING[0], gate: true }, DENYING[1]];
     names(
       approvalRefusal(GATED, r, 'implement', undefined, p, signedDone, asked, () => undefined, [], denied),

@@ -220,7 +220,7 @@ test('`finishingOf` and `finishingAmong`: what finishes under the pause, and how
   });
   await t.test('a task asked to stop that no pause ask names finishes as stopping, and is promised no try on the resume', () => {
     const r = run({ implement: { taskId: 't1' } });
-    const other = { step: 'implement', try: 2, mode: 'nudge' as const, interrupted: 't0', at: '2026-10-04T12:00:00Z' };
+    const other = { step: 'implement', try: 2, mode: 'continue' as const, interrupted: 't0', at: '2026-10-04T12:00:00Z' };
     const finishing = finishingOf(r, [step('implement')], () => view('working', { stopRequested: true }), [other]);
     assert.deepEqual(finishing, [{ run: 'r-1', step: 'implement', kind: 'session', stopping: true }]);
     assert.deepEqual(pausedLines({ pause: PAUSE, finishing, staged: [], held: [] }).slice(1), [
@@ -229,7 +229,7 @@ test('`finishingOf` and `finishingAmong`: what finishes under the pause, and how
   });
   await t.test('a task a pause ask names finishes as stopping and resumed, tried again on nemia resume', () => {
     const r = run({ implement: { taskId: 't1' } });
-    const ask = { step: 'implement', try: 2, mode: 'nudge' as const, interrupted: 't1', at: '2026-10-04T12:00:00Z' };
+    const ask = { step: 'implement', try: 2, mode: 'continue' as const, interrupted: 't1', at: '2026-10-04T12:00:00Z' };
     const finishing = finishingOf(r, [step('implement')], () => view('working', { stopRequested: true }), [ask]);
     assert.deepEqual(finishing, [{ run: 'r-1', step: 'implement', kind: 'session', stopping: true, resumed: true }]);
     assert.deepEqual(pausedLines({ pause: PAUSE, finishing, staged: [], held: [] }).slice(1), [

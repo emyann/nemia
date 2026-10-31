@@ -48,7 +48,7 @@ const CANCELLED = { cancelledAt: '2026-01-02T00:00:00Z' };
 const onTry2 = (approvals: ReturnType<typeof approval>[]) =>
   atPlan({
     steps: {
-      plan: { taskId: 't1-try2', tries: [{ taskId: 't1', cause: 'nudge' }] },
+      plan: { taskId: 't1-try2', tries: [{ taskId: 't1', cause: 'continue' }] },
       implement: { taskId: null },
       review: { taskId: null },
     },
@@ -210,7 +210,7 @@ const refused = (
   asks: RetryAsk[] = [],
 ) => approvalRefusal(PLANNED, r, name, message, p, closeoutOf, asked, () => undefined, asks);
 
-const WORDLESS: RetryAsk = { step: 'plan', try: 2, mode: 'nudge', at: '2026-09-16T23:00:00.000Z' };
+const WORDLESS: RetryAsk = { step: 'plan', try: 2, mode: 'continue', at: '2026-09-16T23:00:00.000Z' };
 
 test('approvalRefusal: what may be approved, and what is refused before the gate is read', async (t) => {
   await t.test('a step at its gate may be approved', () => assert.equal(refused(atPlan(), 'plan', PLAN_DONE), null));
@@ -307,7 +307,7 @@ test('approvalRefusal: approved already, and a send-back asked', async (t) => {
     const refusal = refused(filed, 'plan', all);
     names(refusal, 'try 1 of plan is already approved', 'with words', 'has been filed', 'nemia ls r-1');
     assert.ok(!refusal?.includes('nemia retry'), refusal ?? '');
-    const sendBack = retryRefusal(PLANNED, filed, 'plan', { mode: 'nudge', message: 'x' }, all, signedDone, asked);
+    const sendBack = retryRefusal(PLANNED, filed, 'plan', { mode: 'continue', message: 'x' }, all, signedDone, asked);
     assert.ok(sendBack?.startsWith('plan signed off done'), sendBack ?? '');
   });
   await t.test('REFUSED approved, and nothing waits on it: its run goes on without it', () => {

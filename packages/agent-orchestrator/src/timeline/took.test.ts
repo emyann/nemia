@@ -171,7 +171,7 @@ const ASK = { name: 'ask', gate: true, after: [] } as unknown as Workflow;
 
 /** A run of one gated step held open on task `T`: it signed off blocked, a person answered, and its second try is that answer's turn. */
 const answered = (approved: { try: number; at: string }): RepositoryRun => ({
-  ...run({ ask: { taskId: 'T', tries: [{ taskId: 'T', cause: 'nudge' }] } }),
+  ...run({ ask: { taskId: 'T', tries: [{ taskId: 'T', cause: 'continue' }] } }),
   approvals: [{ step: 'ask', ...approved }],
 });
 

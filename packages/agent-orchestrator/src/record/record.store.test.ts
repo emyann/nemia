@@ -271,7 +271,10 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
         workspace: '/w/implement',
         branch: 'wf/r-old/implement',
         check: { taskId: 'r-old-implement-try2-check' },
-        tries: [{ taskId: 'r-old-implement', check: { taskId: 'r-old-implement-check' }, then: 'retries' }],
+        tries: [
+          { taskId: 'r-old-implement', check: { taskId: 'r-old-implement-check' }, then: 'retries' },
+          { taskId: 'r-old-implement-try1b', cause: 'nudge' },
+        ],
         handedOff: 'r-old-implement-try2',
       },
       ship: { taskId: 'r-old-ship', landed: { commit: 'fed789' } },
@@ -285,11 +288,13 @@ test("the oldest shapes on the owner's store read: no frozen workflow, `disallow
   );
   assert.equal(old.steps.implement.tries![0].cause, 'retries', 'a try written with the former `then` reads as its `cause`');
   assert.equal(Object.hasOwn(old.steps.implement.tries![0], 'then'), false, 'and holds no `then`');
+  assert.equal(old.steps.implement.tries![1].cause, 'continue', 'a try whose cause is the former `nudge` reads as `continue`');
   rewriteRun(old);
   const triesWritten = (JSON.parse(fs.readFileSync(runFile('r-old'), 'utf8')) as { steps: { implement: { tries: object[] } } }).steps
     .implement.tries;
   assert.equal(Reflect.get(triesWritten[0], 'cause'), 'retries');
   assert.equal(Object.hasOwn(triesWritten[0], 'then'), false, 'written back under `cause` alone');
+  assert.equal(Reflect.get(triesWritten[1], 'cause'), 'continue', 'written back in the word it has now');
 
   const noCause = aRecord('r-nocause');
   (noCause.steps as Record<string, Record<string, unknown>>).implement.tries = [{ taskId: 'r-nocause-implement' }];
@@ -439,17 +444,18 @@ test('a retry ask is held to `nemia retry`’s word, reason by reason; one from 
   assert.equal(said({ mode: 'again' }), 'it asks for no mode nemia retry knows ("again")');
   assert.equal(said({}), 'it asks for no mode nemia retry knows (undefined)');
   assert.equal(said({ mode: 'fresh', model: '' }), 'its model is not a name');
-  assert.equal(said({ mode: 'nudge', message: ['go'] }), 'its message is not text');
-  assert.equal(said({ mode: 'nudge', message: '\n' }), 'its message is empty');
-  assert.equal(said({ mode: 'nudge', budget: -1 }), 'its budget is not an amount of dollars above zero');
+  assert.equal(said({ mode: 'continue', message: ['go'] }), 'its message is not text');
+  assert.equal(said({ mode: 'continue', message: '\n' }), 'its message is empty');
+  assert.equal(said({ mode: 'continue', budget: -1 }), 'its budget is not an amount of dollars above zero');
   assert.match(String(said({ mode: 'recheck', message: 'look' })), /^it carries a message and asks for a recheck, /);
 
   assert.equal(said({ mode: 'recheck', budget: 3 }), 'it carries a budget and asks for a recheck, which files no session to spend it');
   assert.deepEqual(said({ mode: 'fresh', at: AT }), { step: 'implement', try: 2, mode: 'fresh', at: AT });
-  assert.deepEqual(said({ mode: 'nudge', model: 'haiku', message: 'go on', budget: 4, at: AT }), {
+  assert.deepEqual(said({ mode: 'nudge', at: AT }), { step: 'implement', try: 2, mode: 'continue', at: AT }, 'the former `nudge` reads as `continue`');
+  assert.deepEqual(said({ mode: 'continue', model: 'haiku', message: 'go on', budget: 4, at: AT }), {
     step: 'implement',
     try: 2,
-    mode: 'nudge',
+    mode: 'continue',
     model: 'haiku',
     message: 'go on',
     budget: 4,

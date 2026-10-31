@@ -202,7 +202,7 @@ test('a call denied in a try that ends blocked is counted once, with its tool, i
 
 test("the next turn's denials count on top, a call denied twice is two, and a daemon started again records none twice", async () => {
   const { run, taskId } = await blockedRun();
-  await runWith(engine, retryRun(run.id, 'implement', { mode: 'nudge', message: 'the --dry-run flag' }));
+  await runWith(engine, retryRun(run.id, 'implement', { mode: 'continue', message: 'the --dry-run flag' }));
   for (let i = 0; i < 4 && !sessions.has(nameFor(taskId, 2)); i++) await tick();
   assert.ok(sessions.has(nameFor(taskId, 2)), 'the answer is the same task, in its next attempt');
   signDenied(taskId, 2, 'done', [
@@ -285,7 +285,7 @@ test('a blocked try answered in its session and signed done is one try, with its
   signDenied(taskId, 1, 'blocked', []);
   for (let i = 0; i < 3; i++) await tick();
   assert.deepEqual(await counted('step.tries', 'answered'), [], 'held open for a word, not settled');
-  await runWith(engine, retryRun(run.id, 'implement', { mode: 'nudge', message: 'the --dry-run flag' }));
+  await runWith(engine, retryRun(run.id, 'implement', { mode: 'continue', message: 'the --dry-run flag' }));
   for (let i = 0; i < 4 && !sessions.has(nameFor(taskId, 2)); i++) await tick();
   assert.ok(sessions.has(nameFor(taskId, 2)), 'the answer is the same task, in its next attempt');
   sign(taskId, 0.75, 2);

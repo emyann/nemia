@@ -4,8 +4,6 @@
  * (`TEAM_PATHS`), with its count and the move that clears it (`TEAM_MOVES`). The counts only shrink: a change that takes a name or a
  * path out of a file lowers its entry in the same commit, and the entry goes once its file is clean. Once both records are empty, the
  * team can leave the repository.
- *
- * Measured on 2026-10-31, on the tree that moved the builtin servers into the package and took the team's names out of product source.
  */
 import type { Baseline } from './words.test.ts';
 

@@ -5,9 +5,9 @@
  * lint tests here read `.oxlintrc.json` and `lint/`, and this package's suite reads the apps' tests (`suite.test.ts`, `comments.test.ts`).
  * The declared-imports scan here reads every workspace package's `package.json` and source, the apps' configs and the runtime's files
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too. The vocabulary test here reads this
- * repository's team from `workflows/`, its agents and its workflows' folders (`words.test.ts`), and its whole-repository scans (`names.test.ts`, `others.test.ts`) read
- * the root's and the apps' `CLAUDE.md` among every file. Every package's test script loads the test-cost probe and reporter from
- * `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages' docs for the diagrams they draw,
+ * repository's team from `workflows/`, its agents and its workflows' folders (`words.test.ts`), and its whole-repository scans
+ * (`names.test.ts`, `others.test.ts`) read the root's and the apps' `CLAUDE.md` among every file. Every package's test script loads
+ * the test-cost probe and reporter from `tools/test-costs/`, so each package's test lists `tools/` too. The docs' tests read the packages' docs for the diagrams they draw,
  * every source for the names their pages cite, and the paths those pages cite, at the root and under `docs/` and `workflows/`.
  * The api's test of what `npm run dev` watches reads every workspace package's `package.json` and sources (`dev-watch.test.ts`).
  * The api's tests read Nemia's builtin servers and skills, the orchestrator's `servers/` and `skills/` (`servers.test.ts`,

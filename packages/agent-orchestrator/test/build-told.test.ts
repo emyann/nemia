@@ -171,9 +171,14 @@ const OPENS_THE_PULL_REQUEST = [
   "a red, cancelled or missing `ci` comes back as the check's refusal, with the Actions URL, the failing jobs and the tail of their log",
 ];
 
+/** What each step given the `effect` skill is told: when to load it, and why. */
+const EFFECT_TOLD =
+  'When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this repository writes Effect 4, and sends you to the docs installed with Effect first.';
+
 /** What an implement step is told, build's and quick's alike: the base, the board's components, a dashboard rendered. */
 const IMPLEMENT_TOLD = [
   ...MERGES_THE_BASE,
+  EFFECT_TOLD,
   ...OPENS_THE_PULL_REQUEST,
   "load `shadcn` for the board's components",
   'When the change touches `tools/observe`',
@@ -233,6 +238,7 @@ const TOLD: Told[] = [
       STOP_BOARD,
       ...KIT_READER_TOLD,
       ...LOOK_PARTS_TOLD,
+      EFFECT_TOLD,
     ],
     adds: ['shadcn', 'look', 'react-aria'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...BROWSER_FENCE],
@@ -251,6 +257,7 @@ const TOLD: Told[] = [
     step: 'review',
     says: [
       ...HOLDS_THE_BASE,
+      EFFECT_TOLD,
       SHADCN_READ,
       ...READS_THE_PULL_REQUEST,
       ...BUILD_REVIEW_TOLD,
@@ -278,6 +285,7 @@ const TOLD: Told[] = [
     step: 'review',
     says: [
       ...HOLDS_THE_BASE,
+      EFFECT_TOLD,
       SHADCN_READ,
       ...READS_THE_PULL_REQUEST,
       'Run the typecheck and the lint yourself, each bare and one command per call: `npx turbo run typecheck --force`, `npm run lint`.',

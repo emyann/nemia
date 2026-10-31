@@ -25,7 +25,7 @@ const { Chips, DecideSection, DiffFileView, GroupBar, LessonChip, TouchedBranch 
 const { ReactFlowProvider } = await import('@xyflow/react');
 const { AllowedReach } = await import('../src/components/Reach.tsx');
 const { TemplateCard } = await import('../src/components/TemplateCard.tsx');
-const { PERSON } = await import('../src/lib/words.ts');
+const { OFFERS, PERSON } = await import('../src/lib/words.ts');
 const { StepBody, StepPolicy, Told } = await import('../src/components/Told.tsx');
 const { RunGone } = await import('../src/components/RunGone.tsx');
 const { KindsBehind } = await import('../src/components/KindsBehind.tsx');
@@ -2397,34 +2397,45 @@ test("a step's node says how many calls its current try was denied, whole, and w
   assert.doesNotMatch(nodeMarkup(needing('unverified · done', {}, { waitingOnYou: [] })), /data-denied/);
 });
 
-/** The Decide section's answers for `offers`, rendered inside the query client their asks are made with. */
-const offersMarkup = (offers: Answer[]) =>
+/** Each step's three commands, as the api answers them on a run `r-1`. */
+const commandsOf = (step: string) => ({
+  name: step,
+  commands: { approve: `nemia approve r-1 ${step}`, retry: `nemia retry r-1 ${step}`, say: `nemia say r-1 ${step}` },
+});
+
+/** The Decide section's answers for `offers`, and the notes of `asked`, rendered inside the query client their asks are made with. */
+const offersMarkup = (offers: Answer[], asked: Array<{ step: string; try: number; note: string | null }> = []) =>
   renderToStaticMarkup(
-    createElement(QueryClientProvider, { client: new QueryClient() }, createElement(Answering.Offers, { runId: 'r-1', offers })),
+    createElement(
+      QueryClientProvider,
+      { client: new QueryClient() },
+      createElement(Answering.Offers, { runId: 'r-1', offers, asked, steps: [...offers, ...asked].map((o) => commandsOf(o.step)) }),
+    ),
   );
 
 test("the answers: a box for a step that asks, Try again for a refused check with a recheck, its box closed while a recheck is chosen — and a try asked, `wf ls`'s note", () => {
-  const html = offersMarkup([
-    { step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] },
-    { step: 'theme', kind: 'try-again', recheck: true, unfinished: false },
-    { step: 'lint', kind: 'try-again', recheck: true, unfinished: true },
-    { step: 'docs', kind: 'try-again', recheck: false, unfinished: false },
-    { step: 'plan', kind: 'asked', try: 2, note: 'try 2 asked (--continue, with your answer) — the next tick files it' },
-  ]);
+  const html = offersMarkup(
+    [
+      { step: 'implement', case: 'answer', kind: 'retry', needs: 'Which database?', questions: [] },
+      { step: 'theme', case: 'try-again', kind: 'retry', recheck: true, unfinished: false },
+      { step: 'lint', case: 'try-again', kind: 'retry', recheck: true, unfinished: true },
+      { step: 'docs', case: 'try-again', kind: 'retry', recheck: false, unfinished: false },
+    ],
+    [{ step: 'plan', try: 2, note: 'try 2 asked (--continue, with your answer) — the next tick files it' }],
+  );
   assert.match(html, /^<section aria-label="Answer"/);
   const rows = new Map(
-    [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
-      m[2],
-      { kind: m[1], html: m[3] },
-    ]),
+    [...html.matchAll(/<li (?:data-offer="([^"]+)" data-kind="([^"]+)"|data-asked="true") data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map(
+      (m) => [m[3], { offer: m[1] ? [m[1], m[2]] : 'asked', html: m[4] }],
+    ),
   );
   assert.deepEqual(
-    [...rows].map(([name, { kind }]) => [name, kind]),
+    [...rows].map(([name, { offer }]) => [name, offer]),
     [
-      ['implement', 'answer'],
-      ['theme', 'try-again'],
-      ['lint', 'try-again'],
-      ['docs', 'try-again'],
+      ['implement', ['answer', 'retry']],
+      ['theme', ['try-again', 'retry']],
+      ['lint', ['try-again', 'retry']],
+      ['docs', ['try-again', 'retry']],
       ['plan', 'asked'],
     ],
   );
@@ -2453,7 +2464,7 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
   );
   assert.match(rows.get('implement')!.html, /<label for="[^"]+" class="sr-only">Your answer to implement<\/label>/);
 
-  assert.equal(said('theme'), 'theme was refused by its check', 'any need but a question is a sentence');
+  assert.equal(said('theme'), `theme ${OFFERS['try-again'].said.refused}`, 'any need but a question is a sentence: a refused check');
   assert.equal(boxes('theme'), 1, 'a refused check: something to tell it if you like');
   assert.deepEqual(buttons('theme'), [['submit', false, 'Try again']]);
   assert.deepEqual(
@@ -2479,12 +2490,10 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
     true,
     `a recheck files no session, so a message on it is refused (\`messageRefusal\`): its box is closed while it is chosen\n${rows.get('lint')!.html}`,
   );
-  assert.match(rows.get('lint')!.html, /placeholder="A recheck runs the check again and files no session: there is nobody to tell\."/);
+  assert.ok(rows.get('lint')!.html.includes(`placeholder="${OFFERS['try-again'].recheck.placeholder}"`), rows.get('lint')!.html);
   assert.deepEqual([closed('implement'), closed('theme'), closed('docs')], [false, false, false]);
-  assert.equal(
-    said('docs'),
-    "docs gave no closeout the run accepts — none, one short of a field it declares, or one naming a file the run does not have; the CLI's decide says which",
-  );
+  assert.equal(unescaped(said('docs')), `docs ${OFFERS['try-again'].said.unsigned}`, 'an unsigned step: no closeout the run accepts');
+  assert.equal(said('lint'), `lint ${OFFERS['try-again'].said.unfinished}`, 'a check that did not finish');
   assert.deepEqual(radios('docs'), [
     ['nudge', true],
     ['fresh', false],
@@ -2503,19 +2512,16 @@ test("the answers: a box for a step that asks, Try again for a refused check wit
 
 test('a step `denials: fail` stopped is offered Try again with a new session first, as `wf decide` offers it, and its row names the calls it was denied', () => {
   const html = offersMarkup([
-    { step: 'notes', kind: 'denied', calls: 'denied: Write(/tmp/w/notes.md)' },
-    { step: 'bare', kind: 'denied', calls: null },
+    { step: 'notes', case: 'denied', kind: 'retry', calls: 'denied: Write(/tmp/w/notes.md)' },
+    { step: 'bare', case: 'denied', kind: 'retry', calls: null },
   ]);
-  const rows = new Map([...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[2], m[3]]));
-  const said = (name: string) => textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]).join(' ');
-  assert.equal(
-    said('notes'),
-    "notes signed off having been denied a call (denied: Write(/tmp/w/notes.md)), and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it",
+  const rows = new Map(
+    [...html.matchAll(/<li data-offer="denied" data-kind="retry" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], m[2]]),
   );
-  assert.equal(
-    said('bare'),
-    "bare signed off having been denied a call, and says denials: fail. This run's allowedTools: is frozen, so a try is denied the same again: a new session is told to do without it",
-  );
+  const said = (name: string) => unescaped(textsOf(/<p data-said="true"[^>]*>([\s\S]*?)<\/p>/.exec(rows.get(name)!)![1]).join(' '));
+  assert.equal(said('notes'), `notes ${OFFERS.denied.said('denied: Write(/tmp/w/notes.md)')}`, 'the calls the api named');
+  assert.equal(said('bare'), `bare ${OFFERS.denied.said(null)}`, 'and none where it named none');
+  assert.notEqual(OFFERS.denied.said('x'), OFFERS.denied.said(null), 'the calls are in the sentence');
   const radios = [...rows.get('notes')!.matchAll(/<input type="radio" name="[^"]*"( checked="")? value="(\w+)"/g)].map((m) => [
     m[2],
     Boolean(m[1]),
@@ -2534,11 +2540,13 @@ test('a step `denials: fail` stopped is offered Try again with a new session fir
 
 test('a step asking questions as data is answered by choosing: radios where it takes one, checkboxes where several, the recommended marked, nothing chosen, and a button that waits for every answer', () => {
   const html = offersMarkup([
-    { step: 'design', kind: 'answer', needs: 'Two questions.', questions: [cut, where] },
-    { step: 'spec', kind: 'answer', needs: 'One question.', questions: [where] },
+    { step: 'design', case: 'answer', kind: 'retry', needs: 'Two questions.', questions: [cut, where] },
+    { step: 'spec', case: 'answer', kind: 'retry', needs: 'One question.', questions: [where] },
   ]);
   const rows = new Map(
-    [...html.matchAll(/<li data-offer="answer" data-questions="true" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [m[1], m[2]]),
+    [...html.matchAll(/<li data-offer="answer" data-kind="retry" data-questions="true" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map(
+      (m) => [m[1], m[2]],
+    ),
   );
   const design = rows.get('design')!;
   assert.ok(design, html);
@@ -2624,7 +2632,8 @@ test('the Decide section puts the answers first, before what there is to decide,
     { client: new QueryClient() },
     createElement(Answering.Offers, {
       runId: 'r-1',
-      offers: [{ step: 'implement', kind: 'answer', needs: 'Which database?', questions: [] }],
+      offers: [{ step: 'implement', case: 'answer', kind: 'retry', needs: 'Which database?', questions: [] }],
+      steps: [commandsOf('implement')],
     }),
   );
   const html = renderToStaticMarkup(createElement(DecideSection, { runId: 'r-1', decision, offers }));
@@ -2637,7 +2646,7 @@ test('the Decide section puts the answers first, before what there is to decide,
   assert.match(html, />implement<\/strong> asks:<\/p> <div data-markdown="true"[^>]*><p[^>]*>Which database\?<\/p><\/div>/);
 });
 
-test("the Decide section's accept row takes a reason and presses it; every other row still only copies", () => {
+test('a loop out of rounds is approved as it stands from the Answer section, with a reason, by its own approve line; every Commands row only copies', () => {
   const decision: Decidable = {
     standings: [],
     touched: [],
@@ -2652,35 +2661,48 @@ test("the Decide section's accept row takes a reason and presses it; every other
     commands: [
       { label: 'once more', command: 'nemia retry r-1 review --round', said: null, step: 'review' },
       {
-        label: 'accept',
+        label: 'approve',
         command: 'nemia approve r-1 review --message "<why>"',
         said: 'review: enough — go on with what is there:  nemia approve r-1 review --message "<why>"',
         step: 'review',
       },
     ],
   };
-  const html = renderToStaticMarkup(
-    createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DecideSection, { runId: 'r-1', decision })),
+  const offers = createElement(
+    QueryClientProvider,
+    { client: new QueryClient() },
+    createElement(Answering.Offers, {
+      runId: 'r-1',
+      offers: [{ step: 'review', case: 'enough', kind: 'approve' }],
+      steps: [commandsOf('review')],
+    }),
   );
-  const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
-  const row = /<li data-command="accept"[\s\S]*?<\/li>/.exec(commands)![0];
-  assert.match(row, /data-step="review"/);
-  assert.match(row, /<code[^>]*>nemia approve r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/);
-  assert.match(row, /<form aria-label="Accept review as it stands"/);
-  const label = /<label for="([^"]+)"[^>]*>Why review&#x27;s work is good enough as it stands<\/label>/.exec(row);
+  const html = renderToStaticMarkup(
+    createElement(QueryClientProvider, { client: new QueryClient() }, createElement(DecideSection, { runId: 'r-1', decision, offers })),
+  );
+  const answer = /<section aria-label="Answer"[\s\S]*?<\/section>/.exec(html)![0];
+  const row = /<li data-offer="enough" data-kind="approve" data-step="review"[\s\S]*?<\/li>/.exec(answer)![0];
+  assert.match(
+    row,
+    /<code>nemia approve r-1 review --message &quot;&lt;why&gt;&quot;<\/code>/,
+    "the step's approve line, with the reason a loop's requires",
+  );
+  assert.ok(row.includes(`<form aria-label="${OFFERS.enough.form('review')}"`), row);
+  const label = new RegExp(`<label for="([^"]+)"[^>]*>${OFFERS.enough.field('review').replace("'", '&#x27;')}</label>`).exec(row);
   assert.ok(label, row);
   assert.match(row, new RegExp(`<textarea id="${label[1]}"`));
   assert.match(
     row,
-    /<button type="submit" disabled=""[^>]*>Accept as it stands<\/button>/,
-    'blank, the button waits for a reason, as `nemia approve` waits for `--message`',
+    new RegExp(`<button type="submit" disabled=""[^>]*>${OFFERS.enough.button}</button>`),
+    'blank, the button waits for a reason, as `nemia approve` of a loop waits for `--message`',
   );
+  const commands = /<section aria-label="Commands"[\s\S]*?<\/section>/.exec(html)![0];
   assert.deepEqual(
-    [.../<li data-command="once more"[\s\S]*?<\/li>/.exec(commands)![0].matchAll(/<button [^>]*>/g)].map((m) =>
-      /data-copy="true"/.test(m[0]),
-    ),
-    [true],
+    [...commands.matchAll(/<button [^>]*>/g)].map((m) => /data-copy="true"/.test(m[0])),
+    [true, true],
+    'every Commands row only copies',
   );
+  assert.doesNotMatch(commands, /<form|<textarea/);
 });
 
 test('the tries say `your answer` beside a try a person answered, and above its closeout in the Output tab, selected or folded', () => {
@@ -3954,10 +3976,11 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     questions: [],
   };
   const html = offersMarkup([
-    { step: 'tokens', kind: 'raise', message: 'over budget $4.25 of $3', ...checkRaise },
+    { step: 'tokens', case: 'raise', kind: 'retry', message: 'over budget $4.25 of $3', ...checkRaise },
     {
       step: 'palette',
-      kind: 'raise',
+      case: 'raise',
+      kind: 'retry',
       message: 'over budget $1.50 of $1',
       by: 'retry',
       above: 1.5,
@@ -3968,10 +3991,11 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
       unfinished: false,
       questions: [],
     },
-    { step: 'types', kind: 'raise', message: 'failed ✗ check (unfinished)', ...checkRaise, unfinished: true },
+    { step: 'types', case: 'raise', kind: 'retry', message: 'failed ✗ check (unfinished)', ...checkRaise, unfinished: true },
     {
       step: 'review',
-      kind: 'raise',
+      case: 'raise',
+      kind: 'retry',
       message: 'over budget — implement $2.10 of $2',
       by: 'round',
       above: 2.1,
@@ -3984,7 +4008,7 @@ test("a step past its budget is offered a raise: its word with the amounts, a bo
     },
   ]);
   const rows = new Map(
-    [...html.matchAll(/<li data-offer="([^"]+)" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
+    [...html.matchAll(/<li data-offer="([^"]+)" data-kind="retry" data-step="([^"]+)"[^>]*>([\s\S]*?)<\/li>/g)].map((m) => [
       m[2],
       { kind: m[1], html: m[3] },
     ]),
@@ -4741,7 +4765,8 @@ test('a raise of a step that signed off blocked asking questions as data draws t
   const html = offersMarkup([
     {
       step: 'palette',
-      kind: 'raise',
+      case: 'raise',
+      kind: 'retry',
       message: 'over budget $1.50 of $1',
       by: 'retry',
       above: 1.5,

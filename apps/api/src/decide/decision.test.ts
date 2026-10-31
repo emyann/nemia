@@ -497,7 +497,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
           .map(({ label, command, step }: DecideCommand) => ({ label, command, step })),
         [
           { label: 'once more', command: 'nemia retry r-d9 review --round', step: 'review' },
-          { label: 'accept', command: 'nemia approve r-d9 review --message "<why>"', step: 'review' },
+          { label: 'approve', command: 'nemia approve r-d9 review --message "<why>"', step: 'review' },
           { label: 'once more', command: 'nemia retry r-d9 implement', step: 'implement' },
         ],
         'both offers are the bare command a person runs (`choicesOf`), never a paragraph under a button that says `once more`',
@@ -507,7 +507,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
         [],
         'every command is one line a person runs, never a sentence',
       );
-      const accept = body.commands.find((c) => c.label === 'accept');
+      const accept = body.commands.find((c) => c.label === 'approve');
       assert.ok(accept?.said, JSON.stringify(body.commands));
       assert.match(
         accept.said,

@@ -32,8 +32,8 @@
  *
  * `accept`, on the day decision 7 retired it (`Approve` in the run core's table): `nemia accept` is `nemia approve` of a loop out of
  * rounds. What is left is the former spelling kept on purpose (`RENAMED`, read by admission and named in its doc), the record's names
- * for what a loop's end writes (`acceptRun`, `acceptAsk`, the `accept-<step>-<n>` file, the decision's `accept` offer label, which slice B
- * renames on the board), and the word's other senses (a trust accepted, a level's words).
+ * for what a loop's end writes (`acceptRun`, `acceptAsk`, the `accept-<step>-<n>` file), and the word's other senses (a trust accepted,
+ * a level's words). The decision's `accept` offer label is `approve` since slice B, as its `merge` is `refresh`.
  *
  * `agents remove`, `workflows remove`, `policy drop`, `agents try`, `template check` and `factory plan`, on the day decision 8 retired them
  * (its rows Rm, Run an agent, Lint and Diff in the run core's table): each is left once, as its own row of `RENAMED` (`command.ts`), which
@@ -66,7 +66,6 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/admission/admission.ts': 1,
     'packages/agent-orchestrator/src/brief/brief-sections.ts': 2,
     'packages/agent-orchestrator/src/command/command.ts': 2,
-    'packages/agent-orchestrator/src/decide/decide.ts': 4,
     'packages/agent-orchestrator/src/gate/commands.verb.ts': 3,
     'packages/agent-orchestrator/src/gate/form.verb.ts': 1,
     'packages/agent-orchestrator/src/gate/gate.ts': 1,

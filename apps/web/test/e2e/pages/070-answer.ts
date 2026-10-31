@@ -110,7 +110,7 @@ export default {
 
     const note = 'try 2 asked (--continue, with your answer) — the next tick files it';
     await expectVisible(
-      decide.locator(`[data-offer="asked"][data-step="${FAKE.blocked}"] [data-note]`, { hasText: note }),
+      decide.locator(`[data-asked][data-step="${FAKE.blocked}"] [data-note]`, { hasText: note }),
       `the step's row says what wf ls says once the run is read again (${note})`,
     );
     const section = page.locator('article > section', { has: page.getByRole('heading', { level: 2, name: FAKE.blocked, exact: true }) });

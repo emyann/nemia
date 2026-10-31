@@ -231,7 +231,7 @@ export default {
       if (ask.mode !== 'nudge' || ask.message !== lines.join('\n\n'))
         throw new Refused(`the answers are the next try's message, in the package's words — ${file} holds ${JSON.stringify(ask)}`);
       await expectVisible(
-        page.locator(`section[aria-label="Decide"] [data-offer="asked"][data-step="spec"]`),
+        page.locator(`section[aria-label="Decide"] [data-asked][data-step="spec"]`),
         "spec's row says its try was asked for",
       );
     } finally {

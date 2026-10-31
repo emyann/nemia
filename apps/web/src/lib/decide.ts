@@ -2,7 +2,7 @@
  * What the board works out from a run's decision, without React: when to ask for it, the Factory card's line, a group's
  * bar, and what a line of a diff is. Pure. The words themselves are the api's, which are the CLI `decide`'s.
  */
-import type { Decidable, DecideCommand, Group, RunDecision, RunSummary, Touched } from './api';
+import type { Decidable, Group, RunDecision, RunSummary, Touched } from './api';
 import { stepState } from './status.ts';
 
 /**
@@ -107,4 +107,3 @@ export function changeOf(touched: Touched | undefined, file: string): { added: n
   if (!touched || 'error' in touched.radius) return undefined;
   return touched.radius.changes.find((c) => c.path === file || (c.from && `${c.from} → ${c.path}` === file));
 }
-

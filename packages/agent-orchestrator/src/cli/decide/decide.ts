@@ -540,7 +540,8 @@ function printChoice({ run, toDecide, commands, closeouts }: Decided, steps: Ste
 /**
  * The step at its gate: that it signed off, or that it is the ending not yet run, with the first paragraph of its own note (`ownNote`)
  * where it has one; then its approval — with an `--answer` for each question its closeout `said` asks — and the send-backs after it, as the
- * run's commands say them.
+ * run's commands say them. The approval is the gate's own line, `nemia approve <run> <step>` word for word: a loop out of rounds is
+ * labelled `approve` too, its line ending in `--message "<why>"`.
  */
 function printApprove(
   runId: string,
@@ -554,7 +555,6 @@ function printApprove(
   console.log(`\n  to decide  ${step.name}${toDecide.filed ? ' has signed off and waits for your word:' : unrun}`);
   const [paragraph] = toDecide.says === null ? [] : ownNote(step).split(/\n[ \t]*\n/);
   for (const line of paragraph?.split('\n') ?? []) console.log(`    ${line}`);
-  // The gate's own line, word for word: a loop out of rounds is offered `nemia approve` too, with its `--message "<why>"`.
   const at = commands.findIndex((c) => c.label === 'approve' && c.command === `nemia approve ${runId} ${step.name}`);
   if (at < 0) return;
   console.log(`\n  approve it    ${commands[at].command} ${answersOr(step, said, '[--message "<words>"]')}`);

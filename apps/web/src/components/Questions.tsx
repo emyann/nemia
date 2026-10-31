@@ -181,7 +181,7 @@ export function RecommendButton({
 }
 
 /** A step whose try a person just asked for, as its row says it until the run is read again: the CLI `ls`'s note. */
-function AskedRow({ step, said }: { step: string; said: string }) {
+export function AskedRow({ step, said }: { step: string; said: string }) {
   return (
     <li data-asked data-step={step} className="rounded border border-outline-variant px-3 py-2 text-body-medium">
       <strong>{step}</strong>{' '}

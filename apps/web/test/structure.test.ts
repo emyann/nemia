@@ -563,7 +563,9 @@ test(`an offer's words for a person are written in ${WORDS} alone`, () => {
 });
 
 test("REFUSED: an offer's sentence spelled outside the table", () => {
-  const planted = new Map([['src/components/X.tsx', "case 'answer':\n  return 'signed off blocked, and said nothing of what it needs';\n"]]);
+  const planted = new Map([
+    ['src/components/X.tsx', "case 'answer':\n  return 'signed off blocked, and said nothing of what it needs';\n"],
+  ]);
   assert.equal(offerWordBreaks(planted, SENTENCES).length, 1);
 });
 

@@ -1,6 +1,6 @@
 /**
- * What a person asks of a run from the board — a try, a round, an approval (a gate's, or a loop's as it stands), words to a session (the command table's
- * routes, apps/api/src/commands/routes.ts).
+ * What a person asks of a run from the board — a try, a round, an approval (a gate's, or a loop's as it stands), words to a session
+ * (the command table's routes, apps/api/src/commands/routes.ts).
  */
 
 import { Schema } from 'effect';

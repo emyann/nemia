@@ -4,18 +4,9 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import {
-  barOf,
-  changeOf,
-  decidableRun,
-  decisionStamp,
-  diffLine,
-  isDecidable,
-  mostLines,
-  touchedSummary,
-} from '../src/lib/decide.ts';
-import { decisionQuery, type Decidable, type Radius, type RunStatus, type Touched } from '../src/lib/api.ts';
-import { coded, decidable, type Word } from './run-fixtures.ts';
+import { barOf, changeOf, decidableRun, decisionStamp, diffLine, isDecidable, mostLines, touchedSummary } from '../src/lib/decide.ts';
+import { type Decidable, type Radius, type RunStatus, type Touched } from '../src/lib/api.ts';
+import { coded, type Word } from './run-fixtures.ts';
 
 const group = (name: string, files: number, added: number, removed: number, binary = 0) => ({ name, files, added, removed, binary });
 

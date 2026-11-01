@@ -24,13 +24,16 @@ export type TranscriptEvent = {
   origin?: { kind: string };
 };
 
+/** The kinds of a `TranscriptEvent`, as its schema decodes them. */
+export const TRANSCRIPT_KINDS = ['text', 'thinking', 'tool_use', 'tool_result', 'system'] as const;
+
 /** Decodes a `TranscriptEvent`: a tool's input is read as it came. */
 const TranscriptEventSchema = decodes<TranscriptEvent>()(
   Schema.Struct({
     id: Schema.String,
     at: Schema.String,
     role: Schema.Literals(['assistant', 'user', 'system']),
-    kind: Schema.Literals(['text', 'thinking', 'tool_use', 'tool_result', 'system']),
+    kind: Schema.Literals(TRANSCRIPT_KINDS),
     text: Schema.optionalKey(Schema.String),
     tool: Schema.optionalKey(Schema.Struct({ name: Schema.String, input: Schema.optionalKey(Schema.Unknown) })),
     result: Schema.optionalKey(Schema.Struct({ text: Schema.String, isError: Schema.Boolean })),

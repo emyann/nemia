@@ -372,6 +372,11 @@
       }
     },
     {
+      "term": "Transcript mark",
+      "meaning": "the kind of the last transcript event before a person's words reached a step's session (`nemia say`), which a said message carries as `after.kind`: text, thinking, tool_use, tool_result or system, the runtime's `TranscriptEvent` kinds held equal in `runtime-client.ts`.",
+      "type": "SaidAfterKind"
+    },
+    {
       "term": "Try",
       "meaning": "one filing of a step as a new runtime task, the way a Kubernetes Job makes a new Pod: a retry, a continued session, a round or a person's `nemia retry` files the next try, and each earlier one is kept on the record (`EarlierTry`) with its cause. A try is never the runtime's attempt, which is a restart inside one task.",
       "type": "Try",

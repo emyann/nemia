@@ -27,6 +27,7 @@ import {
   type MissingCredential,
   type RemoteAgent,
   type TaskPhase,
+  type TranscriptEvent,
   Engine as RuntimeEngine,
   refusalWords,
   type EngineShape,
@@ -41,6 +42,7 @@ import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 import { exportIntervalRefusalOf, sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
 import type { EnginePhase } from './views/views-words.ts';
 import { fromThrow } from './door/door.store.ts';
+import type { SaidAfterKind } from './say/say.ts';
 
 /**
  * Whether two unions hold the same words: `true` only when each is assignable to the other, `false` otherwise, so a `true` annotation
@@ -53,6 +55,9 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
  * runtime's `TaskPhase`: a word added to or dropped from either fails the typecheck here, never a reader at run time.
  */
 export const enginePhaseHeld: Same<EnginePhase, TaskPhase> = true;
+
+/** The orchestrator's copy of the kinds a said message may follow (`SaidAfterKind`), held equal to the runtime's `TranscriptEvent['kind']`. */
+export const saidAfterKindHeld: Same<SaidAfterKind, TranscriptEvent['kind']> = true;
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;

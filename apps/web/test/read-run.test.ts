@@ -73,6 +73,18 @@ test("get, the run page's reads: each decodes what the api gives, keeps out what
     assert.equal(err.status, 404);
     assert.equal(runGone(err), true);
   });
+  await t.test('a word the board does not know in a closed field of a step is refused at decode, never shown', async (t) => {
+    const strange = {
+      ...step(),
+      said: [{ at: '2026-09-30T05:00:00.000Z', attempt: 1, text: 'hi', after: { kind: 'mystery', id: 'e-1' } }],
+    };
+    answering(t, { ...detail(), steps: [strange] });
+    const err: unknown = await readDetail().then(
+      () => assert.fail('a word the board does not know was read'),
+      (e: unknown) => e,
+    );
+    assert.ok(err instanceof UnreadAnswer, String(err));
+  });
   await t.test("a run's decision decodes as the api gave it, in each of its shapes", async (t) => {
     const holding = detail().holding;
     const waiting = detail().waiting;

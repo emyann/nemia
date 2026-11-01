@@ -30,6 +30,5 @@ export const OPEN_STATE: Readonly<Record<string, { readonly card: string }>> = {
   'packages/agent-orchestrator/src/series/series.ts#RollupLine.l.kind': { card: "Close the orchestrator's state words at its doors" },
   'packages/agent-orchestrator/src/series/series.ts#RollupLine.l.phase': { card: "Close the orchestrator's state words at its doors" },
   'packages/agent-orchestrator/src/summary/summary.verb.ts#RunSummary.steps[].status': { card: "Drop a step's deprecated status sentence" },
-  'packages/agent-runtime/src/harness/admission.ts#AdmissionAnswer.reason': { card: 'Rename a sentence called reason to message' },
   'packages/agent-runtime/src/harness/seam.ts#TranscriptEvent.origin.kind': { card: 'Close third-party kinds at the doors' },
 };

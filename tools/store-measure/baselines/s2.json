@@ -1,0 +1,113 @@
+{
+  "machine": {
+    "cpu": "Intel(R) Core(TM) Ultra 9 275HX",
+    "cores": 12,
+    "memoryBytes": 16770088960,
+    "node": "v24.20.0",
+    "platform": "linux",
+    "load": 3.31
+  },
+  "commit": "8462ca324737f344fe3b98712cee59278855d3a4",
+  "date": "2026-11-01T00:28:33.120Z",
+  "repeat": 5,
+  "from": "~/.agent-workflows",
+  "engine": "~/.agent-engine",
+  "copy": {
+    "files": 97919,
+    "bytes": 2255584677,
+    "ms": 23368.293089,
+    "leftOut": [
+      "api.log",
+      "daemon.json",
+      "engine/a2a",
+      "wf-up.log",
+      "worktrees"
+    ]
+  },
+  "counts": {
+    "runs": 100,
+    "finishedRuns": 96,
+    "openRuns": 4,
+    "tasks": 7234,
+    "journalBytes": 114853788,
+    "feedLines": 36680,
+    "unreadable": {
+      "runs": 0,
+      "passLines": 0
+    },
+    "invariantRefusals": 0
+  },
+  "asked": {
+    "finishedRun": "nudge-becomes-continue-in-th-9xml",
+    "openRun": "nemia-s-data-model-slice-2-t-ddir",
+    "feedCursor": 8323165,
+    "feedLinesRead": 1000
+  },
+  "measures": {
+    "runList": {
+      "cold": {
+        "ms": 1334.0293290000009,
+        "heapMb": 142.660432
+      },
+      "warm": {
+        "ms": 41.39390799999819,
+        "heapMb": 1.137928
+      }
+    },
+    "stats": {
+      "cold": {
+        "ms": 4116.742502000001,
+        "heapMb": 59.046504
+      },
+      "warm": {
+        "ms": 148.64183100000082,
+        "heapMb": 0.28332
+      }
+    },
+    "finishedRun": {
+      "cold": {
+        "ms": 864.1103560000047,
+        "heapMb": 85.448904
+      },
+      "warm": {
+        "ms": 106.39620099999593,
+        "heapMb": 1.08644
+      }
+    },
+    "openRun": {
+      "cold": {
+        "ms": 861.3660039999959,
+        "heapMb": 86.181696
+      },
+      "warm": {
+        "ms": 111.89220899999782,
+        "heapMb": 0.849712
+      }
+    },
+    "feedFromCursor": {
+      "cold": {
+        "ms": 21.73585599999933,
+        "heapMb": 0.19332
+      },
+      "warm": {
+        "ms": 19.2413979999983,
+        "heapMb": 0.088312
+      }
+    },
+    "tickPass": {
+      "cold": {
+        "ms": 665.0390560000087,
+        "heapMb": 0.378368
+      },
+      "warm": {
+        "ms": 108.24215099999856,
+        "heapMb": 0.180952
+      }
+    }
+  },
+  "spawned": {
+    "git read (pass)": 11
+  },
+  "placeRefused": {},
+  "refusals": []
+}

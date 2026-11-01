@@ -227,10 +227,10 @@ async function cardSays(page: Page, run: WaitingRun): Promise<void> {
   );
 }
 
-/** The seed's two gates name what a person reads there: the plan that waits, and the review done before a landing not yet filed. */
+/** The seed's two gates name what a person reads there: the step that waits, and the review done before a landing not yet filed. */
 async function gatesSay(page: Page): Promise<void> {
   for (const [id, words, why] of [
-    [GATED.id, 'Read the plan', 'a gate on a step that has run names that step'],
+    [GATED.id, `Read the ${GATED.gated}`, 'a gate on a step that has run names that step'],
     [ENDING.id, 'Read the review', 'a gate held before its step is filed names the step done before it'],
   ] as const)
     await expectTexts(cardOf(page, id).locator('a[data-cut-button]'), [words], why);

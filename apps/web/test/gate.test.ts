@@ -157,15 +157,15 @@ test("gateOfSummary, readLink: the card's gate, what it approves and sends back,
     },
   );
   await t.test(
-    "the card's link to what a gate approves: a plan's inspector, any other step's, and an ending's section, which has handed nothing on",
+    "the card's link to what a gate approves: the step's inspector, in one set of words whatever its name, and an ending's section, which has handed nothing on",
     () => {
-      assert.deepEqual(readLink({ step: 'plan', ends: false }), { words: 'Read the plan', step: 'plan' });
+      assert.deepEqual(readLink({ step: 'plan', ends: false }), { words: 'Read what it handed on', step: 'plan' });
       assert.deepEqual(readLink({ step: 'review', ends: false }), { words: 'Read what it handed on', step: 'review' });
       assert.deepEqual(readLink({ step: 'ship', ends: true }), { words: 'Read what it acts on', hash: 'step-ship' });
       assert.deepEqual(
         readLink({ step: 'plan', ends: true }),
         { words: 'Read what it acts on', hash: 'step-plan' },
-        'an ending named plan has no plan to read yet',
+        'an ending has handed nothing on yet, whatever its name',
       );
     },
   );

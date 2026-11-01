@@ -1,0 +1,84 @@
+/**
+ * The Run door: the one way a program reads and writes a run — its record, and the files a person keeps beside it (asks, holds, refresh
+ * asks, the markers of what `nemia rm` forgets) — an Effect service, `RunDoor`, whose methods take a run's id as `RunId` and answer an
+ * Effect failing with a refusal. Its shape is the run store's (`RunStore`, `record/record.ts`) but the inbox, which is the Card door's
+ * (S3) and stays on `runStore` as its seam.
+ *
+ * Two layers: the files (`runDoorFiles`, over `filesStore`, so a record is the very bytes it was), which `runWith` gives a program that
+ * was given none, and the memory stand-in (`runDoorMemory`, `memory.store.ts`), which a test gives its program. Both are built by
+ * `runDoorOver`, so each write is checked the one way on both: a new run decodes through the model's `Run` (`record/record.model.ts`)
+ * with its id as `RunId.OnCreate` checks it, and a run written back through `Run`, its invariants among it — each try named by its
+ * step and number, no run waiting on itself, a landing with one outcome — or `Invalid` names the check broken and nothing is written.
+ * A record already at a new run's id is `Conflict`. The walks of `test/run-walks.ts` hold both layers to one table.
+ */
+import { Context, Effect, Layer } from 'effect';
+import { doorOf, checked, type DoorOf } from '../door/door.store.ts';
+import { Conflict } from '../refusal/refusal.ts';
+import { filesStore } from '../record/files.store.ts';
+import { Run as RunModel, RunId } from '../record/record.model.ts';
+import type { Run, RunStore } from '../record/record.ts';
+
+/** A layer of the Run door: the run store's groups but the inbox, as plain synchronous methods. */
+export type RunsLayer = Omit<RunStore, 'inbox'>;
+
+/** The Run door's shape: each method of `RunsLayer` answering an Effect, a run's id taken as `RunId`. */
+export type RunDoorShape = DoorOf<RunsLayer, RunId>;
+
+/** A run written back: what the model's `Run` refuses of it, its invariants among it. */
+const runChecked = checked(RunModel, (run: Run) => `run ${run.id}'s record`);
+
+/** A new run's id, as `RunId.OnCreate` checks it: what `runId` mints, never what a stored record only has to read as. */
+const idChecked = checked(RunId.OnCreate, (id: string) => `a new run under ${JSON.stringify(id)}`);
+
+/** The door over `layer`: each method as `doorOf` makes it, a new run's and a run written back's checked before the layer writes. */
+export function runDoorOver(layer: RunsLayer): RunDoorShape {
+  const door = doorOf<RunsLayer, RunId>(layer);
+  return {
+    ...door,
+    runs: {
+      ...door.runs,
+      create: (run) =>
+        Effect.gen(function* () {
+          yield* idChecked(run.id);
+          yield* runChecked(run);
+          return yield* door.runs.create(run);
+        }),
+      rewrite: (run) =>
+        Effect.gen(function* () {
+          yield* runChecked(run);
+          return yield* door.runs.rewrite(run);
+        }),
+    },
+  };
+}
+
+/** A record already at the id of a new run, as a refusal: the files say so by `EEXIST`, the memory by its own. */
+export const runTaken = (id: string): Conflict =>
+  new Conflict({ message: `run ${id} already exists: start it under a new id, or forget the one there with nemia rm ${id}` });
+
+/** The run store's files but the inbox, a new run's record refused as `runTaken` when one is there: what the files layer is over. */
+const { inbox: _, ...files } = filesStore;
+const filesRuns: RunsLayer = {
+  ...files,
+  runs: {
+    ...files.runs,
+    create: (run) => {
+      try {
+        files.runs.create(run);
+      } catch (err) {
+        throw (err as NodeJS.ErrnoException).code === 'EEXIST' ? runTaken(run.id) : err;
+      }
+    },
+  },
+};
+
+/**
+ * The Run door, as the service a program yields: a reference whose default is the door over the store's files, so a program given no
+ * door reads and writes today's records, and one given another — a test's `runDoorMemory()` — reads and writes that one. A default
+ * where `StoreRoot` and the place have none, so that no program's requirements and no caller change while the run store's callers move
+ * onto the door (`docs/architecture.md`, *The Run door*).
+ */
+export const RunDoor = Context.Reference<RunDoorShape>('agent-orchestrator/RunDoor', { defaultValue: () => runDoorOver(filesRuns) });
+
+/** The Run door over the store's files, as a layer: what the default already gives, for a program that names it. */
+export const runDoorFiles: Layer.Layer<never> = Layer.succeed(RunDoor)(runDoorOver(filesRuns));

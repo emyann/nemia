@@ -364,7 +364,7 @@ function signedOffRun(root: string): void {
   fs.mkdirSync(work, { recursive: true });
   fs.mkdirSync(path.join(root, 'engine', 'tasks'), { recursive: true });
   fs.writeFileSync(
-    path.join(root, 'engine', 'tasks', 't-hub.jsonl'),
+    path.join(root, 'engine', 'tasks', 'r-hub-write.jsonl'),
     [
       { kind: 'filed', at, brief: 'Write it.', cwd: work, maxAttempts: 1, harness: 'claude' },
       { kind: 'starting', at, attempt: 1 },
@@ -373,7 +373,7 @@ function signedOffRun(root: string): void {
         kind: 'ended',
         at,
         attempt: 1,
-        sessionId: 'ae/t-hub/1',
+        sessionId: 'ae/r-hub-write/1',
         observed: 'done',
         reason: 'harness',
         closeout: { outcome: 'done', summary: 'Wrote it.', needs: null, artifacts: [] },
@@ -393,7 +393,7 @@ function signedOffRun(root: string): void {
       createdAt: at,
       workflowDir: path.join(root, 'no-such-workflow'),
       workflow: [{ name: 'write', after: [], body: 'Write it.', harness: 'claude', workspace: 'folder' }],
-      steps: { write: { taskId: 't-hub', workspace: work } },
+      steps: { write: { taskId: 'r-hub-write', workspace: work } },
     }),
   );
 }

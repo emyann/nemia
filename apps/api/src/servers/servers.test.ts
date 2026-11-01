@@ -12,9 +12,10 @@ import { story } from '../../test/checkpoints.ts';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { addFactory } from 'agent-orchestrator';
+import { addFactory, builtinServers } from 'agent-orchestrator';
 import { scratch } from '../../test/scratch.ts';
 import { app } from '../app.ts';
+import { BUILTIN_SERVERS } from './servers.ts';
 
 type FactoryServersRead = import('./servers.ts').FactoryServersRead;
 
@@ -128,4 +129,13 @@ test("A person keeps a factory's MCP servers: none recorded, one recorded and re
       'GitHub, with its client id and no key that names a secret',
     );
   });
+});
+
+test("Nemia's builtin servers are the orchestrator package's own folder, never a folder of the checkout's team", () => {
+  const pkg = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'packages', 'agent-orchestrator');
+  assert.equal(path.relative(pkg, path.resolve(BUILTIN_SERVERS)), 'servers', 'the folder is packages/agent-orchestrator/servers');
+  assert.ok(
+    builtinServers(BUILTIN_SERVERS).some((s) => s.name === 'github'),
+    "GitHub's hosted server is a builtin one",
+  );
 });

@@ -93,6 +93,11 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   field its agent's `output:` schema requires.
 - **`wf decide` of a landed run prints no step's closeout**: a test of a step's artifact lines reads a run still awaiting a decision.
 - **A seeded finished step with a worktree on disk owes a hand-off until its record says `handedOff`** (`handOffOwed`).
+- **A run is read and written through the Run door (`RunDoor`, `src/runs/runs.store.ts`), a `Context.Reference` whose default is
+  the files**: a test that only needs a run to exist gives its programs one `runDoorMemory()` (`src/runs/memory.store.ts`, imported
+  by path, after the file sets `WF_ROOT`) and plants the run through it; code still on `runStore` (`test/run-door.baseline.ts`) reads
+  the files whatever door a program was given, so a test whose verb reaches it stays on files. A write breaking the model's `Run` is
+  refused `Invalid`: build a fixture's task ids with `stepTaskId`.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`
   (`folder/folder.store.ts`), a field per `StepKey`: a key added without one fails the typecheck.

@@ -5992,7 +5992,7 @@ minute poll (the owner, at the design gate of 2026-10-21); Capabilities shows th
 pass refuses to start a Claude Code step whose named server reports `needs-auth`, once per pass for the whole factory, and says what to
 do; a look that failed refuses nothing, since an absence read off a failed look is not an absence.
 
-`workflows/servers/<name>.json` is the shipped list; card 2 put GitHub's in it.
+The package's `servers/<name>.json` (`workflows/servers/` until 2026-10-31) is the shipped list; card 2 put GitHub's in it.
 
 **What follows, and is card 2**: GitHub's hosted MCP server as the first shipped one, and the sign-in itself —
 `mcpAuthenticate`, `mcpSubmitOAuthCallbackUrl` and `mcpClearAuth`, none of them called here. Measured against it: Codex 0.154 cannot sign

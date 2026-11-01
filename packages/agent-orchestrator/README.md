@@ -303,6 +303,15 @@ wf stats --json                            # what GET /api/stats answers
   compared with, and respects the filters and the days. Where either run does not say — a record without its agent's instructions, a rendered
   folder gone — and on an item's first appearance, there is no mark.
 
+## The Run door
+
+A run is read and written through one door, `RunDoor` (`src/runs/runs.store.ts`): an Effect service whose methods take a run's id
+as a `RunId` and answer Effects that fail with a refusal (`Missing`, `Conflict`, `Invalid`). Behind it are today's files, unchanged
+on disk, and a memory stand-in a test gives its program with `Effect.provide(program, runDoorMemory())`. Every write is checked
+first: a new run, or one written back, that breaks an invariant of the run's model (`src/record/record.model.ts`) is refused
+`Invalid` and nothing is written, and a new run at an id that has a record is refused `Conflict`. A program given no door reads the
+files. What has not moved onto it yet is counted in `test/run-door.baseline.ts`.
+
 ## Where this stops
 
 **A workflow orders steps and hands them a workspace. Anything that decides *whether the work is

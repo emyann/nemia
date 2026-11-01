@@ -20,6 +20,8 @@ import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import { staged, story } from './story.ts';
 import { names } from './assessed.ts';
+import { eachTest } from './placed.ts';
+import type { Run } from '../src/record/record.ts';
 
 const ROOT = scratch('wf-auto-rules-');
 process.env.WF_ROOT = ROOT;
@@ -35,9 +37,13 @@ const { confirmedFile, confirmRule, digestOf, dropRule, proposedFile, readConfir
   await import('../src/auto/auto.store.ts');
 const { policyListOf, proposalOf } = await import('../src/auto/auto.verb.ts');
 const { engineOf, runWith } = await import('../src/runtime-client.ts');
+const { RunDoor } = await import('../src/runs/runs.store.ts');
+const { runDoorMemory } = await import('../src/runs/memory.store.ts');
 /** The CLI's `main`, loaded only if a checkpoint types a command: these stories call the verbs, and its import is the slowest. */
 const main: Parameters<typeof staged>[0]['main'] = async (...argv) => (await import('../src/cli/main.ts')).main(...argv);
 const stage = staged({ runWith, main, engineOf });
+/** The Run door of the test running now, in memory: every run a story plants, and every admission it asks, reads this one. */
+const door = eachTest(runDoorMemory);
 
 const NOW = new Date('2026-10-06T12:00:00.000Z');
 
@@ -68,27 +74,34 @@ function refusal(fn: () => unknown): { kind: string; message: string } {
   return assert.fail('no refusal');
 }
 
-/** Writes the run `id`'s record, started in `factory`, or in none, its steps `workflow` filed as `steps` say. */
-function writeRun(
+/**
+ * Plants the run `id`'s record through the test's memory door, started in `factory`, or in none, its steps `workflow` filed as `steps`
+ * say: admission reads a run only through the Run door, so a run need exist there and nowhere on disk.
+ */
+const plantRun = (
   id: string,
   factory?: string,
   workflow: object[] = [{ name: 'build', after: [], body: 'Build it.', harness: 'codex' }],
   steps = {},
-) {
-  fs.mkdirSync(path.join(ROOT, 'runs'), { recursive: true });
-  const record = {
-    id,
-    workspace: ROOT,
-    brief: `The brief of ${id}`,
-    createdAt: '2026-10-06T08:00:00.000Z',
-    workflowDir: path.join(ROOT, 'no-such-workflow'),
-    place: { kind: 'folder' },
-    workflow,
-    steps,
-    ...(factory === undefined ? {} : { factory }),
-  };
-  fs.writeFileSync(path.join(ROOT, 'runs', `${id}.json`), JSON.stringify(record));
-}
+) =>
+  Effect.runPromise(
+    Effect.provide(
+      Effect.flatMap(RunDoor, (d) =>
+        d.runs.create({
+          id,
+          workspace: ROOT,
+          brief: `The brief of ${id}`,
+          createdAt: '2026-10-06T08:00:00.000Z',
+          workflowDir: path.join(ROOT, 'no-such-workflow'),
+          place: { kind: 'folder' },
+          workflow,
+          steps,
+          ...(factory === undefined ? {} : { factory }),
+        } as Run),
+      ),
+      door(),
+    ),
+  );
 
 /** A factory of the store, named `name`, holding a scratch repository. */
 const factory = (name: string) => addFactory({ name, repos: [fs.mkdtempSync(path.join(ROOT, `${name}-`))] });
@@ -104,7 +117,10 @@ const decided = async (command: string, floor: 'semi-auto' | 'none' = 'semi-auto
   (
     await stage.runWith(
       stage.board().e,
-      admitted(JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, floor === 'none' ? undefined : floor),
+      Effect.provide(
+        admitted(JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, floor === 'none' ? undefined : floor),
+        door(),
+      ),
     )
   )?.decision;
 
@@ -113,7 +129,7 @@ const decidedAtAuto = async (command: string) =>
   (
     await stage.runWith(
       stage.board().e,
-      admitted(JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, undefined, 'nemia', ROOT),
+      Effect.provide(admitted(JSON.stringify({ tool: 'Bash', input: { command }, cwd: '/w' }), TABLE, undefined, 'nemia', ROOT), door()),
     )
   )?.decision;
 
@@ -123,9 +139,9 @@ test('Her floor: a call on a run or a factory left at manual is denied, one rais
     'REFUSED: a call on a run of a factory at manual, or on the factory, is denied; one raised is hers; an unread run is asked',
     async () => {
       for (const name of ['pipao', 'hkb']) factory(name);
-      writeRun('r-pipao', 'pipao');
-      writeRun('r-hkb', 'hkb');
-      writeRun('r-default');
+      await plantRun('r-pipao', 'pipao');
+      await plantRun('r-hkb', 'hkb');
+      await plantRun('r-default');
       writeFactoryLevel('hkb', { since: '2026-10-06T08:00:00.000Z', raise: { level: 'semi-auto', until: '2099-01-01T00:00:00.000Z' } });
       assert.equal(await decided('nemia show r-pipao'), 'deny');
       assert.equal(await decided('nemia start ./brief.md --factory pipao'), 'deny');
@@ -190,7 +206,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
         ['g-semi', 'semi'],
         ['g-refused', 'auto'],
       ] as const)
-        writeRun(id, at, GATED, { build: { taskId: `${id}-build`, check: { taskId: `${id}-check` } } });
+        await plantRun(id, at, GATED, { build: { taskId: `${id}-build`, check: { taskId: `${id}-check` } } });
       for (const id of ['g-auto', 'g-semi', 'g-refused']) settled(`${id}-build`, { outcome: 'done', summary: 'Built.', artifacts: [] });
       settled('g-auto-check', undefined, 0);
       settled('g-semi-check', undefined, 0);
@@ -201,7 +217,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
       assert.equal(await decidedAtAuto('nemia approve g-refused build'), 'ask', 'its check refused');
       assert.equal(await decidedAtAuto('nemia approve g-gone build'), 'ask', 'a run that does not read');
       const IMPLEMENT = { name: 'implement', after: [], body: 'Build it.', harness: 'codex', check: 'npm test' };
-      writeRun('g-tries', 'auto', [{ ...IMPLEMENT, gate: true }], {
+      await plantRun('g-tries', 'auto', [{ ...IMPLEMENT, gate: true }], {
         implement: { taskId: 'g-tries-implement', check: { taskId: 'g-tries-check' } },
       });
       settled('g-tries-implement', { outcome: 'done', summary: 'Built.', artifacts: [] });
@@ -212,7 +228,7 @@ test('Auto rules decide an approval: proposed, confirmed beside the default, giv
         'ask',
         "the same try raising the step's cap, whatever the rules allow",
       );
-      writeRun('g-free', 'auto', [IMPLEMENT], {
+      await plantRun('g-free', 'auto', [IMPLEMENT], {
         implement: { taskId: 'g-free-implement', check: { taskId: 'g-free-check' } },
       });
       settled('g-free-implement', { outcome: 'done', summary: 'Built.', artifacts: [] });

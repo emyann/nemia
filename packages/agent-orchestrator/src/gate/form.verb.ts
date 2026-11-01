@@ -5,19 +5,20 @@
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
 import { retryable } from '../retry/index.ts';
 import { hasGate } from '../status/status.ts';
 import { approveFormOf } from './gate.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /**
  * The yes `nemia approve` gives on `stepName` of the run `id` now (`approveFormOf`); for a run that is not there, as its name alone says,
  * and the verb it goes to refuses it.
  */
 export const approveForm = Effect.fnUntraced(function* (id: string, stepName: string | undefined) {
-  if (!(yield* tried(() => runStore.runs.exists(id)))) return approveFormOf([], {}, stepName, () => true);
-  const run = yield* tried(() => runStore.runs.read(id));
+  if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id)))) return approveFormOf([], {}, stepName, () => true);
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const step = steps.find((s) => s.name === stepName);
   if (step === undefined || !step.loop || !hasGate(step, run)) return approveFormOf(steps, run, stepName, () => true);

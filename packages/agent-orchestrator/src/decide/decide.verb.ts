@@ -21,7 +21,6 @@ import { acceptedLines, gateLines } from '../brief/index.ts';
 import { parseCloseout, type Closeout } from '../closeout/index.ts';
 import { answerLines, answerOf, overBudgetLine, retriesDue, retryOffers, type Retry, type RetryAsk } from '../retry/index.ts';
 import { timeline, type Timeline } from '../timeline/index.ts';
-import { runStore } from '../record/files.store.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { landedOf, standingsOf, type BranchReader } from '../branches/branches.store.ts';
 import { headsOver, NOTHING_READ, standingReader, standingWhen, type StandingAsker } from '../standing/standing.verb.ts';
@@ -51,6 +50,8 @@ import { collisionsDue, type Collisions } from '../collide/collide.ts';
 import { collisionsAt } from '../collide/collisions.verb.ts';
 import { landingDenies, statusMemo } from '../place/landing.store.ts';
 import { PlaceService } from '../place/place.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /** A step's current try that a person answered: the try, what they said, and what the try before it needed, when it said. */
 export type Answered = { try: number; message: string; needs?: string };
@@ -252,8 +253,8 @@ function deniedLinesOf(run: Run, views: ReadonlyMap<string, TaskView>): Record<s
  */
 export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.ProcessEnv = process.env, standing?: StandingAsker) {
   const e = viewedOnce(yield* EngineService);
-  const run = yield* tried(() => runStore.runs.read(id));
-  const runs = yield* tried(() => runStore.runs.list());
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
+  const runs = yield* (yield* RunDoor).runs.list();
   const live = standing ?? (yield* standingWhen(runs, id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run).pipe(over(e));
@@ -261,7 +262,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const checks = Object.fromEntries(
     yield* checkReportsRead(run, steps, phaseOf, (p) => p === 'succeeded' || p === 'failed' || p === 'stopped').pipe(over(e)),
   );
-  const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
+  const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
   const reader = closeoutReader(views, run);
   const asked = closeoutAsked(views);
   const verdictOf = (name: string) => checks[name]?.verdict;
@@ -279,7 +280,7 @@ export const decideRun = Effect.fn('decide')(function* (id: string, env: NodeJS.
   const { toDecide: decide } = assess(steps, run, phaseOf, reader, asked, verdictOf, asks, rounds, blocked, spendOf, standings);
   const ending = collisionsDue(steps, run, decide);
   const collisions = ending ? yield* collisionsAt(run, ending, standings, git, place) : undefined;
-  const answers = yield* answersOf(e, run, views, yield* tried(() => runStore.asks.answers(id)));
+  const answers = yield* answersOf(e, run, views, yield* (yield* RunDoor).asks.answers(RunId.read(id)));
   const everyTry = yield* everyTryOf(e, run, views);
   const said = saidOf(run, everyTry);
   const filed = new Map([...everyTry].flatMap(([taskId, v]) => (v.state.filedAt ? [[taskId, v.state.filedAt] as const] : [])));

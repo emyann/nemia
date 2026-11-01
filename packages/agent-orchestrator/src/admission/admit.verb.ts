@@ -9,7 +9,6 @@ import { Effect, Result } from 'effect';
 import type { AdmissionAnswer, AdmissionCall } from 'agent-runtime/vocabulary';
 import { tried } from '../runtime-client.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
 import { retryable, waitsOnPerson } from '../retry/index.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import type { Ran } from '../command/entry.verb.ts';
@@ -21,6 +20,8 @@ import { AUTO_ANSWERS, factsOf, listInForce, type AutoRule, type Facts } from '.
 import { readConfirmed } from '../auto/auto.store.ts';
 import { admissionOf, answerOf, namedIn, typedIn, type Auto, type Scope } from './admission.ts';
 import { seenOf } from './seen.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 import { approveForm } from '../gate/form.verb.ts';
 import type { ApproveForm } from '../gate/gate.ts';
 
@@ -59,7 +60,7 @@ export const ADMIT: Ran = {
 
 /** Why `step` of `runId` waits on the person, as `nemia retry` would judge it, or undefined where it waits on no one. */
 const waitRead = Effect.fnUntraced(function* (runId: string, stepName: string) {
-  const run = yield* tried(() => runStore.runs.read(runId));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
   const steps = yield* tried(() => stepsOf(run));
   const step = steps.find((s) => s.name === stepName);
   if (step === undefined) return `is not there: ${runId} has no step ${stepName}`;

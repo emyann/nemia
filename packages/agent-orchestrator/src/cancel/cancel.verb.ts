@@ -9,11 +9,12 @@ import { EngineService, tried } from '../runtime-client.ts';
 import { type Run } from '../record/record.ts';
 import { cancelPlan, type CancelPlan } from './cancel.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { adoptChecks, adoptRounds, adoptTries } from '../tick/advance.verb.ts';
 import { closeWaitingTasks } from '../tick/held.verb.ts';
 import { stopAsked } from '../tick/held.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 export type Cancelled = { run: Run; plan: CancelPlan };
 
@@ -38,10 +39,10 @@ export type Cancelled = { run: Run; plan: CancelPlan };
  */
 export const cancelRun = Effect.fn('cancel')(function* (id: string) {
   const e = yield* EngineService;
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run);
-  const { asks, rounds } = yield* tried(() => runStore.asks.read(id));
+  const { asks, rounds } = yield* (yield* RunDoor).asks.read(RunId.read(id));
   const verdictOf = exitVerdicts(views, run);
   const spendOf = spendReader(views);
   yield* adoptRounds(e, run, steps, views, phaseOf, closeoutReader(views, run), closeoutAsked(views), rounds, spendOf);
@@ -57,5 +58,5 @@ export const cancelRun = Effect.fn('cancel')(function* (id: string) {
   yield* closeWaitingTasks(e, run, views);
   if (plan.kind === 'already-cancelled') return { run, plan } satisfies Cancelled;
 
-  return { run: { ...run, cancelledAt: yield* tried(() => runStore.runs.cancel(id)) }, plan } satisfies Cancelled;
+  return { run: { ...run, cancelledAt: yield* (yield* RunDoor).runs.cancel(RunId.read(id)) }, plan } satisfies Cancelled;
 });

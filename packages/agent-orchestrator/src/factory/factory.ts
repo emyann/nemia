@@ -160,7 +160,7 @@ export function factoryNameRefusal(name: string): string | undefined {
   if (!name) return 'A factory is named by a lowercase slug, and this name is empty. Give the name: nemia factory ls lists them.';
   if (FACTORY_NAME.test(name)) return undefined;
   const lower = name.toLowerCase();
-  const suggested = FACTORY_NAME.test(lower) ? ` — ${lower}, say` : ' — pipao or nemia-2, say';
+  const suggested = FACTORY_NAME.test(lower) ? ` — ${lower}, say` : ' — acme or acme-2, say';
   return `\`${name}\` is not a factory's name: a name is lowercase letters, digits and dashes, starts with a letter or a digit, and is at most 40 characters long${suggested}.`;
 }
 
@@ -222,14 +222,14 @@ export function workflowNameRefusal(workflow: string): string | undefined {
 export function hireRefusal(step: string, agent: string): string | undefined {
   const parts = step.split('/');
   if (parts.length !== 2)
-    return `--step ${step} names a step as <workflow>/<step>, its workflow's folder and its file without .md, one slash between them: --step build/implement, say.`;
+    return `--step ${step} names a step as <workflow>/<step>, its workflow's folder and its file without .md, one slash between them: --step dev/implement, say.`;
   const [workflow, name] = parts;
   const badWorkflow = workflowNameRefusal(workflow);
   if (badWorkflow) return `--step ${step}: ${badWorkflow}`;
   const badStep = stepNameRefusal(name);
   if (badStep) return `--step ${step}: ${badStep}`;
   if (!agent || agent.startsWith('.') || /[\\/\s]/.test(agent))
-    return `\`${agent}\` is not an agent's name: an agent is its file in agents/, named without .md — ada, say.`;
+    return `\`${agent}\` is not an agent's name: an agent is its file in agents/, named without .md — implementer, say.`;
   return undefined;
 }
 
@@ -485,7 +485,7 @@ export const writableMountRefusal = (factory: Pick<Factory, 'name'>, where: stri
   `step. Hire into ${where} an agent whose harness holds a writable mount (nemia factory hire ${factory.name} <agent> --step ${where}), ` +
   `or delete the name from \`writable:\`, so the step only reads the folder. Nothing was written.`;
 
-/** A factory's hires as `nemia factory ls` lists them under its line, sorted by step: `build/implement ← ada`. */
+/** A factory's hires as `nemia factory ls` lists them under its line, sorted by step: `dev/implement ← implementer`. */
 const hireLines = (hires: Hires, width: number): string[] =>
   Object.keys(hires)
     .sort()

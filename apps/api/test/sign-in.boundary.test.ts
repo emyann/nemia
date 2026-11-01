@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect, Layer } from 'effect';
-import { addFactory, engine } from 'agent-orchestrator';
+import { addFactory, BUILTIN_SERVERS, engine } from 'agent-orchestrator';
 import { Engine as RuntimeEngine } from 'agent-runtime';
 import { testEngine } from 'agent-runtime/testing';
 import { appOf, liveOf } from '../src/app.ts';
@@ -21,8 +21,7 @@ import { scratch } from './scratch.ts';
 addFactory({ name: 'signmill', repos: [scratch('nemia-api-sign-in-')] });
 fs.mkdirSync(path.join(root, 'factories', 'signmill'), { recursive: true });
 
-const SERVERS = path.join(import.meta.dirname, '..', '..', '..', 'workflows', 'servers');
-const GITHUB = JSON.parse(fs.readFileSync(path.join(SERVERS, 'github.json'), 'utf8')) as Record<string, unknown>;
+const GITHUB = JSON.parse(fs.readFileSync(path.join(BUILTIN_SERVERS, 'github.json'), 'utf8')) as Record<string, unknown>;
 
 const BOARD = { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' };
 const URL = '/api/factories/signmill/servers';

@@ -6,14 +6,15 @@
  */
 import { Effect } from 'effect';
 import type { Args, Flag } from '../command/command.ts';
-import { EngineService, asked, tried, type TaskView } from '../runtime-client.ts';
-import { runStore } from '../record/files.store.ts';
+import { EngineService, asked, type TaskView } from '../runtime-client.ts';
 import type { Run } from '../record/record.ts';
 import { HOME } from '../record/record.store.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { judgedSteps, workflowsOf } from '../summary/reads.verb.ts';
 import { closeoutOf } from '../views/views.verb.ts';
 import { answerRefusal, answerText, approvedAnswerText, askedQuestions, numberedAnswers } from './index.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /** Where a person answered at the terminal, as the words their answers become say it. */
 const AT_THE_TERMINAL = 'at the terminal';
@@ -46,7 +47,7 @@ export const typedAnswers = Effect.fn('typedAnswers')(function* (
   typed: readonly string[],
   { note, approval = false }: { note?: string; approval?: boolean } = {},
 ) {
-  const run = yield* tried(() => runStore.runs.read(runId));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
   const questions = (yield* askedNow(run, step)).flatMap((a) => a.questions);
   const answers = numberedAnswers(questions, typed, `nemia decide ${runId}`);
   const wrong = Array.isArray(answers) ? answerRefusal(questions, answers, INSTEAD) : answers.error;

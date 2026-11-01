@@ -6,12 +6,13 @@
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { runStore } from '../record/files.store.ts';
 import { retryable, WAITS_ON_PERSON } from '../retry/index.ts';
 import { acceptanceOf, overBudget, runSpend } from '../status/status.ts';
 import { askedQuestions } from '../question/index.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, harnessBlocked, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import type { Seen } from '../auto/index.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /**
  * What admission reads of the run `runId` for its step `stepName` (`Seen`): the step's closeout and the questions it asks, its check's
@@ -20,7 +21,7 @@ import type { Seen } from '../auto/index.ts';
  * such run (`Missing`), and a record that does not read.
  */
 export const seenOf = Effect.fnUntraced(function* (runId: string, stepName: string) {
-  const run = yield* tried(() => runStore.runs.read(runId));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(runId));
   const steps = yield* tried(() => stepsOf(run));
   const step = steps.find((s) => s.name === stepName);
   const { views, phaseOf } = yield* taskPhasesRead(run);

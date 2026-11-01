@@ -46,8 +46,8 @@ export default {
     await settled(page);
     await photograph(page, path.join(OUT, `factory-mid-gate-${await themeOf(page)}.png`), { fullPage: true });
 
-    const read = card.locator(`a[data-read="${gated}"]`, { hasText: /^Read the plan$/ });
-    await expectVisible(read, `the card's gate offers Read the plan, in its answer row`);
+    const read = card.locator(`a[data-read="${gated}"]`, { hasText: /^Read what it handed on$/ });
+    await expectVisible(read, `the card's gate offers Read what it handed on, in its answer row`);
     await expectClearOfEachOther(page);
     await read.click();
     await page.waitForURL((url) => url.pathname === `/runs/${id}` && url.searchParams.get('bar') === `step:${id}/${gated}`, {
@@ -56,7 +56,7 @@ export default {
     const inspector = stepBar(page, id, gated);
     await expectVisible(
       inspector.getByRole('tab', { name: 'Output', selected: true }),
-      `Read the plan lands on ${gated}'s bar, open on Output`,
+      `Read what it handed on lands on ${gated}'s bar, open on Output`,
     );
     await expectVisible(inspector.locator('[data-field="approach"]', { hasText: GATED.output.approach }), "with the plan's approach in it");
     await settled(page);

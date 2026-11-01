@@ -27,7 +27,7 @@ execFileSync('git', ['init', '-q', '-b', 'main'], { cwd: repo });
 type SkillPlace = import('./skills.ts').SkillPlace;
 type SkillRow = import('./skills.ts').SkillRow;
 
-/** Nemia's builtin skills: `workflows/skills` of the checkout these tests run in, the api's own (`HOME_REPO`). Read, never written. */
+/** Nemia's builtin skills: the orchestrator package's `skills/`, none while it has no such folder. Read, never written. */
 const BUILTIN = BUILTIN_SKILLS;
 const builtin = fs.existsSync(BUILTIN)
   ? fs

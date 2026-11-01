@@ -61,7 +61,7 @@ export const backName = (back: readonly string[]): string => (back.length === 1 
 /**
  * The card's words for a gate, in its one row: what approving does, and where a send-back goes.
  * `approve to run ship on main, or send review back`; for a gate that holds after its step ran,
- * `approve what plan handed on, or send it back`. Long names cut it short on the card, which has it whole on hover beside the step's own
+ * `approve what review handed on, or send it back`. Long names cut it short on the card, which has it whole on hover beside the step's own
  * prose; the inspector says it all, whole.
  */
 export function gateCardLine(gate: GateAsk): string {
@@ -73,17 +73,15 @@ export function gateCardLine(gate: GateAsk): string {
 /**
  * The card's way to what a gate asks a person to approve, which a card has no room to show (it must fit its cell): the words, and where on
  * the run's page it goes. A step that has signed off opens its inspector (`step`), on its Output tab, where its closeout is:
- * `Read the plan` for the step this repository's team calls `plan`, `Read what it handed on` for any other. An ending has handed nothing on
- * and has no closeout of its own: its section (`hash`), where what it would act on is drawn beside its gate.
+ * `Read what it handed on`, whatever the step is named. An ending has handed nothing on and has no closeout of its own: its section
+ * (`hash`), where what it would act on is drawn beside its gate.
  */
 export const readLink = (gate: Pick<GateAsk, 'step' | 'ends'>): { words: string; step: string } | { words: string; hash: string } =>
-  gate.ends
-    ? { words: 'Read what it acts on', hash: stepAnchor(gate.step) }
-    : { words: gate.step === 'plan' ? 'Read the plan' : 'Read what it handed on', step: gate.step };
+  gate.ends ? { words: 'Read what it acts on', hash: stepAnchor(gate.step) } : { words: 'Read what it handed on', step: gate.step };
 
 /**
- * A gate's node, under its name, where one line fits: `approve ship to run it`, or `approve plan's hand-off`. Both name the step as
- * the CLI's `ls` does (`approve plan`), and the inspector says the rest.
+ * A gate's node, under its name, where one line fits: `approve ship to run it`, or `approve review's hand-off`. Both name the step as
+ * the CLI's `ls` does (`approve review`), and the inspector says the rest.
  */
 export const gateNodeLine = (gate: Pick<GateAsk, 'step' | 'ends'>): string =>
   gate.ends ? `approve ${gate.step} to run it` : `approve ${gate.step}'s hand-off`;

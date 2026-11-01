@@ -10,10 +10,11 @@ import { tried } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { factoryNames } from '../factory/factory.store.ts';
-import { runStore } from '../record/files.store.ts';
 import { readLevel } from '../nemia/level.store.ts';
 import { readFactoryLevel } from './level.store.ts';
 import { factoryLevelOf, type FactoryLevel, type FactoryLevelFile, type Level } from './level.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /** Each factory level file that does not read said once a process: the deliverer and the keeper read the levels every beat. */
 const saidAlready = new Set<string>();
@@ -50,4 +51,7 @@ export const levelOfFactory = (name: string | undefined, at: number = Date.now()
 
 /** The factory the run `runId` was started in, frozen on its record: the default factory where it names none. Refused: no such run. */
 export const runFactory = (runId: string): Effect.Effect<string, Refusal> =>
-  tried(() => runStore.runs.read(runId).factory ?? DEFAULT_FACTORY);
+  Effect.map(
+    Effect.flatMap(RunDoor, (door) => door.runs.read(RunId.read(runId))),
+    (run) => run.factory ?? DEFAULT_FACTORY,
+  );

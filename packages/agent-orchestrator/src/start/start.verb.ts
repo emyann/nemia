@@ -50,6 +50,7 @@ import {
 import { readFactory } from '../factory/factory.store.ts';
 import { factoryFills } from '../rules/rules.store.ts';
 import { Context, Effect } from 'effect';
+import { RunDoor } from '../runs/runs.store.ts';
 
 /**
  * A workflow folder's steps, as a run in `factory` runs them: each step its hires fill (`factoryFills`, by the folder's name) resolved
@@ -559,6 +560,6 @@ export const startRun = Effect.fn('start')(function* (opts: StartOptions) {
     const pinned = pinsOf(run, steps, run.createdAt);
     if (pinned.length) run.pinned = pinned;
   });
-  yield* tried(() => runStore.runs.create(run));
+  yield* (yield* RunDoor).runs.create(run);
   return run;
 });

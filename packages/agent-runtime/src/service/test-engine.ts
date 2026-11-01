@@ -148,7 +148,7 @@ const viewOf = (id: string, t: TestTask | undefined): TaskView => {
 };
 
 /**
- * How the attempt of a task left in `phase` ended: as the phase settles it, `succeeded` for a turn that signed and waits on a person
+ * How the attempt of a task left in `phase` ended: as the phase settles it, `succeeded` for a turn that ended and waits on a person
  * (`input-required`, as the engine reads `waitsForInput`), and not yet for any other phase.
  */
 const endedOf = (phase: TaskPhase): Outcome | null => (phase === 'input-required' ? 'succeeded' : settledOf(phase));
@@ -305,7 +305,7 @@ export type TestEngine = {
    * Leaves the task `id` in `phase`: `pending` takes its attempt away; `succeeded`, `failed` and `stopped` settle it and end
    * its attempt; any other phase is an attempt in flight. A task stopped before it started settles with no attempt, as the engine
    * settles one, unless `end` is given. `end` is laid over the attempt, field for field, but its `printed`, the text the session
-   * printed, which the task keeps until a settle gives another. `input-required` ends the attempt `succeeded`, a turn that signed and
+   * printed, which the task keeps until a settle gives another. `input-required` ends the attempt `succeeded`, a turn that ended and
    * waits on a person; once one is answered (`answer`), the next settle begins the answer's turn, a new attempt carrying its `turn`.
    * Throws for a task never filed.
    */

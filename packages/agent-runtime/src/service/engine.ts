@@ -890,7 +890,7 @@ const make = (options: EngineOptions) =>
       view: (taskId) => go(viewOf(taskId)),
       path: (taskId) => read(taskId).pipe(Effect.map((events) => pathOf(taskId, events))),
       list: listVerb,
-      stop: (taskId) => go(requestStop(taskId)),
+      stop: (taskId) => go(requestStop(TaskId.read(taskId))),
       logs: (taskId) => go(logsOf(viewOf(taskId), harnessOf)),
       transcript: transcriptVerb,
       output: outputVerbOf(read, harnessOf),

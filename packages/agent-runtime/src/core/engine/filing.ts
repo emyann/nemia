@@ -263,10 +263,10 @@ export const stopRefusalOf = (taskId: string, state: State | undefined): string 
  */
 export const requestStop: RequestStop = Effect.fn('requestStop')(function* (taskId) {
   const journal = yield* Journal;
-  const events = yield* journal.read(TaskId.read(taskId));
+  const events = yield* journal.read(taskId);
   const refused = stopRefusalOf(taskId, events.length ? fold(taskId, events) : undefined);
   if (refused) return yield* Effect.fail(new StopRefused({ message: refused }));
-  yield* journal.append(TaskId.read(taskId), { kind: 'stop-requested', at: new Date().toISOString() });
+  yield* journal.append(taskId, { kind: 'stop-requested', at: new Date().toISOString() });
 });
 
 /** An answer or a close a task held open would not journal, and why, in words that say what to do instead. Nothing was written. */

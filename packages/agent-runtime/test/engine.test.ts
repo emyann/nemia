@@ -442,7 +442,7 @@ test('the crash windows: the engine dies at each point of a start, and the resta
       await b.run(tick());
       assert.equal((await b.run(view(id, await b.run(Effect.flatMap(Runner, (r) => r.observe))))).phase, 'working', 'adopted');
 
-      await b.run(requestStop(id));
+      await b.run(requestStop(TaskId.read(id)));
       await b.run(tick());
       await b.run(tick());
       v = await b.run(view(id, new Map()));
@@ -498,7 +498,7 @@ test('a person stops a running job: the harness is told, the next pass settles i
       await b.run(tick());
       b.sessions.set(nameFor('done', 1), { ...b.sessions.get(nameFor('done', 1))!, state: 'completed' });
       b.sessions.set(nameFor('broke', 1), { ...b.sessions.get(nameFor('broke', 1))!, state: 'failed' });
-      await b.run(requestStop('asked'));
+      await b.run(requestStop(TaskId.read('asked')));
       await b.run(tick());
       assert.equal(b.sessions.get(nameFor('asked', 1))?.state, 'canceled', 'the harness was actually told');
       assert.equal(await b.run(phaseOf('asked')), 'ending', 'not settled on an assumption');
@@ -511,7 +511,7 @@ test('a person stops a running job: the harness is told, the next pass settles i
   );
 
   await s.test('asked again before it has settled, the stop is StopRefused, and nothing is journalled', async () => {
-    const refused = await b.run(Effect.flip(requestStop('asked')));
+    const refused = await b.run(Effect.flip(requestStop(TaskId.read('asked'))));
     assert.equal(refused._tag, 'StopRefused');
     assert.match(refused.message, /^`asked` has been asked to stop already/);
     assert.match(refused.message, /`ae ls`/, 'naming where to see it settle');
@@ -537,7 +537,7 @@ test('a person stops a running job: the harness is told, the next pass settles i
         ['nope', /^`nope` is not a task in this store/, /`ae ls`/],
       ];
       for (const [id, fact, fix] of cases) {
-        const refused = await b.run(Effect.flip(requestStop(id)));
+        const refused = await b.run(Effect.flip(requestStop(TaskId.read(id))));
         assert.equal(refused._tag, 'StopRefused', id);
         assert.match(refused.message, fact, id);
         assert.match(refused.message, fix, id);
@@ -941,7 +941,7 @@ test('long-lived: what a daemon reads off the record of a long-lived task — wh
       const pass = () => Effect.runPromise(tick().pipe(Effect.provide(Layer.mergeAll(journal, runner, memo))));
       const open = await run(file({ ...spec, id: 'open', restartPolicy: 'Always' }));
       await pass();
-      await run(requestStop(open));
+      await run(requestStop(TaskId.read(open)));
       await pass();
       await pass();
       await pass();

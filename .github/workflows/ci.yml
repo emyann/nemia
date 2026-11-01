@@ -138,6 +138,32 @@ jobs:
         timeout-minutes: 10
       - run: npm run typecheck
 
+  contracts:
+    # The contracts under each package's contracts/, verified by tsverify (npm run contracts): any law or obligation not proved,
+    # or a contract it cannot read, exits 1. A verdict is decided by the solver's work, not the clock, so one leg on the floor is enough.
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+      - uses: actions/setup-node@v7
+        timeout-minutes: 5
+        with:
+          node-version: '24.16.0'
+      - run: npm ci
+        timeout-minutes: 10
+      # Each contract's verdict, kept from the runs before (tsverify --cache, keyed by the text of every file its program
+      # reads): a contract whose files are unchanged is answered from it. Restored after npm ci, which empties node_modules.
+      - uses: actions/cache@v6
+        timeout-minutes: 5
+        with:
+          path: node_modules/.cache/tsverify
+          key: tsverify-${{ github.sha }}
+          restore-keys: tsverify-
+      # On the owner's machine: 102 s with no verdict kept, 5 s with every one kept.
+      - run: npm run contracts
+        timeout-minutes: 30
+
   e2e:
     name: e2e shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
@@ -480,7 +506,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [test, lint, typecheck, e2e, e2e-bound, build, gitleaks, guards]
+    needs: [test, lint, typecheck, contracts, e2e, e2e-bound, build, gitleaks, guards]
     steps:
       - name: Every job succeeded
         # toJSON(needs) goes through env, never interpolated into the shell: on a pull request from a fork, an expression the branch

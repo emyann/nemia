@@ -27,6 +27,8 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
+import type { Implementation } from '@emyann/tsverify';
+import type { OwnStatusSpec, StandingSpec } from '../../contracts/standing.contract.ts';
 
 /**
  * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
@@ -366,23 +368,23 @@ export function stepStatus(
  * are its own status's. `awaiting approval` covers both gates: after a step signs off (`atGate`), and before an ending is filed
  * (`waitsAtGate`).
  */
-export function standing(
-  step: Workflow,
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
-  spendOf: SpendOf,
-  verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): { status: StepStatus; own: StepStatus } {
+export const standing: Implementation<StandingSpec> = (
+  step,
+  run,
+  phaseOf,
+  closeoutOf,
+  askedCloseout,
+  steps,
+  spendOf,
+  verdictOf = () => undefined,
+) => {
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   if (held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)) return { own, status: 'over budget' };
   if (atGate(step, run, own, closeoutOf)) return { own, status: 'awaiting approval' };
   if (own === 'pending' && waitsAtGate(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf))
     return { own, status: 'awaiting approval' };
   return { own, status: own };
-}
+};
 
 /**
  * How a step's last try ended, as a try's brief says it (`RetryBriefing.status`): on its own work (`ownStatus`) — and, for a gated step
@@ -455,15 +457,7 @@ function roundWanted(
  * (`landingDue`), never on the check alone: `verified` once the run has committed the merge, and `checking` until it has committed or
  * aborted it, so nothing offers a try of it while its merge is staged in the checkout.
  */
-export function ownStatus(
-  step: Workflow,
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
-  spendOf: SpendOf,
-): StepStatus {
+export const ownStatus: Implementation<OwnStatusSpec> = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) => {
   const st = run.steps[step.name];
   if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);
@@ -490,7 +484,7 @@ export function ownStatus(
     return check === 'failed' || check === 'stopped' || check === 'unknown' ? 'failed (check)' : 'failed';
   }
   return check === 'succeeded' ? signed('verified') : check === 'failed' || check === 'stopped' ? 'failed (check)' : 'checking';
-}
+};
 
 /**
  * Whether a closeout a step gave is one the run does not accept, which reads `unsigned`: short of a field the step owes (`owedFields`), a

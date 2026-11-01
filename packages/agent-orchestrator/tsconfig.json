@@ -18,7 +18,8 @@
   "include": [
     "src",
     "bin",
-    "place"
+    "place",
+    "contracts"
   ],
   "exclude": [
     "src/**/*.test.ts"

@@ -25,18 +25,13 @@
 import type { HarnessArgs } from '../harness/args.ts';
 import type { FormerReason } from './event-schema.ts';
 import type { TranscriptMark } from '../harness/seam.ts';
-import {
-  transition,
-  VERBS,
-  type LifecycleEvent,
-  type LifecycleState,
-  type Move,
-  type Refusal,
-  type VerbGuard,
-  type VerbName,
-} from './lifecycle.ts';
+import { transition, VERBS, type LifecycleEvent, type Move, type Refusal, type VerbGuard, type VerbName } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
 import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Outcome, type SessionState } from './session.ts';
+import type { Implementation } from '@emyann/tsverify';
+import type { DecideSpec } from '../../contracts/decide.contract.ts';
+import type { LifecycleSpec } from '../../contracts/lifecycle.contract.ts';
+import type { ObserveSpec } from '../../contracts/observe.contract.ts';
 
 /** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
 const ENDED_OWN: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'rejected']);
@@ -882,7 +877,7 @@ export const settledQuiet = (state: State): boolean => state.settled !== null;
  * `lifecycle.ts`), which names the next state and the one action. An event with no edge is refused, and the refusal is
  * the answer: nothing is done, and the pass reports it. `move` is the lifecycle's; a test hands another to plant a refusal.
  */
-export function decide(state: State, observed: ReadonlyMap<string, Sighting>, now: Now, move: Move = transition): Action {
+export const decide: Implementation<DecideSpec> = (state, observed, now, move = transition) => {
   if (settledQuiet(state)) return { do: 'nothing', why: `settled: ${state.settled}` };
   const from = lifecycleOf(state);
   const event = observe(state, observed, now);
@@ -890,7 +885,7 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
   return 'refused' in moved
     ? { do: 'nothing', why: `refused: no edge from ${from} on ${event.type}`, refused: moved.refused }
     : moved.action;
-}
+};
 
 /**
  * Where a task stands in its lifecycle, off its journal alone: the state `decide` moves it from. The same journal reads the
@@ -906,15 +901,15 @@ export function decide(state: State, observed: ReadonlyMap<string, Sighting>, no
  * 5. Held open and waiting on a person's answer (`waitsForInput`): `input-required`.
  * 6. Its current turn has an attempt, all ended: `ending`; else `submitted`.
  */
-export function lifecycleOf(state: State): LifecycleState {
+export const lifecycleOf: Implementation<LifecycleSpec> = (state) => {
   if (state.settled) return state.settled === 'succeeded' ? 'completed' : state.settled === 'stopped' ? 'canceled' : 'failed';
   if (state.stopRequested) return 'stopping';
   const last = state.attempts.at(-1);
-  if (last && last.ended === null) return last.spawnedAt ? 'working' : 'starting';
+  if (last && last.ended === null) return last.spawnedAt !== null ? 'working' : 'starting';
   if (state.holdOpen && state.closed) return 'ending';
   if (waitsForInput(state)) return 'input-required';
   return turnOf(state).attempts.length > 0 ? 'ending' : 'submitted';
-}
+};
 
 /**
  * What a pass saw of a task: one event, from its journal and the pass's sightings, recomputed on every pass. It names what
@@ -971,7 +966,7 @@ export function lifecycleOf(state: State): LifecycleState {
  *    later one, the session that ended the turn before it — is still held by its harness: it is stopped first.
  * 10. `READY` otherwise: in a later turn, told the person's answer; else the brief.
  */
-export function observe(state: State, observed: ReadonlyMap<string, Sighting>, now: Now): LifecycleEvent {
+export const observe: Implementation<ObserveSpec> = (state, observed, now) => {
   if (state.settled) return { type: 'SETTLED', outcome: state.settled };
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(state.taskId, last.n)) : undefined;
@@ -994,7 +989,7 @@ export function observe(state: State, observed: ReadonlyMap<string, Sighting>, n
   if (awaitsAdmission(state)) return { type: 'QUEUED' };
   if (turn.continues && sighting && isLive(sighting.state)) return { type: 'PREVIOUS_LIVE', sessionId: sighting.sessionId };
   return { type: 'READY', attempt: state.attempts.length + 1, resumeFrom: turn.continues, ...(turn.words ? { nudge: turn.words } : {}) };
-}
+};
 
 /**
  * Whether `ended`, the last attempt of a task with nothing in flight and no stop asked, is restarted: for a long-lived task,

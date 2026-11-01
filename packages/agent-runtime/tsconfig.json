@@ -11,6 +11,6 @@
     "types": ["node"],
     "noUncheckedIndexedAccess": true
   },
-  "include": ["src", "bin"],
+  "include": ["src", "bin", "contracts"],
   "exclude": ["src/**/*.test.ts"]
 }

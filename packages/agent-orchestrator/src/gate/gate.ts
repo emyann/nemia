@@ -2,24 +2,13 @@
  * A gate, from a person's side: the words refused with an approval (`approvalWordsRefusal`), why `nemia approve` will not approve a step
  * (`approvalRefusal`), and whether a step's task, held open, waits for a person's word on this pass (`holdsOpen`). Pure.
  */
-import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
-import type { Closeout } from '../closeout/index.ts';
-import { andList, tryOf, type CloseoutAsked, type Run, type StepStatus, type TaskPhase } from '../record/record.ts';
-import { heard, modeWord, retryable, type RetryAsk } from '../retry/index.ts';
-import {
-  approvalOf,
-  approvedFirst,
-  branchWord,
-  gatesOf,
-  hasGate,
-  notHandedOn,
-  resultOnBase,
-  standing,
-  type BranchStanding,
-  type SpendOf,
-} from '../status/status.ts';
+import { andList, tryOf, type Run, type StepStatus } from '../record/record.ts';
+import { heard, modeWord, retryable } from '../retry/index.ts';
+import { approvalOf, approvedFirst, branchWord, gatesOf, hasGate, notHandedOn, resultOnBase, standing } from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
+import type { Implementation } from '@emyann/tsverify';
+import type { ApprovalRefusalSpec, HoldsOpenSpec } from '../../contracts/gate.contract.ts';
 
 /**
  * Whether a step's task, filed held open (`holdsOpenOn`) and waiting for a person's word — the runtime's `input-required` — stays open on
@@ -29,21 +18,21 @@ import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
  * a check that refused, a denial under `denials: fail`, a closeout short of a field. And every waiting task of a run called off or pruned,
  * whose steps nobody will answer. A try of a closed step is filed as its own task, `-try<n>`.
  */
-export function holdsOpen(
-  step: Workflow,
-  run: Run,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked,
-  steps: readonly Workflow[],
-  spendOf: SpendOf,
-  verdictOf: (step: string) => Verdict | undefined = () => undefined,
-): boolean {
+export const holdsOpen: Implementation<HoldsOpenSpec> = (
+  step,
+  run,
+  phaseOf,
+  closeoutOf,
+  askedCloseout,
+  steps,
+  spendOf,
+  verdictOf = () => undefined,
+) => {
   if (run.cancelledAt || run.pruned) return false;
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   if (own === 'blocked') return true;
   return hasGate(step, run) && (own === 'checking' || status === 'awaiting approval');
-}
+};
 
 /**
  * Why the words given with an approval cannot ride on it — or null. Pure, and asked before anything about the run: words that are empty.
@@ -71,19 +60,19 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'nem
  * @param standings Where each result branch stands against the base branch now (`branchStandings` in branches.store.ts). Left out, git is
  *   not asked, and the gate alone speaks.
  */
-export function approvalRefusal(
-  steps: readonly Workflow[],
-  run: Run,
-  name: string,
-  message: string | undefined,
-  phaseOf: (taskId: string) => TaskPhase,
-  closeoutOf: (step: string) => Closeout | undefined = () => undefined,
-  askedCloseout: (taskId: string) => CloseoutAsked = () => false,
-  verdictOf: (step: string) => Verdict | undefined = () => undefined,
-  asks: readonly RetryAsk[] = [],
-  spendOf: SpendOf = () => undefined,
-  standings: readonly BranchStanding[] = [],
-): string | null {
+export const approvalRefusal: Implementation<ApprovalRefusalSpec> = (
+  steps,
+  run,
+  name,
+  message,
+  phaseOf,
+  closeoutOf = () => undefined,
+  askedCloseout = () => false,
+  verdictOf = () => undefined,
+  asks = [],
+  spendOf = () => undefined,
+  standings = [],
+) => {
   const command = `nemia approve ${run.id} ${name}`;
   const words = approvalWordsRefusal(message, command);
   if (words) return words;
@@ -160,7 +149,7 @@ export function approvalRefusal(
     unverified: `${name} has handed nothing on: it asked for another round (\`again: true\`), which the run files itself. Its gate holds once a round of it hands on, \`again: false\`.`,
   };
   return why[status] ?? `${name} is ${status}, not awaiting approval, so there is nothing to approve. See why: nemia decide ${run.id}.`;
-}
+};
 
 /** The yes an approval gives: at a step's gate, or to a loop out of rounds. */
 export type ApproveForm = 'gate' | 'loop';

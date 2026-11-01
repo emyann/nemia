@@ -4,10 +4,10 @@
  * shipped one. The edge table is XState's, which the verifier does not read: what `decide` may take of it is declared
  * below, every law tested on the real table, every state against every event (`test/assumptions.test.ts`).
  */
-import { assume, contract } from '@emyann/tsverify';
+import { assume, spec } from '@emyann/tsverify';
 import type { Monotonic } from '../src/core/clock.ts';
-import { type Attempt, backoffOf, decide, nameFor, RESTART_BACKOFF, type State } from '../src/core/domain.ts';
-import { transition } from '../src/core/lifecycle.ts';
+import { type Action, type Attempt, backoffOf, nameFor, type Now, RESTART_BACKOFF, type Sighting, type State } from '../src/core/domain.ts';
+import { type Move, transition } from '../src/core/lifecycle.ts';
 
 export const backoff = assume(backoffOf, {
   pure: true,
@@ -52,7 +52,7 @@ const inFlight = (state: State): Attempt | undefined => {
   return last !== undefined && last.ended === null ? last : undefined;
 };
 
-export const decided = contract(decide, {
+const decideSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>, now: Now, move?: Move) => Action>({
   /** The shipped lifecycle (`move` left to its default), on moments stamped as the runtime stamps them. */
   requires: (state, _observed, now, move) =>
     move === undefined &&
@@ -80,3 +80,4 @@ export const decided = contract(decide, {
     startsOnlyWithNothingInFlight: (state, _observed, _now, _move, out) => out.do !== 'start' || inFlight(state) === undefined,
   },
 });
+export type DecideSpec = typeof decideSpec;

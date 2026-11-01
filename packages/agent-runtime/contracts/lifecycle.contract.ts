@@ -3,10 +3,11 @@
  * src/core/domain.ts, `lifecycleOf`), written as laws over (state, result)
  * rather than as a second copy of the code. Read in place.
  */
-import { contract } from '@emyann/tsverify';
-import { lifecycleOf } from '../src/core/domain.ts';
+import { spec } from '@emyann/tsverify';
+import type { State } from '../src/core/domain.ts';
+import type { LifecycleState } from '../src/core/lifecycle.ts';
 
-export const lifecycle = contract(lifecycleOf, {
+const lifecycleSpec = spec<(state: State) => LifecycleState>({
   ensures: {
     /** 1. Settled: the final state its outcome names. A terminal state is reached exactly when settled. */
     terminalExactlyWhenSettled: (state, s) => (s === 'completed' || s === 'failed' || s === 'canceled') === (state.settled !== null),
@@ -36,3 +37,4 @@ export const lifecycle = contract(lifecycleOf, {
     submittedHasNoAttemptThisTurn: (state, s) => s !== 'submitted' || !state.attempts.some((a) => (a.turn ?? 0) === state.inputs.length),
   },
 });
+export type LifecycleSpec = typeof lifecycleSpec;

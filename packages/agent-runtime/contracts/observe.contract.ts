@@ -3,18 +3,19 @@
  * ordered rules written as laws over (state, observed, now, event), rather than as a second copy of the code. Read in
  * place.
  */
-import { assume, contract } from '@emyann/tsverify';
+import { assume, spec } from '@emyann/tsverify';
 import type { Monotonic } from '../src/core/clock.ts';
 import {
   type Attempt,
   backoffOf,
   nameFor,
-  observe,
   RESTART_BACKOFF,
+  type Now,
   type Sighting,
   type State,
   waitsForInput,
 } from '../src/core/domain.ts';
+import type { LifecycleEvent } from '../src/core/lifecycle.ts';
 
 /**
  * The restart's wait doubles up to its cap: past some forty ends in a row its product is no exact double, which the
@@ -55,7 +56,7 @@ const unreadOf = (state: State, now: { readonly unread?: ReadonlySet<string> }):
   return last !== undefined && now.unread !== undefined && now.unread.has(nameFor(state.taskId, last.n));
 };
 
-export const observed = contract(observe, {
+const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>, now: Now) => LifecycleEvent>({
   /**
    * Every moment on the journal and the clock is whole milliseconds (`Monotonic`, `Instant`), and a deadline a whole
    * number of seconds: the arithmetic on them is then exact.
@@ -132,3 +133,4 @@ export const observed = contract(observe, {
       (e.type !== 'READY' && e.type !== 'RESTART_DUE') || e.attempt === state.attempts.length + 1,
   },
 });
+export type ObserveSpec = typeof observeSpec;

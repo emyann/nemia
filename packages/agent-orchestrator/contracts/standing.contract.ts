@@ -5,11 +5,14 @@
  * declared pure and nothing more, so each law holds of every value they could give. What is read is how `standing`
  * holds a step at its budget and at its gate.
  */
-import { assume, contract } from '@emyann/tsverify';
-import { askedAgain, notHandedOn, overBudget, ownStatus, standing } from '../src/status/status.ts';
+import { assume, spec } from '@emyann/tsverify';
+import type { Closeout } from '../src/closeout/index.ts';
+import type { CloseoutAsked, Run, StepStatus, TaskPhase } from '../src/record/record.ts';
+import type { Workflow } from '../src/step/step.ts';
+import { askedAgain, notHandedOn, overBudget, ownStatus, type SpendOf } from '../src/status/status.ts';
 import { loopSpan } from '../src/workflow/validate.ts';
 import { declaredOutput } from '../src/closeout/closeout.ts';
-import { approved, awaitingIsUnapproved, awaitingOnlyAtAGate, gated, ownOrHeld } from './laws.ts';
+import { approved, awaitingIsUnapproved, awaitingOnlyAtAGate, gated, ownOrHeld, type StandingOf } from './laws.ts';
 
 /** Where a step stands on its own work: never at its budget or its gate, which `standing` alone says. Proved below. */
 export const itsOwnStatus = assume(ownStatus, {
@@ -22,7 +25,7 @@ export const askedForARound = assume(askedAgain, { pure: true });
 export const theLoopsSteps = assume(loopSpan, { pure: true });
 export const whatItDeclared = assume(declaredOutput, { pure: true });
 
-export const stood = contract(standing, {
+const standingSpec = spec<StandingOf>({
   /** The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). */
   requires: (step, run) => Object.hasOwn(run.steps, step.name),
   ensures: {
@@ -66,7 +69,20 @@ export const stood = contract(standing, {
 });
 
 /** `ownStatus` itself: what it says is a step's own status, never one `standing` holds it at. */
-export const ownOnly = contract(ownStatus, {
+export type StandingSpec = typeof standingSpec;
+
+const ownStatusSpec = spec<
+  (
+    step: Workflow,
+    run: Run,
+    phaseOf: (taskId: string) => TaskPhase,
+    closeoutOf: (step: string) => Closeout | undefined,
+    askedCloseout: (taskId: string) => CloseoutAsked,
+    steps: readonly Workflow[],
+    spendOf: SpendOf,
+  ) => StepStatus
+>({
   requires: (step, run) => Object.hasOwn(run.steps, step.name),
   ensures: { neverHeld: (_step, _run, _p, _c, _a, _steps, _s, out) => out !== 'awaiting approval' && out !== 'over budget' },
 });
+export type OwnStatusSpec = typeof ownStatusSpec;

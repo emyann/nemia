@@ -6,10 +6,15 @@
  * (`retryable`) and the steps an ending waits on (`notHandedOn`) only shape what a refusal says: declared pure, and
  * nothing more.
  */
-import { assume, contract } from '@emyann/tsverify';
-import { approvalRefusal, holdsOpen } from '../src/gate/gate.ts';
+import { assume, spec } from '@emyann/tsverify';
+import { holdsOpen } from '../src/gate/gate.ts';
+import type { Verdict } from '../src/check/check.ts';
+import type { Closeout } from '../src/closeout/index.ts';
+import type { CloseoutAsked, Run, TaskPhase } from '../src/record/record.ts';
+import type { RetryAsk } from '../src/retry/index.ts';
+import type { Workflow } from '../src/step/step.ts';
 import { retryable } from '../src/retry/retry.ts';
-import { notHandedOn, standing } from '../src/status/status.ts';
+import { type BranchStanding, notHandedOn, type SpendOf, standing } from '../src/status/status.ts';
 import { awaitingIsUnapproved, awaitingOnlyAtAGate, gated, ownOrHeld, tryNow } from './laws.ts';
 
 /** What the gate takes of where a step stands: its status's doc comment, proved of `standing` (`standing.contract.ts`). */
@@ -20,7 +25,21 @@ export const standingOf = assume(standing, {
 export const sendBack = assume(retryable, { pure: true });
 export const unfinished = assume(notHandedOn, { pure: true });
 
-export const approved = contract(approvalRefusal, {
+const approvalRefusalSpec = spec<
+  (
+    steps: readonly Workflow[],
+    run: Run,
+    name: string,
+    message: string | undefined,
+    phaseOf: (taskId: string) => TaskPhase,
+    closeoutOf?: (step: string) => Closeout | undefined,
+    askedCloseout?: (taskId: string) => CloseoutAsked,
+    verdictOf?: (step: string) => Verdict | undefined,
+    asks?: readonly RetryAsk[],
+    spendOf?: SpendOf,
+    standings?: readonly BranchStanding[],
+  ) => string | null
+>({
   /** A run holds a record of each of its steps: `nemia start` writes one for each (start.verb.ts). */
   requires: (steps, run) => steps.every((s) => Object.hasOwn(run.steps, s.name)),
   ensures: {
@@ -82,7 +101,20 @@ export const approved = contract(approvalRefusal, {
   },
 });
 
-export const held = contract(holdsOpen, {
+export type ApprovalRefusalSpec = typeof approvalRefusalSpec;
+
+const holdsOpenSpec = spec<
+  (
+    step: Workflow,
+    run: Run,
+    phaseOf: (taskId: string) => TaskPhase,
+    closeoutOf: (step: string) => Closeout | undefined,
+    askedCloseout: (taskId: string) => CloseoutAsked,
+    steps: readonly Workflow[],
+    spendOf: SpendOf,
+    verdictOf?: (step: string) => Verdict | undefined,
+  ) => boolean
+>({
   ensures: {
     notOnACancelledRun: (_step, run, _p, _c, _a, _steps, _s, _v, out) => !run.cancelledAt || !out,
     notOnAPrunedRun: (_step, run, _p, _c, _a, _steps, _s, _v, out) => !run.pruned || !out,
@@ -100,3 +132,4 @@ export const held = contract(holdsOpen, {
       !out || gated(step, run) || standing(step, run, p, c, a, steps, s, v).own === 'blocked',
   },
 });
+export type HoldsOpenSpec = typeof holdsOpenSpec;

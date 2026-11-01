@@ -1226,12 +1226,12 @@ test("the pass's refusals: an argument a pass, a step or a settle was never buil
 
 test("decide never reads tools, effort, MCP servers, a budget, a context window, Remote Control, a priority an old journal carries, a filing time, labels, a trace context, usage, a cost, an exit code, what a person said, or an end time but for a long-lived task's backoff — carried on the record, never judged", () => {
   const source = fs.readFileSync(new URL('../src/core/domain.ts', import.meta.url), 'utf8');
-  const from = source.indexOf('export function decide(');
+  const from = source.indexOf('export const decide: ');
   assert.ok(from >= 0, 'found decide');
   const body = source.slice(from);
   for (const name of [
-    'export function lifecycleOf(',
-    'export function observe(',
+    'export const lifecycleOf: ',
+    'export const observe: ',
     'export function spawnRefused(',
     'export function needsHuman(',
     'export const idleOf =',

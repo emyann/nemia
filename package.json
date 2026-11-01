@@ -25,7 +25,7 @@
     "test": "turbo run test --continue",
     "typecheck": "turbo run typecheck",
     "lint": "oxlint && oxfmt --check",
-    "contracts": "tsverify packages/agent-runtime/contracts packages/agent-orchestrator/contracts",
+    "contracts": "tsverify packages/agent-runtime/src && tsverify packages/agent-orchestrator/src --project packages/agent-orchestrator/contracts/tsconfig.json",
     "format": "oxfmt",
     "e2e": "npm run e2e --workspace web --",
     "board:serve": "npm run board:serve --workspace web",

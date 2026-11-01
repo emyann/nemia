@@ -4,11 +4,25 @@
  * keeps a record of, which the proof requires (`nemia start` writes one for each step); of a step with none it says
  * nothing.
  */
-import type { Run } from '../src/record/record.ts';
-import type { standing } from '../src/status/status.ts';
+import type { Verdict } from '../src/check/check.ts';
+import type { Closeout } from '../src/closeout/index.ts';
+import type { CloseoutAsked, Run, StepStatus, TaskPhase } from '../src/record/record.ts';
+import type { SpendOf } from '../src/status/status.ts';
 import type { Workflow } from '../src/step/step.ts';
 
-type Law = (...a: [...Parameters<typeof standing>, out: ReturnType<typeof standing>]) => boolean;
+/** Where a step stands, as `standing` takes and answers it: its own status, and the one a person reads. */
+export type StandingOf = (
+  step: Workflow,
+  run: Run,
+  phaseOf: (taskId: string) => TaskPhase,
+  closeoutOf: (step: string) => Closeout | undefined,
+  askedCloseout: (taskId: string) => CloseoutAsked,
+  steps: readonly Workflow[],
+  spendOf: SpendOf,
+  verdictOf?: (step: string) => Verdict | undefined,
+) => { status: StepStatus; own: StepStatus };
+
+type Law = (...a: [...Parameters<StandingOf>, out: ReturnType<StandingOf>]) => boolean;
 
 /** Whether a step is gated: by its workflow, or by the run (`--gate`). */
 export const gated = (step: Workflow, run: Run): boolean => step.gate === true || (run.gates ?? []).includes(step.name);

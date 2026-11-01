@@ -3,12 +3,12 @@ place: git
 agent: seldon
 gate: true
 budget: 12
-skills: effect, shadcn, change-the-board, look, react-aria, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
+skills: effect, shadcn, change-the-board, look, react-aria, tsverify, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
 reads: costs
 claude:
   fence:
-    disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx shadcn@latest:*), Bash(pnpm dlx shadcn@latest:*), Bash(bunx --bun shadcn@latest:*), Bash(npx turbo run test *build*), Bash(npx tsc *-w*), Bash(npx tsc *-W*), Bash(npx tsc *-in*), Bash(npx tsc *-iN*), Bash(npx tsc *-In*), Bash(npx tsc *-IN*), Bash(npx tsc *-i *), Bash(npx tsc *-I *), Bash(npx tsc *-ts*), Bash(npx tsc *-tS*), Bash(npx tsc *-Ts*), Bash(npx tsc *-TS*), Bash(npx tsc *-g*), Bash(npx tsc *-G*), Bash(npx tsc * false*), Bash(npx tsc *@*), Bash(npx oxlint *--fix*), Bash(npx oxlint *--init*), Bash(npx oxlint *--lsp*), Bash(npx oxlint -c*), Bash(npx oxlint * -c*), Bash(npx oxlint *--config*), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
+    disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx shadcn@latest:*), Bash(pnpm dlx shadcn@latest:*), Bash(bunx --bun shadcn@latest:*), Bash(npx turbo run test *build*), Bash(npx tsc *-w*), Bash(npx tsc *-W*), Bash(npx tsc *-in*), Bash(npx tsc *-iN*), Bash(npx tsc *-In*), Bash(npx tsc *-IN*), Bash(npx tsc *-i *), Bash(npx tsc *-I *), Bash(npx tsc *-ts*), Bash(npx tsc *-tS*), Bash(npx tsc *-Ts*), Bash(npx tsc *-TS*), Bash(npx tsc *-g*), Bash(npx tsc *-G*), Bash(npx tsc * false*), Bash(npx tsc *@*), Bash(npx oxlint *--fix*), Bash(npx oxlint *--init*), Bash(npx oxlint *--lsp*), Bash(npx oxlint -c*), Bash(npx oxlint * -c*), Bash(npx oxlint *--config*), Bash(npx tsverify *--cache*), Bash(npx tsverify *--watch*), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
 ---
 Your brief says what recent runs of this workflow cost, per step and whole (*What runs of this workflow cost*): propose the cut and each
 step's `budget:` from those figures, not from a guess, and say which you went by. When the work you design is larger
@@ -16,6 +16,12 @@ than one run of this workflow usually is, say so, and how to cut it into intents
 
 Say in the spec how each part shows that what it builds holds, so the implementer's parts carry it: on a rewrite of tests, the source
 line each kept or absorbed assertion guards, broken once and seen failing; on a feature, the test written first and seen failing.
+
+When the change adds a pure function that decides — a status, an action, a refusal, from what it is handed — or changes one a contract
+proves (its type is imported from its package's `contracts/`), load the `tsverify` skill, and name in the spec each law the change adds
+or changes: its name, its sentence, and its condition in words. The implementer writes them first and sees each fail on the code as it
+is. To read what a contract proves today, run `npx tsverify <file> <name>`, bare, on the file the function is written in: your fence
+refuses its `--cache`, which writes, and its `--watch`, which never ends.
 
 When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
 repository writes Effect 4, and sends you to the docs installed with Effect first.

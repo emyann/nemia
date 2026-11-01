@@ -5,7 +5,7 @@ context: 200k
 check: |-
   { if [ -n "${WF_BASE_REF:-}" ]; then s=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/quick/change.ts" > "$s/change.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/quick/change.ts, so the change cannot be measured; start the run on a base that has it" >&2; false; }; } && node "$s/change.ts" size; c=$?; rm -rf "$s"; [ "$c" -eq 0 ]; else echo "wf check: a change is measured only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then p=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pictures.ts" > "$p/pictures.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pictures.ts, so no picture can be asked for; start the run on a base that has it" >&2; false; }; } && node "$p/pictures.ts" "${WF_CLOSEOUT:-}"; c=$?; rm -rf "$p"; [ "$c" -eq 0 ]; else echo "wf check: pictures are asked only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then q=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/probe.ts" > "$q/probe.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/probe.ts, so no probe can be read; start the run on a base that has it" >&2; false; }; } && node "$q/probe.ts" check; c=$?; rm -rf "$q"; [ "$c" -eq 0 ]; else echo "wf check: probes are read only in a run's check, where WF_BASE_REF and WF_RUN name the run"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then r=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$r/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so the branch cannot be pushed and no pull request can be proven; start the run on a base that has it" >&2; false; }; } && node "$r/pull-request.ts" push; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; else echo "wf check: the branch is pushed, and its pull request proven to be at the commit this check judges, only in a run's check, where WF_BASE_REF names the base the work began on"; fi; } && { if [ -n "${WF_BASE_REF:-}" ]; then w=$(mktemp -d) && { git show "$WF_BASE_REF:workflows/build/pull-request.ts" > "$w/pull-request.ts" 2>/dev/null || { echo "wf check: the run's base $WF_BASE_REF has no workflows/build/pull-request.ts, so CI's verdict cannot be read; start the run on a base that has it" >&2; false; }; } && node "$w/pull-request.ts" wait; c=$?; rm -rf "$w"; [ "$c" -eq 0 ]; else echo "wf check: CI's verdict is waited for only in a run's check, where WF_BASE_REF names the base the work began on"; fi; }
 budget: 20
-skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
+skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, tsverify, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
 output: implement.schema.json
 claude:
@@ -68,6 +68,15 @@ but to measure it: CI runs every page on the commit your check pushes, before th
 
 When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
 repository writes Effect 4, and sends you to the docs installed with Effect first.
+
+When the change touches a function a contract proves, or writes a contract for one (its type is imported from its package's
+`contracts/`), load the `tsverify` skill before you change the code. Write the laws into the contract first and run the verifier: each
+new law comes back `counterexample` on the code as it is; then change the code until every law is `proved`. Run `npx tsverify <file>`
+on each file you changed that holds a function a contract proves, and say its verdicts in your summary: CI's `contracts` job runs every
+contract on the commit your check pushes. A new behaviour of a function a contract proves is a law of its contract, not a new row of its
+tests. Delete a test a law makes redundant only once you have planted the bug it guards, seen the law come back `counterexample`, and
+put the code back: name in your summary the test, the bug and the law.
+No spec names the laws in a quick run: name each in your `plan`, with its sentence, before you write it.
 
 When the change touches `apps/web`, load `shadcn` for the board's components, and load `change-the-board` before `shadcn`: it says
 where your shell must be for that load.

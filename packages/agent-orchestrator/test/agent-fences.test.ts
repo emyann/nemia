@@ -37,7 +37,10 @@
  * review, which run a package's tests, a build carried on turbo's test line (`TEST_BUILDS`). Design and review measure by the compiler and
  * the linter, which the settings allow (`TSC_ALLOW`, `OXLINT_ALLOW`, `MEASURES`), and deny on their own line what would write or watch
  * (`MEASURE_WRITES`, `MEASURE_DENIES`), a `tsc` without `--noEmit` first being reached by no allow (`NO_EMIT_FIRST`); intake and the
- * janitor deny both whole (`MEASURELESS_DENIES`). No tsconfig of the checkout makes `--noEmit` write (`buildInfoConfigs`). Every command
+ * janitor deny both whole (`MEASURELESS_DENIES`). No tsconfig of the checkout makes `--noEmit` write (`buildInfoConfigs`). Design reads
+ * what a contract proves by the verifier, which the settings allow (`VERIFY_ALLOW`, `VERIFIES`), and denies on its own line its cache,
+ * which writes, and its watch, which never ends (`VERIFY_WRITES`, `VERIFY_DENIES`); review, intake and the janitor deny it whole
+ * (`VERIFYLESS_DENIES`), review reading CI's verdict of every contract. Every command
  * a read-only step's note tells it to run is one its fence allows (`toldOf`), and each read-only agent is told, in one paragraph the
  * four hold equal, to say a refused call its work needs at the top of its sign-off (`REFUSAL_SAID`).
  * The render of a checkout's dashboards (`tools/observe/render/render.ts`) starts a container, so it is the implementer's alone: design
@@ -2775,10 +2778,56 @@ const MEASURE_DENIES = [
 /** The denies that keep intake and the janitor, which measure nothing, from the settings' allows of the compiler and the linter. */
 const MEASURELESS_DENIES = ['Bash(npx tsc:*)', 'Bash(npx oxlint:*)'];
 
+/** The read-only step that runs the verifier: design, which reads what a contract proves before it names a law. */
+const VERIFYING_STEP = 'build/design';
+
+/** The agent of `VERIFYING_STEP`, whose steps run the verifier. */
+const VERIFYING_AGENTS = readOnlySteps()
+  .filter(({ named }) => named === VERIFYING_STEP)
+  .map(({ step }) => step.agent!.name);
+
+/** The settings' allow of the verifier. */
+const VERIFY_ALLOW = 'Bash(npx tsverify:*)';
+
+/** The verifier run to read a verdict, with options that write nothing: what design may run. */
+const VERIFIES: Call[] = [
+  'npx tsverify packages/agent-orchestrator/src/gate/gate.ts',
+  'npx tsverify packages/agent-orchestrator/src/gate/gate.ts holdsOpen --verbose',
+  'npx tsverify packages/agent-runtime/src --json --bound 3 --work 1000000',
+  'npx tsverify packages/agent-runtime/src/core/domain.ts decide --project packages/agent-runtime/tsconfig.json',
+  'timeout 600 npx tsverify packages/agent-runtime/src/core/domain.ts decide',
+].map((command) => ({ tool: 'Bash', command }));
+
+/**
+ * The verifier with an option that writes or never ends: `--cache`, which keeps each verdict in a folder (the nearest package's
+ * `node_modules/.cache/tsverify`, or the one `--cache-location` names), and `--watch`. Each is reached by exactly one rule of
+ * `VERIFY_DENIES`.
+ */
+const VERIFY_WRITES: Call[] = [
+  'npx tsverify --cache',
+  'npx tsverify packages/agent-runtime/src --cache',
+  'npx tsverify packages/agent-runtime/src --cache --cache-location /tmp/verdicts',
+  'npx tsverify packages/agent-runtime/src --cache-location=/tmp/verdicts --cache',
+  'timeout 600 npx tsverify packages/agent-runtime/src --cache',
+  'npx tsverify --watch',
+  'npx tsverify packages/agent-runtime/src/core/domain.ts decide --watch',
+  'timeout 60 npx tsverify --watch --json',
+].map((command) => ({ tool: 'Bash', command }));
+
+/** The denies that answer `VERIFY_WRITES`, on design's line. */
+const VERIFY_DENIES = ['Bash(npx tsverify *--cache*)', 'Bash(npx tsverify *--watch*)'];
+
+/**
+ * The deny that keeps review, intake and the janitor from the settings' allow of the verifier: review reads CI's verdict of every
+ * contract.
+ */
+const VERIFYLESS_DENIES = ['Bash(npx tsverify:*)'];
+
 /** The denies a read-only step's own line holds, by its agent, for what the settings and the skills allow it besides its reads. */
 const ownedDenies = (agent: string): string[] => [
   ...READ_ONLY_DENIES,
   ...(TESTLESS_AGENTS.includes(agent) ? [...TEST_RUN_DENIES, ...MEASURELESS_DENIES] : [...TEST_BUILD_DENIES, ...MEASURE_DENIES]),
+  ...(VERIFYING_AGENTS.includes(agent) ? VERIFY_DENIES : VERIFYLESS_DENIES),
 ];
 
 /** What a read-only agent's steps are refused of what the settings and the skills allow, by `ownedDenies`. */
@@ -2786,6 +2835,7 @@ const refusedTo = (agent: string): Call[] => [
   ...SHADCN,
   ...NPM_TEST,
   ...(TESTLESS_AGENTS.includes(agent) ? [...TEST_RUNS, ...MEASURES, ...MEASURE_WRITES] : [...TEST_BUILDS, ...MEASURE_WRITES]),
+  ...(VERIFYING_AGENTS.includes(agent) ? VERIFY_WRITES : [...VERIFIES, ...VERIFY_WRITES]),
 ];
 
 /** The file of each read-only step, `<workflow>/<step>.md` from the holder, with its agent. */
@@ -2964,6 +3014,26 @@ test("REFUSED: without the settings' allow of tsc or of oxlint, design and revie
     assert.ok(its.length > 0, allow);
     for (const { named, step } of measuringSteps())
       assert.deepEqual(runs(step, MEASURES, without), rest.map(shown), `${named} without ${allow}`);
+  }
+});
+
+test('design reads a verdict by the verifier its note names, which the settings allow, and REFUSED without that allow it reads none', () => {
+  assert.ok(SETTINGS_ALLOWS.includes(VERIFY_ALLOW), `${VERIFY_ALLOW} is in the settings`);
+  const without = { permissions: { allow: SETTINGS_ALLOWS.filter((rule) => rule !== VERIFY_ALLOW) } };
+  const verifying = readOnlySteps().filter(({ step }) => VERIFYING_AGENTS.includes(step.agent!.name));
+  assert.deepEqual(
+    verifying.map(({ named }) => named),
+    [VERIFYING_STEP],
+  );
+  for (const { named, step } of verifying) {
+    assert.ok(
+      toldOf(`${named}.md`)
+        .map(shown)
+        .some((call) => call.startsWith('Bash(npx tsverify ')),
+      `${named}'s note names a read by the verifier`,
+    );
+    assert.deepEqual(runs(step, VERIFIES), VERIFIES.map(shown), named);
+    assert.deepEqual(runs(step, VERIFIES, without), [], `${named} without ${VERIFY_ALLOW}`);
   }
 });
 

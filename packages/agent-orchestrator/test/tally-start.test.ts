@@ -67,22 +67,27 @@ async function started(dir: string): Promise<string> {
 
 const runsWritten = () => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')).length : 0);
 
-test('REFUSED: nemia start of a step whose tally its closeout cannot hold exits 2, naming the file, the schema and the field, and writes no run', async () => {
-  const runs = runsWritten();
-  await assert.rejects(started(triage('unheld', 'issues, issues.closed')), (err: unknown) => {
-    assert.ok(err instanceof Invalid, String(err));
-    assert.equal(err.exitCode, 2);
-    assert.ok(err.message.includes('triage: `tally: issues, issues.closed` in triage.md'), err.message);
-    assert.ok(err.message.includes('`output: triage.schema.json`'), err.message);
-    assert.ok(err.message.includes('no boolean `closed` on the items of an array `issues`'), err.message);
-    return true;
-  });
-  assert.equal(runsWritten(), runs, 'no run was written');
-});
+test('nemia start of a step that declares a tally: refused where its closeout cannot hold it, frozen on the run where it can', async (t) => {
+  await t.test(
+    'REFUSED: a tally its closeout cannot hold exits 2, naming the file, the schema and the field, and writes no run',
+    async () => {
+      const runs = runsWritten();
+      await assert.rejects(started(triage('unheld', 'issues, issues.closed')), (err: unknown) => {
+        assert.ok(err instanceof Invalid, String(err));
+        assert.equal(err.exitCode, 2);
+        assert.ok(err.message.includes('triage: `tally: issues, issues.closed` in triage.md'), err.message);
+        assert.ok(err.message.includes('`output: triage.schema.json`'), err.message);
+        assert.ok(err.message.includes('no boolean `closed` on the items of an array `issues`'), err.message);
+        return true;
+      });
+      assert.equal(runsWritten(), runs, 'no run was written');
+    },
+  );
 
-test('nemia start of a step whose tally its closeout holds freezes the tally with the step on the run record', async () => {
-  const id = await started(triage('held', 'issues, issues.open'));
-  assert.deepEqual(readRun(id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
+  await t.test('a tally its closeout holds is frozen with the step on the run record', async () => {
+    const id = await started(triage('held', 'issues, issues.open'));
+    assert.deepEqual(readRun(id).workflow?.find((s) => s.name === 'triage')?.tally, ['issues', 'issues.open']);
+  });
 });
 
 test("this repository's build workflow counts its review's findings and its placement findings, and loads", () => {

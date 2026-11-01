@@ -19,10 +19,11 @@ import { steeredClock } from '../../test/steered.ts';
 const ROOT = scratch('wf-applied-');
 process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
-const { exportTemplate } = await import('../template/template.store.ts');
+const { templated: programsAt } = await import('../../test/templated.ts');
+const { exportTemplate, reconciled } = programsAt(ROOT);
 const { attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, readFactory } = await import('../runner.ts');
 const { main: cli } = await import('../cli/main.ts');
-const { reconcile, reconcileFactory, reconcileOnce } = await import('./applied.verb.ts');
+const { reconcile, reconcileOnce } = await import('./applied.verb.ts');
 const { appliedDir, readStatus, statusFile, treeDir } = await import('./applied.store.ts');
 const { setRevisions } = await import('../factory/factory.store.ts');
 const { readRun } = await import('../record/record.store.ts');
@@ -33,6 +34,7 @@ const runWith = runOver(runEngine, () => stand().layer);
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
 const { Effect } = await import('effect');
+const { StoreRoot } = await import('../config/root.store.ts');
 
 const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
@@ -165,7 +167,7 @@ test("the controller renders the base read-only and seeds the tree once; a secon
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();
   await apply('seeded', dir, repo, '--set', 'budget=7');
-  const status = reconcileFactory(templated('seeded'));
+  const status = reconciled(templated('seeded'));
   assert.deepEqual(status.conditions, [
     { type: 'Applied', status: 'True', reason: 'Rendered', message: `The base holds ${dir} at 0.1.0; the tree is yours to change.` },
     {
@@ -188,18 +190,18 @@ test("the controller renders the base read-only and seeds the tree once; a secon
   );
   fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
   const written = fs.statSync(statusFile('seeded')).mtimeMs;
-  assert.deepEqual(reconcileFactory(templated('seeded')), status);
+  assert.deepEqual(reconciled(templated('seeded')), status);
   assert.match(fs.readFileSync(review, 'utf8'), /^budget: 9$/m, "the tree, once seeded, is the person's");
   assert.equal(fs.statSync(statusFile('seeded')).mtimeMs, written, 'a status that did not change is not written');
   fs.rmSync(statusFile('seeded'));
   fs.rmSync(treeDir('seeded'), { recursive: true });
-  await Effect.runPromise(reconcileOnce());
+  await Effect.runPromise(reconcileOnce().pipe(Effect.provideService(StoreRoot, ROOT)));
   assert.deepEqual(readStatus('seeded'), status, 'a restart reads it all again off the disk');
   const onDisk = JSON.parse(fs.readFileSync(statusFile('seeded'), 'utf8'));
   const [applied, conflicts] = status.conditions;
   fs.writeFileSync(statusFile('seeded'), JSON.stringify({ ...onDisk, conditions: [{ ...applied, reason: 'Mystery' }, conflicts] }));
   assert.equal(readStatus('seeded'), undefined, 'a condition word outside FactoryConditionReason reads as no status');
-  assert.deepEqual(reconcileFactory(templated('seeded')), status, 'and the next pass writes it again');
+  assert.deepEqual(reconciled(templated('seeded')), status, 'and the next pass writes it again');
   assert.deepEqual(readStatus('seeded'), status);
   assert.match(fs.readFileSync(review, 'utf8'), /^budget: 7$/m, 'a tree removed is seeded again from the base');
 });
@@ -211,7 +213,7 @@ test(
     t.mock.method(console, 'log', () => {});
     const { Fiber } = await import('effect');
     const clock = steeredClock();
-    const loop = Effect.runFork(reconcile().pipe(Effect.provide(clock.layer)));
+    const loop = Effect.runFork(reconcile().pipe(Effect.provide(clock.layer), Effect.provideService(StoreRoot, ROOT)));
     t.after(() => Effect.runPromise(Fiber.interrupt(loop)));
     await until(t, () => clock.asked.length === 1, 'the first pass done', { bell: clock.bell });
     assert.deepEqual(clock.asked, [5_000], 'the controller rests the shipped five seconds');
@@ -236,7 +238,7 @@ test('a template packed into an archive applies as its folder does, each file re
   fs.rmSync(dir, { recursive: true });
   await apply('packed', archive, repo, '--set', 'budget=7');
   assert.deepEqual(templated('packed').template, { source: archive, version: '0.1.0', params: { budget: 7, model: 'opus' } });
-  const status = reconcileFactory(templated('packed'));
+  const status = reconciled(templated('packed'));
   assert.deepEqual(status.conditions[0], {
     type: 'Applied',
     status: 'True',
@@ -247,14 +249,14 @@ test('a template packed into an archive applies as its folder does, each file re
   const copied = path.join(treeDir('packed'), 'workflows', script);
   assert.equal(fs.readFileSync(copied, 'utf8'), '#!/bin/sh\necho run\n');
   assert.equal(fs.statSync(copied).mode & 0o111, 0o111, 'a copied file keeps the mode the archive holds');
-  assert.deepEqual(reconcileFactory(templated('packed')), status, 'a second pass reads the archive to the same base');
+  assert.deepEqual(reconciled(templated('packed')), status, 'a second pass reads the archive to the same base');
 });
 
 test('a template moved to another version is drift: the base and tree are left as they are, and Applied says so', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();
   await apply('drifted', dir, repo, '--set', 'budget=7');
-  const first = reconcileFactory(templated('drifted'));
+  const first = reconciled(templated('drifted'));
   edit(dir, 'nemia.yaml', (spec) => {
     spec.version = '0.2.0';
   });
@@ -263,7 +265,7 @@ test('a template moved to another version is drift: the base and tree are left a
   });
   const listed = () => readFactories().find((f) => f.name === 'drifted') as { status?: unknown };
   assert.deepEqual(listed().status, { applied: '0.1.0', conditions: first.conditions }, 'the listing reads what the controller wrote');
-  const status = reconcileFactory(templated('drifted'));
+  const status = reconciled(templated('drifted'));
   assert.deepEqual(listed().status, { applied: '0.1.0', conditions: status.conditions });
   const { message: drift, ...drifted } = status.conditions[0];
   assert.deepEqual(drifted, { type: 'Applied', status: 'False', reason: 'VersionDrift' });
@@ -272,21 +274,21 @@ test('a template moved to another version is drift: the base and tree are left a
   assert.equal(status.digest, first.digest);
   assert.doesNotMatch(fs.readFileSync(path.join(treeDir('drifted'), 'workflows/dev/review.md'), 'utf8'), /^rounds: 5$/m);
   fs.writeFileSync(path.join(dir, 'nemia.yaml'), 'not: [yaml');
-  assert.equal(reconcileFactory(templated('drifted')).conditions[0].reason, 'TemplateInvalid');
+  assert.equal(reconciled(templated('drifted')).conditions[0].reason, 'TemplateInvalid');
 });
 
 test("parameters changed in the factory's file, or the template's files changed at its version, are said by Applied; base and tree kept", async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();
   await apply('moved', dir, repo, '--set', 'budget=7');
-  const first = reconcileFactory(templated('moved'));
+  const first = reconciled(templated('moved'));
   const file = path.join(FACTORIES, 'moved.json');
   const filedAs = fs.readFileSync(file, 'utf8');
   const content = JSON.parse(filedAs);
   content.template.params.budget = 9;
   fs.writeFileSync(file, JSON.stringify(content));
   const review = (folder: string) => fs.readFileSync(path.join(folder, 'workflows/dev/review.md'), 'utf8');
-  const changed = reconcileFactory(templated('moved'));
+  const changed = reconciled(templated('moved'));
   const { message: moved, ...params } = changed.conditions[0];
   assert.deepEqual(params, { type: 'Applied', status: 'False', reason: 'ParamsChanged' });
   assert.ok(moved.includes('nemia factory diff moved --to <version>'), moved);
@@ -295,11 +297,11 @@ test("parameters changed in the factory's file, or the template's files changed 
   assert.match(review(appliedDir('moved')), /^budget: 7$/m);
   assert.match(review(treeDir('moved')), /^budget: 7$/m);
   fs.writeFileSync(file, filedAs);
-  assert.equal(reconcileFactory(templated('moved')).conditions[0].reason, 'Rendered', 'the parameters put back, the base is as rendered');
+  assert.equal(reconciled(templated('moved')).conditions[0].reason, 'Rendered', 'the parameters put back, the base is as rendered');
   edit(dir, 'workflows/dev/workflow.yaml', (spec) => {
     spec.steps[1].rounds = 5;
   });
-  const edited = reconcileFactory(templated('moved'));
+  const edited = reconciled(templated('moved'));
   const { message: changedWords, ...contentChanged } = edited.conditions[0];
   assert.deepEqual(contentChanged, { type: 'Applied', status: 'False', reason: 'ContentChanged' });
   assert.ok(changedWords.includes('0.1.0'), changedWords);
@@ -315,7 +317,7 @@ test("a templated factory reads its tree's wiring, and attach, hire, fire, detac
   await apply('wired', dir, repo, '--set', 'budget=7');
   await assert.rejects(async () => attachWorkflow({ factory: 'wired', workflow: 'other' }), refusedNaming('Conflict', 'nemia up'));
   await assert.rejects(async () => setRevisions({ factory: 'wired', revisions: 'follow' }), refusedNaming('Conflict', 'nemia up'));
-  reconcileFactory(templated('wired'));
+  reconciled(templated('wired'));
   const own = fs.readFileSync(path.join(FACTORIES, 'wired.json'), 'utf8');
   const wiring = () => JSON.parse(fs.readFileSync(path.join(treeDir('wired'), 'factory.json'), 'utf8'));
   assert.deepEqual(readFactory('wired').workflows, ['dev']);
@@ -347,7 +349,7 @@ test("a templated factory's instruction is its tree's NEMIA.md, written by instr
     refusedWith('Conflict', /its tree is not rendered yet/),
   );
   assert.equal(fs.existsSync(treeDir('told')), false, 'an instruct refused seeds no tree');
-  reconcileFactory(templated('told'));
+  reconciled(templated('told'));
   await main(['factory', 'instruct', 'told', '--file', words], noEngine());
   assert.equal(fs.readFileSync(path.join(treeDir('told'), 'NEMIA.md'), 'utf8'), 'Operate the tree.\n');
   await assert.rejects(
@@ -364,7 +366,7 @@ test("a templated factory's instruction is its tree's NEMIA.md, written by instr
 test("a bare workflow name started in a templated factory is its tree's, and the tree's step is what the run is told", async (t) => {
   const { dir, repo } = template();
   await apply('started', dir, repo, '--set', 'budget=7');
-  reconcileFactory(templated('started'));
+  reconciled(templated('started'));
   const review = path.join(treeDir('started'), 'workflows', 'dev', 'review.md');
   fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
   const printed: string[] = [];
@@ -386,7 +388,7 @@ test('REFUSED: a start of a template whose step names a skill named with its fol
   exportTemplate({ dir, from });
   const lacking = repoWithTeam();
   await apply('nested', dir, lacking);
-  reconcileFactory(templated('nested'));
+  reconciled(templated('nested'));
   const step = fs.readFileSync(path.join(treeDir('nested'), 'workflows', 'dev', 'implement.md'), 'utf8');
   assert.match(step, /^skills: app:y$/m, 'the applied step names the skill as the template does');
   assert.equal(fs.existsSync(path.join(treeDir('nested'), 'workflows', 'skills', 'y')), false, 'and the tree carries none');
@@ -404,7 +406,7 @@ test("a templated factory's due schedule starts its tree's workflow, as a person
   t.mock.method(console, 'log', () => {});
   const { dir, repo } = template();
   await apply('scheduled', dir, repo, '--set', 'budget=7');
-  reconcileFactory(templated('scheduled'));
+  reconciled(templated('scheduled'));
   const review = path.join(treeDir('scheduled'), 'workflows', 'dev', 'review.md');
   fs.writeFileSync(review, fs.readFileSync(review, 'utf8').replace('budget: 7', 'budget: 9'));
   await main(['factory', 'schedule', 'scheduled', 'dev', '--cron', '* * * * *', '--brief', 'Cache the views'], noEngine());
@@ -447,7 +449,7 @@ test("the writers' place factory writes a templated factory's tree; refused with
     );
   }
   assert.equal(fs.existsSync(path.join(ROOT, 'workflows', 'lean')), false, 'a refused write writes nothing of yours');
-  reconcileFactory(templated('written'));
+  reconciled(templated('written'));
   for (const write of writes(bare)) await main([...write, '--factory', 'written'], noEngine());
   const tree = path.join(treeDir('written'), 'workflows');
   assert.ok(fs.existsSync(path.join(tree, 'lean', 'review.md')), "the workflow is written into the tree's, its agents read in the tree");

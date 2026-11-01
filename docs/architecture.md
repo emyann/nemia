@@ -327,6 +327,19 @@ its invariants — a name taken is `Conflict` (the files' `wx`, so `nemia inbox 
 programs that yield it, and its handlers run through `rooted`; no file of `src` but the door's calls `cardFiles` by hand
 (`src/cards/cards.store.test.ts`). The run store holds no inbox.
 
+**The Template door.** A factory template — a folder that holds its `nemia.yaml`, or an archive `nemia template pack` wrote — is read,
+written as a new folder and packed as a new archive through `TemplateDoor` (`packages/agent-orchestrator/src/templates/templates.store.ts`),
+on the Factory door's pattern: two layers built the one way (`templateDoorOver`), the files (`templateFiles`, today's folders and
+archives, each file with its bytes and mode, a write staged beside its place and renamed into it) and a memory stand-in
+(`templateDoorMemory`, `src/templates/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/template-walks.ts`). Its id
+is where the template is read from, `TemplateSource`, checked whole on a write and read by name alone; a tree written decodes through
+`TemplateTreeWrite` — a template's name, the folder's own, each path one in its folder and short enough for an archive — or is
+`Invalid`, and a place taken is `Conflict`. Its default is rooted, as the Factory door's, though its files are outside the store: one
+pattern for every definition door. The template's lint is the verbs', never the door's: `nemia template export` and `pack` check the
+tree (`checkedTree`, pure, in `src/template/template.store.ts`) before they write it, and `unpack` writes what an archive holds. The
+factory controller reads a template through the door on every pass (`renderedAt`), and a factory's `template` is the model's
+`AppliedTemplate`, whose source names the `Template` it was applied from.
+
 **The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
 which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the
 files and the memory layers. Its methods take and give a branded `TaskId`, nominal on read, so a journal written under any id still

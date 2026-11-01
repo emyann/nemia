@@ -21,8 +21,11 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
   (`FactoryDoor`, `src/factories/factories.store.ts`): a factory, its level, rules and servers, rooted at the store's root a program is
   given (`rootedDoor`), its wiring judged by `wiring.ts`, whose refusals `contracts/wiring.contract.ts` proves; the callers still on its stores are
   counted in `test/factory-door.baseline.ts`. Still to come, each its own card on S5a: **S5b**, the Workflow door (its steps, over
-  `folder.store.ts` and `write.store.ts`); **S5c**, the Agent and Skill doors (one context, the same lookup roots); **S5d**, the
-  Template door. A run's frozen `workflow` and its `pinned` revisions, left out of `Run` today, are named there.
+  `folder.store.ts` and `write.store.ts`); **S5c**, the Agent and Skill doors (one context, the same lookup roots). A run's frozen
+  `workflow` and its `pinned` revisions, left out of `Run` today, are named there. **S5d**, the Template door (`TemplateDoor`,
+  `src/templates/templates.store.ts`): a template's folder or archive read, written and packed, rooted as S5a's, each tree written
+  checked by `TemplateTreeWrite`; the model's `Template` (`src/templates/templates.model.ts`) is keyed by its source, and a factory's
+  `template` is an `AppliedTemplate`, whose source names it.
 - **S6, the subscription, the ledger and the feed**, each behind a door on the feed's model.
 - **AgentOnStep** is `StepAgent` in the agents' model: the agent a step is given, and what the step overrides of it, within what the
   agent offers (`Agent.overridable`).
@@ -112,14 +115,27 @@ erDiagram
     object schedules
     unknown instruction "optional"
     enum revisions "optional"
-    object template "optional"
     string tree "optional"
+  }
+  AppliedTemplate {
+    TemplateSource source FK
+    string version
+    object params
   }
   Hire {
     FactoryName factory FK
     WorkflowName workflow FK
     StepName step FK
     AgentName agent FK
+  }
+  Template {
+    TemplateSource source PK
+    string name
+    string version
+    object parameters
+    object hires FK
+    list workflows FK
+    string digest "optional"
   }
   Agent {
     AgentName name PK
@@ -211,10 +227,14 @@ erDiagram
   Run ||--o{ Card : from
   Workflow ||--o{ Factory : workflows
   Agent ||--o{ Factory : hires
+  Factory ||--o| AppliedTemplate : template
+  Template ||--o{ AppliedTemplate : source
   Factory ||--o{ Hire : factory
   Workflow ||--o{ Hire : workflow
   Step ||--o{ Hire : step
   Agent ||--o{ Hire : agent
+  Agent ||--o{ Template : hires
+  Workflow ||--o{ Template : workflows
   Workflow ||--o{ StepAgent : workflow
   Step ||--o{ StepAgent : step
   Agent ||--o{ StepAgent : agent

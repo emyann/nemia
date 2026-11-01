@@ -23,8 +23,8 @@ export function harnessOf(step: string, harness: string | undefined): string | u
       `${step}: \`harness: claude-detached\` is retired: every session of ours runs on the Agent SDK now, as the default harness. Delete the line: the step runs as a job on the Agent SDK.`,
     );
   }
-  if (isRemoteHarness(harness)) {
-    const name = remoteNameOf(harness)!;
+  const name = remoteNameOf(harness);
+  if (name !== undefined) {
     if (REMOTE_NAME.test(name)) return harness;
     refuse(
       `${step}: \`harness: ${harness}\` names a remote A2A agent, and \`${name}\` is not a name one is declared under: lowercase words joined by dashes, as \`a2a-agents.json\` in the store declares them — \`harness: a2a:reviewer\`.`,
@@ -140,7 +140,8 @@ export function sessionContext(
   let at: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = step;
   while (at?.resume && !seen.has(at.name)) {
     seen.add(at.name);
-    const next: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = steps.find((s) => s.name === at!.resume);
+    const resume: string = at.resume;
+    const next: Pick<Workflow, 'name' | 'resume' | 'context'> | undefined = steps.find((s) => s.name === resume);
     if (!next) break;
     at = next;
   }

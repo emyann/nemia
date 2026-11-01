@@ -304,8 +304,8 @@ export function failingLines(log: string): { lines: string[]; cut: number } {
   const all = new Set<string>();
   for (const raw of log.split('\n')) {
     const line = raw.replace(/\r$/, '');
-    const said = /^(\S+:\S+: )?\s*((?:✖|not ok ).*)$/.exec(line);
-    if (said && !said[2].startsWith('✖ failing tests:')) all.add(`${said[1] ?? ''}${said[2].trimEnd()}`);
+    const [, at, failed] = /^(\S+:\S+: )?\s*((?:✖|not ok ).*)$/.exec(line) ?? [];
+    if (failed !== undefined && !failed.startsWith('✖ failing tests:')) all.add(`${at ?? ''}${failed.trimEnd()}`);
   }
   const lines = [...all];
   return { lines: lines.slice(0, FAILING_LINES), cut: Math.max(0, lines.length - FAILING_LINES) };

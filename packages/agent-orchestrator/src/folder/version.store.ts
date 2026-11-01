@@ -83,7 +83,7 @@ export function workflowVersion(dir: string, places: Places): string {
     ];
   });
   return createHash('sha256')
-    .update(JSON.stringify([...files, ...agents, ...added.map((skill) => addedSkillVersion(skill, skills!))]))
+    .update(JSON.stringify([...files, ...agents, ...(skills === undefined ? [] : added.map((skill) => addedSkillVersion(skill, skills)))]))
     .digest('hex')
     .slice(0, 16);
 }

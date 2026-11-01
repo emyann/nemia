@@ -163,8 +163,9 @@ function noStepsBecause(dir: string, entries: readonly string[]): string {
   const readme = entries.find(isReadme);
   if (readme) return ` — ${readme} describes the workflow, and is not a step. Write the first step beside it: implement.md, say.`;
   const workflows = workflowsIn(dir, entries);
-  return workflows.length
-    ? ` — it holds workflows, each a folder of steps: ${workflows.join(', ')}. Name one of them: ${path.join(dir, workflows[0])}.`
+  const [first] = workflows;
+  return first !== undefined
+    ? ` — it holds workflows, each a folder of steps: ${workflows.join(', ')}. Name one of them: ${path.join(dir, first)}.`
     : '';
 }
 
@@ -190,7 +191,8 @@ export function workflowFolder(given: string, from: string, repo: string, tree?:
   const at = path.resolve(from, given);
   if (isFolder(at)) return at;
   const bare = !/[\\/]/.test(given) && given !== '.' && given !== '..';
-  if (bare && given === AGENTS_FOLDER) throw new WorkflowError(agentsFolderRefusal(path.join(repo, 'workflows', given))!);
+  const agentsRefused = bare && given === AGENTS_FOLDER ? agentsFolderRefusal(path.join(repo, 'workflows', given)) : undefined;
+  if (agentsRefused !== undefined) throw new WorkflowError(agentsRefused);
   if (bare && tree !== undefined && isFolder(path.join(tree, 'workflows', given))) return path.join(tree, 'workflows', given);
   const workflows = path.join(repo, 'workflows');
   if (bare && isFolder(path.join(workflows, given))) return path.join(workflows, given);

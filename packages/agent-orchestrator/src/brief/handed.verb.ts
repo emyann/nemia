@@ -14,6 +14,7 @@ import { closeoutOf, parentRead } from '../views/views.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import type { ParentCloseout, ParentStep } from './handed.ts';
+import { firstPiece } from '../piece/piece.ts';
 
 /**
  * What the step `step` of the run `record` said, on the engine's record of its current try (`closeoutOf`) — or why it cannot be given: it
@@ -69,7 +70,7 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
     const said: ParentStep[] = [];
     for (const step of resultSteps(steps)) said.push(yield* stepSaid(e, record, step));
     const landed = how === 'waited' || (yield* parentRead(id, git).pipe(over(e))).landed;
-    out.push({ run: id, asked: record.brief.split('\n')[0], steps: said, how, landed });
+    out.push({ run: id, asked: firstPiece(record.brief, '\n'), steps: said, how, landed });
   }
   return out;
 });

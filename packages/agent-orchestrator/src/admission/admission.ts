@@ -73,7 +73,10 @@ const REDIRECT = /^\d*[<>]/;
 
 /** The words of a command, its redirections and their targets left out. */
 const unredirected = (args: readonly string[]): string[] =>
-  args.filter((a, i) => !REDIRECT.test(a) && !(i > 0 && /^\d*[<>]+&?$/.test(args[i - 1])));
+  args.filter((a, i) => {
+    const before = args[i - 1];
+    return !REDIRECT.test(a) && !(before !== undefined && /^\d*[<>]+&?$/.test(before));
+  });
 
 /** The values `args` holds under `key`, one or many. */
 const valuesAt = (args: Readonly<Record<string, unknown>>, key: string): string[] => {

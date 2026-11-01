@@ -56,7 +56,8 @@ export function keptRecords<P>(memo: RecordMemo<P> | undefined, read: RecordsRea
   const out: P[] = [];
   for (const id of ids) {
     const kept = memo.runs.get(id);
-    const stamp = read.stamps.get(id)!;
+    const stamp = read.stamps.get(id);
+    if (stamp === undefined) continue;
     if (kept && kept.stamp === stamp) {
       if (read.verify) verified(id, kept.of, projected(id));
       out.push(kept.of);

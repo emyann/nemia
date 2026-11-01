@@ -54,8 +54,12 @@ const CONTROL = /[\u0000-\u001f\u007f]/;
 export const OWN_KEYS = ['WF_ROOT', 'PATH'] as const;
 
 /** The environment as given on the command line, `KEY=VALUE` each, split at its first `=`; a word with none keeps an empty key's place. */
-export const envPairs = (given: readonly string[]): [string, string][] =>
-  given.map((word) => (word.includes('=') ? [word.slice(0, word.indexOf('=')), word.slice(word.indexOf('=') + 1)] : [word, '']));
+export const envPairs = (given: readonly string[]): [string, string][] => given.map(envPair);
+
+/** One word of the environment as given, `KEY=VALUE`, split at its first `=`; a word with none is the key, with an empty value. */
+function envPair(word: string): [string, string] {
+  return word.includes('=') ? [word.slice(0, word.indexOf('=')), word.slice(word.indexOf('=') + 1)] : [word, ''];
+}
 
 /**
  * Why `--env` cannot be written into a unit, or null: a word with no `=`, a key that is no variable's name, a key given twice or one the
@@ -63,8 +67,9 @@ export const envPairs = (given: readonly string[]): [string, string][] =>
  */
 export function envRefusal(given: readonly string[]): string | null {
   const seen = new Set<string>();
-  for (const [i, [key, value]] of envPairs(given).entries()) {
-    if (!given[i].includes('=')) return `nemia service install: --env ${given[i]} has no value: give it as --env KEY=VALUE.`;
+  for (const word of given) {
+    const [key, value] = envPair(word);
+    if (!word.includes('=')) return `nemia service install: --env ${word} has no value: give it as --env KEY=VALUE.`;
     if (!ENV_KEY.test(key))
       return `nemia service install: --env ${key} is not a variable's name: a letter or _, then letters, digits and _.`;
     if ((OWN_KEYS as readonly string[]).includes(key))
@@ -246,14 +251,14 @@ const unxml = (text: string): string =>
 
 /** A plist's text read back (`plistText`): its program's two arguments, its folder and its environment. */
 export function plistRead(text: string): UnitRead {
-  const strings = (block: string) => [...block.matchAll(/<string>([\s\S]*?)<\/string>/g)].map((m) => unxml(m[1]));
+  const strings = (block: string) =>
+    [...block.matchAll(/<string>([\s\S]*?)<\/string>/g)].flatMap(([, inner]) => (inner === undefined ? [] : [unxml(inner)]));
   const [node, entry] = strings(/<key>ProgramArguments<\/key><array>([\s\S]*?)<\/array>/.exec(text)?.[1] ?? '');
   const cwd = strings(/<key>WorkingDirectory<\/key>(<string>[\s\S]*?<\/string>)/.exec(text)?.[1] ?? '')[0];
   const envBlock = /<key>EnvironmentVariables<\/key>\s*<dict>([\s\S]*?)<\/dict>/.exec(text)?.[1] ?? '';
-  const env = [...envBlock.matchAll(/<key>([\s\S]*?)<\/key><string>([\s\S]*?)<\/string>/g)].map((m): [string, string] => [
-    unxml(m[1]),
-    unxml(m[2]),
-  ]);
+  const env = [...envBlock.matchAll(/<key>([\s\S]*?)<\/key><string>([\s\S]*?)<\/string>/g)].flatMap(
+    ([, key, value]): Array<[string, string]> => (key === undefined || value === undefined ? [] : [[unxml(key), unxml(value)]]),
+  );
   return { node, entry, cwd, env };
 }
 

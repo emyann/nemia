@@ -195,7 +195,10 @@ function renderAgentOf(name: string, spec: Spec, read: TemplateRead, out: Render
 const namesOf = (read: TemplateRead, holder: string, leaf: string): string[] =>
   read.folder.files
     .filter((file) => file.startsWith(`${holder}/`) && file.endsWith(`/${leaf}`) && file.split('/').length === 3)
-    .map((file) => file.split('/')[1])
+    .flatMap((file) => {
+      const [, name] = file.split('/');
+      return name === undefined ? [] : [name];
+    })
     .sort();
 
 /** The spec of the document `file`, its `{param}` values given. */

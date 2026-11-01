@@ -28,8 +28,11 @@ export type Read = {
 /** The newest run `runs` holds that the schedule of `workflow` in `factory` started, by the fire it was started for. */
 const lastRun = (runs: readonly ScheduleRun[], factory: string, workflow: string): ScheduleRun | undefined =>
   runs
-    .filter((r) => r.scheduled?.factory === factory && r.scheduled.workflow === workflow)
-    .sort((a, b) => Date.parse(b.scheduled!.due) - Date.parse(a.scheduled!.due))[0];
+    .flatMap((run) => {
+      const scheduled = run.scheduled;
+      return scheduled?.factory === factory && scheduled.workflow === workflow ? [{ run, due: Date.parse(scheduled.due) }] : [];
+    })
+    .sort((a, b) => b.due - a.due)[0]?.run;
 
 /** Every schedule of every factory that reads, factories by name, then workflows by name, each read at `now`. */
 export function schedulesRead(runs: readonly ScheduleRun[], now: number): Read[] {
@@ -37,10 +40,9 @@ export function schedulesRead(runs: readonly ScheduleRun[], now: number): Read[]
     .filter((f): f is Factory & { file: string } => !('error' in f))
     .sort((a, b) => a.name.localeCompare(b.name))
     .flatMap((factory) =>
-      Object.keys(factory.schedules)
-        .sort()
-        .map((workflow) => {
-          const schedule = factory.schedules[workflow];
+      Object.entries(factory.schedules)
+        .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+        .map(([workflow, schedule]) => {
           return {
             factory,
             workflow,
@@ -59,7 +61,7 @@ export const isDue = (r: Read): r is Read & { fires: { latest: number; next: num
   scheduleDue({
     latest: r.fires.latest,
     since: Date.parse(r.schedule.since),
-    last: r.last ? Date.parse(r.last.scheduled!.due) : undefined,
+    last: r.last?.scheduled ? Date.parse(r.last.scheduled.due) : undefined,
     settled: settledFire(r.kept),
   });
 

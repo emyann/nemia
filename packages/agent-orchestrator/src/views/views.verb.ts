@@ -94,7 +94,7 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
         Effect.map((got) => {
           const fresh = new Map<unknown, TaskView>(got.views.map((v) => [v.id, v]));
           keep(got.views, at);
-          const answered = wanted.flatMap((id) => fresh.get(id) ?? (missing.includes(id) ? [] : [kept.get(id)!]));
+          const answered = wanted.flatMap((id) => fresh.get(id) ?? (missing.includes(id) ? [] : (kept.get(id) ?? [])));
           return { views: answered, unreadable: got.unreadable } satisfies TaskList;
         }),
       );

@@ -98,8 +98,11 @@ const scopeRead = Effect.fnUntraced(function* (line: string, table: Parameters<t
   const named = namedIn(line, table);
   const factories = new Map<string, Level>();
   const levelOf = function* (factory: string) {
-    if (!factories.has(factory)) factories.set(factory, yield* levelOfFactory(factory));
-    return factories.get(factory)!;
+    const known = factories.get(factory);
+    if (known !== undefined) return known;
+    const level = yield* levelOfFactory(factory);
+    factories.set(factory, level);
+    return level;
   };
   const runs = new Map<string, { factory: string; level: Level } | undefined>();
   for (const runId of new Set(named.flatMap((n) => n.runs))) {

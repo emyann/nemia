@@ -102,10 +102,10 @@ const CLOSEOUT_HANDED =
  * What a brief says of the folders the steps before it handed over (`handed`, each read-only): each by its absolute path and its step,
  * the folder's name, and that it is listed under its own path, since the run's artifacts folder above it is not mounted; then, once, what
  * `closeout.json` holds where one of them holds it (`closeouts`), and for each that does not, of the files its step named, those that are
- * there (`namedWords`, off `named`).
+ * there (`namedWords`, off `named`). `first` is the first of `handed`, the one the line lists as an example.
  */
-const handedLine = (handed: readonly Mount[], named: FiledFolders['named'] = {}, closeouts: readonly string[] = []): string =>
-  `Folders the steps before you handed over, which you may read and must not write: ${handed.map((m) => `\`${m.path}\` (${path.basename(m.path)}'s)`).join(', ')}. Each is mounted on its own path, and the run's artifacts folder above them is not: list one with Glob under its own path, as \`${handed[0].path}/**\`.${handed.some((m) => closeouts.includes(m.path)) ? CLOSEOUT_HANDED : ''}${handed
+const handedLine = (first: Mount, handed: readonly Mount[], named: FiledFolders['named'] = {}, closeouts: readonly string[] = []): string =>
+  `Folders the steps before you handed over, which you may read and must not write: ${handed.map((m) => `\`${m.path}\` (${path.basename(m.path)}'s)`).join(', ')}. Each is mounted on its own path, and the run's artifacts folder above them is not: list one with Glob under its own path, as \`${first.path}/**\`.${handed.some((m) => closeouts.includes(m.path)) ? CLOSEOUT_HANDED : ''}${handed
     .filter((m) => !closeouts.includes(m.path))
     .map((m) => namedWords(path.basename(m.path), named[m.path]))
     .join('')}`;
@@ -120,7 +120,7 @@ function namedWords(step: string, files: HandedFiles | undefined): string {
   const gone =
     files.gone === 1 ? '1 file it named is not there, and is not listed' : `${files.gone} files it named are not there, and are not listed`;
   if (!files.there.length) return ` Of the files ${step} named, none is there: ${gone}.`;
-  return ` The files ${step} named that are there: ${files.there.map((file) => `\`${file}\``).join(', ')}.${files.gone ? ` ${gone[0].toUpperCase()}${gone.slice(1)}.` : ''}`;
+  return ` The files ${step} named that are there: ${files.there.map((file) => `\`${file}\``).join(', ')}.${files.gone ? ` ${gone.charAt(0).toUpperCase()}${gone.slice(1)}.` : ''}`;
 }
 
 /**
@@ -153,7 +153,7 @@ export const mountsLine = (
           `Folders of this factory you may read, and must not write: ${pathsOf(reads)}. Each is mounted read-only; your own work stays in your workspace.`,
         ]
       : []),
-    ...(handed.length ? [handedLine(handed, folders.named, folders.closeouts)] : []),
+    ...(handed[0] ? [handedLine(handed[0], handed, folders.named, folders.closeouts)] : []),
     ...(store.length
       ? [
           `Folders of the store you may read, and must not write, as this step's \`reads:\` names them: ${pathsOf(store)}. Each is mounted read-only; read it with Read, Grep and Glob.`,

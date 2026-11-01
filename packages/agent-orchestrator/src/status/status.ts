@@ -224,7 +224,8 @@ export function endingStopped(
  */
 export function sentBack(record: StepRecord): StepRecord {
   const { check, tries = [], taskId, handedOff: _, landed: __, filesRead: ___, ...rest } = record;
-  return { ...rest, taskId: null, tries: [...tries, { taskId: taskId!, ...(check ? { check } : {}), cause: 'back' }] };
+  const moved: NonNullable<StepRecord['tries']> = taskId === null ? [] : [{ taskId, ...(check ? { check } : {}), cause: 'back' }];
+  return { ...rest, taskId: null, tries: [...tries, ...moved] };
 }
 
 /**
@@ -831,10 +832,11 @@ export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Co
   if (!usages.length) return undefined;
   const sum: Consumed = {};
   for (const field of FIELDS) {
-    if (usages.every((u) => u?.[field] !== undefined)) sum[field] = usages.reduce((n, u) => n + u![field]!, 0);
+    const values = usages.map((u) => u?.[field]);
+    if (values.every((v): v is number => v !== undefined)) sum[field] = values.reduce((n, v) => n + v, 0);
   }
-  if (usages.every((u) => u?.peakContextTokens !== undefined))
-    sum.peakContextTokens = Math.max(...usages.map((u) => u!.peakContextTokens!));
+  const peaks = usages.map((u) => u?.peakContextTokens);
+  if (peaks.every((v): v is number => v !== undefined)) sum.peakContextTokens = Math.max(...peaks);
   const rebuilt = usages.reduce((n, u) => n + (u?.rebuiltCaches ?? 0), 0);
   if (rebuilt) sum.rebuiltCaches = rebuilt;
   const compactions = usages.reduce((n, u) => n + (u?.compactions ?? 0), 0);
@@ -885,7 +887,7 @@ export function readWords(u: Consumed | null | undefined, cap?: number): string 
     ...(u.compactions ? [compactedWords(u.compactions)] : []),
     ...(mark === 'large' ? [`past ${count(LARGE_CONTEXT)} with no cap`] : []),
   ].join(', ');
-  const reached = mark === 'cap' ? `${u.compactions ? `${where} ` : ''}at its ${count(cap!)} cap` : where;
+  const reached = mark === 'cap' && cap !== undefined ? `${u.compactions ? `${where} ` : ''}at its ${count(cap)} cap` : where;
   const peak =
     u.peakContextTokens !== undefined ? `peak ${count(u.peakContextTokens)}${reached ? `, ${reached}` : ''}` : reached || undefined;
   const rebuilt = u.rebuiltCaches

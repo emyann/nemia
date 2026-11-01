@@ -313,7 +313,8 @@ export const unjudgedOf = Effect.fn('unjudgedOf')(function* (e: Engine, run: Run
   const names = folder === undefined ? stepsOf(run).map((s) => s.name) : Object.keys(run.steps);
   const steps = names.map((name) => ({ name, status: word(run.steps[name]), branch: run.steps[name]?.branch }));
   if (folder !== undefined) return { said: unloadedWords(run.id, folder, by), steps } satisfies Unjudged;
+  if (why === undefined) return undefined;
   const named = (err as { taskId: string }).taskId;
   const own = tasks.find((id) => unreadable.has(id)) ?? tasks.find((id) => id === named);
-  return { said: unjudgedWords(run.id, own, (own && unreadable.get(own)) ?? why!, by), steps } satisfies Unjudged;
+  return { said: unjudgedWords(run.id, own, (own && unreadable.get(own)) ?? why, by), steps } satisfies Unjudged;
 });

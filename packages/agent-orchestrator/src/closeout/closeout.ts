@@ -262,11 +262,13 @@ function itemLines(item: unknown): string[] {
  * schema asks for them on every try (`closeoutSchemaOf`).
  */
 export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | false = false, inFolder = false): string => {
-  const declared = step?.output
-    ? outputFields(step)
-        .map((f) => `\`${f}\``)
-        .join(', ')
-    : '';
+  const output = step?.output;
+  const declared =
+    step && output
+      ? outputFields(step)
+          .map((f) => `\`${f}\``)
+          .join(', ')
+      : '';
   return [
     '',
     '## When you are finished',
@@ -297,9 +299,9 @@ export const closeoutContract = (step?: Workflow, replies: 'owed' | 'none' | fal
     '  An artifact may be a value instead, `{"name", "value"}`, such as a pull request\'s address: shown labelled, and as a link',
     "  when it is an http(s) address. `closeout.json` is the run's own name: an artifact that names it is refused.",
     '- `needs`: only when blocked, what a person has to settle; `null` when done. A `done` closeout with a `needs` is refused.',
-    ...(declared
+    ...(declared && output
       ? [
-          `- ${declared}: what this step declares (\`output: ${step!.output!.file}\`), in the shape the session`,
+          `- ${declared}: what this step declares (\`output: ${output.file}\`), in the shape the session`,
           '  asks for. It is handed, as data, to a step that reads it. A closeout',
           '  without it is unsigned, and nothing that waits on this step starts.',
         ]

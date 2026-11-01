@@ -24,7 +24,7 @@ export const isRemoteHarness = (harness: string | undefined): boolean => harness
 
 /** The name `harness: a2a:<name>` gives, or `undefined` for a local harness. Pure. */
 export const remoteNameOf = (harness: string | undefined): string | undefined =>
-  isRemoteHarness(harness) ? harness!.slice(REMOTE_PREFIX.length) : undefined;
+  harness !== undefined && isRemoteHarness(harness) ? harness.slice(REMOTE_PREFIX.length) : undefined;
 
 const RUNS_AS_CONFIGURED =
   'is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one';
@@ -117,5 +117,8 @@ export const HARNESS_FENCE_KEYS: readonly string[] = [
 ];
 
 /** The fence keys harness `harness`'s block takes, its own key then its tool lists, or `undefined` for a name that is no harness. */
-export const fenceKeysOf = (harness: string): readonly string[] | undefined =>
-  Object.hasOwn(HARNESS_KNOBS, harness) ? [HARNESS_KNOBS[harness].fence.key, ...HARNESS_KNOBS[harness].fence.lists] : undefined;
+export const fenceKeysOf = (harness: string): readonly string[] | undefined => {
+  if (!Object.hasOwn(HARNESS_KNOBS, harness)) return undefined;
+  const knobs = HARNESS_KNOBS[harness];
+  return knobs === undefined ? undefined : [knobs.fence.key, ...knobs.fence.lists];
+};

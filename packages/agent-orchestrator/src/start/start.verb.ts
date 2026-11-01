@@ -221,10 +221,11 @@ function undeclaredRefusal(steps: readonly Workflow[]): string | undefined {
   const remote = steps
     .map((s) => ({ s, name: remoteNameOf(s.harness) }))
     .filter((r): r is { s: Workflow; name: string } => r.name !== undefined);
-  if (remote.length === 0) return undefined;
+  const [first] = remote;
+  if (first === undefined) return undefined;
   const read = readRemote();
   if (read.unread)
-    return `${remote[0].s.name}: \`harness: ${remote[0].s.harness}\` names a remote A2A agent, and the file that declares them is refused. ${read.unread}`;
+    return `${first.s.name}: \`harness: ${first.s.harness}\` names a remote A2A agent, and the file that declares them is refused. ${read.unread}`;
   const refused = remote.find(({ name }) => read.refused.has(name));
   if (refused)
     return `${refused.s.name}: \`harness: ${refused.s.harness}\` names a remote A2A agent whose entry is refused. ${read.refused.get(refused.name)}`;

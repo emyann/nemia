@@ -202,6 +202,13 @@ export type SkillChange = SkillDraft | { name: string; preload: boolean };
 /** What `writeSkill` did: the skill's folder, its version now (`skillVersion`), and the files it wrote there. */
 export type SkillWritten = { dir: string; name: string; version: string; written: string[] };
 
+/** The version of the skill just written into `dir` (`skillVersion`); refused as `Missing`, `notThere` said, where its SKILL.md is gone. */
+function versionWritten(dir: string, notThere: string): string {
+  const version = skillVersion(dir);
+  if (version === null) throw new Missing({ message: `${notThere}: it was removed as it was written. Write it again.` });
+  return version;
+}
+
 /** The version of the skill whose folder is `dir`, or null where `dir` is no folder or holds no SKILL.md. */
 const versionThere = (dir: string): string | null =>
   fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? skillVersion(dir) : null;
@@ -281,5 +288,5 @@ export function writeSkill(
       throw err;
     }
   }
-  return { dir: target, name, version: skillVersion(target)!, written: ['SKILL.md'] };
+  return { dir: target, name, version: versionWritten(target, `${named} is not in ${at}`), written: ['SKILL.md'] };
 }

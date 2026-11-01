@@ -62,7 +62,8 @@ export function findAgent(name: string, repo: string, from?: AgentPlace, home = 
     return agent === undefined ? [] : [{ ...place, agent }];
   });
   const where = (list: ReadonlyArray<{ from: AgentPlace }>) => list.map((p) => `--from ${p.from}`).join(' or ');
-  if (!found.length) {
+  const [one] = found;
+  if (one === undefined) {
     const has = agentPlaces(repo, home)
       .filter((place) => fs.existsSync(place.dir))
       .map((place) => `${place.dir} (${[...loadAgents(place.dir).keys()].sort().join(', ') || 'no agents'})`);
@@ -78,7 +79,6 @@ export function findAgent(name: string, repo: string, from?: AgentPlace, home = 
   }
   if (found.length > 1)
     throw new WorkflowError(`${name} is an agent in both places — ${found.map((p) => p.dir).join(' and ')}. Say which: ${where(found)}.`);
-  const one = found[0];
   if (one.agent instanceof Error) throw one.agent;
   return { from: one.from, dir: one.dir, agent: one.agent };
 }
@@ -162,7 +162,7 @@ export function agentRead(from: AgentPlace, dir: string, name: string, { repo, h
 export function agentsRead({ repo, home = HOME }: Readings): AgentsRead {
   const places = agentPlaces(repo, home);
   const agents = places.flatMap(({ from, dir }) =>
-    [...loadAgents(dir).keys()].sort().map((name) => agentRead(from, dir, name, { repo, home })!),
+    [...loadAgents(dir).keys()].sort().flatMap((name) => agentRead(from, dir, name, { repo, home }) ?? []),
   );
   return { agents, places };
 }

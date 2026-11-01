@@ -147,7 +147,7 @@ export const judging = Effect.fn('prune.judging')(function* (
     ...(facts ? { facts } : {}),
   });
   const folder = pruneRefusal(run, { decided: undefined, held: null, owed: [], worktrees: [] });
-  if (!isRepositoryRun(run)) return refused(folder!);
+  if (!isRepositoryRun(run)) return refused(folder ?? '');
 
   const within = resolved(path.join(HOME, 'worktrees', id));
   const steps = frozenSteps(run);
@@ -173,8 +173,9 @@ export const judging = Effect.fn('prune.judging')(function* (
  */
 export const sized = Effect.fn('prune.sized')(function* (ready: Ready) {
   const bytes = yield* freedBytes(ready.listed.map((w) => w.path));
-  const worktrees = ready.listed.map((w, k) => ({ path: w.path, bytes: bytes[k] }));
-  const files = ready.filesAt ? { path: ready.filesAt, bytes: (yield* freedBytes([ready.filesAt]))[0] } : undefined;
+  const worktrees = ready.listed.map((w, k) => ({ path: w.path, bytes: bytes[k] ?? 0 }));
+  const [filesBytes = 0] = ready.filesAt ? yield* freedBytes([ready.filesAt]) : [];
+  const files = ready.filesAt ? { path: ready.filesAt, bytes: filesBytes } : undefined;
   return { ...ready, worktrees, ...(files ? { files } : {}) } satisfies Sized;
 });
 
@@ -370,10 +371,11 @@ function markWith(theirs: Pruned | undefined, went: Pruning['worktrees'], freed:
  * @returns What was done with each, in the order given.
  */
 export const freeing = Effect.fn('prune.freeing')(function* (ready: readonly Sized[]) {
-  if (!ready.length) return [];
+  const [first] = ready;
+  if (first === undefined) return [];
   const now = new Date().toISOString();
   const all = ready.map((r) => marked(r, now));
-  const [{ run, place }] = ready;
+  const { run, place } = first;
   const outcome = yield* place.place.ask('remove', {
     repo: run.repo,
     workspaces: ready.flatMap((r) => r.worktrees.map((w) => w.path)),
@@ -397,7 +399,7 @@ const finished = Effect.fnUntraced(function* (r: Marked, outcome: PlaceOutcome<'
     id: r.run.id,
     kind: 'pruned',
     worktrees: removed,
-    ...(filesWent ? { artifacts: { path: r.files!.path, bytes: files.freed } } : {}),
+    ...(filesWent && r.files ? { artifacts: { path: r.files.path, bytes: files.freed } } : {}),
     left,
     at: r.mine.at,
     ...(r.unmerged ? { unmerged: true as const } : {}),
@@ -431,7 +433,7 @@ function removedOf(
 const removeFiles = Effect.fnUntraced(function* (id: string, kept: { path: string; bytes: number }) {
   const why = runStore.runs.dropFiles(id);
   if (why === null) return { freed: kept.bytes };
-  const still = (yield* freedBytes([kept.path]))[0];
+  const [still = 0] = yield* freedBytes([kept.path]);
   return { freed: Math.max(0, kept.bytes - still), left: { path: kept.path, files: why } satisfies Pruning['left'][number] };
 });
 
@@ -526,13 +528,18 @@ const turned = Effect.fnUntraced(function* (
   );
   yield* forgottenGone(
     judged.flatMap((l) => ('left' in l && l.left ? [l.left] : [])),
-    new Set(groups.map(({ group }) => group[0].run.repo)),
+    new Set(groups.flatMap(({ group }) => group.slice(0, 1).map((r) => r.run.repo))),
   );
   const done = new Map<string, Turned>();
   for (const { group, exit } of groups) {
     group.forEach((r, k) => {
       const id = r.run.id;
-      done.set(id, Exit.isSuccess(exit) ? { id, pruning: exit.value[k] } : { id, failed: Cause.squash(exit.cause) });
+      if (!Exit.isSuccess(exit)) {
+        done.set(id, { id, failed: Cause.squash(exit.cause) });
+        return;
+      }
+      const pruning = exit.value[k];
+      if (pruning !== undefined) done.set(id, { id, pruning });
     });
   }
   return judged.map((l): Turned => done.get(l.id) ?? ('failed' in l ? l : { id: l.id, pruning: l.pruning }));

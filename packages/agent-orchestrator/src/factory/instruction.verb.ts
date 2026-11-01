@@ -60,13 +60,13 @@ const textOf = (args: Args, key: string): string | undefined => {
 };
 
 /** `--path <p>`: the file in the factory's first folder its instruction is read from. */
-const PATH: Flag = {
+const PATH = {
   flag: '--path',
   kind: 'text',
   key: 'path',
   takes: "--path takes a file's path from the factory's first folder: nemia factory instruction <name> --path docs/NEMIA.md",
   twice: 'nemia factory instruction takes --path once: a factory reads one instruction.',
-};
+} satisfies Flag;
 
 /** `nemia factory instruction`'s spec: the factory's name, then `--path`, `--store` or `--clear`. */
 const INSTRUCTION_SPEC: Spec = {
@@ -74,7 +74,7 @@ const INSTRUCTION_SPEC: Spec = {
   flags: [PATH, { flag: '--store', kind: 'switch', key: 'store' }, { flag: '--clear', kind: 'switch', key: 'clear' }],
   unknown: (arg) =>
     `nemia factory instruction takes one factory's name, then --path <path>, --store or --clear, not ${arg}: nemia factory instruction <name> [--path <path> | --store | --clear].`,
-  apart: () => PATH.takes!,
+  apart: () => PATH.takes,
   missing: "nemia factory instruction takes the factory's name: nemia factory instruction <name> [--path <path> | --store | --clear].",
 };
 
@@ -167,14 +167,14 @@ export const FACTORY_INSTRUCTION: Command<FactoryInstruction> = {
 };
 
 /** `--file <path>`, or `-` for stdin: the words to write, read by the command line's runner. */
-const FILE: Flag = {
+const FILE = {
   flag: '--file',
   kind: 'text',
   key: 'file',
   takes: '--file takes the file whose words to write, or - to read them from stdin: nemia factory instruct <name> --file <path>',
   twice: 'nemia factory instruct takes --file once: a factory keeps one instruction.',
   only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
-};
+} satisfies Flag;
 
 /** `nemia factory instruct`'s spec: the factory's name, then `--file` or `--clear`; and the words, which a body alone carries. */
 const INSTRUCT_SPEC: Spec = {
@@ -190,7 +190,7 @@ const INSTRUCT_SPEC: Spec = {
     },
   ],
   unknown: (arg) => `nemia factory instruct takes one factory's name, then --file <path> (or --file - for stdin) or --clear, not ${arg}.`,
-  apart: () => FILE.takes!,
+  apart: () => FILE.takes,
   missing: "nemia factory instruct takes the factory's name: nemia factory instruct <name> --file <path>|- or --clear.",
 };
 

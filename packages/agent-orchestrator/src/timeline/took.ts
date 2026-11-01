@@ -35,7 +35,7 @@ export function ranIn(view: TaskClock): Ran[] {
   return [...turns.values()].flatMap((turn, i, all): Ran[] => {
     const from = turn.find((a) => a.spawnedAt)?.spawnedAt;
     if (!from) return [];
-    const to = turn.at(-1)!.endedAt;
+    const to = turn.at(-1)?.endedAt;
     if (to) return [{ from: Date.parse(from), to: Date.parse(to) }];
     return over || i < all.length - 1 ? [] : [{ from: Date.parse(from), to: null }];
   });
@@ -99,8 +99,18 @@ export type RunTokens = {
 };
 
 /** A part of the input every measured session has, summed; null where one lacks it. */
-const partOf = (used: readonly Consumed[], key: 'cacheReadTokens' | 'cacheWriteTokens' | 'uncachedTokens'): number | null =>
-  used.every((u) => u[key] !== undefined) ? used.reduce((n, u) => n + u[key]!, 0) : null;
+function partOf(used: readonly Consumed[], key: 'cacheReadTokens' | 'cacheWriteTokens' | 'uncachedTokens'): number | null {
+  let sum = 0;
+  for (const u of used) {
+    const n = u[key];
+    if (n === undefined) return null;
+    sum += n;
+  }
+  return sum;
+}
+
+/** A session's usage that measured both its input and its output tokens. */
+type Measured = Consumed & { inputTokens: number; outputTokens: number };
 
 /** Whether a task's view shows a session that ran: an attempt that spawned, other than one that never could start. */
 const ran = (view: TaskClock | undefined): boolean => Boolean(view?.state.attempts.some((a) => a.reason !== 'unstartable' && a.spawnedAt));
@@ -112,13 +122,13 @@ const ran = (view: TaskClock | undefined): boolean => Boolean(view?.state.attemp
 export function runTokens(run: Pick<Run, 'steps'>, views: ReadonlyMap<string, TaskClock>): RunTokens | null {
   const sessions = [...new Set(Object.values(run.steps).flatMap((record) => sessionTasks(record)))].filter((id) => ran(views.get(id)));
   const usages = sessions.map((id) => taskUsage(views.get(id)));
-  const used = usages.filter((u): u is Consumed => u?.inputTokens !== undefined && u.outputTokens !== undefined);
+  const used = usages.filter((u): u is Measured => u?.inputTokens !== undefined && u.outputTokens !== undefined);
   if (!used.length) return null;
-  const input = used.reduce((n, u) => n + u.inputTokens!, 0);
-  const output = used.reduce((n, u) => n + u.outputTokens!, 0);
-  const [cacheRead, cacheWrite, uncached] = (['cacheReadTokens', 'cacheWriteTokens', 'uncachedTokens'] as const).map((k) =>
-    partOf(used, k),
-  );
+  const input = used.reduce((n, u) => n + u.inputTokens, 0);
+  const output = used.reduce((n, u) => n + u.outputTokens, 0);
+  const cacheRead = partOf(used, 'cacheReadTokens');
+  const cacheWrite = partOf(used, 'cacheWriteTokens');
+  const uncached = partOf(used, 'uncachedTokens');
   const unmeasured = sessions.length - used.length;
   const parts =
     cacheRead !== null && cacheWrite !== null && uncached !== null

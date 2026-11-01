@@ -254,7 +254,14 @@ export function firstFiledAt(run: Run, filed: ReadonlyMap<string, string>): stri
     record.taskId,
     record.check?.taskId,
   ]);
-  return tasks.flatMap((id) => (id && filed.has(id) ? [filed.get(id)!] : [])).sort()[0] ?? null;
+  return (
+    tasks
+      .flatMap((id) => {
+        const at = id ? filed.get(id) : undefined;
+        return at === undefined ? [] : [at];
+      })
+      .sort()[0] ?? null
+  );
 }
 
 /**
@@ -279,7 +286,7 @@ function ranOf(attempts: readonly AttemptClock[]): number | null {
   for (const turn of turns.values()) {
     const from = turn.find((a) => a.spawnedAt)?.spawnedAt ?? null;
     if (!from) continue;
-    const ran = between(from, turn.at(-1)!.endedAt);
+    const ran = between(from, turn.at(-1)?.endedAt ?? null);
     if (ran === null) return null;
     ms += ran;
     spawned = true;
@@ -348,6 +355,7 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
   const running = spans.filter((s) => s.at === 'running').length;
   const ranUnknown = spans.filter((s) => s.ran === 'not known' || s.at === 'unknown').length;
   const firsts = spans.map((s) => s.filedAt);
+  const filed = firsts.filter((at): at is string => at !== null);
   const lasts = spans.map((s) => s.endedAt).filter((at): at is string => at !== null);
   const wallMs =
     inFlight.length ||
@@ -356,7 +364,7 @@ function totalOf(loop: string | null, round: number | null, spans: readonly Task
     spans.some((s) => s.at === 'unknown' || (s.at === 'ended' && !s.endedAt)) ||
     !lasts.length
       ? null
-      : between([...(firsts as string[])].sort()[0], lasts.sort().at(-1)!);
+      : between(filed.sort()[0] ?? null, lasts.sort().at(-1) ?? null);
   const said = (known: number, ms: number, pending: [number, string], unknown: number): string =>
     [
       known ? durationWord(ms) : '',
@@ -410,7 +418,8 @@ export function timelineLines(tries: readonly TimelineTry[]): string[] {
   };
   const rows = tries.flatMap((t): Array<[string, string]> => {
     const label = `try ${t.try}${t.round > 1 ? ` · round ${t.round}` : ''}`;
-    const used = usedLines(t.used)[0].replace(/^used\s+/, '');
+    const [usedLine = ''] = usedLines(t.used);
+    const used = usedLine.replace(/^used\s+/, '');
     const cost = t.used?.costUsd !== undefined ? `  cost ${dollars(t.used.costUsd)}` : '';
     return [
       [label, t.session ? `${words(t.session)}  used ${used}${cost}` : `its session is try ${t.sessionOf}'s, checked again`],

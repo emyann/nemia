@@ -6,6 +6,7 @@
  */
 import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
+import { Invalid } from '../refusal/refusal.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { factoryLines, REVISIONS_POLICIES, type FactoryListing, type RevisionsPolicy } from './factory.ts';
@@ -246,13 +247,13 @@ const FACTORY_LS: Command<Listed> = {
 };
 
 /** `--repo <path>`, once per repository a factory is filed with. */
-const REPOS: Flag = {
+const REPOS = {
   flag: '--repo',
   kind: 'text',
   key: 'repos',
   many: true,
   takes: "--repo takes a repository's directory: nemia factory add <name> --repo <path> [--repo <path> ...]",
-};
+} satisfies Flag;
 
 /** `nemia factory add`'s spec: the factory's name, then `--repo` once per repository, and `--no-trust`. */
 const ADD_SPEC: Spec = {
@@ -262,7 +263,7 @@ const ADD_SPEC: Spec = {
     arg.startsWith('-')
       ? `nemia factory add does not take ${arg}. It takes the factory's name, then --repo <path>, once per repository, and --no-trust.`
       : `nemia factory add files one factory, and ${arg} is a second: nemia factory add <name> --repo <path>, once per factory.`,
-  apart: () => REPOS.takes!,
+  apart: () => REPOS.takes,
   missing:
     "nemia factory add takes the factory's name, first: nemia factory add <name> --repo <path> [--repo <path> ...]. Nothing was filed.",
 };
@@ -340,13 +341,13 @@ const FACTORY_DETACH: Command<{ file: string }> = {
 
 /** `nemia factory hire`'s and `fire`'s spec: `shape`, their positional arguments, then `--step <workflow>/<step>` once. */
 function stepSpec(verb: 'hire' | 'fire', shape: string, missing: string): Spec {
-  const step: Flag = {
+  const step = {
     flag: '--step',
     kind: 'text',
     key: 'step',
     takes: `--step takes the step, as <workflow>/<step>: nemia factory ${verb} ${shape} --step build/implement`,
     twice: `nemia factory ${verb} takes --step once: one step at a time.`,
-  };
+  } satisfies Flag;
   return {
     positionals: shape.split(' ').map((p) => ({ key: p.slice(1, -1), takes: 'required', kind: 'name' })),
     flags: [step],
@@ -354,7 +355,7 @@ function stepSpec(verb: 'hire' | 'fire', shape: string, missing: string): Spec {
       arg.startsWith('-')
         ? `nemia factory ${verb} does not take ${arg}. It takes ${shape}, then --step <workflow>/<step>.`
         : `nemia factory ${verb} takes ${shape}, and ${arg} is one more: nemia factory ${verb} ${shape} --step <workflow>/<step>, once per step.`,
-    apart: () => step.takes!,
+    apart: () => step.takes,
     missing,
   };
 }
@@ -467,6 +468,10 @@ const REVISIONS_SPEC: Spec = {
 /** The policy `nemia factory revisions` was given, or undefined where it is neither of the two. */
 const policyOf = (args: Args): RevisionsPolicy | undefined => REVISIONS_POLICIES.find((p) => p === args.revisions);
 
+/** The refusal of `nemia factory revisions` given a policy that is neither of the two. */
+const revisionsRefusal = (args: Args): string =>
+  `nemia factory revisions takes follow or pinned, and was given ${String(args.revisions)}: nemia factory revisions <name> follow|pinned. Nothing was changed.`;
+
 /** `nemia factory revisions`: whether a factory's runs follow merged revisions, written, with what it said before. */
 const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }> = {
   name: 'factory revisions',
@@ -476,16 +481,17 @@ const FACTORY_REVISIONS: Command<{ file: string; was: RevisionsPolicy | null }> 
     'or keep them until nemia refresh (pinned, the default)',
   ],
   spec: REVISIONS_SPEC,
-  check: (args) =>
-    args.revisions === undefined || policyOf(args) !== undefined
-      ? leftOut(REVISIONS_SPEC, args)
-      : `nemia factory revisions takes follow or pinned, and was given ${String(args.revisions)}: nemia factory revisions <name> follow|pinned. Nothing was changed.`,
+  check: (args) => (args.revisions === undefined || policyOf(args) !== undefined ? leftOut(REVISIONS_SPEC, args) : revisionsRefusal(args)),
   writes: true,
   class: 'ask',
   only: { side: 'cli', why: "the board shows a factory's revisions policy in no control yet: nemia factory revisions writes it" },
   handler: (args) =>
     tried(() => {
-      const { file, was } = setRevisions({ factory: textOf(args, 'factory'), revisions: policyOf(args)! });
+      const revisions = policyOf(args);
+      if (revisions === undefined) {
+        throw new Invalid({ message: revisionsRefusal(args) });
+      }
+      const { file, was } = setRevisions({ factory: textOf(args, 'factory'), revisions });
       return { file, was: was ?? null };
     }),
   print: ({ file, was }, args) => [

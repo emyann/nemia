@@ -370,8 +370,8 @@ function harnessPromptOf(file: string, written: string | undefined, former: stri
       `${file}: \`harnessPrompt: ${written}\` and \`systemPrompt: ${former}\` are both set, and they are one key: \`systemPrompt:\` is the former name of \`harnessPrompt:\`. Keep the \`harnessPrompt:\` line and delete the other.`,
     );
   }
-  if (written === undefined && former === undefined) return undefined;
-  const word = written ?? harnessPromptNamed(former!);
+  const word = written ?? (former === undefined ? undefined : harnessPromptNamed(former));
+  if (word === undefined) return undefined;
   if ((HARNESS_PROMPTS as readonly string[]).includes(word)) return word as HarnessPrompt;
   const line = written === undefined ? `systemPrompt: ${former}` : `harnessPrompt: ${written}`;
   const slip = Object.hasOwn(FORMER_HARNESS_PROMPTS, word)
@@ -605,7 +605,7 @@ export const rendersAgent = (step: Workflow): boolean => {
 };
 
 /** What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise. */
-export const briefBody = (step: Workflow): string => (rendersAgent(step) ? step.agent!.body : step.body);
+export const briefBody = (step: Workflow): string => (rendersAgent(step) && step.agent ? step.agent.body : step.body);
 
 /**
  * The skills of a step's session by layer, from its frozen record: its agent's own, and those its `skills:` line added (`addedSkills`),
@@ -665,10 +665,14 @@ export type RenderedSkill = { name: string; whole?: string };
  * sees.
  */
 export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[]): string {
-  const agent = step.agent!;
+  const agent = step.agent;
+  if (agent === undefined)
+    refuse(
+      `${step.name} is given no agent, so there is no prompt of one to render: render only a step whose agent is rendered (rendersAgent).`,
+    );
   const plugin = pluginOf(agent.name);
   const named = skills.filter((s) => s.whole === undefined);
-  const whole = skills.filter((s) => s.whole !== undefined);
+  const whole = skills.flatMap((s) => (s.whole === undefined ? [] : [{ name: s.name, whole: s.whole }]));
   const headed = headedLayers([
     ['instructions', agent.instructions],
     ['custom', agent.customInstructions],
@@ -682,7 +686,7 @@ export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[])
             `Your skills, each loaded with the Skill tool by its name when you need it: ${named.map((s) => `\`${plugin}:${s.name}\``).join(', ')}.`,
           ]
         : []),
-      ...whole.map((s) => `## Skill \`${plugin}:${s.name}\`\n\n${s.whole!.trim()}`),
+      ...whole.map((s) => `## Skill \`${plugin}:${s.name}\`\n\n${s.whole.trim()}`),
     ].join('\n\n') + '\n'
   );
 }
@@ -730,9 +734,10 @@ function sessionSettings(agent: StepAgent): string | undefined {
  */
 export const enabledSkillsOf = (step: Workflow): string[] | 'default' => {
   if ((step.harness ?? DEFAULT_HARNESS) !== DEFAULT_HARNESS) return 'default';
-  if (!rendersAgent(step)) return [];
-  const plugin = pluginOf(step.agent!.name);
-  return [...new Set((step.agent!.skills ?? []).map((name) => `${plugin}:${bareSkillOf(name)}`))];
+  const agent = step.agent;
+  if (!rendersAgent(step) || agent === undefined) return [];
+  const plugin = pluginOf(agent.name);
+  return [...new Set((agent.skills ?? []).map((name) => `${plugin}:${bareSkillOf(name)}`))];
 };
 
 /**
@@ -745,8 +750,8 @@ export function renderedFlags(
   step: Workflow,
   dir: string,
 ): { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string } | undefined {
-  if (!rendersAgent(step)) return undefined;
-  const agent = step.agent!;
+  const agent = step.agent;
+  if (!rendersAgent(step) || agent === undefined) return undefined;
   const prompt = path.join(dir, PROMPT_FILE);
   const plugin = pluginOf(agent.name);
   const told = Boolean(toldWords(agent) || agent.skills?.length);

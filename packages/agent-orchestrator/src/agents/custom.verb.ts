@@ -19,24 +19,24 @@ const textOf = (args: Args, key: string): string | undefined => {
 const twice = (flag: string): string => `nemia agents custom takes ${flag} once: one agent's words are one file.`;
 
 /** `--file <path>`, or `-` for stdin: the words to write, read by the command line's runner. */
-const FILE: Flag = {
+const FILE = {
   flag: '--file',
   kind: 'text',
   key: 'file',
   takes: '--file takes the file whose words to write, or - to read them from stdin: nemia agents custom <name> --file <path>',
   twice: twice('--file'),
   only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
-};
+} satisfies Flag;
 
 /** `--repo <r>`: the repository whose agents a name is looked for in. */
-const REPO: Flag = {
+const REPO = {
   flag: '--repo',
   kind: 'text',
   key: 'repo',
   takes: '--repo takes the repository whose agents to look in: nemia agents custom <name> --repo <r>',
   twice: twice('--repo'),
   only: { side: 'cli', why: 'the api looks in the repository the request is served on (?repo=)' },
-};
+} satisfies Flag;
 
 /** `nemia agents custom`'s spec: the agent's name, then `--file`, `--clear` or `--repo`; and the words, which a body alone carries. */
 const SPEC: Spec = {
@@ -54,7 +54,7 @@ const SPEC: Spec = {
   ],
   unknown: (arg) =>
     `nemia agents custom takes one agent's name, then --file <path> (or --file - for stdin), --clear or --repo <r>, not ${arg}.`,
-  apart: (_value, flag) => (flag === '--repo' ? REPO.takes! : FILE.takes!),
+  apart: (_value, flag) => (flag === '--repo' ? REPO.takes : FILE.takes),
 };
 
 /** The words read: the file they are kept in, the words (null for none), and the package's refusal of the file, null where it reads. */

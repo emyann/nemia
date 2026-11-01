@@ -170,7 +170,7 @@ test("the contract says the place's words: no name it exports and no property of
   assert.ok(names.includes('PlaceRequests') && names.includes('workspaces'), 'the walk read the exports and their nested properties');
   assert.deepEqual(gitWords(names), []);
   for (const word of Object.keys(ALLOWED)) {
-    assert.ok(!REFUSED_WORDS.includes(word) || word in ALLOWED, `${word} is allowed`);
+    assert.ok(!REFUSED_WORDS.includes(word), `${word} is one of git's words the contract refuses: it cannot also be allowed`);
     assert.ok(
       names.some((name) => wordsOf(name).includes(word)),
       `${word} is allowed and said: where the contract no longer says it, take it off`,

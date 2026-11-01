@@ -12,11 +12,25 @@
  */
 export type StepMoment<Event = { id: string }> =
   | { kind: 'streamed'; yes: boolean }
-  | { kind: 'state'; state: string }
+  | { kind: 'state'; state: StepSessionState }
   | { kind: 'events'; events: Event[]; cursor: string }
   | { kind: 'partial'; key: string; text: string; append: boolean; last: boolean }
   | { kind: 'moved'; taskId: string }
   | { kind: 'settled' };
+
+/**
+ * The state of the session a step's attempt runs, in A2A's TaskState words as the runtime says them (its `SessionState`), written out
+ * here because this file imports no runtime, and held equal to the runtime's in `runtime-client.ts` (`stepSessionStateHeld`).
+ */
+export type StepSessionState =
+  | 'submitted'
+  | 'working'
+  | 'input-required'
+  | 'auth-required'
+  | 'completed'
+  | 'failed'
+  | 'canceled'
+  | 'rejected';
 
 /** The attempt a follower follows: the step's task, and the number of its attempt. */
 export type FollowedAttempt = { taskId: string; attempt: number };

@@ -38,6 +38,7 @@ const { timeOfDay, timeToTheSecond } = await import('../src/lib/timeOfDay.ts');
 type RunDetail = import('../src/lib/api.ts').RunDetail;
 type StepReach = import('../src/lib/api.ts').StepReach;
 type ReadOnlyCommands = import('../src/lib/api.ts').ReadOnlyCommands;
+type StepAttempts = import('../src/lib/api.ts').StepAttempts;
 type GraphEdge = import('../src/lib/api.ts').GraphEdge;
 type RunSummary = import('../src/lib/api.ts').RunSummary;
 type StepUsed = import('../src/lib/api.ts').StepUsed;
@@ -191,7 +192,7 @@ function runWith(note: string | null): RunDetail {
         closeout: null,
         unreadable: null,
         check: null,
-        attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+        attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
         used: UNMEASURED,
         spent: null,
         budget: null,
@@ -209,7 +210,7 @@ function runWith(note: string | null): RunDetail {
             closeout: null,
             unreadable: null,
             answer: null,
-            attempts: { count: 1, latest: { startedAt: at, ended: 'done', endedAt: at, reason: 'harness' } },
+            attempts: { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: at, reason: 'harness' } },
           },
         ],
         timeline: [],
@@ -1578,7 +1579,7 @@ const textsOf = (html: string): string[] =>
     .filter(Boolean);
 
 const tookAt = '2026-09-13T00:12:30.000Z';
-const ranOnce = { count: 1, latest: { startedAt: at, ended: 'done', endedAt: tookAt, reason: 'harness' } };
+const ranOnce: StepAttempts = { count: 1, latest: { startedAt: at, ended: 'succeeded', endedAt: tookAt, reason: 'harness' } };
 const closeoutSaying = (summary: string, more: Partial<StepCloseout> = {}): StepCloseout => ({
   outcome: 'done',
   summary,
@@ -1916,7 +1917,7 @@ test("a closeout's question field is drawn as its questions, read-only, the reco
 });
 
 test("a try that ended with no statement says the machine's reason, unsigned, in a sentence — and its fold says the reason, where it said `no closeout`", () => {
-  const unsigned = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: tookAt, reason: 'unsigned' } };
+  const unsigned: StepAttempts = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: tookAt, reason: 'unsigned' } };
   const tries = threeTries.map((t) => (t.try === 1 ? { ...t, attempts: unsigned, closeout: null } : t));
   const html = renderToStaticMarkup(createElement(TryCloseouts, { tries, selected: tries[0], none: 'unused' }));
   assert.deepEqual(textsOf(/<p data-outcome="unsigned" data-by="machine"[^>]*>[\s\S]*?<\/p>/.exec(html)![0]), [

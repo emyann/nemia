@@ -39,7 +39,7 @@ function reportOf(
 
 /** The top-level markdown files of `files` a branch added. */
 const notesIn = (files: readonly ChangedFile[]): string[] =>
-  files.filter((f) => f.status === 'A' && f.path.endsWith('.md') && !f.path.includes('/')).map((f) => f.path);
+  files.filter((f) => f.status === 'added' && f.path.endsWith('.md') && !f.path.includes('/')).map((f) => f.path);
 
 /** The text of a file a diff adds whole: its added lines, after the hunk's head. */
 const addedText = (diff: string): string =>

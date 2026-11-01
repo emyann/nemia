@@ -49,6 +49,7 @@ import {
   type StepUnreadable,
 } from './tries.ts';
 import { RunReadSchema, StepUsedSchema, type RunRead, type StepUsed } from './usage.ts';
+import { TRANSCRIPT_KINDS } from './steps.ts';
 
 /** Decodes a `RetryMode` (asks.ts, which hands out writes and so no schema). */
 const RetryModeSchema = decodes<RetryMode>()(Schema.Literals(['continue', 'fresh', 'recheck']));
@@ -59,7 +60,7 @@ const SaidSchema = decodes<Said>()(
     at: Schema.String,
     attempt: Schema.Number,
     text: Schema.String,
-    after: Schema.NullOr(Schema.Struct({ kind: Schema.String, id: Schema.String })),
+    after: Schema.NullOr(Schema.Struct({ kind: Schema.Literals(TRANSCRIPT_KINDS), id: Schema.String })),
   }),
 );
 

@@ -200,13 +200,24 @@ export type StepUnreadable = { error: string; raw: unknown };
 /** Decodes a `StepUnreadable`: the statement (`raw`) is read as it came. */
 export const StepUnreadableSchema = decodes<StepUnreadable>()(Schema.Struct({ error: Schema.String, raw: Schema.Unknown }));
 
+/** How an attempt ended, as the runtime records it: mirrors `EngineOutcome` in agent-orchestrator. */
+export const ATTEMPT_OUTCOMES = ['succeeded', 'failed', 'stopped'] as const;
+export type AttemptOutcome = (typeof ATTEMPT_OUTCOMES)[number];
+
+/**
+ * Why an attempt ended, in the words a person reads for it: mirrors `AttemptEnd` in agent-orchestrator (`endWords`) — the runtime's
+ * reasons, and the orchestrator's `budget` and `unsigned`.
+ */
+export const ATTEMPT_ENDS = ['harness', 'lost', 'unstartable', 'operator', 'deadline', 'budget', 'unsigned'] as const;
+export type AttemptEnd = (typeof ATTEMPT_ENDS)[number];
+
 /**
  * Mirrors `StepAttempts` in apps/api/src/detail/tries.ts. `endedAt` is when the latest attempt ended — the
  * engine's `Attempt.endedAt` — and null while it runs, or where the engine's record has none.
  */
 export type StepAttempts = {
   count: number;
-  latest: { startedAt: string; ended: string | null; endedAt: string | null; reason: string | null } | null;
+  latest: { startedAt: string; ended: AttemptOutcome | null; endedAt: string | null; reason: AttemptEnd | null } | null;
 };
 
 /** Decodes a `StepAttempts`. */
@@ -216,9 +227,9 @@ export const StepAttemptsSchema = decodes<StepAttempts>()(
     latest: Schema.NullOr(
       Schema.Struct({
         startedAt: Schema.String,
-        ended: Schema.NullOr(Schema.String),
+        ended: Schema.NullOr(Schema.Literals(ATTEMPT_OUTCOMES)),
         endedAt: Schema.NullOr(Schema.String),
-        reason: Schema.NullOr(Schema.String),
+        reason: Schema.NullOr(Schema.Literals(ATTEMPT_ENDS)),
       }),
     ),
   }),

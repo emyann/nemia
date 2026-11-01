@@ -5,7 +5,7 @@
  * said of the try a step is on: its gate's approval (`gateOf`) and a loop's acceptance (`acceptedOf`).
  */
 import { endWords, type RetryAsk, bare, type TaskView, type Views, wordOf, ENGINE_REASON, PHASE_OF } from 'agent-orchestrator';
-import type { AnswerVia, StepPhase, StepReason, WaitOn } from 'agent-orchestrator';
+import type { AnswerVia, AttemptEnd, EngineOutcome, StepPhase, StepReason, WaitOn } from 'agent-orchestrator';
 import {
   acceptanceOf,
   answerOf,
@@ -120,12 +120,15 @@ export type StepAttempts = {
   count: number;
   latest: {
     startedAt: string;
-    /** The harness's last word on the attempt — `done`, `failed`, `stopped`; null while it runs. */
-    ended: string | null;
+    /** How the attempt ended — `succeeded`, `failed`, `stopped` — as `endWords` says it; null while it runs. */
+    ended: EngineOutcome | null;
     /** When it ended: the `at` of the engine's `ended` event, kept as `Attempt.endedAt`; null while it runs. */
     endedAt: string | null;
-    /** `harness` when the harness said it ended, `lost` when the engine stopped seeing it; null while it runs. */
-    reason: string | null;
+    /**
+     * Why it ended (`AttemptEnd`, as `endWords` says it): the runtime's reason — `harness` when the harness said it ended, `lost` when the
+     * engine stopped seeing it — or `budget` and `unsigned`, the orchestrator's; null while it runs.
+     */
+    reason: AttemptEnd | null;
   } | null;
 };
 

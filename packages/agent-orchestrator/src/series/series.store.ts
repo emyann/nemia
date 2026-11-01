@@ -11,7 +11,8 @@ import { Schema } from 'effect';
 import { HOME } from '../record/record.store.ts';
 import { metricsHourDays, metricsMinuteDays } from '../config/config.store.ts';
 import { countRead } from '../meter/tally.store.ts';
-import { RECENT_KEPT, type RecentPass } from '../meter/index.ts';
+import { FORMER_PHASE_WORDS, FORMER_PHASES, isPhase, PHASES, RECENT_KEPT, type RecentPass } from '../meter/index.ts';
+import { ALL_KINDS, DISK_PARTS } from '../disk/disk.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import {
   dayOf,
@@ -70,18 +71,34 @@ export const appendLines = (tier: Tier, lines: readonly RollupLine[]): void => {
   for (const [day, texts] of byDay) fs.appendFileSync(dayFile(tier, day), texts.join(''));
 };
 
-/** A line as the files hold it. */
+/** A label's free name. */
+const named = Schema.optionalKey(Schema.String);
+
+/**
+ * A line as the files hold it: its labels each a string, but a `phase`, `part` and `kind` each a word of its closed set — a phase under
+ * its former word too (`FORMER_PHASES`), which `linesIn` reads as today's.
+ */
 const isLine = Schema.is(
   Schema.Struct({
     t: Schema.String,
     s: Schema.String,
-    l: Schema.Record(Schema.String, Schema.String),
+    l: Schema.Struct({
+      factory: named,
+      workflow: named,
+      step: named,
+      agent: named,
+      phase: Schema.optionalKey(Schema.Literals([...PHASES, ...FORMER_PHASE_WORDS])),
+      harness: named,
+      window: named,
+      part: Schema.optionalKey(Schema.Literals(DISK_PARTS)),
+      kind: Schema.optionalKey(Schema.Literals(ALL_KINDS)),
+    }),
     n: Schema.Finite,
     sum: Schema.Finite,
     min: Schema.Finite,
     max: Schema.Finite,
     last: Schema.Finite,
-    b: Schema.optionalKey(Schema.Array(Schema.Finite)),
+    b: Schema.optionalKey(Schema.mutable(Schema.Array(Schema.Finite))),
     p50: Schema.optionalKey(Schema.Finite),
     p95: Schema.optionalKey(Schema.Finite),
   }),
@@ -99,8 +116,11 @@ const linesIn = (text: string): { lines: RollupLine[]; unread: number } => {
     } catch {
       value = undefined;
     }
-    if (isLine(value)) lines.push(value as RollupLine);
-    else unread++;
+    if (!isLine(value)) unread++;
+    else {
+      const { phase, ...l } = value.l;
+      lines.push({ ...value, l: phase === undefined ? l : { ...l, phase: isPhase(phase) ? phase : FORMER_PHASES[phase] } });
+    }
   }
   return { lines, unread };
 };

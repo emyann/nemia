@@ -7,13 +7,15 @@
  * A line is one series over one span: its start `t`, its series `s`, its labels `l`, how many samples `n`, their `sum`, `min`, `max` and
  * `last`, and for a histogram the counts of its buckets `b` with `p50` and `p95` — exact for a minute, to the bucket for a merged span.
  */
-import { unreadByPart, type DiskReading } from '../disk/disk.ts';
-import { PASS_BOUNDS, PHASES, READ_BOUNDS, type RecentPass } from '../meter/index.ts';
+import { unreadByPart, type DiskKind, type DiskPart, type DiskReading } from '../disk/disk.ts';
+import { PASS_BOUNDS, PHASES, READ_BOUNDS, type Phase, type RecentPass } from '../meter/index.ts';
 
 /** The labels a line may carry: bounded keys, never a run id. A run's own detail stays in its record. */
 export const LABEL_KEYS = ['factory', 'workflow', 'step', 'agent', 'phase', 'harness', 'window', 'part', 'kind'] as const;
 export type LabelKey = (typeof LABEL_KEYS)[number];
-export type Labels = Partial<Record<LabelKey, string>>;
+/** The words a label may say: a closed set for a pass's `phase` (the meter's) and the store's disk `part` and `kind` (the disk's). */
+type LabelWord<K extends LabelKey> = K extends 'phase' ? Phase : K extends 'part' ? DiskPart : K extends 'kind' ? DiskKind : string;
+export type Labels = { [K in LabelKey]?: LabelWord<K> };
 
 /** The upper bounds of the machine's load per core. */
 export const LOAD_BOUNDS: readonly number[] = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 4];

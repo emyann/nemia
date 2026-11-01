@@ -163,10 +163,10 @@ export function lineChanges(from: readonly string[], to: readonly string[]): str
   return changes;
 }
 
-/** One file a change touched: its path, how (`A` added, `M` modified, `D` deleted), its lines added and removed, and its diff. */
+/** One file a change touched: its path, how (the place's `added`, `modified` or `removed`), its lines added and removed, and its diff. */
 export type Change = {
   readonly path: string;
-  readonly status: 'A' | 'M' | 'D';
+  readonly status: 'added' | 'modified' | 'removed';
   readonly added: number;
   readonly removed: number;
   readonly diff: string;
@@ -179,9 +179,9 @@ export function changesOf(from: Tree, to: Tree): Change[] {
     .filter((path) => from[path] !== to[path])
     .map((path) => {
       const lines = lineChanges(linesOf(from[path] ?? ''), linesOf(to[path] ?? ''));
-      const status = from[path] === undefined ? 'A' : to[path] === undefined ? 'D' : 'M';
-      const heads = [`diff a/${path} b/${path}`, `--- ${status === 'A' ? '/dev/null' : `a/${path}`}`];
-      heads.push(`+++ ${status === 'D' ? '/dev/null' : `b/${path}`}`);
+      const status = from[path] === undefined ? 'added' : to[path] === undefined ? 'removed' : 'modified';
+      const heads = [`diff a/${path} b/${path}`, `--- ${status === 'added' ? '/dev/null' : `a/${path}`}`];
+      heads.push(`+++ ${status === 'removed' ? '/dev/null' : `b/${path}`}`);
       return {
         path,
         status,

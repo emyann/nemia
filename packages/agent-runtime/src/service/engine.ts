@@ -90,6 +90,7 @@ import { traceparentOf } from '../harness/telemetry.ts';
 import { attachedSessions, putDrain, liftDrain, type Attached } from '../harness/claude/index.ts';
 import type { McpServersRead } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
+import { answerOptionsRefusalOf } from './answer-options.ts';
 
 /** Options an engine cannot be built from (`optionsRefusalOf`), and why. Nothing was built. */
 export class EngineRefused extends Schema.TaggedError<EngineRefused>()('EngineRefused', {
@@ -863,11 +864,8 @@ const make = (options: EngineOptions) =>
 
     const answerVerb = Effect.fn('Engine.answer')(function* (taskId: string, text: string, options: { config?: HarnessArgs } = {}) {
       const refuse = (message: string) => Effect.fail(new InputRefused({ message }));
-      if (Object.hasOwn(options, 'budgetUsd')) {
-        return yield* refuse(
-          "`budgetUsd` is the harness's configuration: give it under `config`, as `answer(id, text, { config: { budgetUsd: … } })`.",
-        );
-      }
+      const misplaced = answerOptionsRefusalOf(options);
+      if (misplaced) return yield* refuse(misplaced);
       const { config } = options;
       const events = yield* read(taskId);
       const state = events.length ? fold(taskId, events) : undefined;

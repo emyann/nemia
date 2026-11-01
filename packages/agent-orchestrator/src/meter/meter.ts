@@ -22,6 +22,17 @@ export const PHASES = ['records', 'asks', 'journals', 'revisions', 'observe', 'r
 export type Phase = (typeof PHASES)[number];
 
 /**
+ * A phase's former word, as a stored series line may still carry it, and the phase it is read as: `git` is `place`, its word while the
+ * place was git's alone. Read by the series' store (`linesIn`); never written.
+ */
+export const FORMER_PHASE_WORDS = ['git'] as const;
+export type FormerPhase = (typeof FORMER_PHASE_WORDS)[number];
+export const FORMER_PHASES: { readonly [P in FormerPhase]: Phase } = { git: 'place' };
+
+/** Whether a word is a phase of today's (`PHASES`). */
+export const isPhase = (word: string): word is Phase => (PHASES as readonly string[]).includes(word);
+
+/**
  * One phase's count: its time in ms, the calls made to it, the bytes and reads counted while it ran, and the processes it started. A read
  * is one of bytes: a journal is read for what was appended to it since the engine last read it, and one it finds as it left it costs a
  * `stat` and no read, so a pass's journal reads are the journals that changed, not the ones it asked for.

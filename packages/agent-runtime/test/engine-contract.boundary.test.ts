@@ -8,22 +8,20 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Effect } from 'effect';
-import { Engine, testOps, type RunnerOps, type Sighting } from '../src/index.ts';
+import { Engine, nameFor, testOps, type RunnerOps, type Sighting } from '../src/index.ts';
 import { noTranscript } from '../src/harness/transcript.ts';
 import { builtEngine } from './engine.ts';
 import { APART, apartOn, UNKEPT, unwalked, walksOn, type End, type Moved, type Side } from './engine-walks.ts';
 import { scratch } from './scratch.ts';
-
-/** The session of a task's first attempt, as the engine names it. */
-const sessionOf = (id: string): string => `ae/${id}/1`;
 
 /** A stream's text as a harness keeps it: whole, or its last `lastBytes` bytes, and `undefined` for none. */
 const tailOf = (text: string | undefined, lastBytes?: number): string | undefined =>
   text === undefined || lastBytes === undefined ? text : Buffer.from(text).subarray(-lastBytes).toString();
 
 /**
- * A real engine over a store of its own and one harness, `test`, whose sessions `settle` moves: at work after the pass that starts it,
- * ended as asked and read by the pass after, and stopped by the two passes that stop a session and record its end.
+ * A real engine over a store of its own and one harness, `test`, whose sessions `settle` moves: at work after the pass that starts it
+ * — a task's first attempt, or the next turn of one a person answered — ended as asked and read by the pass after, and stopped by the
+ * two passes that stop a session and record its end.
  */
 function realSide(): Side {
   const sessions = new Map<string, Sighting>();
@@ -42,11 +40,14 @@ function realSide(): Side {
       await pass();
       return;
     }
-    if (!sessions.has(sessionOf(id))) await pass();
-    if (end.printed) printed.set(sessionOf(id), end.printed);
+    const last = async () => (await Effect.runPromise(engine.view(id))).state.attempts.at(-1);
+    const inFlight = await last();
+    if (inFlight?.ended !== null) await pass();
+    const session = nameFor(id, (await last())!.n);
+    if (end.printed) printed.set(session, end.printed);
     if (moved === 'working') return;
-    sessions.set(sessionOf(id), {
-      ...sessions.get(sessionOf(id))!,
+    sessions.set(session, {
+      ...sessions.get(session)!,
       state: moved === 'succeeded' ? 'completed' : 'failed',
       ...(end.exitCode === undefined ? {} : { exitCode: end.exitCode }),
       ...(end.closeout === undefined ? {} : { closeout: { payload: end.closeout } }),

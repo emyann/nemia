@@ -8,19 +8,13 @@
  * that declares the named type it sits in, that type's name and the way down to the field (`[]` an element, `{}` an index signature's
  * value). A reader compares such a field to its words; typed `string`, it lets a sentence through where a word was meant.
  *
- * 17 fields the day the guard was written, and 15 once the same card closed a factory condition's `type` and `reason`. One site
- * is reached by every type that carries it and keyed once, by the named type that declares it: the api's `Relayed` under the
+ * 17 fields the day the guard was written, and 15 once the same card closed a factory condition's `type` and `reason`; none once
+ * "Close third-party kinds at the doors" closed its three and "Close the orchestrator's state words at its doors" its six. One site
+ * is reached by every type that carries it and keyed once, by the named type that declares it, as the api's `Relayed` is under the
  * orchestrator's `StepMoment`.
  *
  * It only shrinks: a change that closes a field takes its entry off in the same commit, and a rename of the type or the field moves its
  * key with it. A new field at a door is typed as a closed union named in its context's glossary.json, never added here. Today's open
  * fields, printed as entries: `node tools/guards/test/closed-state.ts`.
  */
-export const OPEN_STATE: Readonly<Record<string, { readonly card: string }>> = {
-  'apps/api/src/detail/tries.ts#StepAttempts.latest.reason': { card: "Close the orchestrator's state words at its doors" },
-  'packages/agent-orchestrator/src/following/following.ts#StepMoment.state': { card: "Close the orchestrator's state words at its doors" },
-  'packages/agent-orchestrator/src/place/place.ts#ChangedFile.status': { card: "Close the orchestrator's state words at its doors" },
-  'packages/agent-orchestrator/src/say/say.ts#Said.after.kind': { card: "Close the orchestrator's state words at its doors" },
-  'packages/agent-orchestrator/src/series/series.ts#RollupLine.l.kind': { card: "Close the orchestrator's state words at its doors" },
-  'packages/agent-orchestrator/src/series/series.ts#RollupLine.l.phase': { card: "Close the orchestrator's state words at its doors" },
-};
+export const OPEN_STATE: Readonly<Record<string, { readonly card: string }>> = {};

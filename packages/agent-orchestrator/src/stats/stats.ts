@@ -15,7 +15,7 @@ import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
 import { isRepositoryRun, tryOf, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import type { Workflow } from '../step/step.ts';
+import { endsOnBase, type Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
@@ -251,7 +251,7 @@ function finishedAt(r: RunRead, ending: Workflow | undefined): string | null {
 
 /** The fact of a finished run (`RunFact`); none for a run that has not finished. */
 function runFactOf(r: RunRead): RunFact[] {
-  const ending = r.steps.find((s) => s.workspace === 'main');
+  const ending = r.steps.find((s) => endsOnBase(s));
   const at = finishedAt(r, ending);
   if (!at) return [];
   const how = ending && r.run.steps[ending.name]?.landed;

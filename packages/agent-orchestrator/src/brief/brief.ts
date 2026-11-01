@@ -2,7 +2,7 @@
  * What a step is told: its brief (`composeBrief`) or, on a remote A2A agent, its remote brief (`remoteBrief`), with what the runs it waited
  * on or was handed as context concluded (`ParentCloseout`). Pure; the sections a brief is made of are `brief-sections.ts`'s.
  */
-import type { Workflow } from '../step/step.ts';
+import { endsOnBase, type Workflow } from '../step/step.ts';
 import { fenced, isRepositoryRun, placeOf, type RepositoryRun, type Run } from '../record/record.ts';
 import type { FiledFolders } from '../filed/filed.ts';
 import { closeoutContract, isLoopTarget, type Closeout } from '../closeout/index.ts';
@@ -167,7 +167,7 @@ export function composeBrief(
   const inFolder = placeOf(run) === 'folder';
   const contracts = [
     ...(step.check ? [landsOnCheck(step, run) ? landingContract(step.check, place.words) : checkContract(step.check)] : []),
-    ...(artifactsDir ? [artifactsContract(artifactsDir, step.workspace === 'main', inFolder)] : []),
+    ...(artifactsDir ? [artifactsContract(artifactsDir, endsOnBase(step), inFolder)] : []),
     closeoutContract(step, repliesOf(step, run, steps, round), inFolder),
   ].join('\n');
   const again = againSection(step, run, steps, closeoutOf, inFolder, place.say, retry, round);
@@ -190,7 +190,7 @@ export function composeBrief(
   const opening = [opened(step), ''];
   const parts = [...opening, '## What was asked for', '', ...request, ...handed.parents, ...handed.decided];
 
-  if (step.after.length > 1 && step.workspace !== 'main' && !inFolder) {
+  if (step.after.length > 1 && !endsOnBase(step) && !inFolder) {
     return [
       ...parts,
       '',
@@ -204,7 +204,7 @@ export function composeBrief(
     ].join('\n');
   }
 
-  if (earlier.length || tree.length || step.workspace === 'main' || inFolder) parts.push('', '## Where to look', '');
+  if (earlier.length || tree.length || endsOnBase(step) || inFolder) parts.push('', '## Where to look', '');
   if (inFolder) {
     parts.push(
       'This step works in a folder the run made for it: what you leave there, and name in `artifacts`, is what the steps after you and the person who decides receive.',
@@ -228,7 +228,7 @@ export function composeBrief(
     if (inHere.length || given.from.length) {
       parts.push('', 'Judge what is there. You have not been given their reasoning, on purpose — read the work,', 'not an account of it.');
     }
-  } else if (step.workspace === 'main' && isRepositoryRun(run)) {
+  } else if (endsOnBase(step) && isRepositoryRun(run)) {
     parts.push(...endingLook(step, run, steps, earlier, place.say));
   } else if (earlier.length && isRepositoryRun(run)) {
     parts.push(

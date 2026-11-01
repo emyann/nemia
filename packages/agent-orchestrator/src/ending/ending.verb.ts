@@ -4,6 +4,7 @@
  * client (`runtime-client.ts`).
  */
 import path from 'node:path';
+import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
@@ -63,7 +64,7 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
   env: NodeJS.ProcessEnv,
   memo: StatusMemo,
 ) {
-  const ending = steps.find((s) => s.workspace === 'main');
+  const ending = steps.find((s) => endsOnBase(s));
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
   const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing);
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
@@ -114,7 +115,7 @@ const mainClaim = Effect.fnUntraced(function* (
   } catch {
     return undefined;
   }
-  const ending = steps.find((s) => s.workspace === 'main');
+  const ending = steps.find((s) => endsOnBase(s));
   if (!ending || !isRepositoryRun(run)) return undefined;
   const repo = path.resolve(run.repo);
   const taskId = run.steps[ending.name]?.taskId;

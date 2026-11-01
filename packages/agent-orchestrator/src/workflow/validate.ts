@@ -3,7 +3,7 @@
  * wait on each other, a workspace, a mode or a loop the team cannot run — and `orderSteps`, `upstreamOf`, `fansOut` and `terminalSteps`
  * read the graph the `after` edges draw.
  */
-import { LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } from '../step/step.ts';
+import { endsOnBase, LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
@@ -113,7 +113,7 @@ function unfilableCheck(steps: readonly Workflow[], s: Workflow): string | undef
  * So a workflow has one such step, at its end, and it is refused here rather than at the moment two sessions collide.
  */
 function validateMainWorkspace(steps: readonly Workflow[]): void {
-  for (const s of steps.filter((x) => x.workspace === 'main')) {
+  for (const s of steps.filter((x) => endsOnBase(x))) {
     const named = `${s.name}: \`workspace: main\` runs the step in the repository's own checkout`;
     const waiting = steps.filter((x) => x.after.includes(s.name)).map((x) => x.name);
     if (waiting.length) {
@@ -344,7 +344,7 @@ export function stepSetRefusal(steps: readonly Workflow[], isolate: boolean): st
       'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
       'Either drop --no-worktree, or make the steps a chain.'
     );
-  const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
+  const ending = !isolate ? steps.find((s) => endsOnBase(s)) : undefined;
   if (ending)
     return (
       `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n` +

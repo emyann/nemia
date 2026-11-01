@@ -24,7 +24,7 @@
  * which finished steps hand their work off on a pass (`handOffDue`).
  */
 import path from 'node:path';
-import type { Workflow } from '../step/step.ts';
+import { endsOnBase, type Workflow } from '../step/step.ts';
 import { placeOf, type Run, type TaskPhase } from '../record/record.ts';
 
 /** One entry of a `node_modules` directory as the runner read it: its name, and a link's target as written. */
@@ -274,7 +274,7 @@ export function depsLines(deps: Provisioned | undefined): string[] {
 export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
   const finished = ['succeeded', 'failed', 'stopped'];
   return Object.entries(run.steps)
-    .filter(([name]) => steps.find((s) => s.name === name)?.workspace !== 'main')
+    .filter(([name]) => !endsOnBase(steps.find((s) => s.name === name) ?? {}))
     .filter(
       ([name, s]) =>
         s.taskId &&
@@ -329,7 +329,7 @@ export type WorkspacePlan =
   | { kind: 'inherit'; from: string }
   | { kind: 'fork'; from: string | null }
   | { kind: 'merge'; from: string; also: string[] }
-  | { kind: 'main' };
+  | { kind: 'base' };
 
 /** The directory inside a folder step's own folder that holds what the run copied in for it: `given/inputs`, `given/from/<step>`. */
 export const GIVEN = 'given';
@@ -358,7 +358,7 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * `inherit` chain ends at a step that made one. Pure.
  */
 export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: WorkspacePlan): Given {
-  if (placeOf(run) !== 'folder' || plan.kind === 'main') return { inputs: null, from: [] };
+  if (placeOf(run) !== 'folder' || plan.kind === 'base') return { inputs: null, from: [] };
   const inputs = run.inputs?.length ? `${GIVEN}/inputs` : null;
   if (plan.kind === 'inherit') return { inputs, from: [] };
   const parents = plan.kind === 'merge' ? [plan.from, ...plan.also] : plan.from ? [plan.from] : [];
@@ -376,7 +376,7 @@ export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: Wo
  * merges onto the first of its parents by name.
  */
 export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {
-  if (step.workspace === 'main') return { kind: 'main' };
+  if (endsOnBase(step)) return { kind: 'base' };
   if (step.after.length === 0) return { kind: 'fork', from: null };
   if (step.after.length > 1) {
     const [first, ...also] = [...step.after].sort();

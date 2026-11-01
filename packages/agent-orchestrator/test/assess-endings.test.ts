@@ -646,7 +646,7 @@ test("`workspacePlan` and the run's result: an ending works in the repository's 
     () => {
       const ending: Workflow = { name: 'ship', after: ['review'], body: 'land it', workspace: 'main', gate: true };
       const dev = [step('implement'), step('review', ['implement']), ending];
-      assert.deepEqual(workspacePlan(dev, ending), { kind: 'main' }, 'said by the step, not by the shape');
+      assert.deepEqual(workspacePlan(dev, ending), { kind: 'base' }, 'said by the step, not by the shape');
       assert.deepEqual(workspacePlan(dev, dev[1]), { kind: 'inherit', from: 'implement' }, 'and nothing else changes');
       assert.deepEqual(
         resultSteps(dev).map((s) => s.name),

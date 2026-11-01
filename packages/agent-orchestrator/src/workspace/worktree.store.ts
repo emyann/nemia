@@ -380,7 +380,7 @@ export const workspaceFor = Effect.fn('workspaceFor')(function* (run: Run, steps
     if (!s?.workspace || !s.branch) throw new Error(`${step.name}: ${name} has no workspace yet`);
     return s as { workspace: string; branch: string };
   };
-  if (!run.isolate || plan.kind === 'main') return cut({ workspace: run.repo, branch: run.branch, notes: [] });
+  if (!run.isolate || plan.kind === 'base') return cut({ workspace: run.repo, branch: run.branch, notes: [] });
   if (plan.kind === 'inherit') {
     const parent = of(plan.from);
     return cut({ workspace: parent.workspace, branch: parent.branch, notes: [] });

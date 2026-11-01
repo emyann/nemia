@@ -11,7 +11,7 @@
  * `**` and its slash cross none as well, so the root's `package.json` is in the list — and a trailing
  * `/` takes everything below.
  */
-import type { Workflow } from '../step/step.ts';
+import { endsOnBase, type Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
 import type { Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
@@ -28,7 +28,7 @@ import type { BranchStood } from '../place/place.ts';
  */
 export function resultSteps(steps: readonly Workflow[]): Workflow[] {
   const ends = terminalSteps(steps);
-  const result = ends.flatMap((s) => (s.workspace === 'main' ? steps.filter((x) => s.after.includes(x.name)) : [s]));
+  const result = ends.flatMap((s) => (endsOnBase(s) ? steps.filter((x) => s.after.includes(x.name)) : [s]));
   return [...new Set(result)];
 }
 
@@ -38,7 +38,7 @@ export function resultSteps(steps: readonly Workflow[]): Workflow[] {
  * one in its words. Pure.
  */
 export function workChecks(steps: readonly Workflow[]): string[] {
-  return [...new Set(steps.filter((s) => s.workspace !== 'main' && s.check).map((s) => s.check!))];
+  return [...new Set(steps.filter((s) => !endsOnBase(s) && s.check).map((s) => s.check!))];
 }
 
 /**

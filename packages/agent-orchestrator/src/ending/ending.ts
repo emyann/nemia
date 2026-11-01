@@ -62,7 +62,7 @@ export const filedAllows = (step: Pick<Workflow, 'workspace' | 'harness' | 'allo
  * (`workspace: main`) on a local harness fenced by a permission mode and its rules, not by a sandbox. Pure.
  */
 export const readsRunArtifacts = (step: Pick<Workflow, 'workspace' | 'harness'>): boolean =>
-  step.workspace === 'main' && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness);
+  endsOnBase(step) && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness);
 
 /**
  * The repository's own checkout as a pass reads it for an ending that lands on its check, as its place's `status` answers

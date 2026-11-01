@@ -6,7 +6,7 @@
  * it reads the record alone.
  */
 import type { Verdict } from '../check/check.ts';
-import { DEFAULT_ROUNDS, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { DEFAULT_ROUNDS, endsOnBase, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import type { TaskClock } from '../timeline/index.ts';
 import { declaredOutput, envelopeRefusals, isLoopTarget, type Closeout } from '../closeout/index.ts';
@@ -103,14 +103,7 @@ function atGate(step: Workflow, run: Run, own: StepStatus, closeoutOf: (step: st
   return !approvalOf(run, step.name);
 }
 
-/**
- * Whether a step acts on the base branch itself: it works in the repository's own checkout (`workspace: main`). Pure, and read of the
- * step alone — whoever files it, a person's approval (`approvedFirst`) or the workflow once a step that can send the work back has passed.
- *
- * It is what a run's ending is: the one step of a workflow that works where a person's own work is, on the branch everything lands on
- * (`validateMainWorkspace` refuses a second, and refuses anything waiting on it).
- */
-export const endsOnBase = (step: Pick<Workflow, 'workspace'>): boolean => step.workspace === 'main';
+export { endsOnBase };
 
 /**
  * Whether a step's gate holds it BEFORE it is filed rather than after it signs off: it is gated (`hasGate`) and acts on the base branch
@@ -261,7 +254,7 @@ export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' 
  * step is in that one directory (`heldCheckouts`). Pure. Nothing of it is filed while that is so — a first session, or another try.
  */
 export const waitsOnCheckout = (steps: readonly Workflow[], name: string, checkout: CheckoutHold | undefined): boolean =>
-  Boolean(checkout) && steps.some((s) => s.name === name && s.workspace === 'main');
+  Boolean(checkout) && steps.some((s) => s.name === name && endsOnBase(s));
 
 /**
  * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in

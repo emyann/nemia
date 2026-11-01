@@ -2,6 +2,7 @@
  * `nemia decide`: what a run produced and the choice it leaves a person — its help, its one flag, read off the command line, and the screen
  * it prints.
  */
+import { endsOnBase } from '../../step/step.ts';
 import {
   AGENT_FACING,
   CHECK_AFFECTING,
@@ -203,7 +204,7 @@ function headOf(run: Decided['run']): string {
 
 /** The run's ending and the indented line that says it waits for the repository's checkout (`checkoutLine`): `''` when nothing holds it. */
 function heldOutOf(steps: Steps, checkout: Decided['checkout']): HeldOut {
-  const ending = steps.find((s) => s.workspace === 'main');
+  const ending = steps.find((s) => endsOnBase(s));
   return { ending, heldOut: checkout && ending ? `  ${checkoutLine(ending.name, checkout)}` : '' };
 }
 

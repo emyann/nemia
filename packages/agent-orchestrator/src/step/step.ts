@@ -443,6 +443,15 @@ export const CLOSEOUT_FIELDS = ['apiVersion', 'outcome', 'summary', 'body', 'art
  */
 export const stepPlace = (step: Pick<Workflow, 'place'>): 'git' | 'folder' => step.place ?? 'git';
 
+/**
+ * Whether a step acts on the base branch itself: it works in the repository's own checkout (`workspace: main`). Pure, and read of the
+ * step alone — whoever files it, a person's approval (`approvedFirst`) or the workflow once a step that can send the work back has passed.
+ *
+ * It is what a run's ending is: the one step of a workflow that works where a person's own work is, on the branch everything lands on
+ * (`validateMainWorkspace` refuses a second, and refuses anything waiting on it).
+ */
+export const endsOnBase = (step: Pick<Workflow, 'workspace'>): boolean => step.workspace === 'main';
+
 /** The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none. */
 export const outputFields = (step: Workflow): string[] => Object.keys(step.output?.schema.properties ?? {});
 

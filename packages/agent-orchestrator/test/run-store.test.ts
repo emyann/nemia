@@ -66,93 +66,94 @@ const door = doorFrom(RunDoor, runDoorFiles);
 
 for (const [name, body] of walksOn(RUN_WALKS, () => ({ door, root: ROOT, layer: 'files' }))) test(name, body);
 
-test('a record stored under an id runId would not mint still reads through the door, and is written back (RunId on read is nominal)', () => {
-  const id = 'Old_Id';
-  fs.mkdirSync(runsDir(), { recursive: true });
-  fs.writeFileSync(runFile(id), JSON.stringify(aRun(id), null, 2));
-  const read = act(door.runs.read(RunId.read(id)));
-  assert.ok(!('refused' in read), 'a stored id is read as it is');
-  assert.equal(act(door.runs.rewrite(read)), true);
+test('a record in the store, read and written back through the door: what it holds is what it held', async (t) => {
+  await t.test(
+    'a record stored under an id runId would not mint still reads through the door, and is written back (RunId on read is nominal)',
+    () => {
+      const id = 'Old_Id';
+      fs.mkdirSync(runsDir(), { recursive: true });
+      fs.writeFileSync(runFile(id), JSON.stringify(aRun(id), null, 2));
+      const read = act(door.runs.read(RunId.read(id)));
+      assert.ok(!('refused' in read), 'a stored id is read as it is');
+      assert.equal(act(door.runs.rewrite(read)), true);
+    },
+  );
+  await t.test('a new run at an id with a record is refused before a byte of the first is written over (wx)', () => {
+    const run = made('r-exclusive');
+    const text = fs.readFileSync(runFile(run.id), 'utf8');
+    assert.deepEqual(act(door.runs.create({ ...run, brief: 'another' })), { refused: 'Conflict' });
+    assert.equal(fs.readFileSync(runFile(run.id), 'utf8'), text);
+  });
+  await t.test('a record read and written back moves no byte, a key no nemia writes included', () => {
+    const id = 'r-bytes';
+    const text = JSON.stringify({ ...aRun(id), laterKey: { kept: [1, 2] } }, null, 2);
+    fs.mkdirSync(runsDir(), { recursive: true });
+    fs.writeFileSync(runFile(id), text);
+    assert.equal(filesStore.runs.rewrite(filesStore.runs.read(id)), true);
+    assert.equal(fs.readFileSync(runFile(id), 'utf8'), text);
+  });
+  await t.test('a record that is not JSON is left out of the list and said, and the other runs are listed', () => {
+    made('r-listed');
+    fs.writeFileSync(runFile('r-not-json'), '{ not json');
+    const said: string[] = [];
+    try {
+      const ids = filesStore.runs.list((line) => said.push(line)).map((run) => run.id);
+      assert.ok(ids.includes('r-listed'));
+      assert.equal(ids.includes('r-not-json'), false);
+      assert.equal(said.length, 1);
+      assert.match(said[0], /r-not-json/);
+    } finally {
+      fs.rmSync(runFile('r-not-json'));
+    }
+  });
 });
 
-test('a new run at an id with a record is refused before a byte of the first is written over (wx)', () => {
-  const run = made('r-exclusive');
-  const text = fs.readFileSync(runFile(run.id), 'utf8');
-  assert.deepEqual(act(door.runs.create({ ...run, brief: 'another' })), { refused: 'Conflict' });
-  assert.equal(fs.readFileSync(runFile(run.id), 'utf8'), text);
-});
-
-test('a record read and written back moves no byte, a key no nemia writes included', () => {
-  const id = 'r-bytes';
-  const text = JSON.stringify({ ...aRun(id), laterKey: { kept: [1, 2] } }, null, 2);
-  fs.mkdirSync(runsDir(), { recursive: true });
-  fs.writeFileSync(runFile(id), text);
-  assert.equal(filesStore.runs.rewrite(filesStore.runs.read(id)), true);
-  assert.equal(fs.readFileSync(runFile(id), 'utf8'), text);
-});
-
-test('every run is called off while the store is paused, and none once the pause is lifted', () => {
-  const run = made('r-paused');
-  putPause({ by: 'ann' });
-  try {
-    assert.equal(filesStore.runs.calledOff(run.id), true);
-  } finally {
-    resumePause();
-  }
-  assert.equal(filesStore.runs.calledOff(run.id), false);
-});
-
-test("the store's pause is composed onto every run read and listed, and written back into none", () => {
-  const run = made('r-pause-read');
-  const pause = putPause({ why: 'merging by hand', by: 'ann' });
-  try {
-    const read = filesStore.runs.read(run.id);
-    assert.deepEqual(read.pause, pause);
-    assert.deepEqual(filesStore.runs.list().find((r) => r.id === run.id)?.pause, pause);
-    assert.deepEqual(
-      filesStore.runs.list(undefined, (id) => (id === run.id ? run : undefined)).find((r) => r.id === run.id)?.pause,
-      pause,
-      'a run the memo kept is read with the pause as it stands',
-    );
-    assert.equal(filesStore.runs.rewrite(read), true);
-    assert.equal('pause' in JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')), false, 'the pause is written into the record');
-  } finally {
-    resumePause();
-  }
-  assert.equal('pause' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
-});
-
-test('a record that is not JSON is left out of the list and said, and the other runs are listed', () => {
-  made('r-listed');
-  fs.writeFileSync(runFile('r-not-json'), '{ not json');
-  const said: string[] = [];
-  try {
-    const ids = filesStore.runs.list((line) => said.push(line)).map((run) => run.id);
-    assert.ok(ids.includes('r-listed'));
-    assert.equal(ids.includes('r-not-json'), false);
-    assert.equal(said.length, 1);
-    assert.match(said[0], /r-not-json/);
-  } finally {
-    fs.rmSync(runFile('r-not-json'));
-  }
-});
-
-test('a pass files for a run until a person holds it, and not again in that pass once the hold is lifted', () => {
-  const run = made('r-may-file');
-  const mayFile = mayFileOf(run);
-  assert.equal(mayFile(), true);
-  const hold = writeHold(run.id, ['other-run']);
-  assert.ok(hold);
-  assert.equal(mayFile(), false);
-  assert.equal(filesStore.holds.lift(run.id, hold.at), true);
-  assert.equal(mayFile(), false);
-  assert.equal(mayFileOf(run)(), true);
-});
-
-test('a pass files nothing for a run whose record is gone', () => {
-  const run = made('r-may-file-gone');
-  fs.rmSync(runFile(run.id));
-  assert.equal(mayFileOf(run)(), false);
+test('whether a person called a run off: a pause, a hold and a record gone, as the store and the tick each read it', async (t) => {
+  await t.test('every run is called off while the store is paused, and none once the pause is lifted', () => {
+    const run = made('r-paused');
+    putPause({ by: 'ann' });
+    try {
+      assert.equal(filesStore.runs.calledOff(run.id), true);
+    } finally {
+      resumePause();
+    }
+    assert.equal(filesStore.runs.calledOff(run.id), false);
+  });
+  await t.test("the store's pause is composed onto every run read and listed, and written back into none", () => {
+    const run = made('r-pause-read');
+    const pause = putPause({ why: 'merging by hand', by: 'ann' });
+    try {
+      const read = filesStore.runs.read(run.id);
+      assert.deepEqual(read.pause, pause);
+      assert.deepEqual(filesStore.runs.list().find((r) => r.id === run.id)?.pause, pause);
+      assert.deepEqual(
+        filesStore.runs.list(undefined, (id) => (id === run.id ? run : undefined)).find((r) => r.id === run.id)?.pause,
+        pause,
+        'a run the memo kept is read with the pause as it stands',
+      );
+      assert.equal(filesStore.runs.rewrite(read), true);
+      assert.equal('pause' in JSON.parse(fs.readFileSync(runFile(run.id), 'utf8')), false, 'the pause is written into the record');
+    } finally {
+      resumePause();
+    }
+    assert.equal('pause' in filesStore.runs.read(run.id), false, 'lifted, no run reads it');
+  });
+  await t.test('a pass files for a run until a person holds it, and not again in that pass once the hold is lifted', () => {
+    const run = made('r-may-file');
+    const mayFile = mayFileOf(run);
+    assert.equal(mayFile(), true);
+    const hold = writeHold(run.id, ['other-run']);
+    assert.ok(hold);
+    assert.equal(mayFile(), false);
+    assert.equal(filesStore.holds.lift(run.id, hold.at), true);
+    assert.equal(mayFile(), false);
+    assert.equal(mayFileOf(run)(), true);
+  });
+  await t.test('a pass files nothing for a run whose record is gone', () => {
+    const run = made('r-may-file-gone');
+    fs.rmSync(runFile(run.id));
+    assert.equal(mayFileOf(run)(), false);
+  });
 });
 
 /** One ask of each kind a person writes, with the path the tick reads it at and its reader's words for a file there that is not one. */
@@ -454,58 +455,56 @@ function sourcesOfSrc(): Record<string, string> {
   return out;
 }
 
-test("every run id with a record file is listed, read or not, and none from a person's file alone", () => {
-  const listed = (): string[] => filesStore.runs.ids().filter((id) => id.startsWith('r-ids-'));
-  made('r-ids-read');
-  fs.writeFileSync(runFile('r-ids-torn'), '{ "id": ');
-  markCancelled('r-ids-cancelled');
-  filesStore.holds.put('r-ids-held', ['x'], {});
-  fs.mkdirSync(asksDir('r-ids-asked'), { recursive: true });
-  assert.deepEqual(listed(), ['r-ids-read', 'r-ids-torn']);
-  assert.ok(!filesStore.runs.list(() => {}).some((run) => run.id === 'r-ids-torn'), 'where list leaves the torn record out');
-});
-
-test('no run id is listed with no runs folder', () => {
-  const away = path.join(scratch('wf-run-store-ids-'), 'runs');
-  fs.renameSync(runsDir(), away);
-  try {
-    assert.deepEqual(filesStore.runs.ids(), []);
-  } finally {
-    fs.renameSync(away, runsDir());
-  }
-});
-
-test("a run's files directory is found while it is a directory, and not when it is absent or a link to one", () => {
-  const files = (id: string): string => path.join(runsDir(), id, 'artifacts');
-  fs.mkdirSync(files('r-files-there'), { recursive: true });
-  assert.equal(filesStore.runs.filesAt('r-files-there'), files('r-files-there'));
-  assert.equal(filesStore.runs.filesAt('r-files-never'), undefined);
-  fs.mkdirSync(path.join(runsDir(), 'r-files-linked'), { recursive: true });
-  fs.symlinkSync(files('r-files-there'), files('r-files-linked'));
-  assert.equal(filesStore.runs.filesAt('r-files-linked'), undefined);
-});
-
-test("a run's files directory dropped is gone, and one never there drops as gone", () => {
-  const files = path.join(runsDir(), 'r-drop-files', 'artifacts');
-  fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
-  fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
-  assert.equal(filesStore.runs.dropFiles('r-drop-files'), null);
-  assert.equal(fs.existsSync(files), false);
-  assert.equal(fs.existsSync(path.join(runsDir(), 'r-drop-files')), true, 'the run keeps its own directory');
-  assert.equal(filesStore.runs.dropFiles('r-drop-never'), null);
-});
-
-test("REFUSED: a run's files directory that cannot be removed answers why in one line, and stays", (t) => {
-  if (process.getuid?.() === 0) return t.skip('root removes what a mode forbids');
-  const files = path.join(runsDir(), 'r-drop-stuck', 'artifacts');
-  fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
-  fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
-  fs.chmodSync(path.join(files, 'implement'), 0o555);
-  t.after(() => fs.chmodSync(path.join(files, 'implement'), 0o755));
-  const why = filesStore.runs.dropFiles('r-drop-stuck');
-  assert.match(why ?? '', /EACCES/);
-  assert.ok(!why?.includes('\n'), why ?? '');
-  assert.equal(fs.existsSync(path.join(files, 'implement', 'shot.png')), true);
+test("what `nemia rm` and `nemia prune --artifacts` read of the store: each run's id, read or not, and its files directory found and dropped", async (t) => {
+  await t.test("every run id with a record file is listed, read or not, and none from a person's file alone", () => {
+    const listed = (): string[] => filesStore.runs.ids().filter((id) => id.startsWith('r-ids-'));
+    made('r-ids-read');
+    fs.writeFileSync(runFile('r-ids-torn'), '{ "id": ');
+    markCancelled('r-ids-cancelled');
+    filesStore.holds.put('r-ids-held', ['x'], {});
+    fs.mkdirSync(asksDir('r-ids-asked'), { recursive: true });
+    assert.deepEqual(listed(), ['r-ids-read', 'r-ids-torn']);
+    assert.ok(!filesStore.runs.list(() => {}).some((run) => run.id === 'r-ids-torn'), 'where list leaves the torn record out');
+  });
+  await t.test('no run id is listed with no runs folder', () => {
+    const away = path.join(scratch('wf-run-store-ids-'), 'runs');
+    fs.renameSync(runsDir(), away);
+    try {
+      assert.deepEqual(filesStore.runs.ids(), []);
+    } finally {
+      fs.renameSync(away, runsDir());
+    }
+  });
+  await t.test("a run's files directory is found while it is a directory, and not when it is absent or a link to one", () => {
+    const files = (id: string): string => path.join(runsDir(), id, 'artifacts');
+    fs.mkdirSync(files('r-files-there'), { recursive: true });
+    assert.equal(filesStore.runs.filesAt('r-files-there'), files('r-files-there'));
+    assert.equal(filesStore.runs.filesAt('r-files-never'), undefined);
+    fs.mkdirSync(path.join(runsDir(), 'r-files-linked'), { recursive: true });
+    fs.symlinkSync(files('r-files-there'), files('r-files-linked'));
+    assert.equal(filesStore.runs.filesAt('r-files-linked'), undefined);
+  });
+  await t.test("a run's files directory dropped is gone, and one never there drops as gone", () => {
+    const files = path.join(runsDir(), 'r-drop-files', 'artifacts');
+    fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
+    fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
+    assert.equal(filesStore.runs.dropFiles('r-drop-files'), null);
+    assert.equal(fs.existsSync(files), false);
+    assert.equal(fs.existsSync(path.join(runsDir(), 'r-drop-files')), true, 'the run keeps its own directory');
+    assert.equal(filesStore.runs.dropFiles('r-drop-never'), null);
+  });
+  await t.test("REFUSED: a run's files directory that cannot be removed answers why in one line, and stays", (c) => {
+    if (process.getuid?.() === 0) return c.skip('root removes what a mode forbids');
+    const files = path.join(runsDir(), 'r-drop-stuck', 'artifacts');
+    fs.mkdirSync(path.join(files, 'implement'), { recursive: true });
+    fs.writeFileSync(path.join(files, 'implement', 'shot.png'), 'x');
+    fs.chmodSync(path.join(files, 'implement'), 0o555);
+    c.after(() => fs.chmodSync(path.join(files, 'implement'), 0o755));
+    const why = filesStore.runs.dropFiles('r-drop-stuck');
+    assert.match(why ?? '', /EACCES/);
+    assert.ok(!why?.includes('\n'), why ?? '');
+    assert.equal(fs.existsSync(path.join(files, 'implement', 'shot.png')), true);
+  });
 });
 
 /** `said` refuses each of `imported` in turn, naming the file, the function and its module, and the fix: a method on RunStore. */

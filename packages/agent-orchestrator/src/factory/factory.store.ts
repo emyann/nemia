@@ -45,8 +45,8 @@ import { firesOf } from '../schedule/schedule.store.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
 import { readStatusAt, readTreeWiringAt, treeDirAt, writeTreeWiringAt } from '../applied/applied.store.ts';
-import { rewired, wiringRefusal, type WiringChange } from './wiring.ts';
-import { ownAgentRefusal } from './own-agent.store.ts';
+import { rewired, wiringRefusal, type WiringChange } from '../wiring/wiring.ts';
+import { ownAgentRefusal } from '../wiring/own-agent.store.ts';
 
 /** Where the factories of the store `home` are: `<home>/factories`, beside `runs/` and `inbox/`. The default factory has no file there. */
 export const factoriesDirAt = (home: string): string => path.join(home, 'factories');

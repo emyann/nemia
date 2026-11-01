@@ -17,7 +17,7 @@ import {
   unscheduledRefusal,
   workflowNameRefusal,
   type Schedule,
-} from './factory.ts';
+} from '../factory/factory.ts';
 
 /**
  * A change of a factory's wiring, by its verb: a workflow attached or detached, an agent hired into a step `<workflow>/<step>` or fired

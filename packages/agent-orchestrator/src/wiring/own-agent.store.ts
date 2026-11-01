@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { frontmatterKey } from '../former/former.ts';
 import { Conflict } from '../refusal/refusal.ts';
-import { hireRefusalOf, type Factory } from './factory.ts';
+import { hireRefusalOf, type Factory } from '../factory/factory.ts';
 
 /**
  * The folders whose `workflows/<workflow>/` a start in `factory` reads a step's own file from, in the store `home`: its repositories and

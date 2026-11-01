@@ -5,7 +5,7 @@
 import type { Run } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
 import type { Factory } from '../src/factory/factory.ts';
-import { hiresInto, type WiringChange } from '../src/factory/wiring.ts';
+import { hiresInto, type WiringChange } from '../src/wiring/wiring.ts';
 
 /** Whether a step is gated: by its workflow, or by the run (`--gate`). */
 export const gated = (step: Workflow, run: Run): boolean => step.gate === true || (run.gates ?? []).includes(step.name);

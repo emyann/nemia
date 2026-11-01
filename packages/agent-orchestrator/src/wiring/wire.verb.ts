@@ -8,10 +8,10 @@ import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
 import { rootGiven, StoreRoot } from '../config/root.store.ts';
-import type { Factory } from './factory.ts';
-import { FactoryName } from './factory.model.ts';
-import { FactoryDoor } from './factories.store.ts';
-import { wiringChecked, wiringNamesRefused } from './factory.store.ts';
+import type { Factory } from '../factory/factory.ts';
+import { FactoryName } from '../factory/factory.model.ts';
+import { FactoryDoor } from '../factories/factories.store.ts';
+import { wiringChecked, wiringNamesRefused } from '../factory/factory.store.ts';
 import type { WiringChange } from './wiring.ts';
 
 /** `program`, given the store's root `home` the handler of `verb` was given, refused (`rootGiven`) where it was given none. */

@@ -1,6 +1,6 @@
 /**
- * The Factory door's contract (`FactoryDoor`, `src/factory/factories.store.ts`), as walks (`door-walks.ts`): every method's rows, run on
- * the files by `src/factory/factories.store.test.ts` and on the memory stand-in by `src/factory/memory.store.test.ts`. A factory filed
+ * The Factory door's contract (`FactoryDoor`, `src/factories/factories.store.ts`), as walks (`door-walks.ts`): every method's rows, run on
+ * the files by `src/factories/factories.store.test.ts` and on the memory stand-in by `src/factories/memory.store.test.ts`. A factory filed
  * is listed and read back, written back and read again, removed and gone; a level, rules and servers written are read back, and taken
  * back. And the write check: a new factory under a name that is no slug, under the default factory's, or at a name taken, and a factory
  * written that breaks an invariant of the model's `Factory` — no repository, a hire into a workflow it does not offer — is refused and
@@ -10,7 +10,7 @@
  */
 import type { DoorWalk } from './door-walks.ts';
 import { act, done } from './door-walks.ts';
-import type { FactoryDoorShape } from '../src/factory/factories.store.ts';
+import type { FactoryDoorShape } from '../src/factories/factories.store.ts';
 import { FactoryName } from '../src/factory/factory.model.ts';
 import type { Factory } from '../src/factory/factory.ts';
 
@@ -52,11 +52,11 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
     {
       name: 'what was filed',
       walk: ({ door }) => {
-        filed(door, 'acme', { workflows: ['build'], hires: { 'build/implement': 'grace' } });
+        filed(door, 'acme', { workflows: ['build'], hires: { 'build/implement': 'implementer' } });
         const { name, repos, workflows, hires, schedules } = done(door.factories.read(nameOf('acme')));
         return { name, repos, workflows, hires, schedules };
       },
-      says: { name: 'acme', repos: ['/repo'], workflows: ['build'], hires: { 'build/implement': 'grace' }, schedules: {} },
+      says: { name: 'acme', repos: ['/repo'], workflows: ['build'], hires: { 'build/implement': 'implementer' }, schedules: {} },
     },
   ],
   'factories.create': [
@@ -91,16 +91,16 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       name: 'a hire written is read back',
       walk: ({ door }) => {
         filed(door, 'acme', { workflows: ['build'] });
-        const file = done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'agora' } })));
+        const file = done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'reviewer' } })));
         return { file, hires: done(door.factories.read(nameOf('acme'))).hires };
       },
-      says: { file: '<root>/factories/acme.json', hires: { 'build/review': 'agora' } },
+      says: { file: '<root>/factories/acme.json', hires: { 'build/review': 'reviewer' } },
     },
     {
       name: 'REFUSED: a hire into a workflow it does not offer is Invalid, nothing written',
       walk: ({ door }) => {
         filed(door, 'acme', { workflows: ['build'] });
-        const written = act(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'ship/land': 'otto' } })));
+        const written = act(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'ship/land': 'shipper' } })));
         return { written, hires: done(door.factories.read(nameOf('acme'))).hires };
       },
       says: { written: { refused: 'Invalid' }, hires: {} },

@@ -17,13 +17,13 @@
 import { Context, Effect, Layer } from 'effect';
 import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { Conflict, type Invalid } from '../refusal/refusal.ts';
-import { defaultFactoryRefusal, DEFAULT_FACTORY, type Factory } from './factory.ts';
-import { Factory as FactoryModel, FactoryName } from './factory.model.ts';
-import { createFactoryAt, readFactoriesAt, readFactoryAt, removeFactoryAt, rewriteFactoryAt } from './factory.store.ts';
+import { defaultFactoryRefusal, DEFAULT_FACTORY, type Factory } from '../factory/factory.ts';
+import { Factory as FactoryModel, FactoryName } from '../factory/factory.model.ts';
+import { createFactoryAt, readFactoriesAt, readFactoryAt, removeFactoryAt, rewriteFactoryAt } from '../factory/factory.store.ts';
 import type { FactoryLevelFile } from '../level/level.ts';
 import { readFactoryLevelAt, writeFactoryLevelAt } from '../level/level.store.ts';
 import { readRules, rulesAtHome, rulesCleared, rulesWritten, type RulesRead } from '../rules/rules.store.ts';
-import type { FactoryServers } from '../servers/servers.ts';
+import type { FactoryServers } from '../servers/index.ts';
 import { factoryServers, writeFactoryServers } from '../servers/servers.store.ts';
 
 /**

@@ -1,7 +1,7 @@
 /**
  * Every file of `src` that still calls the stores the Factory door is over — the factories' (`factory.store.ts`), a factory's level, rules
- * and servers — rather than yielding the door (`FactoryDoor`, `src/factory/factories.store.ts`), with how many calls do
- * (`src/factory/factories.store.test.ts`). A debt, and nothing else: a program yields the door, whose writes are checked on every layer
+ * and servers — rather than yielding the door (`FactoryDoor`, `src/factories/factories.store.ts`), with how many calls do
+ * (`src/factories/factories.store.test.ts`). A debt, and nothing else: a program yields the door, whose writes are checked on every layer
  * and whose memory stand-in a test gives it; a call left on the seam is a synchronous caller S5a did not convert — a start, a plan, the
  * inbox, the board's reads, the level read on every beat, the instruction and the upgrade.
  *

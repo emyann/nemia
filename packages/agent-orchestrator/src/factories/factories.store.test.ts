@@ -11,8 +11,8 @@ import { Effect } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aFactory, FACTORY_WALKS } from '../../test/factory-walks.ts';
-import { FactoryDoor, factoryDoorFiles } from './factories.store.ts';
-import { FactoryName } from './factory.model.ts';
+import { FactoryDoor, factoryDoorFiles } from '../factories/factories.store.ts';
+import { FactoryName } from '../factory/factory.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 const PKG = path.join(import.meta.dirname, '..', '..');
@@ -34,8 +34,8 @@ test('a key the model does not name is kept, where it was, by a write back', () 
   done(door.factories.create(aFactory('acme', { workflows: ['build'] })));
   const planted = { ...(JSON.parse(fs.readFileSync(file, 'utf8')) as object), later: 1 };
   fs.writeFileSync(file, `${JSON.stringify(planted, null, 2)}\n`);
-  done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'agora' } })));
-  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { ...planted, hires: { 'build/review': 'agora' } });
+  done(door.factories.rewrite(aFactory('acme', { workflows: ['build'], hires: { 'build/review': 'reviewer' } })));
+  assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { ...planted, hires: { 'build/review': 'reviewer' } });
 });
 
 test("a templated factory's workflows and hires are written into its tree, and refused Conflict before the tree is rendered", () => {
@@ -47,9 +47,9 @@ test("a templated factory's workflows and hires are written into its tree, and r
   const tree = path.join(root, 'factories', 'acme', 'tree');
   fs.mkdirSync(tree, { recursive: true });
   fs.writeFileSync(path.join(tree, 'factory.json'), `${JSON.stringify({ workflows: [], hires: {} })}\n`);
-  const written = done(door.factories.rewrite(aFactory('acme', { template, workflows: ['build'], hires: { 'build/review': 'agora' } })));
+  const written = done(door.factories.rewrite(aFactory('acme', { template, workflows: ['build'], hires: { 'build/review': 'reviewer' } })));
   assert.equal(written, path.join(tree, 'factory.json'));
-  assert.deepEqual(JSON.parse(fs.readFileSync(written, 'utf8')), { workflows: ['build'], hires: { 'build/review': 'agora' } });
+  assert.deepEqual(JSON.parse(fs.readFileSync(written, 'utf8')), { workflows: ['build'], hires: { 'build/review': 'reviewer' } });
   assert.equal(fs.readFileSync(file, 'utf8'), before, "the factory's own file is left as it was");
 });
 
@@ -102,7 +102,7 @@ const OWN = [
   'src/level/level.store.ts',
   'src/rules/rules.store.ts',
   'src/servers/servers.store.ts',
-  'src/factory/factories.store.ts',
+  'src/factories/factories.store.ts',
 ];
 
 /** Every file of `src` but the tests and the stores, by its path from the package. */
@@ -139,7 +139,7 @@ function debtBreaks(sources: Record<string, string>, debt: Readonly<Record<strin
     const owed = debt[file] ?? 0;
     if (n > owed)
       out.push(
-        `${file} calls the factories' stores ${n} time(s) where test/factory-door.baseline.ts names ${owed}: yield FactoryDoor (src/factory/factories.store.ts) instead`,
+        `${file} calls the factories' stores ${n} time(s) where test/factory-door.baseline.ts names ${owed}: yield FactoryDoor (src/factories/factories.store.ts) instead`,
       );
     if (n < owed)
       out.push(
@@ -159,7 +159,7 @@ test("no file of src calls the factories' stores but as test/factory-door.baseli
 test('REFUSED: a converted file that calls a store again, and a count the baseline holds above what is left', async () => {
   const { FACTORY_DOOR_DEBT } = await import('../../test/factory-door.baseline.ts');
   const sources = sourcesOfSrc();
-  const again = { ...sources, 'src/factory/wire.verb.ts': `${sources['src/factory/wire.verb.ts']}\nconst x = readFactory('a');\n` };
+  const again = { ...sources, 'src/wiring/wire.verb.ts': `${sources['src/wiring/wire.verb.ts']}\nconst x = readFactory('a');\n` };
   assert.equal(debtBreaks(again, FACTORY_DOOR_DEBT).length, 1);
   const [first] = Object.keys(FACTORY_DOOR_DEBT);
   assert.equal(debtBreaks(sources, { ...FACTORY_DOOR_DEBT, [first]: (FACTORY_DOOR_DEBT[first] ?? 0) + 1 }).length, 1);

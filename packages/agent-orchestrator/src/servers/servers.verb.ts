@@ -14,8 +14,8 @@ import { EngineService, signsInMcp, tried, type McpServerState, type McpServersR
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import { rootGiven, StoreRoot } from '../config/root.store.ts';
 import { FactoryName } from '../factory/factory.model.ts';
-import { FactoryDoor } from '../factory/factories.store.ts';
-import { rooted } from '../factory/wire.verb.ts';
+import { FactoryDoor } from '../factories/factories.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { DEFAULT_FACTORY, noFactoryLine } from '../factory/factory.ts';
 import { readFactories } from '../factory/factory.store.ts';

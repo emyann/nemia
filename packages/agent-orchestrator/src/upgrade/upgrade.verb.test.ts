@@ -317,7 +317,7 @@ test("a factory's rules are carried by an upgrade: taken from a template that ad
 test('rules the person wrote and rules the template adds, with none in the base, are one conflict at RULES.md, resolved by a choice', async (t) => {
   t.mock.method(console, 'log', () => {});
   const { dir } = await applied('both');
-  await runWith(noEngine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }));
+  await runWith(noEngine(), FACTORY_RULES.handler({ factory: 'both', words: 'Ours: push whenever.' }, undefined, ROOT));
   assert.equal(textIn(treeDir('both'), RULES), 'Ours: push whenever.\n', "a templated factory's rules are its tree's");
   released(dir, '0.2.0', 5);
   fs.writeFileSync(path.join(dir, RULES), 'Theirs: never push on a Friday.\n');

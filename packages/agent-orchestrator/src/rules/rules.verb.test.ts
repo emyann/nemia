@@ -21,9 +21,9 @@ import { names } from '../../test/assessed.ts';
 const ROOT = scratch('wf-rules-verb-');
 process.env.WF_ROOT = ROOT;
 const { FACTORY_RULES } = await import('./rules.verb.ts');
-const { FactoryDoor } = await import('../factory/factories.store.ts');
+const { FactoryDoor } = await import('../factories/factories.store.ts');
 const { FactoryName } = await import('../factory/factory.model.ts');
-const { factoryDoorMemory } = await import('../factory/memory.store.ts');
+const { factoryDoorMemory } = await import('../factories/memory.store.ts');
 const { runWith: runEngine } = await import('../runner.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
@@ -32,7 +32,7 @@ const runWith = runOver(runEngine, () => stand().layer);
 
 const memory = factoryDoorMemory();
 const door = doorFrom(FactoryDoor, memory);
-done(door.factories.create(aFactory('pipao')));
+done(door.factories.create(aFactory('acme')));
 
 /** The command run with `args`, as the CLI and the api run it, over the memory door. */
 const run = (args: Args) => runWith(engineOf(engine().layer), Effect.provide(FACTORY_RULES.handler(args, undefined, ROOT), memory));
@@ -45,11 +45,11 @@ test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
     ['a name no factory has', { factory: 'nobody', words: 'Be kind.' }, 'Missing', ['nobody']],
     [
       'rules that open with a frontmatter block',
-      { factory: 'pipao', words: '---\nmodel: opus\n---\nBe kind.\n' },
+      { factory: 'acme', words: '---\nmodel: opus\n---\nBe kind.\n' },
       'Invalid',
       ['RULES.md', 'frontmatter', '`---`'],
     ],
-    ['blank rules', { factory: 'pipao', words: '   ' }, 'Invalid', ['pipao']],
+    ['blank rules', { factory: 'acme', words: '   ' }, 'Invalid', ['acme']],
   ];
   for (const [row, args, tag, facts] of rows)
     await t.test(row, async () => {
@@ -58,14 +58,14 @@ test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
         names(err.message, ...facts);
         return true;
       });
-      assert.deepEqual(done(door.factories.list()), ['pipao']);
-      assert.equal(done(door.rules.read(FactoryName.read('pipao'))).words, null);
+      assert.deepEqual(done(door.factories.list()), ['acme']);
+      assert.equal(done(door.rules.read(FactoryName.read('acme'))).words, null);
     });
   await t.test('--file with --clear, by the check, before anything is read', () =>
-    names(FACTORY_RULES.check?.({ factory: 'pipao', file: 'rules.md', clear: true }), 'nemia factory rules', '--file', '--clear'),
+    names(FACTORY_RULES.check?.({ factory: 'acme', file: 'rules.md', clear: true }), 'nemia factory rules', '--file', '--clear'),
   );
   await t.test('taken by the check: --file alone, or nothing', () => {
-    assert.equal(FACTORY_RULES.check?.({ factory: 'pipao', file: 'rules.md' }), null);
-    assert.equal(FACTORY_RULES.check?.({ factory: 'pipao' }), null);
+    assert.equal(FACTORY_RULES.check?.({ factory: 'acme', file: 'rules.md' }), null);
+    assert.equal(FACTORY_RULES.check?.({ factory: 'acme' }), null);
   });
 });

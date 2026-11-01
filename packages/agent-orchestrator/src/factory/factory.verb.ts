@@ -18,11 +18,11 @@ import {
   type RevisionsPolicy,
 } from './factory.ts';
 import { factoriesDir, factoryRepos, readFactories, refuseName } from './factory.store.ts';
-import { ownAgentRefusal } from './own-agent.store.ts';
+import { ownAgentRefusal } from '../wiring/own-agent.store.ts';
 import { FactoryName } from './factory.model.ts';
-import { FactoryDoor } from './factories.store.ts';
+import { FactoryDoor } from '../factories/factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
-import { rooted, wire } from './wire.verb.ts';
+import { rooted, wire } from '../wiring/wire.verb.ts';
 import { removeInstructionFolder } from './instruction.store.ts';
 import { FACTORY_INSTRUCT, FACTORY_INSTRUCTION } from './instruction.verb.ts';
 import { FACTORY_RULES } from '../rules/rules.verb.ts';

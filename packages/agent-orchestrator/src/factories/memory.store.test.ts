@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import { MEMORY_ROOT, factoryDoorMemory } from './memory.store.ts';
-import { FactoryDoor } from './factories.store.ts';
+import { FactoryDoor } from '../factories/factories.store.ts';
 import { doorFrom, walksOn } from '../../test/door-walks.ts';
 import { FACTORY_WALKS } from '../../test/factory-walks.ts';
 

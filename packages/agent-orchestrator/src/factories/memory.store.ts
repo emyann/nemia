@@ -19,11 +19,11 @@ import {
   takenFactoryRefusal,
   unrenderedTreeRefusal,
   type Factory,
-} from './factory.ts';
+} from '../factory/factory.ts';
 import { factoryRulesRefusal, FACTORY_RULES_FILE } from '../rules/rules.ts';
 import type { FactoryLevelFile } from '../level/level.ts';
-import type { FactoryServers } from '../servers/servers.ts';
-import { FactoryDoor, factoryDoorOver, type FactoryLayer } from './factories.store.ts';
+import type { FactoryServers } from '../servers/index.ts';
+import { FactoryDoor, factoryDoorOver, type FactoryLayer } from '../factories/factories.store.ts';
 
 /** Where the stand-in says a factory's files are: the root its paths are named under, as the files' are under the store's root. */
 export const MEMORY_ROOT = '/memory';

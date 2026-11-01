@@ -103,12 +103,12 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   by path, after the file sets `WF_ROOT`) and plants the run through it; code still on `runStore` (`test/run-door.baseline.ts`) reads
   the files whatever door a program was given, so a test whose verb reaches it stays on files. A write breaking the model's `Run` is
   refused `Invalid`: build a fixture's task ids with `stepTaskId`.
-- **A factory is read and written through the Factory door (`FactoryDoor`, `src/factory/factories.store.ts`), whose default is rooted**:
+- **A factory is read and written through the Factory door (`FactoryDoor`, `src/factories/factories.store.ts`), whose default is rooted**:
   it reads the files at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
-  through `rooted(home, verb, program)` (`src/factory/wire.verb.ts`). A test that only needs a factory to exist gives its program one
-  `factoryDoorMemory()` (`src/factory/memory.store.ts`) and plants the factory through it (`aFactory`, `test/factory-walks.ts`); code
+  through `rooted(home, verb, program)` (`src/wiring/wire.verb.ts`). A test that only needs a factory to exist gives its program one
+  `factoryDoorMemory()` (`src/factories/memory.store.ts`) and plants the factory through it (`aFactory`, `test/factory-walks.ts`); code
   still on `factory.store.ts`'s spellings without a root (`test/factory-door.baseline.ts`) reads the module's root whatever door was
-  given. A change of a factory's wiring is judged by `wiringRefusal` (`src/factory/wiring.ts`), whose contract a new rule of the wiring
+  given. A change of a factory's wiring is judged by `wiringRefusal` (`src/wiring/wiring.ts`), whose contract a new rule of the wiring
   is a law of, not a row of a test.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`

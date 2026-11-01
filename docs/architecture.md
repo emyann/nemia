@@ -295,14 +295,14 @@ controller and of each of their callers at once. What still calls the run store'
 `test/run-door.baseline.ts`, which only shrinks; the run store's inbox is the Card door's seam and no part of it.
 
 **The Factory door.** A factory — its file, and the level, rules and servers the store keeps beside it — is read and written through
-`FactoryDoor` (`packages/agent-orchestrator/src/factory/factories.store.ts`), on the Run door's pattern: two layers built the one way
+`FactoryDoor` (`packages/agent-orchestrator/src/factories/factories.store.ts`), on the Run door's pattern: two layers built the one way
 (`factoryDoorOver`), the files (`factoryFiles(home)`, over `factory.store.ts`, `level.store.ts`, `rules.store.ts` and
 `servers.store.ts`, so a file keeps its bytes and a key the model does not name) and a memory stand-in (`factoryDoorMemory`,
-`src/factory/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/factory-walks.ts`). A new factory's name is checked
+`src/factories/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/factory-walks.ts`). A new factory's name is checked
 as `FactoryName.OnCreate` checks it, the default factory is `Conflict`, and a factory written decodes through the model's `Factory`,
 whose checks are its invariants (one repository at least, hires and schedules only into a workflow it offers), or is `Invalid`. A
 person's change of a factory's wiring — attach, detach, hire, fire, schedule, unschedule — is read, judged by a pure function
-(`wiringRefusal` and `rewired`, `src/factory/wiring.ts`, proved by `contracts/wiring.contract.ts` to keep that invariant) and written
+(`wiringRefusal` and `rewired`, `src/wiring/wiring.ts`, proved by `contracts/wiring.contract.ts` to keep that invariant) and written
 back through the door; only the disk's facts (a step's own agent, a cron that fires, a repository that is a directory) stay the
 verb's. Its default departs from the Run door's on one point, which the pattern now carries for every door after it: it is *rooted*
 (`rootedDoor`, `src/door/door.store.ts`), the door over the files at the `StoreRoot` the program is given, read when a method runs,

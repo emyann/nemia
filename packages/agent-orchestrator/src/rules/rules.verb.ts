@@ -11,8 +11,8 @@ import { readFactory } from '../factory/factory.store.ts';
 import { Effect } from 'effect';
 import { Conflict, type Refusal } from '../refusal/refusal.ts';
 import { FactoryName } from '../factory/factory.model.ts';
-import { FactoryDoor } from '../factory/factories.store.ts';
-import { rooted } from '../factory/wire.verb.ts';
+import { FactoryDoor } from '../factories/factories.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import { readRules, rulesAt } from './rules.store.ts';
 
 /**

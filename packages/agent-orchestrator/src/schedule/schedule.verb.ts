@@ -11,7 +11,7 @@ import type { Run } from '../record/record.ts';
 import { isDue, schedulesRead, type Read } from './listed.store.ts';
 import { workflowFolder } from '../folder/folder.store.ts';
 import { scheduleOf, scheduleRefused } from '../factory/factory.store.ts';
-import { rooted, wire } from '../factory/wire.verb.ts';
+import { rooted, wire } from '../wiring/wire.verb.ts';
 import { unscheduledRefusal } from '../factory/factory.ts';
 import { Missing } from '../refusal/refusal.ts';
 import type { Schedule } from '../factory/factory.ts';

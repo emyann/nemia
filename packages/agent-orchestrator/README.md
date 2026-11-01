@@ -314,12 +314,12 @@ files. What has not moved onto it yet is counted in `test/run-door.baseline.ts`.
 
 ## The Factory door
 
-A factory is read and written through `FactoryDoor` (`src/factory/factories.store.ts`), on the same pattern: its file, and the level,
+A factory is read and written through `FactoryDoor` (`src/factories/factories.store.ts`), on the same pattern: its file, and the level,
 rules and servers the store keeps beside it, each method taking a `FactoryName`. Behind it are today's files under the store's root,
 unchanged on disk (a key the model does not name is kept), and a memory stand-in a test gives with `Effect.provide(program,
 factoryDoorMemory())`. A new factory under a name that is no slug, or under `default`, and a factory written that breaks the model's
 `Factory` — no repository, a hire or a schedule into a workflow it does not offer — are refused, and nothing is written. A person's
-attach, detach, hire, fire, schedule and unschedule are judged by one pure function (`wiringRefusal`, `src/factory/wiring.ts`), proved
+attach, detach, hire, fire, schedule and unschedule are judged by one pure function (`wiringRefusal`, `src/wiring/wiring.ts`), proved
 by `contracts/wiring.contract.ts`, then written back through the door. Unlike the Run door, a program given no door reads the files at
 the store's root it was given (`StoreRoot`), and is refused where it was given none. What has not moved onto it yet is counted in
 `test/factory-door.baseline.ts`.

@@ -171,7 +171,8 @@ What the `create-an-agent` skill, being generic, does not say here:
   loaded from the root it refuses with `monorepo_root`), `grilling` and `grill-me` (Iris's interview), and `react-aria` (Adobe's
   documentation of React Aria, for the board's own parts: taken from the root by `npx skills add https://react-aria.adobe.com -a
   claude-code --copy -y`, refreshed by `npx skills update`, and it describes the library's latest release, which may be ahead of the
-  board's pin).
+  board's pin), and `tsverify` (the verifier's, for a contract under a package's `contracts/` and the function it proves: taken by `npx
+  skills add emyann/tsverify -a claude-code --copy -y`, given to build's and quick's steps by their `skills:` lines).
 - `apps/web/src/components/ui/ds` — the design system kit (french-tech-homies/design-system, the `@ds` registry), vendored as shipped
   and credited in `THIRD_PARTY_NOTICES.md`, with its skills `ds-theme`, `ds-build` and `ds-spec` in `apps/web/.claude/skills/`: a nested
   folder, given to the build's design, implement and review steps by their `skills:` lines as `apps/web:<name>`, and said to a session

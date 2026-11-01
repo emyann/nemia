@@ -3,7 +3,7 @@
  * ordered rules written as laws over (state, observed, now, event), rather than as a second copy of the code. Read in
  * place.
  */
-import { assume, spec } from '@emyann/tsverify';
+import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Monotonic } from '../src/core/clock.ts';
 import {
   type Attempt,
@@ -181,4 +181,5 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
     },
   },
 });
-export type ObserveSpec = typeof observeSpec;
+/** The function's type, which the code takes: it then imports nothing of tsverify. */
+export type Observe = Implementation<typeof observeSpec>;

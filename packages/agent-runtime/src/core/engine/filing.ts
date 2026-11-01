@@ -10,8 +10,7 @@ import { Journal } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness/args.ts';
 import { Runner } from '../../harness/seam.ts';
 import { labelsRefusalOf } from '../labels.ts';
-import type { Implementation } from '@emyann/tsverify';
-import type { StopSpec } from '../../../contracts/stop.contract.ts';
+import type { RequestStop } from '../../../contracts/stop.contract.ts';
 
 /** What `file` journals: a task as a person files it. */
 export type Filing = {
@@ -252,7 +251,7 @@ export const stopRefusalOf = (taskId: string, state: State | undefined): string 
  * A person's word that a task stop: journalled as `stop-requested`, whatever it is doing; the next pass stops its session
  * and settles it `stopped`. Refused with `StopRefused`, and nothing journalled, for what `stopRefusalOf` refuses.
  */
-export const requestStop: Implementation<StopSpec> = Effect.fn('requestStop')(function* (taskId) {
+export const requestStop: RequestStop = Effect.fn('requestStop')(function* (taskId) {
   const journal = yield* Journal;
   const events = yield* journal.read(taskId);
   const refused = stopRefusalOf(taskId, events.length ? fold(taskId, events) : undefined);

@@ -28,10 +28,9 @@ import type { TranscriptMark } from '../harness/seam.ts';
 import { transition, VERBS, type LifecycleEvent, type Move, type Refusal, type VerbGuard, type VerbName } from './lifecycle.ts';
 import { elapsedMs, type Instant, type Monotonic } from './clock.ts';
 import { endOf, isLive, NEEDS_HUMAN, RUNNING, waitsOnPerson, type Outcome, type SessionState } from './session.ts';
-import type { Implementation } from '@emyann/tsverify';
-import type { DecideSpec } from '../../contracts/decide.contract.ts';
-import type { LifecycleSpec } from '../../contracts/lifecycle.contract.ts';
-import type { ObserveSpec } from '../../contracts/observe.contract.ts';
+import type { Decide } from '../../contracts/decide.contract.ts';
+import type { LifecycleOf } from '../../contracts/lifecycle.contract.ts';
+import type { Observe } from '../../contracts/observe.contract.ts';
 
 /** Ended by the session itself, not stopped under it: an end on record that no deadline overrules. */
 const ENDED_OWN: ReadonlySet<SessionState> = new Set(['completed', 'failed', 'rejected']);
@@ -877,7 +876,7 @@ export const settledQuiet = (state: State): boolean => state.settled !== null;
  * `lifecycle.ts`), which names the next state and the one action. An event with no edge is refused, and the refusal is
  * the answer: nothing is done, and the pass reports it. `move` is the lifecycle's; a test hands another to plant a refusal.
  */
-export const decide: Implementation<DecideSpec> = (state, observed, now, move = transition) => {
+export const decide: Decide = (state, observed, now, move = transition) => {
   if (settledQuiet(state)) return { do: 'nothing', why: `settled: ${state.settled}` };
   const from = lifecycleOf(state);
   const event = observe(state, observed, now);
@@ -901,7 +900,7 @@ export const decide: Implementation<DecideSpec> = (state, observed, now, move = 
  * 5. Held open and waiting on a person's answer (`waitsForInput`): `input-required`.
  * 6. Its current turn has an attempt, all ended: `ending`; else `submitted`.
  */
-export const lifecycleOf: Implementation<LifecycleSpec> = (state) => {
+export const lifecycleOf: LifecycleOf = (state) => {
   if (state.settled) return state.settled === 'succeeded' ? 'completed' : state.settled === 'stopped' ? 'canceled' : 'failed';
   if (state.stopRequested) return 'stopping';
   const last = state.attempts.at(-1);
@@ -966,7 +965,7 @@ export const lifecycleOf: Implementation<LifecycleSpec> = (state) => {
  *    later one, the session that ended the turn before it — is still held by its harness: it is stopped first.
  * 10. `READY` otherwise: in a later turn, told the person's answer; else the brief.
  */
-export const observe: Implementation<ObserveSpec> = (state, observed, now) => {
+export const observe: Observe = (state, observed, now) => {
   if (state.settled) return { type: 'SETTLED', outcome: state.settled };
   const last = state.attempts.at(-1);
   const sighting = last ? observed.get(nameFor(state.taskId, last.n)) : undefined;

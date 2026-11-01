@@ -27,8 +27,7 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
-import type { Implementation } from '@emyann/tsverify';
-import type { OwnStatusSpec, StandingSpec } from '../../contracts/standing.contract.ts';
+import type { OwnStatus, StandingOf } from '../../contracts/standing.contract.ts';
 
 /**
  * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
@@ -368,16 +367,7 @@ export function stepStatus(
  * are its own status's. `awaiting approval` covers both gates: after a step signs off (`atGate`), and before an ending is filed
  * (`waitsAtGate`).
  */
-export const standing: Implementation<StandingSpec> = (
-  step,
-  run,
-  phaseOf,
-  closeoutOf,
-  askedCloseout,
-  steps,
-  spendOf,
-  verdictOf = () => undefined,
-) => {
+export const standing: StandingOf = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf = () => undefined) => {
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   if (held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)) return { own, status: 'over budget' };
   if (atGate(step, run, own, closeoutOf)) return { own, status: 'awaiting approval' };
@@ -457,7 +447,7 @@ function roundWanted(
  * (`landingDue`), never on the check alone: `verified` once the run has committed the merge, and `checking` until it has committed or
  * aborted it, so nothing offers a try of it while its merge is staged in the checkout.
  */
-export const ownStatus: Implementation<OwnStatusSpec> = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) => {
+export const ownStatus: OwnStatus = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf) => {
   const st = run.steps[step.name];
   if (!st?.taskId) return 'pending';
   const said = closeoutOf(step.name);

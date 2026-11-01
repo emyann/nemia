@@ -3,7 +3,7 @@
  * src/core/domain.ts, `lifecycleOf`), written as laws over (state, result)
  * rather than as a second copy of the code. Read in place.
  */
-import { spec } from '@emyann/tsverify';
+import { type Implementation, spec } from '@emyann/tsverify';
 import type { State } from '../src/core/domain.ts';
 import type { LifecycleState } from '../src/core/lifecycle.ts';
 
@@ -60,4 +60,5 @@ const lifecycleSpec = spec<(state: State) => LifecycleState>({
     },
   },
 });
-export type LifecycleSpec = typeof lifecycleSpec;
+/** The function's type, which the code takes: it then imports nothing of tsverify. */
+export type LifecycleOf = Implementation<typeof lifecycleSpec>;

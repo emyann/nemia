@@ -4,7 +4,7 @@
  * shipped one. The edge table is XState's, which the verifier does not read: what `decide` may take of it is declared
  * below, every law tested on the real table, every state against every event (`test/assumptions.test.ts`).
  */
-import { assume, spec } from '@emyann/tsverify';
+import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Monotonic } from '../src/core/clock.ts';
 import { type Action, type Attempt, backoffOf, nameFor, type Now, RESTART_BACKOFF, type Sighting, type State } from '../src/core/domain.ts';
 import { type Move, transition } from '../src/core/lifecycle.ts';
@@ -111,4 +111,5 @@ const decideSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>, 
     },
   },
 });
-export type DecideSpec = typeof decideSpec;
+/** The function's type, which the code takes: it then imports nothing of tsverify. */
+export type Decide = Implementation<typeof decideSpec>;

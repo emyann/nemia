@@ -27,6 +27,10 @@
  * `react-aria`, this
  * repository's vendored skill for the board's own parts, on their `skills:` line and not on a team-portable agent's.
  *
+ * The same five are each given `tsverify`, the verifier's own skill, and told what a contract asks of them (`DESIGN_LAWS_TOLD`,
+ * `LAWS_TOLD`, `REVIEW_LAWS_TOLD`): design names the laws a change adds or changes, implement writes them first and deletes a test only
+ * once its bug is planted and a law refuses it, and review judges the laws and reads CI's verdict of every contract.
+ *
  * And what becomes of Claude Code's own prompt for each agent of the team (`PROMPTS`, `promptsWrong`): no `harnessPrompt:` line on any,
  * so each keeps it whole, coding section included. An agent the table does not name is refused, so a new one says its value.
  */
@@ -175,7 +179,34 @@ const OPENS_THE_PULL_REQUEST = [
 const EFFECT_TOLD =
   'When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this repository writes Effect 4, and sends you to the docs installed with Effect first.';
 
-/** What an implement step is told, build's and quick's alike: the base, the board's components, a dashboard rendered. */
+/** What design is told of a contract: when to load the verifier's skill, what its spec names, and the read its fence allows. */
+const DESIGN_LAWS_TOLD = [
+  'load the `tsverify` skill, and name in the spec each law the change adds or changes: its name, its sentence, and its condition in words.',
+  'The implementer writes them first and sees each fail on the code as it is.',
+  'run `npx tsverify <file> <name>`, bare, on the file the function is written in',
+];
+
+/** What an implement step is told of a contract, build's and quick's alike: the laws first, the verdicts said, a test deleted on proof. */
+const LAWS_TOLD = [
+  'load the `tsverify` skill before you change the code.',
+  'Write the laws into the contract first and run the verifier',
+  'each new law comes back `counterexample` on the code as it is; then change the code until every law is `proved`.',
+  "and say its verdicts in your summary: CI's `contracts` job runs every contract on the commit your check pushes.",
+  'A new behaviour of a function a contract proves is a law of its contract, not a new row of its tests.',
+  'Delete a test a law makes redundant only once you have planted the bug it guards, seen the law come back `counterexample`, and put the code back: name in your summary the test, the bug and the law.',
+];
+
+/** What a review is told of a contract, build's and quick's alike: the skill to judge laws by, CI's verdict, and the findings. */
+const REVIEW_LAWS_TOLD = [
+  'load the `tsverify` skill to judge its laws.',
+  "CI's `contracts` job verified every contract on the commit implement pushed, and its verdict is in the `ci` you read",
+  'a law loosened or removed with no reason the card or the spec gives',
+  "a law that restates the code rather than say the domain's fact",
+  'a new behaviour of a function a contract proves held by a new test row where a law could state it',
+  'a test deleted where the summary names no bug planted and no law that refused it.',
+];
+
+/** What an implement step is told, build's and quick's alike: the base, the board's components, a dashboard rendered, a contract. */
 const IMPLEMENT_TOLD = [
   ...MERGES_THE_BASE,
   EFFECT_TOLD,
@@ -185,6 +216,7 @@ const IMPLEMENT_TOLD = [
   '`node tools/observe/render/render.ts --out <your files directory>` starts a throwaway stack from this workspace',
   'the check refuses a changed dashboard whose picture and',
   ...LOOK_PARTS_TOLD,
+  ...LAWS_TOLD,
 ];
 
 /** What quick's implement is told that build's is not: to plan first, to decide nothing, no size bound, to run its tests, its pages. */
@@ -202,6 +234,7 @@ const QUICK_TOLD = [
   "**Name the pages** the change touches in your closeout's `pages`",
   '**Nothing runs your tests for you.**',
   "Run them yourself before you sign off, as `CLAUDE.md`, *Check your work*, says of a step's session",
+  'No spec names the laws in a quick run: name each in your `plan`, with its sentence, before you write it.',
 ];
 
 /**
@@ -239,8 +272,9 @@ const TOLD: Told[] = [
       ...KIT_READER_TOLD,
       ...LOOK_PARTS_TOLD,
       EFFECT_TOLD,
+      ...DESIGN_LAWS_TOLD,
     ],
-    adds: ['shadcn', 'look', 'react-aria'],
+    adds: ['shadcn', 'look', 'react-aria', 'tsverify'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...BROWSER_FENCE],
     declares: [],
   },
@@ -248,7 +282,7 @@ const TOLD: Told[] = [
     workflow: 'build',
     step: 'implement',
     says: IMPLEMENT_TOLD,
-    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
+    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard', 'tsverify'],
     denies: [],
     declares: [],
   },
@@ -275,8 +309,9 @@ const TOLD: Told[] = [
       'You do not render one yourself: your fence refuses the command and Docker.',
       ...KIT_READER_TOLD,
       ...LOOK_PARTS_TOLD,
+      ...REVIEW_LAWS_TOLD,
     ],
-    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
+    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard', 'tsverify'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
     declares: ['findings', 'again'],
   },
@@ -297,8 +332,9 @@ const TOLD: Told[] = [
       STOP_BOARD,
       ...KIT_READER_TOLD,
       ...LOOK_PARTS_TOLD,
+      ...REVIEW_LAWS_TOLD,
     ],
-    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
+    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard', 'tsverify'],
     denies: ['Bash(cd:*)', ...NO_BUILD, ...WHOLE_SUITE, ...BROWSER_FENCE],
     declares: ['findings', 'again'],
   },
@@ -306,7 +342,7 @@ const TOLD: Told[] = [
     workflow: 'quick',
     step: 'implement',
     says: [...IMPLEMENT_TOLD, ...QUICK_TOLD],
-    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard'],
+    adds: ['shadcn', 'look', 'react-aria', 'see-a-dashboard', 'tsverify'],
     denies: [],
     declares: ['plan', 'pages'],
   },

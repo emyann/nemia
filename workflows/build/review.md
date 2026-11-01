@@ -7,17 +7,23 @@ loop: implement
 rounds: 3
 budget: 16
 tally: findings, findings.kind=placement
-skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
+skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, tsverify, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
 claude:
   fence:
-    disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx shadcn@latest:*), Bash(pnpm dlx shadcn@latest:*), Bash(bunx --bun shadcn@latest:*), Bash(npx turbo run test *build*), Bash(npx tsc *-w*), Bash(npx tsc *-W*), Bash(npx tsc *-in*), Bash(npx tsc *-iN*), Bash(npx tsc *-In*), Bash(npx tsc *-IN*), Bash(npx tsc *-i *), Bash(npx tsc *-I *), Bash(npx tsc *-ts*), Bash(npx tsc *-tS*), Bash(npx tsc *-Ts*), Bash(npx tsc *-TS*), Bash(npx tsc *-g*), Bash(npx tsc *-G*), Bash(npx tsc * false*), Bash(npx tsc *@*), Bash(npx oxlint *--fix*), Bash(npx oxlint *--init*), Bash(npx oxlint *--lsp*), Bash(npx oxlint -c*), Bash(npx oxlint * -c*), Bash(npx oxlint *--config*), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
+    disallowedTools: Bash(npm run build), Bash(npm run e2e), Bash(npm test), Bash(npx shadcn@latest:*), Bash(pnpm dlx shadcn@latest:*), Bash(bunx --bun shadcn@latest:*), Bash(npx turbo run test *build*), Bash(npx tsc *-w*), Bash(npx tsc *-W*), Bash(npx tsc *-in*), Bash(npx tsc *-iN*), Bash(npx tsc *-In*), Bash(npx tsc *-IN*), Bash(npx tsc *-i *), Bash(npx tsc *-I *), Bash(npx tsc *-ts*), Bash(npx tsc *-tS*), Bash(npx tsc *-Ts*), Bash(npx tsc *-TS*), Bash(npx tsc *-g*), Bash(npx tsc *-G*), Bash(npx tsc * false*), Bash(npx tsc *@*), Bash(npx oxlint *--fix*), Bash(npx oxlint *--init*), Bash(npx oxlint *--lsp*), Bash(npx oxlint -c*), Bash(npx oxlint * -c*), Bash(npx oxlint *--config*), Bash(npx tsverify:*), Bash(npx turbo run test), Bash(npx turbo run test --force), Bash(npx turbo run test --continue), Bash(npx turbo run test --force --continue), Bash(npx turbo run test --continue --force), mcp__playwright__browser_navigate(url:*:8787*), mcp__playwright__browser_navigate(url:*:5173*), mcp__playwright__browser_tabs(url:*:8787*), mcp__playwright__browser_tabs(url:*:5173*)
 ---
 Judge what was asked and what the diff does. The steps before you each left their whole closeout in their folder's `closeout.json`:
 its summary and body are that step's own account, to check against the change, never taken as the answer to a finding.
 
 When the change touches a file that imports from `effect`, load the `effect` skill before you read, write or judge it: it says how this
 repository writes Effect 4, and sends you to the docs installed with Effect first.
+
+When the change touches a contract under a package's `contracts/`, or a function one proves, load the `tsverify` skill to judge its
+laws. CI's `contracts` job verified every contract on the commit implement pushed, and its verdict is in the `ci` you read: you run no
+verifier, which your fence refuses. A finding, each: a law loosened or removed with no reason the card or the spec gives; a law that
+restates the code rather than say the domain's fact; a new behaviour of a function a contract proves held by a new test row where a law
+could state it; a test deleted where the summary names no bug planted and no law that refused it.
 
 When the change touches `apps/web`, read the pictures the implement step named in its `artifacts`, by their paths in its folder's
 `closeout.json`, in light and dark, with the `look` skill. A page or a state the change touches with no picture of it is a finding.

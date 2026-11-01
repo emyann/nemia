@@ -5,7 +5,7 @@
  * takes what its spec proves of it (`standing.contract.ts`), and nothing of its body. The send-back (`retryable`) and the
  * steps an ending waits on (`notHandedOn`) only shape what a refusal says: declared pure, and nothing more.
  */
-import { assume, spec } from '@emyann/tsverify';
+import { assume, type Implementation, spec } from '@emyann/tsverify';
 import { holdsOpen } from '../src/gate/gate.ts';
 import type { Verdict } from '../src/check/check.ts';
 import type { Closeout } from '../src/closeout/index.ts';
@@ -129,7 +129,8 @@ const approvalRefusalSpec = spec<
   },
 });
 
-export type ApprovalRefusalSpec = typeof approvalRefusalSpec;
+/** The function's type, which the code takes: it then imports nothing of tsverify. */
+export type ApprovalRefusal = Implementation<typeof approvalRefusalSpec>;
 
 const holdsOpenSpec = spec<
   (
@@ -178,4 +179,5 @@ const holdsOpenSpec = spec<
     },
   },
 });
-export type HoldsOpenSpec = typeof holdsOpenSpec;
+/** The function's type, which the code takes: it then imports nothing of tsverify. */
+export type HoldsOpen = Implementation<typeof holdsOpenSpec>;

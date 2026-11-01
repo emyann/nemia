@@ -25,6 +25,12 @@
       "sourceType": "github",
       "skillPath": "skills/shadcn/SKILL.md",
       "computedHash": "f615de216e085a84e31593ad0fa9062232adc40cd87b7c7ab2b8e49abf6500be"
+    },
+    "tsverify": {
+      "source": "emyann/tsverify",
+      "sourceType": "github",
+      "skillPath": "skills/tsverify/SKILL.md",
+      "computedHash": "5c2e299f8d6585b7c626e81e2639e6b2134947844d6791a90f0b0773b91bb43a"
     }
   }
 }

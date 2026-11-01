@@ -361,7 +361,7 @@
     },
     {
       "term": "Step record",
-      "meaning": "what a run's record keeps of one of its steps (`Step`, `src/record/record.model.ts`): its current try's task, the tries behind it, where it works and what the run did with it, keyed by its `StepName`.",
+      "meaning": "what a run's record keeps of one of its steps (`Step`, `packages/agent-orchestrator/src/record/record.model.ts`): its current try's task, the tries behind it, where it works and what the run did with it, keyed by its `StepName`.",
       "type": "Step"
     },
     {
@@ -473,7 +473,7 @@
     },
     {
       "term": "Workflow",
-      "meaning": "a folder of markdown files, one file a step: the model's `Workflow` (`src/folder/folder.model.ts`), addressed by its folder, read and written through the Workflow door.",
+      "meaning": "a folder of markdown files, one file a step: the model's `Workflow` (`packages/agent-orchestrator/src/folder/folder.model.ts`), addressed by its folder, read and written through the Workflow door.",
       "type": "Workflow",
       "see": {
         "label": "Workflows",

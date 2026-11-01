@@ -33,7 +33,7 @@
     "release:check": "npm run typecheck && npm test"
   },
   "devDependencies": {
-    "@emyann/tsverify": "^0.2.0",
+    "@emyann/tsverify": "^0.3.0",
     "@playwright/mcp": "0.0.80",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.19.2",

@@ -21,39 +21,49 @@ export const verbTakesIsPure = assume(verbTakes, { pure: true });
 
 const stopSpec = spec<(taskId: string) => Effect.Effect<void, StopRefused | JournalError, Journal>>({
   ensures: {
-    /** The journal is read first, and for this task. */
-    readsFirst: ({ input: [taskId], calls }) => {
-      const first = calls.at(0);
-      return first !== undefined && first.op === 'read' && first.args[0] === taskId;
+    readsFirst: {
+      description: 'The journal is read first, and for this task',
+      condition: ({ input: [taskId], calls }) => {
+        const first = calls.at(0);
+        return first !== undefined && first.op === 'read' && first.args[0] === taskId;
+      },
     },
-    /** A read that fails ends the request with that failure, and nothing else is called. */
-    readFailurePassesThrough: ({ output, calls }) => {
-      const first = calls.at(0);
-      if (first === undefined || first.outcome._tag !== 'Failure') return true;
-      return calls.length === 1 && output._tag === 'Failure' && output.error._tag === first.outcome.error._tag;
+    readFailurePassesThrough: {
+      description: 'A read that fails ends the request with that failure, and nothing else is called',
+      condition: ({ output, calls }) => {
+        const first = calls.at(0);
+        if (first === undefined || first.outcome._tag !== 'Failure') return true;
+        return calls.length === 1 && output._tag === 'Failure' && output.error._tag === first.outcome.error._tag;
+      },
     },
-    /** A refused stop writes nothing. */
-    refusedWritesNothing: ({ output, calls }) =>
-      !(output._tag === 'Failure' && output.error._tag === 'StopRefused') || !calls.some((c) => c.op === 'append'),
-    /** An accepted stop writes exactly one entry, last, to this task, of kind `stop-requested`. */
-    acceptedWritesOneStop: ({ input: [taskId], output, calls }) => {
-      if (output._tag !== 'Success') return true;
-      const last = calls.at(-1);
-      return (
-        calls.filter((c) => c.op === 'append').length === 1 &&
-        last !== undefined &&
-        last.op === 'append' &&
-        last.args[0] === taskId &&
-        last.args[1].kind === 'stop-requested'
-      );
+    refusedWritesNothing: {
+      description: 'A refused stop writes nothing',
+      condition: ({ output, calls }) =>
+        !(output._tag === 'Failure' && output.error._tag === 'StopRefused') || !calls.some((c) => c.op === 'append'),
     },
-    /** The request is refused exactly when the guard, asked of the journal read, gives words. */
-    refusedExactlyWhenTheGuardSays: ({ input: [taskId], output, calls }) => {
-      const first = calls.at(0);
-      if (first === undefined || first.op !== 'read' || first.outcome._tag !== 'Success') return true;
-      const events = first.outcome.value;
-      const refused = stopRefusalOf(taskId, events.length ? fold(taskId, events) : undefined) !== undefined;
-      return refused === (output._tag === 'Failure' && output.error._tag === 'StopRefused');
+    acceptedWritesOneStop: {
+      description: 'An accepted stop writes exactly one entry, last, to this task, of kind stop-requested',
+      condition: ({ input: [taskId], output, calls }) => {
+        if (output._tag !== 'Success') return true;
+        const last = calls.at(-1);
+        return (
+          calls.filter((c) => c.op === 'append').length === 1 &&
+          last !== undefined &&
+          last.op === 'append' &&
+          last.args[0] === taskId &&
+          last.args[1].kind === 'stop-requested'
+        );
+      },
+    },
+    refusedExactlyWhenTheGuardSays: {
+      description: 'The request is refused exactly when the guard, asked of the journal read, gives words',
+      condition: ({ input: [taskId], output, calls }) => {
+        const first = calls.at(0);
+        if (first === undefined || first.op !== 'read' || first.outcome._tag !== 'Success') return true;
+        const events = first.outcome.value;
+        const refused = stopRefusalOf(taskId, events.length ? fold(taskId, events) : undefined) !== undefined;
+        return refused === (output._tag === 'Failure' && output.error._tag === 'StopRefused');
+      },
     },
   },
 });

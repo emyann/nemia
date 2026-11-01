@@ -10,11 +10,12 @@
  * K17's one end-to-end check of a gate's wait is here: the metric, the stats and the timeline agree on plan's wait from the end of the
  * answer's turn. Each function's inputs are tables beside it: `src/meter/step.test.ts`, `src/timeline/*.test.ts`.
  *
- * The stand-in neither answers nor closes a task held open (`close`, `answer` are the runtime's walk, `held.test.ts`): here the
- * controllers' engine answers plan's blocked turn as the runtime does, its next attempt a turn of the same task (`answered`), and the
- * engine's own pass does nothing (`QUIET`), every task read off the stand-in. The wall is `Date`, mocked and moved by hand (a wall
- * decision keeps its now on `Date`): each time on the timeline is a number of minutes the story chose. `WF_ROOT` is set before the
- * runner is imported, which reads it as it loads; `WF_VERIFY_REST=1` judges every run a pass answers from its memo in full.
+ * Plan's blocked turn is answered on the stand-in's own `answer`, which the runtime's walks hold to the real engine's
+ * (`agent-runtime/test/engine-walks.ts`): the answer is the task's input, and the settle after it begins its turn, attempt 2 of the same
+ * task carrying `turn: 1`. The engine's own pass does nothing (`QUIET`), every task read off the stand-in. The wall is `Date`, mocked
+ * and moved by hand (a wall decision keeps its now on `Date`): each time on the timeline is a number of minutes the story chose.
+ * `WF_ROOT` is set before the runner is imported, which reads it as it loads; `WF_VERIFY_REST=1` judges every run a pass answers from
+ * its memo in full.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -88,27 +89,10 @@ const daemon = () => {
 };
 type Daemon = ReturnType<typeof daemon>;
 
-/**
- * The stage's engine as a whole-store pass asks it: a pass of its own that does nothing, no tally, and a person's answer to a task held
- * open taken as the runtime takes it — the attempt that signed kept as it ended, and the next a turn of the same task at work.
- */
+/** The stage's engine as a whole-store pass asks it: a pass of its own that does nothing, and no tally. */
 const ticking = (): Board => {
   const b = stage.board();
-  const view = b.e.view;
-  const inputs = new Map<string, Array<{ at: string; text: string }>>();
-  Object.assign(b.e, {
-    tick: () => Effect.succeed(QUIET),
-    tallied: undefined,
-    answer: (id: string, text: string) =>
-      Effect.sync(() => {
-        const at = new Date().toISOString();
-        inputs.set(id, [...(inputs.get(id) ?? []), { at, text }]);
-        const t = b.restart(id);
-        Object.assign(t.attempt!, { turn: inputs.get(id)!.length });
-        return { at, attempt: t.attempt!.n };
-      }),
-    view: (id: string) => Effect.map(view(id), (v) => (inputs.has(id) ? { ...v, state: { ...v.state, inputs: inputs.get(id) } } : v)),
-  });
+  Object.assign(b.e, { tick: () => Effect.succeed(QUIET), tallied: undefined });
   return b;
 };
 
@@ -212,14 +196,7 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       later(2);
       spawn(plan);
       later(5);
-      b.end(plan, 'input-required', {
-        closeout: BLOCKED,
-        ended: 'succeeded',
-        endedAt: new Date().toISOString(),
-        turn: 0,
-        nativeId: `native-${plan}`,
-        usage: used(0.5),
-      });
+      b.end(plan, 'input-required', { closeout: BLOCKED, usage: used(0.5) });
       await tick(2);
       assert.deepEqual(
         [readRun(id).settlesCounted, readRun(id).gatesTimed, readRun(id).runTimed],
@@ -238,8 +215,9 @@ test('A measured run, end to end: a gate answered, two tries with checks, a loop
       await stage.runWith(b.e, retryRun(id, 'plan', { mode: 'continue', message: 'the --dry-run flag' }));
       await tick();
       assert.deepEqual(steps().plan.tries, [{ taskId: plan, cause: 'continue' }], 'the answer is a turn of the session that asked');
+      spawn(plan);
       later(3);
-      sign(plan, SIGNED, { turn: 1, usage: used(0.25) });
+      sign(plan, SIGNED, { usage: used(0.25) });
       await tick(2);
       assert.deepEqual(await counted('step.gate.wait'), []);
       assert.deepEqual(spansOf(TIMELINE_SPAN, id), [], 'REFUSED: a run stopped at its gate, waiting on a person');

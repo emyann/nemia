@@ -9,12 +9,16 @@ import assert from 'node:assert/strict';
 import { Cause, Effect, Exit } from 'effect';
 import { testEngine } from '../src/testing.ts';
 import { builtEngine } from './engine.ts';
-import { APART, apartOn, failing, UNKEPT, unwalked, WALKS, walksOn, type Kept, type Side } from './engine-walks.ts';
+import { APART, apartOn, failing, UNKEPT, unwalked, WALKS, walksOn, type Kept, type Moved, type Side } from './engine-walks.ts';
 
-/** A new stand-in as a side: its verbs, and its own `settle`. */
+/**
+ * A new stand-in as a side: its verbs, and its own `settle`, which leaves a task held open whose session completed waiting on a person
+ * (`input-required`), as the engine does, since a test of the stand-in says by hand the phase it leaves a task in.
+ */
 function standIn(): Side {
   const made = testEngine();
-  return { engine: builtEngine(made.layer), settle: async (id, moved, end) => void made.settle(id, moved, end) };
+  const phaseOf = (id: string, moved: Moved) => (moved === 'succeeded' && made.tasks.get(id)?.spec.holdOpen ? 'input-required' : moved);
+  return { engine: builtEngine(made.layer), settle: async (id, moved, end) => void made.settle(id, phaseOf(id, moved), end) };
 }
 
 for (const [name, walk] of walksOn(standIn)) test(name, walk);
@@ -34,6 +38,10 @@ const LIES: { readonly [V in Kept]: (answer: Answer) => Answer } = {
   say: Effect.map((said) => ({ ...(said as object), attempt: 2 })),
   interrupt: Effect.catch(() => Effect.succeed({ at: '2026-01-01T00:00:00.000Z', attempt: 1 })),
   answerAsk: Effect.catch(() => Effect.succeed({ at: '2026-01-01T00:00:00.000Z', attempt: 1 })),
+  answer: Effect.match({
+    onFailure: () => ({ at: '2026-01-01T00:00:00.000Z', text: 'elsewhere' }),
+    onSuccess: (input) => ({ ...(input as object), text: 'elsewhere' }),
+  }),
   transcript: Effect.catch(() => Effect.succeed({ events: [], cursor: 'elsewhere' })),
   forget: Effect.map((report) => ({ ...(report as object), forgotten: !(report as { forgotten: boolean }).forgotten })),
   kept: Effect.match({ onFailure: () => ({ tasks: [] }), onSuccess: () => ({ tasks: [{ taskId: 'elsewhere' }] }) }),

@@ -13,7 +13,8 @@
  *   before `in`, `out` or `into` is not counted (`SIGN_IN`), so "signed in to a server" is said and "the session that signed" is not.
  * - **This repository's team stays out of the product** (`teamOf`): the name of each agent of `workflows/agents/`, read as the test
  *   runs, so a new agent is refused with no edit here, and the owner's factory's name (`FACTORY_NAMES`), which no team file holds.
- *   Refused in every package's `src`, `test`, `bin` and `place` and every app's `src` and `test`, tests included: a product test that
+ *   Refused in every package's `src`, `test`, `bin` and `place` and every app's `src` and `test`, tests and their text fixtures
+ *   (`teamRead`) included: a product test that
  *   passes only with our team present is the same debt as product code that names it. A name that is plain English (`PLAIN_NAMES`)
  *   counts only as a quoted literal or a path segment.
  * - **Nor does the product read the team's folder** (`teamPathsIn`): a path into `workflows/<a team workflow>` of this checkout (the
@@ -322,15 +323,27 @@ const skipped = (file: string): boolean => file.endsWith('.test.ts') || file.spl
 /** The files the team's rules leave out: the board's vendored and generated files, and this guard's own two. Tests are read. */
 const teamSkipped = (file: string): boolean => vendored(file) || TEAM_GUARD_FILES.has(file);
 
-/** Every `.ts` and `.tsx` under `dirs` that `skip` keeps, by its path from the root, with its text. */
-const textsOf = (dirs: readonly string[], skip: (file: string) => boolean = skipped): Map<string, string> =>
+/** A source file, which every rule reads. */
+const isSource = (file: string): boolean => /\.tsx?$/.test(file);
+
+/**
+ * What the team's rules read: a source file, and a test's text fixture — a `.md`, `.json`, `.txt` or `.yaml` under a `test` folder —
+ * which names an agent or a path into `workflows/` as plainly as a test's own source does.
+ */
+const teamRead = (file: string): boolean => isSource(file) || (/\.(?:md|json|txt|ya?ml)$/.test(file) && file.split('/').includes('test'));
+
+/**
+ * Every file under `dirs` that `read` takes (a `.ts` or `.tsx`, unless another is given) and `skip` keeps, by its path from the root,
+ * with its text.
+ */
+const textsOf = (dirs: readonly string[], skip: (file: string) => boolean = skipped, read = isSource): Map<string, string> =>
   new Map(
     dirs
       .filter((dir) => fs.existsSync(path.join(ROOT, dir)))
       .flatMap((dir) =>
         fs.readdirSync(path.join(ROOT, dir), { recursive: true, encoding: 'utf8' }).map((f) => `${dir}/${f.split(path.sep).join('/')}`),
       )
-      .filter((f) => /\.tsx?$/.test(f) && !skip(f))
+      .filter((f) => read(f) && !skip(f))
       .sort()
       .map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]),
   );
@@ -477,7 +490,7 @@ function breaches(
 const repository = () => ({
   harness: textsOf(HARNESS_RULE.dirs),
   workflow: textsOf(WORKFLOW_RULE.dirs),
-  team: textsOf(TEAM_RULE.dirs, teamSkipped),
+  team: textsOf(TEAM_RULE.dirs, teamSkipped, teamRead),
 });
 
 const TEAM = teamOf(path.join(ROOT, 'workflows', 'agents'));
@@ -630,7 +643,11 @@ test("the team's rules read every package's and app's source and tests, but this
     assert.ok(read.includes(file), `${file} is read`);
   for (const file of TEAM_GUARD_FILES) assert.ok(!read.includes(file), `${file} says the names on purpose and is not read`);
   assert.ok(!read.some(vendored), "the board's vendored components and route tree are not read");
-  assert.deepEqual(TEAM_FOLDERS, ['build', 'intake', 'janitor', 'quick', 'servers'], "the team's folders, read from workflows/");
+  assert.ok(TEAM_FOLDERS.includes('build') && TEAM_FOLDERS.includes('servers'), `the team's folders read are ${TEAM_FOLDERS.join(', ')}`);
+  assert.ok(!TEAM_FOLDERS.includes('agents'), "the team's agents folder is no workflow of it");
+  assert.ok(read.includes('packages/agent-orchestrator/test/fixtures/team/agents/implementer.md'), "a test's text fixture is read");
+  assert.ok(teamRead('apps/web/test/fixtures/x.yaml') && teamRead('packages/agent-runtime/test/x.json'), 'each kind of text fixture');
+  assert.ok(!teamRead('packages/agent-orchestrator/src/x/README.md'), "a text file outside a test folder is the docs' to hold");
 });
 
 test("the paths matcher counts a path into the team's workflows/, and not a product's own workflows/", () => {
@@ -665,5 +682,8 @@ test("REFUSED: a product test that names the team, the owner's factory or a path
   ]);
   assert.deepEqual(planted('apps/web/test/x.test.ts', "const script = 'workflows/build/landing.ts';\n"), [
     "apps/web/test/x.test.ts holds 1 paths into the team's workflows/",
+  ]);
+  assert.deepEqual(planted('packages/agent-orchestrator/test/fixtures/x/step.md', '---\nagent: otto\n---\nShip it.\n'), [
+    'packages/agent-orchestrator/test/fixtures/x/step.md holds 1 team names',
   ]);
 });

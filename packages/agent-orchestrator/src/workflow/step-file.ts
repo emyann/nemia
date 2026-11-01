@@ -493,7 +493,7 @@ export function renderStep(step: StepDraft): string {
     return value === undefined ? [] : [[key, value]];
   });
   const body = String((provenance ? provenance.body : step.body) ?? '').trim();
-  if (pairs.length) return `---\n${renderFrontmatter(fencedPairs(pairs))}---\n${body}\n`;
+  if (pairs.length) return `---\n${renderFrontmatter(fencedPairs(pairs, step.harness == null ? undefined : String(step.harness).trim()))}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : `${body}\n`;
 }
 

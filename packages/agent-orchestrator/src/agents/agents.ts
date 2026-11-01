@@ -462,7 +462,7 @@ export function renderAgent(draft: AgentDraft): string {
   const values: Array<[string, string | null | undefined]> = AGENT_KEYS.map((key) => [key, isOwnKey(key) ? own[key] : keys[key]]);
   const pairs = values.flatMap(([key, value]): FrontmatterPair[] => (value == null ? [] : [[key, String(value).trim()]]));
   const body = String(draft.body ?? '').trim();
-  if (pairs.length) return `---\n${renderFrontmatter(fencedPairs(pairs))}---\n${body}\n`;
+  if (pairs.length) return `---\n${renderFrontmatter(fencedPairs(pairs, keys.harness?.trim() || undefined))}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : body ? `${body}\n` : '';
 }
 

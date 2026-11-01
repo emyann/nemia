@@ -232,15 +232,19 @@ export function fenceBlockRefusal(file: string, block: FenceBlock | undefined, h
 /**
  * Pairs a writer hands `renderFrontmatter`, with each fence key (`FORMER_FENCE_KEYS`) moved under the block of the harness whose fence
  * takes it (`fenceKeysOf`) — `permissionMode` and the tool lists under `claude:`, `sandbox` under `codex:` — written where the first of
- * them was: `[harness, { fence: { … } }]`. Each value is as the pair had it. What `renderStep` and `renderAgent` write, so nothing writes a
- * fence key at the top level; the parser refuses a block for a harness the file does not run on (`fenceBlockRefusal`).
+ * them was: `[harness, { fence: { … } }]`. Each value is as the pair had it. What `renderStep` and `renderAgent` write. Where the file says
+ * the harness it runs on (`runsOn`), a key of another harness's fence is left at the top level, so the parser refuses it in the words of
+ * the key's reader, which name the draft's own line, rather than a block the person never wrote.
  */
-export function fencedPairs(pairs: ReadonlyArray<readonly [string, FrontmatterValue]>): Array<readonly [string, FrontmatterValue]> {
+export function fencedPairs(
+  pairs: ReadonlyArray<readonly [string, FrontmatterValue]>,
+  runsOn?: string,
+): Array<readonly [string, FrontmatterValue]> {
   const blocks = new Map<string, Record<string, FrontmatterValue>>();
   const out: Array<readonly [string, FrontmatterValue]> = [];
   for (const [key, value] of pairs) {
     const harness = FORMER_FENCE_KEYS.includes(key) ? harnessTaking(key) : undefined;
-    if (harness === undefined) {
+    if (harness === undefined || (runsOn !== undefined && fenceKeysOf(runsOn) !== undefined && harness !== runsOn)) {
       out.push([key, value]);
       continue;
     }

@@ -657,7 +657,10 @@ export type RunStore = {
      * as `list` says it.
      */
     readonly find: (id: string, said?: (line: string) => void) => Run | undefined;
-    /** Make a new run's record: `nemia start`'s, the one writer that makes one. */
+    /**
+     * Make a new run's record: `nemia start`'s, the one writer that makes one. A run from a card (`from.inbox`) is refused while another
+     * run from it stands.
+     */
     readonly create: (run: Run) => void;
     /**
      * Write back the record a pass read, without the person's files composed onto it, and only while it is there: false when it is not,

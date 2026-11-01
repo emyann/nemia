@@ -5,7 +5,7 @@
  * compares; an ask of each kind written once at its name, read, consumed and answered from; a hold, a refresh ask and a prune marker put
  * and taken back; a cancellation kept as first written; a run forgotten; the markers of what `nemia rm` forgets. And the write check:
  * a new run or one written back that breaks an invariant of the model's `Run` is refused `Invalid` and nothing is written, and a new run
- * at an id already made is refused `Conflict`, the first left as it was.
+ * at an id already made is refused `Conflict`, the first left as it was, as is a second run from one card while the first stands.
  *
  * Each row's ids are its own: the files side is one store for the whole file.
  */
@@ -60,6 +60,9 @@ const misnamed = (id: string): Run => {
     steps: { ...run.steps, implement: { ...run.steps.implement, taskId: 't-1', tries: [{ taskId: `${id}-implement`, cause: 'fresh' }] } },
   };
 };
+
+/** A run under `id` started out of the inbox's card `card`. */
+const fromCard = (id: string, card: string): Run => ({ ...aRun(id), from: { inbox: card } });
 
 /** A run that waits on itself. */
 const selfWaiting = (id: string): Run => ({ ...aRun(id), after: [id] });
@@ -147,6 +150,24 @@ const CREATE: Walk[] = [
       return [again, briefOf(door, 'w-twice')];
     },
     says: [{ refused: 'Conflict' }, 'add a flag'],
+  },
+  {
+    name: 'REFUSED: a second run from one card is a Conflict, the first kept, nothing left under the second id',
+    walk: ({ door }) => {
+      act(door.runs.create(fromCard('w-card-first', 'w-card-twice')));
+      const again = act(door.runs.create(fromCard('w-card-second', 'w-card-twice')));
+      return [again, briefOf(door, 'w-card-first'), act(door.runs.taken(idOf('w-card-second')))];
+    },
+    says: [{ refused: 'Conflict' }, 'add a flag', false],
+  },
+  {
+    name: 'a card whose run was forgotten starts again',
+    walk: ({ door }) => {
+      act(door.runs.create(fromCard('w-card-gone', 'w-card-again')));
+      act(door.runs.forget(idOf('w-card-gone')));
+      return [act(door.runs.create(fromCard('w-card-anew', 'w-card-again'))), briefOf(door, 'w-card-anew')];
+    },
+    says: [undefined, 'add a flag'],
   },
 ];
 

@@ -460,6 +460,62 @@ function findRun(id: string, said: (line: string) => void = sayOnce): Run | unde
   return runIds().includes(id) ? runListed(id, said, readPause()) : undefined;
 }
 
+/** Where the claims of the cards started are, `<card>.json` each: beside `runs/`, so that no listing of runs reads one. */
+const startedDir = (): string => path.join(path.dirname(runsDir()), 'started');
+
+/** The run the claim at `file` names, or undefined: none there, or one that does not read as a claim. */
+function claimedAt(file: string): string | undefined {
+  try {
+    const claim: unknown = JSON.parse(fs.readFileSync(file, 'utf8'));
+    return isClaim(claim) ? claim.run : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const isClaim = Schema.is(Schema.Struct({ run: Schema.String }));
+
+/**
+ * Claim the card `card` for the run `id`: `started/<card>.json`, created exclusively (`wx`), so that of two processes starting one card
+ * one run holds it. The run's record is written before its claim, so a claim whose run has no record, or a record from another card, is
+ * stale — a run forgotten, a crash between the writes — and is taken over: renamed aside, which only one taker can do; put back if what
+ * was renamed is not what was judged stale, since another taker came between; else made again, once. Answers whom the card is the run
+ * of when it is not `id`.
+ */
+export function claimCard(card: string, id: string): { taken: true } | { by: string } {
+  const file = path.join(startedDir(), `${card}.json`);
+  const create = (): boolean => {
+    try {
+      fs.writeFileSync(file, JSON.stringify({ run: id }, null, 2), { flag: 'wx' });
+      return true;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === 'EEXIST') return false;
+      throw err;
+    }
+  };
+  fs.mkdirSync(startedDir(), { recursive: true });
+  if (create()) return { taken: true };
+  const by = claimedAt(file);
+  if (by !== undefined && by !== id && findRun(by)?.from?.inbox === card) return { by };
+  const tomb = path.join(startedDir(), `.${card}.${process.pid}.${Math.random().toString(36).slice(2)}`);
+  try {
+    fs.renameSync(file, tomb);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err;
+  }
+  const renamed = fs.existsSync(tomb) ? claimedAt(tomb) : by;
+  if (renamed !== by) {
+    try {
+      fs.linkSync(tomb, file);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    }
+    fs.rmSync(tomb, { force: true });
+    return { by: renamed ?? 'another run' };
+  }
+  fs.rmSync(tomb, { force: true });
+  return create() ? { taken: true } : { by: claimedAt(file) ?? 'another run' };
+}
+
 /**
  * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's pause composed onto each run read
  * (`paused`); the markers of the runs `nemia rm` forgets, under `forgetting/`; the inbox's cards and the tick's tries.

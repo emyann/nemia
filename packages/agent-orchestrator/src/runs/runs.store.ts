@@ -9,12 +9,13 @@
  * `runDoorOver`, so each write is checked the one way on both: a new run decodes through the model's `Run` (`record/record.model.ts`)
  * with its id as `RunId.OnCreate` checks it, and a run written back through `Run`, its invariants among it — each try named by its
  * step and number, no run waiting on itself, a landing with one outcome — or `Invalid` names the check broken and nothing is written.
- * A record already at a new run's id is `Conflict`. The walks of `test/run-walks.ts` hold both layers to one table.
+ * A record already at a new run's id is `Conflict`, and so is a run from a card another run from it stands for (`cardStartedTwice`;
+ * the files hold it across processes by the card's claim, `claimCard`). The walks of `test/run-walks.ts` hold both layers to one table.
  */
 import { Context, Effect, Layer } from 'effect';
 import { doorOf, checked, type DoorOf } from '../door/door.store.ts';
 import { Conflict } from '../refusal/refusal.ts';
-import { filesStore } from '../record/files.store.ts';
+import { claimCard, filesStore } from '../record/files.store.ts';
 import { Run as RunModel, RunId } from '../record/record.model.ts';
 import type { Run, RunStore } from '../record/record.ts';
 
@@ -56,6 +57,12 @@ export function runDoorOver(layer: RunsLayer): RunDoorShape {
 export const runTaken = (id: string): Conflict =>
   new Conflict({ message: `run ${id} already exists: start it under a new id, or forget the one there with nemia rm ${id}` });
 
+/** A run from a card another run from it stands for, as a refusal: one run per card, the files holding it by the card's claim. */
+export const cardStartedTwice = (card: string, run: string): Conflict =>
+  new Conflict({
+    message: `card ${card} was started already as run ${run}: read it with nemia show ${run}, or forget it with nemia rm ${run} and start the card again`,
+  });
+
 /** The run store's files but the inbox, a new run's record refused as `runTaken` when one is there: what the files layer is over. */
 const { inbox: _, ...files } = filesStore;
 const filesRuns: RunsLayer = {
@@ -67,6 +74,13 @@ const filesRuns: RunsLayer = {
         files.runs.create(run);
       } catch (err) {
         throw (err as NodeJS.ErrnoException).code === 'EEXIST' ? runTaken(run.id) : err;
+      }
+      const card = run.from?.inbox;
+      if (card === undefined) return;
+      const claim = claimCard(card, run.id);
+      if ('by' in claim) {
+        files.runs.forget(run.id);
+        throw cardStartedTwice(card, claim.by);
       }
     },
   },

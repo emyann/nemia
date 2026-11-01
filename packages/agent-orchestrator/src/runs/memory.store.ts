@@ -15,7 +15,7 @@ import { spentRoundAsks } from '../round/round.ts';
 import { spentAsks, type RetryAsk } from '../retry/index.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import type { AskKey, AskOf, Hold, PersonRequest, Pruned, Run } from '../record/record.ts';
-import { RunDoor, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
+import { RunDoor, cardStartedTwice, runDoorOver, runTaken, type RunsLayer } from './runs.store.ts';
 
 /** Where the stand-in says a run's files are: the root its paths are named under, as the files' are under `WF_ROOT`. */
 export const MEMORY_ROOT = '/memory';
@@ -111,6 +111,9 @@ function runsOf(st: State): RunsLayer['runs'] {
     find: (id) => (st.records.has(id) ? read(id) : undefined),
     create: (run) => {
       if (st.records.has(run.id)) throw runTaken(run.id);
+      const card = run.from?.inbox;
+      const other = card === undefined ? undefined : [...st.records.values()].find((r) => r.from?.inbox === card);
+      if (card !== undefined && other) throw cardStartedTwice(card, other.id);
       st.records.set(run.id, recordOf(run));
       touch(st, run.id);
     },

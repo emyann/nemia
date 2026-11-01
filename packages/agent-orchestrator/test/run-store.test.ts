@@ -594,3 +594,56 @@ test('REFUSED: a converted file that uses the run store again, and a count the b
   assert.equal(debtBreaks(again, RUN_DOOR_DEBT).length, 1);
   assert.equal(debtBreaks(sources, { ...RUN_DOOR_DEBT, 'src/try/try.verb.ts': 2 }).length, 1);
 });
+
+/** A run under `id` started out of the inbox's card `card`. */
+const fromCard = (id: string, card: string): Run => ({ ...aRun(id), from: { inbox: card } });
+
+/** Where the claim of the card `card` is: `<root>/started/<card>.json`. */
+const claimOf = (card: string): string => path.join(ROOT, 'started', `${card}.json`);
+
+/** A claim of the card `card` planted for the run `run`, as a crash or a forgotten run leaves one. */
+const plantClaim = (card: string, run: string): void => {
+  fs.mkdirSync(path.dirname(claimOf(card)), { recursive: true });
+  fs.writeFileSync(claimOf(card), JSON.stringify({ run }));
+};
+
+test('a claim naming a run with no record is stale: it is taken over, and the claim names the new run', () => {
+  plantClaim('c-stale', 'c-stale-gone');
+  const made = act(door.runs.create(fromCard('c-stale-new', 'c-stale')));
+  assert.equal(made, undefined);
+  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-stale'), 'utf8')), { run: 'c-stale-new' });
+  assert.deepEqual(
+    fs.readdirSync(path.join(ROOT, 'started')).filter((n) => n.includes('c-stale')),
+    ['c-stale.json'],
+  );
+});
+
+test('a claim naming a record from another card is stale, and taken over', () => {
+  act(door.runs.create(fromCard('c-other-run', 'c-other-card')));
+  plantClaim('c-mine', 'c-other-run');
+  assert.equal(act(door.runs.create(fromCard('c-mine-run', 'c-mine'))), undefined);
+  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-mine'), 'utf8')), { run: 'c-mine-run' });
+});
+
+test('a claim lives at <root>/started/<card>.json, and no listing of runs, taken id or stamp reads it', () => {
+  act(door.runs.create(fromCard('c-unread-run', 'c-unread')));
+  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-unread'), 'utf8')), { run: 'c-unread-run' });
+  const listed = filesStore.runs.list(() => {}).map((r) => r.id);
+  assert.deepEqual(
+    {
+      listed: listed.includes('c-unread'),
+      ids: filesStore.runs.ids().includes('c-unread'),
+      stamped: filesStore.runs.stamps().has('c-unread'),
+      taken: filesStore.runs.taken('c-unread'),
+    },
+    { listed: false, ids: false, stamped: false, taken: false },
+  );
+});
+
+test('REFUSED: the loser of a card leaves no record and no folder under its id, and the claim names the first run', () => {
+  act(door.runs.create(fromCard('c-won', 'c-twice')));
+  assert.deepEqual(act(door.runs.create(fromCard('c-lost', 'c-twice'))), { refused: 'Conflict' });
+  assert.equal(fs.existsSync(path.join(runsDir(), 'c-lost.json')), false);
+  assert.equal(fs.existsSync(path.join(runsDir(), 'c-lost')), false);
+  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-twice'), 'utf8')), { run: 'c-won' });
+});

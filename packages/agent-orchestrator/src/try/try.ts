@@ -9,6 +9,7 @@
 import path from 'node:path';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { renderFrontmatter } from '../frontmatter/frontmatter.ts';
+import { fencedPairs } from '../former/former.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { directoryFence } from '../workflow/index.ts';
 
@@ -55,13 +56,15 @@ export const tryText = (name: string, version: string, fence: TryFence): string 
   [
     '---',
     `${VERSION_LINE}${version}`,
-    renderFrontmatter([
-      ['place', 'folder'],
-      ['agent', name],
-      ['budget', String(TRY_BUDGET)],
-      ['permissionMode', fence.permissionMode],
-      ...(fence.allowedTools.length ? [['allowedTools', fence.allowedTools.join(', ')] as const] : []),
-    ]).replace(/\n$/, ''),
+    renderFrontmatter(
+      fencedPairs([
+        ['place', 'folder'],
+        ['agent', name],
+        ['budget', String(TRY_BUDGET)],
+        ['permissionMode', fence.permissionMode],
+        ...(fence.allowedTools.length ? [['allowedTools', fence.allowedTools.join(', ')] as const] : []),
+      ]),
+    ).replace(/\n$/, ''),
     '---',
     'A rehearsal of the brief: work in this folder, and write what you make here.',
     '',

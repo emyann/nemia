@@ -225,7 +225,7 @@ export default {
       ]);
       if (created.status() !== 201) throw new Refused(`the api makes the agent — it answered ${created.status()}: ${await created.text()}`);
       await page.waitForURL((url) => url.pathname === agentPath('yours', made.name), { timeout: WAIT_MS });
-      const written = `---\ndescription: ${made.description}\nskills: ${made.skills}\nmcp: fixture\nmodel: ${made.model}\ntools: ${made.tools}\n---\n${made.body}\n`;
+      const written = `---\ndescription: ${made.description}\nskills: ${made.skills}\nmcp: fixture\nmodel: ${made.model}\nclaude:\n  fence:\n    tools: ${made.tools}\n---\n${made.body}\n`;
       if (!fs.existsSync(madeFile) || fs.readFileSync(madeFile, 'utf8') !== written)
         throw new Refused(
           `agents/${made.name}.md is written as the package writes an agent — it holds ${fs.existsSync(madeFile) ? JSON.stringify(fs.readFileSync(madeFile, 'utf8')) : 'nothing'}`,

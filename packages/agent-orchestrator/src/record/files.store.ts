@@ -128,9 +128,9 @@ function readMergeAsks(id: string): { rounds: RoundAsk[]; notes: string[] } {
   const rounds: RoundAsk[] = [];
   const notes: string[] = [];
   for (const name of fileNames(asksDir(id)) ?? []) {
-    const named = /^merge-(.+)-(\d+)$/.exec(name);
+    const [, target, n] = /^merge-(.+)-(\d+)$/.exec(name) ?? [];
     const file = path.join(asksDir(id), name);
-    const ask = named ? mergeAskIn(file, named[1], Number(named[2])) : undefined;
+    const ask = target !== undefined && n !== undefined ? mergeAskIn(file, target, Number(n)) : undefined;
     if (typeof ask === 'string') notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia refresh --base`);
     else if (ask) rounds.push(ask);
   }
@@ -139,7 +139,7 @@ function readMergeAsks(id: string): { rounds: RoundAsk[]; notes: string[] } {
 
 /** Move each merge ask among `rounds` the run's record already answers (`mergeSpent`) into `done/`: the tick's one touch on it. */
 function consumeMergeAsks(run: Run, rounds: readonly RoundAsk[]): void {
-  const spent = rounds.filter((a) => a.merge && mergeSpent(run, a)).map((a) => mergeAskFile(run.id, a.merge!.target, a.merge!.try));
+  const spent = rounds.flatMap((a) => (a.merge && mergeSpent(run, a) ? [mergeAskFile(run.id, a.merge.target, a.merge.try)] : []));
   doneWith(run.id, spent);
 }
 

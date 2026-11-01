@@ -24,7 +24,7 @@ export const gated = (run: Run): boolean => Boolean(run.after?.length) && !run.c
  * while the hold stands (`Run.hold`), in that order, a run named twice named twice. Pure.
  */
 export const waitedOn = (run: Run): string[] => [
-  ...(gated(run) ? run.after! : []),
+  ...(gated(run) && run.after ? run.after : []),
   ...(run.hold && !run.cancelledAt ? run.hold.until : []),
 ];
 
@@ -32,8 +32,8 @@ export const waitedOn = (run: Run): string[] => [
  * The runs in `after` that have not landed, in the order they were given. Pure; none, and `landed` never called, for a run not `gated`.
  */
 export function waitingOn(run: Run, landed: (runId: string) => boolean): string[] {
-  if (!gated(run)) return [];
-  return run.after!.filter((id) => !landed(id));
+  if (!gated(run) || !run.after) return [];
+  return run.after.filter((id) => !landed(id));
 }
 
 /**
@@ -81,6 +81,17 @@ const neverLands = (w: Wait): boolean => Boolean(w.missing || w.cancelledAt || w
 export const waitWord = (waits: readonly Wait[]): string => `waiting on ${waits.map(waitName).join(', ')}`;
 
 /**
+ * Why a run this one waits on never lands (`neverLands`), in words: the store has no such run, it was cancelled, or its result branches
+ * are gone from `branch`.
+ */
+function neverWhy(w: Wait, branch: string | undefined): string {
+  if (w.missing) return `the store has no run ${w.run}`;
+  if (w.cancelledAt) return `${w.run} was cancelled at ${w.cancelledAt}, and a cancelled run never lands`;
+  const gone = w.gone ?? [];
+  return `${gone.join(', ')} ${gone.length > 1 ? 'are gone, and git cannot find them' : 'is gone, and git cannot find it'} on ${branch}`;
+}
+
+/**
  * What a run waiting on runs leaves a person to do, in one line, for `nemia decide` and for `nemia ls`'s `→ waiting on you`. Pure. Nothing,
  * while each parent may still land: the tick files the roots when it does. For a parent that never will without a person — no such run, a
  * cancelled one, a result branch gone — why, and the two ways out: cancel this run, or start the work again without that edge.
@@ -90,13 +101,7 @@ export function waitAdvice(run: Run, waits: readonly Wait[]): string {
   if (!never.length) {
     return `nothing of ${run.id} is filed until nemia decide says ${waits.map((w) => w.run).join(' and ')} ${waits.length > 1 ? 'have' : 'has'} landed on ${run.branch}; nothing to decide yet`;
   }
-  const why = never.map((w) =>
-    w.missing
-      ? `the store has no run ${w.run}`
-      : w.cancelledAt
-        ? `${w.run} was cancelled at ${w.cancelledAt}, and a cancelled run never lands`
-        : `${w.gone!.join(', ')} ${w.gone!.length > 1 ? 'are gone, and git cannot find them' : 'is gone, and git cannot find it'} on ${run.branch}`,
-  );
+  const why = never.map((w) => neverWhy(w, run.branch));
   return `${why.join('; ')} — yours to resolve: nemia cancel ${run.id}, or start the work again without ${never.map((w) => `--after ${w.run}`).join(' ')}`;
 }
 
@@ -159,14 +164,39 @@ export function holdAdvice(run: Run, waits: readonly Wait[]): string {
     const ids = waits.map((w) => w.run);
     return `nothing of ${run.id} is filed, and nothing is asked of you, until nemia decide says ${runList(ids)} ${ids.length > 1 ? 'have' : 'has'} landed; to go on before then: ${off}`;
   }
-  const why = never.map((w) =>
-    w.missing
-      ? `the store has no run ${w.run}`
-      : w.cancelledAt
-        ? `${w.run} was cancelled at ${w.cancelledAt}, and a cancelled run never lands`
-        : `${w.gone!.join(', ')} ${w.gone!.length > 1 ? 'are gone, and git cannot find them' : 'is gone, and git cannot find it'} on ${run.branch}`,
-  );
+  const why = never.map((w) => neverWhy(w, run.branch));
   return `${why.join('; ')} — yours to resolve: ${off}, or nemia cancel ${run.id}`;
+}
+
+/**
+ * The runs `r` waits on, each beside the edge that says how: its `after` while the gate applies (`gated`), then the runs it is held
+ * until.
+ */
+const waitsOn = (r: Run): Array<[string, string]> => [
+  ...(gated(r) && r.after ? r.after.map((a) => [a, `${r.id} --after ${a}`] as [string, string]) : []),
+  ...(r.hold?.until ?? []).map((h) => [h, `${r.id} held until ${h}`] as [string, string]),
+];
+
+/**
+ * The edges from run `u` to run `id` along what each run of `byId` waits on (`waitsOn`), the first found breadth first, or undefined
+ * where `u` waits on `id` by no route.
+ */
+function routeTo(u: string, id: string, byId: ReadonlyMap<string, Run>): string[] | undefined {
+  const how = new Map<string, string[]>([[u, []]]);
+  const queue = [u];
+  for (let at = queue.shift(); at !== undefined; at = queue.shift()) {
+    const r = at === id ? undefined : byId.get(at);
+    const before = how.get(at);
+    if (before === undefined) continue;
+    for (const [next, edge] of r ? waitsOn(r) : []) {
+      if (how.has(next)) continue;
+      const route = [...before, edge];
+      if (next === id) return route;
+      how.set(next, route);
+      queue.push(next);
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -232,25 +262,10 @@ export function holdRefusal(
     if (landed) return `--until ${u}: ${u} has already landed on ${record.branch}, so there is nothing to wait for: ${drop}.`;
   }
   const byId = new Map(others.map((r) => [r.id, r]));
-  const waitsOn = (r: Run): Array<[string, string]> => [
-    ...(gated(r) ? r.after!.map((a) => [a, `${r.id} --after ${a}`] as [string, string]) : []),
-    ...(r.hold?.until ?? []).map((h) => [h, `${r.id} held until ${h}`] as [string, string]),
-  ];
   for (const u of until) {
-    const how = new Map<string, string[]>([[u, []]]);
-    const queue = [u];
-    while (queue.length) {
-      const at = queue.shift()!;
-      const r = at === id ? undefined : byId.get(at);
-      for (const [next, edge] of r ? waitsOn(r) : []) {
-        if (how.has(next)) continue;
-        const route = [...how.get(at)!, edge];
-        if (next === id)
-          return `--until ${u}: ${u} already waits on ${id} to land (${route.join(', ')}), so each would wait on the other for ever. Hold it without --until ${u}.`;
-        how.set(next, route);
-        queue.push(next);
-      }
-    }
+    const route = routeTo(u, id, byId);
+    if (route)
+      return `--until ${u}: ${u} already waits on ${id} to land (${route.join(', ')}), so each would wait on the other for ever. Hold it without --until ${u}.`;
   }
   return null;
 }

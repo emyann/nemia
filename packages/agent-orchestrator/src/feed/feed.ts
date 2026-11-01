@@ -589,13 +589,13 @@ export type FeedAppended = { lines: FeedLine[]; before: number; after: number; l
  * where in that range this append's lines landed is not known, so nothing is vouched for and a reader reads the file. Pure.
  */
 export function publishedOf({ lines, before, after, leading }: FeedAppended): FeedPublished[] {
-  const sizes = lines.map((l) => Buffer.byteLength(`${JSON.stringify(l)}\n`));
-  const written = Buffer.byteLength(leading) + sizes.reduce((a, b) => a + b, 0);
+  const sized = lines.map((line) => ({ line, size: Buffer.byteLength(`${JSON.stringify(line)}\n`) }));
+  const written = Buffer.byteLength(leading) + sized.reduce((a, b) => a + b.size, 0);
   if (after !== before + written) return [];
   let at = before + Buffer.byteLength(leading);
-  return lines.map((line, i) => {
+  return sized.map(({ line, size }) => {
     const from = at;
-    at += sizes[i];
+    at += size;
     return { from, to: at, line };
   });
 }

@@ -238,8 +238,9 @@ export function loopSpan(steps: readonly Workflow[], looping: Workflow): string[
  */
 function validateLoops(steps: readonly Workflow[]): void {
   const spans = new Map<string, Workflow>();
-  for (const s of steps.filter((x) => x.loop)) {
-    const target = s.loop!;
+  for (const s of steps) {
+    const target = s.loop;
+    if (!target) continue;
     const named = `${s.name}: \`loop: ${target}\``;
     if (target === s.name) {
       throw new WorkflowError(
@@ -274,7 +275,8 @@ function validateLoops(steps: readonly Workflow[]): void {
       }
       spans.set(name, s);
       if (name === target) continue;
-      const step = steps.find((x) => x.name === name)!;
+      const step = steps.find((x) => x.name === name);
+      if (step === undefined) continue;
       if (step.resume) {
         throw new WorkflowError(
           `${name}: \`resume: ${step.resume}\`, and ${name} is in ${s.name}'s loop (\`loop: ${target}\`), which files it as a new session each round — so it cannot continue another. Delete the line: only the loop's first step, ${target}, is continued, and the run does that itself.`,

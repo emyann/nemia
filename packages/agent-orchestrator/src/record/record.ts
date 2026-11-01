@@ -388,7 +388,7 @@ export const taskTryOf = (run: Run, step: string): number => {
 export const turnTryOf = (run: Run, step: string): number => {
   const tries = run.steps[step]?.tries ?? [];
   let at = tries.length + 1;
-  while (at > 1 && tries[at - 2].cause === 'recheck') at--;
+  while (at > 1 && tries[at - 2]?.cause === 'recheck') at--;
   return at;
 };
 

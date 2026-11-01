@@ -26,6 +26,7 @@
 import { SLOT_WAIT } from '../cap/cap.ts';
 import { PAUSE_WAIT } from '../list/list.ts';
 import { PERSON_WAITS, type AnswerVia, type WaitOn } from '../phase/phase.ts';
+import { firstPiece } from '../piece/piece.ts';
 
 /**
  * The kinds of thing the feed writes a line about: a run, one of its steps, a daemon that took the store, or the store itself — its
@@ -264,7 +265,7 @@ export function codesOf(said: Said, kind: InvolvedKind): Codes {
   if (kind === 'Store') return { reason: STORE_WORDS.find((rule) => matches(rule, word))?.reason ?? 'Unknown' };
   if (word.startsWith(DENIED)) return { reason: 'ToolDenied' };
   if (word.endsWith(BLOCKED_END)) return { reason: 'AwaitingAnswer', via: 'closeout' };
-  const said0 = word.split(PART)[0];
+  const said0 = firstPiece(word, PART);
   const base = kind === 'Run' && said0.endsWith(PRUNED) ? said0.slice(0, -PRUNED.length) : said0;
   if (kind === 'Run' && base === 'running' && isHeld(said.note)) return { reason: 'Waiting', on: 'run' };
   const found = (kind === 'Run' ? RUN_WORDS : STEP_WORDS).find((rule) => matches(rule, base));

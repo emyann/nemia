@@ -13,6 +13,7 @@
  * refused, naming its line and the fix.
  */
 import { Document, isMap, isScalar, isSeq, LineCounter, parseDocument, Scalar, YAMLSeq, type Node, type Pair } from 'yaml';
+import { firstPiece } from '../piece/piece.ts';
 import { LIST_KEYS, refuse, STEP_KEYS } from '../step/step.ts';
 
 /** A value a frontmatter key holds: text, a list, or a map, each scalar the string written. */
@@ -97,10 +98,10 @@ export function readFrontmatter(name: string, block: string): Frontmatter {
     );
   }
   const shaped = formerShaped(block);
-  if (doc.errors.length) {
+  const [error] = doc.errors;
+  if (error !== undefined) {
     if (shaped) return { entries: formerEntries(block), former: true };
-    const [error] = doc.errors;
-    refuse(`${name}:${lineAt(error.pos[0])}: ${error.message.split('\n')[0]}. ${YAML_FIX}.`);
+    refuse(`${name}:${lineAt(error.pos[0])}: ${firstPiece(error.message, '\n')}. ${YAML_FIX}.`);
   }
   const root = doc.contents;
   if (root === null || (isScalar(root) && (root.value === null || root.value === ''))) return { entries: [], former: false };
@@ -192,8 +193,14 @@ function pairText(key: string, value: FrontmatterValue, type?: Scalar.Type): str
 
 /** Whether `text` reads back as `key` holding `value`, and nothing else. */
 function readsBack(text: string, key: string, value: FrontmatterValue): boolean {
-  const read = frontmatterOrNull(text);
-  return read !== null && !read.former && read.entries.length === 1 && read.entries[0].key === key && same(read.entries[0].value, value);
+  const only = onlyEntry(frontmatterOrNull(text));
+  return only !== undefined && only.key === key && same(only.value, value);
+}
+
+/** The one entry of a block read as YAML, or undefined for a block that did not read, read in the former form, or holds more or fewer. */
+function onlyEntry(read: Frontmatter | null): FrontmatterEntry | undefined {
+  if (read === null || read.former || read.entries.length !== 1) return undefined;
+  return read.entries[0];
 }
 
 /** Whether two values are the same, item by item. */
@@ -245,9 +252,10 @@ export function withKey(name: string, block: string, key: string, value: Frontma
     return map.items.length ? doc.toString({ lineWidth: 0, minContentWidth: 0 }) : commentsOf(block);
   }
   const node = parsed(writtenPair(key, value)).contents;
-  const written = isMap(node) ? node.items[0].value : null;
+  const first = isMap(node) ? node.items[0] : undefined;
+  const written = first === undefined ? null : first.value;
   if (at.length) for (const pair of at) pair.value = written;
-  else map.items.push(isMap(node) ? node.items[0] : (null as never));
+  else map.items.push(first ?? (null as never));
   return doc.toString({ lineWidth: 0, minContentWidth: 0 });
 }
 
@@ -261,8 +269,8 @@ const commentsOf = (block: string): string =>
 
 /** Whether one former line `key: value` reads, as YAML on its own, as the former reader read it. */
 const lineReadsSame = (line: string, key: string, value: string): boolean => {
-  const read = frontmatterOrNull(line);
-  return read !== null && !read.former && read.entries.length === 1 && read.entries[0].key === key && read.entries[0].value === value;
+  const only = onlyEntry(frontmatterOrNull(line));
+  return only !== undefined && only.key === key && only.value === value;
 };
 
 /**

@@ -98,7 +98,7 @@ function byteAt(file: string, at: number): number {
   try {
     const one = Buffer.alloc(1);
     countRead(fs.readSync(fd, one, 0, 1, at));
-    return one[0];
+    return one.readUInt8(0);
   } finally {
     fs.closeSync(fd);
   }
@@ -388,7 +388,8 @@ async function passOf(file: string, at: WatchAt, { onLine, onRead, onCut }: Watc
   at.cursor = got.cursor;
   for (const [i, line] of got.lines.entries()) {
     if (at.stopped) return false;
-    await onLine(line, got.ends[i]);
+    const end = got.ends[i];
+    if (end !== undefined) await onLine(line, end);
   }
   return !at.stopped;
 }

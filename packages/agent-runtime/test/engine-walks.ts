@@ -635,7 +635,7 @@ const ANSWER_TURN: readonly Walk[] = [
     ],
   },
   {
-    name: 'answering a task nothing was filed under, one not held open, one not started, one at work, one answered already, or with no words, is refused, and keeps only the answer it took',
+    name: 'answering a task nothing was filed under, one not held open, one not started, one at work, one answered already, with no words, or its cap beside its config, is refused, and keeps only the answer it took',
     walk: async ({ engine, settle }) => {
       await asked(engine.file(task('job')));
       await asked(engine.file(heldOpen('a')));
@@ -648,11 +648,13 @@ const ANSWER_TURN: readonly Walk[] = [
       const working = await asked(engine.answer('a', 'go'));
       await settle('a', 'succeeded', { exitCode: 0 });
       const empty = await asked(engine.answer('a', '  '));
+      const capBesideConfig = { budgetUsd: 1 } as never;
+      const uncapped = await asked(engine.answer('a', 'go', capBesideConfig));
       await asked(engine.answer('a', 'go'));
       const twice = await asked(engine.answer('a', 'again'));
-      return [...unstarted, working, empty, twice, (await turnOf(engine, 'a')).inputs.map((i) => i.text)];
+      return [...unstarted, working, empty, uncapped, twice, (await turnOf(engine, 'a')).inputs.map((i) => i.text)];
     },
-    says: [...Array.from({ length: 6 }, () => ({ refused: 'InputRefused' })), ['go']],
+    says: [...Array.from({ length: 7 }, () => ({ refused: 'InputRefused' })), ['go']],
   },
 ];
 

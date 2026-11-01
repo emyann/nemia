@@ -45,6 +45,7 @@ import { notACount, notAStream, OutputRefused } from './output.ts';
 import { SayRefused } from './say.ts';
 import { InterruptRefused } from './interrupt.ts';
 import { AnswerRefused, type Answering } from './answer.ts';
+import { answerOptionsRefusalOf } from './answer-options.ts';
 
 /** One answer asked of the stand-in: the task, the ask by its id, and each question's answer by the question's own text. */
 export type TestAnswer = { taskId: string; id: string; answers: Record<string, string> };
@@ -265,10 +266,10 @@ const unkept = (verb: string) => () =>
 const unknown = (id: string): string => `\`${id}\` is not a task in this store.`;
 
 /**
- * `answer` over what a stand-in holds: refused, and nothing kept, as the engine refuses it (`answerRefusalOf`, its words and its order),
- * else the answer kept on the task as the engine journals it, which `view` carries as `state.inputs`, and returned. The task is then
- * between attempts until a settle begins the answer's turn, as the engine's next pass does (`turnedOf`). It holds no harness to ask
- * of a turn's `config`, which it keeps as given.
+ * `answer` over what a stand-in holds: refused, and nothing kept, as the engine refuses it (`answerOptionsRefusalOf`, then
+ * `answerRefusalOf`: their words and their order), else the answer kept on the task as the engine journals it, which `view` carries
+ * as `state.inputs`, and returned. The task is then between attempts until a settle begins the answer's turn, as the engine's next
+ * pass does (`turnedOf`). It holds no harness to ask of a turn's `config`, which it keeps as given.
  */
 const answerVerbOf =
   (tasks: Map<string, TestTask>): EngineShape['answer'] =>
@@ -276,7 +277,7 @@ const answerVerbOf =
     Effect.gen(function* () {
       const t = tasks.get(taskId);
       const config = options?.config;
-      const refused = answerRefusalOf(taskId, t ? stateOf(taskId, t) : undefined, text, config);
+      const refused = answerOptionsRefusalOf(options ?? {}) ?? answerRefusalOf(taskId, t ? stateOf(taskId, t) : undefined, text, config);
       if (refused !== undefined || !t) return yield* Effect.fail(new InputRefused({ message: refused ?? unknown(taskId) }));
       const input: Input = { at: new Date().toISOString(), text, ...(config ? { config } : {}) };
       t.inputs.push(input);

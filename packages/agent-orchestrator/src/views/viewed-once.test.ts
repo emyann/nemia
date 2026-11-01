@@ -37,6 +37,7 @@ const counting = () => {
     },
     async answer() {},
     async admit() {},
+    async close() {},
     async stop() {},
     async tick() {
       return {};
@@ -77,9 +78,14 @@ test('a verb that changes a task drops its view alone; a pass, and a verb the me
   await Effect.runPromise(e.view('a'));
   await Effect.runPromise(e.view('b'));
   assert.deepEqual(Object.fromEntries(asked), { a: 5, b: 3 }, 'an admission names the tasks it admits');
+  await Effect.runPromise(e.view('b'));
+  await Effect.runPromise(e.close('b'));
+  await Effect.runPromise(e.view('a'));
+  await Effect.runPromise(e.view('b'));
+  assert.deepEqual(Object.fromEntries(asked), { a: 5, b: 4 }, 'a close names the task it closes');
   await Effect.runPromise((e as unknown as { admit(ids: unknown): Effect.Effect<void> }).admit('a'));
   await Effect.runPromise(e.view('a'));
-  assert.deepEqual(Object.fromEntries(asked), { a: 5, b: 3 }, 'an admission given no list, as a caller past the types may, names no task');
+  assert.deepEqual(Object.fromEntries(asked), { a: 5, b: 4 }, 'an admission given no list, as a caller past the types may, names no task');
 });
 
 test('a view that failed is not kept: the next read asks the engine again', async () => {

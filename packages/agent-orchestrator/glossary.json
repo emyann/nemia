@@ -316,6 +316,11 @@
       "type": "RunId"
     },
     {
+      "term": "Session state",
+      "meaning": "where a step's session stands as its moment says it to a follower (`StepMoment`, kind `state`), in A2A's TaskState words: submitted, working, input-required, auth-required, completed, failed, canceled, rejected — the runtime's `SessionState`, kept rather than renamed and held equal in `runtime-client.ts`.",
+      "type": "StepSessionState"
+    },
+    {
       "term": "Show",
       "meaning": "the one spelling of a read of one thing: `nemia show` of a run, the api's `skills show` and `inbox show`.",
       "retired": [

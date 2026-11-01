@@ -4,9 +4,9 @@
  * (`engine-contract.boundary.test.ts`) and the stand-in (`engine-contract.test.ts`) through `walksOn`. A walk is written against a
  * `Side`: an engine's verbs, and the hand that moves a task where no walk can wait for a session.
  *
- * What a walk answers is compared as `told` tells it: a moment as `<time>`, a session's id as `<session>`, a refusal by its tag, and
- * no monotonic moment. `UNKEPT` names the verbs the stand-in does not keep, which die naming themselves; `unwalked` names a verb of
- * the engine that is in neither list. `APART` holds what the stand-in cannot say as the engine does, each proven of both sides, and
+ * What a walk answers is compared as `told` tells it: a moment as `<time>`, a session's id as `<session>` (`SESSION_KEYS`), a refusal by
+ * its tag, and no monotonic moment. `UNKEPT` names the verbs the stand-in does not keep, which die naming themselves; `unwalked` names a
+ * verb of the engine that is in neither list. `APART` holds what the stand-in cannot say as the engine does, each proven of both sides, and
  * `failing` the walks of a verb a side does not say: a stand-in that lies fails one.
  */
 import assert from 'node:assert/strict';
@@ -39,8 +39,8 @@ export type Walk = { readonly name: string; readonly walk: (side: Side) => Promi
 /** A moment as the engine writes one. */
 const MOMENT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 
-/** The keys whose value names a session. */
-const SESSION_KEYS = ['sessionId', 'nativeId'];
+/** The keys whose value names a session: a view's, an attempt's own, and the one an answered turn continues. */
+const SESSION_KEYS = ['sessionId', 'nativeId', 'resumeFrom'];
 
 /** `value` as both sides say it, read after its own JSON: see the file's head. */
 function toldOf(value: unknown, key?: string): unknown {
@@ -589,6 +589,73 @@ const ANSWER: readonly Walk[] = [
   },
 ];
 
+/** A task held open as the walks file one: its turn signed, it waits on a person's answer. */
+const heldOpen = (id: string) => ({ ...task(id), holdOpen: true as const });
+
+/** A view's phase, the answers kept on its state, and its attempts: what an answered turn is told by. */
+const turnOf = async (engine: EngineShape, id: string) => {
+  const { phase, state } = await Effect.runPromise(engine.view(id));
+  return { phase, inputs: state.inputs, attempts: state.attempts };
+};
+
+/** The attempt of a turn its session completed, as both sides say it. */
+const SIGNED = attempt({ ended: 'succeeded', endedAt: '<time>', reason: 'harness', nativeId: '<session>', exitCode: 0 });
+
+/** The answer the walk gives, as both sides keep it. */
+const INPUT = { at: '<time>', text: 'make it smaller' };
+
+const ANSWER_TURN: readonly Walk[] = [
+  {
+    name: "an answer to a task held open that waits is kept as its input, and the answer's turn is the next attempt, carrying its turn",
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(heldOpen('a')));
+      await settle('a', 'succeeded', { exitCode: 0 });
+      const waiting = await turnOf(engine, 'a');
+      const given = await asked(engine.answer('a', 'make it smaller'));
+      const answered = await turnOf(engine, 'a');
+      await settle('a', 'working');
+      const turning = await turnOf(engine, 'a');
+      await settle('a', 'succeeded', { exitCode: 0 });
+      return [waiting, given, answered, turning, await turnOf(engine, 'a')];
+    },
+    says: [
+      { phase: 'input-required', inputs: [], attempts: [SIGNED] },
+      INPUT,
+      { phase: 'between-attempts', inputs: [INPUT], attempts: [SIGNED] },
+      {
+        phase: 'working',
+        inputs: [INPUT],
+        attempts: [SIGNED, attempt({ n: 2, turn: 1, nudge: 'make it smaller', resumeFrom: '<session>' })],
+      },
+      {
+        phase: 'input-required',
+        inputs: [INPUT],
+        attempts: [SIGNED, { ...SIGNED, n: 2, turn: 1, nudge: 'make it smaller', resumeFrom: '<session>' }],
+      },
+    ],
+  },
+  {
+    name: 'answering a task nothing was filed under, one not held open, one not started, one at work, one answered already, or with no words, is refused, and keeps only the answer it took',
+    walk: async ({ engine, settle }) => {
+      await asked(engine.file(task('job')));
+      await asked(engine.file(heldOpen('a')));
+      const unstarted = [
+        await asked(engine.answer('nope', 'go')),
+        await asked(engine.answer('job', 'go')),
+        await asked(engine.answer('a', 'go')),
+      ];
+      await settle('a', 'working');
+      const working = await asked(engine.answer('a', 'go'));
+      await settle('a', 'succeeded', { exitCode: 0 });
+      const empty = await asked(engine.answer('a', '  '));
+      await asked(engine.answer('a', 'go'));
+      const twice = await asked(engine.answer('a', 'again'));
+      return [...unstarted, working, empty, twice, (await turnOf(engine, 'a')).inputs.map((i) => i.text)];
+    },
+    says: [...Array.from({ length: 6 }, () => ({ refused: 'InputRefused' })), ['go']],
+  },
+];
+
 /** A server a factory might record, remote and plain: what the state read is handed. */
 const SERVER = { type: 'http' as const, url: 'https://e.example/mcp' };
 
@@ -693,6 +760,7 @@ export const WALKS = {
   say: SAY,
   interrupt: INTERRUPT,
   answerAsk: ANSWER,
+  answer: ANSWER_TURN,
   transcript: TRANSCRIPT,
   forget: FORGET,
   kept: KEPT,
@@ -715,7 +783,6 @@ export const UNKEPT = [
   'follow',
   'path',
   'quota',
-  'answer',
   'close',
   'watch',
   'tallied',

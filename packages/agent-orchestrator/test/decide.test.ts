@@ -712,7 +712,7 @@ test("a folder whose last step is an ending: `nemia decide` says what that step 
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'ship.md'),
-    `---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\n${SHIP_IT}\n\nAbort on any failure.\n`,
+    `---\nafter: implement\nplace: git\nworkspace: base\ngate: true\n---\n${SHIP_IT}\n\nAbort on any failure.\n`,
   );
   const run = await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir }));
   const { e, settle } = board();
@@ -754,7 +754,7 @@ test("a folder whose last step is an ending: `nemia decide` says what that step 
 const shipping = (): string => {
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it.\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nplace: git\nworkspace: base\ngate: true\n---\nShip it.\n');
   return dir;
 };
 
@@ -814,7 +814,7 @@ test("REFUSED: an ending led by an agent that says `You are …` — `nemia deci
     fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
     fs.writeFileSync(
       path.join(dir, 'land.md'),
-      `---\nafter: implement\nplace: git\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`,
+      `---\nafter: implement\nplace: git\nworkspace: base\ngate: true\nagent: otto\n---\n${note}`,
     );
     const run = await runPlaced(startRun({ brief: 'add sub', repo: aRepo(), workflowDir: dir }));
     const { e, settle } = board();
@@ -903,7 +903,7 @@ test('a run that worked on the base branch itself says so, and still says what i
 test("a run whose one step works in the checkout is not shown the base branch's diff: its work is not on it, and the base moves under it", async (t) => {
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
-  fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nplace: git\nworkspace: main\nslot: none\n---\nWatch the runs.\n');
+  fs.writeFileSync(path.join(dir, 'supervise.md'), '---\nplace: git\nworkspace: base\nslot: none\n---\nWatch the runs.\n');
   const run = await runPlaced(startRun({ brief: 'supervise this repository', repo, workflowDir: dir }));
   const { e, settle } = board();
   await runWith(e, advanceRun(readRun(run.id)));
@@ -960,13 +960,13 @@ test('REFUSED at `nemia start`: --no-worktree on a workflow whose last step merg
   const repo = aRepo();
   const dir = fs.mkdtempSync(path.join(ROOT, 'wf-'));
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\n---\nimplement it\n');
-  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nplace: git\nworkspace: main\ngate: true\n---\nShip it.\n');
+  fs.writeFileSync(path.join(dir, 'ship.md'), '---\nafter: implement\nplace: git\nworkspace: base\ngate: true\n---\nShip it.\n');
   const before = fs.readdirSync(path.join(ROOT, 'runs')).filter((f) => f.endsWith('.json')).length;
   await assert.rejects(
     async () => await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir, isolate: false })),
     (err: Error & { exitCode?: number; _tag?: string }) => {
       assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
-      assert.ok(err.message.startsWith('ship: `workspace: main` ends this workflow'), err.message);
+      assert.ok(err.message.startsWith('ship: `workspace: base` ends this workflow'), err.message);
       assert.ok(err.message.includes('--no-worktree gives the run no result branch'), err.message);
       assert.ok(err.message.includes('Either drop --no-worktree'), 'and names the flag to drop');
       assert.ok(err.message.includes('whose last step is not an ending'), 'or the workflow to start');

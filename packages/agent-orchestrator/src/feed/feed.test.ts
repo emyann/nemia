@@ -850,7 +850,7 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
   await t.test("each step's reason and the run's are the ones the feed's word names, read off the same word", async (t) => {
     const at = { id: 'r-1', brief: 'b', createdAt: '2026-09-22T10:00:00.000Z', repo: '/r', branch: 'wf/r-1', base: 'main' };
     const plan = [{ name: 'plan', after: [], brief: 'plan it' }] as unknown as Parameters<typeof listing>[0]['steps'];
-    const ship = [{ name: 'ship', after: [], brief: 'land it', workspace: 'main' }] as unknown as Parameters<typeof listing>[0]['steps'];
+    const ship = [{ name: 'ship', after: [], brief: 'land it', workspace: 'base' }] as unknown as Parameters<typeof listing>[0]['steps'];
     const filed = { ...at, steps: { plan: { taskId: 't1' } } } as unknown as Run;
     const unfiled = { ...at, steps: {} } as unknown as Run;
     const done = { outcome: 'done' } as unknown as NonNullable<ReturnType<Parameters<typeof listing>[0]['closeoutOf']>>;

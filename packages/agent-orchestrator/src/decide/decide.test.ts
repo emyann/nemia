@@ -94,7 +94,7 @@ test('choicesOf', async (t) => {
   );
 
   await t.test('a workflow whose step merges is offered no land it nor drop it', () => {
-    const merging = [...STEPS, { name: 'ship', after: ['implement'], body: 'Land it.', workspace: 'main' }] as Workflow[];
+    const merging = [...STEPS, { name: 'ship', after: ['implement'], body: 'Land it.', workspace: 'base' }] as Workflow[];
     assert.deepEqual(choicesOf(merging, RUN, awaiting(), []), []);
   });
 

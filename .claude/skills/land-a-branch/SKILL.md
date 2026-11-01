@@ -1,6 +1,6 @@
 ---
 name: land-a-branch
-description: "Land a run's result on the base branch in this repository's own checkout, the way the step says it lands: make that one act, read its result, and write the message that records what landed — or change nothing and say why it refused. For a gated ending step (workspace: main)."
+description: "Land a run's result on the base branch in this repository's own checkout, the way the step says it lands: make that one act, read its result, and write the message that records what landed — or change nothing and say why it refused. For a gated ending step (workspace: base)."
 ---
 
 # Land a branch

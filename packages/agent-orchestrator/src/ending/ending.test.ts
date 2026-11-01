@@ -6,7 +6,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkoutLine, checkoutWord, filedAllows, landedWords, landingDue, landingOpen, type MergeState } from './ending.ts';
+import { checkoutLine, checkoutWord, filedAllows, landedWords, landingDue, landingOpen } from './ending.ts';
+import type { MergeState } from '../place/place.ts';
 import type { RepositoryRun, Run, StepRecord, TaskPhase } from '../run.ts';
 import type { StepStatus } from '../record/record.ts';
 import type { Verdict } from '../check/check.ts';
@@ -20,12 +21,12 @@ test('filedAllows', async (t) => {
   await t.test(
     "a step in the checkout is filed with a read of its run's artifacts after its own rules, on the default harness and on each one fenced by permission rules",
     () => {
-      assert.deepEqual(filedAllows({ workspace: 'main' }, ARTIFACTS), [READ]);
-      assert.deepEqual(filedAllows({ workspace: 'main', harness: 'claude', allowedTools: ['Bash(git status)'] }, ARTIFACTS), [
+      assert.deepEqual(filedAllows({ workspace: 'base' }, ARTIFACTS), [READ]);
+      assert.deepEqual(filedAllows({ workspace: 'base', harness: 'claude', allowedTools: ['Bash(git status)'] }, ARTIFACTS), [
         'Bash(git status)',
         READ,
       ]);
-      assert.deepEqual(filedAllows({ workspace: 'main', allowedTools: [READ] }, ARTIFACTS), [READ], 'given once');
+      assert.deepEqual(filedAllows({ workspace: 'base', allowedTools: [READ] }, ARTIFACTS), [READ], 'given once');
     },
   );
 
@@ -36,14 +37,14 @@ test('filedAllows', async (t) => {
       assert.equal(filedAllows({ allowedTools: own }, ARTIFACTS), own, 'a worktree');
       const inFolder = { place: 'folder' as const, allowedTools: own };
       assert.equal(filedAllows(inFolder, ARTIFACTS), own, 'a folder');
-      assert.equal(filedAllows({ workspace: 'main', harness: 'codex' }, ARTIFACTS), undefined, 'a sandbox');
-      assert.equal(filedAllows({ workspace: 'main', harness: 'a2a:far-away' }, ARTIFACTS), undefined, 'a remote agent');
+      assert.equal(filedAllows({ workspace: 'base', harness: 'codex' }, ARTIFACTS), undefined, 'a sandbox');
+      assert.equal(filedAllows({ workspace: 'base', harness: 'a2a:far-away' }, ARTIFACTS), undefined, 'a remote agent');
     },
   );
 });
 
 /** `implement → ship`, ship an ending with a check: approved first, in the repository's checkout (`landsOnCheck`). */
-const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'main', gate: true, check: 'npm test' };
+const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'base', gate: true, check: 'npm test' };
 /** ship filed, signed, its check filed: every phase given, the checkout's state given. */
 const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
   ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),
@@ -52,9 +53,9 @@ const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> 
     ship: { taskId: 't-ship', check: { taskId: 't-ship-check' }, ...ship },
   },
 });
-const STAGED: MergeState = { merging: 'ours', conflicted: false, missing: [], head: 'base000' };
-const ON_HEAD: MergeState = { merging: 'none', conflicted: false, missing: [], head: 'merged0' };
-const NOT_STAGED: MergeState = { merging: 'none', conflicted: false, missing: ['wf/r-1/implement'], head: 'base000' };
+const STAGED: MergeState = { merging: 'ours', conflicted: false, missing: [], tip: 'base000' };
+const ON_HEAD: MergeState = { merging: 'none', conflicted: false, missing: [], tip: 'merged0' };
+const NOT_STAGED: MergeState = { merging: 'none', conflicted: false, missing: ['wf/r-1/implement'], tip: 'base000' };
 const CALLED_OFF = { cancelledAt: '2026-01-01T01:00:00Z' };
 /** The run `r` with ship's check unfiled where `check` is not given: its record has none. */
 const filedTo = (r: Run, check: TaskPhase | undefined): Run => {
@@ -118,7 +119,7 @@ test('landingDue commits, aborts, waits or records', async (t) => {
     },
   );
 
-  const { head: _, ...headless } = STAGED;
+  const { tip: _, ...headless } = STAGED;
   const aborts: Array<[string, () => unknown, object]> = [
     [
       'a check that refused names the base it was staged on, for `nemia refresh --base`',

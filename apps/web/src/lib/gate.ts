@@ -42,7 +42,7 @@ export function gateOfSummary(
 
 /**
  * The same gate off a run's detail, for one step: the inspector's and the node's. Null unless the step waits at its gate on you, on a run
- * nobody called off. `ends` off the workflow the run froze (`workspace: main`); `back` as the package names it, off the graph's `after`
+ * nobody called off. `ends` off the workflow the run froze (`workspace: base`); `back` as the package names it, off the graph's `after`
  * edges for an ending that has no task yet.
  */
 export function gateOfStep(
@@ -50,7 +50,7 @@ export function gateOfStep(
   step: Pick<DetailStep, 'name' | 'approve' | 'spec' | 'taskId'>,
 ): GateAsk | null {
   if (run.cancelledAt !== null || !step.approve || !run.waitingOnYou.includes(step.name)) return null;
-  const ends = step.spec?.workspace === 'main';
+  const ends = step.spec?.workspace === 'base';
   const back = step.taskId ? [step.name] : run.graph.edges.filter((e) => e.kind === 'after' && e.to === step.name).map((e) => e.from);
   return { step: step.name, ends: ends && !step.taskId, back, onto: run.branch };
 }

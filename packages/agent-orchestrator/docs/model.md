@@ -20,7 +20,8 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
 - **S6, the subscription, the ledger and the feed**, each behind a door on the feed's model.
 - **AgentOnStep** is `StepAgent` in the agents' model: the agent a step is given, and what the step overrides of it, within what the
   agent offers (`Agent.overridable`).
-- **Decision 9**: the place's `PlaceService` becomes `MountKind`, the place's model, beside the runtime's `Mount`.
+- **Decision 9**: the place's model names `PlaceKind` (`git` or `folder`, as a step's `place:` says it, and `MountKind` before it), beside
+  the runtime's `Mount`; the follow-up intent renames the place to the runtime's mount (place → mount).
 - **SQLite**: Effect's `Model.Class` (`effect/schema/Model`, the class `effect/sql`'s repositories read and write) takes these branded
   fields as they are, so a store kept in a database keeps the same ids.
 

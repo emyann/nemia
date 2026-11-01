@@ -137,7 +137,7 @@ export const STATS: Command<Stats> = {
     '[--from <day>] [--to <day>] [--by agent|step|factory|workflow|repo] [--agent|--step|--factory|--workflow|--repo <v>] [--line|--json]',
   help: [
     'what every run in the store adds up to, by UTC day: rounds to',
-    'acceptance of each loop: step, landings of the workspace: main step',
+    'acceptance of each loop: step, landings of the workspace: base step',
     "and on which try, cost and time per landed run, and each step's",
     'tries, time, cost, checks and gate waits; first the last 14 days',
     'against the 14 before. A number nothing measured reads —, never 0.',

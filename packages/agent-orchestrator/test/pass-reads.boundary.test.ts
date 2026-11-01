@@ -541,8 +541,8 @@ test('REFUSED: a run filed on a pass whose standing read no head of its base kee
       standing: (request) => {
         const read = builtinGitPlace.askNow('standing', request);
         if (!('answer' in read)) return read;
-        const { main: _base, ...heads } = read.answer.heads;
-        return { answer: { ...read.answer, heads } };
+        const { main: _base, ...tips } = read.answer.tips;
+        return { answer: { ...read.answer, tips } };
       },
     }),
   );

@@ -181,7 +181,7 @@ const atGate = async (t: TestContext, run: Run, step: string) => {
 const TWO = folder(['plan', 'work']);
 const ONE = folder(['work']);
 const CHECKED = folder(['work'], () => 'check: "true"\n');
-const SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'harness: claude\ngate: true\nworkspace: main\ncheck: "true"\n' : ''));
+const SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'harness: claude\ngate: true\nworkspace: base\ncheck: "true"\n' : ''));
 const LANDS = aRepo();
 
 /** A file left in the workspace of `run`'s step `work`, for the step at work there to hand off, as a session leaves its work. */

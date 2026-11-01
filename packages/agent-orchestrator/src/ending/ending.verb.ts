@@ -1,9 +1,10 @@
 /**
- * A run's ending, as a pass meets it: which run's `workspace: main` step holds the repository's own checkout (`checkoutHold`, `mainClaim`),
+ * A run's ending, as a pass meets it: which run's `workspace: base` step holds the repository's own checkout (`checkoutHold`, `mainClaim`),
  * and the merge an ending staged there, committed or aborted on its check (`landEnding`). A controller, reaching the runtime through the
  * client (`runtime-client.ts`).
  */
 import path from 'node:path';
+import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
 import { asked, over, type Engine } from '../runtime-client.ts';
 import type { Refusal } from '../refusal/refusal.ts';
@@ -36,13 +37,13 @@ import { passRead, type PassRead } from '../cap/cap.verb.ts';
 import type { PassStanding } from '../standing/standing.verb.ts';
 
 /**
- * Which run's `workspace: main` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,
+ * Which run's `workspace: base` step holds the repository's own checkout while this run's waits for it (`heldCheckouts`) — or undefined,
  * when nothing does and this run's may be filed.
  *
  * Asked of the store on the pass that asks, never stored, and then of every run of the same repository — but first, and cheaply, of the
  * run's own asks: undefined, with no other run's claim read, for a run called off, for one with no person's word that would file its own
  * ending (`endingAsked`: the approval of one that has not run, or the ask for a try of one that has), and for one whose ending is in that
- * checkout already. A run is in the checkout while the engine holds its `workspace: main` task in flight, as `inFlight` counts one, so a
+ * checkout already. A run is in the checkout while the engine holds its `workspace: base` task in flight, as `inFlight` counts one, so a
  * step filed earlier in this very pass is read as being in it. One waiting to be filed counts only if the pass would in fact file it: a
  * send-back of the work un-holds its gate, and an ending that will not be filed must not hold another run's for ever. The cap on runs in
  * flight is read once for the pass (`runSlots`): a run it holds files nothing, so its ending claims nothing (`mainClaim`).
@@ -63,7 +64,7 @@ export const checkoutHold = Effect.fn('checkoutHold')(function* (
   env: NodeJS.ProcessEnv,
   memo: StatusMemo,
 ) {
-  const ending = steps.find((s) => s.workspace === 'main');
+  const ending = steps.find((s) => endsOnBase(s));
   if (!ending || run.cancelledAt || endingAsked(run, ending, runStore.asks.read(run.id).asks) === undefined) return undefined;
   const read = 'read' in from ? from.read : passRead(e, runStore.runs.list(), env, yield* from.standing);
   const slotOf = (id: string) => read.slots.pipe(Effect.map((slots) => slots.get(id)));
@@ -114,7 +115,7 @@ const mainClaim = Effect.fnUntraced(function* (
   } catch {
     return undefined;
   }
-  const ending = steps.find((s) => s.workspace === 'main');
+  const ending = steps.find((s) => endsOnBase(s));
   if (!ending || !isRepositoryRun(run)) return undefined;
   const repo = path.resolve(run.repo);
   const taskId = run.steps[ending.name]?.taskId;

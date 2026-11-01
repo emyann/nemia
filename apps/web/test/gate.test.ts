@@ -175,7 +175,7 @@ test("gateOfStep, gateFacts, needWords: the inspector's gate, the facts under it
   await t.test(
     "the inspector's gate is read off the step: an ending with no task runs on approval and goes back along its `after` edges, never its loop's",
     () => {
-      const ship = step('ship', { approve: 'approve ship', taskId: null, spec: { workspace: 'main' } as Step['spec'] });
+      const ship = step('ship', { approve: 'approve ship', taskId: null, spec: { workspace: 'base' } as Step['spec'] });
       const run = detail([ship]);
       const gate = gateOfStep(run, ship);
       assert.deepEqual(gate, { step: 'ship', ends: true, back: ['review'], onto: 'main' });
@@ -201,7 +201,7 @@ test("gateOfStep, gateFacts, needWords: the inspector's gate, the facts under it
     const brief = gateBrief(gate, null, ['implement']);
     assert.equal(brief.approving, "Approving files implement, handed plan's closeout and your words, if any.");
     assert.equal(brief.sendingBack, 'Sending back asks plan for a new try, told your words; it waits at its gate again once it signs off.');
-    const ran = step('ship', { approve: 'approve ship', spec: { workspace: 'main' } as Step['spec'] });
+    const ran = step('ship', { approve: 'approve ship', spec: { workspace: 'base' } as Step['spec'] });
     assert.deepEqual(
       gateOfStep(detail([ran]), ran),
       { step: 'ship', ends: false, back: ['ship'], onto: 'main' },

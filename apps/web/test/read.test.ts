@@ -29,7 +29,7 @@ const row = (extra: object = {}): RunSummary => ({
   id: 'r-1',
   repo: '/work/repo',
   factory: 'nemia',
-  place: 'repository',
+  place: 'git',
   work: null,
   brief: 'Decode the reads',
   workflowDir: '/work/workflows/build',

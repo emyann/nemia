@@ -9,8 +9,8 @@ import type { Workflow } from '../step/step.ts';
 import { storeRootRefusal } from './store-root.ts';
 
 const IMPLEMENT = { name: 'implement', after: [] } as unknown as Workflow;
-const SHIP = { name: 'ship', after: ['implement'], workspace: 'main' } as unknown as Workflow;
-const LONE_SHIP = { name: 'ship', after: [], workspace: 'main' } as unknown as Workflow;
+const SHIP = { name: 'ship', after: ['implement'], workspace: 'base' } as unknown as Workflow;
+const LONE_SHIP = { name: 'ship', after: [], workspace: 'base' } as unknown as Workflow;
 const REVIEW = { name: 'review', after: ['implement'] } as unknown as Workflow;
 const TRIAGE = { name: 'triage', after: [], reads: ['inbox'] } as unknown as Workflow;
 

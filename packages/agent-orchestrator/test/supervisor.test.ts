@@ -1,5 +1,5 @@
 /**
- * A step that never ends, shaped as a supervisor's — one step, `workspace: main`, `slot: none`, `remote: true`, a window of its own, no
+ * A step that never ends, shaped as a supervisor's — one step, `workspace: base`, `slot: none`, `remote: true`, a window of its own, no
  * check — run on disk against a board a test settles. What such a step watches is every other run: it asks by signing off `blocked`, and
  * acts on the answer. The package does two things for it: a step answered many times over, each answer a try of the same session, which
  * is here; and a run the cap on runs in flight (`WF_MAX_RUNS`) neither holds nor counts, which is the cap's story in
@@ -46,7 +46,7 @@ const folderOf = (steps: Record<string, string>): string => {
 
 /** A watcher's workflow: its one step in the repository's own checkout, outside the cap on runs, bridged, on a window of its own. */
 const FOLDER = folderOf({
-  supervise: 'workspace: main\nslot: none\nharness: claude\ncontext: 200k\nremote: true\npermissionMode: dontAsk',
+  supervise: 'workspace: base\nslot: none\nharness: claude\ncontext: 200k\nremote: true\npermissionMode: dontAsk',
 });
 
 /**

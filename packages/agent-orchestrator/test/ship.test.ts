@@ -795,7 +795,7 @@ test("a place that gives no reading of the checkout, or reads its merge as anoth
       ] as const) {
         const { repo, id, checkId, base } = await at.stagedAndSigned();
         settle(checkId, phase, undefined, exitCode);
-        const place = answeringPlace({ merging: 'other', conflicted: false, missing: [], head: base });
+        const place = answeringPlace({ merging: 'other', conflicted: false, missing: [], tip: base });
         assert.deepEqual(await landedThrough(e, id, place), { notes: [], landed: false }, phase);
         assert.equal(at.mergeHead(repo), true, `${phase}: neither committed nor aborted`);
         assert.equal(world().head(repo), base);
@@ -1385,7 +1385,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
   );
 
   await s.test(
-    "a `workspace: main` task the engine has lost holds no checkout: a run nobody can stop does not hold every other run's ending for ever",
+    "a `workspace: base` task the engine has lost holds no checkout: a run nobody can stop does not hold every other run's ending for ever",
     async () => {
       const { first, second } = await at.twoApproved();
       await at.pass(second.id);

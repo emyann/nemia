@@ -11,7 +11,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
-import type { MergeState } from '../ending/ending.ts';
+import type { MergeState } from '../place/place.ts';
 import { pruneAgain, pruneRefusal, type PruneFacts, type Pruning } from './prune.ts';
 import { filesPrunedWords, isRepositoryRun, namesInOrder, type RepositoryRun, type Pruned, type Run } from '../record/record.ts';
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
@@ -125,7 +125,7 @@ export type Judged =
  * (`inventoryUnread`).
  *
  * Read as `nemia rm` reads a run (`forget`), and refused for every reason `pruneRefusal` names: a folder run, a run not over, anything
- * that holds `nemia rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is locked, on no branch with
+ * that holds `nemia rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is held, on no branch with
  * something a removal would leave on none, or holds a change no commit has — or whose status does not read. No other run is asked: one
  * waiting on this run reads its record, which stays. A run once pruned is not asked its merge again for its worktrees; for its files it
  * is. A record whose workflow folder is gone is judged without its steps, and `pruneRefusal` says so.
@@ -153,7 +153,7 @@ export const judging = Effect.fn('prune.judging')(function* (
   const steps = frozenSteps(run);
   const place = yield* askRunPlace(run, yield* PlaceService, within);
   if (!('inventory' in place)) return refused(inventoryUnread('prune', id, run.repo, place));
-  const listed = placeWorktrees(run, steps, within, place).filter((w) => !(w.prunable && w.locked === undefined));
+  const listed = placeWorktrees(run, steps, within, place).filter((w) => w.removable !== 'gone');
   const filesAt = artifacts ? runStore.runs.filesAt(id) : undefined;
   if (!listed.length && !filesAt) {
     return { pruning: nothingLeft(run, artifacts), ...(run.pruned ? { left: { run, place, within } } : {}) } satisfies Judged;
@@ -282,16 +282,16 @@ const judgedOf = Effect.fn('prune.judged')(function* (
 
 /**
  * One worktree as `pruneRefusal` judges it, from what the place's inventory read: its hold (`heldWorktree`), each change it holds
- * uncommitted — and that its status did not read, where it is not locked — and the place's command for it (`say`).
+ * uncommitted — and that its status did not read, where nobody holds it — and the place's command for it (`say`).
  */
 function pruneFact(run: RepositoryRun, place: RunPlaceRead, w: Held): PruneFacts['worktrees'][number] {
   const hold = heldWorktree(w);
   const fix = !hold
     ? sayFilled(place.say.inspect, { path: w.path })
-    : 'locked' in hold
+    : 'heldBy' in hold
       ? sayFilled(place.say.unlock, { repo: run.repo, path: w.path })
       : sayFilled(place.say.attach, { path: w.path });
-  const unread = w.locked === undefined && w.clean === null ? ['(its status could not be read)'] : [];
+  const unread = w.removable !== 'held' && w.clean === null ? ['(its status could not be read)'] : [];
   const changes = [...(w.changes ?? []), ...unread];
   return { path: w.path, ...hold, ...(changes.length ? { changes } : {}), fix };
 }

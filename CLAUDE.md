@@ -103,9 +103,9 @@ holds what every change needs.
   What a step may not type, the run does in its place, as two frozen scripts read out of git and run with `node`, never as a tool a fence
   could not tell apart: `workflows/build/pull-request.ts` pushes a run's own branch and opens or updates its pull request, and
   `workflows/build/landing.ts` merges that pull request and fast-forwards the checkout. The one exception to the rule is a run's ending
-  step (a workflow's last step, `workspace: main`), filed once a person approves it — or, where its workflow puts before it a step that
+  step (a workflow's last step, `workspace: base`), filed once a person approves it — or, where its workflow puts before it a step that
   can send the work back (`loop:`), once that step passes, which is how `quick` lands with no gate at all; an ending with a `check:` and
-  neither of the two is refused at load (`validateMainWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
+  neither of the two is refused at load (`validateBaseWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
   anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
   merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
   `check:`, which is `landing.ts receipt`, and records the commit that landed on its exit 0 (`landingDue`).

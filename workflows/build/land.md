@@ -1,7 +1,7 @@
 ---
 after: review
 place: git
-workspace: main
+workspace: base
 agent: otto
 gate: true
 check: |-

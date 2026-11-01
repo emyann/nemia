@@ -178,7 +178,7 @@ test('`finishingOf` and `finishingAmong`: what finishes under the pause, and how
   await t.test('what finishes under the pause: a session at work, a check that runs, and an ending’s check as a landing', () => {
     const steps = [
       step('implement', [], { check: 'npm test' }),
-      step('ship', ['implement'], { gate: true, workspace: 'main', check: 'npm test' }),
+      step('ship', ['implement'], { gate: true, workspace: 'base', check: 'npm test' }),
     ];
     const r = run({ implement: { taskId: 't1', check: { taskId: 'c1' } }, ship: { taskId: 't2', check: { taskId: 'c2' } } });
     const views: Record<string, FinishingView> = {
@@ -278,7 +278,7 @@ test('`interruptsOf` and `interruptsAmong`: what a pause at once interrupts, and
     );
   });
   await t.test('a pause at once leaves a landing to finish: the session and the check of a step in the own checkout', () => {
-    const ship = step('ship', [], { gate: true, workspace: 'main', check: 'npm test' });
+    const ship = step('ship', [], { gate: true, workspace: 'base', check: 'npm test' });
     const r = run({ ship: { taskId: 't1', check: { taskId: 'c1' } } });
     const working = (id: string) => (id === 't1' || id === 'c1' ? view('working') : undefined);
     assert.equal(

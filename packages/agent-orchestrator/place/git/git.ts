@@ -86,6 +86,19 @@ export function* gitSays(cwd: string, args: readonly string[]): Asking<string | 
   }
 }
 
+/**
+ * The branch the git place names for the cut `leaf` of `run`: the run's prefix (`runBranches`), then the leaf — the one spelling of a
+ * run's branches, which every branch a run left already has (decision 2), so none is renamed. The core names the leaf (`cutName`) and
+ * the place the branch.
+ *
+ * The run's own line is the leaf `run` under the prefix, and not the prefix's folder alone: git keeps refs as files, so a ref named for
+ * the run cannot sit beside the refs under it that a fork cuts. The leaf keeps both shapes under one ref prefix, which `inventory` lists.
+ */
+export const runBranch = (run: string, leaf: string): string => `${runBranches(run)}${leaf}`;
+
+/** The prefix every branch of `run` opens with, the run's id between two slashes after the product's short name. */
+export const runBranches = (run: string): string => `wf/${run}/`;
+
 /** Whether `dir` is a directory, so that git is never run where it cannot start. */
 export const isDirectory = (dir: string): boolean => fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ?? false;
 

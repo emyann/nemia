@@ -292,7 +292,7 @@ export const PRUNE: Command<{
     'Lists what it would remove, with its size, and removes it on',
     '--yes, or on y at the prompt. With no run, every run. Refused',
     'while a run is not over, owes a hand-off, is a folder run, or has',
-    'a worktree locked, on no branch, or with changes no commit has;',
+    'a worktree held, on no branch, or with changes no commit has;',
     'and a finished run not merged unless --unmerged, with --artifacts',
     'as without: its files are what a person reads to decide it',
   ],

@@ -60,7 +60,7 @@ function places(): { repo: string; workspace: string; plain: string } {
   fs.mkdirSync(repo);
   fs.mkdirSync(plain);
   stand().world.repository(repo, { 'a.txt': 'one\n' });
-  const made = stand().place.askNow('make', { repo, at: workspace, name: 'wf/r/one', from: 'main', also: [] });
+  const made = stand().place.askNow('make', { repo, at: workspace, run: 'r', leaf: 'one', from: 'main', also: [] });
   assert.ok('answer' in made, JSON.stringify(made));
   return { repo, workspace, plain };
 }

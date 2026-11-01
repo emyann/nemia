@@ -93,7 +93,7 @@ test("REFUSED at shipped defaults: a step in the checkout, under a store whose p
   const before = runs();
   let failed: (Error & { _tag?: string; exitCode?: number }) | undefined;
   try {
-    await runPlaced(startRun({ brief: 'ship it', repo: aRepo(), workflowDir: folderOf({ ship: 'workspace: main' }) }));
+    await runPlaced(startRun({ brief: 'ship it', repo: aRepo(), workflowDir: folderOf({ ship: 'workspace: base' }) }));
   } catch (err) {
     failed = err as Error & { _tag?: string; exitCode?: number };
   }

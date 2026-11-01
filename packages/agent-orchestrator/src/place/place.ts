@@ -51,11 +51,11 @@ export const PLACE_DEADLINE_MS: Readonly<Record<PlaceVerb, number>> = {
 export type Rooted = { readonly root: string | null };
 
 /**
- * What `open` answers at `nemia start`: the repository, the commit a run starts from, the line of work it is on, and, where the place
- * names one, `staged`: the absolute path of the file whose presence says a merge is staged in that checkout, which the code reads with a
- * `stat` and no process (`stagedHere`).
+ * What `open` answers at `nemia start`: the repo, the commit a run starts from, the line of work it is on, and, where the place names
+ * one, `inProgressFile`: the absolute path of the file whose presence says a merge is in progress in that repo, which the code reads
+ * with a `stat` and no process (`stagedHere`).
  */
-export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string; readonly staged?: string };
+export type Opened = { readonly repo: string; readonly baseRef: string; readonly branch: string; readonly inProgressFile?: string };
 
 /**
  * What `make` answers: the directory a step works in, its line of work, the paths a fan-in merge left conflicted, and notes for the run's
@@ -120,44 +120,50 @@ export type BranchStood = {
  */
 export type KnownStood = { readonly tip: string | null; readonly pastBase: boolean | null };
 
-/** What `standing` answers: every head of the repository by name, and each result branch asked of. */
-export type Standing = { readonly heads: Readonly<Record<string, string>>; readonly branches: readonly BranchStood[] };
+/** What `standing` answers: the tip of every branch of the repo by name, and each result branch asked of. */
+export type Standing = { readonly tips: Readonly<Record<string, string>>; readonly branches: readonly BranchStood[] };
 
 /** What `trial` answers: the commit each base asked of names now (null where the place has none), and each trial in the order asked. */
 export type Trials = { readonly at: Readonly<Record<string, string | null>>; readonly trials: readonly TrialMerge[] };
 
 /**
- * What `status` answers of a checkout an ending lands in: whose merge is in progress (`ours` when every commit it merges is one of the
- * run's tips), whether a path is unmerged, the result branches a commit now would leave out, and HEAD when there is one.
+ * What `status` answers of the repo an ending lands in: whose merge is in progress (`ours` when every commit it merges is one of the
+ * run's tips), whether a path is unmerged, the result branches a commit now would leave out, and the commit the repo is at, its `tip`,
+ * when there is one.
  */
-export type Status = {
+export type MergeState = {
   readonly merging: 'ours' | 'other' | 'none';
   readonly conflicted: boolean;
   readonly missing: readonly string[];
-  readonly head?: string;
+  readonly tip?: string;
 };
 
-/** What `land` answers: the commit that landed the staged merge, or that the merge was taken back. */
+/** What `land` answers: the commit that landed the merge in progress, or that the merge was taken back. */
 export type PlaceLanded = { readonly commit: string } | { readonly aborted: true };
 
 /**
- * One workspace a run left, as `inventory` reads it: where, for which step, on what, and whether it holds anything no commit has — `clean`
- * null where that could not be read — with the paths it holds uncommitted (`changes`), and whether its HEAD's commit is on a line of work.
+ * One workspace a run left, as `inventory` reads it: where, for which step, on which branch, at which commit (`tip`), whether the place
+ * may remove it (`removable`: `yes`, `gone` when its folder is no longer there and the place only forgets it, `held` when someone holds
+ * it, their words in `heldBy`), whether its work is on a branch (`onBranch`: it is on one, or it is clean and its commit is in the
+ * branch it was cut on), whether it holds anything no commit has — `clean` null where that could not be read — and the paths it holds
+ * uncommitted (`changes`).
  */
 export type Held = {
   readonly path: string;
   readonly step?: string;
   readonly branch?: string;
-  readonly head?: string;
-  readonly detached: boolean;
-  readonly locked?: string;
-  readonly prunable: boolean;
-  readonly clean: boolean | null;
+  readonly tip?: string;
+  readonly removable: 'yes' | 'gone' | 'held';
+  readonly heldBy?: string;
   readonly onBranch: boolean;
+  readonly clean: boolean | null;
   readonly changes?: readonly string[];
 };
 
-/** What `inventory` answers: the workspaces a run left, and its lines of work with whether each is merged. */
+/**
+ * What `inventory` answers: the workspaces a run left, and the branches the place named for that run, with whether each is merged — no
+ * other run's.
+ */
 export type Inventory = {
   readonly workspaces: readonly Held[];
   readonly branches: readonly { readonly branch: string; readonly merged: boolean }[];
@@ -186,7 +192,7 @@ export type PlaceAnswers = {
   readonly report: Changes;
   readonly standing: Standing;
   readonly trial: Trials;
-  readonly status: Status;
+  readonly status: MergeState;
   readonly land: PlaceLanded;
   readonly inventory: Inventory;
   readonly remove: Removed;
@@ -194,14 +200,18 @@ export type PlaceAnswers = {
   readonly seal: Sealed;
 };
 
-/** Each verb's request, as the code hands it. */
+/**
+ * Each verb's request, as the code hands it. A run's branches are the place's to name: `make` is handed the run and the leaf of the
+ * step's cut, and `inventory` the run, and the place lists that run's branches alone.
+ */
 export type PlaceRequests = {
   readonly root: { readonly dir: string };
   readonly open: { readonly root: string; readonly isolate: boolean };
   readonly make: {
     readonly repo: string;
     readonly at: string;
-    readonly name: string;
+    readonly run: string;
+    readonly leaf: string;
     readonly from: string;
     readonly also: readonly string[];
   };
@@ -226,11 +236,11 @@ export type PlaceRequests = {
     readonly base: string;
   };
   readonly trial: { readonly repo: string; readonly trials: readonly { readonly onto: string; readonly branch: string }[] };
-  readonly status: { readonly checkout: string; readonly tips: Readonly<Record<string, string>> };
+  readonly status: { readonly repo: string; readonly tips: Readonly<Record<string, string>> };
   readonly land:
-    | { readonly checkout: string; readonly act: 'commit'; readonly message: string }
-    | { readonly checkout: string; readonly act: 'abort' };
-  readonly inventory: { readonly repo: string; readonly under: string; readonly prefix: string; readonly base: string };
+    | { readonly repo: string; readonly act: 'commit'; readonly message: string }
+    | { readonly repo: string; readonly act: 'abort' };
+  readonly inventory: { readonly repo: string; readonly under: string; readonly run: string; readonly base: string };
   readonly remove: { readonly repo: string; readonly workspaces: readonly string[]; readonly branches: readonly string[] };
   readonly export: { readonly repo: string; readonly tag: string; readonly into: string };
   readonly seal: { readonly tree: string };

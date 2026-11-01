@@ -475,7 +475,7 @@ test('apply trusts the places it files, a workspace on the repository it was cut
   t.mock.method(console, 'log', (...args: unknown[]) => printed.push(args.join(' ')));
   const { dir, repo } = template();
   const workspace = path.join(scratch('wf-applied-ws-'), 'one');
-  assert.ok('answer' in stand().place.askNow('make', { repo, at: workspace, name: 'wf/r/one', from: 'main', also: [] }));
+  assert.ok('answer' in stand().place.askNow('make', { repo, at: workspace, run: 'r', leaf: 'one', from: 'main', also: [] }));
   const plain = scratch('wf-applied-plain-');
 
   await apply('quiet', dir, repo, '--set', 'budget=3', '--no-trust');

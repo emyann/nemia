@@ -143,7 +143,8 @@ export {
   toDecide,
   toDecideWords,
 } from './ending/ending.ts';
-export type { Landing, MergeState, ToDecide } from './ending/ending.ts';
+export type { Landing, ToDecide } from './ending/ending.ts';
+export type { MergeState } from './place/place.ts';
 export { approvalRefusal, approvalWordsRefusal, holdsOpen } from './gate/gate.ts';
 export {
   admissionOrder,

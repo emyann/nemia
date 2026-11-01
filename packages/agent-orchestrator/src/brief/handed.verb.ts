@@ -40,7 +40,7 @@ const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: 
  * of each run that reads: the first line of its brief, and the closeout of each step whose work is that run's result (`resultSteps`), on
  * the engine's record of its current try, read as `nemia decide` reads one (`closeoutOf`). Read once, on the pass that files the roots.
  *
- * The result's steps, not the terminal ones: where a folder's last step is an ending that merges (`workspace: main`), that step's account
+ * The result's steps, not the terminal ones: where a folder's last step is an ending that merges (`workspace: base`), that step's account
  * is of the merge — "merged wf/…/implement onto main, the check passed" — and it declares nothing, so a child handed it would be handed
  * nothing about the work. What the child wants is what the work said, which is the step the ending acts on. A folder with no ending step
  * is unchanged: its terminal steps are its result.

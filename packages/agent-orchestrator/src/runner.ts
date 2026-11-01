@@ -358,7 +358,7 @@ export type {
   PlaceVerb,
   Removed,
   Standing,
-  Status,
+  MergeState,
   TrialMerge,
   Unread,
 } from './place/place.ts';

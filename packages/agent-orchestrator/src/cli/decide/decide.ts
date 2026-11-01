@@ -5,6 +5,7 @@
 import {
   AGENT_FACING,
   CHECK_AFFECTING,
+  endsOnBase,
   LESSON,
   parseGlobs,
   answersOr,
@@ -184,7 +185,7 @@ type Awaiting = Extract<Decided['decision'], { kind: 'awaiting' }>;
 /** A run's steps, as its workflow was frozen. */
 type Steps = ReturnType<typeof stepsOf>;
 
-/** The step at `workspace: main`, the run's ending, and the line that says it waits for the checkout another run's ending has, or `''`. */
+/** The step at `workspace: base`, the run's ending, and the line that says it waits for the checkout another run's ending has, or `''`. */
 type HeldOut = { ending?: Steps[number]; heldOut: string };
 
 /** A step's closeout as `decide` read it, or why it could not be read. */
@@ -203,7 +204,7 @@ function headOf(run: Decided['run']): string {
 
 /** The run's ending and the indented line that says it waits for the repository's checkout (`checkoutLine`): `''` when nothing holds it. */
 function heldOutOf(steps: Steps, checkout: Decided['checkout']): HeldOut {
-  const ending = steps.find((s) => s.workspace === 'main');
+  const ending = steps.find((s) => endsOnBase(s));
   return { ending, heldOut: checkout && ending ? `  ${checkoutLine(ending.name, checkout)}` : '' };
 }
 

@@ -8,6 +8,7 @@
  * this file, and it imports none of them. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
+import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
 import { wordFeed } from '../feed/word-feed.verb.ts';
@@ -722,7 +723,7 @@ function answerOf(
   const { filed, checked, tried, looped, notes, feed } = done;
   const { status, unreachable } = assessed;
   const inFlight = !takesNoSlot(steps) && (admission.need.inFlight || [filed, checked, tried, looped].some((names) => names.length > 0));
-  const ending = steps.find((s) => s.workspace === 'main');
+  const ending = steps.find((s) => endsOnBase(s));
   const facts: RestFacts = {
     run,
     status,

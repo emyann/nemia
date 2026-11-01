@@ -426,8 +426,8 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       );
       assert.equal(
         steps.find((s) => s.name === 'ship')?.spec.workspace,
-        'main',
-        "and ship's workspace, so a put does not drop that either",
+        'base',
+        "and ship's workspace, its former `main` read as `base`, so a put does not drop that either",
       );
       const res = await put('as-listed', { steps });
       assert.equal(res.status, 200, await res.clone().text());

@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { checkoutAt, committed, dirty, mergedIn, repositoryAt, takenBack } from './acts.ts';
 import { isDirectory, OWN, real, writeChanges } from './disk.ts';
-import { noRepository, refused, type Reply } from './reads.ts';
+import { noRepository, refused, runBranch, type Reply } from './reads.ts';
 import { commitAt, type Held, type Repository } from './world.ts';
 import type { PlaceRequests } from '../../src/place/place.ts';
 
@@ -23,10 +23,12 @@ function cut(repo: Repository, at: string, name: string, from: string): string |
 }
 
 /**
- * `make`: the workspace at `at` on `name`, cut from `from` or taken up as it stands while its directory is one, with each branch of
- * `also` merged into it: one the repository lacks, or asked while a conflict stands, is a note, dropped where a conflict is left.
+ * `make`: the workspace at `at` on `name`, the branch of the run's leaf (`runBranch`), cut from `from` or taken up as it stands while its
+ * directory is one, with each branch of `also` merged into it: one the repository lacks, or asked while a conflict stands, is a note,
+ * dropped where a conflict is left.
  */
-export function make(held: Held, { repo: dir, at, name, from, also }: PlaceRequests['make']): Reply<'make'> {
+export function make(held: Held, { repo: dir, at, run, leaf, from, also }: PlaceRequests['make']): Reply<'make'> {
+  const name = runBranch(run, leaf);
   if (!isDirectory(dir)) return refused(`${dir} is not a directory, so no workspace can be cut from it`);
   const repo = repositoryAt(held, dir);
   if (!repo) return refused(`${at} could not be cut on ${name} from ${from}: ${noRepository(dir)}`);
@@ -61,7 +63,7 @@ export function handoff(held: Held, { workspace, step, why }: PlaceRequests['han
  * and resolved, never a file the checkout was left since.
  */
 export function land(held: Held, request: PlaceRequests['land']): Reply<'land'> {
-  const { checkout: dir, act } = request;
+  const { repo: dir, act } = request;
   const found = checkoutAt(held, dir);
   if (!found) return refused(`there is no merge to ${act}: ${noRepository(dir)}`);
   const { staged } = found.checkout;

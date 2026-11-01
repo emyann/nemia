@@ -3,7 +3,7 @@
  * wait on each other, a workspace, a mode or a loop the team cannot run — and `orderSteps`, `upstreamOf`, `fansOut` and `terminalSteps`
  * read the graph the `after` edges draw.
  */
-import { LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } from '../step/step.ts';
+import { endsOnBase, LOOP_REPLIES, stepPlace, type Workflow, WorkflowError } from '../step/step.ts';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { contextText, sessionContext } from '../keys/index.ts';
 import { LINE_NAME } from '../workspace/workspace.ts';
@@ -62,7 +62,7 @@ export function validate(steps: readonly Workflow[]): void {
   }
 
   validateFolder(steps);
-  validateMainWorkspace(steps);
+  validateBaseWorkspace(steps);
   validateSlot(steps);
 
   const pending = new Map(steps.map((s) => [s.name, new Set(s.after)]));
@@ -105,16 +105,16 @@ function unfilableCheck(steps: readonly Workflow[], s: Workflow): string | undef
 }
 
 /**
- * The ways a step cannot run in the repository's own checkout (`workspace: main`): it is not the workflow's last step, or its `check:`
+ * The ways a step cannot run in the repository's own checkout (`workspace: base`): it is not the workflow's last step, or its `check:`
  * is nobody's to file (`unfilableCheck`).
  *
  * The checkout is where a person's work is, and it is one directory, on the base branch. A step after this one would start from a
  * checkout this one has changed, and a step running beside it would share that directory — the arrangement worktrees exist to prevent.
  * So a workflow has one such step, at its end, and it is refused here rather than at the moment two sessions collide.
  */
-function validateMainWorkspace(steps: readonly Workflow[]): void {
-  for (const s of steps.filter((x) => x.workspace === 'main')) {
-    const named = `${s.name}: \`workspace: main\` runs the step in the repository's own checkout`;
+function validateBaseWorkspace(steps: readonly Workflow[]): void {
+  for (const s of steps.filter((x) => endsOnBase(x))) {
+    const named = `${s.name}: \`workspace: base\` runs the step in the repository's own checkout`;
     const waiting = steps.filter((x) => x.after.includes(s.name)).map((x) => x.name);
     if (waiting.length) {
       throw new WorkflowError(
@@ -325,7 +325,7 @@ export function terminalSteps(steps: readonly Workflow[]): Workflow[] {
  * the name a run's own line of work is cut under, whose cut and the run's would claim one branch; a step named for another step's
  * check (`<name>-check`) or try (`<name>-try<N>`, `<name>-try<N>-check`), whose tasks a run files under those names and would read one as
  * the other; and, where the run's steps work in place (`isolate: false`), a team that says `place: folder`, which has no base branch to
- * work on, one that can run two steps at once (`fansOut`), which would share a directory, and an ending (`workspace: main`), which would
+ * work on, one that can run two steps at once (`fansOut`), which would share a directory, and an ending (`workspace: base`), which would
  * merge a result branch the run does not have.
  *
  * Asked twice, of the same set: of the folder `nemia start` is given, which it refuses (`stepsToStart`), and of the folder a run that has
@@ -344,18 +344,18 @@ export function stepSetRefusal(steps: readonly Workflow[], isolate: boolean): st
       'this workflow can run two steps at once, and --no-worktree would put them in the same directory.\n' +
       'Either drop --no-worktree, or make the steps a chain.'
     );
-  const ending = !isolate ? steps.find((s) => s.workspace === 'main') : undefined;
+  const ending = !isolate ? steps.find((s) => endsOnBase(s)) : undefined;
   if (ending)
     return (
-      `${ending.name}: \`workspace: main\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n` +
+      `${ending.name}: \`workspace: base\` ends this workflow by merging the run's result branch onto the base branch, and --no-worktree gives the run no result branch — every step works on the base branch itself, where the work already is, so there would be nothing to merge.\n` +
       `Either drop --no-worktree, or start a workflow whose last step is not an ending.`
     );
   const line = steps.find((s) => s.name === LINE_NAME);
   if (line)
     return (
       `${LINE_NAME}: a step may not be named \`${LINE_NAME}\`. A run cuts its own line of work — one worktree and one branch per card — ` +
-      `under that name (\`worktrees/<run>/${LINE_NAME}\` on \`wf/<run>/${LINE_NAME}\`), so this step's cut and the run's would claim one ` +
-      `branch. Rename ${LINE_NAME}.md.`
+      `under that name (\`worktrees/<run>/${LINE_NAME}\`, on the run's branch of that name), so this step's cut and the run's ` +
+      `would claim one branch. Rename ${LINE_NAME}.md.`
     );
   const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
   if (clash)

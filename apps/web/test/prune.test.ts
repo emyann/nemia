@@ -9,7 +9,7 @@ type Prunable = Parameters<typeof pruneOffer>[0];
  * A repository run that succeeded: nothing moving, its worktree and its files still on disk. Whether anybody decided it is the api's
  * to say.
  */
-const finished: Prunable = { id: 'r-1', place: 'repository', status: 'succeeded', moving: false, onDisk: { worktrees: true, files: true } };
+const finished: Prunable = { id: 'r-1', place: 'git', status: 'succeeded', moving: false, onDisk: { worktrees: true, files: true } };
 /** The api's decision of a run nobody merged, and of one that worked on its base branch itself (`Decidable['awaiting']`). */
 const unmerged: Awaiting = { branches: ['wf/r-1/implement'], direct: false };
 const direct: Awaiting = { branches: ['main'], direct: true };

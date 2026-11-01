@@ -7,7 +7,7 @@ type Run = Parameters<typeof holdCandidates>[1][number] & Parameters<typeof hold
 /** A repository run of `/code/app` in flight, held by nobody: what the page offers a hold of, and what a hold may wait on. */
 const run = (extra: Partial<Run> = {}): Run => ({
   id: 'r-1',
-  place: 'repository',
+  place: 'git',
   repo: '/code/app',
   cancelledAt: null,
   pruned: null,

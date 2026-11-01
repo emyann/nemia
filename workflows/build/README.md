@@ -19,7 +19,7 @@ with the Actions URL, the failing jobs and a bounded tail of their log — no ag
 them.
 
 Land merges that same pull request, through `landing.ts`, which its check also reads — out of `HEAD` in the repository's own checkout,
-which a `workspace: main` step is given no base ref for. Otto copies the script out and runs `merge --run <id> --subject … --body-file
+which a `workspace: base` step is given no base ref for. Otto copies the script out and runs `merge --run <id> --subject … --body-file
 …`: it refuses anything but this run's own green pull request — not a draft, based on the base branch, its head the commit the review
 read, `mergeable`, the `ci` context green at that commit, and no result branch of the run left out — then merges it with a merge commit
 whose subject and body are his (`gh pr merge --merge --match-head-commit <sha>`, never `--delete-branch`: GitHub deletes the head

@@ -28,7 +28,8 @@ import {
   renderAgent,
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
-import { formerFenceLine, formerFormLine, placeLine } from '../src/former/former.ts';
+import { baseLine, formerFenceLine, formerFormLine, placeLine } from '../src/former/former.ts';
+import { endsOnBase } from '../src/step/step.ts';
 import { readsMounts } from '../src/filed/filed.ts';
 import { FILED_AS } from '../src/keys/filed-as.ts';
 import { scratch } from './scratch.ts';
@@ -431,10 +432,10 @@ test('the terminal steps are where the work ends up', () => {
 });
 
 test("a step that works in the repository's checkout is the workflow's last: REFUSED when anything waits on it, and when another step ends the workflow beside it", () => {
-  const ship = { name: 'ship', after: ['review'], body: 'x', workspace: 'main' } as Workflow;
+  const ship = { name: 'ship', after: ['review'], body: 'x', workspace: 'base' } as Workflow;
   const chain: Workflow[] = [{ name: 'implement', after: [], body: 'x' }, { name: 'review', after: ['implement'], body: 'x' }, ship];
   assert.doesNotThrow(() => validate(chain), 'the last step may work in the checkout');
-  assert.doesNotThrow(() => validate([{ name: 'ship', after: [], body: 'x', workspace: 'main' }]), 'and so may a workflow of one step');
+  assert.doesNotThrow(() => validate([{ name: 'ship', after: [], body: 'x', workspace: 'base' }]), 'and so may a workflow of one step');
 
   const refused = (steps: Workflow[], pattern: RegExp) =>
     assert.throws(
@@ -444,7 +445,7 @@ test("a step that works in the repository's checkout is the workflow's last: REF
     );
   refused(
     [...chain, { name: 'tell', after: ['ship'], body: 'x' }],
-    /^ship: `workspace: main` runs the step in the repository's own checkout, and tell waits on it — each would start from a checkout this step has changed, and none of them is where the run's work is\. It is a workflow's last step: nothing may wait on it\. Move tell before ship, or delete the line\.$/,
+    /^ship: `workspace: base` runs the step in the repository's own checkout, and tell waits on it — each would start from a checkout this step has changed, and none of them is where the run's work is\. It is a workflow's last step: nothing may wait on it\. Move tell before ship, or delete the line\.$/,
   );
   refused(
     [...chain, { name: 'tell', after: ['ship'], body: 'x' }, { name: 'say', after: ['ship'], body: 'x' }],
@@ -452,12 +453,12 @@ test("a step that works in the repository's checkout is the workflow's last: REF
   );
   refused(
     [...chain, { name: 'publish', after: ['review'], body: 'x' }],
-    /^ship: `workspace: main` runs the step in the repository's own checkout, and publish ends the workflow beside it, so both could be working in that one directory at once\. A run has one ending: make ship wait on publish, or delete the line\.$/,
+    /^ship: `workspace: base` runs the step in the repository's own checkout, and publish ends the workflow beside it, so both could be working in that one directory at once\. A run has one ending: make ship wait on publish, or delete the line\.$/,
   );
   refused(
     [
-      { name: 'a', after: [], body: 'x', workspace: 'main' },
-      { name: 'b', after: [], body: 'x', workspace: 'main' },
+      { name: 'a', after: [], body: 'x', workspace: 'base' },
+      { name: 'b', after: [], body: 'x', workspace: 'base' },
     ],
     /^a: .* and b ends the workflow beside it/,
   );
@@ -519,8 +520,8 @@ test('every key a step has is read — none is accepted and then dropped', () =>
     .map(([k, v]) => `${k}: ${v}`)
     .join('\n')}\n---\nDo the work.\n`;
   const w = parseWorkflow('review', text, (file) => (file === 'review.schema.json' ? JSON.stringify(LOOPING) : undefined));
-  const ending = fm('ship', 'after: review\nworkspace: main');
-  assert.equal(ending.workspace, 'main', 'workspace: is read on a step of its own: no step may set it beside a check:');
+  const ending = fm('ship', 'after: review\nworkspace: base');
+  assert.equal(ending.workspace, 'base', 'workspace: is read on a step of its own: no step may set it beside a check:');
   const watching = fm('supervise', 'slot: none');
   assert.equal(watching.slot, 'none', "slot: is read on a step of its own: it is a workflow of one step's");
   const attached = parseWorkflow(
@@ -1178,7 +1179,7 @@ test("`nemia start` is told which codex files still name their sandbox as `permi
   );
 });
 
-test('`nemia start` is told which steps still say `workspace: folder`, with the line it is read as, and nothing of `place:` or `workspace: main`', () => {
+test('`nemia start` is told which steps still say `workspace: folder`, with the line it is read as, and nothing of `place:` or `workspace: base`', () => {
   assert.equal(
     placeLine('w/write.md'),
     'w/write.md: `workspace: folder` is read as `place: folder`, where the step works. The former line is still read; rename it, or save the file from the board, which writes `place:`.',
@@ -1190,7 +1191,7 @@ test('`nemia start` is told which steps still say `workspace: folder`, with the 
   assert.doesNotThrow(() => loadWorkflows(dir), 'the folder starts: the former line stops nothing');
   assert.deepEqual(formerKeyLines(dir), [placeLine(path.join(dir, 'review.md')), placeLine(path.join(dir, 'write.md'))]);
   assert.deepEqual(formerKeyLines(folder({ 'write.md': '---\nplace: folder\n---\nWrite.\n' })), []);
-  assert.deepEqual(formerKeyLines(folder({ 'ship.md': '---\nplace: git\nworkspace: main\n---\nShip.\n' })), []);
+  assert.deepEqual(formerKeyLines(folder({ 'ship.md': '---\nplace: git\nworkspace: base\n---\nShip.\n' })), []);
 });
 
 test("an effort loads as written: which efforts a step's harness takes is the runtime's to judge, at `nemia start` (`start-config.test.ts`)", () => {
@@ -1739,8 +1740,8 @@ test('`gate: true` gates a step — its closeout waits for a person — and a st
   refused('gate: true\ngate: true', /^plan: `gate` is set twice/);
 });
 
-test("`workspace: main` runs a step in the repository's own checkout, and a step without the line works where the shape puts it; REFUSED at load: `worktree`, another word, a `check:` beside it, no value, and the line twice", () => {
-  assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main');
+test("`workspace: base` runs a step in the repository's own checkout, and a step without the line works where the shape puts it; REFUSED at load: `worktree`, another word, a `check:` beside it, no value, and the line twice", () => {
+  assert.equal(fm('ship', 'after: review\nworkspace: base').workspace, 'base');
   assert.equal(fm('implement', 'check: npm test').workspace, undefined, 'a worktree unless it says otherwise');
   const refused = (lines: string, pattern: RegExp) =>
     assert.throws(
@@ -1750,13 +1751,13 @@ test("`workspace: main` runs a step in the repository's own checkout, and a step
     );
   refused(
     'workspace: worktree',
-    /^ship: `workspace: worktree` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues\. Delete the line, or write `workspace: main` to run the step in the repository's own checkout\.$/,
+    /^ship: `workspace: worktree` is what a step without the line already is: the shape of the workflow says which worktree — its own, or the one it continues\. Delete the line, or write `workspace: base` to run the step in the repository's own checkout\.$/,
   );
-  for (const word of ['Main', 'repo', '/tmp/x', 'true']) {
-    refused(`workspace: ${word}`, new RegExp(`^ship: \`workspace: ${word.replace(/\//g, '/')}\` is not \`main\`\\.`));
+  for (const word of ['Base', 'Main', 'repo', '/tmp/x', 'true']) {
+    refused(`workspace: ${word}`, new RegExp(`^ship: \`workspace: ${word.replace(/\//g, '/')}\` is not \`base\`\\.`));
   }
   refused('workspace:', /^ship: `workspace` has no value\. Delete the line rather than leaving it blank/);
-  refused('workspace: main\nworkspace: main', /^ship: `workspace` is set twice/);
+  refused('workspace: base\nworkspace: base', /^ship: `workspace` is set twice/);
 });
 
 test('`place: folder` runs a step in a folder the run makes, with a check and a resume as a worktree takes them, and `place: git` on a repository; REFUSED at load: another word, a team only some of whose steps say `place: folder`', () => {
@@ -1788,16 +1789,16 @@ test('`place: folder` runs a step in a folder the run makes, with a check and a 
       ),
     );
 
-  const team = (...words: Array<'folder' | 'git' | 'main' | undefined>): Workflow[] =>
+  const team = (...words: Array<'folder' | 'git' | 'base' | undefined>): Workflow[] =>
     words.map((word, i) => ({
       name: `s${i}`,
       after: i ? [`s${i - 1}`] : [],
       body: 'x',
       permissionMode: 'dontAsk',
-      ...(word === 'main' ? { workspace: word } : word ? { place: word } : {}),
+      ...(word === 'base' ? { workspace: word } : word ? { place: word } : {}),
     }));
   assert.doesNotThrow(() => validate(team('folder', 'folder')), 'every step says it');
-  assert.doesNotThrow(() => validate(team(undefined, 'git', 'main')), 'or none does, a step frozen before the key among them');
+  assert.doesNotThrow(() => validate(team(undefined, 'git', 'base')), 'or none does, a step frozen before the key among them');
   assert.equal(isFolderTeam(team('folder', 'folder')), true);
   assert.equal(isFolderTeam(team('folder', 'git')), false);
   assert.equal(isFolderTeam(team(undefined)), false, 'a step frozen on a record before the key is a git step');
@@ -1816,7 +1817,7 @@ test('`place: folder` runs a step in a folder the run makes, with a check and a 
     /^s1, s2 say `place: folder`, and s0 works on a repository, as `place: git` — every step of a team says `place: folder`, or none does\./,
   );
   refused(team('folder', 'git'), /^s0 says `place: folder`, and s1 works on a repository/);
-  refused(team('folder', 'main'), /^s0 says `place: folder`, and s1 works on a repository/);
+  refused(team('folder', 'base'), /^s0 says `place: folder`, and s1 works on a repository/);
 
   assert.throws(
     () =>
@@ -1868,7 +1869,11 @@ test('`workspace: folder` is read as its former spelling, `place: folder`, and n
   const former = fm('write', 'workspace: folder');
   assert.equal(former.place, 'folder', 'read as `place: folder`');
   assert.equal(former.workspace, undefined, 'and says no workspace');
-  assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main', '`workspace: main` is still its own word');
+  assert.equal(
+    fm('ship', 'after: review\nworkspace: main').workspace,
+    'base',
+    '`workspace: main` is the former spelling of `base`, not of a place',
+  );
   const attached = parseWorkflow(
     'write',
     '---\nagent: writer\nworkspace: folder\n---\nWrite.\n',
@@ -1900,6 +1905,32 @@ test('`workspace: folder` is read as its former spelling, `place: folder`, and n
     (e: WorkflowError) => e.exitCode === 2 && e.message.includes('`place` is wiring, and belongs on the step'),
     'an agent may not say where its steps work',
   );
+});
+
+test('`workspace: main` is read as its former spelling, `workspace: base`, and never written: `nemia start` names the line, and a frozen step reads as `base`', () => {
+  const former = fm('ship', 'after: review\nworkspace: main');
+  assert.equal(former.workspace, 'base', 'read as `workspace: base`');
+  assert.equal(fm('ship', 'after: review\nworkspace: base').workspace, 'base', 'as the new spelling is');
+  assert.equal(endsOnBase(former), true, 'and it ends on the base');
+  assert.match(renderStep(former), /^workspace: base$/m, 'a save writes `workspace: base`');
+  assert.doesNotMatch(renderStep(former), /workspace: main/);
+  assert.throws(
+    () => renderStep({ ...former, workspace: 'main' as never }),
+    refusedNaming('ship: ', '`workspace: main`', 'former spelling', 'Send `workspace: base`', 'reload it'),
+  );
+  const dir = folder({ 'ship.md': '---\nplace: git\nworkspace: main\n---\nShip.\n' });
+  assert.doesNotThrow(() => loadWorkflows(dir), 'the folder starts: the former line stops nothing');
+  const lines = formerKeyLines(dir);
+  assert.deepEqual(lines, [baseLine(path.join(dir, 'ship.md'))], '`nemia start` names the file');
+  assert.ok(lines[0].includes('`workspace: base`'), lines[0]);
+  assert.deepEqual(formerKeyLines(folder({ 'ship.md': '---\nplace: git\nworkspace: base\n---\nShip.\n' })), []);
+  const frozen = { name: 'ship', after: ['review'], body: 'Ship.', workspace: 'main' } as unknown as Workflow;
+  assert.deepEqual(
+    asNamed(frozen),
+    { name: 'ship', after: ['review'], body: 'Ship.', workspace: 'base' },
+    'a frozen `main` reads as `base`',
+  );
+  assert.equal(endsOnBase(asNamed(frozen)), true);
 });
 
 test('`denials: fail` is read on a job of `claude`, and a step without the line has none; REFUSED at load: another word, no value, the line twice, and on codex — where no denial is ever read', () => {
@@ -2083,12 +2114,12 @@ test("REFUSED at load: `slot: none` on a step of a workflow that has another —
 
 test("REFUSED at load: a `resume:` on a step that runs in the repository's checkout — its session ran in another directory, and an ending starts cold", () => {
   assert.throws(
-    () => fm('ship', 'workspace: main\nresume: review'),
-    refusedNaming('ship: ', '`workspace: main`', "`resume: review` continues review's session", 'Delete one of the two lines'),
+    () => fm('ship', 'workspace: base\nresume: review'),
+    refusedNaming('ship: ', '`workspace: base`', "`resume: review` continues review's session", 'Delete one of the two lines'),
   );
   assert.throws(
-    () => fm('ship', 'resume: review\nworkspace: main'),
-    refusedNaming('ship: ', '`workspace: main`', '`resume: review`', 'Delete one of the two lines'),
+    () => fm('ship', 'resume: review\nworkspace: base'),
+    refusedNaming('ship: ', '`workspace: base`', '`resume: review`', 'Delete one of the two lines'),
     'whichever order the two lines are written in',
   );
   assert.deepEqual(
@@ -2096,11 +2127,11 @@ test("REFUSED at load: a `resume:` on a step that runs in the repository's check
     ['review', ['review']],
     'each key on its own is read as it was: resume: implies after:',
   );
-  assert.equal(fm('ship', 'after: review\nworkspace: main').workspace, 'main', 'and an ending step waits on what it acts on');
+  assert.equal(fm('ship', 'after: review\nworkspace: base').workspace, 'base', 'and an ending step waits on what it acts on');
 });
 
 test("an ending's `check:` is filed by a person's approval or by a step that can send the work back: REFUSED at load with neither", () => {
-  const ending = { name: 'ship', after: ['review'], body: 'x', workspace: 'main', check: 'npm test' } as Workflow;
+  const ending = { name: 'ship', after: ['review'], body: 'x', workspace: 'base', check: 'npm test' } as Workflow;
   const folder = (loop: boolean, gate: boolean): Workflow[] => [
     { name: 'implement', after: [], body: 'x' },
     { name: 'review', after: ['implement'], body: 'x', ...(loop ? { loop: 'implement' } : {}) },
@@ -2111,7 +2142,7 @@ test("an ending's `check:` is filed by a person's approval or by a step that can
     () => validate(folder(false, false)),
     refusedNaming(
       'ship: ',
-      '`workspace: main`',
+      '`workspace: base`',
       '`check: npm test`',
       '(it waits on review)',
       'Add `gate: true`',
@@ -2142,37 +2173,37 @@ test("an ending's `check:` is filed by a person's approval or by a step that can
 });
 
 test("a step that runs in the repository's checkout reads its `check:`, its `gate:` and its `retries:` as any step does", () => {
-  const ship = fm('ship', 'workspace: main\ngate: true\ncheck: npm test');
+  const ship = fm('ship', 'workspace: base\ngate: true\ncheck: npm test');
   assert.deepEqual(
     [ship.workspace, ship.gate, ship.check],
-    ['main', true, 'npm test'],
+    ['base', true, 'npm test'],
     'gated, it loads: the run executes the check on the merge the step staged, and lands or aborts it',
   );
-  assert.deepEqual([fm('ship', 'check: npm test\ngate: true\nworkspace: main').check], ['npm test'], 'whichever order');
-  const ungated = fm('ship', 'workspace: main\ncheck: npm test');
+  assert.deepEqual([fm('ship', 'check: npm test\ngate: true\nworkspace: base').check], ['npm test'], 'whichever order');
+  const ungated = fm('ship', 'workspace: base\ncheck: npm test');
   assert.deepEqual(
     [ungated.gate, ungated.check],
     [undefined, 'npm test'],
     "ungated, the step file itself loads: who files it is the folder's, and `validate` reads the steps together",
   );
   assert.throws(
-    () => fm('ship', 'workspace: main\ngate: true\ncheck: none'),
+    () => fm('ship', 'workspace: base\ngate: true\ncheck: none'),
     /check/,
     "the check's own refusals still hold beside the gate",
   );
-  assert.throws(() => fm('ship', 'workspace: main\ncheck: none'), /check/, 'and without it');
+  assert.throws(() => fm('ship', 'workspace: base\ncheck: none'), /check/, 'and without it');
 });
 
 test("REFUSED at load: a `check:` on a gated step in the repository's checkout that runs on codex — the run keeps the session from committing the merge by a deny list, which codex takes none of", () => {
   for (const lines of [
-    'workspace: main\ngate: true\ncheck: npm test\nharness: codex',
-    'harness: codex\ncheck: npm test\ngate: true\nworkspace: main',
+    'workspace: base\ngate: true\ncheck: npm test\nharness: codex',
+    'harness: codex\ncheck: npm test\ngate: true\nworkspace: base',
   ]) {
     assert.throws(
       () => fm('ship', lines),
       refusedNaming(
         'ship: ',
-        '`workspace: main`',
+        '`workspace: base`',
         '`check: npm test`',
         '`denyWhileLanding`',
         'delete `harness: codex`',
@@ -2182,12 +2213,12 @@ test("REFUSED at load: a `check:` on a gated step in the repository's checkout t
     );
   }
   assert.equal(
-    fm('ship', 'workspace: main\ngate: true\nharness: codex').harness,
+    fm('ship', 'workspace: base\ngate: true\nharness: codex').harness,
     'codex',
     'an ending on codex that runs its own check still loads',
   );
   assert.equal(
-    fm('ship', 'workspace: main\ngate: true\ncheck: npm test\nharness: claude').check,
+    fm('ship', 'workspace: base\ngate: true\ncheck: npm test\nharness: claude').check,
     'npm test',
     'a claude job takes the deny list',
   );
@@ -2195,15 +2226,15 @@ test("REFUSED at load: a `check:` on a gated step in the repository's checkout t
 
 test("REFUSED at load: `retries:` on a step that runs in the repository's checkout — a try of an ending is a person's to ask for", () => {
   for (const lines of [
-    'workspace: main\ngate: true\ncheck: npm test\nretries: 1',
-    'retries: 1\nworkspace: main',
-    'workspace: main\nretries: 0',
+    'workspace: base\ngate: true\ncheck: npm test\nretries: 1',
+    'retries: 1\nworkspace: base',
+    'workspace: base\nretries: 0',
   ]) {
     assert.throws(
       () => fm('ship', lines),
       refusedNaming(
         'ship: ',
-        '`workspace: main`',
+        '`workspace: base`',
         `\`retries: ${/retries: (\d)/.exec(lines)![1]}\``,
         'nemia retry <run> ship',
         'Delete the `retries:` line',
@@ -2513,20 +2544,20 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
     'remote: false is a setting the parser reads, and is written; retries: 0 too',
   );
 
-  const ending = parseWorkflow('ship', '---\nafter: review\nplace: git\ngate: true\nworkspace: main\nharness: claude\n---\nShip it.\n');
+  const ending = parseWorkflow('ship', '---\nafter: review\nplace: git\ngate: true\nworkspace: base\nharness: claude\n---\nShip it.\n');
   const rendered = renderStep(ending);
   assert.equal(
     rendered,
-    ['---', 'after: review', 'place: git', 'workspace: main', 'harness: claude', 'gate: true', '---', 'Ship it.', ''].join('\n'),
-    'workspace: main, which no step sets beside a check:, is written after place, before harness',
+    ['---', 'after: review', 'place: git', 'workspace: base', 'harness: claude', 'gate: true', '---', 'Ship it.', ''].join('\n'),
+    'workspace: base, which no step sets beside a check:, is written after place, before harness',
   );
   assert.deepEqual(parseWorkflow('ship', rendered), ending, 'and read back as the step');
 
-  const watching = parseWorkflow('supervise', '---\nplace: git\nharness: claude\nslot: none\nworkspace: main\n---\nWatch the runs.\n');
+  const watching = parseWorkflow('supervise', '---\nplace: git\nharness: claude\nslot: none\nworkspace: base\n---\nWatch the runs.\n');
   const watched = renderStep(watching);
   assert.equal(
     watched,
-    ['---', 'place: git', 'workspace: main', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'),
+    ['---', 'place: git', 'workspace: base', 'slot: none', 'harness: claude', '---', 'Watch the runs.', ''].join('\n'),
     'slot: none, which only a workflow of one step sets, is written after workspace, before harness',
   );
   assert.deepEqual(parseWorkflow('supervise', watched), watching);

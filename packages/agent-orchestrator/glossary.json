@@ -90,6 +90,16 @@
       "type": "DoorOf"
     },
     {
+      "term": "Ending",
+      "meaning": "a workflow's last step, run on the base (`workspace: base`, `endsOnBase`), filed once a person approves it or once the step before it that can send the work back passes.",
+      "retired": [
+        {
+          "spelling": "workspace: main",
+          "card": "decision 9: the step format says workspace: base, main read as its former spelling"
+        }
+      ]
+    },
+    {
       "term": "Gate",
       "meaning": "a property of a step: nothing after it is started until a person approves.",
       "see": {

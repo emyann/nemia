@@ -11,6 +11,15 @@
  * file's `by: 'wf up'`), the check's marker `wf <name>:`, the alias's own words, the run's branches `wf/<run>/<step>` and git's identity
  * `user.name=wf`; that card says which of them go.
  *
+ * `workspace: main`, `checkout`, `heads` and `staged`, on the day decision 9 retired them (the Ending row in the run core's table; Repo,
+ * Branch / tip and In progress in the place's, whose paths are the port, `src/place`, alone: the adapters speak git by design).
+ * What `workspace: main` has left is its former spelling kept on purpose (`baseSpelled`, `baseLine`, `baseWritten`, `FrozenStepSchema`
+ * and the renders that read it); what the place's words have left is the port's own inner names (`landing.store.ts`'s memo of a
+ * checkout's `status` and its `heads`, the record's `stagedFile`), off the contract, which `place-contract.test.ts` holds. The same
+ * card moved the run's branch prefix, `wf/<run>/`, out of the core into the place that names it (`runBranch` in `place/git/git.ts`, and
+ * its mirror in the test place's `place/memory/reads.ts`): one count each there, against sixteen the core no longer says, and the
+ * prefix keeps its spelling until slice 4 renames it.
+ *
  * It only shrinks: a change that takes a retired spelling out of a file lowers its count here in the same commit, and takes the entry
  * off where none is left; a new retired row in a table adds the counts of its files the day it lands. A count is never raised, nor a
  * file added for an old spelling.
@@ -106,8 +115,10 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/former-reason/former-reason.ts': 1,
   },
   wf: {
+    'packages/agent-orchestrator/place/git/git.ts': 1,
     'packages/agent-orchestrator/place/git/verbs/handoff.ts': 2,
     'packages/agent-orchestrator/place/git/verbs/make.ts': 2,
+    'packages/agent-orchestrator/place/memory/reads.ts': 1,
     'packages/agent-orchestrator/src/admission/admission.ts': 2,
     'packages/agent-orchestrator/src/brief/brief.ts': 1,
     'packages/agent-orchestrator/src/brief/handed.verb.ts': 1,
@@ -116,14 +127,28 @@ export const RETIRED_COUNTS: Readonly<Record<string, Readonly<Record<string, num
     'packages/agent-orchestrator/src/cli/main.ts': 1,
     'packages/agent-orchestrator/src/config/config.store.ts': 1,
     'packages/agent-orchestrator/src/daemon/daemon.store.ts': 1,
-    'packages/agent-orchestrator/src/forget/forget.ts': 2,
-    'packages/agent-orchestrator/src/forget/forget.verb.ts': 2,
-    'packages/agent-orchestrator/src/place/place.store.ts': 3,
     'packages/agent-orchestrator/src/start/store-root.ts': 1,
     'packages/agent-orchestrator/src/status/status.ts': 1,
-    'packages/agent-orchestrator/src/workflow/validate.ts': 1,
-    'packages/agent-orchestrator/src/workspace/workspace.ts': 6,
-    'packages/agent-orchestrator/src/workspace/worktree.store.ts': 3,
+    'packages/agent-orchestrator/src/workspace/worktree.store.ts': 1,
+  },
+  'workspace: main': {
+    'packages/agent-orchestrator/src/applied/render.ts': 1,
+    'packages/agent-orchestrator/src/folder/folder.store.ts': 1,
+    'packages/agent-orchestrator/src/former/former.ts': 7,
+    'packages/agent-orchestrator/src/step/step.ts': 1,
+    'packages/agent-orchestrator/src/template/draft.ts': 1,
+    'packages/agent-orchestrator/src/workflow/step-file.ts': 1,
+  },
+  checkout: {
+    'packages/agent-orchestrator/src/place/landing.store.ts': 15,
+    'packages/agent-orchestrator/src/place/place.ts': 1,
+  },
+  heads: {
+    'packages/agent-orchestrator/src/place/landing.store.ts': 13,
+    'packages/agent-orchestrator/src/place/place.store.ts': 6,
+  },
+  staged: {
+    'packages/agent-orchestrator/src/place/landing.store.ts': 4,
   },
   shipped: {
     'apps/api/src/agents/skills.ts': 1,

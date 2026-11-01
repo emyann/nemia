@@ -131,7 +131,7 @@ const withAgent = (id: string): Record<string, unknown> => {
     tools: ['Read'],
     retries: 2,
     gate: true,
-    workspace: 'main',
+    workspace: 'base',
     output: {
       file: 'review.json',
       schema: { type: 'object', properties: { verdict: { type: 'string' } }, required: ['verdict'], additionalProperties: false },
@@ -144,7 +144,11 @@ const withAgent = (id: string): Record<string, unknown> => {
 /** Each frozen step key the parser types, broken as a person's edit would break it: where it is, and what `readRun` says is there. */
 const BROKEN: ReadonlyArray<[string, (step: Record<string, unknown>) => void, string]> = [
   ['retries', (step) => (step.retries = '2'), 'its `workflow.1.retries` is "2", where nemia writes number'],
-  ['workspace', (step) => (step.workspace = 'shelf'), 'its `workflow.1.workspace` is "shelf", where nemia writes "main" | "folder"'],
+  [
+    'workspace',
+    (step) => (step.workspace = 'shelf'),
+    'its `workflow.1.workspace` is "shelf", where nemia writes "main" | "base" | "folder"',
+  ],
   ['gate', (step) => (step.gate = 'yes'), 'its `workflow.1.gate` is "yes", where nemia writes true'],
   ['tools', (step) => (step.tools = 'Read'), 'its `workflow.1.tools` is "Read", where nemia writes array'],
   [

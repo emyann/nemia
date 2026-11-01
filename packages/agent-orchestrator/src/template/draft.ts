@@ -10,6 +10,7 @@ import type { Agent } from '../agents/agents.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillNamesOf, toolsOf } from '../keys/index.ts';
 import { FACTORY_RULES_FILE } from '../rules/rules.ts';
+import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
 import { API_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step } from './layout.ts';
 
@@ -125,9 +126,9 @@ function blockOf(file: string, keys: Readonly<Record<string, string | undefined>
 /** The step keys of `step` the template has no place for. */
 const unplaced = (step: StepSource): string[] => Object.keys(step.keys).filter((key) => !PLACED.has(key));
 
-/** The wiring of `step`, typed, in the template's order. */
+/** The wiring of `step`, typed, in the template's order: a former `workspace: main` written as `base` (`baseSpelled`). */
 function wiringOf(step: StepSource): Partial<Step> {
-  const keys = step.keys;
+  const keys = baseSpelled(step.keys);
   const wired: Record<string, unknown> = {};
   if (keys.after !== undefined) wired.after = listOf(keys.after);
   if (keys.input !== undefined) wired.input = listOf(keys.input);

@@ -45,10 +45,10 @@ function started(workflowDir: string, inputs?: string[]): string {
   throw Effect.runSync(Effect.flip(Effect.failCause(exit.cause)));
 }
 
-const ALONE = folder('alone', { ship: '---\nplace: git\nworkspace: main\n---\nShip it.\n' });
+const ALONE = folder('alone', { ship: '---\nplace: git\nworkspace: base\n---\nShip it.\n' });
 const AFTER = folder('after', {
   implement: '---\nplace: git\n---\nBuild it.\n',
-  ship: '---\nafter: implement\nplace: git\nworkspace: main\n---\nShip it.\n',
+  ship: '---\nafter: implement\nplace: git\nworkspace: base\n---\nShip it.\n',
 });
 const PLAIN = folder('plain', { implement: '---\nplace: git\n---\nBuild it.\n' });
 

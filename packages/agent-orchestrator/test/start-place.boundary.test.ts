@@ -34,7 +34,7 @@ function workflow(name: string, landing: boolean): string {
   if (landing)
     fs.writeFileSync(
       path.join(dir, 'ship.md'),
-      '---\nafter: implement\nplace: git\nworkspace: main\ngate: true\ncheck: npm test\n---\nShip it.\n',
+      '---\nafter: implement\nplace: git\nworkspace: base\ngate: true\ncheck: npm test\n---\nShip it.\n',
     );
   return dir;
 }

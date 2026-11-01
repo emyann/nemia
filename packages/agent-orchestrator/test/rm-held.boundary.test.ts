@@ -256,7 +256,7 @@ test("REFUSED at shipped defaults: a locked worktree — git will not remove it,
     [2, `nemia rm: ${locked.run.id} not forgotten — its line above says why, and what to do.`],
   );
   assert.deepEqual(held.printed, [
-    `${locked.run.id}  not forgotten: ${locked.wt} is locked (a person holds it), and git will not remove it — unlock it if nothing needs it: git -C ${repo} worktree unlock ${locked.wt}. Its record, files and branches are kept until every worktree is gone: nemia rm ${locked.run.id} again then.`,
+    `${locked.run.id}  not forgotten: ${locked.wt} is held (a person holds it), and the place will not remove it — let it go if nothing needs it: git -C ${repo} worktree unlock ${locked.wt}. Its record, files and branches are kept until every worktree is gone: nemia rm ${locked.run.id} again then.`,
   ]);
   assert.ok(fs.existsSync(path.join(locked.wt, 'locked.txt')) && worktreesOf(repo).includes(locked.wt));
   assert.ok(readRun(locked.run.id).cancelledAt, 'the record is read with its cancellation, still');
@@ -336,14 +336,14 @@ test('REFUSED at shipped defaults: a worktree on no branch — its session stopp
   const held = await runWith(b.e, forgetRun(p.run.id));
   assert.equal(
     forgetLineOf(held),
-    `${p.run.id}  not forgotten: ${p.wt} is on no branch — its HEAD is detached at ${sha.slice(0, 7)}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${p.wt} switch -c <branch>, or finish or abort what left it there), then nemia rm ${p.run.id} again. Its record, files and branches are kept until every worktree is gone: nemia rm ${p.run.id} again then.`,
+    `${p.run.id}  not forgotten: ${p.wt} is on no branch at its tip ${sha.slice(0, 7)} — as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (git -C ${p.wt} switch -c <branch>, or finish or abort what left it there), then nemia rm ${p.run.id} again. Its record, files and branches are kept until every worktree is gone: nemia rm ${p.run.id} again then.`,
   );
   assert.ok(worktreesOf(repo).includes(p.wt) && gitIn(p.wt, 'rev-parse', 'HEAD') === sha, 'the worktree, and its commit, where they were');
 
   gitIn(p.wt, 'checkout', '-q', '--detach', p.branch);
   fs.writeFileSync(path.join(p.wt, 'more.txt'), 'more\n');
   assert.deepEqual(
-    (await runWith(b.e, forgetRun(p.run.id))).left.map((l) => l.detached),
+    (await runWith(b.e, forgetRun(p.run.id))).left.map((l) => l.offBranch),
     [gitIn(p.wt, 'rev-parse', 'HEAD')],
     'uncommitted work beside it, at a commit that is on a branch: a hand-off would still commit onto no branch',
   );

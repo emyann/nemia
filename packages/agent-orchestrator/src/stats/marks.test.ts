@@ -67,7 +67,7 @@ const inFactory = (factory: string, run: RunFrozen): RunFrozen => ({ ...run, fac
 /** A morning of September 2026. */
 const at = (day: number) => `2026-09-${day}T08:00:00.000Z`;
 
-/** Two runs of build in the default factory, reviewer's skill changed by the second, and between them one of another factory, listed last. */
+/** Two runs of build in the default factory, reviewer's skill changed by the second; between them one of another factory, last. */
 const history = (): RunFrozen[] => [
   frozen('r1', '2026-09-10T08:00:00.000Z', [implement, review()], 'v1'),
   frozen('r2', '2026-09-20T08:00:00.000Z', [implement, review()], 'v2'),

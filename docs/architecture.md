@@ -228,7 +228,7 @@ transcripts across her attempts and the runtime's `said`, never a copy; what the
 
 **The library's writers** are the orchestrator's: an agent, a skill or a workflow of yours written, or removed, against the version it
 was read at, and an agent of yours tried on a short brief, each one entry of the command table served on both sides
-(`src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/folder/workflows.verb.ts`), its handler refusing a place but yours. The
+(`src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/workflows/workflows.verb.ts`), its handler refusing a place but yours. The
 command line reads a person's file or draft folder into the form the board sends (`src/cli/writers.ts`); the api guards the write and
 words the board's answer. Both sides hand a handler only what its one spec gives it (`test/writers-cli.test.ts`,
 `apps/api/src/commands/writers.test.ts`).
@@ -311,6 +311,19 @@ required service would change every controller's type at once. The Run door keep
 a root. What still calls the stores the door is over — a start, a plan, the inbox, the level read on every beat, the instruction, the
 upgrade — is counted per file in `test/factory-door.baseline.ts`, which only shrinks; `factory.store.ts`'s functions each take the
 store's root first (`readFactoryAt`, …), its old spellings the same functions at the module's root, for those callers.
+
+**The Workflow door.** A workflow — its folder of markdown, its steps and its README — is read and written through `WorkflowDoor`
+(`packages/agent-orchestrator/src/workflows/workflows.store.ts`), on the Factory door's pattern and rooted as it is. It is addressed
+by the folder, a branded `WorkflowDir` (`src/folder/folder.model.ts`) minted where a folder is resolved (`workflowFolder`, and the
+writers' `yoursWorkflowDir`) and read nominally from a run's record. Its two layers are built the one way (`workflowDoorOver`): the files
+(`workflowFiles(home)`, over `folder.store.ts`, `version.store.ts` and `write.store.ts`, so a folder is the very bytes today's writer
+writes) and a memory stand-in (`workflowDoorMemory`, `src/workflows/memory.store.ts`, in `STAND_INS`), held to one table of walks
+(`test/workflow-walks.ts`). A write checks each step's name, then the draft through the model's `Workflow`, whose checks are its
+invariants (one step at least, no name twice, every `after:` naming a step of it, no steps waiting on each other), and then the version
+it was read at, judged by a pure function (`workflowVersionRefusal`, `src/folder/folder.ts`, which `contracts/workflow-version.contract.ts`
+proves). What still calls the folder's stores is counted per file in `test/workflow-door.baseline.ts`, which only shrinks; `write.store.ts`'s
+functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), its old
+spellings the same functions at the module's root.
 
 Both shells are level-triggered: a pass reads the world, decides and acts, and carries nothing between passes that the
 next could not read again. The one thing the orchestrator's tick keeps in memory is a cache under that rule, not beside

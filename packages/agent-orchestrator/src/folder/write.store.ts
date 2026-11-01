@@ -11,7 +11,7 @@ import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
 import { codexModeWritten } from '../former/former.ts';
 import { agentDeniesOf, parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal, workflowInUse } from './folder.ts';
+import { agentsFolderRefusal, linkRefusal, noStepsRefusal, parseFolder, stepNameRefusal, twiceRefusal, workflowInUse } from './folder.ts';
 import { agentsFor } from '../agents/read.store.ts';
 import type { Agents } from '../agents/agents.ts';
 import { skillsFor, type Places } from '../skills/read.store.ts';
@@ -82,10 +82,10 @@ export function writeWorkflowAt(
       ),
     );
   }
-  if (!steps.length) refuse(`no steps to write to ${at}, and a workflow has at least one. To remove the workflow, remove its folder.`);
+  if (!steps.length) refuse(noStepsRefusal(at));
   for (const step of steps) refuse(stepNameRefusal(step?.name));
   const twice = steps.find((step, i) => steps.findIndex((other) => other.name === step.name) !== i);
-  if (twice) refuse(`two steps are named ${twice.name}, and a step is its file, ${twice.name}.md. Rename one of them.`);
+  if (twice) refuse(twiceRefusal(twice.name));
   const where = places ?? placesAroundAt(home, at);
   const agents = agentsFor(at, where);
   refuse(codexModeRefusal(steps, agents));

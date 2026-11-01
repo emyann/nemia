@@ -481,6 +481,11 @@
       }
     },
     {
+      "term": "Workflow door",
+      "meaning": "the one way a workflow is read and written — its folder of markdown, its steps and its README: `WorkflowDoor` in `packages/agent-orchestrator/src/workflows/workflows.store.ts`, addressed by `WorkflowDir`, its files layer at the store's root a program is given and a memory one, each refusing a write that breaks the model's `Workflow` or the version it was read at.",
+      "type": "WorkflowDoor"
+    },
+    {
       "term": "Workflow step",
       "meaning": "a step as the model holds it (`WorkflowStep`): its name, the steps it waits on, and the keys that shape the graph — `loop`, `gate`, `check`; a run's frozen workflow is a list of them, read loosely.",
       "type": "WorkflowStep"

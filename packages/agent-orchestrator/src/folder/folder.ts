@@ -99,6 +99,14 @@ export const workflowTaken = (dir: string, version: string | null): string =>
 export const workflowInUse = (dir: string, users: readonly string[]): string =>
   `${dir} is still needed: ${users.join(' ')} Nothing was removed.`;
 
+/** Why a workflow written to `dir` with no steps is refused: a workflow has one at least. */
+export const noStepsRefusal = (dir: string): string =>
+  `no steps to write to ${dir}, and a workflow has at least one. To remove the workflow, remove its folder.`;
+
+/** Why a workflow with two steps named `name` is refused: a step is its file. */
+export const twiceRefusal = (name: string): string =>
+  `two steps are named ${name}, and a step is its file, ${name}.md. Rename one of them.`;
+
 /** The files of a folder that are steps: every `.md` but its README, sorted. */
 export const stepFiles = (entries: readonly string[]): string[] => entries.filter((f) => f.endsWith('.md') && !isReadme(f)).sort();
 

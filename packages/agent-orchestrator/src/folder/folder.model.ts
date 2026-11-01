@@ -9,9 +9,9 @@
 import { Schema } from 'effect';
 import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
-import { stepNameRefusal, workflowDirRefusal } from './folder.ts';
+import { noStepsRefusal, stepNameRefusal, twiceRefusal, workflowDirRefusal } from './folder.ts';
 import { workflowNameRefusal } from '../factory/factory.ts';
-import { afterRefusal, cycleRefusal } from '../workflow/validate.ts';
+import { afterRefusal, cycleRefusal } from '../workflow/index.ts';
 
 /** A step's name: its file's name in its workflow's folder, without `.md` (`stepNameRefusal`). */
 export const StepName = brandedId('StepName', stepNameRefusal);
@@ -53,10 +53,10 @@ export const Workflow = Schema.Struct({
   readme: Schema.optional(Schema.String),
 })
   .check(
-    Schema.makeFilter((w) => w.steps.length > 0 || 'a workflow has at least one step: to remove the workflow, remove its folder'),
+    Schema.makeFilter((w) => w.steps.length > 0 || noStepsRefusal(w.dir)),
     Schema.makeFilter((w) => {
       const twice = w.steps.find((step, i) => w.steps.findIndex((other) => other.name === step.name) !== i);
-      return twice === undefined || `two steps are named ${twice.name}, and a step is its file, ${twice.name}.md: rename one of them`;
+      return twice === undefined || twiceRefusal(twice.name);
     }),
     Schema.makeFilter(
       (w) => folderName(w.dir) === w.name || `${w.dir} is not named ${w.name}: a workflow's name is its folder's, so name them alike`,

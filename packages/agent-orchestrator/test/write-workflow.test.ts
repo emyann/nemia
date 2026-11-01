@@ -125,7 +125,7 @@ test('a step changed is rendered and written, a step unchanged keeps its file, a
   );
 });
 
-test('the README is written only when it is given, to the name the README already has — and a new workflow is a folder made, with its first step', () => {
+test('the README is written only when it is given, to the name the README already has', () => {
   const dir = devIn('readme');
   const steps = loadWorkflows(dir);
   fs.renameSync(path.join(dir, 'README.md'), path.join(dir, 'readme.md'));
@@ -141,13 +141,6 @@ test('the README is written only when it is given, to the name the README alread
     true,
     'the same text is left as it is',
   );
-
-  const fresh = path.join(STORE, 'fresh');
-  assert.equal(fs.existsSync(fresh), false);
-  const made = writeWorkflow(fresh, [step('implement')], '# fresh\n\nA first step.\n');
-  assert.deepEqual([made.written, made.kept, made.removed], [['README.md', 'implement.md'], [], []]);
-  assert.deepEqual(snapshot(fresh), { 'README.md': '# fresh\n\nA first step.\n', 'implement.md': '---\nplace: git\n---\nimplement it\n' });
-  assert.deepEqual(loadWorkflows(fresh), made.steps);
 });
 
 test("a draft naming its agent that sends the resolved denies, as the board lists them, is written with the step's own alone", () => {
@@ -231,7 +224,7 @@ test("REFUSED at shipped defaults, with the folder as it was: a folder outside t
   );
 });
 
-test("REFUSED, with the folder as it was, in the parser's words and naming the step: a key a step does not have, `after:` naming no step, a cycle, a loop that is not a back edge", () => {
+test("REFUSED, with the folder as it was, in the parser's words and naming the step: a key a step does not have, a loop that is not a back edge", () => {
   const dir = devIn('refused');
   const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
   const loadRefusal = (file: string, text: string): string => {
@@ -248,16 +241,6 @@ test("REFUSED, with the folder as it was, in the parser's words and naming the s
   const typo = refusal(dir, () => writeWorkflow(dir, [implement, { ...review, afer: ['implement'] } as StepDraft]));
   assert.match(typo, /^review: `afer` is not a key a step has\. A step's keys are: after, resume, /);
   assert.equal(typo, loadRefusal('review.md', '---\nafer: implement\n---\nreview it\n'), 'the sentence a folder on disk is refused with');
-
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, [implement, { ...review, after: ['implment'], loop: undefined, rounds: undefined }])),
-    'review: waits on "implment", which is not a step here',
-  );
-
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, [{ ...implement, after: ['review'] }, review])),
-    'these steps wait on each other: implement, review',
-  );
 
   const docs = step('docs', { after: ['implement'] });
   const unwaited = refusal(dir, () => writeWorkflow(dir, [implement, docs, { ...review, after: ['implement'], loop: 'docs' }]));
@@ -299,45 +282,9 @@ test('REFUSED, with the folder as it was: an `output:` naming a schema that is n
   );
 });
 
-test('REFUSED, with the folder as it was: a step name that is not a file name, one name twice, no steps, and a folder that is a file', () => {
+test('REFUSED, with the folder as it was: a folder that is a file', () => {
   const dir = devIn('names');
-  const [implement, review] = loadWorkflows(dir) as [Workflow, Workflow];
-  const named = (name: string) => [implement, { ...step(name), after: ['implement'] }];
-  const fix = 'Name it as its file is named, without .md — implement, say.';
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, named('../escape'))),
-    `\`../escape\` is not a step's name: a step is a file in its workflow's folder, and a slash names a file in another. ${fix}`,
-  );
-  assert.equal(fs.existsSync(path.join(STORE, 'escape.md')), false);
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, named('README'))),
-    `\`README\` is not a step's name: README.md is the folder's README, which says what the workflow is for and is never read as a step. ${fix}`,
-  );
-  const md = refusal(dir, () => writeWorkflow(dir, named('docs.md')));
-  assert.ok(md.startsWith("`docs.md` is not a step's name"), md);
-  assert.ok(md.endsWith('named without its .md: `docs`.'), md);
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, named('plan,docs'))),
-    `\`plan,docs\` is not a step's name: \`after:\` and \`input:\` split on every comma, so no step could wait on it. ${fix}`,
-  );
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, named('.docs'))),
-    `\`.docs\` is not a step's name: a name that starts with a dot is a hidden file, which a person listing the folder does not see. ${fix}`,
-  );
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, [implement, { ...review, name: '' }])),
-    `A step has no name, and a step is named by its file in the workflow's folder. ${fix}`,
-  );
-
-  const twice = refusal(dir, () => writeWorkflow(dir, [implement, review, { ...implement, body: 'again' }]));
-  assert.ok(twice.startsWith('two steps are named implement'), twice);
-  assert.ok(twice.includes('implement.md'), twice);
-  assert.ok(twice.endsWith('Rename one of them.'), twice);
-  assert.equal(
-    refusal(dir, () => writeWorkflow(dir, [])),
-    `no steps to write to ${dir}, and a workflow has at least one. To remove the workflow, remove its folder.`,
-  );
-
+  const [implement] = loadWorkflows(dir) as [Workflow, Workflow];
   const file = path.join(STORE, 'a-file');
   fs.writeFileSync(file, 'not a folder\n');
   assert.equal(

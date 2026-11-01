@@ -110,6 +110,12 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   still on `factory.store.ts`'s spellings without a root (`test/factory-door.baseline.ts`) reads the module's root whatever door was
   given. A change of a factory's wiring is judged by `wiringRefusal` (`src/wiring/wiring.ts`), whose contract a new rule of the wiring
   is a law of, not a row of a test.
+- **A workflow is read and written through the Workflow door (`WorkflowDoor`, `src/workflows/workflows.store.ts`), rooted as the
+  Factory door is**, and addressed by a `WorkflowDir` minted where a folder is resolved (`workflowFolder`, `workflowDirAt`), never
+  branded from a plain string with `WorkflowDir.read` outside the model and a stored record. A test that only needs a workflow to exist
+  gives its program one `workflowDoorMemory()` (`src/workflows/memory.store.ts`) and writes it through the door (`aWorkflow`,
+  `test/workflow-walks.ts`); code still on the folder's stores (`test/workflow-door.baseline.ts`) reads the disk whatever door was given. A
+  write's version is judged by `workflowVersionRefusal` (`src/folder/folder.ts`), whose contract a new rule of the version is a law of.
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`
   (`folder/folder.store.ts`), a field per `StepKey`: a key added without one fails the typecheck.

@@ -7,7 +7,7 @@ import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { StepName, WorkflowName } from '../record/record.model.ts';
 import { agentNameRefusal, HARNESS_PROMPTS, skillNameRefusal } from './agents.ts';
-import { OVERRIDABLE } from '../workflow/fence.ts';
+import { OVERRIDABLE } from '../workflow/index.ts';
 
 /** An agent's name: its file's in `agents/`, minus `.md` (`agentNameRefusal`). */
 export const AgentName = brandedId('AgentName', agentNameRefusal);

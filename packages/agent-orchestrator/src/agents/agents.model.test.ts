@@ -9,7 +9,7 @@ import path from 'node:path';
 import { Option, Schema } from 'effect';
 import { Agent, AgentName, agentsModel, SkillName, StepAgent } from './agents.model.ts';
 import { parseAgent } from './agents.ts';
-import { overridesOf } from '../workflow/fence.ts';
+import { overridesOf } from '../workflow/index.ts';
 import { readKeys } from '../former/former.ts';
 import { splitFrontmatter } from '../step/step.ts';
 import { TEAM, TEAM_DEV } from '../../test/team.ts';

@@ -671,7 +671,7 @@
     {
       "files": ["packages/agent-orchestrator/src/former/former.ts"],
       "rules": {
-        "sonarjs/cognitive-complexity": ["error", 19]
+        "sonarjs/cognitive-complexity": ["error", 16]
       }
     },
     {

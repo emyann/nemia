@@ -310,7 +310,6 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
     );
   }
   const mcp = serverNamesOf(file, servers);
-  const overridable = overridableOf(file, offered);
   const composed = composedRefusal(file, skills, harnessPrompt, step) ?? serversRefusal(file, mcp, step);
   if (composed !== undefined) refuse(composed);
   return {
@@ -320,7 +319,7 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
     ...(skills !== undefined && { skills }),
     ...(harnessPrompt !== undefined && { harnessPrompt }),
     ...(mcp !== undefined && { mcp }),
-    ...(overridable !== undefined && { overridable }),
+    ...overridableOf(file, offered),
     keys,
     body,
     read: read ?? (() => undefined),
@@ -328,11 +327,11 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
 }
 
 /**
- * `overridable:` as the list of what a step may override of the agent, each one of `OVERRIDABLE`, or `undefined` for no line. Refused: a
- * word not in the list, naming it and the list.
+ * `overridable:` as the agent's field, the list of what a step may override of it, each one of `OVERRIDABLE` — none for no line.
+ * Refused: a word not in the list, naming it and the list.
  */
-function overridableOf(file: string, written: string | undefined): Overridable[] | undefined {
-  if (written === undefined) return undefined;
+function overridableOf(file: string, written: string | undefined): { overridable?: Overridable[] } {
+  if (written === undefined) return {};
   const words = written
     .split(',')
     .map((word) => word.trim())
@@ -343,7 +342,7 @@ function overridableOf(file: string, written: string | undefined): Overridable[]
       `${file}: \`overridable: ${written}\` names \`${unknown}\`, which is not something a step may override. A step may override ${OVERRIDABLE.join(', ')}: name those this agent offers, or delete the line, and a step may override all of them.`,
     );
   }
-  return [...new Set(words)] as Overridable[];
+  return { overridable: [...new Set(words)] as Overridable[] };
 }
 
 /** Whether a `skills:` value is a card's file, as the line's former use named one: one `.json` file. No skill's name ends so. */

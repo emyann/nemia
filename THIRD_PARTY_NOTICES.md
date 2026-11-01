@@ -273,6 +273,13 @@ sources of its code.
    limitations under the License.
 ```
 
+## tsverify — emyann
+
+The verifier's own skill, from [emyann/tsverify](https://github.com/emyann/tsverify) (`skills/tsverify`): `.claude/skills/tsverify`,
+taken from the root by `npx skills add emyann/tsverify -a claude-code --copy -y` and refreshed by `npx skills update`. It describes the
+release it was taken from; the package this repository pins, `@emyann/tsverify`, installs the pages it cites under
+`node_modules/@emyann/tsverify/docs/`. Its author and its licence, MIT, are this repository's own (`LICENSE`).
+
 ## The design system kit — french-tech-homies
 
 From [french-tech-homies/design-system](https://github.com/french-tech-homies/design-system), through its shadcn registry (`@ds` in

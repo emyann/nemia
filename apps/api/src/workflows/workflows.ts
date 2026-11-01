@@ -78,8 +78,8 @@ export type WorkflowStepSpec = {
    * file says one; null only for a step frozen on a run record before the key, which worked on a repository.
    */
   place: 'git' | 'folder' | null;
-  /** `workspace: main`: the step runs in the repository's own checkout. Null for a step without the line. */
-  workspace: 'main' | null;
+  /** `workspace: base`: the step runs in the repository's own checkout, on the base branch. Null for a step without the line. */
+  workspace: 'base' | null;
   /** The factory's folders the step may write (`writable:`), each by its directory's name: empty where it writes none of them. */
   writable: string[];
   /** What of the store the step reads and never writes (`reads:`), each by its name (`inbox`, `costs`): empty where it reads none. */

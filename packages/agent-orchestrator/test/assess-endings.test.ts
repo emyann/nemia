@@ -72,7 +72,7 @@ const approval = (step: string, n: number, message?: string) => ({
 const SHIP: Workflow = {
   name: 'ship',
   after: ['review'],
-  workspace: 'main',
+  workspace: 'base',
   gate: true,
   body: "Ship it: trial merge this run's result branch onto the base branch, run the check, and commit.\n\nAbort on any failure.",
 };
@@ -168,7 +168,7 @@ const said = (outcome: Closeout['outcome']): Closeout => ({
 });
 
 /** `implement → ship`, ship an ending with a check: approved first, in the repository's checkout (`landsOnCheck`). */
-const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'main', gate: true, check: 'npm test' };
+const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'land it', workspace: 'base', gate: true, check: 'npm test' };
 const LANDING_STEPS = [step('implement'), LANDER];
 /** ship filed, signed, its check filed. */
 const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
@@ -644,7 +644,7 @@ test("`workspacePlan` and the run's result: an ending works in the repository's 
   await t.test(
     "`workspace: main` is the repository's own checkout, and the run's result is the work the ending step acts on, not its branch",
     () => {
-      const ending: Workflow = { name: 'ship', after: ['review'], body: 'land it', workspace: 'main', gate: true };
+      const ending: Workflow = { name: 'ship', after: ['review'], body: 'land it', workspace: 'base', gate: true };
       const dev = [step('implement'), step('review', ['implement']), ending];
       assert.deepEqual(workspacePlan(dev, ending), { kind: 'base' }, 'said by the step, not by the shape');
       assert.deepEqual(workspacePlan(dev, dev[1]), { kind: 'inherit', from: 'implement' }, 'and nothing else changes');
@@ -658,7 +658,7 @@ test("`workspacePlan` and the run's result: an ending works in the repository's 
         ['review'],
         'a folder with no ending step is unchanged',
       );
-      const fanIn: Workflow[] = [step('a'), step('b'), { name: 'ship', after: ['a', 'b'], body: 'land it', workspace: 'main' }];
+      const fanIn: Workflow[] = [step('a'), step('b'), { name: 'ship', after: ['a', 'b'], body: 'land it', workspace: 'base' }];
       assert.deepEqual(
         resultSteps(fanIn).map((s) => s.name),
         ['a', 'b'],
@@ -693,7 +693,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     "an ending step is told where the work is — the branches, not the workspace — since the repository's checkout is not where the run worked",
     () => {
-      const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'main', gate: true };
+      const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'base', gate: true };
       const dev = [step('implement'), step('review', ['implement']), ending];
       const r = run(
         { implement: 't1', review: 't2', ship: null },
@@ -718,7 +718,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     'an ending step is told the check the work was judged by, one line for each distinct check, and none when no step has one',
     () => {
-      const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'main', gate: true };
+      const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'base', gate: true };
       const r = run(
         { implement: 't1', review: 't2', ship: null },
         {
@@ -763,7 +763,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     'a step in the checkout whose run cut no branch — the whole workflow is that step — is told so, and is given no empty fence to read',
     () => {
-      const watcher: Workflow = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'main', slot: 'none' };
+      const watcher: Workflow = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'base', slot: 'none' };
       const r = run({ supervise: 't1' }, { steps: { supervise: { taskId: 't1', workspace: '/repo', branch: 'main' } } });
       const brief = composeBrief(watcher, r, [watcher], () => undefined, FILES);
       assert.match(brief, /You are in \/repo, the repository's own checkout, on main — not in a worktree of this run's\./);
@@ -778,7 +778,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     'a late try of a step in the checkout is told the base branch by name, never the sha the run froze: a step that does not end is composed again on every answer',
     () => {
-      const watcher: Workflow = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'main', slot: 'none' };
+      const watcher: Workflow = { name: 'supervise', after: [], body: 'Watch the runs.', workspace: 'base', slot: 'none' };
       const r = run(
         { supervise: 't1' },
         {
@@ -815,7 +815,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
   await t.test(
     'a step in the checkout is told the one place its files go: the run hands nothing off there, so nothing it leaves is collected or committed',
     () => {
-      const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'main', gate: true };
+      const ending: Workflow = { name: 'ship', after: ['review'], body: 'Ship it.', workspace: 'base', gate: true };
       const dev = [step('implement'), step('review', ['implement']), ending];
       const r = run(
         { implement: 't1', review: 't2', ship: null },

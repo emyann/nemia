@@ -966,7 +966,7 @@ test('REFUSED at `nemia start`: --no-worktree on a workflow whose last step merg
     async () => await runPlaced(startRun({ brief: 'add sub', repo, workflowDir: dir, isolate: false })),
     (err: Error & { exitCode?: number; _tag?: string }) => {
       assert.deepEqual([err._tag, err.exitCode], ['Invalid', 2]);
-      assert.ok(err.message.startsWith('ship: `workspace: main` ends this workflow'), err.message);
+      assert.ok(err.message.startsWith('ship: `workspace: base` ends this workflow'), err.message);
       assert.ok(err.message.includes('--no-worktree gives the run no result branch'), err.message);
       assert.ok(err.message.includes('Either drop --no-worktree'), 'and names the flag to drop');
       assert.ok(err.message.includes('whose last step is not an ending'), 'or the workflow to start');

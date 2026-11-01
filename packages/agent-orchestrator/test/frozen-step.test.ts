@@ -66,7 +66,7 @@ test('a step with every key the parser types, its agent and its output reads as 
     resume: 'implement',
     input: ['implement'],
     place: 'folder',
-    workspace: 'main',
+    workspace: 'base',
     slot: 'none',
     harness: 'claude',
     model: 'opus',
@@ -186,7 +186,7 @@ test('every former name of a key (`FORMER_KEYS`) is checked as the key it is now
   }
 });
 
-test("a step frozen before `place:`, with `workspace: folder`, is read as `place: folder`, its agent's keys too; one with neither key reads as it was, a git step", () => {
+test("a step frozen before `place:`, with `workspace: folder`, is read as `place: folder`, its agent's keys too; one frozen as `workspace: main` as `workspace: base`; one with neither key reads as it was, a git step", () => {
   const record = {
     name: 'write',
     after: [],
@@ -212,7 +212,14 @@ test("a step frozen before `place:`, with `workspace: folder`, is read as `place
   };
   const main = decode(ending);
   assert.ok(Result.isSuccess(main));
-  assert.deepEqual(asNamed(main.success), ending, '`workspace: main` is its own word, and is left as it is');
+  assert.deepEqual(
+    asNamed(main.success),
+    { ...ending, workspace: 'base' },
+    "`workspace: main` is the former spelling of `workspace: base`, read as it, its agent's keys naming the same key",
+  );
+  const base = decode({ ...ending, workspace: 'base' });
+  assert.ok(Result.isSuccess(base));
+  assert.deepEqual(asNamed(base.success), { ...ending, workspace: 'base' }, 'and a step frozen as `base` reads as it was');
   const old = { name: 'implement', after: [], body: 'Build.' };
   const read = decode(old);
   assert.ok(Result.isSuccess(read));

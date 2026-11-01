@@ -21,12 +21,12 @@ test('filedAllows', async (t) => {
   await t.test(
     "a step in the checkout is filed with a read of its run's artifacts after its own rules, on the default harness and on each one fenced by permission rules",
     () => {
-      assert.deepEqual(filedAllows({ workspace: 'main' }, ARTIFACTS), [READ]);
-      assert.deepEqual(filedAllows({ workspace: 'main', harness: 'claude', allowedTools: ['Bash(git status)'] }, ARTIFACTS), [
+      assert.deepEqual(filedAllows({ workspace: 'base' }, ARTIFACTS), [READ]);
+      assert.deepEqual(filedAllows({ workspace: 'base', harness: 'claude', allowedTools: ['Bash(git status)'] }, ARTIFACTS), [
         'Bash(git status)',
         READ,
       ]);
-      assert.deepEqual(filedAllows({ workspace: 'main', allowedTools: [READ] }, ARTIFACTS), [READ], 'given once');
+      assert.deepEqual(filedAllows({ workspace: 'base', allowedTools: [READ] }, ARTIFACTS), [READ], 'given once');
     },
   );
 
@@ -37,14 +37,14 @@ test('filedAllows', async (t) => {
       assert.equal(filedAllows({ allowedTools: own }, ARTIFACTS), own, 'a worktree');
       const inFolder = { place: 'folder' as const, allowedTools: own };
       assert.equal(filedAllows(inFolder, ARTIFACTS), own, 'a folder');
-      assert.equal(filedAllows({ workspace: 'main', harness: 'codex' }, ARTIFACTS), undefined, 'a sandbox');
-      assert.equal(filedAllows({ workspace: 'main', harness: 'a2a:far-away' }, ARTIFACTS), undefined, 'a remote agent');
+      assert.equal(filedAllows({ workspace: 'base', harness: 'codex' }, ARTIFACTS), undefined, 'a sandbox');
+      assert.equal(filedAllows({ workspace: 'base', harness: 'a2a:far-away' }, ARTIFACTS), undefined, 'a remote agent');
     },
   );
 });
 
 /** `implement → ship`, ship an ending with a check: approved first, in the repository's checkout (`landsOnCheck`). */
-const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'main', gate: true, check: 'npm test' };
+const LANDER: Workflow = { name: 'ship', after: ['implement'], body: 'ship it', workspace: 'base', gate: true, check: 'npm test' };
 /** ship filed, signed, its check filed: every phase given, the checkout's state given. */
 const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> = {}): Run => ({
   ...run({ implement: 't-impl' }, { approvals: [{ step: 'ship', try: 1, at: '2026-01-01T00:30:00Z' }], ...rest }),

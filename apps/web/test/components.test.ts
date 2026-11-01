@@ -2918,7 +2918,7 @@ test('a step at its gate is a human gate on the canvas, and its node says what i
     `<span class="font-semibold">${PERSON['awaiting-approval'].rail}</span><span data-need="approve"> · approve review&#x27;s hand-off</span>`,
     'what approving does, in a line that names the step as `wf ls` does: a step that ran hands on',
   );
-  const spec = { ...atGate().steps[0].spec, workspace: 'main' } as RunDetail['steps'][number]['spec'];
+  const spec = { ...atGate().steps[0].spec, workspace: 'base' } as RunDetail['steps'][number]['spec'];
   const ending = nodeMarkup(atGate({ taskId: null, spec, attempts: { count: 0, latest: null } }));
   assert.match(ending, /<span data-need="approve"> · approve review to run it<\/span>/, 'an ending not filed runs');
   assert.match(ending, />not filed yet</, 'an ending at its gate has not been filed: not `no session yet`');
@@ -3127,7 +3127,7 @@ function endingRun(over: Partial<RunDetail> = {}): RunDetail {
       effort: null,
       after: ['review'],
       context: null,
-      workspace: 'main',
+      workspace: 'base',
       place: null,
       resume: null,
       permissionMode: null,

@@ -236,7 +236,7 @@ export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[ste
 /**
  * Whether an ending's merge is landed by the run on its check: it acts on the base branch (`endsOnBase`) and has a `check:` — which a
  * workflow takes beside `workspace: main` only with `gate: true`, so that a person's approval files it, or with a step before it that can
- * send the work back (`loop:`), so that its pass files it (`validateMainWorkspace`). Pure, and no reading of the gate: what the step is,
+ * send the work back (`loop:`), so that its pass files it (`validateBaseWorkspace`). Pure, and no reading of the gate: what the step is,
  * not who files it.
  *
  * Such a step stages the merge and signs off; the run executes its check on the merged tree, as it executes any step's, and commits the

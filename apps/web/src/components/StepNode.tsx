@@ -369,5 +369,5 @@ function GateBand({ word, need }: { word: string; need: { kind: Need['kind']; sa
  */
 const nodeNeed = (need: Need, step: StepNodeData['step']): string =>
   need.kind === 'approve'
-    ? gateNodeLine({ step: step.name, ends: step.spec?.workspace === 'main' && step.taskId === null })
+    ? gateNodeLine({ step: step.name, ends: step.spec?.workspace === 'base' && step.taskId === null })
     : needText(need);

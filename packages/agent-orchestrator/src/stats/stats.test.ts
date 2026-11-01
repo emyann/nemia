@@ -26,7 +26,7 @@ const TEAM = [
   step('design', [], { by: 'seldon' }),
   step('implement', ['design'], { by: 'ada' }),
   step('review', ['implement'], { by: 'agora', loop: 'implement', rounds: 3 }),
-  step('land', ['review'], { by: 'otto', workspace: 'main', gate: true, check: 'npm test' }),
+  step('land', ['review'], { by: 'otto', workspace: 'base', gate: true, check: 'npm test' }),
 ];
 
 /**
@@ -224,7 +224,7 @@ test('first-try landings read the `workspace: main` step: landed on try 1 counts
     'land',
     { commit: 'def' },
   );
-  const noEnding = TEAM.filter((s) => s.workspace !== 'main');
+  const noEnding = TEAM.filter((s) => s.workspace !== 'base');
   const folderish = readOf('none', noEnding, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }] });
   const facts = factsOfAll(first, second, folderish);
   const byId = new Map(facts.runs.map((r) => [r.run, r]));
@@ -252,7 +252,7 @@ test('a run with no ending finishes once each step is done; a check refused or u
 });
 
 test('an ending that commits in its own prose finishes once done, its landing unknown; one that lands on its check waits to land', () => {
-  const prose = TEAM.map((s) => (s.workspace === 'main' ? { ...s, check: undefined } : s));
+  const prose = TEAM.map((s) => (s.workspace === 'base' ? { ...s, check: undefined } : s));
   const tries = (land: Try[]) => ({
     design: [{ end: at(1) }],
     implement: [{ end: at(2), cause: 'round' as const }, { end: at(4) }],
@@ -414,7 +414,7 @@ test('the recap line is one line, and says — where nothing was measured', () =
 });
 
 test('a loop that asked for another round leaves a run with no ending waiting, until a person accepts it', () => {
-  const noEnding = TEAM.filter((s) => s.workspace !== 'main');
+  const noEnding = TEAM.filter((s) => s.workspace !== 'base');
   const tries = { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }] };
   assert.equal(factsOf(readOf('settled', noEnding, tries)).runs.length, 1, 'the same run, its loop signed off again: false, finished');
   const r = readOf('asked', noEnding, tries, {}, true);
@@ -428,7 +428,7 @@ test('a loop that asked for another round leaves a run with no ending waiting, u
 });
 
 test('a day whose runs never recorded their landing has no landed count, printed —; a day with one recorded counts it', () => {
-  const prose = TEAM.map((s) => (s.workspace === 'main' ? { ...s, check: undefined } : s));
+  const prose = TEAM.map((s) => (s.workspace === 'base' ? { ...s, check: undefined } : s));
   const old = (id: string) =>
     readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
   const unknown = factsOfAll(old('old-1'), old('old-2'));
@@ -934,7 +934,7 @@ test("a round's check is no landing, whatever its time, and a step is a landing 
     implement: [{ end: at(2), check: 'passed', checkRan: 1080, deadline: 1200 }],
   });
   assert.deepEqual(statsOf(factsOfAll(round), {}, NOW).all.slowLandings, []);
-  const landing = checked.map((s) => (s.name === 'implement' ? { ...s, workspace: 'main' as const, gate: true as const } : s));
+  const landing = checked.map((s) => (s.name === 'implement' ? { ...s, workspace: 'base' as const, gate: true as const } : s));
   const lands = readOf('lands', landing, {
     design: [{ end: at(1) }],
     implement: [{ end: at(2), check: 'passed', checkRan: 1080, deadline: 1200 }],

@@ -377,7 +377,7 @@ function unfenced(step: Step, settings: Settings = SETTINGS, calls: Call[] = FEN
   if (harness !== 'claude') return [`${step.name}: on ${harness}, which this test does not know how to fence`];
   const denies = [...(step.disallowedTools ?? []), ...(settings.permissions?.deny ?? [])];
   const allows = granting([...(step.allowedTools ?? []), ...(settings.permissions?.allow ?? []), ...grants]);
-  const dontAsk = step.permissionMode === 'dontAsk' && step.workspace !== 'main';
+  const dontAsk = step.permissionMode === 'dontAsk' && step.workspace !== 'base';
   return calls
     .filter((call) => {
       if (deniedPartsOfCall(call).some((part) => denies.some((rule) => reaches(rule, part)))) return false;
@@ -973,7 +973,7 @@ const ACTS: Call[] = [...['npx nemia', 'nemia', 'npx wf', 'wf'].flatMap(actsBy),
  * own denies; any other step runs every call no deny names.
  */
 function acting(step: Step): string[] {
-  if (step.permissionMode !== 'dontAsk' || step.workspace === 'main')
+  if (step.permissionMode !== 'dontAsk' || step.workspace === 'base')
     return [`${step.name}: not a dontAsk job, so every call no deny names runs`];
   const allows = [...(step.allowedTools ?? []), ...(SETTINGS.permissions?.allow ?? []), ...SKILL_GRANTS];
   return ACTS.filter(
@@ -1332,7 +1332,7 @@ const landIn = (workflow: string, root = SHIPPED_HOLDERS[0]): Step | undefined =
 
 test("quick's land is build's land but its after and its gate: main has one guard, whatever the workflow", () => {
   const [build, quick] = [landIn('build'), landIn('quick')];
-  assert.ok(build?.check && build.gate === true && build.workspace === 'main', 'build lands at a gate, in the checkout, on a check');
+  assert.ok(build?.check && build.gate === true && build.workspace === 'base', 'build lands at a gate, in the checkout, on a check');
   assert.deepEqual(landingOf(quick), landingOf(build));
   assert.deepEqual([build.after, quick?.after], [['review'], ['review']], "each waits on its workflow's review");
   assert.deepEqual(
@@ -1648,7 +1648,7 @@ function unbreakable(step: Step, rules: readonly SkillRule[]): string[] {
 }
 
 /** Whether a step is a dontAsk job, which runs only what an allow reaches: what a denial of its is recorded for. */
-const dontAskJob = (step: Step): boolean => step.permissionMode === 'dontAsk' && step.workspace !== 'main';
+const dontAskJob = (step: Step): boolean => step.permissionMode === 'dontAsk' && step.workspace !== 'base';
 
 test("every shipped skill's rules.json reads, and every call that breaks one of its rules is refused to each dontAsk step given it", () => {
   assert.ok(SHIPPED_RULES.length > 0, 'a skill ships its rules');

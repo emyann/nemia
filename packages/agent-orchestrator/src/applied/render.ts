@@ -14,6 +14,7 @@ import { FACTORY_RULES_FILE, factoryRulesRefusal } from '../rules/rules.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { isMap, type ReadFolder } from '../template/index.ts';
 import { renderStep } from '../workflow/index.ts';
+import { baseSpelled } from '../former/former.ts';
 import { substitute, type Params } from './params.ts';
 
 /** A checked template as the store hands it in: its folder as read, and the text of one of its files by its path. */
@@ -110,13 +111,17 @@ const STEP_WORDS = [
   'tally',
 ];
 
-/** The step `step` of `workflow` as its file: its wiring, its overrides on the harness it runs on (`harness`), and its instruction. */
+/**
+ * The step `step` of `workflow` as its file: its wiring, a former `workspace: main` written as `base` (`baseSpelled`), its overrides on
+ * the harness it runs on (`harness`), and its instruction.
+ */
 function stepFile(workflow: string, step: Spec, harness: string, read: TemplateRead, refusals: string[]): string | undefined {
   const name = String(step.name);
   const where = `${WORKFLOWS}/${workflow}/workflow.yaml, step ${name}`;
   const keys: Record<string, string> = {};
   for (const key of STEP_WORDS) if (step[key] !== undefined) keys[key] = lineOf(step[key]);
   if (step.gate === true) keys.gate = 'true';
+  Object.assign(keys, baseSpelled(keys));
   const overrides = isMap(step.overrides) ? step.overrides : {};
   if (typeof overrides.harness === 'string') keys.harness = overrides.harness;
   if (overrides.skills !== undefined) keys.skills = lineOf(overrides.skills);

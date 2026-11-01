@@ -54,6 +54,8 @@ import {
   formerKeyWritten,
   placeSpelled,
   placeWritten,
+  baseSpelled,
+  baseWritten,
   readKeys,
   type Spelled,
 } from '../former/former.ts';
@@ -121,7 +123,7 @@ export function parseWorkflow(
     block === null
       ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
       : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
-  meta = placeSpelled(name, meta);
+  meta = baseSpelled(placeSpelled(name, meta));
   placeRequired(name, meta.place);
   const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
@@ -465,7 +467,8 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never
  * see: a key no step has, in the parser's words, since it would be dropped; a comma inside a step's name in `after:` or `input:`, which
  * would be read as two names; and `workspace: folder`, the former spelling of `place: folder`, which the parser reads but nothing writes
- * (`placeWritten`). A line break in a value is no refusal: it is written as a literal block, which holds it.
+ * (`placeWritten`), as `workspace: main` is of `workspace: base` (`baseWritten`). A line break in a value is no refusal: it is written
+ * as a literal block, which holds it.
  *
  * A step with no key and a body that opens on `---` is written after a frontmatter of one blank line: with none before it, the body
  * would be read as the frontmatter, and after an empty one, as its block.
@@ -478,6 +481,7 @@ export function renderStep(step: StepDraft): string {
     refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
   if (step.harness === 'codex' && step.permissionMode != null) refuse(codexModeWritten(step.name, step.permissionMode));
   if ((step.workspace as string | undefined) === 'folder') refuse(placeWritten(step.name));
+  if ((step.workspace as string | undefined) === 'main') refuse(baseWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const pairs = STEP_KEYS.flatMap((key): FrontmatterPair[] => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : ownValue(step, key));

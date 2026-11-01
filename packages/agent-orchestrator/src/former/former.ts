@@ -1,9 +1,9 @@
 /**
  * The names a key had before it was renamed, and every place one is still read or written back: `FORMER_KEYS`, the frontmatter read under
  * either name (`readKeys`), a line written in the form the file has (`formerKeyWritten`, `codexModeWritten`), a Codex sandbox named by
- * `permissionMode:` (`codexSandboxNamed`, `formerSandbox`), `workspace: folder` read as `place: folder` (`placeSpelled`), the fence a step
- * asks for under either key (`modeOf`), an agent's own key renamed and its words (`FORMER_OWN_KEYS`, `harnessPromptNamed`), and a step
- * frozen on a run record under an old name (`asNamed`).
+ * `permissionMode:` (`codexSandboxNamed`, `formerSandbox`), `workspace: folder` read as `place: folder` (`placeSpelled`), `workspace: main`
+ * read as `workspace: base` (`baseSpelled`), the fence a step asks for under either key (`modeOf`), an agent's own key renamed and its
+ * words (`FORMER_OWN_KEYS`, `harnessPromptNamed`), and a step frozen on a run record under an old name (`asNamed`).
  */
 import { LIST_KEYS, refuse, splitFrontmatter, type StepAgent, type StepKey, type Workflow } from '../step/step.ts';
 import { flatValue, frontmatterOrNull, readFrontmatter, type FrontmatterEntry } from '../frontmatter/frontmatter.ts';
@@ -63,7 +63,8 @@ export function codexSandboxNamed<K extends string>(
 /**
  * A step's lines with `workspace: folder` read as `place: folder`, the key where a step works now: so a folder that says the former line
  * still loads, its step's own keys say `place`, and `nemia start` names the line to rename (`placeLine`). Refused when `place:` is written
- * beside it: the two say one thing, and the file keeps one line. `workspace: main` is the key's own word, and is left as it is. Pure.
+ * beside it: the two say one thing, and the file keeps one line. `workspace: main` is the key's own former word, read as `base`
+ * (`baseSpelled`). Pure.
  */
 export function placeSpelled<K extends string>(
   file: string,
@@ -86,6 +87,24 @@ export const placeLine = (file: string): string =>
 /** Why `workspace: folder` is not written, as `formerKeyWritten` says of a former name: what sends one is a stale form. */
 export const placeWritten = (file: string): string =>
   `${file}: \`workspace: folder\` is the former spelling of \`place: folder\`, which a file may still say but nothing writes. Send \`place: folder\` — a page that sends the former spelling is stale: reload it, and save again.`;
+
+/**
+ * A step's lines with `workspace: main` read as `workspace: base`, the word for a step that works on the base branch in the repository's
+ * own checkout: so a folder that says the former line still loads, its step says `base`, and `nemia start` names the line to rename
+ * (`baseLine`). One key holds both spellings, so the file cannot say the two at once. Pure.
+ */
+export function baseSpelled<K extends string>(meta: Partial<Record<K | 'workspace', string>>): Partial<Record<K | 'workspace', string>> {
+  if (meta.workspace !== 'main') return meta;
+  return { ...meta, workspace: 'base' };
+}
+
+/** What `nemia start` says of a step file that still says `workspace: main` (`baseSpelled`). The one writer of it. */
+export const baseLine = (file: string): string =>
+  `${file}: \`workspace: main\` is read as \`workspace: base\`, a step that works on the base branch in the repository's own checkout. The former line is still read; rename it, or save the file from the board, which writes \`workspace: base\`.`;
+
+/** Why `workspace: main` is not written, as `formerKeyWritten` says of a former name: what sends one is a stale form. */
+export const baseWritten = (file: string): string =>
+  `${file}: \`workspace: main\` is the former spelling of \`workspace: base\`, which a file may still say but nothing writes. Send \`workspace: base\` — a page that sends the former spelling is stale: reload it, and save again.`;
 
 /** The sandbox a codex permission mode named: itself, or `danger-full-access` for `bypassPermissions`, the engine's alias for it. */
 const sandboxNamed = (word: string): string => (word === 'bypassPermissions' ? 'danger-full-access' : word);
@@ -244,20 +263,21 @@ export const harnessPromptLine = (file: string, word: string): string =>
 /**
  * A step as a record holds it: a `Workflow` whose agent's `keys` may still name a key by its former name (`FORMER_KEYS`), and whose agent
  * may still hold its harness prompt as `systemPrompt` (`FORMER_OWN_KEYS`), in a former word, and whose place may still be `workspace:
- * 'folder'` (`placeSpelled`).
+ * 'folder'` (`placeSpelled`), and whose ending may still say `workspace: 'main'` (`baseSpelled`).
  */
 export type FrozenStep = Omit<Workflow, 'agent' | 'workspace'> & {
-  workspace?: 'main' | 'folder';
+  workspace?: 'main' | 'base' | 'folder';
   agent?: Omit<StepAgent, 'keys'> & { keys: string[]; systemPrompt?: string };
 };
 
 /**
  * Whether a frozen step names no key by a former name (`FORMER_KEYS`): on its fields, in its agent's `keys` or in its agent's `given`; and
- * its agent holds no former `systemPrompt` (`FORMER_OWN_KEYS`); and it says no `workspace: 'folder'`, there or in its agent's `given`.
+ * its agent holds no former `systemPrompt` (`FORMER_OWN_KEYS`); and it says no `workspace: 'folder'` or `workspace: 'main'`, there or
+ * in its agent's `given`.
  */
 function isNamed(step: FrozenStep): step is Workflow {
   if (step.agent && Object.hasOwn(step.agent, 'systemPrompt')) return false;
-  if (step.workspace === 'folder' || step.agent?.given?.workspace === 'folder') return false;
+  if (isFormerWorkspace(step.workspace) || isFormerWorkspace(step.agent?.given?.workspace)) return false;
   return [...Object.keys(step), ...(step.agent?.keys ?? []), ...Object.keys(step.agent?.given ?? {})].every((key) => keyNamed(key) === key);
 }
 
@@ -271,9 +291,12 @@ function harnessPromptAsNamed(agent: NonNullable<FrozenStep['agent']>): Omit<Ste
   return { ...rest, harnessPrompt: harnessPromptNamed(former) as HarnessPrompt };
 }
 
+/** Whether a frozen `workspace` is a former spelling: `folder`, now `place: 'folder'`, or `main`, now `base`. */
+const isFormerWorkspace = (workspace: unknown): boolean => workspace === 'folder' || workspace === 'main';
+
 /**
- * A step's fields, or its agent's `given`, under the names their keys have now (`FORMER_KEYS`), and a `workspace: 'folder'` as `place:
- * 'folder'` (`placeSpelled`): a field under both keeps the new one's.
+ * A step's fields, or its agent's `given`, under the names their keys have now (`FORMER_KEYS`), a `workspace: 'folder'` as `place:
+ * 'folder'` (`placeSpelled`) and a `workspace: 'main'` as `workspace: 'base'` (`baseSpelled`): a field under both keeps the new one's.
  */
 function renamedFields(fields: object) {
   const renamed = Object.fromEntries(
@@ -281,6 +304,7 @@ function renamedFields(fields: object) {
       .filter(([key]) => keyNamed(key) === key || !Object.hasOwn(fields, keyNamed(key)))
       .map(([key, value]) => [keyNamed(key), value]),
   );
+  if (renamed.workspace === 'main') return { ...renamed, workspace: 'base' };
   if (renamed.workspace !== 'folder') return renamed;
   const { workspace: _, ...rest } = renamed;
   return { place: 'folder', ...rest };
@@ -291,9 +315,10 @@ function renamedFields(fields: object) {
  * field under it, and the former name among its agent's `keys` and `given`: read so, the tick would hand the engine no `allowedTools` and
  * the step would run unfenced, with nothing said; and its agent's harness prompt as `systemPrompt`, in a former word (`FORMER_OWN_KEYS`):
  * read so, `own` would be filed appended to Claude Code's prompt instead of in its place; and its place as `workspace: 'folder'`, which is
- * `place: 'folder'` now, and its agent's `keys` naming `workspace` for it. Read by `readRun`, so no reader — the tick,
- * `nemia ls`, the api — ever sees a former name, and the next pass that writes the record back writes the new ones alone. A field under
- * both names keeps the new one's value. A step with no former name is returned as it is. Pure.
+ * `place: 'folder'` now, and its agent's `keys` naming `workspace` for it; and its ending as `workspace: 'main'`, which is `workspace:
+ * 'base'` now, so the run would end on no step (`endsOnBase`). Read by `readRun`, so no reader — the tick, `nemia ls`, the api — ever sees
+ * a former name, and the next pass that writes the record back writes the new ones alone. A field under both names keeps the new one's
+ * value. A step with no former name is returned as it is. Pure.
  */
 export function asNamed(step: FrozenStep): Workflow {
   if (isNamed(step)) return step;

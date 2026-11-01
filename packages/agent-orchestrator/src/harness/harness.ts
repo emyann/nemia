@@ -79,8 +79,9 @@ export function remoteRetryRefusal(step: Workflow, flag: 'model' | 'budget', val
 export const REMOTE_REFUSED_KEYS: readonly StepKey[] = STEP_KEYS.filter((key) => REMOTE_REFUSED[key] !== undefined);
 
 /**
- * Refused: a key a step on a remote agent may not set (`REMOTE_REFUSED`), from the step or from its agent — and `workspace: main`, whose
- * checkout the agent never touches. Nothing else is judged against a remote harness: the key's own reading assumes a harness of ours.
+ * Refused: a key a step on a remote agent may not set (`REMOTE_REFUSED`), from the step or from its agent — and `workspace: base`, or its
+ * former spelling `main`, whose checkout the agent never touches. Nothing else is judged against a remote harness: the key's own reading
+ * assumes a harness of ours.
  */
 export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string>>, harness: string): void {
   const said = (key: string, why: string) =>
@@ -91,7 +92,7 @@ export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string
     const why = REMOTE_REFUSED[key];
     if (why !== undefined && meta[key] !== undefined) said(key, why);
   }
-  if (meta.workspace?.trim() === 'main')
+  if (meta.workspace?.trim() === 'base' || meta.workspace?.trim() === 'main')
     said('workspace', "runs the step in the repository's own checkout, which a remote agent on another party's machine never touches");
 }
 

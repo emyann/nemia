@@ -2,10 +2,10 @@
  * `nemia decide`: what a run produced and the choice it leaves a person — its help, its one flag, read off the command line, and the screen
  * it prints.
  */
-import { endsOnBase } from '../../step/step.ts';
 import {
   AGENT_FACING,
   CHECK_AFFECTING,
+  endsOnBase,
   LESSON,
   parseGlobs,
   answersOr,

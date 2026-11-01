@@ -779,7 +779,7 @@ test('handOffDue: which finished steps are handed off', async (t) => {
   await t.test(
     'REFUSED at shipped defaults: a step is handed off once for each try — what a person leaves in its workspace afterwards is not committed under its name',
     () => {
-      const chain: Workflow[] = [step('review'), { ...step('ship', ['review']), workspace: 'main', gate: true }];
+      const chain: Workflow[] = [step('review'), { ...step('ship', ['review']), workspace: 'base', gate: true }];
       const p = phases({ t1: 'succeeded', t2: 'succeeded', t9: 'failed' });
       const at = (review: Run['steps'][string]) => run({}, { steps: { review, ship: { taskId: 't9', workspace: '/repo' } } });
       assert.deepEqual(handOffDue(chain, at({ taskId: 't1', workspace: '/w' }), p), ['review'], 'not yet handed off: due');

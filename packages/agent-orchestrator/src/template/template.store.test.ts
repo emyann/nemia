@@ -191,7 +191,11 @@ test('what export writes reads back as it was written, a long line whole, and a 
   const steps = stepsOf(dir, 'dev');
   assert.equal(steps.get('ship')?.check, long);
   assert.ok(fs.readFileSync(path.join(dir, 'workflows/dev/workflow.yaml'), 'utf8').includes(`check: "${long.replace(/"/g, '\\"')}"`));
-  assert.deepEqual(steps.get('ship'), { name: 'ship', after: ['review'], place: 'git', workspace: 'main', gate: true, check: long });
+  assert.deepEqual(
+    steps.get('ship'),
+    { name: 'ship', after: ['review'], place: 'git', workspace: 'base', gate: true, check: long },
+    'a step file that says `workspace: main`, the former spelling, is exported as `base`',
+  );
   assert.equal(steps.get('implement')?.overrides, undefined, 'a step with no harness key of its own writes no overrides');
   assert.deepEqual(steps.get('review')?.overrides, { skills: ['review-a-change'], mcp: ['docs'], claude: { effort: 'low' } });
   assert.deepEqual(steps.get('review'), {

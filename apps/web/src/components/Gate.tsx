@@ -436,7 +436,7 @@ export const takenOf = (
     : { named: taken.step, said: askedSaid(taken.asked) };
 
 /**
- * Whether the step ends the run in the repository's own checkout, off the workflow the run froze (`workspace: main`, `endsOnBase` in
+ * Whether the step ends the run in the repository's own checkout, off the workflow the run froze (`workspace: base`, `endsOnBase` in
  * agent-orchestrator): a gate on it holds before it is filed, and a person's approval files it; with no gate, as quick's land, the pass
  * of the step before it that can send the work back files it instead.
  *
@@ -445,7 +445,7 @@ export const takenOf = (
  * The two read the same off a step's record at its gate (unfiled, awaiting approval), so the key is what tells them apart; a detail from an
  * api that does not carry it reads as any other step, and its gate is drawn as §6's.
  */
-export const endsTheRun = (step: Pick<RunDetail['steps'][number], 'spec'>): boolean => step.spec?.workspace === 'main';
+export const endsTheRun = (step: Pick<RunDetail['steps'][number], 'spec'>): boolean => step.spec?.workspace === 'base';
 
 /**
  * What an ending step would act on, beside its gate: the run's result, for the person deciding whether to let it run.

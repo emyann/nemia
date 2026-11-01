@@ -12,7 +12,7 @@ import type { TrialMerge } from '../place/place.ts';
 
 const STEPS: Workflow[] = [
   { name: 'implement', after: [], body: 'Build it.' },
-  { name: 'ship', after: ['implement'], body: 'Ship it.', workspace: 'main', check: 'npm test' },
+  { name: 'ship', after: ['implement'], body: 'Ship it.', workspace: 'base', check: 'npm test' },
 ];
 
 /** The same shape with no gate anywhere, as `quick` is: its ending lands on its check all the same, filed by the review before it. */

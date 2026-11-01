@@ -11,8 +11,8 @@
  * file's `by: 'wf up'`), the check's marker `wf <name>:`, the alias's own words, the run's branches `wf/<run>/<step>` and git's identity
  * `user.name=wf`; that card says which of them go.
  *
- * `workspace: main`, `checkout`, `heads` and `staged`, on the day decision 9 retired them (`Ending` in the run core's table; `Repo`,
- * `Branch / tip` and `In progress` in the place's, whose paths are the port, `src/place`, alone: the adapters speak git by design).
+ * `workspace: main`, `checkout`, `heads` and `staged`, on the day decision 9 retired them (the Ending row in the run core's table; Repo,
+ * Branch / tip and In progress in the place's, whose paths are the port, `src/place`, alone: the adapters speak git by design).
  * What `workspace: main` has left is its former spelling kept on purpose (`baseSpelled`, `baseLine`, `baseWritten`, `FrozenStepSchema`
  * and the renders that read it); what the place's words have left is the port's own inner names (`landing.store.ts`'s memo of a
  * checkout's `status` and its `heads`, the record's `stagedFile`), off the contract, which `place-contract.test.ts` holds. The same

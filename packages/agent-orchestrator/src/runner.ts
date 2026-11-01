@@ -488,7 +488,7 @@ export { AGENTS_CUSTOM } from './agents/custom.verb.ts';
 export { POLICY_PROPOSE } from './auto/auto.verb.ts';
 export type { Command, Ran } from './command/entry.verb.ts';
 export { CLI, CLI_VERBS, commandBreaks, commandLine, generated, helpOf, leftOut, parseArgv, routeList } from './command/command.ts';
-export { renamedIn } from './command/command.ts';
+export { renamedIn, renamedValues } from './command/command.ts';
 export type { Args, CommandSpec, Flag, Positional, Route, Spec } from './command/command.ts';
 export type { Accepted, RoundAsked } from './round/round.verb.ts';
 export type { Approved } from './gate/gate.verb.ts';

@@ -4,7 +4,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, renamedIn, type Spec } from './command.ts';
+import { commandBreaks, commandLine, helpOf, leftOut, parseArgv, renamedIn, renamedValues, type Spec } from './command.ts';
 import { COMMANDS, TABLE } from './commands.verb.ts';
 
 const SPEC: Spec = {
@@ -178,7 +178,7 @@ test("retry's command line keeps today's refusals", () => {
     '--message=--fresh',
   );
   assert.deepEqual(parseArgv(RETRY.spec, ['r-1', 'impl', '--message=--fresh']), {
-    mode: 'nudge',
+    mode: 'continue',
     runId: 'r-1',
     step: 'impl',
     message: '--fresh',
@@ -528,7 +528,7 @@ test("the table's help is today's, word for word", () => {
       '                               --why: the reason, said wherever the pause is; --by: who pauses it',
       '                               (default: your OS user)',
       '                               --now: pause at once — each step session or check at work, but a',
-      '                               landing, is asked to stop and tried again on nemia resume: a nudge of',
+      '                               landing, is asked to stop and tried again on nemia resume: a continue of',
       '                               its session, or a recheck. A pause that stands is kept as it was.',
       '                               --yes: with --now, act; without it, --now only says what it would',
       '                               interrupt',
@@ -992,4 +992,20 @@ test('a former word or flag is run as what it became, with a hint, and a line in
   await t.test('the hint of a line renamed twice names what was typed', () => {
     assert.ok(renamedIn(['auto', 'drop', 'r1', '3']).hint!.includes('nemia auto drop'));
   });
+});
+
+test("a body's former value is read as what it became, with a hint naming what to send now, and a body in the new words is left as given", async (t) => {
+  const rows: Array<[string, string, unknown, unknown]> = [
+    ["retry's mode nudge, now continue", 'retry', { mode: 'nudge', message: 'go' }, { mode: 'continue', message: 'go' }],
+    ['a mode in the new words', 'retry', { mode: 'continue' }, undefined],
+    ['a mode nudge on another command is not renamed', 'say', { mode: 'nudge' }, undefined],
+    ['a body that is no object is left for its schema', 'retry', ['nudge'], undefined],
+  ];
+  for (const [name, command, body, now] of rows)
+    await t.test(name, () => {
+      const renamed = renamedValues(command, body);
+      assert.deepEqual(renamed.body, now ?? body);
+      assert.equal(renamed.hint !== undefined, now !== undefined, 'a hint is said exactly when a former value was sent');
+      if (now !== undefined) assert.ok(renamed.hint!.includes('"mode": "continue"'), 'the hint names the value to send now');
+    });
 });

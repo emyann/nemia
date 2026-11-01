@@ -36,7 +36,7 @@ const ANSWERS = Schema.Array(
 function retryHowOf(args: Args): RetryHow {
   const { mode, model, message, budget } = args;
   return {
-    mode: mode === 'fresh' || mode === 'recheck' ? mode : 'nudge',
+    mode: mode === 'fresh' || mode === 'recheck' ? mode : 'continue',
     ...(typeof model === 'string' ? { model } : {}),
     ...(typeof message === 'string' ? { message } : {}),
     ...(typeof budget === 'number' ? { budget } : {}),
@@ -66,7 +66,7 @@ const RETRY: Extension = {
     if (how.model !== undefined && how.mode !== 'fresh') {
       return {
         status: 400,
-        error: `\`model\` names the model a new session runs on, as \`nemia retry --model <m>\` does, so it goes with "mode": "fresh" — a nudge continues a session on the model it has, and a recheck files no session. This request asked for "${how.mode}".`,
+        error: `\`model\` names the model a new session runs on, as \`nemia retry --model <m>\` does, so it goes with "mode": "fresh" — "continue" continues a session on the model it has, and a recheck files no session. This request asked for "${how.mode}".`,
       };
     }
     const notAmount = how.budget !== undefined && !(how.budget > 0) ? budgetRefusal(how, commandLine(command, args)) : null;

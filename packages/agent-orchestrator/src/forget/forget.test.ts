@@ -47,7 +47,7 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1', extra: Par
     },
   );
 /** A person's ask for implement's try `n`. */
-const askFor = (n: number, mode: RetryMode = 'nudge'): RetryAsk => ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' });
+const askFor = (n: number, mode: RetryMode = 'continue'): RetryAsk => ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' });
 const roundAskFor = (round: number): RoundAsk => ({ step: 'review', round, at: '2026-09-13T12:00:00.000Z' });
 /** Where an ask's file is, as the store says it. */
 /** The file each ask is named by, as the store names it: a try's `retry-…`, a round's `round-…`, a merge of the base's `merge-…`. */
@@ -215,7 +215,10 @@ test('`forgetRefusal`: which runs `nemia rm` forgets, and what holds each other 
       'rm /wf/runs/r-1.asks/round-review-2',
     );
 
-    const tried = run({}, { steps: { implement: { taskId: 't1', tries: [{ taskId: 't0', cause: 'nudge' }] }, review: { taskId: 't2' } } });
+    const tried = run(
+      {},
+      { steps: { implement: { taskId: 't1', tries: [{ taskId: 't0', cause: 'continue' }] }, review: { taskId: 't2' } } },
+    );
     assert.equal(forgetRefusal(STEPS, tried, DONE, [], signedDone, asked, undefined, [askFor(2)]), null, 'spent: the record holds try 2');
     assert.equal(
       forgetRefusal(loop, inRound(2), ALL_SUCCEEDED, [], saidIn(2, false), asked, undefined, [], [roundAskFor(2)]),

@@ -140,7 +140,7 @@ test('a blocked sign-off waits on a person until the turn that answers it spawns
   const BLOCKED = { outcome: 'blocked', summary: 'two flags could be meant', artifacts: [], needs: 'which flag?' };
   const asked: RepositoryRun = {
     ...run({ after: undefined, slotHeldAt: undefined }),
-    steps: { side: { taskId: 'c', tries: [{ taskId: 'c', cause: 'nudge' }] as RepositoryRun['steps'][string]['tries'] } },
+    steps: { side: { taskId: 'c', tries: [{ taskId: 'c', cause: 'continue' }] as RepositoryRun['steps'][string]['tries'] } },
   };
   const view: TaskClock = {
     state: {

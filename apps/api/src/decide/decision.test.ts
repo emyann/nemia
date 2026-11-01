@@ -751,7 +751,7 @@ test('a decision with nothing to try, nothing to decide, or no run: pruned, call
       assert.deepEqual(page.waitingOnYou, [], 'it waits on nobody: nothing a person does files anything for it');
       const asks = path.join(root, 'runs', 'r-d10.asks');
       fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
+      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
       const asked = await detailOf('r-d10');
       assert.equal(
         asked.steps.find((s) => s.name === 'implement')?.asked,

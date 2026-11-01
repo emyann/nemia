@@ -228,7 +228,7 @@ export default {
         `2. ${where.title}\n   Chose: ${where.options[0].label} — ${where.options[0].meaning}\n   In my own words: ${QUESTIONS.own}`,
         'Answered by: person, on the board',
       ];
-      if (ask.mode !== 'nudge' || ask.message !== lines.join('\n\n'))
+      if (ask.mode !== 'continue' || ask.message !== lines.join('\n\n'))
         throw new Refused(`the answers are the next try's message, in the package's words — ${file} holds ${JSON.stringify(ask)}`);
       await expectVisible(
         page.locator(`section[aria-label="Decide"] [data-asked][data-step="spec"]`),

@@ -168,7 +168,7 @@ test('the board pauses the store and lifts it, refused a second of each; then re
       assert.deepEqual(stops, ['t-now']);
       assert.deepEqual(
         runStore.asks.read(id).asks.map((a) => ({ mode: a.mode, interrupted: a.interrupted })),
-        [{ mode: 'nudge', interrupted: 't-now' }],
+        [{ mode: 'continue', interrupted: 't-now' }],
       );
       assert.equal((await asked('POST', { why: 'again' }, BOARD, on)).status, 409, 'a plain pause on one that stands');
       const again = await asked('POST', { now: true, why: 'again' }, BOARD, on);

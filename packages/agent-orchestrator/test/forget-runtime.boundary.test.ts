@@ -142,7 +142,7 @@ const signed = async (workflowDir: string, closeout: object, repo = aRepo()) => 
  */
 const finished = async () => {
   const run = await signed(oneStep('harness: codex\ncheck: true'), BLOCKED);
-  await runWith(e, retryRun(run.id, 'implement', { mode: 'nudge', message: 'the --dry-run flag' }));
+  await runWith(e, retryRun(run.id, 'implement', { mode: 'continue', message: 'the --dry-run flag' }));
   await pass(run.id);
   await pass(run.id);
   sign(`${run.id}-implement-try2`, 1, SIGNED);

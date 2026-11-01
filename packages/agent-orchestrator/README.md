@@ -831,7 +831,7 @@ and digits for a number that is not a whole thousand. Refused at load: a value t
 `1.5M`, `200,000`). A window outside what the harness takes, and any `context:` on codex, whose `codex exec` has no
 such knob, are the runtime's to refuse, in its words, at `wf start`.
 
-It goes to the engine on every filing of the step, as `effort:` does, and **a session keeps one window**: a nudge, an
+It goes to the engine on every filing of the step, as `effort:` does, and **a session keeps one window**: a continue, an
 answer, a `retries:` try and a round each continue the session on the window it was started with, and a step that
 continues another's session (`resume:`) is filed with that session's window — without a line of its own it inherits it,
 and one with another is refused at load (`sessionContext`). Claude Code's resumed copy of a session keeps only the flags it
@@ -1556,12 +1556,12 @@ retries: 1
 - **An unsigned step is nudged once, by the run, before it waits on you.** A session that ended without its statement
   — quiet, or `done` by its harness, without calling `StructuredOutput`; the engine records `closedOut: false`, and
   the run reads that as `unsigned` (`closeoutAsked`) — that said nothing is continued once:
-  the next tick files the next try as a nudge on no one's word (`cause: 'signoff'` on the record), with the same
+  the next tick files the next try, its session continued, on no one's word (`cause: 'signoff'` on the record), with the same
   schema, model, effort, context window, tools and permission mode as the session it continues, told in
   `## Try <n>` that it ended without calling `StructuredOutput`, that the work stands and it should change
   nothing and sign off now, finishing first if it had not, and signing off anyway saying what stops it if it
-  cannot. Once a round, never in a loop: a nudge that ends unsigned too leaves the step `unsigned`, on you, and
-  `wf ls` says `try 2, nudged to sign off by the run`, `wf decide` `UNSIGNED: implement (nudged to sign off once
+  cannot. Once a round, never in a loop: a sign-off ask that ends unsigned too leaves the step `unsigned`, on you, and
+  `wf ls` says `try 2, asked to sign off by the run`, `wf decide` `UNSIGNED: implement (asked to sign off once
   by the run, and unsigned again)`. A person's ask for that try comes first. Not nudged: a step over its budget,
   a cancelled run, a closeout short of a declared field (a statement given), and a journal from before the
   engine said `unsigned` for `done`, any `done` recorded with no `closedOut` key, and a session that broke (a `failed`
@@ -1576,8 +1576,8 @@ retries: 1
   is filed, so a suite is never spent on it, and nothing after it starts. Six reasons refuse, each the step's to answer by
   writing the file where its brief says or taking the name off: `not there`, `missing`, `directory`, `escapes`, `outside`,
   `configuration`. Two never do, being the run's own: `not collected` (a file in the workspace whose copy the run did not
-  make) and `not known` (the place did not say); `wf decide` says them as before. The run nudges such a step under the same
-  one nudge a round as a session that gave no closeout (`cause: 'signoff'`): its session continued, told in `## Try <n>` each
+  make) and `not known` (the place did not say); `wf decide` says them as before. The run continues such a step under the same
+  one sign-off ask a round as a session that gave no closeout (`cause: 'signoff'`): its session continued, told in `## Try <n>` each
   file, why, a near name its files directory holds (the same last name in another case or folder), and the two fixes. A
   nudged try that names a missing file again leaves the step `unsigned`, on you: `wf decide` names each file and why under
   `UNSIGNED`, and `wf retry` tries it again. A task is read once (`filesDue`, by the record's `filesRead`), so a file
@@ -1604,7 +1604,7 @@ retries: 1
   engine then says `needs-human`, and the step has no closeout. `wf retry` takes such a step with `--continue` or
   `--fresh`, and refuses `--recheck`. The ask is written as any other. The next tick asks the engine to stop the
   session and files nothing, and a later pass, once the session has stopped, files the try as it files one for a
-  stopped step: a nudge continues the session. A step whose session is still working is refused as before. A
+  stopped step: a continue continues the session. A step whose session is still working is refused as before. A
   caller takes the harness's word by passing it (`retry(…, { stopBlocked: true })`): `wf retry` does, and so does
   the board's `POST …/retry` (its banner's Continue); a caller that leaves it out is refused as before.
   The session can work again before a tick stops it, told something by a peer with no `wf up` running. The ask
@@ -1648,7 +1648,7 @@ retries: 1
   signs, the engine's task waits for a word with nothing running, and `wf ls` prints the engine's `input-required` beside the run's
   word (`input-required · BLOCKED`). A `--continue` that answers a blocked sign-off, or sends back a step at its gate, is the tick's
   `answer` to that task — the same task id, in the session that signed, with what is left of the step's cap — and the record gains
-  the try as any other. Any other try (`--fresh`, `--model`, `--recheck`, `retries:`, the run's sign-off nudge) closes the waiting
+  the try as any other. Any other try (`--fresh`, `--model`, `--recheck`, `retries:`, the run's sign-off ask) closes the waiting
   task and files `-try<n>`. The run closes a task nobody is to answer on the pass that reads it waiting — an ungated step that signed,
   a gate approved, a run called off or pruned — and a close the engine refuses is a note on the pass. A task filed before this, and a
   step on another harness, settles at its sign-off, and its tries are `-try<n>` tasks, as they were.
@@ -1659,7 +1659,7 @@ retries: 1
   says why its last try ended and, beside it, that the cap was raised ([What a step may spend](#what-a-step-may-spend-budget)).
 - **The record keeps the current try where it always was.** `steps[name].taskId` and `steps[name].check` are
   the current try's, so everything that reads them reads the try that decides the step. The tries before it
-  go under `steps[name].tries`, in order, each with its `cause`, what replaced it: `retries`, `nudge`, `fresh` (and its
+  go under `steps[name].tries`, in order, each with its `cause`, what replaced it: `retries`, `continue` (`nudge` in a record written before decision 7, read as `continue`), `fresh` (and its
   model) or `recheck` — and the cap a `--budget` raised, when one did. A person's tries do not spend the step's `retries`.
   A try is a new runtime task, as a Kubernetes Job makes a new Pod; an attempt is the runtime's restart inside one task. A record
   written before the key was `cause` says it `then`, and reads as `cause`.
@@ -1667,12 +1667,12 @@ retries: 1
   0 spent`, `try 2 asked (--recheck) — the next tick files it`, `try 2 asked (--continue, with your answer)`,
   `try 2 asked (--continue) — stopping its blocked session, then the tick files it` beside a `needs-human` (or
   `stopping its session` beside a session that works again since it was asked), and
-  once filed `try 2, by retries: 1` or `try 2, nudged on your word, answered`. A step with a try due is not
+  once filed `try 2, by retries: 1` or `try 2, continued on your word, answered`. A step with a try due is not
   waiting on you. **`wf decide`** names the try each closeout and check belong to — for a try you answered,
   with what the try before it needed and your answer under it — and under *try again* gives the `wf retry` for
   each step that can take one; under a blocked step's `needs`, the `wf retry --message` that answers it.
 
-`retries:` is absent unless an author writes it. A flaky suite would spend a whole session on a nudge, so
+`retries:` is absent unless an author writes it. A flaky suite would spend a whole session on a continue, so
 whether a refusal is the agent's to answer or a person's is left to each workflow's author.
 
 ### Telling a running step something: `wf say`
@@ -1698,7 +1698,7 @@ its own, and everything below reads the words back off the engine's view of the 
   queued and lost them when it was continued (issue 16, closed with that road). So a
   try or a round that continues the session — `wf retry --continue`, `retries:`, a round, the board's Continue — carries
   what was said to the last try's task as `## Said to your session`, inside `## Try <n>` or `## Round <n>`: each
-  message with its time, fenced, before `## Your answer`. A new session (`--fresh`, or a nudge with nothing to
+  message with its time, fenced, before `## Your answer`. A new session (`--fresh`, or a continue with nothing to
   continue) is handed none, as it is handed none of the last one's conversation: say it again with `--message`.
 - **On the board**, the session page (`/runs/<run>/steps/<step>`) has a prompt box under the conversation. It posts to
   `POST /api/runs/:id/steps/:step/say`, guarded as the retry route is, which calls this verb: a refusal shows under the
@@ -1743,7 +1743,7 @@ rounds: 3
   list, is `unsigned`. `replies` is in the target's closeout schema from round 1, where it answers `[]`
   and nothing reads it: a continued session asked for a changed schema rebuilds its whole prompt cache.
   The looping step is told, every round, what its `again` does and which round it is. A new session of
-  the target within a round — `wf retry --fresh`, or a nudge with no session left to continue — is
+  the target within a round — `wf retry --fresh`, or a continue with no session left — is
   handed the round's contract and findings again, off the looping step's try that asked for the round.
 - **At the cap, a person — and they have two answers.** `again: true` on the last round files nothing:
   the step reads `rounds exhausted`, nothing that waits on it runs, and `wf decide` says `ROUNDS
@@ -1826,7 +1826,7 @@ wf start ./ui.md --repo ~/code/myapp --input ./mock.png --input ./notes/api.md
   ```
 
   A brief that continues a session is not told again, as it is not told the request again: a step that `resume:`s
-  another, a nudge, a round that continues its target. A run given none composes exactly as before.
+  another, a continue, a round that continues its target. A run given none composes exactly as before.
 
   The directory is outside the workspace, so the run files it read-only on each step of a repository run on a harness fenced
   by a permission mode, its first filing, a try and a round (`inputsMounts`, in `filedFolders`), and the line names it so:

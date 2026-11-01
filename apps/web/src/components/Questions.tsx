@@ -197,7 +197,7 @@ function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; 
   return (
     <fieldset className="flex flex-wrap gap-x-3 gap-y-1 text-body-small">
       <legend className="sr-only">How to try {step} again</legend>
-      {(['nudge', 'fresh'] as const).map((m) => (
+      {(['continue', 'fresh'] as const).map((m) => (
         <label key={m} className="flex cursor-pointer items-center gap-1.5">
           <input type="radio" name={name} value={m} checked={mode === m} onChange={() => onMode(m)} />
           {MODES[m]} <code className="text-muted-foreground">--{m}</code>
@@ -216,7 +216,7 @@ function ModeChoice({ name, step, mode, onMode }: { name: string; step: string; 
 export function QuestionsForm({ runId, offer }: { runId: string; offer: Extract<Answer, { case: 'answer' }> }) {
   const [draft, setDraft] = useState<Draft>({});
   const [note, setNote] = useState('');
-  const [mode, setMode] = useState<RetryMode>('nudge');
+  const [mode, setMode] = useState<RetryMode>('continue');
   const field = useId();
   const ask = useAsk(runId, offer.step, () => setNote(''));
   if (ask.isSuccess) return <AskedRow step={offer.step} said={askedSaid(ask.data)} />;

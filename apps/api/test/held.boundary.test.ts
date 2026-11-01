@@ -85,7 +85,7 @@ fs.appendFileSync(
 {
   const file = path.join(root, 'runs', 'h-answered.json');
   const run = JSON.parse(fs.readFileSync(file, 'utf8'));
-  run.steps.plan.tries = [{ taskId: 'h-answered-plan', cause: 'nudge' }];
+  run.steps.plan.tries = [{ taskId: 'h-answered-plan', cause: 'continue' }];
   fs.writeFileSync(file, JSON.stringify(run));
 }
 

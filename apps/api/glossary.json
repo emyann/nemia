@@ -66,6 +66,11 @@
       ]
     },
     {
+      "term": "Metric type",
+      "meaning": "a metric's kind as Effect names it (`Metric.Metric.Type`: Counter, Frequency, Gauge, Histogram, Summary), read from the api's own registry; a kind the api keeps no value of is answered with its name and type alone.",
+      "type": "MetricRead"
+    },
+    {
       "term": "Phase / reason / message",
       "meaning": "what each step and each try carries at the api: its `phase` and its `reason`, the codes a reader groups and compares, and its `message`, the sentence a person reads and nothing compares; `status` is the message under its old name, kept for one card.",
       "type": "RunDetail",

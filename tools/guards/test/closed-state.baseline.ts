@@ -21,7 +21,6 @@ export const OPEN_STATE: Readonly<Record<string, { readonly card: string }>> = {
   'apps/api/src/detail/detail.ts#RunDetail.steps[].status': { card: "Drop a step's deprecated status sentence" },
   'apps/api/src/detail/tries.ts#StepAttempts.latest.reason': { card: "Close the orchestrator's state words at its doors" },
   'apps/api/src/detail/tries.ts#StepTry.status': { card: "Drop a step's deprecated status sentence" },
-  'apps/api/src/factory/ceilings.ts#MetricRead.type': { card: 'Close third-party kinds at the doors' },
   'packages/agent-orchestrator/src/following/following.ts#StepMoment.state': { card: "Close the orchestrator's state words at its doors" },
   'packages/agent-orchestrator/src/list/list.ts#Listing.steps[].status': { card: "Drop a step's deprecated status sentence" },
   'packages/agent-orchestrator/src/list/list.ts#Unjudged.steps[].status': { card: "Drop a step's deprecated status sentence" },

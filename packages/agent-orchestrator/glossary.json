@@ -23,7 +23,7 @@
     },
     {
       "term": "Attempt end",
-      "meaning": "why a step's latest attempt ended, in the words a person reads for it (`endWords`): the runtime's reason (harness, lost, unstartable, operator, deadline: its `EndReason`, written out as `AttemptReason` and held equal in `runtime-client.ts`), or the orchestrator's own judging, `budget` (cut at the step's spend cap) and `unsigned` (ended without the statement its task asked for). The api serves it as `StepAttempts.latest.reason`, beside how it ended (`EngineOutcome`).",
+      "meaning": "why a step's latest attempt ended, in the words a person reads for it (`endWords`): the runtime's reason (harness, lost, unstartable, operator, deadline: its `EndReason`, written out as `AttemptReason` and held equal in `packages/agent-orchestrator/src/runtime-client.ts`), or the orchestrator's own judging, `budget` (cut at the step's spend cap) and `unsigned` (ended without the statement its task asked for). The api serves it as `StepAttempts.latest.reason`, beside how it ended (`EngineOutcome`).",
       "type": "AttemptEnd"
     },
     {
@@ -327,7 +327,7 @@
     },
     {
       "term": "Session state",
-      "meaning": "where a step's session stands as its moment says it to a follower (`StepMoment`, kind `state`), in A2A's TaskState words: submitted, working, input-required, auth-required, completed, failed, canceled, rejected — the runtime's `SessionState`, kept rather than renamed and held equal in `runtime-client.ts`.",
+      "meaning": "where a step's session stands as its moment says it to a follower (`StepMoment`, kind `state`), in A2A's TaskState words: submitted, working, input-required, auth-required, completed, failed, canceled, rejected — the runtime's `SessionState`, kept rather than renamed and held equal in `packages/agent-orchestrator/src/runtime-client.ts`.",
       "type": "StepSessionState"
     },
     {
@@ -388,7 +388,7 @@
     },
     {
       "term": "Transcript mark",
-      "meaning": "the kind of the last transcript event before a person's words reached a step's session (`nemia say`), which a said message carries as `after.kind`: text, thinking, tool_use, tool_result or system, the runtime's `TranscriptEvent` kinds held equal in `runtime-client.ts`.",
+      "meaning": "the kind of the last transcript event before a person's words reached a step's session (`nemia say`), which a said message carries as `after.kind`: text, thinking, tool_use, tool_result or system, the runtime's `TranscriptEvent` kinds held equal in `packages/agent-orchestrator/src/runtime-client.ts`.",
       "type": "SaidAfterKind"
     },
     {

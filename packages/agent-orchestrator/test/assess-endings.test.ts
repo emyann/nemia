@@ -187,7 +187,6 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
       for (const pass of [1, 2, 3]) {
         const a = assess(ENDS, r, DONE, signedDone, asked);
         assert.deepEqual([a.ready, a.check, a.retry, a.round], [[], [], [], []], `pass ${pass}: nothing is filed`);
-        assert.equal(stepStatus(SHIP, r, DONE, signedDone, asked, ENDS), 'awaiting approval');
         assert.deepEqual(a.toDecide, {
           kind: 'approve',
           step: 'ship',
@@ -365,14 +364,9 @@ test("`nemia ls`, `nemia rm` and `nemia cancel` at an ending's gate", async (t) 
         closeoutOf: signedDone,
         askedCloseout: asked,
       });
-      assert.deepEqual(l.steps[2], {
-        name: 'ship',
-        status: 'awaiting approval',
-        reason: 'AwaitingApproval',
-        phase: 'waiting',
-        branch: null,
-        note: 'approve it: nemia approve r-1 ship — or send it back: nemia retry r-1 review --message "<objection>"',
-      });
+      const { note, ...ship } = l.steps[2];
+      assert.deepEqual(ship, { name: 'ship', message: 'awaiting approval', reason: 'AwaitingApproval', phase: 'waiting', branch: null });
+      assert.equal(note, 'approve it: nemia approve r-1 ship — or send it back: nemia retry r-1 review --message "<objection>"');
       assert.deepEqual([l.waitingOnYou, onYouWords(l)], [['ship'], ['approve ship']]);
       assert.deepEqual(l.toDecide, {
         kind: 'approve',
@@ -395,9 +389,10 @@ test("`nemia ls`, `nemia rm` and `nemia cancel` at an ending's gate", async (t) 
         closeoutOf: signedDone,
         askedCloseout: asked,
       });
+      assert.equal(after.steps[2].message, 'unverified · done');
       assert.deepEqual(
-        [after.steps[2].status, after.waitingOnYou, after.toDecide],
-        ['unverified · done', [], undefined],
+        [after.waitingOnYou, after.toDecide],
+        [[], undefined],
         'approved and filed, it is a step like any other and waits on nobody',
       );
     },
@@ -437,7 +432,7 @@ test("`nemia ls`, `nemia rm` and `nemia cancel` at an ending's gate", async (t) 
       closeoutOf: signedDone,
       askedCloseout: asked,
     });
-    assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
+    assert.deepEqual([l.steps[2].message, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
   });
 });
 
@@ -499,7 +494,7 @@ test("an ending's gate does not hold while the work goes round again or is being
         closeoutOf: said(true),
         askedCloseout: asked,
       });
-      assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
+      assert.deepEqual([l.steps[2].message, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
 
       const handed = assess(
         looping,
@@ -577,7 +572,7 @@ test("an ending's gate does not hold while the work goes round again or is being
         verdictOf: () => undefined,
         asks: [ask],
       });
-      assert.deepEqual([l.steps[2].status, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
+      assert.deepEqual([l.steps[2].message, l.waitingOnYou, l.toDecide], ['pending', [], undefined]);
 
       const d = decision(
         ENDS,

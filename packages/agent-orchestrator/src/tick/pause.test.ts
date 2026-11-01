@@ -159,7 +159,7 @@ const rowOf = async (run: Run, step: string) => {
   const [{ listed }] = (await runWith(h.e, runsListed(run.id))).runs;
   const row = listed.steps.find((s) => s.name === step);
   assert.ok(row, `${run.id} lists ${step}`);
-  return row as { status: string; note?: string; reason?: string; on?: string; verdict?: unknown };
+  return row as { message: string; note?: string; reason?: string; on?: string; verdict?: unknown };
 };
 
 /** Passes until `step` of `run` waits at its gate, as `nemia ls` lists it: the state an approval asks before it is taken. */
@@ -168,7 +168,7 @@ const atGate = async (t: TestContext, run: Run, step: string) => {
   await until(
     t,
     async () => {
-      seen = (await rowOf(run, step)).status;
+      seen = (await rowOf(run, step)).message;
       if (seen === 'awaiting approval') return true;
       await pass();
       return false;
@@ -268,15 +268,15 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   ]);
   assert.match(pausedLines(last.pause)[0], /^Paused since .* nothing new starts, 2 checks held; /);
   const waits = await rowOf(checked, 'work');
-  assert.notEqual(waits.status, 'checking', 'a check the pause keeps from being filed is not checking');
-  assert.equal(waits.status, PAUSE_WAIT);
+  assert.notEqual(waits.message, 'checking', 'a check the pause keeps from being filed is not checking');
+  assert.equal(waits.message, PAUSE_WAIT);
   assert.deepEqual(
     [waits.reason, waits.on, waits.verdict],
     ['Waiting', 'pause', { result: 'running', exit: null }],
     'its code says the pause holds it, and its check has no verdict yet',
   );
   assert.match(waits.note ?? '', /its check is filed on nemia resume/);
-  assert.equal((await rowOf(landing, 'ship')).status, PAUSE_WAIT, 'nor is the landing whose check it holds');
+  assert.equal((await rowOf(landing, 'ship')).message, PAUSE_WAIT, 'nor is the landing whose check it holds');
 
   assert.deepEqual(h.spawned.slice(before), [], 'no session started while the store is paused');
   assert.equal((await Effect.runPromise(h.e.view(queuedTask))).admission, 'queued', 'the queued task not admitted');
@@ -326,10 +326,10 @@ test('while the store is paused nothing new starts and what runs finishes; the p
   assert.equal(lifted.pause, undefined, 'the pass after the lift says no pause');
   assert.ok(taskOf(running, 'work'), "running's work filed");
   assert.ok(readRun(checked.id).steps.work?.check, "checked's check filed");
-  assert.equal((await rowOf(checked, 'work')).status, 'checking', 'and checking, once its check is filed');
+  assert.equal((await rowOf(checked, 'work')).message, 'checking', 'and checking, once its check is filed');
   putPause({ why: 'again', by: 'ann' });
   try {
-    assert.equal((await rowOf(checked, 'work')).status, 'checking', 'a check filed before the pause is checking under it');
+    assert.equal((await rowOf(checked, 'work')).message, 'checking', 'a check filed before the pause is checking under it');
     assert.equal(
       (await runWith(h.e, pausedRead())).held.some((c) => c.run === checked.id),
       false,

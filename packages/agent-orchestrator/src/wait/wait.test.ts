@@ -176,7 +176,7 @@ test('`listing` puts `waiting on <run>` on each root of a waiting run, where `wa
     await t.test(what, () => {
       const said = listed(r, phase, given);
       assert.deepEqual(
-        said.steps.map((s) => s.status),
+        said.steps.map((s) => s.message),
         statuses,
       );
       if (waiting) assert.deepEqual(said.waiting, waiting);

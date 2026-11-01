@@ -34,7 +34,6 @@ const step = (name: string, codes: typeof VERIFIED | typeof APPROVAL, i: number)
   taskId: `t-${i}`,
   branch: null,
   ...codes,
-  status: codes.message,
   note: null,
   roundDue: false,
   agent: null,

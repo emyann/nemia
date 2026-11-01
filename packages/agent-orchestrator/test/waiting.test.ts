@@ -67,7 +67,7 @@ const aPass = () => stage.runWith(board().e, passStanding(listRuns()));
 /** A run as one waiting on it reads it, where its branches stand asked now, as a person's verb asks them (`standingLiveOf`). */
 const parentNow = (id: string) => stage.runWith(board().e, standingLiveOf([id]).pipe(Effect.flatMap((git) => parentRead(id, git))));
 const decided = async (id: string) => (await stage.runWith(board().e, decideRun(id))).decision;
-const statuses = async (id: string) => (await stage.runWith(board().e, list(board().e, readRun(id)))).steps.map((s) => s.status);
+const statuses = async (id: string) => (await stage.runWith(board().e, list(board().e, readRun(id)))).steps.map((s) => s.message);
 /** The brief the engine was filed with for the task `id`. */
 const briefOf = (id: string): string => board().tasks.get(id)!.spec.brief;
 /** The runs in the store, by their files: a refused start writes none. */

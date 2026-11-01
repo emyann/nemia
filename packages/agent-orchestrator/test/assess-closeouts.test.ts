@@ -69,7 +69,7 @@ const said = (outcome: Closeout['outcome']): Closeout => ({
   artifacts: [],
   needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
 });
-const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.status);
+const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.message);
 const SETTLED = shown({ t1: 'succeeded', t2: 'succeeded' });
 
 /** `findings`, strict — as the tests' team's `test/fixtures/team/agents/review.schema.json` declares it. */
@@ -241,8 +241,8 @@ test('listing of how a step signed off', async (t) => {
     assert.deepEqual(
       live.steps,
       [
-        { name: 'implement', status: 'working', reason: 'Running', phase: 'running', branch: null },
-        { name: 'review', status: 'pending', reason: 'Pending', phase: 'pending', branch: null },
+        { name: 'implement', message: 'working', reason: 'Running', phase: 'running', branch: null },
+        { name: 'review', message: 'pending', reason: 'Pending', phase: 'pending', branch: null },
       ],
       'still running, and never filed',
     );
@@ -251,10 +251,10 @@ test('listing of how a step signed off', async (t) => {
     assert.deepEqual(
       old.steps,
       [
-        { name: 'implement', status: 'unverified', reason: 'Unknown', phase: 'pending', branch: 'wf/r-1/implement' },
-        { name: 'review', status: 'failed', reason: 'Failed', phase: 'failed', branch: 'wf/r-1/review' },
+        { name: 'implement', message: 'unverified', reason: 'Unknown', phase: 'pending', branch: 'wf/r-1/implement' },
+        { name: 'review', message: 'failed', reason: 'Failed', phase: 'failed', branch: 'wf/r-1/review' },
       ],
-      'a run from before closeouts is settled and silent about how: nothing is inferred, and nothing checked it, so it reads unverified',
+      'from before closeouts, nothing is inferred: unverified',
     );
     assert.deepEqual(old.waitingOnYou, []);
   });

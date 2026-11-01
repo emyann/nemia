@@ -86,7 +86,6 @@ const row = (extra: object = {}): RunSummary => ({
       via: 'closeout',
       message: 'succeeded · BLOCKED',
       verdict: null,
-      status: 'succeeded · BLOCKED',
       note: 'try 1',
       roundDue: false,
       agent: null,

@@ -264,8 +264,8 @@ test('a person accepts a loop out of rounds on the board: the acceptance written
       assert.deepEqual(review.accepted, { try: 2, at: took.at, message: WHY });
       const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
       const listed = words.steps.find((s) => s.name === 'review')!;
-      assert.equal(review.status, listed.status, 'as `nemia ls` has it until the tick files what waits');
-      assert.notEqual(review.status, 'exhausted', "the loop over on the person's word");
+      assert.equal(review.message, listed.message, 'as `nemia ls` has it until the tick files what waits');
+      assert.notEqual(review.message, 'exhausted', "the loop over on the person's word");
       assert.deepEqual(run.waitingOnYou, [], 'and nobody waited on');
       const decision = (await (await app().request(`/api/runs/${R}/decision`)).json()) as RunDecision;
       const commands = 'commands' in decision ? decision.commands : [];

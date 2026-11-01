@@ -149,7 +149,7 @@ const engine = () => {
 
 /** Each step's line on `nemia ls`, by name. */
 const statuses = async (e: Engine, id: string): Promise<Record<string, string>> =>
-  Object.fromEntries((await runWith(e, list(e, readRun(id)))).steps.map((s) => [s.name, s.status]));
+  Object.fromEntries((await runWith(e, list(e, readRun(id)))).steps.map((s) => [s.name, s.message]));
 
 /** What the runtime holds of a task. */
 const stateOf = async (e: Engine, taskId: string): Promise<TaskView> => Effect.runPromise(e.view(taskId));
@@ -187,7 +187,7 @@ test("a step that signed off blocked stays open, and a person's answer — `nemi
   assert.equal((await stateOf(e, plan)).state.closed, false, 'not closed');
   const listed = await runWith(e, list(e, readRun(run.id)));
   assert.equal(
-    listed.steps.find((s) => s.name === 'plan')!.status,
+    listed.steps.find((s) => s.name === 'plan')!.message,
     'input-required · BLOCKED',
     "the engine's word, and the run's beside it",
   );

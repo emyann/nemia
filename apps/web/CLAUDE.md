@@ -143,11 +143,11 @@ class merge do, which no test refuses — are in `.claude/skills/change-the-boar
 - A form keyed on an agent's version is thrown away with its draft when a write beside the agent moves the version (`keptAfterCopy`,
   `formKeyOf` in `lib/agents.ts`).
 - A step's state is read from the codes the api carries (`phase`, `reason`, a check's `verdict`), never from its sentence (`message`),
-  which is shown as it comes; a step's `status` is that sentence under its old name, read nowhere. A reason the api adds is refused at
-  the decode until the board's copy (`lib/api/reasons.ts`, held equal by `test/wire.test.ts`) has it, and then by the compiler until
-  `STATE_OF` (`lib/status.ts`) draws it: add its state there, its drawing (`stateDrawn`, whose hue gives the chip's class and the
-  minimap's fill) and `offersOf`, and its words in `PERSON` (`lib/words.ts`: rail, meaning, and the words of its wait if the api lists it
-  as waiting on a person), in the same change; the compiler refuses a state `PERSON` lacks. A card's kind is its phase's (`kindOf`).
+  which is shown as it comes. A reason the api adds is refused at the decode until the board's copy (`lib/api/reasons.ts`, held equal by
+  `test/wire.test.ts`) has it, and then by the compiler until `STATE_OF` (`lib/status.ts`) draws it: add its state there, its drawing
+  (`stateDrawn`, whose hue gives the chip's class and the minimap's fill) and `offersOf`, and its words in `PERSON` (`lib/words.ts`:
+  rail, meaning, and the words of its wait if the api lists it as waiting on a person), in the same change; the compiler refuses a state
+  `PERSON` lacks. A card's kind is its phase's (`kindOf`).
 - A page that must agree with a verb's refusal reads the package's decision (`Decidable.awaiting`), never the list's `toDecide`.
 - A read decodes with `get` (`lib/api/read.ts`) through a schema beside its plain type, written `const XSchema = decodes<X>()(…)`
   (`lib/api/decodes.ts`), which the barrel never exports (`export type *`): every key the board reads required, an unknown key dropped.

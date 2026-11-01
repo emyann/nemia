@@ -274,13 +274,12 @@ const judgedOf = <T>(of: ReadonlyMap<string, T>, name: string): T => {
 };
 
 /**
- * A step's word and codes as a door says them (`RunSummary`'s steps): its codes (`StepCodes`), its word as `message`, and as `status`,
- * the name `message` had, kept for one card.
+ * A step's word and codes as a door says them (`RunSummary`'s steps): its codes (`StepCodes`) and its word as `message`.
  */
-export const stepSaid = (judged: Pick<Judged, 'codes' | 'words'>, name: string): StepCodes & { message: string; status: string } => {
+export const stepSaid = (judged: Pick<Judged, 'codes' | 'words'>, name: string): StepCodes & { message: string } => {
   const { phase, reason, on, via, verdict } = judgedOf(judged.codes, name);
   const word = judgedOf(judged.words, name);
-  return { phase, reason, on, via, message: word, verdict, status: word };
+  return { phase, reason, on, via, message: word, verdict };
 };
 
 /**
@@ -479,7 +478,7 @@ export const judge = Effect.fn('judge')(function* (
   const tickReads = Boolean(run.workflow ?? folder);
   const waitingOnYou = names.filter((name) => read.waitingOnYou.includes(name));
   return {
-    words: new Map(read.steps.map((s) => [s.name, s.status])),
+    words: new Map(read.steps.map((s) => [s.name, s.message])),
     codes: new Map(read.steps.map((s) => [s.name, doorCodes(s)])),
     notes: new Map(read.steps.map((s) => [s.name, s.note ?? null])),
     roundDue: new Set(read.steps.filter((s) => s.roundDue).map((s) => s.name)),

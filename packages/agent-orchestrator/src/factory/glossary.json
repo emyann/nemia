@@ -88,7 +88,7 @@
     },
     {
       "term": "Template",
-      "meaning": "a factory made portable: a folder whose `nemia.yaml` declares its version, parameters and hires, beside its workflows, agents and skills, or an archive of one `nemia template pack` wrote; keyed by its source, as `Template` in `packages/agent-orchestrator/src/templates/templates.model.ts`.",
+      "meaning": "a factory made portable: a folder whose manifest, nemia.yaml, declares its version, parameters and hires, beside its workflows, agents and skills, or an archive of one `nemia template pack` wrote; keyed by its source, as `Template` in `packages/agent-orchestrator/src/templates/templates.model.ts`.",
       "type": "Template"
     },
     {

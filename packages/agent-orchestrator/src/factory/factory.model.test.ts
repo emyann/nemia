@@ -6,7 +6,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { Option, Schema } from 'effect';
-import { Factory, FactoryName, factoryModel, Hire } from './factory.model.ts';
+import { AppliedTemplate, Factory, FactoryName, factoryModel, Hire } from './factory.model.ts';
 
 /** A factory as `readFactory` answers one: attached, hiring and scheduling, its instruction in the store. */
 const PIPAO = {
@@ -32,6 +32,12 @@ test("a factory's name is checked on create by factoryNameRefusal's rule and rea
 
 test('a factory decodes as its store reads one, and one whose wiring outlives a workflow it offers is refused', async (t) => {
   await t.test('attached, hiring and scheduling', () => assert.equal(Schema.decodeUnknownResult(Factory)(PIPAO)._tag, 'Success'));
+  await t.test('as nemia factory apply files it, the template it was applied from read as written', () =>
+    assert.equal(
+      Schema.is(Factory)({ ...PIPAO, template: { source: 'templates/shop', version: '1.0.0', params: { budget: 7 } } }),
+      true,
+    ),
+  );
   await t.test('as nemia factory add files it', () =>
     assert.equal(Schema.is(Factory)({ name: 'nemia', repos: ['/r'], workflows: [], hires: {}, schedules: {} }), true),
   );
@@ -48,5 +54,5 @@ test('a hire names its factory, its workflow and step, and its agent, each by id
   assert.equal(Schema.is(Hire)({ factory: 'pipao', workflow: 'build', step: 'implement', agent: 'ada' }), true);
   assert.equal(Schema.is(Hire)({ factory: 'pipao', step: 'build/implement', agent: 'ada' }), false, 'the workflow is its own field');
   assert.deepEqual(factoryModel.ids, { FactoryName: 'Factory' });
-  assert.deepEqual(factoryModel.entities, [Factory, Hire]);
+  assert.deepEqual(factoryModel.entities, [Factory, AppliedTemplate, Hire]);
 });

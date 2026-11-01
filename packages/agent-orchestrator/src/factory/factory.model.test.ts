@@ -32,8 +32,18 @@ test("a factory's name is checked on create by factoryNameRefusal's rule and rea
 
 test('a factory decodes as its store reads one, and one whose wiring outlives a workflow it offers is refused', async (t) => {
   await t.test('attached, hiring and scheduling', () => assert.equal(Schema.decodeUnknownResult(Factory)(PIPAO)._tag, 'Success'));
-  await t.test('as nemia factory apply files it, the template it was applied from read as written', () =>
-    assert.equal(Schema.is(Factory)({ ...PIPAO, template: { source: 'templates/shop', version: '1.0.0', params: { budget: 7 } } }), true),
+  await t.test('as a factory’s apply files it, the template it was applied from read as written', () =>
+    assert.equal(
+      Schema.is(Factory)({
+        name: 'acme',
+        repos: ['/r'],
+        workflows: [],
+        hires: {},
+        schedules: {},
+        template: { source: 'templates/shop', version: '1.0.0', params: { budget: 7 } },
+      }),
+      true,
+    ),
   );
   await t.test('as nemia factory add files it', () =>
     assert.equal(Schema.is(Factory)({ name: 'nemia', repos: ['/r'], workflows: [], hires: {}, schedules: {} }), true),

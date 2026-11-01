@@ -22,9 +22,11 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
   and its steps (`src/folder/folder.model.ts`), addressed by its folder, `WorkflowDir`, over `folder.store.ts` and `write.store.ts`,
   rooted as S5a's, a write judged against the version it was read at by `workflowVersionRefusal`, which
   `contracts/workflow-version.contract.ts` proves; a run names the folder it started on and the steps it froze (`Run.workflow`, read
-  loosely); the callers still on the folder's stores are counted in `test/workflow-door.baseline.ts`. Still to come, each its own card on
-  S5a: **S5c**, the Agent and Skill doors (one context, the same lookup roots); **S5d**, the Template door. A run's `pinned` revisions,
-  left out of `Run` today, are named there.
+  loosely); the callers still on the folder's stores are counted in `test/workflow-door.baseline.ts`. **S5d**, the Template door
+  (`TemplateDoor`, `src/templates/templates.store.ts`): a template's folder or archive read, written and packed, rooted as S5a's, each
+  tree written checked by `TemplateTreeWrite`; the model's `Template` (`src/templates/templates.model.ts`) is keyed by its source, and a
+  factory's `template` is an `AppliedTemplate`, whose source names it. Still to come, its own card on S5a: **S5c**, the Agent and Skill
+  doors (one context, the same lookup roots). A run's `pinned` revisions, left out of `Run` today, are named there.
 - **S6, the subscription, the ledger and the feed**, each behind a door on the feed's model.
 - **AgentOnStep** is `StepAgent` in the agents' model: the agent a step is given, and what the step overrides of it, within what the
   agent offers (`Agent.overridable`).
@@ -126,14 +128,27 @@ erDiagram
     object schedules
     unknown instruction "optional"
     enum revisions "optional"
-    object template "optional"
     string tree "optional"
+  }
+  AppliedTemplate {
+    TemplateSource source FK
+    string version
+    object params
   }
   Hire {
     FactoryName factory FK
     WorkflowName workflow FK
     StepName step FK
     AgentName agent FK
+  }
+  Template {
+    TemplateSource source PK
+    string name
+    string version
+    object parameters
+    object hires FK
+    list workflows FK
+    string digest "optional"
   }
   Agent {
     AgentName name PK
@@ -229,10 +244,14 @@ erDiagram
   Run ||--o{ Card : from
   Workflow ||--o{ Factory : workflows
   Agent ||--o{ Factory : hires
+  Factory ||--o| AppliedTemplate : template
+  Template ||--o{ AppliedTemplate : source
   Factory ||--o{ Hire : factory
   Workflow ||--o{ Hire : workflow
   WorkflowStep ||--o{ Hire : step
   Agent ||--o{ Hire : agent
+  Agent ||--o{ Template : hires
+  Workflow ||--o{ Template : workflows
   Workflow ||--o{ StepAgent : workflow
   WorkflowStep ||--o{ StepAgent : step
   Agent ||--o{ StepAgent : agent

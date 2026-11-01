@@ -116,6 +116,11 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   gives its program one `workflowDoorMemory()` (`src/workflows/memory.store.ts`) and writes it through the door (`aWorkflow`,
   `test/workflow-walks.ts`); code still on the folder's stores (`test/workflow-door.baseline.ts`) reads the disk whatever door was given. A
   write's version is judged by `workflowVersionRefusal` (`src/folder/folder.ts`), whose contract a new rule of the version is a law of.
+- **A template is read and written through the Template door (`TemplateDoor`, `src/templates/templates.store.ts`), whose default is
+  rooted** as the Factory door's: a program that yields it — the template verbs, `nemia factory apply`, diff, upgrade and resolve, the
+  factory controller (`reconcileFactory`) — is given `StoreRoot`, a handler through `rooted`, and a test runs it with one
+  (`test/templated.ts`) or gives `templateDoorMemory()` (`src/templates/memory.store.ts`). The door checks a tree's name and paths
+  (`TemplateTreeWrite`), never the template's lint: a verb that must refuse a template that does not pass checks it first (`checkedTree`).
 - **A file written back is decoded by a `StructWithRest`**: a `Struct` strips the keys it does not name, and a record written by a newer
   tick keeps them. `Struct({})` accepts an array; a struct with a key refuses one. A frozen step is decoded by `FrozenStepSchema`
   (`folder/folder.store.ts`), a field per `StepKey`: a key added without one fails the typecheck.

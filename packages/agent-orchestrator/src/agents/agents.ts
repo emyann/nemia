@@ -40,7 +40,7 @@ import { bareSkillOf, composedRefusal, serverNamesOf, serversRefusal, SKILL_NAME
 import {
   codexModeWritten,
   codexSandboxNamed,
-  fenceBlockRefusal,
+  refuseFenceBlock,
   fencedPairs,
   FORMER_HARNESS_PROMPTS,
   FORMER_KEYS,
@@ -298,8 +298,7 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
       `${file}: \`name: ${said}\` is not the file's name, and an agent is named by its file: a step names this one \`agent: ${name}\`. Write \`name: ${name}\`, or delete the line.`,
     );
   }
-  const misplaced = fenceBlockRefusal(file, fenced, written.harness?.trim() || DEFAULT_HARNESS);
-  if (misplaced !== undefined) refuse(misplaced);
+  refuseFenceBlock(file, fenced, written.harness);
   if (listed !== undefined && isCardFile(listed)) refuse(cardRetired(file, 'skills', listed));
   const keys = codexSandboxNamed(file, written as Partial<Record<RoleKey, string>>, written.harness);
   const step = stepFrom(file, keys, body, read, spelled);

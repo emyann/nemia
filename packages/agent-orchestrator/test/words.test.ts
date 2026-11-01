@@ -1,6 +1,10 @@
 /**
- * Who may say which word (`docs/architecture.md`, *Who owns what*). Four vocabularies stay in their layer:
+ * Who may say which word (`docs/architecture.md`, *Who owns what*). Four vocabularies stay in their layer, and one harness's fence
+ * keys in its block:
  *
+ * - **Claude Code's fence keys stay in its block and its runner** (`FENCE`): `allowedTools`, `disallowedTools` and `permissionMode`, which
+ *   a step or agent file writes only under `claude: { fence: … }`. Counted in the orchestrator, the runtime but its Claude Code runner
+ *   (`OWN_FENCE`), the api and the board, file by file (`FENCE_WORDS`), each entry naming the slice that moves its words.
  * - **A harness's words stay in the runtime** (`HARNESS`): the names Claude Code, Codex and Anthropic, and the runtime's own permission
  *   modes and sandboxes, imported from its public entry, but the plain English ones (`PLAIN_HARNESS`). Refused in the orchestrator's `src`
  *   and `bin`, `apps/api/src` and `apps/web/src`.
@@ -148,10 +152,86 @@ const MOVES = {
     move: "an agent of this repository's team given as the example name in a message and a JSDoc",
     to: "the same sentences in packages/agent-orchestrator, with a name the team's folder does not hold",
   },
+  fenceArgs: {
+    move: "the runtime's task naming a session's fence by Claude Code's key, `permissionMode`, for every harness",
+    to: "a generic `fence` on the runtime's harness arguments, which each runner turns into its own key (the fence block's slice 2)",
+  },
+  fenceForm: {
+    move: "the api's and the board's fence fields under Claude Code's keys",
+    to: "the harness's block, `<harness>: { fence: … }`, read and written through the orchestrator (the fence block's slice 3)",
+  },
+  fenceFields: {
+    move: "the orchestrator's step and agent fields under Claude Code's keys, which the markdown readers fill from the harness's block",
+    to: "a fence per harness on the step and the agent, Claude Code's keys only inside its block (the fence block's slice 4)",
+  },
 } satisfies Record<string, Move>;
 
 type Entry = { count: number; card: string } | ({ count: number } & Move);
 type Baseline = Readonly<Record<string, Entry>>;
+
+/**
+ * Each file that says one of Claude Code's fence keys (`FENCE`) today, with its count and the move that removes them. In markdown the
+ * guard is the reader, which takes the keys only under the harness's block; here the code's fields still carry them.
+ */
+const FENCE_WORDS: Baseline = {
+  'apps/api/src/capabilities/reach.ts': { count: 17, ...MOVES.fenceForm },
+  'apps/api/src/detail/detail.ts': { count: 13, ...MOVES.fenceForm },
+  'apps/api/src/workflows/builder.ts': { count: 2, ...MOVES.fenceForm },
+  'apps/api/src/workflows/words.ts': { count: 5, ...MOVES.fenceForm },
+  'apps/api/src/workflows/workflows.ts': { count: 13, ...MOVES.fenceForm },
+  'apps/web/src/components/AgentForm.tsx': { count: 5, ...MOVES.fenceForm },
+  'apps/web/src/components/Facts.tsx': { count: 5, ...MOVES.fenceForm },
+  'apps/web/src/components/StepForm.tsx': { count: 1, ...MOVES.fenceForm },
+  'apps/web/src/components/StepNode.tsx': { count: 2, ...MOVES.fenceForm },
+  'apps/web/src/lib/agents.ts': { count: 11, ...MOVES.fenceForm },
+  'apps/web/src/lib/api/agents.ts': { count: 6, ...MOVES.fenceForm },
+  'apps/web/src/lib/api/capabilities.ts': { count: 7, ...MOVES.fenceForm },
+  'apps/web/src/lib/api/detail.ts': { count: 6, ...MOVES.fenceForm },
+  'apps/web/src/lib/api/library.ts': { count: 13, ...MOVES.fenceForm },
+  'apps/web/src/lib/asks.ts': { count: 1, ...MOVES.fenceForm },
+  'apps/web/src/lib/builder.ts': { count: 12, ...MOVES.fenceForm },
+  'apps/web/src/lib/stepCard.ts': { count: 2, ...MOVES.fenceForm },
+  'apps/web/src/lib/words.ts': { count: 2, ...MOVES.fenceForm },
+  'apps/web/src/routes/capabilities.tsx': { count: 3, ...MOVES.fenceForm },
+  'packages/agent-orchestrator/src/agents/agents.ts': { count: 8, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/applied/render.ts': { count: 1, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/brief/brief.ts': { count: 3, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/cli/flags.ts': { count: 3, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/ending/ending.ts': { count: 6, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/filed/filed.ts': { count: 3, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/folder/folder.store.ts': { count: 10, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/folder/write.store.ts': { count: 8, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/former/former.ts': { count: 37, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/harness/harness.ts': { count: 4, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/keys/filed-as.ts': { count: 15, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/keys/keys.ts': { count: 10, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/keys/tools.ts': { count: 22, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/nemia/keep.verb.ts': { count: 7, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/nemia/level.store.ts': { count: 7, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/record/record.ts': { count: 1, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/retry/retry-refusal.ts': { count: 3, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/retry/retry.ts': { count: 10, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/roster/roster.ts': { count: 1, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/servers/servers.ts': { count: 2, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/skills/read.store.ts': { count: 1, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/skills/skills.ts': { count: 1, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/start/start.verb.ts': { count: 3, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/stats/discipline.ts': { count: 1, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/step/step.ts': { count: 29, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/template/draft.ts': { count: 3, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/try/try.ts': { count: 14, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/workflow/fence.ts': { count: 42, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/workflow/step-file.ts': { count: 42, ...MOVES.fenceFields },
+  'packages/agent-orchestrator/src/workflow/unallowed.ts': { count: 6, ...MOVES.fenceFields },
+  'packages/agent-runtime/src/cli/main.ts': { count: 4, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/core/event-schema.ts': { count: 3, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/harness/args.ts': { count: 19, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/harness/choices.ts': { count: 12, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/harness/codex/codex.ts': { count: 21, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/harness/codex/vocabulary.ts': { count: 1, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/harness/sdk.ts': { count: 4, ...MOVES.fenceArgs },
+  'packages/agent-runtime/src/service/engine.ts': { count: 2, ...MOVES.fenceArgs },
+};
 
 /** Each file outside the runtime that says a harness's word today, with its count and what removes them. */
 const HARNESS_WORDS: Baseline = {
@@ -269,6 +349,18 @@ const HARNESS_RULE: Rule = {
   dirs: ['packages/agent-orchestrator/src', 'packages/agent-orchestrator/bin', 'apps/api/src', 'apps/web/src'],
   fix: "a harness's words stay in packages/agent-runtime: say it in this layer's words, or move it there",
 };
+
+/** Claude Code's fence keys, which the format keeps inside its block (`claude: { fence: … }`), counted whole as `wordsIn` counts. */
+const FENCE = ['allowedTools', 'disallowedTools', 'permissionMode'];
+
+const FENCE_RULE: Rule = {
+  what: "Claude Code's fence keys",
+  dirs: [...HARNESS_RULE.dirs, 'packages/agent-runtime/src', 'packages/agent-runtime/bin'],
+  fix: "a harness's fence keys live in its block and its runner (packages/agent-runtime/src/harness/claude/): say the fence in this layer's words",
+};
+
+/** The runtime's Claude Code runner, whose own words the fence keys are. */
+const OWN_FENCE = 'packages/agent-runtime/src/harness/claude/';
 
 const WORKFLOW_RULE: Rule = {
   what: 'workflow words',
@@ -404,8 +496,12 @@ function ratchetBreaks(rule: Rule, counts: Record<string, number>, baseline: Bas
 const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
 
 /** Every breach of the four rules over `texts` of each, against their baselines; the layer above's words read where a workflow's are. */
-function breaches(texts: { harness: Map<string, string>; workflow: Map<string, string>; team: Map<string, string> }, team: string[]) {
+function breaches(
+  texts: { harness: Map<string, string>; workflow: Map<string, string>; team: Map<string, string>; fence: Map<string, string> },
+  team: string[],
+) {
   return [
+    ...ratchetBreaks(FENCE_RULE, measured(texts.fence, FENCE), FENCE_WORDS, onDisk),
     ...ratchetBreaks(HARNESS_RULE, measured(texts.harness, HARNESS), HARNESS_WORDS, onDisk),
     ...ratchetBreaks(WORKFLOW_RULE, measured(texts.workflow, WORKFLOW), WORKFLOW_WORDS, onDisk),
     ...ratchetBreaks(LAYER_ABOVE_RULE, measuredBy(texts.workflow, layerAboveIn), LAYER_ABOVE_WORDS, onDisk),
@@ -413,7 +509,12 @@ function breaches(texts: { harness: Map<string, string>; workflow: Map<string, s
   ];
 }
 
-const repository = () => ({ harness: textsOf(HARNESS_RULE.dirs), workflow: textsOf(WORKFLOW_RULE.dirs), team: textsOf(TEAM_RULE.dirs) });
+const repository = () => ({
+  harness: textsOf(HARNESS_RULE.dirs),
+  workflow: textsOf(WORKFLOW_RULE.dirs),
+  team: textsOf(TEAM_RULE.dirs),
+  fence: new Map([...textsOf(FENCE_RULE.dirs)].filter(([file]) => !file.startsWith(OWN_FENCE))),
+});
 
 const TEAM = teamOf(path.join(ROOT, 'workflows', 'agents'));
 
@@ -469,7 +570,7 @@ test("the harness words, the workflow words, the layer above's words and the tea
 
 test('REFUSED: a new file in each layer that says a word of another', () => {
   const texts = repository();
-  const planted = (rule: 'harness' | 'workflow' | 'team', file: string, text: string, team = TEAM): string[] =>
+  const planted = (rule: 'harness' | 'workflow' | 'team' | 'fence', file: string, text: string, team = TEAM): string[] =>
     breaches({ ...texts, [rule]: new Map([...texts[rule], [file, text]]) }, team);
   const harness = HARNESS_RULE.fix;
   assert.deepEqual(planted('harness', 'packages/agent-orchestrator/src/x/x.ts', 'export const h = "codex";\n'), [
@@ -483,6 +584,9 @@ test('REFUSED: a new file in each layer that says a word of another', () => {
   ]);
   assert.deepEqual(planted('workflow', 'packages/agent-runtime/src/x.ts', '/** A workflow, under nemia. */\nexport const x = 1;\n'), [
     `packages/agent-runtime/src/x.ts holds 2 workflow words: ${WORKFLOW_RULE.fix}; never add them here`,
+  ]);
+  assert.deepEqual(planted('fence', 'apps/api/src/x/x.ts', "export const fenced = { permissionMode: 'plan' };\n"), [
+    `apps/api/src/x/x.ts holds 1 Claude Code's fence keys: ${FENCE_RULE.fix}; never add them here`,
   ]);
   const above = LAYER_ABOVE_RULE.fix;
   const runtimeFile = 'packages/agent-runtime/src/x.ts';

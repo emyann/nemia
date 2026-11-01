@@ -50,7 +50,7 @@ import {
 import {
   codexModeWritten,
   codexSandboxNamed,
-  fenceBlockRefusal,
+  refuseFenceBlock,
   fencedPairs,
   FORMER_KEYS,
   formerKeyWritten,
@@ -127,8 +127,7 @@ export function parseWorkflow(
   placeRequired(name, meta.place);
   const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
-    const misplaced = fenceBlockRefusal(name, fenced, meta.harness?.trim() || DEFAULT_HARNESS);
-    if (misplaced !== undefined) refuse(misplaced);
+    refuseFenceBlock(name, fenced, meta.harness);
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
     const step = stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
     if (meta.skills !== undefined)
@@ -140,8 +139,7 @@ export function parseWorkflow(
     return step;
   }
   const agent = agentOf(name, attached, agents, hired);
-  const misplaced = fenceBlockRefusal(name, fenced, meta.harness?.trim() || agent.keys.harness || DEFAULT_HARNESS);
-  if (misplaced !== undefined) refuse(misplaced);
+  refuseFenceBlock(name, fenced, meta.harness, agent.keys.harness);
   meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
   const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
   const factoryRules = rulesTold(rules, meta.harness ?? agent.keys.harness);
@@ -493,7 +491,8 @@ export function renderStep(step: StepDraft): string {
     return value === undefined ? [] : [[key, value]];
   });
   const body = String((provenance ? provenance.body : step.body) ?? '').trim();
-  if (pairs.length) return `---\n${renderFrontmatter(fencedPairs(pairs, step.harness == null ? undefined : String(step.harness).trim()))}---\n${body}\n`;
+  if (pairs.length)
+    return `---\n${renderFrontmatter(fencedPairs(pairs, step.harness == null ? undefined : String(step.harness).trim()))}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : `${body}\n`;
 }
 

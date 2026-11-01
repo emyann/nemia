@@ -9,6 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Effect } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
@@ -25,7 +26,11 @@ const runWith = runOver(runEngine, () => stand().layer);
 const { runStore } = await import('../record/files.store.ts');
 const { workflowVersion } = await import('./version.store.ts');
 const { removeWorkflow } = await import('./write.store.ts');
-const { queueInInbox } = await import('../inbox/inbox.store.ts');
+const verbs = await import('../inbox/inbox.store.ts');
+const { StoreRoot } = await import('../config/root.store.ts');
+/** `nemia inbox queue`'s verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
+const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) =>
+  Effect.runSync(Effect.provideService(verbs.queueInInbox(...args), StoreRoot, ROOT));
 const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
 
 const e = () => engineOf(engine().layer);

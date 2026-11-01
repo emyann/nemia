@@ -36,22 +36,26 @@ delete process.env.WF_MAX_RUNS;
 delete process.env.WF_MAX_CONCURRENT;
 const {
   addFactory,
-  addToInbox,
   advanceRun,
   attachWorkflow,
   cancelRun,
   decideRun,
-  readInbox,
   retryRun,
   runSlots,
   startRun,
   startFromInbox,
   tickRun,
   runWith: runEngine,
+  StoreRoot,
+  ...verbs
 } = await import('../src/runner.ts');
+/** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
+const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
+const readInbox = (memo?: Parameters<typeof verbs.readInbox>[0]) => atRoot(verbs.readInbox(memo));
 const { listRuns, readRun } = await import('../src/record/record.store.ts');
 const { main: cli } = await import('../src/cli/main.ts');
-const { filesStore } = await import('../src/record/files.store.ts');
+const { cardFiles } = await import('../src/cards/cards.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
 const { passParents } = await import('../src/views/views.verb.ts');
 const { NOTHING_READ, standingReader } = await import('../src/standing/standing.verb.ts');
@@ -974,7 +978,7 @@ test("the queue's failures: a card whose start is refused — its workflow gone,
       assert.equal(refused.queue.on, undefined, "the card's factory names the repository, not the daemon");
       assert.ok(refused.queue.refused.startsWith('dev: the factory solo does not offer this workflow'), refused.queue.refused);
       names(refused.queue.refused, 'nemia factory attach solo dev');
-      assert.equal(filesStore.inbox.tries().get('unattached-card')?.repo, solo);
+      assert.equal(cardFiles(ROOT).tries.list().get('unattached-card')?.repo, solo);
       assert.deepEqual(
         [(await runWith(b.e, tickRun({ repo: daemons }))).queue, listRuns()],
         [undefined, []],
@@ -1229,5 +1233,5 @@ test('a try the tick wrote down is read only as the tick writes it: a file whose
   };
   for (const [name, body] of Object.entries(files)) fs.writeFileSync(path.join(queue, `${name}.json`), JSON.stringify(body));
   fs.writeFileSync(path.join(queue, 'torn.json'), '{"at": "2026');
-  assert.deepEqual([...filesStore.inbox.tries()], [['kept', kept]]);
+  assert.deepEqual([...cardFiles(ROOT).tries.list()], [['kept', kept]]);
 });

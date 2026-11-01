@@ -4,7 +4,7 @@
  * program dies of and the face rethrows as it was thrown. That the face is the program over the engine it is handed and adds nothing is
  * `runWith`'s own definition (`src/runtime-client.ts`), said in the type by `_tickProgramTypes` below, and no test of it can fail.
  * Walked through the runtime itself, `plainEngine` over an in-memory journal
- * and a harness the test signs by hand, as unreadable-journal.test.ts does.
+ * and a harness the test signs by hand, as broken-runs.test.ts does.
  *
  * `WF_ROOT` is set before the runner is imported, which reads it as the module loads. `WF_VERIFY_REST=1` judges in full every run a pass
  * answers from its memo, sessions enough are admitted for the one run, and no cap is set on runs.

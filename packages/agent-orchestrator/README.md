@@ -2387,7 +2387,7 @@ Read the note and say whether it is right.
   Claude Code: the agent is in no session of ours.
 
 What is not there yet: a remote step's transcript on the board, and a declared `output:` sent to the agent as its reply's shape.
-`test/remote-step.test.ts` runs each of these against the A2A SDK's own server over HTTP.
+`test/remote.boundary.test.ts` runs each of these against the A2A SDK's own server over HTTP.
 
 ## A gate: a handoff that waits for a person — `gate:`, `--gate` and `wf approve`
 

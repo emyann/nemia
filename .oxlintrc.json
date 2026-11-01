@@ -542,9 +542,9 @@
     {
       "files": ["packages/agent-orchestrator/src/agents/agents.store.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 137, "skipBlankLines": true, "skipComments": true }],
-        "complexity": ["error", { "max": 41 }],
-        "sonarjs/cognitive-complexity": ["error", 59]
+        "max-lines-per-function": ["error", { "max": 136, "skipBlankLines": true, "skipComments": true }],
+        "complexity": ["error", { "max": 40 }],
+        "sonarjs/cognitive-complexity": ["error", 57]
       }
     },
     {
@@ -588,7 +588,7 @@
     {
       "files": ["packages/agent-orchestrator/src/decide/decide.ts"],
       "rules": {
-        "max-lines-per-function": ["error", { "max": 115, "skipBlankLines": true, "skipComments": true }],
+        "max-lines-per-function": ["error", { "max": 109, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 33 }]
       }
     },
@@ -627,14 +627,14 @@
       "rules": {
         "max-lines-per-function": ["error", { "max": 139, "skipBlankLines": true, "skipComments": true }],
         "complexity": ["error", { "max": 50 }],
-        "sonarjs/cognitive-complexity": ["error", 65]
+        "sonarjs/cognitive-complexity": ["error", 64]
       }
     },
     {
       "files": ["packages/agent-orchestrator/src/tick/assess.ts"],
       "rules": {
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 25]
+        "complexity": ["error", { "max": 29 }],
+        "sonarjs/cognitive-complexity": ["error", 24]
       }
     },
     {
@@ -654,8 +654,8 @@
     {
       "files": ["packages/agent-orchestrator/src/wait/wait.ts"],
       "rules": {
-        "complexity": ["error", { "max": 30 }],
-        "sonarjs/cognitive-complexity": ["error", 53]
+        "complexity": ["error", { "max": 25 }],
+        "sonarjs/cognitive-complexity": ["error", 36]
       }
     },
     {

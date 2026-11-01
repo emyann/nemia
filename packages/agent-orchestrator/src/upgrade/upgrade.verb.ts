@@ -17,7 +17,7 @@ import { FactoryDoor } from '../factories/factories.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import { Effect } from 'effect';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
-import { renderedAt, setsOf, type RenderedAt } from '../applied/applied.verb.ts';
+import { renderedAt, renderedOrNot, setsOf, type RenderedAt } from '../applied/applied.verb.ts';
 import {
   appliedDir,
   digestOf,
@@ -76,23 +76,22 @@ function rendered(name: string, verb: string, notDone: string): { factory: Templ
  * The template at `source` rendered with `factory`'s parameters, or refused where it is at another version than `to`, or does not
  * render.
  */
-function renderTo(verb: string, factory: Templated, source: string, to: string, notDone: string): RenderedAt {
-  let read: RenderedAt | { problems: string[]; version?: string };
-  try {
-    read = renderedAt(source, setsOf(factory.template.params));
-  } catch (err) {
-    read = { problems: [(err as Error).message] };
-  }
+const renderTo = Effect.fn('renderTo')(function* (verb: string, factory: Templated, source: string, to: string, notDone: string) {
+  const read = yield* renderedOrNot(renderedAt(source, setsOf(factory.template.params)));
   if (read.version !== undefined && read.version !== to)
-    throw new Conflict({
-      message: `${verb}: ${source} is at version ${read.version}, not ${to}: put the template at ${to}, or name a folder or archive at ${to} with --template <folder|archive>. ${notDone}`,
-    });
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${verb}: ${source} is at version ${read.version}, not ${to}: put the template at ${to}, or name a folder or archive at ${to} with --template <folder|archive>. ${notDone}`,
+      }),
+    );
   if ('problems' in read)
-    throw new Invalid({
-      message: `${verb}: ${source} does not render ${factory.name} at ${to}, with ${read.problems.length} problem${read.problems.length === 1 ? '' : 's'} (a parameter the version requires is given by none: an upgrade takes no --set yet):\n${read.problems.join('\n')}\n${notDone}`,
-    });
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${verb}: ${source} does not render ${factory.name} at ${to}, with ${read.problems.length} problem${read.problems.length === 1 ? '' : 's'} (a parameter the version requires is given by none: an upgrade takes no --set yet):\n${read.problems.join('\n')}\n${notDone}`,
+      }),
+    );
   return read;
-}
+});
 
 /**
  * The upgrade of the factory `args` name to `--to`, as `verb` asks it, refused in order before anything is written: the factory, one made
@@ -101,16 +100,24 @@ function renderTo(verb: string, factory: Templated, source: string, to: string, 
  * downgrade without `--downgrade` where `downgrades` (`Conflict`); and a template that does not render (`Invalid`). Where no status
  * names the version its base holds, any `--to` is taken: the controller checks it against the base.
  */
-function upgradeAsked(args: Args, verb: string, notDone: string, downgrades = true): Asked {
-  const { factory, from, base } = rendered(textOf(args, 'factory') ?? '', verb, notDone);
+const upgradeAsked = Effect.fn('upgradeAsked')(function* (args: Args, verb: string, notDone: string, downgrades = true) {
+  const { factory, from, base } = yield* tried(() => rendered(textOf(args, 'factory') ?? '', verb, notDone));
   const to = textOf(args, 'to');
   if (to === undefined || !VERSION.test(to))
-    throw new Invalid({
-      message: `${verb} takes the version to upgrade to, three numbers: ${verb} ${factory.name} --to <x.y.z>. ${notDone}`,
-    });
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${verb} takes the version to upgrade to, three numbers: ${verb} ${factory.name} --to <x.y.z>. ${notDone}`,
+      }),
+    );
   const given = textOf(args, 'template');
   const source = given === undefined ? factory.template.source : path.resolve(given);
-  const render = renderTo(verb, factory, source, to, notDone);
+  const render = yield* renderTo(verb, factory, source, to, notDone);
+  return yield* tried(() => upgradeChecked({ factory, from, to, source, render, base }, verb, notDone, downgrades, args));
+});
+
+/** The upgrade `asked`, refused where it asks the version its base holds again, or a downgrade not asked for (`upgradeAsked`). */
+function upgradeChecked(asked: Asked, verb: string, notDone: string, downgrades: boolean, args: Args): Asked {
+  const { factory, from, to, render, base } = asked;
   if (to === from)
     throw new Conflict({
       message:
@@ -122,7 +129,7 @@ function upgradeAsked(args: Args, verb: string, notDone: string, downgrades = tr
     throw new Conflict({
       message: `${verb}: ${to} is below ${from}, the version ${factory.name} was applied at: a downgrade is asked with --downgrade, ${verb} ${factory.name} --to ${to} --downgrade. ${notDone}`,
     });
-  return { factory, from, to, source, render, base };
+  return asked;
 }
 
 /** The merge of the factory's tree with its base and `render`, three ways. */
@@ -169,11 +176,15 @@ export const FACTORY_PLAN: Command<Planned> = {
   writes: false,
   class: 'read',
   only: HERE,
-  handler: (args) =>
-    tried(() => {
-      const { factory, from, to, render, base } = upgradeAsked(args, 'nemia factory diff', 'Nothing was written.', false);
-      return { name: factory.name, from, to, merge: mergeOf(factory.name, base, render) };
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'factory diff',
+      Effect.gen(function* () {
+        const { factory, from, to, render, base } = yield* upgradeAsked(args, 'nemia factory diff', 'Nothing was written.', false);
+        return { name: factory.name, from, to, merge: yield* tried(() => mergeOf(factory.name, base, render)) };
+      }),
+    ),
   print: ({ name, from, to, merge }) => planLines(name, from ?? UNKNOWN, to, merge),
 };
 
@@ -211,9 +222,7 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
       home,
       'factory upgrade',
       Effect.gen(function* () {
-        const { factory, from, to, render, base } = yield* tried(() =>
-          upgradeAsked(args, 'nemia factory upgrade', 'Nothing was upgraded.'),
-        );
+        const { factory, from, to, render, base } = yield* upgradeAsked(args, 'nemia factory upgrade', 'Nothing was upgraded.');
         const given = textOf(args, 'template');
         const conflicts = yield* tried(() => mergeOf(factory.name, base, render).conflicts.length);
         const door = yield* FactoryDoor;
@@ -278,20 +287,31 @@ type Resolved = { name: string; at: string; to: string; file: string; left: stri
  * (`Conflict`); an address that is no conflict of the merge (`Missing`, naming those there are); and a `--file` that is not there
  * (`Invalid`).
  */
-function resolved(args: Args): Resolved {
+const resolved = Effect.fn('resolved')(function* (args: Args) {
   const verb = 'nemia factory resolve';
   const notDone = 'Nothing was resolved.';
-  const { factory, from, base } = rendered(textOf(args, 'factory') ?? '', verb, notDone);
+  const { factory, from, base } = yield* tried(() => rendered(textOf(args, 'factory') ?? '', verb, notDone));
   const to = factory.template.version;
   if (from === undefined)
-    throw new Conflict({
-      message: `${verb}: no status names the version ${factory.name}'s base was applied at, so no upgrade of it can be merged: name it, nemia factory upgrade ${factory.name} --to <it> [--template <folder|archive>], and upgrade again once nemia factory ls shows it applied. ${notDone}`,
-    });
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${verb}: no status names the version ${factory.name}'s base was applied at, so no upgrade of it can be merged: name it, nemia factory upgrade ${factory.name} --to <it> [--template <folder|archive>], and upgrade again once nemia factory ls shows it applied. ${notDone}`,
+      }),
+    );
   if (to === from)
-    throw new Conflict({
-      message: `${verb}: no upgrade of ${factory.name} is under way, so it has no conflict to resolve: nemia factory diff ${factory.name} --to <x.y.z>, then nemia factory upgrade. ${notDone}`,
-    });
-  const merge = mergeOf(factory.name, base, renderTo(verb, factory, factory.template.source, to, notDone));
+    return yield* Effect.fail(
+      new Conflict({
+        message: `${verb}: no upgrade of ${factory.name} is under way, so it has no conflict to resolve: nemia factory diff ${factory.name} --to <x.y.z>, then nemia factory upgrade. ${notDone}`,
+      }),
+    );
+  const render = yield* renderTo(verb, factory, factory.template.source, to, notDone);
+  return yield* tried(() => resolvedWith(args, factory, to, mergeOf(factory.name, base, render)));
+});
+
+/** The choice `args` give for one conflict of `merge`, the upgrade of `factory` to `to`, written (`resolved`). */
+function resolvedWith(args: Args, factory: Templated, to: string, merge: TreeMerge): Resolved {
+  const verb = 'nemia factory resolve';
+  const notDone = 'Nothing was resolved.';
   const at = textOf(args, 'conflict') ?? '';
   if (!merge.conflicts.some((c) => c.at === at))
     throw new Missing({
@@ -322,7 +342,7 @@ export const FACTORY_RESOLVE: Command<Resolved> = {
   class: 'ask',
   asksAlways: true,
   only: HERE,
-  handler: (args) => tried(() => resolved(args)),
+  handler: (args, _env, home) => rooted(home, 'factory resolve', resolved(args)),
   print: ({ name, at, to, file, left }) => [
     `${name}: ${at} resolved for the upgrade to ${to} — ${file}`,
     left.length

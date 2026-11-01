@@ -8,6 +8,7 @@ import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { StepName, WorkflowName } from '../record/record.model.ts';
 import { AgentName } from '../agents/agents.model.ts';
+import { TemplateSource } from '../template/template.model.ts';
 import { factoryNameRefusal, REVISIONS_POLICIES } from './factory.ts';
 
 /** A factory's name: its file's in the store, minus `.json`, a lowercase slug (`factoryNameRefusal`, over `FACTORY_NAME`). */
@@ -22,6 +23,17 @@ const Schedule = Schema.Struct({
   tz: Schema.optional(Schema.String),
   since: Schema.String,
 });
+
+/**
+ * The template a factory was applied from (`nemia factory apply`), as its file records it under `template`: the template's source, the
+ * version its file wants, and the parameters given with `--set`. Its source is read by name alone (Q22), as the file wrote it.
+ */
+export const AppliedTemplate = Schema.Struct({
+  source: TemplateSource.OnRead,
+  version: Schema.String,
+  params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
+}).annotate({ identifier: 'AppliedTemplate' });
+export type AppliedTemplate = typeof AppliedTemplate.Type;
 
 /** The workflow a hire's key `<workflow>/<step>` names. */
 const workflowOf = (step: string): string => step.slice(0, step.indexOf('/'));
@@ -40,13 +52,7 @@ export const Factory = Schema.Struct({
   schedules: Schema.Record(WorkflowName.OnRead, Schedule),
   instruction: Schema.optional(Schema.Union([Schema.Struct({ path: Schema.String }), Schema.Struct({ store: Schema.Literal(true) })])),
   revisions: Schema.optional(Schema.Literals(REVISIONS_POLICIES)),
-  template: Schema.optional(
-    Schema.Struct({
-      source: Schema.String,
-      version: Schema.String,
-      params: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number, Schema.Boolean])),
-    }),
-  ),
+  template: Schema.optional(AppliedTemplate),
   tree: Schema.optional(Schema.String),
 })
   .check(
@@ -72,4 +78,4 @@ export const Hire = Schema.Struct({
 export type Hire = typeof Hire.Type;
 
 /** The factory context's part of the orchestrator's diagram. */
-export const factoryModel = { entities: [Factory, Hire], ids: { FactoryName: 'Factory' } } satisfies ErModel;
+export const factoryModel = { entities: [Factory, AppliedTemplate, Hire], ids: { FactoryName: 'Factory' } } satisfies ErModel;

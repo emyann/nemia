@@ -32,8 +32,6 @@ export const FACTORY_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/skills/skills.verb.ts': 1,
   'src/start/start.verb.ts': 2,
   'src/summary/reads.verb.ts': 1,
-  'src/template/template.store.ts': 1,
-  'src/template/template.verb.ts': 1,
   'src/tick/told.verb.ts': 1,
   'src/trust/trust.verb.ts': 1,
   'src/upgrade/upgrade.verb.ts': 1,

@@ -17,7 +17,10 @@ import type { Command } from '../command/entry.verb.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import { addFactory, factoryRepos, readFactories } from '../factory/factory.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory/factory.ts';
-import { openTemplate, problemLine } from '../template/template.store.ts';
+import { openedTree, placeSkillNames, problemLine, type OpenTemplate } from '../template/template.store.ts';
+import { TemplateSource } from '../template/template.model.ts';
+import { TemplateDoor } from '../templates/templates.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import type { FactorySpec } from '../template/index.ts';
 import {
   appliedDir,
@@ -46,13 +49,22 @@ export type RenderedAt = { version: string; params: Params; entries: Entry[] };
 export const setsOf = (params: FactoryTemplate['params']): string[] =>
   Object.entries(params).map(([key, value]) => `${key}=${String(value)}`);
 
+/** What a render answers where it does not render: every problem a line, with the template's version where it was read. */
+export type Unrendered = { problems: string[]; version?: string };
+
 /**
- * The template at `source`, a folder or an archive, rendered with `params`, each `<key>=<value>`, its files read off its tree; or why it
- * is not: its problems (`nemia template lint`), a parameter refused (`resolveParams`) and what the render refuses (`renderFactory`),
- * every one a line, with the template's version where it was read. Nothing is written.
+ * The template at `source`, a folder or an archive, read through the Template door and rendered with `params`, each `<key>=<value>`,
+ * its files read off its tree; or why it is not: its problems (`nemia template lint`), a parameter refused (`resolveParams`) and what
+ * the render refuses (`renderFactory`), every one a line, with the template's version where it was read. Nothing is written. Refused as
+ * the door refuses a read.
  */
-export function renderedAt(source: string, sets: readonly string[]): RenderedAt | { problems: string[]; version?: string } {
-  const read = openTemplate(source);
+export const renderedAt = Effect.fn('renderedAt')(function* (source: string, sets: readonly string[]) {
+  const tree = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(source));
+  return yield* tried(() => renderOpened(openedTree(source, tree, placeSkillNames()), sets));
+});
+
+/** The template opened as `read`, rendered with `sets`, or why it is not (`renderedAt`). */
+function renderOpened(read: OpenTemplate, sets: readonly string[]): RenderedAt | Unrendered {
   if (read.problems.length) return { problems: read.problems.map(problemLine) };
   const spec = (read.folder.documents.get('nemia.yaml') as { spec: FactorySpec }).spec;
   const { params, refusals } = resolveParams(spec.parameters ?? {}, sets);
@@ -80,16 +92,28 @@ const condition = (type: FactoryConditionType, status: boolean, reason: FactoryC
 /** No upgrade is under way, so nothing waits to be merged. */
 const NO_CONFLICTS = condition('ConflictsPending', false, 'NoUpgrade', 'No upgrade is under way, so no change waits to be merged.');
 
+/** `render` as an answer that cannot fail: what it rendered, or, for whatever stopped it, its words as the one problem. */
+export const renderedOrNot = <R>(render: Effect.Effect<RenderedAt | Unrendered, unknown, R>): Effect.Effect<RenderedAt | Unrendered, never, R> =>
+  render.pipe(Effect.catchCause((cause) => Effect.succeed({ problems: [messageOf(Cause.squash(cause))] })));
+
+/** The words of what was thrown or failed. */
+const messageOf = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
 /** The template `source` as `factory` reads it: rendered, or the `Applied` condition that says why it is not. */
-function readTemplate(factory: Factory & { template: FactoryTemplate }): RenderedAt | Condition {
+const templateNow = Effect.fn('templateNow')(function* (factory: Factory & { template: FactoryTemplate }) {
   const { source, version, params } = factory.template;
   const fix = `nemia template lint ${source}`;
-  let read: RenderedAt | { problems: string[]; version?: string };
-  try {
-    read = renderedAt(source, setsOf(params));
-  } catch (err) {
-    read = { problems: [(err as Error).message] };
-  }
+  const read = yield* renderedOrNot(renderedAt(source, setsOf(params)));
+  return conditionOf(factory, version, fix, read);
+});
+
+/** The render `read` as `factory`, applied at `version`, takes it: rendered, or the `Applied` condition that says why it is not. */
+function conditionOf(
+  factory: Factory & { template: FactoryTemplate },
+  version: string,
+  fix: string,
+  read: RenderedAt | Unrendered,
+): RenderedAt | Condition {
   if ('problems' in read) {
     const more = read.problems.length > 1 ? ` (and ${read.problems.length - 1} more: ${fix})` : '';
     return condition('Applied', false, 'TemplateInvalid', `The template does not render: ${read.problems[0]}${more}`);
@@ -233,8 +257,13 @@ const cameByUpgrade = (last: Status | undefined, version: string): boolean =>
  * upgrade merged where one is due (`upgradePass`), and its status written where it changed. The version its base holds is the template's
  * wherever the base is its render, else the one last written, else unknown, said by its own condition. The status it observed.
  */
-export function reconcileFactory(factory: Factory & { template: FactoryTemplate }): Status {
-  const now = readTemplate(factory);
+export const reconcileFactory = Effect.fn('reconcileFactory')(function* (factory: Factory & { template: FactoryTemplate }) {
+  const now = yield* templateNow(factory);
+  return reconciledWith(factory, now);
+});
+
+/** `factory` brought to its template as rendered now (`now`), or as the condition that says why it is not (`reconcileFactory`). */
+function reconciledWith(factory: Factory & { template: FactoryTemplate }, now: RenderedAt | Condition): Status {
   const last = readStatus(factory.name);
   if (!('type' in now)) stageFolder(appliedDir(factory.name), now.entries, true);
   const base = entriesIn(appliedDir(factory.name));
@@ -263,7 +292,7 @@ export const reconcileOnce = Effect.fn('reconcileOnce')(function* () {
   for (const factory of readFactories()) {
     if ('error' in factory || factory.template === undefined) continue;
     const templated = factory as Factory & { template: FactoryTemplate };
-    yield* Effect.sync(() => reconcileFactory(templated)).pipe(
+    yield* reconcileFactory(templated).pipe(
       Effect.catchCause((cause) => Effect.logWarning(`The factory ${factory.name} could not be reconciled: ${Cause.pretty(cause)}`)),
     );
     done.push(factory.name);
@@ -345,24 +374,28 @@ type Applied = { name: string; repos: readonly string[]; file: string; template:
  * `--template` (`Invalid`); the repositories (`factoryRepos`); a template that does not pass its check, a parameter not declared, of the
  * wrong type or required and not given, and what the render refuses (`Invalid`, every one at once); then as `addFactory` refuses.
  */
-function applied(args: Args): Applied {
+const applied = Effect.fn('applied')(function* (args: Args) {
   const name = textOf(args, 'name') ?? '';
   const given = textOf(args, 'template');
   if (given === undefined)
-    throw new Invalid({
-      message: `nemia factory apply makes a factory from a template: name its folder or archive with --template <folder|archive>. Nothing was filed.`,
-    });
-  const repos = factoryRepos(name, manyOf(args, 'repos'));
+    return yield* Effect.fail(
+      new Invalid({
+        message: `nemia factory apply makes a factory from a template: name its folder or archive with --template <folder|archive>. Nothing was filed.`,
+      }),
+    );
+  const repos = yield* tried(() => factoryRepos(name, manyOf(args, 'repos')));
   const source = path.resolve(given);
-  const read = renderedAt(source, manyOf(args, 'sets'));
+  const read = yield* renderedAt(source, manyOf(args, 'sets'));
   if ('problems' in read)
-    throw new Invalid({
-      message: `${source} cannot make ${name}, with ${read.problems.length} problem${read.problems.length === 1 ? '' : 's'}:\n${read.problems.join('\n')}\nNothing was filed.`,
-    });
+    return yield* Effect.fail(
+      new Invalid({
+        message: `${source} cannot make ${name}, with ${read.problems.length} problem${read.problems.length === 1 ? '' : 's'}:\n${read.problems.join('\n')}\nNothing was filed.`,
+      }),
+    );
   const template = { source, version: read.version, params: read.params };
-  const { factory, file } = addFactory({ name, repos, template });
-  return { name: factory.name, repos: factory.repos, file, template, tree: treeDir(name) };
-}
+  const { factory, file } = yield* tried(() => addFactory({ name, repos, template }));
+  return { name: factory.name, repos: factory.repos, file, template, tree: treeDir(name) } satisfies Applied;
+});
 
 /**
  * `nemia factory apply`: a factory filed from a template, its places then trusted as `nemia factory add` trusts them unless
@@ -378,9 +411,9 @@ export const FACTORY_APPLY: Command<Applied & { trusts: readonly PlaceTrust[] }>
   class: 'ask',
   asksAlways: true,
   only: HERE,
-  handler: (args) =>
+  handler: (args, _env, home) =>
     Effect.gen(function* () {
-      const filed = yield* tried(() => applied(args));
+      const filed = yield* rooted(home, 'factory apply', applied(args));
       return { ...filed, trusts: args.noTrust === true ? [] : yield* trustPlaces(filed.repos) };
     }),
   print: ({ name, repos, file, template, tree, trusts }) => [

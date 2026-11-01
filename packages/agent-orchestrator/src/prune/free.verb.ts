@@ -9,6 +9,7 @@ import path from 'node:path';
 import { Cause, Effect, Exit, type Duration } from 'effect';
 import { keepsWorktrees } from '../config/config.store.ts';
 import { HOME } from '../record/record.store.ts';
+import { firstPiece } from '../piece/piece.ts';
 import { dropEmpty, freedByRepo, judging, resolved, sized, type Judged, type Sized } from './prune.verb.ts';
 import { freeable, freedLine, freeSaid, freeTurn, pruneLines, type Answered, type Pruning } from './prune.ts';
 
@@ -37,7 +38,7 @@ type Swept = { readonly id: string; readonly ready: Sized } | { readonly id: str
 /** Why a judgement, a sizing or a removal that failed did: its refusal's or its defect's own message, on one line. */
 const whyOf = (cause: Cause.Cause<unknown>): string => {
   const err = Cause.squash(cause);
-  return (err instanceof Error ? err.message : String(err)).split('\n')[0];
+  return firstPiece(err instanceof Error ? err.message : String(err), '\n');
 };
 
 /** What is to be said of a run the judgement left: nothing of one with nothing listed, whose empty folder goes; else `freeSaid`. */

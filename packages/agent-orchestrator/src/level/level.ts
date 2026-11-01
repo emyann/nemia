@@ -64,20 +64,24 @@ export const raiseRefusal = (factory: string, level: Level, byDefault: Level): s
     ? `${factory} is at ${byDefault} by default, so a raise to ${level} raises nothing: raise it above its default, or set its default with nemia level ${level} --factory ${factory}.`
     : undefined;
 
+/** The milliseconds of a day, the longest unit a stretch is said in. */
+const DAY = 86_400_000;
+
 /** The milliseconds of each unit a stretch is said in. */
-const UNITS: Readonly<Record<string, number>> = { m: 60_000, h: 3_600_000, d: 86_400_000 };
+const UNITS: Readonly<Record<string, number>> = { m: 60_000, h: 3_600_000, d: DAY };
 
 /** The longest stretch a raise is given for: a week, so a raise always ends. */
-const LONGEST = 7 * UNITS.d;
+const LONGEST = 7 * DAY;
 
 /**
  * The milliseconds of a stretch said as digits and a unit (`90m`, `2h`, `1d`), above zero and at most a week; undefined where it does not
  * read as one. Pure.
  */
 export function durationOf(text: string): number | undefined {
-  const said = /^(\d+)([mhd])$/.exec(text.trim());
-  if (said === null) return undefined;
-  const ms = Number(said[1]) * UNITS[said[2]];
+  const [, digits, unit] = /^(\d+)([mhd])$/.exec(text.trim()) ?? [];
+  const per = unit === undefined ? undefined : UNITS[unit];
+  if (digits === undefined || per === undefined) return undefined;
+  const ms = Number(digits) * per;
   return ms > 0 && ms <= LONGEST ? ms : undefined;
 }
 

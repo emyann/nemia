@@ -6,7 +6,6 @@
  */
 import { Hono } from 'hono';
 import {
-  COMMANDS,
   commandLine,
   DEFAULT_FACTORY,
   FACTORY,
@@ -18,7 +17,7 @@ import {
 } from 'agent-orchestrator';
 import { repoOf } from '../capabilities/capabilities.ts';
 import { type ApiEnv, served } from '../layer.ts';
-import { runPlaced } from '../store.ts';
+import { commandNamed, runPlaced } from '../store.ts';
 
 /**
  * The lines a person types for a factory, built off the table: a workflow attached to it, its file removed and filed again, a workflow
@@ -26,13 +25,12 @@ import { runPlaced } from '../store.ts';
  */
 export type FactoryCommands = { attach: string; rm: string; add: string; schedule: string; trust: string };
 
-const entry = (name: string) => COMMANDS.find((c) => c.name === name)!;
-const ATTACH = entry('factory attach');
-const RM = entry('factory rm');
-const ADD = entry('factory add');
-const SCHEDULE = entry('factory schedule');
-const UNSCHEDULE = entry('factory unschedule');
-const TRUST = entry('factory trust');
+const ATTACH = commandNamed('factory attach');
+const RM = commandNamed('factory rm');
+const ADD = commandNamed('factory add');
+const SCHEDULE = commandNamed('factory schedule');
+const UNSCHEDULE = commandNamed('factory unschedule');
+const TRUST = commandNamed('factory trust');
 
 /**
  * A factory's lines: `nemia factory attach <name> <workflow>`, `nemia factory rm <name>`, `nemia factory add <name> --repo <path>`,

@@ -10,6 +10,7 @@ import { rootSpan } from '../meter/meter.verb.ts';
 import { runTasks } from '../record/record.ts';
 import { EngineService, HARNESSES, tried, type KeptReport } from '../runtime-client.ts';
 import { walk } from '../prune/freed.store.ts';
+import { firstPiece } from '../piece/piece.ts';
 import type { Answered } from '../prune/prune.ts';
 import { storeFree, storeRoots } from './disk.store.ts';
 import {
@@ -158,10 +159,10 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
   const roots = given ?? (yield* tried(storeRoots));
   const factories = new Map(answers.map((a) => [a.run.id, a.run.factory ?? DEFAULT_FACTORY]));
   const runs = { ids: new Set(factories.keys()), factoryOf: (id: string) => factories.get(id) };
-  const walking = roots.flatMap((root, k) => (root.own === undefined ? [k] : []));
+  const walking = roots.flatMap((root, k) => (root.own === undefined ? [{ root, k }] : []));
   const walked = yield* walk(
-    walking.map((k) => roots[k].path),
-    { kinds: walking.map((k) => roots[k].kind), kindIn: (kind, name) => kindIn(kind as DiskKind, name) },
+    walking.map(({ root }) => root.path),
+    { kinds: walking.map(({ root }) => root.kind), kindIn: (kind, name) => kindIn(kind as DiskKind, name) },
   );
   const read = {
     bytes: roots.map((root) => root.own ?? 0),
@@ -169,11 +170,11 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
     unread: roots.map(() => 0),
     read: roots.map(() => true),
   };
-  for (const [at, k] of walking.entries()) {
-    read.bytes[k] = walked.bytes[at];
+  for (const [at, { k }] of walking.entries()) {
+    read.bytes[k] = walked.bytes[at] ?? 0;
     read.kinds[k] = walked.kinds[at];
-    read.unread[k] = walked.unread[at];
-    read.read[k] = walked.read[at];
+    read.unread[k] = walked.unread[at] ?? 0;
+    read.read[k] = walked.read[at] ?? false;
   }
   const at = new Date().toISOString();
   const tasks = new Map(answers.flatMap((a) => runTasks(a.run).map((taskId) => [taskId, a.run.factory ?? DEFAULT_FACTORY])));
@@ -189,7 +190,7 @@ export const diskOnce = Effect.fn('diskOnce')(function* (answers: readonly Answe
 /** Why a sweep that failed did: its refusal's or its defect's own message, on one line. */
 const whyOf = (cause: Cause.Cause<unknown>): string => {
   const err = Cause.squash(cause);
-  return (err instanceof Error ? err.message : String(err)).split('\n')[0];
+  return firstPiece(err instanceof Error ? err.message : String(err), '\n');
 };
 
 /**

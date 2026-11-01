@@ -40,59 +40,62 @@ export type Walk = {
   bursts: number;
 };
 
-/** What the walk has counted so far (`Walk`), and every inode with names still to meet. */
-type Walked = Walk & { readonly linked: Map<string, Linked> };
+/** What the walk has counted so far of one folder asked: its share of a `Walk`'s lists. */
+type Tally = { bytes: number; readonly kinds: Record<string, number>; unread: number; read: boolean };
 
-/** A folder still to read, of the folder asked `index`, and its kind. */
-type Inside = { readonly dir: string; readonly index: number; readonly kind: string };
+/** What the walk has counted so far (`Walk`'s cost), and every inode with names still to meet. */
+type Walked = { names: number; bursts: number; readonly linked: Map<string, Linked> };
 
-/** `bytes` into the folder asked `index`, and into its `kind` there. */
-const into = (walked: Walked, index: number, kind: string, bytes: number) => {
-  walked.bytes[index] += bytes;
-  walked.kinds[index][kind] = (walked.kinds[index][kind] ?? 0) + bytes;
+/** A folder still to read, of the folder asked whose count is `tally`, and its kind. */
+type Inside = { readonly dir: string; readonly tally: Tally; readonly kind: string };
+
+/** `bytes` into the folder asked whose count is `tally`, and into its `kind` there. */
+const into = (tally: Tally, kind: string, bytes: number) => {
+  tally.bytes += bytes;
+  tally.kinds[kind] = (tally.kinds[kind] ?? 0) + bytes;
 };
 
 /**
- * Count one name, `at`, of kind `kind`, into the folder `index`: a folder or a file of one name at once; a file of several names once
- * every one of them was met inside the folders walked, to the folder and the kind where the last was. Answers whether it is a folder,
- * to be read in its turn, and undefined for a name that is not there, which counts nothing.
+ * Count one name, `at`, of kind `kind`, into the folder whose count is `tally`: a folder or a file of one name at once; a file of
+ * several names once every one of them was met inside the folders walked, to the folder and the kind where the last was. Answers
+ * whether it is a folder, to be read in its turn, and undefined for a name that is not there, which counts nothing.
  */
-function counted(at: string, index: number, kind: string, walked: Walked): boolean | undefined {
+function counted(at: string, tally: Tally, kind: string, walked: Walked): boolean | undefined {
   const stat = fs.lstatSync(at, { bigint: true, throwIfNoEntry: false });
   if (!stat) return undefined;
   const bytes = Number(stat.blocks * BLOCK);
   if (stat.isDirectory() || stat.nlink <= 1n) {
-    into(walked, index, kind, bytes);
+    into(tally, kind, bytes);
     return stat.isDirectory();
   }
   const key = `${stat.dev}:${stat.ino}`;
   const linked = walked.linked.get(key) ?? { links: stat.nlink, met: 0n, bytes };
   linked.met += 1n;
   walked.linked.set(key, linked);
-  if (linked.met === linked.links) into(walked, index, kind, bytes);
+  if (linked.met === linked.links) into(tally, kind, bytes);
   return false;
 }
 
-/** The names in the folder `dir` of the folder asked `index`; none for one that does not list, counted unread. */
-function namesIn(dir: string, index: number, walked: Walked): string[] {
+/** The names in the folder `dir` of the folder asked whose count is `tally`; none for one that does not list, counted unread. */
+function namesIn(dir: string, tally: Tally): string[] {
   try {
     return fs.readdirSync(dir);
   } catch {
-    walked.unread[index] += 1;
+    tally.unread += 1;
     return [];
   }
 }
 
 /** `counted`, one more name of the walk: a name that is not there, or whose `lstat` throws, is undefined and counted unread. */
-function countedOrNot(at: string, index: number, kind: string, walked: Walked): boolean | undefined {
+function countedOrNot(at: string, tally: Tally, kind: string, walked: Walked): boolean | undefined {
   walked.names += 1;
   let folder: boolean | undefined;
   try {
-    folder = counted(at, index, kind, walked);
+    folder = counted(at, tally, kind, walked);
   } catch {
     folder = undefined;
   }
-  if (folder === undefined) walked.unread[index] += 1;
+  if (folder === undefined) tally.unread += 1;
   return folder;
 }
 
@@ -121,36 +124,37 @@ const burstEnded = (walked: Walked): boolean => {
  * @returns What they hold, by kind too, what did not read and what the walk cost.
  */
 export const walk = Effect.fn('walk')(function* (dirs: readonly string[], sort?: Sort) {
-  const none = () => dirs.map(() => 0);
-  const walked: Walked = {
-    bytes: none(),
-    kinds: dirs.map(() => ({})),
-    unread: none(),
-    read: dirs.map(() => false),
-    names: 0,
-    bursts: 0,
-    linked: new Map(),
-  };
+  const tallies: Tally[] = [];
+  const walked: Walked = { names: 0, bursts: 0, linked: new Map() };
   const kindIn = sort?.kindIn ?? ((kind: string) => kind);
   const inside: Inside[] = [];
   for (const [index, dir] of dirs.entries()) {
+    const tally: Tally = { bytes: 0, kinds: {}, unread: 0, read: false };
+    tallies.push(tally);
     const kind = sort?.kinds[index] ?? WHOLE;
-    const folder = countedOrNot(dir, index, kind, walked);
-    walked.read[index] = folder !== undefined;
-    if (folder) inside.push({ dir, index, kind });
+    const folder = countedOrNot(dir, tally, kind, walked);
+    tally.read = folder !== undefined;
+    if (folder) inside.push({ dir, tally, kind });
     if (burstEnded(walked)) yield* Effect.yieldNow;
   }
   for (let next = inside.pop(); next; next = inside.pop()) {
-    const { dir, index } = next;
-    for (const name of namesIn(dir, index, walked)) {
+    const { dir, tally } = next;
+    for (const name of namesIn(dir, tally)) {
       const at = path.join(dir, name);
       const kind = kindIn(next.kind, name);
-      if (countedOrNot(at, index, kind, walked)) inside.push({ dir: at, index, kind });
+      if (countedOrNot(at, tally, kind, walked)) inside.push({ dir: at, tally, kind });
       if (burstEnded(walked)) yield* Effect.yieldNow;
     }
   }
-  const { bytes, kinds, unread, read, names, bursts } = walked;
-  return { bytes, kinds, unread, read, names, bursts } satisfies Walk;
+  const { names, bursts } = walked;
+  return {
+    bytes: tallies.map((tally) => tally.bytes),
+    kinds: tallies.map((tally) => tally.kinds),
+    unread: tallies.map((tally) => tally.unread),
+    read: tallies.map((tally) => tally.read),
+    names,
+    bursts,
+  } satisfies Walk;
 });
 
 /**

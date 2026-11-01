@@ -247,7 +247,7 @@ const summarize = Effect.fnUntraced(function* (run: Run, views: Views, reader: E
     after: run.after ?? [],
     context: run.context ?? [],
     waiting: judged.waiting,
-    holdUntil: judged.holding ? run.hold!.until : [],
+    holdUntil: judged.holding && run.hold ? run.hold.until : [],
     holding: judged.holding,
     ...runSaid(judged),
     moving: judged.moving,
@@ -446,10 +446,11 @@ export const runsSummarized = Effect.fn('runsSummarized')(function* (e: Engine, 
     if (yield* atRest(run, one, reader)) read.keep(run, one.summary, one.asked.branches, git.heads);
     else read.drop(run);
   }
-  const summaries: RunSummary[] = runs.map((run) => {
-    const summary = judged.get(run.id)?.summary ?? notJudged.get(run.id) ?? kept.get(run.id)!;
+  const summaries: RunSummary[] = runs.flatMap((run) => {
+    const summary = judged.get(run.id)?.summary ?? notJudged.get(run.id) ?? kept.get(run.id);
+    if (summary === undefined) return [];
     if (kept.has(run.id)) read.hit();
-    return { ...summary, startedAt: runStartedAt(run, filed) };
+    return [{ ...summary, startedAt: runStartedAt(run, filed) }];
   });
   return summaries;
 });

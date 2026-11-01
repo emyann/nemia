@@ -187,7 +187,7 @@ export function artifactLines(dir: string, missing: readonly MissingArtifact[], 
   const filesGone = pruned?.artifacts;
   const gone = filesGone ? missing.filter((m) => m.why === 'missing' || m.why === 'not there').map((m) => m.path) : [];
   return [
-    ...(gone.length ? [`!! not kept: ${gone.join(', ')}  — ${filesPrunedWords(filesGone!)}`] : []),
+    ...(filesGone && gone.length ? [`!! not kept: ${gone.join(', ')}  — ${filesPrunedWords(filesGone)}`] : []),
     ...(filesGone
       ? []
       : line('not there', (names) =>

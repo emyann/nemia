@@ -312,7 +312,7 @@ export function daemonLine(standing: DaemonStanding, now: number): string {
         ? `${holderName(standing.file.by)}: none ticking — ${holderWords(standing.file)} is gone, that pid another process's now; its ${lastPassWords(standing.file, now)}; ${START_WORDS}`
         : `${holderName(standing.file.by)}: none ticking — pid ${standing.file.pid} is gone, its ${lastPassWords(standing.file, now)}; ${START_WORDS}`;
     case 'stopped':
-      return `${holderName(standing.file.by)}: none ticking — pid ${standing.file.pid} stopped ${durationWord(now - Date.parse(standing.file.stoppedAt!))} ago (${standing.file.stoppedAt}), its ${lastPassWords(standing.file, now)}; ${START_WORDS}`;
+      return `${holderName(standing.file.by)}: none ticking — pid ${standing.file.pid} stopped ${durationWord(now - Date.parse(standing.file.stoppedAt ?? ''))} ago (${standing.file.stoppedAt}), its ${lastPassWords(standing.file, now)}; ${START_WORDS}`;
   }
 }
 

@@ -10,6 +10,7 @@ import type { Command } from '../command/entry.verb.ts';
 import { defaultStartsAllowed } from '../factory/factory.store.ts';
 import { inboxDir, runStore } from '../record/files.store.ts';
 import { Missing } from '../refusal/refusal.ts';
+import { firstPiece } from '../piece/piece.ts';
 import { inboxLines, noCardLine, type InboxCard, type InboxListing } from './inbox.ts';
 import { addToInbox, dropFromInbox, queueInInbox, readInbox, type InboxDropped, type InboxQueued } from './inbox.store.ts';
 import { setFrom, type InboxFrom } from './inbox.verb.ts';
@@ -160,17 +161,21 @@ export const INBOX_ADD: Command<{ card: InboxCard; file: string }> = {
       });
     }),
   print: ({ card, file }) => [
-    `${card.name}  ${card.body.split('\n')[0].slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
+    `${card.name}  ${firstPiece(card.body, '\n').slice(0, 56)}${card.workflow ? `  workflow: ${card.workflow}` : ''}${card.repo ? `  repo: ${card.repo}` : ''}${card.factory ? `  factory: ${card.factory}` : ''}`,
     `filed: ${file} — start it with nemia start ${file}${card.workflow ? '' : ' --workflows <w>'}`,
   ],
 };
+
+/** What `--workflow` of `nemia inbox queue` takes, said where it is missing and where it stands apart from its value. */
+const QUEUE_WORKFLOW_TAKES =
+  '--workflow takes the workflow the card starts on, by name or as a path: nemia inbox queue <name> --workflow <w>';
 
 /** `--workflow <w>`, which `nemia inbox queue` writes on the card with the mark. */
 const QUEUE_WORKFLOW: Flag = {
   flag: '--workflow',
   kind: 'text',
   key: 'workflow',
-  takes: '--workflow takes the workflow the card starts on, by name or as a path: nemia inbox queue <name> --workflow <w>',
+  takes: QUEUE_WORKFLOW_TAKES,
   twice: 'nemia inbox queue takes --workflow once: a card starts on one workflow.',
   only: {
     side: 'cli',
@@ -186,7 +191,7 @@ const QUEUE_SPEC: Spec = {
     arg.startsWith('-')
       ? `nemia inbox queue does not take ${arg}. It takes the card's name, then --workflow <w>, or --off to take the card back.`
       : `nemia inbox queue queues one card, and ${arg} is a second: nemia inbox queue <name>, once per card.`,
-  apart: () => QUEUE_WORKFLOW.takes!,
+  apart: () => QUEUE_WORKFLOW_TAKES,
   missing:
     'nemia inbox queue takes the name of the card to queue, as nemia inbox lists it: nemia inbox queue <name> [--workflow <w>] [--off].',
 };

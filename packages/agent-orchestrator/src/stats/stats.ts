@@ -407,10 +407,11 @@ function countsOf(names: readonly string[]): Array<{ name: string; count: number
 
 /** Each step's totals, per agent (`StepRow`), in the order of the tries: run by run, and a run's steps in its workflow's order. */
 function stepRowsOf(tries: readonly TryFact[]): StepRow[] {
-  const rows = new Map<string, TryFact[]>();
+  const rows = new Map<string, [TryFact, ...TryFact[]]>();
   for (const t of tries) {
     const key = JSON.stringify([t.step, t.agent]);
-    rows.set(key, [...(rows.get(key) ?? []), t]);
+    const was = rows.get(key);
+    rows.set(key, was ? [...was, t] : [t]);
   }
   return [...rows.values()].map((of) => ({
     step: of[0].step,
@@ -514,14 +515,15 @@ export function statsOf(
   const to = query.to ?? today;
   const all = [...kept.tries, ...kept.runs, ...kept.marks];
   const from = query.from ?? all.map((x) => x.day).sort()[0] ?? null;
-  const keys = query.by ? [...new Set(all.flatMap((x) => valuesOf(x, query.by!)))].sort(byKey) : [];
+  const by = query.by;
+  const keys = by ? [...new Set(all.flatMap((x) => valuesOf(x, by)))].sort(byKey) : [];
   return {
     from,
     to,
     by: query.by ?? null,
     filters,
     all: groupOf(kept, from, to, today),
-    groups: keys.map((key) => ({ key, ...groupOf(having(kept, query.by!, key), from, to, today) })),
+    groups: by ? keys.map((key) => ({ key, ...groupOf(having(kept, by, key), from, to, today) })) : [],
     unreadable: [...unreadable],
     health: healthOver(from, to),
   };

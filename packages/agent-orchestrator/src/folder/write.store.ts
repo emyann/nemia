@@ -87,8 +87,7 @@ export function writeWorkflow(
   if (twice) refuse(`two steps are named ${twice.name}, and a step is its file, ${twice.name}.md. Rename one of them.`);
   const where = places ?? placesAround(at);
   const agents = agentsFor(at, where);
-  const onCodex = steps.find((step) => step.permissionMode != null && harnessOfDraft(step, agents) === 'codex');
-  if (onCodex) refuse(codexModeWritten(onCodex.name, onCodex.permissionMode!));
+  refuse(codexModeRefusal(steps, agents));
   const texts = steps.map((step) => [step.name, renderStep(ownLine(step, agents))] as const);
   const read = (file: string): string | undefined => {
     try {
@@ -124,6 +123,16 @@ export function writeWorkflow(
   if (readme !== undefined)
     put(entries.find((e) => e.isFile() && isReadme(e.name))?.name ?? 'README.md', readme, (there) => there === readme);
   return { dir: at, steps: parsed, written: written.sort(), kept: kept.sort(), removed: removed.sort() };
+}
+
+/**
+ * The refusal of the first draft of `steps` that sends a sandbox under the former name, as `codexModeWritten` words it, or undefined
+ * where none does.
+ */
+function codexModeRefusal(steps: readonly StepDraft[], agents: Agents): string | undefined {
+  for (const step of steps)
+    if (step.permissionMode != null && harnessOfDraft(step, agents) === 'codex') return codexModeWritten(step.name, step.permissionMode);
+  return undefined;
 }
 
 /**

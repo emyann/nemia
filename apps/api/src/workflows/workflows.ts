@@ -24,7 +24,6 @@ import { Hono } from 'hono';
 import {
   agentsFor,
   cardSkills,
-  COMMANDS,
   DEFAULT_FACTORY,
   fillsOf,
   foldersIn,
@@ -54,7 +53,7 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
 import { graphOf, workflowVersion, type RunGraph } from 'agent-orchestrator';
-import { runPlaced } from '../store.ts';
+import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
 /** Where a workflow is read from: the repository's `workflows/`, or yours, in the store. */
@@ -248,7 +247,7 @@ const unshadowed = <T extends { from: WorkflowSource }>(found: readonly T[], nam
   found.filter((f, i) => found.findIndex((g) => g.from === f.from && name(g) === name(f)) === i);
 
 /** The table's entries the board's workflows are read through, each served on the api alone. */
-const LIST = COMMANDS.find((c) => c.name === 'workflows')!;
+const LIST = commandNamed('workflows');
 
 /**
  * Each folder `dirs` names, loaded as a start on `repo` would load it, in `factory` with its hires: the table's `workflows`, by
@@ -266,6 +265,13 @@ export const loadedOf = async (
     string,
     FolderLoaded
   >;
+
+/** The loading of the folder `dir` among `loaded`, which `loadedOf` gives for each folder it was asked: thrown, naming it, where none. */
+export function loadedAt(loaded: Readonly<Record<string, FolderLoaded>>, dir: string): FolderLoaded {
+  const folder = loaded[dir];
+  if (folder === undefined) throw new Error(`The table's \`workflows\` gave no loading of '${dir}', which it was asked to load.`);
+  return folder;
+}
 
 /**
  * Every workflow `repo` and `home` have that `factory` offers: each folder in each source, by name — in a factory, only those attached to
@@ -295,7 +301,7 @@ export async function listWorkflows(
     home,
     factory,
   );
-  return folders.map(({ name, from, dir }) => listed(name, from, dir, { repo, home }, loaded[dir], factory));
+  return folders.map(({ name, from, dir }) => listed(name, from, dir, { repo, home }, loadedAt(loaded, dir), factory));
 }
 
 /**
@@ -496,7 +502,8 @@ export function folderOf(
 ): { dir: string } | Refusal {
   const sources = sourcesOf(repo, home, tree);
   const found = unshadowed(sources.filter((s) => (!from || s.from === from) && foldersIn(s.dir).includes(name)));
-  if (found.length === 1) return { dir: path.join(found[0].dir, name) };
+  const [only] = found;
+  if (found.length === 1 && only !== undefined) return { dir: path.join(only.dir, name) };
   if (found.length > 1) {
     return {
       status: 409,

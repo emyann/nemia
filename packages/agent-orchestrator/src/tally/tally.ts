@@ -27,6 +27,7 @@ const typesOf = (entry: unknown): string[] => {
 /** An entry's parts: its field, the key of the field's items it reads, and the value it counts them by; undefined in none of the forms. */
 function partsOf(entry: string): { field: string; key: string | undefined; value: string | undefined } | undefined {
   const [fieldKey, value, ...more] = entry.split('=');
+  if (fieldKey === undefined) return undefined;
   const [field, key, ...deeper] = fieldKey.split('.');
   if (more.length || deeper.length || !field || key === '' || (value !== undefined && key === undefined)) return undefined;
   return { field, key, value };
@@ -103,7 +104,9 @@ export function tallyOf(step: string, written: string | undefined, output: StepO
  */
 export function tallyIn(tally: string, output: Record<string, unknown> | undefined): number | null {
   const [fieldKey, match] = tally.split('=');
+  if (fieldKey === undefined) return null;
   const [field, key] = fieldKey.split('.');
+  if (field === undefined) return null;
   const value = output?.[field];
   if (key !== undefined) {
     const counted = (item: Record<string, unknown>) => (match === undefined ? item[key] === true : item[key] === match);

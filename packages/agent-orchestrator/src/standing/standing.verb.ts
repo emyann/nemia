@@ -85,7 +85,7 @@ const remember = (memo: StandingMemo, asks: readonly Ask[], read: readonly Stood
   asks.forEach((ask, i) => {
     const key = keyOf(ask.repo, ask.base);
     const stood = read[i];
-    if (!('answer' in stood)) {
+    if (stood === undefined || !('answer' in stood)) {
       const was = memo.get(key);
       if (was) next.set(key, was);
       return;
@@ -145,9 +145,10 @@ function asksOf(runs: readonly Run[], own: (run: RepositoryRun) => boolean): Ask
 
 /** `ask`, where there is one, asked of each result branch of `run` too, with the tip it recorded and the commit it was cut at. */
 function askedOf(ask: Ask | undefined, run: RepositoryRun): void {
-  for (const branch of ask ? branchesOf(run) : []) {
+  if (!ask) return;
+  for (const branch of branchesOf(run)) {
     const tip = run.tips?.[branch];
-    ask!.branches.set(branch, { branch, baseRef: run.baseRef, ...(tip ? { tip } : {}) });
+    ask.branches.set(branch, { branch, baseRef: run.baseRef, ...(tip ? { tip } : {}) });
   }
 }
 

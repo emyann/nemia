@@ -24,7 +24,8 @@ export function mergedOutput(
   fromAgent: StepOutput | undefined,
   own: StepOutput | undefined,
 ): StepOutput | undefined {
-  if (!fromAgent && !own) return undefined;
+  const declaring = own ?? fromAgent;
+  if (!declaring) return undefined;
   const sides = [
     ...(fromAgent ? [{ output: fromAgent, owner: ownerOf('agent', agent, fromAgent) }] : []),
     ...(own ? [{ output: own, owner: ownerOf('step', step, own) }] : []),
@@ -48,5 +49,5 @@ export function mergedOutput(
     required: [...(fromAgent?.schema.required ?? []), ...(own?.schema.required ?? [])],
     additionalProperties: false as const,
   };
-  return { file: (own ?? fromAgent)!.file, schema, owners };
+  return { file: declaring.file, schema, owners };
 }

@@ -213,8 +213,8 @@ export function passSaid(pass: Pass, was: UpSaid, now: number): { lines: PassLin
   const lines: PassLine[] = paused.lines.map((text) => ({ text }));
   let interval = was.interval;
   if (cost) interval = addPass(interval, cost, now);
-  if (summaryDue(interval, now)) {
-    lines.push({ text: summaryLine(interval!, now) });
+  if (interval !== undefined && summaryDue(interval, now)) {
+    lines.push({ text: summaryLine(interval, now) });
     interval = undefined;
   }
   if (feedError && feedError !== was.feedSaid) lines.push({ text: feedError, warn: true });

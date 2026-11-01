@@ -14,7 +14,6 @@ import { Hono } from 'hono';
 import {
   agentRead,
   agentSkillsFound,
-  COMMANDS,
   factoriesFilling,
   inFactory,
   loadAgents,
@@ -37,7 +36,7 @@ import { type ApiEnv, served } from '../layer.ts';
 import type { Engine } from '../store.ts';
 import { givenSkills, type GivenSkill } from './skills.ts';
 import { sourcesOf, type WorkflowSource } from '../workflows/workflows.ts';
-import { runPlaced } from '../store.ts';
+import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
 export type { AgentUser } from 'agent-orchestrator';
@@ -60,22 +59,22 @@ export type AgentListing = Omit<AgentReading, 'custom'> & { given: GivenSkill[];
 export type LibraryAgent = AgentListing & { fills: AgentFill[]; factories: string[] };
 
 /** The package's listing of the agents (`nemia agents`), its handler `agentsRead`: the api answers it on `GET /api/agents`. */
-const AGENTS = COMMANDS.find((c) => c.name === 'agents')!;
+const AGENTS = commandNamed('agents');
 
 /** The package's card of one agent (`nemia agents card`), its handler `agentCardRead`: on `GET /api/agents/:from/:name/card`. */
-const AGENT_CARD = COMMANDS.find((c) => c.name === 'agents card')!;
+const AGENT_CARD = commandNamed('agents card');
 
 /**
  * The board's agent library in the package's table, each entry served on the api alone: an agent written (`agents write`), removed
  * (`agents rm`), tried (`agents run`) and read for its page (`agents read`).
  */
-const WRITE = COMMANDS.find((c) => c.name === 'agents write')!;
-const REMOVE = COMMANDS.find((c) => c.name === 'agents rm')!;
-const TRY = COMMANDS.find((c) => c.name === 'agents run')!;
-const READ = COMMANDS.find((c) => c.name === 'agents read')!;
+const WRITE = commandNamed('agents write');
+const REMOVE = commandNamed('agents rm');
+const TRY = commandNamed('agents run');
+const READ = commandNamed('agents read');
 
 /** The package's listing of the agent files the store knows (`nemia agents sources`): on `GET /api/agents/sources`. */
-const SOURCES = COMMANDS.find((c) => c.name === 'agents sources')!;
+const SOURCES = commandNamed('agents sources');
 
 /** Where the agents of each place are: `<workflows>/agents`, the repository's then yours. */
 const agentPlaces = (repo: string, home: string): Array<{ from: WorkflowSource; dir: string }> =>
@@ -232,7 +231,8 @@ function draftOf(body: Omit<typeof POST_BODY.Type, 'name'>, name: string): { dra
 
 /** The name in a path, refused in the package's words before anything is read, or the agents folder of `from`. */
 function placeOf(from: string, name: string | null, route: string, repo: string, home: string): { dir: string } | Refusal {
-  if (from !== 'repo' && from !== 'yours')
+  const place = agentPlaces(repo, home).find((p) => p.from === from);
+  if (place === undefined)
     return {
       status: 400,
       error: `${route}: an agent is read from \`repo\` or \`yours\`, as GET /api/agents lists each one's \`from\` — /api/agents/yours/${name ?? '<name>'}, say. This request's was '${from}'.`,
@@ -241,7 +241,7 @@ function placeOf(from: string, name: string | null, route: string, repo: string,
     const refused = agentNameRefusal(name);
     if (refused) return { status: 400, error: refused };
   }
-  return { dir: agentPlaces(repo, home).find((p) => p.from === from)!.dir };
+  return { dir: place.dir };
 }
 
 /** Why there is no agent to answer (404): `from`'s folder, `dir`, has none named `name`. */
@@ -396,7 +396,8 @@ export const agents = new Hono<ApiEnv>()
         const dir = path.join(repo, 'workflows', AGENTS_FOLDER);
         const listed = agentNameRefusal(name) === undefined ? listedAgent('repo', dir, name, repo, home) : null;
         const untried = listed?.untried ?? untriedOf({ from, name, file: path.join(dir, `${name}.md`), keys: {}, schemaFile: null }, home);
-        return c.json({ error: `${route}: ${untried!.why} \`${untried!.copy}\`` }, 403);
+        if (untried === null) throw new Error(`${route}: the package says the repository's agent ${name} can be tried, which no try does.`);
+        return c.json({ error: `${route}: ${untried.why} \`${untried.copy}\`` }, 403);
       }
       const where = yoursOnly(route, from, name, repo, home);
       if (where) return c.json({ error: where.error }, where.status);
@@ -470,8 +471,10 @@ async function saved(
     ...(name !== undefined && { name }),
   };
   const done = (await runPlaced(placeService, e, WRITE.handler(args, undefined, home))) as AgentWritten;
+  const agent = listedAgent('yours', done.dir, done.agent.name, repo, home);
+  if (agent === null) throw new Error(`The agent ${done.agent.name} written to ${done.dir} does not read back: GET /api/agents says why.`);
   return {
-    body: { agent: listedAgent('yours', done.dir, done.agent.name, repo, home)!, written: done.written, removed: done.removed },
+    body: { agent, written: done.written, removed: done.removed },
     status: ok,
   };
 }

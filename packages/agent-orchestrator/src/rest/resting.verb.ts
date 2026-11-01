@@ -94,8 +94,11 @@ export const restingRead = Effect.fn('restingRead')(function* <T>(e: Engine, mem
   const heads = new Map<string, ReadonlyMap<string, string>>();
   const now = (repo: string) => {
     const at = path.resolve(repo);
-    if (!heads.has(at)) heads.set(at, git.heads(at));
-    return heads.get(at)!;
+    const known = heads.get(at);
+    if (known !== undefined) return known;
+    const found = git.heads(at);
+    heads.set(at, found);
+    return found;
   };
   const gave = new Map<string, T>();
   const read: RestingRead<T> = {

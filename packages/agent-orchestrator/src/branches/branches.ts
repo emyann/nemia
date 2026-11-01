@@ -38,7 +38,7 @@ export function resultSteps(steps: readonly Workflow[]): Workflow[] {
  * one in its words. Pure.
  */
 export function workChecks(steps: readonly Workflow[]): string[] {
-  return [...new Set(steps.filter((s) => !endsOnBase(s) && s.check).map((s) => s.check!))];
+  return [...new Set(steps.flatMap((s) => (!endsOnBase(s) && s.check ? [s.check] : [])))];
 }
 
 /**
@@ -86,7 +86,11 @@ export function resultTips(
   heads: Readonly<Record<string, string>> | undefined,
 ): Record<string, string> {
   const tips: Record<string, string> = Object.fromEntries(Object.entries(run.tips ?? {}).filter(([b]) => branches.includes(b)));
-  for (const branch of branches) if (heads && Object.hasOwn(heads, branch)) tips[branch] = heads[branch];
+  for (const branch of branches) {
+    if (!heads || !Object.hasOwn(heads, branch)) continue;
+    const head = heads[branch];
+    if (head !== undefined) tips[branch] = head;
+  }
   return tips;
 }
 
@@ -200,9 +204,9 @@ export function globRegExp(glob: string): RegExp {
     } else if (g.startsWith('**', i)) {
       re += '.*';
       i += 1;
-    } else if (g[i] === '*') re += '[^/]*';
-    else if (g[i] === '?') re += '[^/]';
-    else re += g[i].replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    } else if (g.charAt(i) === '*') re += '[^/]*';
+    else if (g.charAt(i) === '?') re += '[^/]';
+    else re += g.charAt(i).replace(/[.+^${}()|[\]\\]/g, '\\$&');
   }
   return new RegExp(`^${re}$`);
 }
@@ -232,9 +236,9 @@ export function packageOf(file: string, workspaces: readonly string[]): string |
  * The group a file counts in: the workspace package it is in (`packageOf`), else its top-level directory, else the root.
  */
 export function groupOf(file: string, workspaces: readonly string[] = []): string {
-  const dirs = file.split('/').slice(0, -1);
-  if (!dirs.length) return ROOT_GROUP;
-  return packageOf(file, workspaces) ?? dirs[0];
+  const [top] = file.split('/').slice(0, -1);
+  if (top === undefined) return ROOT_GROUP;
+  return packageOf(file, workspaces) ?? top;
 }
 
 /**

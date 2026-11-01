@@ -103,7 +103,10 @@ export function depsPlan(
     ...modulesPlan(mainRoot, worktree, '', main),
     ...Object.keys(nested)
       .sort()
-      .flatMap((folder) => modulesPlan(mainRoot, worktree, folder, nested[folder])),
+      .flatMap((folder) => {
+        const listing = nested[folder];
+        return listing ? modulesPlan(mainRoot, worktree, folder, listing) : [];
+      }),
   ];
 }
 
@@ -291,8 +294,7 @@ export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskI
 function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
   const found = new Set<string>();
   const queue = [name];
-  while (queue.length) {
-    const current = queue.pop()!;
+  for (let current = queue.pop(); current !== undefined; current = queue.pop()) {
     for (const s of steps) {
       if (s.after.includes(current) && !found.has(s.name)) {
         found.add(s.name);
@@ -377,13 +379,11 @@ export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: Wo
  */
 export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {
   if (endsOnBase(step)) return { kind: 'base' };
-  if (step.after.length === 0) return { kind: 'fork', from: null };
-  if (step.after.length > 1) {
-    const [first, ...also] = [...step.after].sort();
-    return { kind: 'merge', from: first, also };
-  }
+  const [first, ...also] = [...step.after].sort();
+  if (first === undefined) return { kind: 'fork', from: null };
+  if (also.length) return { kind: 'merge', from: first, also };
 
-  const parent = step.after[0];
+  const parent = first;
   const siblings = steps.filter((s) => s.after.includes(parent));
   return siblings.length === 1 ? { kind: 'inherit', from: parent } : { kind: 'fork', from: parent };
 }

@@ -42,14 +42,16 @@ export function medianOf(values: readonly number[]): number | null {
   if (!values.length) return null;
   const s = sorted(values);
   const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+  const [low, high] = [s[mid - 1], s[mid]];
+  if (high === undefined) return null;
+  if (s.length % 2) return high;
+  return low === undefined ? null : (low + high) / 2;
 }
 
 /** The 90th percentile of `values`, nearest rank: the smallest value at or above nine tenths of them; null for none. */
 export function p90Of(values: readonly number[]): number | null {
-  if (!values.length) return null;
   const s = sorted(values);
-  return s[Math.ceil(0.9 * s.length) - 1];
+  return s[Math.ceil(0.9 * s.length) - 1] ?? null;
 }
 
 /** One step's cost and tries in each run it ran in, by run id: the measured costs summed, null where none was; and how many tries. */
@@ -71,16 +73,9 @@ function perRunOf(tries: readonly TryFact[]): Map<string, PerRun> {
 function stepCostOf(step: string, runs: PerRun): StepCost[] {
   const costs = [...runs.values()].flatMap((r) => (r.cost === null ? [] : [r.cost]));
   const tries = [...runs.values()].map((r) => r.tries);
-  if (!costs.length) return [];
-  return [
-    {
-      step,
-      runs: costs.length,
-      median: medianOf(costs)!,
-      p90: p90Of(costs)!,
-      tries: { median: medianOf(tries)!, max: Math.max(...tries) },
-    },
-  ];
+  const [median, p90, triesMedian] = [medianOf(costs), p90Of(costs), medianOf(tries)];
+  if (median === null || p90 === null || triesMedian === null) return [];
+  return [{ step, runs: costs.length, median, p90, tries: { median: triesMedian, max: Math.max(...tries) } }];
 }
 
 /**

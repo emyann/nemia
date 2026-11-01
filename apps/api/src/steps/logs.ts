@@ -140,17 +140,57 @@ export async function checksOf(
     if (!step.check) continue;
     const check = checkIn(step.check, run.steps[step.name]?.check?.taskId, views, stderr);
     checks.set(step.name, check);
-    if (!check.refused) continue;
+    const id = check.taskId;
+    if (!check.refused || id === null) continue;
     try {
-      const id = check.taskId!;
       check.refused.stdout = tailOf(
         (await engineRead('output', e.output(id, 'stdout', TAIL_BYTES))) ?? (await engineRead('logs', e.logs(id))),
         CHECK_LINES,
       );
     } catch (err) {
       check.refused.stdout = NO_LINES;
-      check.refused.unreadable ??= unreadableOutput(run, check.taskId!, err);
+      check.refused.unreadable ??= unreadableOutput(run, id, err);
     }
   }
   return checks;
+}
+
+/**
+ * Where the last read of a blocked session's conversation stopped, and what it had said last by then: by task and attempt. One for an app,
+ * of its engine's sessions (`ReadMemo`, layer.ts).
+ */
+export type LastSaid = Map<string, { cursor: string; line: string | null }>;
+
+/**
+ * What the session of the task `taskId` among `views` said last — its last `text` or `system` event, trimmed — through the engine's
+ * `transcript`, or null when the views hold no such task, it has said none or its conversation cannot be read. What it said, not what it
+ * was told: a brief, a `nemia say` and every tool result come back as `user` events (`TranscriptEvent`), and reading a person's own words
+ * back to them says nothing about why the harness stopped.
+ *
+ * Each read costs an observation of the task's harness: the attempt of a session the harness blocked has not ended, so its session's id
+ * is on no record, and the engine asks the harness for it. Read on a run's detail, as a refused check's output is, and never on the
+ * list.
+ *
+ * Read from where the last read of the same attempt stopped, so a page polled every five seconds reads what the session wrote since,
+ * not its whole conversation again (`said`); a cursor the engine refuses, of a transcript replaced since, is read again from the start. A
+ * read's cache, and nothing is decided by it: a fresh app reads from the start.
+ */
+export async function lastLineOf(e: Engine['Service'], views: Views, taskId: string | null, said: LastSaid): Promise<string | null> {
+  const view = taskId === null ? undefined : views.get(taskId);
+  if (view === undefined) return null;
+  const key = `${view.id}#${view.state.attempts.length}`;
+  const read = (after?: string) => engineRead('transcript', e.transcript(view.id, after)).catch(() => undefined);
+  let from = said.get(key);
+  let got = from ? await read(from.cursor) : undefined;
+  if (!got) {
+    from = undefined;
+    got = await read();
+  }
+  if (!got) return null;
+  const last = got.events
+    .filter((event) => event.role !== 'user' && (event.kind === 'text' || event.kind === 'system') && event.text?.trim())
+    .at(-1);
+  const line = last?.text?.trim() ?? from?.line ?? null;
+  said.set(key, { cursor: got.cursor, line });
+  return line;
 }

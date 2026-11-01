@@ -93,10 +93,20 @@ const SAID: readonly Said[] = [
 const takesOf = (said: readonly Said[], shape: string): Readonly<Record<string, string>> =>
   Object.fromEntries(said.map(({ flag, takes }) => [flag, `${flag} takes ${takes}: ${shape}.`]));
 
+/** `--until`'s refusal of a value left out, saying what it takes. */
+const UNTIL_TAKES = `--until takes the run to wait on, by id: ${HOLD_SHAPE}.`;
+
 /** `--until`, `--why` and `--by`, each with its refusal of a value left out, saying what it takes. */
-const HOLD_TAKES: Readonly<Record<string, string>> = {
-  '--until': `--until takes the run to wait on, by id: ${HOLD_SHAPE}.`,
-  ...takesOf(SAID, HOLD_SHAPE),
+const HOLD_TAKES: Readonly<Record<string, string>> = { '--until': UNTIL_TAKES, ...takesOf(SAID, HOLD_SHAPE) };
+
+/**
+ * The refusal of `flag`'s value left out, in `refusals`, which holds one for each text flag of its command (`takesOf`): a flag it holds
+ * none for is thrown, naming it.
+ */
+const takesFor = (refusals: Readonly<Record<string, string>>, flag: string): string => {
+  const takes = refusals[flag];
+  if (takes === undefined) throw new Error(`${flag} has no refusal of its value left out: add it to its command's table of them`);
+  return takes;
 };
 
 /** `--why` or `--by`'s value as one line: every run of whitespace, a newline included, one space. */
@@ -112,7 +122,7 @@ const saidOf = (args: Args, key: 'why' | 'by'): string | undefined => {
 function saidRefusal(args: Args, { flag, key, takes, cap }: Said, refusals: Readonly<Record<string, string>>): string | null {
   const value = textOf(args, key);
   if (value === undefined) return null;
-  if (value.startsWith('--')) return refusals[flag];
+  if (value.startsWith('--')) return takesFor(refusals, flag);
   const line = saidOf(args, key) ?? '';
   if (!line) return `${flag} takes ${takes}, and was given only blanks: give it words, or leave ${flag} out.`;
   if (line.length > cap) return `${flag} takes at most ${cap} characters, and was given ${line.length}: say it shorter.`;
@@ -137,7 +147,7 @@ const saidFlags = (said: readonly Said[], command: string, puts: string, refusal
 function holdArgsRefusal(args: Args): string | null {
   const until = listOf(args, 'until');
   const off = args.off === true;
-  if (until.some((id) => !id || id.startsWith('-'))) return HOLD_TAKES['--until'];
+  if (until.some((id) => !id || id.startsWith('-'))) return UNTIL_TAKES;
   const said = SAID.map((s) => saidRefusal(args, s, HOLD_TAKES)).find((r) => r !== null);
   if (said) return said;
   if (off && until.length) return `nemia hold takes --until or --off, not both: lift the hold first, then hold it again — ${HOLD_SHAPE}.`;
@@ -170,12 +180,12 @@ export const HOLD: Command<{ id: string; lifted: boolean; hold: Hold }> = {
   spec: {
     positionals: [{ key: 'runId', takes: 'required', kind: 'name' }],
     flags: [
-      { flag: '--until', kind: 'text', key: 'until', takes: HOLD_TAKES['--until'], many: true },
+      { flag: '--until', kind: 'text', key: 'until', takes: UNTIL_TAKES, many: true },
       ...saidFlags(SAID, 'nemia hold', 'a hold', HOLD_TAKES, HOLD_SHAPE),
       { flag: '--off', kind: 'switch', key: 'off' },
     ],
     unknown: (arg) => `nemia hold does not take ${arg}. It takes the run, then the runs it waits on or --off: ${HOLD_SHAPE}.`,
-    apart: (_value, flag) => HOLD_TAKES[flag],
+    apart: (_value, flag) => takesFor(HOLD_TAKES, flag),
     missing: 'nemia hold takes the run first: nemia hold <runId> --until <runId> [--until <runId> ...], or nemia hold <runId> --off.',
   },
   check: holdArgsRefusal,
@@ -387,7 +397,7 @@ export const PAUSE: Command<PauseAnswer> = {
       { flag: '--yes', kind: 'switch', key: 'yes' },
     ],
     unknown: (arg) => `nemia pause does not take ${arg}: ${PAUSE_SHAPE}.`,
-    apart: (_value, flag) => PAUSE_TAKES[flag],
+    apart: (_value, flag) => takesFor(PAUSE_TAKES, flag),
   },
   check: (args) => PAUSE_SAID.map((s) => saidRefusal(args, s, PAUSE_TAKES)).find((r) => r !== null) ?? null,
   writes: true,

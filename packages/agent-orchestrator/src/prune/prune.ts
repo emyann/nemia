@@ -239,7 +239,8 @@ export const freeable = (answers: readonly Answered[]): string[] =>
 export function freeTurn(candidates: readonly string[], judged: ReadonlySet<string>, bound: number, turn: number): string[] {
   const fresh = candidates.filter((id) => !judged.has(id)).slice(0, Math.max(0, bound));
   if (fresh.length || !candidates.length || bound < 1) return fresh;
-  return [candidates[turn % candidates.length]];
+  const next = candidates[turn % candidates.length];
+  return next === undefined ? [] : [next];
 }
 
 /**

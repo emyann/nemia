@@ -123,8 +123,8 @@ function modulesLoaded(entry: string, more: readonly string[] = []): string[] {
  * a folder of its own so the card that drops them deletes it whole.
  */
 const PINNED_MODULES: Record<string, { all: number; effect: number }> = {
-  'agent-orchestrator/run': { all: 177, effect: 15 },
-  'agent-orchestrator/workflow': { all: 131, effect: 15 },
+  'agent-orchestrator/run': { all: 178, effect: 15 },
+  'agent-orchestrator/workflow': { all: 132, effect: 15 },
 };
 
 const isEffectModule = (url: string): boolean => url.includes('/node_modules/effect/');

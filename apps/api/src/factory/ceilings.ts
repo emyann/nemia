@@ -4,7 +4,6 @@
  */
 import type { Metric } from 'effect';
 import {
-  COMMANDS,
   lastCeilings,
   lastPassCost,
   type PassCostRead,
@@ -15,7 +14,7 @@ import {
   slotWord,
 } from 'agent-orchestrator';
 import type { Engine } from '../store.ts';
-import { runPlaced } from '../store.ts';
+import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
 /**
@@ -44,7 +43,7 @@ export type Ceilings = {
 };
 
 /** The package's run slots (`slotsOf`), through its entry of the command table, served on the api alone. */
-const CEILINGS = COMMANDS.find((c) => c.name === 'ceilings')!;
+const CEILINGS = commandNamed('ceilings');
 
 /**
  * The cap on runs in flight, and the runs it counts and holds (`Ceilings`), as the package judges them between passes (`CEILINGS`, the
@@ -63,7 +62,7 @@ export async function ceilingsOf(e: Engine['Service'], placeService: PlaceServic
 }
 
 /** The recent passes' entry of the command table, served on both sides. */
-const PASSES = COMMANDS.find((c) => c.name === 'passes')!;
+const PASSES = commandNamed('passes');
 
 /**
  * What the recent passes of the tick cost (`PassesRead`), as `nemia passes --json` prints it (`PASSES`): the last `last` of them, or
@@ -76,7 +75,7 @@ export const passesOf = async (
 ): Promise<PassesRead> => (await runPlaced(placeService, e, PASSES.handler(last === undefined ? {} : { last }))) as PassesRead;
 
 /** The series' entry of the command table, served on both sides. */
-const SERIES = COMMANDS.find((c) => c.name === 'series')!;
+const SERIES = commandNamed('series');
 
 /**
  * The system's series over `range` (`SeriesRead`), as `nemia series --json` prints it (`SERIES`), a past day read off `memo` while its

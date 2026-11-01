@@ -113,10 +113,10 @@ function askedRound(
     at.status === 'exhausted' || held
       ? asks.find((a) => a.step === step.name && a.round === at.round && (!over.length || (a.budget !== undefined && a.budget > above)))
       : undefined;
-  if (!ask) return undefined;
+  if (!ask || !step.loop) return undefined;
   return {
     step: step.name,
-    target: step.loop!,
+    target: step.loop,
     round: at.round,
     by: 'ask',
     ...(over.length ? { budget: ask.budget, raise: over.map((o) => o.name) } : {}),
@@ -150,8 +150,12 @@ export function roundFiled(steps: readonly Workflow[], run: Run, r: Round, taskI
     const over: EarlierTry[] = rest.taskId ? [{ taskId: rest.taskId, ...(check ? { check } : {}), cause, ...raised }] : [];
     next[name] = { ...rest, taskId: name === r.target ? taskId : null, tries: [...tries, ...over] };
   }
-  const refiled = { ...next, ...Object.fromEntries((r.back ?? []).filter((b) => next[b]).map((b) => [b, sentBack(next[b])])) };
-  return { ...refiled, [r.target]: { ...refiled[r.target], ...filed } };
+  const back = (r.back ?? []).flatMap((b) => {
+    const was = next[b];
+    return was ? [[b, sentBack(was)]] : [];
+  });
+  const refiled = { ...next, ...Object.fromEntries(back) };
+  return { ...refiled, [r.target]: { ...(refiled[r.target] ?? { taskId: null }), ...filed } };
 }
 
 /** The pass's line for a round it filed: its round and on whose word, or the merge it files (`mergeNote`). */
@@ -261,14 +265,14 @@ export function roundAsk(
       `${name} has no \`loop:\`, so there is no round of it to run${loops.length ? ` — this run's loops close at ${loops.map((s) => s.name).join(', ')}` : ''}. To try ${name} again: nemia retry ${run.id} ${name}.`,
     );
   }
-  if (!named && loops.length !== 1) {
+  const looping = loopingOf(named, loops);
+  if (!looping) {
     return no(
       loops.length
         ? `${run.id} has ${loops.length} loops, closing at ${loops.map((s) => s.name).join(', ')}: name the one to go round again — nemia retry ${run.id} <step> --round.`
         : `no step of ${run.id} has \`loop:\`, so there is no round to run. To try a step again: nemia retry ${run.id} <step>.`,
     );
   }
-  const looping = named ?? loops[0];
   const now = roundOf(run, looping.name);
   const accepted = acceptanceOf(run, looping.name);
   const filed = steps.filter((s) => s.after.includes(looping.name)).find((s) => run.steps[s.name]?.taskId);
@@ -283,15 +287,15 @@ export function roundAsk(
   const waits = roundWaits(run, looping, asks, over);
   if (waits) return no(waits);
 
-  const step = (n: string) => steps.find((s) => s.name === n)!;
-  const at = (n: string) => standing(step(n), run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
-  const stopping = loopSpan(steps, looping).find((n) => at(n).own !== 'exhausted' && stopsFollowers(at(n).own));
+  const at = (s: Workflow) => standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
+  const span = spanSteps(steps, looping);
+  const stopping = span.find((s) => at(s).own !== 'exhausted' && stopsFollowers(at(s).own));
   if (stopping) {
     return no(
-      `${stopping} is ${at(stopping).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stopping} again: nemia retry ${run.id} ${stopping} — or see why: nemia decide ${run.id}.`,
+      `${stopping.name} is ${at(stopping).status} in round ${now} of ${looping.name}'s loop, so the round cannot end, and there is no round to go again. Try ${stopping.name} again: nemia retry ${run.id} ${stopping.name} — or see why: nemia decide ${run.id}.`,
     );
   }
-  const gate = loopSpan(steps, looping).find((n) => at(n).status === 'awaiting approval');
+  const gate = span.find((s) => at(s).status === 'awaiting approval')?.name;
   if (gate) {
     const handedOn =
       gate === looping.name
@@ -301,7 +305,7 @@ export function roundAsk(
       `${handedOn}: a person's word moves it, not a round. Approve it — nemia approve ${run.id} ${gate} — or send it back: nemia retry ${run.id} ${gate} --message "<objection>".`,
     );
   }
-  const { status, own } = at(looping.name);
+  const { status, own } = at(looping);
   if (status === 'exhausted' || (status === 'over budget' && satisfiesAfter(own))) {
     if (filed) {
       return no(
@@ -314,7 +318,7 @@ export function roundAsk(
         `${looping.name} asked for round ${now + 1}, and ${overWords(over)}: the run files nothing more for ${over.length > 1 ? 'them' : 'it'} until a person raises the cap. Raise it with the round, above ${dollars(above)}: nemia retry ${run.id} ${looping.name} --round --budget <amount>.`,
       );
     }
-    if (over.length && budget! <= above) {
+    if (over.length && budget !== undefined && budget <= above) {
       return no(
         `--budget ${budget} is not above ${dollars(above)}, what ${over.map((o) => o.name).join(' and ')} ${over.length > 1 ? 'have' : 'has'} cost: the round would be held again as soon as it was asked for. Give more than ${dollars(above)}: nemia retry ${run.id} ${looping.name} --round --budget <amount>.`,
       );
@@ -369,6 +373,19 @@ export function roundAsk(
     `round ${now} of ${looping.name}'s loop is still running, so there is nothing to go round again until it ends. Wait for it: nemia ls ${run.id} (or stop the run: nemia cancel ${run.id}).`,
   );
 }
+
+/** The steps of `looping`'s loop (`loopSpan`), in the workflow's order. */
+const spanSteps = (steps: readonly Workflow[], looping: Workflow): Workflow[] => {
+  const names = loopSpan(steps, looping);
+  return steps.filter((s) => names.includes(s.name));
+};
+
+/**
+ * The step whose loop a person means: the one they `named`, or where they name none the run's one loop, of its `loops`; undefined
+ * where they name none and the run has no loop, or several.
+ */
+const loopingOf = (named: Workflow | undefined, loops: readonly Workflow[]): Workflow | undefined =>
+  named ?? (loops.length === 1 ? loops[0] : undefined);
 
 /**
  * Why the words given with an acceptance cannot ride on it — or null. Pure, and asked before anything about the run: words that are missing
@@ -451,14 +468,14 @@ export function acceptAsk(
       `${name} has no \`loop:\`, so it closes no loop and there are no findings to accept${loops.length ? ` — this run's loops close at ${loops.map((s) => s.name).join(', ')}` : ''}. To approve a step at its gate: nemia approve ${run.id} ${name}.`,
     );
   }
-  if (!named && loops.length !== 1) {
+  const looping = loopingOf(named, loops);
+  if (!looping) {
     return no(
       loops.length
         ? `${run.id} has ${loops.length} loops, closing at ${loops.map((s) => s.name).join(', ')}: name the one to accept as it stands — nemia approve ${run.id} <step> --message "<why>".`
         : `no step of ${run.id} has \`loop:\`, so there is no loop to end. To approve a step at its gate: nemia approve ${run.id} <step>.`,
     );
   }
-  const looping = named ?? loops[0];
   const now = roundOf(run, looping.name);
   const n = tryOf(run, looping.name);
   const given = acceptanceOf(run, looping.name);
@@ -469,17 +486,7 @@ export function acceptAsk(
   }
   const waits = acceptWaits(run, looping, asks);
   if (waits) return no(waits);
-  const at = (n: string) =>
-    standing(
-      steps.find((s) => s.name === n)!,
-      run,
-      phaseOf,
-      closeoutOf,
-      askedCloseout,
-      steps,
-      spendOf,
-    );
-  const { status, own } = at(looping.name);
+  const { status, own } = standing(looping, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   if (status === 'exhausted') return { step: looping.name, try: n };
 
   const left = capOf(looping) - now;

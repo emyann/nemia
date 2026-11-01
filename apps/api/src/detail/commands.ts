@@ -2,14 +2,14 @@
  * The command lines a run's page shows a person beside its controls, each built off the orchestrator's table (`commandLine` over
  * `COMMANDS`), so the board spells none.
  */
-import { COMMANDS, commandLine } from 'agent-orchestrator';
+import { commandLine } from 'agent-orchestrator';
+import { commandNamed } from '../store.ts';
 
-const entry = (name: string) => COMMANDS.find((c) => c.name === name)!;
-const DECIDE = entry('decide');
-const APPROVE = entry('approve');
-const RETRY = entry('retry');
-const SAY = entry('say');
-const REFRESH = entry('refresh');
+const DECIDE = commandNamed('decide');
+const APPROVE = commandNamed('approve');
+const RETRY = commandNamed('retry');
+const SAY = commandNamed('say');
+const REFRESH = commandNamed('refresh');
 
 /** The line that prints what there is to decide on a run: `nemia decide <run>`. */
 export const decideLine = (runId: string): string => commandLine(DECIDE, { runId });

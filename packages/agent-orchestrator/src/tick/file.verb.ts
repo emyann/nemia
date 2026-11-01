@@ -29,7 +29,6 @@ import {
   type CloseoutAsked,
   type Run,
   type StepRecord,
-  type StepStatus,
   type TaskPhase,
 } from '../record/record.ts';
 import {
@@ -39,7 +38,6 @@ import {
   holdsOpenOn,
   landsOnCheck,
   MOMENTUM,
-  ownStatus,
   sentBack,
   stepMomentum,
   stepSpend,
@@ -48,7 +46,7 @@ import {
   type RoundAsk,
   type SpendOf,
 } from '../status/status.ts';
-import { composeBrief, remoteBrief, type EndingStopped, type ParentCloseout, type RetryBriefing } from '../brief/index.ts';
+import { composeBrief, remoteBrief, type ParentCloseout } from '../brief/index.ts';
 import { handedOf } from '../brief/handed.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { roundBriefed, roundFiled, roundFiledNote } from '../round/round.ts';
@@ -71,8 +69,9 @@ import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { answerHeld, stopAsked } from './held.verb.ts';
 import { forStep } from '../telemetry/telemetry.store.ts';
 import { stepLabels } from '../telemetry/telemetry.ts';
-import { localFields, refusedTold } from './assess.ts';
-import { filedAt, foldersTold, lacksTold, placeTold, toldOf, type PlaceTold, type Told } from './told.verb.ts';
+import { localFields } from './assess.ts';
+import { filedAt, foldersTold, placeTold, toldOf, type PlaceTold, type Told } from './told.verb.ts';
+import { found, recordNamed, stepNamed, taskToStop, tryTold } from './told.verb.ts';
 
 /** A task as the engine is asked to file it (`e.file`). */
 type Spec = Parameters<Engine['file']>[0];
@@ -120,12 +119,9 @@ export type Heads = () => Readonly<Record<string, string>> | undefined;
 /** The engine as the pass read it: a check's verdict is read off the view the pass judged it by (`reportedEngine`), never a second time. */
 const asRead = (f: Filing): Engine => reportedEngine(f.e, [...f.reads.views.values()]);
 
-/** The step of this name, which the pass's assessment named. */
-const stepNamed = (f: Filing, name: string): Workflow => f.reads.steps.find((s) => s.name === name)!;
-
 /** Close the task held open a filing replaces, where it waits for a word (`Closer`): the engine's refusal as a note, or undefined. */
 const closeFirst = (f: Filing, name: string, taskId: string | null | undefined): Effect.Effect<string | undefined> =>
-  f.closer.awaitsWord(taskId) ? f.closer.closeWaiting(name, taskId!) : Effect.succeed(undefined);
+  taskId && f.closer.awaitsWord(taskId) ? f.closer.closeWaiting(name, taskId) : Effect.succeed(undefined);
 
 /** The steps a pass tried again, and those of them whose try is a recheck, whose checks are filed with the others. */
 type Tried = { tried: string[]; rechecked: string[] };
@@ -156,16 +152,20 @@ const stopFirst = Effect.fnUntraced(function* (f: Filing, r: Retry, taskId: stri
   );
 });
 
-/** Whether a try is a person's continue answering the step's task held open, in the session that signed, rather than a task of its own. */
-const answersHeld = (f: Filing, r: Retry, step: Workflow, record: StepRecord): boolean => {
+/**
+ * The step's task held open a try answers, where the try is a person's continue answering it in the session that signed, rather than a
+ * task of its own; undefined where it is not.
+ */
+const heldAnswered = (f: Filing, r: Retry, step: Workflow, record: StepRecord): string | undefined => {
   const { run, reads } = f;
-  return (
-    f.closer.awaitsWord(record.taskId) &&
+  const taskId = record.taskId;
+  if (!taskId || !f.closer.awaitsWord(taskId)) return undefined;
+  const answers =
     r.by === 'ask' &&
     r.mode === 'continue' &&
-    Boolean(sessionIn(reads.views, record.taskId!)) &&
-    holdsOpen(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf, reads.verdictOf)
-  );
+    Boolean(sessionIn(reads.views, taskId)) &&
+    holdsOpen(step, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf, reads.verdictOf);
+  return answers ? taskId : undefined;
 };
 
 /**
@@ -175,9 +175,9 @@ const answersHeld = (f: Filing, r: Retry, step: Workflow, record: StepRecord): b
 const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   const { run, notes } = f;
   const step = stepNamed(f, r.step);
-  const record = run.steps[r.step];
-  if (r.stopFirst) return yield* stopFirst(f, r, record.taskId!);
+  if (r.stopFirst) return yield* stopFirst(f, r, taskToStop(run, r.step));
   if (!f.mayFile()) return;
+  const record = recordNamed(run, r.step);
   const said = tryWord(r, step);
   if (r.mode === 'recheck') {
     out.tried.push(r.step);
@@ -187,13 +187,14 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
     return;
   }
   const landing = placeTold(run, step, yield* PlaceService, f.heads?.());
-  const answers = answersHeld(f, r, step, record);
+  const held = heldAnswered(f, r, step, record);
+  const answers = held !== undefined;
   const closeRefused = answers ? undefined : yield* closeFirst(f, r.step, record.taskId);
   if (closeRefused) {
     notes.push(closeRefused);
     return;
   }
-  const taskId = answers ? record.taskId! : stepTaskId(run, r.step, r.try);
+  const taskId = held ?? stepTaskId(run, r.step, r.try);
   const briefed = answers ? undefined : (yield* asked('view', f.e.view(taskId))).state.brief;
   const refused = answers || !briefed ? yield* sendTry(f, r, step, taskId, answers, landing) : undefined;
   if (refused) {
@@ -203,7 +204,7 @@ const fileTry = Effect.fnUntraced(function* (f: Filing, r: Retry, out: Tried) {
   out.tried.push(r.step);
   notes.push(said);
   run.steps[r.step] = { ...nextTry(record, r, taskId), ...filedOn(f, step) };
-  for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]);
+  for (const b of r.back ?? []) run.steps[b] = sentBack(recordNamed(run, b));
 });
 
 /**
@@ -221,11 +222,12 @@ const costsFor = Effect.fnUntraced(function* (f: Filing, step: Workflow, resumed
  */
 const sendTry = Effect.fnUntraced(function* (f: Filing, r: Retry, step: Workflow, taskId: string, answers: boolean, landing: PlaceTold) {
   const { e, run, reads } = f;
-  const record = run.steps[r.step];
+  const record = recordNamed(run, r.step);
   const files = artifactsDir(run, r.step);
   fs.mkdirSync(files, { recursive: true });
   const remote = isRemoteHarness(step.harness);
-  const resumeFrom = resumeOn(r.mode === 'continue' && !remote ? sessionIn(reads.views, record.taskId!) : undefined, step, f, record);
+  const continued = r.mode === 'continue' && !remote && record.taskId !== null ? sessionIn(reads.views, record.taskId) : undefined;
+  const resumeFrom = resumeOn(continued, step, f, record);
   const refusal = record.check && step.check ? yield* refusalRead(step.check, record.check.taskId).pipe(over(asRead(f))) : undefined;
   const closeouts = yield* askingReads(f, r, resumeFrom);
   const checked = remote ? [] : yield* checksHandedRead(run, reads.steps, step).pipe(over(asRead(f)));
@@ -273,46 +275,6 @@ const askingReads = Effect.fnUntraced(function* (f: Filing, r: Retry, resumeFrom
   const findings = askedWith === undefined ? undefined : parseCloseout(askedWith);
   return (name: string): Closeout | undefined =>
     asking && name === asking.looping.name && findings && !('error' in findings) ? findings : reads.signedOff(name);
-});
-
-/** What the ending a try is sent back from said, for the work's brief: its status, its summary and needs, and where it merges. */
-const endingSaid = (f: Filing, ending: Workflow): EndingStopped => {
-  const { run, reads } = f;
-  const said = reads.signedOff(ending.name);
-  return {
-    step: ending.name,
-    status: ownStatus(ending, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf),
-    ...(said?.summary ? { summary: said.summary } : {}),
-    ...(said?.needs ? { needs: said.needs } : {}),
-    onto: isRepositoryRun(run) ? run.branch : 'the base branch',
-  };
-};
-
-/**
- * What a local try's brief is told of its try (`RetryBriefing`): how it came and on whose word, the session it continues and what was said
- * to it, how the try before it ended, what its check refused, what was denied it, and the ending it was sent back from.
- */
-const tryTold = (
-  f: Filing,
-  r: Retry,
-  record: StepRecord,
-  t: { status: StepStatus; resumeFrom: string | undefined; refusal: RetryBriefing['refusal'] },
-): RetryBriefing => ({
-  try: r.try,
-  by: r.by,
-  mode: r.mode,
-  ...(r.model ? { model: r.model } : {}),
-  ...(r.message !== undefined ? { message: r.message } : {}),
-  ...(r.budget !== undefined ? { budget: r.budget } : {}),
-  ...(r.pastCap ? { pastCap: true as const } : {}),
-  resumed: Boolean(t.resumeFrom),
-  ...(t.resumeFrom ? { said: saidIn(f.reads.views.get(record.taskId!)) } : {}),
-  status: t.status,
-  ...(t.refusal ? { refusal: t.refusal } : {}),
-  ...(t.status === 'denied' ? { denied: f.reads.spendOf(record.taskId!)?.denied ?? [] } : {}),
-  ...(t.status === 'unsigned' ? lacksTold(f.run, r.step, record) : {}),
-  ...(t.status === 'unsigned' ? refusedTold(f.reads.signedOff(r.step)) : {}),
-  ...(r.back?.length ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
 });
 
 /** A try filed as a task of its own, in the workspace the step had, with its brief, its session to continue and its cap. */
@@ -365,7 +327,7 @@ const fileRound = Effect.fnUntraced(function* (f: Filing, r: Round, looped: stri
   const looping = stepNamed(f, r.step);
   const target = stepNamed(f, r.target);
   const landing = placeTold(run, target, yield* PlaceService, f.heads?.());
-  const record = run.steps[r.target];
+  const record = recordNamed(run, r.target);
   const taskId = stepTaskId(run, r.target, tryOf(run, r.target) + 1);
   const refused = yield* closeFirst(f, r.target, record.taskId);
   if (refused) {
@@ -411,7 +373,7 @@ function roundSpec(
   said: PlaceTold & { landing?: LandingSaid; costs?: WorkflowCosts },
 ): Spec {
   const { run, reads } = f;
-  const record = run.steps[r.target];
+  const record = recordNamed(run, r.target);
   const files = artifactsDir(run, r.target);
   fs.mkdirSync(files, { recursive: true });
   const resumeFrom = resumeOn(record.taskId ? sessionIn(reads.views, record.taskId) : undefined, target, f, record);
@@ -430,7 +392,7 @@ function roundSpec(
       {
         ...roundBriefed(r, looping, said.landing),
         resumed: Boolean(resumeFrom),
-        ...(resumeFrom ? { said: saidIn(reads.views.get(record.taskId!)) } : {}),
+        ...(resumeFrom ? { said: saidIn(record.taskId === null ? undefined : reads.views.get(record.taskId)) } : {}),
       },
       undefined,
       inputsDir(run),
@@ -481,9 +443,11 @@ export const fileChecks = Effect.fn('fileChecks')(function* (f: Filing, names: r
 const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
   const { e, run } = f;
   const step = stepNamed(f, name);
-  const workspace = run.steps[name].workspace ?? run.workspace;
+  const record = recordNamed(run, name);
+  const workspace = record.workspace ?? run.workspace;
   const taskId = checkTaskId(run, name);
   if (!(yield* asked('view', e.view(taskId))).state.brief) {
+    const command = found(step.check, `a check of step ${name}`);
     fs.mkdirSync(path.dirname(checkCloseout(taskId)), { recursive: true });
     const files = artifactsDir(run, name);
     fs.mkdirSync(files, { recursive: true });
@@ -501,16 +465,16 @@ const fileCheck = Effect.fnUntraced(function* (f: Filing, name: string) {
         id: taskId,
         harness: 'check',
         priority: MOMENTUM,
-        brief: step.check!,
+        brief: command,
         cwd: workspace,
         deadlineSeconds: lands ? LANDING_CHECK_DEADLINE_SECONDS : CHECK_DEADLINE_SECONDS,
-        config: { command: checkArgv(step.check!, install !== undefined), env, niceness: CHECK_NICENESS },
+        config: { command: checkArgv(command, install !== undefined), env, niceness: CHECK_NICENESS },
       }),
     );
     const { factory, workflow } = keysOf(run);
     noteFiledCheck({ factory, workflow, step: name, agent: step.agent?.name ?? '' });
   }
-  run.steps[name] = { ...run.steps[name], check: { taskId } };
+  run.steps[name] = { ...record, check: { taskId } };
 });
 
 /**

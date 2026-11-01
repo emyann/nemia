@@ -11,6 +11,8 @@ import { isRemoteHarness } from '../harness/harness.ts';
 import type { Mount } from '../record/record.ts';
 import { fireWord, type ScheduleListed } from '../schedule/schedule.ts';
 import { untrustedLines, type Untrusted } from '../trust/trust.ts';
+import { Invalid } from '../refusal/refusal.ts';
+import { firstPiece } from '../piece/piece.ts';
 
 /** The one default factory's name: listed by `nemia factory ls`, refused to `nemia factory add` and `nemia factory rm`. */
 export const DEFAULT_FACTORY = 'default';
@@ -89,13 +91,15 @@ export type InstructionPlace = { in: 'folder'; folder: string; path: string; fil
 /**
  * Where the instruction of `factory` is read: its tree's `NEMIA.md`, kept by the store, when it was made from a template; the store's
  * file `storeFile` when its file says the store; else the path it names, or
- * `NEMIA.md` when it names none, in its first folder, the first of `repos` as filed.
+ * `NEMIA.md` when it names none, in its first folder, the first of `repos` as filed. Throws `Invalid` for a factory of no repository,
+ * which its file's schema refuses.
  */
 export function instructionAt(factory: Pick<Factory, 'repos' | 'instruction' | 'tree'>, storeFile: string): InstructionPlace {
   if (factory.tree !== undefined) return { in: 'store', file: path.join(factory.tree, DEFAULT_INSTRUCTION) };
   const at = factory.instruction;
   if (at !== undefined && 'store' in at) return { in: 'store', file: storeFile };
-  const folder = factory.repos[0];
+  const [folder] = factory.repos;
+  if (folder === undefined) throw new Invalid({ message: 'a factory works on no repository: nemia factory add <name> --repo <path>' });
   const relative = at?.path ?? DEFAULT_INSTRUCTION;
   return { in: 'folder', folder, path: relative, file: path.join(folder, relative) };
 }
@@ -220,10 +224,9 @@ export function workflowNameRefusal(workflow: string): string | undefined {
  * exist is the start's to judge.
  */
 export function hireRefusal(step: string, agent: string): string | undefined {
-  const parts = step.split('/');
-  if (parts.length !== 2)
+  const [workflow, name, ...more] = step.split('/');
+  if (workflow === undefined || name === undefined || more.length)
     return `--step ${step} names a step as <workflow>/<step>, its workflow's folder and its file without .md, one slash between them: --step dev/implement, say.`;
-  const [workflow, name] = parts;
   const badWorkflow = workflowNameRefusal(workflow);
   if (badWorkflow) return `--step ${step}: ${badWorkflow}`;
   const badStep = stepNameRefusal(name);
@@ -303,7 +306,8 @@ export function hireRefusalOf(
  */
 export function factoryRepo(factory: Pick<Factory, 'repos'> | undefined, named: string | undefined, fallback: string): string {
   if (named !== undefined) return named;
-  if (factory?.repos.length === 1) return factory.repos[0];
+  const [only, ...more] = factory?.repos ?? [];
+  if (only !== undefined && !more.length) return only;
   return fallback;
 }
 
@@ -419,7 +423,7 @@ export const writersOf = (
   (mounts ?? [])
     .map((m) => ({
       path: m.path,
-      steps: steps.filter((s) => !isRemoteHarness(s.harness) && stepMounts(s, [m])?.[0].readOnly === false).map((s) => s.name),
+      steps: steps.filter((s) => !isRemoteHarness(s.harness) && stepMounts(s, [m])?.[0]?.readOnly === false).map((s) => s.name),
     }))
     .filter((w) => w.steps.length);
 
@@ -534,10 +538,11 @@ const scheduleLines = (factory: Factory, listed: readonly ScheduleListed[], widt
     .sort()
     .flatMap((workflow) => {
       const s = factory.schedules[workflow];
+      if (s === undefined) return [];
       const where = `${s.tz ? ` (${s.tz})` : ''}${s.repo ? ` on ${s.repo}` : ''}`;
       const read = listed.find((l) => l.factory === factory.name && l.workflow === workflow);
       return [
-        `${' '.repeat(width)}  schedule ${workflow}  ${s.cron}${where}  ${JSON.stringify(s.brief.split('\n')[0])}`,
+        `${' '.repeat(width)}  schedule ${workflow}  ${s.cron}${where}  ${JSON.stringify(firstPiece(s.brief, '\n'))}`,
         ...(read ? whenLines(read, `${' '.repeat(width)}    `, now) : []),
       ];
     });

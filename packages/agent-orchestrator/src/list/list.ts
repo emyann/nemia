@@ -49,6 +49,7 @@ import { assess } from '../tick/assess.ts';
 import { neverApproved } from '../prune/prune.ts';
 import { daemonLine, staleAfterMs, type DaemonStanding } from '../daemon/daemon.ts';
 import type { Paused } from '../pause/pause.ts';
+import { firstPiece } from '../piece/piece.ts';
 import { fireWord, scheduleLines, type ScheduleListed } from '../schedule/schedule.ts';
 
 export type Listing = {
@@ -314,9 +315,9 @@ export function listing({
     const retry = due.find((r) => r.step === step.name);
     const round = rounds.find((r) => r.step === step.name);
     const accepted = step.loop ? acceptanceOf(run, step.name) : undefined;
-    const heldOut = retry && checkout && waitsOnCheckout(steps, step.name, checkout) ? checkout : undefined;
+    const heldOut = retry && checkout && waitsOnCheckout(steps, step.name, checkout) ? { retry, checkout } : undefined;
     const tried = heldOut
-      ? `try ${retry!.try} asked (${modeWord(retry!)}) — ${checkoutWord(heldOut)}`
+      ? `try ${heldOut.retry.try} asked (${modeWord(heldOut.retry)}) — ${checkoutWord(heldOut.checkout)}`
       : retry
         ? dueNote(step, run, retry)
         : round
@@ -645,19 +646,19 @@ function runLines({ run, listed, result }: RunsListed['runs'][number]): string[]
   if ('said' in listed) {
     const width = Math.max(20, ...listed.steps.map((s) => s.status.length));
     return [
-      `${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}`,
+      `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}`,
       ...listed.steps.map((s) => `   ${s.name.padEnd(14)} ${s.status.padEnd(width)} ${s.branch ?? ''}`),
       `   → unreadable: ${listed.said}`,
     ];
   }
   const { steps, cost } = listed;
-  const said = steps.map((s) => `${shownStatus(s)}${s.cost ? `  ${s.cost}` : ''}`);
-  const width = Math.max(20, ...said.map((w) => w.length));
+  const said = steps.map((s) => ({ s, word: `${shownStatus(s)}${s.cost ? `  ${s.cost}` : ''}` }));
+  const width = Math.max(20, ...said.map(({ word }) => word.length));
   return [
-    `${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`,
-    ...steps.map((s, i) => {
+    `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}${cost ? `  ${cost}` : ''}`,
+    ...said.map(({ s, word }) => {
       const note = shownNote(s);
-      return `   ${s.name.padEnd(14)} ${said[i].padEnd(width)} ${s.branch ?? ''}${note ? `  · ${note}` : ''}`;
+      return `   ${s.name.padEnd(14)} ${word.padEnd(width)} ${s.branch ?? ''}${note ? `  · ${note}` : ''}`;
     }),
     ...asksLines(run, listed, result),
   ];

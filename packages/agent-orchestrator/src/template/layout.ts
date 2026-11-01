@@ -128,8 +128,15 @@ const LAYOUT =
   'skills/<skill>/SKILL.md and anything beside it; and a file a {path:} names';
 
 /** Whether `file`, in a workflow's folder (`rest`, the parts after its name), is one the layout gives it. */
-const inWorkflow = (rest: readonly string[]): boolean =>
-  (rest.length === 1 && (rest[0] === 'workflow.yaml' || rest[0].endsWith('.md'))) || !/\.(md|yaml)$/.test(rest[rest.length - 1]);
+const inWorkflow = (rest: readonly string[]): boolean => {
+  const [only, ...more] = rest;
+  const last = rest.at(-1);
+  return (
+    (only !== undefined && !more.length && (only === 'workflow.yaml' || only.endsWith('.md'))) ||
+    last === undefined ||
+    !/\.(md|yaml)$/.test(last)
+  );
+};
 
 /** Whether the layout gives `file` a place; `named` are the files a `{ path }` of a document names. */
 function inLayout(file: string, named: ReadonlySet<string>): boolean {
@@ -137,7 +144,8 @@ function inLayout(file: string, named: ReadonlySet<string>): boolean {
   const [holder, name, ...rest] = file.split('/');
   if (name === undefined || rest.length === 0) return false;
   if (holder === 'workflows') return inWorkflow(rest);
-  if (holder === 'agents') return rest.length === 1 && AGENT_FILES.includes(rest[0]);
+  const [first] = rest;
+  if (holder === 'agents') return rest.length === 1 && first !== undefined && AGENT_FILES.includes(first);
   return holder === 'skills';
 }
 
@@ -149,7 +157,7 @@ function folderRefusals(files: readonly string[]): Refusal[] {
   const folders = new Set(
     files.flatMap((file) => {
       const [holder, name, ...rest] = file.split('/');
-      return holder in HOLDS && name !== undefined && rest.length > 0 ? [`${holder}/${name}`] : [];
+      return holder !== undefined && holder in HOLDS && name !== undefined && rest.length > 0 ? [`${holder}/${name}`] : [];
     }),
   );
   return [...folders].flatMap((folder) => {
@@ -315,7 +323,7 @@ function textRefusal(value: unknown, at: ReadonlyArray<string | number>): string
 const isStrings = (value: unknown): boolean => Array.isArray(value) && value.every((item) => typeof item === 'string');
 
 /** What each plain leaf must be, and how it is said. */
-const LEAVES: Readonly<Record<string, [(value: unknown) => boolean, string]>> = {
+const LEAVES: Readonly<Record<Exclude<Leaf, 'text' | 'not-yet'>, [(value: unknown) => boolean, string]>> = {
   string: [(v) => typeof v === 'string', 'a string'],
   number: [(v) => typeof v === 'number', 'a number'],
   boolean: [(v) => typeof v === 'boolean', 'true or false'],

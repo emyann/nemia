@@ -24,7 +24,6 @@ import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   agentsFor,
-  COMMANDS,
   HARNESS_CHOICES,
   loadAgents,
   remoteAgents,
@@ -58,8 +57,8 @@ import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { KINDS, schemaNameRefusal, WORDS, workflowNameRefusal, type KeyKind } from './words.ts';
 import type { Engine } from '../store.ts';
-import { folderOf, listed, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
-import { runPlaced } from '../store.ts';
+import { folderOf, listed, loadedAt, loadedOf, placesOf, specOf, type WorkflowListing, type WorkflowStepSpec } from './workflows.ts';
+import { commandNamed, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
 /**
@@ -182,8 +181,8 @@ export type BuildRefused = { error: string; steps: string[] };
  * `review is in two loops` — the longest name first, so `review-2: …` is not taken for `review`'s.
  */
 export function stepsNamed(message: string, names: readonly string[]): string[] {
-  const cycle = /^these steps wait on each other: (.+)$/.exec(message);
-  if (cycle) return cycle[1].split(', ').filter((name) => names.includes(name));
+  const [, cycle] = /^these steps wait on each other: (.+)$/.exec(message) ?? [];
+  if (cycle !== undefined) return cycle.split(', ').filter((name) => names.includes(name));
   const refusedName = names.find((name) => stepNameRefusal(name) === message);
   if (refusedName !== undefined) return [refusedName];
   const twice = names.find((name) => message.startsWith(`two steps are named ${name}, `));
@@ -485,7 +484,7 @@ export function putSchemasBack(dir: string, written: readonly SchemaWas[]): void
 }
 
 /** The table's entry a folder of yours is written through, served on both sides. */
-const WRITE = COMMANDS.find((c) => c.name === 'workflows write')!;
+const WRITE = commandNamed('workflows write');
 
 /**
  * A write of the folder `name` at `dir`, of yours, read as a start on `repo` reads it, through the engine `e`: a change of the folder
@@ -533,19 +532,19 @@ async function write(
     const judged = judgedWith(dir, steps, writing, places);
     if (judged) return judged;
   }
-  const before: SchemaWas[] = writing.map(({ file }) => {
+  const before: Array<SchemaWas & { text: string }> = writing.map(({ file, text }) => {
     try {
-      return { file, was: fs.readFileSync(path.join(dir, file), 'utf8') };
+      return { file, text, was: fs.readFileSync(path.join(dir, file), 'utf8') };
     } catch {
-      return { file, was: undefined };
+      return { file, text, was: undefined };
     }
   });
-  const schemasWritten = writing.filter((s, i) => s.text !== before[i].was).map((s) => s.file);
+  const schemasWritten = before.filter((s) => s.text !== s.was).map((s) => s.file);
   const written: SchemaWas[] = [];
   let result;
   try {
-    for (const [i, { file, text }] of writing.entries()) {
-      written.push(before[i]);
+    for (const { file, text, was } of before) {
+      written.push({ file, was });
       fs.writeFileSync(path.join(dir, file), text);
     }
     const args = {
@@ -564,7 +563,7 @@ async function write(
   }
   const kept = writing.filter((s) => !schemasWritten.includes(s.file)).map((s) => s.file);
   return {
-    workflow: listed(name, 'yours', dir, places, (await loadedOf(e, placeService, [dir], repo, home))[dir]),
+    workflow: listed(name, 'yours', dir, places, loadedAt(await loadedOf(e, placeService, [dir], repo, home), dir)),
     written: [...result.written, ...schemasWritten].sort(),
     kept: [...result.kept, ...kept].sort(),
     removed: result.removed,

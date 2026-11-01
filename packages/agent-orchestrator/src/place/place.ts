@@ -322,7 +322,9 @@ export type PlaceDeclared = {
 export function unknownHoles(say: PlaceSay): readonly { readonly key: SayKey; readonly hole: string }[] {
   return PLACE_SAYS.flatMap((key) => {
     const templates: readonly string[] = typeof say[key] === 'string' ? [say[key]] : say[key];
-    const named = templates.flatMap((template) => [...template.matchAll(/\{(\w+)\}/g)].map((found) => found[1]));
+    const named = templates.flatMap((template) =>
+      [...template.matchAll(/\{(\w+)\}/g)].flatMap(([, hole]) => (hole === undefined ? [] : [hole])),
+    );
     return [...new Set(named)].filter((hole) => !SAY_HOLES[key].includes(hole)).map((hole) => ({ key, hole }));
   });
 }
@@ -347,7 +349,7 @@ export const skillSaid = (section: keyof typeof SKILL_SECTIONS): string => `as y
  * name, a `<branch>` left for a person — as written. Pure.
  */
 export const sayFilled = (template: string, holes: Readonly<Record<string, string>>): string =>
-  template.replace(/\{(\w+)\}/g, (hole: string, name: string) => (Object.hasOwn(holes, name) ? holes[name] : hole));
+  template.replace(/\{(\w+)\}/g, (hole: string, name: string) => (Object.hasOwn(holes, name) ? holes[name] : undefined) ?? hole);
 
 /** What a place verb said instead of answering: its refusal in its words, or why it was not heard. Pure. */
 export const unansweredWords = (outcome: { readonly refused: string } | { readonly unread: Unread }): string =>

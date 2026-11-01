@@ -1,17 +1,29 @@
 /**
  * A step as the tick tells it (`toldOf`): the step its brief is composed for, the harness's own arguments it is filed with (`ownOf`), and
  * what its place says to it (`placeTold`); the files its last closeout lacked (`lacksTold`), and which files the steps before it named
- * are there (`foldersTold`). A controller: it reads the run's rendered agent folder, the skills where a start of
- * the run's folder finds them, and the run's place.
+ * are there (`foldersTold`); and what a pass named, found or thrown as its fault (`found`, `recordNamed`). A controller: it reads the
+ * run's rendered agent folder, the skills where a start of the run's folder finds them, and the run's place.
  */
 import path from 'node:path';
-import { mcpServerOf, type ClaudeFlags, type CodexArgs } from '../runtime-client.ts';
-import { lackedOf, type Run, type StepRecord } from '../record/record.ts';
+import { refusedTold } from './assess.ts';
+import { mcpServerOf, type ClaudeFlags, type CodexArgs, type TaskView } from '../runtime-client.ts';
+import {
+  isRepositoryRun,
+  lackedOf,
+  type CloseoutAsked,
+  type Run,
+  type StepRecord,
+  type StepStatus,
+  type TaskPhase,
+} from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import { filedFolders, type FiledFolders } from '../filed/filed.ts';
 import { artifactFiles, filesHanded, holdsCloseout } from '../artifacts/artifacts.store.ts';
 import { lackLines } from '../artifacts/artifacts.ts';
-import type { RetryBriefing } from '../brief/index.ts';
+import type { EndingStopped, RetryBriefing } from '../brief/index.ts';
+import { ownStatus, type SpendOf } from '../status/status.ts';
+import type { Retry } from '../retry/index.ts';
+import { saidIn } from '../views/views.verb.ts';
 import type { Workflow } from '../step/step.ts';
 import { realRepoOf } from '../workspace/worktree.store.ts';
 import { agentFilesDir, renderedIn, skillsAgain } from '../agents/agents.store.ts';
@@ -165,3 +177,76 @@ export const foldersTold = (
     });
   return { ...folders, named: Object.fromEntries(named), closeouts };
 };
+
+/** What a try's telling reads of its pass (`Filing`): the run, and what the pass read of its steps, tasks and closeouts. */
+type TriedReads = {
+  run: Run;
+  reads: {
+    steps: readonly Workflow[];
+    views: ReadonlyMap<string, TaskView>;
+    phaseOf: (taskId: string) => TaskPhase;
+    signedOff: (step: string) => Closeout | undefined;
+    asked: (taskId: string) => CloseoutAsked;
+    spendOf: SpendOf;
+  };
+};
+
+/** What a pass read and named (`what`), found: one it does not have is thrown, naming it, as a fault of the pass. */
+export const found = <T>(value: T | undefined, what: string): T => {
+  if (value === undefined) throw new Error(`the pass named ${what}, which it does not have: report it as a defect of the tick`);
+  return value;
+};
+
+/** The run's record of the step of this name, which the pass named: one the run has none of is thrown (`found`). */
+export const recordNamed = (run: Run, name: string): StepRecord => found(run.steps[name], `the record of step ${name} of run ${run.id}`);
+
+/** The task of the session a try stops first (`Retry.stopFirst`), which runs: a step with none on the record is thrown (`found`). */
+export const taskToStop = (run: Run, name: string): string =>
+  found(recordNamed(run, name).taskId ?? undefined, `a task of step ${name} of run ${run.id}`);
+
+/** The step of this name, which the pass's assessment named: one the pass did not read is thrown (`found`). */
+export const stepNamed = (f: TriedReads, name: string): Workflow =>
+  found(
+    f.reads.steps.find((s) => s.name === name),
+    `the step ${name}`,
+  );
+
+/** What the ending a try is sent back from said, for the work's brief: its status, its summary and needs, and where it merges. */
+const endingSaid = (f: TriedReads, ending: Workflow): EndingStopped => {
+  const { run, reads } = f;
+  const said = reads.signedOff(ending.name);
+  return {
+    step: ending.name,
+    status: ownStatus(ending, run, reads.phaseOf, reads.signedOff, reads.asked, reads.steps, reads.spendOf),
+    ...(said?.summary ? { summary: said.summary } : {}),
+    ...(said?.needs ? { needs: said.needs } : {}),
+    onto: isRepositoryRun(run) ? run.branch : 'the base branch',
+  };
+};
+
+/**
+ * What a local try's brief is told of its try (`RetryBriefing`): how it came and on whose word, the session it continues and what was said
+ * to it, how the try before it ended, what its check refused, what was denied it, and the ending it was sent back from.
+ */
+export const tryTold = (
+  f: TriedReads,
+  r: Retry,
+  record: StepRecord,
+  t: { status: StepStatus; resumeFrom: string | undefined; refusal: RetryBriefing['refusal'] },
+): RetryBriefing => ({
+  try: r.try,
+  by: r.by,
+  mode: r.mode,
+  ...(r.model ? { model: r.model } : {}),
+  ...(r.message !== undefined ? { message: r.message } : {}),
+  ...(r.budget !== undefined ? { budget: r.budget } : {}),
+  ...(r.pastCap ? { pastCap: true as const } : {}),
+  resumed: Boolean(t.resumeFrom),
+  ...(t.resumeFrom ? { said: saidIn(record.taskId === null ? undefined : f.reads.views.get(record.taskId)) } : {}),
+  status: t.status,
+  ...(t.refusal ? { refusal: t.refusal } : {}),
+  ...(t.status === 'denied' ? { denied: (record.taskId === null ? undefined : f.reads.spendOf(record.taskId))?.denied ?? [] } : {}),
+  ...(t.status === 'unsigned' ? lacksTold(f.run, r.step, record) : {}),
+  ...(t.status === 'unsigned' ? refusedTold(f.reads.signedOff(r.step)) : {}),
+  ...(r.back?.[0] !== undefined ? { ending: endingSaid(f, stepNamed(f, r.back[0])) } : {}),
+});

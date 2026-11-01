@@ -39,6 +39,7 @@ import type { Run } from '../record/record.ts';
 import type { RecordMemo } from '../rest/index.ts';
 import { isReadme, splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { frontmatterOrNull, renderFrontmatter } from '../frontmatter/frontmatter.ts';
+import { firstPiece } from '../piece/piece.ts';
 
 export type InboxCard = {
   /** Its file's name in the inbox, minus `.md`: what `nemia inbox rm` and a start name it by. */
@@ -295,6 +296,15 @@ export const cardState = (l: Pick<InboxListing, 'startedAs' | 'queued' | 'tried'
 export type InboxRuns = RecordMemo<Pick<Run, 'id' | 'from'>>;
 
 /**
+ * The workflow, repository and factory a card that does not read lists, off its lenient reading (`lenient`): each as written where it is
+ * queued, null where it is not, does not say one, or did not read even leniently.
+ */
+function queuedKeys(lenient: InboxCard | undefined): Pick<InboxListing, 'workflow' | 'repo' | 'factory'> {
+  const kept = lenient?.queued !== undefined ? lenient : undefined;
+  return { workflow: kept?.workflow ?? null, repo: kept?.repo ?? null, factory: kept?.factory ?? null };
+}
+
+/**
  * The inbox as `nemia inbox` lists it, by file name: every entry of the folder — a folder inside it by its name and a trailing `/` — each
  * card with the runs its name is on (`startedAs`), and each entry that is not a card listed with why, never hidden. A hidden file and a
  * README are not listed: the one is an editor's, the other says what the folder is for. A queued card says when, and its place in the
@@ -340,7 +350,7 @@ export function inboxListing(
         return {
           name,
           file,
-          title: card.body.split('\n')[0],
+          title: firstPiece(card.body, '\n'),
           workflow: card.workflow ?? null,
           repo: card.repo ?? null,
           factory: card.factory ?? null,
@@ -357,13 +367,12 @@ export function inboxListing(
           lenient = parseInboxCard(file, text, () => true);
         } catch {}
         const queued = lenient?.queued;
-        const repo = queued !== undefined ? (lenient!.repo ?? null) : null;
-        const factory = queued !== undefined ? (lenient!.factory ?? null) : null;
+        const { workflow, repo, factory } = queuedKeys(lenient);
         return {
           name,
           file,
           title: null,
-          workflow: queued !== undefined ? (lenient!.workflow ?? null) : null,
+          workflow,
           repo,
           factory,
           from: [],
@@ -376,7 +385,7 @@ export function inboxListing(
     })
     .map((l): InboxListing => ({ ...l, state: cardState(l) }));
   queueOrder(listed).forEach((l, i) => {
-    l.queued!.place = i + 1;
+    if (l.queued) l.queued.place = i + 1;
   });
   return listed;
 }
@@ -388,8 +397,9 @@ export function inboxListing(
  */
 export const queueOrder = (listing: readonly InboxListing[]): InboxListing[] =>
   listing
-    .filter((l) => l.queued && l.state !== 'started')
-    .sort((a, b) => a.queued!.at.localeCompare(b.queued!.at) || a.name.localeCompare(b.name));
+    .flatMap((l) => (l.queued && l.state !== 'started' ? [{ l, at: l.queued.at }] : []))
+    .sort((a, b) => a.at.localeCompare(b.at) || a.l.name.localeCompare(b.l.name))
+    .map(({ l }) => l);
 
 /**
  * The repository a card's factory picks for it: its factory's one repository, for a card with no `repo:` whose factory is among
@@ -402,7 +412,8 @@ export function factoryRepoOf(
 ): string | null {
   if (l.repo !== null || l.factory === null) return null;
   const repos = factories.get(l.factory)?.repos;
-  return repos?.length === 1 ? repos[0] : null;
+  const [only] = repos ?? [];
+  return repos?.length === 1 && only !== undefined ? only : null;
 }
 
 /**
@@ -506,7 +517,7 @@ export function inboxLines(listing: readonly InboxListing[], unfactoredStarts = 
     const queued = l.queued?.place ? `  queued ${l.queued.place} of ${inLine}` : '';
     const tried = triedClause(l, unfactoredStarts);
     if (l.error !== null) return `${l.name.padEnd(width)}  ${l.error}${queued}${tried}${started}`;
-    return `${l.name.padEnd(width)}  ${l.title!.slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}`;
+    return `${l.name.padEnd(width)}  ${(l.title ?? '').slice(0, 56).trimEnd()}${l.workflow ? `  workflow: ${l.workflow}` : ''}${l.repo ? `  repo: ${l.repo}` : ''}${l.gate ? `  gate: ${l.gate}` : ''}${l.factory ? `  factory: ${l.factory}` : ''}${queued}${tried}${started}`;
   });
 }
 
@@ -560,10 +571,11 @@ export function ideaCard(
   try {
     split = splitFrontmatter(from, text);
   } catch {}
-  const entries = (split?.block == null ? null : frontmatterOrNull(split.block))?.entries ?? [];
+  const block = split?.block ?? null;
+  const entries = (block === null ? null : frontmatterOrNull(block))?.entries ?? [];
   const isCardKey = (key: string) => ([...INBOX_KEYS, 'after'] as string[]).includes(key);
-  if (split && entries.length && entries.every(({ key }) => isCardKey(key))) {
-    const read = inboxKeys(from, split.block!, true);
+  if (split && block !== null && entries.length && entries.every(({ key }) => isCardKey(key))) {
+    const read = inboxKeys(from, block, true);
     if (read.queued !== undefined) {
       refuse(
         `${from}: \`queued\` is not a key a filed idea keeps: a card is queued once it is in the inbox, at the time it is queued. Delete the line and file the idea, then queue the card nemia inbox add names: nemia inbox queue <name>.`,

@@ -60,7 +60,7 @@ export const FORMER_HARNESS_PROMPTS: Readonly<Record<string, HarnessPrompt>> = {
  * not, as the api's picture of an agent that does not load. Pure.
  */
 export const harnessPromptNamed = (word: string): string =>
-  Object.hasOwn(FORMER_HARNESS_PROMPTS, word) ? FORMER_HARNESS_PROMPTS[word] : word;
+  (Object.hasOwn(FORMER_HARNESS_PROMPTS, word) ? FORMER_HARNESS_PROMPTS[word] : undefined) ?? word;
 
 /**
  * A step's or an agent's lines with a codex `permissionMode:` read as the `sandbox:` it names — `bypassPermissions`, which the engine takes
@@ -149,7 +149,7 @@ export const modeOf = (step: Pick<Workflow, 'permissionMode' | 'sandbox'>): stri
 export type Spelled = Partial<Record<string, string>>;
 
 /** The key a frontmatter line names: its own, or the one its former name is now (`FORMER_KEYS`). */
-const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, written) ? FORMER_KEYS[written] : written);
+const keyNamed = (written: string): string => (Object.hasOwn(FORMER_KEYS, written) ? FORMER_KEYS[written] : undefined) ?? written;
 
 /**
  * The frontmatter as key → value: every key a key `refusal` does not refuse — a key a step has, or an agent — set once, to something. The
@@ -193,7 +193,7 @@ export function readKeys<K extends string>(
     if (!value) refuse(noValue(step, key, written));
     meta[key as K] = value;
     if (written !== key) spelled[key] = written;
-    if (inBlock !== undefined) fenced!.keys.push(key);
+    if (inBlock !== undefined) fenced?.keys.push(key);
   };
   for (const entry of readFrontmatter(step, block).entries) {
     if (!isBlockEntry(entry)) {
@@ -226,8 +226,10 @@ function blockFence(step: string, entry: FrontmatterEntry): Array<[string, Front
   if (other !== undefined) refuse(blockKeyRefused(step, harness, other));
   const fence = map.fence;
   if (fence === undefined) return [];
-  if (typeof fence !== 'object' || Array.isArray(fence)) refuse(fenceNotMap(step, harness));
-  const takes = fenceKeysOf(harness)!;
+  const takes = fenceKeysOf(harness);
+  if (takes === undefined)
+    refuse(`${step}: \`${harness}:\` names no harness, so its block holds no fence: delete the block, or name a harness`);
+  if (typeof fence !== 'object' || Array.isArray(fence)) refuse(fenceNotMap(step, harness, takes));
   const keys = Object.entries(fence as Readonly<Record<string, FrontmatterValue>>);
   const untaken = keys.find(([key]) => !takes.includes(key));
   if (untaken !== undefined) refuse(fenceKeyRefused(step, harness, untaken[0], takes));
@@ -243,8 +245,8 @@ const blockKeyRefused = (file: string, harness: string, key: string): string =>
   `${file}: \`${harness}: { ${key}: … }\` — a harness's block in a step or agent file holds its \`fence\` alone. Write \`${key}:\` at the top level, or delete it.`;
 
 /** Refused: a harness's `fence` that is not a map of its keys. */
-const fenceNotMap = (file: string, harness: string): string =>
-  `${file}: \`${harness}: { fence: … }\` is a map of the harness's fence keys — ${fenceKeysOf(harness)!.join(', ')} — each on a line of its own, indented under \`fence:\`.`;
+const fenceNotMap = (file: string, harness: string, takes: readonly string[]): string =>
+  `${file}: \`${harness}: { fence: … }\` is a map of the harness's fence keys — ${takes.join(', ')} — each on a line of its own, indented under \`fence:\`.`;
 
 /** Refused: a key in a harness's fence that the harness does not take. */
 const fenceKeyRefused = (file: string, harness: string, key: string, takes: readonly string[]): string =>
@@ -256,7 +258,8 @@ const fenceKeyRefused = (file: string, harness: string, key: string, takes: read
  */
 export function fenceBlockRefusal(file: string, block: FenceBlock | undefined, harness: string): string | undefined {
   if (block === undefined || block.harness === harness) return undefined;
-  return `${file}:${block.line}: \`${block.harness}: { fence: … }\` fences a session on ${block.harness}, and this file runs on ${harness}. Name the block \`${harness}:\` with ${harness}'s fence keys${fenceKeysOf(harness) ? ` (${fenceKeysOf(harness)!.join(', ')})` : ''}, or set \`harness: ${block.harness}\`.`;
+  const takes = fenceKeysOf(harness);
+  return `${file}:${block.line}: \`${block.harness}: { fence: … }\` fences a session on ${block.harness}, and this file runs on ${harness}. Name the block \`${harness}:\` with ${harness}'s fence keys${takes ? ` (${takes.join(', ')})` : ''}, or set \`harness: ${block.harness}\`.`;
 }
 
 /**
@@ -288,18 +291,20 @@ export function fencedPairs(
       out.push([key, value]);
       continue;
     }
-    if (!blocks.has(harness)) {
-      blocks.set(harness, {});
-      out.push([harness, { fence: blocks.get(harness)! }]);
+    let fence = blocks.get(harness);
+    if (fence === undefined) {
+      fence = {};
+      blocks.set(harness, fence);
+      out.push([harness, { fence }]);
     }
-    blocks.get(harness)![key] = value;
+    fence[key] = value;
   }
   return out;
 }
 
 /** The harness whose fence takes key `key` (`fenceKeysOf`): each fence key is one harness's. */
 const harnessTaking = (key: string): string | undefined =>
-  Object.keys(HARNESS_KNOBS).find((harness) => fenceKeysOf(harness)!.includes(key));
+  Object.keys(HARNESS_KNOBS).find((harness) => fenceKeysOf(harness)?.includes(key));
 
 /** Why a key written with no value is refused, and what to write: the command, the tools or the dollars it takes, or the line deleted. */
 const noValue = (step: string, key: string, written: string): string =>
@@ -377,9 +382,13 @@ function movedTo(
   value: FrontmatterValue,
   harness: string | undefined,
 ): { block: string; key: string; value: FrontmatterValue } | undefined {
-  if (key !== 'permissionMode') return { block: harnessTaking(key)!, key, value };
-  if (harness === undefined || fenceKeysOf(harness) === undefined) return undefined;
-  if (fenceKeysOf(harness)![0] !== 'sandbox') return { block: harness, key, value };
+  if (key !== 'permissionMode') {
+    const block = harnessTaking(key);
+    return block === undefined ? undefined : { block, key, value };
+  }
+  const takes = harness === undefined ? undefined : fenceKeysOf(harness);
+  if (harness === undefined || takes === undefined) return undefined;
+  if (takes[0] !== 'sandbox') return { block: harness, key, value };
   return { block: harness, key: 'sandbox', value: typeof value === 'string' ? sandboxNamed(value) : value };
 }
 
@@ -411,7 +420,10 @@ export function fenceMoved(name: string, text: string, harness: string | undefin
     moved = withKey(name, moved, key, undefined);
   }
   if (moved === block) return { text, changed: false, kept };
-  for (const at of touched) moved = withKey(name, moved, at, { fence: fences.get(at)! });
+  for (const at of touched) {
+    const fence = fences.get(at);
+    if (fence !== undefined) moved = withKey(name, moved, at, { fence });
+  }
   const open = text.indexOf(block);
   return { text: `${text.slice(0, open)}${moved}${text.slice(open + block.length)}`, changed: true, kept };
 }
@@ -436,7 +448,7 @@ export const formerKeyWritten = (file: string, former: string): string =>
   `${file}: \`${former}\` is \`${renamed(former)}\`'s former name, which a file may still say but nothing writes. Send \`${renamed(former)}\` — a page that sends the former name is stale: reload it, and save again.`;
 
 /** The key a former name is now, a step's (`FORMER_KEYS`) or an agent's own (`FORMER_OWN_KEYS`). */
-const renamed = (former: string): string => FORMER_KEYS[former] ?? FORMER_OWN_KEYS[former];
+const renamed = (former: string): string | undefined => FORMER_KEYS[former] ?? FORMER_OWN_KEYS[former];
 
 /**
  * Why a codex `permissionMode` (`formerSandbox`) is not written, as `formerKeyWritten` says of a former name: read

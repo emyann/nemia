@@ -120,7 +120,10 @@ async function withEngine(e: Engine, place: Place, found: Pruning[]): Promise<Pr
   try {
     const { counted, uncounted } = await runWith(e, placedIn(place, runsForgetting(asked)));
     for (const { text } of uncounted) console.log(text);
-    return found.map((p) => (counted.has(p.id) ? { ...p, engine: counted.get(p.id)! } : p));
+    return found.map((p) => {
+      const engine = counted.get(p.id);
+      return engine !== undefined ? { ...p, engine } : p;
+    });
   } catch (err) {
     console.log(`what nemia rm would forget of the engine's tasks was not counted: ${(err as Error).message}`);
     return found;

@@ -110,7 +110,9 @@ export type Fills = { factory: string; workflow: string; agents: Readonly<Record
 /** The hire `fills` makes into the step `step`, or undefined for none. */
 function hireOf(fills: Fills | undefined, step: string): Hire | undefined {
   if (!fills || !Object.hasOwn(fills.agents, step)) return undefined;
-  return { agent: fills.agents[step], factory: fills.factory, step: `${fills.workflow}/${step}` };
+  const agent = fills.agents[step];
+  if (agent === undefined) return undefined;
+  return { agent, factory: fills.factory, step: `${fills.workflow}/${step}` };
 }
 
 /**

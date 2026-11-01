@@ -279,7 +279,7 @@ function dueOf(a: Assessment, steps: readonly Workflow[], waits: boolean): strin
   for (const r of a.round)
     due.push(
       r.merge
-        ? mergeDueWords(r)
+        ? mergeDueWords(r, r.merge)
         : `round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'nemia retry --round'})`,
     );
   return due;
@@ -310,8 +310,8 @@ const roundHeard = (r: Round, ask: RoundAsk): boolean =>
     : r.by === 'ask' && r.step === ask.step && r.round === ask.round;
 
 /** A merge due, said: what its target merges, and that it spends no round. */
-const mergeDueWords = (r: Round): string =>
-  `the merge of ${r.merge!.onto} into ${r.target}'s work is due (nemia refresh --base), on round ${r.round} of ${r.step}'s loop`;
+const mergeDueWords = (r: Round, merge: NonNullable<Round['merge']>): string =>
+  `the merge of ${merge.onto} into ${r.target}'s work is due (nemia refresh --base), on round ${r.round} of ${r.step}'s loop`;
 
 /** An ask no pass files, named. */
 const askNamed = (u: AskName): string =>
@@ -332,8 +332,9 @@ function unlandedHeld(c: Facts): string | undefined {
 /** What the run files once the runs it waits on have landed. */
 function waitsHeld(c: Facts): string | undefined {
   const { run, ready, waits } = c;
-  if (!waits) return undefined;
-  return `it waits on ${andList(run.after!)}, and files ${andList(ready)} once ${run.after!.length > 1 ? 'they have' : 'it has'} landed`;
+  const after = run.after;
+  if (!waits || !after) return undefined;
+  return `it waits on ${andList(after)}, and files ${andList(ready)} once ${after.length > 1 ? 'they have' : 'it has'} landed`;
 }
 
 /** What each step at its gate files once approved: itself, when it never ran, or what waits on it. */
@@ -483,7 +484,7 @@ export function runWorktrees(
     ...new Set(
       Object.values(run.steps)
         .map((s) => s.workspace)
-        .filter((p): p is string => Boolean(p) && ours(p!)),
+        .flatMap((p) => (p && ours(p) ? [p] : [])),
     ),
   ].filter((p) => !worktrees.some((w) => path.resolve(w.path) === path.resolve(p)));
   return { worktrees, unlisted };

@@ -74,7 +74,11 @@ export const retryRun = Effect.fn('retry')(function* (
 
   const refused = refusal((yield* (yield* RunDoor).asks.read(RunId.read(id))).asks);
   if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
-  const step = steps.find((s) => s.name === stepName)!;
+  const step = steps.find((s) => s.name === stepName);
+  if (step === undefined) {
+    const names = steps.map((s) => s.name).join(', ');
+    return yield* Effect.fail(new Invalid({ message: `run ${id} has no step ${stepName}: retry one of its steps (${names})` }));
+  }
   const denied = landingDenies(run, yield* PlaceService);
   const home = yield* StoreRoot;
   const refusedConfig = yield* tried(() => tryRefused(run, steps, step, how, spendOf, denied, home));

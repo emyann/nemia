@@ -88,7 +88,8 @@ export function oneFolder(a: string, b: string): boolean {
  * (`sameRepository`) and two folders; nothing for two roots of different places, where the first wins, and for one folder under both.
  */
 function inBoth(name: string, first: string, root: string): WorkflowError | undefined {
-  const [before, at] = [first, root].map((r) => path.join(r, SKILLS_FOLDER, name));
+  const before = path.join(first, SKILLS_FOLDER, name);
+  const at = path.join(root, SKILLS_FOLDER, name);
   if (!sameRepository(first, root) || oneFolder(before, at)) return undefined;
   return new WorkflowError(
     `${name} is a skill in both ${before} and ${at}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`,

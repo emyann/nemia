@@ -2,7 +2,8 @@
  * The tests that scan files outside their package are re-run when those files change. Turbo caches a package's test by the package's own
  * files, so a test that reads the apps or another package replays a pass from its cache after a change there, unless `turbo.json` names
  * what it reads as its inputs. The contract tests read every source outside their package (`test/contract.test.ts` in each package), the
- * lint tests here read `.oxlintrc.json` and `lint/`, and this package's suite reads the apps' tests (`suite.test.ts`, `comments.test.ts`).
+ * lint tests here read `.oxlintrc.json` and `lint/`, and this package's suite reads the apps' tests (`suite.test.ts`, `comments.test.ts`)
+ * and the orchestrator's guard of its flag reads the apps' `tsconfig.json` (`index-reads.test.ts`).
  * The declared-imports scan here reads every workspace package's `package.json` and source, the apps' configs and the runtime's files
  * among them, and the runtime's contract test reads the `.ts` files at each app's root too. The vocabulary test here reads this
  * repository's team from `workflows/`, its agents and its workflows' folders (`words.test.ts`), and its whole-repository scans
@@ -71,6 +72,7 @@ const INPUTS: Record<string, readonly string[]> = {
     ...APPS,
     '$TURBO_ROOT$/apps/*/*.ts',
     '$TURBO_ROOT$/apps/*/package.json',
+    '$TURBO_ROOT$/apps/*/tsconfig.json',
     '$TURBO_ROOT$/apps/*/CLAUDE.md',
     '$TURBO_ROOT$/CLAUDE.md',
     '$TURBO_ROOT$/workflows/**',

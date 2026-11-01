@@ -96,7 +96,9 @@ export function ranInto(argv: readonly string[], cwd: string, env: NodeJS.Proces
   fs.appendFileSync(log, `$ ${argv.join(' ')}\n`);
   const fd = fs.openSync(log, 'a');
   try {
-    const ran = spawnSync(argv[0], argv.slice(1), { cwd, env, stdio: ['ignore', fd, fd] });
+    const [command, ...args] = argv;
+    if (command === undefined) throw new Error('ranInto runs a command: give it argv with the program first.');
+    const ran = spawnSync(command, args, { cwd, env, stdio: ['ignore', fd, fd] });
     if (ran.error) fs.appendFileSync(log, `${ran.error.message}\n`);
     return ran.status ?? ran.signal ?? 'not started';
   } finally {

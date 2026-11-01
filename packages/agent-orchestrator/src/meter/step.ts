@@ -207,7 +207,10 @@ export function settledFacts(run: Run, steps: readonly Workflow[], settled: Read
 export function settlesDue(run: Run, steps: readonly Workflow[], views: ReadonlyMap<string, FactView>): Set<string> {
   const counted = run.settlesCounted;
   if (!counted) return new Set();
-  const tasks = steps.flatMap((step) => tasksOf(run.steps[step.name] ?? { status: 'pending' }).map((t) => t.taskId));
+  const tasks = steps.flatMap((step) => {
+    const record = run.steps[step.name];
+    return record ? tasksOf(record).map((t) => t.taskId) : [];
+  });
   return new Set(tasks.filter((taskId) => views.get(taskId)?.state.settled && !counted.includes(taskId)));
 }
 
@@ -343,10 +346,11 @@ export function onceFacts(
   const denied = deniedCalls(run, steps, views, callOf);
   const counted = new Map((run.deniedCounted ?? []).map((c) => [c.task, c.attempts]));
   for (const f of denied) counted.set(f.task, Math.max(counted.get(f.task) ?? 0, f.attempt));
+  const timed = gates.flatMap((f) => (f.attributes.step === undefined ? [] : [{ step: f.attributes.step, try: f.try }]));
   return {
     facts: [...gates, ...denied],
     marks: {
-      ...(run.gatesTimed ? { gatesTimed: [...run.gatesTimed, ...gates.map((f) => ({ step: f.attributes.step, try: f.try }))] } : {}),
+      ...(run.gatesTimed ? { gatesTimed: [...run.gatesTimed, ...timed] } : {}),
       ...(run.deniedCounted ? { deniedCounted: [...counted].map(([task, attempts]) => ({ task, attempts })) } : {}),
     },
   };
@@ -386,7 +390,8 @@ export function deniedCalls(
   const counted = run.deniedCounted;
   if (!counted) return [];
   return steps.flatMap((step) => {
-    const sessions = triesOf(run.steps[step.name] ?? { status: 'pending' }).filter((t) => !t.check);
+    const record = run.steps[step.name];
+    const sessions = record ? triesOf(record).filter((t) => !t.check) : [];
     const attributes = { ...stepKeys(run, step) };
     return sessions.flatMap(({ taskId }) => {
       const from = counted.find((c) => c.task === taskId)?.attempts ?? 0;

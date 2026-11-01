@@ -40,8 +40,9 @@ export function heldCheckouts(claims: readonly MainClaim[]): Map<string, Checkou
   for (const group of repos.values()) {
     let taken = group.find((c) => c.holds);
     const waiting = group
-      .filter((c) => !c.holds && c.at !== undefined)
-      .sort((a, b) => a.at!.localeCompare(b.at!) || a.id.localeCompare(b.id));
+      .flatMap((c) => (!c.holds && c.at !== undefined ? [{ claim: c, at: c.at }] : []))
+      .sort((a, b) => a.at.localeCompare(b.at) || a.claim.id.localeCompare(b.claim.id))
+      .map(({ claim }) => claim);
     for (const c of waiting) {
       if (!taken) taken = c;
       else if (taken.id !== c.id) held.set(c.id, { run: taken.id, step: taken.step });

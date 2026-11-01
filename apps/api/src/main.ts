@@ -27,10 +27,10 @@ import { daemonQuota, QuotaAsker } from './factory/quota.ts';
 import { Engine, engineRead } from './store.ts';
 
 /** Prints `err`'s message and exits with its code: 2 for a refusal, 1 for anything else. */
-const fail = (err: unknown): never => {
+function fail(err: unknown): never {
   console.error((err as Error).message ?? String(err));
   return process.exit((err as { exitCode?: number }).exitCode ?? 1);
-};
+}
 
 let port: number;
 let args: ReturnType<typeof argsOf>;
@@ -79,16 +79,16 @@ const listening = Effect.acquireRelease(
     }),
 );
 
-const asked = args!;
+const asked = args;
 if (!asked.ticks) await Effect.runPromise(Effect.scoped(Effect.andThen(listening, Effect.never))).catch(fail);
 else
   await runMain(
-    up(e!, {
+    up(e, {
       every: asked.every,
       repo: repoOf(process.env, running),
       holder: 'api',
       series: [STEP_FOLLOWS],
-      quota: (name) => Effect.promise(() => daemonQuota(asker!, name, () => engineRead('quota', e!.quota(name)))()),
+      quota: (name) => Effect.promise(() => daemonQuota(asker, name, () => engineRead('quota', e.quota(name)))()),
       onTaken: () => Effect.map(listening, (served) => void holdUrl(`http://${HOST}:${served.port}`)),
-    }).pipe(Effect.scoped, Effect.provideContext(services!), Effect.ensuring(runtime.disposeEffect)),
+    }).pipe(Effect.scoped, Effect.provideContext(services), Effect.ensuring(runtime.disposeEffect)),
   ).catch(fail);

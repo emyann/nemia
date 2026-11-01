@@ -264,12 +264,22 @@ export const runSaid = (
 });
 
 /**
+ * What `judged` holds of the step `name` in `of`, its codes or its words. Thrown for a step it did not judge, which a caller naming the
+ * steps of the run it judged (`judgedSteps`) never asks for.
+ */
+const judgedOf = <T>(of: ReadonlyMap<string, T>, name: string): T => {
+  const held = of.get(name);
+  if (held === undefined) throw new Error(`${name} is no step of the judged run: name one of the steps judge read of it (judgedSteps).`);
+  return held;
+};
+
+/**
  * A step's word and codes as a door says them (`RunSummary`'s steps): its codes (`StepCodes`), its word as `message`, and as `status`,
  * the name `message` had, kept for one card.
  */
 export const stepSaid = (judged: Pick<Judged, 'codes' | 'words'>, name: string): StepCodes & { message: string; status: string } => {
-  const { phase, reason, on, via, verdict } = judged.codes.get(name)!;
-  const word = judged.words.get(name)!;
+  const { phase, reason, on, via, verdict } = judgedOf(judged.codes, name);
+  const word = judgedOf(judged.words, name);
   return { phase, reason, on, via, message: word, verdict, status: word };
 };
 
@@ -496,6 +506,12 @@ export const judge = Effect.fn('judge')(function* (
 export const atHarness = (codes: { reason: StepReason; via?: AnswerVia | null }): boolean =>
   codes.reason === 'AwaitingAnswer' && codes.via === 'session';
 
+/** The name a step's harness lists its current try's session under (`nameFor`); null for a step with no task, or no attempt yet. */
+const sessionOf = (taskId: string | null | undefined, view: ReturnType<Views['get']>): string | null => {
+  const attempt = view?.state.attempts.at(-1)?.n;
+  return taskId && attempt !== undefined ? nameFor(taskId, attempt) : null;
+};
+
 /**
  * What a person has to know to act on a step (`StepNeeds`), off the views the request already read, with no observation of its own: its
  * current try's closeout, the engine's word for its task, and what the run established of it (`judge`) — for a step at its gate that waits
@@ -505,27 +521,24 @@ export const atHarness = (codes: { reason: StepReason; via?: AnswerVia | null })
  * session alone was unread the runtime's (`unreadOf`).
  */
 export function needsOf(run: Run, name: string, views: Views, judged: Pick<Judged, 'codes' | 'waitingOnYou' | 'beside'>): StepNeeds {
-  const view = run.steps[name]?.taskId ? views.get(run.steps[name].taskId) : undefined;
+  const taskId = run.steps[name]?.taskId;
+  const view = taskId ? views.get(taskId) : undefined;
   const said = view ? closeoutOf(views, run, name) : undefined;
-  const codes = judged.codes.get(name)!;
+  const codes = judgedOf(judged.codes, name);
   const reason = codes.reason;
   const atGate = reason === 'AwaitingApproval' && judged.waitingOnYou.includes(name);
   const { waits, denied } = judged.beside.get(name) ?? {};
   const words = atHarness(codes) ? waits : undefined;
-  const attempt = view?.state.attempts.at(-1)?.n;
   return {
     needs: said && !('error' in said) && said.outcome === 'blocked' ? said.needs || null : null,
     waitingFor: words
       ? {
           words,
-          advice: answerIn(
-            attempt === undefined ? null : nameFor(run.steps[name].taskId!, attempt),
-            isRemoteHarness(view?.state.harness) ? { run: run.id, step: name } : undefined,
-          ),
+          advice: answerIn(sessionOf(taskId, view), isRemoteHarness(view?.state.harness) ? { run: run.id, step: name } : undefined),
         }
       : null,
-    approve: atGate ? onYouWords({ steps: [{ name, reason }], waitingOnYou: [name] })[0] : null,
-    denied: denied && view ? { words: denied, calls: deniedOf(views)(run.steps[name].taskId!) } : null,
+    approve: atGate ? (onYouWords({ steps: [{ name, reason }], waitingOnYou: [name] })[0] ?? null) : null,
+    denied: denied && view && taskId ? { words: denied, calls: deniedOf(views)(taskId) } : null,
     sessionUnread: unreadOf(view),
   };
 }

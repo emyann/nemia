@@ -120,7 +120,11 @@ export const splitServers = (
   record: FactoryServers | undefined,
 ): { mcp?: Record<string, FactoryServer>; checkout: string[] } => {
   if (!named?.length) return { checkout: [] };
-  const mine = named.filter((name) => record !== undefined && Object.hasOwn(record, name));
-  const checkout = named.filter((name) => !mine.includes(name));
-  return { ...(mine.length ? { mcp: Object.fromEntries(mine.map((name) => [name, record![name]])) } : {}), checkout };
+  const mine = named.flatMap((name): Array<[string, FactoryServer]> => {
+    if (record === undefined || !Object.hasOwn(record, name)) return [];
+    const server = record[name];
+    return server === undefined ? [] : [[name, server]];
+  });
+  const checkout = named.filter((name) => !mine.some(([own]) => own === name));
+  return { ...(mine.length ? { mcp: Object.fromEntries(mine) } : {}), checkout };
 };

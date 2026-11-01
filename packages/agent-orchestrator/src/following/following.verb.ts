@@ -170,8 +170,9 @@ export const followStep = (runId: string, step: string, after?: string): Stream.
       const cursor = yield* tried(feedSize);
       const now = yield* stepNowOf(e, runId, step);
       const o: Onward = { e, runId, step, hold: { unstreamed: false }, ...(after === undefined ? {} : { after }) };
-      const seen = now.attempt > 0 && !now.live ? { taskId: now.taskId!, attempt: now.attempt } : undefined;
-      const opened = nextOf(seen, now) === 'wait' ? streamedOf(e, now.taskId!, o.hold) : Stream.empty;
+      const { taskId } = now;
+      const seen = taskId !== null && now.attempt > 0 && !now.live ? { taskId, attempt: now.attempt } : undefined;
+      const opened = taskId !== null && nextOf(seen, now) === 'wait' ? streamedOf(e, taskId, o.hold) : Stream.empty;
       return Stream.concat(
         opened,
         Stream.suspend(() => (o.hold.unstreamed ? Stream.empty : onward(o, seen, cursor, now))),

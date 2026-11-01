@@ -17,16 +17,25 @@ import { fenceReach, type FenceReach } from 'agent-runtime/vocabulary';
 
 /**
  * What harness `harness`'s fence words reach, the runtime's answer (`fenceReach`): the default harness's for one fenced by neither a mode
- * nor a sandbox, as every permission mode was judged before a step named its harness.
+ * nor a sandbox, as every permission mode was judged before a step named its harness. Throws where the runtime has no answer for its own
+ * default harness, an agent-runtime the orchestrator was not built with.
  */
-const reachOf = (harness: string = DEFAULT_HARNESS): FenceReach => fenceReach(harness) ?? fenceReach(DEFAULT_HARNESS)!;
+const reachOf = (harness: string = DEFAULT_HARNESS): FenceReach => {
+  const reach = fenceReach(harness) ?? fenceReach(DEFAULT_HARNESS);
+  if (reach === undefined) {
+    throw new Error(
+      `agent-runtime names no fence words for its default harness ${DEFAULT_HARNESS}: install the agent-runtime this orchestrator was built with (npm install, from the repository's root).`,
+    );
+  }
+  return reach;
+};
 
 /** How wide fence word `word` is on `reach`: 0 for a word the harness does not take, which `nemia start` refuses (`configRefused`). */
 const rankOf = (reach: FenceReach, word: string): number => reach.rank[word] ?? 0;
 
 /** The widest of a harness's fence words, the first of the top rank: on Claude Code the mode that asks about nothing. */
 const widestOf = (reach: FenceReach): string =>
-  Object.keys(reach.rank).reduce((wide, word) => (reach.rank[word] > reach.rank[wide] ? word : wide));
+  Object.keys(reach.rank).reduce((wide, word) => (rankOf(reach, word) > rankOf(reach, wide) ? word : wide));
 
 /**
  * Whether a session in permission mode `mode` — the runtime's default when `undefined` — writes in its directory unasked: the narrowest
@@ -115,8 +124,8 @@ export function offerRefusal(step: string, agent: Agent, own: Partial<Record<str
     const word = own[written] === undefined ? undefined : overriddenBy(written);
     return word !== undefined && !offered.includes(word);
   });
-  if (key === undefined) return undefined;
-  const word = overriddenBy(key)!;
+  const word = key === undefined ? undefined : overriddenBy(key);
+  if (key === undefined || word === undefined) return undefined;
   const what = word === 'fence' ? `its fence (\`${key}\`)` : `\`${key}\``;
   const offers = offered.length ? `offers ${offered.map((o) => `\`${o}\``).join(', ')}` : 'offers nothing';
   return `${step}: sets ${what}, which its agent ${agent.name} does not offer to override — ${file} ${offers} on its \`overridable:\` line. Add \`${word}\` to that line (every step of ${agent.name} may then override it), or delete the line from this step.`;

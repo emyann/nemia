@@ -398,10 +398,10 @@ function readApprovalsNow(id: string, names = fileNames(asksDir(id))): { approva
   const notes: string[] = [];
   if (!names) return { approvals, notes };
   for (const name of names) {
-    const approved = /^approve-(.+)-(\d+)$/.exec(name);
-    if (!approved) continue;
+    const [, step, n] = /^approve-(.+)-(\d+)$/.exec(name) ?? [];
+    if (step === undefined || n === undefined) continue;
     const file = path.join(asksDir(id), name);
-    const read = approvalIn(file, approved[1], Number(approved[2]));
+    const read = approvalIn(file, step, Number(n));
     if (typeof read === 'string') notes.push(`${file}: ${read}, so it opens no gate — remove it, and approve with nemia approve`);
     else approvals.push(read);
   }
@@ -478,10 +478,10 @@ function readAcceptancesNow(id: string, names = fileNames(asksDir(id))): { accep
   const notes: string[] = [];
   if (!names) return { acceptances, notes };
   for (const name of names) {
-    const took = /^accept-(.+)-(\d+)$/.exec(name);
-    if (!took) continue;
+    const [, step, n] = /^accept-(.+)-(\d+)$/.exec(name) ?? [];
+    if (step === undefined || n === undefined) continue;
     const file = path.join(asksDir(id), name);
-    const read = acceptanceIn(file, took[1], Number(took[2]));
+    const read = acceptanceIn(file, step, Number(n));
     if (typeof read === 'string') notes.push(`${file}: ${read}, so it ends no loop — remove it, and accept with nemia approve`);
     else acceptances.push(read);
   }
@@ -522,15 +522,15 @@ function readAsksNow(id: string): AsksRead {
   if (!names) return read;
   read.notes.push(...readApprovalsNow(id, names).notes, ...readAcceptancesNow(id, names).notes);
   for (const name of names) {
-    const tried = /^retry-(.+)-(\d+)$/.exec(name);
-    const again = /^round-(.+)-(\d+)$/.exec(name);
+    const [, tried, triedN] = /^retry-(.+)-(\d+)$/.exec(name) ?? [];
+    const [, again, againN] = /^round-(.+)-(\d+)$/.exec(name) ?? [];
     const file = path.join(asksDir(id), name);
-    if (tried) {
-      const ask = askIn(file, tried[1], Number(tried[2]));
+    if (tried !== undefined && triedN !== undefined) {
+      const ask = askIn(file, tried, Number(triedN));
       if (typeof ask === 'string') read.notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia retry`);
       else read.asks.push(ask);
-    } else if (again) {
-      const ask = roundAskIn(file, again[1], Number(again[2]));
+    } else if (again !== undefined && againN !== undefined) {
+      const ask = roundAskIn(file, again, Number(againN));
       if (typeof ask === 'string') read.notes.push(`${file}: ${ask}, so it is not honoured — remove it, and ask with nemia retry --round`);
       else read.rounds.push(ask);
     }
@@ -597,8 +597,8 @@ function readAnswersNow(id: string): RetryAsk[] {
   for (const dir of [asksDir(id), path.join(asksDir(id), 'done')]) {
     const names = fileNames(dir) ?? [];
     for (const name of names) {
-      const tried = /^retry-(.+)-(\d+)$/.exec(name);
-      const ask = tried ? askIn(path.join(dir, name), tried[1], Number(tried[2])) : undefined;
+      const [, step, n] = /^retry-(.+)-(\d+)$/.exec(name) ?? [];
+      const ask = step !== undefined && n !== undefined ? askIn(path.join(dir, name), step, Number(n)) : undefined;
       if (ask && typeof ask !== 'string' && ask.message !== undefined) answers.push(ask);
     }
   }

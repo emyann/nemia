@@ -133,8 +133,11 @@ export function removeUnit(file: string): boolean {
 }
 
 /** Runs one of the system's own programs (`systemctl`, `launchctl`, `loginctl`) and answers what it printed; throws when it fails. */
-export const systemCall = (argv: readonly string[]): string =>
-  execFileSync(argv[0], argv.slice(1), { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: CALL_MS });
+export const systemCall = (argv: readonly string[]): string => {
+  const [command, ...args] = argv;
+  if (command === undefined) throw new Error('systemCall runs a program: give it argv with the program first.');
+  return execFileSync(command, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: CALL_MS });
+};
 
 /** Whether `user`'s services outlive their login sessions (`loginctl show-user -p Linger`), or undefined where loginctl cannot say. */
 export function lingerOf(user: string): boolean | undefined {

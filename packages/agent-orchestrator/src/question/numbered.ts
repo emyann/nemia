@@ -65,10 +65,13 @@ function resolved(q: Question, typed: Typed, value: string): Answer | { error: s
   const letters = q.options.map((_, i) => letterOf(i));
   const stray = typed.letters.find((l) => !letters.includes(l));
   if (stray !== undefined) {
-    const offered = q.options.map((o, i) => `${letters[i]} (${o.label})`).join(', ');
+    const offered = q.options.map((o, i) => `${letterOf(i)} (${o.label})`).join(', ');
     return { error: `--answer ${value}: "${q.title}" offers no ${stray}: its options are ${offered}.` };
   }
-  const chose = typed.letters.map((l) => q.options[letters.indexOf(l)].label);
+  const chose = typed.letters.flatMap((l) => {
+    const option = q.options[letters.indexOf(l)];
+    return option === undefined ? [] : [option.label];
+  });
   return { question: q.title, chose, ...(typed.own ? { own: typed.own } : {}) };
 }
 

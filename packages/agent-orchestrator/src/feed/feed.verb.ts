@@ -178,7 +178,10 @@ const readOn = (at: Following): Woken =>
           { cursor: got.cursor, failing: false },
           [
             ...(at.failing ? [{ kind: 'readable' } as const] : []),
-            ...got.lines.map((line, i) => ({ kind: 'line', line, cursor: got.ends[i] }) as const),
+            ...got.lines.flatMap((line, i) => {
+              const cursor = got.ends[i];
+              return cursor === undefined ? [] : [{ kind: 'line', line, cursor } as const];
+            }),
           ],
         ] as const),
     }),

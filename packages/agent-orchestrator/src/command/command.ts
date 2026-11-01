@@ -12,6 +12,9 @@ import { FORMER_MODES } from '../retry/index.ts';
 /** The CLI's name, as every command line the package writes says it. */
 export const CLI = 'nemia';
 
+/** What a former name became (`RENAMED`): the name it is now, and the flag that says an absorbed verb, where it says one. */
+export type Renamed = { readonly to: string; readonly flag?: string };
+
 /**
  * Each command renamed, by its former name of one word or two: `nemia auto …` is `nemia policy …`, and a verb another absorbed is that verb
  * with the flag that says it — `nemia round` is `nemia retry --round`, `nemia merge` is `nemia refresh --base`, `nemia accept` is `nemia
@@ -21,7 +24,7 @@ export const CLI = 'nemia';
  * is still run, as the name it became, and admission reads it as that name too, so the old spelling reaches no rule the new one would not;
  * and no entry of the table is named by a former name (`commandBreaks`), which no line would ever reach.
  */
-export const RENAMED: ReadonlyMap<string, { readonly to: string; readonly flag?: string }> = new Map([
+export const RENAMED: ReadonlyMap<string, Renamed> = new Map([
   ['auto', { to: 'policy' }],
   ['round', { to: 'retry', flag: '--round' }],
   ['merge', { to: 'refresh', flag: '--base' }],
@@ -56,7 +59,9 @@ export function renamedValues(command: string, body: unknown): { body: unknown; 
   if (keys === undefined || typeof body !== 'object' || body === null || Array.isArray(body)) return { body };
   const renamed = [...keys].flatMap(([key, values]) => {
     const was: unknown = Reflect.get(body, key);
-    return typeof was === 'string' && Object.hasOwn(values, was) ? [{ key, was, is: values[was] }] : [];
+    if (typeof was !== 'string' || !Object.hasOwn(values, was)) return [];
+    const is = values[was];
+    return is === undefined ? [] : [{ key, was, is }];
   });
   if (!renamed.length) return { body };
   const said = (value: (p: { key: string; was: string; is: string }) => string) =>
@@ -75,10 +80,11 @@ const withFlag = (rest: readonly string[], flag: string | undefined): string[] =
 };
 
 /** The former name `words` open with, the longest first, and how many words it is; none where they open with no former name. */
-function formerAt(words: readonly string[], used: ReadonlySet<string>): { key: string; size: number } | undefined {
+function formerAt(words: readonly string[], used: ReadonlySet<string>): { key: string; size: number; now: Renamed } | undefined {
   for (const size of [2, 1]) {
     const key = words.slice(0, size).join(' ');
-    if (words.length >= size && !used.has(key) && RENAMED.has(key)) return { key, size };
+    const now = RENAMED.get(key);
+    if (words.length >= size && !used.has(key) && now) return { key, size, now };
   }
   return undefined;
 }
@@ -96,7 +102,7 @@ export function renamedIn(words: readonly string[]): { words: string[]; hint?: s
   const added: string[] = [];
   const used = new Set<string>();
   for (let at = formerAt(named, used); at !== undefined; at = formerAt(named, used)) {
-    const now = RENAMED.get(at.key)!;
+    const now = at.now;
     used.add(at.key);
     typed += Math.max(0, at.size - name);
     const to = now.to.split(' ');
@@ -109,7 +115,7 @@ export function renamedIn(words: readonly string[]): { words: string[]; hint?: s
   if (!used.size && !former.length) return { words: [...words] };
   const rewritten = flags === undefined ? named : [...named.slice(0, name || 1), ...named.slice(name || 1).map((w) => flags.get(w) ?? w)];
   const was = [...(used.size ? [[CLI, ...words.slice(0, typed)].join(' ')] : []), ...former];
-  const is = [...(used.size ? [[CLI, ...named.slice(0, name), ...added].join(' ')] : []), ...former.map((f) => flags!.get(f)!)];
+  const is = [...(used.size ? [[CLI, ...named.slice(0, name), ...added].join(' ')] : []), ...former.flatMap((f) => flags?.get(f) ?? [])];
   return {
     words: rewritten,
     hint: `${was.join(' and ')} ${was.length > 1 ? 'are' : 'is'} now ${is.join(' and ')}: type \`${[CLI, ...rewritten].join(' ')}\`; the former spelling stays accepted until a later release removes it.`,
@@ -247,7 +253,8 @@ export const amountIn = (args: Args, key: string): number | undefined => {
  */
 export function leftOut(spec: Spec, args: Args): string | null {
   for (const flag of spec.flags.filter((f) => f.kind === 'text' && f.key !== undefined && f.only?.side !== 'api')) {
-    const value = args[flag.key!];
+    if (flag.key === undefined) continue;
+    const value = args[flag.key];
     const values = Array.isArray(value) ? value : typeof value === 'string' ? [value] : [];
     if (values.some((v) => !v || v.startsWith('--'))) return flag.takes ?? null;
   }
@@ -263,10 +270,10 @@ const usage = (message: string): never => {
 export function amountOf(text: string | undefined, takes: string, form: string, flag = '--budget'): number {
   const amount = text === undefined ? undefined : dollarsOf(text);
   if (amount === undefined)
-    usage(
+    return usage(
       `${flag} takes ${takes} — an amount above zero, in digits, like 5 or 2.50${text === undefined ? '' : `, and ${text} is not one`}: ${form}`,
     );
-  return amount!;
+  return amount;
 }
 
 /** The value of `flag`, given `value` — joined with `=` or the argument after it — or refused in the flag's words. */
@@ -314,6 +321,7 @@ function placed(spec: Spec, arg: string, args: Filling): boolean {
  */
 function readArg(spec: Spec, argv: readonly string[], i: number, args: Filling) {
   const arg = argv[i];
+  if (arg === undefined) return { last: i, way: false };
   const joined = arg.startsWith('--') && arg.includes('=');
   const name = joined ? arg.slice(0, arg.indexOf('=')) : arg;
   const flag = flagOf(spec, name, joined);
@@ -321,7 +329,7 @@ function readArg(spec: Spec, argv: readonly string[], i: number, args: Filling) 
     if (!placed(spec, arg, args)) usage(spec.unknown(arg));
     return { last: i, way: false };
   }
-  if (once(flag) && args[flag.key!] !== undefined) usage(flag.twice ?? spec.unknown(arg));
+  if (once(flag) && flag.key !== undefined && args[flag.key] !== undefined) usage(flag.twice ?? spec.unknown(arg));
   Object.assign(args, flag.sets);
   if (flag.key === undefined || flag.kind === 'switch') {
     if (flag.key !== undefined) args[flag.key] = true;
@@ -356,6 +364,9 @@ const strayFlag = (spec: Spec, arg: string): boolean =>
 const unfilled = (spec: Spec, p: Positional, arg: string): boolean =>
   arg.startsWith(spec.missing === undefined ? '--' : '-') || (!arg && (spec.missing === undefined || p.kind !== 'text'));
 
+/** Whether the argument typed for the required positional `p` leaves it unfilled (`unfilled`): never where no positional is there. */
+const unfilledBy = (spec: Spec, p: Positional | undefined, arg: string): boolean => p !== undefined && unfilled(spec, p, arg);
+
 /**
  * A command line's arguments after the command's name, read against `spec` — or undefined when it is given too little to act on: a
  * required argument missing, empty, `--help` or one of its own flags, for which the CLI prints its help, unless the spec says its refusal
@@ -369,7 +380,7 @@ export function parseArgv(typed: Spec, argv: readonly string[]): Args | undefine
   const head = argv.slice(0, required.length);
   const stray = spec.missing === undefined || spec.flagFirst ? head.find((a) => strayFlag(spec, a)) : undefined;
   if (stray !== undefined) return usage(spec.unknown(stray));
-  if (head.length < required.length || head.some((a, i) => unfilled(spec, required[i], a))) {
+  if (head.length < required.length || head.some((a, i) => unfilledBy(spec, required[i], a))) {
     return spec.missing === undefined ? undefined : usage(spec.missing);
   }
   const given = Object.fromEntries(required.map((p, i) => [p.key, head[i]]));
@@ -466,7 +477,7 @@ function sideBreaks(c: Entry): string[] {
   const takes = (key: string) =>
     c.spec?.positionals.some((p) => p.key === key) === true || c.spec?.flags.some((f) => f.key === key) === true;
   for (const r of routeList(c)) {
-    for (const key of [...r.path.matchAll(/:(\w+)/g)].map((m) => m[1]).filter((k) => !takes(k)))
+    for (const key of [...r.path.matchAll(/:(\w+)/g)].flatMap(([, k]) => (k === undefined ? [] : [k])).filter((k) => !takes(k)))
       breaks.push(`${c.name}'s route ${r.method} ${r.path} names :${key}, which no argument of its spec takes: key a positional ${key}`);
     if (r.hand !== undefined && !r.hand.trim())
       breaks.push(`${c.name}'s route ${r.method} ${r.path} is served by hand and says no why: say why the table does not generate it`);
@@ -510,10 +521,8 @@ export function commandBreaks(table: readonly Entry[], verbs: readonly string[],
     breaks.push(...routedTwice(c, routed));
     if (!routeList(c).length && !c.only)
       breaks.push(`${c.name} has no route and no only: give it its route on the api, or say which side alone serves it, and why`);
-    if (RENAMED.has(c.name))
-      breaks.push(
-        `${c.name} is a former name in RENAMED, which runs a line that says it as ${RENAMED.get(c.name)!.to}: name the entry anew`,
-      );
+    const renamed = RENAMED.get(c.name);
+    if (renamed) breaks.push(`${c.name} is a former name in RENAMED, which runs a line that says it as ${renamed.to}: name the entry anew`);
     if (c.only?.side !== 'api' && verbs.includes(c.name))
       breaks.push(`${c.name} is a command of the table and a verb of the CLI: take it out of VERBS`);
     breaks.push(...runBreaks(c, runners), ...sideBreaks(c));

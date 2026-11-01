@@ -195,11 +195,12 @@ function replyOf(item: unknown): StepReply {
 }
 
 /**
- * The turn of its task the earlier try `i` (from 0) of a step was: how many tries before it share its task and were no recheck. A task held
- * open and answered keeps each try a person answered under its one id, one turn each; a recheck replaces only the check, on the same turn.
+ * The turn of its task the earlier try `at` of a step was, the tries `before` it being those the record keeps ahead of it: how many of them
+ * share its task and were no recheck. A task held open and answered keeps each try a person answered under its one id, one turn each; a
+ * recheck replaces only the check, on the same turn.
  */
-export const turnOfTry = (earlier: readonly EarlierTry[], i: number): number =>
-  earlier.slice(0, i).filter((t) => t.taskId === earlier[i].taskId && t.cause !== 'recheck').length;
+export const turnOfTry = (before: readonly EarlierTry[], at: EarlierTry): number =>
+  before.filter((t) => t.taskId === at.taskId && t.cause !== 'recheck').length;
 
 /**
  * A step's tries, earliest first: each one its record keeps behind the current (`StepRecord.tries`), then the current, whose codes, word,
@@ -229,13 +230,13 @@ export function triesOf(
   const step = steps.find((s) => s.name === name) ?? bare(name);
   const record = run.steps[name];
   const earlier = record?.tries ?? [];
-  const turnAt = (i: number): number => turnOfTry(earlier, i);
+  const turnAt = (t: EarlierTry, i: number): number => turnOfTry(earlier.slice(0, i), t);
   const recordAt = (n: number): StepRecord => ({ taskId: null, tries: earlier.slice(0, n - 1) });
   const answerAt = (n: number): string | null =>
     answerOf({ ...run, steps: { ...run.steps, [name]: recordAt(n) } }, name, answers)?.message ?? null;
   const noteOf = (n: number) => tryNote(step, recordAt(n), steps, answerAt(n) !== null) || null;
   const earlierSaid = (t: EarlierTry, i: number): Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'status'> => {
-    const word = turnAt(i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId);
+    const word = turnAt(t, i) < (views.get(t.taskId)?.state.inputs?.length ?? 0) ? 'succeeded' : wordOf(views)(t.taskId);
     const { reason, on, via } = ENGINE_REASON[word];
     return { phase: PHASE_OF[reason], reason, on: on ?? null, via: via ?? null, message: word, status: word };
   };
@@ -248,10 +249,10 @@ export function triesOf(
       taskId: t.taskId,
       note: noteOf(i + 1),
       ...earlierSaid(t, i),
-      attempts: attemptsIn(t.taskId, views, turnAt(i)),
+      attempts: attemptsIn(t.taskId, views, turnAt(t, i)),
       check: step.check ? checkIn(step.check, t.check?.taskId, views, stderr) : null,
-      closeout: closeoutIn(run, name, step, t.taskId, views, turnAt(i)),
-      unreadable: unreadableIn(t.taskId, views, turnAt(i)),
+      closeout: closeoutIn(run, name, step, t.taskId, views, turnAt(t, i)),
+      unreadable: unreadableIn(t.taskId, views, turnAt(t, i)),
       answer: answerAt(i + 1),
     })),
     {

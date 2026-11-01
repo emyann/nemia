@@ -45,8 +45,11 @@ export const viewsOf = Effect.fn('viewsOf')(function* (run: Run, reader: Engine)
 
 /** The first task of a run's whose journal a read left out (`viewsFor`), and why; undefined for a run whose every task read. */
 export function unreadableOf(run: Run, unreadable: Unreadable): { taskId: string; why: string } | undefined {
-  const taskId = runTasks(run).find((id) => unreadable.has(id));
-  return taskId === undefined ? undefined : { taskId, why: unreadable.get(taskId)! };
+  for (const taskId of runTasks(run)) {
+    const why = unreadable.get(taskId);
+    if (why !== undefined) return { taskId, why };
+  }
+  return undefined;
 }
 
 /** What `judgedUnlessUnreadable` answers: the judgement, or why there is none. */

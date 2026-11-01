@@ -22,6 +22,7 @@
         "$TURBO_ROOT$/apps/*/test/**",
         "$TURBO_ROOT$/apps/*/*.ts",
         "$TURBO_ROOT$/apps/*/package.json",
+        "$TURBO_ROOT$/apps/*/tsconfig.json",
         "$TURBO_ROOT$/apps/*/CLAUDE.md",
         "$TURBO_ROOT$/CLAUDE.md",
         "$TURBO_ROOT$/README.md",

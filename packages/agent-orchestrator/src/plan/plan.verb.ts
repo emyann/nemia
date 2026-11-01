@@ -67,7 +67,7 @@ export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; 
     }
   }
   if (onRepo) openPlace(place, opts.repo, true);
-  const folderOf = (card: Card): string => folders.get(card.name)!;
+  const folderOf = (card: Card): string => folders.get(card.name) ?? workflowFolder(card.workflow, opts.dir, opts.repo, factory?.tree);
   const startOne = opts.start ?? startRun;
   const started: Planned[] = [];
   for (const [i, card] of cards.entries()) {
@@ -77,7 +77,10 @@ export const startPlan = Effect.fn('startPlan')(function* (opts: { dir: string; 
         brief: card.body,
         repo: opts.repo,
         workflowDir: folderOf(card),
-        after: card.after.map((a) => runOf.get(a)!),
+        after: card.after.flatMap((a) => {
+          const id = runOf.get(a);
+          return id === undefined ? [] : [id];
+        }),
         ...(opts.factory !== undefined ? { factory: opts.factory } : {}),
       }),
     );

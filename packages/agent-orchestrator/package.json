@@ -7,7 +7,7 @@
     "test": "test"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p test",
     "test": "node --import=../../tools/test-costs/probe.ts --import ./test/ambient.ts --test --test-concurrency=2 --test-timeout=120000 --test-reporter=spec --test-reporter-destination=stdout --test-reporter=../../tools/test-costs/reporter.ts --test-reporter-destination=stderr ${WF_TEST_SHARD:+--test-shard=$WF_TEST_SHARD} 'test/*.test.ts' 'src/**/*.test.ts'"
   },
   "keywords": [],

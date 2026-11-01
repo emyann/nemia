@@ -64,9 +64,14 @@ export const pauseNow = Effect.fn('pauseNow')(function* (said: { why?: string; b
   const interrupted: Interrupt[] = [];
   const skipped: Interrupt[] = [];
   for (const i of interrupts) {
+    const run = runs.get(i.run);
+    if (run === undefined) {
+      skipped.push(i);
+      continue;
+    }
     const ask = {
       step: i.step,
-      try: tryOf(runs.get(i.run)!, i.step) + 1,
+      try: tryOf(run, i.step) + 1,
       mode: i.kind === 'check' ? ('recheck' as const) : ('continue' as const),
       interrupted: i.taskId,
       at: now.toISOString(),

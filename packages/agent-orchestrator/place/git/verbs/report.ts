@@ -46,14 +46,18 @@ const kindAt = (repo: string, rev: string, file: string): Asking<string | undefi
 function numstat(out: string): Omit<ChangedFile, 'status'>[] {
   const tokens = out.split('\0');
   const counted: Omit<ChangedFile, 'status'>[] = [];
-  const count = (n: string) => (n === '-' ? null : Number(n));
-  for (let i = 0; i < tokens.length && tokens[i] !== ''; i++) {
-    const [added, removed, ...rest] = tokens[i].split('\t');
+  const count = (n: string | undefined) => (n === '-' ? null : Number(n));
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token === undefined || token === '') break;
+    const [added, removed, ...rest] = token.split('\t');
     const path = rest.join('\t');
     const counts = { added: count(added), removed: count(removed) };
     if (path) counted.push({ ...counts, path });
     else {
-      counted.push({ ...counts, from: tokens[i + 1], path: tokens[i + 2] });
+      const [from, to] = [tokens[i + 1], tokens[i + 2]];
+      if (from === undefined || to === undefined) throw new Refused(`git's numstat ends inside a rename's record`);
+      counted.push({ ...counts, from, path: to });
       i += 2;
     }
   }
@@ -64,10 +68,14 @@ function numstat(out: string): Omit<ChangedFile, 'status'>[] {
 function nameStatus(out: string): { status: string; path: string }[] {
   const tokens = out.split('\0');
   const named: { status: string; path: string }[] = [];
-  for (let i = 0; i < tokens.length && tokens[i] !== ''; i++) {
-    const status = tokens[i].charAt(0);
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (token === undefined || token === '') break;
+    const status = token.charAt(0);
     const both = status === 'R' || status === 'C';
-    named.push({ status, path: tokens[i + (both ? 2 : 1)] });
+    const path = tokens[i + (both ? 2 : 1)];
+    if (path === undefined) throw new Refused(`git's name-status ends inside the record of ${status}`);
+    named.push({ status, path });
     i += both ? 2 : 1;
   }
   return named;
@@ -78,9 +86,13 @@ function* filesOf(repo: string, range: string): Asking<ChangedFile[]> {
   const diff = ['diff', '--no-color', '--no-ext-diff', '--find-renames', '-z'];
   const counts = numstat(yield* read(repo, [...diff, '--numstat', range, '--']));
   const statuses = nameStatus(yield* read(repo, [...diff, '--name-status', range, '--']));
-  if (counts.length !== statuses.length || counts.some((c, i) => c.path !== statuses[i].path))
+  const paired = counts.flatMap((c, i) => {
+    const named = statuses[i];
+    return named !== undefined && named.path === c.path ? [{ ...c, status: named.status }] : [];
+  });
+  if (counts.length !== statuses.length || paired.length !== counts.length)
     throw new Refused(`git's numstat and name-status of ${range} name different files`);
-  return counts.map((c, i) => ({ ...c, status: statuses[i].status }));
+  return paired;
 }
 
 /** The whole diff of each path of `diffOf` that `files` changed, by that path; a rename's diff names both ends, as one. */
@@ -125,7 +137,7 @@ function* changes({ repo, baseRef, onto, branches, diffOf, present, atBase }: Pl
   const diffs: Record<string, Record<string, string>> = {};
   const presents: Record<string, Record<string, 'file' | 'directory' | 'absent'>> = {};
   for (const b of Object.keys(tips)) files[b] = yield* filesOf(repo, `${baseRef}...${b}`);
-  for (const b of Object.keys(tips)) diffs[b] = yield* diffsOf(repo, `${baseRef}...${b}`, files[b], diffOf);
+  for (const [b, changed] of Object.entries(files)) diffs[b] = yield* diffsOf(repo, `${baseRef}...${b}`, changed, diffOf);
   for (const b of Object.keys(tips)) presents[b] = yield* presentAt(repo, b, present);
   const at = { baseRef, onto: (yield* commitOf(repo, onto)) ?? null, tips };
   return { at, files, diffs, present: presents, atBase: yield* textsAt(repo, baseRef, atBase) };

@@ -33,8 +33,10 @@ function firstLeaf(issue: SchemaIssue.Issue, path: ReadonlyArray<PropertyKey>): 
       return firstLeaf(issue.issue, [...path, ...issue.path]);
     case 'Composite':
       return firstLeaf(issue.issues[0], path);
-    case 'AnyOf':
-      return issue.issues.length ? firstLeaf(issue.issues[0], path) : { path, kind: 'type' };
+    case 'AnyOf': {
+      const [first] = issue.issues;
+      return first === undefined ? { path, kind: 'type' } : firstLeaf(first, path);
+    }
     case 'Encoding':
       return firstLeaf(issue.issue, path);
     case 'Filter':

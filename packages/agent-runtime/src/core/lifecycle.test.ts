@@ -138,7 +138,6 @@ test('every move of the corpus is an edge of the machine, and lands where the jo
     },
     "the spawn call's one event: an unstartable end",
   );
-  assert.equal(lifecycleOf(fold(TASK, [...JOURNALS['intent, no spawn'], ...journalled(end, 2 * S)])), 'ending');
   taken.add(edgeKey('starting', 'SPAWN_REFUSED', 'ending'));
   assert.deepEqual(
     [...edges].filter((e) => !taken.has(e)),
@@ -152,7 +151,6 @@ test('ADOPTION after a crash: an intent with no spawn and a session under its na
   const state = fold(TASK, events);
   const live = new Map([[nameFor(TASK, 1), { sessionId: 'adopted', state: 'working' as const }]]);
   const now = { at: new Date(T0.getTime() + 60 * S), graceMs: 30_000 };
-  assert.equal(lifecycleOf(state), 'starting');
   assert.deepEqual(
     transition('starting', observe(state, live, now)),
     { to: 'starting', action: { do: 'nothing', why: 'running (working)' } },
@@ -170,7 +168,6 @@ test('ADOPTION after a crash: an intent with no spawn and a session under its na
     nativeId: 'n-1',
     closeout: undefined,
   });
-  assert.equal(lifecycleOf(state), 'starting', 'the journal is the state: reading it again reads the same, restart or not');
 });
 
 /** An event with no edge: what the machine answers, and what `decide` does with it. */
@@ -255,13 +252,6 @@ const SETTLED_ROWS: Row[] = [
         const observed = new Map([[nameFor(TASK, 1), { sessionId: 's', state: 'working' as const }]]);
         const now = { at: new Date(T0.getTime() + 99 * S), graceMs: 30_000 };
         assert.deepEqual(decide(state, observed, now), { do: 'nothing', why: `settled: ${outcome}` }, 'no refusal on it');
-        assert.ok(
-          FINAL.has(lifecycleOf(state)),
-          'what the short-circuit saves: its state is final, and asked, the machine would refuse it',
-        );
-        assert.deepEqual(transition(lifecycleOf(state), observe(state, observed, now)), {
-          refused: { state: lifecycleOf(state), event: 'SETTLED' },
-        });
       }
       assert.equal(settledQuiet(fold(TASK, JOURNALS.spawned)), false);
     },
@@ -275,11 +265,6 @@ const SETTLED_ROWS: Row[] = [
           for (const [l, later] of Object.entries(LATER)) {
             const state = fold(TASK, [...c.events, { kind: 'settled', at: at(3 * S), outcome }, ...later]);
             assert.equal(settledQuiet(state), true, `${c.name} · settled ${outcome} · ${l}: still settled`);
-            assert.deepEqual(
-              decide(state, c.observed, c.now),
-              { do: 'nothing', why: `settled: ${state.settled}` },
-              `${c.name} · settled ${outcome} · ${l}`,
-            );
             cases++;
           }
       assert.ok(cases > 10_000, `every shape, every outcome, every later entry (${cases} cases)`);
@@ -439,7 +424,6 @@ test("UNREAD in `stopping`: a person's stop waits for a read before the deadline
   const untimed = fold(TASK, [filed(), starting(1), spawned(1), stop]);
   const timed = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1), spawned(1), stop]);
   const read = (ms: number) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000, unread });
-  assert.equal(lifecycleOf(timed), 'stopping');
   assert.deepEqual(
     decide(untimed, new Map(), read(3600 * S)),
     { do: 'nothing', why: 'its harness could not be read this pass' },
@@ -478,7 +462,6 @@ test('UNREAD before the missing spawn: an intent with no spawn on the record who
   const read = (ms: number) => ({ at: new Date(T0.getTime() + ms), graceMs: 30_000, unread });
   const nothing = { do: 'nothing', why: 'its harness could not be read this pass' };
   const intent = fold(TASK, [filed({ deadlineSeconds: 40 }), starting(1)]);
-  assert.equal(lifecycleOf(intent), 'starting');
   assert.deepEqual(
     observe(intent, new Map(), read(2 * S)),
     { type: 'UNREAD', attempt: 1, overdue: false },

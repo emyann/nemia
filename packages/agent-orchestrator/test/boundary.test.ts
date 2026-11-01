@@ -181,13 +181,14 @@ const STORE_SHARED: Record<string, readonly string[]> = {
     'src/rules/rules.store.ts',
     'src/servers/servers.store.ts',
   ],
+  'src/cards/cards.store.ts': ['src/door/door.store.ts', 'src/record/record.store.ts'],
 };
 
 /**
  * The doors' memory stand-ins: store files no file of `src` imports, only a test, so the shipped program never holds its runs in
  * memory.
  */
-const STAND_INS: readonly string[] = ['src/runs/memory.store.ts', 'src/factories/memory.store.ts'];
+const STAND_INS: readonly string[] = ['src/runs/memory.store.ts', 'src/factories/memory.store.ts', 'src/cards/memory.store.ts'];
 
 /** The package's files the CLI may import, beside the files of its own folder. */
 const CLI_REACHES = ['src/runner.ts', 'src/workflow.ts'];

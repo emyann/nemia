@@ -96,7 +96,7 @@
     },
     {
       "term": "Journal",
-      "meaning": "the runtime's durable record of a task, an event a line, which every pass reads again.",
+      "meaning": "the runtime's durable record of a task, an event a line, which every pass reads again; read and written through the Task door alone.",
       "type": "Journal",
       "see": {
         "label": "The engine",
@@ -104,8 +104,18 @@
       }
     },
     {
+      "term": "Task door",
+      "meaning": "the one way a task's journal is read and written (`Journal`, any store given through `Journal.layer`): its ids branded, and an append that breaks a task's invariants refused before any store is written.",
+      "type": "Journal"
+    },
+    {
+      "term": "Append refusal",
+      "meaning": "why the Task door refused an append, on `JournalError.reason`: `malformed-id`, `filed-twice`, `not-filed` or `attempt-out-of-order`.",
+      "type": "AppendRefusalReason"
+    },
+    {
       "term": "Journal entry",
-      "meaning": "an event of a task's journal, with the task it belongs to, in any shape a runtime has written.",
+      "meaning": "an event of a task's journal, with the task it belongs to, in any shape a runtime has written; the Task door gives it with its task's `TaskId`.",
       "type": "JournalEntry"
     },
     {
@@ -240,7 +250,7 @@
     },
     {
       "term": "Task id",
-      "meaning": "a task's id, the name of its journal file: checked on create, read as any string.",
+      "meaning": "a task's id, the name of its journal file, branded `TaskId` at the Task door: checked on a new filing, read as any string.",
       "type": "TaskId"
     },
     {

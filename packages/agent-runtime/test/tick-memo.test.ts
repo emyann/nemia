@@ -12,7 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Engine } from '../src/index.ts';
+import { Engine, Journal, TaskId } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { asyncOps, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
@@ -28,6 +28,17 @@ const refusing: AsyncRunner = {
 };
 
 const N = 40;
+
+/**
+ * An entry a settled task still takes, appended to `id`'s journal under `root` through the Task door, as another writer would: what
+ * it measured. A task is filed once (`appendRefusal`), so this is how a write reaches a settled task's journal.
+ */
+const measuredInto = (root: string, id: string) =>
+  Effect.runPromise(
+    Effect.flatMap(Effect.service(Journal), (journal) =>
+      journal.append(TaskId.read(id), { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { costUsd: 1 } }),
+    ).pipe(Effect.provide(Journal.files(root))),
+  );
 
 /**
  * A store of `N` tasks that settled on the first pass, and an engine whose second pass has folded each once more: the feed names each
@@ -51,7 +62,7 @@ const journalsOf = (root: string) =>
 
 test("a quiet board costs nothing per pass, and one append costs its own bytes: the feed's new ones and what was appended to the one journal it names", async (t) => {
   const s = story(t);
-  const { root, cwd, engine, ids } = await settledStore();
+  const { root, engine, ids } = await settledStore();
 
   await s.test('a pass over settled tasks nothing has written to reads no journal, and nothing of a feed with nothing new', async () => {
     const before = Effect.runSync(engine.io());
@@ -64,17 +75,17 @@ test("a quiet board costs nothing per pass, and one append costs its own bytes: 
   });
 
   await s.test(
-    "a task filed again under a settled task's id: the next pass reads the feed's new bytes and what was appended to that one journal, once each",
+    "an entry appended to a settled task's journal: the next pass reads the feed's new bytes and what was appended to that one journal, once each",
     async () => {
       const feed = path.join(root, 'feed.jsonl');
       const feed0 = sizeOf(feed);
       const journalFile = path.join(root, 'tasks', `${ids[7]}.jsonl`);
       const journal0 = sizeOf(journalFile);
-      await Effect.runPromise(engine.file({ brief: 'task 7, filed again under its id', cwd, id: ids[7] }));
+      await measuredInto(root, ids[7]);
       const grown = sizeOf(feed) - feed0;
-      assert.ok(grown > 0, 'the filing was written to the feed');
+      assert.ok(grown > 0, 'the entry was written to the feed');
       const appended = sizeOf(journalFile) - journal0;
-      assert.ok(appended > 0, 'the filing was written to the journal');
+      assert.ok(appended > 0, 'the entry was written to the journal');
 
       const before = Effect.runSync(engine.io());
       await Effect.runPromise(engine.tick());
@@ -118,16 +129,16 @@ test('a fresh engine on a settled store: what its first passes read, with a feed
   );
 
   await t.test(
-    'a fresh engine on a store whose journals have no feed beside them reads the feed from its start once one is written: a settled task filed again is folded again',
+    'a fresh engine on a store whose journals have no feed beside them reads the feed from its start once one is written: a settled task appended to is folded again',
     async () => {
-      const { root, cwd, ids } = await settledStore();
+      const { root, ids } = await settledStore();
       fs.rmSync(path.join(root, 'feed.jsonl'));
       const engine = builtEngine(Engine.layer({ root, harnesses: { refusing: asyncOps(refusing) } }));
       await Effect.runPromise(engine.tick());
       assert.equal(fs.existsSync(path.join(root, 'feed.jsonl')), false, 'its first pass folded every task and wrote no feed');
       const journal = path.join(root, 'tasks', `${ids[5]}.jsonl`);
       const journal0 = sizeOf(journal);
-      await Effect.runPromise(engine.file({ id: ids[5], brief: 'again', cwd }));
+      await measuredInto(root, ids[5]);
       const appended = sizeOf(journal) - journal0;
       const before = Effect.runSync(engine.io());
       await Effect.runPromise(engine.tick());

@@ -82,7 +82,8 @@ export type { Filing } from './core/engine/index.ts';
 export type { RefusedMove, TaskList, TaskView, UnreadableTask } from './core/engine/index.ts';
 export { refusedText, retiredKeyRefusal } from './core/engine/index.ts';
 
-export { Journal, JournalError, BodyRefused, FEED_LOCK_WAIT_MS } from './core/engine/index.ts';
+export { Journal, JournalError, BodyRefused, FEED_LOCK_WAIT_MS, APPEND_REFUSALS, type AppendRefusalReason } from './core/engine/index.ts';
+export { TaskId } from './core/model.ts';
 export type {
   FeedEntry,
   FeedRefusal,

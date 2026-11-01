@@ -26,6 +26,8 @@ import { countRead, countWrite } from './tally.ts';
 import { FEED_LOCK_WAIT_MS, feedLinesOf, readFeed, rotateFeed, withFeedLock, type ForgottenFeed } from './feed.ts';
 import { BodyRefused, filesBodies, memoryBodies, resolver, split, type BodyOps, type BodyRef, type Resolved } from './bodies.ts';
 import { removeBody, sweep } from './sweep.ts';
+import { TaskId, taskIdRefusal } from '../model.ts';
+import { APPEND_REFUSALS, appendRefusal, type AppendRefusalReason } from './append-refusal.ts';
 
 /**
  * One entry of the store-wide feed: an event, and which task it happened to.
@@ -35,6 +37,9 @@ import { removeBody, sweep } from './sweep.ts';
  * boundary that keeps sequencing out of the engine.
  */
 export type FeedEntry = { taskId: string; event: Event };
+
+/** A feed entry as the Task door gives it: its task by its `TaskId`, branded nominally where the door decodes the feed. */
+export type TaskFeedEntry = { taskId: TaskId; event: Event };
 
 /**
  * Where a reader got to. Opaque, monotonic, and it never expires — that is the whole contract.
@@ -51,9 +56,15 @@ export type Cursor = number;
  */
 export type FeedRefusal = { taskId?: string; why: string };
 
+/**
+ * A journal that cannot be read or written. `reason` is set where the Task door refused the append (`appendRefusal`): a task is
+ * filed once, under an id a file can be named by, written to only once filed, and started at `attempts.length + 1`. It is absent
+ * for a store's own failure.
+ */
 export class JournalError extends Schema.TaggedError<JournalError>()('JournalError', {
   taskId: Schema.String,
   message: Schema.String,
+  reason: Schema.optional(Schema.Literals(APPEND_REFUSALS)),
 }) {}
 
 /**
@@ -141,10 +152,27 @@ export type StoreOps = BodiedJournalOps | (Omit<PlainJournalOps, 'read' | 'feed'
  */
 export type SweepReport = { removable: number; bytes: number; kept: number; removed: number; removedBytes: number };
 
-/** The journal as the engine reads and writes it: whole events, whatever the store keeps (`Journal.layer`). */
-export type JournalShape = Omit<PlainJournalOps, 'append' | 'bodies'> & {
-  /** Write `event` to the task's record and the feed; a store that keeps bodies keeps a brief's text cut at `briefParts`. */
-  readonly append: (taskId: string, event: Event, briefParts?: readonly string[]) => Effect.Effect<void, JournalError>;
+/**
+ * The Task door: the journal as the engine reads and writes it, whole events whatever the store keeps, each task by its `TaskId`
+ * (`Journal.layer`). A store implements `JournalOps` with plain strings; the door brands what it gives back, nominally, so a journal
+ * written under any id still reads (decision Q22), and holds a new filing's id to `taskIdRefusal`.
+ */
+export type JournalShape = Omit<PlainJournalOps, 'append' | 'read' | 'list' | 'feed' | 'forget' | 'feedLines' | 'bodies'> & {
+  /**
+   * Write `event` to the task's record and the feed; a store that keeps bodies keeps a brief's text cut at `briefParts`. Refused,
+   * with nothing written, where `appendRefusal` says (`JournalError.reason`).
+   */
+  readonly append: (taskId: TaskId, event: Event, briefParts?: readonly string[]) => Effect.Effect<void, JournalError>;
+  readonly read: (taskId: TaskId) => Effect.Effect<Event[], JournalError>;
+  readonly list: Effect.Effect<TaskId[], JournalError>;
+  /** As `PlainJournalOps.feed`, each entry's task branded. */
+  readonly feed: (
+    after: Cursor,
+  ) => Effect.Effect<{ entries: TaskFeedEntry[]; cursor: Cursor; refused?: FeedRefusal[]; forgotten?: number }, JournalError>;
+  /** As `PlainJournalOps.forget`. */
+  readonly forget?: (taskIds: readonly TaskId[]) => Effect.Effect<ForgottenFeed | undefined, JournalError>;
+  /** As `PlainJournalOps.feedLines`. */
+  readonly feedLines?: (taskIds: readonly TaskId[]) => Effect.Effect<Readonly<Record<string, number>>, JournalError>;
   /**
    * The bodies no journal and no feed entry names, put before the grace (`BODY_GRACE_MS`): counted, and removed with `yes`. A
    * store that keeps no bodies has none.
@@ -200,13 +228,13 @@ const decodeFeed = Effect.fn('decodeFeed')(function* (
   located: StoreOps['located'],
   bodies: Resolve,
 ) {
-  const entries: FeedEntry[] = [];
+  const entries: TaskFeedEntry[] = [];
   const refused: FeedRefusal[] = [];
   for (const [index, entry] of raw.entries()) {
     const where = `the feed${located ? ` (${located.feed})` : ''}, entry ${index + 1} read from cursor ${after}`;
     if (isFeedEntry(entry)) {
       const read = yield* Effect.result(bodies.resolve(entry.event));
-      if (Result.isSuccess(read)) entries.push({ taskId: entry.taskId, event: upgrade(read.success) });
+      if (Result.isSuccess(read)) entries.push({ taskId: TaskId.read(entry.taskId), event: upgrade(read.success) });
       else refused.push({ taskId: entry.taskId, why: `${where} ${read.failure.message}` });
       continue;
     }
@@ -436,11 +464,39 @@ const journalReader = () => {
 const forgottenWords = (taskId: string, file: string) =>
   `${taskId} has no journal (${file}): it was forgotten, or never filed, and is not written to again. File a new task.`;
 
+/** The words of a filing of `taskId`, whose journal `file` is there already. */
+const filedWords = (taskId: string, file: string) =>
+  `${taskId} is filed already (${file}), and a task is filed once. File the new task under another id, or leave \`id\` out.`;
+
+/** Whether an entry a store holds is a start, read off the store as it is: a journal no runtime wrote is refused by its read. */
+const isStart = (entry: unknown) => typeof entry === 'object' && entry !== null && 'kind' in entry && entry.kind === 'starting';
+
+/** A refusal's words, led by the task it refused, where its own words do not name it. */
+const refusalWords = (taskId: string, refusal: { reason: AppendRefusalReason; message: string }) =>
+  refusal.reason === 'malformed-id' ? refusal.message : `${JSON.stringify(taskId)}: ${refusal.message}`;
+
+/**
+ * The Task door's check of one append (`appendRefusal`), on the task as the store holds it: a refusal fails before the store is
+ * written. The store is read as it is, not decoded, so a check costs no body and no upgrade.
+ */
+const appendChecked = (ops: StoreOps, taskId: TaskId, event: Event) =>
+  ops.read(taskId).pipe(
+    Effect.flatMap((held) => {
+      const refusal = appendRefusal(event.kind === 'filed' ? taskIdRefusal(taskId) : undefined, event, {
+        journal: held.length > 0,
+        started: held.filter(isStart).length,
+      });
+      return refusal
+        ? Effect.fail(new JournalError({ taskId, reason: refusal.reason, message: refusalWords(taskId, refusal) }))
+        : Effect.void;
+    }),
+  );
+
 /** A refusal of a store's bodies as the journal's: a failing store said in its words. */
 const asJournal = (error: { _tag: string; message: string }) => new JournalError({ taskId: '*', message: error.message });
 
 /** Puts the bodies `event` names, then appends the entry naming them: a line never names a body not yet kept. */
-const appendSplit = (ops: BodiedJournalOps, taskId: string, event: Event, briefParts?: readonly string[]) => {
+const appendSplit = (ops: BodiedJournalOps, taskId: TaskId, event: Event, briefParts?: readonly string[]) => {
   const { entry, bodies } = split(event, briefParts);
   return Effect.forEach(bodies, ([ref, text]) => ops.bodies.put(ref, text), { discard: true }).pipe(
     Effect.mapError((error) => new JournalError({ taskId, message: error.message })),
@@ -464,7 +520,7 @@ export const appendFields = (taskId: string, event: Event): { task: string; kind
  * said at `Debug`, the event's kind, annotated the same. The runtime's journal at `Debug` is its log.
  */
 const appendSaid = (append: JournalShape['append']) =>
-  Effect.fn('append')(function* (taskId: string, event: Event, briefParts?: readonly string[]) {
+  Effect.fn('append')(function* (taskId: TaskId, event: Event, briefParts?: readonly string[]) {
     const fields = appendFields(taskId, event);
     yield* Effect.annotateCurrentSpan(fields);
     yield* append(taskId, event, briefParts);
@@ -485,12 +541,14 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
     const bodies = resolver(bodied?.bodies);
     return Layer.succeed(Journal)(
       Journal.of({
-        list: ops.list,
+        list: ops.list.pipe(Effect.map((ids) => ids.map(TaskId.read))),
         ...(ops.subscribe ? { subscribe: ops.subscribe } : {}),
         ...(ops.forget ? { forget: ops.forget } : {}),
         ...(ops.feedLines ? { feedLines: ops.feedLines } : {}),
         append: appendSaid((taskId, event, briefParts) =>
-          bodied ? appendSplit(bodied, taskId, event, briefParts) : ops.append(taskId, event),
+          appendChecked(ops, taskId, event).pipe(
+            Effect.andThen(bodied ? appendSplit(bodied, taskId, event, briefParts) : ops.append(taskId, event)),
+          ),
         ),
         read: (taskId) =>
           ops.read(taskId).pipe(
@@ -544,7 +602,9 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
       /**
        * The task's journal, then the feed, in the one call every writer makes, so no writer can forget the feed, holding the
        * feed's lock (`withFeedLock`), so no rotation drops a line written meanwhile. The task file is the source of truth; the
-       * feed is its index. Refused for a task with no journal, but by its `filed`: a task forgotten is not written to again.
+       * feed is its index. Under the lock still, so two writers cannot both pass the door's check (`appendRefusal`): refused
+       * `not-filed` for a task with no journal, but by its `filed`, since a task forgotten is not written to again; and refused
+       * `filed-twice` for a `filed` to a task that has one, the filing being an exclusive create.
        */
       append: (taskId, event) =>
         Effect.try({
@@ -553,7 +613,11 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
               root,
               () => {
                 fs.mkdirSync(dir, { recursive: true });
-                if (event.kind !== 'filed' && !fs.existsSync(file(taskId))) throw new Error(forgottenWords(taskId, file(taskId)));
+                const held = fs.existsSync(file(taskId));
+                if (event.kind !== 'filed' && !held)
+                  throw new JournalError({ taskId, reason: 'not-filed', message: forgottenWords(taskId, file(taskId)) });
+                if (event.kind === 'filed' && held)
+                  throw new JournalError({ taskId, reason: 'filed-twice', message: filedWords(taskId, file(taskId)) });
                 fs.appendFileSync(file(taskId), JSON.stringify(event) + '\n');
                 countWrite();
                 fs.appendFileSync(feedFile, JSON.stringify({ taskId, event }) + '\n');
@@ -561,7 +625,7 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
               },
               lockWaitMs,
             ),
-          catch: fail(taskId),
+          catch: (cause) => (cause instanceof JournalError ? cause : fail(taskId)(cause)),
         }),
       read: (taskId) => Effect.try({ try: () => journals(file(taskId)), catch: fail(taskId) }),
       list: Effect.try({
@@ -640,6 +704,9 @@ export class Journal extends Context.Service<Journal, JournalShape>()('engine/Jo
           const forgotten = rest.length - entries.length;
           return { entries, cursor: feed.length, ...(forgotten ? { forgotten } : {}) };
         }),
+      /** Each task's lines in the feed, a hole not counted, as the files store counts them. */
+      feedLines: (taskIds: readonly string[]) =>
+        Effect.sync(() => Object.fromEntries(taskIds.map((id) => [id, feed.filter((entry) => entry?.taskId === id).length]))),
       /** The tasks' journals gone, and each of their lines a hole: no bytes to say. */
       forget: (taskIds: readonly string[]) =>
         Effect.sync(() => {

@@ -35,6 +35,7 @@ import { scratch } from './scratch.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
 import { story } from './checkpoints.ts';
+import { TaskId } from '../src/core/model.ts';
 
 /** Sign the session `name` off: done, with a closeout given a moment after its attempt started (`began`, as journalled). */
 const signed = (sessions: Map<string, Sighting>, name: string, summary: string, began: string) =>
@@ -126,7 +127,7 @@ test('a task held open signs and waits with its session released; answered after
       await run(tick());
       const settled = await run(view(id, new Map()));
       assert.equal(settled.phase, 'succeeded');
-      const events = await run(Effect.flatMap(Journal, (j) => j.read(id)));
+      const events = await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(id))));
       assert.deepEqual(
         events.slice(-2).map((e) => (e.kind === 'settled' ? [e.kind, e.outcome, e.note] : [e.kind])),
         [['closed'], ['settled', 'succeeded', 'closed']],
@@ -143,10 +144,10 @@ test('a task held open signs and waits with its session released; answered after
     const engine = builtEngine(Engine.layer({ root }));
     const waiting = async () => {
       const waits = await Effect.runPromise(engine.file({ brief: 'b', cwd: root, holdOpen: true }));
-      await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(waits, e))));
+      await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(waits), e))));
       return waits;
     };
-    const journal = (task: string) => run(Effect.flatMap(Journal, (j) => j.read(task)));
+    const journal = (task: string) => run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))));
     const cli = (...args: string[]) =>
       spawnSync(process.execPath, [ae, ...args], { env: { ...process.env, AE_ROOT: root }, encoding: 'utf8' });
     let answered = '';
@@ -303,20 +304,20 @@ test('answer and close: what each refuses — InputRefused, and nothing journall
       await refusedWith(answer(held, ' '), /^`text` is empty/);
       await refusedWith(answer(held, 'go on'), /has not started an attempt yet/);
       const count = async (task: string) =>
-        ((await run(Effect.flatMap(Journal, (j) => j.read(task)))) as { success: Event[] }).success.length;
+        ((await run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(task))))) as { success: Event[] }).success.length;
       assert.equal(await count(held), 1, 'nothing journalled');
       const unrecorded = ((await run(file({ brief: 'b', cwd: '/r', holdOpen: true }))) as { success: string }).success;
       await run(
         Effect.flatMap(Journal, (j) =>
           Effect.forEach(
             signedJournal().map((e) => (e.kind === 'ended' ? { ...e, nativeId: undefined } : e)),
-            (e) => j.append(unrecorded, e),
+            (e) => j.append(TaskId.read(unrecorded), e),
           ),
         ),
       );
       await refusedWith(answer(unrecorded, 'go on'), /harness recorded no session for it/);
       assert.equal(await count(unrecorded), 4, 'nothing journalled');
-      await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(held, e))));
+      await run(Effect.flatMap(Journal, (j) => Effect.forEach(signedJournal(), (e) => j.append(TaskId.read(held), e))));
       await refusedWith(answer(held, 'go on', { budgetUsd: 2 }), /^keeps no cap$/);
       await refusedWith(answer(held, 'go on', { model: 'opus' }), /^`config\.model` cannot be given to one turn/);
       await refusedWith(answer(held, 'go on', { budgetUsd: 0 }), /^`budgetUsd: 0` is not an amount of dollars/);

@@ -121,7 +121,7 @@ export default {
       'and the banner no longer names it: nobody waits on you for it',
     );
     const written = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined;
-    if (written?.mode !== 'nudge' || written?.message !== ANSWER) {
+    if (written?.mode !== 'continue' || written?.message !== ANSWER) {
       throw new Refused(`the ask is written as wf retry writes it, with the answer — ${file} holds ${JSON.stringify(written)}`);
     }
     await settled(page);

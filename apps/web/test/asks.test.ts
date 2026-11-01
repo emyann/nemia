@@ -173,7 +173,7 @@ test('needOf: what a step needs from a person — its question, its blocked sess
       const note = 'try 2 asked (--continue, with your answer) — the next tick files it';
       const sent = step('plan', 'awaiting approval', {
         note,
-        asked: { try: 2, mode: 'nudge', model: null, message: 'Store it first.', stopFirst: false },
+        asked: { try: 2, mode: 'continue', model: null, message: 'Store it first.', stopFirst: false },
       });
       assert.deepEqual(answersOf(run([sent], [])), [], 'sent back, its try is asked: nothing left to offer');
       assert.deepEqual(askedOf(run([sent], []), 'plan'), { try: 2, note }, 'the Decide section notes it, as any try asked');
@@ -291,7 +291,7 @@ test('offersOf: what the Decide section offers a step, and nothing on a run held
       const asked = step('held', 'needs-human', {
         lastLine: LOGIN,
         note,
-        asked: { try: 2, mode: 'nudge', model: null, message: null, stopFirst: true },
+        asked: { try: 2, mode: 'continue', model: null, message: null, stopFirst: true },
       });
       assert.deepEqual(offersOf(run([asked], [])), [], 'once asked, nothing is left to offer');
       assert.deepEqual(askedOf(run([asked], []), 'held'), { try: 2, note }, 'the note of its try, as for any try asked');
@@ -363,7 +363,7 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
         by: 'retry' as const,
         above: 1.5,
         said: '$1.50',
-        modes: ['nudge', 'fresh'] as RetryMode[],
+        modes: ['continue', 'fresh'] as RetryMode[],
         own: 'blocked' as const,
       };
       const palette = step('palette', 'over budget $1.50 of $1', { raise: blocked, needs: 'Two questions.', closeout });
@@ -380,7 +380,7 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
         by: 'retry' as const,
         above: 4.25,
         said: '$4.25',
-        modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
+        modes: ['continue', 'fresh', 'recheck'] as RetryMode[],
         own: 'failed (check)' as const,
       };
       const byRound = { by: 'round' as const, above: 2.1, said: '$2.10', modes: [] as RetryMode[], own: null };
@@ -388,14 +388,14 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
         by: 'retry' as const,
         above: 3.02,
         said: '$3.02',
-        modes: ['nudge', 'fresh'] as RetryMode[],
+        modes: ['continue', 'fresh'] as RetryMode[],
         own: 'budget exhausted' as const,
       };
       const blocked = {
         by: 'retry' as const,
         above: 1.5,
         said: '$1.50',
-        modes: ['nudge', 'fresh'] as RetryMode[],
+        modes: ['continue', 'fresh'] as RetryMode[],
         own: 'blocked' as const,
       };
       const unfinished = { ...byTry, above: 3.5, said: '$3.50' };
@@ -471,7 +471,7 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
         by: 'retry' as const,
         above: 4.25,
         said: '$4.25',
-        modes: ['nudge', 'fresh', 'recheck'] as RetryMode[],
+        modes: ['continue', 'fresh', 'recheck'] as RetryMode[],
         own: 'failed (check)' as const,
       };
       assert.deepEqual(
@@ -484,7 +484,7 @@ test('raiseTo, answersOf, gateOffered: a raise and its answers, and a gate offer
       const asked = step('tokens', 'over budget $4.25 of $3', {
         raise: byTry,
         note,
-        asked: { try: 3, mode: 'nudge', model: null, message: null, stopFirst: false },
+        asked: { try: 3, mode: 'continue', model: null, message: null, stopFirst: false },
       });
       assert.deepEqual(offersOf(run([asked], [])), [], 'once its raise is asked, nothing is left to offer');
       assert.deepEqual(askedOf(run([asked], []), 'tokens'), { try: 3, note });

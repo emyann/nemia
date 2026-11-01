@@ -500,7 +500,7 @@ test('nemia retry refuses --model and --budget on a remote step, in the words it
       `\`--model haiku\` is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one, and ask runs on \`harness: a2a:reviewer\`, a remote A2A agent: its try would be sent without it. Ask without --model: nemia retry ${run.id} ask.`,
     );
     await assert.rejects(
-      runWith(e, retryRun(run.id, 'ask', { mode: 'nudge', budget: 5 })),
+      runWith(e, retryRun(run.id, 'ask', { mode: 'continue', budget: 5 })),
       (err: Error & { exitCode?: number }) =>
         err.exitCode === 2 && err.message.startsWith('`--budget 5` ') && err.message.includes(`nemia retry ${run.id} ask`),
     );
@@ -542,7 +542,7 @@ test("a remote step's try is a new task, told which try and what a person said, 
   const brief = remoteBrief(steps[0], run, steps, undefined, {
     try: 2,
     by: 'ask',
-    mode: 'nudge',
+    mode: 'continue',
     resumed: false,
     status: 'failed',
     message: 'Look at the tables too.',
@@ -552,7 +552,7 @@ test("a remote step's try is a new task, told which try and what a person said, 
     /## Try 2\n\nThe last try of this step ended `failed`\. A person asked for this try \(`nemia retry`\), with what they said below\. This is a new task/,
   );
   assert.match(brief, /## Your answer\n\n[`~]+text\nLook at the tables too\.\n/);
-  const auto = remoteBrief(steps[0], run, steps, undefined, { try: 2, by: 'retries', mode: 'nudge', resumed: false, status: 'failed' });
+  const auto = remoteBrief(steps[0], run, steps, undefined, { try: 2, by: 'retries', mode: 'continue', resumed: false, status: 'failed' });
   assert.match(auto, /The run filed this try itself: this step declares `retries: 1`\./);
   assert.doesNotMatch(auto, /\/store/);
 });

@@ -31,7 +31,7 @@ const SaidSchema = decodes<Said>()(
 export type QuestionAnswer = { question: string; chose: readonly string[]; own?: string };
 
 /** How the CLI's `retry` tries a step again: continue its session, a new one, or its check run again and no session. */
-export type RetryMode = 'nudge' | 'fresh' | 'recheck';
+export type RetryMode = 'continue' | 'fresh' | 'recheck';
 
 /** What an ask for a try answers: the try asked for, its ask file, and whether the tick stops the step's blocked session first. */
 export type AskedTry = { try: number; file: string; stopFirst: boolean };

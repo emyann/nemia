@@ -400,7 +400,7 @@ function budgetMisgiven(c: Judged): string | undefined {
   return `--budget ${how.budget} is not above ${aboveWord(floor)}, ${what}: ${why}. Give more than ${aboveWord(floor)}: ${command} --budget <amount>.`;
 }
 
-/** A step the run is about to try again itself: a nudge to sign off, or a try `retries:` still covers. */
+/** A step the run is about to try again itself: an ask to sign off, or a try `retries:` still covers. */
 function runTriesItself(c: Judged): string | undefined {
   const { steps, step, run, name, phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf, next } = c;
   const itself = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, [], () => false, spendOf).find(
@@ -410,7 +410,7 @@ function runTriesItself(c: Judged): string | undefined {
     const why = lackedOf(run.steps[name]).length
       ? 'its closeout named a file the run does not have'
       : 'its session ended without the closeout it was asked for';
-    return `the run nudges ${name} itself: ${why}, and the run continues it once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: nemia ls ${run.id}.`;
+    return `the run continues ${name} itself: ${why}, once a round, told to sign off, before it waits on you — the next tick files try ${next}. Wait for it: nemia ls ${run.id}.`;
   }
   if (itself) {
     const left = (step.retries ?? 0) - retriesSpent(run.steps[name]);

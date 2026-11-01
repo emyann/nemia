@@ -257,10 +257,10 @@ function gatesOf(f: Forgetting, steps: readonly Workflow[]): string[] {
     .map((s) => s.name);
 }
 
-/** On whose word a try is due, as `dueOf` says it: `retries:`, the run's sign-off nudge, `nemia pause --now`, or `nemia retry`. */
+/** On whose word a try is due, as `dueOf` says it: `retries:`, the run's sign-off ask, `nemia pause --now`, or `nemia retry`. */
 const dueBy = (r: Retry, step: Workflow | undefined): string => {
   if (r.by === 'retries') return `retries: ${step?.retries}`;
-  if (r.by === 'signoff') return 'a nudge to sign off';
+  if (r.by === 'signoff') return 'an ask to sign off';
   return r.by === 'pause' ? 'nemia pause --now' : `nemia retry ${modeWord(r)}`;
 };
 

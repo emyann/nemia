@@ -193,7 +193,7 @@ test("a step that signed off blocked stays open, and a person's answer — `nemi
   );
   assert.deepEqual(listed.waitingOnYou, ['plan']);
 
-  await runWith(e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag' }));
+  await runWith(e, retryRun(run.id, 'plan', { mode: 'continue', message: 'the --dry-run flag' }));
   const answered = await pass(run.id);
   assert.deepEqual(answered.tried, ['plan']);
   assert.deepEqual(answered.filed, []);
@@ -205,7 +205,7 @@ test("a step that signed off blocked stays open, and a person's answer — `nemi
   assert.equal(record.taskId, plan, 'the same task');
   assert.deepEqual(
     record.tries?.map((t) => [t.taskId, t.cause]),
-    [[plan, 'nudge']],
+    [[plan, 'continue']],
     'the try it was, behind it',
   );
   assert.deepEqual(readAsks(run.id).asks, [], 'the ask is consumed');
@@ -222,7 +222,7 @@ test("a step that signed off blocked stays open, and a person's answer — `nemi
 
 test('an answer carries what is left of the cap in force; over it, the task stays open, and a `--budget` answer carries what is left of the cap raised', async () => {
   const under = await signedPlan({ plan: 'budget: 4' }, BLOCKED, undefined, { costUsd: 1.5 });
-  await runWith(under.e, retryRun(under.run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag' }));
+  await runWith(under.e, retryRun(under.run.id, 'plan', { mode: 'continue', message: 'the --dry-run flag' }));
   await under.pass(under.run.id);
   assert.equal(
     (await stateOf(under.e, `${under.run.id}-plan`)).state.inputs[0].config?.budgetUsd,
@@ -238,7 +238,7 @@ test('an answer carries what is left of the cap in force; over it, the task stay
     'input-required',
     'a blocked step over its budget waits for a person all the same',
   );
-  await runWith(e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag', budget: 6 }));
+  await runWith(e, retryRun(run.id, 'plan', { mode: 'continue', message: 'the --dry-run flag', budget: 6 }));
   assert.deepEqual((await pass(run.id)).tried, ['plan']);
   assert.equal((await stateOf(e, `${run.id}-plan`)).state.inputs[0].config?.budgetUsd, 1, '$6 less the $5 spent');
 });
@@ -288,7 +288,7 @@ test("a held task whose job ended `done` with no statement (`closedOut: false`) 
 test('a pass that answered and died before writing the run down is adopted: the turn is the try it is, nothing is stopped and nothing is filed again', async () => {
   const { run, e, pass } = await signedPlan({}, BLOCKED);
   const plan = `${run.id}-plan`;
-  await runWith(e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag' }));
+  await runWith(e, retryRun(run.id, 'plan', { mode: 'continue', message: 'the --dry-run flag' }));
   await Effect.runPromise(e.answer(plan, 'the --dry-run flag'));
   await Effect.runPromise(e.tick());
   assert.equal((await stateOf(e, plan)).phase, 'working', 'what the pass did before it died: the answer, and nothing on the record');
@@ -314,7 +314,7 @@ test('a pass that answered and died before writing the run down is adopted: the 
 const answeredTurn = async () => {
   const h = await signedPlan({}, BLOCKED);
   const plan = `${h.run.id}-plan`;
-  await runWith(h.e, retryRun(h.run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag' }));
+  await runWith(h.e, retryRun(h.run.id, 'plan', { mode: 'continue', message: 'the --dry-run flag' }));
   assert.deepEqual((await h.pass(h.run.id)).tried, ['plan'], 'answered');
   return { ...h, plan, turn: nameFor(plan, 2) };
 };
@@ -340,7 +340,7 @@ const triedAgain = async (h: Awaited<ReturnType<typeof answeredTurn>>, from: str
   );
   assert.match(decided.offers.join('\n'), /nemia retry \S+ plan/, `${end}: and \`nemia decide\` offers the retry`);
 
-  await runWith(e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'the --dry-run flag, again' }));
+  await runWith(e, retryRun(run.id, 'plan', { mode: 'continue', message: 'the --dry-run flag, again' }));
   assert.deepEqual((await pass(run.id)).tried, ['plan'], `${end}: the nudge`);
   assert.equal((await stateOf(e, plan)).state.inputs.length, 1, `${end}: the settled task is not answered again`);
   const next = await stateOf(e, `${plan}-try3`);
@@ -454,7 +454,7 @@ test('a gated step stays open while its check runs, so a send-back once the chec
   sessions.set(check, { ...sessions.get(check)!, state: 'completed', busy: false, exitCode: 0 });
   await pass(run.id);
   assert.equal((await statuses(e, run.id)).plan, 'awaiting approval');
-  await runWith(e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'smaller steps, please' }));
+  await runWith(e, retryRun(run.id, 'plan', { mode: 'continue', message: 'smaller steps, please' }));
   const sent = await pass(run.id);
   assert.deepEqual([sent.tried, sent.filed], [['plan'], []]);
   assert.equal((await stateOf(e, plan)).state.inputs.length, 1, 'answered, in the session that signed');
@@ -463,7 +463,7 @@ test('a gated step stays open while its check runs, so a send-back once the chec
 test("a send-back from a gate — `nemia retry --message` on a signed gated step — is an answer to its task, and the next turn's sign-off waits for an approval of its own", async () => {
   const { run, e, pass, sign } = await signedPlan({}, SIGNED, ['plan']);
   const plan = `${run.id}-plan`;
-  await runWith(e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'smaller steps, please' }));
+  await runWith(e, retryRun(run.id, 'plan', { mode: 'continue', message: 'smaller steps, please' }));
   const sent = await pass(run.id);
   assert.deepEqual([sent.tried, sent.filed], [['plan'], []]);
   assert.match((await stateOf(e, plan)).state.inputs[0].text, /smaller steps, please/);
@@ -582,7 +582,7 @@ test('a run whose tasks were filed before tasks were held open is worked as it w
     "the run's filings as they were, nothing held open: its gate settled at the sign-off",
   );
   assert.deepEqual([signed.filed, (await statuses(h.e, run.id)).plan], [[], 'awaiting approval']);
-  await runWith(h.e, retryRun(run.id, 'plan', { mode: 'nudge', message: 'smaller steps, please' }));
+  await runWith(h.e, retryRun(run.id, 'plan', { mode: 'continue', message: 'smaller steps, please' }));
   assert.deepEqual((await h.pass(run.id)).tried, ['plan']);
   const sent = await stateOf(h.e, `${run.id}-plan-try2`);
   assert.match(sent.state.brief, /smaller steps, please/);

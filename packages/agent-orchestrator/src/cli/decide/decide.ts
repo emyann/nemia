@@ -299,7 +299,7 @@ function printRefusals(run: Decided['run'], decision: Awaiting): void {
     );
   if (decision.unsigned.length)
     console.log(
-      `  UNSIGNED: ${decision.unsigned.map((n) => (signoffsSpent(run.steps[n]) ? `${n} (nudged to sign off once by the run, and unsigned again)` : n)).join(', ')}  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran`,
+      `  UNSIGNED: ${decision.unsigned.map((n) => (signoffsSpent(run.steps[n]) ? `${n} (asked to sign off once by the run, and unsigned again)` : n)).join(', ')}  — ended without the closeout it was asked for, or without a field its output: declares, or its closeout named a file the run does not have; nothing after it ran`,
     );
   for (const line of decision.unsigned.flatMap((name) => lackedLines(run, name))) console.log(`    ${line}`);
   if (decision.unverified.length)

@@ -445,14 +445,14 @@ test('REFUSED once pruned: a step at its gate is offered no approval and no send
 test('retryable and retryRefusal: sending back from a gate is `nemia retry --message`', async (t) => {
   await t.test('a step at its gate may be tried, and a try of it sends back', () => {
     const at = retryable(PLANNED[0], atPlan(), PLAN_DONE, signedDone, asked, PLANNED);
-    assert.deepEqual([at.status, at.modes, at.sendsBack], ['awaiting approval', ['nudge', 'fresh'], true]);
+    assert.deepEqual([at.status, at.modes, at.sendsBack], ['awaiting approval', ['continue', 'fresh'], true]);
   });
   await t.test('with words, nudged or fresh, it may be sent back', () => {
-    assert.equal(refusal(atPlan(), { mode: 'nudge', message: 'store the flag before you parse it' }), null);
+    assert.equal(refusal(atPlan(), { mode: 'continue', message: 'store the flag before you parse it' }), null);
     assert.equal(refusal(atPlan(), { mode: 'fresh', message: 'start over from the second reading' }), null);
   });
   await t.test('REFUSED without words, naming the send-back and the approval', () => {
-    names(refusal(atPlan(), { mode: 'nudge' }), 'plan is awaiting approval', `${OBJECTION} —`, 'nemia approve r-1 plan');
+    names(refusal(atPlan(), { mode: 'continue' }), 'plan is awaiting approval', `${OBJECTION} —`, 'nemia approve r-1 plan');
     names(refusal(atPlan(), { mode: 'fresh' }), `${OBJECTION} --fresh`, 'nemia approve r-1 plan');
   });
   await t.test('REFUSED with --recheck', () => {
@@ -460,11 +460,11 @@ test('retryable and retryRefusal: sending back from a gate is `nemia retry --mes
   });
   const approved = atPlan({ approvals: [approval('plan', 1)] });
   await t.test('approved, nothing after it filed: it may still be sent back, with words', () => {
-    assert.equal(refusal(approved, { mode: 'nudge', message: 'not yet: store it first' }), null);
+    assert.equal(refusal(approved, { mode: 'continue', message: 'not yet: store it first' }), null);
   });
   await t.test('REFUSED approved, without words', () => {
     names(
-      refusal(approved, { mode: 'nudge' }),
+      refusal(approved, { mode: 'continue' }),
       'plan is approved (try 1, at 2026-09-16T23:10:00.000Z)',
       'nothing after it is filed yet',
       OBJECTION,
@@ -473,7 +473,7 @@ test('retryable and retryRefusal: sending back from a gate is `nemia retry --mes
   await t.test('REFUSED once what follows is filed: it has handed on', () => {
     const handedOn = run({ plan: 't1', implement: 't2', review: null }, { gates: ['plan'], approvals: [approval('plan', 1)] });
     names(
-      refusal(handedOn, { mode: 'nudge', message: 'too late' }, phases({ t1: 'succeeded', t2: 'running' })),
+      refusal(handedOn, { mode: 'continue', message: 'too late' }, phases({ t1: 'succeeded', t2: 'running' })),
       'plan signed off done',
       'has been filed',
       'nothing to try again',
@@ -485,7 +485,7 @@ test('retryable and retryRefusal: sending back from a gate is `nemia retry --mes
     { gates: ['implement'], steps: { implement: { taskId: 't1', check: { taskId: 'c1' } } }, approvals: [approval('implement', 1)] },
   );
   const passed = phases({ t1: 'succeeded', c1: 'succeeded' });
-  const more = { mode: 'nudge', message: 'one more thing' } as const;
+  const more = { mode: 'continue', message: 'one more thing' } as const;
   await t.test('REFUSED a step nothing waits on, once approved: it has handed on', () => {
     assert.equal(retryable(terminal[0], last, passed, signedDone, asked, terminal).sendsBack, undefined);
     names(retryRefusal(terminal, last, 'implement', more, passed, signedDone, asked), 'implement is verified', 'nothing to try again');
@@ -517,7 +517,7 @@ test("triedFrom and retrySection: a send-back's brief says why the step is back"
     const brief = retrySection(PLANNED[0], {
       try: 2,
       by: 'ask',
-      mode: 'nudge',
+      mode: 'continue',
       resumed: true,
       status: 'awaiting approval',
       message: 'store the flag before you parse it',
@@ -531,7 +531,7 @@ test("triedFrom and retrySection: a send-back's brief says why the step is back"
 });
 
 test('REFUSED at a gate, pass after pass: a wordless ask for the next try is not due', async (t) => {
-  const wordless: RetryAsk = { step: 'plan', try: 2, mode: 'nudge', at: '2026-09-16T23:00:00.000Z' };
+  const wordless: RetryAsk = { step: 'plan', try: 2, mode: 'continue', at: '2026-09-16T23:00:00.000Z' };
   const withWords: RetryAsk = { ...wordless, message: 'store it first' };
   await t.test('while the session runs, blocked by its harness, it is due: the tick stops the session first', () => {
     const due = retriesDue(

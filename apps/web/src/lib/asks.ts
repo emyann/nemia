@@ -122,7 +122,7 @@ export type OfferKind = keyof RunDetail['steps'][number]['commands'];
  * What a run's page offers for a step, by why it waits (`case`), each with the command it presses (`kind`), whose line is the api's
  * (`step.commands[kind]`): the board spells no verb itself.
  *
- *   answer     it signed off blocked: an answer to its `needs`, carried into a nudge, or a fresh session — and where its closeout asks
+ *   answer     it signed off blocked: an answer to its `needs`, carried into a continue, or a fresh session — and where its closeout asks
  *              questions as data (`StepCloseout.questions`), those, every field's in the schema's order, answered by choosing
  *   try-again  it was refused by its check, or it ended without its closeout: another session, with something to say if you like —
  *              and where a check did not pass, the check run again; first, when it did not finish
@@ -130,11 +130,11 @@ export type OfferKind = keyof RunDetail['steps'][number]['commands'];
  *              offers it — the run's `allowedTools:` is frozen, so a try is denied the same call again. `calls` is the line naming them
  *              (`StepNeeds.denied`)
  *   raise      a try of it, or its loop's round, has to carry a raise of its cap (`StepRaise`): over its budget, ended at it, or a check
- *              that did not finish past it. With its try — the CLI's `retry --budget`, a nudge or a new session, and for a step that
+ *              that did not finish past it. With its try — the CLI's `retry --budget`, a continue or a new session, and for a step that
  *              signed off blocked the answer to its `needs` beside it (`--message`), or its check again, which needs no raise — or with
  *              its loop's round, the CLI's `retry --round --budget`. `message` is its word, with the amounts; `unfinished` whether its
  *              check did not finish
- *   continue   the harness blocked its session, with nothing signed: a nudge, with something to say if you like, which the package takes
+ *   continue   the harness blocked its session, with nothing signed: a continue, with something to say if you like, which the package takes
  *              as the CLI's `retry` does — the tick stops the session, then files the try. The banner offers it, beside what the session
  *              said last
  *   enough     a loop out of rounds, waiting on you: its work taken as it stands, with your reason — the CLI's `approve` of a loop

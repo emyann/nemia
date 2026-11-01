@@ -12,7 +12,7 @@ import { Result, Schema, SchemaIssue } from 'effect';
 import { BY_CAP, oneLine, WHY_CAP, type Acceptance, type Approval, type Hold, type Pruned, type Run } from './record.ts';
 import { spentAcceptances, spentApprovals, type RoundAsk } from '../status/status.ts';
 import { spentRoundAsks } from '../round/round.ts';
-import { spentAsks, TRY_CAUSES, upgradeTries, type RetryAsk } from '../retry/index.ts';
+import { spentAsks, TRY_CAUSES, upgradeAsk, upgradeTries, type RetryAsk } from '../retry/index.ts';
 import { asNamed } from '../workflow.ts';
 import { FrozenStepSchema } from '../folder/folder.store.ts';
 import { inputsRoot } from './places.store.ts';
@@ -423,7 +423,7 @@ const ApprovalFileSchema = Schema.StructWithRest(Schema.Struct({ at: When, messa
 const AcceptanceFileSchema = Schema.StructWithRest(Schema.Struct({ at: When, message: Said }), Rest);
 const RoundAskFileSchema = Kept({ budget: Schema.optionalKey(Dollars), at: Schema.optionalKey(Schema.Unknown) });
 const RetryAskFileSchema = Kept({
-  mode: Schema.Literals(['nudge', 'fresh', 'recheck']),
+  mode: Schema.Literals(['continue', 'fresh', 'recheck']),
   model: Schema.optionalKey(Schema.NonEmptyString),
   message: Schema.optionalKey(Said),
   budget: Schema.optionalKey(Dollars),
@@ -566,7 +566,7 @@ function askRefusal(refused: string, held: unknown): string {
 export function askIn(file: string, step: string, n: number): RetryAsk | string {
   const held = heldIn(file);
   if ('unreadable' in held) return held.unreadable;
-  const read = readAs(RetryAskFileSchema, held.read);
+  const read = readAs(RetryAskFileSchema, upgradeAsk(held.read));
   if ('refused' in read) return askRefusal(read.refused, held.read);
   const { mode, model, message, budget, interrupted, at } = read.read;
   if (message !== undefined && mode === 'recheck') return 'it carries a message and asks for a recheck, which files no session to read it';

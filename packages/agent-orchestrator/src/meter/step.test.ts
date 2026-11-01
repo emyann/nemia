@@ -506,7 +506,7 @@ const ANSWERED = {
   id: 'r-4',
   workflowDir: '/w/intake',
   createdAt: '2026-10-06T09:59:00.000Z',
-  steps: { ask: { status: 'done', taskId: 'r-4-ask', tries: [{ taskId: 'r-4-ask', cause: 'nudge' }] } },
+  steps: { ask: { status: 'done', taskId: 'r-4-ask', tries: [{ taskId: 'r-4-ask', cause: 'continue' }] } },
   approvals: [{ step: 'ask', try: 2, at: '2026-10-06T10:29:00.000Z' }],
   gatesTimed: [],
   runTimed: false,

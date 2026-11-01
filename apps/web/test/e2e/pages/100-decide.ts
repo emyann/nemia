@@ -110,7 +110,7 @@ export default {
       throw new Refused(`the api takes the send-back to ${back} — it answered ${sent.status()}: ${await sent.text()}`);
     const ask = path.join(asks, `retry-${back}-2`);
     const asked = fs.existsSync(ask) ? JSON.parse(fs.readFileSync(ask, 'utf8')) : undefined;
-    if (asked?.step !== back || asked?.try !== 2 || asked?.mode !== 'nudge' || asked?.message !== ENDING.objection) {
+    if (asked?.step !== back || asked?.try !== 2 || asked?.mode !== 'continue' || asked?.message !== ENDING.objection) {
       throw new Refused(`the send-back is written as wf retry --message writes it, for ${back} — ${ask} holds ${JSON.stringify(asked)}`);
     }
     if (fs.readdirSync(asks).length !== 1) throw new Refused(`and nothing else — ${asks} holds ${fs.readdirSync(asks).join(', ')}`);

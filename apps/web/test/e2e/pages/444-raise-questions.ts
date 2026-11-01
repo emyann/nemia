@@ -56,7 +56,7 @@ export default {
         `1. ${tone.title}\n   Chose: ${tone.recommended} — ${tone.options[1].meaning}`,
         'Answered by: person, on the board',
       ].join('\n\n');
-      if (ask.mode !== 'nudge' || ask.budget !== 2 || ask.message !== told)
+      if (ask.mode !== 'continue' || ask.budget !== 2 || ask.message !== told)
         throw new Refused(`the try is asked with the budget, the answer its words — ${file} holds ${JSON.stringify(ask)}`);
     } finally {
       await page.goto(new URL('/runs', page.url()).href, { waitUntil: 'load' });

@@ -307,9 +307,9 @@ export const resultOnBase = (standings: readonly BranchStanding[]): boolean =>
  * finished, so the run does not say it for it, and does not spend a suite on work nobody signed. The
  * runtime ends a session that goes quiet, or that its harness ends `done`, without it as its harness
  * ended it, and says so — `closedOut: false` — and settles the task `succeeded`; this layer judges it
- * (`closeoutAsked`) and nudges it once a round (`retriesDue`). A task an old journal ended `failed`
+ * (`closeoutAsked`) and continues it once a round (`retriesDue`). A task an old journal ended `failed`
  * for it, read back as `former: 'unsigned'`, is this word too: read as `failed`, the run would be called failed rather than
- * waiting on you, and a nudged try told its session broke rather than that it gave no closeout. Only
+ * waiting on you, and a continued try told its session broke rather than that it gave no closeout. Only
  * a `failed` task — one a person stopped is `stopped`. A task that settled `succeeded` with nothing
  * said is `unsigned` too. An unreadable closeout counts as none: the run cannot read that the work is
  * done. A task never asked for a closeout is not held to one.
@@ -750,7 +750,7 @@ export const merged = (record: StepRecord | undefined): boolean =>
  * The looping step, and its try that asked for the round a loop's target is on — or undefined when the target owes no `replies`.
  *
  * The looping step's own place is unfiled until the target is verified, so the closeout whose findings the target owes answers to is
- * behind it, on this try. `advance` reads it from there for a new session of the target within the round — a fresh try, or a nudge with
+ * behind it, on this try. `advance` reads it from there for a new session of the target within the round — a fresh try, or a continue with
  * no session left to continue — which would otherwise be asked for replies to findings nobody handed it.
  */
 export function askingTry(steps: readonly Workflow[], run: Run, name: string): { looping: Workflow; taskId: string } | undefined {

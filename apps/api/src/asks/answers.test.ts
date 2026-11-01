@@ -127,7 +127,7 @@ test('POST …/retry with answers: what it refuses — answers that do not fit t
       'an option the question does not offer',
       'design',
       {
-        mode: 'nudge',
+        mode: 'continue',
         answers: [
           { question: cut.title, chose: ['c'] },
           { question: where.title, chose: ['gate'] },
@@ -138,20 +138,20 @@ test('POST …/retry with answers: what it refuses — answers that do not fit t
     [
       'a question left unanswered',
       'design',
-      { mode: 'nudge', answers: [{ question: cut.title, chose: ['a'] }] },
+      { mode: 'continue', answers: [{ question: cut.title, chose: ['a'] }] },
       /"Where do the answers go\?" is not answered/,
     ],
     [
       'a step that asks in free text asks no question answers can name',
       'plain',
-      { mode: 'nudge', answers: [{ question: 'Postgres or MySQL?', chose: [] }] },
+      { mode: 'continue', answers: [{ question: 'Postgres or MySQL?', chose: [] }] },
       /asks no questions now/,
     ],
     [
       'nor one whose fields ask one title twice',
       'twice',
       {
-        mode: 'nudge',
+        mode: 'continue',
         answers: [
           { question: cut.title, chose: ['a'] },
           { question: cut.title, chose: ['retry'] },
@@ -160,7 +160,7 @@ test('POST …/retry with answers: what it refuses — answers that do not fit t
       /asks no questions now/,
     ],
     ['answers on a recheck', 'design', { mode: 'recheck', answers: [{ question: cut.title, chose: ['a'] }] }, /a recheck files no session/],
-    ['answers that are no list', 'design', { mode: 'nudge', answers: 'a' }, /^`answers` are/],
+    ['answers that are no list', 'design', { mode: 'continue', answers: 'a' }, /^`answers` are/],
   ];
   for (const [name, step, body, facts] of rows)
     await t.test(name, async () => {
@@ -198,17 +198,17 @@ test('a person reads the questions a closeout asks on the run’s detail and ans
         { question: cut.title, chose: [], own: 'Three ways.' },
         { question: where.title, chose: ['retry', 'gate'] },
       ];
-      const res = await ask('design', { mode: 'nudge', message: 'Thanks.', answers });
+      const res = await ask('design', { mode: 'continue', message: 'Thanks.', answers });
       assert.equal(res.status, 202, await res.clone().text());
       const written = JSON.parse(fs.readFileSync(askFile(R, 'design', 2), 'utf8')) as { mode: string; message: string };
-      assert.equal(written.mode, 'nudge');
+      assert.equal(written.mode, 'continue');
       assert.equal(written.message, answerText([cut, where], answers, 'Thanks.'));
       assert.ok(written.message.endsWith('Answered by: person, on the board'), written.message);
 
-      const plain = await ask('plain', { mode: 'nudge', message: 'Postgres.' });
+      const plain = await ask('plain', { mode: 'continue', message: 'Postgres.' });
       assert.equal(plain.status, 202, await plain.clone().text());
       assert.equal((JSON.parse(fs.readFileSync(askFile(R, 'plain', 2), 'utf8')) as { message: string }).message, 'Postgres.');
-      const twice = await ask('twice', { mode: 'nudge', message: 'Shape first, into the retry.' });
+      const twice = await ask('twice', { mode: 'continue', message: 'Shape first, into the retry.' });
       assert.equal(twice.status, 202, await twice.clone().text());
     },
   );

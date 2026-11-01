@@ -220,12 +220,12 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   used: used(),
   spent: { usd: 1.25, measured: 1, unmeasured: 0, said: '$1.25' },
   budget: { usd: 3, said: '$3', of: '$1.25 of $3', over: false },
-  raise: { by: 'retry', above: 1.25, said: 'raise it', modes: ['nudge', 'fresh', 'recheck'], own: 'failed (check)' },
+  raise: { by: 'retry', above: 1.25, said: 'raise it', modes: ['continue', 'fresh', 'recheck'], own: 'failed (check)' },
   tries: [
     {
       try: 1,
       round: 1,
-      cause: 'nudge',
+      cause: 'continue',
       current: false,
       taskId: 't-1',
       note: null,

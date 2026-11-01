@@ -193,8 +193,9 @@ export const breakdownLines = (c: PassCostRead): string[] => {
     String(c.phases[p].spawned),
   ]);
   const head = ['phase', 'ms', 'calls', 'read', 'processes'];
-  const widths = head.map((h, k) => Math.max(h.length, ...rows.map((r) => r[k].length)));
-  const line = (r: string[]) => `  ${r.map((cell, k) => (k === 0 ? cell.padEnd(widths[k]) : cell.padStart(widths[k]))).join('  ')}`;
+  const widths = head.map((h, k) => Math.max(h.length, ...rows.map((r) => (r[k] ?? '').length)));
+  const line = (r: string[]) =>
+    `  ${r.map((cell, k) => (k === 0 ? cell.padEnd(widths[k] ?? 0) : cell.padStart(widths[k] ?? 0))).join('  ')}`;
   const harnesses = Object.entries(c.harnesses)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(
@@ -277,9 +278,10 @@ export const passHistogram = (recent: readonly Pick<RecentPass, 'ms'>[], bounds:
   const counts = Array.from({ length: bounds.length + 1 }, () => 0);
   for (const { ms } of recent) {
     const at = bounds.findIndex((le) => ms <= le);
-    counts[at < 0 ? bounds.length : at]++;
+    const bucket = at < 0 ? bounds.length : at;
+    counts[bucket] = (counts[bucket] ?? 0) + 1;
   }
-  return counts.map((count, k) => ({ le: k < bounds.length ? bounds[k] : null, count }));
+  return counts.map((count, k) => ({ le: bounds[k] ?? null, count }));
 };
 
 /** One phase over the recent passes: its time a pass, on average, and its share of all their time. */
@@ -313,10 +315,12 @@ export const passSummary = (recent: readonly RecentPass[]): PassSummary | null =
   if (!latest) return null;
   const sorted = recent.map((r) => r.ms).sort((a, b) => a - b);
   const mid = sorted.length >> 1;
+  const [lower, upper, slowest] = [sorted[mid - 1], sorted[mid], sorted.at(-1)];
+  if (upper === undefined || slowest === undefined) return null;
   return {
     passes: recent.length,
-    medianMs: sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2,
-    slowestMs: sorted.at(-1)!,
+    medianMs: sorted.length % 2 || lower === undefined ? upper : (lower + upper) / 2,
+    slowestMs: slowest,
     at: latest.at,
     runs: latest.runs,
     tasks: latest.tasks,
@@ -352,13 +356,14 @@ const bucketWord = (b: PassBucket, bounds: readonly number[]): string => (b.le =
 
 /** `nemia passes`' lines: the summary, the histogram a row a bucket from the first to the last with passes, and the parts. */
 export const passesLines = ({ recent, histogram, parts, summary, bounds }: PassesRead): string[] => {
-  if (!summary) return ['no pass is kept yet: nemia up, or the api, ticks the store and keeps its last passes'];
+  const [oldest] = recent;
+  if (!summary || !oldest) return ['no pass is kept yet: nemia up, or the api, ticks the store and keeps its last passes'];
   const first = histogram.findIndex((b) => b.count > 0);
   const last = histogram.length - 1 - [...histogram].reverse().findIndex((b) => b.count > 0);
   const most = Math.max(...histogram.map((b) => b.count));
   const width = Math.max(...histogram.map((b) => bucketWord(b, bounds).length));
   return [
-    `${plural(summary.passes, 'pass', 'passes')} since ${recent[0].at}: ${msWord(summary.medianMs)} ms a pass (median), slowest ${msWord(summary.slowestMs)}`,
+    `${plural(summary.passes, 'pass', 'passes')} since ${oldest.at}: ${msWord(summary.medianMs)} ms a pass (median), slowest ${msWord(summary.slowestMs)}`,
     `the last pass: ${plural(summary.runs, 'run')} in the store, ${plural(summary.reads, 'journal read')}, ` +
       `${plural(summary.tasks, 'task')} not settled, ${summary.queued} queued, ${summary.admitted} admitted`,
     'passes by time:',

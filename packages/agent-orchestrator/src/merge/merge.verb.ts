@@ -50,7 +50,8 @@ const trialOf =
   (branch: string): Tried => {
     if (!isRepositoryRun(run)) return { trial: { error: 'no repository' }, base: null };
     const { at, trials } = trialMerges(run.repo, [{ onto: run.branch, branch }], place);
-    return { trial: mergeWordOf(trials[0]), base: at[run.branch] ?? null };
+    const [trial = { unknown: `the place answered no trial of ${branch}` }] = trials;
+    return { trial: mergeWordOf(trial), base: at[run.branch] ?? null };
   };
 
 /**

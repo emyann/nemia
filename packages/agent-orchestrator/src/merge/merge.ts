@@ -66,7 +66,7 @@ export const mergePending = (run: Run, looping: Workflow, asks: readonly RoundAs
   asks.find((a) => a.merge && a.step === looping.name && a.merge.target === looping.loop && a.merge.try === tryOf(run, a.merge.target) + 1);
 
 /** The merge asks a record already answers — each names a try its target has reached. The tick consumes these. */
-export const mergeSpent = (run: Run, a: RoundAsk): boolean => Boolean(a.merge) && tryOf(run, a.merge!.target) >= a.merge!.try;
+export const mergeSpent = (run: Run, a: RoundAsk): boolean => (a.merge ? tryOf(run, a.merge.target) >= a.merge.try : false);
 
 /**
  * Why a verb that ends or turns a loop waits on a merge a person asked of it (`mergePending`): the tick files the merge once, and a round
@@ -192,7 +192,8 @@ export function mergeAsk(
   const refused =
     askedRefusal(run, looping, asks) ?? loopRefusal(steps, run, looping, reads) ?? followerRefusal(steps, run, looping, reads);
   if (refused) return no(refused);
-  const target = looping.loop!;
+  const target = looping.loop;
+  if (target === undefined) return no(`${looping.name} closes no loop, so there is no step to merge into. See it: nemia ls ${run.id}.`);
   const branch = run.steps[target]?.branch;
   if (!branch) return no(`${target} has no branch to merge into yet. See it: nemia ls ${run.id}.`);
   const { trial, base } = tried(branch);
@@ -215,7 +216,8 @@ function loopNamed(steps: readonly Workflow[], run: Run, name: string | undefine
     return { refusal: `${run.id} has no step "${name}" — its steps are ${steps.map((s) => s.name).join(', ')}.` };
   const named = name === undefined ? undefined : loopOf(steps, name);
   if (named) return named;
-  if (loops.length === 1 && name === undefined) return loops[0];
+  const [only] = loops;
+  if (only !== undefined && loops.length === 1 && name === undefined) return only;
   if (loops.length > 1 && name === undefined)
     return {
       refusal: `${run.id} has ${loops.length} loops, closing at ${loops.map((s) => s.name).join(', ')}: name the one whose work merges — nemia refresh ${run.id} <step> --base.`,
@@ -399,7 +401,7 @@ const mergeRead = (onto: string, say: PlaceSay | undefined): string[] =>
  * @param say The run's place's words for reading a merge (`PlaceSay`). Absent, and the step is sent to its place's skill.
  */
 export function mergeReviewSection(step: Workflow, run: Run, closeoutOf: (step: string) => Closeout | undefined, say?: PlaceSay): string {
-  const target = step.loop!;
+  const target = step.loop;
   const round = roundOf(run, step.name);
   const cap = capOf(step);
   const onto = run.branch ?? 'the base';

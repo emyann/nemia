@@ -37,7 +37,8 @@ export function make(held: Held, { repo: dir, at, run, leaf, from, also }: Place
     return refused(`${at} holds a workspace on ${there.branch}, not on ${name}: remove it, then let the run cut it again`);
   const failed = there && isDirectory(at) ? undefined : cut(repo, at, name, from);
   if (failed) return refused(`${at} could not be cut on ${name} from ${from}: ${failed}`);
-  const found = checkoutAt(held, at)!;
+  const found = checkoutAt(held, at);
+  if (!found) return refused(`${at} could not be cut on ${name} from ${from}: the place holds no checkout there after cutting it`);
   const notes: string[] = [];
   for (const branch of also) {
     const tip = commitAt(repo, branch);

@@ -60,25 +60,26 @@ function withinOf(repo: Repository, commit: string, of: string): 'yes' | 'no' | 
   return within(repo, commit, base.id) ? 'yes' : 'no';
 }
 
-/** Where one branch asked of stands against `base`. */
-function stood(repo: Repository, base: string, one: PlaceRequests['standing']['branches'][number]): BranchStood {
+/** Where one branch asked of stands against `base`, whose commit is `baseId`. */
+function stood(repo: Repository, base: string, baseId: string, one: PlaceRequests['standing']['branches'][number]): BranchStood {
   const head = repo.branches.get(one.branch) ?? null;
   const commit = head ?? one.tip;
   const onBase = commit ? withinOf(repo, commit, base) : 'unknown';
   const known = one.known?.tip === commit && one.known?.pastBase !== null ? one.known?.pastBase : undefined;
-  const inRunBase = onBase === 'yes' && known === undefined ? withinOf(repo, commit!, one.baseRef) : 'unknown';
+  const inRunBase = onBase === 'yes' && known === undefined && commit ? withinOf(repo, commit, one.baseRef) : 'unknown';
   const pastBase = onBase !== 'yes' ? null : (known ?? (inRunBase === 'unknown' ? null : inRunBase === 'no'));
-  return { branch: one.branch, tip: head, onBase, pastBase, ahead: head === null ? null : ahead(repo, commitAt(repo, base)!.id, head) };
+  return { branch: one.branch, tip: head, onBase, pastBase, ahead: head === null ? null : ahead(repo, baseId, head) };
 }
 
 /** `standing`: every branch and its commit, and where each branch asked of stands against `base`. */
 export function standing(held: Held, { repo: dir, base, branches }: PlaceRequests['standing']): Reply<'standing'> {
   const repo = repositoryAt(held, dir);
   if (!repo) return refused(`the branches of ${dir} cannot be listed: ${noRepository(dir)}`);
-  if (branches.length && !commitAt(repo, base))
+  const baseAt = commitAt(repo, base);
+  if (branches.length && !baseAt)
     return refused(`${base} names no commit in ${dir}, the base the branches are asked of: is it a branch of that repository?`);
   const tips = Object.fromEntries([...repo.branches].sort(([a], [b]) => (a < b ? -1 : 1)));
-  return { tips, branches: branches.map((one) => stood(repo, base, one)) };
+  return { tips, branches: baseAt ? branches.map((one) => stood(repo, base, baseAt.id, one)) : [] };
 }
 
 /** `report`: what each branch the repository has changed since the commit it shares with the base. */

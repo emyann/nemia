@@ -24,6 +24,7 @@ import {
 import { queueFactoryRefusal } from './queue-factory.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 import { workRoot } from '../record/places.store.ts';
+import { firstPiece } from '../piece/piece.ts';
 import { WorkflowError, type Workflow } from '../step/step.ts';
 import { isFolderTeam } from '../workflow/index.ts';
 import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
@@ -110,7 +111,7 @@ export function addToInbox(opts: { text: string; from?: string; dir?: string; wo
   const given = { workflow: opts.workflow, repo: opts.repo, factory: opts.factory };
   const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, given, isDirectory, opts.dir);
   for (;;) {
-    const name = runId(body.split('\n')[0]);
+    const name = runId(firstPiece(body, '\n'));
     if (!runStore.inbox.add(`${name}.md`, text)) continue;
     return { card: parseInboxCard(`${name}.md`, text, isDirectory), file: runStore.inbox.where(`${name}.md`) };
   }

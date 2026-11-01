@@ -1,6 +1,7 @@
 /**
  * The rules of a template's place and names, pure: where a template is read from (`templateSourceRefusal`), what names one
- * (`templateNameRefusal`), what is a path in its folder (`treePathRefusal`), and a problem of one (`Problem`). The model's checks (`templates.model.ts`) take them.
+ * (`templateNameRefusal`), what is a path in its folder (`treePathRefusal`), and a problem of one (`Problem`). The model's checks
+ * (`templates.model.ts`) take them.
  */
 import path from 'node:path';
 import { SKILL_NAME } from '../keys/index.ts';

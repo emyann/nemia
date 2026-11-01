@@ -1,16 +1,17 @@
 /**
- * What the client's engine hands the runtime, walked on the shipped engine: the collector the process exports to (`otlpOf`), none when
- * it exports nowhere, and its sessions' tools' inputs asked for only when `NEMIA_TOOL_DETAILS` is `1` (`sessionTelemetryOf`), which a stub
- * `claude` on PATH reads back, and said on stderr for a value that asks nothing (`toolDetailsRefusalOf`).
+ * What the client's engine hands the runtime, walked on the shipped engine, as one table: the collector the process exports to
+ * (`otlpOf`), none when it exports nowhere, its sessions' tools' inputs asked for only when `NEMIA_TOOL_DETAILS` is `1`
+ * (`sessionTelemetryOf`), which a stub `claude` on PATH reads back, and said on stderr for a value that asks nothing
+ * (`toolDetailsRefusalOf`).
  *
- * - the client's engine is handed the collector the process exports to: the shipped engine files a task on the shipped `check` harness.
- * - the client's engine of a process that exports nowhere is handed no collector: the same, with no trace.
- * - the client's engine asks a session for its tools' details when NEMIA_TOOL_DETAILS is 1: a real process, the stub `claude` started —
- *   the one link of that chain no pure test reads, since `sessionTelemetryOf` and `claudeTelemetryEnv` are each pinned purely
- *   (`src/telemetry/telemetry.test.ts`, agent-runtime's `test/telemetry.test.ts`). One spawn, not one per value.
+ * - the shipped engine files a task on the shipped `check` harness, with a trace or none: what it joins is the runtime's journal.
+ * - the stub `claude` is started by a real process: the one link of that chain no pure test reads, since `sessionTelemetryOf` and
+ *   `claudeTelemetryEnv` are each pinned purely (`src/telemetry/telemetry.test.ts`, agent-runtime's `test/telemetry.test.ts`). One
+ *   spawn, not one per value.
+ * - the refusal is said as the client builds the shipped engine.
  *
- * The test place does not model the shipped engine nor a process. `WF_ROOT` is set before the client is imported: it is read as the
- * module loads.
+ * The labels a step's task is filed with are read off the engine's stand-in, in the measured run's story. The test place does not
+ * model the shipped engine nor a process. `WF_ROOT` is set before the client is imported: it is read as the module loads.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
@@ -55,16 +56,6 @@ const filedTrace = async () => {
   );
   return (await Effect.runPromise(e.view(id))).state.traceparent;
 };
-
-test("the client's engine is handed the collector the process exports to: its tasks join the filing's trace", async (t) => {
-  exportingTo(t, 'http://127.0.0.1:4318/');
-  assert.match((await filedTrace()) ?? '', /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
-});
-
-test("the client's engine of a process that exports nowhere is handed no collector: its tasks carry no trace", async (t) => {
-  exportingTo(t, '');
-  assert.equal(await filedTrace(), undefined);
-});
 
 /**
  * Asks task `id` to stop when test `t` ends, and takes a task that has already settled for the end the stop was asked for: the engine
@@ -121,26 +112,46 @@ require('node:fs').writeFileSync(${JSON.stringify(seen)}, JSON.stringify(env));
   return { env: JSON.parse(fs.readFileSync(seen, 'utf8')) as Record<string, string>, e, id };
 };
 
-test(
-  "the client's engine hands a session the collector and OTEL_LOG_TOOL_DETAILS when NEMIA_TOOL_DETAILS is 1: the one link no pure test reads",
-  WAITED,
-  async (t) => {
-    const { env } = await jobTelemetry(t, '1');
-    assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, 'http://127.0.0.1:9');
-    assert.equal(env.OTEL_LOG_TOOL_DETAILS, '1');
-  },
-);
+/** A row of the table: its name, its options, and what it holds. */
+type Row = { name: string; options?: { timeout: number }; check: (t: TestContext) => Promise<void> };
 
-test('REFUSED: a NEMIA_TOOL_DETAILS that asks nothing is said on stderr as the engine is built', async (t) => {
-  withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
-  const said = t.mock.method(console, 'error', () => {});
-  clientEngine();
-  assert.deepEqual(
-    said.mock.calls.map((c) => c.arguments).filter((a) => String(a[0]).includes('NEMIA_TOOL_DETAILS')),
-    [
-      [
-        'nemia: NEMIA_TOOL_DETAILS is "true", which asks nothing: set it to 1 for each session to export its tools\' inputs, or unset it. Their tools\' details are left off.',
-      ],
-    ],
-  );
+const HANDED: Row[] = [
+  {
+    name: "the client's engine is handed the collector the process exports to: its tasks join the filing's trace",
+    check: async (t) => {
+      exportingTo(t, 'http://127.0.0.1:4318/');
+      assert.match((await filedTrace()) ?? '', /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
+    },
+  },
+  {
+    name: "REFUSED: the client's engine of a process that exports nowhere is handed no collector: its tasks carry no trace",
+    check: async (t) => {
+      exportingTo(t, '');
+      assert.equal(await filedTrace(), undefined);
+    },
+  },
+  {
+    name: "the client's engine hands a session the collector and OTEL_LOG_TOOL_DETAILS when NEMIA_TOOL_DETAILS is 1: the one link no pure test reads",
+    options: WAITED,
+    check: async (t) => {
+      const { env } = await jobTelemetry(t, '1');
+      assert.equal(env.OTEL_EXPORTER_OTLP_ENDPOINT, 'http://127.0.0.1:9');
+      assert.equal(env.OTEL_LOG_TOOL_DETAILS, '1');
+    },
+  },
+  {
+    name: 'REFUSED: a NEMIA_TOOL_DETAILS that asks nothing is said on stderr, once, as the engine is built',
+    check: async (t) => {
+      withEnv(t, { OTEL_EXPORTER_OTLP_ENDPOINT: 'http://127.0.0.1:9', NEMIA_TOOL_DETAILS: 'true' });
+      const said = t.mock.method(console, 'error', () => {});
+      clientEngine();
+      const lines = said.mock.calls.map((c) => String(c.arguments[0])).filter((line) => line.includes('NEMIA_TOOL_DETAILS'));
+      assert.equal(lines.length, 1, lines.join('\n'));
+      assert.ok(lines[0].startsWith('nemia: ') && lines[0].includes('"true"'), lines[0]);
+    },
+  },
+];
+
+test("what the client's engine hands the runtime of the process's telemetry: a collector or none, a session's tools' details, a refusal said", async (t) => {
+  for (const row of HANDED) await t.test(row.name, row.options ?? {}, row.check);
 });

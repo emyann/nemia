@@ -40,6 +40,7 @@ import { REMOTE_PREFIX, remoteNameOf } from './harness/harness.ts';
 import { Invalid, isRefusal, type Refusal } from './refusal/refusal.ts';
 import { exportIntervalRefusalOf, sessionTelemetryOf, toolDetailsRefusalOf } from './telemetry/telemetry.ts';
 import type { EnginePhase } from './views/views-words.ts';
+import { fromThrow } from './door/door.store.ts';
 
 /**
  * Whether two unions hold the same words: `true` only when each is assignable to the other, `false` otherwise, so a `true` annotation
@@ -245,8 +246,7 @@ const orRefusal = (err: unknown): Effect.Effect<never, Refusal> => (isRefusal(er
  * A synchronous read of the store or of git, in a controller's program: what `read` returns, or the refusal it threw as the program's
  * failure (`orRefusal`); anything else it threw, the program dies of.
  */
-export const tried = <A>(read: () => A): Effect.Effect<A, Refusal> =>
-  Effect.try({ try: read, catch: (err) => err }).pipe(Effect.catch(orRefusal));
+export const tried: <A>(read: () => A) => Effect.Effect<A, Refusal> = fromThrow;
 
 /**
  * The engine's verb `verb`, `effect`, in a controller's program: what it succeeds with; a refusal of the runtime it dies of in the

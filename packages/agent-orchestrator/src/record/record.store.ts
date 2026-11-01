@@ -728,10 +728,13 @@ export const restStamps = (): Map<string, string> =>
 /** A record as it is written, by both writers: its frozen steps under the names their keys have now. */
 const recordText = (run: Omit<Run, 'approvals' | 'acceptances' | 'pruned' | 'hold' | 'pause'>): string => JSON.stringify(run, null, 2);
 
-/** A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, a person's file. */
+/**
+ * A new run's record: `start`'s, and the one writer that makes one. Without the store's pause, a person's file. Exclusive (`wx`): a
+ * record already at the id is left as it is, and the write throws `EEXIST`, which the Run door answers as `Conflict`.
+ */
 export const writeRun = ({ pause: _, ...run }: Run) => {
   fs.mkdirSync(runsDir(), { recursive: true });
-  fs.writeFileSync(runFile(run.id), recordText(run));
+  fs.writeFileSync(runFile(run.id), recordText(run), { flag: 'wx' });
 };
 
 /**

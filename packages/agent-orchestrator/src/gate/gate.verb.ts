@@ -14,6 +14,8 @@ import { standingsOf } from '../branches/branches.store.ts';
 import { standingLive } from '../standing/standing.verb.ts';
 import { closeoutAsked, closeoutReader, exitVerdicts, spendReader, taskPhasesRead } from '../views/views.verb.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /** What `nemia approve` did: the run, the approval as written, and its file. */
 export type Approved = { run: Run; approval: Approval; file: string };
@@ -35,13 +37,13 @@ export type Approved = { run: Run; approval: Approval; file: string };
  * name. Fails with a refusal, the verb's or one a read threw; dies of anything else (`tried`).
  */
 export const approveRun = Effect.fn('approve')(function* (id: string, stepName: string, message?: string) {
-  if (!(yield* tried(() => runStore.runs.exists(id))))
+  if (!(yield* (yield* RunDoor).runs.exists(RunId.read(id))))
     return yield* Effect.fail(
       new Missing({
         message: `no such run: ${id}. nemia approve takes a run by its id, as nemia ls lists it: nemia approve <runId> <step>.`,
       }),
     );
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   const steps = yield* tried(() => stepsOf(run));
   const { views, phaseOf } = yield* taskPhasesRead(run);
   const asks = steps.some((s) => s.name === stepName && approvedFirst(s, run));
@@ -68,7 +70,7 @@ export const approveRun = Effect.fn('approve')(function* (id: string, stepName: 
     at: new Date().toISOString(),
     ...(message !== undefined ? { message } : {}),
   };
-  const written = yield* tried(() => runStore.asks.write(id, { kind: 'approve', of: 'gate', ask: approval }));
+  const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', of: 'gate', ask: approval });
   const file = written.where;
   if (!written.written) {
     const { stray } = written;

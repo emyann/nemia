@@ -27,7 +27,6 @@ import { finishingAmong, type Finishing, type Pause, type PauseStanding } from '
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { stepsOrNone, unloadedFolder } from '../record/steps.store.ts';
 import { hasStarted } from '../wait/wait.ts';
-import { runStore } from '../record/files.store.ts';
 import { ceilings, recordCeilings, recordPassCost, recordRecentPass } from '../daemon/daemon.store.ts';
 import { verifiesRest } from '../config/config.store.ts';
 import { feedFile } from '../feed/feed.store.ts';
@@ -46,6 +45,8 @@ import { heldRead } from '../list/list.verb.ts';
 import { finishForgetting, type ForgettingLine } from '../forgetting/forgetting.verb.ts';
 import type { DiskReading } from '../disk/disk.ts';
 import { costOf, ioOf, meteredEngine, recordPassMetrics, recordStepMetrics, talliedIn } from '../meter/meter.verb.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /**
  * One pass: every run advanced, in the store's order, and what the pass did with the queue of inbox cards and with the factories'
@@ -246,7 +247,7 @@ const pass = Effect.fn('pass')(function* (engine: Engine, { repo, memo, verify }
   const resting = yield* restingPass(e, memo, verify);
   const ran = yield* tried(() => ceilings());
   yield* tried(() => within('act', () => recordCeilings(ran)));
-  const runs = yield* tried(() => runStore.runs.list(undefined, resting && keptOf(resting)));
+  const runs = yield* (yield* RunDoor).runs.list(undefined, resting && keptOf(resting));
   if (resting) forgotten(memo, runs);
   noteSeen({ runs: runs.length });
   const pause = yield* tried(() => readPause());
@@ -447,7 +448,7 @@ const keptOf =
 const restingPass = Effect.fn('restingPass')(function* (e: Engine, memo: RestMemo, verify: boolean) {
   if (typeof e.feed !== 'function') return undefined;
   if (!(yield* followedFeed(e, memo))) return undefined;
-  const stamps = yield* tried(() => runStore.runs.stamps());
+  const stamps = yield* (yield* RunDoor).runs.stamps();
   const resting: RestingPass = { memo, verify, stamps, rested: 0 };
   return resting;
 });
@@ -528,7 +529,7 @@ const verified = Effect.fn('verified')(function* (
   slot: RunSlot | undefined,
   kept: Omit<Advanced, 'run'>,
 ) {
-  const fresh = yield* tried(() => runStore.runs.read(run.id));
+  const fresh = yield* (yield* RunDoor).runs.read(RunId.read(run.id));
   const record = JSON.stringify(fresh);
   if (record !== JSON.stringify(run))
     return yield* Effect.die(

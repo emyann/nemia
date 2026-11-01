@@ -277,6 +277,23 @@ came to empty the person's own `~/.agent-workflows/runs`. The runtime's half is 
 `EngineOptions`, `ClaudeOptions` and the journal's makers, and `packages/agent-runtime/src/cli/main.ts` is the one module that reads
 `AE_ROOT` (`test/engine-root.test.ts`).
 
+**The Run door.** A run — its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it — is read and
+written through one Effect service, `RunDoor` (`packages/agent-orchestrator/src/runs/runs.store.ts`), whose methods take a `RunId` and
+answer Effects failing with a refusal. It has two layers built the one way (`runDoorOver`): the files (`runDoorFiles`, over
+`filesStore`, so a record keeps its bytes) and a memory stand-in (`runDoorMemory`, `src/runs/memory.store.ts`, which no file of `src`
+imports: `STAND_INS` in `test/boundary.test.ts`). Each write is checked first, on both: a new run decodes through the model's `Run`
+(`src/record/record.model.ts`) with its id as `RunId.OnCreate` checks it, a run written back through `Run`, and a break of an invariant
+is `Invalid`; a new run at an id with a record is `Conflict`, the files' `wx`. One table of walks holds the layers to each other
+(`test/run-walks.ts`, run on files by `test/run-store.test.ts` and on memory by `src/runs/memory.store.test.ts`), as the place's do;
+the pattern — `doorOf`, `checked`, `fromThrow` in `src/door/door.store.ts`, and the walk runner `test/door-walks.ts` — names no
+aggregate, for the doors after it. Unlike `PlaceService` and `StoreRoot`, the door has a default: it is a `Context.Reference` whose
+default value is the files door, so a program given none reads today's records and one given the memory layer reads that, and no
+program's requirements change while the run store's callers move onto it. A default here departs from the rule above on purpose:
+`RunDoor` is no fact of where a program runs, as the place and the root are, and requiring it would have changed the type of every
+controller and of each of their callers at once. What still calls the run store's run groups (`runStore.runs`, `.asks`, `.holds`,
+`.refresh`, `.forgetting`) — synchronous callers, the stats, the run list, the pages, the command line — is a debt counted per file in
+`test/run-door.baseline.ts`, which only shrinks; the run store's inbox is the Card door's seam and no part of it.
+
 Both shells are level-triggered: a pass reads the world, decides and acts, and carries nothing between passes that the
 next could not read again. The one thing the orchestrator's tick keeps in memory is a cache under that rule, not beside
 it: a finished run judged at rest on a full pass is answered from its memo while none of its inputs changed — its record,

@@ -20,7 +20,7 @@ import { leftOutMounts, startRun } from './start.verb.ts';
 import { pausedRead } from '../list/list.verb.ts';
 import { pausedWords, type Paused } from '../pause/pause.ts';
 import { parentRead } from '../views/views.verb.ts';
-import { EngineService, tried } from '../runtime-client.ts';
+import { EngineService } from '../runtime-client.ts';
 import { standingLive } from '../standing/standing.verb.ts';
 import { contextLines } from './context.ts';
 import { contextSection } from '../brief/index.ts';
@@ -28,6 +28,8 @@ import { parentCloseouts } from '../brief/handed.verb.ts';
 import { runStore } from '../record/files.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
 import { idRefusal } from '../forget/forget.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /** What `nemia start --help` prints of a folder of cards, after the start of one brief. */
 const FOLDER_HELP = `nemia start <folder> [--repo .] [--factory <name>]
@@ -371,7 +373,7 @@ export const CONCLUDED: Command<Concluded> = {
     if (notId) throw new Invalid({ message: notId });
     if (!runStore.runs.exists(id))
       throw new Missing({ message: `nemia concluded ${id}: the store has no run ${id}. It takes a run by its id — nemia ls lists them.` });
-    const git = yield* standingLive([yield* tried(() => runStore.runs.read(id))]);
+    const git = yield* standingLive([yield* (yield* RunDoor).runs.read(RunId.read(id))]);
     const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read', git);
     return { run: id, landed: parent.landed, section: contextSection(parent) };
   }),

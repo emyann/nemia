@@ -37,6 +37,8 @@ import type { Run } from '../record/record.ts';
 import { repoAllows, type Allows } from '../trust/allows.verb.ts';
 import { appendRevision, ledgerOf } from './revisions.store.ts';
 import { kindsDrift, revisionNow, stepsDrift, type Drift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { RunId } from '../record/record.model.ts';
 
 /** What a run resolved on a pass: the steps it now holds, and the revision of each kind they were read at. */
 export type Resolved = { steps: Workflow[]; pins: Pin[] };
@@ -453,7 +455,7 @@ export function followPass(run: Run, at: string, filing: boolean, read: PassRevi
  * whose folder does not load, which has no revision to take. A run with no record is refused `Missing` by the store's read.
  */
 export const refreshRun = Effect.fn('refresh')(function* (id: string) {
-  const run = yield* tried(() => runStore.runs.read(id));
+  const run = yield* (yield* RunDoor).runs.read(RunId.read(id));
   if (!hasStarted(run))
     return yield* Effect.fail(
       new Conflict({
@@ -481,7 +483,7 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
         message: `run ${id} is already on the newest revision of every kind it resolved: there is nothing to take. Edit a workflow, an agent, a skill or the factory's rules, and nemia refresh ${id} again. Nothing was written.`,
       }),
     );
-  if (!runStore.refresh.put(id))
+  if (!(yield* (yield* RunDoor).refresh.put(RunId.read(id))))
     return yield* Effect.fail(new Conflict({ message: `run ${id} is already asked to refresh: the next pass takes the new revisions.` }));
   return drift;
 });
@@ -490,7 +492,8 @@ export const refreshRun = Effect.fn('refresh')(function* (id: string) {
  * What a pass owes the store once it has decided: the record, written where this pass or the pins changed it, and then the refresh ask the
  * pins answered, lifted — in that order, so an ask is never spent on a record that was not written.
  */
-export const pinsWritten = (run: Run, took: PinnedPass, wrote: boolean): void => {
-  if (wrote || took.wrote) runStore.runs.rewrite(run);
-  if (took.lift) runStore.refresh.lift(run.id);
-};
+export const pinsWritten = Effect.fn('pinsWritten')(function* (run: Run, took: PinnedPass, wrote: boolean) {
+  const door = yield* RunDoor;
+  if (wrote || took.wrote) yield* door.runs.rewrite(run);
+  if (took.lift) yield* door.refresh.lift(RunId.read(run.id));
+});

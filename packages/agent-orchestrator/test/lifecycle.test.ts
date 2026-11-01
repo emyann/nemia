@@ -29,6 +29,8 @@ delete process.env.WF_MAX_RUNS;
 process.env.WF_DEFAULT_FACTORY_STARTS = '1';
 const { advanceRun, cancelRun, decideRun, list, startRun, stepsOf, runWith } = await import('../src/runner.ts');
 const { readRun } = await import('../src/record/record.store.ts');
+const { RunDoor } = await import('../src/runs/runs.store.ts');
+const { runDoorMemory } = await import('../src/runs/memory.store.ts');
 const { LINE_NAME } = await import('../src/run.ts');
 const { PlaceService } = await import('../src/place/place.store.ts');
 const { engineOf } = await import('../src/runtime-client.ts');
@@ -387,10 +389,16 @@ test('a failed step, then a cancelled run', async (t) => {
     const amnesia: Run = {
       ...readRun(failed),
       id: `${failed}-amnesia`,
-      steps: { implement: { taskId: 't-forgotten' }, review: { taskId: null } },
+      steps: { implement: { taskId: `${failed}-amnesia-implement` }, review: { taskId: null } },
     };
-    fs.writeFileSync(path.join(ROOT, 'runs', `${amnesia.id}.json`), JSON.stringify(amnesia));
-    const { plan } = await stage.runWith(stage.board().e, cancelRun(amnesia.id));
+    const door = runDoorMemory();
+    await Effect.runPromise(
+      Effect.provide(
+        Effect.flatMap(RunDoor, (d) => d.runs.create(amnesia)),
+        door,
+      ),
+    );
+    const { plan } = await stage.runWith(stage.board().e, Effect.provide(cancelRun(amnesia.id), door));
     assert.ok(plan.kind === 'finished' || plan.stop.length === 0, 'nothing reported as stopped');
     assert.deepEqual(stage.board().stopped, [check, `${id}-b`]);
   });

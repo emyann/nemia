@@ -1,0 +1,72 @@
+/**
+ * Where a step stands (agent-orchestrator, src/status/status.ts): `standing`, the one place a step's status is decided,
+ * whose laws the gate's spec assumes (`gate.contract.ts`). Its laws are proved whatever the step's own status is
+ * (`ownStatus`, its closeout, its check, its session) and whatever the run has spent: the helpers that judge those are
+ * declared pure and nothing more, so each law holds of every value they could give. What is read is how `standing`
+ * holds a step at its budget and at its gate.
+ */
+import { assume, contract } from '@emyann/tsverify';
+import { askedAgain, notHandedOn, overBudget, ownStatus, standing } from '../src/status/status.ts';
+import { loopSpan } from '../src/workflow/validate.ts';
+import { declaredOutput } from '../src/closeout/closeout.ts';
+import { approved, awaitingIsUnapproved, awaitingOnlyAtAGate, gated, ownOrHeld } from './laws.ts';
+
+/** Where a step stands on its own work: never at its budget or its gate, which `standing` alone says. Proved below. */
+export const itsOwnStatus = assume(ownStatus, {
+  pure: true,
+  ensures: { neverHeld: (_step, _run, _p, _c, _a, _steps, _s, out) => out !== 'awaiting approval' && out !== 'over budget' },
+});
+export const overItsCap = assume(overBudget, { pure: true });
+export const notYetHandedOn = assume(notHandedOn, { pure: true });
+export const askedForARound = assume(askedAgain, { pure: true });
+export const theLoopsSteps = assume(loopSpan, { pure: true });
+export const whatItDeclared = assume(declaredOutput, { pure: true });
+
+export const stood = contract(standing, {
+  /** The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). */
+  requires: (step, run) => Object.hasOwn(run.steps, step.name),
+  ensures: {
+    /** What the gate's spec assumes of it (laws.ts). */
+    awaitingOnlyAtAGate,
+    awaitingIsUnapproved,
+    ownOrHeld,
+    /** Its check comes first: a gated step still checking is checking. */
+    aCheckComesFirst: (_step, _run, _p, _c, _a, _steps, _s, _v, out) => out.own !== 'checking' || out.status === 'checking',
+    /**
+     * A gated step that signed off on its own work reads `awaiting approval` until the try it is on is approved, but
+     * where it asked for a round, is a later try of an ending approved before it was filed, or is held at its budget.
+     */
+    aGateHoldsASignedStep: (step, run, _p, c, _a, _steps, _s, _v, out) =>
+      !gated(step, run) ||
+      (out.own !== 'verified' && out.own !== 'unverified') ||
+      approved(run, step.name) ||
+      askedAgain(step, run, c) ||
+      (step.workspace === 'main' && (run.steps[step.name]?.tries?.length ?? 0) > 0) ||
+      out.status === 'awaiting approval' ||
+      out.status === 'over budget',
+    /** A looping step that asked for another round is not held at its gate: the gate is on what comes after it. */
+    aRoundIsNotHeldAtTheGate: (step, run, _p, c, _a, _steps, _s, _v, out) =>
+      out.status !== 'awaiting approval' || out.own === 'pending' || !askedAgain(step, run, c),
+    /** Over budget only where another session of it would be the way on: a step filed. */
+    overBudgetOnlyOnceFiled: (step, run, _p, _c, _a, _steps, _s, _v, out) => out.status !== 'over budget' || !!run.steps[step.name]?.taskId,
+    /** And only over its cap, or as a loop held by a step of it over its own. */
+    overBudgetOnlyOverACap: (step, run, _p, _c, _a, steps, s, _v, out) =>
+      out.status !== 'over budget' || overBudget(step, run, s) !== undefined || steps.some((x) => x.name === step.name && !!x.loop),
+    /** An ending approved before it is filed waits at its gate once every step before it has handed on. */
+    anEndingWaitsBeforeItIsFiled: (step, run, p, c, a, steps, s, v, out) =>
+      out.own !== 'pending' ||
+      step.workspace !== 'main' ||
+      !gated(step, run) ||
+      !!run.cancelledAt ||
+      !!run.steps[step.name]?.taskId ||
+      approved(run, step.name) ||
+      notHandedOn(step, run, p, c, a, steps, s, v ?? (() => undefined)).length > 0 ||
+      out.status === 'awaiting approval',
+  },
+});
+
+/** `ownStatus` itself: what it says is a step's own status, never one `standing` holds it at. */
+export const ownOnly = contract(ownStatus, {
+  requires: (step, run) => Object.hasOwn(run.steps, step.name),
+  ensures: { neverHeld: (_step, _run, _p, _c, _a, _steps, _s, out) => out !== 'awaiting approval' && out !== 'over budget' },
+});

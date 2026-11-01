@@ -1,0 +1,8 @@
+{
+  "//": "The verifier reads a contract's program with the nearest tsconfig, and refuses an index read whose type says the element is there: the package's code is compiled without noUncheckedIndexedAccess, so its contracts are read with it. The package's typecheck reads them as the package's code is read.",
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": true
+  },
+  "include": ["."]
+}

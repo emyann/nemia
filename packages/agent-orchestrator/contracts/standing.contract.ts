@@ -5,7 +5,7 @@
  * run has spent: the helpers that judge those are declared pure and nothing more, so each law holds of every value they
  * could give. What is read is how `standing` holds a step at its budget and at its gate.
  */
-import { assume, spec } from '@emyann/tsverify';
+import { assume, type Implementation, spec } from '@emyann/tsverify';
 import type { Verdict } from '../src/check/check.ts';
 import type { Closeout } from '../src/closeout/index.ts';
 import type { CloseoutAsked, Run, StepStatus, TaskPhase } from '../src/record/record.ts';
@@ -16,7 +16,7 @@ import { declaredOutput } from '../src/closeout/closeout.ts';
 import { approved, gated } from './laws.ts';
 
 /** Where a step stands, as `standing` takes and answers it: its own status, and the one a person reads. */
-type StandingOf = (
+type Stands = (
   step: Workflow,
   run: Run,
   phaseOf: (taskId: string) => TaskPhase,
@@ -33,7 +33,7 @@ export const askedForARound = assume(askedAgain, { pure: true });
 export const theLoopsSteps = assume(loopSpan, { pure: true });
 export const whatItDeclared = assume(declaredOutput, { pure: true });
 
-const standingSpec = spec<StandingOf>({
+const standingSpec = spec<Stands>({
   /** The run holds a record of the step: `nemia start` writes one for each (start.verb.ts). */
   requires: ({ input: [step, run] }) => Object.hasOwn(run.steps, step.name),
   ensures: {
@@ -94,7 +94,8 @@ const standingSpec = spec<StandingOf>({
   },
 });
 
-export type StandingSpec = typeof standingSpec;
+/** `standing`'s type, which the code takes: it then imports nothing of tsverify. */
+export type StandingOf = Implementation<typeof standingSpec>;
 
 /** `ownStatus` itself: what it says is a step's own status, never one `standing` holds it at. */
 const ownStatusSpec = spec<
@@ -116,4 +117,5 @@ const ownStatusSpec = spec<
     },
   },
 });
-export type OwnStatusSpec = typeof ownStatusSpec;
+/** The function's type, which the code takes: it then imports nothing of tsverify. */
+export type OwnStatus = Implementation<typeof ownStatusSpec>;

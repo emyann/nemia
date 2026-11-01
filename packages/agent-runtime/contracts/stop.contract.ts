@@ -3,7 +3,7 @@
  * journalled as `stop-requested`, and refused, with nothing journalled, for what `stopRefusalOf` refuses. The laws speak of the
  * outcome and of the journal's calls, never of how the program is written.
  */
-import { assume } from '@emyann/tsverify';
+import { assume, type Implementation } from '@emyann/tsverify';
 import { spec } from '@emyann/tsverify/effect';
 import type { Effect } from 'effect';
 import { fold, verbTakes } from '../src/core/domain.ts';
@@ -67,4 +67,5 @@ const stopSpec = spec<(taskId: string) => Effect.Effect<void, StopRefused | Jour
     },
   },
 });
-export type StopSpec = typeof stopSpec;
+/** The function's type, which the code takes: it then imports nothing of tsverify. */
+export type RequestStop = Implementation<typeof stopSpec>;

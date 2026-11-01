@@ -7,8 +7,7 @@ import { andList, tryOf, type Run, type StepStatus } from '../record/record.ts';
 import { heard, modeWord, retryable } from '../retry/index.ts';
 import { approvalOf, approvedFirst, branchWord, gatesOf, hasGate, notHandedOn, resultOnBase, standing } from '../status/status.ts';
 import { heldRefusal, prunedRefusal } from '../prune/prune.ts';
-import type { Implementation } from '@emyann/tsverify';
-import type { ApprovalRefusalSpec, HoldsOpenSpec } from '../../contracts/gate.contract.ts';
+import type { ApprovalRefusal, HoldsOpen } from '../../contracts/gate.contract.ts';
 
 /**
  * Whether a step's task, filed held open (`holdsOpenOn`) and waiting for a person's word — the runtime's `input-required` — stays open on
@@ -18,16 +17,7 @@ import type { ApprovalRefusalSpec, HoldsOpenSpec } from '../../contracts/gate.co
  * a check that refused, a denial under `denials: fail`, a closeout short of a field. And every waiting task of a run called off or pruned,
  * whose steps nobody will answer. A try of a closed step is filed as its own task, `-try<n>`.
  */
-export const holdsOpen: Implementation<HoldsOpenSpec> = (
-  step,
-  run,
-  phaseOf,
-  closeoutOf,
-  askedCloseout,
-  steps,
-  spendOf,
-  verdictOf = () => undefined,
-) => {
+export const holdsOpen: HoldsOpen = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf = () => undefined) => {
   if (run.cancelledAt || run.pruned) return false;
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   if (own === 'blocked') return true;
@@ -60,7 +50,7 @@ export const approvalWordsRefusal = (message: string | undefined, command = 'nem
  * @param standings Where each result branch stands against the base branch now (`branchStandings` in branches.store.ts). Left out, git is
  *   not asked, and the gate alone speaks.
  */
-export const approvalRefusal: Implementation<ApprovalRefusalSpec> = (
+export const approvalRefusal: ApprovalRefusal = (
   steps,
   run,
   name,

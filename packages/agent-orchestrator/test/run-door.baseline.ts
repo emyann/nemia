@@ -24,7 +24,7 @@ export const RUN_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/costs/costs.verb.ts': 1,
   'src/ending/ending.verb.ts': 4,
   'src/feed/word-feed.verb.ts': 1,
-  'src/folder/workflows.verb.ts': 1,
+  'src/workflows/workflows.verb.ts': 1,
   'src/forget/forget.verb.ts': 4,
   'src/forgetting/forgetting.verb.ts': 2,
   'src/gate/commands.verb.ts': 3,

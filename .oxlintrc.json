@@ -692,8 +692,7 @@
     {
       "files": ["packages/agent-orchestrator/src/workflow/validate.ts"],
       "rules": {
-        "complexity": ["error", { "max": 26 }],
-        "sonarjs/cognitive-complexity": ["error", 52]
+        "sonarjs/cognitive-complexity": ["error", 40]
       }
     },
     {

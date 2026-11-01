@@ -7,8 +7,7 @@ import { foreignId, brandedCount, brandedId, type Count, type Id } from '../mode
 import type { ErModel } from '../model/er.model.ts';
 import { stepTaskId } from './record.ts';
 import { idRefusal } from '../forget/forget.ts';
-import { stepNameRefusal } from '../folder/folder.ts';
-import { workflowNameRefusal } from '../factory/factory.ts';
+import { FrozenWorkflowStep, StepName, WorkflowDir, WorkflowName } from '../folder/folder.model.ts';
 import { TRY_CAUSES, upgradeTries } from '../retry/index.ts';
 
 /** What a stored record is read through before `Run` reads it, as the store does: a try's former `then` read as its `cause`. */
@@ -18,13 +17,8 @@ export { upgradeTries };
 export const RunId = brandedId('RunId', (value) => idRefusal(value));
 export type RunId = Id<'RunId'>;
 
-/** A step's name: its file's name in its workflow's folder, without `.md` (`stepNameRefusal`). */
-export const StepName = brandedId('StepName', stepNameRefusal);
-export type StepName = Id<'StepName'>;
-
-/** A workflow's name: its folder's (`workflowNameRefusal`). */
-export const WorkflowName = brandedId('WorkflowName', workflowNameRefusal);
-export type WorkflowName = Id<'WorkflowName'>;
+/** A step's name and a workflow's: the definition's ids (`folder/folder.model.ts`), which a run's record names. */
+export { StepName, WorkflowName };
 
 /** A try's number within its step, from 1. */
 export const TryNumber = brandedCount('TryNumber', 1);
@@ -156,8 +150,9 @@ const afterOthers = Schema.makeFilter(
 /**
  * A run's record (`Run`, record.ts:37), the aggregate: what it was started on and with, frozen at start, its steps by name, and what
  * the tick wrote down of it. A repository run names its repository, base, branch and worktrees; a folder run, `place: { kind:
- * 'folder' }` and none of them. Left out, as no relation of the model: the frozen workflow and the revisions pinned (the
- * definitions' and the revisions' own, S5), the counters the tick keeps for the metrics (`gatesTimed`, `deniedCounted`,
+ * 'folder' }` and none of them. It names the workflow's folder it started on (`workflowDir`, read nominally, so no stored record is
+ * refused) and the steps it froze at start (`workflow`, read loosely, `FrozenWorkflowStep`). Left out, as no relation of the model: the
+ * revisions pinned (the revisions' own, S5), the counters the tick keeps for the metrics (`gatesTimed`, `deniedCounted`,
  * `settlesCounted`, `runTimed`, `slotHeldAt`), and what `readRun` composes on read and never writes (`approvals`, `acceptances`,
  * `pruned`, `hold`, `pause`). Read as the store's reader reads it: a key it does not name is kept on the record, and ignored here.
  */
@@ -165,7 +160,8 @@ export const Run = Schema.Struct({
   id: RunId.OnRead,
   workspace: Schema.String,
   brief: Schema.String,
-  workflowDir: Schema.String,
+  workflowDir: WorkflowDir.OnRead,
+  workflow: Schema.optional(Schema.Array(FrozenWorkflowStep)),
   after: Schema.optional(Schema.Array(RunId.OnRead)),
   context: Schema.optional(Schema.Array(RunId.OnRead)),
   inputs: Schema.optional(Schema.Array(Schema.String)),
@@ -193,5 +189,5 @@ export type Run = typeof Run.Type;
 /** Run-core's part of the orchestrator's diagram (`model/diagram.model.ts`): its entities, and the ids it owns. */
 export const recordModel = {
   entities: [Run, Step, Try, Round, Landing],
-  ids: { RunId: 'Run', StepName: 'Step', TryNumber: 'Try', WorkflowName: 'Workflow' },
+  ids: { RunId: 'Run', TryNumber: 'Try' },
 } satisfies ErModel;

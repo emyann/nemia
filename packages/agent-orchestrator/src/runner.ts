@@ -433,7 +433,7 @@ export { checkoutHold } from './ending/ending.verb.ts';
 export { runSlots, type Slots, slotsOf } from './cap/cap.verb.ts';
 export type { MergeWord, StandingMerge } from './branches/index.ts';
 export type { Collision, Collisions } from './collide/collide.ts';
-export type { FolderLoaded } from './folder/workflows.verb.ts';
+export type { FolderLoaded } from './workflows/workflows.verb.ts';
 export type { SkillPage } from './skills/skills.verb.ts';
 export type { Advanced } from './tick/advance.verb.ts';
 export type { Pass } from './tick/tick.verb.ts';

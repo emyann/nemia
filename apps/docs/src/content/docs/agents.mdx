@@ -45,7 +45,9 @@ below it, indented. A key that takes a list, such as `tools`, reads `Read, Grep`
 The fence keys sit under the block of the harness the agent runs on: `claude` takes `permissionMode`, `tools`, `allowedTools` and
 `disallowedTools` under its `fence`, and `codex` takes `sandbox`. A block holds its `fence` and nothing else. A fence key written at the
 top level, as files did before, is still read as the key in the block, and the start of a run names each file that writes one. To move
-them into the block, type `nemia frontmatter rewrite <folder>`: it keeps every value as written.
+them into the block, type `nemia frontmatter rewrite <folder>`: it keeps every value as written. A permission mode in a step that
+names neither its harness nor an agent beside it stays where it is, since either harness could run it, and the rewrite says so: add a
+harness line and rewrite again.
 
 The agent's keys are defaults. A step may set one of the same keys, and the step's wins, with one exception: a key of the fence only
 narrows (below).

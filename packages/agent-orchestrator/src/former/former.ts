@@ -349,27 +349,52 @@ export const overridableLine = (file: string): string =>
   `${file}: no \`overridable:\` line, so a step may override every key it takes from this agent, its fence narrowed, skills and MCP servers added. Say what a step may override — \`overridable: [model, fence, skills]\` — and a step that writes anything else is refused at load.`;
 
 /**
- * A file's text with each top-level fence key (`FORMER_FENCE_KEYS`) moved into the block of the harness it runs on — `harness`, its own
- * line's or its agent's — every value as it was, and `changed`. A file whose fence is already in its block is returned as it is. What
+ * The block a top-level fence key moves into: the harness whose fence takes it (`harnessTaking`), and for the mode key one harness takes
+ * and another reads as its former spelling (`codexSandboxNamed`), the harness the file runs on, whose own mode key it becomes. Undefined
+ * for that key where the file's harness is not known: it stays where it is.
+ */
+function movedTo(
+  key: string,
+  value: FrontmatterValue,
+  harness: string | undefined,
+): { block: string; key: string; value: FrontmatterValue } | undefined {
+  if (key !== 'permissionMode') return { block: harnessTaking(key)!, key, value };
+  if (harness === undefined || fenceKeysOf(harness) === undefined) return undefined;
+  if (fenceKeysOf(harness)![0] !== 'sandbox') return { block: harness, key, value };
+  return { block: harness, key: 'sandbox', value: typeof value === 'string' ? sandboxNamed(value) : value };
+}
+
+/**
+ * A file's text with each top-level fence key (`FORMER_FENCE_KEYS`) moved into the block of the harness whose fence takes it (`movedTo`),
+ * every value as it was, and `changed`; `kept`, the keys left at the top level because the harness they belong to is not known — the
+ * mode key two harnesses read, where `harness` is undefined. A file whose fence is already in its block is returned as it is. What
  * `nemia frontmatter rewrite` writes after the line form. Refused where the block cannot be written so it reads back the same.
  */
-export function fenceMoved(name: string, text: string, harness: string): { text: string; changed: boolean } {
+export function fenceMoved(name: string, text: string, harness: string | undefined): { text: string; changed: boolean; kept: string[] } {
   const { block } = splitFrontmatter(name, text);
-  if (block === null) return { text, changed: false };
+  if (block === null) return { text, changed: false, kept: [] };
   const read = readFrontmatter(name, block);
   const top = read.entries.filter(({ key }) => FORMER_FENCE_KEYS.includes(key));
-  if (read.former || !top.length) return { text, changed: false };
-  const fence: Record<string, FrontmatterValue> = {};
+  if (read.former || !top.length) return { text, changed: false, kept: [] };
+  const fences = new Map<string, Record<string, FrontmatterValue>>();
+  for (const entry of read.entries.filter(({ key }) => isHarnessBlock(key))) fences.set(entry.key, { ...fenceOfBlock(entry.value) });
+  const kept: string[] = [];
+  const touched = new Set<string>();
+  let moved = block;
   for (const { key, value } of top) {
-    const sandboxMode = key === 'permissionMode' && fenceKeysOf(harness)?.[0] === 'sandbox';
-    fence[sandboxMode ? 'sandbox' : key] = sandboxMode && typeof value === 'string' ? sandboxNamed(value) : value;
+    const to = movedTo(key, value, harness);
+    if (to === undefined) {
+      kept.push(key);
+      continue;
+    }
+    fences.set(to.block, { ...fences.get(to.block), [to.key]: to.value });
+    touched.add(to.block);
+    moved = withKey(name, moved, key, undefined);
   }
-  const at = read.entries.find(({ key }) => isHarnessBlock(key));
-  let moved = top.reduce((written, { key }) => withKey(name, written, key, undefined), block);
-  const existing = at === undefined ? {} : (fenceOfBlock(at.value) ?? {});
-  moved = withKey(name, moved, at?.key ?? harness, { fence: { ...existing, ...fence } });
+  if (moved === block) return { text, changed: false, kept };
+  for (const at of touched) moved = withKey(name, moved, at, { fence: fences.get(at)! });
   const open = text.indexOf(block);
-  return { text: `${text.slice(0, open)}${moved}${text.slice(open + block.length)}`, changed: true };
+  return { text: `${text.slice(0, open)}${moved}${text.slice(open + block.length)}`, changed: true, kept };
 }
 
 /**

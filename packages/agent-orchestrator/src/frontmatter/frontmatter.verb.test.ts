@@ -12,7 +12,8 @@ import { scratch } from '../../test/scratch.ts';
 import { readFrontmatter } from './frontmatter.ts';
 import { readKeys } from '../former/former.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
-import { FRONTMATTER_REWRITE, rewriteFolders, storeFolders, type Rewritten } from './frontmatter.verb.ts';
+import { FRONTMATTER_REWRITE, rewriteFolders, rewrittenLines, storeFolders, type Rewritten } from './frontmatter.verb.ts';
+import { parseAgent, parseWorkflow } from '../workflow.ts';
 
 const FORMER = fs.readFileSync(path.join(import.meta.dirname, '../../test/fixtures/former-frontmatter/build-land.md'), 'utf8');
 const TAIL = '---\ncheck: npm test # every file\nbudget: 2\n---\nThe body.\n';
@@ -137,4 +138,30 @@ test("a top-level fence key moves into the block of the harness its file runs on
   assert.equal(bodyOf(moved), bodyOf('---\n---\nReview.\n'), 'the body byte for byte');
   assert.equal(fs.readFileSync(agent, 'utf8'), '---\nharness: codex\nmodel: gpt-5\n---\nYou review.\n');
   assert.equal((await rewrite(home, { folders: [dir], check: true })).failed, undefined, 'and --check passes after');
+});
+
+test('a step that names no agent: each fence key goes to the harness that takes it, and a `permissionMode` it cannot place is kept and said', async () => {
+  const home = scratch('wf-frontmatter-hired-');
+  const dir = path.join(home, 'factories', 'acme', 'applied', 'workflows', 'dev');
+  const step = put(path.join(dir, 'review.md'), '---\nplace: git\nsandbox: read-only\npermissionMode: plan\n---\nReview.\n');
+  const found = (await rewrite(home, { folders: [dir] })).found;
+  assert.deepEqual(found?.rewritten, [step]);
+  assert.deepEqual(found?.kept, [{ file: step, key: 'permissionMode' }], 'its harness is not known here: the line is kept');
+  assert.ok(
+    rewrittenLines(found).some((line) => line.startsWith('kept:') && line.includes(step) && line.includes('permissionMode')),
+    'and the command says so',
+  );
+  const moved = fs.readFileSync(step, 'utf8');
+  assert.deepEqual(
+    readFrontmatter(step, splitFrontmatter(step, moved).block!).entries.map((e) => e.key),
+    ['place', 'permissionMode', 'codex'],
+    "`sandbox` under codex's block, whatever harness the file's own lines would guess",
+  );
+  const agents = new Map([['coder', parseAgent('coder', '---\nharness: codex\nmodel: gpt-5\n---\nYou code.\n')]]);
+  const hired = parseWorkflow('review', moved.replace('permissionMode: plan\n', ''), undefined, agents, undefined, {
+    agent: 'coder',
+    factory: 'acme',
+    step: 'dev/review',
+  });
+  assert.equal(hired.sandbox, 'read-only', 'the moved step loads hired onto a Codex agent');
 });

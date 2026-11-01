@@ -474,7 +474,9 @@ same key written both at the top level and in the block. `renderStep` and `rende
 A fence key written at the top level is its former spelling, used until 2026-10-31, and it is still read, as the key in the block of the
 file's harness (`FORMER_FENCE_KEYS`); `nemia start` prints a line naming each file that writes one. `nemia frontmatter rewrite
 <folder>` moves each into its block, every value byte for byte (`fenceMoved`; a codex file's former `permissionMode:` lands as
-`sandbox:`), and `--check` exits 1 where a move is due. Saving the file from the board writes the block too.
+`sandbox:`), each into the block of the harness whose fence takes it, and `--check` exits 1 where a move is due. A `permissionMode:`
+whose harness the file does not say — no `harness:` line, and no agent beside it, as a step a factory hires its agent into — is left
+where it is, still read, and named on a `kept:` line. Saving the file from the board writes the block too.
 
 **No key is control flow.** No conditions, no expressions, no templating, and no loop a keyword
 decides. That is the design, not a missing feature.

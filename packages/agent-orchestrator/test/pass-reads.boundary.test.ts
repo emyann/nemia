@@ -406,6 +406,7 @@ const askedEngine = () => {
   };
   const list = async (ids: string[]) => {
     asked.push(...ids);
+    if (ids.includes('slow')) await new Promise<void>((go) => (held.go = go));
     return { views: ids.map((id) => ({ id })), unreadable: [] };
   };
   const wrote = async () => undefined;
@@ -438,6 +439,31 @@ test('a view the engine was still reading when a write of the pass went through 
   held.go?.();
   await again;
   assert.deepEqual(asked, ['slow', 'slow'], 'read again: what it read may be from before the write');
+});
+
+test('a view kept for the pass that a write drops while a list is in flight is read again, never left out of the list', async () => {
+  const { e: engine, asked, held } = askedEngine();
+  const e = reportedEngine(engine, []);
+  await Effect.runPromise(e.view('kept'));
+  const list = { answered: false };
+  const listed = Effect.runPromise(e.list(['kept', 'slow'])).finally(() => (list.answered = true));
+  const release = async () => {
+    while (held.go === undefined && !list.answered) await new Promise((r) => setImmediate(r));
+    const go = held.go;
+    held.go = undefined;
+    go?.();
+  };
+  while (held.go === undefined) await new Promise((r) => setImmediate(r));
+  await Effect.runPromise(e.file({ id: 'kept' } as never));
+  await release();
+  await release();
+  const { views } = await listed;
+  assert.deepEqual(
+    views.map((v) => v.id),
+    ['kept', 'slow'],
+    'every task handed in is answered',
+  );
+  assert.deepEqual(asked, ['kept', 'slow', 'kept', 'slow'], 'the kept task read again, after the write, with the read in flight across it');
 });
 
 test('a forget drops the views of the tasks it forgets, and keeps the others the pass read', async () => {

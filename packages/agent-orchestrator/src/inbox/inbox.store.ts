@@ -1,13 +1,16 @@
 /**
  * The inbox's verbs: its cards read (`readInbox`), filed (`addToInbox`), queued and taken back (`queueInInbox`), dropped
  * (`dropFromInbox`), and a path named as a card (`inboxNameAt`), each card and each try the tick wrote down of a queued card's start read
- * and written through `runStore.inbox` (`files.store.ts`). The judgement is `inbox.ts`'s.
+ * and written through the Card door (`CardDoor`, `src/cards/cards.store.ts`): each verb an Effect program that yields it, so a program
+ * given `StoreRoot` reads the store's files and a test gives `cardDoorMemory()`. The judgement is `inbox.ts`'s.
  *
  * Beneath the controllers, beside `files.store.ts`: it imports neither the engine nor a controller, and `runner.ts` re-exports what the
  * package exports of it. A card's start — `startFromInbox`, and `startQueued`, the tick's — starts a run, and
  * is `inbox.verb.ts`'s, through `startRun`.
  */
 import fs from 'node:fs';
+import path from 'node:path';
+import { Effect } from 'effect';
 import {
   ideaCard,
   inboxListing,
@@ -23,6 +26,8 @@ import {
 } from './inbox.ts';
 import { queueFactoryRefusal } from './queue-factory.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
+import { CardDoor, cardNameAt, inboxAt } from '../cards/cards.store.ts';
+import { CardName } from './inbox.model.ts';
 import { workRoot } from '../record/places.store.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { WorkflowError, type Workflow } from '../step/step.ts';
@@ -31,13 +36,15 @@ import { loadWorkflows, workflowFolder } from '../folder/folder.store.ts';
 import { defaultStartsAllowed, factoryNames, readFactories, treeOf } from '../factory/factory.store.ts';
 import type { Factory } from '../factory/factory.ts';
 import { HOME, isDirectory, runId, runsDir } from '../record/record.store.ts';
-import { keptRuns, runStore } from '../record/files.store.ts';
+import { keptRuns } from '../record/files.store.ts';
 
 /** The names of the inbox's cards, as `nemia inbox` lists them. */
-export const inboxCards = (): string[] =>
-  inboxListing(runStore.inbox.entries(), [], () => true)
+export const inboxCards = Effect.fn('inboxCards')(function* () {
+  const entries = yield* (yield* CardDoor).cards.entries();
+  return inboxListing(entries, [], () => true)
     .filter((l) => l.file.endsWith('.md'))
     .map((l) => l.name);
+});
 
 /**
  * `nemia inbox`: every card in the inbox, by name, with the runs a record says it was started as (`inboxListing`) — and every entry that
@@ -49,14 +56,18 @@ export const inboxCards = (): string[] =>
  * one (`keptRuns`): a warm read of the board's inbox reads no finished run's record. With none — the command line's — every record is
  * read, and the answer is the same.
  */
-export const readInbox = (memo?: InboxRuns): InboxListing[] =>
-  inboxListing(
-    runStore.inbox.entries(),
+export const readInbox = Effect.fn('readInbox')(function* (memo?: InboxRuns) {
+  const door = yield* CardDoor;
+  const entries = yield* door.cards.entries();
+  const tries = yield* door.tries.list();
+  return inboxListing(
+    entries,
     keptRuns(memo, (run) => ({ id: run.id, ...(run.from === undefined ? {} : { from: run.from }) })),
     isDirectory,
-    runStore.inbox.tries(),
+    tries,
     readableFactories(),
   );
+});
 
 /** The store's factories that read, by name: what a queued card's repository is chosen from (`queueRepo`). One not read is none. */
 export const readableFactories = (): Map<string, Factory> =>
@@ -100,22 +111,30 @@ function cardRepoRefusal(opts: { workflow?: string; repo?: string; dir?: string;
  * what a refusal calls it; `dir` is the folder a path in the text's own `workflow:` is read from — the file's — and it is written absolute
  * (`ideaCard`). `workflow`, `repo` and `factory` are written as the card's keys, over the text's own: `repo` an absolute path to a
  * directory, `workflow` a name or an absolute path (`workflowAt`), as a start would be given it, and `factory` a factory's name, whose
- * factory the start judges.
+ * factory the start judges. The card is filed exclusively (`cards.add`): a name another card took meanwhile (`Conflict`) is drawn again.
  */
-export function addToInbox(opts: { text: string; from?: string; dir?: string; workflow?: string; repo?: string; factory?: string }): {
-  card: InboxCard;
-  file: string;
-} {
+export const addToInbox = Effect.fn('addToInbox')(function* (opts: {
+  text: string;
+  from?: string;
+  dir?: string;
+  workflow?: string;
+  repo?: string;
+  factory?: string;
+}) {
   const refusedRepo = cardRepoRefusal(opts);
-  if (refusedRepo) throw new WorkflowError(refusedRepo);
+  if (refusedRepo) return yield* Effect.fail(new WorkflowError(refusedRepo));
   const given = { workflow: opts.workflow, repo: opts.repo, factory: opts.factory };
   const { text, body } = ideaCard(opts.from ?? 'the idea', opts.text, given, isDirectory, opts.dir);
+  const door = yield* CardDoor;
   for (;;) {
-    const name = runId(firstPiece(body, '\n'));
-    if (!runStore.inbox.add(`${name}.md`, text)) continue;
-    return { card: parseInboxCard(`${name}.md`, text, isDirectory), file: runStore.inbox.where(`${name}.md`) };
+    const name = CardName.read(runId(firstPiece(body, '\n')));
+    const filed = yield* Effect.result(door.cards.add(name, text));
+    if (filed._tag === 'Failure' && filed.failure._tag === 'Conflict') continue;
+    if (filed._tag === 'Failure') return yield* Effect.fail(filed.failure);
+    const out: { card: InboxCard; file: string } = { card: parseInboxCard(`${name}.md`, text, isDirectory), file: filed.success };
+    return out;
   }
-}
+});
 
 /**
  * What `nemia inbox queue` did: the card as it now reads, its file, and — once queued — its place in the queue's order, how many are in
@@ -130,6 +149,9 @@ export type InboxQueued = {
   factoryRepo: string | null;
 };
 
+/** What `queueInInbox` answers, as its type says it. */
+const queued = (done: InboxQueued): InboxQueued => done;
+
 /** A queue `queueRefusal` refused, by its kind: a card a run's record names, or one already queued, is a `Conflict`; the rest `Invalid`. */
 const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]): Conflict | WorkflowError =>
   startedAs.length || card.queued !== undefined ? new Conflict({ message: why }) : new WorkflowError(why);
@@ -138,14 +160,14 @@ const queueRefused = (why: string, card: InboxCard, startedAs: readonly string[]
  * Throws what refuses the queue of `card`, in `file`, on `workflow` when one is given: `queueRefusal`'s reasons by their kind
  * (`queueRefused`), then its factory's (`queueFactoryRefusal`), an `Invalid`, by the factories on file and `defaultStartsAllowed`.
  */
-function refuseQueue(card: InboxCard, file: string, workflow: string | undefined): void {
-  const listed = readInbox().find((l) => l.name === card.name);
+const refuseQueue = Effect.fn('refuseQueue')(function* (card: InboxCard, file: string, workflow: string | undefined) {
+  const listed = (yield* readInbox()).find((l) => l.name === card.name);
   const startedAs = listed?.startedAs ?? [];
   const why = queueRefusal(card, file, startedAs, listed?.queued?.place ?? null, workflow);
   if (why) throw queueRefused(why, card, startedAs);
   const whyFactory = queueFactoryRefusal(card, file, factoryNames(), defaultStartsAllowed());
   if (whyFactory) throw new WorkflowError(whyFactory);
-}
+});
 
 /**
  * `nemia inbox queue <name>`: the card marked to start on its own, `queued:` the time now, and `workflow:` written over its own when given;
@@ -162,33 +184,35 @@ function refuseQueue(card: InboxCard, file: string, workflow: string | undefined
  * and refused onto a folder team for a card that names a repository (`cardRepoRefusal`); with none given, the card's `repo:` is not judged.
  * `off` on a card not queued writes nothing, and says so.
  */
-export function queueInInbox(name: string, how: { off?: boolean; workflow?: string } = {}): InboxQueued {
+export const queueInInbox = Effect.fn('queueInInbox')(function* (name: string, how: { off?: boolean; workflow?: string } = {}) {
   const refused = inboxNameRefusal(name);
-  if (refused) throw new WorkflowError(refused);
-  const file = runStore.inbox.where(`${name}.md`);
-  const text = runStore.inbox.read(`${name}.md`);
+  if (refused) return yield* Effect.fail(new WorkflowError(refused));
+  const door = yield* CardDoor;
+  const card$ = CardName.read(name);
+  const file = yield* door.cards.where(card$);
+  const text = yield* door.cards.read(card$);
   if (text === null) {
-    throw new Missing({
-      message: `${noCardLine(name, inboxCards())} Queue one of those — nemia inbox queue <name> — or park the idea first: nemia inbox add "<idea>".`,
+    return yield* new Missing({
+      message: `${noCardLine(name, yield* inboxCards())} Queue one of those — nemia inbox queue <name> — or park the idea first: nemia inbox add "<idea>".`,
     });
   }
   const exists = how.off ? () => true : isDirectory;
   const card = parseInboxCard(`${name}.md`, text, exists);
-  if (how.off && card.queued === undefined) return { card, file, was: 'not queued', factoryRepo: null };
-  if (!how.off) refuseQueue(card, file, how.workflow);
+  if (how.off && card.queued === undefined) return queued({ card, file, was: 'not queued', factoryRepo: null });
+  if (!how.off) yield* refuseQueue(card, file, how.workflow);
   if (how.workflow !== undefined) {
     const refusedRepo = cardRepoRefusal({ workflow: how.workflow, repo: card.repo, factory: card.factory });
     if (refusedRepo) throw new WorkflowError(refusedRepo);
   }
   const written = queuedText(card, how.off ? null : new Date().toISOString(), exists, how.workflow);
-  runStore.inbox.rewrite(`${name}.md`, written);
+  yield* door.cards.rewrite(card$, written);
   const now = parseInboxCard(`${name}.md`, written, exists);
-  if (how.off) return { card: now, file, was: 'taken back', factoryRepo: null };
-  const order = queueOrder(readInbox());
+  if (how.off) return queued({ card: now, file, was: 'taken back', factoryRepo: null });
+  const order = queueOrder(yield* readInbox());
   const place = order.findIndex((l) => l.name === name) + 1;
   const factoryRepo = order.find((l) => l.name === name)?.factoryRepo ?? null;
-  return { card: now, file, ...(place ? { place } : {}), of: order.length, was: 'queued', factoryRepo };
-}
+  return queued({ card: now, file, ...(place ? { place } : {}), of: order.length, was: 'queued', factoryRepo });
+});
 
 /** What `nemia inbox rm` did: the card's file removed, or no card of that name, and the cards the inbox has. */
 export type InboxDropped = { removed: true; file: string } | { removed: false; cards: string[] };
@@ -197,29 +221,51 @@ export type InboxDropped = { removed: true; file: string } | { removed: false; c
  * `nemia inbox rm`: a card dropped without being started. Refused, exit 2, for a name that is not a card's (`inboxNameRefusal`). A name
  * with no card is normal — dropped already, or never filed — and says which cards there are.
  */
-export function dropFromInbox(name: string): InboxDropped {
+export const dropFromInbox = Effect.fn('dropFromInbox')(function* (name: string) {
   const refused = inboxNameRefusal(name);
-  if (refused) throw new WorkflowError(refused);
-  const file = runStore.inbox.where(`${name}.md`);
-  try {
-    if (!runStore.inbox.drop(`${name}.md`)) return { removed: false, cards: inboxCards() };
-  } catch (err) {
-    throw Object.assign(
-      new Error(
-        `nemia inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`,
+  if (refused) return yield* Effect.fail(new WorkflowError(refused));
+  const door = yield* CardDoor;
+  const file = yield* door.cards.where(CardName.read(name));
+  const removed = yield* door.cards
+    .drop(CardName.read(name))
+    .pipe(
+      Effect.catchDefect((err) =>
+        Effect.die(
+          Object.assign(
+            new Error(
+              `nemia inbox rm: ${file} could not be removed — ${(err as Error).message}. Nothing was dropped: remove the file by hand, or fix what stops it and drop it again.`,
+            ),
+            { exitCode: 1 },
+          ),
+        ),
       ),
-      { exitCode: 1 },
     );
-  }
-  return { removed: true, file };
-}
+  const out: InboxDropped = removed ? { removed: true, file } : { removed: false, cards: yield* inboxCards() };
+  return out;
+});
 
 /**
- * The name of the inbox card `given` is a path to, as the store reads it (`runStore.inbox.nameAt`) — any path under the inbox, links
- * resolved — or `given` itself where it is a card's name the inbox has and no file of that name stands where it is typed; else null, for
- * a path outside it and for text: what makes `nemia start <path|name>` go through `startFromInbox`. A card not there at its path is still
- * a card's path, refused by name at start; a name no card has is text.
+ * The name of the card `given` is a path to in the store `home`'s inbox (`cardNameAt`) — any path under the inbox, links resolved — or
+ * `given` itself where it is a card's name the inbox has and no file of that name stands where it is typed; else null, for a path outside
+ * it and for text: what makes `nemia start <path|name>` go through `startFromInbox`. A card not there at its path is still a card's path,
+ * refused by name at start; a name no card has is text.
  */
-export const inboxNameAt = (given: string): string | null =>
-  runStore.inbox.nameAt(given) ??
-  (inboxNameRefusal(given) === undefined && !fs.existsSync(given) && runStore.inbox.read(`${given}.md`) !== null ? given : null);
+export const inboxNameAt = (home: string, given: string): string | null =>
+  cardNameAt(home, given) ??
+  (inboxNameRefusal(given) === undefined && !fs.existsSync(given) && fs.existsSync(path.join(inboxAt(home), `${given}.md`)) ? given : null);
+
+/**
+ * What the board shows of each entry `cards` lists beside the listing: when its card was filed and its text, read through the Card door —
+ * or neither, for an entry that is no card, one that does not read (`error`), and one dropped since the listing read it.
+ */
+export const inboxEntries = Effect.fn('inboxEntries')(function* (cards: readonly InboxListing[]) {
+  const door = yield* CardDoor;
+  return yield* Effect.forEach(cards, (entry) => {
+    if (!entry.file.endsWith('.md')) return Effect.succeed({ filedAt: null, text: null });
+    const name = CardName.read(entry.file.slice(0, -'.md'.length));
+    return Effect.all({
+      filedAt: door.cards.filedAt(name),
+      text: entry.error === null ? door.cards.read(name) : Effect.succeed(null),
+    }).pipe(Effect.catchCause(() => Effect.succeed({ filedAt: null, text: null })));
+  });
+});

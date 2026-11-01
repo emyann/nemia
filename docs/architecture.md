@@ -228,7 +228,7 @@ transcripts across her attempts and the runtime's `said`, never a copy; what the
 
 **The library's writers** are the orchestrator's: an agent, a skill or a workflow of yours written, or removed, against the version it
 was read at, and an agent of yours tried on a short brief, each one entry of the command table served on both sides
-(`src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/folder/workflows.verb.ts`), its handler refusing a place but yours. The
+(`src/agents/library.verb.ts`, `src/skills/skills.verb.ts`, `src/workflows/workflows.verb.ts`), its handler refusing a place but yours. The
 command line reads a person's file or draft folder into the form the board sends (`src/cli/writers.ts`); the api guards the write and
 words the board's answer. Both sides hand a handler only what its one spec gives it (`test/writers-cli.test.ts`,
 `apps/api/src/commands/writers.test.ts`).
@@ -292,7 +292,12 @@ program's requirements change while the run store's callers move onto it. A defa
 `RunDoor` is no fact of where a program runs, as the place and the root are, and requiring it would have changed the type of every
 controller and of each of their callers at once. What still calls the run store's run groups (`runStore.runs`, `.asks`, `.holds`,
 `.refresh`, `.forgetting`) — synchronous callers, the stats, the run list, the pages, the command line — is a debt counted per file in
-`test/run-door.baseline.ts`, which only shrinks; the run store's inbox is the Card door's seam and no part of it.
+`test/run-door.baseline.ts`, which only shrinks. A run from a card is created once: on the files the create writes the record `wx`,
+then claims the card with a `wx` create of `<root>/started/<card>.json` naming the run — outside `runs/`, so no listing, prune or sweep
+of runs reads it — and a loser forgets its own record and is refused `Conflict` (`cardStartedTwice`). Forgetting a run (`runs.forget`,
+`nemia rm`) removes the claim that names it, so a store keeps no claim of a run it no longer has; a claim whose run has no record all the
+same, or one from another card — a crash between the two writes — is stale and taken over. The memory stand-in refuses the same off
+its map. It is the Run door's to hold, not the Card door's: only this door can tell whether a claim's run still has a record.
 
 **The Factory door.** A factory — its file, and the level, rules and servers the store keeps beside it — is read and written through
 `FactoryDoor` (`packages/agent-orchestrator/src/factories/factories.store.ts`), on the Run door's pattern: two layers built the one way
@@ -311,6 +316,29 @@ required service would change every controller's type at once. The Run door keep
 a root. What still calls the stores the door is over — a start, a plan, the inbox, the level read on every beat, the instruction, the
 upgrade — is counted per file in `test/factory-door.baseline.ts`, which only shrinks; `factory.store.ts`'s functions each take the
 store's root first (`readFactoryAt`, …), its old spellings the same functions at the module's root, for those callers.
+
+**The Card door.** A card of the inbox, and the tick's tries of a queued one, are read and written through `CardDoor`
+(`packages/agent-orchestrator/src/cards/cards.store.ts`), rooted as the Factory door is: two layers built the one way (`cardDoorOver`),
+the files (`cardFiles(home)`, `<root>/inbox/<name>.md` and `<root>/queue/<name>.json`, so a card keeps a person's bytes) and a memory
+stand-in (`cardDoorMemory`, `src/cards/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/card-walks.ts`). A card's
+name is checked as `CardName.OnCreate` checks it, its text read as a card by `parseInboxCard` — the reader the model's `Card` says holds
+its invariants — a name taken is `Conflict` (the files' `wx`, so `nemia inbox add` draws another), a card written back that is not there
+`Missing`, and a try is decoded through the model's `MissedStart`. The inbox's verbs (`src/inbox/inbox.store.ts`, `inbox.verb.ts`) are
+programs that yield it, and its handlers run through `rooted`; no file of `src` but the door's calls `cardFiles` by hand
+(`src/cards/cards.store.test.ts`). The run store holds no inbox.
+
+**The Workflow door.** A workflow — its folder of markdown, its steps and its README — is read and written through `WorkflowDoor`
+(`packages/agent-orchestrator/src/workflows/workflows.store.ts`), on the Factory door's pattern and rooted as it is. It is addressed
+by the folder, a branded `WorkflowDir` (`src/folder/folder.model.ts`) minted where a folder is resolved (`workflowFolder`, and the
+writers' `yoursWorkflowDir`) and read nominally from a run's record. Its two layers are built the one way (`workflowDoorOver`): the files
+(`workflowFiles(home)`, over `folder.store.ts`, `version.store.ts` and `write.store.ts`, so a folder is the very bytes today's writer
+writes) and a memory stand-in (`workflowDoorMemory`, `src/workflows/memory.store.ts`, in `STAND_INS`), held to one table of walks
+(`test/workflow-walks.ts`). A write checks each step's name, then the draft through the model's `Workflow`, whose checks are its
+invariants (one step at least, no name twice, every `after:` naming a step of it, no steps waiting on each other), and then the version
+it was read at, judged by a pure function (`workflowVersionRefusal`, `src/folder/folder.ts`, which `contracts/workflow-version.contract.ts`
+proves). What still calls the folder's stores is counted per file in `test/workflow-door.baseline.ts`, which only shrinks; `write.store.ts`'s
+functions each take the store's root first (`writeWorkflowAt`, `isWorkflowsHolderAt`, `knownReposAt`, `placesAroundAt`), its old
+spellings the same functions at the module's root.
 
 **The Template door.** A factory template — a folder that holds its `nemia.yaml`, or an archive `nemia template pack` wrote — is read,
 written as a new folder and packed as a new archive through `TemplateDoor` (`packages/agent-orchestrator/src/templates/templates.store.ts`),

@@ -582,20 +582,25 @@ async function cardStarted(
   asked: Extract<Asked, { card: string }>,
   repo: string,
   factory: string | undefined,
+  home: string,
 ) {
   const started = await runPlaced(
     placeService,
     e,
-    START_ENTRY.handler({
-      card: asked.card,
-      at: repo,
-      factory,
-      fix: '?factory=<name>',
-      workflows: asked.dir,
-      instead: asked.brief,
-      after: asked.after,
-      context: asked.context,
-    }),
+    START_ENTRY.handler(
+      {
+        card: asked.card,
+        at: repo,
+        factory,
+        fix: '?factory=<name>',
+        workflows: asked.dir,
+        instead: asked.brief,
+        after: asked.after,
+        context: asked.context,
+      },
+      undefined,
+      home,
+    ),
   );
   return {
     id: started.id,
@@ -651,7 +656,7 @@ export const workflows = new Hono<ApiEnv>()
       if ('status' in asked) return c.json({ error: asked.error }, asked.status);
       const named = c.req.query('factory') === DEFAULT_FACTORY ? DEFAULT_FACTORY : factory?.name;
       if (asked.card !== undefined) {
-        const started = await cardStarted(e, placeService, asked, repo, named);
+        const started = await cardStarted(e, placeService, asked, repo, named, home);
         c.header('Location', `/api/runs/${encodeURIComponent(started.id)}`);
         return c.json(started, 201);
       }
@@ -659,14 +664,18 @@ export const workflows = new Hono<ApiEnv>()
       const { id } = await runPlaced(
         placeService,
         e,
-        START_ENTRY.handler({
-          brief: asked.brief,
-          repo: found.repo ?? repo,
-          workflows: asked.dir,
-          after: asked.after,
-          context: asked.context,
-          factory: found.factory?.name,
-        }),
+        START_ENTRY.handler(
+          {
+            brief: asked.brief,
+            repo: found.repo ?? repo,
+            workflows: asked.dir,
+            after: asked.after,
+            context: asked.context,
+            factory: found.factory?.name,
+          },
+          undefined,
+          home,
+        ),
       );
       c.header('Location', `/api/runs/${encodeURIComponent(id)}`);
       return c.json({ id }, 201);

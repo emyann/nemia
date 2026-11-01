@@ -18,7 +18,7 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import { Schema } from 'effect';
+import { Effect, Schema } from 'effect';
 import { Hono } from 'hono';
 import {
   DEFAULT_FACTORY,
@@ -30,8 +30,8 @@ import {
   Invalid,
   parseInboxCard,
   readFactory,
-  readInbox,
-  runStore,
+  inboxEntries,
+  StoreRoot,
   type Factory,
   type InboxListing,
 } from 'agent-orchestrator';
@@ -99,20 +99,18 @@ const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNo
  * (`InboxEntry`). An entry dropped, or edited into a card that does not read, since the listing read it is listed as the listing has it,
  * with no body or time, and read again next time.
  */
-export function listInbox(cards: readonly InboxListing[] = readInbox()): InboxEntry[] {
-  return cards.map(inboxEntry);
-}
+export const listInbox = (cards: readonly InboxListing[], home: string): Effect.Effect<InboxEntry[]> =>
+  Effect.map(Effect.provideService(inboxEntries(cards), StoreRoot, home), (read) =>
+    cards.map((entry, at) => inboxEntry(entry, read[at] ?? { filedAt: null, text: null })),
+  );
 
 /** One card of the inbox as `listInbox` lists it: with its body and when its file was written, or neither where it no longer reads. */
-function inboxEntry(entry: InboxListing): InboxEntry {
-  let filedAt: string | null = null;
+function inboxEntry(entry: InboxListing, read: { filedAt: string | null; text: string | null }): InboxEntry {
   let body: string | null = null;
   try {
-    filedAt = runStore.inbox.filedAt(entry.file);
-    const text = filedAt !== null && entry.error === null ? runStore.inbox.read(entry.file) : null;
-    if (text !== null) body = parseInboxCard(entry.file, text, isDirectory).body;
+    if (read.filedAt !== null && read.text !== null) body = parseInboxCard(entry.file, read.text, isDirectory).body;
   } catch {}
-  return { ...entry, body, filedAt };
+  return { ...entry, body, filedAt: read.filedAt };
 }
 
 const FILE_SHAPE =
@@ -279,22 +277,21 @@ function filingOf(body: typeof FILE_BODY.Type, repo: string, home: string): Fili
  */
 export const inbox = new Hono<ApiEnv>()
   .get('/api/inbox', (c) =>
-    served(c, async ({ e, placeService, memo }) => {
-      const { cards } = await runPlaced(
-        placeService,
-        e,
-        INBOX.handler({}, undefined, undefined, { records: { inbox: memo.records.inbox } }),
-      );
-      return c.json(listInbox(cards));
+    served(c, async ({ e, placeService, memo, home }) => {
+      const { cards } = await runPlaced(placeService, e, INBOX.handler({}, undefined, home, { records: { inbox: memo.records.inbox } }));
+      return c.json(await runPlaced(placeService, e, listInbox(cards, home)));
     }),
   )
   .get('/api/inbox/:name', (c) => {
     const name = c.req.param('name');
     const wrong = inboxNameRefusal(name);
     if (wrong) return c.json({ error: wrong }, 400);
-    return served(c, async ({ e, placeService }) => {
-      const { card, source } = (await runPlaced(placeService, e, CARD.handler({ name }))) as { card: InboxListing; source: string };
-      const entry = inboxEntry(card);
+    return served(c, async ({ e, placeService, home }) => {
+      const { card, source } = (await runPlaced(placeService, e, CARD.handler({ name }, undefined, home))) as {
+        card: InboxListing;
+        source: string;
+      };
+      const [entry = inboxEntry(card, { filedAt: null, text: null })] = await runPlaced(placeService, e, listInbox([card], home));
       const keys =
         entry.error === null
           ? INBOX_KEYS.map((key) => ({
@@ -317,7 +314,7 @@ export const inbox = new Hono<ApiEnv>()
       const { card, file } = await runPlaced(
         placeService,
         e,
-        INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo, factory: asked.factory }),
+        INBOX_ADD.handler({ idea: asked.text, workflow: asked.workflow, repo: asked.repo, factory: asked.factory }, undefined, home),
       );
       const filed: InboxFiled = {
         name: card.name,

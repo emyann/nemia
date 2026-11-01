@@ -4,10 +4,9 @@
  * run is there and whether a person called it off; the stamps a pass compares, and the asks it reads, consumes and answers from; a hold
  * lifted only as it was read; and the tick asking it, before each filing, whether a person called the run off since (`mayFileOf`). And a
  * person's writes: an ask of each kind at its name, never over a file there, a hold put once and standing while its file does, a
- * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file. And the inbox, as one table:
- * its entries, a card filed exclusively, rewritten keeping its filing time, dropped, the tick's tries put, read and dropped, and the
- * card a path names. And what `nemia rm` and `nemia prune --artifacts` read of it: every run's id read or not, a run's files directory
- * found and dropped.
+ * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file; the inbox is the Card
+ * door's (`src/cards/cards.store.test.ts`). And what `nemia rm` and `nemia prune --artifacts` read of it: every run's id read or not, a
+ * run's files directory found and dropped.
  *
  * And the refusal that keeps the interface the one way in: a file of `src` but the store's own that imports a run's or a person's file
  * functions from `record.store.ts`, or through `runner.ts`, is refused. `WF_ROOT` is set before the store is imported, since it is read as
@@ -257,122 +256,6 @@ test("a run forgotten loses its record and every person's file and its directory
   assert.deepEqual(filesStore.runs.forget(run.id), []);
 });
 
-test("`filesStore.inbox`: its entries, a card read, filed exclusively, rewritten, dropped and found, the tick's tries, and the card a path names", async (t) => {
-  await t.test(
-    "the inbox's entries are a folder by its name and a trailing slash, a markdown file with its text, any other file with none; and none with no inbox",
-    () => {
-      assert.equal(fs.existsSync(path.join(ROOT, 'inbox')), false);
-      assert.deepEqual(filesStore.inbox.entries(), []);
-      fs.mkdirSync(path.join(ROOT, 'inbox', 'a-folder'), { recursive: true });
-      fs.writeFileSync(path.join(ROOT, 'inbox', 'an-idea.md'), 'an idea\n');
-      fs.writeFileSync(path.join(ROOT, 'inbox', 'notes.txt'), 'not a card');
-      try {
-        assert.deepEqual(
-          filesStore.inbox.entries().sort((a, b) => a.file.localeCompare(b.file)),
-          [
-            { file: 'a-folder/', text: '' },
-            { file: 'an-idea.md', text: 'an idea\n' },
-            { file: 'notes.txt', text: '' },
-          ],
-        );
-      } finally {
-        fs.rmSync(path.join(ROOT, 'inbox'), { recursive: true });
-      }
-    },
-  );
-
-  await t.test('a card is read by its file, and a file not there reads as null', () => {
-    assert.equal(filesStore.inbox.add('c-read.md', 'read me\n'), true);
-    assert.equal(filesStore.inbox.read('c-read.md'), 'read me\n');
-    assert.equal(filesStore.inbox.read('c-never-filed.md'), null);
-  });
-
-  await t.test('a card that is there and cannot be read is not read as gone: reading it throws', () => {
-    fs.mkdirSync(path.join(ROOT, 'inbox', 'c-folder.md'), { recursive: true });
-    assert.throws(
-      () => filesStore.inbox.read('c-folder.md'),
-      (err: NodeJS.ErrnoException) => err.code === 'EISDIR',
-    );
-  });
-
-  await t.test('a card filed is written exclusively: a second filing at its name answers false and the first stays byte for byte', () => {
-    assert.equal(filesStore.inbox.add('c-twice.md', 'first\n'), true);
-    assert.equal(filesStore.inbox.add('c-twice.md', 'second\n'), false);
-    assert.equal(fs.readFileSync(path.join(ROOT, 'inbox', 'c-twice.md'), 'utf8'), 'first\n');
-  });
-
-  await t.test('a card rewritten is written whole, keeps the time it was filed, and leaves no hidden file', () => {
-    const file = path.join(ROOT, 'inbox', 'c-rewrite.md');
-    assert.equal(filesStore.inbox.add('c-rewrite.md', 'before\n'), true);
-    const filed = new Date('2026-01-02T03:04:05.000Z');
-    fs.utimesSync(file, filed, filed);
-    filesStore.inbox.rewrite('c-rewrite.md', 'after\n');
-    assert.equal(fs.readFileSync(file, 'utf8'), 'after\n');
-    assert.equal(filesStore.inbox.filedAt('c-rewrite.md'), filed.toISOString());
-    assert.deepEqual(
-      fs.readdirSync(path.join(ROOT, 'inbox')).filter((name) => name.startsWith('.')),
-      [],
-    );
-  });
-
-  await t.test('a card dropped is gone, and dropped again answers false', () => {
-    assert.equal(filesStore.inbox.add('c-drop.md', 'drop me\n'), true);
-    assert.equal(typeof filesStore.inbox.filedAt('c-drop.md'), 'string');
-    assert.equal(filesStore.inbox.drop('c-drop.md'), true);
-    assert.equal(filesStore.inbox.filedAt('c-drop.md'), null);
-    assert.equal(filesStore.inbox.drop('c-drop.md'), false);
-  });
-
-  await t.test('a card that is there and cannot be removed is not dropped as gone: dropping it throws, and it stays', () => {
-    const at = path.join(ROOT, 'inbox', 'c-stuck.md');
-    fs.mkdirSync(at, { recursive: true });
-    assert.throws(() => filesStore.inbox.drop('c-stuck.md'));
-    assert.equal(fs.existsSync(at), true);
-  });
-
-  await t.test('a card is found where a person reads it', () => {
-    assert.equal(filesStore.inbox.where('x.md'), path.join(ROOT, 'inbox', 'x.md'));
-  });
-
-  await t.test("a try put is read back by its card's name, a file that does not read as a try is none, and a try dropped is gone", () => {
-    const queue = path.join(ROOT, 'queue');
-    const tried = { at, text: 'the card\n', repo: '/repo', why: 'the workflow is gone', refused: true };
-    filesStore.inbox.putTry('t-put', tried);
-    assert.equal(fs.readFileSync(path.join(queue, 't-put.json'), 'utf8'), JSON.stringify(tried, null, 2));
-    fs.writeFileSync(path.join(queue, 't-torn.json'), '{ "at": ');
-    fs.writeFileSync(path.join(queue, 't-shape.json'), JSON.stringify({ at, text: 'x' }));
-    assert.deepEqual([...filesStore.inbox.tries()], [['t-put', tried]]);
-    filesStore.inbox.dropTry('t-put');
-    filesStore.inbox.dropTry('t-never-put');
-    assert.deepEqual([...filesStore.inbox.tries()], []);
-    assert.equal(fs.existsSync(path.join(queue, 't-put.json')), false);
-  });
-
-  await t.test(
-    'a path names an inbox card by its file, by its name, through a link to the inbox, and in an inbox that is a link; and no card outside it',
-    () => {
-      const inbox = path.join(ROOT, 'inbox');
-      fs.mkdirSync(inbox, { recursive: true });
-      assert.equal(filesStore.inbox.nameAt(path.join(inbox, 'c-named.md')), 'c-named');
-      assert.equal(filesStore.inbox.nameAt(path.join(inbox, 'c-named')), 'c-named');
-      const linked = path.join(scratch('wf-run-store-link-'), 'cards');
-      fs.symlinkSync(inbox, linked);
-      assert.equal(filesStore.inbox.nameAt(path.join(linked, 'c-named.md')), 'c-named');
-      assert.equal(filesStore.inbox.nameAt(path.join(ROOT, 'elsewhere', 'c-named.md')), null);
-      assert.equal(filesStore.inbox.nameAt('add a flag'), null);
-      const real = path.join(scratch('wf-run-store-real-'), 'inbox');
-      fs.renameSync(inbox, real);
-      fs.symlinkSync(real, inbox);
-      try {
-        assert.equal(filesStore.inbox.nameAt(path.join(real, 'c-named.md')), 'c-named', 'an inbox that is itself a link');
-      } finally {
-        fs.rmSync(inbox);
-        fs.renameSync(real, inbox);
-      }
-    },
-  );
-});
-
 /** The functions of `record.store.ts` that read or write a run's record or a person's files beside it: `runStore` says each. */
 const GUARDED = [
   'readRun',
@@ -592,4 +475,57 @@ test('REFUSED: a converted file that uses the run store again, and a count the b
   };
   assert.equal(debtBreaks(again, RUN_DOOR_DEBT).length, 1);
   assert.equal(debtBreaks(sources, { ...RUN_DOOR_DEBT, 'src/try/try.verb.ts': 2 }).length, 1);
+});
+
+/** A run under `id` started out of the inbox's card `card`. */
+const fromCard = (id: string, card: string): Run => ({ ...aRun(id), from: { inbox: card } });
+
+/** Where the claim of the card `card` is: `<root>/started/<card>.json`. */
+const claimOf = (card: string): string => path.join(ROOT, 'started', `${card}.json`);
+
+/** A claim of the card `card` planted for the run `run`, as a crash or a forgotten run leaves one. */
+const plantClaim = (card: string, run: string): void => {
+  fs.mkdirSync(path.dirname(claimOf(card)), { recursive: true });
+  fs.writeFileSync(claimOf(card), JSON.stringify({ run }));
+};
+
+test('a claim naming a run with no record is stale: it is taken over, and the claim names the new run', () => {
+  plantClaim('c-stale', 'c-stale-gone');
+  const made = act(door.runs.create(fromCard('c-stale-new', 'c-stale')));
+  assert.equal(made, undefined);
+  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-stale'), 'utf8')), { run: 'c-stale-new' });
+  assert.deepEqual(
+    fs.readdirSync(path.join(ROOT, 'started')).filter((n) => n.includes('c-stale')),
+    ['c-stale.json'],
+  );
+});
+
+test('a claim naming a record from another card is stale, and taken over', () => {
+  act(door.runs.create(fromCard('c-other-run', 'c-other-card')));
+  plantClaim('c-mine', 'c-other-run');
+  assert.equal(act(door.runs.create(fromCard('c-mine-run', 'c-mine'))), undefined);
+  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-mine'), 'utf8')), { run: 'c-mine-run' });
+});
+
+test('a claim lives at <root>/started/<card>.json, and no listing of runs, taken id or stamp reads it', () => {
+  act(door.runs.create(fromCard('c-unread-run', 'c-unread')));
+  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-unread'), 'utf8')), { run: 'c-unread-run' });
+  const listed = filesStore.runs.list(() => {}).map((r) => r.id);
+  assert.deepEqual(
+    {
+      listed: listed.includes('c-unread'),
+      ids: filesStore.runs.ids().includes('c-unread'),
+      stamped: filesStore.runs.stamps().has('c-unread'),
+      taken: filesStore.runs.taken('c-unread'),
+    },
+    { listed: false, ids: false, stamped: false, taken: false },
+  );
+});
+
+test('REFUSED: the loser of a card leaves no record and no folder under its id, and the claim names the first run', () => {
+  act(door.runs.create(fromCard('c-won', 'c-twice')));
+  assert.deepEqual(act(door.runs.create(fromCard('c-lost', 'c-twice'))), { refused: 'Conflict' });
+  assert.equal(fs.existsSync(path.join(runsDir(), 'c-lost.json')), false);
+  assert.equal(fs.existsSync(path.join(runsDir(), 'c-lost')), false);
+  assert.deepEqual(JSON.parse(fs.readFileSync(claimOf('c-twice'), 'utf8')), { run: 'c-won' });
 });

@@ -45,7 +45,7 @@ import { SKILL_ENTRIES } from '../skills/skills.verb.ts';
 import { MERGES } from '../branches/merges.verb.ts';
 import { mergeRun } from '../merge/merge.verb.ts';
 import { mergeAskedLine } from '../merge/merge.ts';
-import { WORKFLOW_ENTRIES } from '../folder/workflows.verb.ts';
+import { WORKFLOW_ENTRIES } from '../workflows/workflows.verb.ts';
 import { FACTORIES } from '../factory/factory.verb.ts';
 import { TEMPLATES } from '../template/template.verb.ts';
 import { INBOXES } from '../inbox/commands.verb.ts';

@@ -2564,7 +2564,7 @@ a write or a removal is checked against the version it was read at, and one with
 the caller runs it again with `--version`; a workflow's own schemas left to a follow-up card.
 
 - **The entries**: `AGENTS_WRITE`, `AGENTS_REMOVE` and `AGENTS_TRY` (`src/agents/library.verb.ts`), `SKILLS_WRITE`
-  (`src/skills/skills.verb.ts`), `WORKFLOWS_WRITE` and `WORKFLOWS_REMOVE` (`src/folder/workflows.verb.ts`), their flags from
+  (`src/skills/skills.verb.ts`), `WORKFLOWS_WRITE` and `WORKFLOWS_REMOVE` (`src/workflows/workflows.verb.ts`), their flags from
   `src/yours/yours.ts`: `--version` on both sides, a path the command line alone takes (`--file`, `--folder`) and the form the api
   alone hands (`draft`, `schema`, `change`, `readme`). Each handler resolves yours from its store and refuses any other place
   (`yoursOrRefused`, `src/yours/yours.ts`).
@@ -2579,7 +2579,7 @@ the caller runs it again with `--version`; a workflow's own schemas left to a fo
   workflow's own `*.schema.json` and a skill's extra files for the person to place.
 - **Held**: `test/writers-cli.test.ts` (each write read back and each refusal, through `main`, and the keys the command line hands a
   handler against its spec), `apps/api/src/commands/writers.test.ts` (the keys each route hands, against the same spec),
-  `test/verbs-skill.test.ts`, `test/demand-cli.test.ts` (the try starts a daemon) and `src/folder/workflows.verb.test.ts`.
+  `test/verbs-skill.test.ts`, `test/demand-cli.test.ts` (the try starts a daemon) and `src/workflows/workflows.verb.test.ts`.
 
 ## Shipped: recruit-or-create and her first meeting (phase 7, card 4)
 

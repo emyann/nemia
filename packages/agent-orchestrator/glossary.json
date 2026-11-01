@@ -317,7 +317,7 @@
     },
     {
       "term": "Run door",
-      "meaning": "the run's door: its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it, by `RunId`; the files by default, the memory stand-in where a test gives it. The run store (`RunStore`) is what is left of it outside: the inbox, the Card door's seam, and the callers still to move.",
+      "meaning": "the run's door: its record, and the asks, holds, refresh asks and forgetting markers a person keeps beside it, by `RunId`; the files by default, the memory stand-in where a test gives it. A run from a card is created once: its create claims the card exclusively, in the store's started folder, and refuses a second run from it as `Conflict`. The run store (`RunStore`) is what is left of it outside: the callers still to move.",
       "type": "RunDoor"
     },
     {
@@ -352,12 +352,17 @@
     },
     {
       "term": "Step",
-      "meaning": "one markdown file of a workflow: who does it, what it may do, and what must finish first.",
+      "meaning": "one markdown file of a workflow: who does it, what it may do, and what must finish first. The model's `WorkflowStep`, which owns `StepName`; the run's record of one is a step record.",
       "type": "Step",
       "see": {
         "label": "A step",
         "href": "/workflows/#a-step"
       }
+    },
+    {
+      "term": "Step record",
+      "meaning": "what a run's record keeps of one of its steps (`Step`, `packages/agent-orchestrator/src/record/record.model.ts`): its current try's task, the tries behind it, where it works and what the run did with it, keyed by its `StepName`.",
+      "type": "Step"
     },
     {
       "term": "Step status",
@@ -468,12 +473,27 @@
     },
     {
       "term": "Workflow",
-      "meaning": "a folder of markdown files, one file a step.",
+      "meaning": "a folder of markdown files, one file a step: the model's `Workflow` (`packages/agent-orchestrator/src/folder/folder.model.ts`), addressed by its folder, read and written through the Workflow door.",
       "type": "Workflow",
       "see": {
         "label": "Workflows",
         "href": "/workflows/"
       }
+    },
+    {
+      "term": "Workflow door",
+      "meaning": "the one way a workflow is read and written — its folder of markdown, its steps and its README: `WorkflowDoor` in `packages/agent-orchestrator/src/workflows/workflows.store.ts`, addressed by `WorkflowDir`, its files layer at the store's root a program is given and a memory one, each refusing a write that breaks the model's `Workflow` or the version it was read at.",
+      "type": "WorkflowDoor"
+    },
+    {
+      "term": "Workflow step",
+      "meaning": "a step as the model holds it (`WorkflowStep`): its name, the steps it waits on, and the keys that shape the graph — `loop`, `gate`, `check`; a run's frozen workflow is a list of them, read loosely.",
+      "type": "WorkflowStep"
+    },
+    {
+      "term": "WorkflowDir",
+      "meaning": "a workflow's folder, absolute and resolved, neither the agents' nor the skills': the Workflow door's id, minted where a folder is resolved (`workflowFolder`) and read nominally from a run's record.",
+      "type": "WorkflowDir"
     },
     {
       "term": "WorkflowName",

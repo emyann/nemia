@@ -207,6 +207,11 @@
       }
     },
     {
+      "term": "Pass phase",
+      "meaning": "a part of a tick's pass its time is counted in (`PHASES`): records, asks, journals, revisions, observe, runtime, place, assess, act, the `phase` label of a series line (`pass.phase.ms`). The place phase was `git` while the place was git's alone; a stored line that still says `git` reads as `place` (`FORMER_PHASES`). Never a step's phase.",
+      "type": "Phase"
+    },
+    {
       "term": "Pending",
       "meaning": "not filed yet: a step waiting on the steps before it (reason `Pending`, status `pending`), or held back by a thing (reason `Waiting`, `on` a run, the limit, the checkout or the pause).",
       "type": "WaitOn"

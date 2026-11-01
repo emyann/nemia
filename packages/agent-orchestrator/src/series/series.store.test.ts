@@ -56,6 +56,33 @@ test('lines go to the file of their UTC day, and a line that does not read is le
   assert.deepEqual(readDay('minute', '2026-01-01'), [], 'no file, no lines');
 });
 
+test("a label's word is read in its closed set: a phase stored under its former word reads as today's, and a word of no set is left out", (t) => {
+  const day = '2026-10-06';
+  fs.rmSync(dayFile('hour', day), { force: true });
+  const stored = (v: number, l: Record<string, string>) => `${JSON.stringify(line(`${day}T0${v}:00:00.000Z`, v, l))}\n`;
+  fs.mkdirSync(tierDir('hour'), { recursive: true });
+  fs.writeFileSync(
+    dayFile('hour', day),
+    [
+      stored(1, { phase: 'git' }),
+      stored(2, { phase: 'nope' }),
+      stored(3, { part: 'runs', kind: 'nope' }),
+      stored(4, { part: 'nope' }),
+      stored(5, { part: 'runs', kind: 'records' }),
+    ].join(''),
+  );
+  const said = stderrOf(t);
+  const read = readDay('hour', day);
+  assert.deepEqual(
+    read.map((x) => [x.sum, x.l]),
+    [
+      [1, { phase: 'place' }],
+      [5, { part: 'runs', kind: 'records' }],
+    ],
+  );
+  assert.equal(said.length, 1, 'the three lines of no set are said once, with their file');
+});
+
 test("the last line is read off the latest day's tail alone, however long the day", async () => {
   fs.rmSync(tierDir('minute'), { recursive: true, force: true });
   appendLines('minute', [line('2026-10-04T10:00:00.000Z', 1)]);

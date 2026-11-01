@@ -65,9 +65,9 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
       assert.equal(decided(line), 'ask', line);
     });
   await t.test('the person reads why: the line, and what it answers', () => {
-    names(answerOf('nemia retry r gate')?.reason, 'nemia retry r gate', 'waits on you', 'gate of r is awaiting approval');
-    names(answerOf('nemia approve r gate')?.reason, 'nemia approve r gate', 'waits on you', 'yours to give');
-    names(answerOf('nemia retry r check --budget 5')?.reason, 'nemia retry r check --budget 5', "a step's cap", 'yours to raise');
+    names(answerOf('nemia retry r gate')?.message, 'nemia retry r gate', 'waits on you', 'gate of r is awaiting approval');
+    names(answerOf('nemia approve r gate')?.message, 'nemia approve r gate', 'waits on you', 'yours to give');
+    names(answerOf('nemia retry r check --budget 5')?.message, 'nemia retry r check --budget 5', "a step's cap", 'yours to raise');
   });
   await t.test('the class decides, not the name: a table that classes approve as act lets it through', () => {
     const table = TABLE.map((c) => (c.name === 'approve' ? { ...c, class: 'act' as const } : c));
@@ -87,7 +87,7 @@ test('`admissionOf` with no floor and no rules: what answers the person is asked
       assert.equal(decided(line), 'ask', line);
     });
   await t.test('a write of the rules says it is asked every time', () => {
-    names(answerOf('nemia policy confirm nemia tries')?.reason, 'nemia policy confirm nemia tries is yours', 'asked every time');
+    names(answerOf('nemia policy confirm nemia tries')?.message, 'nemia policy confirm nemia tries is yours', 'asked every time');
   });
 });
 
@@ -147,8 +147,8 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
       assert.equal(scopedAnswer(line)?.decision, 'deny', line);
     });
   await t.test('a denial names the run, its factory and level, the floor, and the command that raises it', () => {
-    names(scopedAnswer('nemia hold r')?.reason, 'nemia hold r', 'r of the factory pipao', 'at manual', 'below semi-auto');
-    names(scopedAnswer('nemia hold r')?.reason, 'nemia level semi-auto --factory pipao [--for <duration>]');
+    names(scopedAnswer('nemia hold r')?.message, 'nemia hold r', 'r of the factory pipao', 'at manual', 'below semi-auto');
+    names(scopedAnswer('nemia hold r')?.message, 'nemia level semi-auto --factory pipao [--for <duration>]');
   });
   await t.test('every factory at the floor or above: the scope answers as no scope does', () => {
     const open: Scope = { atLeast: 'semi-auto', runOf: () => ({ factory: 'hkb', level: 'semi-auto' }), factoryOf: () => 'semi-auto' };
@@ -157,7 +157,7 @@ test('`admissionOf` under her floor and at auto: below the floor denied, unread 
     assert.equal(scopedAnswer('nemia show t'), undefined, 'a run of a factory above the floor is hers to read');
   });
   await t.test('REFUSED to pass unread: a run that does not read, and a scoped command whose words do not parse, are asked', () => {
-    names(scopedAnswer('nemia show gone')?.reason, 'names gone', 'does not read');
+    names(scopedAnswer('nemia show gone')?.message, 'names gone', 'does not read');
     assert.equal(scopedAnswer('nemia show gone')?.decision, 'ask');
     assert.equal(scopedAnswer('nemia show t --frob')?.decision, 'ask');
   });

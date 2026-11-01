@@ -264,7 +264,9 @@ export function readFact(name: string): string {
 export function promptAllows(): string[] {
   let raw: unknown;
   try {
-    raw = JSON.parse(fs.readFileSync(path.join(nemiaDir(), CONFIG_FOLDERS[0], 'settings.local.json'), 'utf8'));
+    const [folder] = CONFIG_FOLDERS;
+    if (folder === undefined) return [];
+    raw = JSON.parse(fs.readFileSync(path.join(nemiaDir(), folder, 'settings.local.json'), 'utf8'));
   } catch {
     return [];
   }

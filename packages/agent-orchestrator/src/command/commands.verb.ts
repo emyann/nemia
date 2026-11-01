@@ -293,7 +293,9 @@ const REFRESH: Command<{
     const { runId } = named(args);
     if (args.base !== true) return { drift: yield* refreshRun(runId) };
     const { run, ask, file } = yield* mergeRun(runId, textOf(args, 'step'));
-    const looping = stepsOf(run).find((s) => s.name === ask.step)!;
+    const looping = stepsOf(run).find((s) => s.name === ask.step);
+    if (looping === undefined)
+      throw new Error(`run ${run.id} has no step ${ask.step}, which its merge asks: report it as a defect of nemia refresh --base`);
     const { target, onto, sha } = ask.merge;
     return { step: ask.step, target, onto, sha, round: ask.round, file, said: mergeAskedLine(ask, looping) };
   }),

@@ -140,7 +140,10 @@ const seriesKept = (ring: readonly RecentPass[]): number => {
 };
 
 /** The machine's load over the last minute, per core it has. */
-const loadNow = (): number => os.loadavg()[0] / os.availableParallelism();
+const loadNow = (): number => {
+  const [lastMinute = 0] = os.loadavg();
+  return lastMinute / os.availableParallelism();
+};
 
 /**
  * What a pass is handed from outside: where a queued card starts, the memo, whether it verifies, the quota the daemon last read, and
@@ -337,13 +340,16 @@ const waitingJudged = Effect.fn('waitingJudged')(function* (
   return counted;
 });
 
+/** A run's feed as the pass judged it, keyed by its id, for `emitFeed`: none for a run the pass did not judge. */
+const feedOf = <F>(id: string, judged: { feed: F } | undefined): (readonly [string, F])[] => (judged ? [[id, judged.feed] as const] : []);
+
 /**
  * Why the feed could not be written with what the pass judged (`emitFeed`) and the store's pause it read at its start (`pause`, whose
  * put and lift the feed says), or undefined once it was: never the pass's failure.
  */
 const feedErrorOf = (runs: readonly Run[], { done, unjudged }: Judging, pause: Pause | null): Effect.Effect<string | undefined> =>
   Effect.exit(
-    emitFeed(new Map(runs.flatMap((run) => (done.has(run.id) ? [[run.id, done.get(run.id)!.feed] as const] : []))), {
+    emitFeed(new Map(runs.flatMap((run) => feedOf(run.id, done.get(run.id)))), {
       unjudged: new Set(unjudged.keys()),
       pause,
     }),

@@ -109,7 +109,7 @@ export function retryable(
   const { status, own } = standing(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf);
   const taskId = run.steps[step.name]?.taskId;
   const settled = taskId ? SETTLED.has(phaseOf(taskId)) : false;
-  const harnessAsks = status === 'running' && Boolean(taskId) && harnessBlocked(taskId!) && !closeoutOf(step.name);
+  const harnessAsks = status === 'running' && Boolean(taskId && harnessBlocked(taskId)) && !closeoutOf(step.name);
   const tried = status === 'over budget' ? own : status;
   const followers = steps.filter((s) => s.after.includes(step.name));
   const noneFiled = followers.length > 0 && !followers.some((s) => run.steps[s.name]?.taskId);
@@ -364,7 +364,8 @@ const STOPPED_FIRST: readonly RetryMode[] = ['continue', 'fresh'];
  * for: `budget $5`.
  */
 export function tryNote(step: Workflow, record: StepRecord | undefined, steps: readonly Workflow[] = [], answered = false): string {
-  const last = record?.tries?.at(-1);
+  const tries = record?.tries ?? [];
+  const last = tries.at(-1);
   if (!last) return '';
   const looping = loopOf(steps, step.name);
   const round = roundIn(record);
@@ -372,7 +373,7 @@ export function tryNote(step: Workflow, record: StepRecord | undefined, steps: r
   const raised = last.budget !== undefined ? `budget ${budgetWord(last.budget)}` : '';
   if (last.cause === 'round') return [inRound, raised].filter(Boolean).join(', ');
   const how = howOf(step, last);
-  return [inRound, `try ${record!.tries!.length + 1}, ${how}`, raised, answered ? 'answered' : ''].filter(Boolean).join(', ');
+  return [inRound, `try ${tries.length + 1}, ${how}`, raised, answered ? 'answered' : ''].filter(Boolean).join(', ');
 }
 
 /**
@@ -527,7 +528,7 @@ export function retryOffers(
     } else if (status === 'denied') {
       offer(
         `${command} --fresh`,
-        `${deniedOffer(spendOf(run.steps[step.name].taskId!)?.denied ?? [], { disallowedTools: filedDenies(step, run, landingDenied) }, { cwd: run.steps[step.name].workspace, runId: run.id })}${landAgain} A new session, told to do without it`,
+        `${deniedOffer(deniedOn(record, spendOf), { disallowedTools: filedDenies(step, run, landingDenied) }, { cwd: record?.workspace, runId: run.id })}${landAgain} A new session, told to do without it`,
         `  (or continue its session: ${command})`,
       );
     } else if (isRemoteHarness(step.harness)) {
@@ -545,6 +546,10 @@ export function retryOffers(
 
 /** What `nemia decide` offers for each step a person may try again, as its lines: each offer's sentence (`retryOffers`). Pure. */
 export const retryLines = (...args: Parameters<typeof retryOffers>): string[] => retryOffers(...args).map((o) => o.said);
+
+/** What the current task of a step's record was denied (`TaskSpend.denied`): none for a record with no task, or a task with no denial. */
+const deniedOn = (record: StepRecord | undefined, spendOf: SpendOf): readonly string[] =>
+  (record?.taskId ? spendOf(record.taskId) : undefined)?.denied ?? [];
 
 /**
  * The longest one rule `deniedOffer` prints: a rule clipped with `…` is not one a person can copy into `allowedTools:`, so a path goes

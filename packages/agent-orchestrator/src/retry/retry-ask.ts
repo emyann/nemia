@@ -239,16 +239,21 @@ const askedWord = (r: Retry): string =>
  */
 export function nextTry(record: StepRecord, retry: Retry, taskId?: string): StepRecord {
   const { check, tries = [], handedOff: _, landed: __, filesRead, ...rest } = record;
+  if (record.taskId === null)
+    throw new Error(`try ${retry.try} of ${retry.step} is filed over a record with no task: file a try of a step that has one`);
+  const same = retry.mode === 'recheck';
+  const next = same ? record.taskId : taskId;
+  if (next === undefined)
+    throw new Error(`try ${retry.try} of ${retry.step} is no recheck, and is filed with no task: pass the new task's id`);
   const over: EarlierTry = {
-    taskId: record.taskId!,
+    taskId: record.taskId,
     ...(check ? { check } : {}),
     cause: retry.by === 'ask' || retry.by === 'pause' ? retry.mode : retry.by,
     ...(retry.by === 'pause' ? { paused: true as const } : {}),
     ...(retry.model ? { model: retry.model } : {}),
     ...(retry.budget !== undefined ? { budget: retry.budget } : {}),
   };
-  const same = retry.mode === 'recheck';
-  return { ...rest, ...(same && filesRead ? { filesRead } : {}), taskId: same ? record.taskId : taskId!, tries: [...tries, over] };
+  return { ...rest, ...(same && filesRead ? { filesRead } : {}), taskId: next, tries: [...tries, over] };
 }
 
 /**

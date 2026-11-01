@@ -251,8 +251,8 @@ function uncarriedRefusal(c: Judged, pending: RetryAsk): string {
   const { name, command, next, status, raise, floor } = c;
   const asked = `try ${next} of ${name} is asked for (${modeWord(pending)}, at ${pending.at})`;
   const again = `Delete that ask — retry-${name}-${next}, in the run's .asks directory — and ask again`;
-  if (pending.budget === undefined) {
-    return `${asked} without a --budget above ${aboveWord(raise!)}, and ${name} ${raiseWords(status, raise!)}, so no tick honours it. ${again}: ${command} --budget <amount>.`;
+  if (pending.budget === undefined && raise !== undefined) {
+    return `${asked} without a --budget above ${aboveWord(raise)}, and ${name} ${raiseWords(status, raise)}, so no tick honours it. ${again}: ${command} --budget <amount>.`;
   }
   if (!floor) {
     return `${asked} with --budget ${pending.budget}, and ${name} has no \`budget:\`, so there is no cap to raise and no tick honours it. ${again}: ${command}.`;
@@ -285,7 +285,7 @@ function stoppedEndingRefusal(c: Judged): string | undefined {
 /** An ending at its gate with nothing of it filed: no try to replace, so its approval, or a send-back of the work it would act on. */
 function endingGateRefusal(c: Judged): string | undefined {
   const { step, run, name, status } = c;
-  if (status !== 'awaiting approval' || run.steps[name].taskId) return undefined;
+  if (status !== 'awaiting approval' || run.steps[name]?.taskId) return undefined;
   const back = sendBackTo(step, run)
     .map((s) => `nemia retry ${run.id} ${s} --message "<objection>"`)
     .join(' or ');
@@ -339,11 +339,11 @@ function wordlessRefusal(c: Judged): string | undefined {
   const { steps, run, name, how, command, phaseOf, closeoutOf, askedCloseout, verdictOf, spendOf, sendsBack, back } = c;
   if (!sendsBack || how.message !== undefined) return undefined;
   const say = `Say what to change: ${command} --message "<objection>"${how.mode === 'fresh' ? ` ${modeWord(how)}` : ''}`;
-  if (back) {
-    const ending = steps.find((s) => s.name === back[0])!;
+  const sentFrom = back && steps.find((s) => s.name === back[0]);
+  if (sentFrom) {
     return (
-      `${name}'s work went on to ${ending.name}, and ${stoppedWords(c, ending)}: a try of ${name} sends the work back from there, and one with no words tells its session nothing to change. ` +
-      `${say} — or land again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${ending.name}.`
+      `${name}'s work went on to ${sentFrom.name}, and ${stoppedWords(c, sentFrom)}: a try of ${name} sends the work back from there, and one with no words tells its session nothing to change. ` +
+      `${say} — or land again, for what was not the work — a dirty checkout, a flaky test: nemia retry ${run.id} ${sentFrom.name}.`
     );
   }
   const ending = steps.find(

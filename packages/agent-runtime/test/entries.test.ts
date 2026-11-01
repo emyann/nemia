@@ -43,6 +43,8 @@ const PINNED: Record<string, string[]> = {
     'MCP_STATES',
     'signsInMcp',
     'mcpServerOf',
+    'MCP_TRANSPORTS',
+    'transportOf',
     'DrainRefused',
     'ReconcileRefused',
     'Runner',

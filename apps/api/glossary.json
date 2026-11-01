@@ -66,6 +66,16 @@
       ]
     },
     {
+      "term": "MCP server type",
+      "meaning": "the transport an MCP server of a factory's `.mcp.json` declares, as a harness loads one (`stdio`, `http`, `sse`, the runtime's `MCP_TRANSPORTS`), or `unknown` for any other word, the word as written quoted in the server's not-asked sentence. A server with a command and no type is `stdio`.",
+      "type": "McpServer"
+    },
+    {
+      "term": "Metric type",
+      "meaning": "a metric's kind as Effect names it (`Metric.Metric.Type`: Counter, Frequency, Gauge, Histogram, Summary), read from the api's own registry; a kind the api keeps no value of is answered with its name and type alone.",
+      "type": "MetricRead"
+    },
+    {
       "term": "Phase / reason / message",
       "meaning": "what each step and each try carries at the api: its `phase` and its `reason`, the codes a reader groups and compares, and its `message`, the sentence a person reads and nothing compares.",
       "type": "RunDetail",

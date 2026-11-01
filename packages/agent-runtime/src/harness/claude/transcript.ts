@@ -7,7 +7,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Usage } from '../../core/index.ts';
-import type { TranscriptEvent } from '../seam.ts';
+import type { SDKMessageOrigin } from '@anthropic-ai/claude-agent-sdk';
+import { originOf, type TranscriptEvent, type TranscriptOriginKind } from '../seam.ts';
 import { isoTime } from '../transcript.ts';
 import { type ContentBlock, decodeLine, type Line, lineOf, writtenAt } from './lines.ts';
 
@@ -115,7 +116,7 @@ const blockEvents = (
   id: string,
   at: string,
   role: TranscriptEvent['role'],
-  origin?: { kind: string },
+  origin?: { kind: TranscriptOriginKind },
 ): TranscriptEvent[] => {
   const said = (text: string): TranscriptEvent => ({
     id: `${id}:${i}`,
@@ -145,6 +146,14 @@ const blockEvents = (
   }
   return [said(`[${block.type}]`)];
 };
+
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+/**
+ * The seam's origin words are the Agent SDK's (`SDKMessageOrigin`, `sdk.d.ts:5561`) and `unknown`: an SDK that names another kind fails
+ * this typecheck until `ORIGIN_KINDS` (`../seam.ts`) names it too, while a line that already says it reads as `unknown`.
+ */
+export const originKindsHeld: Same<TranscriptOriginKind, SDKMessageOrigin['kind'] | 'unknown'> = true;
 
 /** A `queued_command` attachment as events: words sent in by a peer as `system`, the session's own user's as `user`, anything else none. */
 const queuedEvents = (line: Line<'attachment'>, id: string, at: string): TranscriptEvent[] => {
@@ -210,7 +219,8 @@ export const claudeTranscriptEvents = (entry: unknown, offset: number, file?: st
   if (line.type === 'system') return [{ id, at, role: 'system', kind: 'system', text: line.content ?? line.subtype ?? 'system' }];
   if (line.type === 'attachment') return queuedEvents(line, id, at);
   const role = line.isMeta === true ? 'system' : line.type;
-  const from = line.type === 'user' && role === 'user' && typeof line.origin?.kind === 'string' ? { kind: line.origin.kind } : undefined;
+  const from =
+    line.type === 'user' && role === 'user' && typeof line.origin?.kind === 'string' ? { kind: originOf(line.origin.kind) } : undefined;
   const content = line.message.content;
   if (typeof content === 'string')
     return [{ id: `${id}:0`, at, role, kind: role === 'system' ? 'system' : 'text', text: content, ...(from ? { origin: from } : {}) }];

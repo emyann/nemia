@@ -910,7 +910,7 @@ export function lifecycleOf(state: State): LifecycleState {
   if (state.settled) return state.settled === 'succeeded' ? 'completed' : state.settled === 'stopped' ? 'canceled' : 'failed';
   if (state.stopRequested) return 'stopping';
   const last = state.attempts.at(-1);
-  if (last && last.ended === null) return last.spawnedAt ? 'working' : 'starting';
+  if (last && last.ended === null) return last.spawnedAt !== null ? 'working' : 'starting';
   if (state.holdOpen && state.closed) return 'ending';
   if (waitsForInput(state)) return 'input-required';
   return turnOf(state).attempts.length > 0 ? 'ending' : 'submitted';

@@ -338,6 +338,14 @@ const RUNS: Record<string, Walk[]> = {
         again: [],
       },
     },
+    {
+      name: 'a run from a card forgotten takes its claim of the card with it',
+      walk: ({ door }) => {
+        act(door.runs.create(fromCard('w-forget-card', 'w-claimed')));
+        return act(door.runs.forget(idOf('w-forget-card')));
+      },
+      says: ['runs/w-forget-card.json', 'started/w-claimed.json'],
+    },
   ],
   'runs.ids': [
     {

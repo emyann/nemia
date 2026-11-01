@@ -86,8 +86,12 @@ function readOf(st: State, id: string): Run {
   } as Run;
 }
 
-/** Remove what the stand-in holds of `id`, answering each name removed as the files name it under `WF_ROOT`. */
+/**
+ * Remove what the stand-in holds of `id`, answering each name removed as the files name it under `WF_ROOT`: a run from a card, its claim
+ * of the card too, which the stand-in holds as the record itself, a run created only while no other from its card stands.
+ */
 function forgetOf(st: State, id: string): string[] {
+  const card = st.records.get(id)?.from?.inbox;
   const removed: string[] = [];
   const named: Array<[Map<string, unknown>, string]> = [
     [st.records, `${id}.json`],
@@ -98,6 +102,7 @@ function forgetOf(st: State, id: string): string[] {
     [st.asks, `${id}.asks/`],
   ];
   for (const [held, name] of named) if (held.delete(id)) removed.push(`runs/${name}`);
+  if (card !== undefined) removed.push(`started/${card}.json`);
   st.versions.delete(id);
   return removed;
 }

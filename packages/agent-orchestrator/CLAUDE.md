@@ -103,7 +103,9 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
   by path, after the file sets `WF_ROOT`) and plants the run through it; code still on `runStore` (`test/run-door.baseline.ts`) reads
   the files whatever door a program was given, so a test whose verb reaches it stays on files. A write breaking the model's `Run` is
   refused `Invalid`: build a fixture's task ids with `stepTaskId`. A run from a card is refused `Conflict` while another run from it
-  stands: the files hold it by an exclusive claim, `<root>/started/<card>.json`, taken over once its run is forgotten.
+  stands: the files hold it by an exclusive claim, `<root>/started/<card>.json`, removed with the run that it names (`runs.forget`),
+  and taken over where its run has no record. A test that removes a run's files by hand removes its claim too, as the e2e's
+  `takeBackRuns` does.
 - **A factory is read and written through the Factory door (`FactoryDoor`, `src/factories/factories.store.ts`), whose default is rooted**:
   it reads the files at the `StoreRoot` a program is given, and is refused `Invalid` where none was, so a handler that yields it is run
   through `rooted(home, verb, program)` (`src/wiring/wire.verb.ts`). A test that only needs a factory to exist gives its program one

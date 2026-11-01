@@ -5,7 +5,7 @@ import { photograph, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, hiringStarts, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, takeBackRuns } from '../world.ts';
 
 /** The card this page files for the factory, and starts there. */
 const CARD = 'hire-the-reviewer-in-the-factory-e2e0';
@@ -119,8 +119,7 @@ export default {
         );
     } finally {
       await other.close();
-      for (const file of fs.readdirSync(runsDir))
-        if (!runsBefore.includes(file)) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
+      takeBackRuns(runsDir, runsBefore);
       fs.rmSync(cardFile, { force: true });
       unhire();
       fs.writeFileSync(factoryFile, factoryText);

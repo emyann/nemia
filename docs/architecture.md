@@ -294,8 +294,9 @@ controller and of each of their callers at once. What still calls the run store'
 `.refresh`, `.forgetting`) — synchronous callers, the stats, the run list, the pages, the command line — is a debt counted per file in
 `test/run-door.baseline.ts`, which only shrinks. A run from a card is created once: on the files the create writes the record `wx`,
 then claims the card with a `wx` create of `<root>/started/<card>.json` naming the run — outside `runs/`, so no listing, prune or sweep
-of runs reads it — and a loser forgets its own record and is refused `Conflict` (`cardStartedTwice`); a claim whose run has no record,
-or one from another card, is stale and taken over, so a card starts again after `nemia rm`. The memory stand-in refuses the same off
+of runs reads it — and a loser forgets its own record and is refused `Conflict` (`cardStartedTwice`). Forgetting a run (`runs.forget`,
+`nemia rm`) removes the claim that names it, so a store keeps no claim of a run it no longer has; a claim whose run has no record all the
+same, or one from another card — a crash between the two writes — is stale and taken over. The memory stand-in refuses the same off
 its map. It is the Run door's to hold, not the Card door's: only this door can tell whether a claim's run still has a record.
 
 **The Factory door.** A factory — its file, and the level, rules and servers the store keeps beside it — is read and written through

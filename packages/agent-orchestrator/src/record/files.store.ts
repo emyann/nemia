@@ -160,8 +160,12 @@ function consumeAllAsks(run: Run, asks: readonly RetryAsk[], rounds: readonly Ro
   consumeMergeAsks(run, rounds);
 }
 
-/** Remove the run's record and a person's files beside it, and its own directory, answering each path removed from `WF_ROOT`. */
+/**
+ * Remove the run's record and a person's files beside it, and its own directory, and the claim of the card it was started from while the
+ * claim names it (`claimCard`), answering each path removed from `WF_ROOT`. A claim naming another run is that run's, and stays.
+ */
 function removeRunFiles(id: string): string[] {
+  const card = cardOf(id);
   const removed: string[] = [];
   for (const at of [runFile(id), cancelFile(id), pruneFile(id), holdFile(id), refreshFile(id), asksDir(id), path.join(runsDir(), id)]) {
     const st = lstatOf(at);
@@ -169,8 +173,24 @@ function removeRunFiles(id: string): string[] {
     fs.rmSync(at, { recursive: true, force: true });
     removed.push(`${path.relative(HOME, at)}${st.isDirectory() ? '/' : ''}`);
   }
+  const claim = card === undefined ? undefined : path.join(startedDir(), `${card}.json`);
+  if (claim !== undefined && claimedAt(claim) === id) {
+    fs.rmSync(claim, { force: true });
+    removed.push(path.join('started', `${card}.json`));
+  }
   return removed;
 }
+
+/** The card the record of the run `id` says it was started from, or undefined: none, no record, or one that does not read. */
+function cardOf(id: string): string | undefined {
+  try {
+    const record: unknown = JSON.parse(fs.readFileSync(runFile(id), 'utf8'));
+    return isFromCard(record) ? record.from.inbox : undefined;
+  } catch {
+    return undefined;
+  }
+}
+const isFromCard = Schema.is(Schema.Struct({ from: Schema.Struct({ inbox: Schema.String }) }));
 
 /** Whether an id names something of a run in the store: its record, a person's file beside it, its asks or its own directory. */
 function runIdTaken(id: string): boolean {

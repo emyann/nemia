@@ -20,9 +20,27 @@ export type TranscriptEvent = {
   text?: string;
   tool?: { name: string; input?: unknown };
   result?: { text: string; isError: boolean };
-  /** Where a `user` event's words came from, as the harness said it: `human` where a person wrote them into the session itself. */
-  origin?: { kind: string };
+  /**
+   * Where a `user` event's words came from, as the harness said it: `human` where a person wrote them into the session itself, one of the
+   * Agent SDK's other words for an origin, or `unknown` for a word it has not named.
+   */
+  origin?: { kind: TranscriptOriginKind };
 };
+
+/** The words of a transcript event's origin, the runtime's `ORIGIN_KINDS` and `unknown`. */
+const ORIGIN_KINDS = [
+  'human',
+  'channel',
+  'peer',
+  'task-notification',
+  'coordinator',
+  'unclassified',
+  'observer',
+  'auto-continuation',
+  'observer-activity',
+  'unknown',
+] as const;
+export type TranscriptOriginKind = (typeof ORIGIN_KINDS)[number];
 
 /** Decodes a `TranscriptEvent`: a tool's input is read as it came. */
 const TranscriptEventSchema = decodes<TranscriptEvent>()(
@@ -34,7 +52,7 @@ const TranscriptEventSchema = decodes<TranscriptEvent>()(
     text: Schema.optionalKey(Schema.String),
     tool: Schema.optionalKey(Schema.Struct({ name: Schema.String, input: Schema.optionalKey(Schema.Unknown) })),
     result: Schema.optionalKey(Schema.Struct({ text: Schema.String, isError: Schema.Boolean })),
-    origin: Schema.optionalKey(Schema.Struct({ kind: Schema.String })),
+    origin: Schema.optionalKey(Schema.Struct({ kind: Schema.Literals(ORIGIN_KINDS) })),
   }),
 );
 

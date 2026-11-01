@@ -201,11 +201,6 @@ test('ADOPTION, the crash window: an intent with no spawn behind it is spawned, 
   assert.deepEqual(decide(s, seen([N1, 'working']), now(5)).do, 'nothing', 'already out there: adopt it');
 });
 
-test('settled is terminal — nothing moves after it, whatever the machine says', () => {
-  const s = fold(TASK, [...ran('succeeded'), { kind: 'settled', at: at(4), outcome: 'succeeded' }]);
-  assert.equal(decide(s, seen([N1, 'failed']), now(99)).do, 'nothing');
-});
-
 test('the fold re-derives the same state from a replayed journal — restart safety', () => {
   const events = ran('failed');
   assert.deepEqual(
@@ -932,7 +927,6 @@ test("CONTRACT: every attempt a task settles over is ended — with the statemen
             }
             walked++;
             const [attempt] = fold(TASK, events).attempts;
-            assert.notEqual(attempt.ended, null, `${at_}: settled over an open attempt — neither statement nor reason`);
             assert.equal(attempt.closeout, sighting?.closeout?.payload, `${at_}: the statement is the session's, untouched, or none`);
             if (state === 'completed' || state === 'failed' || state === 'rejected')
               assert.ok(

@@ -290,6 +290,8 @@ const PINNED: Record<string, string[]> = {
     'messageRefusal',
     'missingArtifacts',
     'nameFor',
+    'MCP_TRANSPORTS',
+    'transportOf',
     'namesInOrder',
     'nemiaChatPlace',
     'noCardLine',

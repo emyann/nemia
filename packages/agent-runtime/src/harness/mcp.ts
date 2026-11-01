@@ -9,6 +9,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type { McpServer, RemoteMcpServer } from './seam.ts';
 import type { HarnessArgs } from './args.ts';
+import type { TransportOf } from '../../contracts/transport.contract.ts';
+
+/**
+ * The transports Claude Code loads a server of a `.mcp.json` over, the Agent SDK's words (`McpServerConfigForProcessTransport`, its
+ * in-process `sdk` aside), held equal to them in `claude/attached-options.ts`.
+ */
+export const MCP_TRANSPORTS = ['stdio', 'http', 'sse'] as const;
+
+/** An MCP server's transport: a word of `MCP_TRANSPORTS`. */
+export type McpTransport = (typeof MCP_TRANSPORTS)[number];
+
+/**
+ * A server's written `type` as its transport: itself where `MCP_TRANSPORTS` names it, `unknown` otherwise
+ * (`contracts/transport.contract.ts`).
+ */
+export const transportOf: TransportOf = (written) => MCP_TRANSPORTS.find((transport) => transport === written) ?? 'unknown';
 
 const isMap = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isStringMap = (v: unknown) => isMap(v) && Object.values(v).every((s) => typeof s === 'string');

@@ -128,6 +128,11 @@
       ]
     },
     {
+      "term": "MCP transport",
+      "meaning": "what Claude Code loads an MCP server of a `.mcp.json` over, in the Agent SDK's words for a server a file declares (`MCP_TRANSPORTS`: stdio, http, sse); a written `type` that is none of them reads as `unknown` (`transportOf`).",
+      "type": "McpTransport"
+    },
+    {
       "term": "Mount",
       "meaning": "a folder beyond a task's `cwd` its session may reach, and whether it may only read it.",
       "type": "Mount"

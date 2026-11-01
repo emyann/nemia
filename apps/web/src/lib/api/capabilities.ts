@@ -29,7 +29,8 @@ const DescribedSchema = decodes<Described>()(
 export type McpServer = {
   name: string;
   source: string;
-  type: string;
+  /** The transport Claude Code loads it over, or `unknown` for any other word, which `notAsked` quotes as written. */
+  type: 'stdio' | 'http' | 'sse' | 'unknown';
   command: string | null;
   args: string[];
   url: string | null;
@@ -51,7 +52,7 @@ const McpServerSchema = decodes<McpServer>()(
   Schema.Struct({
     name: Schema.String,
     source: Schema.String,
-    type: Schema.String,
+    type: Schema.Literals(['stdio', 'http', 'sse', 'unknown']),
     command: Schema.NullOr(Schema.String),
     args: Strings,
     url: Schema.NullOr(Schema.String),

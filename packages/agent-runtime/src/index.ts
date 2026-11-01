@@ -181,8 +181,12 @@ export { folderTrust, trustFolder, trustedFolder, type FolderTrust, type FolderT
  */
 export { MCP_STATES, signsInMcp } from './harness/mcp-state.ts';
 export type { McpServerState, McpServersRead } from './harness/mcp-state.ts';
-/** One MCP server a caller records and a harness is handed, and the one producer of its bytes (`mcpServerOf`). */
-export { mcpServerOf } from './harness/mcp.ts';
+/**
+ * One MCP server a caller records and a harness is handed, the one producer of its bytes (`mcpServerOf`), and its transport's words
+ * (`MCP_TRANSPORTS`, `transportOf`).
+ */
+export { MCP_TRANSPORTS, mcpServerOf, transportOf } from './harness/mcp.ts';
+export type { McpTransport } from './harness/mcp.ts';
 export type { LocalMcpServer, RemoteMcpServer } from './harness/seam.ts';
 /**
  * The allow rules a harness's own project configuration in a directory grants a session started there; `undefined` for a harness that

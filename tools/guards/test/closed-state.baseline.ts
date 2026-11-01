@@ -17,7 +17,6 @@
  * fields, printed as entries: `node tools/guards/test/closed-state.ts`.
  */
 export const OPEN_STATE: Readonly<Record<string, { readonly card: string }>> = {
-  'apps/api/src/capabilities/capabilities.ts#McpServer.type': { card: 'Close third-party kinds at the doors' },
   'apps/api/src/detail/detail.ts#RunDetail.steps[].status': { card: "Drop a step's deprecated status sentence" },
   'apps/api/src/detail/tries.ts#StepAttempts.latest.reason': { card: "Close the orchestrator's state words at its doors" },
   'apps/api/src/detail/tries.ts#StepTry.status': { card: "Drop a step's deprecated status sentence" },

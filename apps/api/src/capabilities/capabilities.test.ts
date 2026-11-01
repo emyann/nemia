@@ -477,6 +477,36 @@ test('a server that is not stdio, or whose entry does not read, is listed with w
   );
 });
 
+test("a server's `type` is the transport Claude Code loads it over, and any other word is `unknown`, the word as written in why it was not asked", async (t) => {
+  const repo = repoWith({
+    '.mcp.json': {
+      mcpServers: {
+        http: { type: 'http', url: 'https://mcp.example.com/mcp' },
+        sse: { type: 'sse', url: 'https://mcp.example.com/sse' },
+        ws: { type: 'ws', url: 'wss://mcp.example.com/ws' },
+        untyped: { url: 'https://mcp.example.com/untyped' },
+        local: { command: 'definitely-not-a-command-here' },
+      },
+    },
+    '.claude/settings.json': { enabledMcpjsonServers: [] },
+  });
+  const { body } = await served(repo);
+  const of = (name: string) => body.mcp.find((s) => s.name === name);
+  await t.test('http and sse read as themselves', () => {
+    assert.deepEqual([of('http')?.type, of('sse')?.type], ['http', 'sse']);
+  });
+  await t.test('a word Claude Code loads no server over reads as unknown, and why it was not asked quotes it', () => {
+    assert.equal(of('ws')?.type, 'unknown');
+    assert.ok(of('ws')?.notAsked?.includes('"ws"'), of('ws')?.notAsked ?? 'no notAsked');
+  });
+  await t.test('a url with no type is unknown: Claude Code loads no server from one', () => {
+    assert.equal(of('untyped')?.type, 'unknown');
+  });
+  await t.test('a command with no type is stdio', () => {
+    assert.equal(of('local')?.type, 'stdio');
+  });
+});
+
 test('a .mcp.json or a settings file that does not read is a warning naming it and the fix, and the rest is still served', async () => {
   const repo = repoWith({
     '.mcp.json': '{ "mcpServers": ',

@@ -30,6 +30,7 @@ const SDK = path.join(ROOT, 'node_modules', '@anthropic-ai', 'claude-agent-sdk',
  */
 const CLAIMS: Record<string, string> = {
   '1205-1220': 'McpHttpServerConfig',
+  '1249': 'McpServerConfigForProcessTransport',
   '1265-1315': 'McpServerStatus',
   '1694': 'env',
   '1896': 'includePartialMessages',

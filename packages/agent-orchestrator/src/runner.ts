@@ -54,10 +54,12 @@ export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, 
 export { answerIn, deniedWords, harnessWaitLine, isRepositoryRun, placeOf, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
- * their step's session waits on them (`harnessWaitLine`). Re-exported because the api cannot import agent-runtime — it is not a
- * dependency of it — and the runtime client (`runtime-client.ts`) is the only file in the workspace that knows the engine exists.
+ * their step's session waits on them (`harnessWaitLine`); and an MCP server's transport as Claude Code loads one (`MCP_TRANSPORTS`,
+ * `McpTransport`), a written `type` read as one or as `unknown` (`transportOf`). Re-exported because the api cannot import
+ * agent-runtime — it is not a dependency of it — and the runtime client (`runtime-client.ts`) is the only file in the workspace that
+ * knows the engine exists.
  */
-export { nameFor } from './runtime-client.ts';
+export { MCP_TRANSPORTS, nameFor, transportOf, type McpTransport } from './runtime-client.ts';
 /**
  * The runtime's task lifecycle as plain data — its states, its edges, its first and final states — which the board draws. Re-exported
  * because the api cannot import agent-runtime, as `nameFor` is.
@@ -68,10 +70,7 @@ export { lifecycleGraph, type LifecycleGraph } from './runtime-client.ts';
  * why there are none. Re-exported because the api cannot import agent-runtime, as `nameFor` is.
  */
 export type { HarnessQuota, QuotaLimit } from './runtime-client.ts';
-/**
- * Why one task's journal does not read, when `err` is what a read of it rejected with; undefined for any other failure
- * (`unreadableJournal`).
- */
+/** Why one task's journal does not read, when `err` is what a read of it rejected with; undefined for any other failure. */
 export { unreadableJournal } from './runtime-client.ts';
 export {
   filesPrunedWords,

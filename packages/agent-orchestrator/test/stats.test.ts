@@ -115,7 +115,7 @@ function writeRun(id: string, workflow: object[], steps: Record<string, object>,
       isolate: true,
       brief: `The brief of ${id}`,
       createdAt: at(0),
-      workflowDir: '/repos/one/workflows/build',
+      workflowDir: '/repos/one/workflows/dev',
       workflow,
       steps,
       ...more,
@@ -164,8 +164,8 @@ function aLanding() {
   writeRun(
     'landed',
     [
-      { name: 'implement', after: [], body: 'Do it.', check: 'true', agent: agent('ada') },
-      { name: 'review', after: ['implement'], body: 'Review it.', loop: 'implement', rounds: 3, agent: agent('agora') },
+      { name: 'implement', after: [], body: 'Do it.', check: 'true', agent: agent('implementer') },
+      { name: 'review', after: ['implement'], body: 'Review it.', loop: 'implement', rounds: 3, agent: agent('reviewer') },
       { name: 'land', after: ['review'], body: 'Land it.', workspace: 'main' },
     ],
     {
@@ -225,7 +225,7 @@ function aTouchedRun() {
   });
   writeRun(
     'touched',
-    [{ name: 'design', after: [], body: 'Design it.', agent: { ...agent('seldon'), skills: ['change-the-board', 'shadcn', 'app:y'] } }],
+    [{ name: 'design', after: [], body: 'Design it.', agent: { ...agent('planner'), skills: ['change-the-board', 'shadcn', 'app:y'] } }],
     { design: { taskId: 'touched-design-2', tries: [{ taskId: 'touched-design', cause: 'retries' }] } },
     { factory: 'touched', createdAt: `${TOUCHED_DAY}T00:00:00.000Z` },
   );
@@ -234,7 +234,7 @@ function aTouchedRun() {
     ['shadcn', ''],
     ['y', 'applies: ["apps/web/**"]\n'],
   ])
-    rendered('touched', 'design', 'seldon', name, { applies });
+    rendered('touched', 'design', 'planner', name, { applies });
 }
 
 test('`nemia stats` over a store: the numbers it answers and the words it prints, each read off the runs and the engine', async (t) => {
@@ -265,7 +265,7 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
       const build = all.all.steps.find((row) => row.step === 'build');
       assert.deepEqual(build?.checks, { passed: 0, refused: 1, unfinished: 1 }, 'no exit code is unfinished; exit 1 refused');
       assert.equal(build?.costUsd, null, 'no session of build was measured');
-      assert.equal(all.all.steps.find((row) => row.step === 'implement')?.agent, 'ada');
+      assert.equal(all.all.steps.find((row) => row.step === 'implement')?.agent, 'implementer');
       assert.deepEqual(all.unreadable, []);
     },
   );
@@ -342,8 +342,8 @@ test('`nemia stats` over a store: the numbers it answers and the words it prints
         'both tries touched apps/web and one loaded change-the-board; shadcn declares no path; a skill named with its folder, frozen and loaded as `y`, is counted as its line writes it',
       );
       const words = await printedBy(sub, ['stats', ...range]);
-      assert.match(words, /^design\s+seldon\s+change-the-board\s+1\s+1\s+1 of 2$/m);
-      assert.match(words, /^design\s+seldon\s+shadcn\s+1\s+1\s+—$/m);
+      assert.match(words, /^design\s+planner\s+change-the-board\s+1\s+1\s+1 of 2$/m);
+      assert.match(words, /^design\s+planner\s+shadcn\s+1\s+1\s+—$/m);
     },
   );
 });
@@ -379,16 +379,16 @@ function aDeniedRun() {
   ran('denied-bg', { from: 2, to: 2, day: UNMEASURED_DAY, attempts: [{ denials: [rm] }] });
   ran('denied-quiet', { from: 1, to: 1, day: QUIET_DAY });
   ran('denied-before-jobs', { from: 18, to: 18, day: BG_DAY });
-  rendered('denied', 'write', 'ada', RULED, { rules: JSON.stringify({ rules: RULES }) });
-  rendered('denied', 'write', 'ada', 'look');
-  rendered('denied', 'write', 'ada', 'unread', { rules: '{ "rules": [{ "id": "x" }] }' });
-  rendered('denied', 'write', 'ada', 'y', {
+  rendered('denied', 'write', 'implementer', RULED, { rules: JSON.stringify({ rules: RULES }) });
+  rendered('denied', 'write', 'implementer', 'look');
+  rendered('denied', 'write', 'implementer', 'unread', { rules: '{ "rules": [{ "id": "x" }] }' });
+  rendered('denied', 'write', 'implementer', 'y', {
     rules: JSON.stringify({ rules: [{ id: 'no-wget', says: 'Never download', breaks: ['Bash(wget:*)'] }] }),
   });
   writeRun(
     'denied',
     [
-      { name: 'write', after: [], body: 'Write it.', agent: { ...agent('ada'), skills: [RULED, 'look', 'unread', 'app:y'] } },
+      { name: 'write', after: [], body: 'Write it.', agent: { ...agent('implementer'), skills: [RULED, 'look', 'unread', 'app:y'] } },
       { name: 'codex', after: [], body: 'Do it.', harness: 'codex' },
       { name: 'bg', after: [], body: 'Do it.', background: true },
       { name: 'quiet', after: [], body: 'Do it.' },
@@ -430,7 +430,7 @@ function aSkillsRun() {
   writeRun(
     'skills',
     [
-      { name: 'spec', after: [], body: 'Write it.', check: 'true', agent: agent('seldon') },
+      { name: 'spec', after: [], body: 'Write it.', check: 'true', agent: agent('planner') },
       { name: 'quiet', after: [], body: 'Do it.' },
       { name: 'old', after: [], body: 'Do it.' },
     ],
@@ -506,8 +506,8 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
     assert.match(words, new RegExp(`^${DENIED_DAY}\\s.*\\s2/try\\s+—$`, 'm'));
     assert.match(words, new RegExp(`^${UNMEASURED_DAY}\\s.*\\s—\\s+—$`, 'm'));
     assert.match(words, new RegExp(`^${QUIET_DAY}\\s.*\\s0/try\\s+—$`, 'm'));
-    assert.match(words, /^write\s+ada\s+3\s.*\s4 \(2 of 3\)\s+—$/m, 'the step row says how many of its tries were measured');
-    assert.match(words, /^write\s+ada\s+Write\(\/x\)\s+2$/m);
+    assert.match(words, /^write\s+implementer\s+3\s.*\s4 \(2 of 3\)\s+—$/m, 'the step row says how many of its tries were measured');
+    assert.match(words, /^write\s+implementer\s+Write\(\/x\)\s+2$/m);
     assert.match(await printedBy(sub, ['stats', '--line', '--factory', 'denials']), /, \S+ \(\S+\) calls denied, /);
   });
 
@@ -528,8 +528,8 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
       assert.deepEqual(all.steps.find((row) => row.step === 'quiet')?.rules, [], 'a step given no skill');
       const words = await printedBy(sub, ['stats', ...denials]);
       assert.match(words, /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/m);
-      assert.match(words, new RegExp(`^write\\s+ada\\s+${RULED}\\s+no-write\\s+1\\s+1$`, 'm'));
-      assert.match(words, new RegExp(`^write\\s+ada\\s+${RULED}\\s+no-curl\\s+2\\s+0$`, 'm'));
+      assert.match(words, new RegExp(`^write\\s+implementer\\s+${RULED}\\s+no-write\\s+1\\s+1$`, 'm'));
+      assert.match(words, new RegExp(`^write\\s+implementer\\s+${RULED}\\s+no-curl\\s+2\\s+0$`, 'm'));
     },
   );
 
@@ -557,10 +557,10 @@ test('Unmeasured is null, never 0: a codex, background, recheck or pre-jobs try 
       assert.match(words, new RegExp(`^${SKILLS_DAY}\\s.*\\s3/try$`, 'm'));
       assert.match(words, new RegExp(`^${NO_SKILL_DAY}\\s.*\\s0/try$`, 'm'));
       assert.match(words, new RegExp(`^${UNSAID_DAY}\\s.*\\s—$`, 'm'));
-      assert.match(words, /^spec\s+seldon\s+3\s.*\s3 \(1 of 3\)$/m, 'the step row says how many of its tries were measured');
+      assert.match(words, /^spec\s+planner\s+3\s.*\s3 \(1 of 3\)$/m, 'the step row says how many of its tries were measured');
       assert.match(words, /^old\s+—\s+1\s.*\s—$/m);
-      assert.match(words, /^spec\s+seldon\s+write-a-spec\s+2\s+1\s+—$/m);
-      assert.match(words, /^spec\s+seldon\s+look\s+1\s+1\s+—$/m);
+      assert.match(words, /^spec\s+planner\s+write-a-spec\s+2\s+1\s+—$/m);
+      assert.match(words, /^spec\s+planner\s+look\s+1\s+1\s+—$/m);
       assert.match(
         await printedBy(sub, ['stats', '--line', '--factory', 'skills']),
         /, \S+ \(\S+\) calls denied, \S+ \(\S+\) skills loaded$/,
@@ -609,7 +609,7 @@ const REVIEWED = '/repos/one/workflows/review';
 const SKILL = 'review-a-change';
 
 /** The review step, filled by `hire` with its `instructions`. */
-const reviewBy = (hire = 'agora', instructions = 'You are Agora.') => ({
+const reviewBy = (hire = 'reviewer', instructions = 'You are Reviewer.') => ({
   name: 'review',
   after: [],
   body: `${instructions}\n\nReview it.`,
@@ -653,7 +653,7 @@ test("A change is marked once: a skill copy, a hire and an agent's instructions,
           kind: 'skill',
           name: SKILL,
           steps: ['review'],
-          agents: ['agora'],
+          agents: ['reviewer'],
           since: 'marks-1',
         },
       ]);
@@ -661,24 +661,24 @@ test("A change is marked once: a skill copy, a hire and an agent's instructions,
   );
 
   await s.test("an agent's instructions changed are marked once, on the agent; a hire changed once, on the step", async (sub) => {
-    reviewRun('marks-5', '2026-09-23', reviewBy('agora', 'You are Agora, who reads twice.'), after);
-    reviewRun('marks-6', '2026-09-24', reviewBy('agora', 'You are Agora, who reads twice.'), after);
-    reviewRun('marks-7', '2026-09-25', reviewBy('iris', 'You are Iris.'), after);
-    reviewRun('marks-8', '2026-09-26', reviewBy('iris', 'You are Iris.'), after);
+    reviewRun('marks-5', '2026-09-23', reviewBy('reviewer', 'You are Reviewer, who reads twice.'), after);
+    reviewRun('marks-6', '2026-09-24', reviewBy('reviewer', 'You are Reviewer, who reads twice.'), after);
+    reviewRun('marks-7', '2026-09-25', reviewBy('intaker', 'You are Intaker.'), after);
+    reviewRun('marks-8', '2026-09-26', reviewBy('intaker', 'You are Intaker.'), after);
     assert.deepEqual(
       (await answered(sub, ['--workflow', 'review'])).all.marks.map((m) => [m.day, m.run, m.kind, m.name, m.since]),
       [
         ['2026-09-21', 'marks-2', 'skill', SKILL, 'marks-1'],
-        ['2026-09-23', 'marks-5', 'agent', 'agora', 'marks-4'],
+        ['2026-09-23', 'marks-5', 'agent', 'reviewer', 'marks-4'],
         ['2026-09-25', 'marks-7', 'step', 'review', 'marks-6'],
       ],
-      'iris appears in marks-7: her first instructions have nothing to compare with',
+      'intaker appears in marks-7: her first instructions have nothing to compare with',
     );
   });
 
   await s.test('a run of another factory, between them in the same folder, is compared within its own factory alone', async (sub) => {
-    reviewRun('pipao-1', '2026-09-22', reviewBy('ada', 'You are Ada.'), 'Something else.', { factory: 'pipao' });
-    reviewRun('pipao-2', '2026-09-24', reviewBy('ada', 'You are Ada.'), 'Something else.', { factory: 'pipao' });
+    reviewRun('pipao-1', '2026-09-22', reviewBy('implementer', 'You are Implementer.'), 'Something else.', { factory: 'pipao' });
+    reviewRun('pipao-2', '2026-09-24', reviewBy('implementer', 'You are Implementer.'), 'Something else.', { factory: 'pipao' });
     const marks = (await answered(sub, ['--workflow', 'review'])).all.marks;
     assert.deepEqual(
       marks.map((m) => m.run),
@@ -691,7 +691,7 @@ test("A change is marked once: a skill copy, a hire and an agent's instructions,
     const words = await printedBy(sub, ['stats', '--workflow', 'review']);
     assert.match(words, /^day\s+changed\s+run\s+since$/m);
     assert.match(words, new RegExp(`^2026-09-21\\s+skill ${SKILL}\\s+marks-2\\s+marks-1$`, 'm'));
-    assert.match(words, /^2026-09-23\s+agent agora\s+marks-5\s+marks-4$/m);
+    assert.match(words, /^2026-09-23\s+agent reviewer\s+marks-5\s+marks-4$/m);
     assert.match(words, /^2026-09-25\s+step review\s+marks-7\s+marks-6$/m);
   });
 });

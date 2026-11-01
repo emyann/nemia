@@ -12,19 +12,19 @@ import { dayOf, statsOf } from './stats.ts';
 import { frozenOf, marksOf, type RunFrozen } from './marks.ts';
 
 const NOW = new Date('2026-09-30T12:00:00.000Z');
-const BUILD = '/a/workflows/build';
+const BUILD = '/a/workflows/dev';
 const SKILL = 'review-a-change';
 
-/** A review step filled by agora, or the agent `more` names, as the parser resolves it: its instructions before the step's own note. */
+/** A review step filled by reviewer, or the agent `more` names, as the parser resolves it: its instructions before the step's own note. */
 function review(
   more: { agent?: string; instructions?: string | null; note?: string; model?: string; skills?: string[]; added?: string[] } = {},
 ): Workflow {
-  const instructions = more.instructions === undefined ? 'You are Agora.' : more.instructions;
+  const instructions = more.instructions === undefined ? 'You are Reviewer.' : more.instructions;
   const note = more.note ?? 'Review it.';
   const own = more.skills ?? [SKILL];
   const added = more.added?.filter((skill) => !own.includes(skill));
   const agent: StepAgent = {
-    name: more.agent ?? 'agora',
+    name: more.agent ?? 'reviewer',
     keys: more.added ? ['skills'] : [],
     body: note,
     given: {},
@@ -67,7 +67,7 @@ const inFactory = (factory: string, run: RunFrozen): RunFrozen => ({ ...run, fac
 /** A morning of September 2026. */
 const at = (day: number) => `2026-09-${day}T08:00:00.000Z`;
 
-/** Two runs of build in the default factory, agora's skill changed by the second, and between them one of another factory, listed last. */
+/** Two runs of build in the default factory, reviewer's skill changed by the second, and between them one of another factory, listed last. */
 const history = (): RunFrozen[] => [
   frozen('r1', '2026-09-10T08:00:00.000Z', [implement, review()], 'v1'),
   frozen('r2', '2026-09-20T08:00:00.000Z', [implement, review()], 'v2'),
@@ -99,27 +99,21 @@ const MARKS: MarkRow[] = [
   },
   {
     name: 'runs are compared within their workflow folder as recorded, never across two folders of the same name',
-    runs: () => [
-      frozen('r1', at(10), [review()], 'v1', '/a/workflows/build'),
-      frozen('r2', at(11), [review()], 'v2', '/b/workflows/build'),
-    ],
+    runs: () => [frozen('r1', at(10), [review()], 'v1', '/a/workflows/dev'), frozen('r2', at(11), [review()], 'v2', '/b/workflows/dev')],
     marks: [],
   },
   {
     name: 'two runs of the one folder as recorded are compared',
-    runs: () => [
-      frozen('r1', at(10), [review()], 'v1', '/a/workflows/build'),
-      frozen('r2', at(11), [review()], 'v2', '/a/workflows/build'),
-    ],
+    runs: () => [frozen('r1', at(10), [review()], 'v1', '/a/workflows/dev'), frozen('r2', at(11), [review()], 'v2', '/a/workflows/dev')],
     marks: [`r2 skill ${SKILL} since r1`],
   },
   {
     name: 'two factories that hire different agents into one step of one folder mark nothing as their runs alternate',
     runs: () => [
       frozen('r1', at(10), [review()]),
-      inFactory('pipao', frozen('r2', at(11), [review({ agent: 'ada' })])),
+      inFactory('pipao', frozen('r2', at(11), [review({ agent: 'implementer' })])),
       frozen('r3', at(12), [review()]),
-      inFactory('pipao', frozen('r4', at(13), [review({ agent: 'ada' })])),
+      inFactory('pipao', frozen('r4', at(13), [review({ agent: 'implementer' })])),
     ],
     marks: [],
   },
@@ -128,8 +122,8 @@ const MARKS: MarkRow[] = [
     runs: () => [
       inFactory('pipao', frozen('r1', at(10), [review()])),
       frozen('r2', at(11), [review()]),
-      inFactory('pipao', frozen('r3', at(12), [review({ agent: 'ada' })])),
-      inFactory('pipao', frozen('r4', at(13), [review({ agent: 'ada' })])),
+      inFactory('pipao', frozen('r3', at(12), [review({ agent: 'implementer' })])),
+      inFactory('pipao', frozen('r4', at(13), [review({ agent: 'implementer' })])),
     ],
     marks: ['r3 step review since r1'],
   },
@@ -142,20 +136,20 @@ const MARKS: MarkRow[] = [
     name: 'an agent whose record carries no instructions is unknown: its next instructions are compared from the run after',
     runs: () => [
       frozen('r1', at(10), [review({ instructions: null })]),
-      frozen('r2', at(11), [review({ instructions: 'You are Agora.' })]),
-      frozen('r3', at(12), [review({ instructions: 'You are Agora, again.' })]),
+      frozen('r2', at(11), [review({ instructions: 'You are Reviewer.' })]),
+      frozen('r3', at(12), [review({ instructions: 'You are Reviewer, again.' })]),
     ],
-    marks: ['r3 agent agora since r2'],
+    marks: ['r3 agent reviewer since r2'],
   },
   {
-    name: 'a first appearance has nothing to compare with: the review, agora and the skill appear in r2',
+    name: 'a first appearance has nothing to compare with: the review, reviewer and the skill appear in r2',
     runs: () => [frozen('r1', at(10), [implement], null), frozen('r2', at(11), [implement, review()])],
     marks: [],
   },
   {
     name: 'an agent is marked for its instructions, never its step',
-    runs: () => [frozen('r1', at(10), [review()]), frozen('r2', at(11), [review({ instructions: 'You are Agora, again.' })])],
-    marks: ['r2 agent agora since r1'],
+    runs: () => [frozen('r1', at(10), [review()]), frozen('r2', at(11), [review({ instructions: 'You are Reviewer, again.' })])],
+    marks: ['r2 agent reviewer since r1'],
   },
   {
     name: 'a step is marked for its own note, never its agent',
@@ -175,7 +169,7 @@ const MARKS: MarkRow[] = [
   {
     name: "the agent's own skills still mark it",
     runs: () => [frozen('r1', at(10), [review()]), frozen('r2', at(11), [review({ skills: [SKILL, 'extra'] })])],
-    marks: ['r2 agent agora since r1'],
+    marks: ['r2 agent reviewer since r1'],
   },
 ];
 
@@ -194,7 +188,7 @@ const ITEMS: Array<{ name: string; check: () => void }> = [
       const { items } = frozen('r2', at(11), [review({ added: [SKILL, 'extra'] })]);
       const extra = items.find((i) => i.kind === 'skill' && i.name === 'extra');
       assert.deepEqual(extra && { steps: extra.steps, agents: extra.agents }, { steps: ['review'], agents: [] });
-      assert.deepEqual(items.find((i) => i.kind === 'skill' && i.name === SKILL)?.agents, ['agora']);
+      assert.deepEqual(items.find((i) => i.kind === 'skill' && i.name === SKILL)?.agents, ['reviewer']);
     },
   },
   {
@@ -202,7 +196,7 @@ const ITEMS: Array<{ name: string; check: () => void }> = [
     check: () => {
       const second: Workflow = { ...review(), name: 'second' };
       const { items } = frozenOf(
-        { run: 'r1', factory: 'default', workflow: 'build', repo: '/a', day: '2026-09-10', at: at(10), workflowDir: BUILD },
+        { run: 'r1', factory: 'default', workflow: 'dev', repo: '/a', day: '2026-09-10', at: at(10), workflowDir: BUILD },
         [review(), second],
         new Map([['second', new Map([[SKILL, 'v1']])]]),
       );
@@ -210,7 +204,7 @@ const ITEMS: Array<{ name: string; check: () => void }> = [
         items.map((i) => [i.kind, i.name, i.digest === null ? null : 'known', i.steps]),
         [
           ['step', 'review', 'known', ['review']],
-          ['agent', 'agora', 'known', ['review', 'second']],
+          ['agent', 'reviewer', 'known', ['review', 'second']],
           ['skill', SKILL, 'known', ['review', 'second']],
           ['step', 'second', 'known', ['second']],
         ],
@@ -246,7 +240,7 @@ const ITEMS: Array<{ name: string; check: () => void }> = [
     check: () =>
       assert.deepEqual(
         statsOf({ tries: [], runs: [], frozen: history() }, { by: 'agent' }, NOW).groups.map((g) => [g.key, g.marks.length]),
-        [['agora', 1]],
+        [['reviewer', 1]],
       ),
   },
   {

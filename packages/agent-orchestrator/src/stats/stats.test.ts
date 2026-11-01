@@ -37,10 +37,10 @@ const step = (name: string, after: string[], more: Partial<Workflow> & { by?: st
 
 /** The team's shape: a design, the work, a review that loops back to it, and an ending in the checkout. */
 const TEAM = [
-  step('design', [], { by: 'seldon' }),
-  step('implement', ['design'], { by: 'ada' }),
-  step('review', ['implement'], { by: 'agora', loop: 'implement', rounds: 3 }),
-  step('land', ['review'], { by: 'otto', workspace: 'base', gate: true, check: 'npm test' }),
+  step('design', [], { by: 'planner' }),
+  step('implement', ['design'], { by: 'implementer' }),
+  step('review', ['implement'], { by: 'reviewer', loop: 'implement', rounds: 3 }),
+  step('land', ['review'], { by: 'shipper', workspace: 'base', gate: true, check: 'npm test' }),
 ];
 
 /**
@@ -140,7 +140,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
     const last = ids.at(-1)!;
     record[name] = { taskId: last.taskId, ...(last.check ? { check: last.check } : {}), tries: ids.slice(0, -1) };
   }
-  const run = { id, workflowDir: '/r/workflows/build', repo: '/r', workflow: [...steps], steps: record, ...more } as unknown as Run;
+  const run = { id, workflowDir: '/r/workflows/dev', repo: '/r', workflow: [...steps], steps: record, ...more } as unknown as Run;
   return {
     run,
     steps,
@@ -250,10 +250,10 @@ test('`dayOf`, `dayPlus` and `keysOf`: the UTC day of a time, the day n days off
     {
       name: 'a run with no factory is the default one, its workflow is its folder by name, its repository null for a folder run',
       check: () =>
-        assert.deepEqual(keysOf({ id: 'r', workflowDir: '/r/workflows/build' } as unknown as Run), {
+        assert.deepEqual(keysOf({ id: 'r', workflowDir: '/r/workflows/dev' } as unknown as Run), {
           run: 'r',
           factory: 'default',
-          workflow: 'build',
+          workflow: 'dev',
           repo: null,
         }),
     },
@@ -275,7 +275,11 @@ const noLoop = TEAM.map(({ loop: _loop, rounds: _rounds, ...s }) => s as Workflo
 const noEnding = TEAM.filter((s) => s.workspace !== 'base');
 const prose = TEAM.map((s) => (s.workspace === 'base' ? { ...s, check: undefined } : s));
 const plain = [step('implement', []), step('document', ['implement'])];
-const gated = [step('brief', []), step('design', ['brief'], { gate: true, by: 'seldon' }), step('implement', ['design'], { by: 'ada' })];
+const gated = [
+  step('brief', []),
+  step('design', ['brief'], { gate: true, by: 'planner' }),
+  step('implement', ['design'], { by: 'implementer' }),
+];
 const gatedTries = {
   brief: [{ end: at(0) }],
   design: [{ end: at(1), check: 'passed' as const, cause: 'retries' as const }, { end: at(3) }],
@@ -318,7 +322,7 @@ const secondTry = () =>
     { commit: 'def' },
   );
 const declaredSpec = { design: { 'write-a-spec': [readWithRead] } };
-const seldon = [step('design', [], { by: 'seldon' })];
+const planner = [step('design', [], { by: 'planner' })];
 
 test("`factsOf`: one run's timeline and record as a fact per try that ended, and one for the run once it finished", async (t) => {
   await rowsOf(t, [
@@ -499,7 +503,7 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
     {
       name: "a gate approved on a try that answered a session waits from that answer's end, the try with no time or cost of its own",
       check: () => {
-        const approved = readOf('a', [step('design', [], { gate: true, by: 'seldon' })], answered, {
+        const approved = readOf('a', [step('design', [], { gate: true, by: 'planner' })], answered, {
           approvals: [{ step: 'design', try: 2, at: minus(at(3), 30 * MIN) }],
         });
         const [one, two, ...more] = factsOf(approved).tries;
@@ -516,7 +520,7 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
     {
       name: "an approval of the try that owns the answered session waits from the session's end",
       check: () => {
-        const owner = readOf('o', [step('design', [], { gate: true, by: 'seldon' })], answered, {
+        const owner = readOf('o', [step('design', [], { gate: true, by: 'planner' })], answered, {
           approvals: [{ step: 'design', try: 1, at: minus(at(3), 30 * MIN) }],
         });
         assert.deepEqual(
@@ -528,7 +532,7 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
     {
       name: 'a claude try filed before steps ran as jobs has its denials unmeasured; one after has them',
       check: () => {
-        const r = readOf('bg', seldon, { design: [{ end: at(1) }, { end: at(1, JOBS_DAY), denied: ['Write(/x)'] }] });
+        const r = readOf('bg', planner, { design: [{ end: at(1) }, { end: at(1, JOBS_DAY), denied: ['Write(/x)'] }] });
         assert.deepEqual(
           factsOf(r).tries.map((x) => x.denied),
           [null, ['Write(/x)']],
@@ -550,7 +554,7 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
       check: () =>
         assert.deepEqual(
           factsOf(
-            readOf('skills', seldon, { design: [{ end: at(1), skills: ['look', 'effect'] }, { end: at(2), skills: [] }, { end: at(3) }] }),
+            readOf('skills', planner, { design: [{ end: at(1), skills: ['look', 'effect'] }, { end: at(2), skills: [] }, { end: at(3) }] }),
           ).tries.map((x) => x.skills),
           [['look', 'effect'], [], null],
         ),
@@ -559,7 +563,7 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
       name: 'a skill that declares no path is due on no try, and a try whose files are not measured is due nothing',
       check: () => {
         const r = applying(
-          readOf('due', seldon, {
+          readOf('due', planner, {
             design: [
               { end: at(1), skills: [], files: ['apps/web/src/a.tsx'] },
               { end: at(3), skills: ['effect'] },
@@ -587,7 +591,7 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
     {
       name: "a try keeps or breaks each rule its step's skills declare, by the calls it was denied; a skill that declares none gives none",
       check: () => {
-        const r = declaring(readOf('rules', seldon, { design: [{ end: at(1, JOBS_DAY), denied: ['Bash(cat)', 'Write(/x)'] }] }), {
+        const r = declaring(readOf('rules', planner, { design: [{ end: at(1, JOBS_DAY), denied: ['Bash(cat)', 'Write(/x)'] }] }), {
           design: { 'write-a-spec': [readWithRead, checksBare], effect: [] },
         });
         assert.deepEqual(factsOf(r).tries[0].rules, [
@@ -600,7 +604,7 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
       name: 'a recheck has no session of its own: it keeps and breaks no rule',
       check: () => {
         const recheck = declaring(
-          readOf('recheck', seldon, {
+          readOf('recheck', planner, {
             design: [
               { end: at(1, JOBS_DAY), denied: ['Bash(cat)'], check: 'unfinished' },
               { end: at(2, JOBS_DAY), recheck: true, check: 'passed' },
@@ -621,16 +625,16 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
       name: 'a codex try, or one before steps ran as jobs, keeps and breaks no rule',
       check: () => {
         const codex = declaring(
-          readOf('codex', [step('design', [], { by: 'seldon', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] }),
+          readOf('codex', [step('design', [], { by: 'planner', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] }),
           declaredSpec,
         );
-        const before = declaring(readOf('before', seldon, { design: [{ end: at(1) }] }), declaredSpec);
+        const before = declaring(readOf('before', planner, { design: [{ end: at(1) }] }), declaredSpec);
         for (const r of [codex, before]) assert.equal(factsOf(r).tries[0].rules, null, r.run.id);
       },
     },
     {
       name: 'a measured try of a step whose skills declare no rule has none: [], not null',
-      check: () => assert.deepEqual(factsOf(readOf('undeclared', seldon, { design: [{ end: at(1, JOBS_DAY) }] })).tries[0].rules, []),
+      check: () => assert.deepEqual(factsOf(readOf('undeclared', planner, { design: [{ end: at(1, JOBS_DAY) }] })).tries[0].rules, []),
     },
     {
       name: "a try's tallies are its own session's closeout's values: a measured empty list is 0",
@@ -680,7 +684,7 @@ test("`factsOf`: one run's timeline and record as a fact per try that ended, and
     {
       name: 'a step that declares no tally gives none, whatever its closeout holds',
       check: () =>
-        assert.deepEqual(factsOf(readOf('plain', seldon, { design: [{ end: at(1), closeout: { issues: [1] } }] })).tries[0].tallies, []),
+        assert.deepEqual(factsOf(readOf('plain', planner, { design: [{ end: at(1), closeout: { issues: [1] } }] })).tries[0].tallies, []),
     },
     {
       name: 'a landing check filed with no deadline has none',
@@ -694,7 +698,7 @@ test('`headlineOf`: the headline numbers of a set of facts, each mean over what 
   const headline = (...reads: ReturnType<typeof readOf>[]) => headlineOf(factsOfAll(...reads));
   const old = (id: string) =>
     readOf(id, prose, { design: [{ end: at(1) }], implement: [{ end: at(2) }], review: [{ end: at(3) }], land: [{ end: at(7) }] });
-  const deniedSteps = [step('design', [], { by: 'seldon' }), step('implement', ['design'], { by: 'ada', harness: 'codex' })];
+  const deniedSteps = [step('design', [], { by: 'planner' }), step('implement', ['design'], { by: 'implementer', harness: 'codex' })];
   const deniedTries = {
     design: [
       { end: at(1, JOBS_DAY), denied: ['Write(/x)', 'Bash(git push)'] },
@@ -760,18 +764,18 @@ test('`headlineOf`: the headline numbers of a set of facts, each mean over what 
       check: () =>
         assert.equal(
           headline(
-            readOf('skills', seldon, { design: [{ end: at(1), skills: ['look', 'effect'] }, { end: at(2), skills: [] }, { end: at(3) }] }),
+            readOf('skills', planner, { design: [{ end: at(1), skills: ['look', 'effect'] }, { end: at(2), skills: [] }, { end: at(3) }] }),
           ).skillsPerTry,
           1,
         ),
     },
     {
       name: 'no try measured its skills: null',
-      check: () => assert.equal(headline(readOf('unsaid', seldon, { design: [{ end: at(1) }] })).skillsPerTry, null),
+      check: () => assert.equal(headline(readOf('unsaid', planner, { design: [{ end: at(1) }] })).skillsPerTry, null),
     },
     {
       name: 'a session that loaded none is a measured 0',
-      check: () => assert.equal(headline(readOf('none', seldon, { design: [{ end: at(1), skills: [] }] })).skillsPerTry, 0),
+      check: () => assert.equal(headline(readOf('none', planner, { design: [{ end: at(1), skills: [] }] })).skillsPerTry, 0),
     },
   ]);
 });
@@ -789,7 +793,7 @@ test('`slowLandingsOf`: each landing check that passed in more than half the dea
         assert.deepEqual(rest, {
           run: 'slow',
           factory: 'default',
-          workflow: 'build',
+          workflow: 'dev',
           repo: '/r',
           day: DAY,
           step: 'land',
@@ -872,9 +876,9 @@ const touchedTries = {
   ],
 };
 const touched = () =>
-  applying(readOf('due', seldon, touchedTries), { design: { 'change-the-board': ['apps/web/**'], effect: ['packages/**'], shadcn: [] } });
+  applying(readOf('due', planner, touchedTries), { design: { 'change-the-board': ['apps/web/**'], effect: ['packages/**'], shadcn: [] } });
 const ruled = () =>
-  declaring(readOf('rules', seldon, { design: [{ end: at(1, JOBS_DAY), denied: ['Bash(cat)', 'Write(/x)'] }] }), {
+  declaring(readOf('rules', planner, { design: [{ end: at(1, JOBS_DAY), denied: ['Bash(cat)', 'Write(/x)'] }] }), {
     design: { 'write-a-spec': [readWithRead, checksBare], effect: [] },
   });
 const tallied = () =>
@@ -927,7 +931,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
     {
       name: 'a claude try before steps ran as jobs leaves the tile before at null, and the last tile is not diluted with 0',
       check: () => {
-        const r = readOf('bg', seldon, { design: [{ end: at(1) }, { end: at(1, JOBS_DAY), denied: ['Write(/x)'] }] });
+        const r = readOf('bg', planner, { design: [{ end: at(1) }, { end: at(1, JOBS_DAY), denied: ['Write(/x)'] }] });
         const { all } = statsOf(factsOfAll(r), {}, JOBS_NOW);
         assert.deepEqual([all.tiles.before.deniedPerTry, all.tiles.last.deniedPerTry], [null, 1]);
       },
@@ -935,16 +939,16 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
     {
       name: 'by agent, a step no agent fills is a group of its own, last, never the group of an agent that fills a step of the same name',
       check: () => {
-        const filled = readOf('a', [step('implement', [], { by: 'ada' })], { implement: [{ end: at(1) }] });
+        const filled = readOf('a', [step('implement', [], { by: 'implementer' })], { implement: [{ end: at(1) }] });
         const bare = readOf('b', [step('implement', [])], { implement: [{ end: at(2) }] });
         assert.deepEqual(
           statsOf(factsOfAll(filled, bare), { by: 'agent' }, NOW).groups.map((g) => [g.key, g.total.tries]),
           [
-            ['ada', 1],
+            ['implementer', 1],
             [null, 1],
           ],
         );
-        assert.equal(statsOf(factsOfAll(filled, bare), { agent: 'ada' }, NOW).all.total.tries, 1);
+        assert.equal(statsOf(factsOfAll(filled, bare), { agent: 'implementer' }, NOW).all.total.tries, 1);
       },
     },
     {
@@ -959,7 +963,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
     {
       name: "a day's refused calls are a mean over its measured tries",
       check: () => {
-        const steps = [step('design', [], { by: 'seldon' }), step('implement', ['design'], { by: 'ada', harness: 'codex' })];
+        const steps = [step('design', [], { by: 'planner' }), step('implement', ['design'], { by: 'implementer', harness: 'codex' })];
         const s = statsOf(
           factsOfAll(
             readOf('denied', steps, {
@@ -979,7 +983,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
     {
       name: "a step's refused calls are counted by call, most first and then by call, over its measured tries",
       check: () => {
-        const [row] = statsOf(factsOfAll(readOf('by-call', seldon, deniedByCall)), {}, JOBS_NOW).all.steps;
+        const [row] = statsOf(factsOfAll(readOf('by-call', planner, deniedByCall)), {}, JOBS_NOW).all.steps;
         assert.deepEqual([row.deniedCalls, row.deniedTries], [7, 2]);
         assert.deepEqual(row.denials, [
           { call: 'Bash(git push)', count: 3 },
@@ -992,7 +996,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
       name: "a codex step's refused calls are null over 0 tries, with no call",
       check: () => {
         const [row] = statsOf(
-          factsOfAll(readOf('codex', [step('design', [], { by: 'seldon', harness: 'codex' })], deniedByCall)),
+          factsOfAll(readOf('codex', [step('design', [], { by: 'planner', harness: 'codex' })], deniedByCall)),
           {},
           JOBS_NOW,
         ).all.steps;
@@ -1004,7 +1008,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
       check: () => {
         const s = statsOf(
           factsOfAll(
-            readOf('skills', seldon, { design: [{ end: at(1), skills: ['look', 'effect'] }, { end: at(2), skills: [] }, { end: at(3) }] }),
+            readOf('skills', planner, { design: [{ end: at(1), skills: ['look', 'effect'] }, { end: at(2), skills: [] }, { end: at(3) }] }),
           ),
           {},
           NOW,
@@ -1015,7 +1019,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
     {
       name: "a step's skills are counted by skill over its measured tries, most first and then by name, and how many tries were measured",
       check: () => {
-        const [row] = statsOf(factsOfAll(readOf('by-skill', seldon, skillsBy)), {}, NOW).all.steps;
+        const [row] = statsOf(factsOfAll(readOf('by-skill', planner, skillsBy)), {}, NOW).all.steps;
         assert.deepEqual([row.tries, row.skillLoads, row.skillTries], [3, 4, 2]);
         assert.deepEqual(
           row.skills.map((x) => [x.skill, x.count]),
@@ -1030,7 +1034,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
     {
       name: "an unmeasured step's skills are null over 0 tries",
       check: () => {
-        const [row] = statsOf(factsOfAll(readOf('unsaid', seldon, { design: [{ end: at(1) }] })), {}, NOW).all.steps;
+        const [row] = statsOf(factsOfAll(readOf('unsaid', planner, { design: [{ end: at(1) }] })), {}, NOW).all.steps;
         assert.deepEqual([row.skillLoads, row.skillTries, row.skills], [null, 0, []]);
       },
     },
@@ -1055,11 +1059,11 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
       name: 'a try whose denials were not measured — on codex, before steps ran as jobs, undeclared — gives no row, never a row of zeros',
       check: () => {
         const codex = declaring(
-          readOf('codex', [step('design', [], { by: 'seldon', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] }),
+          readOf('codex', [step('design', [], { by: 'planner', harness: 'codex' })], { design: [{ end: at(1, JOBS_DAY) }] }),
           declaredSpec,
         );
-        const before = declaring(readOf('before', seldon, { design: [{ end: at(1) }] }), declaredSpec);
-        const undeclared = readOf('undeclared', seldon, { design: [{ end: at(1, JOBS_DAY) }] });
+        const before = declaring(readOf('before', planner, { design: [{ end: at(1) }] }), declaredSpec);
+        const undeclared = readOf('undeclared', planner, { design: [{ end: at(1, JOBS_DAY) }] });
         for (const r of [codex, before, undeclared])
           assert.deepEqual(statsOf(factsOfAll(r), {}, JOBS_NOW).all.steps[0].rules, [], r.run.id);
       },
@@ -1067,7 +1071,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
     {
       name: "a rule's kept and broken add up to its step and agent's tries whose denials were measured",
       check: () => {
-        const steps = [step('design', [], { by: 'seldon' }), step('implement', ['design'], { by: 'ada' })];
+        const steps = [step('design', [], { by: 'planner' }), step('implement', ['design'], { by: 'implementer' })];
         const r = declaring(
           readOf('identity', steps, {
             design: [
@@ -1124,7 +1128,7 @@ test('`statsOf`: the facts bucketed by UTC day and by a key, filtered, totalled 
       name: 'a step that declares no tally gives no row',
       check: () =>
         assert.deepEqual(
-          statsOf(factsOfAll(readOf('plain', seldon, { design: [{ end: at(1), closeout: { issues: [1] } }] })), {}, NOW).all.tallies,
+          statsOf(factsOfAll(readOf('plain', planner, { design: [{ end: at(1), closeout: { issues: [1] } }] })), {}, NOW).all.tallies,
           [],
         ),
     },
@@ -1231,7 +1235,7 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
           JOBS_NOW,
         );
         assert.match(statsLine(codex), /— \(—\) calls denied/);
-        const none = statsOf(factsOfAll(readOf('none', seldon, { design: [{ end: at(1, JOBS_DAY) }] })), {}, JOBS_NOW);
+        const none = statsOf(factsOfAll(readOf('none', planner, { design: [{ end: at(1, JOBS_DAY) }] })), {}, JOBS_NOW);
         assert.match(statsLine(none), /0\/try \(—\) calls denied/);
         none.all.tiles.last.deniedPerTry = 1 / 300;
         assert.match(statsLine(none), / 0\.003\/try \(—\) calls denied/);
@@ -1241,11 +1245,11 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
       name: 'skills loaded: — where none were measured, 0/try for a measured none',
       check: () => {
         assert.match(
-          statsLine(statsOf(factsOfAll(readOf('unsaid', seldon, { design: [{ end: at(1) }] })), {}, NOW)),
+          statsLine(statsOf(factsOfAll(readOf('unsaid', planner, { design: [{ end: at(1) }] })), {}, NOW)),
           /— \(—\) skills loaded$/,
         );
         assert.match(
-          statsLine(statsOf(factsOfAll(readOf('none', seldon, { design: [{ end: at(1), skills: [] }] })), {}, NOW)),
+          statsLine(statsOf(factsOfAll(readOf('none', planner, { design: [{ end: at(1), skills: [] }] })), {}, NOW)),
           /0\/try \(—\) skills loaded$/,
         );
       },
@@ -1253,18 +1257,18 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
     {
       name: 'the step row says how many of its tries had their skills measured, and a skill row under its header',
       check: () => {
-        const words = wordsOf([readOf('by-skill', seldon, skillsBy)]);
+        const words = wordsOf([readOf('by-skill', planner, skillsBy)]);
         hasLine(words, /^design .*\s4 \(2 of 3\)$/);
         hasLine(words, /^step\s+agent\s+skill\s+loads\s+tries\s+when touched$/);
-        hasLine(words, /^design\s+seldon\s+write-a-spec\s+2\s+2\s+—$/);
+        hasLine(words, /^design\s+planner\s+write-a-spec\s+2\s+2\s+—$/);
       },
     },
     {
       name: "a skill's row says how many touched tries loaded it, and — where it declares no path",
       check: () => {
         const words = wordsOf([touched()]);
-        hasLine(words, /^design\s+seldon\s+change-the-board\s+1\s+1\s+1 of 2$/);
-        hasLine(words, /^design\s+seldon\s+shadcn\s+1\s+1\s+—$/);
+        hasLine(words, /^design\s+planner\s+change-the-board\s+1\s+1\s+1 of 2$/);
+        hasLine(words, /^design\s+planner\s+shadcn\s+1\s+1\s+—$/);
       },
     },
     {
@@ -1272,15 +1276,15 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
       check: () => {
         const words = wordsOf([ruled()], {}, JOBS_NOW);
         hasLine(words, /^step\s+agent\s+skill\s+rule\s+kept\s+broken$/);
-        hasLine(words, /^design\s+seldon\s+write-a-spec\s+read-with-read\s+0\s+1$/);
-        hasLine(words, /^design\s+seldon\s+write-a-spec\s+checks-bare\s+1\s+0$/);
+        hasLine(words, /^design\s+planner\s+write-a-spec\s+read-with-read\s+0\s+1$/);
+        hasLine(words, /^design\s+planner\s+write-a-spec\s+checks-bare\s+1\s+0$/);
       },
     },
     {
       name: 'no rule measured: no rule header',
       check: () =>
         assert.ok(
-          !wordsOf([readOf('undeclared', seldon, { design: [{ end: at(1, JOBS_DAY) }] })], {}, JOBS_NOW).some((l) =>
+          !wordsOf([readOf('undeclared', planner, { design: [{ end: at(1, JOBS_DAY) }] })], {}, JOBS_NOW).some((l) =>
             /^step\s+agent\s+skill\s+rule/.test(l),
           ),
         ),
@@ -1298,7 +1302,7 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
     },
     {
       name: 'a step row says its tries, its time, its check time and its cost',
-      check: () => hasLine(wordsOf([twoRounds('c1')]), /^implement\s+ada\s+2\s+4h00m\s+2h00m\s+\$2\.00\s/),
+      check: () => hasLine(wordsOf([twoRounds('c1')]), /^implement\s+implementer\s+2\s+4h00m\s+2h00m\s+\$2\.00\s/),
     },
     {
       name: "the system's health is said under `system` where the series kept some, and nothing where none",
@@ -1364,8 +1368,8 @@ test('`statsLines` and `statsLine`: the stats in words, — where nothing was me
 const QUERIES: Array<{ name: string; given: Parameters<typeof statsQueryOf>[0]; query: ReturnType<typeof statsQueryOf> | 'refused' }> = [
   {
     name: 'a key to go by, a day and a filter are taken as given',
-    given: { by: 'repo', from: '2026-09-01', agent: 'ada' },
-    query: { by: 'repo', from: '2026-09-01', agent: 'ada' },
+    given: { by: 'repo', from: '2026-09-01', agent: 'implementer' },
+    query: { by: 'repo', from: '2026-09-01', agent: 'implementer' },
   },
   { name: 'nothing given is the whole store', given: {}, query: {} },
   {

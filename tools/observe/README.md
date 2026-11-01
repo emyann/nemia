@@ -415,7 +415,7 @@ Measured 2026-10-11 on Claude Code 2.1.296, over the 7 days this stack held:
 - **The means are per session**, `avg_over_time(span.value) by (span.row)`, as a run's page has a row per session: a step whose three
   tries each ran a session spends three times its bar a run, and **Tries a run** says how many. A try that answered an earlier try's
   session adds one to **Tries a run** and no row: the session's `ran` and `cost` hold every turn of it, once. A range holding one run
-  shows that run's own numbers (`agent-orchestrator/test/timeline-spans.test.ts` holds the spans equal to the page's rows).
+  shows that run's own numbers (`agent-orchestrator/test/measured-run.test.ts` holds the spans equal to the page's rows).
 - **Tempo answers 7 days back**, where Prometheus keeps 90: no month over month here. The `factory` and `workflow` choices are read from
   Prometheus (`step_tries_total`), so a workflow is offered once a session of it has settled.
 - Measured 2026-10-11 on this stack, over probe spans under a service of their own: `avg_over_time` of a numeric span attribute answers

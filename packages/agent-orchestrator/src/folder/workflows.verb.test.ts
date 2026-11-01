@@ -24,7 +24,7 @@ const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const { runStore } = await import('../record/files.store.ts');
 const { workflowVersion } = await import('./version.store.ts');
-const { removeWorkflow } = await import('./write.store.ts');
+const { removeWorkflowAt } = await import('./write.store.ts');
 const { queueInInbox } = await import('../inbox/inbox.store.ts');
 const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
 
@@ -207,7 +207,7 @@ test("REFUSED, by the remover itself: a folder outside yours, one nested in it a
   const yours = path.join(ROOT, 'workflows');
   for (const dir of [theirs, nested]) {
     assert.throws(
-      () => removeWorkflow(dir, { home: ROOT }),
+      () => removeWorkflowAt(ROOT, dir),
       (err: Error) => {
         assert.ok(err instanceof Invalid);
         assert.equal(
@@ -221,7 +221,7 @@ test("REFUSED, by the remover itself: a folder outside yours, one nested in it a
   }
   const agents = folder('agents', { 'one.md': 'An agent.\n' });
   assert.throws(
-    () => removeWorkflow(agents, { home: ROOT }),
+    () => removeWorkflowAt(ROOT, agents),
     (err: Error) => err instanceof Invalid && new RegExp(`^${agents.replaceAll('/', '\\/')} is agents\\/, the folder of`).test(err.message),
   );
   assert.ok(fs.existsSync(path.join(agents, 'one.md')));

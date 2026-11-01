@@ -24,7 +24,7 @@ import { stillNeeded, workflowStale, workflowTaken } from './folder.ts';
 import { loadWorkflows } from './folder.store.ts';
 import type { Places } from '../skills/read.store.ts';
 import { workflowVersion } from './version.store.ts';
-import { removeWorkflow, writeWorkflow, type WorkflowRemoved, type WorkflowWritten } from './write.store.ts';
+import { removeWorkflowAt, writeWorkflowAt, type WorkflowRemoved, type WorkflowWritten } from './write.store.ts';
 
 /** The text under `key`, or undefined where none was given. */
 const textOf = (args: Args, key: string): string | undefined => {
@@ -157,7 +157,7 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
       const dir = versionHeld('nemia workflows write', 'write', args, home);
       const steps = JSON.parse(textOf(args, 'draft') ?? '[]') as StepDraft[];
       const places = writePlacesOf(args, home);
-      const written = writeWorkflow(dir, steps, textOf(args, 'readme'), { places });
+      const written = writeWorkflowAt(home, dir, steps, textOf(args, 'readme'), { places });
       return { ...written, version: workflowVersion(written.dir, places) };
     }),
   print: ({ dir, version, written, kept, removed }) => [
@@ -216,7 +216,7 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
   handler: (args, _env, home = HOME) =>
     tried(() => {
       const dir = path.resolve(versionHeld('nemia workflows rm', 'remove', args, home));
-      return removeWorkflow(dir, { home, users: usersOf(dir) });
+      return removeWorkflowAt(home, dir, usersOf(dir));
     }),
   print: ({ dir, removed }) => [`removed ${dir}: ${removed.join(', ')}`],
 };

@@ -22,4 +22,15 @@ export type { ComposedLayer } from './layers.ts';
 export { unallowedRefusal } from './unallowed.ts';
 export type { Hire } from './step-file.ts';
 export type { StepDraft } from './step-file.ts';
-export { fansOut, isFolderTeam, loopSpan, orderSteps, stepSetRefusal, terminalSteps, upstreamOf, validate } from './validate.ts';
+export {
+  afterRefusal,
+  cycleRefusal,
+  fansOut,
+  isFolderTeam,
+  loopSpan,
+  orderSteps,
+  stepSetRefusal,
+  terminalSteps,
+  upstreamOf,
+  validate,
+} from './validate.ts';

@@ -37,7 +37,7 @@ export const GLOBAL_ROOTS: Readonly<Record<string, number>> = {
   'src/feed/feed.store.ts': 1,
   'src/folder/lookup.store.ts': 1,
   'src/folder/workflows.verb.ts': 2,
-  'src/folder/write.store.ts': 4,
+  'src/folder/write.store.ts': 1,
   'src/forget/forget.verb.ts': 4,
   'src/inbox/inbox.store.ts': 1,
   'src/level/level.store.ts': 1,

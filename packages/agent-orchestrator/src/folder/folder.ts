@@ -6,6 +6,8 @@ import path from 'node:path';
 import { AGENTS_FOLDER, FRONTMATTER, isReadme, SKILLS_FOLDER, type Workflow } from '../step/step.ts';
 import { orderSteps, parseWorkflow, validate, type Hire } from '../workflow/index.ts';
 import type { Agents, SkillsFound } from '../agents/agents.ts';
+import type { WorkflowDirRefusal } from '../../contracts/workflow-dir.contract.ts';
+import type { WorkflowVersionRefusal } from '../../contracts/workflow-version.contract.ts';
 
 /**
  * Why `name` cannot be a step's name, or `undefined` when it can. A step is its file, `<name>.md`, in its workflow's folder, and other
@@ -158,3 +160,60 @@ export function readmeDescription(text: string): string | null {
   }
   return null;
 }
+
+/** What is at a workflow's folder before a write or a removal: nothing, a file, or a folder at its version (`workflowVersion`). */
+export type WorkflowThere = { kind: 'none' } | { kind: 'file' } | { kind: 'folder'; version: string };
+
+/** A refusal of a workflow's write or removal: the kind the api answers it with, and its words. */
+export type VersionRefused = { kind: 'Invalid' | 'Conflict' | 'Missing'; message: string };
+
+/**
+ * Why `dir` cannot be a workflow's folder as the Workflow door is addressed by it (`WorkflowDir`), or null where it can: absolute and
+ * normalized as `path.resolve` leaves it, so one folder has one id, not the root, and not the folder of agents or of skills beside the
+ * workflows (`agentsFolderRefusal`). Pure, and proved by `contracts/workflow-dir.contract.ts`.
+ */
+export const workflowDirRefusal: WorkflowDirRefusal = (dir) => {
+  const fix = 'Name the folder as `workflowFolder` resolves it: an absolute path, as path.resolve leaves it.';
+  if (!dir.startsWith('/')) return `${JSON.stringify(dir)} is not a workflow's folder: it is not absolute. ${fix}`;
+  if (
+    dir.includes('//') ||
+    dir.includes('/./') ||
+    dir.includes('/../') ||
+    dir.endsWith('/.') ||
+    dir.endsWith('/..') ||
+    (dir.length > 1 && dir.endsWith('/'))
+  )
+    return `${JSON.stringify(dir)} is not a workflow's folder: resolving it would change it. ${fix}`;
+  if (dir === '/') return `/ is not a workflow's folder: a workflow is a folder with a name. ${fix}`;
+  if (dir === AGENTS_FOLDER || dir.endsWith('/' + AGENTS_FOLDER) || dir === SKILLS_FOLDER || dir.endsWith('/' + SKILLS_FOLDER))
+    return `${dir} is the folder of the agents or the skills beside the workflows, not a workflow. Name a workflow beside it.`;
+  return null;
+};
+
+/**
+ * Why a write or a removal (`does`) of the workflow folder `dir`, given the version `given` it was read at, does nothing, judged against
+ * what is there now (`there`), or null where it goes on: a new write over nothing goes; a write given a version where nothing is now is
+ * `Missing`; a write over a file, or over a folder with no version, a `Conflict` (`workflowTaken`); a removal of a folder with no
+ * version `Invalid`; and an act given a version the folder is no longer at a `Conflict` (`workflowStale`). A removal where no folder is
+ * goes on, to the remover's own refusal. Pure, and proved by `contracts/workflow-version.contract.ts`.
+ */
+export const workflowVersionRefusal: WorkflowVersionRefusal = (dir, does, there, given) => {
+  if (there.kind === 'none') {
+    if (does === 'write' && given !== undefined)
+      return {
+        kind: 'Missing',
+        message: `${dir} is not there: it was removed since it was read. Write it with no version to make it again.`,
+      };
+    return null;
+  }
+  if (there.kind === 'file') return does === 'write' ? { kind: 'Conflict', message: workflowTaken(dir, null) } : null;
+  if (given === undefined) {
+    if (does === 'write') return { kind: 'Conflict', message: workflowTaken(dir, there.version) };
+    return {
+      kind: 'Invalid',
+      message: `${dir} is at version ${there.version}, and a removal is checked against the version it was read at, so a folder changed since is not removed unseen. Give that version to remove it.`,
+    };
+  }
+  if (given !== there.version) return { kind: 'Conflict', message: workflowStale[does](dir, given, there.version) };
+  return null;
+};

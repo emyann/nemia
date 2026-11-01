@@ -15,6 +15,50 @@ import { LINE_NAME } from '../workspace/workspace.ts';
 export const isFolderTeam = (steps: readonly Pick<Workflow, 'place'>[]): boolean =>
   steps.length > 0 && steps.every((s) => stepPlace(s) === 'folder');
 
+/** What `after` reads of a step: its name, and the names of the steps it waits on. */
+type Waits = { readonly name: string; readonly after: readonly string[] };
+
+/** Why `s` cannot wait as its `after:` says among the steps named `names` — a name no step has, or its own — or undefined where it can. */
+const waitRefusal = (s: Waits, names: ReadonlySet<string>): string | undefined => {
+  for (const a of s.after) {
+    if (!names.has(a)) return `${s.name}: waits on "${a}", which is not a step here`;
+    if (a === s.name) return `${s.name}: waits on itself`;
+  }
+  return undefined;
+};
+
+/**
+ * Why the steps do not wait as their `after:` lines say: the first step that waits on a name no step has, or on itself, or undefined
+ * where each waits on others of them. One rule, read by `validate` and by the model's `Workflow` (`folder/folder.model.ts`).
+ */
+export function afterRefusal(steps: readonly Waits[]): string | undefined {
+  const names = new Set(steps.map((s) => s.name));
+  for (const s of steps) {
+    const refused = waitRefusal(s, names);
+    if (refused !== undefined) return refused;
+  }
+  return undefined;
+}
+
+/**
+ * Why the steps wait on each other, naming them, or undefined where none does: some are left once every step that waits on nothing left
+ * is taken away. One rule, read by `validate` and by the model's `Workflow`.
+ */
+export function cycleRefusal(steps: readonly Waits[]): string | undefined {
+  const pending = new Map(steps.map((s) => [s.name, new Set(s.after)]));
+  for (let moved = true; moved;) {
+    moved = false;
+    for (const [name, deps] of pending) {
+      if (deps.size === 0) {
+        pending.delete(name);
+        for (const other of pending.values()) other.delete(name);
+        moved = true;
+      }
+    }
+  }
+  return pending.size ? `these steps wait on each other: ${[...pending.keys()].sort().join(', ')}` : undefined;
+}
+
 /**
  * The ways a folder of markdown is not a workflow: a step waits on one that does not exist, the steps
  * wait on each other, or a step reads the output of one that has not finished or declares none. All
@@ -27,10 +71,8 @@ export const isFolderTeam = (steps: readonly Pick<Workflow, 'place'>[]): boolean
 export function validate(steps: readonly Workflow[]): void {
   const names = new Set(steps.map((s) => s.name));
   for (const s of steps) {
-    for (const a of s.after) {
-      if (!names.has(a)) throw new WorkflowError(`${s.name}: waits on "${a}", which is not a step here`);
-      if (a === s.name) throw new WorkflowError(`${s.name}: waits on itself`);
-    }
+    const waits = waitRefusal(s, names);
+    if (waits !== undefined) throw new WorkflowError(waits);
     for (const from of s.input ?? []) {
       const producer = steps.find((x) => x.name === from);
       if (!producer)
@@ -65,18 +107,8 @@ export function validate(steps: readonly Workflow[]): void {
   validateBaseWorkspace(steps);
   validateSlot(steps);
 
-  const pending = new Map(steps.map((s) => [s.name, new Set(s.after)]));
-  for (let moved = true; moved;) {
-    moved = false;
-    for (const [name, deps] of pending) {
-      if (deps.size === 0) {
-        pending.delete(name);
-        for (const other of pending.values()) other.delete(name);
-        moved = true;
-      }
-    }
-  }
-  if (pending.size) throw new WorkflowError(`these steps wait on each other: ${[...pending.keys()].sort().join(', ')}`);
+  const cycle = cycleRefusal(steps);
+  if (cycle !== undefined) throw new WorkflowError(cycle);
 
   validateLoops(steps);
 }

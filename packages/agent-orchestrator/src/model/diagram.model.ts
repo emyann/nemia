@@ -4,6 +4,7 @@
  */
 import { erDiagram, type ErModel } from './er.model.ts';
 import { recordModel } from '../record/record.model.ts';
+import { folderModel } from '../folder/folder.model.ts';
 import { inboxModel } from '../inbox/inbox.model.ts';
 import { factoryModel } from '../factory/factory.model.ts';
 import { placeModel } from '../place/place.model.ts';
@@ -11,7 +12,7 @@ import { agentsModel } from '../agents/agents.model.ts';
 import { feedModel } from '../feed/feed.model.ts';
 
 /** Each context's part of the model, in the order the diagram draws them. */
-const MODELS: readonly ErModel[] = [recordModel, inboxModel, factoryModel, placeModel, agentsModel, feedModel];
+const MODELS: readonly ErModel[] = [recordModel, folderModel, inboxModel, factoryModel, placeModel, agentsModel, feedModel];
 
 /** The orchestrator's `erDiagram`, printed between the `diagram:orchestrator-model` markers of `docs/model.md`. */
 export const orchestratorModelDiagram = (): string =>

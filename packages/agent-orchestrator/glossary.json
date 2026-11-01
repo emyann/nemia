@@ -352,12 +352,17 @@
     },
     {
       "term": "Step",
-      "meaning": "one markdown file of a workflow: who does it, what it may do, and what must finish first.",
+      "meaning": "one markdown file of a workflow: who does it, what it may do, and what must finish first. The model's `WorkflowStep`, which owns `StepName`; the run's record of one is a step record.",
       "type": "Step",
       "see": {
         "label": "A step",
         "href": "/workflows/#a-step"
       }
+    },
+    {
+      "term": "Step record",
+      "meaning": "what a run's record keeps of one of its steps (`Step`, `src/record/record.model.ts`): its current try's task, the tries behind it, where it works and what the run did with it, keyed by its `StepName`.",
+      "type": "Step"
     },
     {
       "term": "Step status",
@@ -468,12 +473,22 @@
     },
     {
       "term": "Workflow",
-      "meaning": "a folder of markdown files, one file a step.",
+      "meaning": "a folder of markdown files, one file a step: the model's `Workflow` (`src/folder/folder.model.ts`), addressed by its folder, read and written through the Workflow door.",
       "type": "Workflow",
       "see": {
         "label": "Workflows",
         "href": "/workflows/"
       }
+    },
+    {
+      "term": "Workflow step",
+      "meaning": "a step as the model holds it (`WorkflowStep`): its name, the steps it waits on, and the keys that shape the graph — `loop`, `gate`, `check`; a run's frozen workflow is a list of them, read loosely.",
+      "type": "WorkflowStep"
+    },
+    {
+      "term": "WorkflowDir",
+      "meaning": "a workflow's folder, absolute and resolved, neither the agents' nor the skills': the Workflow door's id, minted where a folder is resolved (`workflowFolder`) and read nominally from a run's record.",
+      "type": "WorkflowDir"
     },
     {
       "term": "WorkflowName",

@@ -1,9 +1,10 @@
 /**
  * A factory's wiring, judged (agent-orchestrator, src/wiring/wiring.ts): why a person's change of what a factory offers, hires and
- * schedules is refused (`wiringRefusal`), and the factory after one it accepts (`rewired`). The laws are the Factory door's invariant
- * from each side: a factory hires and schedules only into a workflow it offers, so a change that would break it is refused, and every
- * change accepted keeps it. The names a change carries are judged by `hireRefusal` and `workflowNameRefusal`, declared pure and nothing
- * more: whether a name is well formed is theirs, and their tests'.
+ * schedules is refused (`wiringRefusal`), and the factory after one it accepts (`rewired`). The refusal's laws are the Factory door's
+ * invariant — a factory hires and schedules only into a workflow it offers — so a change that would break it is refused; the
+ * rewire's say what each change does, and the door's model decode refuses a factory written that breaks the invariant. The names a
+ * change carries are judged by `hireRefusal` and `workflowNameRefusal`, declared pure and nothing more: whether a name is well formed
+ * is theirs, and their tests'.
  */
 import { assume, type Implementation, spec } from '@emyann/tsverify';
 import {
@@ -19,7 +20,7 @@ import {
   type Factory,
 } from '../src/factory/factory.ts';
 import { hiresInto, withEntry, withHire, withName, withoutEntry, type WiringChange, type WiringRefused } from '../src/wiring/wiring.ts';
-import { accepted, hiresOffered, keepsTheOffer, schedulesOffered } from './laws.ts';
+import { accepted } from './laws.ts';
 
 export const hireNamed = assume(hireRefusal, { pure: false });
 export const workflowNamed = assume(workflowNameRefusal, { pure: true });
@@ -128,56 +129,27 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
 export type WiringRefusal = Implementation<typeof wiringRefusalSpec>;
 
 const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
-  /** Its callers rewire only a factory that keeps the invariant, and only by a change `wiringRefusal` accepts (`accepted`). */
-  requires: ({ input: [factory, change] }) => keepsTheOffer(factory) && accepted(factory, change),
+  /**
+   * Its callers rewire only by a change `wiringRefusal` accepts (`accepted`). That the factory after it still keeps the invariant is
+   * the model's to refuse otherwise: the Factory door decodes every factory it writes through `Factory` (`factoryChecked`).
+   */
+  requires: ({ input: [factory, change] }) => accepted(factory, change),
   ensures: {
-    hiresOnlyOfferedAfterAttach: {
-      description: 'An accepted attach leaves a factory that hires only into workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'attach' || hiresOffered(output),
+    detachWithdraws: {
+      description: 'After a detach the factory no longer offers the workflow',
+      condition: ({ input: [, change], output }) => change.verb !== 'detach' || !output.workflows.includes(change.workflow),
     },
-    schedulesOnlyOfferedAfterAttach: {
-      description: 'An accepted attach leaves a factory that schedules only workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'attach' || schedulesOffered(output),
+    fireLeaves: {
+      description: 'After a fire the step is hired into no more',
+      condition: ({ input: [, change], output }) => change.verb !== 'fire' || !Object.hasOwn(output.hires, change.step),
     },
-    hiresOnlyOfferedAfterDetach: {
-      description: 'An accepted detach leaves a factory that hires only into workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'detach' || hiresOffered(output),
+    scheduleHolds: {
+      description: 'After a schedule the factory schedules the workflow',
+      condition: ({ input: [, change], output }) => change.verb !== 'schedule' || Object.hasOwn(output.schedules, change.workflow),
     },
-    schedulesOnlyOfferedAfterDetach: {
-      description: 'An accepted detach leaves a factory that schedules only workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'detach' || schedulesOffered(output),
-    },
-    hiresOnlyOfferedAfterHire: {
-      description: 'An accepted hire leaves a factory that hires only into workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'hire' || hiresOffered(output),
-    },
-    schedulesOnlyOfferedAfterHire: {
-      description: 'An accepted hire leaves a factory that schedules only workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'hire' || schedulesOffered(output),
-    },
-    hiresOnlyOfferedAfterFire: {
-      description: 'An accepted fire leaves a factory that hires only into workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'fire' || hiresOffered(output),
-    },
-    schedulesOnlyOfferedAfterFire: {
-      description: 'An accepted fire leaves a factory that schedules only workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'fire' || schedulesOffered(output),
-    },
-    hiresOnlyOfferedAfterSchedule: {
-      description: 'An accepted schedule leaves a factory that hires only into workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'schedule' || hiresOffered(output),
-    },
-    schedulesOnlyOfferedAfterSchedule: {
-      description: 'An accepted schedule leaves a factory that schedules only workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'schedule' || schedulesOffered(output),
-    },
-    hiresOnlyOfferedAfterUnschedule: {
-      description: 'An accepted unschedule leaves a factory that hires only into workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'unschedule' || hiresOffered(output),
-    },
-    schedulesOnlyOfferedAfterUnschedule: {
-      description: 'An accepted unschedule leaves a factory that schedules only workflows it offers',
-      condition: ({ input: [, change], output }) => change.verb !== 'unschedule' || schedulesOffered(output),
+    unscheduleLeaves: {
+      description: 'After an unschedule the factory schedules the workflow no more',
+      condition: ({ input: [, change], output }) => change.verb !== 'unschedule' || !Object.hasOwn(output.schedules, change.workflow),
     },
     keepsRepos: {
       description: 'A wiring change never changes the repositories',

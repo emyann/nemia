@@ -18,18 +18,6 @@ export const tryNow = (run: Run, name: string): number => {
 export const approved = (run: Run, name: string): boolean =>
   (run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name));
 
-/** Whether a factory hires and schedules only into workflows it offers: the Factory door's invariant (`factory.model.ts`). */
-export const keepsTheOffer = (factory: Pick<Factory, 'workflows' | 'hires' | 'schedules'>): boolean =>
-  hiresOffered(factory) && schedulesOffered(factory);
-
-/** Whether a factory hires only into workflows it offers. */
-export const hiresOffered = (factory: Pick<Factory, 'workflows' | 'hires'>): boolean =>
-  Object.keys(factory.hires).every((step) => factory.workflows.includes(step.slice(0, step.indexOf('/'))));
-
-/** Whether a factory schedules only workflows it offers. */
-export const schedulesOffered = (factory: Pick<Factory, 'workflows' | 'schedules'>): boolean =>
-  Object.keys(factory.schedules).every((workflow) => factory.workflows.includes(workflow));
-
 /**
  * Whether a factory takes a change of its wiring, its names aside, as `wiringRefusal` judges it: a hire or a schedule only into a
  * workflow it offers, a detach only of one it offers and no longer hires into nor schedules, a fire only of a step it hires into, an

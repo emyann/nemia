@@ -71,8 +71,8 @@ export default {
       );
     }
     await expectVisible(
-      section.locator('dd', { hasText: /^main$/ }),
-      `${ending}'s facts say it runs in the repository's own checkout (workspace main)`,
+      section.locator('dd', { hasText: /^base$/ }),
+      `${ending}'s facts say it runs in the repository's own checkout (workspace base)`,
     );
     await expectVisible(section.locator('dd', { hasText: /^awaiting approval$/ }), 'and that its gate awaits approval');
     const sendBack = gate.getByRole('form', { name: `Send ${back} back` });

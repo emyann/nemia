@@ -6,11 +6,12 @@ import { Effect, Schema } from 'effect';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { awaitsAdmission, fold, verbTakes, type Input, type State } from '../domain.ts';
-import { Journal } from './journal.ts';
+import { Journal, type JournalError } from './journal.ts';
 import { argsRefusalOf, configForTurn, turnArgsRefusalOf, type HarnessArgs } from '../../harness/args.ts';
 import { Runner } from '../../harness/seam.ts';
 import { labelsRefusalOf } from '../labels.ts';
 import type { RequestStop } from '../../../contracts/stop.contract.ts';
+import { TaskId } from '../model.ts';
 
 /** What `file` journals: a task as a person files it. */
 export type Filing = {
@@ -166,29 +167,38 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
   if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
   const journal = yield* Journal;
   const id = spec.id ?? `t-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
-  yield* journal.append(
-    id,
-    {
-      kind: 'filed',
-      at: new Date().toISOString(),
-      brief: spec.brief,
-      cwd: spec.cwd,
-      harness: spec.harness,
-      config: spec.config,
-      deadlineSeconds: spec.deadlineSeconds,
-      resumeFrom: spec.resumeFrom,
-      closeoutSchema: spec.closeoutSchema,
-      holdOpen: spec.holdOpen,
-      queued: spec.queued === true,
-      ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
-      ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
-      ...(spec.labels !== undefined && Object.keys(spec.labels).length ? { labels: spec.labels } : {}),
-      ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
-    },
-    spec.briefParts,
-  );
+  yield* journal
+    .append(
+      TaskId.read(id),
+      {
+        kind: 'filed',
+        at: new Date().toISOString(),
+        brief: spec.brief,
+        cwd: spec.cwd,
+        harness: spec.harness,
+        config: spec.config,
+        deadlineSeconds: spec.deadlineSeconds,
+        resumeFrom: spec.resumeFrom,
+        closeoutSchema: spec.closeoutSchema,
+        holdOpen: spec.holdOpen,
+        queued: spec.queued === true,
+        ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
+        ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
+        ...(spec.labels !== undefined && Object.keys(spec.labels).length ? { labels: spec.labels } : {}),
+        ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
+      },
+      spec.briefParts,
+    )
+    .pipe(Effect.catchTag('JournalError', (error) => Effect.fail(filingRefused(error) ?? error)));
   return id;
 });
+
+/**
+ * The Task door's refusal of a filing as the caller's (`FileRefused`, which `ae` exits 2 on): an id no file can be named by, or one
+ * already filed. Any other failure of the journal is the store's, and stays a `JournalError`.
+ */
+const filingRefused = (error: JournalError): FileRefused | undefined =>
+  error.reason === 'malformed-id' || error.reason === 'filed-twice' ? new FileRefused({ message: error.message }) : undefined;
 
 /** An `admit` the runtime would not journal, and why, in words that say what to do instead. Nothing was written. */
 export class AdmitRefused extends Schema.TaggedError<AdmitRefused>()('AdmitRefused', {
@@ -214,7 +224,7 @@ export const admit = Effect.fn('admit')(function* (taskIds: readonly string[]) {
   const journal = yield* Journal;
   const states: State[] = [];
   for (const id of new Set(taskIds)) {
-    const events = yield* journal.read(id);
+    const events = yield* journal.read(TaskId.read(id));
     const state = events.length ? fold(id, events) : undefined;
     const refused = admitRefusalOf(id, state);
     if (refused) return yield* Effect.fail(new AdmitRefused({ message: refused }));
@@ -223,7 +233,7 @@ export const admit = Effect.fn('admit')(function* (taskIds: readonly string[]) {
   const admitted: string[] = [];
   for (const state of states) {
     if (!awaitsAdmission(state)) continue;
-    yield* journal.append(state.taskId, { kind: 'admitted', at: new Date().toISOString() });
+    yield* journal.append(TaskId.read(state.taskId), { kind: 'admitted', at: new Date().toISOString() });
     admitted.push(state.taskId);
   }
   return admitted;
@@ -311,23 +321,23 @@ export const closeRefusalOf = (taskId: string, state: State | undefined): string
  */
 export const answer = Effect.fn('answer')(function* (taskId: string, text: string, config?: HarnessArgs) {
   const journal = yield* Journal;
-  const events = yield* journal.read(taskId);
+  const events = yield* journal.read(TaskId.read(taskId));
   const state = events.length ? fold(taskId, events) : undefined;
   const runner = yield* Runner;
   const refused = answerRefusalOf(taskId, state, text, config) ?? (config && state ? runner.refuses?.(filingOf(state, config)) : undefined);
   if (refused) return yield* Effect.fail(new InputRefused({ message: refused }));
   const input: Input = { at: new Date().toISOString(), text, ...(config ? { config } : {}) };
-  yield* journal.append(taskId, { kind: 'input', ...input });
+  yield* journal.append(TaskId.read(taskId), { kind: 'input', ...input });
   return input;
 });
 
 /** Settle a task held open that waits for an answer: `succeeded`, on the next pass. Journalled as `closed`. */
 export const close = Effect.fn('close')(function* (taskId: string) {
   const journal = yield* Journal;
-  const events = yield* journal.read(taskId);
+  const events = yield* journal.read(TaskId.read(taskId));
   const refused = closeRefusalOf(taskId, events.length ? fold(taskId, events) : undefined);
   if (refused) return yield* Effect.fail(new InputRefused({ message: refused }));
-  yield* journal.append(taskId, { kind: 'closed', at: new Date().toISOString() });
+  yield* journal.append(TaskId.read(taskId), { kind: 'closed', at: new Date().toISOString() });
 });
 
 /** The task as it was filed, with a turn's own configuration laid over its own: what a harness is asked of an answer's. */

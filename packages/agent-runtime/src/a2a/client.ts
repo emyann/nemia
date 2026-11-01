@@ -63,6 +63,7 @@ import {
 } from './handler.ts';
 import { followUpOf, messageOf, RUNTIME_EXTENSION, sightingOf, wordsOf } from './map.ts';
 import { followThrough } from './follow.ts';
+import { TaskId } from '../core/model.ts';
 
 /**
  * A `Transport` that calls a request handler in this process. Each call gets a fresh server context, as a request that
@@ -470,6 +471,6 @@ export const a2aRunner = (ops: RunnerOps, harness = 'runner'): Layer.Layer<Runne
   Layer.unwrap(
     Effect.gen(function* () {
       const journal = yield* Journal;
-      return Runner.layer(a2aOps(harness, ops, (taskId) => Effect.runPromise(journal.read(taskId))));
+      return Runner.layer(a2aOps(harness, ops, (taskId) => Effect.runPromise(journal.read(TaskId.read(taskId)))));
     }),
   );

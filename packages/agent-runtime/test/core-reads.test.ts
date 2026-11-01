@@ -25,8 +25,15 @@ const CORE = [
   'src/core/lifecycle.ts',
 ];
 
-/** The code alone: block comments and line comments out, so a sentence about a model is not a read of one. */
-const codeOf = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+/**
+ * The code alone: block comments and line comments out, so a sentence about a model is not a read of one, and each module an import
+ * names left blank, so `from '../model.ts'` is not a read of `model`.
+ */
+const codeOf = (text: string) =>
+  text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:'"`])\/\/.*$/gm, '$1')
+    .replace(/(\bfrom\s*)(['"])[^'"]*\2/g, '$1$2$2');
 
 const NAMED = new RegExp(`\\b(${HARNESS_ARGS.join('|')})\\b`);
 /**
@@ -75,6 +82,7 @@ test('the check refuses every way of opening config, and is not refused by carry
     'const released = yield* runner.release(session, state.config ?? {}).pipe(',
     'config: configForTurn(state.config, turnOf(state, attempt?.turn ?? 0).config),',
     '// a comment about the model is not a read of one',
+    "import { TaskId } from '../model.ts';",
   ];
   for (const line of CARRIED) assert.deepEqual(reads(codeOf(line)), [], `refused, and it only carries: ${line}`);
 });

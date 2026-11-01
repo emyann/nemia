@@ -17,13 +17,15 @@ import type { Event } from '../domain.ts';
 import { ioCounts } from './tally.ts';
 import { scratch } from '../../../test/scratch.ts';
 import { story } from '../../../test/checkpoints.ts';
+import { TaskId } from '../model.ts';
 
 const root = () => scratch('ae-bodies-');
 const run = <A, E>(layer: Layer.Layer<Journal>, e: Effect.Effect<A, E, Journal>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
 const failure = <A>(layer: Layer.Layer<Journal>, e: Effect.Effect<A, JournalError | BodyRefused, Journal>) =>
   Effect.runPromise(Effect.flip(e).pipe(Effect.provide(layer)));
-const append = (taskId: string, event: Event, parts?: readonly string[]) => Effect.flatMap(Journal, (j) => j.append(taskId, event, parts));
-const read = (taskId: string) => Effect.flatMap(Journal, (j) => j.read(taskId));
+const append = (taskId: string, event: Event, parts?: readonly string[]) =>
+  Effect.flatMap(Journal, (j) => j.append(TaskId.read(taskId), event, parts));
+const read = (taskId: string) => Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId)));
 const feed = (after = 0) => Effect.flatMap(Journal, (j) => j.feed(after));
 
 /** A text of about `bytes` bytes, told apart by `seed`. */
@@ -141,9 +143,9 @@ test('a long brief is kept once by the tasks that share it, read back key for ke
     const reading = Effect.flatMap(Journal, (j) =>
       Effect.gen(function* () {
         const before = ioCounts();
-        yield* j.read('t1');
+        yield* j.read(TaskId.read('t1'));
         const between = ioCounts();
-        yield* j.read('t1');
+        yield* j.read(TaskId.read('t1'));
         return [between.reads - before.reads, ioCounts().reads - between.reads];
       }),
     );

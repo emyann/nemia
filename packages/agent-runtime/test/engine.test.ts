@@ -40,6 +40,7 @@ import { engineAt } from '../src/cli/main.ts';
 import { stepClock } from './clock.ts';
 import { scratch } from './scratch.ts';
 import { story } from './checkpoints.ts';
+import { TaskId } from '../src/core/model.ts';
 
 /**
  * One board: a journal and a fake harness whose session states a test moves by hand — and the pass's memo of the settled
@@ -77,9 +78,12 @@ const startedLongAgo = async (b: ReturnType<typeof board>, id: string) => {
   const at = new Date(Date.now() - 2 * DEADLINE_SECONDS * 1000).toISOString();
   await b.run(
     Effect.flatMap(Journal, (j) =>
-      Effect.all([j.append(id, { kind: 'starting', at, attempt: 1 }), j.append(id, { kind: 'spawned', at, attempt: 1 })], {
-        discard: true,
-      }),
+      Effect.all(
+        [j.append(TaskId.read(id), { kind: 'starting', at, attempt: 1 }), j.append(TaskId.read(id), { kind: 'spawned', at, attempt: 1 })],
+        {
+          discard: true,
+        },
+      ),
     ),
   );
   b.sessions.set(nameFor(id, 1), { sessionId: `old-${id}`, state: 'working', nativeId: `old-${id}` });
@@ -114,18 +118,18 @@ const recording = () => {
 /** Appends `events` to `id`'s journal, each stamped `ago` ms before now. */
 const journalAgo = (id: string, ...events: Array<[number, Record<string, unknown>]>) =>
   Effect.flatMap(Journal, (j) =>
-    Effect.forEach(events, ([ago, e]) => j.append(id, { ...e, at: new Date(Date.now() - ago).toISOString() } as Event), {
+    Effect.forEach(events, ([ago, e]) => j.append(TaskId.read(id), { ...e, at: new Date(Date.now() - ago).toISOString() } as Event), {
       discard: true,
     }),
   );
 
 const kindsOf = (id: string) =>
   Effect.map(
-    Effect.flatMap(Journal, (j) => j.read(id)),
+    Effect.flatMap(Journal, (j) => j.read(TaskId.read(id))),
     (events) => events.map((e) => e.kind),
   );
 
-const eventsOf = (id: string) => Effect.flatMap(Journal, (j) => j.read(id));
+const eventsOf = (id: string) => Effect.flatMap(Journal, (j) => j.read(TaskId.read(id)));
 
 const phaseOf = (id: string) => Effect.flatMap(Runner, (r) => Effect.flatMap(r.observe, (o) => Effect.map(view(id, o), (v) => v.phase)));
 
@@ -136,7 +140,9 @@ const phaseOf = (id: string) => Effect.flatMap(Runner, (r) => Effect.flatMap(r.o
  * Which queued task a pass admits under the engine's ceiling, in which pool and in which order, is `test/admission.test.ts`'s.
  */
 const fileAt = (b: ReturnType<typeof board>, id: string, at: string, fields: Record<string, unknown> = {}) =>
-  b.run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields })));
+  b.run(
+    Effect.flatMap(Journal, (j) => j.append(TaskId.read(id), { kind: 'filed', at, brief: id, cwd: '/repo', queued: false, ...fields })),
+  );
 
 const SCHEMA = { type: 'object', properties: { outcome: { type: 'string' } }, required: ['outcome'] };
 
@@ -436,7 +442,7 @@ test('the crash windows: the engine dies at each point of a start, and the resta
       await b.run(tick());
       assert.equal((await b.run(view(id, await b.run(Effect.flatMap(Runner, (r) => r.observe))))).phase, 'working', 'adopted');
 
-      await b.run(requestStop(id));
+      await b.run(requestStop(TaskId.read(id)));
       await b.run(tick());
       await b.run(tick());
       v = await b.run(view(id, new Map()));
@@ -452,7 +458,7 @@ test('the crash windows: the engine dies at each point of a start, and the resta
     const spawnedAt = new Date().toISOString();
     await b.run(
       Effect.flatMap(Journal, (j) =>
-        j.append(id, { kind: 'spawned', at: spawnedAt, attempt: 1, error: 'launcher: lost the acknowledgement' }),
+        j.append(TaskId.read(id), { kind: 'spawned', at: spawnedAt, attempt: 1, error: 'launcher: lost the acknowledgement' }),
       ),
     );
     const state = fold(id, await b.run(eventsOf(id)));
@@ -492,7 +498,7 @@ test('a person stops a running job: the harness is told, the next pass settles i
       await b.run(tick());
       b.sessions.set(nameFor('done', 1), { ...b.sessions.get(nameFor('done', 1))!, state: 'completed' });
       b.sessions.set(nameFor('broke', 1), { ...b.sessions.get(nameFor('broke', 1))!, state: 'failed' });
-      await b.run(requestStop('asked'));
+      await b.run(requestStop(TaskId.read('asked')));
       await b.run(tick());
       assert.equal(b.sessions.get(nameFor('asked', 1))?.state, 'canceled', 'the harness was actually told');
       assert.equal(await b.run(phaseOf('asked')), 'ending', 'not settled on an assumption');
@@ -505,7 +511,7 @@ test('a person stops a running job: the harness is told, the next pass settles i
   );
 
   await s.test('asked again before it has settled, the stop is StopRefused, and nothing is journalled', async () => {
-    const refused = await b.run(Effect.flip(requestStop('asked')));
+    const refused = await b.run(Effect.flip(requestStop(TaskId.read('asked'))));
     assert.equal(refused._tag, 'StopRefused');
     assert.match(refused.message, /^`asked` has been asked to stop already/);
     assert.match(refused.message, /`ae ls`/, 'naming where to see it settle');
@@ -531,7 +537,7 @@ test('a person stops a running job: the harness is told, the next pass settles i
         ['nope', /^`nope` is not a task in this store/, /`ae ls`/],
       ];
       for (const [id, fact, fix] of cases) {
-        const refused = await b.run(Effect.flip(requestStop(id)));
+        const refused = await b.run(Effect.flip(requestStop(TaskId.read(id))));
         assert.equal(refused._tag, 'StopRefused', id);
         assert.match(refused.message, fact, id);
         assert.match(refused.message, fix, id);
@@ -725,7 +731,7 @@ test('the ways an attempt fails: a spawn refused, a harness failure, a session l
     b.sessions.delete(first);
     await b.run(
       Effect.flatMap(Journal, (j) =>
-        j.append(id, {
+        j.append(TaskId.read(id), {
           kind: 'ended',
           at: new Date().toISOString(),
           attempt: 1,
@@ -753,7 +759,14 @@ test('the ways an attempt fails: a spawn refused, a harness failure, a session l
       const id = 'legacy';
       await b.run(
         Effect.flatMap(Journal, (j) =>
-          j.append(id, { kind: 'filed', at: new Date().toISOString(), brief: 'b', cwd: '/r', maxAttempts: 2, resume: 'always' } as Event),
+          j.append(TaskId.read(id), {
+            kind: 'filed',
+            at: new Date().toISOString(),
+            brief: 'b',
+            cwd: '/r',
+            maxAttempts: 2,
+            resume: 'always',
+          } as Event),
         ),
       );
       await b.run(tick());
@@ -928,7 +941,7 @@ test('long-lived: what a daemon reads off the record of a long-lived task — wh
       const pass = () => Effect.runPromise(tick().pipe(Effect.provide(Layer.mergeAll(journal, runner, memo))));
       const open = await run(file({ ...spec, id: 'open', restartPolicy: 'Always' }));
       await pass();
-      await run(requestStop(open));
+      await run(requestStop(TaskId.read(open)));
       await pass();
       await pass();
       await pass();
@@ -1360,14 +1373,18 @@ test('the memo: a pass skips a settled task until the feed names it — check mo
     async () => {
       const j = countedJournal();
       const b = await settledBeside(j, { verify: true });
-      const before = j.readsOf('done');
       await b.run(
         Effect.flatMap(Journal, (journal) =>
-          journal.append('done', { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { costUsd: 1 } }),
+          journal.append(TaskId.read('done'), { kind: 'measured', at: new Date().toISOString(), attempt: 1, usage: { costUsd: 1 } }),
         ),
       );
+      const before = j.readsOf('done');
       await b.run(tick());
-      assert.equal(j.readsOf('done'), before + 2, 'folded again, and stepped: its decision is nothing');
+      assert.equal(
+        j.readsOf('done'),
+        before + 2,
+        'folded again, and stepped: its decision is nothing (counted after the append, which the Task door reads once to check)',
+      );
       await b.run(tick());
       assert.equal(j.readsOf('done'), before + 2 + 1, 'in check mode, a skip is folded once more, to prove it');
     },
@@ -1701,9 +1718,15 @@ test('a harness unread for a pass: neither there nor gone — nothing ended, spa
       const long = new Date(Date.now() - GRACE_MS - 10 * 60_000).toISOString();
       await run(
         Effect.flatMap(Journal, (j) =>
-          Effect.all([j.append(id, { kind: 'starting', at: long, attempt: 1 }), j.append(id, { kind: 'spawned', at: long, attempt: 1 })], {
-            discard: true,
-          }),
+          Effect.all(
+            [
+              j.append(TaskId.read(id), { kind: 'starting', at: long, attempt: 1 }),
+              j.append(TaskId.read(id), { kind: 'spawned', at: long, attempt: 1 }),
+            ],
+            {
+              discard: true,
+            },
+          ),
         ),
       );
       sessions.set(nameFor(id, 1), { sessionId: 'kept', state: 'working', nativeId: 'kept' });
@@ -1740,7 +1763,7 @@ test('a harness unread for a pass: neither there nor gone — nothing ended, spa
       const layer = Layer.mergeAll(Journal.test(), Runner.layer(composite({ claude }, 'claude')), tickMemoLayer({ verify: true }));
       const run = <A, E>(e: Effect.Effect<A, E, Journal | Runner>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
       const id = await run(file({ ...spec, harness: 'claude' }));
-      await run(Effect.flatMap(Journal, (j) => j.append(id, { kind: 'starting', at: new Date().toISOString(), attempt: 1 })));
+      await run(Effect.flatMap(Journal, (j) => j.append(TaskId.read(id), { kind: 'starting', at: new Date().toISOString(), attempt: 1 })));
       sessions.set(nameFor(id, 1), { sessionId: 'kept', state: 'working', nativeId: 'kept' });
       await run(tick());
       assert.deepEqual(spawns, [], 'not spawned a second time under its name on a read that failed');
@@ -1787,7 +1810,10 @@ test('a harness unread for a pass: neither there nor gone — nothing ended, spa
       await run(
         Effect.flatMap(Journal, (j) =>
           Effect.all(
-            [j.append(away, { kind: 'starting', at: long, attempt: 1 }), j.append(away, { kind: 'spawned', at: long, attempt: 1 })],
+            [
+              j.append(TaskId.read(away), { kind: 'starting', at: long, attempt: 1 }),
+              j.append(TaskId.read(away), { kind: 'spawned', at: long, attempt: 1 }),
+            ],
             {
               discard: true,
             },

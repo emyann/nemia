@@ -2,10 +2,12 @@
  * The file-backed journal and feed. The cursor is a byte offset, which is the part worth testing:
  * an off-by-one here means a consumer either misses an event or replays one forever.
  *
- * Told as one story — a board appended to, read, followed and resumed, and an engine's pass over it reading only what was appended —
- * then two tables: the journals an older runtime wrote, read in today's shape, and the entries no runtime wrote, each failing its
- * read by name. The edges of the incremental read (a journal replaced, cut, rewritten, gone) and the schema's completeness stay
- * focused.
+ * What every layer of the Task door answers alike — an append read back in order, the list, the feed resumed from a cursor, the task's
+ * invariants — is walked on each (`test/journal-walks.ts`). This file holds what the files alone do: told as one story — an engine's
+ * pass and a reader over a board reading only what was appended, a torn last line never handed on — then two tables: the journals an
+ * older runtime wrote, read in today's shape, and the entries no runtime wrote, each failing its read by name. The edges of the
+ * incremental read (a journal replaced, cut, rewritten, gone), the files store's own refusals under the feed's lock and the schema's
+ * completeness stay focused.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -20,19 +22,22 @@ import { ioCounts } from './tally.ts';
 import { scratch } from '../../../test/scratch.ts';
 import { asyncOps, asyncStore, type AsyncRunner, type AsyncSighting } from '../../../test/promise-runner.ts';
 import { story } from '../../../test/checkpoints.ts';
+import { TaskId } from '../model.ts';
 
 const root = () => scratch('ae-journal-');
 /** A fresh layer over the same directory — what a restarted engine sees. */
 const run = <A, E>(dir: string, e: Effect.Effect<A, E, Journal>) => Effect.runPromise(e.pipe(Effect.provide(Journal.files(dir))));
-const readOf = (id: string) => Effect.flatMap(Journal, (j) => j.read(id));
+const readOf = (id: string) => Effect.flatMap(Journal, (j) => j.read(TaskId.read(id)));
 const feedFrom = (after: number) => Effect.flatMap(Journal, (j) => j.feed(after));
 
-const ev = (kind: Event['kind'], at: string): Event => ({ kind, at, attempt: 1 }) as Event;
+const ev = (kind: Event['kind'], at: string, attempt = 1): Event => ({ kind, at, attempt }) as Event;
 /** A task's `filed`, at `at`: what an append to a task with no journal must be. */
 const filedAt = (at: string): Event => ({ ...TODAY, at }) as Event;
 /** Each of `ids` filed, at the start of 2026, so the events a test appends after have a journal to go to. */
 const fileEach = (ids: readonly string[]) =>
-  Effect.flatMap(Journal, (j) => Effect.forEach(ids, (id) => j.append(id, filedAt('2026-01-01T00:00:00Z')), { discard: true }));
+  Effect.flatMap(Journal, (j) =>
+    Effect.forEach(ids, (id) => j.append(TaskId.read(id), filedAt('2026-01-01T00:00:00Z')), { discard: true }),
+  );
 
 /** What reading `t1`'s journal through `ops` costs (`ioCounts` deltas), and what it gives. */
 const costOf = async (ops: ReturnType<typeof Journal.filesOps>, taskId = 't1') => {
@@ -45,7 +50,7 @@ const costOf = async (ops: ReturnType<typeof Journal.filesOps>, taskId = 't1') =
 /** How many tasks the story's engine files and keeps at work. */
 const N = 12;
 
-test('a board is appended to, read, followed from a cursor and resumed by a fresh reader, and a pass over it reads only what was appended', async (t) => {
+test('a board on files is read for what was appended alone: by a pass, a view and a fresh reader, a torn last line never handed on', async (t) => {
   const s = story(t);
   const board = path.join(root(), 'board');
   const sessions = new Map<string, AsyncSighting>();
@@ -63,19 +68,6 @@ test('a board is appended to, read, followed from a cursor and resumed by a fres
   const feedFile = path.join(board, 'feed.jsonl');
   const sizeOf = (file: string) => fs.statSync(file).size;
   const ids: string[] = [];
-  let mark = 0;
-
-  await s.test('a board never written to is empty, not an error', async () => {
-    assert.deepEqual(
-      await run(
-        board,
-        Effect.flatMap(Journal, (j) => j.list),
-      ),
-      [],
-    );
-    assert.deepEqual(await run(board, readOf('nope')), []);
-    assert.deepEqual((await run(board, feedFrom(0))).entries, []);
-  });
 
   await s.test('a pass over tasks at work whose journals nothing has written to reads no byte', async () => {
     const cwd = scratch('ae-cursor-cwd-');
@@ -120,82 +112,16 @@ test('a board is appended to, read, followed from a cursor and resumed by a fres
     },
   );
 
-  await s.test('events come back in the order they were appended', async () => {
-    mark = (await run(board, feedFrom(0))).cursor;
-    assert.equal(mark, sizeOf(feedFile), 'the cursor of a whole feed is its end');
-    await run(
-      board,
-      fileEach(['t1']).pipe(
-        Effect.andThen(
-          Effect.flatMap(Journal, (j) =>
-            Effect.forEach(['a', 'b', 'c'], (c) => j.append('t1', ev('starting', `2026-01-01T00:00:0${c.charCodeAt(0) - 97}Z`)), {
-              discard: true,
-            }),
-          ),
-        ),
-      ),
-    );
-    const events = await run(board, readOf('t1'));
-    assert.equal(events.length, 4);
-    assert.deepEqual(
-      events.map((e) => `${e.kind} ${e.at.slice(-3, -1)}`),
-      ['filed 00', 'starting 00', 'starting 01', 'starting 02'],
-    );
-  });
-
-  await s.test('the feed spans tasks and the cursor resumes exactly where it stopped', async () => {
-    const from = sizeOf(feedFile);
-    await run(
-      board,
-      fileEach(['u1', 'u2', 'u3']).pipe(
-        Effect.andThen(
-          Effect.flatMap(Journal, (j) =>
-            Effect.all([j.append('u1', ev('starting', '2026-01-01T00:00:00Z')), j.append('u2', ev('starting', '2026-01-01T00:00:01Z'))], {
-              discard: true,
-            }),
-          ),
-        ),
-      ),
-    );
-    const first = await run(board, feedFrom(from));
-    assert.deepEqual(
-      first.entries.map((e) => e.taskId),
-      ['u1', 'u2', 'u3', 'u1', 'u2'],
-    );
-    assert.ok(first.cursor > from);
-
-    const caughtUp = await run(board, feedFrom(first.cursor));
-    assert.deepEqual(caughtUp.entries, [], 'a reader that has caught up sees nothing');
-    assert.equal(caughtUp.cursor, first.cursor, 'and does not move');
-
-    await run(
-      board,
-      Effect.flatMap(Journal, (j) => j.append('u3', ev('spawned', '2026-01-01T00:00:02Z'))),
-    );
-    const next = await run(board, feedFrom(first.cursor));
-    assert.deepEqual(
-      next.entries.map((e) => e.taskId),
-      ['u3'],
-      'then sees exactly what arrived after it',
-    );
-    const again = await run(board, feedFrom(next.cursor));
-    assert.deepEqual(again.entries, [], 'delivered once, not twice');
-  });
-
-  await s.test('an old cursor replays everything since — it never expires', async () => {
-    const all = await run(board, feedFrom(mark));
-    assert.equal(all.entries.length, 10, 'a consumer away for a week replays rather than starting over');
-    assert.deepEqual(
-      all.entries.map((e) => e.taskId),
-      ['t1', 't1', 't1', 't1', 'u1', 'u2', 'u3', 'u1', 'u2', 'u3'],
-    );
-  });
-
   await s.test('a half-written trailing line is never handed to a consumer', async () => {
     const end = sizeOf(feedFile);
+    const whole = (await run(board, feedFrom(0))).entries.map((e) => e.taskId);
     fs.appendFileSync(feedFile, '{"taskId":"t2","eve');
     const got = await run(board, feedFrom(0));
-    assert.equal(got.entries.at(-1)?.taskId, 'u3', 'the partial line is not parsed');
+    assert.deepEqual(
+      got.entries.map((e) => e.taskId),
+      whole,
+      'the partial line is not parsed',
+    );
     assert.equal(got.cursor, end, 'and the cursor stops before it');
     fs.appendFileSync(feedFile, 'nt":{"kind":"spawned","at":"2026-01-01T00:00:01Z","attempt":1}}\n');
     const after = await run(board, feedFrom(got.cursor));
@@ -207,6 +133,18 @@ test('a board is appended to, read, followed from a cursor and resumed by a fres
   });
 
   await s.test('a second read of a journal nothing has written to reads no byte', async () => {
+    await run(
+      board,
+      fileEach(['t1']).pipe(
+        Effect.andThen(
+          Effect.flatMap(Journal, (j) =>
+            Effect.forEach([1, 2, 3], (n) => j.append(TaskId.read('t1'), ev('starting', `2026-01-01T00:00:0${n - 1}Z`, n)), {
+              discard: true,
+            }),
+          ),
+        ),
+      ),
+    );
     const ops = Journal.filesOps(board);
     const file = path.join(board, 'tasks', 't1.jsonl');
     const first = await costOf(ops);
@@ -810,7 +748,9 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
     async () => {
       const error = await Effect.runPromise(
         Effect.flatMap(Journal, (j) =>
-          j.append('t-mem', { kind: 'filed', brief: 'b', cwd: '/r' } as never).pipe(Effect.andThen(j.read('t-mem'))),
+          j
+            .append(TaskId.read('t-mem'), { kind: 'filed', brief: 'b', cwd: '/r' } as never)
+            .pipe(Effect.andThen(j.read(TaskId.read('t-mem')))),
         ).pipe(Effect.flip, Effect.provide(Journal.test())),
       );
       assert.deepEqual([error._tag, error.taskId], ['JournalError', 't-mem']);
@@ -953,4 +893,22 @@ test('a last line cut short fails the read as it always has, and once completed 
     after.entries.map((e) => (e as Event).kind),
     ['filed', 'starting', 'starting', 'spawned'],
   );
+});
+
+test("the files store refuses by itself, under the feed's lock, a second filing and an entry to a task with no journal, so two writers cannot both pass the door's check", async (t) => {
+  const board = root();
+  const ops = Journal.filesOps(board);
+  const appended = (taskId: string, event: Event) =>
+    Effect.runPromise(Effect.result(ops.append(taskId, event))).then((r) => (r._tag === 'Failure' ? r.failure.reason : 'taken'));
+  await t.test('a filing to a task with no journal is taken', async () => {
+    assert.equal(await appended('a', filedAt('2026-01-01T00:00:00Z')), 'taken');
+  });
+  await t.test('a second filing is refused filed-twice, and the journal keeps one line', async () => {
+    assert.equal(await appended('a', filedAt('2026-01-01T00:00:01Z')), 'filed-twice');
+    assert.equal((await Effect.runPromise(ops.read('a'))).length, 1);
+  });
+  await t.test('an entry to a task with no journal is refused not-filed, and no journal is made', async () => {
+    assert.equal(await appended('b', ev('starting', '2026-01-01T00:00:02Z')), 'not-filed');
+    assert.equal(fs.existsSync(path.join(board, 'tasks', 'b.jsonl')), false);
+  });
 });

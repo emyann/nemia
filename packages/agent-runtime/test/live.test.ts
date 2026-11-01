@@ -59,6 +59,7 @@ import { filesOf, readRun } from '../src/harness/claude/attached-file.ts';
 import { claudeStreamOutput } from '../src/harness/detached/output.ts';
 import { until as waitUntil } from '../src/waits/index.ts';
 import { scratch } from './scratch.ts';
+import { TaskId } from '../src/core/model.ts';
 
 const live = process.env.AE_LIVE === '1';
 const skip = live ? false : 'set AE_LIVE=1 to run against Claude Code (spends money)';
@@ -555,7 +556,7 @@ test(
     const journal = () =>
       Effect.runPromise(
         Effect.gen(function* () {
-          return yield* (yield* Journal).read(id);
+          return yield* (yield* Journal).read(TaskId.read(id));
         }).pipe(Effect.provide(Journal.files(root))),
       );
     let inFlight: { denials: unknown; resulted: boolean; denied: unknown[] } | undefined;
@@ -863,7 +864,7 @@ test(
     const client = clientOf('codex', detachedOps(codex, root), (taskId) =>
       Effect.runPromise(
         Effect.gen(function* () {
-          return yield* (yield* Journal).read(taskId);
+          return yield* (yield* Journal).read(TaskId.read(taskId));
         }).pipe(Effect.provide(Journal.files(root))),
       ),
     );

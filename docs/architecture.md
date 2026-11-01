@@ -326,6 +326,19 @@ its invariants — a name taken is `Conflict` (the files' `wx`, so `nemia inbox 
 programs that yield it, and its handlers run through `rooted`; no file of `src` but the door's calls `cardFiles` by hand
 (`src/cards/cards.store.test.ts`). The run store holds no inbox.
 
+**The Task door.** A task's journal is read and written through the runtime's `Journal` (`packages/agent-runtime/src/core/engine/journal.ts`),
+which is the Task door: every store reaches the engine through `Journal.layer`, so the door holds a hand-written store as it holds the
+files and the memory layers. Its methods take and give a branded `TaskId`, nominal on read, so a journal written under any id still
+reads, while a store implements plain strings. Before any store is written, an append is asked of `appendRefusal`
+(`src/core/engine/append-refusal.ts`, proved by `contracts/journal.contract.ts`): a filing under an id no file can be named by, a second
+filing of a task, an entry to a task never filed or forgotten, and a start that is not `attempts.length + 1` are refused `JournalError`
+with a closed `reason`, which `file` turns into `FileRefused` for the two a caller made. The files layer holds `filed-twice` and
+`not-filed` again under the feed's lock, as an exclusive create, so two processes cannot both pass. One table of walks holds the files
+and both memory layers to each other (`packages/agent-runtime/test/journal-walks.ts`). The runtime takes the doors' pattern and none
+of their code: the shape — a door per aggregate, its invariants refused at it, one table of walks over every layer — belongs below both
+layers, and each keeps a runner of its own today (`test/door-walks.ts` above, `test/journal-walks.ts` and `test/engine-walks.ts` in the
+runtime). Hoisting one generic runner into `agent-runtime/testing`, which the orchestrator's doors would then take, is the candidate move.
+
 Both shells are level-triggered: a pass reads the world, decides and acts, and carries nothing between passes that the
 next could not read again. The one thing the orchestrator's tick keeps in memory is a cache under that rule, not beside
 it: a finished run judged at rest on a full pass is answered from its memo while none of its inputs changed — its record,

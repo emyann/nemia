@@ -138,6 +138,23 @@ jobs:
         timeout-minutes: 10
       - run: npm run typecheck
 
+  contracts:
+    # The contracts under each package's contracts/, verified by tsverify (npm run contracts): any law or obligation not proved,
+    # or a contract it cannot read, exits 1. A verdict is decided by the solver's work, not the clock, so one leg on the floor is enough.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        timeout-minutes: 5
+      - uses: actions/setup-node@v7
+        timeout-minutes: 5
+        with:
+          node-version: '24.16.0'
+      - run: npm ci
+        timeout-minutes: 10
+      - run: npm run contracts
+        timeout-minutes: 15
+
   e2e:
     name: e2e shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
@@ -480,7 +497,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: always()
-    needs: [test, lint, typecheck, e2e, e2e-bound, build, gitleaks, guards]
+    needs: [test, lint, typecheck, contracts, e2e, e2e-bound, build, gitleaks, guards]
     steps:
       - name: Every job succeeded
         # toJSON(needs) goes through env, never interpolated into the shell: on a pull request from a fork, an expression the branch

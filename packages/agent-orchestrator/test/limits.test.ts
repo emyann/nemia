@@ -103,7 +103,7 @@ const RECORD: Record<string, Partial<Record<Rule, number>>> = {
   'packages/agent-orchestrator/src/wait/wait.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/record/record.store.ts': { 'max-lines': 1 },
   'packages/agent-orchestrator/src/timeline/timeline.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
-  'packages/agent-orchestrator/src/workflow/validate.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 2 },
+  'packages/agent-orchestrator/src/workflow/validate.ts': { 'sonarjs/cognitive-complexity': 2 },
   'packages/agent-orchestrator/src/workspace/worktree.store.ts': { complexity: 1, 'sonarjs/cognitive-complexity': 1 },
   'packages/agent-runtime/src/a2a/client.ts': { 'max-lines-per-function': 1 },
   'packages/agent-runtime/src/a2a/map.ts': { 'sonarjs/cognitive-complexity': 1 },

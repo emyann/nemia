@@ -75,6 +75,16 @@ test("a run's invariants: each refuses its planted breach, and lets through what
     ],
     ['REFUSED: a run waiting on itself', run({ implement: null }, { after: ['r-0', 'r-1'] }), false],
     ['a run waiting on another', run({ implement: null }, { after: ['r-0'] }), true],
+    [
+      'a run with the workflow it froze at start, as a stored record holds it: a key the model does not name kept',
+      run(
+        { implement: null },
+        {
+          workflow: [{ name: 'implement', after: [], gate: true, check: 'npm test', loop: 'implement', body: 'Build it.', retries: 2 }],
+        },
+      ),
+      true,
+    ],
   ];
   for (const [what, value, ok] of rows) await t.test(what, () => assert.equal(decodes(value), ok));
 });

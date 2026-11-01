@@ -27,7 +27,8 @@ import {
   placeLine,
   baseLine,
 } from '../former/former.ts';
-import { agentsDir, agentsFolderRefusal, parseFolder, readmeDescription, stepFiles, type Fills } from './folder.ts';
+import { agentsDir, agentsFolderRefusal, parseFolder, readmeDescription, stepFiles, workflowDirRefusal, type Fills } from './folder.ts';
+import { WorkflowDir } from './folder.model.ts';
 import { HARNESS_PROMPTS } from '../agents/agents.ts';
 import { agentsFor } from '../agents/read.store.ts';
 import { entriesOf, skillsFor, type Places } from '../skills/read.store.ts';
@@ -179,23 +180,34 @@ export function workflowsIn(dir: string, entries?: readonly string[]): string[] 
 const isFolder = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
 /**
+ * The folder `dir` as the Workflow door's id (`WorkflowDir`), or refused as a `WorkflowError` in `workflowDirRefusal`'s words: where a
+ * folder is resolved, the one place besides a stored record a `WorkflowDir` comes from.
+ */
+export function workflowDirAt(dir: string): WorkflowDir {
+  const refused = workflowDirRefusal(dir);
+  if (refused !== null) throw new WorkflowError(refused);
+  return WorkflowDir.read(dir);
+}
+
+/**
  * The workflow folder a person names: a path, relative to where it is written — the directory `nemia start` is typed in, the plan folder a
  * card is in — or, when no folder is there and it is a bare name, the workflow of that name in `tree`, the tree of a factory made from a
  * template, then in the repository: `dev` is `<tree>/workflows/dev`, else `<repo>/workflows/dev`. The path is looked at first, so a folder
  * a person points at is never shadowed by one of the tree's or the repository's.
  *
- * Refused when none is a folder, naming where it looked and the workflows the repository has. Whether the folder is a workflow is
- * `loadWorkflows`' to say.
+ * Answered as a `WorkflowDir`, absolute and resolved (`workflowDirAt`). Refused when none is a folder, naming where it looked and the
+ * workflows the repository has. Whether the folder is a workflow is `loadWorkflows`' to say.
  */
-export function workflowFolder(given: string, from: string, repo: string, tree?: string): string {
+export function workflowFolder(given: string, from: string, repo: string, tree?: string): WorkflowDir {
   const at = path.resolve(from, given);
-  if (isFolder(at)) return at;
+  if (isFolder(at)) return workflowDirAt(at);
   const bare = !/[\\/]/.test(given) && given !== '.' && given !== '..';
   const agentsRefused = bare && given === AGENTS_FOLDER ? agentsFolderRefusal(path.join(repo, 'workflows', given)) : undefined;
   if (agentsRefused !== undefined) throw new WorkflowError(agentsRefused);
-  if (bare && tree !== undefined && isFolder(path.join(tree, 'workflows', given))) return path.join(tree, 'workflows', given);
+  if (bare && tree !== undefined && isFolder(path.join(tree, 'workflows', given)))
+    return workflowDirAt(path.resolve(tree, 'workflows', given));
   const workflows = path.join(repo, 'workflows');
-  if (bare && isFolder(path.join(workflows, given))) return path.join(workflows, given);
+  if (bare && isFolder(path.join(workflows, given))) return workflowDirAt(path.resolve(workflows, given));
   const theirs = workflowsIn(workflows);
   throw new WorkflowError(
     `no workflow folder at ${at}${bare ? `, nor a workflow named ${given} in ${workflows}` : ''}. ` +

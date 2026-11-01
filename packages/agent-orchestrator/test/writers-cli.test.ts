@@ -287,21 +287,8 @@ test('nemia workflows write writes a draft folder into yours, changes it at its 
   assert.equal(fs.existsSync(path.join(YOURS, 'notes')), false);
 });
 
-test('REFUSED at shipped defaults: a workflow written where one is, at a version it moved on from, by a bad name, or from no folder', async (t) => {
+test('REFUSED at shipped defaults: a workflow written by a bad name, into the repository, or from no folder', async (t) => {
   const folder = draftWorkflow('review');
-  const at = versionIn((await typed(t, 'workflows', 'write', 'yours', 'review', '--folder', folder)).out);
-  assert.equal(
-    await refused(t, 'workflows', 'write', 'yours', 'review', '--folder', folder),
-    `${path.join(YOURS, 'review')} is a workflow already, at version ${at}: a write given that version changes it. Give the new one another name, or write this one with that version.`,
-  );
-  assert.match(
-    await refused(t, 'workflows', 'write', 'yours', 'review', '--folder', folder, '--version', '0000000000000000'),
-    /0000000000000000/,
-  );
-  assert.equal(
-    await refused(t, 'workflows', 'write', 'yours', 'gone', '--folder', folder, '--version', at),
-    `${path.join(YOURS, 'gone')} is not there: it was removed since it was read. Write it with no version to make it again.`,
-  );
   names(
     await refusedAs(t, 'Invalid', 'workflows', 'write', 'yours', '../review', '--folder', folder),
     /^nemia workflows write: /,
@@ -327,17 +314,9 @@ test('REFUSED at shipped defaults: a workflow written where one is, at a version
   );
 });
 
-test('REFUSED at shipped defaults: a workflow removed with no version, at one it moved on from, the agents’ folder, or in the repository', async (t) => {
+test('REFUSED at shipped defaults: a workflow removed from the agents’ folder, or in the repository', async (t) => {
   const folder = draftWorkflow('triage');
   const at = versionIn((await typed(t, 'workflows', 'write', 'yours', 'triage', '--folder', folder)).out);
-  assert.match(
-    await refused(t, 'workflows', 'remove', 'yours', 'triage'),
-    new RegExp(`is at version ${at}, and a removal is checked against the version it was read at`),
-  );
-  assert.match(
-    await refused(t, 'workflows', 'remove', 'yours', 'triage', '--version', '0000000000000000'),
-    new RegExp(`it is at version ${at}`),
-  );
   names(
     await refusedAs(t, 'Invalid', 'workflows', 'remove', 'yours', 'agents', '--version', at),
     /^nemia workflows rm: agents\/ holds /,

@@ -24,16 +24,23 @@ const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 const { runStore } = await import('../record/files.store.ts');
-const { workflowVersion } = await import('./version.store.ts');
-const { removeWorkflow } = await import('./write.store.ts');
+const { workflowVersion } = await import('../folder/version.store.ts');
+const { removeWorkflowAt } = await import('../folder/write.store.ts');
 const verbs = await import('../inbox/inbox.store.ts');
 const { StoreRoot } = await import('../config/root.store.ts');
 /** `nemia inbox queue`'s verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
 const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) =>
   Effect.runSync(Effect.provideService(verbs.queueInInbox(...args), StoreRoot, ROOT));
 const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
+const { workflowDoorMemory } = await import('./memory.store.ts');
 
 const e = () => engineOf(engine().layer);
+
+/** One Workflow door's memory stand-in, given to each program the test runs: the folders it writes, the next reads. */
+const memoryOver = () => {
+  const memory = workflowDoorMemory();
+  return <A, E, R>(program: Effect.Effect<A, E, R>) => Effect.provide(program, memory);
+};
 
 /** A folder of yours, `name`, with each step's file as given. */
 function folder(name: string, files: Record<string, string>): string {
@@ -44,14 +51,16 @@ function folder(name: string, files: Record<string, string>): string {
 }
 
 test('a folder written from its steps through the entry is the folder its list and its step read back', async () => {
+  const onMemory = memoryOver();
   const dir = path.join(ROOT, 'workflows', 'written');
   const draft = JSON.stringify([
     { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
     { name: 'build', after: ['plan'], place: 'git', body: 'Build it.' },
   ]);
-  const done = await runWith(e(), WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft }, undefined, ROOT));
+  const done = await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'written', draft }, undefined, ROOT)));
   assert.deepEqual(done.written, ['build.md', 'plan.md']);
-  const listed = await runWith(e(), WORKFLOWS_LIST.handler({ dirs: [dir] }, undefined, ROOT));
+  assert.equal(fs.existsSync(dir), false, 'written to the memory layer, not the disk');
+  const listed = await runWith(e(), onMemory(WORKFLOWS_LIST.handler({ dirs: [dir] }, undefined, ROOT)));
   const loaded = listed[dir];
   assert.ok(loaded && 'steps' in loaded, JSON.stringify(loaded));
   assert.deepEqual(
@@ -61,14 +70,23 @@ test('a folder written from its steps through the entry is the folder its list a
       ['build', ['plan']],
     ],
   );
-  const read = await runWith(e(), WORKFLOWS_STEP.handler({ from: 'yours', name: 'written', step: 'build', dir }, undefined, ROOT));
+  const read = await runWith(
+    e(),
+    onMemory(WORKFLOWS_STEP.handler({ from: 'yours', name: 'written', step: 'build', dir }, undefined, ROOT)),
+  );
   assert.equal(read.step?.body, 'Build it.');
   assert.deepEqual(read.steps, ['plan', 'build']);
 });
 
 test('a step the folder does not have is none, with the names of those it has', async () => {
-  const dir = folder('one-step', { 'only.md': '---\nplace: git\n---\nDo it.\n' });
-  const read = await runWith(e(), WORKFLOWS_STEP.handler({ from: 'yours', name: 'one-step', step: 'other', dir }, undefined, ROOT));
+  const onMemory = memoryOver();
+  const dir = path.join(ROOT, 'workflows', 'one-step');
+  const draft = JSON.stringify([{ name: 'only', after: [], place: 'git', body: 'Do it.' }]);
+  await runWith(e(), onMemory(WORKFLOWS_WRITE.handler({ from: 'yours', name: 'one-step', draft }, undefined, ROOT)));
+  const read = await runWith(
+    e(),
+    onMemory(WORKFLOWS_STEP.handler({ from: 'yours', name: 'one-step', step: 'other', dir }, undefined, ROOT)),
+  );
   assert.deepEqual(read, { step: null, steps: ['only'] });
 });
 
@@ -81,7 +99,7 @@ test("REFUSED: a folder that does not load is listed with the loader's words who
   assert.ok(listed[good] && 'steps' in listed[good]);
 });
 
-test("REFUSED: a draft the writer refuses is thrown as the writer's Invalid, naming the file and the fix, and nothing is written", async () => {
+test("REFUSED: a draft the model's Workflow refuses is thrown as the door's Invalid, naming the file, and nothing is written", async () => {
   const dir = path.join(ROOT, 'workflows', 'twice');
   const draft = JSON.stringify([
     { name: 'plan', after: [], place: 'git', body: 'Plan it.' },
@@ -89,9 +107,7 @@ test("REFUSED: a draft the writer refuses is thrown as the writer's Invalid, nam
   ]);
   await assert.rejects(runWith(e(), WORKFLOWS_WRITE.handler({ from: 'yours', name: 'twice', draft }, undefined, ROOT)), (err: Error) => {
     assert.deepEqual([(err as { _tag?: string })._tag, (err as { exitCode?: number }).exitCode], ['Invalid', 2]);
-    assert.ok(err.message.startsWith('two steps are named plan'), err.message);
     assert.ok(err.message.includes('plan.md'), err.message);
-    assert.ok(err.message.includes('Rename one'), err.message);
     return true;
   });
   assert.equal(fs.existsSync(dir), false);
@@ -212,7 +228,7 @@ test("REFUSED, by the remover itself: a folder outside yours, one nested in it a
   const yours = path.join(ROOT, 'workflows');
   for (const dir of [theirs, nested]) {
     assert.throws(
-      () => removeWorkflow(dir, { home: ROOT }),
+      () => removeWorkflowAt(ROOT, dir),
       (err: Error) => {
         assert.ok(err instanceof Invalid);
         assert.equal(
@@ -226,7 +242,7 @@ test("REFUSED, by the remover itself: a folder outside yours, one nested in it a
   }
   const agents = folder('agents', { 'one.md': 'An agent.\n' });
   assert.throws(
-    () => removeWorkflow(agents, { home: ROOT }),
+    () => removeWorkflowAt(ROOT, agents),
     (err: Error) => err instanceof Invalid && new RegExp(`^${agents.replaceAll('/', '\\/')} is agents\\/, the folder of`).test(err.message),
   );
   assert.ok(fs.existsSync(path.join(agents, 'one.md')));

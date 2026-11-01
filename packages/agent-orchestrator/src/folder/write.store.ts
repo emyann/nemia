@@ -11,12 +11,12 @@ import { isReadme, WorkflowError, type Workflow } from '../step/step.ts';
 import { codexModeWritten } from '../former/former.ts';
 import { agentDeniesOf, parseWorkflow, renderStep, type StepDraft } from '../workflow/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { agentsFolderRefusal, linkRefusal, parseFolder, stepNameRefusal, workflowInUse } from './folder.ts';
+import { agentsFolderRefusal, linkRefusal, noStepsRefusal, parseFolder, stepNameRefusal, twiceRefusal, workflowInUse } from './folder.ts';
 import { agentsFor } from '../agents/read.store.ts';
 import type { Agents } from '../agents/agents.ts';
 import { skillsFor, type Places } from '../skills/read.store.ts';
 import { HOME, isDirectory } from '../record/record.store.ts';
-import { readFactories } from '../factory/factory.store.ts';
+import { readFactoriesAt } from '../factory/factory.store.ts';
 
 /**
  * What `writeWorkflow` did: the folder, its steps as they now read, and its files by name — written, left as they were because they already
@@ -54,7 +54,8 @@ export type WorkflowWritten = { dir: string; steps: Workflow[]; written: string[
  * of it would look (`lookupRoots`): in `places`, or else the factory's repository its folder is in and the store (`placesAround`). A run
  * is not changed by any of it: it froze its folder at `nemia start`.
  */
-export function writeWorkflow(
+export function writeWorkflowAt(
+  home: string,
   dir: string,
   steps: readonly StepDraft[],
   readme?: string,
@@ -65,7 +66,7 @@ export function writeWorkflow(
     if (why) throw new WorkflowError(why);
   };
   refuse(agentsFolderRefusal(at));
-  if (!anywhere) refuse(workflowPlaceRefusal(at, places?.repo));
+  if (!anywhere) refuse(workflowPlaceRefusal(home, at, places?.repo));
   if (fs.existsSync(at) && !isDirectory(at))
     refuse(`${at} is a file, and a workflow is a folder of steps. Name a folder — one that is not there yet is made.`);
   let entries: fs.Dirent[] = [];
@@ -81,11 +82,11 @@ export function writeWorkflow(
       ),
     );
   }
-  if (!steps.length) refuse(`no steps to write to ${at}, and a workflow has at least one. To remove the workflow, remove its folder.`);
+  if (!steps.length) refuse(noStepsRefusal(at));
   for (const step of steps) refuse(stepNameRefusal(step?.name));
   const twice = steps.find((step, i) => steps.findIndex((other) => other.name === step.name) !== i);
-  if (twice) refuse(`two steps are named ${twice.name}, and a step is its file, ${twice.name}.md. Rename one of them.`);
-  const where = places ?? placesAround(at);
+  if (twice) refuse(twiceRefusal(twice.name));
+  const where = places ?? placesAroundAt(home, at);
   const agents = agentsFor(at, where);
   refuse(codexModeRefusal(steps, agents));
   const texts = steps.map((step) => [step.name, renderStep(ownLine(step, agents))] as const);
@@ -158,17 +159,14 @@ function ownLine(step: StepDraft, agents: Agents): StepDraft {
 export type WorkflowRemoved = { dir: string; removed: string[] };
 
 /**
- * A workflow of yours removed whole: the folder `dir`, directly under `<home>/workflows/`, and every file in it.
+ * A workflow of yours removed whole: the folder `dir`, directly under `<home>/workflows/` of the store `home`, and every file in it.
  *
  * Refused, and nothing removed: the folder of agents or of skills (`agentsFolderRefusal`), a folder anywhere but directly under yours — a
  * repository's workflow is not removed here (`Invalid`); a folder that is a link, since removing it would leave whatever it points at
  * (`Invalid`); a folder not there, or a file of that name (`Missing`); and a folder something still needs, `users` being one sentence each
  * naming the command that frees it, which the caller gathers (`Conflict`).
  */
-export function removeWorkflow(
-  dir: string,
-  { home = HOME, users = [] }: { home?: string; users?: readonly string[] } = {},
-): WorkflowRemoved {
+export function removeWorkflowAt(home: string, dir: string, users: readonly string[] = []): WorkflowRemoved {
   const at = path.resolve(dir);
   const yours = path.resolve(home, 'workflows');
   const folderRefused = agentsFolderRefusal(at);
@@ -202,40 +200,61 @@ export function removeWorkflow(
  * store's `workflows/`, or in a repository's the store knows — `<repo>/workflows/<name>`, for a `repo` of a factory or the one the caller
  * names. The folder itself, not one below it, nor the `workflows/` that holds it: those are the folders the board lists as workflows.
  */
-function workflowPlaceRefusal(at: string, repo?: string): string | undefined {
+function workflowPlaceRefusal(home: string, at: string, repo?: string): string | undefined {
   const holder = path.dirname(at);
-  const store = path.resolve(HOME, 'workflows');
-  if (isWorkflowsHolder(holder, repo)) return undefined;
+  const store = path.resolve(home, 'workflows');
+  if (isWorkflowsHolderAt(home, holder, repo)) return undefined;
   return `${at} is not a workflow in the store's workflows/ (${path.join(store, '<name>')}) nor in a repository's the store knows (<repo>/workflows/<name>, for a factory's repo), and writing a workflow removes the files of the steps it no longer has. Write it to a folder in one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`;
 }
 
 /** The repositories the store knows, each resolved: every factory's `repos` that reads, and `repo` when the caller names one. */
-export function knownRepos(repo?: string): Set<string> {
-  const known = new Set(readFactories().flatMap((f) => ('repos' in f ? f.repos.map((r) => path.resolve(r)) : [])));
+export function knownReposAt(home: string, repo?: string): Set<string> {
+  const known = new Set(readFactoriesAt(home).flatMap((f) => ('repos' in f ? f.repos.map((r) => path.resolve(r)) : [])));
   if (repo) known.add(path.resolve(repo));
   return known;
 }
 
 /** The trees of the factories made from a template, each resolved: where such a factory runs from, laid out as a repository. */
-const factoryTrees = (): Set<string> =>
-  new Set(readFactories().flatMap((f) => ('tree' in f && f.tree !== undefined ? [path.resolve(f.tree)] : [])));
+const factoryTrees = (home: string): Set<string> =>
+  new Set(readFactoriesAt(home).flatMap((f) => ('tree' in f && f.tree !== undefined ? [path.resolve(f.tree)] : [])));
 
 /**
  * Whether `dir` holds the workflows the board lists: the store's `workflows/`, or the `workflows/` of a repository the store knows — a
  * factory's, or `repo` when the caller names one, as the api names its own — or of the tree of a factory made from a template.
  */
-export function isWorkflowsHolder(dir: string, repo?: string): boolean {
+export function isWorkflowsHolderAt(home: string, dir: string, repo?: string): boolean {
   const at = path.resolve(dir);
-  if (at === path.resolve(HOME, 'workflows')) return true;
+  if (at === path.resolve(home, 'workflows')) return true;
   if (path.basename(at) !== 'workflows') return false;
-  return knownRepos(repo).has(path.dirname(at)) || factoryTrees().has(path.dirname(at));
+  return knownReposAt(home, repo).has(path.dirname(at)) || factoryTrees(home).has(path.dirname(at));
 }
 
 /**
  * Where a workflow folder's runs would look for its agents and skills beside its own (`Places`): the repository or factory's tree it is in
  * — `<repo>/workflows/<name>`, for a repository a factory names — and the store. A folder of the store's is only the store's.
  */
-export function placesAround(workflowDir: string): Places {
+export function placesAroundAt(home: string, workflowDir: string): Places {
   const repo = path.dirname(path.dirname(path.resolve(workflowDir)));
-  return { ...(knownRepos().has(repo) || factoryTrees().has(repo) ? { repo } : {}), home: HOME };
+  return { ...(knownReposAt(home).has(repo) || factoryTrees(home).has(repo) ? { repo } : {}), home };
 }
+
+/**
+ * A function of this file taking the store's root first, as the old spelling that takes none: `at` the module's root, `HOME`. The one
+ * line of this file that reads a root of its own (`test/global-roots.baseline.ts`); each spelling below is called by code not yet on the
+ * Workflow door (`test/workflow-door.baseline.ts`).
+ */
+const atHome =
+  <A extends unknown[], R>(at: (home: string, ...args: A) => R) =>
+  (...args: A): R =>
+    at(HOME, ...args);
+
+/** `writeWorkflowAt` the module's root. */
+export const writeWorkflow = atHome(writeWorkflowAt);
+/** `removeWorkflowAt` the module's root. */
+export const removeWorkflow = atHome(removeWorkflowAt);
+/** `knownReposAt` the module's root. */
+export const knownRepos = atHome(knownReposAt);
+/** `isWorkflowsHolderAt` the module's root. */
+export const isWorkflowsHolder = atHome(isWorkflowsHolderAt);
+/** `placesAroundAt` the module's root. */
+export const placesAround = atHome(placesAroundAt);

@@ -28,6 +28,8 @@ import {
   renderAgent,
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
+import { Schema } from 'effect';
+import { WorkflowDir } from '../src/folder/folder.model.ts';
 import { baseLine, formerFenceLine, formerFormLine, placeLine } from '../src/former/former.ts';
 import { endsOnBase } from '../src/step/step.ts';
 import { readsMounts } from '../src/filed/filed.ts';
@@ -2351,6 +2353,12 @@ test("`workflowFolder` finds a workflow by a path from where it is written, or b
     path.join(plans, 'dev'),
     "the folder where it is written, before the repository's of that name",
   );
+  const relative = path.relative(process.cwd(), repo);
+  assert.equal(workflowFolder('ui', plans, relative), path.join(workflows, 'ui'), 'a relative repository, resolved');
+  for (const dir of [workflowFolder('dev', repo, repo), workflowFolder('ui', plans, relative)])
+    assert.equal(Schema.is(WorkflowDir.OnCreate)(dir), true, `${dir} is minted as the Workflow door's id`);
+  fs.mkdirSync(path.join(plans, 'agents'));
+  assert.throws(() => workflowFolder('./agents', plans, repo), WorkflowError, 'REFUSED: a path to an agents folder is no workflow');
 });
 
 test('REFUSED at shipped defaults: `workflowFolder` on a name the repository does not have, a path that is not there, a path that is not read as a name, and a file — naming where it looked, and the workflows there are', () => {

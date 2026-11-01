@@ -23,7 +23,8 @@ const root = () => scratch('ae-bodies-');
 const run = <A, E>(layer: Layer.Layer<Journal>, e: Effect.Effect<A, E, Journal>) => Effect.runPromise(e.pipe(Effect.provide(layer)));
 const failure = <A>(layer: Layer.Layer<Journal>, e: Effect.Effect<A, JournalError | BodyRefused, Journal>) =>
   Effect.runPromise(Effect.flip(e).pipe(Effect.provide(layer)));
-const append = (taskId: string, event: Event, parts?: readonly string[]) => Effect.flatMap(Journal, (j) => j.append(TaskId.read(taskId), event, parts));
+const append = (taskId: string, event: Event, parts?: readonly string[]) =>
+  Effect.flatMap(Journal, (j) => j.append(TaskId.read(taskId), event, parts));
 const read = (taskId: string) => Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId)));
 const feed = (after = 0) => Effect.flatMap(Journal, (j) => j.feed(after));
 

@@ -40,6 +40,7 @@ import { ownPool, toAdmit, type AdmissionRule } from '../admission.ts';
 import { countedFacts } from './counted.ts';
 import { deniedFacts } from './denied.ts';
 import { instantNow } from './now.ts';
+import { spawnedEntry, stamped } from './stamped.ts';
 import { TaskId } from '../model.ts';
 
 /**
@@ -62,20 +63,6 @@ const nowFor = (unread: ReadonlySet<string>): Now => {
   const now = instantNow();
   return { at: new Date(now.at), ...(now.mono ? { mono: now.mono } : {}), graceMs: GRACE_MS, unread };
 };
-
-/** When an entry is journalled: its `at`, and the same moment on the monotonic clock where there is one (a start, spawn, end or gap). */
-const stamped = (): { at: string; mono?: Monotonic } => {
-  const now = instantNow();
-  return { at: new Date(now.at).toISOString(), ...(now.mono ? { mono: now.mono } : {}) };
-};
-
-/** The `spawned` entry of `attempt`, stamped now, with the error its spawn call returned when it returned one. */
-const spawnedEntry = (attempt: number, error: string | undefined): Event => ({
-  kind: 'spawned',
-  ...stamped(),
-  attempt,
-  ...(error !== undefined ? { error } : {}),
-});
 
 /**
  * A live session is one the engine is still waiting on: at work or waiting on a person. `completed`, `failed`, `rejected` and `canceled`
@@ -539,7 +526,12 @@ const letGo = Effect.fn('releaseFinished')(function* (
       measured &&
       (Object.keys(measured) as Array<keyof Usage>).some((key) => measured[key] !== undefined && attempt.usage?.[key] === undefined)
     ) {
-      yield* journal.append(TaskId.read(state.taskId), { kind: 'measured', at: new Date().toISOString(), attempt: attempt.n, usage: measured });
+      yield* journal.append(TaskId.read(state.taskId), {
+        kind: 'measured',
+        at: new Date().toISOString(),
+        attempt: attempt.n,
+        usage: measured,
+      });
       wrote = true;
     }
   }

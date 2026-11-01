@@ -189,7 +189,7 @@ const FEED: readonly Walk[] = [
 
 const FORGET: readonly Walk[] = [
   {
-    name: "a forgotten task reads as none, is not listed, and its lines leave the feed, counted as forgotten after a cursor before them",
+    name: 'a forgotten task reads as none, is not listed, and its lines leave the feed, counted as forgotten after a cursor before them',
     walk: async (side) => {
       await file(side, 'a');
       await file(side, 'b');

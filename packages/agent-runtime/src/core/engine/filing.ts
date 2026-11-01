@@ -167,27 +167,29 @@ export const file = Effect.fn('file')(function* (spec: Filing) {
   if (refused) return yield* Effect.fail(new FileRefused({ message: refused }));
   const journal = yield* Journal;
   const id = spec.id ?? `t-${Date.now().toString(36)}-${randomUUID().slice(0, 8)}`;
-  yield* journal.append(
-    TaskId.read(id),
-    {
-      kind: 'filed',
-      at: new Date().toISOString(),
-      brief: spec.brief,
-      cwd: spec.cwd,
-      harness: spec.harness,
-      config: spec.config,
-      deadlineSeconds: spec.deadlineSeconds,
-      resumeFrom: spec.resumeFrom,
-      closeoutSchema: spec.closeoutSchema,
-      holdOpen: spec.holdOpen,
-      queued: spec.queued === true,
-      ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
-      ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
-      ...(spec.labels !== undefined && Object.keys(spec.labels).length ? { labels: spec.labels } : {}),
-      ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
-    },
-    spec.briefParts,
-  ).pipe(Effect.catchTag('JournalError', (error) => Effect.fail(filingRefused(error) ?? error)));
+  yield* journal
+    .append(
+      TaskId.read(id),
+      {
+        kind: 'filed',
+        at: new Date().toISOString(),
+        brief: spec.brief,
+        cwd: spec.cwd,
+        harness: spec.harness,
+        config: spec.config,
+        deadlineSeconds: spec.deadlineSeconds,
+        resumeFrom: spec.resumeFrom,
+        closeoutSchema: spec.closeoutSchema,
+        holdOpen: spec.holdOpen,
+        queued: spec.queued === true,
+        ...(spec.priority !== undefined && spec.priority !== 0 ? { priority: spec.priority } : {}),
+        ...(spec.restartPolicy === 'Always' ? { restartPolicy: 'Always' as const } : {}),
+        ...(spec.labels !== undefined && Object.keys(spec.labels).length ? { labels: spec.labels } : {}),
+        ...(spec.traceparent !== undefined ? { traceparent: spec.traceparent } : {}),
+      },
+      spec.briefParts,
+    )
+    .pipe(Effect.catchTag('JournalError', (error) => Effect.fail(filingRefused(error) ?? error)));
   return id;
 });
 

@@ -747,6 +747,10 @@ const askedVerbsOf = (
   ...mcpSignInVerbsOf(harnesses, root, executable),
 });
 
+/** A task's events, read through the Task door `journal` gives. */
+const readOn = (journal: Layer.Layer<Journal>, taskId: string) =>
+  Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId))).pipe(Effect.provide(journal));
+
 const make = (options: EngineOptions) =>
   Effect.gen(function* () {
     const refused = optionsRefusalOf(options);
@@ -757,7 +761,7 @@ const make = (options: EngineOptions) =>
 
     const journalOps = options.journal ?? Journal.filesOps(root);
     const journal = Journal.layer(journalOps);
-    const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId))).pipe(Effect.provide(journal)));
+    const events = (taskId: string) => Effect.runPromise(readOn(journal, taskId));
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);

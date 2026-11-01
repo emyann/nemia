@@ -44,7 +44,7 @@ async function traced(program: Effect.Effect<void, unknown, Journal>): Promise<{
   return { logs, spans };
 }
 
-const starting: Event = { kind: 'starting', at: '2026-10-05T08:00:00.000Z', attempt: 2 };
+const starting: Event = { kind: 'starting', at: '2026-10-05T08:00:00.000Z', attempt: 1 };
 const filed = { kind: 'filed', at: '2026-10-05T08:00:00.000Z', brief: 'b', cwd: '/w' } as Event;
 
 test('an append is said at Debug, its kind, annotated with its task, its kind and its attempt where it has one', async () => {
@@ -57,20 +57,21 @@ test('an append is said at Debug, its kind, annotated with its task, its kind an
   );
   assert.deepEqual(logs, [
     { level: 'Debug', text: 'filed', annotations: { task: 't-1', kind: 'filed' } },
-    { level: 'Debug', text: 'starting', annotations: { task: 't-1', kind: 'starting', attempt: 2 } },
+    { level: 'Debug', text: 'starting', annotations: { task: 't-1', kind: 'starting', attempt: 1 } },
   ]);
-  assert.deepEqual(appendFields('t-1', starting), { task: 't-1', kind: 'starting', attempt: 2 });
+  assert.deepEqual(appendFields('t-1', starting), { task: 't-1', kind: 'starting', attempt: 1 });
 });
 
 test('an append is a span of its own, append, under the span of the verb that wrote it, its attributes the same fields', async () => {
   const { spans } = await traced(
     Effect.gen(function* () {
       const journal = yield* Journal;
+      yield* journal.append(TaskId.read('t-1'), filed);
       yield* journal.append(TaskId.read('t-1'), starting);
     }).pipe(Effect.withSpan('file')),
   );
-  const append = spans.find((s) => s.name === 'append');
+  const append = spans.find((s) => s.name === 'append' && Object.fromEntries(s.attributes).kind === 'starting');
   assert.ok(append, `no append span among ${spans.map((s) => s.name).join(', ')}`);
   assert.equal(Option.getOrUndefined(append.parent)?.spanId, spans.find((s) => s.name === 'file')?.spanId);
-  assert.deepEqual(Object.fromEntries(append.attributes), { task: 't-1', kind: 'starting', attempt: 2 });
+  assert.deepEqual(Object.fromEntries(append.attributes), { task: 't-1', kind: 'starting', attempt: 1 });
 });

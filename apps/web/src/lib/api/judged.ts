@@ -3,20 +3,27 @@
  * `GET /api/runs/:id`): where it stands, who it waits on, what it cost, what to decide. Each type has its schema beside it, which `get`
  * decodes the api's answer with.
  */
-import { Schema } from 'effect';
+import { Schema, SchemaTransformation } from 'effect';
 import { decodes } from './decodes.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
 export const StringsSchema = Schema.mutable(Schema.Array(Schema.String));
 
 /**
- * Mirrors `PlaceKind` in agent-orchestrator's record/record.ts: the kind of workspace a run's steps work in — a repository's worktrees, or
- * folders the run makes.
+ * Mirrors `PlaceKind` in agent-orchestrator's place/place.model.ts: the kind of place a run's steps work in — `git`, branches of a
+ * repository, or `folder`, folders the run makes — as a step's `place:` says it.
  */
-export type PlaceKind = 'repository' | 'folder';
+export type PlaceKind = 'git' | 'folder';
 
-/** Decodes a `PlaceKind`. */
-export const PlaceKindSchema = decodes<PlaceKind>()(Schema.Literals(['repository', 'folder']));
+/** Decodes a `PlaceKind`, and `repository`, its former spelling an api not yet restarted still answers, as `git`. */
+export const PlaceKindSchema = decodes<PlaceKind>()(
+  Schema.Literals(['git', 'folder', 'repository']).pipe(
+    Schema.decodeTo(
+      Schema.Literals(['git', 'folder']),
+      SchemaTransformation.transform({ decode: (kind) => (kind === 'repository' ? 'git' : kind), encode: (kind) => kind }),
+    ),
+  ),
+);
 
 /**
  * Mirrors `RunStatus` in agent-orchestrator: where `assess` puts the run. `failed` is a run in which a step broke; one a person alone

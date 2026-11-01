@@ -42,7 +42,7 @@ export const awaitingOf = (decision: RunDecision): Awaiting | null => (isDecidab
  */
 export function prunable(run: Prunable): boolean {
   const { worktrees, files } = run.onDisk;
-  return run.place === 'repository' && !run.moving && run.status !== 'running' && (worktrees || files);
+  return run.place === 'git' && !run.moving && run.status !== 'running' && (worktrees || files);
 }
 
 /**

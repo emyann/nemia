@@ -126,7 +126,7 @@ function runWith(note: string | null): RunDetail {
     brief: 'Go round again',
     decide: 'nemia decide r-1',
     repo: '/code/app',
-    place: 'repository',
+    place: 'git',
     work: null,
     workflowDir: '/code/app/workflow',
     workflowPage: null,
@@ -555,7 +555,7 @@ function summaryRun(): RunSummary {
   return {
     id: 'r-1',
     repo: '/code/app',
-    place: 'repository',
+    place: 'git',
     work: null,
     brief: 'Tile it',
     workflowDir: '/code/app/workflow',

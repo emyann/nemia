@@ -15,7 +15,7 @@ const run = (id: string, extra: Partial<RunSummary> = {}, steps: readonly string
   id,
   repo: '/code/app',
   factory: null,
-  place: 'repository',
+  place: 'git',
   work: null,
   brief: `# ${id}'s brief\n\nMore.`,
   workflowDir: '/code/app/workflows/dev',

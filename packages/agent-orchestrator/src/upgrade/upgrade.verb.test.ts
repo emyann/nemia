@@ -21,14 +21,14 @@ import { heldUnasked } from '../../test/unasked.ts';
 const ROOT = scratch('wf-upgrade-');
 process.env.WF_ROOT = ROOT;
 const FACTORIES = path.join(ROOT, 'factories');
-const { exportTemplate } = await import('../template/template.store.ts');
+const { templated: programsAt } = await import('../../test/templated.ts');
+const { exportTemplate, reconciled } = programsAt(ROOT);
 const { FACTORY_RULES, factoryRules, readFactory, runWith: runEngine } = await import('../runner.ts');
 const stand = eachTest(testPlace);
 const runWith = runOver(runEngine, () => stand().layer);
 const { main: cli } = await import('../cli/main.ts');
 /** `nemia`, as a person types it, its commands given this test's place. */
 const main = (argv: string[], e?: Parameters<typeof cli>[1]) => cli(argv, e, undefined, stand().place);
-const { reconcileFactory } = await import('../applied/applied.verb.ts');
 const { appliedDir, digestOf, entriesIn, readStatus, replaceBase, resolutionsFile, statusFile, swapTree, treeDir } =
   await import('../applied/applied.store.ts');
 const { readRun } = await import('../record/record.store.ts');
@@ -78,7 +78,7 @@ async function applied(name: string, rules?: string): Promise<{ dir: string; rep
     spec.steps[1].budget = { param: 'budget' };
   });
   await main(['factory', 'apply', name, '--template', dir, '--repo', repo, '--set', 'budget=7'], noEngine());
-  reconcileFactory(templated(name));
+  reconciled(templated(name));
   return { dir, repo };
 }
 
@@ -184,7 +184,7 @@ test('a downgrade asked with --downgrade is filed, and merged as an upgrade is',
   released(dir, '0.0.9', 5);
   await main(['factory', 'upgrade', 'lowered', '--to', '0.0.9', '--downgrade'], noEngine());
   assert.equal(templated('lowered').template.version, '0.0.9');
-  assert.equal(reconcileFactory(templated('lowered')).version, '0.0.9');
+  assert.equal(reconciled(templated('lowered')).version, '0.0.9');
   assert.match(textIn(treeDir('lowered'), REVIEW), /^rounds: 5$/m);
 });
 
@@ -200,7 +200,7 @@ test("a clean upgrade writes the factory's file alone; the controller swaps the 
   assert.deepEqual(printed, ['clean: 0.1.0 → 0.2.0', `filed: ${file}`, 'the daemon merges it on its next pass (nemia up)']);
   assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), { ...filedAs, template: { ...filedAs.template, version: '0.2.0' } });
   assert.deepEqual(bytesUnder(path.join(FACTORIES, 'clean')), folder, 'the upgrade writes no tree, base nor status');
-  const status = reconcileFactory(templated('clean'));
+  const status = reconciled(templated('clean'));
   assert.equal(status.version, '0.2.0');
   assert.deepEqual(
     status.conditions.map((c) => [c.type, c.status, c.reason]),
@@ -215,7 +215,7 @@ test("a clean upgrade writes the factory's file alone; the controller swaps the 
   assert.equal(fs.statSync(path.join(appliedDir('clean'), REVIEW)).mode & 0o222, 0, 'the base is read-only again');
   const written = fs.statSync(statusFile('clean')).mtimeMs;
   const tree = bytesUnder(treeDir('clean'));
-  assert.deepEqual(reconcileFactory(templated('clean')), status);
+  assert.deepEqual(reconciled(templated('clean')), status);
   assert.equal(fs.statSync(statusFile('clean')).mtimeMs, written, 'a second pass writes no status');
   assert.deepEqual(bytesUnder(treeDir('clean')), tree, 'nor a tree');
   await assert.rejects(
@@ -235,7 +235,7 @@ test('conflicts wait for a choice with only the status written; resolve writes e
   assert.match(printed[2], /^2 conflicts wait for a choice: nemia factory diff clash --to 0\.2\.0 shows each/);
   const tree = bytesUnder(treeDir('clash'));
   const base = bytesUnder(appliedDir('clash'));
-  const waiting = reconcileFactory(templated('clash'));
+  const waiting = reconciled(templated('clash'));
   assert.deepEqual(bytesUnder(treeDir('clash')), tree, 'the tree is left as it is while a conflict waits');
   assert.deepEqual(bytesUnder(appliedDir('clash')), base, 'and the base');
   assert.equal(waiting.version, '0.1.0');
@@ -269,7 +269,7 @@ test('conflicts wait for a choice with only the status written; resolve writes e
 
   assert.match((await printedBy(t, 'factory', 'resolve', 'clash', `${REVIEW}#rounds`, '--theirs'))[1], /^1 conflict still wait/);
   assert.deepEqual(
-    reconcileFactory(templated('clash')).upgrade?.conflicts.map((c) => c.at),
+    reconciled(templated('clash')).upgrade?.conflicts.map((c) => c.at),
     [`${README}:1-1`],
   );
   assert.deepEqual(bytesUnder(treeDir('clash')), tree, 'one conflict left, nothing merged');
@@ -284,7 +284,7 @@ test('conflicts wait for a choice with only the status written; resolve writes e
     choices: { [`${REVIEW}#rounds`]: 'theirs', [`${README}:1-1`]: { text: '# dev, both\n' } },
   });
 
-  const merged = reconcileFactory(templated('clash'));
+  const merged = reconciled(templated('clash'));
   assert.equal(merged.version, '0.2.0');
   assert.equal(merged.conditions[0].reason, 'Upgraded');
   assert.equal(merged.upgrade, undefined, 'no conflict is said once merged');
@@ -301,7 +301,7 @@ test("a factory's rules are carried by an upgrade: taken from a template that ad
   released(dir, '0.2.0', 5);
   fs.writeFileSync(path.join(dir, RULES), 'Never push on a Friday.\n');
   await main(['factory', 'upgrade', 'ruled', '--to', '0.2.0'], noEngine());
-  const status = reconcileFactory(templated('ruled'));
+  const status = reconciled(templated('ruled'));
   assert.equal(status.version, '0.2.0');
   assert.equal(status.upgrade, undefined, 'no conflict');
   assert.equal(textIn(treeDir('ruled'), RULES), 'Never push on a Friday.\n');
@@ -322,14 +322,14 @@ test('rules the person wrote and rules the template adds, with none in the base,
   released(dir, '0.2.0', 5);
   fs.writeFileSync(path.join(dir, RULES), 'Theirs: never push on a Friday.\n');
   await main(['factory', 'upgrade', 'both', '--to', '0.2.0'], noEngine());
-  const waiting = reconcileFactory(templated('both'));
+  const waiting = reconciled(templated('both'));
   assert.equal(waiting.version, '0.1.0');
   assert.deepEqual(waiting.upgrade?.conflicts, [
     { at: RULES, base: null, ours: 'Ours: push whenever.\n', theirs: 'Theirs: never push on a Friday.\n' },
   ]);
   assert.equal(textIn(treeDir('both'), RULES), 'Ours: push whenever.\n', 'left as it is while the conflict waits');
   await main(['factory', 'resolve', 'both', RULES, '--theirs'], noEngine());
-  const merged = reconcileFactory(templated('both'));
+  const merged = reconciled(templated('both'));
   assert.equal(merged.version, '0.2.0');
   assert.equal(merged.upgrade, undefined);
   assert.equal(textIn(treeDir('both'), RULES), 'Theirs: never push on a Friday.\n');
@@ -344,7 +344,7 @@ test('rules changed by the person and by the template on different lines, from a
   released(dir, '0.2.0', 5);
   rewrite(dir, RULES, 'before a migration', 'before any migration');
   await main(['factory', 'upgrade', 'lined', '--to', '0.2.0'], noEngine());
-  const status = reconcileFactory(templated('lined'));
+  const status = reconciled(templated('lined'));
   assert.equal(status.version, '0.2.0');
   assert.equal(status.upgrade, undefined, 'no conflict');
   assert.equal(
@@ -367,7 +367,7 @@ test('choices made for another version are not merged, and the next resolve drop
   rewrite(dir, README, '# dev, theirs\n', '# dev, three\n');
   await main(['factory', 'upgrade', 'stale', '--to', '0.3.0'], noEngine());
   const tree = bytesUnder(treeDir('stale'));
-  const waiting = reconcileFactory(templated('stale'));
+  const waiting = reconciled(templated('stale'));
   assert.deepEqual(
     waiting.upgrade?.conflicts.map((c) => c.at),
     [`${README}:1-1`, `${REVIEW}#rounds`],
@@ -380,7 +380,7 @@ test('choices made for another version are not merged, and the next resolve drop
     choices: { [`${README}:1-1`]: 'theirs' },
   });
   assert.deepEqual(
-    reconcileFactory(templated('stale')).upgrade?.conflicts.map((c) => c.at),
+    reconciled(templated('stale')).upgrade?.conflicts.map((c) => c.at),
     [`${REVIEW}#rounds`],
   );
 });
@@ -395,7 +395,7 @@ test('a status lost while an upgrade waits leaves the version unknown, and an up
   fs.rmSync(statusFile('lost'));
   const tree = bytesUnder(treeDir('lost'));
   const base = bytesUnder(appliedDir('lost'));
-  const unknown = reconcileFactory(templated('lost'));
+  const unknown = reconciled(templated('lost'));
   assert.equal(unknown.version, null, 'the base is not the render, and no status names its version');
   assert.deepEqual([unknown.conditions[0].status, unknown.conditions[0].reason], ['False', 'VersionUnknown']);
   assert.match(unknown.conditions[0].message, /nemia factory upgrade lost --to <it>/);
@@ -407,10 +407,10 @@ test('a status lost while an upgrade waits leaves the version unknown, and an up
   );
 
   await main(['factory', 'upgrade', 'lost', '--to', '0.1.0', '--template', old], noEngine());
-  const named = reconcileFactory(templated('lost'));
+  const named = reconciled(templated('lost'));
   assert.deepEqual([named.version, named.conditions[0].reason], ['0.1.0', 'Rendered']);
   await main(['factory', 'upgrade', 'lost', '--to', '0.2.0', '--template', dir], noEngine());
-  const merged = reconcileFactory(templated('lost'));
+  const merged = reconciled(templated('lost'));
   assert.deepEqual([merged.version, merged.conditions[0].reason], ['0.2.0', 'Upgraded']);
   assert.match(textIn(treeDir('lost'), REVIEW), /^rounds: 5$/m);
 });
@@ -478,15 +478,15 @@ test('a pass stopped after the tree is swapped merges the same tree on the next;
   await main(['factory', 'resolve', 'stopped', `${README}:1-1`, '--ours'], noEngine());
   const oldBase = entriesIn(appliedDir('stopped'));
   const oldStatus = fs.readFileSync(statusFile('stopped'));
-  reconcileFactory(templated('stopped'));
+  reconciled(templated('stopped'));
   const tree = bytesUnder(treeDir('stopped'));
   const status = readStatus('stopped');
   replaceBase('stopped', oldBase);
   fs.writeFileSync(statusFile('stopped'), oldStatus);
-  assert.deepEqual(reconcileFactory(templated('stopped')), status, 'the tree swapped, the base not: the next pass ends it');
+  assert.deepEqual(reconciled(templated('stopped')), status, 'the tree swapped, the base not: the next pass ends it');
   assert.deepEqual(bytesUnder(treeDir('stopped')), tree, 'composing the same tree');
   fs.writeFileSync(statusFile('stopped'), oldStatus);
-  const after = reconcileFactory(templated('stopped'));
+  const after = reconciled(templated('stopped'));
   assert.equal(after.version, '0.2.0', 'the base swapped, the status not: the version is the render');
   assert.equal(after.conditions[0].status, 'True');
   assert.deepEqual(bytesUnder(treeDir('stopped')), tree);
@@ -500,7 +500,7 @@ test("a run in flight keeps the steps frozen on its record while its factory's t
   const id = printed[0].split(' ')[0];
   released(dir, '0.2.0', 5);
   await main(['factory', 'upgrade', 'flying', '--to', '0.2.0'], noEngine());
-  assert.equal(reconcileFactory(templated('flying')).conditions[0].reason, 'Upgraded');
+  assert.equal(reconciled(templated('flying')).conditions[0].reason, 'Upgraded');
   assert.match(textIn(treeDir('flying'), REVIEW), /^rounds: 5$/m);
   assert.equal(readRun(id).workflow?.find((step) => step.name === 'review')?.rounds, 3, 'its review step as it started');
 });

@@ -12,3 +12,10 @@ test("the orchestrator's diagram draws every context's entities, and the runtime
   assert.ok(!heads.includes('TaskId'), 'TaskId has no block: it is the runtime’s');
   assert.ok(lines.includes('  TaskId ||--o{ Try : taskId'), lines.join('\n'));
 });
+
+test("a factory's applied template draws a relation to the factory and to the template its source names", () => {
+  const lines = orchestratorModelDiagram().split('\n');
+  for (const entity of ['Template', 'AppliedTemplate']) assert.ok(lines.includes(`  ${entity} {`), `${entity} has a block`);
+  assert.ok(lines.includes('  Factory ||--o| AppliedTemplate : template'), lines.join('\n'));
+  assert.ok(lines.includes('  Template ||--o{ AppliedTemplate : source'), lines.join('\n'));
+});

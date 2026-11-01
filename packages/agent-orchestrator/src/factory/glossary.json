@@ -6,6 +6,7 @@
     "packages/agent-orchestrator/src/factory",
     "packages/agent-orchestrator/src/template",
     "packages/agent-orchestrator/src/factories",
+    "packages/agent-orchestrator/src/templates",
     "packages/agent-orchestrator/src/wiring"
   ],
   "terms": [
@@ -84,6 +85,26 @@
         "label": "Hires",
         "href": "/factories/#hires"
       }
+    },
+    {
+      "term": "Template",
+      "meaning": "a factory made portable: a folder whose manifest, nemia.yaml, declares its version, parameters and hires, beside its workflows, agents and skills, or an archive of one `nemia template pack` wrote; keyed by its source, as `Template` in `packages/agent-orchestrator/src/templates/templates.model.ts`.",
+      "type": "Template"
+    },
+    {
+      "term": "Template source",
+      "meaning": "where a template is read from: its folder or its archive, by its whole path, checked when a template is written and read by name alone, so a factory's file written before the check still reads.",
+      "type": "TemplateSource"
+    },
+    {
+      "term": "Template door",
+      "meaning": "the one way a template's folder or archive is read, written and packed: `TemplateDoor` in `packages/agent-orchestrator/src/templates/templates.store.ts`, rooted as the Factory door is, its files layer and a memory one, each refusing a tree whose name or paths `TemplateTreeWrite` refuses. The template's lint is the verbs', not the door's.",
+      "type": "TemplateDoorShape"
+    },
+    {
+      "term": "Applied template",
+      "meaning": "the template a factory was made from by `nemia factory apply`, as its file records it under `template`: the template's source, the version the factory wants, and the parameters given with `--set`.",
+      "type": "AppliedTemplate"
     }
   ]
 }

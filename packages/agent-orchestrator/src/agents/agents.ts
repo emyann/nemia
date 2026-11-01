@@ -24,6 +24,8 @@
  * agent, which keeps its operator's.
  */
 import path from 'node:path';
+import type { DefinitionVersionRefusal } from '../../contracts/definition-version.contract.ts';
+import { takenAt } from '../folder/folder.ts';
 import {
   AGENTS_FOLDER,
   isReadme,
@@ -762,3 +764,43 @@ export function renderedFlags(
     ...(settings !== undefined && { settings }),
   };
 }
+
+export type { DefinitionThere } from '../../contracts/definition-version.contract.ts';
+
+/**
+ * Why a write or a removal (`does`) of the agent or skill `name`, given the version `given` it was read at, does nothing, judged against
+ * what is at its name now (`there`), or null where it goes on: a new write over nothing goes; a write given a version where none is held
+ * now is `Missing`; a new write over what is there a `Conflict`; a removal of a held one with no version `Invalid`; and an act given a
+ * version it is no longer at a `Conflict`. A removal where none is held goes on, to the remover's own refusal. Pure, the one judgement of
+ * the Agent and Skill doors' layers, and proved by `contracts/definition-version.contract.ts`.
+ */
+export const definitionVersionRefusal: DefinitionVersionRefusal = (what, name, does, there, given) => {
+  const named = what === 'agent' ? `${AGENTS_FOLDER}/${name}.md` : `${SKILLS_FOLDER}/${name}`;
+  const anew = what === 'agent' ? 'Give the new agent another name' : 'Give the new skill another name';
+  if (there.kind !== 'held') {
+    if (does === 'remove') return null;
+    if (given !== undefined)
+      return {
+        kind: 'Missing',
+        message: `${named} is not there: it was removed since it was read. Write it as a new ${what} to have it back.`,
+      };
+    if (there.kind === 'none') return null;
+    return { kind: 'Conflict', message: `${named} is there already, and is no ${what}. ${anew}, or remove what is there first.` };
+  }
+  if (given === undefined) {
+    if (does === 'write')
+      return { kind: 'Conflict', message: `${named} is there already. ${anew}, or open it and change it${takenAt(there.version)}.` };
+    return {
+      kind: 'Invalid',
+      message: `${named} is at version ${there.version}, and a removal is checked against the version it was read at, so a ${what} changed since is not removed unseen. Give that version to remove it.`,
+    };
+  }
+  if (given === there.version) return null;
+  return {
+    kind: 'Conflict',
+    message:
+      does === 'write'
+        ? `${named} changed since it was read (version ${given}, now ${there.version}), and writing it would lose what changed. Read it again, and make the change on what it holds now.`
+        : `${named} changed since it was read (version ${given}, now ${there.version}). Read it again before removing it.`,
+  };
+};

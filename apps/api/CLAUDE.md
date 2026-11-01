@@ -6,6 +6,11 @@ The workflows behind HTTP, and the feed as a stream: Hono over the orchestrator'
 tests may import the runtime's public entries, and the test place from `agent-orchestrator/testing`. A harness fact it needs comes
 from the orchestrator; what it holds today below its layer is in `docs/architecture.md`, *Who owns what*.
 
+- **The source (`src`) is under `noUncheckedIndexedAccess`, and lint refuses a `!`** there (`.oxlintrc.json`, held by
+  `packages/agent-orchestrator/test/index-reads.test.ts`): say what an absence means (the refusal or the miss the code already gives),
+  never a cast or a default the contract does not give. A dictionary read stays a plain read, its `undefined` handled, with no
+  `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
+  flag off.
 - **A body read off a response is `unknown`**: name the api's own answer type (`(await res.json()) as RunDetail`).
 - **An encoded `..` never reaches a route in a test**: `app.request` resolves `%2E%2E` before the router sees it. Send `..%2F…` to reach
   a name refusal.

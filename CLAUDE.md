@@ -36,7 +36,8 @@ holds what every change needs.
   whole suite only to measure it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a
   run no check follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
-  runtime's tests under `test/tsconfig.json`, which leaves its source's `noUncheckedIndexedAccess` off);
+  tests of the runtime, the orchestrator and the api each under their package's `test/tsconfig.json`, which leaves the source's
+  `noUncheckedIndexedAccess` off);
   `tools/guards/test/suite.test.ts` refuses a test file no typecheck reads.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.

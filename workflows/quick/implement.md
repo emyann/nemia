@@ -71,11 +71,13 @@ repository writes Effect 4, and sends you to the docs installed with Effect firs
 
 When the change touches a function a contract proves, or writes a contract for one (its type is imported from its package's
 `contracts/`), load the `tsverify` skill before you change the code. Write the laws into the contract first and run the verifier: each
-new law comes back `counterexample` on the code as it is; then change the code until every law is `proved`. Run `npx tsverify <file>`
-on each file you changed that holds a function a contract proves, and say its verdicts in your summary: CI's `contracts` job runs every
-contract on the commit your check pushes. A new behaviour of a function a contract proves is a law of its contract, not a new row of its
-tests. Delete a test a law makes redundant only once you have planted the bug it guards, seen the law come back `counterexample`, and
-put the code back: name in your summary the test, the bug and the law.
+new law comes back `counterexample` on the code as it is; then change the code until every law is `proved`. When the laws cannot all
+hold, a counterexample no code could avoid because two laws, or a law and `requires`, leave no result for its input, change no law:
+sign off `blocked`, naming the laws, the input and why no result keeps them together, so that a person amends the spec. Run
+`npx tsverify <file>` on each file you changed that holds a function a contract proves, and say its verdicts in your summary: CI's
+`contracts` job runs every contract on the commit your check pushes. A new behaviour of a function a contract proves is a law of its
+contract, not a new row of its tests. Delete a test a law makes redundant only once you have planted the bug it guards, seen the law
+come back `counterexample`, and put the code back: name in your summary the test, the bug and the law.
 No spec names the laws in a quick run: name each in your `plan`, with its sentence, before you write it.
 
 When the change touches `apps/web`, load `shadcn` for the board's components, and load `change-the-board` before `shadcn`: it says

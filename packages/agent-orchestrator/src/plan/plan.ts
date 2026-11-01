@@ -257,10 +257,10 @@ export function planOrder(cards: readonly Card[]): Card[] {
 function cycleIn(pending: readonly Card[]): Card[] {
   const byName = new Map(pending.map((c) => [c.name, c]));
   const walked: Card[] = [];
-  let at = pending[0];
+  let at: Card | undefined = pending[0];
   while (at !== undefined && !walked.includes(at)) {
     walked.push(at);
-    const parent = at.after.find((a) => byName.has(a));
+    const parent: string | undefined = at.after.find((a) => byName.has(a));
     at = parent === undefined ? undefined : byName.get(parent);
   }
   return at === undefined ? walked : walked.slice(walked.indexOf(at));

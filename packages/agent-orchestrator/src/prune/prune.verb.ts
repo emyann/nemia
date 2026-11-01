@@ -82,6 +82,8 @@ export const prune = Effect.fn('prune')(function* (
   const ready = yield* sized(judged.ready);
   if (!yes) return prunableOf(ready);
   const [pruned] = yield* freeing([ready]);
+  if (pruned === undefined)
+    throw new Error(`freeing answered no pruning for ${id}, where it answers one for each run it is handed: report it as a bug`);
   return pruned;
 });
 

@@ -110,7 +110,7 @@ const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; 
  * - the sweep takes `FREE_A_SWEEP` of them not judged yet, or one already judged in its turn (`freeTurn`);
  * - each is judged as `nemia prune <id>` judges it, with no flag (`judging`), and sized when ready (`sized`), side by side;
  * - those ready are removed by one `remove` a repository (`freedByRepo`), repositories side by side;
- * - each run freed is said (`freedLine`), and a run left is said once while its words stand (`freeSaid`): a locked, detached or
+ * - each run freed is said (`freedLine`), and a run left is said once while its words stand (`freeSaid`): a held, off-branch or
  *   changed worktree, a place that did not answer, a worktree git would not remove.
  *
  * Level-triggered: a run freed has no folder left and is no candidate; one that is not freed is judged again on a later sweep, by what

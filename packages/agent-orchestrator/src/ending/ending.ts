@@ -3,7 +3,7 @@
  * it holds (`checkoutLine`), and what is left for a person to decide (`toDecide`, `gateRefusal`). Pure: the tick merges and commits.
  */
 import type { Verdict } from '../check/check.ts';
-import type { Status } from '../place/place.ts';
+import type { MergeState } from '../place/place.ts';
 import type { Workflow } from '../step/step.ts';
 import { sandboxed, terminalSteps } from '../workflow/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
@@ -65,13 +65,6 @@ export const readsRunArtifacts = (step: Pick<Workflow, 'workspace' | 'harness'>)
   endsOnBase(step) && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness);
 
 /**
- * The repository's own checkout as a pass reads it for an ending that lands on its check, as its place's `status` answers
- * (`checkoutStatus`): whose merge is in progress — `ours` when every commit it merges is a tip of this run's result branches, `other` for a
- * person's or another run's, `none` — whether a path is unmerged, the result branches a commit now would leave out, and HEAD.
- */
-export type MergeState = Status;
-
-/**
  * What a pass does about an ending's staged merge (`landingDue`): commit it with the step's message, abort it, only write down how it
  * stands, or wait, with why, where its place gave no reading of the checkout.
  */
@@ -129,7 +122,7 @@ export function landingDue(
   if (own !== 'checking' && !staged) return nothing;
   const read = merge();
   if ('unread' in read) return { act: 'wait', why: read.unread };
-  const { merging, conflicted, missing, head } = read;
+  const { merging, conflicted, missing, tip } = read;
   if (merging === 'other') return undefined;
   const ours = merging === 'ours';
   const onHead = !ours && merging === 'none' && missing.length === 0;
@@ -148,7 +141,7 @@ export function landingDue(
   }
   if (check === 'succeeded') {
     if (ours) return message?.trim() ? { act: 'commit', message } : end(`${step.name} signed off no commit message`);
-    if (onHead && head) return { act: 'record', landed: { commit: head } };
+    if (onHead && tip) return { act: 'record', landed: { commit: tip } };
     return {
       act: 'record',
       landed: { aborted: 'its check passed, and the merge it judged was no longer staged, so nothing was committed' },
@@ -157,7 +150,7 @@ export function landingDue(
   const why = refusedCheck(check, verdict) ? `its check refused the merge (exit ${verdict})` : 'its check did not finish';
   return end(
     onHead ? `${why}, and the result is on ${run.branch} already: it was committed before its check ran` : why,
-    refusedBase(head, check, verdict),
+    refusedBase(tip, check, verdict),
   );
 }
 
@@ -183,8 +176,8 @@ const landingSettled = (
  * non-zero (`refusedCheck`) — nothing for a check that did not finish, or with no HEAD read. What lets `nemia refresh --base` file a merge
  * of work that merges cleanly onto that base and breaks on it (`mergeAsk`). Pure.
  */
-const refusedBase = (head: string | undefined, check: TaskPhase, verdict: Verdict | undefined): { refusedOn?: string } =>
-  head && refusedCheck(check, verdict) ? { refusedOn: head } : {};
+const refusedBase = (tip: string | undefined, check: TaskPhase, verdict: Verdict | undefined): { refusedOn?: string } =>
+  tip && refusedCheck(check, verdict) ? { refusedOn: tip } : {};
 
 /**
  * Whether an ending that lands on its check still owes the checkout a landing, and holds it: filed, with nothing landed yet, and its

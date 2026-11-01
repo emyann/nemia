@@ -5,26 +5,43 @@
  * (`stopGroup`), and the words of an ask that was not heard (`stoppedWords`, `threwWords`).
  */
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
-import { Context, Effect, Layer, Schedule, Schema } from 'effect';
+import { Context, Effect, Layer, Schedule, Schema, SchemaTransformation } from 'effect';
 import type { Inventory, Opened, PlaceDeclared, PlaceOutcome, PlaceRequests, PlaceVerb, Standing, Trials, Unread } from './place.ts';
 import { Invalid } from '../refusal/refusal.ts';
 import type { RepositoryRun } from '../record/record.ts';
 
 const Count = Schema.NullOr(Schema.Int);
 
-/** What `standing` answers (`Standing`), as `standing.json` keeps each answer (`standing.store.ts`). */
-export const StandingSchema = Schema.Struct({
-  heads: Schema.Record(Schema.String, Schema.String),
-  branches: Schema.Array(
-    Schema.Struct({
-      branch: Schema.String,
-      tip: Schema.NullOr(Schema.String),
-      onBase: Schema.Literals(['yes', 'no', 'unknown']),
-      pastBase: Schema.NullOr(Schema.Boolean),
-      ahead: Count,
+const Tips = Schema.Record(Schema.String, Schema.String);
+
+const BranchesStood = Schema.Array(
+  Schema.Struct({
+    branch: Schema.String,
+    tip: Schema.NullOr(Schema.String),
+    onBase: Schema.Literals(['yes', 'no', 'unknown']),
+    pastBase: Schema.NullOr(Schema.Boolean),
+    ahead: Count,
+  }),
+);
+
+const StandingNow = Schema.Struct({ tips: Tips, branches: BranchesStood });
+
+/** An answer a former nemia kept, its `tips` written `heads`, read as `tips`. */
+const StandingFormer = Schema.Struct({ heads: Tips, branches: BranchesStood }).pipe(
+  Schema.decodeTo(
+    StandingNow,
+    SchemaTransformation.transform({
+      decode: ({ heads, branches }) => ({ tips: heads, branches }),
+      encode: ({ tips, branches }) => ({ heads: tips, branches }),
     }),
   ),
-}) satisfies Schema.Schema<Standing>;
+);
+
+/**
+ * What `standing` answers (`Standing`), as `standing.json` keeps each answer (`standing.store.ts`): an answer a former nemia kept with
+ * its `tips` as `heads` is read as `tips`, since the file outlives the rename.
+ */
+export const StandingSchema = Schema.Union([StandingNow, StandingFormer]) satisfies Schema.Schema<Standing>;
 
 /** How long a process group, stopped at its deadline, is given to end on SIGTERM before it is killed. */
 export const STOP_GRACE_MS = 2000;
@@ -134,16 +151,16 @@ export class PlaceService extends Context.Service<PlaceService, Place>()('orches
 export type RunPlaceRead = { readonly place: Place; readonly say: PlaceDeclared['say']; readonly inventory: Inventory };
 
 /**
- * What `place` reads the repository run left (`inventory`): its worktrees inside `under` and its branches under `wf/<id>/`, merged or
- * not into its base branch, with the place's `say` — or the outcome that is no answer: refused, or not heard. Never an empty inventory
- * in its place.
+ * What `place` reads the repository run left (`inventory`): its worktrees inside `under` and the run's branches, as its place names them,
+ * merged or not into its base branch, with the place's `say` — or the outcome that is no answer: refused, or not heard. Never an empty
+ * inventory in its place.
  */
 export function readRunPlace(
   run: Pick<RepositoryRun, 'id' | 'repo' | 'branch'>,
   place: Place,
   under: string,
 ): RunPlaceRead | Exclude<PlaceOutcome<'inventory'>, { answer: unknown }> {
-  const read = place.askNow('inventory', { repo: run.repo, under, prefix: `wf/${run.id}/`, base: run.branch });
+  const read = place.askNow('inventory', { repo: run.repo, under, run: run.id, base: run.branch });
   return 'answer' in read ? { place, say: place.declared.say, inventory: read.answer } : read;
 }
 
@@ -157,7 +174,7 @@ export const askRunPlace = (
   under: string,
 ): Effect.Effect<RunPlaceRead | Exclude<PlaceOutcome<'inventory'>, { answer: unknown }>> =>
   place
-    .ask('inventory', { repo: run.repo, under, prefix: `wf/${run.id}/`, base: run.branch })
+    .ask('inventory', { repo: run.repo, under, run: run.id, base: run.branch })
     .pipe(Effect.map((read) => ('answer' in read ? { place, say: place.declared.say, inventory: read.answer } : read)));
 
 /**

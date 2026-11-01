@@ -1,6 +1,6 @@
 /**
  * `standing`: where a repository's result branches stand against the base branch they land on, as a pass of the tick reads it. Takes `{
- * repo, branches: [{ branch, tip?, baseRef }], base }`; answers `Standing`: `heads`, every branch of the repository and its commit, and for
+ * repo, branches: [{ branch, tip?, baseRef }], base }`; answers `Standing`: `tips`, every branch of the repository and its commit, and for
  * each branch asked of, in the order asked, its tip, whether it is within `base` (`onBase`), whether the commit asked of holds work past
  * its run's `baseRef` (`pastBase`), and how many commits it is ahead of `base`.
  *
@@ -118,5 +118,5 @@ export function* standing({ repo, base, branches }: PlaceRequests['standing']): 
   if (typeof read === 'string') return refused(read);
   const stood: BranchStood[] = [];
   for (const one of branches) stood.push(yield* stoodOne(repo, base, one, read));
-  return { heads: read.heads, branches: stood };
+  return { tips: read.heads, branches: stood };
 }

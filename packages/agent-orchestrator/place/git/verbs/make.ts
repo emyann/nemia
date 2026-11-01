@@ -1,11 +1,12 @@
 /**
- * `make`: the workspace a step works in, cut for it — a worktree at `at` on a new branch `name` from `from`, or the one already there on
- * `name`, taken up where it stands, as a pass that died before filing the step left it. Each branch of `also` is merged into it, in order;
- * a merge that conflicts is left conflicted, markers and all, since resolving it is the step's work. Then what `.worktreeinclude` lists in
- * `repo` and git ignores there is copied in, never over a file already there, never from outside the repository, and never a
- * `node_modules`, which the orchestrator makes. Takes `{ repo, at, name, from, also }`; answers `{ workspace, branch, conflicts, notes }`:
- * `at`, `name`, the paths left unmerged, and what a person should hear of the copy and of a merge that failed. Refuses a `repo` that is
- * no directory, an `at` that holds a worktree on another branch, and a cut git will not make, in git's words.
+ * `make`: the workspace a step works in, cut for it — a worktree at `at` on a new branch `name`, the run's branch for the leaf
+ * (`runBranch`), from `from`, or the one already there on `name`, taken up where it stands, as a pass that died before filing the step left
+ * it. Each branch of `also` is merged into it, in order; a merge that conflicts is left conflicted, markers and all, since resolving it is
+ * the step's work. Then what `.worktreeinclude` lists in `repo` and git ignores there is copied in, never over a file already there, never
+ * from outside the repository, and never a `node_modules`, which the orchestrator makes. Takes `{ repo, at, run, leaf, from, also }`;
+ * answers `{ workspace, branch, conflicts, notes }`: `at`, `name`, the paths left unmerged, and what a person should hear of the copy and
+ * of a merge that failed. Refuses a `repo` that is no directory, an `at` that holds a worktree on another branch, and a cut git will not
+ * make, in git's words.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -17,6 +18,7 @@ import {
   readInclude,
   refusalLines,
   refused,
+  runBranch,
   type Asking,
   type Refusal,
   type Reply,
@@ -105,7 +107,8 @@ function* includeFiles(repo: string, at: string): Asking<string[]> {
 }
 
 /** The verb's body. */
-export function* make({ repo, at, name, from, also }: PlaceRequests['make']): Asking<Reply<'make'>> {
+export function* make({ repo, at, run, leaf, from, also }: PlaceRequests['make']): Asking<Reply<'make'>> {
+  const name = runBranch(run, leaf);
   if (!isDirectory(repo)) return refused(`${repo} is not a directory, so no workspace can be cut from it`);
   const there = yield* takenUp(at, name);
   if (typeof there === 'object') return there;

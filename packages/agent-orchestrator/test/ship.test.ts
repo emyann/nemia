@@ -795,7 +795,7 @@ test("a place that gives no reading of the checkout, or reads its merge as anoth
       ] as const) {
         const { repo, id, checkId, base } = await at.stagedAndSigned();
         settle(checkId, phase, undefined, exitCode);
-        const place = answeringPlace({ merging: 'other', conflicted: false, missing: [], head: base });
+        const place = answeringPlace({ merging: 'other', conflicted: false, missing: [], tip: base });
         assert.deepEqual(await landedThrough(e, id, place), { notes: [], landed: false }, phase);
         assert.equal(at.mergeHead(repo), true, `${phase}: neither committed nor aborted`);
         assert.equal(world().head(repo), base);

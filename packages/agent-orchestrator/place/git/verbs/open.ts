@@ -1,10 +1,10 @@
 /**
- * `open`: the repository a run starts in, read at `nemia start` (`openPlace` in `src/place/place.store.ts`) — the commit HEAD is at and
- * the branch it is on, and the file a merge staged there is named in. Takes `{ root, isolate }`; answers `{ repo, baseRef, branch, staged
- * }`, `repo` as given, `staged` the absolute path of the checkout's MERGE_HEAD, which is there exactly while a merge is in progress, and is
- * found where git keeps it in a linked worktree too. Refuses a `root` that is no directory, no git repository, or a repository with no
- * commit yet; and, for a run that cuts worktrees (`isolate`), a `.worktreeinclude` that is no file or has a line `make` would refuse as
- * written (`worktreeInclude`), each line named, before anything of the run is written.
+ * `open`: the repository a run starts in, read at `nemia start` (`openPlace` in `src/place/place.store.ts`) — the commit HEAD is at and the
+ * branch it is on, and the file a merge staged there is named in. Takes `{ root, isolate }`; answers `{ repo, baseRef, branch,
+ * inProgressFile }`, `repo` as given, `inProgressFile` the absolute path of the checkout's MERGE_HEAD, which is there exactly while a merge
+ * is in progress, and is found where git keeps it in a linked worktree too. Refuses a `root` that is no directory, no git repository, or a
+ * repository with no commit yet; and, for a run that cuts worktrees (`isolate`), a `.worktreeinclude` that is no file or has a line `make`
+ * would refuse as written (`worktreeInclude`), each line named, before anything of the run is written.
  */
 import path from 'node:path';
 import { git, gitSays, isDirectory, readInclude, refusalLines, refused, type Asking, type Reply } from '../git.ts';
@@ -29,5 +29,5 @@ export function* open({ root, isolate }: PlaceRequests['open']): Asking<Reply<'o
   const include = isolate ? includeRefusal(root) : undefined;
   if (include) return refused(include);
   const staged = path.resolve(root, yield* git(root, ['rev-parse', '--git-path', 'MERGE_HEAD']));
-  return { repo: root, baseRef, branch: yield* git(root, ['rev-parse', '--abbrev-ref', 'HEAD']), staged };
+  return { repo: root, baseRef, branch: yield* git(root, ['rev-parse', '--abbrev-ref', 'HEAD']), inProgressFile: staged };
 }

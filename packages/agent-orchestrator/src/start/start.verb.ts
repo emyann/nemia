@@ -397,7 +397,7 @@ const folderRun = Effect.fn('folderRun')(function* (id: string, told: Told, step
  */
 const repositoryRun = Effect.fn('repositoryRun')(function* (id: string, told: Told, steps: Run['steps'], repo: string, isolate: boolean) {
   const place = yield* PlaceService;
-  const { baseRef, branch, staged } = yield* tried(() => openPlace(place, repo, isolate));
+  const { baseRef, branch, inProgressFile: staged } = yield* tried(() => openPlace(place, repo, isolate));
   const git = yield* standingLiveOf(told.after ?? []);
   const refusedAfter = yield* tried(() => afterRefusal(told.after ?? [], { repo, branch }, (id) => parentRecord(id, git)));
   if (refusedAfter) return yield* Effect.fail(new Invalid({ message: refusedAfter }));

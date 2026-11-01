@@ -388,23 +388,21 @@ export function workspacePlan(steps: readonly Workflow[], step: Workflow): Works
   return siblings.length === 1 ? { kind: 'inherit', from: parent } : { kind: 'fork', from: parent };
 }
 
-/** The leaf a run's own line of work is cut under: `worktrees/<run>/run` on `wf/<run>/run`. */
+/** The leaf a run's own line of work is cut under: `worktrees/<run>/run`, on the branch its place names for that leaf. */
 export const LINE_NAME = 'run';
 
 /**
- * What a cut of `step` is called — the leaf under `worktrees/<run>/` and `wf/<run>/`. Pure, a function of the frozen step set alone, so a
- * pass that died halfway and a restart name the same cut the same way.
+ * What a cut of `step` is called — the leaf under `worktrees/<run>/`, which the core names; the branch is the place's to name, handed the
+ * run and the leaf (`make`), as the git place's `runBranch` does. Pure, a function of the frozen step set alone, so a pass that died
+ * halfway and a restart name the same cut the same way.
  *
  * A run's line of work is one workspace and one branch per card, named for the run and not for whichever step happened to cut it:
  * `LINE_NAME`. The line is the first step in the workflow's order that forks off the run's base ref (`{ kind: 'fork', from: null }`), and
- * every step that inherits from it stands in the same cut. So a person in the store, and a reader of a pull request on GitHub, see
- * `wf/<run>/run`: the card, and no step.
+ * every step that inherits from it stands in the same cut. So a person in the store, and a reader of a pull request, see the leaf `run`:
+ * the card, and no step.
  *
  * Every other cut keeps its step's name — a fork with a parent, a fan-in merge, and a second root of a run that starts wide — because
  * those are lines of work beside the run's own, and each needs a worktree and a branch of its own.
- *
- * The run's branch is not `wf/<run>`: git keeps refs as files, so a ref `wf/<run>` cannot sit beside the refs `wf/<run>/<step>` a fork
- * cuts. The leaf keeps both shapes under one directory and one ref prefix, which is what every reader of these names already keys on.
  */
 export function cutName(steps: readonly Workflow[], step: Workflow): string {
   const line = steps.find((s) => {

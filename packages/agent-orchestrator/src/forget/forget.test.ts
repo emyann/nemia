@@ -505,9 +505,8 @@ test('`forgetRefusal` says its reasons in one order — in flight, a merge stage
 test("`runWorktrees`, `heldWorktree` and `branchFates`: a run's worktrees, which a removal leaves, and what becomes of each branch", async (t) => {
   const atHeld = (p: string, more: Partial<Held> = {}): Held => ({
     path: p,
-    head: 'def',
-    detached: false,
-    prunable: false,
+    tip: 'def',
+    removable: 'yes',
     clean: true,
     onBranch: true,
     ...more,
@@ -518,8 +517,8 @@ test("`runWorktrees`, `heldWorktree` and `branchFates`: a run's worktrees, which
       const listed: Held[] = [
         atHeld('/repo', { branch: 'main' }),
         atHeld('/wf/worktrees/r-1/implement', { branch: 'wf/r-1/implement' }),
-        atHeld('/wf/worktrees/r-1/cut', { branch: 'wf/r-1/cut', locked: 'a person holds it', clean: null }),
-        atHeld('/wf/worktrees/r-1/lost', { detached: true, prunable: true, clean: null }),
+        atHeld('/wf/worktrees/r-1/cut', { branch: 'wf/r-1/cut', removable: 'held', heldBy: 'a person holds it', clean: null }),
+        atHeld('/wf/worktrees/r-1/lost', { removable: 'gone', onBranch: false, clean: null }),
         atHeld('/wf/worktrees/r-1-x2/implement', { branch: 'wf/r-1-x2/implement' }),
       ];
       const r = run(
@@ -553,24 +552,30 @@ test("`runWorktrees`, `heldWorktree` and `branchFates`: a run's worktrees, which
     },
   );
 
-  await t.test('REFUSED: `heldWorktree` leaves a locked worktree, and one on no branch unless clean on a branch already', () => {
-    const on: Held = { ...atHeld('/wf/worktrees/r-1/implement'), head: 'abc', branch: 'wf/r-1/implement', clean: false };
-    const detached: Held = { ...on, branch: undefined, detached: true, clean: true, onBranch: true };
+  await t.test('REFUSED: `heldWorktree` leaves a worktree someone holds, and one its place reads off its branch, named by its tip', () => {
+    const on: Held = { ...atHeld('/wf/worktrees/r-1/implement'), tip: 'abc', branch: 'wf/r-1/implement', clean: false };
     assert.equal(heldWorktree(on), null, 'what it holds uncommitted is handed off onto its branch');
-    assert.deepEqual(heldWorktree({ ...on, locked: '', clean: null }), { locked: '' });
-    assert.deepEqual(heldWorktree({ ...detached, locked: 'mine' }), { locked: 'mine' });
-    assert.deepEqual(heldWorktree({ ...detached, clean: null }), { detached: 'abc' }, 'its status not read: held');
-    assert.deepEqual(heldWorktree({ ...detached, onBranch: false }), { detached: 'abc' }, 'a commit on no branch');
-    assert.deepEqual(heldWorktree({ ...detached, clean: false }), { detached: 'abc' }, 'a hand-off would commit onto no branch');
-    assert.equal(heldWorktree(detached), null, 'nothing a removal loses');
+    assert.deepEqual(heldWorktree({ ...on, removable: 'held', heldBy: '', clean: null }), { heldBy: '' });
+    assert.deepEqual(heldWorktree({ ...on, removable: 'held', heldBy: 'mine', onBranch: false }), { heldBy: 'mine' }, 'held first');
+    assert.deepEqual(
+      heldWorktree({ ...on, branch: undefined, onBranch: false }),
+      { offBranch: 'abc' },
+      'a hand-off would commit onto no branch',
+    );
+    assert.deepEqual(heldWorktree({ ...on, tip: undefined, onBranch: false }), { offBranch: '' }, 'its tip unread: still held');
+    assert.equal(
+      heldWorktree({ ...on, branch: undefined, clean: true }),
+      null,
+      'on its branch as its place reads it: nothing a removal loses',
+    );
   });
 
   await t.test(
-    "`branchFates` keeps every branch unless asked; asked, deletes one merged and keeps one not unless forced — never the base, nor a run's whose id starts with this one's",
+    '`branchFates` keeps every branch its place lists for the run unless asked; asked, deletes one merged and keeps one not unless forced — never the base',
     () => {
-      const listed = ['main', 'wf/r-1/review', 'wf/r-1/implement', 'wf/r-1-x2/implement', 'wf/r-12/implement'];
+      const listed = ['main', 'wf/r-1/review', 'wf/r-1/implement'];
       const merged = (b: string) => b !== 'wf/r-1/review';
-      const r = { id: 'r-1' };
+      const r = { branch: 'main' };
       assert.deepEqual(branchFates(r, listed, merged), [
         { branch: 'wf/r-1/implement', deleted: false, why: 'default' },
         { branch: 'wf/r-1/review', deleted: false, why: 'default' },
@@ -679,7 +684,7 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       'no branch of its own',
     );
   });
-  await t.test("not forgotten: a worktree locked, one git would not remove, a stray, each with its fix; and the record's fate", () => {
+  await t.test("not forgotten: a worktree held, one git would not remove, a stray, each with its fix; and the record's fate", () => {
     const line = forgetLine({
       ...forgotten,
       kind: 'held',
@@ -689,7 +694,7 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       left: [
         {
           path: '/wf/worktrees/r-1/implement',
-          locked: 'a person holds it',
+          heldBy: 'a person holds it',
           fix: 'git -C /repo worktree unlock /wf/worktrees/r-1/implement',
         },
         {
@@ -703,7 +708,7 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
     inOrder(
       line,
       'r-1  not forgotten: ',
-      '/wf/worktrees/r-1/implement is locked (a person holds it)',
+      '/wf/worktrees/r-1/implement is held (a person holds it)',
       'git -C /repo worktree unlock /wf/worktrees/r-1/implement',
       "fatal: '/wf/worktrees/r-1/fix' contains modified or untracked files",
       'git -C /wf/worktrees/r-1/fix status',
@@ -722,7 +727,7 @@ test('`forgetLine` says in one line what happened to each run: forgotten, with w
       left: [
         {
           path: '/wf/worktrees/r-1/implement',
-          detached: '9d2bd34db7ead0116fa7062827675f3a801e940d',
+          offBranch: '9d2bd34db7ead0116fa7062827675f3a801e940d',
           fix: 'git -C /wf/worktrees/r-1/implement switch -c <branch>',
         },
         {

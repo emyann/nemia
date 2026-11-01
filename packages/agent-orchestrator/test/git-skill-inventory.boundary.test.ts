@@ -1,8 +1,9 @@
 /**
- * The git place's `inventory` and `remove` (`place/git/verbs/`), asked of `gitPlace` against scratch repositories: what a run
- * left, read — each worktree inside `under` with its lock, its detached HEAD, whether git could prune it, what it holds uncommitted and
- * whether its HEAD is on a branch, and each branch under the prefix with whether it is merged — and taken away, never forced. Each with an
- * answer, a refusal or an empty answer, and an unread outcome, which is never an empty one. Git runs with no user or system configuration
+ * The git place's `inventory` and `remove` (`place/git/verbs/`), asked of `gitPlace` against scratch repositories: what a run left, read —
+ * each worktree inside `under` with its tip, whether it may be removed (held by its lock, gone where git could prune it), what it holds
+ * uncommitted and whether its work is on a branch, and each branch of the run with whether it is merged — and taken away, never forced.
+ * Each with an answer, a refusal or an empty answer, and an unread outcome, which is never an empty one. Git runs with no user or system
+ * configuration
  * and a fixed identity, so a machine's hooks, default branch or signing change nothing here.
  */
 import { test } from 'node:test';
@@ -56,9 +57,9 @@ function unreadOf(outcome: PlaceOutcome<PlaceVerb>): string {
 
 /**
  * A repository with a run's worktrees under `<repo>-wt/x`: `a` clean on `wf/x/a`; `b` on `wf/x/b`, locked with a reason that has spaces;
- * `c` detached at main's commit, which is on a branch; `d` detached at a commit made there, on none; `e` on `wf/x/e` with a change to `f`
- * and a new file; `p` on `wf/x/p`, its directory gone; and one outside `under`. Branches: `wf/x/ahead` with a commit main has not,
- * `wf/y/a` and `other` outside the prefix.
+ * `c` detached at main's commit, which is on a branch; `d` detached at a commit made there, on none; `g` detached at main's commit with a
+ * change to `f`; `e` on `wf/x/e` with a change to `f` and a new file; `p` on `wf/x/p`, its directory gone; and one outside `under`.
+ * Branches: `wf/x/ahead` with a commit main has not, `wf/y/a`, another run's, and `other`.
  */
 function aRun() {
   const repo = repository();
@@ -72,6 +73,8 @@ function aRun() {
   fs.writeFileSync(path.join(at('d'), 'rebased'), 'rebased\n');
   git(at('d'), 'add', '-A');
   git(at('d'), 'commit', '-q', '-m', 'made on no branch');
+  git(repo, 'worktree', 'add', '-q', '--detach', at('g'), 'main');
+  fs.writeFileSync(path.join(at('g'), 'f'), 'changed\n');
   git(repo, 'worktree', 'add', '-q', '-b', 'wf/x/e', at('e'));
   fs.writeFileSync(path.join(at('e'), 'f'), 'changed\n');
   fs.writeFileSync(path.join(at('e'), 'new.txt'), 'new\n');
@@ -89,34 +92,17 @@ function aRun() {
   return { repo, under, at, main: git(repo, 'rev-parse', 'main'), d: git(at('d'), 'rev-parse', 'HEAD') };
 }
 
-test('inventory answers the worktrees inside `under` as git lists them, and the branches under the prefix with whether each is merged into the base', () => {
+test("inventory answers the worktrees inside `under` as git lists them, and the run's branches with whether each is merged into the base", () => {
   const r = aRun();
-  const answer = answerOf(run('inventory', { repo: r.repo, under: r.under, prefix: 'wf/x/', base: 'main' }));
+  const answer = answerOf(run('inventory', { repo: r.repo, under: r.under, run: 'x', base: 'main' }));
   assert.deepEqual(answer.workspaces, [
-    { path: r.at('a'), head: r.main, branch: 'wf/x/a', detached: false, prunable: false, clean: true, onBranch: true },
-    {
-      path: r.at('b'),
-      head: r.main,
-      branch: 'wf/x/b',
-      detached: false,
-      locked: 'a person holds it',
-      prunable: false,
-      clean: null,
-      onBranch: true,
-    },
-    { path: r.at('c'), head: r.main, detached: true, prunable: false, clean: true, onBranch: true },
-    { path: r.at('d'), head: r.d, detached: true, prunable: false, clean: true, onBranch: false },
-    {
-      path: r.at('e'),
-      head: r.main,
-      branch: 'wf/x/e',
-      detached: false,
-      prunable: false,
-      clean: false,
-      onBranch: true,
-      changes: ['f', 'new.txt'],
-    },
-    { path: r.at('p'), head: r.main, branch: 'wf/x/p', detached: false, prunable: true, clean: null, onBranch: true },
+    { path: r.at('a'), tip: r.main, branch: 'wf/x/a', removable: 'yes', clean: true, onBranch: true },
+    { path: r.at('b'), tip: r.main, branch: 'wf/x/b', removable: 'held', heldBy: 'a person holds it', clean: null, onBranch: true },
+    { path: r.at('c'), tip: r.main, removable: 'yes', clean: true, onBranch: true },
+    { path: r.at('d'), tip: r.d, removable: 'yes', clean: true, onBranch: false },
+    { path: r.at('e'), tip: r.main, branch: 'wf/x/e', removable: 'yes', clean: false, onBranch: true, changes: ['f', 'new.txt'] },
+    { path: r.at('g'), tip: r.main, removable: 'yes', clean: false, onBranch: false, changes: ['f'] },
+    { path: r.at('p'), tip: r.main, branch: 'wf/x/p', removable: 'gone', clean: null, onBranch: true },
   ]);
   assert.deepEqual(answer.branches, [
     { branch: 'wf/x/a', merged: true },
@@ -135,7 +121,7 @@ test('inventory reads `under` through its links, as git names a worktree, and ne
   git(repo, 'worktree', 'add', '-q', '-b', 'wf/x/a', path.join(real, 'x', 'a'));
   const link = `${repo}-link`;
   fs.symlinkSync(real, link);
-  const answer = answerOf(run('inventory', { repo, under: path.join(link, 'x'), prefix: 'wf/x/', base: 'main' }));
+  const answer = answerOf(run('inventory', { repo, under: path.join(link, 'x'), run: 'x', base: 'main' }));
   assert.deepEqual(
     answer.workspaces.map((w) => w.path),
     [path.join(real, 'x', 'a')],
@@ -144,7 +130,7 @@ test('inventory reads `under` through its links, as git names a worktree, and ne
 
 test('inventory answers nothing left of a repository that is no directory: the run is forgotten with no worktree and no branch', () => {
   const gone = path.join(scratch('wf-git-inventory-gone-'), 'repo');
-  assert.deepEqual(answerOf(run('inventory', { repo: gone, under: gone, prefix: 'wf/x/', base: 'main' })), {
+  assert.deepEqual(answerOf(run('inventory', { repo: gone, under: gone, run: 'x', base: 'main' })), {
     workspaces: [],
     branches: [],
   });
@@ -152,7 +138,7 @@ test('inventory answers nothing left of a repository that is no directory: the r
 
 test('REFUSED as unread, never as nothing to remove: an inventory of a directory git cannot list as a repository', () => {
   const plain = scratch('wf-git-inventory-plain-');
-  const outcome = run('inventory', { repo: plain, under: path.join(plain, 'x'), prefix: 'wf/x/', base: 'main' });
+  const outcome = run('inventory', { repo: plain, under: path.join(plain, 'x'), run: 'x', base: 'main' });
   assert.ok(!('answer' in outcome), `no answer, empty or not: ${JSON.stringify(outcome)}`);
   assert.equal(
     unreadOf(outcome),
@@ -165,7 +151,7 @@ test('REFUSED as unread, never as nothing to remove: an inventory of a directory
 test('inventory and remove are unread for a request they cannot read', () => {
   assert.equal(
     unreadOf(run('inventory', { repo: '/', under: '/', base: 'main' })),
-    "the request's `prefix` is missing, where a string is asked",
+    "the request's `run` is missing, where a string is asked",
   );
   assert.equal(
     unreadOf(run('remove', { repo: '/', workspaces: '/w', branches: [] })),

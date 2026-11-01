@@ -6,7 +6,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkoutLine, checkoutWord, filedAllows, landedWords, landingDue, landingOpen, type MergeState } from './ending.ts';
+import { checkoutLine, checkoutWord, filedAllows, landedWords, landingDue, landingOpen } from './ending.ts';
+import type { MergeState } from '../place/place.ts';
 import type { RepositoryRun, Run, StepRecord, TaskPhase } from '../run.ts';
 import type { StepStatus } from '../record/record.ts';
 import type { Verdict } from '../check/check.ts';
@@ -52,9 +53,9 @@ const atLanding = (rest: Partial<RepositoryRun> = {}, ship: Partial<StepRecord> 
     ship: { taskId: 't-ship', check: { taskId: 't-ship-check' }, ...ship },
   },
 });
-const STAGED: MergeState = { merging: 'ours', conflicted: false, missing: [], head: 'base000' };
-const ON_HEAD: MergeState = { merging: 'none', conflicted: false, missing: [], head: 'merged0' };
-const NOT_STAGED: MergeState = { merging: 'none', conflicted: false, missing: ['wf/r-1/implement'], head: 'base000' };
+const STAGED: MergeState = { merging: 'ours', conflicted: false, missing: [], tip: 'base000' };
+const ON_HEAD: MergeState = { merging: 'none', conflicted: false, missing: [], tip: 'merged0' };
+const NOT_STAGED: MergeState = { merging: 'none', conflicted: false, missing: ['wf/r-1/implement'], tip: 'base000' };
 const CALLED_OFF = { cancelledAt: '2026-01-01T01:00:00Z' };
 /** The run `r` with ship's check unfiled where `check` is not given: its record has none. */
 const filedTo = (r: Run, check: TaskPhase | undefined): Run => {
@@ -118,7 +119,7 @@ test('landingDue commits, aborts, waits or records', async (t) => {
     },
   );
 
-  const { head: _, ...headless } = STAGED;
+  const { tip: _, ...headless } = STAGED;
   const aborts: Array<[string, () => unknown, object]> = [
     [
       'a check that refused names the base it was staged on, for `nemia refresh --base`',

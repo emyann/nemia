@@ -125,7 +125,7 @@ test('both ways of asking answer the same, and a verb that throws is unread in o
   const now = place.askNow('open', { root, isolate: false });
   assert.deepEqual(await Effect.runPromise(place.ask('open', { root, isolate: false })), now);
   const none = scratch('wf-test-place-none-');
-  const request = { repo: none, under: none, prefix: 'wf/x/', base: 'main' };
+  const request = { repo: none, under: none, run: 'x', base: 'main' };
   const unread = place.askNow('inventory', request);
   assert.ok('unread' in unread, JSON.stringify(unread));
   assert.equal(unread.unread.verb, 'inventory');

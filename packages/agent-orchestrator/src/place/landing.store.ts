@@ -8,12 +8,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { Effect } from 'effect';
-import type { MergeState } from '../ending/ending.ts';
 import type { LandingWords } from '../check/check.ts';
 import { resultBranches } from '../branches/branches.store.ts';
 import { resultTips } from '../branches/index.ts';
 import { isRepositoryRun, type RepositoryRun, type Run } from '../record/record.ts';
-import type { PlaceOutcome, PlaceSay } from './place.ts';
+import type { MergeState, PlaceOutcome, PlaceSay } from './place.ts';
 import { landsOnCheck } from '../status/status.ts';
 import type { Workflow } from '../step/step.ts';
 import type { Place } from './place.store.ts';
@@ -65,8 +64,8 @@ function readOf(outcome: PlaceOutcome<'status'>): CheckoutRead {
 }
 
 /** What `place` says of `checkout` against `tips`, or why it said nothing. */
-const statusRead = (place: Place, checkout: string, tips: Readonly<Record<string, string>>): CheckoutRead =>
-  readOf(place.askNow('status', { checkout, tips }));
+const statusRead = (place: Place, repo: string, tips: Readonly<Record<string, string>>): CheckoutRead =>
+  readOf(place.askNow('status', { repo, tips }));
 
 /**
  * `checkoutStatus`, asked off the loop (`ask`) and kept in `memo`, so the `checkoutStatus` that follows it for the same run answers
@@ -76,7 +75,7 @@ export const askCheckoutStatus = (run: RepositoryRun, memo: StatusMemo): Effect.
   const key = JSON.stringify([path.resolve(run.repo), run.id]);
   const known = memo.reads.get(key);
   if (known) return Effect.succeed(known);
-  return memo.place.ask('status', { checkout: run.repo, tips: resultTips(run, resultBranches(run), memo.heads(run)) }).pipe(
+  return memo.place.ask('status', { repo: run.repo, tips: resultTips(run, resultBranches(run), memo.heads(run)) }).pipe(
     Effect.map((outcome) => {
       const read = readOf(outcome);
       memo.reads.set(key, read);
@@ -120,7 +119,7 @@ export function landThrough(
   memo: StatusMemo,
 ): LandedThrough {
   memo.reads.clear();
-  const outcome = memo.place.askNow('land', { checkout: run.repo, ...act });
+  const outcome = memo.place.askNow('land', { repo: run.repo, ...act });
   if ('answer' in outcome) return outcome.answer;
   if ('refused' in outcome) return { refused: outcome.refused };
   return { unread: `the place's land was not heard: ${outcome.unread.said}` };

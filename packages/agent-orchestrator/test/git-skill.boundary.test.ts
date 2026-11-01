@@ -89,9 +89,9 @@ function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>): Extract<PlaceO
 
 /** The file `open` names for a merge staged in the checkout `root`, or a failure where it names none. */
 function stagedOf(root: string): string {
-  const { staged } = answerOf(run('open', { root, isolate: true }));
-  assert.ok(staged !== undefined, `open named no staged-merge file for ${root}`);
-  return staged;
+  const { inProgressFile } = answerOf(run('open', { root, isolate: true }));
+  assert.ok(inProgressFile !== undefined, `open named no file of a merge in progress for ${root}`);
+  return inProgressFile;
 }
 
 /** The words of a refusal, or a failure naming what it was instead. */
@@ -191,7 +191,7 @@ test('open answers the repository as given, the commit HEAD is at, the branch it
     repo: dir,
     baseRef: git(dir, 'rev-parse', 'HEAD'),
     branch: 'main',
-    staged: path.join(dir, '.git', 'MERGE_HEAD'),
+    inProgressFile: path.join(dir, '.git', 'MERGE_HEAD'),
   });
 });
 
@@ -217,11 +217,11 @@ test("the place's stage words, run as said with the checkout and the branches fi
   const said = gitPlace().declared.say.stage.replaceAll('{repo}', dir).replaceAll('{branches}', 'wf/x/a wf/x/b');
   const ran = spawnSync('sh', ['-c', said], { env: ENV, encoding: 'utf8' });
   assert.equal(ran.status, 0, ran.stderr);
-  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': a, 'wf/x/b': b } })), {
+  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': a, 'wf/x/b': b } })), {
     merging: 'ours',
     conflicted: false,
     missing: [],
-    head: git(dir, 'rev-parse', 'HEAD'),
+    tip: git(dir, 'rev-parse', 'HEAD'),
   });
   assert.equal(fs.existsSync(stagedOf(dir)), true, "and open's file says it");
 });
@@ -314,40 +314,40 @@ test('handoff is unread for a request with no step', () => {
 test('status of a checkout merging nothing: none, nothing unmerged, and a tip not on HEAD is missing', () => {
   const dir = repository();
   const head = git(dir, 'rev-parse', 'HEAD');
-  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: {} })), { merging: 'none', conflicted: false, missing: [], head });
+  assert.deepEqual(answerOf(run('status', { repo: dir, tips: {} })), { merging: 'none', conflicted: false, missing: [], tip: head });
   const tip = branched(dir, 'wf/x/b', 'g', 'b\n');
-  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/b': tip } })), {
+  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/b': tip } })), {
     merging: 'none',
     conflicted: false,
     missing: ['wf/x/b'],
-    head,
+    tip: head,
   });
   git(dir, 'merge', '-q', '--no-ff', '-m', 'land b', 'wf/x/b');
-  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/b': tip } })).missing, []);
+  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/b': tip } })).missing, []);
 });
 
 test("status of a clean merge staged: ours when it merges the run's tips, other when it merges anything else", () => {
   const dir = repository();
   const tip = staged(dir);
   const head = git(dir, 'rev-parse', 'HEAD');
-  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })), {
+  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })), {
     merging: 'ours',
     conflicted: false,
     missing: [],
-    head,
+    tip: head,
   });
-  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/c': head } })).merging, 'other');
+  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/c': head } })).merging, 'other');
 });
 
 test('status of a merge that conflicts: conflicted, read off the index even while a lock is held on it', () => {
   const dir = repository();
   const tip = conflicted(dir);
   const head = git(dir, 'rev-parse', 'HEAD');
-  const want = { merging: 'ours', conflicted: true, missing: [], head };
-  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })), want);
+  const want = { merging: 'ours', conflicted: true, missing: [], tip: head };
+  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })), want);
   const lock = path.join(dir, '.git', 'index.lock');
   fs.writeFileSync(lock, '');
-  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })), want);
+  assert.deepEqual(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })), want);
   assert.ok(fs.existsSync(lock), 'the lock is still the one planted');
 });
 
@@ -358,7 +358,7 @@ test('status writes nothing to the index of a checkout a person works in, where 
   fs.utimesSync(path.join(dir, 'g'), later, later);
   const index = path.join(dir, '.git', 'index');
   const before = fs.readFileSync(index);
-  assert.equal(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })).conflicted, true);
+  assert.equal(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })).conflicted, true);
   assert.deepEqual(fs.readFileSync(index), before);
   git(dir, 'diff', '--quiet', 'HEAD', '--', 'g');
   assert.notDeepEqual(fs.readFileSync(index), before, 'a diff does refresh it, so the comparison above can fail');
@@ -370,21 +370,18 @@ test('status reads a worktree, whose MERGE_HEAD is not under its own folder', ()
   const tree = path.join(scratch('wf-git-skill-tree-'), 'w');
   git(dir, 'worktree', 'add', '-q', '-b', 'ship', tree, 'main');
   git(tree, 'merge', '-q', '--no-ff', '--no-commit', 'wf/x/a');
-  assert.equal(answerOf(run('status', { checkout: tree, tips: { 'wf/x/a': tip } })).merging, 'ours');
-  assert.equal(answerOf(run('status', { checkout: dir, tips: { 'wf/x/a': tip } })).merging, 'none');
+  assert.equal(answerOf(run('status', { repo: tree, tips: { 'wf/x/a': tip } })).merging, 'ours');
+  assert.equal(answerOf(run('status', { repo: dir, tips: { 'wf/x/a': tip } })).merging, 'none');
 });
 
 test('REFUSED: status of a checkout that is no repository', () => {
   const plain = scratch('wf-git-skill-plain-');
-  assert.equal(
-    refusalOf(run('status', { checkout: plain, tips: {} })),
-    `${plain} is not a git repository, so no merge can be staged there`,
-  );
+  assert.equal(refusalOf(run('status', { repo: plain, tips: {} })), `${plain} is not a git repository, so no merge can be staged there`);
 });
 
 test('status is unread when its tips are not an object of strings', () => {
   assert.equal(
-    unreadOf(run('status', { checkout: '/', tips: ['wf/x/a'] })),
+    unreadOf(run('status', { repo: '/', tips: ['wf/x/a'] })),
     'the request\'s `tips` is ["wf/x/a"], where an object of strings is asked',
   );
 });
@@ -393,7 +390,7 @@ test('land commits a staged merge with the message given, and answers the commit
   const dir = repository();
   const tip = staged(dir);
   const before = git(dir, 'rev-parse', 'HEAD');
-  const { commit } = answerOf(run('land', { checkout: dir, act: 'commit', message: 'Land wf/x/a\n\nIt passed its check.' })) as {
+  const { commit } = answerOf(run('land', { repo: dir, act: 'commit', message: 'Land wf/x/a\n\nIt passed its check.' })) as {
     commit: string;
   };
   assert.equal(commit, git(dir, 'rev-parse', 'HEAD'));
@@ -447,12 +444,12 @@ test('a land held past its deadline by a hook leaves the hook running nowhere, t
       return { dir, marker, hook };
     },
     ({ dir }, deadlineMs) =>
-      gitPlace({ env: ENV }).askNow('land', { checkout: dir, act: 'commit', message: 'm' }, { deadlineMs, graceMs: GRACE_MS }),
+      gitPlace({ env: ENV }).askNow('land', { repo: dir, act: 'commit', message: 'm' }, { deadlineMs, graceMs: GRACE_MS }),
   );
   assert.ok(unreadOf(outcome).startsWith(stoppedAt(deadlineMs)), unreadOf(outcome));
   assert.deepEqual(running(made.hook), [], 'the hook runs no more');
   assert.equal(merging(made.dir), true, 'the merge is still staged');
-  assert.deepEqual(answerOf(run('land', { checkout: made.dir, act: 'abort' })), { aborted: true });
+  assert.deepEqual(answerOf(run('land', { repo: made.dir, act: 'abort' })), { aborted: true });
 });
 
 test('a handoff held past its deadline by a clean filter leaves no index.lock, and the next verb answers', (t) => {
@@ -481,11 +478,11 @@ test('a handoff held past its deadline by a clean filter leaves no index.lock, a
   assert.equal(fs.existsSync(path.join(dir, '.git', 'index.lock')), false, 'the lock is gone');
   assert.deepEqual(running(filter), [], 'the filter runs no more');
   git(dir, 'config', '--unset', 'filter.held.clean');
-  assert.deepEqual(answerOf(run('status', { checkout: dir, tips: {} })), {
+  assert.deepEqual(answerOf(run('status', { repo: dir, tips: {} })), {
     merging: 'none',
     conflicted: false,
     missing: [],
-    head: git(dir, 'rev-parse', 'HEAD'),
+    tip: git(dir, 'rev-parse', 'HEAD'),
   });
 });
 
@@ -545,7 +542,7 @@ test('land aborts a merge that conflicts, and leaves the checkout at ours', () =
   const dir = repository();
   conflicted(dir);
   const head = git(dir, 'rev-parse', 'HEAD');
-  assert.deepEqual(answerOf(run('land', { checkout: dir, act: 'abort' })), { aborted: true });
+  assert.deepEqual(answerOf(run('land', { repo: dir, act: 'abort' })), { aborted: true });
   assert.equal(merging(dir), false);
   assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
   assert.equal(fs.readFileSync(path.join(dir, 'f'), 'utf8'), 'ours\n');
@@ -556,19 +553,19 @@ test('REFUSED: land with no merge in progress, either act, and a commit git will
   const dir = repository();
   const head = git(dir, 'rev-parse', 'HEAD');
   assert.equal(
-    refusalOf(run('land', { checkout: dir, act: 'commit', message: 'm' })),
+    refusalOf(run('land', { repo: dir, act: 'commit', message: 'm' })),
     `no merge is in progress in ${dir}, so there is none to commit`,
   );
-  assert.equal(refusalOf(run('land', { checkout: dir, act: 'abort' })), `no merge is in progress in ${dir}, so there is none to abort`);
+  assert.equal(refusalOf(run('land', { repo: dir, act: 'abort' })), `no merge is in progress in ${dir}, so there is none to abort`);
   assert.equal(git(dir, 'rev-parse', 'HEAD'), head);
   conflicted(dir);
-  assert.match(refusalOf(run('land', { checkout: dir, act: 'commit', message: 'm' })), /unmerged/);
+  assert.match(refusalOf(run('land', { repo: dir, act: 'commit', message: 'm' })), /unmerged/);
   assert.equal(merging(dir), true, 'the merge is left for the abort');
 });
 
 test('land is unread for an act it does not know, and for a commit with no message', () => {
-  assert.equal(unreadOf(run('land', { checkout: '/', act: 'push' })), 'the request\'s `act` is "push", where commit or abort is asked');
-  assert.equal(unreadOf(run('land', { checkout: '/', act: 'commit' })), "the request's `message` is missing, where a string is asked");
+  assert.equal(unreadOf(run('land', { repo: '/', act: 'push' })), 'the request\'s `act` is "push", where commit or abort is asked');
+  assert.equal(unreadOf(run('land', { repo: '/', act: 'commit' })), "the request's `message` is missing, where a string is asked");
 });
 
 /** Every ref of `dir` with its commit, HEAD and what the checkout and index hold: what a trial merge must leave as it was. */

@@ -341,21 +341,20 @@ test('the place reads the checkout as a landing needs it: whose merge is staged,
     assert.ok('answer' in outcome, `${verb} answered: ${JSON.stringify(outcome)}`);
     return outcome.answer;
   };
-  const status = (checkout: string, tips: Record<string, string>) => answered('status', { checkout, tips });
-  const land = (checkout: string, act: { act: 'commit'; message: string } | { act: 'abort' }) =>
-    placed.askNow('land', { checkout, ...act });
-  const stagedIn = (root: string) => ({ stagedFile: answered('open', { root, isolate: false }).staged });
+  const status = (repo: string, tips: Record<string, string>) => answered('status', { repo, tips });
+  const land = (repo: string, act: { act: 'commit'; message: string } | { act: 'abort' }) => placed.askNow('land', { repo, ...act });
+  const stagedIn = (root: string) => ({ stagedFile: answered('open', { root, isolate: false }).inProgressFile });
   const a = branch('wf/r/a', 'a.ts', 'a\n');
   const b = branch('wf/r/b', 'b.ts', 'b\n');
   const base = git(repo, 'rev-parse', 'HEAD');
   const tips = { 'wf/r/a': a, 'wf/r/b': b };
   const marker = stagedIn(repo);
-  assert.deepEqual(status(repo, tips), { merging: 'none', conflicted: false, missing: ['wf/r/a', 'wf/r/b'], head: base });
+  assert.deepEqual(status(repo, tips), { merging: 'none', conflicted: false, missing: ['wf/r/a', 'wf/r/b'], tip: base });
   assert.equal(stagedHere(marker), false);
 
   git(repo, 'merge', '--no-ff', '--no-commit', 'wf/r/a');
   assert.equal(stagedHere(marker), true, 'read off the file open named alone, which is all a pass asks of a checkout with no landing due');
-  assert.deepEqual(status(repo, tips), { merging: 'ours', conflicted: false, missing: ['wf/r/b'], head: base }, 'one branch of two staged');
+  assert.deepEqual(status(repo, tips), { merging: 'ours', conflicted: false, missing: ['wf/r/b'], tip: base }, 'one branch of two staged');
   assert.equal(status(repo, { 'wf/r/b': b }).merging, 'other', "a merge of a commit that is not one of the run's tips is another's");
   assert.deepEqual(land(repo, { act: 'abort' }), { answer: { aborted: true } });
   assert.equal(git(repo, 'status', '--porcelain'), '');
@@ -364,12 +363,12 @@ test('the place reads the checkout as a landing needs it: whose merge is staged,
   assert.match(nothing.refused, /MERGE_HEAD|no merge/i, "and says why, in git's words");
 
   git(repo, 'merge', '--no-ff', '--no-commit', 'wf/r/a', 'wf/r/b');
-  assert.deepEqual(status(repo, tips), { merging: 'ours', conflicted: false, missing: [], head: base });
+  assert.deepEqual(status(repo, tips), { merging: 'ours', conflicted: false, missing: [], tip: base });
   const made = land(repo, { act: 'commit', message: 'Add a and b\n\nboth.\n' });
   assert.ok('answer' in made && 'commit' in made.answer);
   assert.equal(git(repo, 'log', '-1', '--format=%B'), 'Add a and b\n\nboth.');
   assert.equal(git(repo, 'log', '-1', '--format=%P').split(' ').length, 3, 'an octopus of the base and both tips');
-  assert.deepEqual(status(repo, tips), { merging: 'none', conflicted: false, missing: [], head: made.answer.commit }, 'both on HEAD');
+  assert.deepEqual(status(repo, tips), { merging: 'none', conflicted: false, missing: [], tip: made.answer.commit }, 'both on HEAD');
 
   const c1 = branch('wf/r/c1', 'c.ts', 'one\n');
   const c2 = branch('wf/r/c2', 'c.ts', 'two\n');

@@ -145,7 +145,9 @@ export const CARD_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: [true, false, null],
     },
   ],
-  'cards.where': [{ name: 'its file in the inbox', walk: ({ door }) => done(door.cards.where(nameOf('an-idea'))), says: '<root>/inbox/an-idea.md' }],
+  'cards.where': [
+    { name: 'its file in the inbox', walk: ({ door }) => done(door.cards.where(nameOf('an-idea'))), says: '<root>/inbox/an-idea.md' },
+  ],
   'tries.list': [
     { name: 'none with no try', walk: ({ door }) => done(door.tries.list()), says: {} },
     {

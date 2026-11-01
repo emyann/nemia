@@ -8,7 +8,7 @@ import { Effect } from 'effect';
 import { tried } from '../runtime-client.ts';
 import { type Acceptance, type Run } from '../record/record.ts';
 import { type RoundAsk } from '../status/status.ts';
-import { acceptAsk, roundAsk } from './round.ts';
+import { acceptAsk, acceptWordsRefusal, roundAsk } from './round.ts';
 import { stepsOf } from '../record/record.store.ts';
 import { runStore } from '../record/files.store.ts';
 import { strayAsk } from '../say/say.verb.ts';
@@ -92,7 +92,8 @@ export const acceptRun = Effect.fn('accept')(function* (id: string, stepName?: s
 
   const first = answer(run, (yield* (yield* RunDoor).asks.read(RunId.read(id))).rounds);
   if ('refusal' in first) return yield* Effect.fail(new Conflict({ message: first.refusal }));
-  const acceptance: Acceptance = { step: first.step, try: first.try, at: new Date().toISOString(), message: message! };
+  if (message === undefined) return yield* Effect.fail(new Conflict({ message: acceptWordsRefusal(message, `nemia approve ${id}`) ?? '' }));
+  const acceptance: Acceptance = { step: first.step, try: first.try, at: new Date().toISOString(), message };
   const written = yield* (yield* RunDoor).asks.write(RunId.read(id), { kind: 'approve', of: 'loop', ask: acceptance });
   const file = written.where;
   if (!written.written) {

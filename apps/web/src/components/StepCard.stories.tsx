@@ -16,13 +16,13 @@ const facts = (effort: string, context: string, permission: string): StepCardFac
   { key: 'Permission', value: permission },
 ];
 
-const SELDON = { name: 'Seldon', initial: 'S', role: 'Software architect' };
+const DESIGNER = { name: 'Designer', initial: 'D', role: 'Software architect' };
 
 const AT_WORK: StepCardFacts = {
   kind: 'work',
   hue: 'alive',
   tag: { word: PERSON.working.rail, color: 'secondary', variant: 'tonal' },
-  agent: { name: 'Ada', initial: 'A', role: 'Software engineer' },
+  agent: { name: 'Implementer', initial: 'I', role: 'Software engineer' },
   step: 'implement',
   place: 'try 1 · round 1 of 3',
   time: { label: 'At work', value: '9m', note: 'since 7:55 PM', ink: 'alive' },
@@ -36,7 +36,7 @@ const AT_A_GATE: StepCardFacts = {
   kind: 'gate',
   hue: 'yours',
   tag: { word: PERSON['awaiting-approval'].rail, color: 'primary', variant: 'filled' },
-  agent: SELDON,
+  agent: DESIGNER,
   step: 'design',
   place: 'try 1',
   time: { label: 'Waiting', value: '6m', note: 'since 7:41 PM', ink: 'yours' },
@@ -62,7 +62,7 @@ const TO_COME: StepCardFacts = {
   kind: 'come',
   hue: 'none',
   tag: { word: PERSON.waiting.rail, color: 'secondary', variant: 'outlined' },
-  agent: { name: 'Agora', initial: 'A', role: 'Code reviewer' },
+  agent: { name: 'Reviewer', initial: 'R', role: 'Code reviewer' },
   step: 'review',
   place: 'up to 3 rounds',
   time: { label: 'Starts', value: 'after implement', note: '', ink: 'muted' },
@@ -76,7 +76,7 @@ const FAILED: StepCardFacts = {
   kind: 'failed',
   hue: 'none',
   tag: { word: PERSON['failed-check'].rail, color: 'error', variant: 'tonal' },
-  agent: { name: 'Otto', initial: 'O', role: 'Release engineer' },
+  agent: { name: 'Shipper', initial: 'S', role: 'Release engineer' },
   step: 'land',
   place: 'try 1',
   time: { label: 'Failed', value: '7:57 PM', note: 'ran 4m', ink: 'failure' },

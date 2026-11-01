@@ -118,7 +118,10 @@ function CompactSkill({ skill }: { skill: AgentSkill }) {
   );
 }
 
-/** An agent's name as a person's: its file's name, first letter up and dashes as spaces — `iris` is Iris, `note-writer` Note writer. */
+/**
+ * An agent's name as a person's: its file's name, first letter up and dashes as spaces — `reviewer` is Reviewer, `note-writer` Note
+ * writer.
+ */
 export const personOf = (name: string): string => {
   const spaced = name.replaceAll('-', ' ');
   return spaced.charAt(0).toUpperCase() + spaced.slice(1);

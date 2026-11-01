@@ -239,7 +239,7 @@ export function readOnlyCommands<T extends Dated & { measured: readonly string[]
 const ON_THE_FENCED =
   "Not named by the unfenced measurement. The fenced reviewer had it the same day, and `tools:` only narrows the harness's own set.";
 /** Why Edit and Write are taken to be in it: nothing measured names them. */
-const EDITS_WITH = 'Not named by any measurement. Every implement step of this repository, filed with no `tools:`, changes files with it.';
+const EDITS_WITH = 'Not named by any measurement. A step filed with no `tools:` changes files with it.';
 
 /**
  * What a Claude Code step with no `tools:` has: the harness's own set, as measured — `claude -p` spawned with the engine's flags, as an

@@ -428,13 +428,16 @@ files need each other's values, and no file or folder is named `utils`, `helpers
 Codex's and Anthropic's names, and the runtime's own permission modes and sandboxes but the plain English ones — stay in
 packages/agent-runtime: not in the orchestrator's `src` and `bin`, `apps/api/src` or `apps/web/src`. A workflow's words — a workflow,
 a step, a gate, a factory, a closeout, the orchestrator, `wf` and Nemia — stay out of the runtime's `src` and `bin`. This repository's
-team, the agents of `workflows/agents/`, stays out of every package's `src`. A word is matched whole and in any case, comments
+team — the agents of `workflows/agents/` and the owner's factory, `pipao` — stays out of every package's `src`, `test`, `bin` and
+`place` and every app's `src` and `test`, tests included, so that no product test passes only with the team present; nor does any of
+them name a path into the team's `workflows/` (a folder of its workflows, or the checkout's `workflows/` reached from its root). Those
+two are counted in `packages/agent-orchestrator/test/team-names.baseline.ts`, each entry naming the move that clears it. A word is matched whole and in any case, comments
 included. Each file that says one today is counted, and the count only shrinks. Each context lists its own words in a
 `glossary.json` at its door, a word and the spellings it retired, and `tools/guards/test/glossary.test.ts` counts each retired spelling
 under its table's paths the same way.
 
 Each rule's test first refuses planted source that breaks it, so none can pass by reading nothing. The contract tests
 read every file git lists outside their package; `turbo.json` makes the apps' `src` and `test`, for the runtime the apps' root
-`.ts` files and the orchestrator's source and tests, and for the orchestrator `workflows/agents/`, inputs of their package's test (`tools/guards/test/turbo-inputs.test.ts`),
+`.ts` files and the orchestrator's source and tests, and for the orchestrator `workflows/`, inputs of their package's test (`tools/guards/test/turbo-inputs.test.ts`),
 so a breach there cannot replay a pass from turbo's cache. A change to any other file outside a package is not in its
 cache key: run `npx turbo run test --force` after one.

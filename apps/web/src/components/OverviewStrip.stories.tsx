@@ -39,15 +39,15 @@ const BUSY: Strip = {
   agents: { count: 2, hired: 6 },
   rows: [
     {
-      agent: 'ada',
+      agent: 'implementer',
       step: 'implement',
       run: 'r-1',
       title: 'The kit batch, and every part of it the board draws',
       minutes: 17,
       atWork: '17m',
     },
-    { agent: 'otto', step: 'land', run: 'r-2', title: 'The runs page', minutes: 9, atWork: '9m' },
-    { agent: 'agora', step: 'review', run: 'r-3', title: 'The quota meter', minutes: 4, atWork: '4m' },
+    { agent: 'shipper', step: 'land', run: 'r-2', title: 'The runs page', minutes: 9, atWork: '9m' },
+    { agent: 'reviewer', step: 'review', run: 'r-3', title: 'The quota meter', minutes: 4, atWork: '4m' },
   ],
   more: 2,
 };

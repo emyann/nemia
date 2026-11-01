@@ -59,6 +59,12 @@ export function entriesOf(dir: string): string[] {
 /** The folder of the package's builtin place skills (`place/<name>`), each a skill an agent may give where no root holds its name. */
 export const PLACE_SKILLS = path.join(import.meta.dirname, '..', '..', 'place');
 
+/**
+ * The folder of Nemia's builtin skills, built into the package (`skills/`), which the board offers to copy into a person's library:
+ * none while the package has no such folder, which reads as no skill (`skillFolders`), never as a refusal.
+ */
+export const BUILTIN_SKILLS = path.join(import.meta.dirname, '..', '..', SKILLS_FOLDER);
+
 /** Whether the skill folder `dir` is a builtin place skill of the package (`PLACE_SKILLS`). */
 export const isBuiltinPlace = (dir: string): boolean => path.dirname(path.resolve(dir)) === path.resolve(PLACE_SKILLS);
 

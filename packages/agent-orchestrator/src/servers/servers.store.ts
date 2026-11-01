@@ -107,11 +107,17 @@ export function writeFactoryServers(home: string, name: string, servers: Factory
 }
 
 /**
- * Nemia's builtin servers, by name: each `<name>.json` of `dir` that reads as one, in the folder's order. The folder is data in a
- * checkout (`workflows/servers/`), not the store, so `dir` is the caller's to name and no root is read here.
+ * The folder of Nemia's builtin MCP servers, built into the package (`servers/`, its README saying what a file holds): each a
+ * `<name>.json` a person may add to a factory of theirs without typing its address or its client id, GitHub's (`github.json`) first.
+ */
+export const BUILTIN_SERVERS = path.join(import.meta.dirname, '..', '..', 'servers');
+
+/**
+ * Nemia's builtin servers, by name: each `<name>.json` of `dir` that reads as one, in the folder's order. The builtin folder is the
+ * package's own (`BUILTIN_SERVERS`), not the store, and `dir` is the caller's to name, so no root is read here.
  *
- * An absent folder is an empty list, never a throw — git commits no empty directory, and there is no builtin server today — and a
- * file that does not read is left out rather than failing the read, since one bad builtin file must not blank the add form.
+ * An absent folder is an empty list, never a throw, since git commits no empty directory; and a file that does not read is left out
+ * rather than failing the read, since one bad builtin file must not blank the add form.
  */
 export const builtinServers = (dir: string): readonly BuiltinServer[] => {
   let files: string[];

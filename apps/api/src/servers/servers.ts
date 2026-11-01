@@ -5,11 +5,11 @@
  *
  * A folder of its own because `src/factories/` holds six source files, the cap, and a limit is met by cutting rather than by raising a
  * ceiling. The state is the runtime's, asked through the package: no file here imports the runtime or a harness SDK. And the builtin
- * folder is read by the package too (`builtinServers`): a reader of the api touches no disk of its own (`test/kinds.test.ts`), so this
- * file names the folder and the package reads it.
+ * folder is the package's, named and read there (`BUILTIN_SERVERS`, `builtinServers`): a reader of the api touches no disk of its own
+ * (`test/kinds.test.ts`).
  */
-import path from 'node:path';
 import {
+  BUILTIN_SERVERS,
   FACTORY_SERVERS,
   factoryNameRefusal,
   serverNameRefusal,
@@ -19,17 +19,15 @@ import {
 } from 'agent-orchestrator';
 import { Hono } from 'hono';
 import { valueAt } from '../body.ts';
-import { HOME_REPO } from '../capabilities/capabilities.ts';
 import type { Named, RouteWords } from '../commands/words.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { runPlaced } from '../store.ts';
 
 /**
- * `workflows/servers/` of the checkout the api runs from: Nemia's builtin MCP servers, each a `<name>.json` a person may add to a
- * factory of theirs without typing its address or its client id: GitHub's (`github.json`), signed in to from the board
- * (`sign-in.ts`). A checkout without the folder lists no builtin server, which is no error.
+ * Nemia's builtin MCP servers: the orchestrator package's `servers/`, each a `<name>.json` a person may add to a factory of theirs
+ * without typing its address or its client id: GitHub's (`github.json`), signed in to from the board (`sign-in.ts`).
  */
-export const BUILTIN_SERVERS = path.join(HOME_REPO, 'workflows', 'servers');
+export { BUILTIN_SERVERS };
 
 /** What the board reads of a factory's servers: its record with each state, and Nemia's builtin list for the add form. */
 export type FactoryServersRead = ServersListing & { readonly builtin: readonly BuiltinServer[] };

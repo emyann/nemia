@@ -287,6 +287,22 @@
       "excludeFiles": ["packages/agent-runtime/src/**/*.test.ts"],
       "rules": { "typescript/no-non-null-assertion": "error" }
     },
+    // The orchestrator's source and the api's are under the same flag, and refuse `x!` for the same reason; their tests are not.
+    // packages/agent-orchestrator/test/index-reads.test.ts holds these blocks and the flag.
+    {
+      "files": [
+        "packages/agent-orchestrator/src/**",
+        "packages/agent-orchestrator/bin/**",
+        "packages/agent-orchestrator/place/**"
+      ],
+      "excludeFiles": ["packages/agent-orchestrator/src/**/*.test.ts", "packages/agent-orchestrator/place/**/*.test.ts"],
+      "rules": { "typescript/no-non-null-assertion": "error" }
+    },
+    {
+      "files": ["apps/api/src/**"],
+      "excludeFiles": ["apps/api/src/**/*.test.ts"],
+      "rules": { "typescript/no-non-null-assertion": "error" }
+    },
     // The runtime is the bottom layer: it reaches no layer above it.
     {
       "files": ["packages/agent-runtime/src/**", "packages/agent-runtime/bin/**"],

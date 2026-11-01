@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noUncheckedIndexedAccess": false
+  },
+  "include": [
+    "**/*",
+    "../src/**/*.test.ts",
+    "../../../tools"
+  ],
+  "exclude": [
+    "../../../tools/**/node_modules"
+  ]
+}

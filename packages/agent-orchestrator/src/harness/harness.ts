@@ -4,6 +4,7 @@
  * start.verb.ts).
  */
 import { refuse, STEP_KEYS, type StepKey, type Workflow } from '../step/step.ts';
+import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 
 /** The harness a step runs on when it names none. */
 export const DEFAULT_HARNESS = 'claude';
@@ -106,3 +107,15 @@ export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string
  * command, and no step runs on it.
  */
 export const HARNESSES: readonly string[] = ['claude', 'codex'];
+
+/**
+ * The fence keys of every harness: each one's own key and its tool lists. One list for the package, read by the template and by the
+ * markdown readers, which take a harness's fence under its block (`<harness>: { fence: … }`, `fenceKeysOf`).
+ */
+export const HARNESS_FENCE_KEYS: readonly string[] = [
+  ...new Set(Object.values(HARNESS_KNOBS).flatMap((knobs) => [knobs.fence.key, ...knobs.fence.lists])),
+];
+
+/** The fence keys harness `harness`'s block takes, its own key then its tool lists, or `undefined` for a name that is no harness. */
+export const fenceKeysOf = (harness: string): readonly string[] | undefined =>
+  Object.hasOwn(HARNESS_KNOBS, harness) ? [HARNESS_KNOBS[harness].fence.key, ...HARNESS_KNOBS[harness].fence.lists] : undefined;

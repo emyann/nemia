@@ -23,7 +23,7 @@ import {
   HARNESSES,
   parseFolder,
   parseWorkflow,
-  POLICY_KEYS,
+  OVERRIDE_KEYS,
   REMOTE_REFUSED_KEYS,
   renderStep,
   STEP_KEY_MEANINGS,
@@ -234,7 +234,7 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       );
       assert.equal(Object.hasOwn(withAgents.agents, 'broken'), false, 'an agent the load refuses gives no values');
       for (const file of ['picked.md', 'picked.schema.json', 'broken.md']) fs.rmSync(path.join(STORE, 'agents', file));
-      const agentOnly = ['role', 'description', 'skills', 'harnessPrompt', 'mcp'];
+      const agentOnly = ['role', 'description', 'overridable', 'skills', 'harnessPrompt', 'mcp'];
       assert.deepEqual(
         form.roleKeys,
         [
@@ -255,14 +255,14 @@ test('a person builds a workflow of theirs on the board: the form, a new folder,
       assert.deepEqual(
         form.roleKeys,
         AGENT_KEYS.filter((k) => !agentOnly.includes(k)),
-        'the role keys are the agent keys but role, description, skills, harnessPrompt and mcp',
+        'the role keys are the agent keys but role, description, overridable, skills, harnessPrompt and mcp',
       );
       assert.deepEqual(
         form.policyKeys,
         ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox', 'skills', 'mcp'],
         "the policy keys, which the builder groups as the step's policy over its agent: the fence keys and the skills and servers it adds",
       );
-      assert.deepEqual(form.policyKeys, [...POLICY_KEYS], "the package's list, never one of the api's own");
+      assert.deepEqual(form.policyKeys, [...OVERRIDE_KEYS], "the package's list, never one of the api's own");
       for (const own of agentOnly)
         assert.equal(
           form.roleKeys.includes(own as never),
@@ -939,8 +939,8 @@ test('a former key on the board: listed and saved under the name it has now, and
       assert.equal(saved.status, 200, await saved.clone().text());
       assert.equal(
         fs.readFileSync(path.join(dir, 'write.md'), 'utf8'),
-        '---\nplace: git\npermissionMode: dontAsk\ndisallowedTools: SendMessage\nallowedTools: Edit(notes/**)\n---\nWrite the note.\n',
-        'a save of the step writes the names the keys have',
+        '---\nplace: git\nclaude:\n  fence:\n    permissionMode: dontAsk\n    disallowedTools: SendMessage\n    allowedTools: Edit(notes/**)\n---\nWrite the note.\n',
+        'a save of the step writes the names the keys have, in its harness block',
       );
     },
   );
@@ -972,7 +972,7 @@ test('a former key on the board: listed and saved under the name it has now, and
       assert.equal(saved.status, 200, await saved.clone().text());
       assert.equal(
         fs.readFileSync(path.join(dir, 'write.md'), 'utf8'),
-        '---\nplace: folder\npermissionMode: acceptEdits\n---\nWrite the note.\n',
+        '---\nplace: folder\nclaude:\n  fence:\n    permissionMode: acceptEdits\n---\nWrite the note.\n',
         'a save of the step writes `place: folder`, and no `workspace:` line',
       );
       const git = await put('placed', { steps: [{ ...step, spec: { ...step.spec, place: 'git' } }] });
@@ -1021,8 +1021,8 @@ test('a former key on the board: listed and saved under the name it has now, and
       assert.equal(saved.status, 200, await saved.clone().text());
       assert.equal(
         fs.readFileSync(path.join(dir, 'review.md'), 'utf8'),
-        '---\nplace: git\nharness: codex\nsandbox: workspace-write\n---\nReview it.\n',
-        'saved with a change, it says `sandbox:`',
+        '---\nplace: git\nharness: codex\ncodex:\n  fence:\n    sandbox: workspace-write\n---\nReview it.\n',
+        'saved with a change, it says `sandbox:`, in its harness block',
       );
     },
   );

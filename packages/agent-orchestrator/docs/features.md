@@ -53,6 +53,8 @@ own skills, cards 1a to 4 (§12). The runtime's thin-runtime stages are tracked 
 2. §13, the cases `test/run.test.ts` still holds: the say cases, to move beside `src/say/`; its timeline cases are fj03 slice 4's.
 3. §14, the former frontmatter form's fallback taken out, once `nemia frontmatter rewrite --check` is clean on the owner's machine:
    carded, waiting in the inbox.
+4. §15 to §17, the rest of a harness's fence under its block (decision 12, after its slice 1 shipped on 2026-10-31): the runtime's
+   generic `fence`, the api and the board on the block and `overridable:`, and the internal fields moved.
 
 A step's tries and rounds as attempts of one task (*tries as attempts*; written "4c" before 2026-09-28, and not the runtime's stage
 4c, admission), the second item until 2026-10-24, is closed as decided that day (language work, decision 6): a try stays the
@@ -5669,6 +5671,35 @@ branch on it, `formerFormLine` at `nemia start`), so such a block is refused nam
 the verb stay, for a folder written before that is brought in later. A run frozen before keeps its steps as records, which no
 frontmatter reader reads.
 
+## 15. The runtime's `HarnessArgs` take a generic `fence` (decision 12, slice 2)
+
+**Today** the runtime's `HarnessArgs` call either harness's fence `permissionMode`: Claude Code's permission mode, and Codex's sandbox
+too, which the tick hands it as `sandbox ?? permissionMode` (`modeOf`). The markdown already says a fence under each harness's block
+(slice 1, *Shipped* below).
+
+**The card**: a `fence` key on `HarnessArgs`, generic, which each runner translates into its own flag — Claude Code's runner into
+`permissionMode`, Codex's into `sandbox` (`-s`). The runtime's `permissionMode` field, which names Codex's sandbox too, is renamed to it.
+A task filed before is read back by the runtime's own means: the former name in `RENAMED_ARGS` (`agent-runtime/src/harness/args.ts`),
+and the journal's `upgrade`, which reads an argument under its new name. Then `modeOf` goes, and the orchestrator files `fence`.
+
+## 16. The api and the board read and write the block and `overridable:` (decision 12, slice 3)
+
+**Today** the api and the board pass the fence as the internal fields the readers flatten the block into, and a save from the board
+writes the block through `renderStep` and `renderAgent`. The agent form does not show `overridable:`, and a save from it keeps the line
+its file has (`AgentDraft.overridable` absent).
+
+**The card**: the api's answer field `policyKeys` (`apps/api/src/workflows/builder.ts`) renamed for what it is, the keys a step sets as
+its overrides (`OVERRIDE_KEYS`); the api's agent read and write carry `overridable:`; the board's agent form shows the offer and edits
+it, and the step form shows only what the step's agent offers.
+
+## 17. The internal fields move under the block (decision 12, slice 4)
+
+**Today** `Workflow`'s `permissionMode`, `tools`, `allowedTools`, `disallowedTools` and `sandbox`, and `Agent.keys`, hold the fence as
+flat fields, and the readers flatten each block into them.
+
+**The card**: those fields move to the block's shape, a fence per harness, until the `FENCE_WORDS` ratchet in
+`test/words.test.ts` reaches zero outside the claude block and the runtime's Claude Code runner.
+
 ## Engine-side work
 
 Not agent-orchestrator features, listed so nothing is lost:
@@ -6025,3 +6056,33 @@ that read none; the fold), `src/watch/selector.test.ts`, `test/run-feed.test.ts`
 
 What it leaves: a pause put and lifted between two passes is said by no line, as a hold's is. The Factory and InboxCard kinds keep their
 own later card.
+
+## Shipped: a harness's fence under its block, and what a step may override — `overridable:` (decision 12, slice 1, 2026-10-31)
+
+A step's and an agent's fence keys were written at the top level. They are written now under the block of the harness the file runs on,
+in a template's shape: `claude: { fence: { permissionMode, tools, allowedTools, disallowedTools } }`, `codex: { fence: { sandbox } }`
+(`fenceKeysOf` and `HARNESS_FENCE_KEYS`, the latter the template's `FENCE_KEYS` until then, in `src/harness/harness.ts` beside the
+harness's other facts, so the frontmatter's reader takes them without loading the template, whose `src/template/layout.ts` re-exports
+them).
+
+- **The readers flatten the block** (`readKeys`, `src/former/former.ts`) into the same fields as before, so nothing past the load
+  changed. Refused at load: a key the harness's fence does not take, a key in the block other than `fence`, two blocks, a block for a
+  harness the file does not run on (`fenceBlockRefusal`), and one key written both at the top level and in the block.
+- **The former spelling is read**: a top-level fence key reads as the key in the block of the file's harness (`FORMER_FENCE_KEYS`), and
+  `nemia start` names each such file (`formerFenceLine`). `nemia frontmatter rewrite <folder>` moves each into its block, every value
+  byte for byte (`fenceMoved`), and `--check` exits 1 where a move is due: each key into the block of the harness whose fence takes it, a
+  `permissionMode` into the block of the harness the file runs on — its `harness:` line, else its agent's beside it — and, where neither
+  says (a step a factory hires its agent into), left where it is and named on a `kept:` line. `renderStep` and `renderAgent` write the block alone
+  (`fencedPairs`).
+- **An agent says what a step may override**, `overridable:`, its own key (`AGENT_OWN_KEYS`), each word one of `OVERRIDABLE`
+  (`src/workflow/fence.ts`): `fence` for every fence key at once, still only narrowing, and `skills` and `mcp`, still only adding. A step
+  whose own keys override something the line leaves out is refused at load (`offerRefusal`), naming the key and the agent, whether the
+  agent came by `agent:` or by a hire. An agent with no line offers everything, the owner's decision, and `nemia start` says to add one
+  (`overridableLine`). The keys a step sets over its agent's fence and composition are named `OVERRIDE_KEYS`. A try of an agent whose
+  line leaves out `fence` is refused before it starts, in the try's words (`untriedOf`): its step narrows the agent's fence to its folder.
+
+Tested in `test/overrides.test.ts` (the block read, each refusal of a block, the offer on a named and a hired agent, the save that keeps
+the line), `src/frontmatter/frontmatter.verb.test.ts`, `test/agents.test.ts`, `test/rendering.test.ts`, `test/write-agent.test.ts`, and
+the api's `src/agents/try.test.ts`.
+
+What it leaves: §15 to §17.

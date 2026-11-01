@@ -71,11 +71,56 @@ export const sandboxed = (harness: string): boolean => fenceReach(harness)?.by =
 export const FENCE_KEYS = ['tools', 'allowedTools', 'disallowedTools', 'permissionMode', 'sandbox'] as const;
 
 /**
- * The keys a step's own file sets as its policy over its agent: the fence keys, which only tighten the agent's (`fenceRefusal`), and
- * `skills:` and `mcp:`, which add to the agent's (`addedSkillsRefusal`; a server loaded allows no tool). Every other key is the step's
- * wiring, or its agent's role.
+ * The keys a step's own file sets as its overrides of its agent's fence and composition: the fence keys, which only tighten the agent's
+ * (`fenceRefusal`), and `skills:` and `mcp:`, which add to the agent's (`addedSkillsRefusal`; a server loaded allows no tool). Every
+ * other key is the step's wiring, or one of its agent's role keys it sets in the agent's place.
  */
-export const POLICY_KEYS = [...FENCE_KEYS, 'skills', 'mcp'] as const satisfies readonly StepKey[];
+export const OVERRIDE_KEYS = [...FENCE_KEYS, 'skills', 'mcp'] as const satisfies readonly StepKey[];
+
+/**
+ * What an agent may offer a step to override (`overridable:`): each role key a step takes from it but its fence, `fence` for every fence
+ * key at once (it only narrows), and `skills` and `mcp` (each only adds). The words of the agent's `overridable:` line.
+ */
+export const OVERRIDABLE = ['model', 'effort', 'context', 'harness', 'remote', 'output', 'fence', 'skills', 'mcp'] as const;
+export type Overridable = (typeof OVERRIDABLE)[number];
+
+/** What a step's key `key` overrides of its agent (`OVERRIDABLE`), or `undefined` for a key that is the step's own wiring. */
+const overriddenBy = (key: string): Overridable | undefined =>
+  (FENCE_KEYS as readonly string[]).includes(key)
+    ? 'fence'
+    : (OVERRIDABLE as readonly string[]).includes(key)
+      ? (key as Overridable)
+      : undefined;
+
+/**
+ * What step `step`'s own keys `own` override of its agent (`overriddenBy`), each once, in `OVERRIDABLE`'s order: the step's side of the
+ * agent on a step, whatever brought the agent — its `agent:` line or a hire.
+ */
+export const overridesOf = (own: Partial<Record<string, string>>): Overridable[] => {
+  const keys = Object.keys(own).flatMap((key) => (own[key] === undefined ? [] : [overriddenBy(key)]));
+  return OVERRIDABLE.filter((word) => keys.includes(word));
+};
+
+/**
+ * Why step `step` may not override what its own keys `own` override of agent `agent` (`overridesOf`), or `undefined` when it may: the
+ * first that the agent's `overridable:` leaves out. An agent with no line offers everything. Judged on every load, from the files, the
+ * same for a step that names its agent and one a factory hires it into. The refusal names the step, the key, the agent and its file,
+ * and both fixes.
+ */
+export function offerRefusal(step: string, agent: Agent, own: Partial<Record<string, string>>): string | undefined {
+  if (agent.overridable === undefined) return undefined;
+  const file = `${AGENTS_FOLDER}/${agent.name}.md`;
+  const offered = agent.overridable;
+  const key = Object.keys(own).find((written) => {
+    const word = own[written] === undefined ? undefined : overriddenBy(written);
+    return word !== undefined && !offered.includes(word);
+  });
+  if (key === undefined) return undefined;
+  const word = overriddenBy(key)!;
+  const what = word === 'fence' ? `its fence (\`${key}\`)` : `\`${key}\``;
+  const offers = offered.length ? `offers ${offered.map((o) => `\`${o}\``).join(', ')}` : 'offers nothing';
+  return `${step}: sets ${what}, which its agent ${agent.name} does not offer to override — ${file} ${offers} on its \`overridable:\` line. Add \`${word}\` to that line (every step of ${agent.name} may then override it), or delete the line from this step.`;
+}
 
 /** One of a fence's keys. */
 type FenceKey = (typeof FENCE_KEYS)[number];

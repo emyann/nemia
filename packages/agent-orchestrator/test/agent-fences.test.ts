@@ -811,7 +811,7 @@ test("REFUSED: the team's implementer with its deny line cut back to the four it
   const root = teamCopy('wf-fences-');
   const file = path.join(root, 'agents', 'implementer.md');
   const text = fs.readFileSync(file, 'utf8');
-  const cut = text.replace(/^disallowedTools: .*$/m, 'disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger');
+  const cut = withFenceList(text, 'disallowedTools', () => 'SendMessage, CronCreate, CronDelete, RemoteTrigger');
   assert.notEqual(cut, text, 'the implementer has a deny line to cut');
   fs.writeFileSync(file, cut);
   const implement = loadWorkflows(path.join(root, 'dev')).find((s) => s.name === 'implement')!;
@@ -981,18 +981,48 @@ function acting(step: Step): string[] {
   ).map(shown);
 }
 
+/** A list of a fence that a file's frontmatter writes on one line, as a comma string. */
+type FenceList = 'tools' | 'allowedTools' | 'disallowedTools';
+
+/**
+ * The line of the fence list `key` in the frontmatter of `text`, in either form: under its harness's block (`claude:`, then `  fence:`,
+ * the key four spaces in), or at the top level, the former spelling. Its value is a comma string; a list written as YAML items is thrown
+ * on, since no edit here reads one, so that such a list is never read as empty.
+ */
+function fenceLineIn(text: string, key: FenceList): { start: number; at: number; end: number; head: string; value: string } | undefined {
+  const front = /^---\n[\s\S]*?\n---\n/.exec(text)?.[0] ?? '';
+  const found = new RegExp(`^(\\w+:\\n  fence:\\n(?:    .*\\n)*?    |)(${key}: ?)(.*)$`, 'm').exec(front);
+  if (!found) return undefined;
+  const [whole, block = '', head = '', value = ''] = found;
+  if (value.trim() === '') throw new Error(`the ${key} list is not a comma string on its own line: write it as one`);
+  const at = found.index + block.length;
+  return { start: text.lastIndexOf('\n', at) + 1, at, end: found.index + whole.length, head, value };
+}
+
+/** The rules of the fence list `key` in the frontmatter of `text`, in either form (`fenceLineIn`); none where it has no such list. */
+function fenceListOf(text: string, key: FenceList): string[] {
+  return fenceLineIn(text, key)?.value.split(', ') ?? [];
+}
+
+/**
+ * `text` with its fence list `key`'s value rewritten by `edit`, in either form (`fenceLineIn`), or the list's line taken out where `edit`
+ * gives `undefined`, and its block with it once the block holds nothing. `text` as it was where it has no such list, which each caller's
+ * `notEqual` names.
+ */
+function withFenceList(text: string, key: FenceList, edit: (value: string) => string | undefined): string {
+  const found = fenceLineIn(text, key);
+  if (!found) return text;
+  const value = edit(found.value);
+  if (value !== undefined) return text.slice(0, found.at) + found.head + value + text.slice(found.end);
+  return (text.slice(0, found.start) + text.slice(found.end + 1)).replace(/^\w+:\n  fence:\n(?! {4})/m, '');
+}
+
 /**
  * The step of the shipped `workflow` that `agent` runs, read from a scratch copy of the shipped team, the `key` line replaced by `line`
  * in each file of `of`, the agent's alone by default.
  */
 function shippedWith(agent: string, workflow: string, key: 'allowedTools' | 'disallowedTools', line: string, ...of: string[]): Step {
-  return shippedEdited(
-    agent,
-    workflow,
-    `a ${key} line to replace`,
-    (text) => text.replace(new RegExp(`^${key}: .*$`, 'm'), `${key}: ${line}`),
-    ...of,
-  );
+  return shippedEdited(agent, workflow, `a ${key} line to replace`, (text) => withFenceList(text, key, () => line), ...of);
 }
 
 /** The steps that run what no deny names, each with its file under the shipped holder: the two whose own line denies the collector. */
@@ -1005,7 +1035,7 @@ const COLLECTOR_FENCED = [
 
 /** The rules on the `disallowedTools:` line of the file `file` of the holder `root`, none where it has no such line. */
 const denyLineOf = (file: string, root = SHIPPED_HOLDERS[0]): string[] =>
-  /^disallowedTools: (.*)$/m.exec(fs.readFileSync(path.join(root, file), 'utf8'))?.[1].split(', ') ?? [];
+  fenceListOf(fs.readFileSync(path.join(root, file), 'utf8'), 'disallowedTools');
 
 /** The step of the shipped `workflow` that `agent` runs, as `wf start` freezes it. */
 const shippedStepIn = (agent: string, workflow: string): Step => {
@@ -1037,8 +1067,8 @@ function shippedEdited(agent: string, workflow: string, what: string, edit: (tex
  * lifts none of them.
  */
 function stepLineCut(agent: string, workflow: string, file: string, allowed?: string): Step {
-  const ownLine = (text: string) => text.replace(/^disallowedTools: .*$/m, 'disallowedTools: Bash(npm run build)');
-  const allowing = (text: string) => text.replace(/^allowedTools: (.*)$/m, `allowedTools: $1, ${allowed}`);
+  const ownLine = (text: string) => withFenceList(text, 'disallowedTools', () => 'Bash(npm run build)');
+  const allowing = (text: string) => withFenceList(text, 'allowedTools', (value) => `${value}, ${allowed}`);
   if (allowed === undefined) return shippedEdited(agent, workflow, 'a disallowedTools line', ownLine, file);
   const edit = (text: string) => (/^agent: /m.test(text) ? ownLine(text) : allowing(text));
   return shippedEdited(agent, workflow, 'a disallowedTools or an allowedTools line', edit, `agents/${agent}.md`, file);
@@ -1127,7 +1157,13 @@ test('Seldon and Agora drive the browser by their own allow, each tool by name, 
     assert.deepEqual(unfenced(step, SETTINGS, LIVE_BOARD), [], `${agent} is refused the live board`);
     assert.deepEqual(unfenced(step, SETTINGS, NAMED_FILES), [], `${agent} names no file a browser tool writes`);
     assert.deepEqual(unfenced(step), [], agent);
-    const hired = shippedEdited(agent, workflow, 'a deny line of its own', (text) => text.replace(/^disallowedTools: .*\n/m, ''), file);
+    const hired = shippedEdited(
+      agent,
+      workflow,
+      'a deny line of its own',
+      (text) => withFenceList(text, 'disallowedTools', () => undefined),
+      file,
+    );
     assert.ok(
       hired.disallowedTools?.includes('mcp__playwright__browser_run_code_unsafe'),
       `${agent}'s own file denies browser_run_code_unsafe by name, for a step that hires it and denies nothing itself`,
@@ -1156,9 +1192,11 @@ test('REFUSED: a browser tool an agent allows no more is reached no more, and br
       agent,
     );
     const unsafe = shippedEdited(agent, workflow, 'a deny of browser_run_code_unsafe', (text) =>
-      text
-        .replace(', mcp__playwright__browser_run_code_unsafe', '')
-        .replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__playwright__browser_run_code_unsafe'),
+      withFenceList(
+        text.replace(', mcp__playwright__browser_run_code_unsafe', ''),
+        'allowedTools',
+        (value) => `${value}, mcp__playwright__browser_run_code_unsafe`,
+      ),
     );
     assert.deepEqual(unfenced(unsafe), [`${unsafe.name}: mcp__playwright__browser_run_code_unsafe`], agent);
     assert.deepEqual(
@@ -1167,7 +1205,7 @@ test('REFUSED: a browser tool an agent allows no more is reached no more, and br
       `${file}'s own line cannot lift what its agent denies`,
     );
     const allowedAlone = shippedEdited(agent, workflow, 'an allowedTools line', (text) =>
-      text.replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__playwright__browser_run_code_unsafe'),
+      withFenceList(text, 'allowedTools', (value) => `${value}, mcp__playwright__browser_run_code_unsafe`),
     );
     assert.deepEqual(unfenced(allowedAlone), [], `${agent}: its own deny wins over an allow`);
   }
@@ -1182,7 +1220,7 @@ test('REFUSED: a whole server allowed on an agent is named, in either spelling, 
     ['mcp__playwright__browser_navigate(url:*:8787*)', false],
   ] as const) {
     const step = shippedEdited('agora', 'build', 'an allowedTools line', (text) =>
-      text.replace(/^allowedTools: (.*)$/m, `allowedTools: $1, ${rule}`),
+      withFenceList(text, 'allowedTools', (value) => `${value}, ${rule}`),
     );
     assert.deepEqual(wholeServers(step), named ? [`review: ${rule}`] : [], rule);
   }
@@ -2248,7 +2286,7 @@ test("REFUSED: a step file that writes one of its agent's denies back onto its o
   ]) {
     const at = path.join(root, file);
     const text = fs.readFileSync(at, 'utf8');
-    const added = text.replace(/^disallowedTools: (.*)$/m, `disallowedTools: $1, ${rule}`);
+    const added = withFenceList(text, 'disallowedTools', (value) => `${value}, ${rule}`);
     assert.notEqual(added, text, `${file} has a disallowedTools line`);
     fs.writeFileSync(at, added);
   }
@@ -3625,7 +3663,7 @@ test('REFUSED: Grace without her deny of merge_pull_request, read from her files
     ['mcp__github__merge_pull_request'],
   );
   const agora = shippedEdited('agora', 'build', 'an allowedTools line', (text) =>
-    text.replace(/^allowedTools: (.*)$/m, 'allowedTools: $1, mcp__github__merge_pull_request'),
+    withFenceList(text, 'allowedTools', (value) => `${value}, mcp__github__merge_pull_request`),
   );
   assert.deepEqual(
     runs(

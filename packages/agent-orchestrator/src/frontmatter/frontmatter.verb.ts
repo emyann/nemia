@@ -1,7 +1,8 @@
 /**
  * `nemia frontmatter rewrite [<folder>...] [--check]`: every markdown file under the folders given — or, given none, the store's own:
  * `$WF_ROOT/workflows/`, `inbox/`, and each factory's `tree/` and `applied/` — whose frontmatter is still in the former line form,
- * rewritten as YAML with every value byte for byte (`rewriteFormer`), each through a file beside it renamed onto it. `.git` and
+ * rewritten as YAML with every value byte for byte (`rewriteFormer`), and every step or agent file that still writes a fence key at the top
+ * level with the key moved into its harness's block (`fenceMoved`), each through a file beside it renamed onto it. `.git` and
  * `node_modules` are not walked, nor a link.
  *
  * It says each file rewritten, each file refused with its refusal (which names the line), and each line of a file in YAML whose plain
@@ -20,18 +21,24 @@ import type { Args, Spec } from '../command/command.ts';
 import { rootGiven } from '../config/root.store.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { isRefusal, Missing } from '../refusal/refusal.ts';
-import { splitFrontmatter, WorkflowError } from '../step/step.ts';
+import { AGENTS_FOLDER, SKILLS_FOLDER, splitFrontmatter, WorkflowError } from '../step/step.ts';
+import { fenceMoved, frontmatterKey } from '../former/former.ts';
+import { DEFAULT_HARNESS } from '../harness/harness.ts';
 import { commentTails, rewriteFormer } from './frontmatter.ts';
 
 /** The folders a walk does not go into: a repository's history and a package's dependencies. */
 const SKIPPED = new Set(['.git', 'node_modules']);
 
-/** What a walk found: the files rewritten (or due, under `--check`), those refused with why, and each ` #` tail as `file:line`. */
+/**
+ * What a walk found: the files rewritten (or due, under `--check`), those refused with why, each ` #` tail as `file:line`, and each fence
+ * key left at the top level because the file's harness is not known (`fenceMoved`'s `kept`), as `file: key`.
+ */
 export type Rewritten = {
   readonly check: boolean;
   readonly rewritten: readonly string[];
   readonly refused: readonly { readonly file: string; readonly why: string }[];
   readonly tails: readonly string[];
+  readonly kept?: readonly { readonly file: string; readonly key: string }[];
 };
 
 /**
@@ -104,16 +111,46 @@ function foldersOf(args: Args, home: string): string[] {
   });
 }
 
+/**
+ * Whether `file` may be a step or an agent, whose top-level fence keys move into its harness's block: no skill, no README, nothing under a
+ * `skills/` folder, whose frontmatter is the harness's own.
+ */
+const fenced = (file: string): boolean =>
+  !['SKILL.md', 'README.md'].includes(path.basename(file)) && !file.split(path.sep).includes(SKILLS_FOLDER);
+
+/**
+ * The harness `file` runs on, for the block its fence moves into: its own `harness:` line, else the agent its `agent:` line names, read
+ * beside its folder (`agents/<name>.md`), whose harness is its own line's or the default; an agent's own file with no line runs on the
+ * default. Undefined where nothing here says: a step with no `agent:` line, which a factory may hire onto any agent, or one whose agent
+ * lives in another place.
+ */
+function harnessOfFile(file: string, text: string): string | undefined {
+  const own = frontmatterKey(text, 'harness');
+  if (own !== undefined) return own;
+  if (path.basename(path.dirname(file)) === AGENTS_FOLDER) return DEFAULT_HARNESS;
+  const agent = frontmatterKey(text, 'agent');
+  const at = agent === undefined ? undefined : path.join(path.dirname(file), '..', AGENTS_FOLDER, `${agent}.md`);
+  if (at === undefined || !fs.existsSync(at)) return undefined;
+  return frontmatterKey(fs.readFileSync(at, 'utf8'), 'harness') ?? DEFAULT_HARNESS;
+}
+
 /** Each markdown file under `folders` rewritten where its frontmatter is former — or only found, under `check` — and read for tails. */
 export function rewriteFolders(folders: readonly string[], check: boolean): Rewritten {
   const files = [...new Set(folders.flatMap(markdownIn))];
   const rewritten: string[] = [];
   const refused: { file: string; why: string }[] = [];
   const tails: string[] = [];
+  const kept: { file: string; key: string }[] = [];
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8');
     try {
-      const { text: written, changed } = rewriteFormer(file, text);
+      const yaml = rewriteFormer(file, text);
+      const moved = fenced(file)
+        ? fenceMoved(file, yaml.text, harnessOfFile(file, yaml.text))
+        : { text: yaml.text, changed: false, kept: [] };
+      kept.push(...moved.kept.map((key) => ({ file, key })));
+      const written = moved.text;
+      const changed = yaml.changed || moved.changed;
       if (changed) {
         if (!check) replaceFile(file, written);
         rewritten.push(file);
@@ -124,17 +161,24 @@ export function rewriteFolders(folders: readonly string[], check: boolean): Rewr
       refused.push({ file, why: err.message });
     }
   }
-  return { check, rewritten, refused, tails };
+  return { check, rewritten, refused, tails, kept };
 }
 
-/** What `nemia frontmatter rewrite` says of a walk: each file rewritten or due, each refused, each tail, and none of them where none. */
-export function rewrittenLines({ check, rewritten, refused, tails }: Rewritten): string[] {
+/**
+ * What `nemia frontmatter rewrite` says of a walk: each file rewritten or due, each refused, each tail, each fence key kept, and none of
+ * them where none.
+ */
+export function rewrittenLines({ check, rewritten, refused, tails, kept = [] }: Rewritten): string[] {
   const lines = [
     ...rewritten.map((file) => `${check ? 'due' : 'rewritten'}: ${file}`),
     ...refused.map(({ why }) => `refused: ${why}`),
     ...tails.map(
       (at) =>
         `comment: ${at} — YAML reads what follows " #" as a comment, where the former reader kept it in the value: quote the value to keep it, or leave it`,
+    ),
+    ...kept.map(
+      ({ file, key }) =>
+        `kept: ${file} — \`${key}:\` stays at the top level, where it is still read: the file names no \`harness:\` and no agent beside it, so which harness's block takes it is not known here. Add \`harness: <id>\` and rewrite again, or move it by hand into the block of the harness that runs it, \`<harness>: { fence: … }\``,
     ),
   ];
   if (check && rewritten.length) lines.push('a rewrite is due: nemia frontmatter rewrite, with the same folders, writes it');

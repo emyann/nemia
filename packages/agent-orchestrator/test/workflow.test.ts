@@ -28,7 +28,7 @@ import {
   renderAgent,
 } from '../src/workflow.ts';
 import { formerKeyLines } from '../src/folder/folder.store.ts';
-import { baseLine, formerFormLine, placeLine } from '../src/former/former.ts';
+import { baseLine, formerFenceLine, formerFormLine, placeLine } from '../src/former/former.ts';
 import { endsOnBase } from '../src/step/step.ts';
 import { readsMounts } from '../src/filed/filed.ts';
 import { FILED_AS } from '../src/keys/filed-as.ts';
@@ -971,11 +971,12 @@ test('`disallow:` and `allow:`, the names the lists had until 2026-09-23, are st
   assert.deepEqual(agent.keys, { allowedTools: 'Edit(**)' });
   assert.match(
     renderStep(old),
-    /^disallowedTools: Bash\(git push \*\), SendMessage$/m,
-    'written back, a step read under the former name is written under the new one: saved from the board, the file is renamed',
+    /^claude:\n {2}fence:\n {4}disallowedTools: Bash\(git push \*\), SendMessage$/m,
+    'written back, a step read under the former name is written under the new one, in its harness block: saved from the board, the file is renamed',
   );
-  assert.match(renderStep(old), /^allowedTools: Edit\(\*\*\), Bash\(npm test\)$/m);
-  assert.doesNotMatch(renderStep(old), /^(dis)?allow:/m);
+  assert.match(renderStep(old), /^ {4}allowedTools: Edit\(\*\*\), Bash\(npm test\)$/m);
+  assert.doesNotMatch(renderStep(old), /^ *(dis)?allow:/m);
+  assert.doesNotMatch(renderStep(old), /^(dis)?allowedTools:/m, 'and no fence key at the top level');
 });
 
 test("a step on the former name beside an agent on the new one sets that one key, its own, over the agent's", () => {
@@ -1095,7 +1096,7 @@ test('`nemia start` is told which files still write a former name: the steps, th
   const root = folder({
     'team/write.md': '---\nplace: git\nagent: writer\ndisallow: SendMessage\n---\n',
     'team/review.md': '---\nafter: write\nplace: git\n---\nReview.\n',
-    'agents/writer.md': '---\nallow: Edit(**)\n---\nWrite.\n',
+    'agents/writer.md': '---\nallow: Edit(**)\noverridable: fence\n---\nWrite.\n',
     'agents/unused.md': '---\nallow: Edit(**)\n---\nNobody names me.\n',
   });
   const dir = path.join(root, 'team');
@@ -1104,7 +1105,10 @@ test('`nemia start` is told which files still write a former name: the steps, th
     formerKeyLine(path.join(dir, 'write.md'), 'disallow'),
     formerKeyLine(path.join(root, 'agents', 'writer.md'), 'allow'),
   ]);
-  assert.deepEqual(formerKeyLines(folder({ 'write.md': '---\nplace: git\nallowedTools: Edit(**)\n---\nWrite.\n' })), []);
+  assert.deepEqual(
+    formerKeyLines(folder({ 'write.md': '---\nplace: git\nclaude:\n  fence:\n    allowedTools: Edit(**)\n---\nWrite.\n' })),
+    [],
+  );
   assert.deepEqual(formerKeyLines(path.join(dir, 'nope')), []);
 });
 
@@ -1112,7 +1116,7 @@ test('`nemia start` is told which step and agent files are still in the former l
   const root = folder({
     'team/write.md': '---\nplace: git\nagent: writer\ncheck: { npm test; npm run lint: x; }\n---\nWrite.\n',
     'team/review.md': '---\nafter: write\nplace: git\ncheck: "npm test # all of it"\n---\nReview.\n',
-    'agents/writer.md': '---\nmodel: opus\ndisallowedTools: Bash(git push:*), Bash(echo a: b)\n---\nWrite.\n',
+    'agents/writer.md': '---\nmodel: opus\noverridable: model\ndisallowedTools: Bash(git push:*), Bash(echo a: b)\n---\nWrite.\n',
   });
   const dir = path.join(root, 'team');
   const [write, review] = loadWorkflows(dir);
@@ -1121,6 +1125,7 @@ test('`nemia start` is told which step and agent files are still in the former l
   assert.deepEqual(formerKeyLines(dir), [
     formerFormLine(path.join(dir, 'write.md')),
     formerFormLine(path.join(root, 'agents', 'writer.md')),
+    formerFenceLine(path.join(root, 'agents', 'writer.md'), 'disallowedTools'),
   ]);
   assert.match(formerFormLine('w/write.md'), /^w\/write\.md: /);
 });
@@ -1133,8 +1138,8 @@ test('`nemia start` is told which agent a step names still says `systemPrompt:`,
   const root = folder({
     'team/write.md': '---\nplace: git\nagent: writer\n---\n',
     'team/review.md': '---\nafter: write\nplace: git\nagent: reviewer\n---\n',
-    'agents/writer.md': '---\nsystemPrompt: own\n---\nWrite.\n',
-    'agents/reviewer.md': '---\nharnessPrompt: no-coding\n---\nReview.\n',
+    'agents/writer.md': '---\nsystemPrompt: own\noverridable: model\n---\nWrite.\n',
+    'agents/reviewer.md': '---\nharnessPrompt: no-coding\noverridable: model\n---\nReview.\n',
     'agents/unused.md': '---\nsystemPrompt: default\n---\nNobody names me.\n',
   });
   const dir = path.join(root, 'team');
@@ -1151,20 +1156,27 @@ test("`nemia start` is told which codex files still name their sandbox as `permi
     'team/review.md': '---\nplace: git\nharness: codex\npermissionMode: read-only\n---\nReview.\n',
     'team/check.md': '---\nafter: review\nplace: git\nagent: checker\npermissionMode: read-only\n---\nCheck.\n',
     'team/implement.md': '---\nafter: check\nplace: git\npermissionMode: dontAsk\n---\nImplement.\n',
-    'agents/checker.md': '---\nharness: codex\npermissionMode: read-only\n---\nYou check.\n',
+    'agents/checker.md': '---\nharness: codex\noverridable: fence\npermissionMode: read-only\n---\nYou check.\n',
   });
   const dir = path.join(root, 'team');
   assert.doesNotThrow(() => loadWorkflows(dir), 'the folder starts: the former line stops nothing');
   assert.deepEqual(
     formerKeyLines(dir),
     [
+      formerFenceLine(path.join(dir, 'check.md'), 'permissionMode'),
       codexModeLine(path.join(dir, 'check.md'), 'read-only'),
+      formerFenceLine(path.join(dir, 'implement.md'), 'permissionMode'),
+      formerFenceLine(path.join(dir, 'review.md'), 'permissionMode'),
       codexModeLine(path.join(dir, 'review.md'), 'read-only'),
+      formerFenceLine(path.join(root, 'agents', 'checker.md'), 'permissionMode'),
       codexModeLine(path.join(root, 'agents', 'checker.md'), 'read-only'),
     ],
-    "a Claude Code step's own mode is not named",
+    "a Claude Code step's own mode is named only as a former spelling, never as a codex sandbox",
   );
-  assert.deepEqual(formerKeyLines(folder({ 'review.md': '---\nplace: git\nharness: codex\nsandbox: read-only\n---\nReview.\n' })), []);
+  assert.deepEqual(
+    formerKeyLines(folder({ 'review.md': '---\nplace: git\nharness: codex\ncodex:\n  fence:\n    sandbox: read-only\n---\nReview.\n' })),
+    [],
+  );
 });
 
 test('`nemia start` is told which steps still say `workspace: folder`, with the line it is read as, and nothing of `place:` or `workspace: base`', () => {
@@ -1945,8 +1957,8 @@ test('`denials: fail` is read on a job of `claude`, and a step without the line 
   const step = fm('review', 'denials: fail\nallowedTools: Edit(**)');
   assert.equal(
     renderStep(step),
-    ['---', 'place: git', 'allowedTools: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'),
-    'written back after allowedTools, before remote',
+    ['---', 'place: git', 'claude:', '  fence:', '    allowedTools: Edit(**)', 'denials: fail', '---', 'Do the work.', ''].join('\n'),
+    'written back after the harness block that holds allowedTools, before remote',
   );
   assert.deepEqual(parseWorkflow('review', renderStep(step)), step, 'and read back as the step');
 });
@@ -2501,10 +2513,12 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
       'model: opus',
       'effort: xhigh',
       'context: 200k',
-      'permissionMode: dontAsk',
-      'tools: Read, Grep, Glob, Bash',
-      'disallowedTools: Bash(npm run build), SendMessage',
-      'allowedTools: Edit(**), Bash(npm test)',
+      'claude:',
+      '  fence:',
+      '    permissionMode: dontAsk',
+      '    tools: Read, Grep, Glob, Bash',
+      '    disallowedTools: Bash(npm run build), SendMessage',
+      '    allowedTools: Edit(**), Bash(npm test)',
       'denials: fail',
       'remote: true',
       'deadlineSeconds: 900',
@@ -2552,13 +2566,15 @@ test('`renderStep` of a step that sets every key: one line a key, in `STEP_KEYS`
   const fence = renderStep(fenced);
   assert.equal(
     fence,
-    ['---', 'place: git', 'harness: codex', 'effort: high', 'sandbox: read-only', '---', 'Review it.', ''].join('\n'),
-    "sandbox:, a codex step's, is written after context, where permissionMode is on Claude Code",
+    ['---', 'place: git', 'harness: codex', 'effort: high', 'codex:', '  fence:', '    sandbox: read-only', '---', 'Review it.', ''].join(
+      '\n',
+    ),
+    "sandbox:, a codex step's, is written in codex's block after context, where permissionMode's block is on Claude Code",
   );
   assert.deepEqual(parseWorkflow('review', fence), fenced, 'and read back as the step');
   assert.equal(
     renderStep(parseWorkflow('review', '---\nplace: git\nharness: codex\npermissionMode: bypassPermissions\n---\nReview it.\n')),
-    ['---', 'place: git', 'harness: codex', 'sandbox: danger-full-access', '---', 'Review it.', ''].join('\n'),
+    ['---', 'place: git', 'harness: codex', 'codex:', '  fence:', '    sandbox: danger-full-access', '---', 'Review it.', ''].join('\n'),
     "a sandbox read from the former line is written under Codex's name",
   );
 });
@@ -2581,18 +2597,24 @@ test('REFUSED: `renderStep` and `renderAgent` of a codex draft that sends its sa
   );
   assert.match(
     renderStep({ name: 'review', body: 'Review it.', harness: 'codex', sandbox: 'read-only' } as StepDraft),
-    /^sandbox: read-only$/m,
-    'written under its own name, each is taken',
+    /^codex:\n {2}fence:\n {4}sandbox: read-only$/m,
+    'written under its own name, in its harness block, each is taken',
   );
   assert.match(
     renderAgent({ name: 'reviewer', keys: { harness: 'codex', sandbox: 'read-only' }, body: 'You review.' }),
-    /^sandbox: read-only$/m,
+    /^codex:\n {2}fence:\n {4}sandbox: read-only$/m,
   );
   assert.match(
     renderStep({ name: 'implement', body: 'Do it.', permissionMode: 'dontAsk' } as StepDraft),
-    /^permissionMode: dontAsk$/m,
+    /^claude:\n {2}fence:\n {4}permissionMode: dontAsk$/m,
     "and a claude draft's permissionMode is its own",
   );
+  for (const text of [
+    renderStep({ name: 'review', body: 'Review it.', harness: 'codex', sandbox: 'read-only' } as StepDraft),
+    renderAgent({ name: 'reviewer', keys: { harness: 'codex', sandbox: 'read-only' }, body: 'You review.' }),
+    renderStep({ name: 'implement', body: 'Do it.', permissionMode: 'dontAsk' } as StepDraft),
+  ])
+    assert.doesNotMatch(text, /^(sandbox|permissionMode):/m, 'and no fence key at the top level');
   assert.throws(
     () => renderStep({ name: 'review', body: 'Review it.', harness: 'codex', permissionMode: 'dontAsk' } as StepDraft),
     said('review', 'dontAsk'),
@@ -2669,7 +2691,12 @@ test("`renderStep` of a step over an agent writes its own denies alone, which ad
   const parsed = (text: string) => parseWorkflow('implement', text, undefined, agents);
   const own = parsed('---\nagent: ada\nplace: git\ndisallowedTools: Bash(npm run build), Bash(git push)\n---\nDo it.\n');
   const text = renderStep(own);
-  assert.match(text, /^disallowedTools: Bash\(npm run build\)$/m, "the agent's are not pinned into the step's file");
+  assert.match(
+    text,
+    /^claude:\n {2}fence:\n {4}disallowedTools: Bash\(npm run build\)$/m,
+    "the agent's are not pinned into the step's file",
+  );
+  assert.doesNotMatch(text, /^disallowedTools:/m, 'and no fence key at the top level');
   assert.deepEqual(parsed(text).disallowedTools, own.disallowedTools, 'and it reads back to what the session is refused');
   const repeated = parsed('---\nagent: ada\nplace: git\ndisallowedTools: Bash(git push:*), Bash(git push)\n---\nDo it.\n');
   assert.doesNotMatch(renderStep(repeated), /disallowedTools/, 'a line that only repeats its agent is no line');
@@ -2731,14 +2758,14 @@ test("REFUSED by `renderStep`, in the parser's words where the parser has them: 
   assert.match(message({ ...step, input: ['a,b'] }), /^review: `input` lists `a,b`/);
 
   for (const [draft, lines, rule] of [
-    [{ ...step, tools: [] }, 'tools:', /^review: `tools` has no value, which reads as every tool/],
+    [{ ...step, tools: [] }, 'claude:\n  fence:\n    tools:', /^review: `tools` has no value, which reads as every tool/],
     [{ ...step, model: '' }, 'model:', /^review: `model` has no value\. Delete the line/],
     [{ ...step, deadlineSeconds: '5m' }, 'deadlineSeconds: 5m', /^review: `deadlineSeconds: 5m` is not a count\./],
     [{ ...step, gate: false }, 'gate: false', /^review: `gate: false` is what a step without the line already is\./],
     [{ ...step, harness: 'banana' }, 'harness: banana', /^review: `harness: banana` is not a harness a step can run on\./],
     [
       { ...step, disallowedTools: ['Bash(git push, git reset)'] },
-      'disallowedTools: Bash(git push, git reset)',
+      'claude:\n  fence:\n    disallowedTools: Bash(git push, git reset)',
       /^review: `disallowedTools: Bash\(git push, git reset\)` has a comma inside an entry/,
     ],
     [{ ...step, output: {} }, 'output:', /^review: `output` has no value\. Delete the line/],

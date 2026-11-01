@@ -10,8 +10,10 @@ import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
 import { scratch } from '../../test/scratch.ts';
 import { readFrontmatter } from './frontmatter.ts';
+import { readKeys } from '../former/former.ts';
 import { splitFrontmatter, WorkflowError } from '../step/step.ts';
-import { FRONTMATTER_REWRITE, rewriteFolders, storeFolders, type Rewritten } from './frontmatter.verb.ts';
+import { FRONTMATTER_REWRITE, rewriteFolders, rewrittenLines, storeFolders, type Rewritten } from './frontmatter.verb.ts';
+import { parseAgent, parseWorkflow } from '../workflow.ts';
 
 const FORMER = fs.readFileSync(path.join(import.meta.dirname, '../../test/fixtures/former-frontmatter/build-land.md'), 'utf8');
 const TAIL = '---\ncheck: npm test # every file\nbudget: 2\n---\nThe body.\n';
@@ -27,6 +29,9 @@ const put = (file: string, text: string, mode = 0o644): string => {
 
 /** What follows a file's frontmatter, byte for byte. */
 const bodyOf = (text: string): string => text.slice(text.indexOf('\n---\n', 3) + 5);
+
+/** A file's keys as the step and agent readers read them (`readKeys`), a harness's block read into its fence keys. */
+const keysOf = (file: string, text: string) => readKeys(file, splitFrontmatter(file, text).block!, () => undefined).meta;
 
 /** The command's handler run on `argv`'s arguments over the store `home`: its answer, or how it failed and the exit code it carries. */
 async function rewrite(home: string, args: { folders?: string[]; check?: true }) {
@@ -64,9 +69,9 @@ test("the store's workflows, inbox and a templated factory's tree and applied ba
     assert.notEqual(text, FORMER);
     assert.equal(readFrontmatter(file, splitFrontmatter(file, text).block!).former, false, 'now YAML');
     assert.deepEqual(
-      readFrontmatter(file, splitFrontmatter(file, text).block!).entries.map((e) => e.value),
-      readFrontmatter(file, splitFrontmatter(file, FORMER).block!).entries.map((e) => e.value),
-      'every value as the former reader read it',
+      keysOf(file, text),
+      keysOf(file, FORMER),
+      'every value as the former reader read it, a top-level fence key read from its block',
     );
     assert.equal(bodyOf(text), bodyOf(FORMER), 'the body byte for byte');
   }
@@ -106,4 +111,57 @@ test('a folder given: a file in neither form refused at its line, a ` #` tail li
   const clean = await rewrite(home, { folders: [dir], check: true });
   assert.equal(clean.failed, undefined, 'a tail alone is no rewrite due');
   assert.deepEqual(clean.found?.tails, [`${tail}:2`]);
+});
+
+test("a top-level fence key moves into the block of the harness its file runs on, its agent's where it names none, every value kept", async () => {
+  const home = scratch('wf-frontmatter-fence-');
+  const dir = path.join(home, 'team');
+  const step = put(
+    path.join(dir, 'dev', 'review.md'),
+    '---\nplace: git\nagent: reviewer\npermissionMode: bypassPermissions\n---\nReview.\n',
+  );
+  const agent = put(path.join(dir, 'agents', 'reviewer.md'), '---\nharness: codex\nmodel: gpt-5\n---\nYou review.\n');
+  assert.equal((await rewrite(home, { folders: [dir], check: true })).failed?.exitCode, 1, '--check ends with exit 1: a move is due');
+  assert.deepEqual((await rewrite(home, { folders: [dir] })).found?.rewritten, [step], 'the step alone: its agent writes no fence');
+  const moved = fs.readFileSync(step, 'utf8');
+  const read = readFrontmatter(step, splitFrontmatter(step, moved).block!).entries;
+  assert.deepEqual(
+    read.map((e) => e.key),
+    ['place', 'agent', 'codex'],
+    "no fence key left at the top level: the block named by its agent's harness",
+  );
+  assert.deepEqual(
+    keysOf(step, moved),
+    { place: 'git', agent: 'reviewer', sandbox: 'danger-full-access' },
+    "codex's former mode is its sandbox",
+  );
+  assert.equal(bodyOf(moved), bodyOf('---\n---\nReview.\n'), 'the body byte for byte');
+  assert.equal(fs.readFileSync(agent, 'utf8'), '---\nharness: codex\nmodel: gpt-5\n---\nYou review.\n');
+  assert.equal((await rewrite(home, { folders: [dir], check: true })).failed, undefined, 'and --check passes after');
+});
+
+test('a step that names no agent: each fence key goes to the harness that takes it, and a `permissionMode` it cannot place is kept and said', async () => {
+  const home = scratch('wf-frontmatter-hired-');
+  const dir = path.join(home, 'factories', 'acme', 'applied', 'workflows', 'dev');
+  const step = put(path.join(dir, 'review.md'), '---\nplace: git\nsandbox: read-only\npermissionMode: plan\n---\nReview.\n');
+  const found = (await rewrite(home, { folders: [dir] })).found;
+  assert.deepEqual(found?.rewritten, [step]);
+  assert.deepEqual(found?.kept, [{ file: step, key: 'permissionMode' }], 'its harness is not known here: the line is kept');
+  assert.ok(
+    rewrittenLines(found).some((line) => line.startsWith('kept:') && line.includes(step) && line.includes('permissionMode')),
+    'and the command says so',
+  );
+  const moved = fs.readFileSync(step, 'utf8');
+  assert.deepEqual(
+    readFrontmatter(step, splitFrontmatter(step, moved).block!).entries.map((e) => e.key),
+    ['place', 'permissionMode', 'codex'],
+    "`sandbox` under codex's block, whatever harness the file's own lines would guess",
+  );
+  const agents = new Map([['coder', parseAgent('coder', '---\nharness: codex\nmodel: gpt-5\n---\nYou code.\n')]]);
+  const hired = parseWorkflow('review', moved.replace('permissionMode: plan\n', ''), undefined, agents, undefined, {
+    agent: 'coder',
+    factory: 'acme',
+    step: 'dev/review',
+  });
+  assert.equal(hired.sandbox, 'read-only', 'the moved step loads hired onto a Codex agent');
 });

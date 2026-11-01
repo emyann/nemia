@@ -18,7 +18,8 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
 - **S5, the definitions**: a workflow, an agent and a skill, read from their folders through models of their own; a run's frozen
   `workflow` and its `pinned` revisions, left out of `Run` today, are named there.
 - **S6, the subscription, the ledger and the feed**, each behind a door on the feed's model.
-- **The held AgentOnStep card** fills `StepAgent` in the agents' model, the agent a step is given.
+- **AgentOnStep** is `StepAgent` in the agents' model: the agent a step is given, and what the step overrides of it, within what the
+  agent offers (`Agent.overridable`).
 - **Decision 9**: the place's model names `PlaceKind` (`git` or `folder`, as a step's `place:` says it, and `MountKind` before it), beside
   the runtime's `Mount`; the follow-up intent renames the place to the runtime's mount (place → mount).
 - **SQLite**: Effect's `Model.Class` (`effect/schema/Model`, the class `effect/sql`'s repositories read and write) takes these branded
@@ -120,6 +121,7 @@ erDiagram
     list skills "optional"
     enum harnessPrompt "optional"
     list mcp "optional"
+    list overridable "optional"
     object keys
     string body
     string customInstructions "optional"
@@ -128,6 +130,7 @@ erDiagram
     WorkflowName workflow FK
     StepName step FK
     AgentName agent FK
+    list overrides "optional"
   }
   Subscription {
     SubscriptionName name PK

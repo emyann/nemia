@@ -445,7 +445,7 @@ test('a former key — `disallow:`, `allow:`, a codex `permissionMode:`, `card:`
         assert.equal(put.status, 200, await put.clone().text());
         assert.equal(
           fs.readFileSync(path.join(AGENTS, 'former.md'), 'utf8'),
-          '---\ndescription: Writes under the old names.\ndisallowedTools: SendMessage\nallowedTools: Edit(**)\n---\nDo it.\n',
+          '---\ndescription: Writes under the old names.\nclaude:\n  fence:\n    disallowedTools: SendMessage\n    allowedTools: Edit(**)\n---\nDo it.\n',
         );
       } finally {
         fs.rmSync(path.join(AGENTS, 'former.md'), { force: true });
@@ -508,7 +508,7 @@ test('a former key — `disallow:`, `allow:`, a codex `permissionMode:`, `card:`
         assert.equal(put.status, 200, await put.clone().text());
         assert.equal(
           fs.readFileSync(path.join(AGENTS, 'fenced.md'), 'utf8'),
-          '---\ndescription: Reviews on codex.\nharness: codex\nsandbox: danger-full-access\n---\nReview it.\n',
+          '---\ndescription: Reviews on codex.\nharness: codex\ncodex:\n  fence:\n    sandbox: danger-full-access\n---\nReview it.\n',
         );
       } finally {
         for (const name of ['fenced', 'fenced-broken', 'moded-broken']) fs.rmSync(path.join(AGENTS, `${name}.md`), { force: true });
@@ -622,7 +622,7 @@ test('a person makes an agent of theirs — with a result schema, skills, a harn
     assert.deepEqual(saved.written, ['scribe.md']);
     assert.equal(
       fs.readFileSync(path.join(AGENTS, 'scribe.md'), 'utf8'),
-      '---\ndescription: Use this when a change needs its notes written.\nmodel: sonnet\neffort: low\ntools: Read, Write\n---\nWrite the notes.\n',
+      '---\ndescription: Use this when a change needs its notes written.\nmodel: sonnet\neffort: low\nclaude:\n  fence:\n    tools: Read, Write\n---\nWrite the notes.\n',
     );
 
     const put = await send('PUT', '/api/agents/yours/scribe', {

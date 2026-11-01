@@ -18,6 +18,9 @@ import {
   formerFormLine,
   formerKeyLine,
   formerKeysIn,
+  formerFenceIn,
+  formerFenceLine,
+  overridableLine,
   frontmatterKey,
   harnessPromptLine,
   inFormerForm,
@@ -84,6 +87,7 @@ export function formerKeyLines(dir: string): string[] {
       return [
         ...(inFormerForm(text) ? [formerFormLine(at)] : []),
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
+        ...formerFenceIn(text).map((key) => formerFenceLine(at, key)),
         ...codexMode(at, text, harness),
         ...(frontmatterKey(text, 'workspace') === 'folder' ? [placeLine(at)] : []),
         ...(frontmatterKey(text, 'workspace') === 'main' ? [baseLine(at)] : []),
@@ -96,8 +100,10 @@ export function formerKeyLines(dir: string): string[] {
       return [
         ...(inFormerForm(text) ? [formerFormLine(at)] : []),
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
+        ...formerFenceIn(text).map((key) => formerFenceLine(at, key)),
         ...codexMode(at, text, frontmatterKey(text, 'harness')),
         ...(prompt === undefined ? [] : [harnessPromptLine(at, prompt)]),
+        ...(text && frontmatterKey(text, 'overridable') === undefined ? [overridableLine(at)] : []),
       ];
     }),
   ];
@@ -133,7 +139,7 @@ const agentAt = (dir: string, agent: string): string => path.join(agentsDir(dir)
 
 /** The word a file on `harness` names its sandbox under as `permissionMode:`, the former name of `sandbox:` there; else undefined. */
 const formerModeOf = (text: string, harness: string | undefined): string | undefined =>
-  harness === 'codex' ? frontmatterKey(text, 'permissionMode') : undefined;
+  harness === 'codex' ? frontmatterKey(text, 'permissionMode', true) : undefined;
 
 /**
  * Each step file of the workflow in `dir` with its text, the agent it names and the harness it runs on: its own `harness:`, else its

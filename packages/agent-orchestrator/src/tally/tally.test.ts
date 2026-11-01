@@ -1,13 +1,14 @@
 /**
- * A step's tallies (`tally.ts`): a `tally:` line read against the step's `output:` schema and refused where the closeout cannot hold it,
- * naming the step's file, the schema's and the entry; a closeout's value of a tally, null where nothing was measured and 0 where a zero
- * was; and the rows a step's tries total to. The fixtures name a workflow of their own, and no source of the counting names this
- * repository's.
+ * A step's tallies (`tally.ts`), as three tables: a `tally:` line read against the step's `output:` schema (`tallyOf`), each refusal a
+ * row asserting its kind and exit code; a closeout's value of a tally (`tallyIn`), null where nothing was measured and 0 where a zero
+ * was; and the rows a step's tries total to (`tallyRowsOf`). The fixtures name a workflow of their own, and no source of the counting
+ * names this repository's: the source guard at the file's end.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Invalid } from '../refusal/refusal.ts';
 import type { OutputSchema, StepOutput } from '../step/step.ts';
 import { tallyIn, tallyOf, tallyRowsOf } from './tally.ts';
 
@@ -34,169 +35,160 @@ const triage = schema({
   verdict: { type: 'string' },
 });
 
-/** The message `tallyOf` refuses `written` with, against `output`. */
-function refusal(written: string, output: StepOutput | undefined): string {
-  try {
-    tallyOf('triage', written, output);
-  } catch (err) {
-    return (err as Error).message;
-  }
-  return assert.fail(`tally: ${written} was not refused`);
-}
+/** A row of `tallyOf`: the line written, the schema it is read against, and the list it reads as, or `'refused'`. */
+type TallyOfRow = { name: string; written: string | undefined; output?: StepOutput | undefined; reads: string[] | undefined | 'refused' };
 
-test('a tally of an array, a number, an integer or null, and an array of items with a boolean flag reads as the list written', () => {
-  assert.deepEqual(tallyOf('triage', ' issues, issues.open ,score, seen', triage), ['issues', 'issues.open', 'score', 'seen']);
-  assert.equal(tallyOf('triage', undefined, triage), undefined, 'no line, no tally');
-  assert.deepEqual(tallyOf('triage', '', undefined), [], 'an empty line on a step with no output counts nothing');
+const TALLY_OF: TallyOfRow[] = [
+  {
+    name: 'a tally of an array, a number, an integer or null, and an array of items with a boolean flag reads as the list written',
+    written: ' issues, issues.open ,score, seen',
+    output: triage,
+    reads: ['issues', 'issues.open', 'score', 'seen'],
+  },
+  { name: 'no line, no tally', written: undefined, output: triage, reads: undefined },
+  { name: 'an empty line on a step with no output counts nothing', written: '', output: undefined, reads: [] },
+  {
+    name: 'a tally of the items of an array whose string has a value reads as written, a value of its enum or any value of a free string',
+    written: 'issues, issues.kind=bug, issues.note=a.b',
+    output: triage,
+    reads: ['issues', 'issues.kind=bug', 'issues.note=a.b'],
+  },
+  { name: 'REFUSED: a value its enum does not hold', written: 'issues.kind=nope', output: triage, reads: 'refused' },
+  ...['issues.open=true', 'issues.closed=bug', 'score.kind=bug'].map((written): TallyOfRow => ({
+    name: `REFUSED: a key that is no string of the items of an array: ${written}`,
+    written,
+    output: triage,
+    reads: 'refused',
+  })),
+  { name: 'REFUSED: an entry that names a key and no value', written: 'issues.kind=', output: triage, reads: 'refused' },
+  { name: 'REFUSED: an entry that names a free string and no value', written: 'issues.title=', output: triage, reads: 'refused' },
+  { name: 'REFUSED: a tally on a step with no output', written: 'issues', output: undefined, reads: 'refused' },
+  { name: 'REFUSED: a tally of a field the schema does not declare', written: 'issues, nope', output: triage, reads: 'refused' },
+  {
+    name: 'REFUSED: a tally of a field that is not an array, an integer or a number',
+    written: 'verdict',
+    output: triage,
+    reads: 'refused',
+  },
+  ...['issues.title', 'issues.closed', 'score.open'].map((written): TallyOfRow => ({
+    name: `REFUSED: a flag that is not a boolean of the items of an array: ${written}`,
+    written,
+    output: triage,
+    reads: 'refused',
+  })),
+  ...['issues.open.now', 'issues.', '.open', 'issues.kind=bug=x', 'issues.kind.x=bug', 'issues=bug', '=bug', 'issues.=bug'].map(
+    (written): TallyOfRow => ({
+      name: `REFUSED: more than one dot or equals sign, an empty part, or a value with no key: ${written}`,
+      written,
+      output: triage,
+      reads: 'refused',
+    }),
+  ),
+  { name: 'REFUSED: an entry given twice', written: 'issues, score, issues', output: triage, reads: 'refused' },
+  { name: 'REFUSED: an entry with a value given twice', written: 'issues.kind=bug, issues.kind=bug', output: triage, reads: 'refused' },
+];
+
+test("`tallyOf` reads a `tally:` line against the step's `output:` schema, and refuses what the closeout cannot hold", async (t) => {
+  for (const row of TALLY_OF)
+    await t.test(row.name, () => {
+      if (row.reads !== 'refused') return assert.deepEqual(tallyOf('triage', row.written, row.output), row.reads);
+      assert.throws(
+        () => tallyOf('triage', row.written, row.output),
+        (err: unknown) => err instanceof Invalid && err._tag === 'Invalid' && err.exitCode === 2,
+      );
+    });
 });
 
-test('a tally of the items of an array whose string has a value reads as written, a value of its enum or any value of a free string', () => {
-  assert.deepEqual(tallyOf('triage', 'issues, issues.kind=bug, issues.note=a.b', triage), ['issues', 'issues.kind=bug', 'issues.note=a.b']);
+/** A closeout every `tallyIn` row reads. */
+const OUTPUT = {
+  issues: [{ open: true }, { open: false }, {}, { open: 'true' }],
+  score: 2.5,
+  empty: [],
+  zero: 0,
+  kinds: [{ kind: 'bug' }, { kind: 'idea' }, { kind: 'Bug' }, {}, 'bug', { kind: 'bug ' }],
+  three: 'three',
+  none: null,
+  nan: Number.NaN,
+};
+
+const TALLY_IN: Array<{ name: string; tally: string; output?: Record<string, unknown>; value: number | null }> = [
+  { name: 'an array gives its item count', tally: 'issues', value: 4 },
+  { name: 'a flag gives the items whose flag is exactly true', tally: 'issues.open', value: 1 },
+  { name: 'a number gives its value', tally: 'score', value: 2.5 },
+  { name: 'an empty array is a measured 0', tally: 'empty', value: 0 },
+  { name: 'a flag of an empty array is a measured 0', tally: 'empty.open', value: 0 },
+  { name: 'a zero is a measured 0', tally: 'zero', value: 0 },
+  { name: '`field.key=value` gives the items whose key is exactly the value', tally: 'kinds.kind=bug', value: 1 },
+  { name: '`field.key=value` of another value', tally: 'kinds.kind=idea', value: 1 },
+  { name: '`field.key=value` of an empty array is 0', tally: 'empty.kind=bug', value: 0 },
+  { name: 'a field missing measured nothing: null, never 0', tally: 'missing', value: null },
+  { name: 'a field of another type at run time measured nothing', tally: 'three', value: null },
+  { name: 'a flag of a field that is no array measured nothing', tally: 'three.open', value: null },
+  { name: 'a match of a field that is no array measured nothing', tally: 'three.kind=bug', value: null },
+  { name: 'a match of a missing field measured nothing', tally: 'missing.kind=bug', value: null },
+  { name: 'a null measured nothing', tally: 'none', value: null },
+  { name: 'NaN measured nothing', tally: 'nan', value: null },
+  { name: 'no closeout measured nothing', tally: 'issues', output: undefined, value: null },
+  { name: 'no closeout measured no match', tally: 'issues.kind=bug', output: undefined, value: null },
+];
+
+test("`tallyIn` gives a closeout's value of a tally: null where nothing was measured, 0 where a zero was", async (t) => {
+  for (const row of TALLY_IN)
+    await t.test(row.name, () => assert.equal(tallyIn(row.tally, 'output' in row ? row.output : OUTPUT), row.value));
 });
 
-test('REFUSED: a value its enum does not hold, naming the step file, the schema file and the values it holds', () => {
-  const message = refusal('issues.kind=nope', triage);
-  assert.match(message, /^triage: `tally: issues.kind=nope` in triage\.md: /);
-  assert.ok(message.includes('`output: triage.schema.json`'), message);
-  assert.ok(message.includes('the `kind` of the items of `issues`'), message);
-  assert.ok(message.includes('as one of bug, idea'), message);
-});
+const DAYS = ['2026-09-01', '2026-09-02', '2026-09-03'];
 
-test('REFUSED: a key that is no string of the items of an array, naming the step file, the schema file, the field and the key', () => {
-  for (const written of ['issues.open=true', 'issues.closed=bug', 'score.kind=bug']) {
-    const message = refusal(written, triage);
-    const [field, key] = written.split('=')[0].split('.');
-    assert.match(message, /triage\.md/, written);
-    assert.ok(
-      message.includes(`\`output: triage.schema.json\` declares no string \`${key}\` on the items of an array \`${field}\``),
-      `${written}: ${message}`,
-    );
-  }
-});
-
-test('REFUSED: an entry that names a key and no value', () => {
-  const message = refusal('issues.kind=', triage);
-  assert.match(message, /triage\.md/);
-  assert.ok(message.includes('`issues.kind=` names no value'), message);
-});
-
-test('a tally on a step with no output is refused, naming the step file', () => {
-  const message = refusal('issues', undefined);
-  assert.match(message, /^triage: `tally: issues` in triage\.md /);
-  assert.match(message, /declares no `output:`/);
-});
-
-test('a tally of a field the schema does not declare is refused, naming the step file, the schema file and the fields it has', () => {
-  const message = refusal('issues, nope', triage);
-  assert.match(message, /triage\.md/);
-  assert.match(message, /`output: triage\.schema\.json` declares no field `nope`/);
-  assert.match(message, /it declares issues, score, seen, verdict/);
-});
-
-test('a tally of a field that is not an array, an integer or a number is refused, naming the field and its type', () => {
-  const message = refusal('verdict', triage);
-  assert.match(message, /triage\.md/);
-  assert.match(message, /`output: triage\.schema\.json` declares `verdict`/);
-  assert.match(message, /`verdict` as \["string"\]/);
-});
-
-test('a flag that is not a boolean of the items of an array is refused, naming the field and the flag', () => {
-  for (const written of ['issues.title', 'issues.closed', 'score.open']) {
-    const message = refusal(written, triage);
-    const [field, flag] = written.split('.');
-    assert.match(message, /triage\.md/, written);
-    assert.ok(message.includes(`declares no boolean \`${flag}\` on the items of an array \`${field}\``), `${written}: ${message}`);
-    assert.ok(message.includes('`output: triage.schema.json`'), written);
-  }
-});
-
-test('an entry with more than one dot or one equals sign, an empty part, or a value with no key is refused, naming the three forms', () => {
-  for (const written of [
-    'issues.open.now',
-    'issues.',
-    '.open',
-    'issues.kind=bug=x',
-    'issues.kind.x=bug',
-    'issues=bug',
-    '=bug',
-    'issues.=bug',
-  ]) {
-    const message = refusal(written, triage);
-    assert.ok(message.includes(`\`${written}\` is none of a field, \`field.flag\` and \`field.key=value\``), `${written}: ${message}`);
-    assert.match(message, /triage\.md/);
-  }
-});
-
-test('an entry given twice is refused', () => {
-  const message = refusal('issues, score, issues', triage);
-  assert.match(message, /triage\.md/);
-  assert.match(message, /names `issues` twice/);
-  assert.match(refusal('issues.kind=bug, issues.kind=bug', triage), /names `issues.kind=bug` twice/);
-});
-
-test('a closeout gives an array its item count, a number its value and a flag its true items; a zero measured is 0', () => {
-  const output = { issues: [{ open: true }, { open: false }, {}, { open: 'true' }], score: 2.5, empty: [], zero: 0 };
-  assert.equal(tallyIn('issues', output), 4);
-  assert.equal(tallyIn('issues.open', output), 1);
-  assert.equal(tallyIn('score', output), 2.5);
-  assert.equal(tallyIn('empty', output), 0);
-  assert.equal(tallyIn('empty.open', output), 0);
-  assert.equal(tallyIn('zero', output), 0);
-});
-
-test('a closeout gives `field.key=value` the items whose key is exactly the value; an empty array is 0', () => {
-  const output = { issues: [{ kind: 'bug' }, { kind: 'idea' }, { kind: 'Bug' }, {}, 'bug', { kind: 'bug ' }], empty: [] };
-  assert.equal(tallyIn('issues.kind=bug', output), 1);
-  assert.equal(tallyIn('issues.kind=idea', output), 1);
-  assert.equal(tallyIn('empty.kind=bug', output), 0);
-});
-
-test('a closeout without the field, with another type at run time, or none at all, measured nothing: null, never 0', () => {
-  const output = { issues: 'three', score: null, nan: Number.NaN };
-  assert.equal(tallyIn('missing', output), null);
-  assert.equal(tallyIn('issues', output), null);
-  assert.equal(tallyIn('issues.open', output), null);
-  assert.equal(tallyIn('issues.kind=bug', output), null);
-  assert.equal(tallyIn('missing.kind=bug', output), null);
-  assert.equal(tallyIn('issues.kind=bug', undefined), null);
-  assert.equal(tallyIn('score', output), null);
-  assert.equal(tallyIn('nan', output), null);
-  assert.equal(tallyIn('issues', undefined), null);
-});
-
-test("a step's tries total per tally over the range and per day, null on a day nothing was measured", () => {
-  const rows = tallyRowsOf(
-    [
+const TALLY_ROWS: Array<{ name: string; tries: Parameters<typeof tallyRowsOf>[0]; rows: ReturnType<typeof tallyRowsOf> }> = [
+  {
+    name: "a step's tries total per tally over the range and per day, null on a day nothing was measured, in the order first given",
+    tries: [
       { step: 'triage', day: '2026-09-01', tallies: [{ tally: 'issues', value: 3 }] },
       { step: 'triage', day: '2026-09-01', tallies: [{ tally: 'issues', value: 0 }] },
       { step: 'triage', day: '2026-09-02', tallies: [{ tally: 'issues', value: null }] },
       { step: 'check-in', day: '2026-09-02', tallies: [{ tally: 'notes', value: 2 }] },
       { step: 'plain', day: '2026-09-02', tallies: [] },
     ],
-    ['2026-09-01', '2026-09-02', '2026-09-03'],
-  );
-  assert.deepEqual(rows, [
-    {
-      step: 'triage',
-      tally: 'issues',
-      total: { sum: 3, tries: 2 },
-      days: [
-        { day: '2026-09-01', sum: 3, tries: 2 },
-        { day: '2026-09-02', sum: null, tries: 0 },
-        { day: '2026-09-03', sum: null, tries: 0 },
-      ],
-    },
-    {
-      step: 'check-in',
-      tally: 'notes',
-      total: { sum: 2, tries: 1 },
-      days: [
-        { day: '2026-09-01', sum: null, tries: 0 },
-        { day: '2026-09-02', sum: 2, tries: 1 },
-        { day: '2026-09-03', sum: null, tries: 0 },
-      ],
-    },
-  ]);
+    rows: [
+      {
+        step: 'triage',
+        tally: 'issues',
+        total: { sum: 3, tries: 2 },
+        days: [
+          { day: '2026-09-01', sum: 3, tries: 2 },
+          { day: '2026-09-02', sum: null, tries: 0 },
+          { day: '2026-09-03', sum: null, tries: 0 },
+        ],
+      },
+      {
+        step: 'check-in',
+        tally: 'notes',
+        total: { sum: 2, tries: 1 },
+        days: [
+          { day: '2026-09-01', sum: null, tries: 0 },
+          { day: '2026-09-02', sum: 2, tries: 1 },
+          { day: '2026-09-03', sum: null, tries: 0 },
+        ],
+      },
+    ],
+  },
+  {
+    name: 'a tally no try measured totals null over 0 tries, never 0',
+    tries: [{ step: 'triage', day: '2026-09-03', tallies: [{ tally: 'issues', value: null }] }],
+    rows: [
+      {
+        step: 'triage',
+        tally: 'issues',
+        total: { sum: null, tries: 0 },
+        days: DAYS.map((day) => ({ day, sum: null, tries: 0 })),
+      },
+    ],
+  },
+  { name: 'no try declares a tally: no row', tries: [{ step: 'plain', day: '2026-09-01', tallies: [] }], rows: [] },
+];
+
+test("`tallyRowsOf` totals a step's tries per tally, over the range and on each of its days", async (t) => {
+  for (const row of TALLY_ROWS) await t.test(row.name, () => assert.deepEqual(tallyRowsOf(row.tries, DAYS), row.rows));
 });
 
 /** The words of this repository's build workflow that the counting must never know. */

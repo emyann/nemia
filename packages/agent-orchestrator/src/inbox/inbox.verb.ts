@@ -27,7 +27,10 @@ import {
 import { gateRefusal } from '../ending/ending.ts';
 import { isRepositoryRun, type Run } from '../record/record.ts';
 import { isDirectory } from '../record/record.store.ts';
-import { inboxDir, runStore } from '../record/files.store.ts';
+import { inboxDir } from '../record/files.store.ts';
+import { CardDoor } from '../cards/cards.store.ts';
+import { RunDoor } from '../runs/runs.store.ts';
+import { CardName } from './inbox.model.ts';
 import { inboxCards, readableFactories } from './inbox.store.ts';
 import { repoFor, startRun } from '../start/start.verb.ts';
 import { contextRefusal } from '../start/index.ts';
@@ -137,20 +140,22 @@ function cardFactory(opts: Pick<InboxStart, 'factory' | 'fix'>, named: string | 
  */
 export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: InboxStart) {
   const refused = inboxNameRefusal(opts.name);
-  if (refused) throw new WorkflowError(refused);
-  const file = runStore.inbox.where(`${opts.name}.md`);
-  const text = runStore.inbox.read(`${opts.name}.md`);
+  if (refused) return yield* Effect.fail(new WorkflowError(refused));
+  const door = yield* CardDoor;
+  const runs = yield* RunDoor;
+  const name = CardName.read(opts.name);
+  const file = yield* door.cards.where(name);
+  const text = yield* door.cards.read(name);
   if (text === null) {
-    throw new Missing({
-      message: `${noCardLine(opts.name, inboxCards())} Start one of those — nemia start ${runStore.inbox.where('<name>.md')} — or park the idea first: nemia inbox add "<idea>".`,
-    });
+    return yield* Effect.fail(
+      new Missing({
+        message: `${noCardLine(opts.name, yield* inboxCards())} Start one of those — nemia start ${path.join(path.dirname(file), '<name>.md')} — or park the idea first: nemia inbox add "<idea>".`,
+      }),
+    );
   }
   const card = parseInboxCard(`${opts.name}.md`, text, isDirectory);
-  const started = runStore.runs
-    .list()
-    .filter((r) => r.from?.inbox === card.name)
-    .map((r) => r.id);
-  if (started.length) throw new Conflict({ message: startedRefusal(card, file, started) });
+  const started = (yield* runs.runs.list()).filter((r) => r.from?.inbox === card.name).map((r) => r.id);
+  if (started.length) return yield* Effect.fail(new Conflict({ message: startedRefusal(card, file, started) }));
 
   const factory = cardFactory(opts, card.factory, file);
   const repo = repoFor(factory, opts.repo ?? card.repo, opts.callerRepo);
@@ -161,7 +166,8 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     );
   }
   const gates = cardGates(card, opts.gates ?? [], workflowDir, repo);
-  const context = cardContext(card, opts);
+  const ids = new Set(yield* runs.runs.ids());
+  const context = cardContext(card, opts, (id) => ids.has(id));
 
   const run = yield* startRun({
     brief: opts.brief?.trim() ?? card.body,
@@ -177,7 +183,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
     ...(factory !== undefined ? { factory } : {}),
   });
   const ignoredRepo = card.repo !== undefined && !isRepositoryRun(run) ? { ignoredRepo: card.repo } : {};
-  const queueLeft = card.queued === undefined ? undefined : takeQueueOff(card.name, file);
+  const queueLeft = card.queued === undefined ? undefined : yield* takeQueueOff(name, file);
   const out: InboxStarted = { run, card, ...ignoredRepo, ...(queueLeft !== undefined ? { queueLeft } : {}) };
   return out;
 });
@@ -187,21 +193,19 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
  * back and an edit made since is kept, its paths not judged, as `nemia inbox queue --off` takes it off. Why it is still there, when that
  * failed.
  */
-function takeQueueOff(name: string, file: string): string | undefined {
-  try {
-    const now = runStore.inbox.read(`${name}.md`);
+const takeQueueOff = (name: CardName, file: string): Effect.Effect<string | undefined, never, never> =>
+  Effect.gen(function* () {
+    const door = yield* CardDoor;
+    const now = yield* door.cards.read(name);
     if (now === null) return undefined;
     const card = parseInboxCard(`${name}.md`, now, () => true);
     if (card.queued !== undefined)
-      runStore.inbox.rewrite(
-        `${name}.md`,
+      yield* door.cards.rewrite(
+        name,
         queuedText(card, null, () => true),
       );
     return undefined;
-  } catch (err) {
-    return `${file} keeps its queued: line — ${(err as Error).message}`;
-  }
-}
+  }).pipe(Effect.catchCause((cause) => Effect.succeed(`${file} keeps its queued: line — ${(Cause.squash(cause) as Error).message}`)));
 
 /** The steps a card's run is gated at: its `gate:` first, then `flags`, a step both name once — refused as the card's line when no step. */
 function cardGates(card: InboxCard, flags: readonly string[], workflowDir: string, repo: string): string[] {
@@ -215,8 +219,8 @@ function cardGates(card: InboxCard, flags: readonly string[], workflowDir: strin
 /**
  * The runs a card's run is handed as context: its `from:`, then `opts.context`, a run both name once — refused as `contextRefusal` says.
  */
-function cardContext(card: InboxCard, opts: InboxStart): string[] {
-  const refusedFrom = contextRefusal(card.from ?? [], opts.after ?? [], runStore.runs.exists, undefined, `${card.file}: from:`);
+function cardContext(card: InboxCard, opts: InboxStart, exists: (id: string) => boolean): string[] {
+  const refusedFrom = contextRefusal(card.from ?? [], opts.after ?? [], exists, undefined, `${card.file}: from:`);
   if (refusedFrom) throw refusedFrom;
   return [...new Set([...(card.from ?? []), ...(opts.context ?? [])])];
 }
@@ -226,47 +230,51 @@ export type InboxFrom = { card: InboxCard; file: string; was: string[] };
 
 /**
  * `nemia inbox from <card> <run>…`: the card's `from:` set to `runs`, the runs its run is handed as context — or taken off, for none
- * (`--off`). The card is written whole through `runStore.inbox.rewrite`, every other key kept (`fromText`).
+ * (`--off`). The card is written whole through the Card door (`cards.rewrite`), every other key kept (`fromText`).
  *
  * Refused by name, exit 2, before anything is written: a name that is not a card's (`inboxNameRefusal`), a name with no card (`Missing`),
  * a card that does not read, a card a run's record says was started (`Conflict`, `startedRefusal`), and what `contextRefusal` refuses of
  * `runs`: one the store does not have (`Missing`) or one named twice.
  */
-export function setFrom(name: string, runs: readonly string[]): InboxFrom {
+export const setFrom = Effect.fn('setFrom')(function* (name: string, runs: readonly string[]) {
   const refused = inboxNameRefusal(name);
-  if (refused) throw new WorkflowError(refused);
-  const file = runStore.inbox.where(`${name}.md`);
-  const text = runStore.inbox.read(`${name}.md`);
+  if (refused) return yield* Effect.fail(new WorkflowError(refused));
+  const door = yield* CardDoor;
+  const runDoor = yield* RunDoor;
+  const card$ = CardName.read(name);
+  const file = yield* door.cards.where(card$);
+  const text = yield* door.cards.read(card$);
   if (text === null) {
-    throw new Missing({
-      message: `${noCardLine(name, inboxCards())} Name one of those — nemia inbox from <name> <run> — or park the idea first: nemia inbox add "<idea>".`,
-    });
+    return yield* Effect.fail(
+      new Missing({
+        message: `${noCardLine(name, yield* inboxCards())} Name one of those — nemia inbox from <name> <run> — or park the idea first: nemia inbox add "<idea>".`,
+      }),
+    );
   }
   const card = parseInboxCard(`${name}.md`, text, () => true);
-  const started = runStore.runs
-    .list()
-    .filter((r) => r.from?.inbox === card.name)
-    .map((r) => r.id);
-  if (started.length) throw new Conflict({ message: startedRefusal(card, file, started) });
-  const refusedRuns = contextRefusal(runs, [], runStore.runs.exists, undefined, 'nemia inbox from');
-  if (refusedRuns) throw refusedRuns;
+  const started = (yield* runDoor.runs.list()).filter((r) => r.from?.inbox === card.name).map((r) => r.id);
+  if (started.length) return yield* Effect.fail(new Conflict({ message: startedRefusal(card, file, started) }));
+  const ids = new Set(yield* runDoor.runs.ids());
+  const refusedRuns = contextRefusal(runs, [], (id) => ids.has(id), undefined, 'nemia inbox from');
+  if (refusedRuns) return yield* Effect.fail(refusedRuns);
   const written = fromText(card, runs, () => true);
-  runStore.inbox.rewrite(`${name}.md`, written);
-  return { card: parseInboxCard(`${name}.md`, written, () => true), file, was: card.from ?? [] };
-}
+  yield* door.cards.rewrite(card$, written);
+  const out: InboxFrom = { card: parseInboxCard(`${name}.md`, written, () => true), file, was: card.from ?? [] };
+  return out;
+});
 
 /**
  * The tries in `names` of cards `listing` does not list as tried — no longer queued as they were — removed; one that cannot be is left for
  * a later pass.
  */
-function dropStaleTries(names: Iterable<string>, listing: readonly InboxListing[]): void {
-  for (const name of names) {
-    if (listing.some((l) => l.name === name && l.tried)) continue;
-    try {
-      runStore.inbox.dropTry(name);
-    } catch {}
-  }
-}
+const dropStaleTries = (names: Iterable<string>, listing: readonly InboxListing[]) =>
+  Effect.gen(function* () {
+    const door = yield* CardDoor;
+    for (const name of names) {
+      if (listing.some((l) => l.name === name && l.tried)) continue;
+      yield* Effect.ignoreCause(door.tries.drop(CardName.read(name)));
+    }
+  });
 
 /**
  * The repository a queued card's line names (`on`), when it was tried on the daemon's (`fromDaemon`): none for a card that names no
@@ -292,11 +300,13 @@ const daemonsRepo = (card: Pick<InboxListing, 'factory'>, on: string, fromDaemon
  * card again. The inbox, the tries and, with a card queued, the factories are read once. A try written for a card that is no longer
  * queued as it was is removed on the way, or on a later pass when it cannot be.
  */
-export const startQueued = Effect.fn('startQueued')(function* (repo: string, runs: readonly Run[] = runStore.runs.list()) {
-  const files = runStore.inbox.entries();
-  const tries = runStore.inbox.tries();
+export const startQueued = Effect.fn('startQueued')(function* (repo: string, given?: readonly Run[]) {
+  const door = yield* CardDoor;
+  const runs = given ?? (yield* (yield* RunDoor).runs.list());
+  const files = yield* door.cards.entries();
+  const tries = yield* door.tries.list();
   const listing = inboxListing(files, runs, isDirectory, tries);
-  dropStaleTries(tries.keys(), listing);
+  yield* dropStaleTries(tries.keys(), listing);
   if (!queueOrder(listing).length) return undefined;
   const factories = readableFactories();
   const next = nextQueued(listing, repo, factories);
@@ -323,9 +333,7 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, run
   const card = files.find((f) => f.file === next.file);
   if (card) {
     const record: MissedStart = { at: new Date().toISOString(), text: card.text, repo: on, why, refused };
-    try {
-      runStore.inbox.putTry(next.name, record);
-    } catch {}
+    yield* Effect.ignoreCause(door.tries.put(CardName.read(next.name), record));
   }
   return refused
     ? ({ card: next.name, refused: why, ...where } satisfies QueueStarted)

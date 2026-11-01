@@ -8,6 +8,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { tried } from '../runtime-client.ts';
+import { Effect } from 'effect';
+import { rooted } from '../wiring/wire.verb.ts';
 import type { Args, Flag, Positional, Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { apiKey, cliPath, factoryFlag, FROM, versionFlag, writerSpec, yoursOrRefused } from '../yours/yours.ts';
@@ -172,13 +174,13 @@ export const WORKFLOWS_WRITE: Command<WorkflowWritten & { version: string }> = {
  * tick never starts again; and every factory that attaches its name while none of its repositories has a workflow of that name, with its
  * hires into it. A run that froze its steps, a card not queued and a factory with a repository's workflow of the name go on without it.
  */
-function usersOf(dir: string): string[] {
+const usersOf = Effect.fn('usersOf')(function* (dir: string) {
   const name = path.basename(dir);
   const runs = runStore.runs
     .list(() => {})
     .filter((run) => run.workflow === undefined && path.resolve(run.workflowDir) === dir)
     .map((run) => stillNeeded.run(run.id, dir));
-  const cards = readInbox()
+  const cards = (yield* readInbox())
     .filter((card) => card.queued?.place != null && card.workflow !== null && path.resolve(inboxDir(), card.workflow) === dir)
     .map((card) => stillNeeded.card(card.name, dir));
   const factories = readFactories().flatMap((factory) => {
@@ -188,7 +190,7 @@ function usersOf(dir: string): string[] {
     return [stillNeeded.factory(factory.name, name, hires.sort())];
   });
   return [...runs, ...cards, ...factories];
-}
+});
 
 /**
  * A folder of yours, `<home>/workflows/<name>`, removed whole (`removeWorkflow`), checked first against the version it was read at
@@ -214,10 +216,15 @@ export const WORKFLOWS_REMOVE: Command<WorkflowRemoved> = {
     hand: 'the builder guards the removal, and decodes its version in its own words',
   },
   handler: (args, _env, home = HOME) =>
-    tried(() => {
-      const dir = path.resolve(versionHeld('nemia workflows rm', 'remove', args, home));
-      return removeWorkflow(dir, { home, users: usersOf(dir) });
-    }),
+    rooted(
+      home,
+      'workflows rm',
+      Effect.gen(function* () {
+        const dir = yield* tried(() => path.resolve(versionHeld('nemia workflows rm', 'remove', args, home)));
+        const users = yield* usersOf(dir);
+        return yield* tried(() => removeWorkflow(dir, { home, users }));
+      }),
+    ),
   print: ({ dir, removed }) => [`removed ${dir}: ${removed.join(', ')}`],
 };
 

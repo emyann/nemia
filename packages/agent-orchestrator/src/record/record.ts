@@ -757,43 +757,4 @@ export type RunStore = {
     /** Where a person finds the run's marker: the path a message names for them to read or remove. */
     readonly where: (id: string) => string;
   };
-  readonly inbox: {
-    /**
-     * The inbox's entries, by their file in it: a folder by its name and a trailing `/`, a markdown file with its text, any other file
-     * with none. None when there is no inbox yet.
-     */
-    readonly entries: () => Array<{ file: string; text: string }>;
-    /** The text of the inbox's entry `file` (`<name>.md` for a card), or null when it is not there. Throws anything else. */
-    readonly read: (file: string) => string | null;
-    /** When the entry `file` was last written, as an ISO time: a card's filing time. Null when it is gone. */
-    readonly filedAt: (file: string) => string | null;
-    /**
-     * File a person's card at `file`, exclusively: false when a file already stands at its name, which is left as it is. Throws what the
-     * filesystem throws otherwise.
-     */
-    readonly add: (file: string, text: string) => boolean;
-    /**
-     * Write a person's card at `file` whole, through a hidden file renamed over it, so a reader never reads half a card; the card keeps
-     * the time it was filed, set back when it can be. Throws what the filesystem throws.
-     */
-    readonly rewrite: (file: string, text: string) => void;
-    /** Remove a person's card at `file`: false when it is not there. Throws what the filesystem throws otherwise. */
-    readonly drop: (file: string) => boolean;
-    /** Where a person finds the inbox's entry `file`: the path a message names. */
-    readonly where: (file: string) => string;
-    /**
-     * The name of the card `given` is a path to — any path under the inbox, `<inbox>/<name>.md` or `<inbox>/<name>`, links resolved on
-     * the way to both — or null for a path outside it, and for text: the inverse of `where`.
-     */
-    readonly nameAt: (given: string) => string | null;
-    /**
-     * The tick's tries of a queued card's start that did not happen, by card name. A file that does not read as one, torn or removed
-     * after the listing, is none.
-     */
-    readonly tries: () => Map<string, MissedStart>;
-    /** Write down the tick's try of the card `name`, whole over the one there: the tick's alone. Throws what the filesystem throws. */
-    readonly putTry: (name: string, tried: MissedStart) => void;
-    /** Remove the tick's try of the card `name`, there or not: the tick's alone. */
-    readonly dropTry: (name: string) => void;
-  };
 };

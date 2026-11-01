@@ -1,7 +1,8 @@
 /**
  * The run store on files under `WF_ROOT`: `filesStore`, the only implementation of `RunStore`, made of the functions of
- * `record.store.ts` and of a person's writes beside them here, and of the inbox's files (`inboxDir`, and the tick's tries of a queued
- * card beside it); and `runStore`, the one binding every controller reads it through, where another implementation would be swapped in.
+ * `record.store.ts` and of a person's writes beside them here, and the path of the inbox (`inboxDir`), whose cards are the Card door's
+ * (`src/cards/cards.store.ts`); the claims of the cards started (`claimCard`); and `runStore`, the one binding every controller reads it
+ * through, where another implementation would be swapped in.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -9,7 +10,6 @@ import { isDeepStrictEqual } from 'node:util';
 import { Schema } from 'effect';
 import { pauseFile, readPause } from '../pause/pause.store.ts';
 import type { Pause } from '../pause/pause.ts';
-import { inboxNameOf, type MissedStart } from '../inbox/index.ts';
 import type { AskKey, AskOf, AsksRead, AskWritten, PersonRequest, Pruned, Run, RunStore } from './record.ts';
 import type { RetryAsk } from '../retry/index.ts';
 import type { RoundAsk } from '../status/status.ts';
@@ -247,19 +247,6 @@ function dropFiles(id: string): string | null {
   }
 }
 
-/** The name of the inbox card `given` is a path to, links resolved on the way to it and to the inbox (`inboxNameOf`); else null. */
-function inboxNameAt(given: string): string | null {
-  const real = (at: string): string => {
-    try {
-      return fs.realpathSync(at);
-    } catch {
-      return at;
-    }
-  };
-  const at = path.resolve(given);
-  return inboxNameOf(path.join(real(path.dirname(at)), path.basename(at)), real(inboxDir()));
-}
-
 /** Write the prune marker whole, or remove it for `undefined`. */
 const writePruned = (id: string, marker: Pruned | undefined): void =>
   marker ? fs.writeFileSync(pruneFile(id), JSON.stringify(marker, null, 2)) : fs.rmSync(pruneFile(id), { force: true });
@@ -269,112 +256,6 @@ const writePruned = (id: string, marker: Pruned | undefined): void =>
  * repository, since a card's `repo:` says which one the idea is about.
  */
 export const inboxDir = (): string => path.join(HOME, 'inbox');
-
-/**
- * Where the tick writes down a queued card's start it tried and did not make (`MissedStart`): `$WF_ROOT/queue/<name>.json`, outside the
- * inbox, which is a person's. The tick is its one writer: it writes one when a start does not happen, and removes it once the card is not
- * queued as it was — started, taken back, dropped or edited.
- */
-const queueDir = (): string => path.join(HOME, 'queue');
-
-/** The inbox's entries: a folder by its name and a trailing `/`, a markdown file with its text, any other file with none. */
-function inboxEntries(): Array<{ file: string; text: string }> {
-  let names: string[];
-  try {
-    names = fs.readdirSync(inboxDir());
-  } catch {
-    return [];
-  }
-  return names.map((name) => {
-    const at = path.join(inboxDir(), name);
-    if (isDirectory(at)) return { file: `${name}/`, text: '' };
-    try {
-      return { file: name, text: name.endsWith('.md') ? fs.readFileSync(at, 'utf8') : '' };
-    } catch {
-      return { file: name, text: '' };
-    }
-  });
-}
-
-/** The text of the inbox's entry `file`, or null when it is not there. */
-function readInboxFile(file: string): string | null {
-  try {
-    return fs.readFileSync(path.join(inboxDir(), file), 'utf8');
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return null;
-    throw err;
-  }
-}
-
-/** When the inbox's entry `file` was last written, or null when it is gone. */
-const filedAt = (file: string): string | null =>
-  fs.statSync(path.join(inboxDir(), file), { throwIfNoEntry: false })?.mtime.toISOString() ?? null;
-
-/** A card filed at `file` exclusively, the inbox made first: false when a file stands at its name. */
-function addCard(file: string, text: string): boolean {
-  fs.mkdirSync(inboxDir(), { recursive: true });
-  try {
-    fs.writeFileSync(path.join(inboxDir(), file), text, { flag: 'wx' });
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'EEXIST') return false;
-    throw err;
-  }
-  return true;
-}
-
-/** A card written whole at `file` through a hidden file renamed over it, its prior time set back when it can be. */
-function rewriteCard(file: string, text: string): void {
-  const at = path.join(inboxDir(), file);
-  const filed = fs.statSync(at, { throwIfNoEntry: false })?.mtime;
-  const hidden = path.join(inboxDir(), `.${file}.${process.pid}`);
-  fs.writeFileSync(hidden, text);
-  fs.renameSync(hidden, at);
-  if (!filed) return;
-  try {
-    fs.utimesSync(at, filed, filed);
-  } catch {}
-}
-
-/** A card removed at `file`: false when it is not there. */
-function dropCard(file: string): boolean {
-  try {
-    fs.rmSync(path.join(inboxDir(), file));
-  } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === 'ENOENT') return false;
-    throw err;
-  }
-  return true;
-}
-
-/** A try as the tick writes it (`MissedStart`); any key beside these is left unread. */
-const isMissedStart = Schema.is(
-  Schema.Struct({ at: Schema.String, text: Schema.String, repo: Schema.String, why: Schema.String, refused: Schema.Boolean }),
-);
-
-/** The tries the tick has written down, by card name; a file that does not read as one is none. */
-function queueTries(): Map<string, MissedStart> {
-  const tries = new Map<string, MissedStart>();
-  let names: string[];
-  try {
-    names = fs.readdirSync(queueDir()).filter((n) => n.endsWith('.json'));
-  } catch {
-    return tries;
-  }
-  for (const file of names) {
-    try {
-      const r: unknown = JSON.parse(fs.readFileSync(path.join(queueDir(), file), 'utf8'));
-      if (isMissedStart(r))
-        tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
-    } catch {}
-  }
-  return tries;
-}
-
-/** The tick's try of the card `name` written whole, the queue's folder made first. */
-function putTry(name: string, tried: MissedStart): void {
-  fs.mkdirSync(queueDir(), { recursive: true });
-  fs.writeFileSync(path.join(queueDir(), `${name}.json`), JSON.stringify(tried, null, 2));
-}
 
 /** Where `nemia rm` writes down the engine's tasks of the runs it forgets: beside `runs/`, since each `runs/<id>.*` goes with a record. */
 const forgettingDir = (): string => path.join(HOME, 'forgetting');
@@ -518,7 +399,7 @@ export function claimCard(card: string, id: string): { taken: true } | { by: str
 
 /**
  * A run's record and a person's files beside it, each a file of its own under `runs/`, with the store's pause composed onto each run read
- * (`paused`); the markers of the runs `nemia rm` forgets, under `forgetting/`; the inbox's cards and the tick's tries.
+ * (`paused`); the markers of the runs `nemia rm` forgets, under `forgetting/`.
  */
 export const filesStore: RunStore = {
   runs: {
@@ -551,19 +432,6 @@ export const filesStore: RunStore = {
     list: forgettingRuns,
     lift: (id) => fs.rmSync(forgettingFile(id), { force: true }),
     where: forgettingFile,
-  },
-  inbox: {
-    entries: inboxEntries,
-    read: readInboxFile,
-    filedAt,
-    add: addCard,
-    rewrite: rewriteCard,
-    drop: dropCard,
-    where: (file) => path.join(inboxDir(), file),
-    nameAt: inboxNameAt,
-    tries: queueTries,
-    putTry,
-    dropTry: (name) => fs.rmSync(path.join(queueDir(), `${name}.json`), { force: true }),
   },
 };
 

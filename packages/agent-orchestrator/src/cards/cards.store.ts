@@ -63,11 +63,15 @@ export type CardDoorShape = DoorOf<CardLayer, CardName>;
 
 /** A card already at a new card's name, as a refusal: the files say so by `EEXIST`, the memory by its own. */
 export const cardTaken = (name: string, file: string): Conflict =>
-  new Conflict({ message: `a card is filed already at ${file}: file the new one under another name, or drop that one with nemia inbox rm ${name}` });
+  new Conflict({
+    message: `a card is filed already at ${file}: file the new one under another name, or drop that one with nemia inbox rm ${name}`,
+  });
 
 /** No card at the name a write back names, as a refusal. */
 export const noCardToRewrite = (name: string): Missing =>
-  new Missing({ message: `there is no card ${name} to write back: file it with nemia inbox add, or name a card nemia inbox lists. Nothing was written.` });
+  new Missing({
+    message: `there is no card ${name} to write back: file it with nemia inbox add, or name a card nemia inbox lists. Nothing was written.`,
+  });
 
 /** A name a card or a try is written under, as `CardName.OnCreate` checks it. */
 const nameChecked = checked(CardName.OnCreate, (name: string) => `a card under ${JSON.stringify(name)}`);

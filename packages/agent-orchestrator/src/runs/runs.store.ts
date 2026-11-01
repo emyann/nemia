@@ -1,8 +1,8 @@
 /**
  * The Run door: the one way a program reads and writes a run — its record, and the files a person keeps beside it (asks, holds, refresh
  * asks, the markers of what `nemia rm` forgets) — an Effect service, `RunDoor`, whose methods take a run's id as `RunId` and answer an
- * Effect failing with a refusal. Its shape is the run store's (`RunStore`, `record/record.ts`) but the inbox, which is the Card door's
- * (S3) and stays on `runStore` as its seam.
+ * Effect failing with a refusal. Its shape is the run store's (`RunStore`, `record/record.ts`); the inbox is the Card door's
+ * (`src/cards/cards.store.ts`).
  *
  * Two layers: the files (`runDoorFiles`, over `filesStore`, so a record is the very bytes it was), which `runWith` gives a program that
  * was given none, and the memory stand-in (`runDoorMemory`, `memory.store.ts`), which a test gives its program. Both are built by
@@ -19,8 +19,8 @@ import { claimCard, filesStore } from '../record/files.store.ts';
 import { Run as RunModel, RunId } from '../record/record.model.ts';
 import type { Run, RunStore } from '../record/record.ts';
 
-/** A layer of the Run door: the run store's groups but the inbox, as plain synchronous methods. */
-export type RunsLayer = Omit<RunStore, 'inbox'>;
+/** A layer of the Run door: the run store's groups, as plain synchronous methods. */
+export type RunsLayer = RunStore;
 
 /** The Run door's shape: each method of `RunsLayer` answering an Effect, a run's id taken as `RunId`. */
 export type RunDoorShape = DoorOf<RunsLayer, RunId>;
@@ -63,8 +63,8 @@ export const cardStartedTwice = (card: string, run: string): Conflict =>
     message: `card ${card} was started already as run ${run}: read it with nemia show ${run}, or forget it with nemia rm ${run} and start the card again`,
   });
 
-/** The run store's files but the inbox, a new run's record refused as `runTaken` when one is there: what the files layer is over. */
-const { inbox: _, ...files } = filesStore;
+/** The run store's files, a new run's record refused as `runTaken` when one is there: what the files layer is over. */
+const files = filesStore;
 const filesRuns: RunsLayer = {
   ...files,
   runs: {

@@ -44,7 +44,10 @@ test("the inbox's entries: a folder by its name and a trailing slash, any other 
 test('a card that is there and cannot be read is not read as gone: reading it dies of what the disk said', () => {
   const { door, inbox } = store();
   fs.mkdirSync(path.join(inbox, 'c-folder.md'), { recursive: true });
-  assert.throws(() => act(door.cards.read(nameOf('c-folder'))), (err: NodeJS.ErrnoException) => err.code === 'EISDIR');
+  assert.throws(
+    () => act(door.cards.read(nameOf('c-folder'))),
+    (err: NodeJS.ErrnoException) => err.code === 'EISDIR',
+  );
 });
 
 test('a card filed makes the inbox; a write back keeps its time and leaves no hidden file', () => {
@@ -74,7 +77,7 @@ test('a try file that does not read as a try is none', () => {
   assert.deepEqual([...done(door.tries.list())], [['kept', kept]]);
 });
 
-test("the card a path names: any path under the inbox, links resolved on the way to it and to the inbox, else null", () => {
+test('the card a path names: any path under the inbox, links resolved on the way to it and to the inbox, else null', () => {
   const root = scratch('wf-card-door-');
   const inbox = path.join(root, 'inbox');
   fs.mkdirSync(inbox, { recursive: true });
@@ -103,4 +106,40 @@ test('the default door reads the files at the store root the program is given, a
     ['an-idea.md'],
   );
   assert.deepEqual(act(list), { refused: 'Invalid' });
+});
+
+const PKG = path.join(import.meta.dirname, '..', '..');
+
+/** Every file of `src` but the tests and the Card door's own folder, by its path from the package. */
+function sourcesOfSrc(): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const entry of fs.readdirSync(path.join(PKG, 'src'), { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !entry.name.endsWith('.ts') || entry.name.endsWith('.test.ts')) continue;
+    const file = path.relative(PKG, path.join(entry.parentPath, entry.name)).split(path.sep).join('/');
+    if (!file.startsWith('src/cards/')) out[file] = fs.readFileSync(path.join(PKG, file), 'utf8');
+  }
+  return out;
+}
+
+/** The files of `sources` that call the door's files layer by hand, comment lines left out, rather than yielding `CardDoor`. */
+const byHand = (sources: Record<string, string>): string[] =>
+  Object.entries(sources)
+    .filter(([, text]) =>
+      /(?<![\w$.])cardFiles\s*\(/.test(
+        text
+          .split('\n')
+          .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+          .join('\n'),
+      ),
+    )
+    .map(([file]) => file);
+
+test("no file of src but the Card door's reads the inbox's files by hand (`cardFiles`): each yields CardDoor", () => {
+  assert.deepEqual(byHand(sourcesOfSrc()), []);
+});
+
+test('REFUSED: a file of src that calls cardFiles', () => {
+  const sources = sourcesOfSrc();
+  const again = { ...sources, 'src/cli/start.ts': `${sources['src/cli/start.ts'] ?? ''}\nconst x = cardFiles(home).cards.entries();\n` };
+  assert.deepEqual(byHand(again), ['src/cli/start.ts']);
 });

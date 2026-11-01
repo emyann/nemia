@@ -6,8 +6,7 @@
  * list, the pages or the command line, or a read inside a refusal's words.
  *
  * It only shrinks: a file converted takes its line away, a count cut is lowered here, and a file this does not name may hold none at all.
- * `runStore.inbox` is no debt of this one: it is the Card door's seam (S3). The files store itself (`record/files.store.ts`) defines the
- * seam and is not counted.
+ * The files store itself (`record/files.store.ts`) defines the seam and is not counted.
  */
 
 /** Each file by its path from the package, and its uses of the run store's run groups, comments left out. */
@@ -29,7 +28,6 @@ export const RUN_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/forgetting/forgetting.verb.ts': 2,
   'src/gate/commands.verb.ts': 3,
   'src/gate/gate.verb.ts': 2,
-  'src/inbox/inbox.verb.ts': 5,
   'src/list/list.verb.ts': 8,
   'src/pause/pause.verb.ts': 2,
   'src/prune/prune.verb.ts': 10,

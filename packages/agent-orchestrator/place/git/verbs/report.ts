@@ -80,7 +80,7 @@ const CHANGE_OF: Readonly<Record<string, FileChange>> = {
  * `--name-status -z` read into each file's change, in git's order: a rename or copy names both ends. A letter the place has no word for
  * is `Refused`, never passed on as git spelled it.
  */
-export function nameStatus(out: string): { status: FileChange; path: string }[] {
+function nameStatus(out: string): { status: FileChange; path: string }[] {
   const tokens = out.split('\0');
   const named: { status: FileChange; path: string }[] = [];
   for (let i = 0; i < tokens.length; i++) {

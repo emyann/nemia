@@ -10,7 +10,6 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gitPlace } from '../place/git/place.ts';
-import { nameStatus } from '../place/git/verbs/report.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
 import { scratch } from './scratch.ts';
 
@@ -107,8 +106,22 @@ test("report answers the files a branch changed in the place's words: added, mod
   ]);
 });
 
-test('REFUSED: a status letter the place has no word for, rather than passed on as git spelled it', () => {
-  assert.throws(() => nameStatus('X\0a.txt\0'), Error);
+/**
+ * A `git` that is the real one but for `--name-status`, whose first record's letter it prints as `X`, a change the place has no word
+ * for: the files git names are the same, so its two readings still agree.
+ */
+function gitSayingX(): string {
+  const bin = scratch('wf-report-x-git-');
+  const real = execFileSync('sh', ['-c', 'command -v git'], { env: ENV, encoding: 'utf8' }).trim();
+  const script = `#!/bin/sh\ncase " $* " in\n  *" --name-status "*) "${real}" "$@" | sed '1s/^./X/' ;;\n  *) exec "${real}" "$@" ;;\nesac\n`;
+  fs.writeFileSync(path.join(bin, 'git'), script, { mode: 0o755 });
+  return bin;
+}
+
+test("REFUSED: a status letter the place has no word for, in the place's words, never passed on as git spelled it", () => {
+  const dir = repository();
+  const outcome = gitPlace({ env: { ...ENV, PATH: `${gitSayingX()}${path.delimiter}${ENV.PATH ?? ''}` } }).askNow('report', request(dir));
+  assert.ok('refused' in outcome, JSON.stringify(outcome));
 });
 
 test("report answers each path's diff it was asked, a rename's two ends as one, and none for a path the branch did not change", () => {

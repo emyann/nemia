@@ -317,7 +317,7 @@ test('a filing whose closeout schema has moved starts a fresh session; one whose
   b.settle(`${run.id}-build`, 'failed');
   fs.writeFileSync(kept.agentFile, `---\nskills: ${kept.skill}\n---\nYou build it differently.\n`);
   await runPlaced(refreshRun(run.id));
-  await runWith(b.e, retryRun(run.id, 'build', { mode: 'nudge' }));
+  await runWith(b.e, retryRun(run.id, 'build', { mode: 'continue' }));
   await runWith(b.e, advanceRun(readRun(run.id)));
   assert.equal(
     b.tasks.get(`${run.id}-build-try2`)!.spec.resumeFrom,
@@ -337,7 +337,7 @@ test('a filing whose closeout schema has moved starts a fresh session; one whose
     JSON.stringify({ ...schema, properties: { ...schema.properties, why: { type: 'string' } }, required: ['verdict', 'why'] }),
   );
   await runPlaced(refreshRun(other.id));
-  await runWith(b2.e, retryRun(other.id, 'build', { mode: 'nudge' }));
+  await runWith(b2.e, retryRun(other.id, 'build', { mode: 'continue' }));
   await runWith(b2.e, advanceRun(readRun(other.id)));
   assert.equal(
     b2.tasks.get(`${other.id}-build-try2`)!.spec.resumeFrom,

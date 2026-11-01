@@ -105,7 +105,7 @@ function readOf(id: string, steps: readonly Workflow[], tries: Record<string, Tr
       const taskId = t.recheck || t.answers ? ids[i - 1].taskId : own;
       const sessionEnd = t.check ? minus(t.end, 10 * MIN) : t.end;
       if (t.answers) {
-        ids[i - 1].cause = 'nudge';
+        ids[i - 1].cause = 'continue';
         views.set(taskId, answeredBy(views.get(taskId)!, sessionEnd));
       } else {
         views.set(taskId, ended(sessionEnd, t.cost === undefined ? 1 : t.cost, t.failed));

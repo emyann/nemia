@@ -118,7 +118,7 @@ const SIGNED = { outcome: 'done', summary: 'did it', artifacts: [], needs: null 
  */
 async function walk(
   dir: string,
-  first: { mode: 'nudge' | 'fresh'; model?: string } = { mode: 'nudge' },
+  first: { mode: 'continue' | 'fresh'; model?: string } = { mode: 'continue' },
 ): Promise<{ id: string; filed: Filed[]; target: string; looping: string; steps: Workflow[] }> {
   const run = await runPlaced(startRun({ brief: 'add a flag', repo: aRepo(), workflowDir: dir }));
   const steps = stepsOf(run);
@@ -165,7 +165,7 @@ async function walk(
     }
     if (pending.some(([id]) => tryOfId(id, target) === 1)) await runWith(b.e, retryRun(run.id, target, first));
     if (pending.some(([id]) => tryOfId(id, target) === 2))
-      await runWith(b.e, retryRun(run.id, target, { mode: 'nudge', message: 'the --dry-run flag' }));
+      await runWith(b.e, retryRun(run.id, target, { mode: 'continue', message: 'the --dry-run flag' }));
   }
   return { id: run.id, filed: order.map((id) => b.tasks.get(id)!.spec), target, looping: looping.name, steps };
 }
@@ -259,7 +259,7 @@ test("a loop's target with a context window keeps it on every try — a nudge, a
     '---\nafter: implement\nplace: git\ncontext: 150000\noutput: review.schema.json\nloop: implement\n---\nreview it\n',
   );
   fs.writeFileSync(path.join(dir, 'review.schema.json'), JSON.stringify(looping));
-  for (const first of [{ mode: 'nudge' as const }, { mode: 'fresh' as const, model: 'sonnet' }]) {
+  for (const first of [{ mode: 'continue' as const }, { mode: 'fresh' as const, model: 'sonnet' }]) {
     const { id, filed, target } = await walk(dir, first);
     assert.deepEqual(chainDifferences(filed), [], first.mode);
     const tries = filed.filter((f) => f.id.startsWith(`${id}-${target}`) && !f.id.endsWith('-check'));

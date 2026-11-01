@@ -235,7 +235,7 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
     async (t) => {
       const sent: Array<{ url: string; init: RequestInit }> = [];
       asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r 1.asks/retry-implement-2', stopFirst: false }), sent);
-      assert.deepEqual(await askTry('r 1', 'implement', { mode: 'nudge', message: '--flag stays' }), {
+      assert.deepEqual(await askTry('r 1', 'implement', { mode: 'continue', message: '--flag stays' }), {
         try: 2,
         file: '/store/runs/r 1.asks/retry-implement-2',
         stopFirst: false,
@@ -244,15 +244,15 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
       assert.equal(sent[0].url, '/api/runs/r%201/steps/implement/retry');
       assert.equal(sent[0].init.method, 'POST');
       assert.deepEqual(sent[0].init.headers, { 'content-type': 'application/json' });
-      assert.deepEqual(JSON.parse(String(sent[0].init.body)), { mode: 'nudge', message: '--flag stays' });
+      assert.deepEqual(JSON.parse(String(sent[0].init.body)), { mode: 'continue', message: '--flag stays' });
 
       asking(t, 202, JSON.stringify({ try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true }), sent);
       assert.deepEqual(
-        await askTry('r-1', 'held', { mode: 'nudge' }),
+        await askTry('r-1', 'held', { mode: 'continue' }),
         { try: 2, file: '/store/runs/r-1.asks/retry-held-2', stopFirst: true },
         'continue on a session the harness blocked: the tick stops it before it files the try, and the api says so',
       );
-      assert.deepEqual(JSON.parse(String(sent[1].init.body)), { mode: 'nudge' });
+      assert.deepEqual(JSON.parse(String(sent[1].init.body)), { mode: 'continue' });
     },
   );
   await t.test(
@@ -262,11 +262,11 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
         'working is still running, so there is nothing to try again until it ends. Wait for it: wf ls r-1 (or stop the run: wf cancel r-1).';
       const sent: Array<{ url: string; init: RequestInit }> = [];
       asking(t, 409, JSON.stringify({ error: refusal }), sent);
-      await assert.rejects(askTry('r-1', 'working', { mode: 'nudge' }), (err: Error) => err.message === refusal);
+      await assert.rejects(askTry('r-1', 'working', { mode: 'continue' }), (err: Error) => err.message === refusal);
 
       globalThis.fetch = async () => new Response(JSON.stringify({ ok: true }), { status: 202 });
       await assert.rejects(
-        askTry('r-1', 'implement', { mode: 'nudge' }),
+        askTry('r-1', 'implement', { mode: 'continue' }),
         (err: Error) =>
           err.message.startsWith(
             'POST /api/runs/r-1/steps/implement/retry answered what this board does not read: at try, the value is missing.',
@@ -275,7 +275,7 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
 
       globalThis.fetch = async () => new Response('<html>Bad Gateway</html>', { status: 502, statusText: 'Bad Gateway' });
       await assert.rejects(
-        askTry('r-1', 'implement', { mode: 'nudge' }),
+        askTry('r-1', 'implement', { mode: 'continue' }),
         (err: Error) => err.message === 'POST /api/runs/r-1/steps/implement/retry answered 502 Bad Gateway',
       );
     },
@@ -287,13 +287,13 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
         "--budget 4 is not above $4.25, what tokens's tries have cost: a try under it would read over budget again as soon as it ended. Give more than $4.25: wf retry r-1 tokens --budget <amount>.";
       let answer = () => answered(202, { try: 3, file: '/store/runs/r-1.asks/retry-tokens-3', stopFirst: false });
       const sent = starting(t, () => answer());
-      assert.deepEqual(await askTry('r-1', 'tokens', { mode: 'nudge', budget: 5 }), {
+      assert.deepEqual(await askTry('r-1', 'tokens', { mode: 'continue', budget: 5 }), {
         try: 3,
         file: '/store/runs/r-1.asks/retry-tokens-3',
         stopFirst: false,
       });
       answer = () => answered(409, { error: refusal });
-      await assert.rejects(askTry('r-1', 'tokens', { mode: 'nudge', budget: 4 }), (err: Error) => err.message === refusal);
+      await assert.rejects(askTry('r-1', 'tokens', { mode: 'continue', budget: 4 }), (err: Error) => err.message === refusal);
 
       answer = () => answered(202, { step: 'review', round: 3, file: '/store/runs/r 1.asks/round-review-3' });
       assert.deepEqual(await askRound('r 1', { step: 'review', budget: 3 }), {
@@ -316,8 +316,8 @@ test("each ask of a run's page: posted as the api takes it, read back, and refus
       assert.deepEqual(
         sent.map(({ url, init }) => [url, init?.method, new Headers(init?.headers).get('content-type'), JSON.parse(String(init?.body))]),
         [
-          ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'nudge', budget: 5 }],
-          ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'nudge', budget: 4 }],
+          ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'continue', budget: 5 }],
+          ['/api/runs/r-1/steps/tokens/retry', 'POST', 'application/json', { mode: 'continue', budget: 4 }],
           ['/api/runs/r%201/round', 'POST', 'application/json', { step: 'review', budget: 3 }],
           ['/api/runs/r-1/round', 'POST', 'application/json', { step: 'review', budget: 2 }],
           ['/api/runs/r-1/round', 'POST', 'application/json', { budget: 3 }],

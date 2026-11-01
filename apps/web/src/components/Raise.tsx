@@ -37,7 +37,7 @@ export function RaiseRow({ runId, offer }: { runId: string; offer: Extract<Answe
   const [amount, setAmount] = useState(() => String(raiseTo(offer.above)));
   const [message, setMessage] = useState('');
   const [draft, setDraft] = useState<Draft>({});
-  const [mode, setMode] = useState<RetryMode>(offer.unfinished && offer.modes.includes('recheck') ? 'recheck' : 'nudge');
+  const [mode, setMode] = useState<RetryMode>(offer.unfinished && offer.modes.includes('recheck') ? 'recheck' : 'continue');
   const field = useId();
   const tried = useAsk(runId, offer.step, () => setMessage(''));
   const rounded = useRound(runId);

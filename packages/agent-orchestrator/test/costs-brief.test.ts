@@ -271,7 +271,7 @@ test("a fresh try of the step is told the costs again, and one that continues th
   await pass(run.id);
   fail(fresh, 1);
   await pass(run.id);
-  await runWith(e, retryRun(run.id, 'design', { mode: 'nudge', message: 'once more' }));
+  await runWith(e, retryRun(run.id, 'design', { mode: 'continue', message: 'once more' }));
   viewed.length = 0;
   await pass(run.id);
   assert.deepEqual(

@@ -185,7 +185,7 @@ const onTry = (tries: EarlierTry[] = [], check: string | null = 'c1') =>
     },
   );
 /** A person's ask for implement's try `n`. */
-const askFor = (n: number, mode: RetryMode = 'nudge'): RetryAsk => ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' });
+const askFor = (n: number, mode: RetryMode = 'continue'): RetryAsk => ({ step: 'implement', try: n, mode, at: '2026-09-13T10:00:00.000Z' });
 /**
  * What the engine measured of each task's sessions, by id — dollars on its ended attempts — and the tasks its harness ended at their
  * budget.
@@ -477,7 +477,7 @@ test('`retries:` counts within a round: a round is new work, and its check may r
   for (const [name, tries, spent] of [
     ['two tries by retries: 2 spent', ['retries', 'retries'], 2],
     ['a round after a retry: none spent', ['retries', 'round'], 0],
-    ['a retry after a round, then a nudge: 1 spent', ['round', 'retries', 'nudge'], 1],
+    ['a retry after a round, then a nudge: 1 spent', ['round', 'retries', 'continue'], 1],
   ] as const) {
     await t.test(`retriesSpent: ${name}`, () => assert.equal(retriesSpent(record(...tries)), spent));
   }
@@ -654,7 +654,7 @@ test("composeBrief of a new session of a loop's target within a round: handed th
   const fromAsking = (name: string) => (name === 'review' ? reviewed(true) : undefined);
   const newSessions = [
     { try: 3, by: 'ask' as const, mode: 'fresh' as const, model: 'opus', resumed: false, status: 'unsigned' as const },
-    { try: 3, by: 'retries' as const, mode: 'nudge' as const, resumed: false, status: 'failed (check)' as const },
+    { try: 3, by: 'retries' as const, mode: 'continue' as const, resumed: false, status: 'failed (check)' as const },
   ];
   for (const retry of newSessions) {
     await t.test(`a ${retry.mode} try with no session: the try, the round, the findings of the try that asked, once`, () => {
@@ -677,7 +677,7 @@ test("composeBrief of a new session of a loop's target within a round: handed th
     const nudged = composeBrief(IMPLEMENT, r, LOOP, fromAsking, FILES, undefined, {
       try: 3,
       by: 'retries',
-      mode: 'nudge',
+      mode: 'continue',
       resumed: true,
       status: 'failed (check)',
     });
@@ -747,7 +747,7 @@ test('REFUSED past its budget, at shipped defaults: a step whose ended tries cos
     await t.test(`${why}: its check refused, and \`retries:\` tries it again`, () => {
       assert.equal(stepStatus(BUDGETED[0], r, p, signedDone, asked, BUDGETED, under, OVER.verdict), 'failed (check)');
       assert.deepEqual(assessed(BUDGETED, r, p, signedDone, { ...OVER, spent: under }).retry, [
-        { step: 'implement', try: 3, mode: 'nudge', by: 'retries' },
+        { step: 'implement', try: 3, mode: 'continue', by: 'retries' },
       ]);
       const l = listed(BUDGETED, r, shown(REFUSED_TWICE), signedOff({ implement: said('done') }), { ...OVER, spent: under });
       assert.equal(l.steps[0].status, 'failed ✗ check (exit 1)');
@@ -795,7 +795,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget', async (t) => {
     retryRefusal(BUDGETED, r, 'implement', how, p, signedDone, asked, OVER.verdict, asks, () => false, of);
   await t.test('without `--budget`, the step and its amounts named', () => {
     names(
-      refusal({ mode: 'nudge' }),
+      refusal({ mode: 'continue' }),
       'implement is over budget',
       '$4.25 of its $3 budget',
       'above $4.25',
@@ -806,7 +806,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget', async (t) => {
   for (const low of [3, 4.25]) {
     await t.test(`\`--budget ${low}\`, not above what it spent`, () => {
       names(
-        refusal({ mode: 'nudge', budget: low }),
+        refusal({ mode: 'continue', budget: low }),
         `--budget ${low} is not above $4.25`,
         'more than $4.25',
         'nemia retry r-1 implement --budget <amount>',
@@ -814,14 +814,14 @@ test('REFUSED by name: `nemia retry` of a step over its budget', async (t) => {
     });
   }
   await t.test('above it, or a recheck without one, is taken; a recheck with one, or no amount, refused', () => {
-    assert.equal(refusal({ mode: 'nudge', budget: 4.26 }), null);
+    assert.equal(refusal({ mode: 'continue', budget: 4.26 }), null);
     assert.equal(refusal({ mode: 'recheck' }), null);
     names(refusal({ mode: 'recheck', budget: 10 }), '--budget', '--recheck files none');
-    names(refusal({ mode: 'nudge', budget: 0 }), '--budget 0 is not an amount.');
+    names(refusal({ mode: 'continue', budget: 0 }), '--budget 0 is not an amount.');
   });
   for (const budget of [10, 3]) {
     await t.test(`under its cap with \`retries:\` left, \`--budget ${budget}\`: the run tries it itself, said first`, () => {
-      const itself = refusal({ mode: 'nudge', budget }, [], spends({ t0: 1, t1: 1 }));
+      const itself = refusal({ mode: 'continue', budget }, [], spends({ t0: 1, t1: 1 }));
       namesFor('tried by the run', itself, 'the run tries implement again itself', '`retries: 2` has 1 left', 'try 3', 'nemia ls r-1');
       assert.ok(!itself!.includes('--budget'));
     });
@@ -830,15 +830,15 @@ test('REFUSED by name: `nemia retry` of a step over its budget', async (t) => {
     const spentOut: Workflow[] = [{ ...BUDGETED[0], retries: 1 }, BUDGETED[1]];
     const out = (how: RetryHow) =>
       retryRefusal(spentOut, r, 'implement', how, p, signedDone, asked, OVER.verdict, [], () => false, spends({ t0: 1, t1: 1 }));
-    assert.equal(out({ mode: 'nudge', budget: 10 }), null);
-    names(out({ mode: 'nudge', budget: 2.5 }), '--budget 2.5 is not above $3', 'the $3 cap in force on implement');
+    assert.equal(out({ mode: 'continue', budget: 10 }), null);
+    names(out({ mode: 'continue', budget: 2.5 }), '--budget 2.5 is not above $3', 'the $3 cap in force on implement');
   });
   await t.test('a step with no `budget:`', () => {
     const plain = retryRefusal(
       STEPS,
       run({ implement: 't1', review: null }),
       'implement',
-      { mode: 'nudge', budget: 5 },
+      { mode: 'continue', budget: 5 },
       phases({ t1: 'failed' }),
       signedDone,
       asked,
@@ -847,7 +847,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget', async (t) => {
   });
   await t.test('an ask left waiting without a raise is named; one that carries enough is waited for', () => {
     names(
-      refusal({ mode: 'nudge', budget: 10 }, [askFor(3)]),
+      refusal({ mode: 'continue', budget: 10 }, [askFor(3)]),
       'try 3 of implement is asked for (--continue, at ',
       'without a --budget above $4.25',
       '$4.25 of its $3 budget',
@@ -855,7 +855,7 @@ test('REFUSED by name: `nemia retry` of a step over its budget', async (t) => {
       '.asks',
       'nemia retry r-1 implement --budget <amount>',
     );
-    names(refusal({ mode: 'nudge' }, [{ ...askFor(3), budget: 10 }]), 'try 3 of implement is already asked for');
+    names(refusal({ mode: 'continue' }, [{ ...askFor(3), budget: 10 }]), 'try 3 of implement is already asked for');
   });
 });
 
@@ -892,14 +892,14 @@ test('a step blocked under its cap takes a `--budget` above it, not past its cap
       spent,
     );
   await t.test('taken with one above the cap, or none; the tick files it with no `pastCap`', () => {
-    assert.equal(refusal({ mode: 'nudge', budget: 40 }), null);
-    assert.equal(refusal({ mode: 'nudge' }), null);
-    assert.deepEqual(due([{ ...askFor(2), budget: 40 }]), [{ step: 'implement', try: 2, mode: 'nudge', budget: 40, by: 'ask' }]);
+    assert.equal(refusal({ mode: 'continue', budget: 40 }), null);
+    assert.equal(refusal({ mode: 'continue' }), null);
+    assert.deepEqual(due([{ ...askFor(2), budget: 40 }]), [{ step: 'implement', try: 2, mode: 'continue', budget: 40, by: 'ask' }]);
   });
   for (const low of [15, 20]) {
     await t.test(`REFUSED: \`--budget ${low}\`, not above the cap in force`, () => {
       names(
-        refusal({ mode: 'nudge', budget: low }),
+        refusal({ mode: 'continue', budget: low }),
         `--budget ${low} is not above $20`,
         '$20 cap in force on implement',
         '$19.27',
@@ -911,7 +911,7 @@ test('a step blocked under its cap takes a `--budget` above it, not past its cap
   await t.test('an ask left with one not above the cap is never due, and named', () => {
     assert.deepEqual(due([{ ...askFor(2), budget: 20 }]), []);
     names(
-      refusal({ mode: 'nudge', budget: 40 }, [{ ...askFor(2), budget: 20 }]),
+      refusal({ mode: 'continue', budget: 40 }, [{ ...askFor(2), budget: 20 }]),
       'try 2 of implement is asked for (--continue, at ',
       'with --budget 20, not above $20',
       'retry-implement-2',
@@ -924,8 +924,8 @@ test('a step blocked under its cap takes a `--budget` above it, not past its cap
     const failed = phases({ t1: 'failed' });
     const unbudgeted = (asks: RetryAsk[]) => retriesDue(STEPS, free, failed, signedDone, asked, () => undefined, asks);
     assert.deepEqual(unbudgeted([{ ...askFor(2), budget: 10 }]), []);
-    assert.deepEqual(unbudgeted([askFor(2)]), [{ step: 'implement', try: 2, mode: 'nudge', by: 'ask' }]);
-    const left = retryRefusal(STEPS, free, 'implement', { mode: 'nudge' }, failed, signedDone, asked, () => undefined, [
+    assert.deepEqual(unbudgeted([askFor(2)]), [{ step: 'implement', try: 2, mode: 'continue', by: 'ask' }]);
+    const left = retryRefusal(STEPS, free, 'implement', { mode: 'continue' }, failed, signedDone, asked, () => undefined, [
       { ...askFor(2), budget: 10 },
     ]);
     names(
@@ -971,7 +971,7 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
       {
         status: 'budget exhausted',
         reason: 'BudgetExhausted',
-        modes: ['nudge', 'fresh'],
+        modes: ['continue', 'fresh'],
         raise: { above: 3.02, spent: { usd: 3.02, measured: 1, unmeasured: 0 }, cap: 3 },
       },
     );
@@ -997,14 +997,14 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
     );
   await t.test('REFUSED: no `--budget`, or one not above what it cost', () => {
     names(
-      refusal({ mode: 'nudge' }),
+      refusal({ mode: 'continue' }),
       'implement ended at its budget',
       'stopped its session at $3',
       'cost $3.02',
       'nemia retry r-1 implement --budget <amount>',
     );
     names(
-      refusal({ mode: 'nudge', budget: 2 }),
+      refusal({ mode: 'continue', budget: 2 }),
       '--budget 2 is not above $3.02',
       'more than $3.02',
       'nemia retry r-1 implement --budget <amount>',
@@ -1013,7 +1013,7 @@ test('a step its harness ended at its budget reads budget exhausted, with the am
   await t.test('cut off before its cost was written: the cap it was ended at is what a raise passes', () => {
     const unmeasured = spends({}, ['t1']);
     names(
-      refusal({ mode: 'nudge', budget: 3 }, unmeasured),
+      refusal({ mode: 'continue', budget: 3 }, unmeasured),
       '--budget 3 is not above $3',
       'more than $3:',
       'nemia retry r-1 implement --budget <amount>',
@@ -1119,7 +1119,7 @@ test("costLine and runCostLines: a step's cost on `nemia decide`, beside the cap
   const three = onTry(
     [
       { taskId: 't-a', cause: 'retries' },
-      { taskId: 't-b', cause: 'nudge', budget: 10 },
+      { taskId: 't-b', cause: 'continue', budget: 10 },
     ],
     null,
   );
@@ -1219,13 +1219,13 @@ test('REFUSED as a verdict past a budget: a check that did not finish reads fail
       const refusal = (how: RetryHow) => retryRefusal(BUDGETED, r, 'implement', how, p, signedDone, asked, v, [], () => false, spent);
       assert.equal(refusal({ mode: 'recheck' }), null);
       names(
-        refusal({ mode: 'nudge' }),
+        refusal({ mode: 'continue' }),
         "implement's check did not finish",
         '$4.25 of its $3 budget',
         'nemia retry r-1 implement --recheck',
         'above $4.25: nemia retry r-1 implement --budget <amount>',
       );
-      names(refusal({ mode: 'nudge', budget: 4 }), '--budget 4 is not above $4.25', 'nemia retry r-1 implement --budget <amount>');
+      names(refusal({ mode: 'continue', budget: 4 }), '--budget 4 is not above $4.25', 'nemia retry r-1 implement --budget <amount>');
       assert.equal(refusal({ mode: 'fresh', budget: 10 }), null);
       assert.deepEqual(
         retriesDue(BUDGETED, r, p, signedDone, asked, v, [askFor(3)], () => false, spent),
@@ -1250,7 +1250,7 @@ test('retrySection: a try past a budget is told why its last try ended, and that
     retrySection(step('implement'), {
       try: 2,
       by: 'ask',
-      mode: 'nudge',
+      mode: 'continue',
       resumed: true,
       status,
       ...(budget !== undefined ? { budget } : {}),
@@ -1414,7 +1414,7 @@ test('REFUSED past a budget in a loop: `again: true` files no round while a step
       BUDGETED_LOOP,
       r,
       'implement',
-      { mode: 'nudge', budget: 10 },
+      { mode: 'continue', budget: 10 },
       ALL_SUCCEEDED,
       said,
       asked,

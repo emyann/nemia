@@ -372,7 +372,7 @@ test("a gated step that signed off blocked, was answered and then approved gives
   await tick(3);
   assert.deepEqual(timelineSpans(run.id), [], 'none while it waits on an answer');
   later(6);
-  await runWith(engine, retryRun(run.id, 'intake', { mode: 'nudge', message: 'the --dry-run flag' }));
+  await runWith(engine, retryRun(run.id, 'intake', { mode: 'continue', message: 'the --dry-run flag' }));
   await tickUntil(() => sessions.has(nameFor(intake, 2)));
   assert.equal(readRun(run.id).steps.intake.taskId, intake, 'the answer is a turn of the session that asked');
   later(3);
@@ -406,12 +406,12 @@ test('REFUSED: a gated step sent back from its gate with words waited on no answ
   sign(intake, 0.5);
   await tick(3);
   later(6);
-  await runWith(engine, retryRun(run.id, 'intake', { mode: 'nudge', message: 'smaller steps, please' }));
+  await runWith(engine, retryRun(run.id, 'intake', { mode: 'continue', message: 'smaller steps, please' }));
   await tickUntil(() => sessions.has(nameFor(intake, 2)));
   const causes = readRun(run.id).steps.intake.tries?.map((x) => x.cause);
   assert.deepEqual(
     [readRun(run.id).steps.intake.taskId, causes],
-    [intake, ['nudge']],
+    [intake, ['continue']],
     'the record an answer to a blocked sign-off leaves, but for what the first turn signed',
   );
   later(3);

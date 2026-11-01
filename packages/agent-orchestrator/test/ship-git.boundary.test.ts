@@ -601,7 +601,7 @@ for (const [said, exitCode, words] of [
       assert.ok(err.message.endsWith('nemia retry ' + id + ' ship.'), err.message);
       return true;
     });
-    await runWith(e, retryRun(id, 'ship', { mode: 'nudge' }));
+    await runWith(e, retryRun(id, 'ship', { mode: 'continue' }));
     assert.deepEqual(
       (await runWith(e, advanceRun(readRun(id)))).tried,
       ['ship'],

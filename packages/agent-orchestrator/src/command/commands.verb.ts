@@ -20,7 +20,7 @@ import { tried } from '../runtime-client.ts';
 import { APPROVE } from '../gate/commands.verb.ts';
 import { ANSWER_HELP, answerFlag, recheckAnswerRefusal, typedAnswers, typedOf } from '../question/asked.verb.ts';
 import { stepsOf } from '../record/record.store.ts';
-import { messageRefusal, type RetryHow } from '../retry/index.ts';
+import { messageRefusal, modeWord, type RetryHow } from '../retry/index.ts';
 import { retryRun } from '../retry/retry.verb.ts';
 import { rootGiven, StoreRoot } from '../config/root.store.ts';
 import { roundRun } from '../round/round.verb.ts';
@@ -75,7 +75,7 @@ function howOf(args: Args): RetryHow {
   const message = textOf(args, 'message');
   const budget = amountIn(args, 'budget');
   return {
-    mode: mode === 'fresh' || mode === 'recheck' ? mode : 'nudge',
+    mode: mode === 'fresh' || mode === 'recheck' ? mode : 'continue',
     ...(model !== undefined ? { model } : {}),
     ...(message !== undefined ? { message } : {}),
     ...(budget !== undefined ? { budget } : {}),
@@ -151,7 +151,7 @@ const RETRY: Command<{
   spec: {
     positionals: RUN_LOOP,
     flags: [
-      { flag: '--continue', kind: 'switch', sets: { mode: 'nudge' }, way: true },
+      { flag: '--continue', kind: 'switch', sets: { mode: 'continue' }, way: true },
       { flag: '--fresh', kind: 'switch', sets: { mode: 'fresh' }, way: true },
       { flag: '--recheck', kind: 'switch', sets: { mode: 'recheck' }, way: true },
       {
@@ -180,7 +180,7 @@ const RETRY: Command<{
         twice: 'nemia retry takes --budget once: the cap to raise the step to, in dollars — nemia retry <runId> <step> --budget <amount>.',
       },
     ],
-    defaults: { mode: 'nudge' },
+    defaults: { mode: 'continue' },
     unknown: (arg) =>
       `nemia retry does not take ${arg}. It takes one of --continue, --fresh, --model <m>, --recheck, --round, and --message "<answer>" and --budget <amount>.`,
     oneWay: 'nemia retry asks for one try, one way: pick one of --continue, --fresh, --model <m>, --recheck, --round.',
@@ -199,7 +199,7 @@ const RETRY: Command<{
   class: 'answer',
   route: [
     { method: 'POST', path: '/api/runs/:runId/steps/:step/retry', status: 202 },
-    { method: 'POST', path: '/api/runs/:runId/round', status: 202, sets: { round: true, mode: 'nudge' } },
+    { method: 'POST', path: '/api/runs/:runId/round', status: 202, sets: { round: true, mode: 'continue' } },
   ],
   apiTakes: ['answers'],
   apiKeys: ['try', 'file', 'stopFirst', 'step', 'round'],
@@ -225,8 +225,7 @@ const RETRY: Command<{
         `   ${file}`,
       ];
     const ask = howOf(args);
-    const way = ask.mode === 'nudge' ? 'continue' : ask.mode;
-    const how = `${ask.model ? `--model ${ask.model}` : `--${way}`}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
+    const how = `${modeWord(ask)}${ask.budget !== undefined ? `, --budget ${ask.budget}` : ''}`;
     const then = stopFirst
       ? 'its harness blocked its session: the next tick stops it, and files the try once it has stopped'
       : 'the next tick files it, once';

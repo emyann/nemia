@@ -89,7 +89,7 @@ beforeEachTest(() => {
     taskId: 'h-rechecked-plan-try3',
     tries: [
       { taskId: 'h-rechecked-plan', cause: 'recheck' },
-      { taskId: 'h-rechecked-plan', cause: 'nudge' },
+      { taskId: 'h-rechecked-plan', cause: 'continue' },
     ],
   };
   fs.writeFileSync(file, JSON.stringify(run));

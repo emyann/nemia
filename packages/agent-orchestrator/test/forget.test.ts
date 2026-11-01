@@ -175,7 +175,7 @@ test('after a landing: the sweep frees the run, `nemia prune --artifacts --yes` 
     const wt = readRun(id).steps.implement.workspace!;
     board().settle(`${id}-implement`, 'succeeded', BLOCKED);
     await pass(id);
-    await stage.runWith(e(), retryRun(id, 'implement', { mode: 'nudge', message: 'the --dry-run flag' }));
+    await stage.runWith(e(), retryRun(id, 'implement', { mode: 'continue', message: 'the --dry-run flag' }));
     await pass(id);
     fs.writeFileSync(path.join(wt, 'flag.ts'), 'export const dryRun = true;\n');
     world().commit(wt, 'add the flag');
@@ -436,7 +436,7 @@ test('`nemia rm` refused, then allowed: each run that holds it named on its line
       const asked = await stage.runPlaced(startRun({ brief: 'a try asked for', repo, workflowDir: folder() }));
       await pass(asked.id);
       board().settle(`${asked.id}-implement`, 'succeeded');
-      await stage.runWith(e(), retryRun(asked.id, 'implement', { mode: 'nudge' }));
+      await stage.runWith(e(), retryRun(asked.id, 'implement', { mode: 'continue' }));
       const parent = await aParent(repo, { work: 'parent.txt' });
       const child = await stage.runPlaced(startRun({ brief: 'the child', repo, workflowDir: folder(), after: [parent.run.id] }));
       const over = await aParent(repo, { work: 'over.txt' });
@@ -571,7 +571,7 @@ test('`nemia rm` refused, then allowed: each run that holds it named on its line
       fs.mkdirSync(asks, { recursive: true });
       fs.writeFileSync(
         path.join(asks, 'retry-implement-2'),
-        JSON.stringify({ step: 'implement', try: 2, mode: 'nudge', at: '2026-09-16T00:00:00.000Z' }),
+        JSON.stringify({ step: 'implement', try: 2, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
       );
       for (const suffix of ['.json', '.cancelled', '.asks']) {
         const { printed, error } = await typed(t, 'rm', `${id}${suffix}`);
@@ -777,7 +777,7 @@ test('the engine refuses to forget: a task left unsettled waits with its marker 
       await pass(run.id);
       board().settle(`${run.id}-implement`, 'succeeded', BLOCKED);
       await pass(run.id);
-      await stage.runWith(e(), retryRun(run.id, 'implement', { mode: 'nudge', message: 'the --dry-run flag' }));
+      await stage.runWith(e(), retryRun(run.id, 'implement', { mode: 'continue', message: 'the --dry-run flag' }));
       await pass(run.id);
       board().settle(`${run.id}-implement-try2`, 'succeeded', SIGNED);
       await pass(run.id);

@@ -836,7 +836,7 @@ test("a step that continues another's session (`resume:`) is filed with that ses
   settle(`${run.id}-respond`, 'succeeded', SIGNED);
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).checked, ['respond']);
   settle(`${run.id}-respond-check`, 'failed', undefined, 1);
-  await runWith(e, retryRun(run.id, 'respond', { mode: 'nudge', message: 'the test fails' }));
+  await runWith(e, retryRun(run.id, 'respond', { mode: 'continue', message: 'the test fails' }));
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, ['respond']);
   assert.equal(tasks.get(`${run.id}-respond-try2`)!.spec.config?.contextTokens, 200_000, 'its nudge, continuing the same chain');
 });
@@ -1186,7 +1186,7 @@ test('REFUSED at read: an ask file whose message is not text, is empty, or rides
   const at = '2026-09-13T10:00:00.000Z';
   fs.mkdirSync(asksDir(run.id), { recursive: true });
   const refused = {
-    'retry-implement-2': [{ mode: 'nudge', message: 42, at }, 'its message is not text'],
+    'retry-implement-2': [{ mode: 'continue', message: 42, at }, 'its message is not text'],
     'retry-implement-3': [{ mode: 'fresh', message: ' ', at }, 'its message is empty'],
     'retry-review-2': [
       { mode: 'recheck', message: 'the suite is fixed', at },
@@ -1260,7 +1260,7 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
   assert.equal((await runWith(e, list(e, readRun(run.id)))).steps[0].note, undefined, '`nemia ls` shows nothing asked');
   assert.deepEqual((await runWith(e, advanceRun(readRun(run.id)))).tried, [], 'and no pass honours it');
   await assert.rejects(
-    runWith(e, retryRun(run.id, 'implement', { mode: 'nudge' })),
+    runWith(e, retryRun(run.id, 'implement', { mode: 'continue' })),
     refusedWith(
       new RegExp(
         `^try 2 of implement cannot be asked for: ${escaped(file)} is already there, and it is not an ask — it asks for no mode nemia retry knows \\(undefined\\)\\. ` +
@@ -1271,7 +1271,7 @@ test("REFUSED by name at shipped defaults: a file at an ask's name that is not a
   assert.equal(fs.readFileSync(file, 'utf8'), '{}', 'not written over');
   assert.equal(filings.length, 2);
   fs.rmSync(file);
-  await runWith(e, retryRun(run.id, 'implement', { mode: 'nudge' }));
+  await runWith(e, retryRun(run.id, 'implement', { mode: 'continue' }));
   assert.deepEqual(
     (await runWith(e, advanceRun(readRun(run.id)))).tried,
     ['implement'],
@@ -1435,7 +1435,7 @@ test("REFUSED at shipped defaults: a pass that read a run before `nemia rm` forg
   fs.mkdirSync(asks);
   fs.writeFileSync(
     path.join(asks, 'retry-implement-1'),
-    JSON.stringify({ step: 'implement', try: 1, mode: 'nudge', at: '2026-09-16T00:00:00.000Z' }),
+    JSON.stringify({ step: 'implement', try: 1, mode: 'continue', at: '2026-09-16T00:00:00.000Z' }),
   );
   const mkdir = fs.mkdirSync;
   t.mock.method(fs, 'mkdirSync', (at: string, ...rest: unknown[]) => {

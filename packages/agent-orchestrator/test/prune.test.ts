@@ -339,7 +339,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       assert.equal(again.kind, 'nothing');
       names(again.nothing, pruned.at, pruned.artifacts.at, 'nemia prune --artifacts');
       assert.deepEqual(readRun(id).pruned, pruned, 'a prune with nothing to do leaves the marker as it was');
-      await assert.rejects(runWith(b.e, retryRun(id, 'implement', { mode: 'nudge' })), (err: Error) => {
+      await assert.rejects(runWith(b.e, retryRun(id, 'implement', { mode: 'continue' })), (err: Error) => {
         names(err.message, `${id} was pruned at ${pruned.at}`, pruned.artifacts!.at, 'a retry');
         return true;
       });
@@ -386,7 +386,7 @@ test('`nemia prune` of a run that landed: listed with its size until --yes, then
       const marked = readRun(inPlace.id).pruned!;
       assert.deepEqual(marked.worktrees, []);
       assert.equal(marked.at, marked.artifacts!.at, 'pruned once its files go');
-      await assert.rejects(runWith(b.e, retryRun(inPlace.id, 'implement', { mode: 'nudge' })), (err: Error) => {
+      await assert.rejects(runWith(b.e, retryRun(inPlace.id, 'implement', { mode: 'continue' })), (err: Error) => {
         names(err.message, `${inPlace.id} was pruned at ${marked.at}`, 'nemia prune --artifacts', 'a retry');
         return true;
       });
@@ -570,7 +570,7 @@ test('`nemia prune` refused, then let through: what holds it is named with the f
       const landed = await aFinished(b, { merged: true });
       const asks = path.join(ROOT, 'runs', `${landed.run.id}.asks`);
       fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
+      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
       assert.equal((await runWith(b.e, decideRun(landed.run.id))).decision.kind, 'landed');
       const asked = await runWith(b.e, prune(landed.run.id, { yes: true }));
       assert.equal(asked.kind, 'refused', 'a retry asked of a step that landed, which no pass files: the ask alone holds it');
@@ -670,7 +670,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
         names(err.message, `${run.id} was pruned at ${at}`, 'nemia prune', verb);
         return true;
       };
-      await assert.rejects(runWith(b.e, retryRun(run.id, 'implement', { mode: 'nudge' })), refusedNaming('a retry'));
+      await assert.rejects(runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue' })), refusedNaming('a retry'));
       await assert.rejects(runWith(b.e, roundRun(run.id, 'implement')), refusedNaming('a round'));
       await assert.rejects(runWith(b.e, approveRun(run.id, 'implement')), refusedNaming('an approval'));
       await assert.rejects(runWith(b.e, acceptRun(run.id, 'implement', 'as it stands')), refusedNaming('an acceptance'));
@@ -680,7 +680,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
 
       const asks = path.join(ROOT, 'runs', `${run.id}.asks`);
       fs.mkdirSync(asks, { recursive: true });
-      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'nudge' }));
+      fs.writeFileSync(path.join(asks, 'retry-implement-2'), JSON.stringify({ mode: 'continue' }));
       const filings = [...b.filings];
       await runWith(b.e, advanceRun(readRun(run.id)));
       assert.deepEqual(b.filings, filings, 'nothing filed of an ask written by hand: the pass is the guard that holds');
@@ -714,7 +714,7 @@ test('after a prune: a retry, a round, an approval and an acceptance are refused
       assert.ok(!d.overBudgetLine!.includes('waiting on you'), d.overBudgetLine);
       assert.deepEqual([d.offers, d.answering, d.gates], [[], {}, {}]);
       await assert.rejects(
-        runWith(b.e, retryRun(run.id, 'implement', { mode: 'nudge', budget: 5 })),
+        runWith(b.e, retryRun(run.id, 'implement', { mode: 'continue', budget: 5 })),
         /was pruned at/,
         'the raise is refused',
       );

@@ -44,6 +44,14 @@
       }
     },
     {
+      "term": "Hint",
+      "meaning": "the sentence a generated route's 202 answer adds, under `hint`, when its body said a value under a former spelling (`renamedValues`, the run core's `RENAMED_VALUES`): it names the value to send now, as the CLI's hint names the line to type. Absent where the body said nothing renamed.",
+      "see": {
+        "label": "The api",
+        "href": "/map/#the-api"
+      }
+    },
+    {
       "term": "Landed",
       "meaning": "a run's result is on its base, as the package asks it: the `landed` key of a hold's wait, of a run waited on and of a run handed as context, and the decision's `land it`.",
       "retired": [

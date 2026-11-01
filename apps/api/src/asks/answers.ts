@@ -36,7 +36,7 @@ export async function answeredHow(
     return {
       status: 400,
       error:
-        '`answers` are carried into the step\'s next try, as `nemia retry --message` carries an answer, and a recheck files no session to read them. Send them with "mode": "nudge" or "fresh".',
+        '`answers` are carried into the step\'s next try, as `nemia retry --message` carries an answer, and a recheck files no session to read them. Send them with "mode": "continue" or "fresh".',
     };
   }
   const asked = await askedNow(e, run, step, home);

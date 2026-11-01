@@ -352,7 +352,7 @@ test('REFUSED at shipped defaults: every route that writes, asked by a page on a
   for (const { command, r } of routed) {
     const { method, path: route } = r;
     const url = route.replace(':runId', 'r-guard').replace(':step', 'plan').replace(':name', 'g-guard').replace(':from', 'yours');
-    const body = JSON.stringify({ mode: 'nudge', message: 'Go.', text: 'Go.' });
+    const body = JSON.stringify({ mode: 'continue', message: 'Go.', text: 'Go.' });
     for (const [what, headers, status] of GUARD_LEGS) {
       const said = `${command.name} ${method} ${route}: ${what}`;
       const res = await app.request(url, { method, headers: { ...BOARD, ...headers }, body });

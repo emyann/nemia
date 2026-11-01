@@ -193,7 +193,7 @@ export const startFromInbox = Effect.fn('startFromInbox')(function* (opts: Inbox
  * back and an edit made since is kept, its paths not judged, as `nemia inbox queue --off` takes it off. Why it is still there, when that
  * failed.
  */
-const takeQueueOff = (name: CardName, file: string): Effect.Effect<string | undefined, never, never> =>
+const takeQueueOff = (name: CardName, file: string): Effect.Effect<string | undefined> =>
   Effect.gen(function* () {
     const door = yield* CardDoor;
     const now = yield* door.cards.read(name);

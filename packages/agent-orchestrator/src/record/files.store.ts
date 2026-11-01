@@ -29,7 +29,6 @@ import {
   fileNames,
   heldIn,
   holdFile,
-  isDirectory,
   listRuns,
   lstatOf,
   markCancelled,

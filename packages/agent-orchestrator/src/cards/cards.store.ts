@@ -138,10 +138,37 @@ export function cardNameAt(home: string, given: string): string | null {
   return inboxNameOf(path.join(real(path.dirname(at)), path.basename(at)), real(inboxAt(home)));
 }
 
+/** The tick's tries in the folder `queue`, as the door's files layer reads and writes them. */
+function triesAt(queue: string): CardLayer['tries'] {
+  return {
+    list: () => {
+      const tries = new Map<string, MissedStart>();
+      let names: string[];
+      try {
+        names = fs.readdirSync(queue).filter((n) => n.endsWith('.json'));
+      } catch {
+        return tries;
+      }
+      for (const file of names.sort()) {
+        try {
+          const r: unknown = JSON.parse(fs.readFileSync(path.join(queue, file), 'utf8'));
+          if (isMissedStart(r))
+            tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
+        } catch {}
+      }
+      return tries;
+    },
+    put: (name, tried) => {
+      fs.mkdirSync(queue, { recursive: true });
+      fs.writeFileSync(path.join(queue, `${name}.json`), JSON.stringify(tried, null, 2));
+    },
+    drop: (name) => fs.rmSync(path.join(queue, `${name}.json`), { force: true }),
+  };
+}
+
 /** The files of the store `home`, as a layer of the door: the inbox's cards and the queue's tries. */
 export function cardFiles(home: string): CardLayer {
   const inbox = inboxAt(home);
-  const queue = queueAt(home);
   const fileOf = (name: string) => path.join(inbox, `${name}.md`);
   return {
     cards: {
@@ -202,30 +229,7 @@ export function cardFiles(home: string): CardLayer {
       },
       where: fileOf,
     },
-    tries: {
-      list: () => {
-        const tries = new Map<string, MissedStart>();
-        let names: string[];
-        try {
-          names = fs.readdirSync(queue).filter((n) => n.endsWith('.json'));
-        } catch {
-          return tries;
-        }
-        for (const file of names.sort()) {
-          try {
-            const r: unknown = JSON.parse(fs.readFileSync(path.join(queue, file), 'utf8'));
-            if (isMissedStart(r))
-              tries.set(file.slice(0, -'.json'.length), { at: r.at, text: r.text, repo: r.repo, why: r.why, refused: r.refused });
-          } catch {}
-        }
-        return tries;
-      },
-      put: (name, tried) => {
-        fs.mkdirSync(queue, { recursive: true });
-        fs.writeFileSync(path.join(queue, `${name}.json`), JSON.stringify(tried, null, 2));
-      },
-      drop: (name) => fs.rmSync(path.join(queue, `${name}.json`), { force: true }),
-    },
+    tries: triesAt(queueAt(home)),
   };
 }
 

@@ -9,7 +9,6 @@ import type { Verdict } from '../check/check.ts';
 import type { Workflow } from '../step/step.ts';
 import type { EarlierTry, RetryAsk } from '../retry/index.ts';
 import type { MergeOf, RoundAsk } from '../status/status.ts';
-import type { MissedStart } from '../inbox/index.ts';
 import type { Pause } from '../pause/pause.ts';
 import type { Pin } from '../revisions/revisions.ts';
 

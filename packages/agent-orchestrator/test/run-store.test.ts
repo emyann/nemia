@@ -4,9 +4,9 @@
  * run is there and whether a person called it off; the stamps a pass compares, and the asks it reads, consumes and answers from; a hold
  * lifted only as it was read; and the tick asking it, before each filing, whether a person called the run off since (`mayFileOf`). And a
  * person's writes: an ask of each kind at its name, never over a file there, a hold put once and standing while its file does, a
- * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file; the inbox is the Card door's
- * (`src/cards/cards.store.test.ts`). And what `nemia rm` and `nemia prune --artifacts` read of it: every run's id read or not, a run's files directory
- * found and dropped.
+ * cancellation kept as first written, a prune marker put and taken back, and a run forgotten file by file; the inbox is the Card
+ * door's (`src/cards/cards.store.test.ts`). And what `nemia rm` and `nemia prune --artifacts` read of it: every run's id read or not, a
+ * run's files directory found and dropped.
  *
  * And the refusal that keeps the interface the one way in: a file of `src` but the store's own that imports a run's or a person's file
  * functions from `record.store.ts`, or through `runner.ts`, is refused. `WF_ROOT` is set before the store is imported, since it is read as

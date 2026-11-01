@@ -113,7 +113,7 @@ test('the two ways of asking answer the same, in the environment the place was g
 test('REFUSED: a verb that throws is unread in one sentence naming the verb and what was thrown, either way of asking', async () => {
   const dir = repository();
   const lost = gitPlace({ env: { ...ENV, PATH: scratch('wf-git-place-no-git-') } });
-  const request = { repo: dir, under: dir, prefix: 'wf/x/', base: 'main' };
+  const request = { repo: dir, under: dir, run: 'x', base: 'main' };
   const now = saidOf(lost.askNow('inventory', request), 'inventory');
   const later = saidOf(await Effect.runPromise(lost.ask('inventory', request)), 'inventory');
   assert.equal(now, 'inventory threw before it answered: spawnSync git ENOENT');
@@ -142,7 +142,7 @@ test('REFUSED: a git held past its deadline, asked while the process waits, is u
     const pid = Number(fs.readFileSync(marker, 'utf8'));
     assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone, not even a zombie`);
     assert.ok(said.startsWith(killedWords(deadlineMs)), said);
-    const next = PLACE.askNow('status', { checkout: dir, tips: {} });
+    const next = PLACE.askNow('status', { repo: dir, tips: {} });
     assert.ok('answer' in next && next.answer.merging === 'none', `the next question is answered: ${JSON.stringify(next)}`);
     return;
   }
@@ -165,7 +165,7 @@ test('REFUSED: a git held past its deadline, asked off the loop, is unread in th
     const pid = Number(fs.readFileSync(marker, 'utf8'));
     assert.throws(() => process.kill(pid, 0), { code: 'ESRCH' }, `the child ${pid} is gone`);
     assert.ok(said.startsWith(killedWords(deadlineMs)), said);
-    const next = await Effect.runPromise(PLACE.ask('status', { checkout: dir, tips: {} }));
+    const next = await Effect.runPromise(PLACE.ask('status', { repo: dir, tips: {} }));
     assert.ok('answer' in next && next.answer.merging === 'none', `the next question is answered: ${JSON.stringify(next)}`);
     return;
   }
@@ -212,7 +212,7 @@ test("the shipped place counts each question in the pass's place phase, and each
   const dir = repository();
   const asked = Effect.gen(function* () {
     const first = yield* builtinGitPlace.ask('seal', { tree: path.join(dir, 'no-such-tree') });
-    const second = builtinGitPlace.askNow('status', { checkout: path.join(dir, 'no-such-checkout'), tips: {} });
+    const second = builtinGitPlace.askNow('status', { repo: path.join(dir, 'no-such-checkout'), tips: {} });
     return [first, second];
   });
   const none = await Effect.runPromise(meteredPass(asked));

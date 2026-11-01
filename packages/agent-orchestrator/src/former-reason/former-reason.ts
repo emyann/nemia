@@ -37,7 +37,7 @@ export const isFormerReason = (value: string): boolean => Object.hasOwn(FORMER_R
  * case (the person's answer at this card's design); every other code is current, and kept as written. Pure.
  */
 export function currentOf(codes: { reason: string; on?: string; via?: string }, kind: InvolvedKind): Codes {
-  const converted = isFormerReason(codes.reason) ? FORMER_REASONS[codes.reason][kind] : undefined;
+  const converted = isFormerReason(codes.reason) ? FORMER_REASONS[codes.reason]?.[kind] : undefined;
   if (converted) return converted;
   if (codes.reason === 'Waiting' && codes.on === undefined) return { reason: 'Pending' };
   return codes as Codes;
@@ -57,15 +57,19 @@ export function formerOf(codes: Codes, kind: InvolvedKind): string | undefined {
   }
   if (kind !== 'Step') return undefined;
   return Object.keys(FORMER_REASONS).find((former) => {
-    const now = FORMER_REASONS[former].Step;
+    const now = FORMER_REASONS[former]?.Step;
     return now !== undefined && now.reason === codes.reason && now.on === codes.on && now.via === codes.via;
   });
 }
 
-/** What a former code is now spelled as a selector: `reason=AwaitingAnswer,via=session`, a step's reading first. */
-const spelled = (former: string): string => {
-  const { Step, Run } = FORMER_REASONS[former];
-  const now = (Step ?? Run)!;
+/**
+ * What a former code is now spelled as a selector: `reason=AwaitingAnswer,via=session`, a step's reading first; undefined where the table
+ * holds no reading of it, which no row of it is.
+ */
+const spelled = (former: string): string | undefined => {
+  const converted = FORMER_REASONS[former];
+  const now = converted?.Step ?? converted?.Run;
+  if (now === undefined) return undefined;
   return [`reason=${now.reason}`, ...(now.on ? [`on=${now.on}`] : []), ...(now.via ? [`via=${now.via}`] : [])].join(',');
 };
 
@@ -75,7 +79,8 @@ const spelled = (former: string): string => {
  */
 export function formerHints(selector: string): string[] {
   const named = selector.match(/[A-Za-z][A-Za-z0-9]*/g) ?? [];
-  return [...new Set(named.filter(isFormerReason))].map(
-    (former) => `${former} is a former reason, still read: type ${spelled(former)} instead`,
-  );
+  return [...new Set(named.filter(isFormerReason))].flatMap((former) => {
+    const now = spelled(former);
+    return now === undefined ? [] : [`${former} is a former reason, still read: type ${now} instead`];
+  });
 }

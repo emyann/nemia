@@ -4,6 +4,7 @@
  * start.verb.ts).
  */
 import { refuse, STEP_KEYS, type StepKey, type Workflow } from '../step/step.ts';
+import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 
 /** The harness a step runs on when it names none. */
 export const DEFAULT_HARNESS = 'claude';
@@ -23,7 +24,7 @@ export const isRemoteHarness = (harness: string | undefined): boolean => harness
 
 /** The name `harness: a2a:<name>` gives, or `undefined` for a local harness. Pure. */
 export const remoteNameOf = (harness: string | undefined): string | undefined =>
-  isRemoteHarness(harness) ? harness!.slice(REMOTE_PREFIX.length) : undefined;
+  harness !== undefined && isRemoteHarness(harness) ? harness.slice(REMOTE_PREFIX.length) : undefined;
 
 const RUNS_AS_CONFIGURED =
   'is how a harness of ours is to run the session, and a remote agent runs as its operator configured it: A2A carries no such argument, and the runtime refuses a task filed with one';
@@ -79,8 +80,9 @@ export function remoteRetryRefusal(step: Workflow, flag: 'model' | 'budget', val
 export const REMOTE_REFUSED_KEYS: readonly StepKey[] = STEP_KEYS.filter((key) => REMOTE_REFUSED[key] !== undefined);
 
 /**
- * Refused: a key a step on a remote agent may not set (`REMOTE_REFUSED`), from the step or from its agent — and `workspace: main`, whose
- * checkout the agent never touches. Nothing else is judged against a remote harness: the key's own reading assumes a harness of ours.
+ * Refused: a key a step on a remote agent may not set (`REMOTE_REFUSED`), from the step or from its agent — and `workspace: base`, or its
+ * former spelling `main`, whose checkout the agent never touches. Nothing else is judged against a remote harness: the key's own reading
+ * assumes a harness of ours.
  */
 export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string>>, harness: string): void {
   const said = (key: string, why: string) =>
@@ -91,7 +93,7 @@ export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string
     const why = REMOTE_REFUSED[key];
     if (why !== undefined && meta[key] !== undefined) said(key, why);
   }
-  if (meta.workspace?.trim() === 'main')
+  if (meta.workspace?.trim() === 'base' || meta.workspace?.trim() === 'main')
     said('workspace', "runs the step in the repository's own checkout, which a remote agent on another party's machine never touches");
 }
 
@@ -105,3 +107,18 @@ export function remoteRefusal(step: string, meta: Partial<Record<StepKey, string
  * command, and no step runs on it.
  */
 export const HARNESSES: readonly string[] = ['claude', 'codex'];
+
+/**
+ * The fence keys of every harness: each one's own key and its tool lists. One list for the package, read by the template and by the
+ * markdown readers, which take a harness's fence under its block (`<harness>: { fence: … }`, `fenceKeysOf`).
+ */
+export const HARNESS_FENCE_KEYS: readonly string[] = [
+  ...new Set(Object.values(HARNESS_KNOBS).flatMap((knobs) => [knobs.fence.key, ...knobs.fence.lists])),
+];
+
+/** The fence keys harness `harness`'s block takes, its own key then its tool lists, or `undefined` for a name that is no harness. */
+export const fenceKeysOf = (harness: string): readonly string[] | undefined => {
+  if (!Object.hasOwn(HARNESS_KNOBS, harness)) return undefined;
+  const knobs = HARNESS_KNOBS[harness];
+  return knobs === undefined ? undefined : [knobs.fence.key, ...knobs.fence.lists];
+};

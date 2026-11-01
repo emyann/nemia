@@ -95,7 +95,7 @@ export function Facts({ rows }: { rows: Array<[label: string, value: ReactNode]>
  * marked `this try`. For a step not filed, what the workflow says, or a dash. A step on a remote A2A agent (`remoteRows`) reads otherwise.
  *
  * The context is the session's window as the step writes it — `200k` — and the model's whole window where neither the step nor the try has
- * one. `workspace` is a row only where the step says it (`main`, the repository's own checkout rather than a worktree of the run's), and
+ * one. `workspace` is a row only where the step says it (`base`, the repository's own checkout rather than a worktree of the run's), and
  * `place` only where it says `folder` (`placeRows`): a detail from an api that does not carry the key has none. `loop` and `rounds`, the
  * edge back and how many rounds it may run, are rows beside `after` on a looping step only. A codex step's fence is its sandbox, which the
  * engine's task files as its permission mode: the same row, under Codex's name (`fenceLabel`). A step filed bridged has a `reach` row: its

@@ -129,7 +129,14 @@ export default {
       ]);
       if (saved.status() !== 200) throw new Refused(`the api saves the agent — it answered ${saved.status()}: ${await saved.text()}`);
       const written = fs.readFileSync(agentFile, 'utf8');
-      for (const line of [`skills: ${mine}`, 'harnessPrompt: no-coding', 'tools: Read, Skill', `description: ${drafted}`]) {
+      for (const line of [
+        `skills: ${mine}`,
+        'harnessPrompt: no-coding',
+        'claude:',
+        '  fence:',
+        '    tools: Read, Skill',
+        `description: ${drafted}`,
+      ]) {
         if (!written.split('\n').includes(line))
           throw new Refused(`agents/${seeded.name}.md says ${line} — it holds ${JSON.stringify(written)}`);
       }

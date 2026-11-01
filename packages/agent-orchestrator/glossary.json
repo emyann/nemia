@@ -90,6 +90,16 @@
       "type": "DoorOf"
     },
     {
+      "term": "Ending",
+      "meaning": "a workflow's last step, run on the base (`workspace: base`, `endsOnBase`), filed once a person approves it or once the step before it that can send the work back passes.",
+      "retired": [
+        {
+          "spelling": "workspace: main",
+          "card": "decision 9: the step format says workspace: base, main read as its former spelling"
+        }
+      ]
+    },
+    {
       "term": "Gate",
       "meaning": "a property of a step: nothing after it is started until a person approves.",
       "see": {
@@ -110,6 +120,11 @@
           "card": "decision 8: one spelling to list, to read one thing, and to remove"
         }
       ]
+    },
+    {
+      "term": "Harness fence keys",
+      "meaning": "the fence keys of every harness, one list for the package (`HARNESS_FENCE_KEYS`, from the runtime's `HARNESS_KNOBS`): each written under its own harness's block, `permissionMode`, `tools`, `allowedTools` and `disallowedTools` under `claude: { fence: … }` and `sandbox` under `codex: { fence: … }`. Read by a template and by the markdown readers alike; a top-level fence key is their former spelling, still read, which `nemia frontmatter rewrite` moves into the block.",
+      "type": "HARNESS_FENCE_KEYS"
     },
     {
       "term": "Hold",

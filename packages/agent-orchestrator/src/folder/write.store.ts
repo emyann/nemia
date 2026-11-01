@@ -87,6 +87,7 @@ export function writeWorkflow(
   if (twice) refuse(`two steps are named ${twice.name}, and a step is its file, ${twice.name}.md. Rename one of them.`);
   const where = places ?? placesAround(at);
   const agents = agentsFor(at, where);
+  refuse(codexModeRefusal(steps, agents));
   const texts = steps.map((step) => [step.name, renderStep(ownLine(step, agents))] as const);
   const read = (file: string): string | undefined => {
     try {
@@ -96,8 +97,6 @@ export function writeWorkflow(
     }
   };
   const parsed = parseFolder(texts, read, agents, skillsFor(at, where));
-  const onCodex = steps.find((step) => step.permissionMode != null && parsed.find((s) => s.name === step.name)?.harness === 'codex');
-  if (onCodex) refuse(codexModeWritten(onCodex.name, onCodex.permissionMode!));
 
   fs.mkdirSync(at, { recursive: true });
   const written: string[] = [];
@@ -127,10 +126,27 @@ export function writeWorkflow(
 }
 
 /**
+ * The refusal of the first draft of `steps` that sends a sandbox under the former name, as `codexModeWritten` words it, or undefined
+ * where none does.
+ */
+function codexModeRefusal(steps: readonly StepDraft[], agents: Agents): string | undefined {
+  for (const step of steps)
+    if (step.permissionMode != null && harnessOfDraft(step, agents) === 'codex') return codexModeWritten(step.name, step.permissionMode);
+  return undefined;
+}
+
+/**
  * Draft `step` as its own file holds it: one that names its agent `agent:` by name and sends a `disallowedTools` list — the board sends
  * the resolved one, its agent's denies with the step's own — without the rules that agent's file denies, which the step's line adds to
  * (`deniesWith`), so a save never pins its agent's line into the step again. Any other draft as it is.
  */
+/** The harness a draft runs on: its own `harness`, else its agent's by its file, else none said. */
+function harnessOfDraft(step: StepDraft, agents: Agents): string | undefined {
+  if (step.harness != null) return String(step.harness);
+  const agent = typeof step.agent === 'string' ? agents.get(step.agent) : undefined;
+  return agent === undefined || agent instanceof WorkflowError ? undefined : agent.keys.harness;
+}
+
 function ownLine(step: StepDraft, agents: Agents): StepDraft {
   const agent = typeof step.agent === 'string' ? agents.get(step.agent) : undefined;
   if (!step.disallowedTools || agent === undefined || agent instanceof WorkflowError) return step;

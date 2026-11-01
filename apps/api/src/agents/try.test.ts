@@ -172,7 +172,15 @@ test('a person tries an agent of theirs: a folder run fenced with a dollar, one 
 
     const file = path.join(TRIES, 'scribe', 'try.md');
     const text = fs.readFileSync(file, 'utf8');
-    for (const line of ['place: folder', 'agent: scribe', 'budget: 1', 'permissionMode: dontAsk', 'allowedTools: Edit(**)']) {
+    for (const line of [
+      'place: folder',
+      'agent: scribe',
+      'budget: 1',
+      'claude:',
+      '  fence:',
+      '    permissionMode: dontAsk',
+      '    allowedTools: Edit(**)',
+    ]) {
       assert.ok(text.split('\n').includes(line), `the try's step says ${line}`);
     }
     const agent = (await (await app().request('/api/agents/yours/scribe')).json()) as AgentListing;
@@ -292,8 +300,14 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
       ] as const) {
         const id = await idOf(await tryIt(name, { brief: 'Write the notes.' }));
         const lines = fs.readFileSync(path.join(TRIES, name, 'try.md'), 'utf8').split('\n');
-        assert.ok(lines.includes(`permissionMode: ${mode}`), `${name}: dontAsk, or its own mode where narrower: ${lines.join('\n')}`);
-        assert.ok(lines.includes(`allowedTools: ${rules.join(', ')}`), `${name}: its rules inside the folder alone: ${lines.join('\n')}`);
+        assert.ok(
+          lines.includes(`    permissionMode: ${mode}`) && lines.includes('claude:'),
+          `${name}: dontAsk, or its own mode where narrower: ${lines.join('\n')}`,
+        );
+        assert.ok(
+          lines.includes(`    allowedTools: ${rules.join(', ')}`),
+          `${name}: its rules inside the folder alone: ${lines.join('\n')}`,
+        );
         const step = JSON.parse(fs.readFileSync(path.join(RUNS, `${id}.json`), 'utf8')).workflow[0];
         assert.equal(step.permissionMode, mode);
         assert.deepEqual(step.allowedTools, rules, "the try's list replaces the agent's");
@@ -379,6 +393,22 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
         why: SERVERS_UNTRIED,
         copy: null,
       });
+    },
+  );
+
+  await t.test(
+    "an agent whose `overridable:` line leaves out `fence` is refused a try before anything is written, in the try's words, and its listing says the same; offered, it is tried",
+    async () => {
+      fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, skills\nmodel: sonnet\n---\nSay what you see.\n');
+      const why = await refused(tryIt('closed', { brief: 'Look.' }), 422, /`overridable: model, skills`/);
+      assert.ok(why.includes('`fence`') && why.includes('try'), why);
+      assert.equal(fs.existsSync(path.join(TRIES, 'closed')), false, 'no try folder for it');
+      const agents = (await (await app().request('/api/agents')).json()) as AgentListing[];
+      assert.equal(agents.find((agent) => agent.from === 'yours' && agent.name === 'closed')?.untried?.why, why);
+      fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, fence\nmodel: sonnet\n---\nSay what you see.\n');
+      const id = await idOf(await tryIt('closed', { brief: 'Look.' }));
+      ended(id);
+      assert.equal((await remove(id)).status, 200);
     },
   );
 

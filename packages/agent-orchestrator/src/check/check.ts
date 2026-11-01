@@ -24,7 +24,7 @@
  * Pure: no disk, no process, no engine. `file.verb.ts` is the file that files these.
  */
 import { isRepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
-import type { Workflow } from '../step/step.ts';
+import { endsOnBase, type Workflow } from '../step/step.ts';
 
 /**
  * The seconds a step's check may run before the engine stops it, where the check does not land the run: a round's check. A hung check must
@@ -107,7 +107,7 @@ export const checkEnvOf = (
 ): CheckEnv => ({
   WF_RUN: run.id,
   WF_STEP: step.name,
-  ...(isRepositoryRun(run) && step.workspace !== 'main' ? { WF_BASE_REF: run.baseRef } : {}),
+  ...(isRepositoryRun(run) && !endsOnBase(step) ? { WF_BASE_REF: run.baseRef } : {}),
   WF_WORKSPACE: t.workspace,
   WF_ARTIFACTS: t.files,
   ...(t.closeout ? { WF_CLOSEOUT: t.closeout } : {}),
@@ -304,8 +304,8 @@ export function failingLines(log: string): { lines: string[]; cut: number } {
   const all = new Set<string>();
   for (const raw of log.split('\n')) {
     const line = raw.replace(/\r$/, '');
-    const said = /^(\S+:\S+: )?\s*((?:✖|not ok ).*)$/.exec(line);
-    if (said && !said[2].startsWith('✖ failing tests:')) all.add(`${said[1] ?? ''}${said[2].trimEnd()}`);
+    const [, at, failed] = /^(\S+:\S+: )?\s*((?:✖|not ok ).*)$/.exec(line) ?? [];
+    if (failed !== undefined && !failed.startsWith('✖ failing tests:')) all.add(`${at ?? ''}${failed.trimEnd()}`);
   }
   const lines = [...all];
   return { lines: lines.slice(0, FAILING_LINES), cut: Math.max(0, lines.length - FAILING_LINES) };

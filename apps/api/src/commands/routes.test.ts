@@ -463,7 +463,7 @@ test('what a route refuses or ignores of its body, and the removals the board wi
   );
 
   await t.test(
-    'REFUSED at shipped defaults: a try whose worktree git will not remove — locked — is a 409 naming the worktree, how to unlock it and `nemia rm`, and its record kept',
+    'REFUSED at shipped defaults: a try whose worktree its place will not remove — held — is a 409 naming the worktree, how to let it go and `nemia rm`, and its record kept',
     async () => {
       const id = 'r-held-try';
       const repo = fs.mkdtempSync(path.join(root, 'repo-'));
@@ -473,7 +473,7 @@ test('what a route refuses or ignores of its body, and the removals the board wi
       const res = await remove(id);
       assert.equal(res.status, 409);
       const said = ((await res.json()) as { error: string }).error;
-      assert.ok(said.startsWith(`${id}  not forgotten: ${worktree} is locked (a person holds it)`), said);
+      assert.ok(said.startsWith(`${id}  not forgotten: ${worktree} is held (a person holds it)`), said);
       for (const fact of [`git -C ${repo} worktree unlock ${worktree}`, `nemia rm ${id} again`])
         assert.ok(said.includes(fact), `${fact} in ${said}`);
       assert.ok(fs.existsSync(path.join(root, 'runs', `${id}.json`)), 'the record is kept');

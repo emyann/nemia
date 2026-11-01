@@ -10,8 +10,9 @@ import type { Agent } from '../agents/agents.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
 import { budgetOf, countOf, gateOf, readsNamesOf, rulesOf, serverNamesOf, skillNamesOf, toolsOf } from '../keys/index.ts';
 import { FACTORY_RULES_FILE } from '../rules/rules.ts';
+import { baseSpelled } from '../former/former.ts';
 import type { RevisionsPolicy } from '../factory/factory.ts';
-import { API_VERSION, FENCE_KEYS, type Profile, type Step } from './layout.ts';
+import { API_VERSION, HARNESS_FENCE_KEYS, type Profile, type Step } from './layout.ts';
 
 /** A step as its file writes it: its name, its own keys as the parser names them (never its agent's), its body and its file. */
 export type StepSource = { name: string; keys: Readonly<Record<string, string>>; body: string; file: string };
@@ -90,7 +91,7 @@ const PLACED = new Set<string>([
   ...WORDS,
   ...COUNTED,
   ...BLOCK_KEYS,
-  ...FENCE_KEYS,
+  ...HARNESS_FENCE_KEYS,
 ]);
 
 /** A list as today's lines write one: comma-separated, each trimmed. */
@@ -109,7 +110,7 @@ const isWordKey = (key: string): boolean => Object.values(HARNESS_KNOBS).some((k
  */
 function blockOf(file: string, keys: Readonly<Record<string, string | undefined>>, harness: string): Profile | undefined {
   const fence: Record<string, string | readonly string[]> = {};
-  for (const key of FENCE_KEYS) {
+  for (const key of HARNESS_FENCE_KEYS) {
     const written = keys[key];
     if (written === undefined) continue;
     if (isWordKey(key)) fence[HARNESS_KNOBS[harness]?.fence.key ?? key] = written;
@@ -125,9 +126,9 @@ function blockOf(file: string, keys: Readonly<Record<string, string | undefined>
 /** The step keys of `step` the template has no place for. */
 const unplaced = (step: StepSource): string[] => Object.keys(step.keys).filter((key) => !PLACED.has(key));
 
-/** The wiring of `step`, typed, in the template's order. */
+/** The wiring of `step`, typed, in the template's order: a former `workspace: main` written as `base` (`baseSpelled`). */
 function wiringOf(step: StepSource): Partial<Step> {
-  const keys = step.keys;
+  const keys = baseSpelled(step.keys);
   const wired: Record<string, unknown> = {};
   if (keys.after !== undefined) wired.after = listOf(keys.after);
   if (keys.input !== undefined) wired.input = listOf(keys.input);

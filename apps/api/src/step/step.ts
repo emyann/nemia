@@ -10,7 +10,6 @@
 import path from 'node:path';
 import { Hono } from 'hono';
 import {
-  COMMANDS,
   DEFAULT_FACTORY,
   fillsOf,
   hireRefusalOf,
@@ -26,7 +25,7 @@ import type { AgentSkill, SkillsFound, Workflow } from 'agent-orchestrator/workf
 import { foundInOf, sourceOf, type SkillSource } from '../agents/skills.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { agentSkillsOf, folderOf, keyRows, placesOf, stepSourceOf, type KeyRow, type WorkflowSource } from '../workflows/workflows.ts';
-import { runPlaced } from '../store.ts';
+import { commandNamed, runPlaced } from '../store.ts';
 
 /** How many of a step's runs its page lists, newest first. */
 export const RECENT_RUNS = 5;
@@ -208,10 +207,10 @@ export function skillsFromOf(layers: ToldLayers, found: SkillsFound, repo: strin
 }
 
 /** The table's entry a step's page is read through, served on the api alone. */
-const STEP = COMMANDS.find((c) => c.name === 'workflows step')!;
+const STEP = commandNamed('workflows step');
 
 /** The package's listing of the agents (`nemia agents`), which a step's hire is chosen from. */
-const AGENTS = COMMANDS.find((c) => c.name === 'agents')!;
+const AGENTS = commandNamed('agents');
 
 /**
  * A step's page.

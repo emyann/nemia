@@ -1,6 +1,6 @@
 /**
  * `standing`: where a repository's result branches stand against the base branch they land on, as a pass of the tick reads it. Takes `{
- * repo, branches: [{ branch, tip?, baseRef }], base }`; answers `Standing`: `heads`, every branch of the repository and its commit, and for
+ * repo, branches: [{ branch, tip?, baseRef }], base }`; answers `Standing`: `tips`, every branch of the repository and its commit, and for
  * each branch asked of, in the order asked, its tip, whether it is within `base` (`onBase`), whether the commit asked of holds work past
  * its run's `baseRef` (`pastBase`), and how many commits it is ahead of `base`.
  *
@@ -39,13 +39,14 @@ function* listing(repo: string, bases: readonly string[]): Asking<Listing | unde
   const ahead = new Map(bases.map((b) => [b, new Map<string, number>()]));
   for (const line of listed.split('\n')) {
     const words = line.split(' ');
-    if (words.length < 2 + bases.length * 2) continue;
+    const commit = words[0];
+    if (commit === undefined || words.length < 2 + bases.length * 2) continue;
     const branch = words
       .slice(1 + bases.length * 2)
       .join(' ')
       .replace(/^refs\/heads\//, '');
-    heads[branch] = words[0];
-    bases.forEach((b, k) => ahead.get(b)!.set(branch, Number(words[1 + k * 2])));
+    heads[branch] = commit;
+    bases.forEach((b, k) => ahead.get(b)?.set(branch, Number(words[1 + k * 2])));
   }
   return { heads, ahead };
 }
@@ -76,10 +77,10 @@ function* pastOf(repo: string, listed: Listing, one: Asked, head: string | null,
 /** Where one branch asked of stands, read off `listed`, and git asked for what it does not hold. */
 function* stoodOne(repo: string, base: string, one: Asked, listed: Listing): Asking<BranchStood> {
   const { branch, tip } = one;
-  const head = Object.hasOwn(listed.heads, branch) ? listed.heads[branch] : null;
+  const head = Object.hasOwn(listed.heads, branch) ? (listed.heads[branch] ?? null) : null;
   const commit = head ?? tip;
   const onBase: Within = !commit ? 'unknown' : head ? yield* withinOf(repo, listed, branch, head, base) : yield* within(repo, commit, base);
-  const past = onBase === 'yes' ? yield* pastOf(repo, listed, one, head, commit!) : undefined;
+  const past = onBase === 'yes' && commit ? yield* pastOf(repo, listed, one, head, commit) : undefined;
   const ahead =
     head === null
       ? null
@@ -118,5 +119,5 @@ export function* standing({ repo, base, branches }: PlaceRequests['standing']): 
   if (typeof read === 'string') return refused(read);
   const stood: BranchStood[] = [];
   for (const one of branches) stood.push(yield* stoodOne(repo, base, one, read));
-  return { heads: read.heads, branches: stood };
+  return { tips: read.heads, branches: stood };
 }

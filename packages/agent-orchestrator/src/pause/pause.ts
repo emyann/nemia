@@ -8,7 +8,7 @@
 import type { Run } from '../record/record.ts';
 import type { RecordMemo } from '../rest/index.ts';
 import type { RetryAsk } from '../retry/index.ts';
-import type { Workflow } from '../step/step.ts';
+import { endsOnBase, type Workflow } from '../step/step.ts';
 import { landsOnCheck } from '../status/status.ts';
 import { phaseOfView, type WordView } from '../views/views-words.ts';
 
@@ -119,11 +119,11 @@ const stepAtWork = (
 
 /**
  * The tasks of `run` a pause at once stops: those still at work as `finishingOf` reads them, but a step's in the repository's own
- * checkout (`workspace: main`), whose session, check and merge are a landing and finish, and one the engine was already asked to stop.
+ * checkout (`workspace: base`), whose session, check and merge are a landing and finish, and one the engine was already asked to stop.
  */
 export function interruptsOf(run: Run, steps: readonly Workflow[], viewOf: (taskId: string) => FinishingView | undefined): Interrupt[] {
   return steps
-    .filter((step) => step.workspace !== 'main')
+    .filter((step) => !endsOnBase(step))
     .flatMap((step) =>
       stepAtWork(run, step, viewOf)
         .filter(({ view }) => !view.state.stopRequested)

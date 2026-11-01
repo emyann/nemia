@@ -90,8 +90,7 @@ export function commitOf(repo: Repository, id: string): Commit {
 export function ancestors(repo: Repository, id: string): Set<string> {
   const seen = new Set<string>();
   const next = [id];
-  while (next.length) {
-    const at = next.pop()!;
+  for (let at = next.pop(); at !== undefined; at = next.pop()) {
     if (seen.has(at)) continue;
     seen.add(at);
     next.push(...(repo.commits.get(at)?.parents ?? []));
@@ -148,9 +147,9 @@ export const linesOf = (text: string): string[] => (text === '' ? [] : text.repl
  */
 export function lineChanges(from: readonly string[], to: readonly string[]): string[] {
   const kept = Array.from({ length: from.length + 1 }, () => Array.from({ length: to.length + 1 }, () => 0));
-  for (let i = from.length - 1; i >= 0; i--)
-    for (let j = to.length - 1; j >= 0; j--)
-      kept[i][j] = from[i] === to[j] ? kept[i + 1][j + 1] + 1 : Math.max(kept[i + 1][j], kept[i][j + 1]);
+  const at = (i: number, j: number): number => kept[i]?.[j] ?? 0;
+  for (const [i, row] of [...kept.entries()].reverse().slice(1))
+    for (let j = to.length - 1; j >= 0; j--) row[j] = from[i] === to[j] ? at(i + 1, j + 1) + 1 : Math.max(at(i + 1, j), at(i, j + 1));
   const changes: string[] = [];
   let [i, j] = [0, 0];
   while (i < from.length || j < to.length) {
@@ -158,7 +157,7 @@ export function lineChanges(from: readonly string[], to: readonly string[]): str
       changes.push(` ${from[i]}`);
       i += 1;
       j += 1;
-    } else if (i < from.length && (j === to.length || kept[i + 1][j] >= kept[i][j + 1])) changes.push(`-${from[i++]}`);
+    } else if (i < from.length && (j === to.length || at(i + 1, j) >= at(i, j + 1))) changes.push(`-${from[i++]}`);
     else changes.push(`+${to[j++]}`);
   }
   return changes;

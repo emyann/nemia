@@ -14,6 +14,7 @@ import { closeoutOf, parentRead } from '../views/views.verb.ts';
 import type { BranchReader } from '../branches/branches.store.ts';
 import { phaseOfView } from '../views/views-words.ts';
 import type { ParentCloseout, ParentStep } from './handed.ts';
+import { firstPiece } from '../piece/piece.ts';
 
 /**
  * What the step `step` of the run `record` said, on the engine's record of its current try (`closeoutOf`) — or why it cannot be given: it
@@ -40,7 +41,7 @@ const stepSaid = Effect.fn('stepSaid')(function* (e: Engine, record: Run, step: 
  * of each run that reads: the first line of its brief, and the closeout of each step whose work is that run's result (`resultSteps`), on
  * the engine's record of its current try, read as `nemia decide` reads one (`closeoutOf`). Read once, on the pass that files the roots.
  *
- * The result's steps, not the terminal ones: where a folder's last step is an ending that merges (`workspace: main`), that step's account
+ * The result's steps, not the terminal ones: where a folder's last step is an ending that merges (`workspace: base`), that step's account
  * is of the merge — "merged wf/…/implement onto main, the check passed" — and it declares nothing, so a child handed it would be handed
  * nothing about the work. What the child wants is what the work said, which is the step the ending acts on. A folder with no ending step
  * is unchanged: its terminal steps are its result.
@@ -69,7 +70,7 @@ export const parentCloseouts = Effect.fn('parentCloseouts')(function* (
     const said: ParentStep[] = [];
     for (const step of resultSteps(steps)) said.push(yield* stepSaid(e, record, step));
     const landed = how === 'waited' || (yield* parentRead(id, git).pipe(over(e))).landed;
-    out.push({ run: id, asked: record.brief.split('\n')[0], steps: said, how, landed });
+    out.push({ run: id, asked: firstPiece(record.brief, '\n'), steps: said, how, landed });
   }
   return out;
 });

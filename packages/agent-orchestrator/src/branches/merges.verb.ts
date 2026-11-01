@@ -22,7 +22,7 @@ export function mergesOf(place: Place, runId: string, branches: readonly string[
   );
   return Object.fromEntries(
     branches.map((branch, i) => {
-      const merge = mergeWordOf(trials[i]);
+      const merge = mergeWordOf(trials[i] ?? { unknown: `the place answered no trial of ${branch}` });
       return [branch, { ...merge, said: mergeWord(merge, run.branch) }];
     }),
   );

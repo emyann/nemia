@@ -142,9 +142,10 @@ export function cardToStart(file: string, text: string, after: readonly string[]
   } catch {
     return null;
   }
-  const read = split.block === null ? null : frontmatterOrNull(split.block);
+  if (split.block === null) return null;
+  const read = frontmatterOrNull(split.block);
   if (!read?.entries.length || !read.entries.every(({ key }) => KEY_WORD.test(key))) return null;
-  const keys = frontmatterKeys(file, split.block!, CARD_KEYS, (key) => startUnknown(file, key));
+  const keys = frontmatterKeys(file, split.block, CARD_KEYS, (key) => startUnknown(file, key));
   const body = bodyOf(file, split.body);
   const waits = afterOf(file, keys.after);
   if (waits.length && !after.length) {
@@ -234,14 +235,15 @@ export function planOrder(cards: readonly Card[]): Card[] {
   const placed = new Set<string>();
   const pending = [...cards].sort((a, b) => a.name.localeCompare(b.name));
   while (pending.length) {
-    const next = pending.findIndex((c) => c.after.every((a) => placed.has(a)));
-    if (next < 0) {
+    const card = pending.find((c) => c.after.every((a) => placed.has(a)));
+    if (card === undefined) {
       const cycle = cycleIn(pending);
+      const waits = cycle.map((c, i) => `${c.name} after ${cycle[(i + 1) % cycle.length]?.name ?? ''}`);
       refuse(
-        `${cycle.map((c) => c.file).join(', ')} wait on each other — ${cycle.map((c, i) => `${c.name} after ${cycle[(i + 1) % cycle.length].name}`).join(', ')} — so none of them could ever start. Take one of those cards out of the other's \`after:\`.`,
+        `${cycle.map((c) => c.file).join(', ')} wait on each other — ${waits.join(', ')} — so none of them could ever start. Take one of those cards out of the other's \`after:\`.`,
       );
     }
-    const [card] = pending.splice(next, 1);
+    pending.splice(pending.indexOf(card), 1);
     order.push(card);
     placed.add(card.name);
   }
@@ -255,12 +257,13 @@ export function planOrder(cards: readonly Card[]): Card[] {
 function cycleIn(pending: readonly Card[]): Card[] {
   const byName = new Map(pending.map((c) => [c.name, c]));
   const walked: Card[] = [];
-  let at = pending[0];
-  while (!walked.includes(at)) {
+  let at: Card | undefined = pending[0];
+  while (at !== undefined && !walked.includes(at)) {
     walked.push(at);
-    at = byName.get(at.after.find((a) => byName.has(a))!)!;
+    const parent: string | undefined = at.after.find((a) => byName.has(a));
+    at = parent === undefined ? undefined : byName.get(parent);
   }
-  return walked.slice(walked.indexOf(at));
+  return at === undefined ? walked : walked.slice(walked.indexOf(at));
 }
 
 /** A card `nemia start <folder>` started: the card, the id of its run, and the workflow folder that run froze. */

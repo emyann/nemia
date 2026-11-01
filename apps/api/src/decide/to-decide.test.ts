@@ -183,7 +183,7 @@ test("a run at its ending's gate: `to decide` says what the ending would do on t
         detail.steps.map((s) => [s.name, s.spec?.workspace ?? null]),
         [
           ['implement', null],
-          ['ship', 'main'],
+          ['ship', 'base'],
         ],
         "the key the board tells an ending's gate from another gate by: the ending runs in the repository's own checkout, and the work does not",
       );

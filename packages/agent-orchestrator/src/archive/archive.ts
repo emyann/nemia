@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { gunzipSync, gzipSync } from 'node:zlib';
 import { SKILL_NAME } from '../keys/index.ts';
 import { Invalid } from '../refusal/refusal.ts';
+import { firstPiece } from '../piece/piece.ts';
 
 /** A file of a template's tree: its path from the template's folder with `/` between parts, its mode's permission bits, its bytes. */
 export type TreeFile = { path: string; mode: number; bytes: Uint8Array };
@@ -45,7 +46,7 @@ function octal(block: Buffer, at: number, field: number, value: number): void {
 /** The sum of a header's bytes, its checksum field counted as eight spaces. */
 function checksumOf(block: Uint8Array): number {
   let sum = 0;
-  for (let i = 0; i < BLOCK; i++) sum += i >= 148 && i < 156 ? 0x20 : block[i];
+  for (const [i, byte] of block.subarray(0, BLOCK).entries()) sum += i >= 148 && i < 156 ? 0x20 : byte;
   return sum;
 }
 
@@ -180,8 +181,8 @@ function entriesOf(tar: Uint8Array): Entries {
 
 /** The template's name, the one top folder every entry stands in; each entry under another, or a top that is no name, refused. */
 function topOf(entries: Entries): string | undefined {
-  const tops = new Set([...entries.folders, ...entries.files.map((f) => f.path)].map((p) => p.split('/')[0]));
-  const [name] = [...entries.files.map((f) => f.path), ...entries.folders].map((p) => p.split('/')[0]);
+  const tops = new Set([...entries.folders, ...entries.files.map((f) => f.path)].map((p) => firstPiece(p, '/')));
+  const [name] = [...entries.files.map((f) => f.path), ...entries.folders].map((p) => firstPiece(p, '/'));
   if (tops.size > 1)
     entries.refused.push({
       entry: [...tops].sort().join(', '),

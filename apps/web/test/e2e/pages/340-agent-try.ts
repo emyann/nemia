@@ -138,7 +138,15 @@ export default {
       id = body.id;
 
       const stepFile = fs.readFileSync(path.join(tries, seeded.name, 'try.md'), 'utf8').split('\n');
-      for (const line of ['place: folder', `agent: ${seeded.name}`, 'budget: 1', 'permissionMode: dontAsk', 'allowedTools: Edit(**)']) {
+      for (const line of [
+        'place: folder',
+        `agent: ${seeded.name}`,
+        'budget: 1',
+        'claude:',
+        '  fence:',
+        '    permissionMode: dontAsk',
+        '    allowedTools: Edit(**)',
+      ]) {
         if (!stepFile.includes(line))
           throw new Refused(`tries/${seeded.name}/try.md says ${line} — it holds ${JSON.stringify(stepFile.join('\n'))}`);
       }

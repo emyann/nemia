@@ -85,7 +85,7 @@ const remember = (memo: StandingMemo, asks: readonly Ask[], read: readonly Stood
   asks.forEach((ask, i) => {
     const key = keyOf(ask.repo, ask.base);
     const stood = read[i];
-    if (!('answer' in stood)) {
+    if (stood === undefined || !('answer' in stood)) {
       const was = memo.get(key);
       if (was) next.set(key, was);
       return;
@@ -145,9 +145,10 @@ function asksOf(runs: readonly Run[], own: (run: RepositoryRun) => boolean): Ask
 
 /** `ask`, where there is one, asked of each result branch of `run` too, with the tip it recorded and the commit it was cut at. */
 function askedOf(ask: Ask | undefined, run: RepositoryRun): void {
-  for (const branch of ask ? branchesOf(run) : []) {
+  if (!ask) return;
+  for (const branch of branchesOf(run)) {
     const tip = run.tips?.[branch];
-    ask!.branches.set(branch, { branch, baseRef: run.baseRef, ...(tip ? { tip } : {}) });
+    ask.branches.set(branch, { branch, baseRef: run.baseRef, ...(tip ? { tip } : {}) });
   }
 }
 
@@ -296,7 +297,7 @@ export function headsNow(run: Run, place: Place): Readonly<Record<string, string
   if (!isRepositoryRun(run)) return undefined;
   const request = { repo: path.resolve(run.repo), base: run.branch, branches: [] };
   const outcome = place.askNow('standing', request, { deadlineMs: STANDING_DEADLINE_MS });
-  return 'answer' in outcome ? outcome.answer.heads : undefined;
+  return 'answer' in outcome ? outcome.answer.tips : undefined;
 }
 
 /** What was read of the repository and base branch `run` is in, or undefined where none was. */
@@ -305,12 +306,12 @@ const stoodOf = (standing: PassStanding, run: RepositoryRun): StoodRead | undefi
 /** Every branch of `run`'s repository and its commit, as it was read; undefined where none was. */
 export const headsFor = (standing: PassStanding, run: RepositoryRun): Readonly<Record<string, string>> | undefined => {
   const stood = stoodOf(standing, run);
-  return stood && 'answer' in stood ? stood.answer.heads : undefined;
+  return stood && 'answer' in stood ? stood.answer.tips : undefined;
 };
 
 /** The heads of `repo` off any reading of it that has an answer, or undefined where none has. */
 const repoHeads = (standing: PassStanding, repo: string): Readonly<Record<string, string>> | undefined => {
-  for (const stood of standing.read.values()) if (stood.repo === path.resolve(repo) && 'answer' in stood) return stood.answer.heads;
+  for (const stood of standing.read.values()) if (stood.repo === path.resolve(repo) && 'answer' in stood) return stood.answer.tips;
   return undefined;
 };
 

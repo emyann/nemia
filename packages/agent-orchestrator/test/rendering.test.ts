@@ -148,7 +148,10 @@ test("an agent gives skills by name and says what becomes of Claude Code's promp
     keys: { tools: 'Read, Skill' },
     body: 'You build.\n',
   });
-  assert.equal(written, '---\nskills: review-a-change, write-a-note\nharnessPrompt: no-coding\ntools: Read, Skill\n---\nYou build.\n');
+  assert.equal(
+    written,
+    '---\nskills: review-a-change, write-a-note\nharnessPrompt: no-coding\nclaude:\n  fence:\n    tools: Read, Skill\n---\nYou build.\n',
+  );
   assert.deepEqual(parseAgent('builder', written).skills, a.skills);
   for (const word of ['keep', 'no-coding', 'replace']) {
     const agent = parseAgent('builder', `---\nharnessPrompt: ${word}\n---\nYou build.\n`);

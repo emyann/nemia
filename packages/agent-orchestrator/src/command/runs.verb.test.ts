@@ -96,7 +96,7 @@ test('REFUSED on the api: a removal that removed nothing is thrown in forget’s
     thrown(RM.apiRefusal?.({ id: f.id, removed: f.kind === 'forgotten', engine: null, forgot: f }, { runId: f.id }));
   const refused = forgot({ kind: 'refused', refusal: 'r-1 has a task in flight: nemia cancel r-1 first.' });
   assert.deepEqual(rmRefusal(refused), { tag: 'Conflict', message: 'r-1 has a task in flight: nemia cancel r-1 first.' });
-  const held = forgot({ kind: 'held', left: [{ path: '/w/r-1/implement', locked: 'in use' }], removed: ['/w/r-1/plan'] });
+  const held = forgot({ kind: 'held', left: [{ path: '/w/r-1/implement', heldBy: 'in use' }], removed: ['/w/r-1/plan'] });
   assert.deepEqual(rmRefusal(held), { tag: 'Conflict', message: forgetLine(held) });
   assert.match(forgetLine(held), /^r-1 {2}not forgotten:.*nemia rm r-1 again then\.$/);
   const missing = forgot({ kind: 'missing', files: ['runs/r-1.asks'] });

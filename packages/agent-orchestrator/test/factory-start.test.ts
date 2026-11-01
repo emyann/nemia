@@ -164,7 +164,7 @@ const factoryFiles = () => (fs.existsSync(FACTORIES) ? fs.readdirSync(FACTORIES)
 
 /** The workspaces the place lists under the store's worktrees for `repo`, as a string to compare. */
 const worktrees = (repo: string): string => {
-  const read = stand().place.askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), prefix: 'wf/', base: 'main' });
+  const read = stand().place.askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), run: 'r', base: 'main' });
   assert.ok('answer' in read, 'the place answered');
   return JSON.stringify(read.answer.workspaces.map((w) => w.path));
 };
@@ -645,7 +645,7 @@ test('the workspaces a refused start is compared by are read off the place: one 
   const repo = aRepo();
   const none = worktrees(repo);
   const at = path.join(ROOT, 'worktrees', 'cut-by-hand', 'implement');
-  const made = stand().place.askNow('make', { repo, at, name: 'wf/cut-by-hand/implement', from: 'main', also: [] });
+  const made = stand().place.askNow('make', { repo, at, run: 'cut-by-hand', leaf: 'implement', from: 'main', also: [] });
   assert.ok('answer' in made, JSON.stringify(made));
   assert.notEqual(worktrees(repo), none, 'a workspace cut since is a reading that differs');
   assert.deepEqual(JSON.parse(worktrees(repo)), [fs.realpathSync(at)]);

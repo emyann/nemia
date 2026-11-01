@@ -136,7 +136,8 @@ function entryValuesOf(
  */
 function formerValue(key: string, value: string): FrontmatterValue {
   const alone = frontmatterOrNull(`${key}: ${value}\n`);
-  return alone !== null && !alone.former && alone.entries.length === 1 ? alone.entries[0].value : value;
+  const only = alone !== null && !alone.former && alone.entries.length === 1 ? alone.entries[0] : undefined;
+  return only === undefined ? value : only.value;
 }
 
 /**
@@ -238,12 +239,13 @@ function keptKeys(text: string): string {
  */
 export function withPreload(file: string, text: string, on: boolean): string {
   const { block } = splitFrontmatter(file, text);
-  if (block === null)
+  const normal = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
+  const opened = FRONTMATTER.exec(normal);
+  if (block === null || opened === null)
     refuse(
       `${file} has no frontmatter, and \`preload:\` is a line of it. Open the file with \`---\`, \`description: <what it does, one line>\` and \`---\`.`,
     );
-  const normal = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n');
-  const rest = normal.slice(FRONTMATTER.exec(normal)![0].length);
+  const rest = normal.slice(opened[0].length);
   const written = `---\n${withKey(file, block, 'preload', on ? 'true' : undefined)}---\n${rest}`;
   if ((frontmatterKey(written, 'preload') === 'true') !== on) {
     refuse(
@@ -270,7 +272,7 @@ export function appliesOf(text: string): string[] {
   if (read == null || entry === undefined) return [];
   const alone = read.former && typeof entry.value === 'string' ? frontmatterOrNull(`applies: ${entry.value}\n`) : null;
   if (alone !== null && (alone.former || alone.entries.length !== 1)) return [];
-  const value = alone === null ? entry.value : alone.entries[0].value;
+  const value = alone === null ? entry.value : alone.entries[0]?.value;
   const globs = Array.isArray(value) ? value : [value];
   return globs.every((g) => typeof g === 'string' && g.trim()) ? globs.map((g: string) => g.trim()) : [];
 }

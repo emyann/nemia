@@ -48,14 +48,14 @@ export function heldRefusal(run: Run, what: string): string | null {
  * What `nemia prune` found of one run, as git and the engine say it now: what `pruneRefusal` judges. `decided` is the kind `nemia decide`
  * says (`decision`), undefined for a record that froze no workflow and whose folder does not read; `held` is why `nemia rm` would not
  * forget it (`forgetRefusal`, worded for `nemia prune`); `owed` the steps a pass still owes a hand-off (`handOffOwed` in advance.verb.ts);
- * and each worktree its place lists as the run's, with its lock, its detached HEAD when a removal would leave what it holds on no branch
- * (`heldWorktree`), each change it holds uncommitted, and `fix`, the place's command for it (its `say`).
+ * and each worktree its place lists as the run's, with who holds it (`heldBy`), its tip when a removal would leave what it holds on no
+ * branch (`offBranch`, `heldWorktree`), each change it holds uncommitted, and `fix`, the place's command for it (its `say`).
  */
 export type PruneFacts = {
   decided: Decision['kind'] | undefined;
   held: string | null;
   owed: readonly string[];
-  worktrees: ReadonlyArray<{ path: string; locked?: string; detached?: string; changes?: readonly string[]; fix?: string }>;
+  worktrees: ReadonlyArray<{ path: string; heldBy?: string; offBranch?: string; changes?: readonly string[]; fix?: string }>;
   /** Whether this prune would remove the run's files directory (`--artifacts`, and one is there). */
   files?: boolean;
 };
@@ -86,8 +86,8 @@ export const pruneAgain = (id: string, { unmerged = false, artifacts = false }: 
  *   (`prunedRefusal`), and its branch is the one place its work is left. A run that worked in the repository itself has no branch to
  *   merge, and is refused so only for its files, which are part of what a person reads to decide it.
  * - **a hand-off still owed** (`owed`): what a pass would commit, and the files it would collect, are only in the worktree.
- * - **a worktree git would not remove, or that holds what no branch has**: locked; on no branch; or with changes no commit holds — where
- *   `nemia rm` would commit them under a step's name, `nemia prune` leaves that to a person, since the run is not being forgotten.
+ * - **a worktree the place would not remove, or that holds what no branch has**: held; on no branch; or with changes no commit holds —
+ *   where `nemia rm` would commit them under a step's name, `nemia prune` leaves that to a person, since the run is not being forgotten.
  *
  * `unmerged` and `artifacts` are the flags the person gave, and every command offered repeats them (`pruneAgain`).
  */
@@ -134,14 +134,14 @@ function unmergedRefusal(run: RepositoryRun, artifacts: boolean): string {
 }
 
 /**
- * Why `nemia prune` keeps one worktree — locked, on no branch, or holding changes — with the place's command for it, or undefined. Pure.
+ * Why `nemia prune` keeps one worktree — held, on no branch, or holding changes — with the place's command for it, or undefined. Pure.
  */
 function worktreeRefusal(w: PruneFacts['worktrees'][number], again: string): string | undefined {
-  if (w.locked !== undefined) {
-    return `${w.path} is locked${w.locked ? ` (${w.locked})` : ''}, and git will not remove it — unlock it if nothing needs it${w.fix ? `: ${w.fix}` : ''}`;
+  if (w.heldBy !== undefined) {
+    return `${w.path} is held${w.heldBy ? ` (${w.heldBy})` : ''}, and the place will not remove it — let it go if nothing needs it${w.fix ? `: ${w.fix}` : ''}`;
   }
-  if (w.detached !== undefined) {
-    return `${w.path} is on no branch — its HEAD is detached${w.detached ? ` at ${w.detached.slice(0, 7)}` : ''} — and removing it would leave what it holds on none: put it on one${w.fix ? ` (${w.fix})` : ''}, then ${again}`;
+  if (w.offBranch !== undefined) {
+    return `${w.path} is on no branch${w.offBranch ? ` at its tip ${w.offBranch.slice(0, 7)}` : ''} — and removing it would leave what it holds on none: put it on one${w.fix ? ` (${w.fix})` : ''}, then ${again}`;
   }
   if (!w.changes?.length) return undefined;
   const shown = w.changes.slice(0, 3).join(', ');
@@ -239,7 +239,8 @@ export const freeable = (answers: readonly Answered[]): string[] =>
 export function freeTurn(candidates: readonly string[], judged: ReadonlySet<string>, bound: number, turn: number): string[] {
   const fresh = candidates.filter((id) => !judged.has(id)).slice(0, Math.max(0, bound));
   if (fresh.length || !candidates.length || bound < 1) return fresh;
-  return [candidates[turn % candidates.length]];
+  const next = candidates[turn % candidates.length];
+  return next === undefined ? [] : [next];
 }
 
 /**

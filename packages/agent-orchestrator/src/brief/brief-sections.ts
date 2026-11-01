@@ -392,7 +392,8 @@ export function loopSection(
   steps: readonly Workflow[],
   closeoutOf: (step: string) => Closeout | undefined,
 ): string {
-  const target = step.loop!;
+  const target = step.loop;
+  if (target === undefined) return '';
   const round = roundOf(run, step.name);
   const cap = capOf(step);
   const between = loopSpan(steps, step).filter((n) => n !== target && n !== step.name);
@@ -420,14 +421,14 @@ export function loopSection(
     'finding worth their attention and not worth another round can go with `again: false`.',
   ];
   if (round > 1) {
+    const looped = steps.find((s) => s.name === target);
+    if (looped === undefined)
+      throw new Error(`loop: ${target} names no step of the workflow: name one of its steps on ${step.name}'s loop:`);
     lines.push(
       '',
       `${target} answered the last round's findings: its \`${LOOP_REPLIES}\` are below. A \`won't fix\` is an answer, not an oversight —`,
       'weigh its reason against the change, and raise the finding again only if the reason does not hold.',
-      repliesSection(
-        steps.find((s) => s.name === target)!,
-        closeoutOf,
-      ),
+      repliesSection(looped, closeoutOf),
     );
   }
   return lines.join('\n');

@@ -5,6 +5,7 @@
 import {
   AGENT_FACING,
   CHECK_AFFECTING,
+  endsOnBase,
   LESSON,
   parseGlobs,
   answersOr,
@@ -149,12 +150,13 @@ export function decideHow(argv: string[]): { sensitive?: string[] } {
  */
 export async function decideVerb(rest: string[], e: Engine, place: Place): Promise<void> {
   if (rest.includes('--help')) return console.log(DECIDE_HELP);
-  if (!rest[0]) return console.log(HELP);
-  if (rest[0].startsWith('--'))
-    usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${rest[0]} before it.`);
+  const [runId] = rest;
+  if (!runId) return console.log(HELP);
+  if (runId.startsWith('--'))
+    usage(`nemia decide takes the run first: nemia decide <runId> [--sensitive <globs>] — not ${runId} before it.`);
   const { sensitive } = decideHow(rest.slice(1));
-  const decided = await runWith(e, placedIn(place, decideRun(rest[0]))).catch(async (err: unknown) => {
-    const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runStore.runs.read(rest[0]), err, 'nemia decide')));
+  const decided = await runWith(e, placedIn(place, decideRun(runId))).catch(async (err: unknown) => {
+    const unjudged = await runWith(e, placedIn(place, unjudgedOf(e, runStore.runs.read(runId), err, 'nemia decide')));
     throw unjudged ? new Error(unjudged.said) : err;
   });
   const { run } = decided;
@@ -184,7 +186,7 @@ type Awaiting = Extract<Decided['decision'], { kind: 'awaiting' }>;
 /** A run's steps, as its workflow was frozen. */
 type Steps = ReturnType<typeof stepsOf>;
 
-/** The step at `workspace: main`, the run's ending, and the line that says it waits for the checkout another run's ending has, or `''`. */
+/** The step at `workspace: base`, the run's ending, and the line that says it waits for the checkout another run's ending has, or `''`. */
 type HeldOut = { ending?: Steps[number]; heldOut: string };
 
 /** A step's closeout as `decide` read it, or why it could not be read. */
@@ -198,12 +200,14 @@ function headOf(run: Decided['run']): string {
   const given = inputsNote(inputsDir(run), run.inputs);
   const from = fromNote(run);
   const pruned = run.pruned ? `${prunedWords(run.pruned)}; ${prunedKept(run.pruned)}` : '';
-  return `${run.id}  ${run.brief.split('\n')[0].slice(0, 56)}${from ? `\n  ${from}` : ''}${given ? `\n  ${given}` : ''}${pruned ? `\n  ${pruned}` : ''}`;
+  const end = run.brief.indexOf('\n');
+  const line = end < 0 ? run.brief : run.brief.slice(0, end);
+  return `${run.id}  ${line.slice(0, 56)}${from ? `\n  ${from}` : ''}${given ? `\n  ${given}` : ''}${pruned ? `\n  ${pruned}` : ''}`;
 }
 
 /** The run's ending and the indented line that says it waits for the repository's checkout (`checkoutLine`): `''` when nothing holds it. */
 function heldOutOf(steps: Steps, checkout: Decided['checkout']): HeldOut {
-  const ending = steps.find((s) => s.workspace === 'main');
+  const ending = steps.find((s) => endsOnBase(s));
   return { ending, heldOut: checkout && ending ? `  ${checkoutLine(ending.name, checkout)}` : '' };
 }
 
@@ -250,14 +254,12 @@ function printHold({ run, decision, holding, waitingOn }: Decided, head: string)
 function printRunning(d: Decided, waiting: string[], head: string, steps: Steps, { ending, heldOut }: HeldOut): void {
   console.log(`${head}\n\n  still running: ${waiting.join(', ')}`);
   for (const [name, line] of Object.entries(d.waitingOn)) console.log(`  ${name}: ${line}`);
-  for (const r of d.retrying.filter((r) => !(heldOut && r.step === ending?.name)))
-    console.log(
-      `  ${r.step}: ${dueNote(
-        steps.find((s) => s.name === r.step)!,
-        d.run,
-        r,
-      )}`,
-    );
+  for (const r of d.retrying.filter((r) => !(heldOut && r.step === ending?.name))) {
+    const step = steps.find((s) => s.name === r.step);
+    if (step === undefined)
+      throw new Error(`a try is due of ${r.step}, which the run has no step of: report it as a defect of nemia decide`);
+    console.log(`  ${r.step}: ${dueNote(step, d.run, r)}`);
+  }
   for (const r of d.rounding) console.log(`  ${r.step}: ${roundDueNote(steps, r)}`);
   if (heldOut) console.log(heldOut);
   console.log('  nothing to decide yet');
@@ -360,11 +362,16 @@ function changesRead(
 ): { toRead: BranchChanges[]; results: BranchChanges[] } {
   const toRead = branchesToRead(
     branches,
-    namesInOrder(git, steps).map((name) => git.steps[name].branch),
+    namesInOrder(git, steps).map((name) => git.steps[name]?.branch),
     git.isolate ? git.branch : undefined,
   );
   const read = changesOf(place, git, [...toRead, ...branches], sensitive ?? CHECK_AFFECTING);
-  const of = (branch: string) => read.find((c) => c.branch === branch)!;
+  const of = (branch: string): BranchChanges => {
+    const changes = read.find((c) => c.branch === branch);
+    if (changes === undefined)
+      throw new Error(`the changes of ${branch} were not read with the others: report it as a defect of nemia decide`);
+    return changes;
+  };
   return { toRead: toRead.map(of), results: branches.map(of) };
 }
 
@@ -550,14 +557,16 @@ function printApprove(
   commands: readonly DecideCommand[],
   said: Closeout | undefined,
 ): void {
-  const step = steps.find((s) => s.name === toDecide.step)!;
+  const step = steps.find((s) => s.name === toDecide.step);
+  if (step === undefined) throw new Error(`the run has no step ${toDecide.step} to approve: report it as a defect of nemia decide`);
   const unrun = ` has not run: this workflow's ending, and your approval is what runs it${toDecide.says === null ? '' : ':'}`;
   console.log(`\n  to decide  ${step.name}${toDecide.filed ? ' has signed off and waits for your word:' : unrun}`);
   const [paragraph] = toDecide.says === null ? [] : ownNote(step).split(/\n[ \t]*\n/);
   for (const line of paragraph?.split('\n') ?? []) console.log(`    ${line}`);
   const at = commands.findIndex((c) => c.label === 'approve' && c.command === `nemia approve ${runId} ${step.name}`);
-  if (at < 0) return;
-  console.log(`\n  approve it    ${commands[at].command} ${answersOr(step, said, '[--message "<words>"]')}`);
+  const approve = commands[at];
+  if (approve === undefined) return;
+  console.log(`\n  approve it    ${approve.command} ${answersOr(step, said, '[--message "<words>"]')}`);
   for (const back of commands.slice(at + 1)) {
     if (back.label !== 'send back' || back.said !== null) break;
     console.log(`  send it back  ${back.command}`);

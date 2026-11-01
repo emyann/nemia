@@ -6,10 +6,11 @@
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
 import { DEFAULT_HARNESS, isRemoteHarness, REMOTE_PREFIX } from '../harness/harness.ts';
 import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts';
+import { baseSpelled } from '../former/former.ts';
 import {
   documentFile,
   documentRefusals,
-  FENCE_KEYS,
+  HARNESS_FENCE_KEYS,
   isMap,
   isParam,
   layoutRefusals,
@@ -42,7 +43,12 @@ const specOf = (folder: ReadFolder, file: string): Record<string, unknown> => {
 
 /** The names of the folders of `holder` (`workflows`, `agents`, `skills`) in `files`. */
 const foldersOf = (files: readonly string[], holder: string): string[] => [
-  ...new Set(files.flatMap((file) => (file.startsWith(`${holder}/`) && file.split('/').length > 2 ? [file.split('/')[1]] : []))),
+  ...new Set(
+    files.flatMap((file) => {
+      const [, name, ...rest] = file.split('/');
+      return file.startsWith(`${holder}/`) && name !== undefined && rest.length ? [name] : [];
+    }),
+  ),
 ];
 
 /** What `folder` holds, read off its files and documents; `placeSkills` count as skills it holds. */
@@ -74,7 +80,7 @@ function hireRefusals(held: Held): Refusal[] {
   const hires = isMap(held.manifest.hires) ? held.manifest.hires : {};
   return Object.entries(hires).flatMap(([key, agent]): Refusal[] => {
     const at = ['spec', 'hires', key];
-    const [workflow, step, ...more] = key.split('/');
+    const [workflow = '', step, ...more] = key.split('/');
     const read = held.workflows.get(workflow);
     const refusals: string[] = [];
     if (step === undefined || more.length) refusals.push(`hire ${key} is not <workflow>/<step>: name the step it fills.`);
@@ -122,7 +128,10 @@ function siblingRefusals(file: string, at: At, step: Record<string, unknown>, na
     }));
 }
 
-/** What a step's own words name that today's are not: its place, workspace, what it reads of the store, and the form of its tallies. */
+/**
+ * What a step's own words name that today's are not: its place, workspace — `main` read as its former spelling of `base` (`baseSpelled`) —
+ * what it reads of the store, and the form of its tallies.
+ */
 function wordRefusals(file: string, at: At, step: Record<string, unknown>): Refusal[] {
   const refusals: Refusal[] = [];
   const among = (key: string, value: unknown, words: readonly string[], where: At): void => {
@@ -130,7 +139,12 @@ function wordRefusals(file: string, at: At, step: Record<string, unknown>): Refu
       refusals.push({ file, at: where, message: `${spelled(where)} is ${value}, and ${key} is one of ${words.join(', ')}.` });
   };
   among('place', step.place, PLACES, [...at, 'place']);
-  among('workspace', step.workspace, ['worktree', ...WORKSPACES], [...at, 'workspace']);
+  among(
+    'workspace',
+    baseSpelled({ workspace: step.workspace as string | undefined }).workspace,
+    ['worktree', ...WORKSPACES],
+    [...at, 'workspace'],
+  );
   for (const [name, i] of stringsOf(step.reads)) among('reads', name, STORE_READS, [...at, 'reads', i]);
   for (const [entry, i] of stringsOf(step.tally))
     if (!/^[A-Za-z_]\w*(?:\.[A-Za-z_]\w*(?:=[^=\s]+)?)?$/.test(entry))
@@ -168,7 +182,7 @@ function stepRefusals(held: Held): Refusal[] {
 function stepFileRefusals(folder: ReadFolder, held: Held): Refusal[] {
   return folder.files.flatMap((file) => {
     const [holder, workflow, leaf, ...more] = file.split('/');
-    if (holder !== 'workflows' || more.length || !leaf?.endsWith('.md') || /^readme\.md$/i.test(leaf)) return [];
+    if (holder !== 'workflows' || workflow === undefined || more.length || !leaf?.endsWith('.md') || /^readme\.md$/i.test(leaf)) return [];
     const step = leaf.slice(0, -'.md'.length);
     if (held.workflows.get(workflow)?.steps.some((s) => s.name === step)) return [];
     return [{ file, at: [], message: `${file} names no step of ${workflow}: name the step in its workflow.yaml, or remove the file.` }];
@@ -210,9 +224,14 @@ function harnessRefusals(file: string, at: At, holder: Record<string, unknown>, 
   return refusals;
 }
 
-/** Why the fence key `key`, valued `value`, is not one of `harness`'s fence, or undefined: another harness's key, or a word it lacks. */
-function fenceRefusal(harness: string, key: string, value: unknown): string | undefined {
-  const fence = HARNESS_KNOBS[harness].fence;
+/** The knobs of one harness, as `HARNESS_KNOBS` holds them. */
+type Knobs = (typeof HARNESS_KNOBS)[string];
+
+/**
+ * Why the fence key `key`, valued `value`, is not one of `harness`'s fence (`fence`), or undefined: another harness's key, or a word it
+ * lacks.
+ */
+function fenceRefusal(harness: string, fence: Knobs['fence'], key: string, value: unknown): string | undefined {
   if (key === fence.key)
     return typeof value === 'string' && !fence.words.includes(value)
       ? `${value} is no word ${harness} fences by: one of ${fence.words.join(', ')}.`
@@ -221,9 +240,13 @@ function fenceRefusal(harness: string, key: string, value: unknown): string | un
   return `${harness} is fenced by ${[fence.key, ...fence.lists].join(', ')}, and ${key} is another harness's fence key: remove it.`;
 }
 
-/** What `profile`, the block of `harness` at `at`, breaks of its harness's knobs: its effort, context, fence and options. */
+/**
+ * What `profile`, the block of `harness` at `at`, breaks of its harness's knobs: its effort, context, fence and options. Nothing for a
+ * harness `HARNESS_KNOBS` has no knobs of, which no caller hands it: a block is named by a harness there.
+ */
 function profileRefusals(file: string, at: At, harness: string, profile: Record<string, unknown>): Refusal[] {
   const knobs = HARNESS_KNOBS[harness];
+  if (knobs === undefined) return [];
   const refusals: Refusal[] = [];
   const refuse = (where: At, message: string | undefined): void => {
     if (message !== undefined) refusals.push({ file, at: where, message: `${spelled(where)}: ${message}` });
@@ -232,16 +255,18 @@ function profileRefusals(file: string, at: At, harness: string, profile: Record<
     refuse([...at, 'effort'], `${profile.effort} is no effort ${harness} knows: one of ${knobs.effort.join(', ')}.`);
   if ('context' in profile && !knobs.context) refuse([...at, 'context'], `${harness} takes no context window: remove it.`);
   for (const [key, value] of Object.entries(isMap(profile.fence) ? profile.fence : {}))
-    refuse([...at, 'fence', key], fenceRefusal(harness, key, value));
+    refuse([...at, 'fence', key], fenceRefusal(harness, knobs.fence, key, value));
   for (const key of Object.keys(isMap(profile.options) ? profile.options : {}))
-    refuse([...at, 'options', key], optionRefusal(harness, key));
+    refuse([...at, 'options', key], optionRefusal(harness, knobs.flags, key));
   return refusals;
 }
 
-/** Why `key` may not be an option of `harness`'s block: a fence key, a key of the block, a flag the runtime sets, or one unread. */
-function optionRefusal(harness: string, key: string): string | undefined {
-  const flags = HARNESS_KNOBS[harness].flags;
-  if (FENCE_KEYS.includes(key)) return `${key} is a fence key, read by nemia: write it under fence, never in options.`;
+/**
+ * Why `key` may not be an option of `harness`'s block, whose flags are `flags`: a fence key, a key of the block, a flag the runtime
+ * sets, or one unread.
+ */
+function optionRefusal(harness: string, flags: Knobs['flags'], key: string): string | undefined {
+  if (HARNESS_FENCE_KEYS.includes(key)) return `${key} is a fence key, read by nemia: write it under fence, never in options.`;
   if ((PROFILE_KEYS as readonly string[]).includes(key)) return `${key} is a key of the block: write it beside options, never in it.`;
   if ('owned' in flags && flags.owned.includes(key)) return `${key} is a flag the runtime sets itself: remove it.`;
   if ('only' in flags && !flags.only.includes(key))

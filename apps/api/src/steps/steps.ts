@@ -5,24 +5,24 @@
 import { Effect, Stream } from 'effect';
 import { Hono } from 'hono';
 import { type SSEMessage, type SSEStreamingApi, streamSSE } from 'hono/streaming';
-import { COMMANDS, LOGS, phaseOfView, type TaskView } from 'agent-orchestrator';
+import { LOGS, phaseOfView, type TaskView } from 'agent-orchestrator';
 import { filesPrunedWords } from 'agent-orchestrator/run';
 import { refusedName, typeOf } from './artifacts.ts';
 import { type StepLog, tailOf } from './logs.ts';
 import { type LifecycleTransition, pathToTurn, type StepPath, tryOfStep } from './path.ts';
 import type { Followings, Relayed } from './following.ts';
 import { type ApiEnv, type ApiRuntime, served } from '../layer.ts';
-import { engineRead, type Engine, taskOfStep, runPlaced } from '../store.ts';
+import { commandNamed, engineRead, type Engine, taskOfStep, runPlaced } from '../store.ts';
 import type { PlaceService } from 'agent-orchestrator';
 
 /**
  * The board's reads of a step in the package's table, each served on the api alone: a file of its files directory (`step artifact`) and of
  * its own folder (`step file`), the path of one of its tasks (`step path`), and a read of its conversation (`step transcript`).
  */
-const ARTIFACT = COMMANDS.find((c) => c.name === 'step artifact')!;
-const FILE = COMMANDS.find((c) => c.name === 'step file')!;
-const PATH = COMMANDS.find((c) => c.name === 'step path')!;
-const TRANSCRIPT = COMMANDS.find((c) => c.name === 'step transcript')!;
+const ARTIFACT = commandNamed('step artifact');
+const FILE = commandNamed('step file');
+const PATH = commandNamed('step path');
+const TRANSCRIPT = commandNamed('step transcript');
 
 /** One read of the conversation of `task`, a task of the step `step` of the run `id`, from `after` (`step transcript`). */
 const transcriptOf = async (

@@ -125,16 +125,23 @@ export function clockOf(
   const tl = timeline(run, views, filed, steps);
   const sessionIds = new Set(Object.values(run.steps).flatMap((record) => sessionTasks(record)));
   const checkIds = [...new Set(runTasks(run))].filter((id) => !sessionIds.has(id));
-  const parts = [
-    ranOf([...sessionIds], views),
-    ranOf(checkIds, views),
-    [...gateWaits(run, tl, steps), ...answerWaits(tl), ...openWaits(tl, steps, waiting)],
-    slotWaits(run, tl),
-  ].map((spans) => clipped(spans, wall));
-  const reach = parts.map((_, i) => unionMs(parts.slice(0, i + 1).flat()));
-  const [sessionsMs, checksMs, personMs, slotMs] = reach.map((ms, i) => ms - (reach[i - 1] ?? 0));
+  const sessions = clipped(ranOf([...sessionIds], views), wall);
+  const checks = [...sessions, ...clipped(ranOf(checkIds, views), wall)];
+  const person = [...checks, ...clipped([...gateWaits(run, tl, steps), ...answerWaits(tl), ...openWaits(tl, steps, waiting)], wall)];
+  const slot = [...person, ...clipped(slotWaits(run, tl), wall)];
+  const sessionsMs = unionMs(sessions);
+  const checksReach = unionMs(checks);
+  const personReach = unionMs(person);
+  const slotReach = unionMs(slot);
   const wallMs = wall.to - wall.from;
-  return { wallMs, sessionsMs, checksMs, personMs, slotMs, restMs: wallMs - reach[3] };
+  return {
+    wallMs,
+    sessionsMs,
+    checksMs: checksReach - sessionsMs,
+    personMs: personReach - checksReach,
+    slotMs: slotReach - personReach,
+    restMs: wallMs - slotReach,
+  };
 }
 
 /**

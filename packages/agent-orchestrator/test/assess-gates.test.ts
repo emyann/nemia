@@ -294,7 +294,7 @@ test('slotNeed at a gate', async (t) => {
 });
 
 /** `implement → review → ship`: the ending step works in the repository's checkout, and is gated. */
-const SHIP: Workflow = { name: 'ship', after: ['review'], workspace: 'main', gate: true, body: 'Ship it.' };
+const SHIP: Workflow = { name: 'ship', after: ['review'], workspace: 'base', gate: true, body: 'Ship it.' };
 const ENDS: Workflow[] = [step('implement'), step('review', ['implement']), SHIP];
 /** implement and review done on the run's branch, ship never filed. */
 const atEnd = (extra: Partial<RepositoryRun> = {}) =>

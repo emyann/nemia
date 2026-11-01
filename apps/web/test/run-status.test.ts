@@ -49,7 +49,7 @@ const sourcesOf = (dir: string, under = ''): Map<string, string> =>
 /** A repository run, nothing of it moving, as the list's row and the answer for one run say it, stopped as `status` says. */
 const stopped = (status: RunStatus, waitingOnYou: string[]) => ({
   id: `r-${status}`,
-  place: 'repository' as const,
+  place: 'git' as const,
   repo: '/code/app',
   cancelledAt: null,
   pruned: null,

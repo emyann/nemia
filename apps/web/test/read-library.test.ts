@@ -77,6 +77,17 @@ test("a step's page and a list of workflows are read in the place named, under a
       assert.equal(asked.at(-1), '/api/workflows/yours/w/review?factory=f&repo=%2Fcode%2Fapp');
     },
   );
+  await t.test('a listed step whose spec says `workspace: main`, the former spelling, reads as `workspace: base`', async (t) => {
+    const listing = workflow();
+    const former = { ...listing, steps: listing.steps.map((step) => ({ ...step, spec: { ...step.spec, workspace: 'main' } })) };
+    answering(t, [former]);
+    const [read] = await readWorkflows();
+    assert.deepEqual(
+      read.steps.map((step) => step.spec.workspace),
+      listing.steps.map(() => 'base'),
+    );
+    assert.deepEqual(read, listing, 'the rest as the api gave it');
+  });
   await t.test(
     "REFUSED: a list of workflows is read in its place — with none, the list the builder drafts from; in a factory, the factory's, under the key its start reads",
     async (t) => {

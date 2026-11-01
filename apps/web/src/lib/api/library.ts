@@ -2,7 +2,7 @@
  * What the library's reads share — an agent's card entry, a skill's place and cost and a skill an agent gives, a schema pasted for a step,
  * every key of a step, and a key's row on a card's or a step's page — each type with the schema `get` decodes it with.
  */
-import { Schema, Struct } from 'effect';
+import { Schema, SchemaTransformation, Struct } from 'effect';
 import { decodes } from './decodes.ts';
 
 /** A list of strings, as a decoded answer holds it: mutable, as the plain types say. */
@@ -106,8 +106,8 @@ export type WorkflowStepSpec = {
    * file says one; null only for a step frozen on a run before the key, which worked on a repository, and for a draft yet to choose.
    */
   place: 'git' | 'folder' | null;
-  /** `workspace: main`: the step runs in the repository's own checkout. Null for a step without the line. */
-  workspace: 'main' | null;
+  /** `workspace: base`: the step runs in the repository's own checkout, on the base branch. Null for a step without the line. */
+  workspace: 'base' | null;
   /** The factory's folders the step may write (`writable:`), by their directory names: empty where it only reads them. */
   writable: string[];
   /** What of the store the step reads and never writes (`reads:`), each by its name (`inbox`, `costs`): empty where it reads none. */
@@ -194,6 +194,17 @@ export const StepKeySchema = decodes<StepKey>()(
   ]),
 );
 
+/**
+ * `workspace: base`, and its former spelling `main` read as it, from an api built before the rename: the board never holds `main`, and a
+ * save sends `base`.
+ */
+const BaseWorkspace = Schema.Literals(['base', 'main']).pipe(
+  Schema.decodeTo(
+    Schema.Literal('base'),
+    SchemaTransformation.transform({ decode: (): 'base' => 'base', encode: (word): 'base' | 'main' => word }),
+  ),
+);
+
 /** Decodes a `WorkflowStepSpec`: every key a step sets, of its type and words. */
 export const WorkflowStepSpecSchema = decodes<WorkflowStepSpec>()(
   Schema.Struct({
@@ -205,7 +216,7 @@ export const WorkflowStepSpecSchema = decodes<WorkflowStepSpec>()(
     resume: Schema.NullOr(Schema.String),
     input: Strings,
     place: Schema.NullOr(Schema.Literals(['git', 'folder'])),
-    workspace: Schema.NullOr(Schema.Literal('main')),
+    workspace: Schema.NullOr(BaseWorkspace),
     writable: Strings,
     reads: Strings,
     slot: Schema.NullOr(Schema.Literal('none')),

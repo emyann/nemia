@@ -4,7 +4,7 @@
  * what the run's place reads of its repository is handed in.
  */
 import type { Workflow } from '../step/step.ts';
-import { andList, type CloseoutAsked, type Run, type TaskPhase } from '../record/record.ts';
+import { andList, type CloseoutAsked, type RepositoryRun, type Run, type TaskPhase } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
 import type { Verdict } from '../check/check.ts';
 import { modeWord, spentAsks, type Retry, type RetryAsk } from '../retry/index.ts';
@@ -19,13 +19,13 @@ import {
   type RoundAsk,
   type SpendOf,
 } from '../status/status.ts';
-import { landingOpen, type MergeState } from '../ending/ending.ts';
+import { landingOpen } from '../ending/ending.ts';
 import { gated, holdWord } from '../wait/wait.ts';
 import { assess, type Assessment } from '../tick/assess.ts';
 import { spentRoundAsks } from '../round/round.ts';
 import { inside } from '../workspace/workspace.ts';
 import path from 'node:path';
-import type { Held } from '../place/place.ts';
+import type { Held, MergeState } from '../place/place.ts';
 import { engineWords, type EngineForgetting } from '../forgetting/forgetting.ts';
 
 /**
@@ -279,7 +279,7 @@ function dueOf(a: Assessment, steps: readonly Workflow[], waits: boolean): strin
   for (const r of a.round)
     due.push(
       r.merge
-        ? mergeDueWords(r)
+        ? mergeDueWords(r, r.merge)
         : `round ${r.round} of ${r.step}'s loop is due (${r.by === 'again' ? 'again: true' : 'nemia retry --round'})`,
     );
   return due;
@@ -310,8 +310,8 @@ const roundHeard = (r: Round, ask: RoundAsk): boolean =>
     : r.by === 'ask' && r.step === ask.step && r.round === ask.round;
 
 /** A merge due, said: what its target merges, and that it spends no round. */
-const mergeDueWords = (r: Round): string =>
-  `the merge of ${r.merge!.onto} into ${r.target}'s work is due (nemia refresh --base), on round ${r.round} of ${r.step}'s loop`;
+const mergeDueWords = (r: Round, merge: NonNullable<Round['merge']>): string =>
+  `the merge of ${merge.onto} into ${r.target}'s work is due (nemia refresh --base), on round ${r.round} of ${r.step}'s loop`;
 
 /** An ask no pass files, named. */
 const askNamed = (u: AskName): string =>
@@ -332,8 +332,9 @@ function unlandedHeld(c: Facts): string | undefined {
 /** What the run files once the runs it waits on have landed. */
 function waitsHeld(c: Facts): string | undefined {
   const { run, ready, waits } = c;
-  if (!waits) return undefined;
-  return `it waits on ${andList(run.after!)}, and files ${andList(ready)} once ${run.after!.length > 1 ? 'they have' : 'it has'} landed`;
+  const after = run.after;
+  if (!waits || !after) return undefined;
+  return `it waits on ${andList(after)}, and files ${andList(ready)} once ${after.length > 1 ? 'they have' : 'it has'} landed`;
 }
 
 /** What each step at its gate files once approved: itself, when it never ran, or what waits on it. */
@@ -483,7 +484,7 @@ export function runWorktrees(
     ...new Set(
       Object.values(run.steps)
         .map((s) => s.workspace)
-        .filter((p): p is string => Boolean(p) && ours(p!)),
+        .flatMap((p) => (p && ours(p) ? [p] : [])),
     ),
   ].filter((p) => !worktrees.some((w) => path.resolve(w.path) === path.resolve(p)));
   return { worktrees, unlisted };
@@ -491,13 +492,14 @@ export function runWorktrees(
 
 /**
  * Why `nemia rm` leaves a worktree as it is — or null, when its place may be asked to remove it. Pure: handed what the place's inventory
- * read of it. Locked: git refuses, and so does `nemia rm`. Detached — a rebase, a bisect or a checkout of a commit left its HEAD on no
- * branch, as a session stopped in the middle of one does — unless it is clean and its HEAD's commit is on a branch already: a hand-off
- * there commits onto no branch, and removing it leaves that commit, and any the session made, on none.
+ * read of it. Held by someone (`removable: 'held'`, their words in `heldBy`): the place will not remove it, and neither does `nemia rm`.
+ * Off its branch (`onBranch` false, as a rebase, a bisect or a checkout of a commit leaves it, and a session stopped in the middle of
+ * one): a hand-off there commits onto no branch, and removing it leaves that commit, and any the session made, on none; it is named by
+ * its tip.
  */
-export function heldWorktree(w: Held): { locked: string } | { detached: string } | null {
-  if (w.locked !== undefined) return { locked: w.locked };
-  if (w.detached && !(w.clean === true && w.onBranch)) return { detached: w.head ?? '' };
+export function heldWorktree(w: Held): { heldBy: string } | { offBranch: string } | null {
+  if (w.removable === 'held') return { heldBy: w.heldBy ?? '' };
+  if (!w.onBranch) return { offBranch: w.tip ?? '' };
   return null;
 }
 
@@ -512,18 +514,18 @@ export type BranchFate = {
 };
 
 /**
- * What becomes of each branch git has under the run's name, `wf/<id>/`. Pure. Only those: never the base branch a `--no-worktree` run
- * worked on, nor another run's. Kept unless `deleteBranches`; deleted when merged into the run's base branch (`merged`, git's word), or
- * with `forceUnmerged`; otherwise kept.
+ * What becomes of each branch the place lists for the run (its `inventory`, which lists that run's alone). Pure. Never the run's base
+ * branch, which a `--no-worktree` run worked on. Kept unless `deleteBranches`; deleted when merged into the run's base branch (`merged`),
+ * or with `forceUnmerged`; otherwise kept.
  */
 export function branchFates(
-  run: Pick<Run, 'id'>,
+  run: Pick<RepositoryRun, 'branch'>,
   listed: readonly string[],
   merged: (branch: string) => boolean,
   how: ForgetHow = {},
 ): BranchFate[] {
   return listed
-    .filter((b) => b.startsWith(`wf/${run.id}/`))
+    .filter((b) => b !== run.branch)
     .sort()
     .map((branch): BranchFate => {
       if (!how.deleteBranches) return { branch, deleted: false, why: 'default' };
@@ -586,16 +588,16 @@ export type Forgot = {
   /** Worktrees whose directory was already gone. */
   gone: string[];
   /**
-   * What is still there: locked (with git's reason); on no branch (`detached`, at its HEAD's commit); holding what `step` left uncommitted,
-   * which the hand-off could not commit (`uncommitted`, in git's words); refused by git (in its words); left as it was because the place's
-   * `verb` did not answer (`unread`, with its refusal or why it was not heard); a directory git does not know as a worktree — or, for a run
-   * with no record, its worktrees' directory, which nothing says whose worktrees are in. `fix` is the place's command for it, from its
-   * `say`.
+   * What is still there: held by someone (`heldBy`, in their words); on no branch (`offBranch`, at its tip); holding what `step` left
+   * uncommitted, which the hand-off could not commit (`uncommitted`, in git's words); refused by git (in its words); left as it was because
+   * the place's `verb` did not answer (`unread`, with its refusal or why it was not heard); a directory git does not know as a worktree —
+   * or, for a run with no record, its worktrees' directory, which nothing says whose worktrees are in. `fix` is the place's command for it,
+   * from its `say`.
    */
   left: Array<{
     path: string;
-    locked?: string;
-    detached?: string;
+    heldBy?: string;
+    offBranch?: string;
     uncommitted?: string;
     step?: string;
     git?: string;
@@ -684,10 +686,10 @@ function leftWords(f: Forgot): string {
 /** What one thing still there after `nemia rm` is, why it is there, and what to do: `fix`, the place's command, where it has one. */
 function leftWord(id: string, l: Forgot['left'][number]): string {
   const fix = (lead: string) => (l.fix ? `${lead}${l.fix}` : '');
-  if (l.locked !== undefined)
-    return `${l.path} is locked${l.locked ? ` (${l.locked})` : ''}, and git will not remove it — unlock it if nothing needs it${fix(': ')}`;
-  if (l.detached !== undefined)
-    return `${l.path} is on no branch — its HEAD is detached${l.detached ? ` at ${l.detached.slice(0, 7)}` : ''}, as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (${fix('')}${l.fix ? ', or ' : ''}finish or abort what left it there), then nemia rm ${id} again`;
+  if (l.heldBy !== undefined)
+    return `${l.path} is held${l.heldBy ? ` (${l.heldBy})` : ''}, and the place will not remove it — let it go if nothing needs it${fix(': ')}`;
+  if (l.offBranch !== undefined)
+    return `${l.path} is on no branch${l.offBranch ? ` at its tip ${l.offBranch.slice(0, 7)}` : ''} — as a rebase, a bisect or a checkout of a commit leaves it — and removing it would leave what it holds, committed or not, on no branch: put it on one (${fix('')}${l.fix ? ', or ' : ''}finish or abort what left it there), then nemia rm ${id} again`;
   if (l.uncommitted !== undefined)
     return `${l.path} holds what ${l.step} left uncommitted, and the hand-off could not commit it — ${l.uncommitted}. That work is on no branch until it is committed, so nothing of it was removed: commit it there yourself (it is staged${fix(': ')}), then nemia rm ${id} again`;
   if (l.unread)

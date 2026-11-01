@@ -218,8 +218,8 @@ test('REFUSED at shipped defaults: a landed run whose worktree holds a change, i
   assert.deepEqual(ids.map(whole), [true, true, true]);
   assert.equal(logged.length, 3, `each said once, though each was judged three times: ${logged.join('\n')}`);
   assert.match(logged.find((l) => l.startsWith(`${dirty.id}  not freed: `)) ?? '', /holds changes no commit has \(left\.txt\)/);
-  assert.match(logged.find((l) => l.startsWith(`${locked.id}  not freed: `)) ?? '', /is locked, and git will not remove it/);
-  assert.match(logged.find((l) => l.startsWith(`${detached.id}  not freed: `)) ?? '', /is on no branch — its HEAD is detached/);
+  assert.match(logged.find((l) => l.startsWith(`${locked.id}  not freed: `)) ?? '', /is held, and the place will not remove it/);
+  assert.match(logged.find((l) => l.startsWith(`${detached.id}  not freed: `)) ?? '', /is on no branch at its tip/);
 
   fs.rmSync(path.join(lane(dirty.id), 'left.txt'));
   git(repo, 'worktree', 'unlock', lane(locked.id));

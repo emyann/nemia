@@ -88,8 +88,8 @@ function entriesOf(head: string): Map<string, string> {
   const entries = new Map<string, string>();
   let key = '';
   for (const line of linesOf(head)) {
-    const opens = /^([A-Za-z_][\w-]*)\s*:/.exec(line);
-    if (opens) key = opens[1];
+    const [, opened] = /^([A-Za-z_][\w-]*)\s*:/.exec(line) ?? [];
+    if (opened !== undefined) key = opened;
     entries.set(key, (entries.get(key) ?? '') + line);
   }
   return entries;
@@ -320,7 +320,11 @@ function chosenText(conflict: Conflict, choice: Choice | undefined): string | nu
 export function compose(merge: TreeMerge, choices: Readonly<Record<string, Choice>>): { entries: TreeFile[] } | { pending: Conflict[] } {
   const pending = merge.conflicts.filter((conflict) => !Object.hasOwn(choices, conflict.at));
   if (pending.length) return { pending };
-  const chosen = new Map(merge.conflicts.map((conflict) => [conflict.at, choices[conflict.at]]));
+  const chosen = new Map<string, Choice>();
+  for (const conflict of merge.conflicts) {
+    const choice = choices[conflict.at];
+    if (choice !== undefined) chosen.set(conflict.at, choice);
+  }
   const entries: TreeFile[] = [];
   for (const file of merge.files) {
     const bytes = file.build(chosen);

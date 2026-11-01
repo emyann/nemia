@@ -1,6 +1,6 @@
 /**
  * The flow numbers of a store's history, defined on each workflow's structure and never on a step's name: the rounds of each `loop:` step
- * to acceptance, the tries of the `workspace: main` step to a landing, what a landed run cost and how long it took, and every step's tries,
+ * to acceptance, the tries of the `workspace: base` step to a landing, what a landed run cost and how long it took, and every step's tries,
  * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, the skills its sessions
  * loaded, where their ends say, and the skills whose paths they touched, and each rule its skills declare, kept or broken by those calls
  * (`discipline.ts`); each count the step declares over its closeouts (`tally:`, `tally.ts`), per step and day; and each landing check
@@ -15,7 +15,7 @@ import path from 'node:path';
 import { Invalid } from '../refusal/refusal.ts';
 import { isRepositoryRun, tryOf, type Run } from '../record/record.ts';
 import type { Closeout } from '../closeout/index.ts';
-import type { Workflow } from '../step/step.ts';
+import { endsOnBase, type Workflow } from '../step/step.ts';
 import { DEFAULT_FACTORY } from '../factory/factory.ts';
 import { askedAgain, landsOnCheck } from '../status/status.ts';
 import { gateWaitOf, tryEndOf, type Timeline, type TimelineTry } from '../timeline/index.ts';
@@ -91,7 +91,7 @@ export type TryFact = RunKeys & {
 
 /**
  * One run that finished, on the UTC day its ending step's last task ended, or its last task, with no ending step. `rounds` holds, for each
- * `loop:` step whose loop ended accepted, how many rounds it ran. `landed` says whether its `workspace: main` step committed, and
+ * `loop:` step whose loop ended accepted, how many rounds it ran. `landed` says whether its `workspace: base` step committed, and
  * `firstTry` whether it did so on its first try: null with no such step or where its record does not say, and `firstTry` null on a run
  * that did not land. `costUsd` is every
  * session's cost, null unless each was measured; `wallMs` its first filing to its last end. A run counts under every step and agent it has.
@@ -251,7 +251,7 @@ function finishedAt(r: RunRead, ending: Workflow | undefined): string | null {
 
 /** The fact of a finished run (`RunFact`); none for a run that has not finished. */
 function runFactOf(r: RunRead): RunFact[] {
-  const ending = r.steps.find((s) => s.workspace === 'main');
+  const ending = r.steps.find((s) => endsOnBase(s));
   const at = finishedAt(r, ending);
   if (!at) return [];
   const how = ending && r.run.steps[ending.name]?.landed;
@@ -407,10 +407,11 @@ function countsOf(names: readonly string[]): Array<{ name: string; count: number
 
 /** Each step's totals, per agent (`StepRow`), in the order of the tries: run by run, and a run's steps in its workflow's order. */
 function stepRowsOf(tries: readonly TryFact[]): StepRow[] {
-  const rows = new Map<string, TryFact[]>();
+  const rows = new Map<string, [TryFact, ...TryFact[]]>();
   for (const t of tries) {
     const key = JSON.stringify([t.step, t.agent]);
-    rows.set(key, [...(rows.get(key) ?? []), t]);
+    const was = rows.get(key);
+    rows.set(key, was ? [...was, t] : [t]);
   }
   return [...rows.values()].map((of) => ({
     step: of[0].step,
@@ -514,14 +515,15 @@ export function statsOf(
   const to = query.to ?? today;
   const all = [...kept.tries, ...kept.runs, ...kept.marks];
   const from = query.from ?? all.map((x) => x.day).sort()[0] ?? null;
-  const keys = query.by ? [...new Set(all.flatMap((x) => valuesOf(x, query.by!)))].sort(byKey) : [];
+  const by = query.by;
+  const keys = by ? [...new Set(all.flatMap((x) => valuesOf(x, by)))].sort(byKey) : [];
   return {
     from,
     to,
     by: query.by ?? null,
     filters,
     all: groupOf(kept, from, to, today),
-    groups: keys.map((key) => ({ key, ...groupOf(having(kept, query.by!, key), from, to, today) })),
+    groups: by ? keys.map((key) => ({ key, ...groupOf(having(kept, by, key), from, to, today) })) : [],
     unreadable: [...unreadable],
     health: healthOver(from, to),
   };

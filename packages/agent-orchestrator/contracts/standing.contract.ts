@@ -44,7 +44,7 @@ const standingSpec = spec<StandingOf>({
       (output.own !== 'verified' && output.own !== 'unverified') ||
       approved(run, step.name) ||
       askedAgain(step, run, c) ||
-      (step.workspace === 'main' && (run.steps[step.name]?.tries?.length ?? 0) > 0) ||
+      (step.workspace === 'base' && (run.steps[step.name]?.tries?.length ?? 0) > 0) ||
       output.status === 'awaiting approval' ||
       output.status === 'over budget',
     /** A looping step that asked for another round is not held at its gate: the gate is on what comes after it. */
@@ -58,7 +58,7 @@ const standingSpec = spec<StandingOf>({
     /** An ending approved before it is filed waits at its gate once every step before it has handed on. */
     anEndingWaitsBeforeItIsFiled: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
       output.own !== 'pending' ||
-      step.workspace !== 'main' ||
+      step.workspace !== 'base' ||
       !gated(step, run) ||
       !!run.cancelledAt ||
       !!run.steps[step.name]?.taskId ||

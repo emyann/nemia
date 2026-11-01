@@ -24,11 +24,11 @@ import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
  * worktree, and the engine gives it no other directory. A file named from the workspace root is collected into
  * the directory at hand-off, before the check (`collectArtifacts` in artifacts.store.ts), so such a step hands it over too.
  *
- * `inMain` for a step that works in the repository's own checkout (`workspace: main`): there the second way is
+ * `inMain` for a step that works in the repository's own checkout (`workspace: base`): there the second way is
  * false and does harm. The run hands nothing off in a person's checkout (`handOffDue`), so nothing is collected
  * and nothing is committed — a file left there stays in their checkout for ever, and the next run's ending step
  * reads `git status --porcelain` as dirty and stops. Such a step has no check to be given `WF_ARTIFACTS` either,
- * since `workspace: main` refuses one, and nothing follows it to read what it wrote. So it is told the one way.
+ * since `workspace: base` refuses one, and nothing follows it to read what it wrote. So it is told the one way.
  *
  * `inFolder` for a step of a folder run (`place: folder`): there the *first* way is the one that does harm. Such a step runs as a
  * job, which asks nobody, fenced to its own folder, and that directory sits beside the folder, outside the fence: told to put a file
@@ -187,7 +187,7 @@ export function artifactLines(dir: string, missing: readonly MissingArtifact[], 
   const filesGone = pruned?.artifacts;
   const gone = filesGone ? missing.filter((m) => m.why === 'missing' || m.why === 'not there').map((m) => m.path) : [];
   return [
-    ...(gone.length ? [`!! not kept: ${gone.join(', ')}  — ${filesPrunedWords(filesGone!)}`] : []),
+    ...(filesGone && gone.length ? [`!! not kept: ${gone.join(', ')}  — ${filesPrunedWords(filesGone)}`] : []),
     ...(filesGone
       ? []
       : line('not there', (names) =>

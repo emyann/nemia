@@ -126,7 +126,7 @@ const markerOf = (id: string) => path.join(ROOT, 'forgetting', `${id}.json`);
 const listed = async (): Promise<string[]> => (await Effect.runPromise(e().list())).views.map((v) => v.id);
 /** The directories `repo` has a checkout in under the store's worktrees, as its place lists them. */
 const worktreesOf = (repo: string): string[] => {
-  const outcome = stage.place().place.askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), prefix: 'wf/', base: 'main' });
+  const outcome = stage.place().place.askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), run: 'r', base: 'main' });
   assert.ok('answer' in outcome, `the inventory of ${repo}`);
   return outcome.answer.workspaces.map((w) => w.path);
 };

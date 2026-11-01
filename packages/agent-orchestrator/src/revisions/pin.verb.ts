@@ -39,6 +39,7 @@ import { appendRevision, ledgerOf } from './revisions.store.ts';
 import { kindsDrift, revisionNow, stepsDrift, type Drift, type KindName, type Pin, type Revision, type RevisionKind } from './revisions.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 import { RunId } from '../record/record.model.ts';
+import { firstPiece } from '../piece/piece.ts';
 
 /** What a run resolved on a pass: the steps it now holds, and the revision of each kind they were read at. */
 export type Resolved = { steps: Workflow[]; pins: Pin[] };
@@ -47,7 +48,7 @@ export type Resolved = { steps: Workflow[]; pins: Pin[] };
 export type Kept = { kept: string };
 
 /** A refusal's or an error's first line, which is what a note on the feed has room for. */
-const firstLine = (said: string): string => said.split('\n')[0];
+const firstLine = (said: string): string => firstPiece(said, '\n');
 
 /** The factory a run was started in, read; none for the default factory, which is no file. */
 const factoryOf = (run: Pick<Run, 'factory'>): Factory | undefined =>

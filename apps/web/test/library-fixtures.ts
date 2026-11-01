@@ -117,7 +117,7 @@ export const stepSpec = (extra: Partial<WorkflowStepSpec> = {}): WorkflowStepSpe
   after: ['review'],
   resume: null,
   input: ['review'],
-  workspace: 'main',
+  workspace: 'base',
   place: 'git',
   writable: [],
   reads: [],
@@ -178,7 +178,7 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPag
   dir: '/work/workflows/build',
   step: 'ship',
   body: 'Land it.',
-  source: '---\nplace: git\nworkspace: main\n---\nLand it.\n',
+  source: '---\nplace: git\nworkspace: base\n---\nLand it.\n',
   keys: [
     { key: 'workspace', value: 'main', meaning: 'Where the step works.' },
     { key: 'model', value: null, meaning: 'The model.' },
@@ -209,7 +209,7 @@ export const stepPage = (extra: Partial<WorkflowStepPage> = {}): WorkflowStepPag
 /** The builder's form: a key of each shape, an agent of yours, and the keys a remote step refuses. */
 export const keyForm = (extra: Partial<KeyForm> = {}): KeyForm => ({
   keys: [
-    { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['main'], byHarness: null },
+    { key: 'workspace', meaning: 'Where the step works.', kind: 'choice', choices: ['base'], byHarness: null },
     { key: 'slot', meaning: 'Whether the run takes a slot.', kind: 'choice', choices: ['none'], byHarness: null },
     { key: 'effort', meaning: 'How hard it thinks.', kind: 'harness-word', choices: null, byHarness: { claude: ['low', 'high'] } },
   ],

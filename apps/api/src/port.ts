@@ -19,10 +19,12 @@ export const NO_TICK = '--no-tick';
  * started by mistake.
  */
 export function argsOf(argv: readonly string[]): { ticks: false } | { ticks: true; every: number } {
-  if (argv.length === 1 && argv[0] === NO_TICK) return { ticks: false };
-  const asked = argv.length === 0 ? everyOf(undefined) : argv.length === 1 && !argv[0].startsWith('-') ? everyOf(argv[0]) : undefined;
+  const [only] = argv;
+  if (argv.length === 1 && only === NO_TICK) return { ticks: false };
+  const asked =
+    argv.length === 0 ? everyOf(undefined) : argv.length === 1 && only !== undefined && !only.startsWith('-') ? everyOf(only) : undefined;
   if (asked && 'every' in asked) return { ticks: true, every: asked.every };
-  const other = argv.length === 1 ? argv[0] : argv.join(' ');
+  const other = argv.join(' ');
   throw Object.assign(
     new Error(
       `the api takes no ${other}. Give ${NO_TICK} to serve the board without ticking the store, or nothing to be the store's daemon, ` +

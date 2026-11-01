@@ -7,7 +7,7 @@
  */
 import { checkoutAt, commitMade, committed, headOf, mergedIn, putBackOn, resolved, takenBack, treeOf, type Found } from './acts.ts';
 import { isDirectory, readTree, real, writeChanges } from './disk.ts';
-import { changesOf, commitAt, type Held, type Repository, type Tree, type World } from './world.ts';
+import { changesOf, commitAt, commitOf, type Held, type Repository, type Tree, type World } from './world.ts';
 
 /** The checkout at `dir`, which the place holds. */
 function found(held: Held, dir: string): Found {
@@ -49,7 +49,7 @@ function repository(held: Held, root: string, files: Tree): string {
 function branch(held: Held, root: string, name: string, files: Readonly<Record<string, string | null>>, from: string): string {
   const { repo } = found(held, root);
   const base = repo.branches.get(name) ?? idOf(repo, from);
-  const before = repo.commits.get(base)!.tree;
+  const before = commitOf(repo, base).tree;
   const after = changed(before, files);
   for (const checkout of repo.checkouts.values()) if (checkout.branch === name) writeChanges(checkout.dir, before, after);
   return commitMade(held, repo, name, after, [base], `on ${name}`);
@@ -84,13 +84,14 @@ export function worldOf(held: Held): World {
     },
     read: (root, rev) => {
       const { repo } = found(held, root);
-      const { parents, message } = repo.commits.get(idOf(repo, rev))!;
+      const { parents, message } = commitOf(repo, idOf(repo, rev));
       return { parents, message };
     },
     changed: (root, rev) => {
       const { repo } = found(held, root);
-      const { tree, parents } = repo.commits.get(idOf(repo, rev))!;
-      return changesOf(parents.length ? repo.commits.get(parents[0])!.tree : {}, tree).map((change) => change.path);
+      const { tree, parents } = commitOf(repo, idOf(repo, rev));
+      const [first] = parents;
+      return changesOf(first === undefined ? {} : commitOf(repo, first).tree, tree).map((change) => change.path);
     },
     tip: (root, name) => found(held, root).repo.branches.get(name) ?? null,
     changes: (checkout) => changes(held, checkout),

@@ -40,8 +40,9 @@ export function tryOfStep(
       error: `Step '${step}' of run '${run.id}' has had ${current} ${current === 1 ? 'try' : 'tries'}, so it has no try ${n}. GET /api/runs/${run.id} lists them under \`tries\`.`,
     };
   }
-  if (n === current) return { try: current, taskId: record?.taskId ?? null };
-  return { try: n, taskId: earlier[n - 1].taskId, turn: turnOfTry(earlier, n - 1) };
+  const at = earlier[n - 1];
+  if (at === undefined) return { try: current, taskId: record?.taskId ?? null };
+  return { try: n, taskId: at.taskId, turn: turnOfTry(earlier.slice(0, n - 1), at) };
 }
 
 /**

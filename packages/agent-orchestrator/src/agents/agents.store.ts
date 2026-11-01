@@ -54,7 +54,7 @@ export const agentFilesDir = (run: Pick<Run, 'id'>, step: string): string => pat
  * its flags would name a plugin that is not there.
  */
 export const renderedIn = (dir: string, step: Workflow): boolean =>
-  isDirectory(dir) && (!namesPlugin(step) || isDirectory(path.join(dir, pluginOf(step.agent!.name))));
+  isDirectory(dir) && (!namesPlugin(step) || (step.agent !== undefined && isDirectory(path.join(dir, pluginOf(step.agent.name)))));
 
 /**
  * Render every step of `steps` whose agent is rendered (`rendersAgent`) into its folder (`agentFilesDir`): its prompt, its skills copied
@@ -67,7 +67,8 @@ export const renderedIn = (dir: string, step: Workflow): boolean =>
  */
 export function writeAgentFiles(run: Pick<Run, 'id'>, steps: readonly Workflow[], skills: SkillsFound): void {
   for (const step of steps.filter(rendersAgent)) {
-    const agent = step.agent!;
+    const agent = step.agent;
+    if (agent === undefined) continue;
     const dir = agentFilesDir(run, step.name);
     const plugin = path.join(dir, pluginOf(agent.name));
     fs.mkdirSync(dir, { recursive: true });
@@ -240,9 +241,35 @@ function repoUsers(at: string, name: string, repo: string | undefined): string[]
 const inUseByRepo = (name: string, users: readonly string[], repo: string, does: string): string =>
   `${AGENTS_FOLDER}/${name}.md is named by ${users.length === 1 ? 'a step' : `${users.length} steps`} of the repository ${repo} — ${users.join(', ')} — which has no ${name} of its own, so its workflows are given this one, and ${does} would leave ${users.length === 1 ? 'it' : 'each'} naming an agent that is not there, which the workflow refuses to load. Give ${users.length === 1 ? 'that step' : 'those steps'} another agent or remove the \`agent:\` line, or copy this agent into ${path.join(repo, 'workflows', AGENTS_FOLDER)}/ (git shows it as a change to commit), first.`;
 
+/** Refused, `Conflict`, while a step of `repo`'s workflows is given the store's agent `name` (`repoUsers`), and `does` would break it. */
+function refuseRepoUsers(at: string, name: string, repo: string | undefined, does: string): void {
+  if (repo === undefined) return;
+  const theirs = repoUsers(at, name, repo);
+  if (theirs.length) refuse(inUseByRepo(name, theirs, repo, does), Conflict, theirs);
+}
+
+/** The version of the agent `name` as it reads just after it was written, `version`; `Missing` where it no longer reads. */
+function readBack(name: string, version: string | null): string {
+  if (version !== null) return version;
+  throw new Missing({
+    message: `${AGENTS_FOLDER}/${name}.md does not read back after it was written: something removed it meanwhile. Read the agents again, and write it once more.`,
+  });
+}
+
 /** Why a new agent `name` is not written over the one there, at `version`. */
 const agentTaken = (name: string, version: string | null): string =>
   `${AGENTS_FOLDER}/${name}.md is there already. Give the new agent another name, or open it and change it${takenAt(version)}.`;
+
+/**
+ * `draft` with the `overridable:` line the file at `at` has, read at `version` (none for a new agent), where the draft does not say the
+ * line (`AgentDraft.overridable` absent): a page that does not know the line saves the agent without widening what its steps may override.
+ * `null` in the draft takes it out.
+ */
+function keptOffer(draft: AgentDraft, version: string | null, at: string): AgentDraft {
+  if (draft.overridable !== undefined || version === null || !fs.existsSync(at)) return draft;
+  const kept = frontmatterKey(fs.readFileSync(at, 'utf8'), 'overridable');
+  return kept === undefined ? draft : { ...draft, overridable: kept };
+}
 
 /**
  * An agent written from a draft (`renderAgent`): what the board's Agents page saves, and the inverse of `loadAgents` for one agent. `dir`
@@ -317,10 +344,9 @@ export function writeAgent(
       );
     const users = agentUsers(path.dirname(at), old);
     if (users.length) refuse(inUse(old, users, `renaming it to ${name}`), Conflict, users);
-    const theirs = repoUsers(at, old, repo);
-    if (theirs.length) refuse(inUseByRepo(old, theirs, repo!, `renaming it to ${name}`), Conflict, theirs);
+    refuseRepoUsers(at, old, repo, `renaming it to ${name}`);
   }
-  const text = renderAgent(draft);
+  const text = renderAgent(keptOffer(draft, version, file(old)));
   const given = SIDECARS.map((kind) => ({ ...kind, sidecar: schema ?? null, named: frontmatterKey(text, kind.key) }));
   for (const { key, what, a, suggest, sidecar, named: mine } of given) {
     if (!sidecar) continue;
@@ -402,7 +428,7 @@ export function writeAgent(
     fs.rmSync(file(old));
     removed.push(`${old}.md`);
   }
-  return { dir: at, agent, version: versionOf(name)!, written, removed };
+  return { dir: at, agent, version: readBack(name, versionOf(name)), written, removed };
 }
 
 /**
@@ -437,8 +463,7 @@ export function removeAgent(
     );
   const users = agentUsers(path.dirname(at), name);
   if (users.length) refuse(inUse(name, users, 'removing it'), Conflict, users);
-  const theirs = repoUsers(at, name, repo);
-  if (theirs.length) refuse(inUseByRepo(name, theirs, repo!, 'removing it'), Conflict, theirs);
+  refuseRepoUsers(at, name, repo, 'removing it');
   const read = (f: string) => {
     try {
       return fs.readFileSync(path.join(at, f), 'utf8');

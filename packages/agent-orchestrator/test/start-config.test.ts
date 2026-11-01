@@ -32,7 +32,7 @@ function folder(name: string, own = 'effort: high', ending = 'gate: true'): stri
   fs.writeFileSync(path.join(dir, 'implement.md'), `---\nplace: git\n${own}\n---\nBuild it.\n`);
   fs.writeFileSync(
     path.join(dir, 'ship.md'),
-    `---\nafter: implement\nplace: git\nworkspace: main\n${ending}\ncheck: npm test\n---\nShip it.\n`,
+    `---\nafter: implement\nplace: git\nworkspace: base\n${ending}\ncheck: npm test\n---\nShip it.\n`,
   );
   return dir;
 }
@@ -215,7 +215,7 @@ test("REFUSED at `nemia start`: a codex sandbox written under its former name, `
 test("a lone step in the checkout and an ending after a step start in a store whose path every permission rule carries, and their runs are written: the store's refusal asks the root", () => {
   const lone = path.join(ROOT, 'workflows', 'lone-ending');
   fs.mkdirSync(lone, { recursive: true });
-  fs.writeFileSync(path.join(lone, 'ship.md'), '---\nplace: git\nworkspace: main\n---\nShip it.\n');
+  fs.writeFileSync(path.join(lone, 'ship.md'), '---\nplace: git\nworkspace: base\n---\nShip it.\n');
   for (const dir of [lone, GATED]) {
     const id = started(dir);
     assert.ok(runsWritten().includes(id), dir);

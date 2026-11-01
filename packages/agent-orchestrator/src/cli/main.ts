@@ -298,7 +298,9 @@ async function watchedOnce(
   const { lines, ends, cursor } = readFeedEnds(from);
   for (const [i, line] of lines.entries()) {
     if (!selects(selectors, line)) continue;
-    console.log(watchedLine(line, ends[i], how));
+    const end = ends[i];
+    if (end === undefined) continue;
+    console.log(watchedLine(line, end, how));
   }
   if (how.json === true) bookmarked(cursor, how, cursorFile);
   else {
@@ -394,7 +396,9 @@ async function commanded(command: Command | Ran, rest: string[], e: Engine, dema
   if (wrong) usage(wrong);
   if (command.ticks === true) await Effect.runPromise(ensureDaemon(demand()));
   const runner = RUNS.get(command.name);
-  if (runner || command.handler === undefined) return runner!(args, e, place);
+  if (runner) return runner(args, e, place);
+  if (command.handler === undefined)
+    throw new Error(`${command.name} has neither a runner nor a handler: give it one in RUNS or its entry`);
   const data = await runWith(e, placedIn(place, command.handler(args, process.env, wfRoot(process.env))));
   for (const line of command.print(data, args)) console.log(line);
   for (const line of command.note?.(data, args) ?? []) console.error(line);
@@ -436,7 +440,9 @@ export async function main(
   const e = given ?? engine();
   const command = TABLE.find((c) => c.name === named.name && c.only?.side !== 'api');
   if (command) return commanded(command, named.rest, e, demand, place);
-  return VERBS.get(named.name)!(named.rest, e, place);
+  const verb = VERBS.get(named.name);
+  if (verb === undefined) return console.log(HELP);
+  return verb(named.rest, e, place);
 }
 
 /** Runs `argv` as `main` does, for the `wf` alias: its one-line hint first, on stderr, so what a script reads off stdout stays the same. */

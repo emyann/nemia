@@ -492,7 +492,7 @@ export const REGATED = {
 
 /**
  * A seventh run, whose workflow's ending is a step of its own: `implement → review → ship`, with `ship` in the repository's own checkout
- * (`workspace: main`) and gated. implement and review signed off; ship has never run, so it reads `awaiting approval` — its approval is
+ * (`workspace: base`) and gated. implement and review signed off; ship has never run, so it reads `awaiting approval` — its approval is
  * what files it — and nothing of the run moves. So it is finished, and it stays on the Factory's floor all the same: nobody has decided it.
  *
  * Its branch is committed in FAKE's repository, two commits ahead of main, so the gate panel has a standing and its counts to show, and
@@ -503,7 +503,7 @@ export const ENDING = {
   id: 'ship-it-or-send-it-back-e2e12',
   title: 'Ship it, or send it back',
   steps: ['implement', 'review', 'ship'],
-  /** The step that ends the run, at its gate: `workspace: main`, gated, and not filed. */
+  /** The step that ends the run, at its gate: `workspace: base`, gated, and not filed. */
   ending: 'ship',
   /** The step a send-back at that gate goes to: the work it would act on, not the step at the gate (`sendBackTo`). */
   back: 'review',
@@ -1779,7 +1779,7 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   commit(
     LANDED.branch,
     'Say what shipping is',
-    [['workflows/dev/ship.md', '---\nworkspace: main\ngate: true\n---\nMerge it onto the base branch.\n']],
+    [['workflows/dev/ship.md', '---\nworkspace: base\ngate: true\n---\nMerge it onto the base branch.\n']],
     true,
   );
   git('merge', '-q', '--no-ff', '-m', `Merge ${LANDED.id}`, LANDED.branch);
@@ -1807,11 +1807,11 @@ function seedDecisions(root: string, repo: string, base: string, now: number): v
   write(path.join(shipDir, 'implement.md'), '---\nplace: git\nharness: claude\n---\nImplement what was asked.\n');
   write(path.join(shipDir, 'review.md'), '---\nplace: git\nharness: claude\nafter: implement\n---\nReview the change.\n');
   const shipBody = `${ENDING.says}\n\nLook at the checkout first: it is a person's, and this step is the run doing what they would do by hand.`;
-  write(path.join(shipDir, 'ship.md'), `---\nplace: git\nharness: claude\nafter: review\nworkspace: main\ngate: true\n---\n${shipBody}\n`);
+  write(path.join(shipDir, 'ship.md'), `---\nplace: git\nharness: claude\nafter: review\nworkspace: base\ngate: true\n---\n${shipBody}\n`);
   const shipWorkflow = [
     { name: 'implement', after: [], body: 'Implement what was asked.', harness: 'claude' },
     { name: 'review', after: ['implement'], body: 'Review the change.', harness: 'claude' },
-    { name: 'ship', after: ['review'], body: shipBody, harness: 'claude', workspace: 'main', gate: true },
+    { name: 'ship', after: ['review'], body: shipBody, harness: 'claude', workspace: 'base', gate: true },
   ];
 
   const shipRun = (id: string, title: string, why: string, branch: string, minutes: number, steps: object, workflow = shipWorkflow) =>

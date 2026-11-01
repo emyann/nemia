@@ -30,7 +30,7 @@ const PART_OF: Readonly<Record<string, DiskPart>> = {
 };
 
 /** The part a name of the store's root is: its own for a part's folder, `other` for any other. */
-export const partOf = (name: string): DiskPart => (Object.hasOwn(PART_OF, name) ? PART_OF[name] : 'other');
+export const partOf = (name: string): DiskPart => (Object.hasOwn(PART_OF, name) ? PART_OF[name] : undefined) ?? 'other';
 
 /**
  * The kinds of each part, each kind inside one part, so a part's kinds add up to the part:
@@ -91,7 +91,7 @@ export function kindAt(part: DiskPart, name?: string): DiskKind {
  * `node_modules` is `dependencies`, and everything under it; any other name keeps its folder's kind.
  */
 export function kindIn(kind: DiskKind, name: string): DiskKind {
-  if (kind === 'runs-other') return Object.hasOwn(RUN_FOLDERS, name) ? RUN_FOLDERS[name] : 'runs-other';
+  if (kind === 'runs-other') return (Object.hasOwn(RUN_FOLDERS, name) ? RUN_FOLDERS[name] : undefined) ?? 'runs-other';
   if (kind === 'handed' || kind === 'pictures') return isPicture(name) ? 'pictures' : 'handed';
   if (kind === 'checkout') return name === 'node_modules' ? 'dependencies' : 'checkout';
   return kind;
@@ -146,19 +146,20 @@ export type DiskRun = { run: string; factory?: string; bytes: number };
 
 /**
  * The roots with what was read of each (`walked`), its bytes by kind among them, and the run and factory of each that has one
- * (`factoryOf`, by a run's id).
+ * (`factoryOf`, by a run's id); a root the walk says nothing of read nothing, its bytes zero.
  */
 const told = (roots: readonly DiskRoot[], walked: Walked, ids: ReadonlySet<string>, factoryOf: (id: string) => string | undefined) =>
   roots.map((root, k) => {
     const run = root.name === undefined ? undefined : runOf(root.name, ids);
+    const bytes = walked.bytes[k] ?? 0;
     return {
       root,
       run,
       factory: run === undefined ? undefined : factoryOf(run),
-      bytes: walked.bytes[k],
-      kinds: Object.entries(walked.kinds?.[k] ?? { [root.kind]: walked.bytes[k] }) as [DiskKind, number][],
-      unread: walked.unread[k],
-      read: walked.read[k],
+      bytes,
+      kinds: Object.entries(walked.kinds?.[k] ?? { [root.kind]: bytes }) as [DiskKind, number][],
+      unread: walked.unread[k] ?? 0,
+      read: walked.read[k] ?? false,
     };
   });
 
@@ -218,7 +219,7 @@ const plus = (entry: DiskEntry, bytes: number | undefined, unread: number): Disk
 const inOrder = (entries: readonly DiskEntry[]): DiskEntry[] => {
   const met = new Map<string, number>();
   for (const entry of entries) if (!met.has(entry.factory ?? '')) met.set(entry.factory ?? '', entry.factory === undefined ? -1 : met.size);
-  const rank = (entry: DiskEntry) => [
+  const rank = (entry: DiskEntry): [part: number, factory: number, kind: number] => [
     DISK_PARTS.indexOf(entry.part),
     met.get(entry.factory ?? '') ?? 0,
     entry.kind === undefined ? -1 : ALL_KINDS.indexOf(entry.kind),

@@ -1,13 +1,15 @@
 ---
 after: review
 place: git
-workspace: main
+workspace: base
 agent: otto
 gate: true
 check: |-
   { r=$(mktemp -d) && { git show "HEAD:workflows/build/landing.ts" > "$r/landing.ts" || { echo "wf check: this checkout's HEAD has no workflows/build/landing.ts, so the landing this step made cannot be proven; land on a base that has it" >&2; false; }; } && node "$r/landing.ts" receipt --run "$WF_RUN"; c=$?; rm -rf "$r"; [ "$c" -eq 0 ]; }
 budget: 10
-disallowedTools: Bash(*:4318*), Bash(*:4317*)
+claude:
+  fence:
+    disallowedTools: Bash(*:4318*), Bash(*:4317*)
 ---
 Land this run's result: merge its own pull request on GitHub, with a merge commit whose message you write, and fast-forward the base
 branch in this checkout. Both acts are the one frozen script this step's check also reads, so your fence can refuse every `gh` call and

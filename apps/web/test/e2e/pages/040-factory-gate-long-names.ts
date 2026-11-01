@@ -41,14 +41,14 @@ function seedLongNames(root: string, createdAt: string, now = Date.now()): strin
     { name: implement, after: [], body: 'Implement what was asked.', harness: 'claude' },
     { name: notes, after: [implement], body: 'Write the migration notes.', harness: 'claude' },
     { name: back, after: [implement], body: 'Review the change.', harness: 'claude' },
-    { name: ending, after: [back], body: says, harness: 'claude', workspace: 'main', gate: true },
+    { name: ending, after: [back], body: says, harness: 'claude', workspace: 'base', gate: true },
   ];
   for (const step of workflow) {
     const keys = [
       `harness: ${step.harness}`,
       'place: git',
       ...(step.after.length ? [`after: ${step.after.join(', ')}`] : []),
-      ...(step.workspace ? ['workspace: main', 'gate: true'] : []),
+      ...(step.workspace ? ['workspace: base', 'gate: true'] : []),
     ];
     write(path.join(dir, `${step.name}.md`), `---\n${keys.join('\n')}\n---\n${step.body}\n`);
   }

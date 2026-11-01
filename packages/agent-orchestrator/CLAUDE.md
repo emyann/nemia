@@ -6,6 +6,11 @@ it holds today that is a candidate for the runtime is in `docs/architecture.md`,
 
 ## Folders
 
+- **The source (`src`, `bin`, `place`) is under `noUncheckedIndexedAccess`, and lint refuses a `!`** there (`.oxlintrc.json`, held by
+  `packages/agent-orchestrator/test/index-reads.test.ts`): say what an absence means (the refusal or the miss the code already gives),
+  never a cast or a default the contract does not give. A dictionary read stays a plain read, its `undefined` handled, with no
+  `Object.hasOwn` guard put in front of it: that changes what a prototype key reads. The tests' own `test/tsconfig.json` leaves the
+  flag off. `text.split(sep)[0]` is `firstPiece` (`src/piece/piece.ts`).
 - **A test beside its file reaches the helpers one folder further up** (`../../test/scratch.ts`).
 - **The store's root is a service, `StoreRoot` (`src/config/root.store.ts`), given where a program is composed** —
   `src/cli/main.ts` and the api's `app.ts`, each from `WF_ROOT` through `storeRootLayer(env)` — and a store function takes it as a

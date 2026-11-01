@@ -42,7 +42,7 @@ export const awaitingOf = (decision: RunDecision): Awaiting | null => (isDecidab
  */
 export function prunable(run: Prunable): boolean {
   const { worktrees, files } = run.onDisk;
-  return run.place === 'repository' && !run.moving && run.status !== 'running' && (worktrees || files);
+  return run.place === 'git' && !run.moving && run.status !== 'running' && (worktrees || files);
 }
 
 /**
@@ -53,7 +53,7 @@ export function prunable(run: Prunable): boolean {
 export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer | null {
   if (!prunable(run)) return null;
   const { worktrees, files } = run.onDisk;
-  const warning = awaiting ? unmergedWarning(run.id, awaiting) : null;
+  const warning = awaiting ? unmergedWarning(awaiting) : null;
   const merge = !awaiting
     ? null
     : awaiting.direct
@@ -102,11 +102,11 @@ export function pruneOffer(run: Prunable, awaiting: Awaiting | null): PruneOffer
  * What `--unmerged` gives up, said plainly: no branch is deleted, and the run's result branches become the only copy of its work — or, for
  * a run that worked on its base branch itself, what it would be decided on is gone.
  */
-export function unmergedWarning(id: string, awaiting: Awaiting): string {
+export function unmergedWarning(awaiting: Awaiting): string {
   const after = 'No branch is ever deleted, and none of its steps can be tried again, sent round or approved.';
   if (awaiting.direct)
     return `It worked on ${awaiting.branches[0] ?? 'its base branch'} itself and nobody has decided it: once pruned, the files you would read to decide it are gone. ${after}`;
-  const branches = awaiting.branches.length ? awaiting.branches.join(', ') : `wf/${id}/…`;
+  const branches = awaiting.branches.length ? awaiting.branches.join(', ') : `the run's branches`;
   return `Its work was never merged: once pruned, ${branches} ${awaiting.branches.length > 1 ? 'are' : 'is'} the only copy of it. ${after}`;
 }
 

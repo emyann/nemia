@@ -108,7 +108,7 @@ test('standing answers every head, and where each branch stands: on its base or 
   const repo = repository();
   const answer = answerOf(standing({ repo: repo.dir, base: 'main', branches: asked(repo) }));
   assert.deepEqual(answer.branches, stood(repo.dir));
-  assert.deepEqual(answer.heads, {
+  assert.deepEqual(answer.tips, {
     main: repo.landed,
     'wf/r/a': git(repo.dir, 'rev-parse', 'wf/r/a'),
     'wf/r/b': git(repo.dir, 'rev-parse', 'wf/r/b'),
@@ -165,7 +165,7 @@ test('standing asked of no branch answers the heads alone, whatever the base', (
   const repo = repository();
   const answer = answerOf(standing({ repo: repo.dir, base: 'no-such-base', branches: [] }));
   assert.deepEqual(answer.branches, []);
-  assert.equal(answer.heads['wf/r/b'], git(repo.dir, 'rev-parse', 'wf/r/b'));
+  assert.equal(answer.tips['wf/r/b'], git(repo.dir, 'rev-parse', 'wf/r/b'));
 });
 
 /** Whether `commit` is within `base` in `dir`, as git's `merge-base --is-ancestor` says: `yes`, `no` (its exit 1), or `unknown`. */

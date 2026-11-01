@@ -1,10 +1,9 @@
 {
   "context": "place",
   "title": "Place",
-  "about": "Where a run's steps keep their work, and the git place that comes with Nemia.",
+  "about": "Where a run's steps keep their work, said in the place's own words; git's words stay inside the git place that comes with Nemia.",
   "paths": [
-    "packages/agent-orchestrator/src/place",
-    "packages/agent-orchestrator/place"
+    "packages/agent-orchestrator/src/place"
   ],
   "terms": [
     {
@@ -17,9 +16,78 @@
       }
     },
     {
-      "term": "Mount kind",
-      "meaning": "the kind of place a run's work is on, `repository` or `folder`, as its record says; what Place becomes on decision 9's card.",
-      "type": "MountKind"
+      "term": "Place kind",
+      "meaning": "the kind of place a run's work is on, `git` or `folder`, as a step's `place:` says it and the run's record keeps it; whether the place becomes a mount is its own card.",
+      "type": "PlaceKind",
+      "retired": [
+        {
+          "spelling": "MountKind",
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+        }
+      ]
+    },
+    {
+      "term": "Repo",
+      "meaning": "the repository a run works on, by its path: what every request to the place names it, `status` and `land` included.",
+      "retired": [
+        {
+          "spelling": "checkout",
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+        }
+      ]
+    },
+    {
+      "term": "Branch / tip",
+      "meaning": "a line of work, a generic version-control word kept on purpose, and its latest commit as last read. The place names a run's branches: the core hands it the run and the leaf of a step's cut.",
+      "retired": [
+        {
+          "spelling": "head",
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+        },
+        {
+          "spelling": "heads",
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+        }
+      ]
+    },
+    {
+      "term": "MergeState",
+      "meaning": "whose merge is in progress in the repo's own directory, `ours`, `other` or `none`, whether a path is unmerged, the result branches a commit would leave out, and the repo's tip.",
+      "type": "MergeState",
+      "retired": [
+        {
+          "spelling": "type Status",
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+        }
+      ]
+    },
+    {
+      "term": "In progress",
+      "meaning": "a merge begun in the repo and not yet committed or taken back; `inProgressFile` is the file whose presence says one is.",
+      "retired": [
+        {
+          "spelling": "staged",
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+        }
+      ]
+    },
+    {
+      "term": "Removable / on branch",
+      "meaning": "what the place says of a workspace a run left: whether it may remove it (`yes`, `gone` when its folder is no longer there, `held` when someone holds it, their words in `heldBy`), and whether its work is on a branch.",
+      "retired": [
+        {
+          "spelling": "prunable",
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+        },
+        {
+          "spelling": "locked",
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+        },
+        {
+          "spelling": "detached",
+          "card": "decision 9: the place speaks its own words; git's stay in the adapter"
+        }
+      ]
     }
   ]
 }

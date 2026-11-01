@@ -173,11 +173,12 @@ const answersOf = Effect.fn('answersOf')(function* (e: Engine, run: Run, views: 
   const answers: Record<string, Answered> = {};
   for (const name of Object.keys(run.steps)) {
     const answer = answerOf(run, name, given);
-    if (!answer) continue;
-    const before = run.steps[name].tries!.at(-1)!.taskId;
+    const last = run.steps[name]?.tries?.at(-1);
+    if (!answer || last === undefined || answer.message === undefined) continue;
+    const before = last.taskId;
     const closeout = (views.get(before) ?? (yield* engineAsked('view', e.view(before)))).state.attempts.at(-1)?.closeout;
     const c = closeout === undefined ? undefined : parseCloseout(closeout);
-    answers[name] = { try: answer.try, message: answer.message!, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
+    answers[name] = { try: answer.try, message: answer.message, ...(c && !('error' in c) && c.needs ? { needs: c.needs } : {}) };
   }
   return answers;
 });

@@ -8,16 +8,15 @@
  */
 import { Schema } from 'effect';
 import { Hono } from 'hono';
-import { COMMANDS } from 'agent-orchestrator';
 import { readBody, valueAt } from '../body.ts';
 import { refusedBeforeReading } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { buildGuard, yoursOnly } from './builder.ts';
 import { folderOf } from './workflows.ts';
-import { runPlaced } from '../store.ts';
+import { commandNamed, runPlaced } from '../store.ts';
 
 /** The table's entry a folder of yours is removed through, which refuses a folder changed since it was read. */
-const REMOVE = COMMANDS.find((c) => c.name === 'workflows rm')!;
+const REMOVE = commandNamed('workflows rm');
 
 const DELETE_SHAPE = '`{ "version": "<as GET /api/workflows lists it>" }`';
 

@@ -20,6 +20,7 @@
  */
 import { waitsOf, type Reason } from '../feed/index.ts';
 import { SELECTOR_FORM } from '../watch/selector.ts';
+import { firstPiece } from '../piece/piece.ts';
 
 /** What one builtin wake word was really selecting: the reasons whose lines its prose found, or the wait a note it led carried. */
 type Selecting = { readonly reasons?: readonly Reason[]; readonly waits?: true };
@@ -40,9 +41,6 @@ export const FORMER_WAKE: Readonly<Record<string, Selecting>> = {
   'needs:': { waits: true },
   'denied:': { reasons: ['ToolDenied'] },
 };
-
-/** The words in the order the table names them, which is the order a converted reason selector lists its reasons in. */
-const WORDS: readonly string[] = Object.keys(FORMER_WAKE);
 
 /** The wake list a subscription held when it named none of its own: the seven words of the package's own default. */
 export const FORMER_DEFAULT_WAKE: readonly string[] = [
@@ -76,10 +74,10 @@ const asKeyed = (word: string): string => word.trim().toLowerCase();
  */
 export function selectorsOfWake(wake: readonly string[]): { selectors: string[]; unconverted: string[] } {
   const asked = wake.map(asKeyed);
-  const named = WORDS.filter((word) => asked.includes(word));
-  const waits = named.some((word) => FORMER_WAKE[word].waits === true);
+  const named = Object.entries(FORMER_WAKE).flatMap(([word, selecting]) => (asked.includes(word) ? [selecting] : []));
+  const waits = named.some((selecting) => selecting.waits === true);
   const reasons: Reason[] = [];
-  for (const word of named) for (const reason of FORMER_WAKE[word].reasons ?? []) if (!reasons.includes(reason)) reasons.push(reason);
+  for (const selecting of named) for (const reason of selecting.reasons ?? []) if (!reasons.includes(reason)) reasons.push(reason);
   const kept = waits ? reasons.filter((reason) => !waitsOf(reason)) : reasons;
   return {
     selectors: [...(waits ? ['waits=person'] : []), ...(kept.length ? [reasonSelector(kept)] : [])],
@@ -96,7 +94,7 @@ const RETIRED: readonly string[] = ['--wake', '--wake-word'];
  * selector takes. Pure, and asked first by the command's `unknown`.
  */
 export function retiredWakeRefusal(command: string, arg: string): string | undefined {
-  const flag = arg.split('=')[0];
+  const flag = firstPiece(arg, '=');
   if (!RETIRED.includes(flag)) return undefined;
   return (
     `${command} no longer takes ${flag}: the feed's lines are no longer matched on their prose but selected by the keys they name — ` +

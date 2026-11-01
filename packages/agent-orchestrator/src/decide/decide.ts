@@ -104,6 +104,34 @@ export type Decision =
  */
 export type Landed = boolean | 'unchanged';
 
+/** Whether a step's task is still live, `pending` or `running`: never for a step with no task. */
+function liveTask(taskId: string | null | undefined, phaseOf: (taskId: string) => TaskPhase): boolean {
+  return taskId ? ['pending', 'running'].includes(phaseOf(taskId)) : false;
+}
+
+/** Whether a step's current check exited refusing the work (`refusedCheck`): never for a step with no check on its record. */
+function refusedOwnCheck(
+  run: Run,
+  name: string,
+  phaseOf: (taskId: string) => TaskPhase,
+  verdictOf: (step: string) => Verdict | undefined,
+): boolean {
+  const check = run.steps[name]?.check;
+  return check !== undefined && refusedCheck(phaseOf(check.taskId), verdictOf(name));
+}
+
+/** `landed`, asked once per branch: a second call for the same branch returns what the first read. */
+function once(landed: (branch: string) => Landed): (branch: string) => Landed {
+  const said = new Map<string, Landed>();
+  return (branch) => {
+    const known = said.get(branch);
+    if (known !== undefined) return known;
+    const read = landed(branch);
+    said.set(branch, read);
+    return read;
+  };
+}
+
 /**
  * What is left for a person to do about this run (`Decision`). Pure. Read on `assess`'s inputs: a step a round due files again is held
  * on no budget (`roundSpans`); an ending un-held at its gate (`unheld`) needs no reading here, since the try or round due makes the run
@@ -126,7 +154,7 @@ export type Landed = boolean | 'unchanged';
  * @param verdictOf What each step's current check exited with: a refusal and a check that did not finish are told apart.
  * @param harnessBlocked Whether a task's session is blocked by its harness (`retryable`): a person's try of such a step is waited on too.
  * @param spendOf What each task's sessions cost (`taskSpend`): a step over its budget, or ended at it, is waited on by a person.
- * @param checkout The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
+ * @param checkout The run whose `workspace: base` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
  *   ending.verb.ts): what this run is still running for.
  */
 export function decision(
@@ -161,13 +189,11 @@ export function decision(
   );
   const standingOf = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
   const refiled = roundSpans(steps, round);
-  const statusOf = new Map(steps.map((s) => [s.name, refiled.has(s.name) ? standingOf.get(s.name)!.own : standingOf.get(s.name)!.status]));
+  const statusOf = new Map([...standingOf].map(([name, st]) => [name, refiled.has(name) ? st.own : st.status]));
   if (status === 'running') {
     const live = steps
       .filter(
-        (s) =>
-          statusOf.get(s.name) === 'checking' ||
-          (statusOf.get(s.name) === 'running' && ['pending', 'running'].includes(phaseOf(run.steps[s.name].taskId!))),
+        (s) => statusOf.get(s.name) === 'checking' || (statusOf.get(s.name) === 'running' && liveTask(run.steps[s.name]?.taskId, phaseOf)),
       )
       .map((s) => s.name);
     const waitsForCheckout = checkout ? steps.filter((s) => waitsOnCheckout(steps, s.name, checkout)).map((s) => s.name) : [];
@@ -183,11 +209,7 @@ export function decision(
 
   const direct = run.branch !== undefined && branches.includes(run.branch);
 
-  const said = new Map<string, Landed>();
-  const stands = (branch: string): Landed => {
-    if (!said.has(branch)) said.set(branch, landed(branch));
-    return said.get(branch)!;
-  };
+  const stands = once(landed);
   const atGate = steps
     .filter((s) => statusOf.get(s.name) === 'awaiting approval')
     .map((s) => s.name)
@@ -200,14 +222,14 @@ export function decision(
   if (onBase && branches.every((b) => stands(b) === true)) return { kind: 'landed', branches };
 
   const named = (...want: StepStatus[]) =>
-    steps
-      .filter((s) => want.includes(standingOf.get(s.name)!.own))
-      .map((s) => s.name)
+    [...standingOf]
+      .filter(([, st]) => want.includes(st.own))
+      .map(([name]) => name)
       .sort();
   const awaitingAnswer = named('blocked');
   const failed = named('failed', 'stopped');
   const checkFailed = named('failed (check)');
-  const unfinishedCheck = checkFailed.filter((name) => !refusedCheck(phaseOf(run.steps[name].check!.taskId), verdictOf(name)));
+  const unfinishedCheck = checkFailed.filter((name) => !refusedOwnCheck(run, name, phaseOf, verdictOf));
   const failedCheck = checkFailed.filter((name) => !unfinishedCheck.includes(name));
   const unsigned = named('unsigned');
   const unverified = named('unverified');

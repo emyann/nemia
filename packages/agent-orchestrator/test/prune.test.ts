@@ -149,7 +149,7 @@ const typed = async (t: TestContext, e: Engine, ...argv: string[]) => {
 
 /** The directories `repo` has a checkout in under the store's worktrees, as its place lists them. */
 const worktreesOf = (repo: string): string[] => {
-  const outcome = placeNow().askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), prefix: 'wf/', base: 'main' });
+  const outcome = placeNow().askNow('inventory', { repo, under: path.join(ROOT, 'worktrees'), run: 'r', base: 'main' });
   assert.ok('answer' in outcome, `the inventory of ${repo}`);
   return outcome.answer.workspaces.map((w) => w.path);
 };

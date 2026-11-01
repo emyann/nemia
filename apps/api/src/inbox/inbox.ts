@@ -21,7 +21,6 @@ import path from 'node:path';
 import { Schema } from 'effect';
 import { Hono } from 'hono';
 import {
-  COMMANDS,
   DEFAULT_FACTORY,
   INBOX,
   INBOX_ADD,
@@ -40,7 +39,7 @@ import { readBody, type BodyIssue } from '../body.ts';
 import { refusedBeforeReading, type Guarded, type Refusal } from '../guard.ts';
 import { type ApiEnv, served } from '../layer.ts';
 import { folderOf, type KeyRow } from '../workflows/workflows.ts';
-import { runPlaced } from '../store.ts';
+import { commandNamed, runPlaced } from '../store.ts';
 
 /**
  * A card as the board lists it: the package's listing (`InboxListing`) — its name, first line, workflow and repo as the card writes them,
@@ -91,7 +90,7 @@ export type InboxQueueAnswer = {
 export type InboxFromAnswer = { name: string; file: string; from: string[]; was: string[] };
 
 /** One card read for its page (`inbox show`), an entry of the package's table the api serves alone: on `GET /api/inbox/:name`. */
-const CARD = COMMANDS.find((c) => c.name === 'inbox show')!;
+const CARD = commandNamed('inbox show');
 
 const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNoEntry: false })?.isDirectory());
 
@@ -101,16 +100,19 @@ const isDirectory = (at: string): boolean => Boolean(fs.statSync(at, { throwIfNo
  * with no body or time, and read again next time.
  */
 export function listInbox(cards: readonly InboxListing[] = readInbox()): InboxEntry[] {
-  return cards.map((entry) => {
-    let filedAt: string | null = null;
-    let body: string | null = null;
-    try {
-      filedAt = runStore.inbox.filedAt(entry.file);
-      const text = filedAt !== null && entry.error === null ? runStore.inbox.read(entry.file) : null;
-      if (text !== null) body = parseInboxCard(entry.file, text, isDirectory).body;
-    } catch {}
-    return { ...entry, body, filedAt };
-  });
+  return cards.map(inboxEntry);
+}
+
+/** One card of the inbox as `listInbox` lists it: with its body and when its file was written, or neither where it no longer reads. */
+function inboxEntry(entry: InboxListing): InboxEntry {
+  let filedAt: string | null = null;
+  let body: string | null = null;
+  try {
+    filedAt = runStore.inbox.filedAt(entry.file);
+    const text = filedAt !== null && entry.error === null ? runStore.inbox.read(entry.file) : null;
+    if (text !== null) body = parseInboxCard(entry.file, text, isDirectory).body;
+  } catch {}
+  return { ...entry, body, filedAt };
 }
 
 const FILE_SHAPE =
@@ -179,7 +181,8 @@ function folderAmong(
 ): { dir: string } | Refusal {
   const looked = repos.map((repo) => folderOf(name, from, repo, home, factory.tree));
   const dirs = [...new Set(looked.flatMap((found) => ('dir' in found ? [found.dir] : [])))];
-  if (dirs.length === 1) return { dir: dirs[0] };
+  const [only] = dirs;
+  if (dirs.length === 1 && only !== undefined) return { dir: only };
   if (dirs.length > 1) {
     return {
       status: 409,
@@ -204,7 +207,7 @@ function folderAmong(
 function filingIn(factory: Factory, body: typeof FILE_BODY.Type, home: string): Filing | Refusal {
   const repos = factory.repos.map((r) => path.resolve(r));
   const sent = body.repo === undefined ? undefined : path.resolve(body.repo);
-  if (sent !== undefined && !repos.includes(sent)) throw outsideFactory(factory, body.repo!);
+  if (body.repo !== undefined && sent !== undefined && !repos.includes(sent)) throw outsideFactory(factory, body.repo);
   const filing: Filing = { text: body.body, factory: factory.name, ...(sent !== undefined ? { repo: sent } : {}) };
   if (body.workflow === undefined) return filing;
   const about = sent ?? (repos.length === 1 ? repos[0] : undefined);
@@ -291,7 +294,7 @@ export const inbox = new Hono<ApiEnv>()
     if (wrong) return c.json({ error: wrong }, 400);
     return served(c, async ({ e, placeService }) => {
       const { card, source } = (await runPlaced(placeService, e, CARD.handler({ name }))) as { card: InboxListing; source: string };
-      const [entry] = listInbox([card]);
+      const entry = inboxEntry(card);
       const keys =
         entry.error === null
           ? INBOX_KEYS.map((key) => ({

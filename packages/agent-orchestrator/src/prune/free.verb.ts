@@ -9,6 +9,7 @@ import path from 'node:path';
 import { Cause, Effect, Exit, type Duration } from 'effect';
 import { keepsWorktrees } from '../config/config.store.ts';
 import { HOME } from '../record/record.store.ts';
+import { firstPiece } from '../piece/piece.ts';
 import { dropEmpty, freedByRepo, judging, resolved, sized, type Judged, type Sized } from './prune.verb.ts';
 import { freeable, freedLine, freeSaid, freeTurn, pruneLines, type Answered, type Pruning } from './prune.ts';
 
@@ -37,7 +38,7 @@ type Swept = { readonly id: string; readonly ready: Sized } | { readonly id: str
 /** Why a judgement, a sizing or a removal that failed did: its refusal's or its defect's own message, on one line. */
 const whyOf = (cause: Cause.Cause<unknown>): string => {
   const err = Cause.squash(cause);
-  return (err instanceof Error ? err.message : String(err)).split('\n')[0];
+  return firstPiece(err instanceof Error ? err.message : String(err), '\n');
 };
 
 /** What is to be said of a run the judgement left: nothing of one with nothing listed, whose empty folder goes; else `freeSaid`. */
@@ -110,7 +111,7 @@ const saidOnce = Effect.fnUntraced(function* (left: ReadonlyArray<{ id: string; 
  * - the sweep takes `FREE_A_SWEEP` of them not judged yet, or one already judged in its turn (`freeTurn`);
  * - each is judged as `nemia prune <id>` judges it, with no flag (`judging`), and sized when ready (`sized`), side by side;
  * - those ready are removed by one `remove` a repository (`freedByRepo`), repositories side by side;
- * - each run freed is said (`freedLine`), and a run left is said once while its words stand (`freeSaid`): a locked, detached or
+ * - each run freed is said (`freedLine`), and a run left is said once while its words stand (`freeSaid`): a held, off-branch or
  *   changed worktree, a place that did not answer, a worktree git would not remove.
  *
  * Level-triggered: a run freed has no folder left and is no candidate; one that is not freed is judged again on a later sweep, by what

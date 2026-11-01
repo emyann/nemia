@@ -11,7 +11,7 @@
  * `**` and its slash cross none as well, so the root's `package.json` is in the list — and a trailing
  * `/` takes everything below.
  */
-import type { Workflow } from '../step/step.ts';
+import { endsOnBase, type Workflow } from '../step/step.ts';
 import { terminalSteps } from '../workflow/index.ts';
 import type { Run } from '../record/record.ts';
 import type { Assessment } from '../tick/assess.ts';
@@ -20,7 +20,7 @@ import type { BranchStood } from '../place/place.ts';
 
 /**
  * The steps whose branch is the run's result: the steps nothing waits on (`terminalSteps`) — and, where one of those works in the
- * repository's own checkout (`workspace: main`), the steps it waits on instead. Pure.
+ * repository's own checkout (`workspace: base`), the steps it waits on instead. Pure.
  *
  * An ending step has no branch of its own: it works on the base branch, and what it acts on is the work of the steps before it. Read as
  * the result, its `main` would be the run's own branch, and every question about the run's result — has it landed, what did it touch,
@@ -28,7 +28,7 @@ import type { BranchStood } from '../place/place.ts';
  */
 export function resultSteps(steps: readonly Workflow[]): Workflow[] {
   const ends = terminalSteps(steps);
-  const result = ends.flatMap((s) => (s.workspace === 'main' ? steps.filter((x) => s.after.includes(x.name)) : [s]));
+  const result = ends.flatMap((s) => (endsOnBase(s) ? steps.filter((x) => s.after.includes(x.name)) : [s]));
   return [...new Set(result)];
 }
 
@@ -38,7 +38,7 @@ export function resultSteps(steps: readonly Workflow[]): Workflow[] {
  * one in its words. Pure.
  */
 export function workChecks(steps: readonly Workflow[]): string[] {
-  return [...new Set(steps.filter((s) => s.workspace !== 'main' && s.check).map((s) => s.check!))];
+  return [...new Set(steps.flatMap((s) => (!endsOnBase(s) && s.check ? [s.check] : [])))];
 }
 
 /**
@@ -86,7 +86,11 @@ export function resultTips(
   heads: Readonly<Record<string, string>> | undefined,
 ): Record<string, string> {
   const tips: Record<string, string> = Object.fromEntries(Object.entries(run.tips ?? {}).filter(([b]) => branches.includes(b)));
-  for (const branch of branches) if (heads && Object.hasOwn(heads, branch)) tips[branch] = heads[branch];
+  for (const branch of branches) {
+    if (!heads || !Object.hasOwn(heads, branch)) continue;
+    const head = heads[branch];
+    if (head !== undefined) tips[branch] = head;
+  }
   return tips;
 }
 
@@ -200,9 +204,9 @@ export function globRegExp(glob: string): RegExp {
     } else if (g.startsWith('**', i)) {
       re += '.*';
       i += 1;
-    } else if (g[i] === '*') re += '[^/]*';
-    else if (g[i] === '?') re += '[^/]';
-    else re += g[i].replace(/[.+^${}()|[\]\\]/g, '\\$&');
+    } else if (g.charAt(i) === '*') re += '[^/]*';
+    else if (g.charAt(i) === '?') re += '[^/]';
+    else re += g.charAt(i).replace(/[.+^${}()|[\]\\]/g, '\\$&');
   }
   return new RegExp(`^${re}$`);
 }
@@ -232,9 +236,9 @@ export function packageOf(file: string, workspaces: readonly string[]): string |
  * The group a file counts in: the workspace package it is in (`packageOf`), else its top-level directory, else the root.
  */
 export function groupOf(file: string, workspaces: readonly string[] = []): string {
-  const dirs = file.split('/').slice(0, -1);
-  if (!dirs.length) return ROOT_GROUP;
-  return packageOf(file, workspaces) ?? dirs[0];
+  const [top] = file.split('/').slice(0, -1);
+  if (top === undefined) return ROOT_GROUP;
+  return packageOf(file, workspaces) ?? top;
 }
 
 /**
@@ -325,7 +329,7 @@ export function radiusLines(r: Radius): string[] {
  * where the work a person has to judge is.
  *
  * `base` is the run's own base branch, given only for a run that cut worktrees (`isolate`): it is dropped from that fallback, because
- * such a run's work is never on it. A step that recorded the base branch worked in the repository's own checkout (`workspace: main`),
+ * such a run's work is never on it. A step that recorded the base branch worked in the repository's own checkout (`workspace: base`),
  * where the run commits nothing — so the diff between the run's frozen base and that branch is not the run's work but the base moving
  * under it, which every other run's merge adds to, and read as the work it would show a person everything merged since the run
  * started. `tipBranches` refuses the same branch for the same reason.

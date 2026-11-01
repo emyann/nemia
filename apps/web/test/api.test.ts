@@ -371,6 +371,16 @@ test("a run's reads: gone on a 404 alone, its last read kept, any other failure 
       assert.deepEqual(asked, ['/api/runs/r-1'], 'read once: a run gone is said at once, not after three tries');
     },
   );
+  await t.test("a run's place said `repository`, the former spelling an api not yet restarted answers, is read as `git`", async (t) => {
+    const before = globalThis.fetch;
+    globalThis.fetch = async () => answered(200, { ...detail(), place: 'repository' });
+    const client = new QueryClient();
+    t.after(() => {
+      globalThis.fetch = before;
+      client.clear();
+    });
+    assert.equal((await client.fetchQuery(runQuery('r-1'))).place, 'git');
+  });
   await t.test('only a 404 is a run gone: any other failure is tried again three times, as before', () => {
     assert.equal(runGone(new ReadRefusal('No run', 404)), true);
     for (const other of [

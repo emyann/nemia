@@ -7,8 +7,10 @@ check: |-
 budget: 20
 skills: effect, shadcn, change-the-board, look, react-aria, see-a-dashboard, apps/web:ds-build, apps/web:ds-theme, apps/web:ds-spec
 mcp: playwright
-disallowedTools: Bash(*:4318*), Bash(*:4317*)
 output: implement.schema.json
+claude:
+  fence:
+    disallowedTools: Bash(*:4318*), Bash(*:4317*)
 ---
 **Open the pull request before you sign off**, once a round and after you merged the base: this run's change is judged on GitHub, and
 your fence refuses every `git push` and every `gh` call, so the push and the pull request are one frozen script, read from the base as

@@ -26,10 +26,13 @@ An agent is one markdown file in an `agents` folder, beside the workflow folders
 description: Reviews a change read-only, as a second engineer would
 harness: claude
 model: opus
-tools: Read, Grep, Glob, Bash
-permissionMode: dontAsk
-allowedTools: Bash(git diff:*), Bash(git log:*), Bash(npm run lint)
 skills: review-a-change
+overridable: model, effort, fence
+claude:
+  fence:
+    tools: Read, Grep, Glob, Bash
+    permissionMode: dontAsk
+    allowedTools: Bash(git diff:*), Bash(git log:*), Bash(npm run lint)
 ---
 
 Review the changes on this branch. Be specific about correctness, not style.
@@ -39,8 +42,26 @@ The frontmatter is YAML, as a step's is. Quote a value that holds `: ` or ` #`, 
 `description: "Reviews a change: correctness, not style"`, and write a long one as a literal block, `|-` and the value on the lines
 below it, indented. A key that takes a list, such as `tools`, reads `Read, Grep` and `[Read, Grep]` alike.
 
+The fence keys sit under the block of the harness the agent runs on: `claude` takes `permissionMode`, `tools`, `allowedTools` and
+`disallowedTools` under its `fence`, and `codex` takes `sandbox`. A block holds its `fence` and nothing else. A fence key written at the
+top level, as files did before, is still read as the key in the block, and the start of a run names each file that writes one. To move
+them into the block, type `nemia frontmatter rewrite <folder>`: it keeps every value as written. A permission mode in a step that
+names neither its harness nor an agent beside it stays where it is, since either harness could run it, and the rewrite says so: add a
+harness line and rewrite again.
+
 The agent's keys are defaults. A step may set one of the same keys, and the step's wins, with one exception: a key of the fence only
-narrows (below). The agents are read by `packages/agent-orchestrator/src/agents/read.store.ts`. This repository's own team sits in
+narrows (below).
+
+## What a step may override
+
+An agent says what a step may override of it, on its `overridable` line. The words are `model`, `effort`, `context`, `harness`,
+`remote`, `output`, `fence`, `skills` and `mcp` (`OVERRIDABLE`). `fence` stands for every fence key at once, and a step still only
+narrows it; `skills` and `mcp` only add. The reviewer above lets a step choose its model and effort, and narrow its fence, and nothing
+else.
+
+A step that sets something the line leaves out is refused when the workflow is read (`offerRefusal`), naming the key and the agent.
+Delete the step's line, or add the word to the agent's. It holds the same for a step that names its agent and for one a factory hires
+it into. An agent with no `overridable` line offers everything, and the start of a run says to add one. The agents are read by `packages/agent-orchestrator/src/agents/read.store.ts`. This repository's own team sits in
 `workflows/agents/`.
 
 ## Tools and the fence

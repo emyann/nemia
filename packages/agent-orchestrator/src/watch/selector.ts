@@ -127,13 +127,13 @@ const listRefusal = (key: string, list: string): string | undefined => {
 function clauseRefusal(text: string): string | undefined {
   const t = text.trim();
   if (!t) return `a selector holds an empty clause: ${SELECTOR_FORM}`;
-  const listed = LISTED.exec(t);
-  if (listed) return keyRefusal(listed[1]) ?? listRefusal(listed[1], listed[3]);
+  const [, listedKey, , list] = LISTED.exec(t) ?? [];
+  if (listedKey !== undefined && list !== undefined) return keyRefusal(listedKey) ?? listRefusal(listedKey, list);
   if (MEANS_LIST.test(t))
     return `${JSON.stringify(t)} names a list and spells it with no (values) after ${/notin/.test(t) ? 'notin' : 'in'}: ${SELECTOR_FORM}`;
   if (t.includes('==')) return `${JSON.stringify(t)} compares with ==, and a selector compares with one =: ${SELECTOR_FORM}`;
-  const compared = COMPARED.exec(t);
-  if (compared) return keyRefusal(compared[1]) ?? valueRefusal(compared[1], compared[2], compared[3].trim());
+  const [, key, op, value] = COMPARED.exec(t) ?? [];
+  if (key !== undefined && op !== undefined && value !== undefined) return keyRefusal(key) ?? valueRefusal(key, op, value.trim());
   if (KEY.test(t)) return keyRefusal(t);
   return `${JSON.stringify(t)} is no clause of a selector: it names no operator: ${SELECTOR_FORM}`;
 }
@@ -159,15 +159,15 @@ export function selectorsRefusal(values: readonly string[]): string | undefined 
 /** One clause of checked text, parsed (`selectorsRefusal` first): its key, its operator, and its value or values. */
 function clauseOf(text: string): Clause {
   const t = text.trim();
-  const listed = LISTED.exec(t);
-  if (listed) {
-    const values = listed[3].split(',').map((v) => v.trim());
-    return listed[2] === 'notin' ? { key: listed[1], op: 'notin', values } : { key: listed[1], op: 'in', values };
+  const [, listedKey, listOp, list] = LISTED.exec(t) ?? [];
+  if (listedKey !== undefined && list !== undefined) {
+    const values = list.split(',').map((v) => v.trim());
+    return listOp === 'notin' ? { key: listedKey, op: 'notin', values } : { key: listedKey, op: 'in', values };
   }
-  const compared = COMPARED.exec(t);
-  if (compared) {
-    const value = compared[3].trim();
-    return compared[2] === '!=' ? { key: compared[1], op: '!=', value } : { key: compared[1], op: '=', value };
+  const [, key, op, compared] = COMPARED.exec(t) ?? [];
+  if (key !== undefined && compared !== undefined) {
+    const value = compared.trim();
+    return op === '!=' ? { key, op: '!=', value } : { key, op: '=', value };
   }
   return { key: t, op: 'exists' };
 }

@@ -39,14 +39,14 @@ export function factoryRules(name: string): FactoryRules {
 }
 
 /** `--file <path>`, or `-` for stdin: the words to write, read by the command line's runner. */
-const FILE: Flag = {
+const FILE = {
   flag: '--file',
   kind: 'text',
   key: 'file',
   takes: '--file takes the file whose words to write, or - to read them from stdin: nemia factory rules <name> --file <path>',
   twice: 'nemia factory rules takes --file once: a factory keeps one file of rules.',
   only: { side: 'cli', why: 'the api is sent the words themselves, never a path to read' },
-};
+} satisfies Flag;
 
 /** `nemia factory rules`'s spec: the factory's name, then `--file` or `--clear`; and the words, which a body alone carries. */
 const SPEC: Spec = {
@@ -62,7 +62,7 @@ const SPEC: Spec = {
     },
   ],
   unknown: (arg) => `nemia factory rules takes one factory's name, then --file <path> (or --file - for stdin) or --clear, not ${arg}.`,
-  apart: () => FILE.takes!,
+  apart: () => FILE.takes,
   missing: "nemia factory rules takes the factory's name: nemia factory rules <name> [--file <path>|- | --clear].",
 };
 

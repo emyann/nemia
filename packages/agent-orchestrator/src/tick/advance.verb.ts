@@ -8,6 +8,7 @@
  * this file, and it imports none of them. A controller, reaching the runtime through the client (`runtime-client.ts`).
  */
 import fs from 'node:fs';
+import { endsOnBase } from '../step/step.ts';
 import { Effect } from 'effect';
 import { EngineService, asked as engineAsked, denialText, over, type Engine, type TaskView } from '../runtime-client.ts';
 import { wordFeed } from '../feed/word-feed.verb.ts';
@@ -66,6 +67,7 @@ import { checkoutHold, landEnding } from '../ending/ending.verb.ts';
 import { statusMemo } from '../place/landing.store.ts';
 import type { PassRead } from '../cap/cap.verb.ts';
 import { fileChecks, fileReady, fileRounds, fileTries, type Closer, type Filing, type Heads, type PassReads } from './file.verb.ts';
+import { recordNamed } from './told.verb.ts';
 import { closeHeld, stopAsked } from './held.verb.ts';
 import { RunDoor } from '../runs/runs.store.ts';
 
@@ -97,12 +99,13 @@ export const adoptChecks = Effect.fn('adoptChecks')(function* (
 ) {
   const adopted: string[] = [];
   for (const step of steps) {
-    if (run.steps[step.name]?.check || stepStatus(step, run, phaseOf, closeoutOf, asked, steps, spendOf) !== 'checking') continue;
+    const record = run.steps[step.name];
+    if (!record || record.check || stepStatus(step, run, phaseOf, closeoutOf, asked, steps, spendOf) !== 'checking') continue;
     const taskId = checkTaskId(run, step.name);
     const view = yield* engineAsked('view', e.view(taskId));
     if (!view.state.brief) continue;
     views.set(taskId, view);
-    run.steps[step.name] = { ...run.steps[step.name], check: { taskId } };
+    run.steps[step.name] = { ...record, check: { taskId } };
     adopted.push(step.name);
   }
   return adopted;
@@ -134,9 +137,10 @@ export const adoptTries = Effect.fn('adoptTries')(function* (
 ) {
   const adopted: string[] = [];
   for (const r of retriesDue(steps, run, phaseOf, closeoutOf, asked, verdictOf, asks, () => false, spendOf)) {
-    const current = run.steps[r.step]?.taskId;
-    if (r.by === 'ask' && r.mode === 'continue' && current && answersIn(views.get(current)) > turnsOf(run.steps[r.step])) {
-      run.steps[r.step] = nextTry(run.steps[r.step], r, current);
+    const held = run.steps[r.step];
+    const current = held?.taskId;
+    if (held && r.by === 'ask' && r.mode === 'continue' && current && answersIn(views.get(current)) > turnsOf(held)) {
+      run.steps[r.step] = nextTry(held, r, current);
       adopted.push(r.step);
       continue;
     }
@@ -144,9 +148,9 @@ export const adoptTries = Effect.fn('adoptTries')(function* (
     const view = yield* engineAsked('view', e.view(taskId));
     if (!view.state.brief) continue;
     views.set(taskId, view);
-    const record = run.steps[r.step];
+    const record = recordNamed(run, r.step);
     run.steps[r.step] = r.mode === 'recheck' ? { ...nextTry(record, r), check: { taskId } } : nextTry(record, r, taskId);
-    for (const b of r.back ?? []) run.steps[b] = sentBack(run.steps[b]);
+    for (const b of r.back ?? []) run.steps[b] = sentBack(recordNamed(run, b));
     adopted.push(r.step);
   }
   return adopted;
@@ -530,9 +534,10 @@ const handOffAll = Effect.fnUntraced(function* (run: Run, r: PassReads, place: P
   for (const name of handOffOwed(r.steps, run, r.phaseOf)) {
     if (!runStore.runs.exists(run.id)) continue;
     const record = run.steps[name];
-    const unhanded = isRepositoryRun(run) ? yield* handedOffBy(place, record.workspace!, name) : folderPlace(runsDir()).handOff(run, name);
+    if (!record?.taskId || !record.workspace) continue;
+    const unhanded = isRepositoryRun(run) ? yield* handedOffBy(place, record.workspace, name) : folderPlace(runsDir()).handOff(run, name);
     if (unhanded === undefined) {
-      run.steps[name] = { ...record, handedOff: record.taskId! };
+      run.steps[name] = { ...record, handedOff: record.taskId };
       marked = true;
     }
     collected.push(...(unhanded === undefined ? [] : [`${name}: ${unhanded}`]), ...collectArtifacts(run, name, r.signedOff(name)));
@@ -553,9 +558,10 @@ function readFiles(run: Run, r: PassReads): { read: number; notes: string[] } {
   const notes: string[] = [];
   for (const name of due) {
     const record = run.steps[name];
+    if (!record?.taskId) continue;
     const lacked = filesLacked(run, name, r.signedOff(name));
     const why = Object.fromEntries(lacked.map((file) => [file.path, file.why]));
-    run.steps[name] = { ...record, filesRead: { taskId: record.taskId!, lacked: why } };
+    run.steps[name] = { ...record, filesRead: { taskId: record.taskId, lacked: why } };
     if (lacked.length) {
       notes.push(`${name}: its closeout named ${lacked.map((file) => file.path).join(', ')}, which the run does not have — not accepted`);
     }
@@ -660,12 +666,10 @@ const admit = Effect.fnUntraced(function* (
 
 /** Write when the cap first held the run (`slotHeldAt`), and say so once, while the pass may file still: answers whether it did. */
 function holdFirst(f: Filing, held: RunSlot | undefined, ready: readonly string[]): boolean {
-  const heldFirst = Boolean(held && !f.run.slotHeldAt && f.mayFile());
-  if (heldFirst) {
-    f.run.slotHeldAt = new Date().toISOString();
-    f.notes.push(`${ready.join(', ')}: ${slotWord(held!)} — filed once a run in flight settles`);
-  }
-  return heldFirst;
+  if (!held || f.run.slotHeldAt || !f.mayFile()) return false;
+  f.run.slotHeldAt = new Date().toISOString();
+  f.notes.push(`${ready.join(', ')}: ${slotWord(held)} — filed once a run in flight settles`);
+  return true;
 }
 
 /** Whether `run` reads other runs: one it waits on (`waitedOn`), or one it is handed as context before it starts. */
@@ -722,7 +726,7 @@ function answerOf(
   const { filed, checked, tried, looped, notes, feed } = done;
   const { status, unreachable } = assessed;
   const inFlight = !takesNoSlot(steps) && (admission.need.inFlight || [filed, checked, tried, looped].some((names) => names.length > 0));
-  const ending = steps.find((s) => s.workspace === 'main');
+  const ending = steps.find((s) => endsOnBase(s));
   const facts: RestFacts = {
     run,
     status,
@@ -764,4 +768,9 @@ function answerOf(
  * waits for, read off this one function.
  */
 export const handOffOwed = (steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] =>
-  run.pruned ? [] : handOffDue(steps, run, phaseOf).filter((name) => fs.existsSync(run.steps[name].workspace!));
+  run.pruned
+    ? []
+    : handOffDue(steps, run, phaseOf).filter((name) => {
+        const workspace = run.steps[name]?.workspace;
+        return workspace !== undefined && fs.existsSync(workspace);
+      });

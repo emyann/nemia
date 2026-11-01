@@ -1,12 +1,13 @@
 /**
  * The packages whose source is under `noUncheckedIndexedAccess`, held there. TypeScript types `arr[i]` and `record[key]` as always
  * present unless the flag is on, and `x!` puts the hole back: so each package in `CHECKED` has the flag in its main tsconfig, keeps every
- * non-test file of its `src/` and `bin/` in that config (a file moved to the tests' config, which leaves the flag off, escapes it), and
- * has a block of `.oxlintrc.json` refusing a non-null assertion over that source. A package joins `CHECKED` in the card that turns the
- * flag on for it.
+ * non-test file of its source (each of `src/`, `bin/` and `place/` it has) in that config (a file moved to the tests' config, which
+ * leaves the flag off, escapes it), and has a block of `.oxlintrc.json` refusing a non-null assertion over each of those folders. A
+ * package joins `CHECKED` in the card that turns the flag on for it: the runtime, the orchestrator and the api, each with its tests under
+ * a `test/tsconfig.json` of their own that leaves the flag off.
  *
- * The test reads files outside this package. `turbo.json` makes `.oxlintrc.json` and the runtime's files inputs of this package's tests;
- * after a change anywhere else, `npx turbo run test --force`.
+ * The test reads files outside this package. `turbo.json` makes `.oxlintrc.json`, the runtime's files and the apps' tsconfigs inputs of
+ * this package's tests; after a change anywhere else, `npx turbo run test --force`.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,7 +18,10 @@ import ts from 'typescript';
 const ROOT = path.join(import.meta.dirname, '..', '..', '..');
 
 /** The packages under the flag, by their folder from the repository's root. */
-const CHECKED = ['packages/agent-runtime'];
+const CHECKED = ['packages/agent-runtime', 'packages/agent-orchestrator', 'apps/api'];
+
+/** The folders that hold a package's source, each one it has. */
+const SOURCE = ['src', 'bin', 'place'];
 
 const RULE = 'typescript/no-non-null-assertion';
 
@@ -25,7 +29,7 @@ type Block = { files: string[]; excludeFiles?: string[]; rules: Record<string, u
 type Lint = { overrides: Block[] };
 
 /** What a package gives the guard: its main tsconfig's parsed options and files, and the non-test files of its source. */
-type Package = { dir: string; options: ts.CompilerOptions; fileNames: string[]; source: string[] };
+type Package = { dir: string; options: ts.CompilerOptions; fileNames: string[]; folders: string[]; source: string[] };
 
 /** Why each package is not held under the flag and the rule, one line a reason; none when every one is. */
 function refusals(packages: Package[], lint: Lint): string[] {
@@ -40,9 +44,10 @@ function refusals(packages: Package[], lint: Lint): string[] {
       out.push(`${file} is left out of ${pkg.dir}/tsconfig.json, so the flag does not read it: take it out of that config's exclude`);
     const last = lint.overrides.filter((block) => RULE in block.rules && block.files.includes(`${pkg.dir}/src/**`)).at(-1);
     const level = Array.isArray(last?.rules[RULE]) ? (last.rules[RULE] as unknown[])[0] : last?.rules[RULE];
-    if (last === undefined || level !== 'error' || !last.files.includes(`${pkg.dir}/bin/**`))
+    const globs = pkg.folders.map((folder) => `${pkg.dir}/${folder}/**`);
+    if (last === undefined || level !== 'error' || !globs.every((glob) => last.files.includes(glob)))
       out.push(
-        `.oxlintrc.json does not refuse a non-null assertion in ${pkg.dir}: add a block setting "${RULE}": "error" on its src/** and bin/**`,
+        `.oxlintrc.json does not refuse a non-null assertion in ${pkg.dir}: add a block setting "${RULE}": "error" on ${globs.join(', ')}`,
       );
     return out;
   });
@@ -63,14 +68,13 @@ function readPackage(dir: string): Package {
   if (read.error) throw new Error(ts.flattenDiagnosticMessageText(read.error.messageText, '\n'));
   const parsed = ts.parseJsonConfigFileContent(read.config, ts.sys, abs);
   const fromRoot = (f: string): string => path.relative(ROOT, path.resolve(abs, f)).split(path.sep).join('/');
-  const source = ['src', 'bin']
-    .filter((folder) => fs.existsSync(path.join(abs, folder)))
-    .flatMap((folder) =>
-      (fs.readdirSync(path.join(abs, folder), { recursive: true }) as string[])
-        .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
-        .map((f) => fromRoot(path.join(folder, f))),
-    );
-  return { dir, options: parsed.options, fileNames: parsed.fileNames.map(fromRoot), source };
+  const folders = SOURCE.filter((folder) => fs.existsSync(path.join(abs, folder)));
+  const source = folders.flatMap((folder) =>
+    (fs.readdirSync(path.join(abs, folder), { recursive: true }) as string[])
+      .filter((f) => /\.tsx?$/.test(f) && !/\.test\.tsx?$/.test(f))
+      .map((f) => fromRoot(path.join(folder, f))),
+  );
+  return { dir, options: parsed.options, fileNames: parsed.fileNames.map(fromRoot), folders, source };
 }
 
 const held = (): Package => readPackage('packages/agent-runtime');
@@ -104,6 +108,16 @@ test('REFUSED: a source file the flagged config leaves out', () => {
 test('REFUSED: no lint block refusing a non-null assertion over a checked package', () => {
   const lint = readLint();
   const found = refusals([held()], { overrides: lint.overrides.filter((block) => !(RULE in block.rules)) });
+  assert.equal(found.length, 1);
+  assert.match(found[0] ?? '', /^\.oxlintrc\.json does not refuse/);
+});
+
+test('REFUSED: a package with a place folder whose lint block leaves place/** out', () => {
+  const lint = readLint();
+  const place = 'packages/agent-orchestrator/place/**';
+  const found = refusals([readPackage('packages/agent-orchestrator')], {
+    overrides: lint.overrides.map((block) => ({ ...block, files: block.files.filter((f) => f !== place) })),
+  });
   assert.equal(found.length, 1);
   assert.match(found[0] ?? '', /^\.oxlintrc\.json does not refuse/);
 });

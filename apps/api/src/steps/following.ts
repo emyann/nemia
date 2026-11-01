@@ -145,10 +145,11 @@ export class Followings extends Context.Service<
             const read = yield* caught;
             const snap = { seq: entry.seq, held: entry.held };
             const queued = [...(yield* PubSub.takeUpTo(sub, Number.MAX_SAFE_INTEGER))];
-            const gone = entry.last !== undefined && !queued.some((q) => isLast(q.m));
+            const last = entry.last;
+            const gone = last !== undefined && !queued.some((q) => isLast(q.m));
             return Stream.concat(
               Stream.fromIterable<Relayed>(joinedHead(said, read, queued, snap)),
-              gone ? Stream.make<[Relayed]>(entry.last!) : Stream.fromSubscription(sub).pipe(Stream.map((q) => q.m)),
+              gone ? Stream.make<[Relayed]>(last) : Stream.fromSubscription(sub).pipe(Stream.map((q) => q.m)),
             ).pipe(Stream.takeUntil(isLast));
           }),
         );

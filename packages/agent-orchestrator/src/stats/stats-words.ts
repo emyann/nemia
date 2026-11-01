@@ -35,10 +35,10 @@ const wordsOf = (h: Headline): Record<string, string> => ({
 
 /** Rows of cells in columns, each as wide as its widest cell, two spaces apart. */
 function table(rows: readonly string[][]): string[] {
-  const widths = rows[0].map((_, i) => Math.max(...rows.map((r) => r[i].length)));
+  const widths = (rows[0] ?? []).map((_, i) => Math.max(...rows.map((r) => r[i]?.length ?? 0)));
   return rows.map((r) =>
     r
-      .map((cell, i) => cell.padEnd(widths[i]))
+      .map((cell, i) => cell.padEnd(widths[i] ?? 0))
       .join('  ')
       .trimEnd(),
   );
@@ -51,7 +51,7 @@ function tileLines(g: Group): string[] {
   const then = wordsOf(before);
   return [
     `last 14 days (${last.from} → ${last.to}), against the 14 before (${before.from} → ${before.to})`,
-    ...table(Object.keys(now).map((name) => [`  ${name}`, now[name], `(${then[name]})`])),
+    ...table(Object.entries(now).map(([name, word]) => [`  ${name}`, word, `(${then[name]})`])),
   ];
 }
 

@@ -105,6 +105,10 @@ const diskSamples = (disk: DiskReading): Sample[] => [
   { s: 'disk.size', l: {}, v: disk.size },
 ];
 
+/** The machine's load at each check's start a pass kept, a sample a check; none for a pass that kept no load. */
+const checkLoads = (load: number | undefined, checks: RecentPass['checks']): Sample[] =>
+  load === undefined ? [] : (checks ?? []).map((l): Sample => ({ s: 'check.load', l, v: load }));
+
 /** What one kept pass is sampled into: every series it carries a figure of, none for a figure an older tick did not keep. */
 export const samplesOf = (p: RecentPass): Sample[] => [
   { s: 'pass.ms', l: {}, v: p.ms },
@@ -115,7 +119,7 @@ export const samplesOf = (p: RecentPass): Sample[] => [
   { s: 'sessions.admitted', l: {}, v: p.admitted },
   ...(p.waitMs === undefined ? [] : [{ s: 'admission.wait.ms', l: {}, v: p.waitMs } satisfies Sample]),
   ...(p.load === undefined ? [] : [{ s: 'machine.load', l: {}, v: p.load } satisfies Sample]),
-  ...(p.load === undefined ? [] : (p.checks ?? []).map((l): Sample => ({ s: 'check.load', l, v: p.load! }))),
+  ...checkLoads(p.load, p.checks),
   ...Object.entries(p.quota ?? {}).flatMap(([harness, windows]) =>
     Object.entries(windows).map(([window, v]): Sample => ({ s: 'quota.used', l: { harness, window }, v })),
   ),
@@ -131,22 +135,31 @@ const boundsOf = (s: string): readonly number[] | undefined => {
   return series?.kind === 'histogram' ? series.bounds : undefined;
 };
 
-/** The value at `q` of sorted `values`, by nearest rank. */
-const rank = (sorted: readonly number[], q: number): number => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)];
+/** A list that holds one item at least. */
+type NonEmpty<T> = readonly [T, ...T[]];
+
+/** The last item of `items`, which holds one at least. */
+const lastOf = <T>(items: NonEmpty<T>): T => items.at(-1) ?? items[0];
+
+/** The value at `q` of sorted `values`, by nearest rank: the last for a `q` above 1. */
+const rank = (sorted: NonEmpty<number>, q: number): number => sorted[Math.max(0, Math.ceil(q * sorted.length) - 1)] ?? lastOf(sorted);
 
 /** The counts of `values` in the buckets of `bounds`, each in the first whose bound it does not pass, one past the last for the rest. */
 export const bucketsOf = (values: readonly number[], bounds: readonly number[]): number[] => {
   const b = Array.from({ length: bounds.length + 1 }, () => 0);
   for (const v of values) {
     const at = bounds.findIndex((le) => v <= le);
-    b[at < 0 ? bounds.length : at]++;
+    const k = at < 0 ? bounds.length : at;
+    b[k] = (b[k] ?? 0) + 1;
   }
   return b;
 };
 
 /** One line of `values` (in their order) over the span from `t`: exact percentiles and its buckets for a histogram. */
-const lineOf = (t: string, s: string, l: Labels, values: readonly number[]): RollupLine => {
-  const sorted = [...values].sort((a, b) => a - b);
+const lineOf = (t: string, s: string, l: Labels, values: NonEmpty<number>): RollupLine => {
+  const [head, ...tail] = values;
+  const copy: [number, ...number[]] = [head, ...tail];
+  const sorted = copy.sort((a, b) => a - b);
   const bounds = boundsOf(s);
   return {
     t,
@@ -155,18 +168,19 @@ const lineOf = (t: string, s: string, l: Labels, values: readonly number[]): Rol
     n: values.length,
     sum: values.reduce((n, v) => n + v, 0),
     min: sorted[0],
-    max: sorted.at(-1)!,
-    last: values.at(-1)!,
+    max: lastOf(sorted),
+    last: lastOf(values),
     ...(bounds ? { b: bucketsOf(values, bounds), p50: rank(sorted, 0.5), p95: rank(sorted, 0.95) } : {}),
   };
 };
 
 /** `items` grouped by `key`, in the order each key was first met. */
-const grouped = <T>(items: readonly T[], key: (item: T) => string): T[][] => {
-  const groups = new Map<string, T[]>();
+const grouped = <T>(items: readonly T[], key: (item: T) => string): Array<NonEmpty<T>> => {
+  const groups = new Map<string, NonEmpty<T>>();
   for (const item of items) {
     const k = key(item);
-    groups.set(k, [...(groups.get(k) ?? []), item]);
+    const was = groups.get(k);
+    groups.set(k, was ? [...was, item] : [item]);
   }
   return [...groups.values()];
 };
@@ -174,13 +188,8 @@ const grouped = <T>(items: readonly T[], key: (item: T) => string): T[][] => {
 /** The passes of `ring` in the minutes `due`, rolled into a line per minute, series and label set, oldest minute first. */
 export const rollMinutes = (ring: readonly RecentPass[], due: readonly string[]): RollupLine[] =>
   due.flatMap((minute) =>
-    grouped(ring.filter((p) => floorTo(Date.parse(p.at), MINUTE) === minute).flatMap(samplesOf), (x) => keyOf(x.s, x.l)).map((xs) =>
-      lineOf(
-        minute,
-        xs[0].s,
-        xs[0].l,
-        xs.map((x) => x.v),
-      ),
+    grouped(ring.filter((p) => floorTo(Date.parse(p.at), MINUTE) === minute).flatMap(samplesOf), (x) => keyOf(x.s, x.l)).map(
+      ([first, ...rest]) => lineOf(minute, first.s, first.l, [first.v, ...rest.map((x) => x.v)]),
     ),
   );
 
@@ -217,26 +226,26 @@ export const percentileOf = (b: readonly number[], bounds: readonly number[], mi
   const n = b.reduce((x, y) => x + y, 0);
   const target = q * n;
   let below = 0;
-  for (let k = 0; k < b.length; k++) {
-    if (b[k] > 0 && below + b[k] >= target) {
-      const lo = Math.max(min, k > 0 ? bounds[k - 1] : min);
-      const hi = Math.min(max, k < bounds.length ? bounds[k] : max);
-      return lo + (hi - lo) * Math.min(1, Math.max(0, (target - below) / b[k]));
+  for (const [k, count] of b.entries()) {
+    if (count > 0 && below + count >= target) {
+      const lo = Math.max(min, bounds[k - 1] ?? min);
+      const hi = Math.min(max, bounds[k] ?? max);
+      return lo + (hi - lo) * Math.min(1, Math.max(0, (target - below) / count));
     }
-    below += b[k];
+    below += count;
   }
   return max;
 };
 
 /** Lines of one series and label set merged into one over the span from `t`: counts and sums added, extremes folded, buckets added. */
-const merged = (t: string, lines: readonly RollupLine[]): RollupLine => {
+const merged = (t: string, lines: NonEmpty<RollupLine>): RollupLine => {
   const [first] = lines;
   const min = Math.min(...lines.map((x) => x.min));
   const max = Math.max(...lines.map((x) => x.max));
   const bounds = boundsOf(first.s);
   const buckets =
     bounds && lines.every((x) => x.b?.length === bounds.length + 1)
-      ? Array.from({ length: bounds.length + 1 }, (_, k) => lines.reduce((n, x) => n + x.b![k], 0))
+      ? Array.from({ length: bounds.length + 1 }, (_, k) => lines.reduce((n, x) => n + (x.b?.[k] ?? 0), 0))
       : undefined;
   return {
     t,
@@ -246,7 +255,7 @@ const merged = (t: string, lines: readonly RollupLine[]): RollupLine => {
     sum: lines.reduce((n, x) => n + x.sum, 0),
     min,
     max,
-    last: lines.at(-1)!.last,
+    last: lastOf(lines).last,
     ...(bounds && buckets
       ? { b: buckets, p50: percentileOf(buckets, bounds, min, max, 0.5), p95: percentileOf(buckets, bounds, min, max, 0.95) }
       : {}),
@@ -309,7 +318,7 @@ export type SeriesRead = {
   series: Array<{ s: string; l: Labels; points: SeriesPoint[] }>;
 };
 
-const SPAN_WORD = { [MINUTE]: 'minute', [HOUR]: 'hour', [DAY]: 'day' } as Record<number, SeriesRead['span']>;
+const SPAN_WORD = { [MINUTE]: 'minute', [HOUR]: 'hour', [DAY]: 'day' } as const satisfies Record<number, SeriesRead['span']>;
 
 /** A line as a point. */
 const pointOf = (x: RollupLine): SeriesPoint => ({
@@ -358,13 +367,8 @@ export type Health = {
 
 /** The lines of one series, every label set, merged into one, or none. */
 const whole = (lines: readonly RollupLine[], s: SeriesName): RollupLine | undefined => {
-  const of = lines.filter((x) => x.s === s);
-  return of.length
-    ? merged(
-        of[0].t,
-        of.map((x) => ({ ...x, l: {} })),
-      )
-    : undefined;
+  const [first, ...rest] = lines.flatMap((x) => (x.s === s ? [{ ...x, l: {} }] : []));
+  return first ? merged(first.t, [first, ...rest]) : undefined;
 };
 
 /** The period's health (`Health`) from its lines, oldest first. */
@@ -385,7 +389,7 @@ export const healthOf = (lines: readonly RollupLine[]): Health => {
     ).map((xs) => ({
       harness: xs[0].l.harness ?? '',
       window: xs[0].l.window ?? '',
-      latest: xs.at(-1)!.last,
+      latest: lastOf(xs).last,
       peak: Math.max(...xs.map((x) => x.max)),
     })),
   };
@@ -404,8 +408,9 @@ export const seriesLines = (read: SeriesRead): string[] =>
   read.series.length
     ? [
         `${read.range}, a point a ${read.span}, from ${read.from} to ${read.to}:`,
-        ...read.series.map(({ s, l, points }) => {
-          const latest = points.at(-1)!;
+        ...read.series.flatMap(({ s, l, points }) => {
+          const latest = points.at(-1);
+          if (latest === undefined) return [];
           const top = Math.max(...points.map((p) => p.max));
           return `  ${[s, labelWords(l)].filter(Boolean).join(' ')}: ${points.length} points, latest ${round(latest.p95 ?? latest.last)}, highest ${round(top)}`;
         }),

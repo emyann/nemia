@@ -375,6 +375,8 @@ export const CONCLUDED: Command<Concluded> = {
       throw new Missing({ message: `nemia concluded ${id}: the store has no run ${id}. It takes a run by its id — nemia ls lists them.` });
     const git = yield* standingLive([yield* (yield* RunDoor).runs.read(RunId.read(id))]);
     const [parent] = yield* parentCloseouts(yield* EngineService, [id], 'read', git);
+    if (parent === undefined)
+      throw new Missing({ message: `nemia concluded ${id}: nothing was read of run ${id}. See what it holds with nemia ls ${id}.` });
     return { run: id, landed: parent.landed, section: contextSection(parent) };
   }),
   print: ({ section }) => [section.replace(/^\n+/, '')],

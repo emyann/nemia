@@ -19,6 +19,7 @@ import { givenSkillOf, SKILL_NAME } from '../keys/index.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { copySkillFiles, entriesOf, isBuiltinPlace, lookupRoots, PLACE_SKILLS, skillsFor } from '../skills/read.store.ts';
 import { splitFrontmatter } from '../step/step.ts';
+import { firstPiece } from '../piece/piece.ts';
 import { ARCHIVE_LIMIT, contentDigest, packArchive, pathRefusals, unpackArchive, type TreeFile } from '../archive/archive.ts';
 import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source, type StepSource } from './index.ts';
 
@@ -65,11 +66,12 @@ function parseDocument(file: string, text: string, problems: Problem[]): Parsed 
   const errors = docs.flatMap((doc) => doc.errors);
   for (const error of errors) {
     const [at] = error.linePos ?? [];
-    problems.push({ file, line: at?.line, col: at?.col, message: `does not parse: ${error.message.split('\n')[0]}` });
+    problems.push({ file, line: at?.line, col: at?.col, message: `does not parse: ${firstPiece(error.message, '\n')}` });
   }
   if (errors.length) return undefined;
-  if (docs.length > 1) {
-    const at = lines.linePos(docs[1].range[0]);
+  const second = docs[1];
+  if (second !== undefined) {
+    const at = lines.linePos(second.range[0]);
     problems.push({ file, ...at, message: 'holds a second document, and a file of a template holds one: split it, or remove the second.' });
   }
   return { doc: docs[0], lines };

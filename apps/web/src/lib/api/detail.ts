@@ -206,7 +206,7 @@ export type StepSpec = {
   context: number | null;
   after: string[];
   /**
-   * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's: the step that ends the run, whose
+   * `base` for a step that runs in the repository's own checkout rather than a worktree of the run's: the step that ends the run, whose
    * gate holds before it is filed and whose approval is what files it (`endsTheRun`). Null for every other step.
    */
   workspace: string | null;

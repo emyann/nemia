@@ -130,8 +130,8 @@ export type HandedPart = { kind: 'text'; text: string } | { kind: 'from'; run: s
 function askedOf(lines: readonly string[]): string {
   const at = lines.indexOf('What it was asked, the first line:');
   const open = lines.findIndex((line, i) => i > at && /^`{3,}/.test(line));
-  if (at < 0 || open < 0) return '';
-  const fence = /^`+/.exec(lines[open])![0];
+  const fence = /^`+/.exec(lines[open] ?? '')?.[0];
+  if (at < 0 || fence === undefined) return '';
   const close = lines.findIndex((line, i) => i > open && line.trim() === fence);
   return lines.slice(open + 1, close < 0 ? undefined : close).join('\n');
 }
@@ -157,7 +157,7 @@ export function handedParts(task: string): HandedPart[] {
     if (fence !== null) {
       if (line.trim() === fence) fence = null;
     } else if (/^`{3,}/.test(line)) {
-      fence = /^`+/.exec(line)![0];
+      fence = /^`+/.exec(line)?.[0] ?? null;
     } else if (line.startsWith('## ')) {
       parts.push(...partOf(run, lines));
       run = /^## From run (\S+)\s*$/.exec(line)?.[1] ?? null;

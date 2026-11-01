@@ -50,10 +50,14 @@ import {
 import {
   codexModeWritten,
   codexSandboxNamed,
+  refuseFenceBlock,
+  fencedPairs,
   FORMER_KEYS,
   formerKeyWritten,
   placeSpelled,
   placeWritten,
+  baseSpelled,
+  baseWritten,
   readKeys,
   type Spelled,
 } from '../former/former.ts';
@@ -61,7 +65,7 @@ import type { Agent, Agents, SkillsFound } from '../agents/agents.ts';
 import { headedLayers } from './layers.ts';
 import { tallyOf } from '../tally/tally.ts';
 import { mergedOutput } from '../keys/index.ts';
-import { addedSkillsRefusal, agentDeniesOf, deniesWith, fenceRefusal, ownDenies, refuseUnwritable } from './fence.ts';
+import { addedSkillsRefusal, agentDeniesOf, deniesWith, fenceRefusal, offerRefusal, ownDenies, refuseUnwritable } from './fence.ts';
 
 /** A factory's `rules` as a step on `harness` is told them, trimmed: none for blank rules, and none on a remote agent. */
 const rulesTold = (rules: string | undefined, harness: string | undefined): string | undefined =>
@@ -117,14 +121,15 @@ export function parseWorkflow(
   let {
     meta: { agent: written, ...meta },
     spelled,
-  } =
-    block === null
-      ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {} }
-      : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
-  meta = placeSpelled(name, meta);
+    block: fenced,
+  } = block === null
+    ? { meta: {} as Partial<Record<StepKey, string>>, spelled: {}, block: undefined }
+    : readKeys<StepKey>(name, block, (key) => (isStepKey(key) ? undefined : unknownKey(name, key)));
+  meta = baseSpelled(placeSpelled(name, meta));
   placeRequired(name, meta.place);
   const attached = attachedAgent(name, written, hired);
   if (attached === undefined) {
+    refuseFenceBlock(name, fenced, meta.harness);
     if (!own) throw new WorkflowError(`${name}: the body is empty — a step with nothing to say is not a step`);
     const step = stepFrom(name, codexSandboxNamed(name, meta, meta.harness), own, read, spelled);
     if (meta.skills !== undefined)
@@ -136,6 +141,7 @@ export function parseWorkflow(
     return step;
   }
   const agent = agentOf(name, attached, agents, hired);
+  refuseFenceBlock(name, fenced, meta.harness, agent.keys.harness);
   meta = codexSandboxNamed(name, meta, meta.harness ?? agent.keys.harness);
   const inherited = fenceOf(meta) === undefined ? agent.keys : withoutFence(agent.keys);
   const factoryRules = rulesTold(rules, meta.harness ?? agent.keys.harness);
@@ -231,6 +237,8 @@ function agentStepRefusal(
   step: Workflow,
   skills: SkillsFound | undefined,
 ): void {
+  const unoffered = offerRefusal(name, agent, own);
+  if (unoffered !== undefined) refuse(unoffered);
   const loosened = fenceRefusal(name, agent, own, step);
   if (loosened !== undefined) refuse(loosened);
   const by = `${name}: \`agent: ${agent.name}\``;
@@ -465,7 +473,8 @@ const EMPTY_IS_UNSET: readonly StepKey[] = [
  * (`writeWorkflow` parses what it rendered before it writes). Refused here is only what a file cannot hold, which the parser would never
  * see: a key no step has, in the parser's words, since it would be dropped; a comma inside a step's name in `after:` or `input:`, which
  * would be read as two names; and `workspace: folder`, the former spelling of `place: folder`, which the parser reads but nothing writes
- * (`placeWritten`). A line break in a value is no refusal: it is written as a literal block, which holds it.
+ * (`placeWritten`), as `workspace: main` is of `workspace: base` (`baseWritten`). A line break in a value is no refusal: it is written
+ * as a literal block, which holds it.
  *
  * A step with no key and a body that opens on `---` is written after a frontmatter of one blank line: with none before it, the body
  * would be read as the frontmatter, and after an empty one, as its block.
@@ -478,6 +487,7 @@ export function renderStep(step: StepDraft): string {
     refuse(Object.hasOwn(FORMER_KEYS, unknown) ? formerKeyWritten(step.name, unknown) : unknownKey(step.name, unknown));
   if (step.harness === 'codex' && step.permissionMode != null) refuse(codexModeWritten(step.name, step.permissionMode));
   if ((step.workspace as string | undefined) === 'folder') refuse(placeWritten(step.name));
+  if ((step.workspace as string | undefined) === 'main') refuse(baseWritten(step.name));
   const provenance = step.agent != null && typeof step.agent === 'object' ? step.agent : undefined;
   const pairs = STEP_KEYS.flatMap((key): FrontmatterPair[] => {
     const value = writtenValue(step.name, key, key === 'agent' ? (provenance?.name ?? step.agent) : ownValue(step, key));
@@ -485,7 +495,8 @@ export function renderStep(step: StepDraft): string {
     return value === undefined ? [] : [[key, value]];
   });
   const body = String((provenance ? provenance.body : step.body) ?? '').trim();
-  if (pairs.length) return `---\n${renderFrontmatter(pairs)}---\n${body}\n`;
+  if (pairs.length)
+    return `---\n${renderFrontmatter(fencedPairs(pairs, step.harness == null ? undefined : String(step.harness).trim()))}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : `${body}\n`;
 }
 

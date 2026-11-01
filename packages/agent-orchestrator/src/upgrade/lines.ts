@@ -19,16 +19,16 @@ function matched(a: readonly string[], b: readonly string[]): number[] {
   const rows = a.length + 1;
   const cols = b.length + 1;
   const table = new Uint32Array(rows * cols);
+  const cell = (i: number, j: number): number => table[i * cols + j] ?? 0;
   for (let i = a.length - 1; i >= 0; i--)
     for (let j = b.length - 1; j >= 0; j--)
-      table[i * cols + j] =
-        a[i] === b[j] ? table[(i + 1) * cols + j + 1] + 1 : Math.max(table[(i + 1) * cols + j], table[i * cols + j + 1]);
+      table[i * cols + j] = a[i] === b[j] ? cell(i + 1, j + 1) + 1 : Math.max(cell(i + 1, j), cell(i, j + 1));
   const pairs: number[] = Array.from({ length: a.length }, () => -1);
   let i = 0;
   let j = 0;
   while (i < a.length && j < b.length) {
     if (a[i] === b[j]) pairs[i++] = j++;
-    else if (table[(i + 1) * cols + j] >= table[i * cols + j + 1]) i++;
+    else if (cell(i + 1, j) >= cell(i, j + 1)) i++;
     else j++;
   }
   return pairs;
@@ -65,8 +65,9 @@ export function diff3Lines(base: readonly string[], ours: readonly string[], the
   let j = 0;
   let k = 0;
   while (i < base.length || j < ours.length || k < theirs.length) {
-    if (i < base.length && toOurs[i] === j && toTheirs[i] === k) {
-      segments.push({ clean: [base[i]] });
+    const line = base[i];
+    if (line !== undefined && toOurs[i] === j && toTheirs[i] === k) {
+      segments.push({ clean: [line] });
       i++;
       j++;
       k++;
@@ -74,8 +75,8 @@ export function diff3Lines(base: readonly string[], ours: readonly string[], the
     }
     let s = i;
     while (s < base.length && (toOurs[s] === -1 || toTheirs[s] === -1)) s++;
-    const o = s < base.length ? toOurs[s] : ours.length;
-    const t = s < base.length ? toTheirs[s] : theirs.length;
+    const o = toOurs[s] ?? ours.length;
+    const t = toTheirs[s] ?? theirs.length;
     segments.push(chunkOf(i, base.slice(i, s), ours.slice(j, o), theirs.slice(k, t)));
     i = s;
     j = o;

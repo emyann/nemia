@@ -51,7 +51,7 @@ const RUN: WaitingRun = {
   id: 'lay-the-diamond-top-e2e4',
   repo: '/code/app',
   factory: 'nemia',
-  place: 'repository',
+  place: 'git',
   work: null,
   brief: 'A title that runs over the copy control of its card',
   workflowDir: '/code/app/workflows/dev',

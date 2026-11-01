@@ -342,7 +342,8 @@ export function startFactory(named: string | undefined, at: string, fix: string)
   if (named !== undefined) return { factory: readFactory(named) };
   const { factories, unread } = readable();
   const holding = factoriesHolding(factories, at);
-  if (holding.length === 1) return holding[0];
+  const [only] = holding;
+  if (holding.length === 1 && only !== undefined) return only;
   if (holding.length > 1) throw new Invalid({ message: ambiguousFactoryRefusal(at, holding, fix) });
   if (defaultStartsAllowed()) return {};
   throw new Invalid({

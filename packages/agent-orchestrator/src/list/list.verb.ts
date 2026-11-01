@@ -55,7 +55,7 @@ import { currentTasks, finishingAmong, type Pause, type Paused, type PauseHeld, 
  * @param standings Where each result branch stands against the base branch, asked once the run's status is known; left out, every result
  *   branch of the run, as `git` reads it (`standingsOf`).
  * @param slot The cap on runs in flight holding this run (`runSlots`), said where `waiting` would be; left out, none.
- * @param checkout Where the branches stand, as `git` was read off it, to read the run whose `workspace: main` step holds the repository's
+ * @param checkout Where the branches stand, as `git` was read off it, to read the run whose `workspace: base` step holds the repository's
  *   own checkout over (`checkoutHold`); left out, none is read.
  * @param git The call's branch reader (`standingReader`): what was read of where the result branches stand, never git asked as it goes.
  * @param parent The runs it waits on and is held until, as `parentsRead` read them; left out, read here.
@@ -313,7 +313,8 @@ export const unjudgedOf = Effect.fn('unjudgedOf')(function* (e: Engine, run: Run
   const names = folder === undefined ? stepsOf(run).map((s) => s.name) : Object.keys(run.steps);
   const steps = names.map((name) => ({ name, status: word(run.steps[name]), branch: run.steps[name]?.branch }));
   if (folder !== undefined) return { said: unloadedWords(run.id, folder, by), steps } satisfies Unjudged;
+  if (why === undefined) return undefined;
   const named = (err as { taskId: string }).taskId;
   const own = tasks.find((id) => unreadable.has(id)) ?? tasks.find((id) => id === named);
-  return { said: unjudgedWords(run.id, own, (own && unreadable.get(own)) ?? why!, by), steps } satisfies Unjudged;
+  return { said: unjudgedWords(run.id, own, (own && unreadable.get(own)) ?? why, by), steps } satisfies Unjudged;
 });

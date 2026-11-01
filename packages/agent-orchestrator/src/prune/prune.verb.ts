@@ -11,7 +11,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { Cause, Effect, Exit } from 'effect';
 import { EngineService, type Engine } from '../runtime-client.ts';
 import type { Workflow } from '../step/step.ts';
-import type { MergeState } from '../ending/ending.ts';
+import type { MergeState } from '../place/place.ts';
 import { pruneAgain, pruneRefusal, type PruneFacts, type Pruning } from './prune.ts';
 import { filesPrunedWords, isRepositoryRun, namesInOrder, type RepositoryRun, type Pruned, type Run } from '../record/record.ts';
 import { approvedFirst, landsOnCheck } from '../status/status.ts';
@@ -82,6 +82,8 @@ export const prune = Effect.fn('prune')(function* (
   const ready = yield* sized(judged.ready);
   if (!yes) return prunableOf(ready);
   const [pruned] = yield* freeing([ready]);
+  if (pruned === undefined)
+    throw new Error(`freeing answered no pruning for ${id}, where it answers one for each run it is handed: report it as a bug`);
   return pruned;
 });
 
@@ -125,7 +127,7 @@ export type Judged =
  * (`inventoryUnread`).
  *
  * Read as `nemia rm` reads a run (`forget`), and refused for every reason `pruneRefusal` names: a folder run, a run not over, anything
- * that holds `nemia rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is locked, on no branch with
+ * that holds `nemia rm`, a finished run not merged unless `unmerged`, a hand-off owed, and a worktree that is held, on no branch with
  * something a removal would leave on none, or holds a change no commit has — or whose status does not read. No other run is asked: one
  * waiting on this run reads its record, which stays. A run once pruned is not asked its merge again for its worktrees; for its files it
  * is. A record whose workflow folder is gone is judged without its steps, and `pruneRefusal` says so.
@@ -147,13 +149,13 @@ export const judging = Effect.fn('prune.judging')(function* (
     ...(facts ? { facts } : {}),
   });
   const folder = pruneRefusal(run, { decided: undefined, held: null, owed: [], worktrees: [] });
-  if (!isRepositoryRun(run)) return refused(folder!);
+  if (!isRepositoryRun(run)) return refused(folder ?? '');
 
   const within = resolved(path.join(HOME, 'worktrees', id));
   const steps = frozenSteps(run);
   const place = yield* askRunPlace(run, yield* PlaceService, within);
   if (!('inventory' in place)) return refused(inventoryUnread('prune', id, run.repo, place));
-  const listed = placeWorktrees(run, steps, within, place).filter((w) => !(w.prunable && w.locked === undefined));
+  const listed = placeWorktrees(run, steps, within, place).filter((w) => w.removable !== 'gone');
   const filesAt = artifacts ? runStore.runs.filesAt(id) : undefined;
   if (!listed.length && !filesAt) {
     return { pruning: nothingLeft(run, artifacts), ...(run.pruned ? { left: { run, place, within } } : {}) } satisfies Judged;
@@ -173,8 +175,9 @@ export const judging = Effect.fn('prune.judging')(function* (
  */
 export const sized = Effect.fn('prune.sized')(function* (ready: Ready) {
   const bytes = yield* freedBytes(ready.listed.map((w) => w.path));
-  const worktrees = ready.listed.map((w, k) => ({ path: w.path, bytes: bytes[k] }));
-  const files = ready.filesAt ? { path: ready.filesAt, bytes: (yield* freedBytes([ready.filesAt]))[0] } : undefined;
+  const worktrees = ready.listed.map((w, k) => ({ path: w.path, bytes: bytes[k] ?? 0 }));
+  const [filesBytes = 0] = ready.filesAt ? yield* freedBytes([ready.filesAt]) : [];
+  const files = ready.filesAt ? { path: ready.filesAt, bytes: filesBytes } : undefined;
   return { ...ready, worktrees, ...(files ? { files } : {}) } satisfies Sized;
 });
 
@@ -282,16 +285,16 @@ const judgedOf = Effect.fn('prune.judged')(function* (
 
 /**
  * One worktree as `pruneRefusal` judges it, from what the place's inventory read: its hold (`heldWorktree`), each change it holds
- * uncommitted — and that its status did not read, where it is not locked — and the place's command for it (`say`).
+ * uncommitted — and that its status did not read, where nobody holds it — and the place's command for it (`say`).
  */
 function pruneFact(run: RepositoryRun, place: RunPlaceRead, w: Held): PruneFacts['worktrees'][number] {
   const hold = heldWorktree(w);
   const fix = !hold
     ? sayFilled(place.say.inspect, { path: w.path })
-    : 'locked' in hold
+    : 'heldBy' in hold
       ? sayFilled(place.say.unlock, { repo: run.repo, path: w.path })
       : sayFilled(place.say.attach, { path: w.path });
-  const unread = w.locked === undefined && w.clean === null ? ['(its status could not be read)'] : [];
+  const unread = w.removable !== 'held' && w.clean === null ? ['(its status could not be read)'] : [];
   const changes = [...(w.changes ?? []), ...unread];
   return { path: w.path, ...hold, ...(changes.length ? { changes } : {}), fix };
 }
@@ -370,10 +373,11 @@ function markWith(theirs: Pruned | undefined, went: Pruning['worktrees'], freed:
  * @returns What was done with each, in the order given.
  */
 export const freeing = Effect.fn('prune.freeing')(function* (ready: readonly Sized[]) {
-  if (!ready.length) return [];
+  const [first] = ready;
+  if (first === undefined) return [];
   const now = new Date().toISOString();
   const all = ready.map((r) => marked(r, now));
-  const [{ run, place }] = ready;
+  const { run, place } = first;
   const outcome = yield* place.place.ask('remove', {
     repo: run.repo,
     workspaces: ready.flatMap((r) => r.worktrees.map((w) => w.path)),
@@ -397,7 +401,7 @@ const finished = Effect.fnUntraced(function* (r: Marked, outcome: PlaceOutcome<'
     id: r.run.id,
     kind: 'pruned',
     worktrees: removed,
-    ...(filesWent ? { artifacts: { path: r.files!.path, bytes: files.freed } } : {}),
+    ...(filesWent && r.files ? { artifacts: { path: r.files.path, bytes: files.freed } } : {}),
     left,
     at: r.mine.at,
     ...(r.unmerged ? { unmerged: true as const } : {}),
@@ -431,7 +435,7 @@ function removedOf(
 const removeFiles = Effect.fnUntraced(function* (id: string, kept: { path: string; bytes: number }) {
   const why = runStore.runs.dropFiles(id);
   if (why === null) return { freed: kept.bytes };
-  const still = (yield* freedBytes([kept.path]))[0];
+  const [still = 0] = yield* freedBytes([kept.path]);
   return { freed: Math.max(0, kept.bytes - still), left: { path: kept.path, files: why } satisfies Pruning['left'][number] };
 });
 
@@ -526,13 +530,18 @@ const turned = Effect.fnUntraced(function* (
   );
   yield* forgottenGone(
     judged.flatMap((l) => ('left' in l && l.left ? [l.left] : [])),
-    new Set(groups.map(({ group }) => group[0].run.repo)),
+    new Set(groups.flatMap(({ group }) => group.slice(0, 1).map((r) => r.run.repo))),
   );
   const done = new Map<string, Turned>();
   for (const { group, exit } of groups) {
     group.forEach((r, k) => {
       const id = r.run.id;
-      done.set(id, Exit.isSuccess(exit) ? { id, pruning: exit.value[k] } : { id, failed: Cause.squash(exit.cause) });
+      if (!Exit.isSuccess(exit)) {
+        done.set(id, { id, failed: Cause.squash(exit.cause) });
+        return;
+      }
+      const pruning = exit.value[k];
+      if (pruning !== undefined) done.set(id, { id, pruning });
     });
   }
   return judged.map((l): Turned => done.get(l.id) ?? ('failed' in l ? l : { id: l.id, pruning: l.pruning }));

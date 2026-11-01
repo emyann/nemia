@@ -69,14 +69,19 @@ export type FolderRun = RunBase & {
   stagedFile?: undefined;
 };
 
-/** The kinds of workspace a run's steps work in: `repository`, which a record without `place` is, and `folder`. */
-export type PlaceKind = 'repository' | 'folder';
+/**
+ * The kinds of place a run's steps work in, as a step's `place:` says them: `git`, which a record without `place` is, and `folder`. Held
+ * here, in a pure file the package's entries reach, and decoded by the place's model (`PlaceKind`, place/place.model.ts), which a pure
+ * file may not import (test/boundary.test.ts).
+ */
+export const PLACE_KINDS = ['git', 'folder'] as const;
+export type PlaceKind = (typeof PLACE_KINDS)[number];
 
 /** Which kind of workspace a run's steps work in. Pure. */
-export const placeOf = (run: Pick<Run, 'place'>): PlaceKind => run.place?.kind ?? 'repository';
+export const placeOf = (run: Pick<Run, 'place'>): PlaceKind => run.place?.kind ?? 'git';
 
 /** Whether a run is a repository run: what reading its repository, base and branches needs. */
-export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) === 'repository';
+export const isRepositoryRun = (run: Run): run is RepositoryRun => placeOf(run) === 'git';
 
 type RunBase = {
   id: string;
@@ -383,7 +388,7 @@ export const taskTryOf = (run: Run, step: string): number => {
 export const turnTryOf = (run: Run, step: string): number => {
   const tries = run.steps[step]?.tries ?? [];
   let at = tries.length + 1;
-  while (at > 1 && tries[at - 2].cause === 'recheck') at--;
+  while (at > 1 && tries[at - 2]?.cause === 'recheck') at--;
   return at;
 };
 

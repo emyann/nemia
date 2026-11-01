@@ -40,6 +40,8 @@ import { bareSkillOf, composedRefusal, serverNamesOf, serversRefusal, SKILL_NAME
 import {
   codexModeWritten,
   codexSandboxNamed,
+  refuseFenceBlock,
+  fencedPairs,
   FORMER_HARNESS_PROMPTS,
   FORMER_KEYS,
   FORMER_OWN_KEYS,
@@ -47,7 +49,7 @@ import {
   harnessPromptNamed,
   readKeys,
 } from '../former/former.ts';
-import { headedLayers, stepFrom } from '../workflow/index.ts';
+import { headedLayers, OVERRIDABLE, stepFrom, type Overridable } from '../workflow/index.ts';
 import type { AgentSkill } from '../skills/skills.ts';
 import { frontmatterOrNull, renderFrontmatter, type FrontmatterPair } from '../frontmatter/frontmatter.ts';
 import { DEFAULT_HARNESS, isRemoteHarness } from '../harness/harness.ts';
@@ -67,6 +69,7 @@ export const AGENT_KEYS = [
   'skills',
   'harnessPrompt',
   'mcp',
+  'overridable',
   'harness',
   'model',
   'effort',
@@ -87,7 +90,7 @@ export type AgentKey = (typeof AGENT_KEYS)[number];
  * (`apps/api/src/workflows/builder.ts`'s `ROLE_KEYS` and `apps/api/src/agents/agents.ts`'s, off this list; `apps/web/src/lib/agents.ts` by
  * hand).
  */
-export const AGENT_OWN_KEYS = ['role', 'description', 'skills', 'harnessPrompt', 'mcp'] as const;
+export const AGENT_OWN_KEYS = ['role', 'description', 'skills', 'harnessPrompt', 'mcp', 'overridable'] as const;
 export type AgentOwnKey = (typeof AGENT_OWN_KEYS)[number];
 /** The keys a step takes from its agent: every agent key but its own (`AGENT_OWN_KEYS`). */
 export type RoleKey = Exclude<AgentKey, AgentOwnKey>;
@@ -100,6 +103,7 @@ const OWN_LINE: Record<AgentOwnKey, string> = {
   skills: 'skills',
   harnessPrompt: "Claude Code's prompt",
   mcp: 'MCP servers',
+  overridable: 'what a step may override',
 };
 
 /**
@@ -188,6 +192,11 @@ export type Agent = {
    * step's own line adds: a server is loaded only where an agent or a step names it.
    */
   mcp?: string[];
+  /**
+   * What a step may override of it (`overridable:`, each one of `OVERRIDABLE`): a step that writes anything else is refused at load
+   * (`offerRefusal`). Absent, a step may override everything it takes from the agent, as before the line.
+   */
+  overridable?: Overridable[];
   keys: Partial<Record<RoleKey, string>>;
   body: string;
   /**
@@ -273,21 +282,23 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
       skills: listed,
       harnessPrompt: prompt,
       mcp: servers,
+      overridable: offered,
       systemPrompt: former,
       name: said,
       color: _,
       ...written
     },
     spelled,
-  } =
-    block === null
-      ? { meta: {} as Partial<Record<AgentKey | 'name' | 'color' | 'systemPrompt', string>>, spelled: {} }
-      : readKeys<AgentKey | 'name' | 'color' | 'systemPrompt'>(file, block, (key) => agentKeyRefusal(file, key));
+    block: fenced,
+  } = block === null
+    ? { meta: {} as Partial<Record<AgentKey | 'name' | 'color' | 'systemPrompt', string>>, spelled: {}, block: undefined }
+    : readKeys<AgentKey | 'name' | 'color' | 'systemPrompt'>(file, block, (key) => agentKeyRefusal(file, key));
   if (said !== undefined && said !== name) {
     refuse(
       `${file}: \`name: ${said}\` is not the file's name, and an agent is named by its file: a step names this one \`agent: ${name}\`. Write \`name: ${name}\`, or delete the line.`,
     );
   }
+  refuseFenceBlock(file, fenced, written.harness);
   if (listed !== undefined && isCardFile(listed)) refuse(cardRetired(file, 'skills', listed));
   const keys = codexSandboxNamed(file, written as Partial<Record<RoleKey, string>>, written.harness);
   const step = stepFrom(file, keys, body, read, spelled);
@@ -308,10 +319,30 @@ export function parseAgent(name: string, text: string, read?: (file: string) => 
     ...(skills !== undefined && { skills }),
     ...(harnessPrompt !== undefined && { harnessPrompt }),
     ...(mcp !== undefined && { mcp }),
+    ...overridableOf(file, offered),
     keys,
     body,
     read: read ?? (() => undefined),
   };
+}
+
+/**
+ * `overridable:` as the agent's field, the list of what a step may override of it, each one of `OVERRIDABLE` — none for no line.
+ * Refused: a word not in the list, naming it and the list.
+ */
+function overridableOf(file: string, written: string | undefined): { overridable?: Overridable[] } {
+  if (written === undefined) return {};
+  const words = written
+    .split(',')
+    .map((word) => word.trim())
+    .filter(Boolean);
+  const unknown = words.find((word) => !(OVERRIDABLE as readonly string[]).includes(word));
+  if (unknown !== undefined) {
+    refuse(
+      `${file}: \`overridable: ${written}\` names \`${unknown}\`, which is not something a step may override. A step may override ${OVERRIDABLE.join(', ')}: name those this agent offers, or delete the line, and a step may override all of them.`,
+    );
+  }
+  return { overridable: [...new Set(words)] as Overridable[] };
 }
 
 /** Whether a `skills:` value is a card's file, as the line's former use named one: one `.json` file. No skill's name ends so. */
@@ -339,8 +370,8 @@ function harnessPromptOf(file: string, written: string | undefined, former: stri
       `${file}: \`harnessPrompt: ${written}\` and \`systemPrompt: ${former}\` are both set, and they are one key: \`systemPrompt:\` is the former name of \`harnessPrompt:\`. Keep the \`harnessPrompt:\` line and delete the other.`,
     );
   }
-  if (written === undefined && former === undefined) return undefined;
-  const word = written ?? harnessPromptNamed(former!);
+  const word = written ?? (former === undefined ? undefined : harnessPromptNamed(former));
+  if (word === undefined) return undefined;
   if ((HARNESS_PROMPTS as readonly string[]).includes(word)) return word as HarnessPrompt;
   const line = written === undefined ? `systemPrompt: ${former}` : `harnessPrompt: ${written}`;
   const slip = Object.hasOwn(FORMER_HARNESS_PROMPTS, word)
@@ -365,6 +396,11 @@ export type AgentDraft = {
   harnessPrompt?: string | null;
   /** The MCP servers its sessions load, as written: `playwright, docs`. */
   mcp?: string | null;
+  /**
+   * What a step may override of it, as written: `model, fence, skills`. `null` takes the line out; absent keeps the line its file has
+   * (`writeAgent`), so a page that does not know the line cannot widen the agent's offer by saving.
+   */
+  overridable?: string | null;
   keys: Partial<Record<RoleKey, string | null>>;
   body: string;
 };
@@ -419,11 +455,12 @@ export function renderAgent(draft: AgentDraft): string {
     skills: draft.skills,
     harnessPrompt: draft.harnessPrompt,
     mcp: draft.mcp,
+    overridable: draft.overridable,
   };
   const values: Array<[string, string | null | undefined]> = AGENT_KEYS.map((key) => [key, isOwnKey(key) ? own[key] : keys[key]]);
   const pairs = values.flatMap(([key, value]): FrontmatterPair[] => (value == null ? [] : [[key, String(value).trim()]]));
   const body = String(draft.body ?? '').trim();
-  if (pairs.length) return `---\n${renderFrontmatter(pairs)}---\n${body}\n`;
+  if (pairs.length) return `---\n${renderFrontmatter(fencedPairs(pairs, keys.harness?.trim() || undefined))}---\n${body}\n`;
   return /^---[ \t]*(?:\n|$)/.test(body) ? `---\n\n---\n${body}\n` : body ? `${body}\n` : '';
 }
 
@@ -441,6 +478,7 @@ export function agentDraftOf(name: string, text: string, read?: (file: string) =
     skills: agent.skills?.length ? agent.skills.join(', ') : null,
     harnessPrompt: agent.harnessPrompt ?? null,
     mcp: agent.mcp?.length ? agent.mcp.join(', ') : null,
+    overridable: agent.overridable === undefined ? null : agent.overridable.join(', '),
     keys: agent.keys,
     body: agent.body,
   };
@@ -567,7 +605,7 @@ export const rendersAgent = (step: Workflow): boolean => {
 };
 
 /** What a step's brief opens with: its own note alone when its agent is rendered, its agent's instructions and its note otherwise. */
-export const briefBody = (step: Workflow): string => (rendersAgent(step) ? step.agent!.body : step.body);
+export const briefBody = (step: Workflow): string => (rendersAgent(step) && step.agent ? step.agent.body : step.body);
 
 /**
  * The skills of a step's session by layer, from its frozen record: its agent's own, and those its `skills:` line added (`addedSkills`),
@@ -627,10 +665,14 @@ export type RenderedSkill = { name: string; whole?: string };
  * sees.
  */
 export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[]): string {
-  const agent = step.agent!;
+  const agent = step.agent;
+  if (agent === undefined)
+    refuse(
+      `${step.name} is given no agent, so there is no prompt of one to render: render only a step whose agent is rendered (rendersAgent).`,
+    );
   const plugin = pluginOf(agent.name);
   const named = skills.filter((s) => s.whole === undefined);
-  const whole = skills.filter((s) => s.whole !== undefined);
+  const whole = skills.flatMap((s) => (s.whole === undefined ? [] : [{ name: s.name, whole: s.whole }]));
   const headed = headedLayers([
     ['instructions', agent.instructions],
     ['custom', agent.customInstructions],
@@ -644,7 +686,7 @@ export function renderedPrompt(step: Workflow, skills: readonly RenderedSkill[])
             `Your skills, each loaded with the Skill tool by its name when you need it: ${named.map((s) => `\`${plugin}:${s.name}\``).join(', ')}.`,
           ]
         : []),
-      ...whole.map((s) => `## Skill \`${plugin}:${s.name}\`\n\n${s.whole!.trim()}`),
+      ...whole.map((s) => `## Skill \`${plugin}:${s.name}\`\n\n${s.whole.trim()}`),
     ].join('\n\n') + '\n'
   );
 }
@@ -692,9 +734,10 @@ function sessionSettings(agent: StepAgent): string | undefined {
  */
 export const enabledSkillsOf = (step: Workflow): string[] | 'default' => {
   if ((step.harness ?? DEFAULT_HARNESS) !== DEFAULT_HARNESS) return 'default';
-  if (!rendersAgent(step)) return [];
-  const plugin = pluginOf(step.agent!.name);
-  return [...new Set((step.agent!.skills ?? []).map((name) => `${plugin}:${bareSkillOf(name)}`))];
+  const agent = step.agent;
+  if (!rendersAgent(step) || agent === undefined) return [];
+  const plugin = pluginOf(agent.name);
+  return [...new Set((agent.skills ?? []).map((name) => `${plugin}:${bareSkillOf(name)}`))];
 };
 
 /**
@@ -707,8 +750,8 @@ export function renderedFlags(
   step: Workflow,
   dir: string,
 ): { appendSystemPromptFile?: string; systemPromptFile?: string; pluginDir?: string[]; settings?: string } | undefined {
-  if (!rendersAgent(step)) return undefined;
-  const agent = step.agent!;
+  const agent = step.agent;
+  if (!rendersAgent(step) || agent === undefined) return undefined;
   const prompt = path.join(dir, PROMPT_FILE);
   const plugin = pluginOf(agent.name);
   const told = Boolean(toldWords(agent) || agent.skills?.length);

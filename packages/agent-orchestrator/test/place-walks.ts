@@ -73,10 +73,14 @@ function repoIn({ world }: Side, area: string, files: Record<string, string> = {
   return { root, base: world.repository(root, files) };
 }
 
-/** A workspace of `root` at `<area>/ws/<step>` on `wf/r/<step>`, cut from `from` with `also` merged in: the request, and its outcome. */
+/**
+ * A workspace of `root` at `<area>/ws/<step>` for the leaf `<step>` of the run `r`, cut from `from` with `also` merged in: the request,
+ * the branch it is on (`name`, as both places name it, `wf/r/<step>`), and its outcome.
+ */
 function cut({ place }: Side, area: string, root: string, step: string, from = 'main', also: readonly string[] = []) {
-  const request = { repo: root, at: path.join(area, 'ws', step), name: `wf/r/${step}`, from, also };
-  return { ...request, made: place.askNow('make', request) };
+  const request = { repo: root, at: path.join(area, 'ws', step), run: 'r', leaf: step, from, also };
+  const made = place.askNow('make', request);
+  return { ...request, name: 'answer' in made ? made.answer.branch : `wf/r/${step}`, made };
 }
 
 /** The answer of `outcome`, which is one. */
@@ -85,12 +89,12 @@ function answerOf<V extends PlaceVerb>(outcome: PlaceOutcome<V>) {
   return outcome.answer;
 }
 
-/** `open` of `root`, its staged file read as whether it is there. */
+/** `open` of `root`, its file of a merge in progress read as whether it is there. */
 function opened({ place }: Side, root: string): unknown {
   const outcome = place.askNow('open', { root, isolate: false });
-  return 'answer' in outcome
-    ? { ...outcome.answer, staged: outcome.answer.staged !== undefined && fs.existsSync(outcome.answer.staged) }
-    : outcome;
+  if (!('answer' in outcome)) return outcome;
+  const { inProgressFile } = outcome.answer;
+  return { ...outcome.answer, inProgressFile: inProgressFile !== undefined && fs.existsSync(inProgressFile) };
 }
 
 /** `standing` of `branches` in `root` against main. */
@@ -156,7 +160,7 @@ const OPEN: readonly Walk[] = [
       const { root, base } = repoIn(side, area);
       return { base, opened: opened(side, root) };
     },
-    says: { base: 'commit-1', opened: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', staged: false } },
+    says: { base: 'commit-1', opened: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', inProgressFile: false } },
   },
   {
     name: 'the staged file is there while a merge is staged, and gone once it is landed or taken back',
@@ -165,19 +169,19 @@ const OPEN: readonly Walk[] = [
       const before = opened(side, root);
       side.world.stage(root, 'work');
       const staged = opened(side, root);
-      side.place.askNow('land', { checkout: root, act: 'commit', message: 'land work' });
+      side.place.askNow('land', { repo: root, act: 'commit', message: 'land work' });
       const landed = opened(side, root);
       side.world.stage(root, 'clash');
       const again = opened(side, root);
-      side.place.askNow('land', { checkout: root, act: 'abort' });
+      side.place.askNow('land', { repo: root, act: 'abort' });
       return { before, staged, landed, again, takenBack: opened(side, root) };
     },
     says: {
-      again: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', staged: true },
-      before: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: false },
-      landed: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', staged: false },
-      staged: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: true },
-      takenBack: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', staged: false },
+      again: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', inProgressFile: true },
+      before: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', inProgressFile: false },
+      landed: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', inProgressFile: false },
+      staged: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', inProgressFile: true },
+      takenBack: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', inProgressFile: false },
     },
   },
   {
@@ -229,7 +233,7 @@ const MAKE: readonly Walk[] = [
       files: { 'a.txt': 'one\n', 'dir/in.txt': 'x\n' },
       head: 'commit-1',
       made: { answer: { branch: 'wf/r/one', conflicts: [], notes: [], workspace: '<area>/ws/one' } },
-      standing: { answer: { branches: [], heads: { main: 'commit-1', 'wf/r/one': 'commit-1' } } },
+      standing: { answer: { branches: [], tips: { main: 'commit-1', 'wf/r/one': 'commit-1' } } },
     },
   },
   {
@@ -334,11 +338,11 @@ const MAKE: readonly Walk[] = [
       const { root } = repoIn(side, area);
       const { at } = cut(side, area, root, 'one');
       const ask = (request: Partial<PlaceRequests['make']>) =>
-        side.place.askNow('make', { repo: root, at, name: 'wf/r/one', from: 'main', also: [], ...request });
+        side.place.askNow('make', { repo: root, at, run: 'r', leaf: 'one', from: 'main', also: [], ...request });
       return [
-        ask({ name: 'wf/r/two' }),
+        ask({ leaf: 'two' }),
         ask({ at: path.join(area, 'ws', 'other') }),
-        ask({ at: path.join(area, 'ws', 'three'), name: 'wf/r/three', from: 'nope' }),
+        ask({ at: path.join(area, 'ws', 'three'), leaf: 'three', from: 'nope' }),
         ask({ repo: path.join(area, 'none') }),
       ];
     },
@@ -517,11 +521,11 @@ const STANDING: readonly Walk[] = [
     },
     says: {
       base: 'commit-1',
-      none: { answer: { branches: [], heads: { main: 'commit-1', 'wf/r/one': 'commit-1' } } },
+      none: { answer: { branches: [], tips: { main: 'commit-1', 'wf/r/one': 'commit-1' } } },
       one: {
         answer: {
           branches: [{ ahead: 0, branch: 'wf/r/one', onBase: 'yes', pastBase: false, tip: 'commit-1' }],
-          heads: { main: 'commit-1', 'wf/r/one': 'commit-1' },
+          tips: { main: 'commit-1', 'wf/r/one': 'commit-1' },
         },
       },
     },
@@ -533,21 +537,21 @@ const STANDING: readonly Walk[] = [
       const asked = [{ branch: 'work', baseRef: base }];
       const ahead = stand(side, root, asked);
       side.world.stage(root, 'work');
-      side.place.askNow('land', { checkout: root, act: 'commit', message: 'land work' });
+      side.place.askNow('land', { repo: root, act: 'commit', message: 'land work' });
       return { base, work, ahead, landed: stand(side, root, asked) };
     },
     says: {
       ahead: {
         answer: {
           branches: [{ ahead: 1, branch: 'work', onBase: 'no', pastBase: null, tip: 'commit-1' }],
-          heads: { clash: 'commit-2', main: 'commit-3', work: 'commit-1' },
+          tips: { clash: 'commit-2', main: 'commit-3', work: 'commit-1' },
         },
       },
       base: 'commit-4',
       landed: {
         answer: {
           branches: [{ ahead: 0, branch: 'work', onBase: 'yes', pastBase: true, tip: 'commit-1' }],
-          heads: { clash: 'commit-2', main: 'commit-5', work: 'commit-1' },
+          tips: { clash: 'commit-2', main: 'commit-5', work: 'commit-1' },
         },
       },
       work: 'commit-1',
@@ -559,7 +563,7 @@ const STANDING: readonly Walk[] = [
       const { root, base, main, work } = forked(side, area);
       const asked = [{ branch: 'work', baseRef: base }];
       side.world.stage(root, 'work');
-      side.place.askNow('land', { checkout: root, act: 'commit', message: 'land work' });
+      side.place.askNow('land', { repo: root, act: 'commit', message: 'land work' });
       fs.writeFileSync(path.join(root, 'a.txt'), 'an edit left uncommitted\n');
       fs.writeFileSync(path.join(root, 'kept.txt'), 'a file no commit knows\n');
       const landed = stand(side, root, asked);
@@ -581,7 +585,7 @@ const STANDING: readonly Walk[] = [
       landed: {
         answer: {
           branches: [{ ahead: 0, branch: 'work', onBase: 'yes', pastBase: true, tip: 'commit-1' }],
-          heads: { clash: 'commit-2', main: 'commit-3', work: 'commit-1' },
+          tips: { clash: 'commit-2', main: 'commit-3', work: 'commit-1' },
         },
       },
       main: 'commit-4',
@@ -593,7 +597,7 @@ const STANDING: readonly Walk[] = [
         standing: {
           answer: {
             branches: [{ ahead: 1, branch: 'work', onBase: 'no', pastBase: null, tip: 'commit-1' }],
-            heads: { clash: 'commit-2', main: 'commit-4', work: 'commit-1' },
+            tips: { clash: 'commit-2', main: 'commit-4', work: 'commit-1' },
           },
         },
         tip: 'commit-4',
@@ -606,7 +610,7 @@ const STANDING: readonly Walk[] = [
         standing: {
           answer: {
             branches: [{ ahead: 1, branch: 'work', onBase: 'no', pastBase: null, tip: 'commit-1' }],
-            heads: { clash: 'commit-2', main: 'commit-4', work: 'commit-1' },
+            tips: { clash: 'commit-2', main: 'commit-4', work: 'commit-1' },
           },
         },
         tip: 'commit-4',
@@ -704,11 +708,11 @@ const STATUS: readonly Walk[] = [
     name: 'nothing staged: no merge, and each tip the checkout does not hold is missing',
     walk: (side, area) => {
       const { root, base, work } = forked(side, area);
-      return { base, work, status: side.place.askNow('status', { checkout: root, tips: { work, landed: base } }) };
+      return { base, work, status: side.place.askNow('status', { repo: root, tips: { work, landed: base } }) };
     },
     says: {
       base: 'commit-1',
-      status: { answer: { conflicted: false, head: 'commit-2', merging: 'none', missing: ['work'] } },
+      status: { answer: { conflicted: false, merging: 'none', missing: ['work'], tip: 'commit-2' } },
       work: 'commit-3',
     },
   },
@@ -717,15 +721,15 @@ const STATUS: readonly Walk[] = [
     walk: (side, area) => {
       const { root, work, clash } = forked(side, area);
       side.world.stage(root, 'work');
-      const ask = (tips: Record<string, string>) => side.place.askNow('status', { checkout: root, tips });
+      const ask = (tips: Record<string, string>) => side.place.askNow('status', { repo: root, tips });
       return { work, clash, ours: ask({ work }), leavesOut: ask({ work, clash }), other: ask({ clash }), none: ask({}) };
     },
     says: {
       clash: 'commit-1',
-      leavesOut: { answer: { conflicted: false, head: 'commit-2', merging: 'ours', missing: ['clash'] } },
-      none: { answer: { conflicted: false, head: 'commit-2', merging: 'other', missing: [] } },
-      other: { answer: { conflicted: false, head: 'commit-2', merging: 'other', missing: ['clash'] } },
-      ours: { answer: { conflicted: false, head: 'commit-2', merging: 'ours', missing: [] } },
+      leavesOut: { answer: { conflicted: false, merging: 'ours', missing: ['clash'], tip: 'commit-2' } },
+      none: { answer: { conflicted: false, merging: 'other', missing: [], tip: 'commit-2' } },
+      other: { answer: { conflicted: false, merging: 'other', missing: ['clash'], tip: 'commit-2' } },
+      ours: { answer: { conflicted: false, merging: 'ours', missing: [], tip: 'commit-2' } },
       work: 'commit-3',
     },
   },
@@ -740,7 +744,7 @@ const STATUS: readonly Walk[] = [
         files: Object.keys(filesIn(root)),
         ours: filesIn(root)['a.txt'] === 'ours\n',
         opened: opened(side, root),
-        status: side.place.askNow('status', { checkout: root, tips: { work } }),
+        status: side.place.askNow('status', { repo: root, tips: { work } }),
       });
       side.world.takeBack(root);
       const nothingTaken = read();
@@ -759,47 +763,47 @@ const STATUS: readonly Walk[] = [
         changes: ['b.txt'],
         files: ['a.txt', 'b.txt'],
         head: 'commit-2',
-        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: true },
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', inProgressFile: true },
         ours: true,
         staged: 'commit-3',
-        status: { answer: { conflicted: false, head: 'commit-2', merging: 'ours', missing: [] } },
+        status: { answer: { conflicted: false, merging: 'ours', missing: [], tip: 'commit-2' } },
       },
       cleanBack: {
         changes: [],
         files: ['a.txt'],
         head: 'commit-2',
-        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: false },
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', inProgressFile: false },
         ours: true,
         staged: null,
-        status: { answer: { conflicted: false, head: 'commit-2', merging: 'none', missing: ['work'] } },
+        status: { answer: { conflicted: false, merging: 'none', missing: ['work'], tip: 'commit-2' } },
       },
       conflicted: {
         changes: ['a.txt'],
         files: ['a.txt'],
         head: 'commit-2',
-        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: true },
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', inProgressFile: true },
         ours: false,
         staged: 'commit-1',
-        status: { answer: { conflicted: true, head: 'commit-2', merging: 'other', missing: ['work'] } },
+        status: { answer: { conflicted: true, merging: 'other', missing: ['work'], tip: 'commit-2' } },
       },
       conflictedBack: {
         changes: [],
         files: ['a.txt'],
         head: 'commit-2',
-        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: false },
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', inProgressFile: false },
         ours: true,
         staged: null,
-        status: { answer: { conflicted: false, head: 'commit-2', merging: 'none', missing: ['work'] } },
+        status: { answer: { conflicted: false, merging: 'none', missing: ['work'], tip: 'commit-2' } },
       },
       main: 'commit-2',
       nothingTaken: {
         changes: [],
         files: ['a.txt'],
         head: 'commit-2',
-        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', staged: false },
+        opened: { baseRef: 'commit-2', branch: 'main', repo: '<area>/repo', inProgressFile: false },
         ours: true,
         staged: null,
-        status: { answer: { conflicted: false, head: 'commit-2', merging: 'none', missing: ['work'] } },
+        status: { answer: { conflicted: false, merging: 'none', missing: ['work'], tip: 'commit-2' } },
       },
       work: 'commit-3',
     },
@@ -809,22 +813,22 @@ const STATUS: readonly Walk[] = [
     walk: (side, area) => {
       const { root, work, clash } = forked(side, area);
       side.world.stage(root, 'clash');
-      const conflicted = side.place.askNow('status', { checkout: root, tips: { clash } });
-      side.place.askNow('land', { checkout: root, act: 'abort' });
+      const conflicted = side.place.askNow('status', { repo: root, tips: { clash } });
+      side.place.askNow('land', { repo: root, act: 'abort' });
       side.world.stage(root, 'work');
-      side.place.askNow('land', { checkout: root, act: 'commit', message: 'land work' });
-      return { conflicted, landed: side.place.askNow('status', { checkout: root, tips: { work } }) };
+      side.place.askNow('land', { repo: root, act: 'commit', message: 'land work' });
+      return { conflicted, landed: side.place.askNow('status', { repo: root, tips: { work } }) };
     },
     says: {
-      conflicted: { answer: { conflicted: true, head: 'commit-1', merging: 'ours', missing: [] } },
-      landed: { answer: { conflicted: false, head: 'commit-2', merging: 'none', missing: [] } },
+      conflicted: { answer: { conflicted: true, merging: 'ours', missing: [], tip: 'commit-1' } },
+      landed: { answer: { conflicted: false, merging: 'none', missing: [], tip: 'commit-2' } },
     },
   },
   {
     name: 'REFUSED: a directory that is no repository, and a path that is none',
     walk: (side, area) => [
-      side.place.askNow('status', { checkout: area, tips: {} }),
-      side.place.askNow('status', { checkout: path.join(area, 'none'), tips: {} }),
+      side.place.askNow('status', { repo: area, tips: {} }),
+      side.place.askNow('status', { repo: path.join(area, 'none'), tips: {} }),
     ],
     says: [{ refused: true }, { refused: true }],
   },
@@ -836,7 +840,7 @@ const LAND: readonly Walk[] = [
     walk: (side, area) => {
       const { root, main, work } = forked(side, area);
       side.world.stage(root, 'work');
-      const landed = side.place.askNow('land', { checkout: root, act: 'commit', message: 'Land work\n\nIt adds b.\n' });
+      const landed = side.place.askNow('land', { repo: root, act: 'commit', message: 'Land work\n\nIt adds b.\n' });
       return { main, work, landed, head: side.world.head(root), commit: side.world.read(root, 'main'), files: filesIn(root) };
     },
     says: {
@@ -855,7 +859,7 @@ const LAND: readonly Walk[] = [
       side.world.stage(root, 'work');
       fs.writeFileSync(path.join(root, 'left.txt'), 'left by the check\n');
       fs.writeFileSync(path.join(root, 'b.txt'), 'edited since\n');
-      const landed = side.place.askNow('land', { checkout: root, act: 'commit', message: 'land work' });
+      const landed = side.place.askNow('land', { repo: root, act: 'commit', message: 'land work' });
       const report = { repo: root, baseRef: main, onto: 'main', branches: ['main'], diffOf: [], present: ['left.txt'], atBase: [] };
       const { files, present } = answerOf(side.place.askNow('report', { ...report, atBase: [] }));
       const after = answerOf(side.place.askNow('report', { ...report, baseRef: 'main', atBase: ['b.txt'] })).atBase;
@@ -870,11 +874,11 @@ const LAND: readonly Walk[] = [
             branch: 'main',
             changes: ['b.txt', 'left.txt'],
             clean: false,
-            detached: false,
-            head: 'commit-1',
             onBranch: true,
             path: '<area>/repo',
-            prunable: false,
+
+            removable: 'yes',
+            tip: 'commit-1',
           },
         ],
       },
@@ -889,11 +893,11 @@ const LAND: readonly Walk[] = [
     walk: (side, area) => {
       const { root, main, clash } = forked(side, area);
       side.world.stage(root, 'clash');
-      const before = side.place.askNow('status', { checkout: root, tips: { clash } });
+      const before = side.place.askNow('status', { repo: root, tips: { clash } });
       fs.writeFileSync(path.join(root, 'a.txt'), 'both\n');
       side.world.resolve(root, 'a.txt');
-      const resolved = side.place.askNow('status', { checkout: root, tips: { clash } });
-      const landed = side.place.askNow('land', { checkout: root, act: 'commit', message: 'land clash' });
+      const resolved = side.place.askNow('status', { repo: root, tips: { clash } });
+      const landed = side.place.askNow('land', { repo: root, act: 'commit', message: 'land clash' });
       const report = { repo: root, baseRef: 'main', onto: 'main', branches: [], diffOf: [], present: [], atBase: ['a.txt'] };
       return {
         main,
@@ -907,18 +911,16 @@ const LAND: readonly Walk[] = [
       };
     },
     says: {
-      before: { answer: { conflicted: true, head: 'commit-1', merging: 'ours', missing: [] } },
+      before: { answer: { conflicted: true, merging: 'ours', missing: [], tip: 'commit-1' } },
       checkout: {
         branches: [],
-        workspaces: [
-          { branch: 'main', clean: true, detached: false, head: 'commit-2', onBranch: true, path: '<area>/repo', prunable: false },
-        ],
+        workspaces: [{ branch: 'main', clean: true, onBranch: true, path: '<area>/repo', removable: 'yes', tip: 'commit-2' }],
       },
       clash: 'commit-3',
       commit: { message: 'land clash', parents: ['commit-1', 'commit-3'] },
       landed: { answer: { commit: 'commit-2' } },
       main: 'commit-1',
-      resolved: { answer: { conflicted: false, head: 'commit-1', merging: 'ours', missing: [] } },
+      resolved: { answer: { conflicted: false, merging: 'ours', missing: [], tip: 'commit-1' } },
       text: { 'a.txt': 'both\n' },
     },
   },
@@ -927,7 +929,7 @@ const LAND: readonly Walk[] = [
     walk: (side, area) => {
       const { root, main } = forked(side, area);
       side.world.stage(root, 'clash');
-      const aborted = side.place.askNow('land', { checkout: root, act: 'abort' });
+      const aborted = side.place.askNow('land', { repo: root, act: 'abort' });
       return { main, aborted, head: side.world.head(root), files: filesIn(root), opened: opened(side, root) };
     },
     says: {
@@ -935,15 +937,15 @@ const LAND: readonly Walk[] = [
       files: { 'a.txt': 'ours\n' },
       head: 'commit-1',
       main: 'commit-1',
-      opened: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', staged: false },
+      opened: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', inProgressFile: false },
     },
   },
   {
     name: 'REFUSED: either act with nothing staged, a commit of a merge still in conflict, which stays staged, and no repository',
     walk: (side, area) => {
       const { root, main } = forked(side, area);
-      const commit = (checkout: string) => side.place.askNow('land', { checkout, act: 'commit', message: 'land' });
-      const nothing = [commit(root), side.place.askNow('land', { checkout: root, act: 'abort' })];
+      const commit = (repo: string) => side.place.askNow('land', { repo, act: 'commit', message: 'land' });
+      const nothing = [commit(root), side.place.askNow('land', { repo: root, act: 'abort' })];
       side.world.stage(root, 'clash');
       return { main, nothing, conflicted: commit(root), head: side.world.head(root), opened: opened(side, root), none: commit(area) };
     },
@@ -953,7 +955,7 @@ const LAND: readonly Walk[] = [
       main: 'commit-1',
       none: { refused: true },
       nothing: [{ refused: true }, { refused: true }],
-      opened: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', staged: true },
+      opened: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', inProgressFile: true },
     },
   },
 ];
@@ -972,14 +974,14 @@ function twoWorkspaces(side: Side, area: string) {
 
 /** `inventory` of `root` under `under`, its workspaces by path. */
 function listed(side: Side, root: string, under: string): unknown {
-  const outcome = side.place.askNow('inventory', { repo: root, under, prefix: 'wf/r/', base: 'main' });
+  const outcome = side.place.askNow('inventory', { repo: root, under, run: 'r', base: 'main' });
   if (!('answer' in outcome)) return outcome;
   return { ...outcome.answer, workspaces: [...outcome.answer.workspaces].sort((a, b) => (a.path < b.path ? -1 : 1)) };
 }
 
 const INVENTORY: readonly Walk[] = [
   {
-    name: 'the workspaces inside `under`, each clean or with the paths it holds uncommitted, and the branches under the prefix, merged or not',
+    name: "the workspaces inside `under`, each clean or with the paths it holds uncommitted, and the run's branches, merged or not",
     walk: (side, area) => {
       const { root, base, committed } = twoWorkspaces(side, area);
       side.world.branch(root, 'other', { 'c.txt': 'three\n' });
@@ -1001,16 +1003,16 @@ const INVENTORY: readonly Walk[] = [
           { branch: 'wf/r/two', merged: false },
         ],
         workspaces: [
-          { branch: 'wf/r/one', clean: true, detached: false, head: 'commit-1', onBranch: true, path: '<area>/ws/one', prunable: false },
+          { branch: 'wf/r/one', clean: true, onBranch: true, path: '<area>/ws/one', removable: 'yes', tip: 'commit-1' },
           {
             branch: 'wf/r/two',
             changes: ['a.txt', 'left.txt'],
             clean: false,
-            detached: false,
-            head: 'commit-2',
             onBranch: true,
             path: '<area>/ws/two',
-            prunable: false,
+
+            removable: 'yes',
+            tip: 'commit-2',
           },
         ],
       },
@@ -1025,10 +1027,40 @@ const INVENTORY: readonly Walk[] = [
       fs.mkdirSync(path.join(at, 'fresh', 'deep'), { recursive: true });
       fs.writeFileSync(path.join(at, 'fresh', 'deep', 'new.txt'), 'new\n');
       fs.writeFileSync(path.join(at, 'fresh', 'other.txt'), 'new\n');
-      const outcome = side.place.askNow('inventory', { repo: root, under: path.join(area, 'ws'), prefix: 'wf/r/', base: 'main' });
+      const outcome = side.place.askNow('inventory', { repo: root, under: path.join(area, 'ws'), run: 'r', base: 'main' });
       return answerOf(outcome).workspaces.map((w) => w.changes);
     },
     says: [['fresh/', 'kept/new.txt']],
+  },
+  {
+    name: "a run's inventory lists the branches its place named for it, `wf/<run>/<leaf>`, and never another run's",
+    walk: (side, area) => {
+      const { root } = repoIn(side, area);
+      const at = (leaf: string) => path.join(area, 'ws', leaf);
+      for (const [run, leaf] of [
+        ['ra', 'one'],
+        ['rb', 'two'],
+        ['ra-x', 'three'],
+      ])
+        side.place.askNow('make', { repo: root, at: at(leaf), run, leaf, from: 'main', also: [] });
+      const branchesOf = (run: string) =>
+        answerOf(side.place.askNow('inventory', { repo: root, under: path.join(area, 'else'), run, base: 'main' })).branches;
+      return { a: branchesOf('ra'), b: branchesOf('rb'), none: branchesOf('rc') };
+    },
+    says: { a: [{ branch: 'wf/ra/one', merged: true }], b: [{ branch: 'wf/rb/two', merged: true }], none: [] },
+  },
+  {
+    name: 'a workspace whose folder is gone is listed `gone`, its status unread; one there is removable, on its branch',
+    walk: (side, area) => {
+      const { root, one } = twoWorkspaces(side, area);
+      fs.rmSync(one.at, { recursive: true });
+      const { workspaces } = answerOf(side.place.askNow('inventory', { repo: root, under: path.join(area, 'ws'), run: 'r', base: 'main' }));
+      return [...workspaces].sort((a, b) => (a.path < b.path ? -1 : 1)).map(({ changes: _changes, ...held }) => held);
+    },
+    says: [
+      { branch: 'wf/r/one', clean: null, onBranch: true, path: '<area>/ws/one', removable: 'gone', tip: 'commit-1' },
+      { branch: 'wf/r/two', clean: false, onBranch: true, path: '<area>/ws/two', removable: 'yes', tip: 'commit-2' },
+    ],
   },
   {
     name: 'a repository that is no directory left nothing: it answers empty',
@@ -1068,20 +1100,20 @@ const REMOVE: readonly Walk[] = [
       left: {
         branches: [{ branch: 'wf/r/two', merged: false }],
         workspaces: [
-          { branch: 'main', clean: true, detached: false, head: 'commit-1', onBranch: true, path: '<area>/repo', prunable: false },
+          { branch: 'main', clean: true, onBranch: true, path: '<area>/repo', removable: 'yes', tip: 'commit-1' },
           {
             branch: 'wf/r/two',
             changes: ['a.txt', 'left.txt'],
             clean: false,
-            detached: false,
-            head: 'commit-2',
             onBranch: true,
             path: '<area>/ws/two',
-            prunable: false,
+
+            removable: 'yes',
+            tip: 'commit-2',
           },
         ],
       },
-      standing: { answer: { branches: [], heads: { main: 'commit-1', 'wf/r/two': 'commit-2' } } },
+      standing: { answer: { branches: [], tips: { main: 'commit-1', 'wf/r/two': 'commit-2' } } },
       there: [false, true],
     },
   },
@@ -1161,7 +1193,7 @@ const SEAL: readonly Walk[] = [
     },
     says: {
       base: 'commit-1',
-      opened: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', staged: false },
+      opened: { baseRef: 'commit-1', branch: 'main', repo: '<area>/repo', inProgressFile: false },
       outcomes: [{ refused: true }, { refused: true }],
     },
   },

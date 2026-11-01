@@ -75,11 +75,12 @@ function readOf(st: State, id: string): Run {
   const record = st.records.get(id);
   if (!record) throw new Missing({ message: `no such run: ${id}  (try 'nemia ls')` });
   const [approvals, acceptances] = [waiting(st, id, 'gate'), waiting(st, id, 'loop')];
+  const [pruned, hold] = [st.pruned.get(id), st.holds.get(id)];
   return {
     ...structuredClone(record),
     ...(st.cancelled.has(id) ? { cancelledAt: st.cancelled.get(id) } : {}),
-    ...(st.pruned.has(id) ? { pruned: structuredClone(st.pruned.get(id)!) } : {}),
-    ...(st.holds.has(id) ? { hold: structuredClone(st.holds.get(id)!) } : {}),
+    ...(pruned !== undefined ? { pruned: structuredClone(pruned) } : {}),
+    ...(hold !== undefined ? { hold: structuredClone(hold) } : {}),
     ...(approvals.length ? { approvals } : {}),
     ...(acceptances.length ? { acceptances } : {}),
   } as Run;
@@ -124,11 +125,12 @@ function runsOf(st: State): RunsLayer['runs'] {
     taken: (id) => [st.records, st.cancelled, st.pruned, st.holds, st.refresh, st.asks].some((m) => m.has(id)),
     calledOff: (id) => st.cancelled.has(id) || st.pruned.has(id) || st.holds.has(id),
     cancel: (id) => {
-      if (!st.cancelled.has(id)) {
-        st.cancelled.set(id, new Date().toISOString());
-        touch(st, id);
-      }
-      return st.cancelled.get(id)!;
+      const at = st.cancelled.get(id);
+      if (at !== undefined) return at;
+      const now = new Date().toISOString();
+      st.cancelled.set(id, now);
+      touch(st, id);
+      return now;
     },
     forget: (id) => forgetOf(st, id),
     ids,
@@ -139,7 +141,10 @@ function runsOf(st: State): RunsLayer['runs'] {
       else st.pruned.delete(id);
       touch(st, id);
     },
-    pruned: (id) => (st.pruned.has(id) ? structuredClone(st.pruned.get(id)!) : undefined),
+    pruned: (id) => {
+      const marker = st.pruned.get(id);
+      return marker === undefined ? undefined : structuredClone(marker);
+    },
   };
 }
 
@@ -197,7 +202,7 @@ function asksGroup(st: State): RunsLayer['asks'] {
         st,
         run.id,
         'base',
-        merges.map((a) => ({ step: a.merge!.target, n: a.merge!.try })),
+        merges.flatMap((a) => (a.merge ? [{ step: a.merge.target, n: a.merge.try }] : [])),
       );
     },
     write: (id, person) => {
@@ -254,7 +259,10 @@ function refreshOf(st: State): RunsLayer['refresh'] {
 function forgettingOf(st: State): RunsLayer['forgetting'] {
   return {
     write: (id, taskIds) => void st.forgetting.set(id, [...taskIds]),
-    read: (id) => (st.forgetting.has(id) ? [...st.forgetting.get(id)!] : undefined),
+    read: (id) => {
+      const taskIds = st.forgetting.get(id);
+      return taskIds === undefined ? undefined : [...taskIds];
+    },
     list: () => [...st.forgetting.keys()].sort(),
     lift: (id) => void st.forgetting.delete(id),
     where: (id) => path.posix.join(MEMORY_ROOT, 'forgetting', `${id}.json`),

@@ -134,10 +134,10 @@ test("a folder run read on the board: listed by its kind and place, its page wit
           listed.map((r) => [r.id, r.place]),
           [
             ['f-notes', 'folder'],
-            ['r-repo', 'repository'],
+            ['r-repo', 'git'],
           ],
         );
-        assert.equal(((await (await app().request('/api/runs/r-repo')).json()) as { place: unknown }).place, 'repository');
+        assert.equal(((await (await app().request('/api/runs/r-repo')).json()) as { place: unknown }).place, 'git');
       } finally {
         fs.rmSync(record);
       }

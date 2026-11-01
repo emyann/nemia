@@ -67,7 +67,7 @@ test('make cuts a worktree at `at` on a new branch from `from`, and answers it w
   const repo = repository();
   const tip = branched(repo, 'wf/r-1/a', 'f', 'a\n');
   const at = atOf('b');
-  assert.deepEqual(madeOf(make({ repo, at, name: 'wf/r-1/b', from: 'wf/r-1/a', also: [] })), {
+  assert.deepEqual(madeOf(make({ repo, at, run: 'r-1', leaf: 'b', from: 'wf/r-1/a', also: [] })), {
     workspace: at,
     branch: 'wf/r-1/b',
     conflicts: [],
@@ -84,7 +84,7 @@ test('make takes up a worktree already at `at` on `name` where it stands, its co
   fs.writeFileSync(path.join(at, 'f'), 'worked\n');
   git(at, 'commit', '-q', '-am', 'work');
   const head = git(at, 'rev-parse', 'HEAD');
-  const asked = { repo, at, name: 'wf/r-1/a', from: 'main', also: [] };
+  const asked = { repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [] };
   assert.deepEqual(madeOf(make(asked)), { workspace: at, branch: 'wf/r-1/a', conflicts: [], notes: [] });
   assert.deepEqual(madeOf(make(asked)), { workspace: at, branch: 'wf/r-1/a', conflicts: [], notes: [] });
   assert.equal(git(at, 'rev-parse', 'HEAD'), head, 'nothing cut again, nothing reset');
@@ -93,16 +93,16 @@ test('make takes up a worktree already at `at` on `name` where it stands, its co
 test('REFUSED: make on a repository that is no directory, on an `at` holding a worktree on another branch, and on a `from` git does not have', () => {
   const repo = repository();
   const nowhere = path.join(scratch('wf-git-make-plain-'), 'nowhere');
-  assert.deepEqual(make({ repo: nowhere, at: atOf('a'), name: 'wf/r-1/a', from: 'main', also: [] }), {
+  assert.deepEqual(make({ repo: nowhere, at: atOf('a'), run: 'r-1', leaf: 'a', from: 'main', also: [] }), {
     refused: `${nowhere} is not a directory, so no workspace can be cut from it`,
   });
   const at = atOf('a');
   git(repo, 'worktree', 'add', '-q', '-b', 'other', at, 'main');
-  assert.deepEqual(make({ repo, at, name: 'wf/r-1/a', from: 'main', also: [] }), {
+  assert.deepEqual(make({ repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [] }), {
     refused: `${at} holds a worktree on other, not on wf/r-1/a: remove it with git worktree remove, then let the run cut it again`,
   });
   const fresh = atOf('b');
-  const outcome = make({ repo, at: fresh, name: 'wf/r-1/b', from: 'no-such-branch', also: [] });
+  const outcome = make({ repo, at: fresh, run: 'r-1', leaf: 'b', from: 'no-such-branch', also: [] });
   assert.ok('refused' in outcome, JSON.stringify(outcome));
   const cut = 'could not be cut on wf/r-1/b from no-such-branch: ';
   assert.ok(outcome.refused.includes(cut), outcome.refused);
@@ -110,7 +110,7 @@ test('REFUSED: make on a repository that is no directory, on an `at` holding a w
 });
 
 test('make is unread for a request whose `also` is no list of strings', () => {
-  const outcome = make({ repo: repository(), at: atOf('a'), name: 'wf/r-1/a', from: 'main' });
+  const outcome = make({ repo: repository(), at: atOf('a'), run: 'r-1', leaf: 'a', from: 'main' });
   assert.ok('unread' in outcome, JSON.stringify(outcome));
   assert.equal(outcome.unread.said, "the request's `also` is missing, where a list of strings is asked");
 });
@@ -121,7 +121,7 @@ test("a fan-in's merges: clean, they answer no conflict; conflicting, the marker
   branched(repo, 'wf/r-1/b', 'g', 'b\n');
   branched(repo, 'wf/r-1/c', 'f', 'c\n');
   const clean = atOf('merge');
-  assert.deepEqual(madeOf(make({ repo, at: clean, name: 'wf/r-1/merge', from: 'wf/r-1/a', also: ['wf/r-1/b'] })), {
+  assert.deepEqual(madeOf(make({ repo, at: clean, run: 'r-1', leaf: 'merge', from: 'wf/r-1/a', also: ['wf/r-1/b'] })), {
     workspace: clean,
     branch: 'wf/r-1/merge',
     conflicts: [],
@@ -131,7 +131,7 @@ test("a fan-in's merges: clean, they answer no conflict; conflicting, the marker
   assert.equal(git(clean, 'status', '--porcelain'), '', 'and committed');
 
   const torn = atOf('torn');
-  const asked = { repo, at: torn, name: 'wf/r-1/torn', from: 'wf/r-1/a', also: ['wf/r-1/c', 'wf/r-1/b'] };
+  const asked = { repo, at: torn, run: 'r-1', leaf: 'torn', from: 'wf/r-1/a', also: ['wf/r-1/c', 'wf/r-1/b'] };
   const made = madeOf(make(asked));
   assert.deepEqual(made.conflicts, ['f']);
   assert.deepEqual(made.notes, [], 'a merge that conflicts is the step’s work, not a note');
@@ -142,7 +142,7 @@ test("a fan-in's merges: clean, they answer no conflict; conflicting, the marker
 test('a merge of a branch git does not have is a note, not a conflict', () => {
   const repo = repository();
   const at = atOf('merge');
-  const made = madeOf(make({ repo, at, name: 'wf/r-1/merge', from: 'main', also: ['wf/r-1/gone'] }));
+  const made = madeOf(make({ repo, at, run: 'r-1', leaf: 'merge', from: 'main', also: ['wf/r-1/gone'] }));
   assert.deepEqual(made.conflicts, []);
   assert.equal(made.notes.length, 1);
   assert.match(made.notes[0], /^merge: wf\/r-1\/gone was not merged — .*wf\/r-1\/gone/);
@@ -165,7 +165,7 @@ test('make copies what .worktreeinclude lists and git ignores, never over a file
   fs.writeFileSync(path.join(at, '.env.local'), 'TOKEN=mine\n');
   const dotGit = fs.readFileSync(path.join(at, '.git'), 'utf8');
 
-  const made = madeOf(make({ repo, at, name: 'wf/r-1/a', from: 'main', also: [] }));
+  const made = madeOf(make({ repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [] }));
   assert.deepEqual(made.notes, [
     '.worktreeinclude: skipped missing.txt — not in the main checkout',
     `.worktreeinclude: refused ".git" is git's own`,
@@ -186,7 +186,7 @@ test('a .worktreeinclude that is no file is a note of make, which cuts all the s
   const repo = repository();
   fs.mkdirSync(path.join(repo, '.worktreeinclude'));
   const at = atOf('a');
-  assert.deepEqual(madeOf(make({ repo, at, name: 'wf/r-1/a', from: 'main', also: [] })).notes, [
+  assert.deepEqual(madeOf(make({ repo, at, run: 'r-1', leaf: 'a', from: 'main', also: [] })).notes, [
     `.worktreeinclude: not read — ${path.join(repo, '.worktreeinclude')} is not a file`,
   ]);
   assert.ok(fs.existsSync(path.join(at, 'f')));

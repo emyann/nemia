@@ -9,13 +9,13 @@ import { hasStarted, runReady } from '../wait/wait.ts';
 import type { Assessment } from '../tick/assess.ts';
 
 /**
- * Which run's `workspace: main` step is working in a repository's own checkout while another run's waits for it (`heldCheckouts`): the run,
+ * Which run's `workspace: base` step is working in a repository's own checkout while another run's waits for it (`heldCheckouts`): the run,
  * and its step.
  */
 export type CheckoutHold = { run: string; step: string };
 
 /**
- * A run's claim on a repository's own checkout on a pass (`checkoutHold` in ending.verb.ts): the `workspace: main` step that works there,
+ * A run's claim on a repository's own checkout on a pass (`checkoutHold` in ending.verb.ts): the `workspace: base` step that works there,
  * the repository, and either `holds` — its task is filed and the engine holds it in flight, so the step is in that checkout now — or `at`,
  * the time of the approval that would file it (`approvalOf`), which is what orders the runs waiting for it.
  */
@@ -26,7 +26,7 @@ export type MainClaim = { id: string; repo: string; step: string; holds: boolean
  *
  * An ending step works in the repository's own checkout, which is one directory on the base branch: two of them at once read the same
  * `git status`, trial merge over each other, and the loser's `git merge --abort` throws away the winner's staged merge. Prose in a
- * `ship.md` is not a constraint, so the machinery holds the second: a run whose `workspace: main` task is in flight has the checkout, and
+ * `ship.md` is not a constraint, so the machinery holds the second: a run whose `workspace: base` task is in flight has the checkout, and
  * every other run of the same repository waiting to file one is held until it settles, and a run in it is never held. With none in it,
  * the oldest approval takes it — then by id — so which pass reads which run first decides nothing.
  *
@@ -40,8 +40,9 @@ export function heldCheckouts(claims: readonly MainClaim[]): Map<string, Checkou
   for (const group of repos.values()) {
     let taken = group.find((c) => c.holds);
     const waiting = group
-      .filter((c) => !c.holds && c.at !== undefined)
-      .sort((a, b) => a.at!.localeCompare(b.at!) || a.id.localeCompare(b.id));
+      .flatMap((c) => (!c.holds && c.at !== undefined ? [{ claim: c, at: c.at }] : []))
+      .sort((a, b) => a.at.localeCompare(b.at) || a.claim.id.localeCompare(b.claim.id))
+      .map(({ claim }) => claim);
     for (const c of waiting) {
       if (!taken) taken = c;
       else if (taken.id !== c.id) held.set(c.id, { run: taken.id, step: taken.step });

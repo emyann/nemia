@@ -24,7 +24,7 @@
  * which finished steps hand their work off on a pass (`handOffDue`).
  */
 import path from 'node:path';
-import type { Workflow } from '../step/step.ts';
+import { endsOnBase, type Workflow } from '../step/step.ts';
 import { placeOf, type Run, type TaskPhase } from '../record/record.ts';
 
 /** One entry of a `node_modules` directory as the runner read it: its name, and a link's target as written. */
@@ -103,7 +103,10 @@ export function depsPlan(
     ...modulesPlan(mainRoot, worktree, '', main),
     ...Object.keys(nested)
       .sort()
-      .flatMap((folder) => modulesPlan(mainRoot, worktree, folder, nested[folder])),
+      .flatMap((folder) => {
+        const listing = nested[folder];
+        return listing ? modulesPlan(mainRoot, worktree, folder, listing) : [];
+      }),
   ];
 }
 
@@ -266,7 +269,7 @@ export function depsLines(deps: Provisioned | undefined): string[] {
  * and later its own check's litter, are in it. Handing the step off before its follower is filed is
  * enough, and `advance` does that in the same pass that files the follower.
  *
- * Never a step that works in the repository's own checkout (`workspace: main`): what lies in a person's
+ * Never a step that works in the repository's own checkout (`workspace: base`): what lies in a person's
  * checkout is not the run's to commit under a step's name, and such a step commits its own work there.
  * And once for each try (`handedOff`): what is in the workspace after the hand-off is a person's, or
  * the next step's, and not this step's to sign.
@@ -274,7 +277,7 @@ export function depsLines(deps: Provisioned | undefined): string[] {
 export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskId: string) => TaskPhase): string[] {
   const finished = ['succeeded', 'failed', 'stopped'];
   return Object.entries(run.steps)
-    .filter(([name]) => steps.find((s) => s.name === name)?.workspace !== 'main')
+    .filter(([name]) => !endsOnBase(steps.find((s) => s.name === name) ?? {}))
     .filter(
       ([name, s]) =>
         s.taskId &&
@@ -291,8 +294,7 @@ export function handOffDue(steps: readonly Workflow[], run: Run, phaseOf: (taskI
 function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
   const found = new Set<string>();
   const queue = [name];
-  while (queue.length) {
-    const current = queue.pop()!;
+  for (let current = queue.pop(); current !== undefined; current = queue.pop()) {
     for (const s of steps) {
       if (s.after.includes(current) && !found.has(s.name)) {
         found.add(s.name);
@@ -317,7 +319,7 @@ function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
  *   - **merge** — a step that waits on SEVERAL steps is a fan-in, so it gets a worktree with all
  *     of their work combined. `after: a, b` means "wait for both" and "give me both". Nobody has
  *     to learn a new key for the thing they already asked for.
- *   - **main** — the one a step says rather than the shape: `workspace: main`, the repository's own
+ *   - **main** — the one a step says rather than the shape: `workspace: base`, the repository's own
  *     checkout, for the last step of a workflow, which acts on the base branch. No worktree is cut,
  *     nothing is merged into it, and the run commits nothing there: what a person's checkout holds is
  *     theirs, and the step commits its own work as they would.
@@ -329,7 +331,7 @@ export type WorkspacePlan =
   | { kind: 'inherit'; from: string }
   | { kind: 'fork'; from: string | null }
   | { kind: 'merge'; from: string; also: string[] }
-  | { kind: 'main' };
+  | { kind: 'base' };
 
 /** The directory inside a folder step's own folder that holds what the run copied in for it: `given/inputs`, `given/from/<step>`. */
 export const GIVEN = 'given';
@@ -358,7 +360,7 @@ export type Given = { inputs: string | null; from: readonly GivenFrom[] };
  * `inherit` chain ends at a step that made one. Pure.
  */
 export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: WorkspacePlan): Given {
-  if (placeOf(run) !== 'folder' || plan.kind === 'main') return { inputs: null, from: [] };
+  if (placeOf(run) !== 'folder' || plan.kind === 'base') return { inputs: null, from: [] };
   const inputs = run.inputs?.length ? `${GIVEN}/inputs` : null;
   if (plan.kind === 'inherit') return { inputs, from: [] };
   const parents = plan.kind === 'merge' ? [plan.from, ...plan.also] : plan.from ? [plan.from] : [];
@@ -372,39 +374,35 @@ export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: Wo
 }
 
 /**
- * Which workspace a step needs (`WorkspacePlan`). Pure. `main` is said by the step (`workspace: main`), never read off the shape; a fan-in
+ * Which workspace a step needs (`WorkspacePlan`). Pure. `main` is said by the step (`workspace: base`), never read off the shape; a fan-in
  * merges onto the first of its parents by name.
  */
 export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {
-  if (step.workspace === 'main') return { kind: 'main' };
-  if (step.after.length === 0) return { kind: 'fork', from: null };
-  if (step.after.length > 1) {
-    const [first, ...also] = [...step.after].sort();
-    return { kind: 'merge', from: first, also };
-  }
+  if (endsOnBase(step)) return { kind: 'base' };
+  const [first, ...also] = [...step.after].sort();
+  if (first === undefined) return { kind: 'fork', from: null };
+  if (also.length) return { kind: 'merge', from: first, also };
 
-  const parent = step.after[0];
+  const parent = first;
   const siblings = steps.filter((s) => s.after.includes(parent));
   return siblings.length === 1 ? { kind: 'inherit', from: parent } : { kind: 'fork', from: parent };
 }
 
-/** The leaf a run's own line of work is cut under: `worktrees/<run>/run` on `wf/<run>/run`. */
+/** The leaf a run's own line of work is cut under: `worktrees/<run>/run`, on the branch its place names for that leaf. */
 export const LINE_NAME = 'run';
 
 /**
- * What a cut of `step` is called — the leaf under `worktrees/<run>/` and `wf/<run>/`. Pure, a function of the frozen step set alone, so a
- * pass that died halfway and a restart name the same cut the same way.
+ * What a cut of `step` is called — the leaf under `worktrees/<run>/`, which the core names; the branch is the place's to name, handed the
+ * run and the leaf (`make`), as the git place's `runBranch` does. Pure, a function of the frozen step set alone, so a pass that died
+ * halfway and a restart name the same cut the same way.
  *
  * A run's line of work is one workspace and one branch per card, named for the run and not for whichever step happened to cut it:
  * `LINE_NAME`. The line is the first step in the workflow's order that forks off the run's base ref (`{ kind: 'fork', from: null }`), and
- * every step that inherits from it stands in the same cut. So a person in the store, and a reader of a pull request on GitHub, see
- * `wf/<run>/run`: the card, and no step.
+ * every step that inherits from it stands in the same cut. So a person in the store, and a reader of a pull request, see the leaf `run`:
+ * the card, and no step.
  *
  * Every other cut keeps its step's name — a fork with a parent, a fan-in merge, and a second root of a run that starts wide — because
  * those are lines of work beside the run's own, and each needs a worktree and a branch of its own.
- *
- * The run's branch is not `wf/<run>`: git keeps refs as files, so a ref `wf/<run>` cannot sit beside the refs `wf/<run>/<step>` a fork
- * cuts. The leaf keeps both shapes under one directory and one ref prefix, which is what every reader of these names already keys on.
  */
 export function cutName(steps: readonly Workflow[], step: Workflow): string {
   const line = steps.find((s) => {

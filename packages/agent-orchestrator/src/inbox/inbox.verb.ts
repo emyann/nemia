@@ -320,10 +320,13 @@ export const startQueued = Effect.fn('startQueued')(function* (repo: string, run
   const last = next.tried;
   if (!refused && last && !last.refused && last.why === why && last.repo === on)
     return { card: next.name, failed: why, again: true, ...where } satisfies QueueStarted;
-  const record: MissedStart = { at: new Date().toISOString(), text: files.find((f) => f.file === next.file)!.text, repo: on, why, refused };
-  try {
-    runStore.inbox.putTry(next.name, record);
-  } catch {}
+  const card = files.find((f) => f.file === next.file);
+  if (card) {
+    const record: MissedStart = { at: new Date().toISOString(), text: card.text, repo: on, why, refused };
+    try {
+      runStore.inbox.putTry(next.name, record);
+    } catch {}
+  }
   return refused
     ? ({ card: next.name, refused: why, ...where } satisfies QueueStarted)
     : ({ card: next.name, failed: why, again: false, ...where } satisfies QueueStarted);

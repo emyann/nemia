@@ -23,7 +23,8 @@ export type Workflow = {
    */
   resume?: string;
   /**
-   * `workspace: main`: the step runs in the repository's own checkout rather than a worktree of its own.
+   * `workspace: base`: the step runs in the repository's own checkout, on the base branch, rather than a worktree of its own.
+   * `workspace: main` is its former spelling, still read as `base` (`baseSpelled`), and never written (`baseWritten`).
    *
    * A structural key, and with `place:` the only one about a directory: everything else about where a step works is the shape of
    * the workflow (`workspacePlan`). A run's work happens on branches in worktrees, which is what keeps two steps out of each other's
@@ -35,7 +36,7 @@ export type Workflow = {
    * or one that ends a workflow beside another: a run has one ending (`validate`).
    *
    */
-  workspace?: 'main';
+  workspace?: 'base';
   /**
    * `place: folder`: the step works in a folder the run makes for it, and the run needs no git repository — a kind of workspace that is not
    * the git kind (`place` on the run record). `place: git`: on branches of a repository. A step file says one (`placeRequired`); only a
@@ -365,6 +366,7 @@ export const LIST_KEYS: readonly string[] = [
   'allowedTools',
   'tally',
   'from',
+  'overridable',
   'disallow',
   'allow',
 ];
@@ -389,7 +391,7 @@ export const STEP_KEY_MEANINGS: Readonly<Record<StepKey, string>> = {
   place:
     '`folder`: the step works in a folder the run makes, and the run needs no git repository — said by every step of the team, or by none. `git`: on branches of a repository. Every step says one; none is the default',
   workspace:
-    "`main`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
+    "`base`: the step runs in the repository's own checkout rather than a worktree of its own — a workflow's last step, which acts on the base branch",
   writable:
     "the folders of the run's factory this step may write, each by its directory's name — every other step of the run only reads them; one that is the run's own repository is the step's workspace already — over a fence that writes",
   reads:
@@ -442,6 +444,15 @@ export const CLOSEOUT_FIELDS = ['apiVersion', 'outcome', 'summary', 'body', 'art
  * without the line is refused at load (`placeRequired`). The one reader of a step's place. Pure.
  */
 export const stepPlace = (step: Pick<Workflow, 'place'>): 'git' | 'folder' => step.place ?? 'git';
+
+/**
+ * Whether a step acts on the base branch itself: it works in the repository's own checkout (`workspace: base`). Pure, and read of the
+ * step alone — whoever files it, a person's approval (`approvedFirst`) or the workflow once a step that can send the work back has passed.
+ *
+ * It is what a run's ending is: the one step of a workflow that works where a person's own work is, on the branch everything lands on
+ * (`validateBaseWorkspace` refuses a second, and refuses anything waiting on it).
+ */
+export const endsOnBase = (step: Pick<Workflow, 'workspace'>): boolean => step.workspace === 'base';
 
 /** The fields a step's `output:` declares, in the schema's order. `[]` for a step that declares none. */
 export const outputFields = (step: Workflow): string[] => Object.keys(step.output?.schema.properties ?? {});

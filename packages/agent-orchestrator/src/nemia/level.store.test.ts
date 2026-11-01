@@ -67,7 +67,7 @@ test('`readNemia`: her shipped definition reads in auto, and a hand list of her 
   });
   const dir = scratch('wf-nemia-asks-');
   const text = fs.readFileSync(nemiaDefinition(), 'utf8');
-  const head = (line: string) => text.replace(/^permissionMode:/m, `${line}\npermissionMode:`);
+  const head = (line: string) => text.replace(/^claude:$/m, `${line}\nclaude:`);
   for (const [name, cut, facts] of [
     ['asks', head('askTools: Bash(nemia approve:*)'), ['askTools:']],
     ['allows', head('allowedTools: Read, Bash(nemia show:*)'), ['allowedTools: Bash(nemia show:*)']],

@@ -36,7 +36,8 @@ holds what every change needs.
   whole suite only to measure it, as the e2e's rule says. A failing test it did not run is the check's refusal, answered in the next try. Outside a
   run no check follows you: run the whole suite before you commit.
 - `npm run typecheck` — `tsc --noEmit` per package, over its `src` and its `test/` (the web's `test/e2e/` under its own tsconfig, and the
-  runtime's tests under `test/tsconfig.json`, which leaves its source's `noUncheckedIndexedAccess` off);
+  tests of the runtime, the orchestrator and the api each under their package's `test/tsconfig.json`, which leaves the source's
+  `noUncheckedIndexedAccess` off);
   `tools/guards/test/suite.test.ts` refuses a test file no typecheck reads.
 - `npm run lint` — oxlint (`.oxlintrc.json`) and `oxfmt --check` (`.oxfmtrc.json`); `npm run format` writes the layout. Every shipped
   `check:` runs it after the types. A rule turned off, or a line allowed with `oxlint-disable-next-line`, says why beside it.
@@ -103,9 +104,9 @@ holds what every change needs.
   What a step may not type, the run does in its place, as two frozen scripts read out of git and run with `node`, never as a tool a fence
   could not tell apart: `workflows/build/pull-request.ts` pushes a run's own branch and opens or updates its pull request, and
   `workflows/build/landing.ts` merges that pull request and fast-forwards the checkout. The one exception to the rule is a run's ending
-  step (a workflow's last step, `workspace: main`), filed once a person approves it — or, where its workflow puts before it a step that
+  step (a workflow's last step, `workspace: base`), filed once a person approves it — or, where its workflow puts before it a step that
   can send the work back (`loop:`), once that step passes, which is how `quick` lands with no gate at all; an ending with a `check:` and
-  neither of the two is refused at load (`validateMainWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
+  neither of the two is refused at load (`validateBaseWorkspace`, `src/workflow/validate.ts`). It runs `landing.ts merge`, which refuses
   anything but this run's own green pull request — `mergeable`, `ci` green at the head the review read, no result branch left out — then
   merges it with a merge commit whose message the step wrote and fast-forwards the base branch here; the run then executes the step's
   `check:`, which is `landing.ts receipt`, and records the commit that landed on its exit 0 (`landingDue`).
@@ -120,8 +121,9 @@ What the `create-an-agent` skill, being generic, does not say here:
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
 - **Every agent of the team reads the repository through git.** The four read-only ones (Seldon, Agora, Iris, Argus, each `dontAsk`, which
-  no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, and each holds the
-  place's `git` skill on its `skills:`; the three writers (Ada, Grace, Otto) run `auto` and need no allow. Nothing in the set writes
+  no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, a list of their
+  `claude:` block's fence (`claude: { fence: … }`) as is each `disallowedTools:` below, and each holds the place's `git` skill on its
+  `skills:`; the three writers (Ada, Grace, Otto) run `auto` and need no allow. Nothing in the set writes
   the repository's history, its refs or its configuration — `git merge-tree` writes a loose object and no ref, and `git status` and
   `git describe --dirty` refresh the worktree's index and rewrite it when they can take its lock — and `git push` stays refused by the
   writers' `disallowedTools:`, Grace's held equal to Ada's. The set holds `cat`, `head`, `tail`, `wc`, `cut` and `ls` too, each kept

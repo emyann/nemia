@@ -39,9 +39,14 @@ export const sayRun = Effect.fn('say')(function* (id: string, stepName: string, 
   const taskId = run.steps[stepName]?.taskId;
   const phase = taskId ? phaseOfView(yield* asked('view', e.view(taskId))) : 'unknown';
   const refused = sayRefusal(steps, run, stepName, () => phase);
-  if (refused) return yield* Effect.fail(new Conflict({ message: refused }));
-  const said = yield* toldBy(e, taskId!, text);
-  return { run, taskId: taskId!, try: tryOf(run, stepName), said } satisfies Told;
+  if (refused || !taskId)
+    return yield* Effect.fail(
+      new Conflict({
+        message: refused ?? `${stepName} has not been filed yet, so there is no session to hear anything: nemia ls ${run.id}.`,
+      }),
+    );
+  const said = yield* toldBy(e, taskId, text);
+  return { run, taskId, try: tryOf(run, stepName), said } satisfies Told;
 });
 
 /**

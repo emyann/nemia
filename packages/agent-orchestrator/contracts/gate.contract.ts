@@ -79,7 +79,7 @@ const approvalRefusalSpec = spec<
       return (
         output !== null ||
         step === undefined ||
-        step.workspace !== 'main' ||
+        step.workspace !== 'base' ||
         !gated(step, run) ||
         !!run.steps[name]?.taskId ||
         on.length === 0 ||
@@ -91,7 +91,7 @@ const approvalRefusalSpec = spec<
       return (
         output !== null ||
         step === undefined ||
-        step.workspace !== 'main' ||
+        step.workspace !== 'base' ||
         !gated(step, run) ||
         !!run.steps[name]?.taskId ||
         !(asks ?? []).some((x) => step.after.includes(x.step))

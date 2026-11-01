@@ -168,7 +168,7 @@ export function loadAgents(dir: string): Map<string, Agent | WorkflowError> {
     const name = path.basename(file, '.md');
     const at = path.join(dir, file);
     try {
-      if (entries.find((e) => e.name === file)!.isSymbolicLink()) {
+      if (entries.find((e) => e.name === file)?.isSymbolicLink()) {
         throw new WorkflowError(
           linkRefusal(
             at,

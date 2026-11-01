@@ -53,7 +53,7 @@ const run = (statuses: readonly Word[], extra: Partial<RunSummary> = {}): RunSum
   id: 'r-1',
   repo: '/code/app',
   factory: null,
-  place: 'repository',
+  place: 'git',
   work: null,
   brief: 'Do the thing',
   workflowDir: '/code/app/workflows/dev',

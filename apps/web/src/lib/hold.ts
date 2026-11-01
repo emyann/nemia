@@ -10,7 +10,7 @@ type Candidate = Pick<RunSummary, 'id' | 'place' | 'repo' | 'cancelledAt' | 'pru
  * that has landed, a circle, a run on another base branch — is the package's to refuse (`holdRefusal`), in its words.
  */
 export const holdable = (run: Holdable): boolean =>
-  run.place === 'repository' &&
+  run.place === 'git' &&
   run.repo !== null &&
   run.cancelledAt === null &&
   run.pruned === null &&
@@ -28,7 +28,7 @@ export const holdCandidates = <R extends Candidate>(run: Pick<RunSummary, 'id' |
   runs.filter(
     (r) =>
       r.id !== run.id &&
-      r.place === 'repository' &&
+      r.place === 'git' &&
       r.repo !== null &&
       r.repo === run.repo &&
       r.cancelledAt === null &&

@@ -79,7 +79,7 @@ const CHECKED = fs.mkdtempSync(path.join(ROOT, 'wf-checked-'));
 fs.writeFileSync(path.join(CHECKED, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 fs.writeFileSync(
   path.join(CHECKED, 'ship.md'),
-  '---\nafter: work\nplace: git\nworkspace: main\ngate: true\ncheck: "true"\nharness: claude\n---\nShip it.\n',
+  '---\nafter: work\nplace: git\nworkspace: base\ngate: true\ncheck: "true"\nharness: claude\n---\nShip it.\n',
 );
 
 /** `work → ship`: an ending at its gate, whose own session merges the run's branch in the repository's checkout. */
@@ -87,7 +87,7 @@ const ENDING = fs.mkdtempSync(path.join(ROOT, 'wf-ending-'));
 fs.writeFileSync(path.join(ENDING, 'work.md'), '---\nplace: git\nharness: codex\n---\nwork it\n');
 fs.writeFileSync(
   path.join(ENDING, 'ship.md'),
-  '---\nafter: work\nplace: git\nworkspace: main\ngate: true\nharness: codex\n---\nShip it.\n',
+  '---\nafter: work\nplace: git\nworkspace: base\ngate: true\nharness: codex\n---\nShip it.\n',
 );
 
 /** The tasks of the run `id` the stand-in holds, by id. */

@@ -18,10 +18,14 @@ import {
   formerFormLine,
   formerKeyLine,
   formerKeysIn,
+  formerFenceIn,
+  formerFenceLine,
+  overridableLine,
   frontmatterKey,
   harnessPromptLine,
   inFormerForm,
   placeLine,
+  baseLine,
 } from '../former/former.ts';
 import { agentsDir, agentsFolderRefusal, parseFolder, readmeDescription, stepFiles, type Fills } from './folder.ts';
 import { HARNESS_PROMPTS } from '../agents/agents.ts';
@@ -66,8 +70,9 @@ export function loadWorkflows(dir: string, places: Places = {}, fills?: Fills): 
  * A file that runs on codex — by its own `harness:` line, or a step's by its agent's — and still names its sandbox as `permissionMode:` is
  * named too (`codexModeLine`): the parser reads the line as `sandbox:`. So is an agent that still says `systemPrompt:`
  * (`harnessPromptLine`), which the parser reads as `harnessPrompt:`, and a step file that still says `workspace: folder` (`placeLine`),
- * which the parser reads as `place: folder`. And each step or agent file whose frontmatter is still in the former line form, not YAML
- * (`formerFormLine`): the parser reads it, and `nemia frontmatter rewrite` writes it as YAML.
+ * which the parser reads as `place: folder`, or `workspace: main` (`baseLine`), which it reads as `workspace: base`. And each step or
+ * agent file whose frontmatter is still in the former line form, not YAML (`formerFormLine`): the parser reads it, and `nemia frontmatter
+ * rewrite` writes it as YAML.
  */
 export function formerKeyLines(dir: string): string[] {
   const steps = stepTexts(dir);
@@ -82,8 +87,10 @@ export function formerKeyLines(dir: string): string[] {
       return [
         ...(inFormerForm(text) ? [formerFormLine(at)] : []),
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
+        ...formerFenceIn(text).map((key) => formerFenceLine(at, key)),
         ...codexMode(at, text, harness),
         ...(frontmatterKey(text, 'workspace') === 'folder' ? [placeLine(at)] : []),
+        ...(frontmatterKey(text, 'workspace') === 'main' ? [baseLine(at)] : []),
       ];
     }),
     ...agents.flatMap((agent) => {
@@ -93,8 +100,10 @@ export function formerKeyLines(dir: string): string[] {
       return [
         ...(inFormerForm(text) ? [formerFormLine(at)] : []),
         ...formerKeysIn(text).map((former) => formerKeyLine(at, former)),
+        ...formerFenceIn(text).map((key) => formerFenceLine(at, key)),
         ...codexMode(at, text, frontmatterKey(text, 'harness')),
         ...(prompt === undefined ? [] : [harnessPromptLine(at, prompt)]),
+        ...(text && frontmatterKey(text, 'overridable') === undefined ? [overridableLine(at)] : []),
       ];
     }),
   ];
@@ -130,7 +139,7 @@ const agentAt = (dir: string, agent: string): string => path.join(agentsDir(dir)
 
 /** The word a file on `harness` names its sandbox under as `permissionMode:`, the former name of `sandbox:` there; else undefined. */
 const formerModeOf = (text: string, harness: string | undefined): string | undefined =>
-  harness === 'codex' ? frontmatterKey(text, 'permissionMode') : undefined;
+  harness === 'codex' ? frontmatterKey(text, 'permissionMode', true) : undefined;
 
 /**
  * Each step file of the workflow in `dir` with its text, the agent it names and the harness it runs on: its own `harness:`, else its
@@ -154,8 +163,9 @@ function noStepsBecause(dir: string, entries: readonly string[]): string {
   const readme = entries.find(isReadme);
   if (readme) return ` — ${readme} describes the workflow, and is not a step. Write the first step beside it: implement.md, say.`;
   const workflows = workflowsIn(dir, entries);
-  return workflows.length
-    ? ` — it holds workflows, each a folder of steps: ${workflows.join(', ')}. Name one of them: ${path.join(dir, workflows[0])}.`
+  const [first] = workflows;
+  return first !== undefined
+    ? ` — it holds workflows, each a folder of steps: ${workflows.join(', ')}. Name one of them: ${path.join(dir, first)}.`
     : '';
 }
 
@@ -181,7 +191,8 @@ export function workflowFolder(given: string, from: string, repo: string, tree?:
   const at = path.resolve(from, given);
   if (isFolder(at)) return at;
   const bare = !/[\\/]/.test(given) && given !== '.' && given !== '..';
-  if (bare && given === AGENTS_FOLDER) throw new WorkflowError(agentsFolderRefusal(path.join(repo, 'workflows', given))!);
+  const agentsRefused = bare && given === AGENTS_FOLDER ? agentsFolderRefusal(path.join(repo, 'workflows', given)) : undefined;
+  if (agentsRefused !== undefined) throw new WorkflowError(agentsRefused);
   if (bare && tree !== undefined && isFolder(path.join(tree, 'workflows', given))) return path.join(tree, 'workflows', given);
   const workflows = path.join(repo, 'workflows');
   if (bare && isFolder(path.join(workflows, given))) return path.join(workflows, given);
@@ -291,7 +302,7 @@ const frozenStepFields = {
   resume: Schema.optionalKey(Schema.String),
   input: Schema.optionalKey(Strings),
   place: Schema.optionalKey(Schema.Literals(PLACES)),
-  workspace: Schema.optionalKey(Schema.Literals(['main', 'folder'])),
+  workspace: Schema.optionalKey(Schema.Literals(['main', 'base', 'folder'])),
   writable: Schema.optionalKey(Strings),
   reads: Schema.optionalKey(Strings),
   slot: Schema.optionalKey(Schema.Literal('none')),

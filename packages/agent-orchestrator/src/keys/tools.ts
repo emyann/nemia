@@ -174,8 +174,8 @@ export type DeniedAt = { cwd?: string; runId?: string };
 
 /** A call or a rule, `Tool` or `Tool(what)`, split. Pure. */
 const callOf = (written: string): { tool: string; what?: string } => {
-  const call = /^([^()]+)\((.*)\)$/s.exec(written);
-  return call ? { tool: call[1], what: call[2] } : { tool: written };
+  const [, tool, what] = /^([^()]+)\((.*)\)$/s.exec(written) ?? [];
+  return tool !== undefined && what !== undefined ? { tool, what } : { tool: written };
 };
 
 /** A directory as a prefix: no trailing slash. */
@@ -259,6 +259,6 @@ function pathUnder(pattern: string, path: string, cwd: string | undefined): bool
     .split(/(\*\*|\*|\?)/)
     .map((part) => (part === '**' ? '.*' : part === '*' ? '[^/]*' : part === '?' ? '[^/]' : part.replace(/[.+^${}()|[\]\\]/g, '\\$&')))
     .join('');
-  const from = relative ? `${dirOf(cwd!).replace(/[.+^${}()|[\]\\*?]/g, '\\$&')}/${bare.includes('/') ? '' : '(?:.*/)?'}` : '';
+  const from = relative && cwd ? `${dirOf(cwd).replace(/[.+^${}()|[\]\\*?]/g, '\\$&')}/${bare.includes('/') ? '' : '(?:.*/)?'}` : '';
   return new RegExp(`^${from}${glob}(?:/.*)?$`, 's').test(target);
 }

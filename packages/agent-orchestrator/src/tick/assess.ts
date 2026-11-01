@@ -36,7 +36,7 @@ export type Assessment = {
   unreachable: string[];
   /**
    * Steps waiting on the repository's own checkout on this pass (`waitsOnCheckout`): an ending a person's word would file, or a try of one,
-   * while another run's `workspace: main` step is in that one directory. Nothing of them is filed, and the run is running for them — so the
+   * while another run's `workspace: base` step is in that one directory. Nothing of them is filed, and the run is running for them — so the
    * cap on runs in flight still counts it (`slotNeed`), as it counts a run whose next step the pass files.
    */
   waitingOnCheckout: string[];
@@ -96,7 +96,7 @@ export type Assessment = {
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, no step is over.
  * @param standings Where each result branch stands against the base branch on this pass (`branchStandings` in branches.store.ts): what says
  *   a run whose folder has no gated ending is one nobody has decided (`toDecide`). Left out, no branch is ahead, and only a gate says so.
- * @param checkout The run whose `workspace: main` step is in the repository's own checkout (`checkoutHold` in ending.verb.ts), if one is.
+ * @param checkout The run whose `workspace: base` step is in the repository's own checkout (`checkoutHold` in ending.verb.ts), if one is.
  *   Left out, nothing holds the checkout.
  */
 export function assess(
@@ -118,13 +118,13 @@ export function assess(
   if (run.hold) [asks, roundAsks] = [[], []];
 
   const stood = new Map(steps.map((s) => [s.name, standing(s, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)]));
-  const status = new Map(steps.map((s) => [s.name, stood.get(s.name)!.status]));
+  const status = new Map([...stood].map(([name, st]) => [name, st.status]));
   const due = retriesDue(steps, run, phaseOf, closeoutOf, askedCloseout, verdictOf, asks, harnessBlocked, spendOf);
   const retry = due.filter((r) => !waitsOnCheckout(steps, r.step, checkout));
   const waitingOnCheckout: string[] = due.filter((r) => waitsOnCheckout(steps, r.step, checkout)).map((r) => r.step);
   for (const r of due) status.set(r.step, 'running');
   const round = roundsDue(steps, run, phaseOf, closeoutOf, askedCloseout, roundAsks, spendOf);
-  for (const name of roundSpans(steps, round)) if (status.get(name) === 'over budget') status.set(name, stood.get(name)!.own);
+  unspent(status, stood, roundSpans(steps, round));
   for (const r of round) status.set(r.step, 'running');
   for (const name of unheld(steps, run, retry, round)) status.set(name, 'pending');
   const ready: string[] = [];
@@ -132,7 +132,8 @@ export function assess(
   const unreachable: string[] = [];
 
   for (const step of steps) {
-    const own = status.get(step.name)!;
+    const own = status.get(step.name);
+    if (own === undefined) continue;
     if (own === 'checking' && !run.steps[step.name]?.check) check.push(step.name);
     if (own !== 'pending') continue;
     const deps = step.after.map((a) => status.get(a) ?? 'pending');
@@ -146,7 +147,7 @@ export function assess(
   const overall: Assessment['status'] = all.every(satisfiesAfter)
     ? 'succeeded'
     : unreachable.length || all.some(stopsFollowers)
-      ? stoppedOnWord(steps.map((s) => ({ status: status.get(s.name)!, own: stood.get(s.name)!.own })))
+      ? stoppedOnWord(steps.flatMap((s) => wordsOf(status.get(s.name), stood.get(s.name))))
       : 'running';
 
   if (run.hold)
@@ -175,6 +176,18 @@ function underPause(run: Run, a: Assessment): Assessment {
   const waitingOnPause = steps.length ? { waitingOnPause: { steps, checks } } : {};
   return { ...a, ready: [], check: [], retry: [], round: [], waitingOnCheckout: [], ...waitingOnPause };
 }
+
+/** Read each step of a round due (`roundSpans`) that is `over budget` as its own ending under it, in `status`: never one not stood. */
+function unspent(status: Map<string, StepStatus>, stood: ReadonlyMap<string, { own: StepStatus }>, names: Iterable<string>): void {
+  for (const name of names) {
+    const st = stood.get(name);
+    if (st && status.get(name) === 'over budget') status.set(name, st.own);
+  }
+}
+
+/** A step's status and its own ending under it (`standing`), for `stoppedOnWord`: none for a step the assessment did not stand. */
+const wordsOf = (status: StepStatus | undefined, stood: { own: StepStatus } | undefined): { status: StepStatus; own: StepStatus }[] =>
+  status !== undefined && stood !== undefined ? [{ status, own: stood.own }] : [];
 
 /**
  * The status of a run that stopped short of succeeding: `failed` where a step broke, else what it waits on a person for. Pure. Off each

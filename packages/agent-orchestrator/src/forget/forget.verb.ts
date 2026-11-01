@@ -66,17 +66,17 @@ type Worktrees = Pick<Forgot, 'removed' | 'handedOff' | 'gone' | 'left'>;
  * and go with its record: no worktree, no branch, and no git asked. A repository run goes in an order `nemia rm` can finish when it is
  * interrupted and run again:
  *
- * 0. **What it left, read by its place** (`inventory`), before anything is written: its worktrees inside
- *    `worktrees/<id>` and its branches under `wf/<id>/`. An inventory refused or not heard is no answer, never an empty one: the run is
- *    refused in those words (`inventoryUnread`), and nothing is touched.
+ * 0. **What it left, read by its place** (`inventory`), before anything is written: its worktrees inside `worktrees/<id>` and the branches
+ *    its place lists for it. An inventory refused or not heard is no answer, never an empty one: the run is refused in those words
+ *    (`inventoryUnread`), and nothing is touched.
  * 1. **Its worktrees, through its place**: each the inventory lists (`runWorktrees`), by its real path, so the run's directory and the
- *    record's are read the same way (`resolved`). One whose directory is gone, or is no worktree git can read, and is not locked, is
- *    pruned. What one holds uncommitted is committed first under its step's name by the place's `handoff` — a failed or stopped step's
- *    work lives only there — and what git ignores is not work. Then one `remove` of them all, never forced, which prunes git's list. A
- *    worktree git will not remove — locked, still dirty, on no branch with something a removal would leave on none (`heldWorktree`), or
- *    whose hand-off git refuses — is left as it is, and said why with the place's command for it (its `say`); so is one whose verb did
- *    not answer, and a directory in `worktrees/<id>` git does not know. Then the run is `held`, and nothing else is removed, so its record
- *    is there for `nemia rm` to find it by once a person has dealt with them.
+ *    record's are read the same way (`resolved`). One whose directory is gone (`removable: 'gone'`) is pruned. What one holds uncommitted
+ *    is committed first under its step's name by the place's `handoff` — a failed or stopped step's work lives only there — and what git
+ *    ignores is not work. Then one `remove` of them all, never forced, which prunes git's list. A worktree the place will not remove —
+ *    held, still dirty, on no branch with something a removal would leave on none (`heldWorktree`), or whose hand-off git refuses — is left
+ *    as it is, and said why with the place's command for it (its `say`); so is one whose verb did not answer, and a directory in
+ *    `worktrees/<id>` git does not know. Then the run is `held`, and nothing else is removed, so its record is there for `nemia rm` to find
+ *    it by once a person has dealt with them.
  * 2. **Its branches**, as asked (`branchFates`): kept by default; deleted merged into the run's base branch, as the inventory read it —
  *    never one a hand-off just committed onto — or forced; through the place's `remove`.
  * 3. **Its record, then every file under `WF_ROOT` keyed by its id** (`removeKeyed`): the record first, so the run is never read without
@@ -255,19 +255,19 @@ function removeWorktrees(run: RepositoryRun, steps: readonly Workflow[] | undefi
 }
 
 /**
- * Whether one of a repository run's worktrees is to be removed, adding to `done` what is not: one git can prune and nobody locked is gone,
+ * Whether one of a repository run's worktrees is to be removed, adding to `done` what is not: one whose folder is gone is gone,
  * or pruned by the `remove`; one held (`heldWorktree`) is left with the place's command for it; one not clean is handed off first, and left
  * when its hand-off is refused, uncommitted, or does not answer.
  */
 function handWorktree(run: RepositoryRun, place: RunPlaceRead, w: Held & { step: string }, done: Worktrees): boolean {
-  if (w.prunable && w.locked === undefined) {
+  if (w.removable === 'gone') {
     if (!lstatOf(w.path)) done.gone.push(w.path);
     return false;
   }
   const hold = heldWorktree(w);
   if (hold) {
     const fix =
-      'locked' in hold ? sayFilled(place.say.unlock, { repo: run.repo, path: w.path }) : sayFilled(place.say.attach, { path: w.path });
+      'heldBy' in hold ? sayFilled(place.say.unlock, { repo: run.repo, path: w.path }) : sayFilled(place.say.attach, { path: w.path });
     done.left.push({ path: w.path, ...hold, fix });
     return false;
   }
@@ -302,7 +302,7 @@ function strays(within: string): string[] {
 }
 
 /**
- * Delete the repository run's branches, as asked (`branchFates`): those its place's inventory read under `wf/<id>/`, merged into the run's
+ * Delete the repository run's branches, as asked (`branchFates`): those its place's inventory lists for the run, merged into the run's
  * base branch as it read them — never one `handedOff` just committed onto, which the base has not — or forced, through the place's
  * `remove`. One git refuses to delete is kept, in git's words; all of them, when the `remove` does not answer.
  */

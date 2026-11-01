@@ -35,6 +35,16 @@ import type { PlaceService } from 'agent-orchestrator';
 /** The harness that is Claude Code, as the engine names it: every session of it a job on the Agent SDK. */
 const CLAUDE_CODE = 'claude';
 
+/** The harness a step runs on without a `harness:` line: the engine's first (`HARNESSES`), thrown as the module loads where it has none. */
+const FIRST_HARNESS: string = (() => {
+  const [first] = Object.keys(HARNESSES);
+  if (first === undefined)
+    throw new Error(
+      "The engine names no harness (`HARNESSES` is empty): install the agent-runtime this api was built with (npm install, from the repository's root).",
+    );
+  return first;
+})();
+
 /**
  * The modes a job was measured in on Claude Code 2.1.280, each denying what would ask and carrying on (agent-runtime's docs/open-issues.md,
  * "Claude Code as a job") — none given being the engine's `auto`. `bypassPermissions` was not measured, so the page claims nothing of a job
@@ -163,9 +173,9 @@ export type CapabilitiesWithSteps = Capabilities & {
  * and `Bash(*)` both do. Null for a rule that names no built-in tool so, an MCP server's (`mcp__<server>__<tool>`) among them.
  */
 function ruleOf(rule: string): { tool: string; scope: string | null } | null {
-  const m = /^([A-Za-z][A-Za-z0-9]*)(?:\(([\s\S]*)\))?$/.exec(rule);
-  if (!m) return null;
-  return { tool: m[1], scope: m[2] === undefined || m[2] === '*' ? null : m[2] };
+  const [, tool, scope] = /^([A-Za-z][A-Za-z0-9]*)(?:\(([\s\S]*)\))?$/.exec(rule) ?? [];
+  if (tool === undefined) return null;
+  return { tool, scope: scope === undefined || scope === '*' ? null : scope };
 }
 
 /** A Bash rule's scope in one spelling: `:*` at its end is a trailing ` *`. Anywhere else a colon is a colon. */
@@ -205,8 +215,8 @@ export function bashCovers(outer: string, inner: string): boolean {
  * are.
  */
 function mcpRuleOf(rule: string): { server: string; tool: string | null } | null {
-  const m = /^mcp__(.+?)(?:__(.+))?$/.exec(rule);
-  return m ? { server: m[1], tool: m[2] === undefined || m[2] === '*' ? null : m[2] } : null;
+  const [, server, tool] = /^mcp__(.+?)(?:__(.+))?$/.exec(rule) ?? [];
+  return server === undefined ? null : { server, tool: tool === undefined || tool === '*' ? null : tool };
 }
 
 /**
@@ -295,8 +305,8 @@ function serversReached(
           const asking = rule === null ? denyingRule(rules.ask, server.name, tool.name) : null;
           return {
             name: tool.name,
-            denied: rule === null ? null : rules.denied.find((d) => d.rule === rule)!,
-            asks: asking === null ? null : rules.asked.find((a) => a.rule === asking)!,
+            denied: rule === null ? null : (rules.denied.find((d) => d.rule === rule) ?? null),
+            asks: asking === null ? null : (rules.asked.find((a) => a.rule === asking) ?? null),
             allowed: rule === null && asking === null && denyingRule(rules.allow, server.name, tool.name) !== null,
           };
         }) ?? null,
@@ -326,7 +336,7 @@ function stepReach(
   spec: WorkflowStepSpec,
   named: readonly string[],
 ): StepReach {
-  const harness = spec.harness ?? Object.keys(HARNESSES)[0];
+  const harness = spec.harness ?? FIRST_HARNESS;
   const dontAsk = spec.permissionMode === 'dontAsk';
   const askDenier = harness === CLAUDE_CODE ? askDenierOf(harness, spec) : null;
   const reach = {

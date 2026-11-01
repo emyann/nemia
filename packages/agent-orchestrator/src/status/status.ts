@@ -6,7 +6,7 @@
  * it reads the record alone.
  */
 import type { Verdict } from '../check/check.ts';
-import { DEFAULT_ROUNDS, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
+import { DEFAULT_ROUNDS, endsOnBase, LOOP_REPLIES, outputFields, type Workflow } from '../step/step.ts';
 import { loopSpan } from '../workflow/index.ts';
 import type { TaskClock } from '../timeline/index.ts';
 import { declaredOutput, envelopeRefusals, isLoopTarget, type Closeout } from '../closeout/index.ts';
@@ -105,14 +105,7 @@ function atGate(step: Workflow, run: Run, own: StepStatus, closeoutOf: (step: st
   return !approvalOf(run, step.name);
 }
 
-/**
- * Whether a step acts on the base branch itself: it works in the repository's own checkout (`workspace: main`). Pure, and read of the
- * step alone — whoever files it, a person's approval (`approvedFirst`) or the workflow once a step that can send the work back has passed.
- *
- * It is what a run's ending is: the one step of a workflow that works where a person's own work is, on the branch everything lands on
- * (`validateMainWorkspace` refuses a second, and refuses anything waiting on it).
- */
-export const endsOnBase = (step: Pick<Workflow, 'workspace'>): boolean => step.workspace === 'main';
+export { endsOnBase };
 
 /**
  * Whether a step's gate holds it BEFORE it is filed rather than after it signs off: it is gated (`hasGate`) and acts on the base branch
@@ -233,7 +226,8 @@ export function endingStopped(
  */
 export function sentBack(record: StepRecord): StepRecord {
   const { check, tries = [], taskId, handedOff: _, landed: __, filesRead: ___, ...rest } = record;
-  return { ...rest, taskId: null, tries: [...tries, { taskId: taskId!, ...(check ? { check } : {}), cause: 'back' }] };
+  const moved: NonNullable<StepRecord['tries']> = taskId === null ? [] : [{ taskId, ...(check ? { check } : {}), cause: 'back' }];
+  return { ...rest, taskId: null, tries: [...tries, ...moved] };
 }
 
 /**
@@ -244,8 +238,8 @@ export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[ste
 
 /**
  * Whether an ending's merge is landed by the run on its check: it acts on the base branch (`endsOnBase`) and has a `check:` — which a
- * workflow takes beside `workspace: main` only with `gate: true`, so that a person's approval files it, or with a step before it that can
- * send the work back (`loop:`), so that its pass files it (`validateMainWorkspace`). Pure, and no reading of the gate: what the step is,
+ * workflow takes beside `workspace: base` only with `gate: true`, so that a person's approval files it, or with a step before it that can
+ * send the work back (`loop:`), so that its pass files it (`validateBaseWorkspace`). Pure, and no reading of the gate: what the step is,
  * not who files it.
  *
  * Such a step stages the merge and signs off; the run executes its check on the merged tree, as it executes any step's, and commits the
@@ -259,11 +253,11 @@ export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' 
   endsOnBase(step) && step.check !== undefined;
 
 /**
- * Whether this step waits on the checkout on a pass: it works in the repository's own checkout (`workspace: main`), and another run's
+ * Whether this step waits on the checkout on a pass: it works in the repository's own checkout (`workspace: base`), and another run's
  * step is in that one directory (`heldCheckouts`). Pure. Nothing of it is filed while that is so — a first session, or another try.
  */
 export const waitsOnCheckout = (steps: readonly Workflow[], name: string, checkout: CheckoutHold | undefined): boolean =>
-  Boolean(checkout) && steps.some((s) => s.name === name && s.workspace === 'main');
+  Boolean(checkout) && steps.some((s) => s.name === name && endsOnBase(s));
 
 /**
  * Where a run's result branch stands against the base branch it was cut from, as git says it on a pass (`branchStandings` in
@@ -832,10 +826,11 @@ export function sumUsage(usages: ReadonlyArray<Consumed | null | undefined>): Co
   if (!usages.length) return undefined;
   const sum: Consumed = {};
   for (const field of FIELDS) {
-    if (usages.every((u) => u?.[field] !== undefined)) sum[field] = usages.reduce((n, u) => n + u![field]!, 0);
+    const values = usages.map((u) => u?.[field]);
+    if (values.every((v): v is number => v !== undefined)) sum[field] = values.reduce((n, v) => n + v, 0);
   }
-  if (usages.every((u) => u?.peakContextTokens !== undefined))
-    sum.peakContextTokens = Math.max(...usages.map((u) => u!.peakContextTokens!));
+  const peaks = usages.map((u) => u?.peakContextTokens);
+  if (peaks.every((v): v is number => v !== undefined)) sum.peakContextTokens = Math.max(...peaks);
   const rebuilt = usages.reduce((n, u) => n + (u?.rebuiltCaches ?? 0), 0);
   if (rebuilt) sum.rebuiltCaches = rebuilt;
   const compactions = usages.reduce((n, u) => n + (u?.compactions ?? 0), 0);
@@ -886,7 +881,7 @@ export function readWords(u: Consumed | null | undefined, cap?: number): string 
     ...(u.compactions ? [compactedWords(u.compactions)] : []),
     ...(mark === 'large' ? [`past ${count(LARGE_CONTEXT)} with no cap`] : []),
   ].join(', ');
-  const reached = mark === 'cap' ? `${u.compactions ? `${where} ` : ''}at its ${count(cap!)} cap` : where;
+  const reached = mark === 'cap' && cap !== undefined ? `${u.compactions ? `${where} ` : ''}at its ${count(cap)} cap` : where;
   const peak =
     u.peakContextTokens !== undefined ? `peak ${count(u.peakContextTokens)}${reached ? `, ${reached}` : ''}` : reached || undefined;
   const rebuilt = u.rebuiltCaches

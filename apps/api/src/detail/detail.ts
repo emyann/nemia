@@ -73,8 +73,8 @@ import { folderFiles, type StepArtifact } from '../steps/artifacts.ts';
 import { driftNow, type RunGraph, runGraph } from 'agent-orchestrator';
 import type { AnswerVia, CheckVerdict, RunPhase, RunReason, StepPhase, StepReason, WaitOn } from 'agent-orchestrator';
 
-import { checksOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
-import { engineRead, type Engine, judgedOn, workFolderOf } from '../store.ts';
+import { checksOf, lastLineOf, refusedStderr, type StepCheck } from '../steps/logs.ts';
+import { judgedOn, workFolderOf } from '../store.ts';
 import {
   acceptedOf,
   attemptsIn,
@@ -157,7 +157,7 @@ export type StepSpec = {
   context: number | null;
   after: string[];
   /**
-   * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's (`workspace: main`): the step that
+   * `base` for a step that runs in the repository's own checkout rather than a worktree of the run's (`workspace: base`): the step that
    * ends the run, whose gate holds before it is filed and whose approval is what files it. Null for every other step, which works in a
    * worktree. What tells such a gate from any other on the board, where the two read the same off the record: unfiled and awaiting
    * approval.
@@ -538,43 +538,6 @@ function roundSpend(clock: Timeline, steps: readonly Workflow[], total: Timeline
 }
 
 /**
- * Where the last read of a blocked session's conversation stopped, and what it had said last by then: by task and attempt. One for an app,
- * of its engine's sessions (`ReadMemo`, layer.ts).
- */
-export type LastSaid = Map<string, { cursor: string; line: string | null }>;
-
-/**
- * What a session said last — its last `text` or `system` event, trimmed — through the engine's `transcript`, or null when it has said
- * none or its conversation cannot be read. What it said, not what it was told: a brief, a `nemia say` and every tool result come back as
- * `user` events (`TranscriptEvent`), and reading a person's own words back to them says nothing about why the harness stopped.
- *
- * Each read costs an observation of the task's harness: the attempt of a session the harness blocked has not ended, so its session's id
- * is on no record, and the engine asks the harness for it. Read on a run's detail, as a refused check's output is, and never on the
- * list.
- *
- * Read from where the last read of the same attempt stopped, so a page polled every five seconds reads what the session wrote since,
- * not its whole conversation again (`said`); a cursor the engine refuses, of a transcript replaced since, is read again from the start. A
- * read's cache, and nothing is decided by it: a fresh app reads from the start.
- */
-async function lastLineOf(e: Engine['Service'], view: TaskView, said: LastSaid): Promise<string | null> {
-  const key = `${view.id}#${view.state.attempts.length}`;
-  const read = (after?: string) => engineRead('transcript', e.transcript(view.id, after)).catch(() => undefined);
-  let from = said.get(key);
-  let got = from ? await read(from.cursor) : undefined;
-  if (!got) {
-    from = undefined;
-    got = await read();
-  }
-  if (!got) return null;
-  const last = got.events
-    .filter((event) => event.role !== 'user' && (event.kind === 'text' || event.kind === 'system') && event.text?.trim())
-    .at(-1);
-  const line = last?.text?.trim() ?? from?.line ?? null;
-  said.set(key, { cursor: got.cursor, line });
-  return line;
-}
-
-/**
  * Every file that folder holds (`folderFiles`), for a person who never opens a terminal; empty where there is no folder. A folder the
  * api cannot read answers with why instead of a list, since the board words an empty list as the step having made nothing.
  */
@@ -665,9 +628,9 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
     pruned: prunedOf(run),
     onDisk: onDiskOf(run, home),
     ...handedRuns(run),
-    ...(run.from ? { from: run.from, fromNote: fromNote(run)! } : {}),
+    ...(run.from ? { from: run.from, fromNote: fromNote(run) } : {}),
     waiting: judged.waiting,
-    holdUntil: judged.holding ? run.hold!.until : [],
+    holdUntil: judged.holding && run.hold ? run.hold.until : [],
     holding: judged.holding,
     ...runSaid(judged),
     moving: judged.moving,
@@ -710,7 +673,7 @@ export async function detail(run: Run, { e, placeService, home, memo }: Detailin
           roundDue: judged.roundDue.has(name),
           commands: stepCommands(run.id, name),
           ...needs,
-          lastLine: atHarness(current) ? await lastLineOf(e, views.get(taskId!)!, memo.said) : null,
+          lastLine: atHarness(current) ? await lastLineOf(e, views, taskId, memo.said) : null,
           gate: gateOf(run, steps.find((s) => s.name === name) ?? bare(name), current.reason),
           accepted: acceptedOf(run, name),
           said: taskId ? [...(views.get(taskId)?.state.said ?? [])] : [],
@@ -817,7 +780,7 @@ const MODE_FLAGS: readonly string[] = ['--permission-mode', '-s', '--sandbox'];
  */
 function runsInOf(state: TaskView['state']): StepFiled['runsIn'] {
   const name = state.harness ?? Object.keys(HARNESSES)[0];
-  if (!Object.hasOwn(HARNESSES, name)) return null;
+  if (name === undefined || !Object.hasOwn(HARNESSES, name)) return null;
   const harness = HARNESSES[name as keyof typeof HARNESSES];
   const { permissionMode, tools: filedTools } = state.config ?? {};
   const by = permissionMode === undefined ? 'default' : 'filed';

@@ -12,6 +12,12 @@
  *
  * A word that runs nothing passes: `'git'` in a list, a comparison or another function's argument, `MERGE_HEAD` in a sentence or a comment.
  *
+ * And a fifth, **`branch`**: the name of a run's branch built — a template whose text before a hole ends in `wf/`, a string ending in
+ * `wf/` with something added to it, a `startsWith` handed a string that opens with `wf/` — since the place names a run's branches and
+ * the run core asks it (`make`'s `run` and `leaf`, `inventory`'s `run`). It reads the `src` of every workspace and the package's
+ * `place/` but its two places, `place/git` and `place/memory`, which name them (`BRANCH_NAMERS`); a name in prose — a comment, an
+ * escaped example inside a message — builds nothing and passes. It has no baseline.
+ *
  * A file that held such a call was a known exception, counted file by file (`GIT_SITES`), and the count only shrank. Each entry named the
  * cards that removed its calls (`CARDS`). `ratchetBreaks` refuses a file no entry holds, a count above the measure or below it, an entry
  * for a file gone or clean, and an entry with no card or an unknown card. The baseline is empty, and stays so.
@@ -23,7 +29,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { argumentsOf, calleeName, calleeRoot, factsOf, literalParts, runsGit, SPAWNS, type FileFacts } from './git-spawns.ts';
+import { argumentsOf, calleeName, calleeRoot, factsOf, literalParts, runsGit, SPAWNS, stringOf, type FileFacts } from './git-spawns.ts';
 import { workspaces } from './workspaces.ts';
 import { scratch } from './scratch.ts';
 
@@ -56,7 +62,32 @@ type Baseline = Readonly<Record<string, Entry>>;
 /** Each file that calls git, with its count and the cards that remove its calls: none. */
 const GIT_SITES: Baseline = {};
 
-type Matcher = { name: 'spawn' | 'wrapper' | 'path' | 'script'; matches: (call: ts.CallExpression, facts: FileFacts) => boolean };
+type Matcher = {
+  name: 'spawn' | 'wrapper' | 'path' | 'script' | 'branch';
+  matches: (node: ts.Node, facts: FileFacts) => boolean;
+};
+
+/** A matcher of calls alone. */
+const ofCall =
+  (matches: (call: ts.CallExpression, facts: FileFacts) => boolean): Matcher['matches'] =>
+  (node, facts) =>
+    ts.isCallExpression(node) && matches(node, facts);
+
+/** Whether a piece of text ends in the `wf/` a run's branch opens with, as a whole segment. */
+const endsInRunPrefix = (text: string): boolean => /(^|[^\w])wf\/$/.test(text);
+
+/** Whether `node` builds the name of a run's branch: see the file's head. */
+function buildsBranch(node: ts.Node, facts: FileFacts): boolean {
+  if (ts.isTemplateExpression(node))
+    return [node.head.text, ...node.templateSpans.slice(0, -1).map((span) => span.literal.text)].some(endsInRunPrefix);
+  if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken)
+    return endsInRunPrefix(stringOf(node.left, facts) ?? '');
+  if (ts.isCallExpression(node) && calleeName(node) === 'startsWith') {
+    const first = node.arguments[0];
+    return first !== undefined && !ts.isTemplateExpression(first) && (stringOf(first, facts) ?? '').startsWith('wf/');
+  }
+  return false;
+}
 
 /** Whether a string holds one of git's own files as a whole `/`-separated segment. */
 const namesGitFile = (text: string): boolean => text.split('/').some((segment) => GIT_SEGMENTS.includes(segment));
@@ -67,25 +98,39 @@ const namesScript = (text: string): boolean => text.split('/').some((segment) =>
 const MATCHERS: readonly Matcher[] = [
   {
     name: 'spawn',
-    matches: runsGit,
+    matches: ofCall(runsGit),
   },
-  { name: 'wrapper', matches: (call) => WRAPPERS.includes(calleeName(call) ?? '') },
+  { name: 'wrapper', matches: ofCall((call) => WRAPPERS.includes(calleeName(call) ?? '')) },
   {
     name: 'path',
-    matches: (call, facts) =>
-      facts.pathNames.has(calleeRoot(call) ?? '') && call.arguments.some((arg) => literalParts(arg, facts).some(namesGitFile)),
+    matches: ofCall(
+      (call, facts) =>
+        facts.pathNames.has(calleeRoot(call) ?? '') && call.arguments.some((arg) => literalParts(arg, facts).some(namesGitFile)),
+    ),
   },
   {
     name: 'script',
-    matches: (call, facts) =>
-      (SPAWNS.includes(calleeName(call) ?? '') || facts.pathNames.has(calleeRoot(call) ?? '')) &&
-      argumentsOf(call).some((arg) => literalParts(arg, facts).some(namesScript)),
+    matches: ofCall(
+      (call, facts) =>
+        (SPAWNS.includes(calleeName(call) ?? '') || facts.pathNames.has(calleeRoot(call) ?? '')) &&
+        argumentsOf(call).some((arg) => literalParts(arg, facts).some(namesScript)),
+    ),
   },
+  { name: 'branch', matches: buildsBranch },
 ];
+
+/** The matchers of a git call, held to `GIT_SITES`: all but `branch`, which has no baseline. */
+const GIT_MATCHERS = MATCHERS.filter((m) => m.name !== 'branch');
+
+/** The folders of the package's `place/` that name a run's branches, by their path from the root. */
+const BRANCH_NAMERS = ['packages/agent-orchestrator/place/git/', 'packages/agent-orchestrator/place/memory/'];
 
 type Site = { line: number; matcher: Matcher['name'] };
 
-/** Each call of `text` that runs git or reads git's files, by its line and the first of `matchers` that holds: a call counts once. */
+/**
+ * Each node of `text` that runs git, reads git's files or builds a run's branch, by its line and the first of `matchers` that holds: a
+ * node counts once.
+ */
 function sitesIn(file: string, text: string, matchers: readonly Matcher[] = MATCHERS): Site[] {
   const source = ts.createSourceFile(
     file,
@@ -97,10 +142,8 @@ function sitesIn(file: string, text: string, matchers: readonly Matcher[] = MATC
   const facts = factsOf(source);
   const sites: Site[] = [];
   const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node)) {
-      const matcher = matchers.find((m) => m.matches(node, facts));
-      if (matcher) sites.push({ line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1, matcher: matcher.name });
-    }
+    const matcher = matchers.find((m) => m.matches(node, facts));
+    if (matcher) sites.push({ line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1, matcher: matcher.name });
     ts.forEachChild(node, visit);
   };
   visit(source);
@@ -126,7 +169,7 @@ function sourcesOf(root: string): string[] {
 }
 
 /** Each file's count of sites, for the files that hold one at least. */
-const measured = (texts: ReadonlyMap<string, string>, matchers: readonly Matcher[] = MATCHERS): Record<string, number> =>
+const measured = (texts: ReadonlyMap<string, string>, matchers: readonly Matcher[] = GIT_MATCHERS): Record<string, number> =>
   Object.fromEntries([...texts].map(([file, text]) => [file, sitesIn(file, text, matchers).length]).filter(([, count]) => count !== 0));
 
 /** What an entry fails to name: one card at least, each one `CARDS` knows. */
@@ -169,6 +212,17 @@ const onDisk = (file: string): boolean => fs.existsSync(path.join(ROOT, file));
 
 const repository = (): Map<string, string> => new Map(sourcesOf(ROOT).map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')]));
 
+/** Every `.ts` under the package's `place/` but in a folder that names a run's branches (`BRANCH_NAMERS`), by its path from `root`. */
+function placeSourcesOf(root: string): string[] {
+  const place = 'packages/agent-orchestrator/place';
+  if (!fs.existsSync(path.join(root, place))) return [];
+  return fs
+    .readdirSync(path.join(root, place), { recursive: true, encoding: 'utf8' })
+    .map((f) => `${place}/${f.split(path.sep).join('/')}`)
+    .filter((f) => /\.tsx?$/.test(f) && !isTest(f) && !BRANCH_NAMERS.some((namer) => f.startsWith(namer)))
+    .sort();
+}
+
 /** The plants each matcher must refuse, each one call over one or more lines. */
 const PLANTS: Readonly<Record<Matcher['name'], readonly string[]>> = {
   spawn: [
@@ -188,6 +242,12 @@ const PLANTS: Readonly<Record<Matcher['name'], readonly string[]>> = {
     "import fs from 'node:fs';\nfs.existsSync(`${repo}/.git`);\n",
     "import * as fsp from 'node:fs/promises';\nconst name = 'MERGE_HEAD';\nawait fsp.readFile(name);\n",
     "import { join } from 'node:path';\nimport { existsSync } from 'node:fs';\nexistsSync(join(repo, '.git'));\n",
+  ],
+  branch: [
+    'const name = `wf/${run.id}/x`;\n',
+    "const name = 'wf/' + id;\n",
+    "const prefix = 'wf/';\nconst mine = b.startsWith(prefix);\n",
+    'const mine = b.startsWith(`wf/${id}/`);\n',
   ],
   script: [
     "import path from 'node:path';\npath.join(dir, 'scripts', `${verb}.ts`);\n",
@@ -212,6 +272,9 @@ const WORDS = [
   "execFileSync('npm', ['run', 'git']);\nexecSync('npx gitlab');\n",
   "const said = 'its scripts are gone: a place answers by a call';\nconst has = pkg.scripts.test;\n",
   "import path from 'node:path';\npath.join(root, 'transcripts', 'scripts.md');\nspawn(process.execPath, [entry, 'scripts.json']);\n",
+  "/** A run's branches are `wf/<id>/<leaf>`, as its place names them. */\nexport const y = 1;\n",
+  'const said = `cut under (\\`worktrees/<run>/${LINE_NAME}\\` on \\`wf/<run>/${LINE_NAME}\\`), so ${step} claims it`;\n',
+  "const says = 'wf/<id>/ is the place\\'s spelling';\nconst tail = `${head}wf/`;\nconst other = 'nowf/' + id;\n",
 ];
 
 test('a plant of each matcher is one site under it, and over several lines too', () => {
@@ -267,6 +330,19 @@ test("the scan reads every workspace's src, and no test, script or file outside 
   for (const dir of ['packages/p', 'apps/w']) fs.writeFileSync(path.join(root, dir, 'package.json'), '{}');
   fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ workspaces: ['packages/*', 'apps/*', 'tools/g'] }));
   assert.deepEqual(sourcesOf(root).sort(), ['apps/w/src/c.tsx', 'packages/p/src/a.ts', 'tools/g/src/e.ts']);
+});
+
+test("no src names a run's branch: the place names it, and the run core asks it", () => {
+  const texts = new Map(
+    [...sourcesOf(ROOT), ...placeSourcesOf(ROOT)].map((f) => [f, fs.readFileSync(path.join(ROOT, f), 'utf8')] as const),
+  );
+  const branch = MATCHERS.filter((m) => m.name === 'branch');
+  const built = [...texts].flatMap(([file, text]) => sitesIn(file, text, branch).map(({ line }) => `${file}:${line}`));
+  assert.deepEqual(
+    built,
+    [],
+    "each builds a run's branch name: ask the place for it — `make` with the run and the leaf, `inventory` with the run — in its stead",
+  );
 });
 
 test('the git calls of every src are held to their baseline, each entry naming its cards', () => {

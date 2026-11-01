@@ -67,7 +67,7 @@ export const answersIn = (view: TaskView | undefined): number => (view?.state.ho
  * And a task a verb of this pass has changed since is read again: `file`, `admit`, `answer`, `stop`, `close` and `say` each drop the view
  * of the tasks they name, when the verb runs, so what `advance` reads after its own act is the engine's, never a report or a read from
  * before it. A verb this does not know drops every view, for the same reason, and so does any verb while a read is in flight: what that
- * read answers is not kept.
+ * read answers is not kept, and a `list` whose kept view such a verb dropped reads again, so no task it was handed is left out unnamed.
  */
 export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
   const kept = new Map<unknown, TaskView>(views.map((v) => [v.id, v]));
@@ -82,7 +82,7 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
       const at = writes;
       return e.view(taskId).pipe(Effect.tap((read) => Effect.sync(() => keep([read], at))));
     });
-  const list = (ids: readonly string[]) =>
+  const list = (ids: readonly string[]): ReturnType<Engine['list']> =>
     Effect.suspend(() => {
       const wanted = [...new Set(ids)];
       const missing = wanted.filter((id) => !kept.has(id));
@@ -91,11 +91,16 @@ export function reportedEngine(e: Engine, views: readonly TaskView[]): Engine {
         ? e.list(missing)
         : Effect.succeed({ views: [], unreadable: [] });
       return read.pipe(
-        Effect.map((got) => {
+        Effect.flatMap((got) => {
           const fresh = new Map<unknown, TaskView>(got.views.map((v) => [v.id, v]));
           keep(got.views, at);
-          const answered = wanted.flatMap((id) => fresh.get(id) ?? (missing.includes(id) ? [] : [kept.get(id)!]));
-          return { views: answered, unreadable: got.unreadable } satisfies TaskList;
+          const answered: TaskView[] = [];
+          for (const id of wanted) {
+            const v = fresh.get(id) ?? (missing.includes(id) ? undefined : kept.get(id));
+            if (v === undefined && !missing.includes(id)) return list(ids);
+            if (v !== undefined) answered.push(v);
+          }
+          return Effect.succeed({ views: answered, unreadable: got.unreadable } satisfies TaskList);
         }),
       );
     });

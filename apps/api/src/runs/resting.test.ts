@@ -457,7 +457,7 @@ test('a gated run read by the list at every event from being filed to being appr
   assert.equal(gated.status, 'awaiting approval', "`assess`'s word for a run stopped at its gate, as `nemia decide` says it");
   assert.equal(gated.moving, false);
   assert.deepEqual(gated.waitingOnYou, ['design']);
-  assert.equal(gated.steps.find((s) => s.name === 'design')?.status, 'awaiting approval');
+  assert.equal(gated.steps.find((s) => s.name === 'design')?.message, 'awaiting approval');
 
   await runWith(engine(), approveRun(id, 'design'));
   const approved = await read('approved');
@@ -601,7 +601,7 @@ test("what a poll costs: the journals of the runs still moving, of a page's own 
     const output = t.mock.method(e, 'output');
     const logs = t.mock.method(e, 'logs');
     const run = await unverified(() => listed('r-verdict'));
-    assert.equal(run?.steps.find((s) => s.name === 'implement')?.status, 'failed ✗ check (exit 1)');
+    assert.equal(run?.steps.find((s) => s.name === 'implement')?.message, 'failed ✗ check (exit 1)');
     assert.deepEqual([output.mock.callCount(), logs.mock.callCount()], [0, 0]);
   });
   await s.test(

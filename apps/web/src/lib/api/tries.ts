@@ -227,8 +227,7 @@ export const StepAttemptsSchema = decodes<StepAttempts>()(
 /**
  * Mirrors `StepTry` in apps/api/src/detail/tries.ts: one try of a step, earliest first. `cause` is what replaced it, null on the current
  * try, which `current` marks; `note` how it was reached, in the CLI `ls`'s words. `phase`, `reason` and `message` are the step's own on
- * the current try, and on an earlier one the codes and the word of its task's engine; `message` is shown, never compared. `status` is
- * `message` under its old name, which the board reads nowhere.
+ * the current try, and on an earlier one the codes and the word of its task's engine; `message` is shown, never compared.
  */
 export type StepTry = {
   try: number;
@@ -242,8 +241,6 @@ export type StepTry = {
   on: WaitOn | null;
   via: AnswerVia | null;
   message: string;
-  /** @deprecated `message` under its old name: read `message`. */
-  status: string;
   attempts: StepAttempts;
   check: StepCheck | null;
   closeout: StepCloseout | null;
@@ -263,7 +260,6 @@ export const StepTrySchema = decodes<StepTry>()(
     taskId: Schema.NullOr(Schema.String),
     note: Schema.NullOr(Schema.String),
     ...StepCodesFields,
-    status: Schema.String,
     attempts: StepAttemptsSchema,
     check: Schema.NullOr(StepCheckSchema),
     closeout: Schema.NullOr(StepCloseoutSchema),

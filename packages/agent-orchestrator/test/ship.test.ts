@@ -384,7 +384,7 @@ const e = () => stage.board().e;
 const waitLine = (holder: string) =>
   `  ship: waiting on the checkout (${holder}'s ship has it) — it works in the repository's own checkout, ` +
   `and two endings never do at once; the next tick files ship once ${holder}'s ship has settled`;
-const statusOf = async (id: string, step: string) => (await listed(id)).steps.find((s) => s.name === step)!.status;
+const statusOf = async (id: string, step: string) => (await listed(id)).steps.find((s) => s.name === step)!.message;
 const asks = (id: string) => at.asksOf(id).filter((f) => f.startsWith('merge-'));
 /** A refusal of `nemia refresh --base`: exit 2, naming `facts`, and no merge asked. For `assert.rejects`. */
 const mergeRefused =
@@ -430,7 +430,7 @@ test("a run waits at its ending's gate, is approved, stages its merge, lands it 
       assert.equal(readRun(id).steps.ship.taskId, null);
       assert.equal(at.uncommitted(repo), '', 'the checkout is clean');
       const l = await listed(id);
-      assert.equal(l.steps.find((x) => x.name === 'ship')?.status, 'awaiting approval');
+      assert.equal(l.steps.find((x) => x.name === 'ship')?.message, 'awaiting approval');
       assert.deepEqual(l.toDecide, {
         kind: 'approve',
         step: 'ship',
@@ -1087,7 +1087,7 @@ test('a result a person merged by hand before its ending ran: the run has landed
       assert.deepEqual(l.waitingOnYou, [], 'and nobody is waited on for an approval that would be refused');
       const ship = l.steps.find((x) => x.name === 'ship')!;
       assert.deepEqual(
-        [ship.status, ship.note],
+        [ship.message, ship.note],
         [
           'awaiting approval',
           `${branch} is on main — nothing is left for ship to merge: the run has landed as git reads it, and nothing waits on you; close the record if you want it closed: nemia cancel ${id}`,
@@ -1207,7 +1207,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       assert.equal(readRun(first.id).steps.ship.taskId, null);
       assert.equal(readRun(second.id).steps.ship.workspace, repo, "and the one filed is in the repository's own checkout");
       assert.deepEqual((await at.pass(first.id)).filed, [], 'pass after pass, while that step is in the checkout');
-      assert.equal((await shipOf(first.id)).status, `waiting on the checkout (${second.id}'s ship has it)`);
+      assert.equal((await shipOf(first.id)).message, `waiting on the checkout (${second.id}'s ship has it)`);
       const { decision, checkout } = await stage.runWith(e(), decideRun(first.id));
       assert.deepEqual([decision.kind, decision.kind === 'running' ? decision.waiting : []], ['running', ['ship']]);
       assert.deepEqual(checkout, { run: second.id, step: 'ship' });
@@ -1303,7 +1303,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       assert.equal(world().head(two.repo), first.base, 'nothing merged while two endings wanted the same directory');
       const l = await listed(second.id);
       assert.deepEqual(
-        [l.steps[1].status, l.steps[1].note],
+        [l.steps[1].message, l.steps[1].note],
         ['succeeded · BLOCKED', `try 2 asked (--continue) — waiting on the checkout (${first.id}'s ship has it)`],
       );
       const printed = await at.printedBy(st, ['decide', second.id]);
@@ -1327,7 +1327,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
       assert.deepEqual(l.waitingOnYou, [], 'nobody is waited on — what holds it is a directory');
       assert.equal(l.toDecide, undefined, 'and there is nothing to decide');
       assert.deepEqual(
-        [l.steps[1].status, l.steps[1].note],
+        [l.steps[1].message, l.steps[1].note],
         ['succeeded · BLOCKED', `try 2 asked (--continue) — waiting on the checkout (${first.id}'s ship has it)`],
       );
       const { decision } = await stage.runWith(e(), decideRun(second.id));
@@ -1361,7 +1361,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
     settle(`${second.id}-ship`, 'succeeded', SIGNED);
     assert.deepEqual((await at.pass(first.id)).filed, ['ship'], 'and filed on the first pass after it settles');
     assert.equal(readRun(first.id).steps.ship.workspace, repo);
-    assert.equal((await shipOf(first.id)).status, 'pending');
+    assert.equal((await shipOf(first.id)).message, 'pending');
   });
 
   await s.test(
@@ -1377,7 +1377,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
         [],
         'until it has settled that agent is still mid merge, so the other files nothing',
       );
-      assert.equal((await shipOf(first.id)).status, `waiting on the checkout (${second.id}'s ship has it)`);
+      assert.equal((await shipOf(first.id)).message, `waiting on the checkout (${second.id}'s ship has it)`);
       settle(`${second.id}-ship`, 'stopped');
       assert.deepEqual((await at.pass(first.id)).filed, ['ship'], 'settled stopped: the checkout is free, and the next pass takes it');
       assert.equal(readRun(first.id).steps.ship.workspace, repo);
@@ -1437,7 +1437,7 @@ test('a checkout held by a merge staged and not landed, and claimed by no run th
       assert.deepEqual((await at.pass(child.id)).filed, [], 'a merge-only run approved oldest waits on a run at its own gate');
       await stage.runWith(e(), approveRun(waiting.id, 'ship'));
       assert.deepEqual((await at.pass(waiting.id)).filed, ['ship'], 'so the checkout goes to the run that would use it');
-      assert.equal((await shipOf(waiting.id)).status, 'pending');
+      assert.equal((await shipOf(waiting.id)).message, 'pending');
 
       const other = at.aRepo();
       const inFlight = await at.atTheGate({ repo: other });
@@ -1473,7 +1473,7 @@ test('a checkout held by a merge staged and not landed, and claimed by no run th
       assert.deepEqual((await at.pass(other.id)).filed, ['ship'], 'the older word takes the checkout');
       assert.deepEqual((await at.pass(child.id)).filed, [], 'and the run with nothing filed waits for it');
       await at.aPass(e());
-      assert.equal((await listed(child.id)).steps[0].status, `waiting on the checkout (${other.id}'s ship has it)`);
+      assert.equal((await listed(child.id)).steps[0].message, `waiting on the checkout (${other.id}'s ship has it)`);
       settle(`${other.id}-ship`, 'succeeded', SIGNED);
       assert.deepEqual((await at.pass(child.id)).filed, ['ship'], 'and is filed once that step settles');
       assert.equal(readRun(child.id).steps.ship.workspace, repo);
@@ -1681,7 +1681,7 @@ test('an ending that stopped on the base branch sends the work back through the 
       settle(`${id}-review-try3`, 'succeeded', { ...SIGNED, again: false });
       assert.deepEqual((await at.pass(id)).filed, [], 'the loop has settled, and the ending holds at its gate');
       const l = await listed(id);
-      assert.deepEqual([l.steps.find((x) => x.name === 'ship')!.status, l.toDecide?.kind], ['awaiting approval', 'approve']);
+      assert.deepEqual([l.steps.find((x) => x.name === 'ship')!.message, l.toDecide?.kind], ['awaiting approval', 'approve']);
       const { approval } = await stage.runWith(e(), approveRun(id, 'ship', 'Merge it, now it takes main.'));
       assert.deepEqual([approval.step, approval.try], ['ship', 2], 'a new approval, of the try the ending is now on');
       assert.deepEqual((await at.pass(id)).filed, ['ship']);
@@ -1877,7 +1877,7 @@ test('a loop out of rounds before its ending: accepted as it stands, sent back a
         'accepted, the loop ends; the ending is approved before it is filed, so it goes to its gate',
       );
       const l = await listed(id);
-      assert.deepEqual([l.steps.find((x) => x.name === 'ship')!.status, l.toDecide?.kind], ['awaiting approval', 'approve']);
+      assert.deepEqual([l.steps.find((x) => x.name === 'ship')!.message, l.toDecide?.kind], ['awaiting approval', 'approve']);
       const { decision: d, offers, accepted } = await stage.runWith(e(), decideRun(id));
       assert.deepEqual(
         [d.kind === 'awaiting' && d.awaitingApproval, offers],

@@ -34,7 +34,7 @@ const headed = (page: Page, state: string) =>
 
 /**
  * What the package says of a step whose check the pause holds (`judgedRow` in the package's list.ts): its codes, which the board draws
- * by, and its words, the message and the note beside it, which it only shows. `status` is the message under its old name.
+ * by, and its words, the message and the note beside it, which it only shows.
  */
 const HELD_WORDS = {
   phase: 'pending',
@@ -42,7 +42,6 @@ const HELD_WORDS = {
   on: 'pause',
   via: null,
   message: 'waiting on the pause',
-  status: 'waiting on the pause',
   verdict: { result: 'running', exit: null },
   note: 'its check is filed on nemia resume',
 } as const satisfies Partial<Step>;

@@ -98,7 +98,7 @@ const askedOf = async (id: string) => {
 /** `nemia ls` of the run `id`: each step's status, and who waits on you. */
 const listed = async (id: string) => {
   const l = await stage.runWith(stage.board().e, list(stage.board().e, readRun(id)));
-  return { statuses: l.steps.map((s) => s.status), onYou: l.waitingOnYou };
+  return { statuses: l.steps.map((s) => s.message), onYou: l.waitingOnYou };
 };
 /** What `nemia decide` decides of the run `id`, where it awaits you. */
 const awaiting = async (id: string) => {

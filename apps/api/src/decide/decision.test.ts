@@ -651,7 +651,7 @@ test('the commands a decision offers are bare `nemia` lines, by the state the ru
       });
 
       const detail = await detailOf('r-d11');
-      assert.deepEqual([detail.steps[0].status, detail.steps[1].status, detail.waitingOnYou], ['denied', 'pending', ['implement']]);
+      assert.deepEqual([detail.steps[0].message, detail.steps[1].message, detail.waitingOnYou], ['denied', 'pending', ['implement']]);
       const body = await decidable('r-d11');
       const once = body.commands.filter((c: DecideCommand) => c.label === 'once more');
       assert.deepEqual(

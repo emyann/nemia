@@ -172,7 +172,7 @@ test("a run at its ending's gate: `to decide` says what the ending would do on t
       const before = gitCount();
       const detail = await detailOf(id);
       assert.deepEqual(
-        detail.steps.map((s) => [s.name, s.status]),
+        detail.steps.map((s) => [s.name, s.message]),
         [
           ['implement', 'unverified · done'],
           ['ship', 'awaiting approval'],
@@ -534,7 +534,7 @@ test("a finished run's `to decide`, level-triggered: its branch ahead of the bas
 
       const detail = await detailOf(id);
       assert.deepEqual(
-        detail.steps.map((s) => s.status),
+        detail.steps.map((s) => s.message),
         ['unverified · done', 'unverified · done'],
       );
       assert.deepEqual([detail.status, detail.waitingOnYou], ['succeeded', []]);

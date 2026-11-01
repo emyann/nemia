@@ -486,12 +486,12 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
       const listed = await summary();
       const statuses = ['over budget $2.10 of $2', 'over budget — implement $2.10 of $2', 'over budget $4.25 of $3'];
       assert.deepEqual(
-        listed.steps.map((s) => s.status),
+        listed.steps.map((s) => s.message),
         statuses,
       );
       assert.deepEqual(
-        listed.steps.map(({ name, status, note }) => ({ name, status, note })),
-        words.steps.map(({ name, status, note }) => ({ name, status, note: note ?? null })),
+        listed.steps.map(({ name, message, note }) => ({ name, message, note })),
+        words.steps.map(({ name, message, note }) => ({ name, message, note: note ?? null })),
       );
       assert.deepEqual(listed.waitingOnYou, ['implement', 'review', 'tokens']);
       assert.deepEqual(listed.waitingOnYou, words.waitingOnYou);
@@ -499,7 +499,7 @@ test('a run whose steps went over their budgets: what each try cost, the steps h
 
       const run = await detail();
       assert.deepEqual(
-        run.steps.map((s) => s.status),
+        run.steps.map((s) => s.message),
         statuses,
       );
       assert.deepEqual(run.waitingOnYou, listed.waitingOnYou);
@@ -642,9 +642,9 @@ test('steps past their budget on their own work: one that signed off blocked is 
       const run = await detail(R2);
       const [palette, lint] = ['palette', 'lint'].map((name) => stepOf(run, name));
       assert.deepEqual(
-        [palette.status, lint.status],
+        [palette.message, lint.message],
         ['over budget $1.50 of $1', 'over budget $1.20 of $1'],
-        'its word is over budget however it ended: how it ended is on the raise',
+        'how it ended is on the raise',
       );
       assert.deepEqual(run.waitingOnYou, ['palette', 'lint']);
       assert.deepEqual(palette.raise, { by: 'retry', above: 1.5, said: '$1.50', modes: ['continue', 'fresh'], own: 'blocked' });

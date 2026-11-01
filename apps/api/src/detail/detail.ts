@@ -361,8 +361,6 @@ export type RunDetail = {
     message: string;
     /** As on `RunSummary`: its check's verdict as codes, null for a step not judged by its check. */
     verdict: CheckVerdict | null;
-    /** @deprecated As on `RunSummary`: `message` under its old name, kept for one card. */
-    status: string;
     /** As on `RunSummary`. */
     note: string | null;
     /** As on `RunSummary`. */

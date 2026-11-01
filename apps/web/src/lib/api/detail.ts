@@ -399,8 +399,6 @@ export type RunDetail = RunCodes & {
       message: string;
       /** As on `RunSummary`: its check's verdict as codes, null for a step its check did not judge. */
       verdict: CheckVerdict | null;
-      /** @deprecated As on `RunSummary`: `message` under its old name, which the board reads nowhere. */
-      status: string;
       /** As on `RunSummary`. */
       note: string | null;
       /** As on `RunSummary`. */
@@ -582,7 +580,6 @@ const DetailStepSchema = decodes<RunDetail['steps'][number]>()(
     branch: Schema.NullOr(Schema.String),
     ...StepCodesFields,
     verdict: Schema.NullOr(CheckVerdictSchema),
-    status: Schema.String,
     note: Schema.NullOr(Schema.String),
     roundDue: Schema.Boolean,
     commands: Schema.Struct({ approve: Schema.String, retry: Schema.String, say: Schema.String }),

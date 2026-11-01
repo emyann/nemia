@@ -38,7 +38,10 @@ const CLAUDE_CODE = 'claude';
 /** The harness a step runs on without a `harness:` line: the engine's first (`HARNESSES`), thrown as the module loads where it has none. */
 const FIRST_HARNESS: string = (() => {
   const [first] = Object.keys(HARNESSES);
-  if (first === undefined) throw new Error("The engine names no harness (`HARNESSES` is empty): give it one, as `claude: 'claude'`.");
+  if (first === undefined)
+    throw new Error(
+      "The engine names no harness (`HARNESSES` is empty): install the agent-runtime this api was built with (npm install, from the repository's root).",
+    );
   return first;
 })();
 

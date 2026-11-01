@@ -18,13 +18,13 @@ import { fenceReach, type FenceReach } from 'agent-runtime/vocabulary';
 /**
  * What harness `harness`'s fence words reach, the runtime's answer (`fenceReach`): the default harness's for one fenced by neither a mode
  * nor a sandbox, as every permission mode was judged before a step named its harness. Throws where the runtime has no answer for its own
- * default harness, an agent-runtime the orchestrator was not shipped with.
+ * default harness, an agent-runtime the orchestrator was not built with.
  */
 const reachOf = (harness: string = DEFAULT_HARNESS): FenceReach => {
   const reach = fenceReach(harness) ?? fenceReach(DEFAULT_HARNESS);
   if (reach === undefined) {
     throw new Error(
-      `agent-runtime names no fence words for its default harness ${DEFAULT_HARNESS}: install the agent-runtime this orchestrator was shipped with (npm install, from the repository's root).`,
+      `agent-runtime names no fence words for its default harness ${DEFAULT_HARNESS}: install the agent-runtime this orchestrator was built with (npm install, from the repository's root).`,
     );
   }
   return reach;

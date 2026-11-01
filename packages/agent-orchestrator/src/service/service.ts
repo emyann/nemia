@@ -67,9 +67,9 @@ function envPair(word: string): [string, string] {
  */
 export function envRefusal(given: readonly string[]): string | null {
   const seen = new Set<string>();
-  for (const word of given) {
-    const [key, value] = envPair(word);
-    if (!word.includes('=')) return `nemia service install: --env ${word} has no value: give it as --env KEY=VALUE.`;
+  for (const entry of given) {
+    const [key, value] = envPair(entry);
+    if (!entry.includes('=')) return `nemia service install: --env ${entry} has no value: give it as --env KEY=VALUE.`;
     if (!ENV_KEY.test(key))
       return `nemia service install: --env ${key} is not a variable's name: a letter or _, then letters, digits and _.`;
     if ((OWN_KEYS as readonly string[]).includes(key))

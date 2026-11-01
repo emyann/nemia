@@ -16,6 +16,6 @@
  * left. A count is never raised, nor a file added. Today's counts, printed as entries: `node tools/guards/test/parsed-state.ts`.
  */
 export const PARSED_STATE: Readonly<Record<string, { readonly count: number; readonly card: string }>> = {
-  'packages/agent-orchestrator/src/feed/reason.ts': { count: 6, card: "A step's state crosses the wire as a code, not a sentence" },
+  'packages/agent-orchestrator/src/feed/reason.ts': { count: 5, card: "A step's state crosses the wire as a code, not a sentence" },
   'packages/agent-orchestrator/src/service/service.ts': { count: 2, card: "A step's state crosses the wire as a code, not a sentence" },
 };

@@ -22,6 +22,11 @@
       }
     },
     {
+      "term": "Attempt end",
+      "meaning": "why a step's latest attempt ended, in the words a person reads for it (`endWords`): the runtime's reason (harness, lost, unstartable, operator, deadline: its `EndReason`, written out as `AttemptReason` and held equal in `packages/agent-orchestrator/src/runtime-client.ts`), or the orchestrator's own judging, `budget` (cut at the step's spend cap) and `unsigned` (ended without the statement its task asked for). The api serves it as `StepAttempts.latest.reason`, beside how it ended (`EngineOutcome`).",
+      "type": "AttemptEnd"
+    },
+    {
       "term": "Blocked",
       "meaning": "only a closeout's outcome: the agent signed off unable to go on without an answer, which its step says as reason `AwaitingAnswer`, `via` closeout.",
       "type": "Closeout"
@@ -202,6 +207,11 @@
       }
     },
     {
+      "term": "Pass phase",
+      "meaning": "a part of a tick's pass its time is counted in (`PHASES`): records, asks, journals, revisions, observe, runtime, place, assess, act, the `phase` label of a series line (`pass.phase.ms`). The place phase was `git` while the place was git's alone; a stored line that still says `git` reads as `place` (`FORMER_PHASES`). Never a step's phase.",
+      "type": "Phase"
+    },
+    {
       "term": "Pending",
       "meaning": "not filed yet: a step waiting on the steps before it (reason `Pending`, status `pending`), or held back by a thing (reason `Waiting`, `on` a run, the limit, the checkout or the pause).",
       "type": "WaitOn"
@@ -316,6 +326,11 @@
       "type": "RunId"
     },
     {
+      "term": "Session state",
+      "meaning": "where a step's session stands as its moment says it to a follower (`StepMoment`, kind `state`), in A2A's TaskState words: submitted, working, input-required, auth-required, completed, failed, canceled, rejected — the runtime's `SessionState`, kept rather than renamed and held equal in `packages/agent-orchestrator/src/runtime-client.ts`.",
+      "type": "StepSessionState"
+    },
+    {
       "term": "Show",
       "meaning": "the one spelling of a read of one thing: `nemia show` of a run, the api's `skills show` and `inbox show`.",
       "retired": [
@@ -370,6 +385,11 @@
         "label": "Two loops",
         "href": "/how-a-run-lives/#two-loops-both-level-triggered"
       }
+    },
+    {
+      "term": "Transcript mark",
+      "meaning": "the kind of the last transcript event before a person's words reached a step's session (`nemia say`), which a said message carries as `after.kind`: text, thinking, tool_use, tool_result or system, the runtime's `TranscriptEvent` kinds held equal in `packages/agent-orchestrator/src/runtime-client.ts`.",
+      "type": "SaidAfterKind"
     },
     {
       "term": "Try",

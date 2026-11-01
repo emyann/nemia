@@ -1,4 +1,5 @@
 import type { StepArtifact, StepTry } from './api';
+import type { AttemptEnd } from './api/tries.ts';
 
 /**
  * How the Output tab draws one field of a closeout. A closed set, and `json` is the answer for anything it does not recognise:
@@ -94,7 +95,7 @@ export type Outcome =
  * `unsigned`, the orchestrator's end word (`endWords`), no longer one of the engine's: an end without the statement its task asked for.
  * `harness` is not here: a harness's own end is a reason only when it said `failed` or `stopped` (`outcomeOf`).
  */
-export const MACHINE_WORDS: Readonly<Record<string, string>> = {
+export const MACHINE_WORDS: Readonly<Partial<Record<AttemptEnd, string>>> = {
   unsigned: 'The session ended without the closing statement it was asked for. It may have finished; it did not say so.',
   lost: 'The session was lost: it vanished, or its worker stopped beating, before it said how it went.',
   unstartable: 'The session never started: its harness vouched that nothing ran.',
@@ -104,7 +105,7 @@ export const MACHINE_WORDS: Readonly<Record<string, string>> = {
 };
 
 /** What is said after an agent's statement when its attempt was cut anyway: it spoke, and then the machine ended it. */
-const CUT_WORDS: Readonly<Record<string, string>> = {
+const CUT_WORDS: Readonly<Partial<Record<AttemptEnd, string>>> = {
   operator: 'then a person stopped it',
   deadline: 'then it ran past its deadline and was stopped',
   budget: 'then its harness cut it off at its spend cap',

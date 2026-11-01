@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { askingTry, budgetOf, budgetUsdFor, owedFields, spentAcceptances, taskSpend, type RepositoryRun, type Run } from '../run.ts';
-import { taskUsage, type TaskClock } from '../timeline/timeline.ts';
+import { taskUsage, type AttemptReason, type TaskClock } from '../timeline/timeline.ts';
 import type { EarlierTry } from '../retry/retry-ask.ts';
 import type { OutputSchema, Workflow } from '../workflow.ts';
 import { run, step } from '../../test/assessed.ts';
@@ -13,7 +13,7 @@ import { run, step } from '../../test/assessed.ts';
 const clock = (m: number, s = 0) => new Date(Date.UTC(2026, 8, 13, 8, m, s)).toISOString();
 
 test('taskSpend: what a task cost is the dollars on its attempts that are over', async (t) => {
-  const attempt = (endedAt: string | null, reason: string | null, costUsd?: number, limit?: string) => ({
+  const attempt = (endedAt: string | null, reason: AttemptReason | null, costUsd?: number, limit?: string) => ({
     startedAt: clock(0),
     spawnedAt: clock(0, 5),
     endedAt,
@@ -33,9 +33,10 @@ test('taskSpend: what a task cost is the dollars on its attempts that are over',
     });
   });
   await t.test('an earlier cut is not the last attempt’s, and a `budget` reason is no longer read', () => {
+    const budgetAsReasonAgainstItsType = 'budget' as AttemptReason;
     const later = view('failed', attempt(clock(9), 'harness', 3.5, 'budget'), attempt(clock(12), 'harness', 0.5));
     assert.equal(taskSpend(later)!.budgetEnded, false);
-    assert.equal(taskSpend(view('failed', attempt(clock(9), 'budget', 3.5)))!.budgetEnded, false);
+    assert.equal(taskSpend(view('failed', attempt(clock(9), budgetAsReasonAgainstItsType, 3.5)))!.budgetEnded, false);
   });
   await t.test('an attempt in flight is in neither count', () => {
     assert.deepEqual(taskSpend(view(null, attempt(clock(5), 'lost', 1.25), attempt(null, null))), {

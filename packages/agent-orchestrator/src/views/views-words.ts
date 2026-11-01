@@ -4,9 +4,16 @@
  * since a pure file imports no runtime.
  */
 import { type TaskPhase } from '../record/record.ts';
-import { signedAndHeld, type AttemptClock, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
+import { signedAndHeld, type AttemptClock, type AttemptReason, type EngineOutcome, type TaskClock } from '../timeline/index.ts';
 
-export type { EngineOutcome };
+export type { AttemptReason, EngineOutcome };
+
+/**
+ * How an attempt ended, in the words a person reads for it (`endWords`): the runtime's reason (`AttemptReason`), or the orchestrator's
+ * own judging of an end the runtime only carries the fact of — `budget`, cut at the step's spend cap, and `unsigned`, ended without the
+ * statement its task asked for.
+ */
+export type AttemptEnd = AttemptReason | 'budget' | 'unsigned';
 
 /**
  * The runtime's task phases, written out because a pure file imports no runtime, a type included: the closed set a task's view stands
@@ -110,7 +117,7 @@ export const unsignedEnd = (state: WordView['state'], a: WordAttempt | undefined
  * recorded it. The one writer of those words for a surface that shows an attempt's end, so every surface says the same: never read an
  * attempt's raw `reason` for `unsigned` or `budget`.
  */
-export const endWords = (state: WordView['state'], a: WordAttempt): { ended: string | null; reason: string | null } =>
+export const endWords = (state: WordView['state'], a: WordAttempt): { ended: EngineOutcome | null; reason: AttemptEnd | null } =>
   a.limit === 'budget'
     ? { ended: 'failed', reason: 'budget' }
     : unsignedEnd(state, a)

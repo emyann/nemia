@@ -142,6 +142,33 @@ const FILES: { name: string; check: (t: TestContext) => void | Promise<void> }[]
       assert.ok(said[0].startsWith(`${dayFile('minute', '2026-10-05')}: 2 `), said[0]);
     },
   },
+  {
+    name: "a label's word is read in its closed set: a phase stored under its former word reads as today's, and a word of no set is left out",
+    check: (t) => {
+      const stored = (v: number, l: Record<string, string>) => `${JSON.stringify(line(`2026-10-06T0${v}:00:00.000Z`, v, l))}\n`;
+      fs.mkdirSync(tierDir('hour'), { recursive: true });
+      fs.writeFileSync(
+        dayFile('hour', '2026-10-06'),
+        [
+          stored(1, { phase: 'git' }),
+          stored(2, { phase: 'nope' }),
+          stored(3, { part: 'runs', kind: 'nope' }),
+          stored(4, { part: 'nope' }),
+          stored(5, { part: 'runs', kind: 'records' }),
+        ].join(''),
+      );
+      const said: string[] = [];
+      t.mock.method(process.stderr, 'write', (text: string) => said.push(text) > 0);
+      assert.deepEqual(
+        readDay('hour', '2026-10-06').map((x) => [x.sum, x.l]),
+        [
+          [1, { phase: 'place' }],
+          [5, { part: 'runs', kind: 'records' }],
+        ],
+      );
+      assert.equal(said.length, 1, 'the three lines of no set are said once, with their file');
+    },
+  },
   { name: 'no file, no lines', check: () => assert.deepEqual(readDay('minute', '2026-01-01'), []) },
   { name: 'no last line before any is written', check: () => assert.equal(lastLine('hour'), undefined) },
   {

@@ -24,6 +24,7 @@ import { own } from '../core/own.ts';
 import { argsRefusalOf, type HarnessArgs } from './args.ts';
 import { causeWords, RunnerError } from './error.ts';
 import type { Telemetry } from './telemetry.ts';
+import type { OriginOf } from '../../contracts/origin.contract.ts';
 
 export { RunnerError } from './error.ts';
 
@@ -113,10 +114,33 @@ export type TranscriptEvent = {
   /**
    * Where the words came from, as the harness said it, for a `user` event: `human` where a person wrote them into the session itself
    * — Claude Code's own face, a claude.ai bridge — and absent where the host pushed them on the session's input, which the caller
-   * already knows it did. **Carried, never judged**: `decide` does not read it; a layer that draws a conversation does.
+   * already knows it did. A word the harness has not named reads as `unknown` (`originOf`), never as `human`. **Carried, never judged**:
+   * `decide` does not read it; a layer that draws a conversation does.
    */
-  origin?: { kind: string };
+  origin?: { kind: TranscriptOriginKind };
 };
+
+/**
+ * The words a harness has for where a transcript event came from, the Agent SDK's (`SDKMessageOrigin['kind']`), held equal to them in
+ * Claude's reader.
+ */
+export const ORIGIN_KINDS = [
+  'human',
+  'channel',
+  'peer',
+  'task-notification',
+  'coordinator',
+  'unclassified',
+  'observer',
+  'auto-continuation',
+  'observer-activity',
+] as const;
+
+/** Where a transcript event came from: a word of `ORIGIN_KINDS`, or `unknown` for one the harness wrote that is none of them. */
+export type TranscriptOriginKind = (typeof ORIGIN_KINDS)[number] | 'unknown';
+
+/** A harness's written origin as its word: itself where `ORIGIN_KINDS` names it, `unknown` otherwise (`contracts/origin.contract.ts`). */
+export const originOf: OriginOf = (written) => ORIGIN_KINDS.find((kind) => kind === written) ?? 'unknown';
 
 /** One event of a session's transcript, named as an event is unique: by its `kind` and `id` together. */
 export type TranscriptMark = { kind: TranscriptEvent['kind']; id: string };

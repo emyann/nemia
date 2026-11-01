@@ -75,8 +75,14 @@
       "term": "Harness",
       "meaning": "the program a session runs in: Claude Code, Codex, a plain command, or a remote A2A agent.",
       "retired": [
-        { "spelling": "claude-detached", "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed" },
-        { "spelling": "claude-bg", "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed" }
+        {
+          "spelling": "claude-detached",
+          "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed"
+        },
+        {
+          "spelling": "claude-bg",
+          "card": "every Claude Code session runs on the Agent SDK: `claude -p` and `claude --bg` removed"
+        }
       ],
       "see": {
         "label": "A harness",
@@ -120,6 +126,11 @@
           "card": "the runtime says where a task stands in one closed set (decisions 2 and 11 of the language work)"
         }
       ]
+    },
+    {
+      "term": "MCP transport",
+      "meaning": "what Claude Code loads an MCP server of a `.mcp.json` over, in the Agent SDK's words for a server a file declares (`MCP_TRANSPORTS`: stdio, http, sse); a written `type` that is none of them reads as `unknown` (`transportOf`).",
+      "type": "McpTransport"
     },
     {
       "term": "Mount",
@@ -231,6 +242,11 @@
       "term": "Task id",
       "meaning": "a task's id, the name of its journal file: checked on create, read as any string.",
       "type": "TaskId"
+    },
+    {
+      "term": "Transcript origin",
+      "meaning": "where a harness's transcript event came from, as the harness said it: one of the Agent SDK's words for a message's origin (`ORIGIN_KINDS`: human, channel, peer, task-notification, coordinator, unclassified, observer, auto-continuation, observer-activity), or `unknown` for any word the SDK has not named, never read as a person's (`originOf`).",
+      "type": "TranscriptOriginKind"
     }
   ]
 }

@@ -355,13 +355,6 @@
     // The ceilings only fall: a limit is met by cutting, never by raising a ceiling. packages/agent-orchestrator/test/limits.test.ts
     // ratchets them: it refuses a ceiling above the measure, and holds each file's count of offenders.
     {
-      "files": ["apps/api/src/capabilities/capabilities.ts"],
-      "rules": {
-        "complexity": ["error", { "max": 21 }],
-        "sonarjs/cognitive-complexity": ["error", 16]
-      }
-    },
-    {
       "files": ["apps/api/src/capabilities/reach.ts"],
       "rules": {
         "max-lines-per-function": ["error", { "max": 137, "skipBlankLines": true, "skipComments": true }],

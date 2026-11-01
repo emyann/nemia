@@ -17,13 +17,10 @@
  * fields, printed as entries: `node tools/guards/test/closed-state.ts`.
  */
 export const OPEN_STATE: Readonly<Record<string, { readonly card: string }>> = {
-  'apps/api/src/capabilities/capabilities.ts#McpServer.type': { card: 'Close third-party kinds at the doors' },
   'apps/api/src/detail/tries.ts#StepAttempts.latest.reason': { card: "Close the orchestrator's state words at its doors" },
-  'apps/api/src/factory/ceilings.ts#MetricRead.type': { card: 'Close third-party kinds at the doors' },
   'packages/agent-orchestrator/src/following/following.ts#StepMoment.state': { card: "Close the orchestrator's state words at its doors" },
   'packages/agent-orchestrator/src/place/place.ts#ChangedFile.status': { card: "Close the orchestrator's state words at its doors" },
   'packages/agent-orchestrator/src/say/say.ts#Said.after.kind': { card: "Close the orchestrator's state words at its doors" },
   'packages/agent-orchestrator/src/series/series.ts#RollupLine.l.kind': { card: "Close the orchestrator's state words at its doors" },
   'packages/agent-orchestrator/src/series/series.ts#RollupLine.l.phase': { card: "Close the orchestrator's state words at its doors" },
-  'packages/agent-runtime/src/harness/seam.ts#TranscriptEvent.origin.kind': { card: 'Close third-party kinds at the doors' },
 };

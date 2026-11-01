@@ -16,6 +16,12 @@ import { turnOf, turnSpanOf, type TurnSpan, type TurnTry } from './turns.ts';
 export type EngineOutcome = 'succeeded' | 'failed' | 'stopped';
 
 /**
+ * Why an attempt ended, as the runtime records it: its `EndReason`, written out because this file imports no runtime, and held equal to
+ * it in `runtime-client.ts` (`attemptReasonHeld`).
+ */
+export type AttemptReason = 'harness' | 'lost' | 'unstartable' | 'operator' | 'deadline';
+
+/**
  * An attempt's clock, and what it consumed, as the engine's `Attempt` keeps them: named here because this file does not import the
  * engine. decide.verb.ts hands `timeline` the engine's views, which have this shape.
  */
@@ -23,7 +29,7 @@ export type AttemptClock = {
   startedAt: string;
   spawnedAt: string | null;
   endedAt: string | null;
-  reason: string | null;
+  reason: AttemptReason | null;
   usage: Consumed | null;
   resumeFrom?: string;
   /**

@@ -479,7 +479,7 @@ test("a task held open that signed waits on a person, and nothing runs: it ended
     startedAt: clock(0, 1),
     spawnedAt: clock(0, 4),
     endedAt: clock(9, 4),
-    reason: 'harness',
+    reason: 'harness' as const,
     usage: null,
     ended: 'succeeded' as const,
   };
@@ -508,7 +508,7 @@ test("a task held open that signed waits on a person, and nothing runs: it ended
     startedAt: clock(600),
     spawnedAt: clock(600, 3),
     endedAt: clock(605, 3),
-    reason: 'harness',
+    reason: 'harness' as const,
     usage: null,
     ended: 'succeeded' as const,
     turn: 1,

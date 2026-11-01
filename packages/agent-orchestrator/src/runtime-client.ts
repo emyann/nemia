@@ -26,6 +26,7 @@ import {
   type Credentials,
   type MissingCredential,
   type RemoteAgent,
+  type EndReason,
   type SessionState,
   type TaskPhase,
   type TranscriptEvent,
@@ -45,6 +46,7 @@ import type { EnginePhase } from './views/views-words.ts';
 import { fromThrow } from './door/door.store.ts';
 import type { SaidAfterKind } from './say/say.ts';
 import type { StepSessionState } from './following/following.ts';
+import type { AttemptReason } from './timeline/index.ts';
 
 /**
  * Whether two unions hold the same words: `true` only when each is assignable to the other, `false` otherwise, so a `true` annotation
@@ -65,6 +67,9 @@ export const saidAfterKindHeld: Same<SaidAfterKind, TranscriptEvent['kind']> = t
 
 /** The orchestrator's copy of A2A's session states (`StepSessionState`), held equal to the runtime's `SessionState`. */
 export const stepSessionStateHeld: Same<StepSessionState, SessionState> = true;
+
+/** The orchestrator's copy of why an attempt ended (`AttemptReason`), held equal to the runtime's `EndReason`. */
+export const attemptReasonHeld: Same<AttemptReason, EndReason> = true;
 
 /** The runtime's engine, built: each verb an Effect whose refusal is a tagged error, which a controller reads with `asked`. */
 export type Engine = EngineShape;

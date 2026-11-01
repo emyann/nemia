@@ -77,7 +77,7 @@ const answeredBy = (view: TaskClock, end: string): TaskClock => {
     startedAt: minus(end, 10 * MIN),
     spawnedAt: minus(end, 10 * MIN),
     endedAt: end,
-    reason: 'harness',
+    reason: 'harness' as const,
     usage: { costUsd: 0.5 },
     turn,
   };

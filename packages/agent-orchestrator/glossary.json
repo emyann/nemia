@@ -22,6 +22,11 @@
       }
     },
     {
+      "term": "Attempt end",
+      "meaning": "why a step's latest attempt ended, in the words a person reads for it (`endWords`): the runtime's reason (harness, lost, unstartable, operator, deadline: its `EndReason`, written out as `AttemptReason` and held equal in `runtime-client.ts`), or the orchestrator's own judging, `budget` (cut at the step's spend cap) and `unsigned` (ended without the statement its task asked for). The api serves it as `StepAttempts.latest.reason`, beside how it ended (`EngineOutcome`).",
+      "type": "AttemptEnd"
+    },
+    {
       "term": "Blocked",
       "meaning": "only a closeout's outcome: the agent signed off unable to go on without an answer, which its step says as reason `AwaitingAnswer`, `via` closeout.",
       "type": "Closeout"

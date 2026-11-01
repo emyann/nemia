@@ -420,7 +420,7 @@ export {
   unjudgedWord,
   waitingOf,
 } from './views/views.verb.ts';
-export { endWords, phaseOfView, wordOfView } from './views/views-words.ts';
+export { endWords, phaseOfView, wordOfView, type AttemptEnd, type EngineOutcome } from './views/views-words.ts';
 export type { Bridge, CheckReport } from './views/views.verb.ts';
 export { readPlan } from './plan/plan.store.ts';
 export { leftOutMounts, repoFor, startRun } from './start/start.verb.ts';

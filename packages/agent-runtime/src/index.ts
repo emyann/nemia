@@ -109,6 +109,7 @@ export type {
   Transcript,
   TranscriptCursor,
   TranscriptEvent,
+  TranscriptOriginKind,
   TranscriptMark,
 } from './harness/index.ts';
 export { HARNESS_ARGS, TAKEN_ARGS, TURN_ARGS, argsRefusalOf } from './harness/index.ts';

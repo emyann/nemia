@@ -40,6 +40,7 @@ const CLAIMS: Record<string, string> = {
   '2451-2461': 'systemPrompt',
   '3078': 'mcpServerStatus',
   '4687': 'appendSystemPrompt',
+  '5561': 'SDKMessageOrigin',
   '6034-6037': 'total_cost_usd',
   '9304': 'autoCompactWindow',
 };

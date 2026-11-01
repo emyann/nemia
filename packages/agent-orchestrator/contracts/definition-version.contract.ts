@@ -11,7 +11,13 @@ import type { VersionRefused } from '../src/folder/folder.ts';
 export type DefinitionThere = { kind: 'none' } | { kind: 'other' } | { kind: 'held'; version: string };
 
 const definitionVersionRefusalSpec = spec<
-  (what: 'agent' | 'skill', name: string, does: 'write' | 'remove', there: DefinitionThere, given: string | undefined) => VersionRefused | null
+  (
+    what: 'agent' | 'skill',
+    name: string,
+    does: 'write' | 'remove',
+    there: DefinitionThere,
+    given: string | undefined,
+  ) => VersionRefused | null
 >({
   ensures: {
     newWriteGoes: {

@@ -1,7 +1,7 @@
 /**
- * The precedence of the lookup roots (`lookupRoots`), pure: which of them — three at most — a name is read from, or the refusal of a name one repository holds
- * in both of its places. Agents and skills are found through it, on the files (`agentsFor`, `skillsFor`) and in the doors' memory
- * stand-ins, so the four cannot disagree. Its laws are `contracts/lookup.contract.ts`'s.
+ * The precedence of the lookup roots (`lookupRoots`), pure: which of them — three at most — a name is read from, or the refusal of a
+ * name one repository holds in both of its places. Agents and skills are found through it, on the files (`agentsFor`, `skillsFor`)
+ * and in the doors' memory stand-ins, so the four cannot disagree. Its laws are `contracts/lookup.contract.ts`'s.
  */
 import type { LookedUp, LookupRoot } from '../../contracts/lookup.contract.ts';
 

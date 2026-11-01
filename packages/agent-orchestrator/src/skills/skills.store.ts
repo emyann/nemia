@@ -10,12 +10,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { AGENTS_FOLDER, SKILLS_FOLDER, WorkflowError } from '../step/step.ts';
-import { linkRefusal, takenAt } from '../folder/folder.ts';
+import { linkRefusal } from '../folder/folder.ts';
 import { skillNameRefusal, skillTurnCost, type SkillCost, type SkillsFound } from '../agents/agents.ts';
 import { skillEntryOf, renderSkill, withPreload, type AgentSkill, type SkillDraft } from './skills.ts';
 import { skillLinkRefusal, skillVersion } from './read.store.ts';
-import { HOME } from '../record/record.store.ts';
-import { isWorkflowsHolder } from '../folder/write.store.ts';
+import type { VersionRefused } from '../folder/folder.ts';
+import { isWorkflowsHolderAt } from '../folder/write.store.ts';
+import { definitionVersionRefusal, type DefinitionThere } from '../agents/agents.ts';
 import { Conflict, Missing } from '../refusal/refusal.ts';
 
 /** One skill folder read now: its card entry, or null with `error` saying why no agent can be given it; and what it costs a turn. */
@@ -122,11 +123,17 @@ export type SkillCopied = { dir: string; name: string; written: string[] };
  * copied into a hidden folder beside where it goes and renamed into place, so a copy that fails part-way leaves no half a skill to be
  * found.
  */
-export function copySkill(from: string, to: string, name: string, { anywhere = false }: { anywhere?: boolean } = {}): SkillCopied {
+export function copySkill(
+  home: string,
+  from: string,
+  to: string,
+  name: string,
+  { anywhere = false }: { anywhere?: boolean } = {},
+): SkillCopied {
   const refuse = refuseSkill;
   const at = path.resolve(to);
   const linkWhy = 'a copy follows a link, and would bring in whatever it points at, outside the skill.';
-  judgeSkillPlace(at, name, anywhere, 'Copy it', linkWhy);
+  judgeSkillPlace(home, at, name, anywhere, 'Copy it', linkWhy);
   const source = path.join(path.resolve(from), name);
   if (fs.lstatSync(source, { throwIfNoEntry: false })?.isSymbolicLink()) refuse(linkRefusal(source, linkWhy));
   const skillFile = path.join(source, 'SKILL.md');
@@ -181,14 +188,14 @@ const refuseSkill = (words: string | undefined, kind?: typeof Missing | typeof C
  * board lists — the store's, or that of a repository a factory names — unless `anywhere`; `name` is a skill's (`skillNameRefusal`); and
  * neither `at` nor the folder it is in is a link, which a write would follow out of the store.
  */
-function judgeSkillPlace(at: string, name: string, anywhere: boolean, verb: string, linkWhy: string): void {
+function judgeSkillPlace(home: string, at: string, name: string, anywhere: boolean, verb: string, linkWhy: string): void {
   if (path.basename(at) !== SKILLS_FOLDER)
     refuseSkill(
       `${at} is not a folder of skills: the skills agents give are in the ${SKILLS_FOLDER}/ beside ${AGENTS_FOLDER}/. Name <workflows>/${SKILLS_FOLDER}.`,
     );
-  if (!anywhere && !isWorkflowsHolder(path.dirname(at))) {
+  if (!anywhere && !isWorkflowsHolderAt(home, path.dirname(at))) {
     refuseSkill(
-      `${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(HOME, 'workflows'), SKILLS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${SKILLS_FOLDER}, for a factory's repo). ${verb} to one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`,
+      `${at} is not the store's ${SKILLS_FOLDER}/ (${path.join(path.resolve(home, 'workflows'), SKILLS_FOLDER)}) nor a repository's the store knows (<repo>/workflows/${SKILLS_FOLDER}, for a factory's repo). ${verb} to one of the two, give its repository to a factory (nemia factory add <name> --repo <repo>), or pass { anywhere: true } to write ${at} all the same.`,
     );
   }
   refuseSkill(skillNameRefusal(name));
@@ -209,9 +216,21 @@ function versionWritten(dir: string, notThere: string): string {
   return version;
 }
 
-/** The version of the skill whose folder is `dir`, or null where `dir` is no folder or holds no SKILL.md. */
-const versionThere = (dir: string): string | null =>
-  fs.statSync(dir, { throwIfNoEntry: false })?.isDirectory() ? skillVersion(dir) : null;
+/**
+ * What is at the skill folder `dir` now, as the version judgement reads it (`definitionVersionRefusal`): nothing; something that is no
+ * skill — a file, or a folder whose SKILL.md is not a file of its own; or a skill at its version (`skillVersion`).
+ */
+export function skillThere(dir: string): DefinitionThere {
+  if (!fs.lstatSync(dir, { throwIfNoEntry: false })) return { kind: 'none' };
+  const version = fs.lstatSync(path.join(dir, 'SKILL.md'), { throwIfNoEntry: false })?.isFile() ? skillVersion(dir) : null;
+  return version === null ? { kind: 'other' } : { kind: 'held', version };
+}
+
+/** A version judged refused (`definitionVersionRefusal`), thrown as the refusal of its kind; nothing for none. */
+const refuseVersion = (refused: VersionRefused | null): void => {
+  if (refused !== null)
+    refuseSkill(refused.message, refused.kind === 'Missing' ? Missing : refused.kind === 'Conflict' ? Conflict : undefined);
+};
 
 /**
  * A skill of the folder of skills `to` written: made, with `{ version: null }`, or changed, with the version it was read at. What the
@@ -227,13 +246,21 @@ const versionThere = (dir: string): string | null =>
  * beside SKILL.md, so a write that fails leaves no half a skill.
  */
 export function writeSkill(
+  home: string,
   to: string,
   change: SkillChange,
   { version, anywhere = false }: { version: string | null; anywhere?: boolean },
 ): SkillWritten {
   const at = path.resolve(to);
   const name = change?.name;
-  judgeSkillPlace(at, name, anywhere, 'Write it', 'a write follows a link, and would write whatever it points at, outside the store.');
+  judgeSkillPlace(
+    home,
+    at,
+    name,
+    anywhere,
+    'Write it',
+    'a write follows a link, and would write whatever it points at, outside the store.',
+  );
   const target = path.join(at, name);
   const file = path.join(target, 'SKILL.md');
   const named = `${SKILLS_FOLDER}/${name}`;
@@ -255,12 +282,7 @@ export function writeSkill(
       refuseSkill(
         `${named} is a change of \`preload:\` alone, and there is no skill to change: write the whole skill — its description and instructions — to make it.`,
       );
-    if (fs.lstatSync(target, { throwIfNoEntry: false })) {
-      refuseSkill(
-        `${named} is there already, in ${at}, and a new skill would write over it. Give it another name, or open ${name} and change it${takenAt(versionThere(target))}.`,
-        Conflict,
-      );
-    }
+    refuseVersion(definitionVersionRefusal('skill', name, 'write', skillThere(target), undefined));
     const text = rendered();
     fs.mkdirSync(at, { recursive: true });
     const staging = path.join(at, `.${name}.writing-${process.pid}-${Date.now()}`);
@@ -273,11 +295,7 @@ export function writeSkill(
       throw err;
     }
   } else {
-    if (!fs.lstatSync(file, { throwIfNoEntry: false })?.isFile())
-      refuseSkill(`${named} is not in ${at}: it was removed. Write it again as a new skill.`, Missing);
-    const now = skillVersion(target);
-    if (now !== version)
-      refuseSkill(`${named} changed since it was read (version ${version}, now ${now}). Read it again before changing it.`, Conflict);
+    refuseVersion(definitionVersionRefusal('skill', name, 'write', skillThere(target), version));
     const text = rendered(fs.readFileSync(file, 'utf8'));
     const staging = path.join(target, `.SKILL.md.writing-${process.pid}-${Date.now()}`);
     try {

@@ -89,7 +89,10 @@ export function oneFolder(a: string, b: string): boolean {
   }
 }
 
-/** The skills of the roots `roots`, by bare name, each the folder it is or its refusal, a builtin place skill found last. */
+/**
+ * The skills of the roots `roots`, by bare name, each the folder it is or its refusal, a builtin place skill found last. One folder under
+ * both of a repository's places, the one a link to the other, is one skill, given from the first.
+ */
 function rootSkills(roots: readonly string[]): Map<string, string | WorkflowError> {
   const held = roots.map((root) =>
     entriesOf(path.join(root, SKILLS_FOLDER))
@@ -102,7 +105,6 @@ function rootSkills(roots: readonly string[]): Map<string, string | WorkflowErro
     if (looked.kind === 'none') continue;
     const at = path.join(roots[looked.at] ?? '', SKILLS_FOLDER, name);
     const again = looked.kind === 'both' ? path.join(roots[looked.again] ?? '', SKILLS_FOLDER, name) : undefined;
-    // One folder under both places, the one a link to the other, is one skill, given from the first.
     found.set(
       name,
       again !== undefined && !oneFolder(at, again)

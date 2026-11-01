@@ -162,7 +162,7 @@ test('a name is refused unless it is one file of the agents folder that a step c
 test('a new agent is written, reads back, and changes no workflow beside it', () => {
   fresh();
   const dev = snapshot(path.join(STORE, 'dev'));
-  const done = writeAgent(AGENTS, scribe, { version: null });
+  const done = writeAgent(ROOT, AGENTS, scribe, { version: null });
   assert.deepEqual(done.written, ['scribe.md']);
   assert.equal(done.version, agentVersion(AGENTS, 'scribe'));
   assert.deepEqual(plain(loadAgents(AGENTS).get('scribe') as Agent), {
@@ -178,16 +178,16 @@ test('a new agent is written, reads back, and changes no workflow beside it', ()
 
 test('an edit carries the version it read, and a stale one is refused', () => {
   fresh();
-  const { version } = writeAgent(AGENTS, scribe, { version: null });
-  const edited = writeAgent(AGENTS, { ...scribe, keys: { ...scribe.keys, effort: 'high' } }, { version });
+  const { version } = writeAgent(ROOT, AGENTS, scribe, { version: null });
+  const edited = writeAgent(ROOT, AGENTS, { ...scribe, keys: { ...scribe.keys, effort: 'high' } }, { version });
   assert.notEqual(edited.version, version);
   assert.equal((loadAgents(AGENTS).get('scribe') as Agent).keys.effort, 'high');
   refused(
-    () => writeAgent(AGENTS, scribe, { version }),
+    () => writeAgent(ROOT, AGENTS, scribe, { version }),
     /^agents\/scribe\.md changed since it was read \(version [0-9a-f]{16}, now [0-9a-f]{16}\)/,
     'Conflict',
   );
-  refused(() => removeAgent(AGENTS, 'scribe', { version }), /^agents\/scribe\.md changed since it was read/, 'Conflict');
+  refused(() => removeAgent(ROOT, AGENTS, 'scribe', { version }), /^agents\/scribe\.md changed since it was read/, 'Conflict');
 });
 
 test("with `repo`, a write's and a removal's version is read with the skills a start there finds, as the board lists it", () => {
@@ -203,60 +203,60 @@ test("with `repo`, a write's and a removal's version is read with the skills a s
     keys: { tools: 'Read, Skill' },
     body: 'Carry it.',
   };
-  const made = writeAgent(AGENTS, courier, { version: null, repo });
+  const made = writeAgent(ROOT, AGENTS, courier, { version: null, repo });
   const listed = agentVersion(AGENTS, 'courier', agentSkillsFound(AGENTS, repo));
   assert.equal(made.version, listed, 'the version a write answers is the one the listing reads');
   assert.notEqual(listed, agentVersion(AGENTS, 'courier'), 'the skill is found only in the repository, so the two readings differ');
   refused(
-    () => writeAgent(AGENTS, courier, { version: agentVersion(AGENTS, 'courier')!, repo }),
+    () => writeAgent(ROOT, AGENTS, courier, { version: agentVersion(AGENTS, 'courier')!, repo }),
     /^agents\/courier\.md changed since it was read/,
     'Conflict',
   );
-  const saved = writeAgent(AGENTS, { ...courier, description: 'Carries notes on.' }, { version: listed!, repo });
+  const saved = writeAgent(ROOT, AGENTS, { ...courier, description: 'Carries notes on.' }, { version: listed!, repo });
   fs.writeFileSync(path.join(skill, 'SKILL.md'), '---\nname: pass-a-note\ndescription: Hands a note along.\n---\nHand it on.\n');
   refused(
-    () => removeAgent(AGENTS, 'courier', { version: saved.version, repo }),
+    () => removeAgent(ROOT, AGENTS, 'courier', { version: saved.version, repo }),
     /^agents\/courier\.md changed since it was read/,
     'Conflict',
   );
   const now = agentVersion(AGENTS, 'courier', agentSkillsFound(AGENTS, repo))!;
-  assert.deepEqual(removeAgent(AGENTS, 'courier', { version: now, repo }).removed, ['courier.md']);
+  assert.deepEqual(removeAgent(ROOT, AGENTS, 'courier', { version: now, repo }).removed, ['courier.md']);
 });
 
 test('a new agent over one that is there, and an edit of one that is not, are refused', () => {
   fresh();
   refused(
-    () => writeAgent(AGENTS, { ...scribe, name: 'reviewer' }, { version: null }),
+    () => writeAgent(ROOT, AGENTS, { ...scribe, name: 'reviewer' }, { version: null }),
     new RegExp(
       `^agents/reviewer\\.md is there already\\. Give the new agent another name, or open it and change it: it is at version ${agentVersion(AGENTS, 'reviewer')}, and a write given that version changes it\\.$`,
     ),
     'Conflict',
   );
-  refused(() => writeAgent(AGENTS, scribe, { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');
-  refused(() => removeAgent(AGENTS, 'scribe', { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');
+  refused(() => writeAgent(ROOT, AGENTS, scribe, { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');
+  refused(() => removeAgent(ROOT, AGENTS, 'scribe', { version: '0123456789abcdef' }), /^agents\/scribe\.md is not there/, 'Missing');
 });
 
 test("a write refuses what the parser refuses, in the parser's words", () => {
   fresh();
   refused(
-    () => writeAgent(AGENTS, { ...scribe, keys: { context: 'lots' } }, { version: null }),
+    () => writeAgent(ROOT, AGENTS, { ...scribe, keys: { context: 'lots' } }, { version: null }),
     /^agents\/scribe\.md: `context: lots` is not a number of tokens/,
   );
   refused(
-    () => writeAgent(AGENTS, { ...scribe, keys: { output: 'nothing.schema.json' } }, { version: null }),
+    () => writeAgent(ROOT, AGENTS, { ...scribe, keys: { output: 'nothing.schema.json' } }, { version: null }),
     /^agents\/scribe\.md: `output: nothing\.schema\.json` is not there/,
   );
   refused(
-    () => writeAgent(AGENTS, { ...scribe, keys: { check: 'npm test' } as AgentDraft['keys'] }, { version: null }),
+    () => writeAgent(ROOT, AGENTS, { ...scribe, keys: { check: 'npm test' } as AgentDraft['keys'] }, { version: null }),
     /^agents\/scribe\.md: `check` is wiring, and belongs on the step/,
   );
   refused(
-    () => writeAgent(AGENTS, { ...scribe, keys: { agent: 'reviewer' } as AgentDraft['keys'] }, { version: null }),
+    () => writeAgent(ROOT, AGENTS, { ...scribe, keys: { agent: 'reviewer' } as AgentDraft['keys'] }, { version: null }),
     /^agents\/scribe\.md: `agent` is a step's key/,
   );
-  refused(() => writeAgent(AGENTS, { ...scribe, name: 'x.md' }, { version: null }), /^`x\.md` is not an agent's name/);
+  refused(() => writeAgent(ROOT, AGENTS, { ...scribe, name: 'x.md' }, { version: null }), /^`x\.md` is not an agent's name/);
   refused(
-    () => writeAgent(AGENTS, { ...scribe, name: '../dev/plan' }, { version: null }),
+    () => writeAgent(ROOT, AGENTS, { ...scribe, name: '../dev/plan' }, { version: null }),
     /is not an agent's name: an agent is a file in agents\//,
   );
 });
@@ -265,11 +265,14 @@ test('a write is refused outside the two places the board lists agents from, and
   fresh();
   const elsewhere = path.join(ROOT, 'elsewhere', 'agents');
   fs.mkdirSync(elsewhere, { recursive: true });
-  refused(() => writeAgent(elsewhere, scribe, { version: null }), /elsewhere\/agents is not the store's agents\/ .* nor a repository's/);
+  refused(
+    () => writeAgent(ROOT, elsewhere, scribe, { version: null }),
+    /elsewhere\/agents is not the store's agents\/ .* nor a repository's/,
+  );
   assert.equal(fs.existsSync(path.join(elsewhere, 'scribe.md')), false);
-  refused(() => writeAgent(path.join(STORE, 'dev'), scribe, { version: null }), /dev is not a folder of agents/);
-  refused(() => removeAgent(elsewhere, 'scribe', { version: 'x' }), /is not the store's agents\//);
-  writeAgent(elsewhere, scribe, { version: null, anywhere: true });
+  refused(() => writeAgent(ROOT, path.join(STORE, 'dev'), scribe, { version: null }), /dev is not a folder of agents/);
+  refused(() => removeAgent(ROOT, elsewhere, 'scribe', { version: 'x' }), /is not the store's agents\//);
+  writeAgent(ROOT, elsewhere, scribe, { version: null, anywhere: true });
   assert.ok(fs.existsSync(path.join(elsewhere, 'scribe.md')));
 });
 
@@ -280,15 +283,15 @@ test('REFUSED at shipped defaults: an agent written into the workflows/ of a che
   const agents = path.join(checkout, 'workflows', 'agents');
   fs.mkdirSync(agents, { recursive: true });
   refused(
-    () => writeAgent(agents, scribe, { version: null }),
+    () => writeAgent(ROOT, agents, scribe, { version: null }),
     /agents is not the store's agents\/ .* nor a repository's the store knows .* give its repository to a factory \(nemia factory add <name> --repo <repo>\)/,
   );
   assert.equal(fs.existsSync(path.join(agents, 'scribe.md')), false, 'a .git beside it makes no repository known');
-  writeAgent(agents, scribe, { version: null, repo: checkout });
+  writeAgent(ROOT, agents, scribe, { version: null, repo: checkout });
   assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), 'the repository the caller names');
   fs.rmSync(path.join(agents, 'scribe.md'));
   addFactory({ name: 'agent-known', repos: [checkout] });
-  writeAgent(agents, scribe, { version: null });
+  writeAgent(ROOT, agents, scribe, { version: null });
   assert.ok(fs.existsSync(path.join(agents, 'scribe.md')), "a factory's repository");
 });
 
@@ -297,8 +300,8 @@ test('a write through a link is refused by name', () => {
   const outside = path.join(ROOT, 'outside.md');
   fs.writeFileSync(outside, 'mine\n');
   fs.symlinkSync(outside, path.join(AGENTS, 'scribe.md'));
-  refused(() => writeAgent(AGENTS, scribe, { version: null }), /scribe\.md is a link/);
-  refused(() => removeAgent(AGENTS, 'scribe', { version: 'x' }), /scribe\.md is a link/);
+  refused(() => writeAgent(ROOT, AGENTS, scribe, { version: null }), /scribe\.md is a link/);
+  refused(() => removeAgent(ROOT, AGENTS, 'scribe', { version: 'x' }), /scribe\.md is a link/);
   assert.equal(fs.readFileSync(outside, 'utf8'), 'mine\n');
 });
 
@@ -310,7 +313,7 @@ test('a result schema written through a link is refused by name, and what the li
   const withSchema = { ...scribe, keys: { ...scribe.keys, output: 'scribe.schema.json' } };
   const schema = { file: 'scribe.schema.json', text: '{"type":"object"}\n' };
   refused(
-    () => writeAgent(AGENTS, withSchema, { version: null, schema }),
+    () => writeAgent(ROOT, AGENTS, withSchema, { version: null, schema }),
     /^\S*scribe\.schema\.json is a link, and a result schema is its agent's own/,
   );
   assert.equal(fs.readFileSync(outside, 'utf8'), '{"mine":true}\n');
@@ -331,14 +334,14 @@ test('a remove or a rename of an agent a step still names is refused, naming the
   fresh();
   const reviewer = agentVersion(AGENTS, 'reviewer')!;
   const err = refused(
-    () => removeAgent(AGENTS, 'reviewer', { version: reviewer }),
+    () => removeAgent(ROOT, AGENTS, 'reviewer', { version: reviewer }),
     /^agents\/reviewer\.md is named by a step beside it — dev\/review — and removing it would leave it naming an agent that is not there/,
     'Conflict',
   );
   assert.deepEqual(err._tag === 'Conflict' && err.users, ['dev/review']);
   const reviewerAgent = loadAgents(AGENTS).get('reviewer') as Agent;
   refused(
-    () => writeAgent(AGENTS, { ...draftOf(reviewerAgent), name: 'critic' }, { version: reviewer, from: 'reviewer' }),
+    () => writeAgent(ROOT, AGENTS, { ...draftOf(reviewerAgent), name: 'critic' }, { version: reviewer, from: 'reviewer' }),
     /^agents\/reviewer\.md is named by a step beside it — dev\/review — and renaming it to critic would/,
     'Conflict',
   );
@@ -349,22 +352,26 @@ test('a remove or a rename of an agent a step still names is refused, naming the
     ['broken/a', 'dev/review'],
     "a folder that does not load still counts: its step is broken by the agent's going all the same, and `agent : x` names x",
   );
-  refused(() => removeAgent(AGENTS, 'reviewer', { version: reviewer }), /named by 2 steps beside it — broken\/a, dev\/review/, 'Conflict');
+  refused(
+    () => removeAgent(ROOT, AGENTS, 'reviewer', { version: reviewer }),
+    /named by 2 steps beside it — broken\/a, dev\/review/,
+    'Conflict',
+  );
 });
 
 test('a rename writes the new file and removes the old; onto another agent it is refused', () => {
   fresh();
-  const { version } = writeAgent(AGENTS, scribe, { version: null });
+  const { version } = writeAgent(ROOT, AGENTS, scribe, { version: null });
   refused(
-    () => writeAgent(AGENTS, { ...scribe, name: 'reviewer' }, { version, from: 'scribe' }),
+    () => writeAgent(ROOT, AGENTS, { ...scribe, name: 'reviewer' }, { version, from: 'scribe' }),
     /^agents\/reviewer\.md is there already, and renaming scribe to it/,
     'Conflict',
   );
   refused(
-    () => writeAgent(AGENTS, { ...scribe, name: 'x' }, { version: null, from: 'scribe' }),
+    () => writeAgent(ROOT, AGENTS, { ...scribe, name: 'x' }, { version: null, from: 'scribe' }),
     /^a new agent is not renamed from another/,
   );
-  const done = writeAgent(AGENTS, { ...scribe, name: 'notary' }, { version, from: 'scribe' });
+  const done = writeAgent(ROOT, AGENTS, { ...scribe, name: 'notary' }, { version, from: 'scribe' });
   assert.deepEqual([done.written, done.removed], [['notary.md'], ['scribe.md']]);
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false);
   assert.equal((loadAgents(AGENTS).get('notary') as Agent).body, scribe.body);
@@ -379,16 +386,17 @@ test('a result schema travels with its agent: written with it, refused when not 
   );
   const withOutput = { ...scribe, keys: { ...scribe.keys, output: 'scribe.schema.json' } };
   refused(
-    () => writeAgent(AGENTS, withOutput, { version: null, schema: { file: 'other.schema.json', text } }),
+    () => writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: { file: 'other.schema.json', text } }),
     /^the result schema is other\.schema\.json, and agents\/scribe\.md names scribe\.schema\.json/,
   );
   refused(
-    () => writeAgent(AGENTS, withOutput, { version: null, schema: { file: '../x.json', text } }),
+    () => writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: { file: '../x.json', text } }),
     /^`\.\.\/x\.json` is not a result schema's name/,
   );
   refused(
     () =>
       writeAgent(
+        ROOT,
         AGENTS,
         { ...scribe, keys: { output: 'review.schema.json' } },
         { version: null, schema: { file: 'review.schema.json', text } },
@@ -396,10 +404,10 @@ test('a result schema travels with its agent: written with it, refused when not 
     /^review\.schema\.json is the result schema of reviewer too/,
   );
   refused(
-    () => writeAgent(AGENTS, withOutput, { version: null, schema: { file: 'scribe.schema.json', text: '{"type":"object"}' } }),
+    () => writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: { file: 'scribe.schema.json', text: '{"type":"object"}' } }),
     /^agents\/scribe\.md: `output: scribe\.schema\.json` is not a schema of fields/,
   );
-  const done = writeAgent(AGENTS, withOutput, { version: null, schema: { file: 'scribe.schema.json', text } });
+  const done = writeAgent(ROOT, AGENTS, withOutput, { version: null, schema: { file: 'scribe.schema.json', text } });
   assert.deepEqual(done.written, ['scribe.schema.json', 'scribe.md']);
   assert.deepEqual((loadAgents(AGENTS).get('scribe') as Agent).read('scribe.schema.json'), text);
   fs.writeFileSync(path.join(AGENTS, 'scribe.schema.json'), text + '\n');
@@ -408,14 +416,14 @@ test('a result schema travels with its agent: written with it, refused when not 
     done.version,
     "the schema is part of the agent's version: a change to it moves the version",
   );
-  writeAgent(AGENTS, { ...withOutput, name: 'notary' }, { version: null });
+  writeAgent(ROOT, AGENTS, { ...withOutput, name: 'notary' }, { version: null });
   assert.deepEqual(
-    removeAgent(AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed,
+    removeAgent(ROOT, AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed,
     ['scribe.md'],
     'a schema another agent names too stays when one of them goes',
   );
   assert.deepEqual(
-    removeAgent(AGENTS, 'notary', { version: agentVersion(AGENTS, 'notary')! }).removed,
+    removeAgent(ROOT, AGENTS, 'notary', { version: agentVersion(AGENTS, 'notary')! }).removed,
     ['notary.md', 'scribe.schema.json'],
     'and goes with the last',
   );
@@ -425,11 +433,11 @@ test('REFUSED at shipped defaults: a card sent with its agent, which is generate
   fresh();
   const text = '[{"id":"write-a-note","name":"Write a note","description":"Write the notes of a change.","tags":["note"]}]';
   refused(
-    () => writeAgent(AGENTS, scribe, { version: null, card: { file: 'scribe.skills.json', text } } as never),
+    () => writeAgent(ROOT, AGENTS, scribe, { version: null, card: { file: 'scribe.skills.json', text } } as never),
     /^`card` is not written with an agent: its card is generated from its skills\./,
   );
   refused(
-    () => writeAgent(AGENTS, scribe, { version: null, card: undefined } as never),
+    () => writeAgent(ROOT, AGENTS, scribe, { version: null, card: undefined } as never),
     /^`card` is not written with an agent: its card is generated from its skills/,
   );
   assert.equal(fs.existsSync(path.join(AGENTS, 'scribe.md')), false, 'and nothing of it is written');
@@ -443,11 +451,11 @@ test('an agent writes the file it names, and a write that fails leaves it not be
     text: JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false }),
   };
   const withSchema = { ...scribe, keys: { ...scribe.keys, output: schema.file } };
-  const done = writeAgent(AGENTS, withSchema, { version: null, schema });
+  const done = writeAgent(ROOT, AGENTS, withSchema, { version: null, schema });
   assert.deepEqual(done.written, ['scribe.schema.json', 'scribe.md']);
   fresh();
   fs.mkdirSync(path.join(AGENTS, 'scribe.md'));
-  assert.throws(() => writeAgent(AGENTS, withSchema, { version: null, schema }));
+  assert.throws(() => writeAgent(ROOT, AGENTS, withSchema, { version: null, schema }));
   assert.equal(
     fs.existsSync(path.join(AGENTS, 'scribe.schema.json')),
     false,
@@ -462,8 +470,8 @@ test("a key's line taken off leaves the file it named: a save never deletes what
     text: JSON.stringify({ type: 'object', properties: { notes: { type: 'string' } }, required: ['notes'], additionalProperties: false }),
   };
   const withSchema = { ...scribe, keys: { ...scribe.keys, output: schema.file } };
-  const made = writeAgent(AGENTS, withSchema, { version: null, schema });
-  const bare = writeAgent(AGENTS, scribe, { version: made.version });
+  const made = writeAgent(ROOT, AGENTS, withSchema, { version: null, schema });
+  const bare = writeAgent(ROOT, AGENTS, scribe, { version: made.version });
   assert.deepEqual(bare.removed, [], 'the line taken off — a field cleared on the board and saved — removes nothing');
   assert.equal(fs.readFileSync(path.join(AGENTS, 'scribe.schema.json'), 'utf8'), schema.text, 'the file is still there, as written');
   assert.equal(
@@ -473,8 +481,9 @@ test("a key's line taken off leaves the file it named: a save never deletes what
   );
 
   fresh();
-  writeAgent(AGENTS, withSchema, { version: null, schema });
+  writeAgent(ROOT, AGENTS, withSchema, { version: null, schema });
   const moved = writeAgent(
+    ROOT,
     AGENTS,
     { ...withSchema, keys: { ...withSchema.keys, output: 'scribe.notes.json' } },
     { version: agentVersion(AGENTS, 'scribe')!, schema: { ...schema, file: 'scribe.notes.json' } },
@@ -482,13 +491,13 @@ test("a key's line taken off leaves the file it named: a save never deletes what
   assert.deepEqual(moved.removed, [], 'a line pointed at another file leaves the one it pointed at before');
   assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.notes.json')), 'and writes the new one');
   assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), 'the file it named before is still there');
-  const gone = removeAgent(AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed.sort();
+  const gone = removeAgent(ROOT, AGENTS, 'scribe', { version: agentVersion(AGENTS, 'scribe')! }).removed.sort();
   assert.deepEqual(gone, ['scribe.md', 'scribe.notes.json'], 'removing the agent takes its files: the one it names now goes with it');
   assert.ok(fs.existsSync(path.join(AGENTS, 'scribe.schema.json')), 'and the one it no longer names is not its to take');
 });
 
 test('the workflows beside the agents still load after every write', () => {
   fresh();
-  writeAgent(AGENTS, scribe, { version: null });
+  writeAgent(ROOT, AGENTS, scribe, { version: null });
   assert.ok(loadWorkflows(path.join(STORE, 'dev')).length > 0);
 });

@@ -146,9 +146,9 @@ export const SKILLS_WRITE: Command<SkillWritten | SkillCopied> = {
         { factory: writerText(args, 'factory'), treeOf: (factory) => templatedTree(factory, 'nemia skills write') },
       );
       const copy = writerText(args, 'copy');
-      if (copy !== undefined) return copySkill(writerText(args, 'builtin') ?? '', library, copy);
+      if (copy !== undefined) return copySkill(home, writerText(args, 'builtin') ?? '', library, copy);
       const change = JSON.parse(writerText(args, 'change') ?? 'null') as SkillChange;
-      return writeSkill(library, change, { version: writerText(args, 'version') ?? null });
+      return writeSkill(home, library, change, { version: writerText(args, 'version') ?? null });
     }),
   print: writtenLines,
 };

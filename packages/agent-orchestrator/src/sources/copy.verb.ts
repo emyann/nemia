@@ -70,12 +70,12 @@ function writeCopy(source: Source, skills: readonly SourceSkill[], parts: readon
   try {
     for (const skill of skills) {
       if (held(skill.name)) continue;
-      made.push(copySkill(path.dirname(skill.dir), yourSkillsDir(home), skill.name, { anywhere: true }).dir);
+      made.push(copySkill(home, path.dirname(skill.dir), yourSkillsDir(home), skill.name, { anywhere: true }).dir);
       copied.push(skill.name);
     }
     const schema = source.schema && !held(source.schema.file) ? source.schema : null;
     if (!held(`agents/${name}.md`)) {
-      const wrote = writeAgent(yoursOf('agents', home), source.draft, { version: null, ...(schema && { schema }), anywhere: true });
+      const wrote = writeAgent(home, yoursOf('agents', home), source.draft, { version: null, ...(schema && { schema }), anywhere: true });
       made.push(...wrote.written.map((f) => path.join(wrote.dir, f)));
       copied.push(...(schema ? [schema.file] : []), `agents/${name}.md`);
     } else if (schema) {

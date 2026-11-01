@@ -1,6 +1,6 @@
 /**
- * The agents model: an agent, its name, a skill and its name, and the agent a step names, as Schemas at the context's door. A declaration in
- * S1: no read path decodes through it.
+ * The agents model: an agent, its name, a skill and its name, and the agent a step names, as Schemas at the context's door. A
+ * declaration in S1: no read path decodes through it; the Skill door checks a skill's write through `Skill`.
  */
 import { Schema } from 'effect';
 import { brandedId, type Id } from '../model/brand.model.ts';
@@ -39,7 +39,7 @@ export type Agent = typeof Agent.Type;
 /** Why a skill's `description:` is refused, or nothing: one line, and there, as the card reader requires (`skillEntryOf`). */
 const descriptionRefusal = (description: string): string | undefined =>
   description.trim() === ''
-    ? "a skill has a `description:`, which the A2A protocol marks REQUIRED and Claude Code lists a skill by: write one line saying what it does."
+    ? 'a skill has a `description:`, which the A2A protocol marks REQUIRED and Claude Code lists a skill by: write one line saying what it does.'
     : /[\r\n]/.test(description)
       ? "a skill's `description:` is one line, a card's value: write it on one line."
       : undefined;

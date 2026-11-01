@@ -103,7 +103,7 @@ export const AGENTS_WRITE: Command<AgentWritten> = {
       const draft = JSON.parse(writerText(args, 'draft') ?? '{}') as AgentDraft;
       const version = writerText(args, 'version') ?? null;
       const schema = writerText(args, 'schema');
-      return writeAgent(dir, draft, {
+      return writeAgent(home, dir, draft, {
         version,
         ...(name !== undefined && (version !== null || name !== draft?.name) && { from: name }),
         ...(schema !== undefined && { schema: JSON.parse(schema) as AgentSidecar | null }),
@@ -132,7 +132,7 @@ export const AGENTS_REMOVE: Command<{ dir: string; removed: string[] }> = {
       const name = writerText(args, 'name') ?? '';
       const repo = writerText(args, 'repo');
       const dir = yoursOrRefused('nemia agents rm', 'agents', writerText(args, 'from') ?? '', name, repo ?? '', home);
-      return removeAgent(dir, name, { version: writerText(args, 'version') ?? null, ...(repo !== undefined && { repo }) });
+      return removeAgent(home, dir, name, { version: writerText(args, 'version') ?? null, ...(repo !== undefined && { repo }) });
     }),
   print: ({ dir, removed }) => [`removed from ${dir}: ${removed.join(', ')}`],
 };

@@ -6,7 +6,10 @@
  */
 import { type Implementation, spec } from '@emyann/tsverify';
 
-/** A lookup root as the decider reads it: the repository it is a place of (none for a root of no repository), and whether it holds the name. */
+/**
+ * A lookup root as the decider reads it: the repository it is a place of (none for a root of no repository), and whether it holds the
+ * name.
+ */
 export type LookupRoot = { readonly repo: string | undefined; readonly has: boolean };
 
 /** Where a name is read from: the root it is found in, nowhere, or two places of one repository (`at` first, `again` after it). */
@@ -38,8 +41,7 @@ const lookedUpSpec = spec<(roots: readonly LookupRoot[]) => Looked>({
     },
     oneRepositoryTwice: {
       description: 'A name one repository holds in both of its places is refused, naming both',
-      condition: ({ input: [roots], output }) =>
-        output.kind === 'none' || (output.kind === 'both') === heldAgain(roots, output.at),
+      condition: ({ input: [roots], output }) => output.kind === 'none' || (output.kind === 'both') === heldAgain(roots, output.at),
     },
     againIsTheOtherPlace: {
       description: 'The second place a refusal names holds the name and is the same repository’s',

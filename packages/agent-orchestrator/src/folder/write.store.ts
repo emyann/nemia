@@ -254,7 +254,3 @@ export const writeWorkflow = atHome(writeWorkflowAt);
 export const removeWorkflow = atHome(removeWorkflowAt);
 /** `knownReposAt` the module's root. */
 export const knownRepos = atHome(knownReposAt);
-/** `isWorkflowsHolderAt` the module's root. */
-export const isWorkflowsHolder = atHome(isWorkflowsHolderAt);
-/** `placesAroundAt` the module's root. */
-export const placesAround = atHome(placesAroundAt);

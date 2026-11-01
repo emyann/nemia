@@ -6061,21 +6061,28 @@ own later card.
 
 A step's and an agent's fence keys were written at the top level. They are written now under the block of the harness the file runs on,
 in a template's shape: `claude: { fence: { permissionMode, tools, allowedTools, disallowedTools } }`, `codex: { fence: { sandbox } }`
-(`fenceKeysOf` and `HARNESS_FENCE_KEYS` in `src/template/layout.ts`, the latter `FENCE_KEYS` until then).
+(`fenceKeysOf` and `HARNESS_FENCE_KEYS`, the latter the template's `FENCE_KEYS` until then, in `src/harness/harness.ts` beside the
+harness's other facts, so the frontmatter's reader takes them without loading the template, whose `src/template/layout.ts` re-exports
+them).
 
 - **The readers flatten the block** (`readKeys`, `src/former/former.ts`) into the same fields as before, so nothing past the load
   changed. Refused at load: a key the harness's fence does not take, a key in the block other than `fence`, two blocks, a block for a
   harness the file does not run on (`fenceBlockRefusal`), and one key written both at the top level and in the block.
 - **The former spelling is read**: a top-level fence key reads as the key in the block of the file's harness (`FORMER_FENCE_KEYS`), and
   `nemia start` names each such file (`formerFenceLine`). `nemia frontmatter rewrite <folder>` moves each into its block, every value
-  byte for byte (`fenceMoved`), and `--check` exits 1 where a move is due. `renderStep` and `renderAgent` write the block alone
+  byte for byte (`fenceMoved`), and `--check` exits 1 where a move is due: each key into the block of the harness whose fence takes it, a
+  `permissionMode` into the block of the harness the file runs on — its `harness:` line, else its agent's beside it — and, where neither
+  says (a step a factory hires its agent into), left where it is and named on a `kept:` line. `renderStep` and `renderAgent` write the block alone
   (`fencedPairs`).
 - **An agent says what a step may override**, `overridable:`, its own key (`AGENT_OWN_KEYS`), each word one of `OVERRIDABLE`
   (`src/workflow/fence.ts`): `fence` for every fence key at once, still only narrowing, and `skills` and `mcp`, still only adding. A step
   whose own keys override something the line leaves out is refused at load (`offerRefusal`), naming the key and the agent, whether the
   agent came by `agent:` or by a hire. An agent with no line offers everything, the owner's decision, and `nemia start` says to add one
-  (`overridableLine`). The keys a step sets over its agent's fence and composition are named `OVERRIDE_KEYS`.
+  (`overridableLine`). The keys a step sets over its agent's fence and composition are named `OVERRIDE_KEYS`. A try of an agent whose
+  line leaves out `fence` is refused before it starts, in the try's words (`untriedOf`): its step narrows the agent's fence to its folder.
 
-Tested in `src/frontmatter/frontmatter.verb.test.ts`, `test/agents.test.ts`, `test/rendering.test.ts` and `test/write-agent.test.ts`.
+Tested in `test/overrides.test.ts` (the block read, each refusal of a block, the offer on a named and a hired agent, the save that keeps
+the line), `src/frontmatter/frontmatter.verb.test.ts`, `test/agents.test.ts`, `test/rendering.test.ts`, `test/write-agent.test.ts`, and
+the api's `src/agents/try.test.ts`.
 
 What it leaves: §15 to §17.

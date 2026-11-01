@@ -74,7 +74,7 @@ test('an agent is its role keys as written, its description, and its body as its
  * of them for its agent: a step's work is the workflow's, not the agent's. A step's own `skills:` and `mcp:` add to its agent's and never
  * stand in for them. Every other agent key is a key a step may set for itself, and takes from its agent when it does not.
  */
-const AGENT_OWN = ['role', 'description', 'skills', 'harnessPrompt', 'mcp'];
+const AGENT_OWN = ['role', 'description', 'skills', 'harnessPrompt', 'mcp', 'overridable'];
 
 test("the role keys are the keys a step has, but for wiring, the agent's own keys", () => {
   assert.deepEqual([...AGENT_OWN_KEYS], AGENT_OWN, 'the package names the same keys as its own');
@@ -561,7 +561,7 @@ test("REFUSED at shipped defaults: a step that runs a fenced agent on the other 
     assert.deepEqual(step.agent?.given, {}, `${line}: the agent gives the step nothing`);
     assert.equal(
       renderStep(step),
-      '---\nplace: git\nagent: mover\nharness: codex\nsandbox: read-only\n---\n\n',
+      '---\nplace: git\nagent: mover\nharness: codex\ncodex:\n  fence:\n    sandbox: read-only\n---\n\n',
       `${line}: written back as its own`,
     );
   }
@@ -627,7 +627,7 @@ test('REFUSED at shipped defaults: writeWorkflow of a draft on codex by its agen
   });
   assert.equal(
     fs.readFileSync(path.join(folder, 'review.md'), 'utf8'),
-    '---\nplace: git\nagent: reviewer\nsandbox: read-only\n---\n\n',
+    '---\nplace: git\nagent: reviewer\ncodex:\n  fence:\n    sandbox: read-only\n---\n\n',
     'sent under its own name, it is written',
   );
 });

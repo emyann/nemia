@@ -120,8 +120,9 @@ What the `create-an-agent` skill, being generic, does not say here:
 - An agent's questions are an output field `{ "x-shape": "questions" }`, expanded by `packages/agent-orchestrator/src/question/question.ts`.
 - Its checks are *Check your work*, forced for `workflows/`; a new agent is named in *Where things are*.
 - **Every agent of the team reads the repository through git.** The four read-only ones (Seldon, Agora, Iris, Argus, each `dontAsk`, which
-  no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, and each holds the
-  place's `git` skill on its `skills:`; the three writers (Ada, Grace, Otto) run `auto` and need no allow. Nothing in the set writes
+  no allow from a step reaches) carry the same read-only git set on their own `allowedTools:` in `workflows/agents/`, a list of their
+  `claude:` block's fence (`claude: { fence: … }`) as is each `disallowedTools:` below, and each holds the place's `git` skill on its
+  `skills:`; the three writers (Ada, Grace, Otto) run `auto` and need no allow. Nothing in the set writes
   the repository's history, its refs or its configuration — `git merge-tree` writes a loose object and no ref, and `git status` and
   `git describe --dirty` refresh the worktree's index and rewrite it when they can take its lock — and `git push` stays refused by the
   writers' `disallowedTools:`, Grace's held equal to Ada's. The set holds `cat`, `head`, `tail`, `wc`, `cut` and `ls` too, each kept

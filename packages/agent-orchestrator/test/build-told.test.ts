@@ -468,7 +468,7 @@ test('REFUSED: a step that denies a command no more is named', () => {
   assert.deepEqual(untold('build', review), ['build/review: denies Bash(npm run e2e)']);
   const intake = shippedEdited('intake', 'intake', (text) => text.replace('Bash(npm run build), ', ''));
   assert.deepEqual(untold('intake', intake), ['intake/intake: denies Bash(npm run build)']);
-  const janitor = shippedEdited('janitor', 'argus', (text) => text.replace(/^disallowedTools: .*\n/m, ''));
+  const janitor = shippedEdited('janitor', 'argus', (text) => text.replace(/^claude:\n  fence:\n    disallowedTools: .*\n/m, ''));
   assert.deepEqual(
     untold('janitor', janitor),
     NO_BUILD.map((rule) => `janitor/argus: denies ${rule}`),

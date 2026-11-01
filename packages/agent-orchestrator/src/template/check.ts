@@ -9,7 +9,7 @@ import { givenSkillOf, PLACES, STORE_READS, WORKSPACES } from '../keys/index.ts'
 import {
   documentFile,
   documentRefusals,
-  FENCE_KEYS,
+  HARNESS_FENCE_KEYS,
   isMap,
   isParam,
   layoutRefusals,
@@ -241,7 +241,7 @@ function profileRefusals(file: string, at: At, harness: string, profile: Record<
 /** Why `key` may not be an option of `harness`'s block: a fence key, a key of the block, a flag the runtime sets, or one unread. */
 function optionRefusal(harness: string, key: string): string | undefined {
   const flags = HARNESS_KNOBS[harness].flags;
-  if (FENCE_KEYS.includes(key)) return `${key} is a fence key, read by nemia: write it under fence, never in options.`;
+  if (HARNESS_FENCE_KEYS.includes(key)) return `${key} is a fence key, read by nemia: write it under fence, never in options.`;
   if ((PROFILE_KEYS as readonly string[]).includes(key)) return `${key} is a key of the block: write it beside options, never in it.`;
   if ('owned' in flags && flags.owned.includes(key)) return `${key} is a flag the runtime sets itself: remove it.`;
   if ('only' in flags && !flags.only.includes(key))

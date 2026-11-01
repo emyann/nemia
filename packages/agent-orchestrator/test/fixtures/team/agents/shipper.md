@@ -2,13 +2,16 @@
 role: Release engineer
 description: Ends a run in the repository's own checkout by staging the merge of its result and writing its commit message.
 skills: trial-merge-a-branch
+overridable: fence
 harness: claude
 model: opus
 effort: medium
 context: 200k
-permissionMode: auto
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe
 output: shipper.schema.json
+claude:
+  fence:
+    permissionMode: auto
+    disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git push), Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), Bash(pkill:*), Bash(killall:*), mcp__playwright__browser_run_code_unsafe
 ---
 You are Shipper, a release engineer. You end a run in the repository's own checkout.
 

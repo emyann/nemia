@@ -9,6 +9,7 @@
 import path from 'node:path';
 import { isRemoteHarness } from '../harness/harness.ts';
 import { renderFrontmatter } from '../frontmatter/frontmatter.ts';
+import { fencedPairs, frontmatterKey } from '../former/former.ts';
 import { AGENTS_FOLDER, SKILLS_FOLDER } from '../step/step.ts';
 import { directoryFence } from '../workflow/index.ts';
 
@@ -55,13 +56,15 @@ export const tryText = (name: string, version: string, fence: TryFence): string 
   [
     '---',
     `${VERSION_LINE}${version}`,
-    renderFrontmatter([
-      ['place', 'folder'],
-      ['agent', name],
-      ['budget', String(TRY_BUDGET)],
-      ['permissionMode', fence.permissionMode],
-      ...(fence.allowedTools.length ? [['allowedTools', fence.allowedTools.join(', ')] as const] : []),
-    ]).replace(/\n$/, ''),
+    renderFrontmatter(
+      fencedPairs([
+        ['place', 'folder'],
+        ['agent', name],
+        ['budget', String(TRY_BUDGET)],
+        ['permissionMode', fence.permissionMode],
+        ...(fence.allowedTools.length ? [['allowedTools', fence.allowedTools.join(', ')] as const] : []),
+      ]),
+    ).replace(/\n$/, ''),
     '---',
     'A rehearsal of the brief: work in this folder, and write what you make here.',
     '',
@@ -88,8 +91,8 @@ const FENCED_HARNESSES: readonly string[] = ['claude'];
 export type Untried = { why: string; copy: string | null };
 
 /**
- * The agent `untriedOf` judges: its place, its name, its file, its keys as written, its `mcp:` line as written, and the result schema's
- * file beside it.
+ * The agent `untriedOf` judges: its place, its name, its file, its keys as written, its `mcp:` line as written, the result schema's file
+ * beside it, and its file's text, whose `overridable:` line says whether a try may narrow its fence.
  */
 export type TriedAgent = {
   from: 'repo' | 'yours';
@@ -98,6 +101,7 @@ export type TriedAgent = {
   keys: { harness?: string; remote?: string } & FencedKeys;
   mcp?: string | null;
   schemaFile: string | null;
+  source?: string;
 };
 
 /** Why the agent `name`, whose `mcp:` line is written `line`, cannot be tried: a try has no checkout to load a server from. */
@@ -105,8 +109,16 @@ const serversUntried = (name: string, line: string): string =>
   `${name} names MCP servers (\`mcp: ${line}\`), which a session loads from its checkout's \`.mcp.json\`, and a try runs with no repository, in a folder of its own, which has none. Delete the line to try it, and name the server on the step that needs it: a step's own \`mcp:\` adds to its agent's.`;
 
 /**
+ * Why the agent `name`, whose `overridable:` line is written `line` and leaves out `fence`, cannot be tried: a try is a step of its own,
+ * and the narrowing to its folder is a step's override of the agent's fence, which the line does not offer (`offerRefusal`).
+ */
+const offerUntried = (name: string, line: string): string =>
+  `${name} offers its steps \`overridable: ${line}\`, without \`fence\`, and a try is a step of its own that narrows the agent's fence to the try's folder — so nothing it reads or writes reaches outside the run — which is a step overriding the fence. Add \`fence\` to the line to try it: a step's fence only ever narrows its agent's, never widens it.`;
+
+/**
  * Why the agent cannot be tried (`Untried`) in the store `home`, or null: an agent of the repository's, a reserved name, a harness or a
- * mode a try cannot fence, a bridged session, or MCP servers it names (`mcp`), which a try has no checkout to load from.
+ * mode a try cannot fence, a bridged session, MCP servers it names (`mcp`), which a try has no checkout to load from, or an `overridable:`
+ * line that does not offer the fence the try narrows.
  */
 export function untriedOf(agent: TriedAgent, home: string): Untried | null {
   if (agent.from === 'repo') {
@@ -139,6 +151,9 @@ export function untriedOf(agent: TriedAgent, home: string): Untried | null {
     };
   }
   if (agent.mcp) return { why: serversUntried(agent.name, agent.mcp), copy: null };
+  const offered = agent.source === undefined ? undefined : frontmatterKey(agent.source, 'overridable');
+  if (offered !== undefined && !offered.split(',').some((word) => word.trim() === 'fence'))
+    return { why: offerUntried(agent.name, offered), copy: null };
   const fence = tryFence(agent.name, agent.keys);
   return typeof fence === 'string' ? { why: fence, copy: null } : null;
 }

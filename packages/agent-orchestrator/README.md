@@ -349,8 +349,10 @@ slip in with an example. For now a person reads `PLAN.md` and starts a run per p
 ---
 harness: codex             # claude (default) | codex | a2a:<name>, a remote agent
 after: implement           # what must finish first: verified, or unverified if it has no check
-sandbox: read-only         # Codex's sandbox; a Claude Code step's fence is permissionMode:
 output: review.schema.json # what its closeout declares for a later step: a JSON Schema beside it
+codex:                     # the block of the harness it runs on, which holds that harness's fence
+  fence:
+    sandbox: read-only     # Codex's sandbox; a Claude Code step's is claude: { fence: { permissionMode } }
 ---
 Review the changes on this branch. Be specific about correctness, not style.
 ```
@@ -426,7 +428,8 @@ reads as it was written.
 A step's keys are a closed list — `after`, `resume`, `input`, `workspace`, `slot`, `agent`, `harness`, `model`, `effort`, `context`,
 `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`, `deadlineSeconds`, `budget`, `check`, `retries`,
 `gate`, `output`, `tally`, `loop`, `rounds` — and a key the parser does not know is refused by name before anything is spent, as is a value
-it cannot use (`src/workflow/step-file.ts`). `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
+it cannot use (`src/workflow/step-file.ts`). The fence keys among them (`permissionMode`, `sandbox`, `tools`, `disallowedTools`,
+`allowedTools`) are written under the block of the harness the step runs on, below. `guide` is refused with a reason of its own, and so is `maxAttempts`, retired on 2026-09-23 with
 the runtime's own: the runtime makes one attempt at a session, and trying again is the run's — `retries:` and `wf retry`
 ([below](#trying-again-retries-and-wf-retry)). A run frozen with the key still loads, lists and files, without it.
 
@@ -446,6 +449,34 @@ to rewrite. Whether the word is a sandbox is the runtime's to say at `wf start`;
 still calls either fence `permissionMode`, and the tick hands the one the step has on (`modeOf`). A page of the board opened before the rename that sends `permissionMode` back
 on a codex step is refused, saying to reload; a save from the board writes `sandbox:`, and a save that changes nothing keeps the file.
 Codex's approval policy is untouched: `codex exec` asks nobody, and the engine passes no `-a`.
+
+**A harness's fence is written under that harness's block**, named by its id, the shape a template writes (`src/template/layout.ts`):
+
+```md
+---
+harness: claude
+claude:
+  fence:
+    permissionMode: dontAsk
+    tools: Read, Grep, Glob, Bash
+    allowedTools: Bash(git log:*), Bash(git diff:*)
+    disallowedTools: Bash(npm run build)
+---
+```
+
+`claude:` takes `permissionMode`, `tools`, `allowedTools` and `disallowedTools`; `codex:` takes `sandbox` alone (`fenceKeysOf`, from
+the runtime's `HARNESS_KNOBS`, and `HARNESS_FENCE_KEYS`, every harness's). A block holds `fence` and nothing else: `model`, `effort`
+and `context` stay at the top level. A list in it is a comma string or a YAML list, as anywhere. The load reads the block into the same
+keys as before, so nothing past it changed. Refused at load, each naming the file and the fix: a key the harness's fence does not take,
+two blocks, a block for a harness the file does not run on (its own `harness:` line, its agent's, or `claude` without one), and the
+same key written both at the top level and in the block. `renderStep` and `renderAgent` write the block alone.
+
+A fence key written at the top level is its former spelling, used until 2026-10-31, and it is still read, as the key in the block of the
+file's harness (`FORMER_FENCE_KEYS`); `nemia start` prints a line naming each file that writes one. `nemia frontmatter rewrite
+<folder>` moves each into its block, every value byte for byte (`fenceMoved`; a codex file's former `permissionMode:` lands as
+`sandbox:`), each into the block of the harness whose fence takes it, and `--check` exits 1 where a move is due. A `permissionMode:`
+whose harness the file does not say — no `harness:` line, and no agent beside it, as a step a factory hires its agent into — is left
+where it is, still read, and named on a `kept:` line. Saving the file from the board writes the block too.
 
 **No key is control flow.** No conditions, no expressions, no templating, and no loop a keyword
 decides. That is the design, not a missing feature.
@@ -479,9 +510,12 @@ An agent is written once, in `agents/` beside the workflow folders — `<repo>/w
 description: Reviews a change read-only, as a second engineer would
 harness: claude
 model: opus
-tools: Read, Grep, Glob, Bash
-permissionMode: dontAsk
 output: review.schema.json   # beside the agent, in agents/
+overridable: model, fence    # what a step may override of it
+claude:
+  fence:
+    tools: Read, Grep, Glob, Bash
+    permissionMode: dontAsk
 ---
 Review the changes on this branch. Be specific about correctness, not style.
 ```
@@ -496,7 +530,8 @@ rounds: 3
 ```
 
 Its keys are a role's — `harness`, `model`, `effort`, `context`, `permissionMode`, `sandbox`, `tools`, `disallowedTools`, `allowedTools`, `remote`,
-`output` — and its own, `role:`, `description:`, `skills:`, `harnessPrompt:` and `mcp:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
+`output`, the fence keys under the harness's block — and its own, `role:`, `description:`, `skills:`, `harnessPrompt:`, `mcp:` and
+`overridable:`. A wiring key in an agent file is refused by name, saying it belongs on the step, and so
 is `agent:` itself: an agent does not name another. Each value is read by the rules a step's is, and refused in the
 agent's own name (`agents/reviewer.md: …`). A broken agent refuses only the steps that name it; one named that is not
 there is refused listing the agents there are. A link in `agents/` is refused as a linked step is. `agents` is not a
@@ -519,6 +554,16 @@ writes a resolved step back as its file was: `agent:`, the keys the step set its
 `disallowedTools:` without the denies its agent gave it (`StepAgent.agentDenies`), and no line where it only repeated them. `wf start` names
 each node's agent beside it — `implement (implementer) → review (reviewer) → ship (shipper)` — and a node with nothing attached by its
 name alone.
+
+**What a step may override is the agent's to say: `overridable:`.** Its words are `OVERRIDABLE` (`src/workflow/fence.ts`): `model`,
+`effort`, `context`, `harness`, `remote`, `output`, `fence`, `skills` and `mcp`. `fence` stands for every fence key at once, and a
+step's fence still only narrows its agent's; `skills` and `mcp` only add. A word not in the list is refused, naming it and the list. A
+step whose own frontmatter sets something the line leaves out is refused at load (`offerRefusal`), naming the step, the key and the
+agent: delete the step's line, or add the word to the agent's. This is judged on every load, from the files, the same for a step that
+names its agent by `agent:` and one a factory hires it into: what the step overrides is its side of the agent on a step
+(`StepAgent`, `overridesOf`). The keys a step sets over its agent's fence and composition are `OVERRIDE_KEYS`. An agent with no line
+offers everything, as before the line, and `nemia start` prints a line for its file saying to add one. `overridable:` is the agent's
+own key: no step takes it.
 
 #### Five layers: what shapes an agent, apart from its task
 
@@ -578,7 +623,7 @@ A procedure is none of them: it belongs in a skill the agent or the step is give
 in a fence, a gate or a test, which holds whether or not the words were read.
 
 A capability is routed the same way, and lands on a fence: one a role needs everywhere — reading a repository through git's read-only
-commands, say — goes on each agent's own `allowedTools:` by question 1, never left to a folder's `.claude/settings.json`. Those settings
+commands, say — goes on each agent's own `allowedTools:`, in its `claude:` block's fence, by question 1, never left to a folder's `.claude/settings.json`. Those settings
 bind whoever works in that folder and travel with no agent, so an agent that leans on them is fenced differently in the next factory; and
 a step cannot make up the difference, since a step may narrow its agent's fence and never widen it (below).
 
@@ -595,7 +640,8 @@ its agent's rules allow. Its `permissionMode:` or `sandbox:` may be no wider tha
 agent's, or than its harness's default when the agent names none: from narrowest, `plan`; `dontAsk`, `default` and `manual`;
 `acceptEdits`; `auto`; `bypassPermissions` — and on codex `read-only`; `workspace-write`; `danger-full-access`. And it may not run a
 fenced agent on the other harness, whose fence cannot be compared. Its `writable:` widens where its writes reach and never what it may
-do, so it is refused over a fence that writes nothing (*A factory's other folders*, below). One rule covers another when it is the
+do, so it is refused over a fence that writes nothing (*A factory's other folders*, below). Before any of this, a step narrows its
+agent's fence only where the agent's `overridable:` names `fence` (above). One rule covers another when it is the
 same rule, a bare tool, a command prefix (`Bash(npm:*)` covers `Bash(npm test)`, never a command joined to another, `Bash(npm test &&
 git push)`) or a path ending in `**` (`Edit(**)` covers `Edit(notes/**)`); anything else counts as wider. An agent's mode grants what it does unasked: from
 `acceptEdits` up, an `Edit` inside its directory, and under `bypassPermissions` every rule. The board's try (`apps/api`) holds an
@@ -684,7 +730,9 @@ not a semantic version: it changes when the agent's file, its result schema or o
 description: Writes a short note on what it is asked about.
 skills: write-a-note, mind-the-tone
 harnessPrompt: no-coding
-tools: Read, Edit, Skill
+claude:
+  fence:
+    tools: Read, Edit, Skill
 ---
 You write notes. Load `write-a-note` before you start.
 ```
@@ -798,9 +846,11 @@ SKILL.md's frontmatter as YAML and holds it to its card entry.
 ```md
 ---
 after: implement
-# The only tools the session has. Bash is there for `git diff` and `npm test`; nothing that edits.
-tools: Read, Grep, Glob, Bash
 effort: high
+claude:
+  fence:
+    # The only tools the session has. Bash is there for `git diff` and `npm test`; nothing that edits.
+    tools: Read, Grep, Glob, Bash
 ---
 Review the change in this workspace as a second engineer would.
 ```
@@ -854,10 +904,12 @@ issue 26, measured on a 100k window with 22k-token reads).
 ```md
 ---
 after: implement
-tools: Read, Grep, Glob, Bash
-permissionMode: dontAsk
-# The settings allow both for implement's check, and both write into the workspace. A deny beats an allow.
-disallowedTools: Bash(npm run build), Bash(npm run e2e)
+claude:
+  fence:
+    tools: Read, Grep, Glob, Bash
+    permissionMode: dontAsk
+    # The settings allow both for implement's check, and both write into the workspace. A deny beats an allow.
+    disallowedTools: Bash(npm run build), Bash(npm run e2e)
 ---
 Review the change in this workspace as a second engineer would.
 ```
@@ -923,9 +975,11 @@ job.
 
 ```md
 ---
-permissionMode: dontAsk
-allowedTools: Edit(**)
 denials: fail   # a try the harness denied a call is not passed on
+claude:
+  fence:
+    permissionMode: dontAsk
+    allowedTools: Edit(**)
 ---
 Write the note.
 ```
@@ -1087,12 +1141,14 @@ Implement what was asked, in this repository. It changes what a person sees in t
 harness: claude
 after: implement
 input: implement
-tools: Read, Grep, Glob, Bash
-permissionMode: dontAsk
-disallowedTools: Bash(npm run build), Bash(npm run e2e)
 output: review.schema.json      # findings, and again: boolean
 loop: implement
 rounds: 3
+claude:
+  fence:
+    tools: Read, Grep, Glob, Bash
+    permissionMode: dontAsk
+    disallowedTools: Bash(npm run build), Bash(npm run e2e)
 ---
 Review the change in this workspace as a second engineer would, and look at it as a person who opens the web app would. …
 ```
@@ -1728,10 +1784,12 @@ person.
 ---
 harness: codex
 after: implement
-sandbox: read-only
 output: review.schema.json   # findings, and again: boolean
 loop: implement
 rounds: 3
+codex:
+  fence:
+    sandbox: read-only
 ---
 ```
 
@@ -2419,7 +2477,9 @@ workspace: main       # the repository's own checkout: it reads the store and th
 slot: none            # not one of the runs the cap holds — it watches them
 harness: claude
 remote: true          # bridged to claude.ai, so the person it asks can answer from a phone
-disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git merge:*), Bash(git checkout:*), …
+claude:
+  fence:
+    disallowedTools: SendMessage, CronCreate, CronDelete, RemoteTrigger, Bash(git merge:*), Bash(git checkout:*), …
 ---
 Watch this repository's runs, and put what needs a person in front of the person.
 ```

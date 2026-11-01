@@ -2,14 +2,17 @@
 role: Code reviewer
 description: Reads a change as a second engineer would, and sends it round again while a finding is worth it.
 skills: review-a-change, ask-for-another-round
+overridable: output, skills
 harness: claude
 model: opus
 effort: high
 context: 200k
-tools: Read, Grep, Glob, Bash, Skill
-permissionMode: dontAsk
-allowedTools: Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git status)
 output: review.schema.json
+claude:
+  fence:
+    tools: Read, Grep, Glob, Bash, Skill
+    permissionMode: dontAsk
+    allowedTools: Bash(git diff:*), Bash(git log:*), Bash(git show:*), Bash(git status)
 ---
 Review the change in this workspace. Write nothing into it.
 

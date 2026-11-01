@@ -5,6 +5,7 @@
  * store turns that into a line.
  */
 import { HARNESS_KNOBS } from 'agent-runtime/vocabulary';
+import { HARNESS_FENCE_KEYS } from '../harness/harness.ts';
 import { SKILL_NAME } from '../keys/index.ts';
 import { REVISIONS_POLICIES, type RevisionsPolicy } from '../factory/factory.ts';
 
@@ -190,10 +191,8 @@ type Shape =
   | { readonly list: Shape }
   | { readonly fields: Readonly<Record<string, Shape>>; readonly required?: readonly string[]; readonly rest?: Shape };
 
-/** The fence keys of every harness: each one's own key and its tool lists. */
-export const FENCE_KEYS: readonly string[] = [
-  ...new Set(Object.values(HARNESS_KNOBS).flatMap((knobs) => [knobs.fence.key, ...knobs.fence.lists])),
-];
+/** The fence keys of every harness, the package's one list of them (`harness/harness.ts`), read by the template's shape. */
+export { fenceKeysOf, HARNESS_FENCE_KEYS } from '../harness/harness.ts';
 
 /** The keys a harness's block holds. */
 export const PROFILE_KEYS = ['model', 'effort', 'context', 'fence', 'options'] as const;
@@ -203,7 +202,7 @@ const PROFILE: Shape = {
     model: 'words',
     effort: 'words',
     context: 'words',
-    fence: { fields: Object.fromEntries(FENCE_KEYS.map((key) => [key, isList(key) ? 'strings' : 'string'])) },
+    fence: { fields: Object.fromEntries(HARNESS_FENCE_KEYS.map((key) => [key, isList(key) ? 'strings' : 'string'])) },
     options: { fields: {}, rest: 'option' },
   },
 };

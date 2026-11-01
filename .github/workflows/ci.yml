@@ -142,7 +142,7 @@ jobs:
     # The contracts under each package's contracts/, verified by tsverify (npm run contracts): any law or obligation not proved,
     # or a contract it cannot read, exits 1. A verdict is decided by the solver's work, not the clock, so one leg on the floor is enough.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v7
         timeout-minutes: 5
@@ -152,8 +152,9 @@ jobs:
           node-version: '24.16.0'
       - run: npm ci
         timeout-minutes: 10
+      # 11 m 42 s on a runner, 5 m on the owner's machine.
       - run: npm run contracts
-        timeout-minutes: 15
+        timeout-minutes: 30
 
   e2e:
     name: e2e shard ${{ matrix.shard }}

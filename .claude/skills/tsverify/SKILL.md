@@ -83,6 +83,7 @@ export const shipping: Shipping = (total) => (total >= 50 ? 0 : 5)
 | --- | --- |
 | `proved` | Nothing, for every input `requires` allows. |
 | `counterexample` | Run the function on `e.g.`'s input; the `where` line says what each call returned. Fix the code, the law or `requires`. |
+| `unmeetable` | No code could keep the law at `e.g.`'s input: the laws it names leave no result together there. Change the spec, not the code: loosen one of them, or narrow `requires`. |
 | `vacuous` | The law says nothing of the function: rewrite it. |
 | `bounded` | No proof, and no counterexample with arrays of up to 4 elements. The reason says what stands in the way, often a loop's invariant (`docs/proofs.md`). |
 | `unsupported` | The code or the law uses what tsverify does not read. The reason says what to write instead. |

@@ -96,11 +96,12 @@ export const seriesOf = async (
 /**
  * One metric as `GET /api/metrics` answers it: its name, kind, description and attributes, and its value — a counter's `count`, a gauge's
  * `value`, or a histogram's `count`, `sum`, `min`, `max` and `buckets`, each the observations at most `le`, counted from the first bucket
- * on (cumulative, as OpenTelemetry's are not). A kind the api keeps none of is answered with its name and kind alone.
+ * on (cumulative, as OpenTelemetry's are not). Its `type` is Effect's own word for the kind (`Metric.Metric.Type`: Counter, Frequency,
+ * Gauge, Histogram, Summary); a kind the api keeps none of is answered with its name and kind alone.
  */
 export type MetricRead = {
   name: string;
-  type: string;
+  type: Metric.Metric.Type;
   description: string | null;
   attributes: Readonly<Record<string, string>>;
   count?: number;

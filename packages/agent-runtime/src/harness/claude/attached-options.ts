@@ -13,15 +13,25 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import type { Options } from '@anthropic-ai/claude-agent-sdk';
-import type { SpawnRequest } from '../seam.ts';
+import type { McpServerConfigForProcessTransport, Options } from '@anthropic-ai/claude-agent-sdk';
+import type { LocalMcpServer, RemoteMcpServer, SpawnRequest } from '../seam.ts';
 import { CLAUDE_DEFAULT_MODE, claudeAllows, claudeDenies, claudeFlagName, worktreeName, type ClaudeFlags } from './vocabulary.ts';
 import { admittedFlags } from './admission.ts';
 import { memorylessSettings } from './memory.ts';
 import { claudeTelemetryEnv } from './telemetry.ts';
 import { CLAUDE_JOB_ENV } from './job-env.ts';
-import { everyMcpServer } from '../mcp.ts';
+import { everyMcpServer, type McpTransport } from '../mcp.ts';
 import { withoutTelemetry } from '../telemetry.ts';
+
+type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
+
+/**
+ * The transports of `MCP_TRANSPORTS` (`../mcp.ts`) are the Agent SDK's for a server a file declares (`McpServerConfigForProcessTransport`,
+ * `sdk.d.ts:1249`, its in-process `sdk` aside), and the ones the seam's servers carry: an SDK that names another fails this typecheck until
+ * `MCP_TRANSPORTS` names it too, while a `.mcp.json` that already says it reads as `unknown`.
+ */
+export const mcpTransportsHeld: Same<McpTransport, Exclude<NonNullable<McpServerConfigForProcessTransport['type']>, 'sdk'>> = true;
+export const seamTransportsHeld: Same<McpTransport, NonNullable<LocalMcpServer['type']> | RemoteMcpServer['type']> = true;
 
 /** The options of `Options` this file sets: what `query()` is given, beside its prompt and the runner's own callbacks. */
 export type AttachedOptions = Pick<

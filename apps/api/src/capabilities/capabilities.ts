@@ -10,7 +10,7 @@ import path from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { Context, Effect, Layer } from 'effect';
-import type { Running } from 'agent-orchestrator';
+import { MCP_TRANSPORTS, transportOf, type McpTransport, type Running } from 'agent-orchestrator';
 import { WorkflowError, readFrontmatter, splitFrontmatter } from 'agent-orchestrator/workflow';
 import type { FrontmatterEntry } from 'agent-orchestrator/workflow';
 
@@ -24,8 +24,11 @@ export type McpTool = { name: string; description: string | null; denied: string
 export type McpServer = {
   name: string;
   source: string;
-  /** `.mcp.json`'s `type`: `stdio` for a server with a command and none given. */
-  type: string;
+  /**
+   * `.mcp.json`'s `type`, as the transport a harness loads the server over (`MCP_TRANSPORTS`): `stdio` for a server with a command and
+   * none given, and `unknown` for any other word, or a url with none, the word as written quoted in `notAsked`.
+   */
+  type: McpTransport | 'unknown';
   /**
    * `command`, `args` and `url` as `.mcp.json` writes them: the api expands `${VAR}` only to start the server, so no secret reaches the
    * page.
@@ -134,7 +137,10 @@ export async function capabilitiesOf(
       if (!server.command)
         return {
           ...entry,
-          notAsked: `Not a stdio server (${server.type}, at ${server.url}): the api asks only stdio servers for their tools.`,
+          notAsked:
+            server.type === 'unknown'
+              ? `Not a server a harness loads (${server.written === null ? 'no `type`' : `\`type: ${JSON.stringify(server.written)}\``}, at ${server.url}): give "type" one of ${MCP_TRANSPORTS.map((t) => `"${t}"`).join(', ')} in ${MCP_JSON}.`
+              : `Not a stdio server (${server.type}, at ${server.url}): the api asks only stdio servers for their tools.`,
         };
       if (!entry.enabled) {
         return {
@@ -415,16 +421,24 @@ function enabledBy(settings: Json | null, warnings: string[]): (name: string) =>
   return (name) => !disabled.includes(name) && (all || listed.includes(name));
 }
 
-/** A server as `.mcp.json` declares it. `invalid` says what is wrong with an entry the api cannot read. */
+/**
+ * A server as `.mcp.json` declares it: `written` its `type` as written, or null where none is. `invalid` says what is wrong with an entry
+ * the api cannot read.
+ */
 type Declared = {
   name: string;
-  type: string;
+  type: McpTransport | 'unknown';
+  written: string | null;
   command: string | null;
   args: string[];
   env: Record<string, string>;
   url: string | null;
   invalid: string | null;
 };
+
+/** A server's written `type` as its transport, and the word as written: `stdio` for a command with none, `unknown` for a url with none. */
+const transportWritten = (written: unknown, command: string | null): Pick<Declared, 'type' | 'written'> =>
+  typeof written === 'string' ? { type: transportOf(written), written } : { type: command ? 'stdio' : 'unknown', written: null };
 
 function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
   if (!mcpJson) return [];
@@ -435,7 +449,7 @@ function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
     return [];
   }
   return Object.entries(mcpJson.mcpServers).map(([name, spec]): Declared => {
-    const bare: Declared = { name, type: 'stdio', command: null, args: [], env: {}, url: null, invalid: null };
+    const bare: Declared = { name, type: 'stdio', written: null, command: null, args: [], env: {}, url: null, invalid: null };
     if (!isObject(spec))
       return { ...bare, invalid: `${MCP_JSON} declares ${name} as something other than an object, so it is not started.` };
     const command = typeof spec.command === 'string' && spec.command ? spec.command : null;
@@ -447,7 +461,7 @@ function declaredServers(mcpJson: Json | null, warnings: string[]): Declared[] {
         : null;
     const declared = {
       ...bare,
-      type: typeof spec.type === 'string' ? spec.type : command ? 'stdio' : 'unknown',
+      ...transportWritten(spec.type, command),
       command,
       url,
       args: args ?? [],

@@ -457,24 +457,39 @@ test('a server .claude/settings.json does not enable is listed, and not started'
   assert.equal(body.mcp[0].tools?.length, 2);
 });
 
-test('a server that is not stdio, or whose entry does not read, is listed with why, and not started', async () => {
+test('a server that is not stdio, or whose entry does not read, is listed with why, and not started: its `type` the transport a harness loads it over, any other word `unknown`, quoted as written in why', async () => {
   const repo = repoWith({
-    '.mcp.json': { mcpServers: { remote: { type: 'http', url: 'https://mcp.example.com/mcp' }, broken: { args: 'not a list' } } },
-    '.claude/settings.json': { enabledMcpjsonServers: ['remote', 'broken'] },
+    '.mcp.json': {
+      mcpServers: {
+        remote: { type: 'http', url: 'https://mcp.example.com/mcp' },
+        broken: { args: 'not a list' },
+        sse: { type: 'sse', url: 'https://mcp.example.com/sse' },
+        ws: { type: 'ws', url: 'wss://mcp.example.com/ws' },
+        untyped: { url: 'https://mcp.example.com/untyped' },
+        local: { command: 'definitely-not-a-command-here' },
+      },
+    },
+    '.claude/settings.json': { enabledMcpjsonServers: ['remote', 'broken', 'sse', 'ws', 'untyped'] },
   });
   const { status, body } = await served(repo);
   assert.equal(status, 200);
-  const [remote, broken] = body.mcp;
-  assert.deepEqual([remote.type, remote.url, remote.tools, remote.error], ['http', 'https://mcp.example.com/mcp', null, null]);
+  const of = (name: string) => body.mcp.find((s) => s.name === name);
+  const remote = of('remote');
+  assert.deepEqual([remote?.type, remote?.url, remote?.tools, remote?.error], ['http', 'https://mcp.example.com/mcp', null, null]);
   assert.equal(
-    remote.notAsked,
+    remote?.notAsked,
     'Not a stdio server (http, at https://mcp.example.com/mcp): the api asks only stdio servers for their tools.',
   );
-  assert.equal(broken.tools, null);
+  assert.equal(of('broken')?.tools, null);
   assert.equal(
-    broken.error,
+    of('broken')?.error,
     '.mcp.json gives broken neither a `command` nor a `url` and `args` that are not a list of strings, so it is not started. Fix its entry.',
   );
+  assert.equal(of('sse')?.type, 'sse', 'sse reads as itself');
+  assert.equal(of('ws')?.type, 'unknown', 'a word no harness loads a server over reads as unknown');
+  assert.ok(of('ws')?.notAsked?.includes('"ws"'), 'and why it was not asked quotes the word as written');
+  assert.equal(of('untyped')?.type, 'unknown', 'a url with no type is unknown: a harness loads no server from one');
+  assert.equal(of('local')?.type, 'stdio', 'a command with no type is stdio');
 });
 
 test('a .mcp.json or a settings file that does not read is a warning naming it and the fix, and the rest is still served', async () => {

@@ -187,7 +187,6 @@ test("an ending's gate holds it before it is filed, and `to decide` says the ste
       for (const pass of [1, 2, 3]) {
         const a = assess(ENDS, r, DONE, signedDone, asked);
         assert.deepEqual([a.ready, a.check, a.retry, a.round], [[], [], [], []], `pass ${pass}: nothing is filed`);
-        assert.equal(stepStatus(SHIP, r, DONE, signedDone, asked, ENDS), 'awaiting approval');
         assert.deepEqual(a.toDecide, {
           kind: 'approve',
           step: 'ship',

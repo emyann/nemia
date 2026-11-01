@@ -1144,6 +1144,11 @@ test('claudeTranscriptEvents: a line of a Claude transcript as the events it say
         [undefined],
         "a line the harness itself put in is the system's, and carries no origin of a person",
       );
+      assert.deepEqual(
+        claudeTranscriptEvents(line({ kind: 'teleport' }), 0).map((e) => e.origin),
+        [{ kind: 'unknown' }],
+        'an origin the SDK has not named reads as unknown, never as a person',
+      );
     },
   );
 });

@@ -112,6 +112,11 @@ export { folderTrust, trustFolder, type FolderTrust, type FolderTrusted } from '
  */
 export { mcpServerOf, type LocalMcpServer, type RemoteMcpServer } from 'agent-runtime';
 /**
+ * An MCP server's transport in the Agent SDK's words (`MCP_TRANSPORTS`, `McpTransport`), and a written `type` read as one, or as
+ * `unknown` for any other word (`transportOf`).
+ */
+export { MCP_TRANSPORTS, transportOf, type McpTransport } from 'agent-runtime';
+/**
  * What a harness says of the servers it was handed, carried here whole and never worded again: the five state words it has
  * (`MCP_STATES`), one server's state as it says it, and what a whole read answers — the states, or that the look failed and why,
  * never an empty list. Asked of the engine's `mcpState`, and refused by `McpStateRefused`.

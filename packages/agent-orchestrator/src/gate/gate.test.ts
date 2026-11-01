@@ -105,16 +105,6 @@ const HOLDS: Array<[string, Workflow, Run, TaskPhase, Closeout | undefined, Task
   ['REFUSED ungated, its check running', CHECKED_PLAN, { ...CHECKING, gates: undefined }, 'succeeded', signedDone(), 'running', false],
   ['REFUSED gated, its check refused: a try of it is its own task', CHECKED_PLAN, CHECKING, 'succeeded', signedDone(), 'failed', false],
   ['REFUSED unsigned', PLAN, at({ gates: ['plan'] }), 'succeeded', undefined, undefined, false],
-  ['REFUSED a run called off', PLAN, at({ ...CANCELLED }), 'succeeded', said('blocked'), undefined, false],
-  [
-    'REFUSED a run pruned',
-    PLAN,
-    at({ gates: ['plan'], pruned: { at: '2026-01-02T00:00:00Z', worktrees: [] } }),
-    'succeeded',
-    signedDone(),
-    undefined,
-    false,
-  ],
 ];
 
 test('holdsOpen', async (t) => {

@@ -9,6 +9,7 @@ import { atWorkState, fold, nameFor, own, waitsForInput, type Event, type Sighti
 import { Journal, type JournalError, type StoreOps } from '../core/engine/index.ts';
 import type { RunnerError, Runner } from '../harness/index.ts';
 import type { SeamOps } from '../a2a/index.ts';
+import { TaskId } from '../core/model.ts';
 
 /** Why `forget` removed nothing: an argument it does not take, or a task it cannot forget, named by `taskId`. */
 export class ForgetRefused extends Schema.TaggedError<ForgetRefused>()('ForgetRefused', {
@@ -87,7 +88,7 @@ const countOf = (counts: Readonly<Record<string, number>> | undefined, taskId: s
 const feedCountsOf = (go: Go, ids: readonly string[], dry: boolean) =>
   Effect.gen(function* () {
     const counted = yield* go(Effect.map(Journal, (j) => j.feedLines));
-    if (counted) return dry ? yield* go(counted(ids)) : undefined;
+    if (counted) return dry ? yield* go(counted(ids.map(TaskId.read))) : undefined;
     const { entries } = yield* go(Effect.flatMap(Journal, (j) => j.feed(0)));
     return Object.fromEntries(ids.map((id) => [id, entries.filter((e) => e.taskId === id).length]));
   });
@@ -141,7 +142,7 @@ export const forgetVerbOf = (
   const heldOf = (taskId: string, listed: ReadonlySet<string>) =>
     Effect.gen(function* () {
       if (!listed.has(taskId)) return yield* refuse(`no task ${taskId} in this store; \`ae ls\` lists them: ${NOTHING}.`, taskId);
-      const events = yield* go(Effect.flatMap(Journal, (j) => j.read(taskId))).pipe(
+      const events = yield* go(Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId)))).pipe(
         Effect.catch((e: JournalError) =>
           refuse(
             `${e.message}: whether it settled cannot be told, and forgetting it would lose a record nobody has read: ${NOTHING}.`,
@@ -191,7 +192,7 @@ export const forgetVerbOf = (
       tasks.push({ taskId: h.taskId, journalBytes, feedLines: countOf(before, h.taskId), sessions: yield* sessionsOf(h, dry) });
     }
     if (dry) return { forgotten: false, tasks } satisfies ForgetReport;
-    const feed = yield* go(forgetStore(ids));
+    const feed = yield* go(forgetStore(ids.map(TaskId.read)));
     const counts = before ?? feed?.linesByTask;
     return {
       forgotten: true,

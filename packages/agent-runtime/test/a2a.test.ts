@@ -39,6 +39,7 @@ import { nameParts } from '../src/core/domain.ts';
 import { SESSION_STATES, type Outcome, type SessionState } from '../src/core/session.ts';
 import type { Attempt, Sighting } from '../src/core/domain.ts';
 import { Runner, RunnerError, testOps, type ExpectedSession, type RunnerOps, type SpawnRequest } from '../src/harness/seam.ts';
+import { TaskId } from '../src/core/model.ts';
 
 /** JSON's round trip, as a transport that serialises would carry a value. */
 const overTheWire = (v: unknown) => JSON.parse(JSON.stringify(structuredClone(v)));
@@ -903,7 +904,7 @@ test('the Effect door: a2aRunner takes the same seam', async (t) => {
       assert.equal(spawned[0].name, `ae/${id}/1`);
       assert.equal(sessions.get(`ae/${id}/1`)!.state, 'working');
 
-      await run(requestStop(id));
+      await run(requestStop(TaskId.read(id)));
       await run(tick());
       assert.equal(sessions.get(`ae/${id}/1`)!.state, 'canceled', 'the stop reached the driver through cancelTask');
 

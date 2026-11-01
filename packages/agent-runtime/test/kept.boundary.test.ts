@@ -15,6 +15,7 @@ import { Effect } from 'effect';
 import type { Event, RunnerOps } from '../src/index.ts';
 import { scratch } from './scratch.ts';
 import { story } from './checkpoints.ts';
+import { TaskId } from '../src/core/model.ts';
 
 const config = scratch('ae-kept-config-');
 process.env.CLAUDE_CONFIG_DIR = config;
@@ -71,7 +72,7 @@ const journalled = async (
         ] satisfies Event[])
       : []),
   ];
-  const append = Effect.forEach(events, (event) => Effect.flatMap(Journal, (j) => j.append(taskId, event)), { discard: true });
+  const append = Effect.forEach(events, (event) => Effect.flatMap(Journal, (j) => j.append(TaskId.read(taskId), event)), { discard: true });
   await Effect.runPromise(append.pipe(Effect.provide(Journal.files(root))));
 };
 
@@ -176,7 +177,7 @@ test('`ae kept`: what each task of a store keeps on the disk, counted once, and 
       { kind: 'starting', at, attempt: 1 },
       { kind: 'settled', at, outcome: 'stopped', nativeId: 'sess-o1' },
     ];
-    const append = Effect.forEach(events, (event) => Effect.flatMap(Journal, (j) => j.append('o1', event)), { discard: true });
+    const append = Effect.forEach(events, (event) => Effect.flatMap(Journal, (j) => j.append(TaskId.read('o1'), event)), { discard: true });
     await Effect.runPromise(append.pipe(Effect.provide(Journal.files(root))));
     const transcript = plant(transcriptAt('-r', 'sess-o1'));
     assert.equal((await keptOf(engine, 'o1'))?.records, blocksOf(transcript));

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { appendFields, Journal } from './journal.ts';
 import type { Event } from '../domain.ts';
+import { TaskId } from '../model.ts';
 
 /** What a capturing logger was handed: each log's level, its message's text and its annotations. */
 type Logged = { level: string; text: string; annotations: Record<string, unknown> };
@@ -43,33 +44,34 @@ async function traced(program: Effect.Effect<void, unknown, Journal>): Promise<{
   return { logs, spans };
 }
 
-const starting: Event = { kind: 'starting', at: '2026-10-05T08:00:00.000Z', attempt: 2 };
+const starting: Event = { kind: 'starting', at: '2026-10-05T08:00:00.000Z', attempt: 1 };
 const filed = { kind: 'filed', at: '2026-10-05T08:00:00.000Z', brief: 'b', cwd: '/w' } as Event;
 
 test('an append is said at Debug, its kind, annotated with its task, its kind and its attempt where it has one', async () => {
   const { logs } = await traced(
     Effect.gen(function* () {
       const journal = yield* Journal;
-      yield* journal.append('t-1', filed);
-      yield* journal.append('t-1', starting);
+      yield* journal.append(TaskId.read('t-1'), filed);
+      yield* journal.append(TaskId.read('t-1'), starting);
     }),
   );
   assert.deepEqual(logs, [
     { level: 'Debug', text: 'filed', annotations: { task: 't-1', kind: 'filed' } },
-    { level: 'Debug', text: 'starting', annotations: { task: 't-1', kind: 'starting', attempt: 2 } },
+    { level: 'Debug', text: 'starting', annotations: { task: 't-1', kind: 'starting', attempt: 1 } },
   ]);
-  assert.deepEqual(appendFields('t-1', starting), { task: 't-1', kind: 'starting', attempt: 2 });
+  assert.deepEqual(appendFields('t-1', starting), { task: 't-1', kind: 'starting', attempt: 1 });
 });
 
 test('an append is a span of its own, append, under the span of the verb that wrote it, its attributes the same fields', async () => {
   const { spans } = await traced(
     Effect.gen(function* () {
       const journal = yield* Journal;
-      yield* journal.append('t-1', starting);
+      yield* journal.append(TaskId.read('t-1'), filed);
+      yield* journal.append(TaskId.read('t-1'), starting);
     }).pipe(Effect.withSpan('file')),
   );
-  const append = spans.find((s) => s.name === 'append');
+  const append = spans.find((s) => s.name === 'append' && Object.fromEntries(s.attributes).kind === 'starting');
   assert.ok(append, `no append span among ${spans.map((s) => s.name).join(', ')}`);
   assert.equal(Option.getOrUndefined(append.parent)?.spanId, spans.find((s) => s.name === 'file')?.spanId);
-  assert.deepEqual(Object.fromEntries(append.attributes), { task: 't-1', kind: 'starting', attempt: 2 });
+  assert.deepEqual(Object.fromEntries(append.attributes), { task: 't-1', kind: 'starting', attempt: 1 });
 });

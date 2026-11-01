@@ -45,11 +45,12 @@ import { scratch } from './scratch.ts';
 import { story } from './checkpoints.ts';
 import { builtEngine } from './engine.ts';
 import { until, WAITED, type Waiter } from '../src/waits/index.ts';
+import { TaskId } from '../src/core/model.ts';
 
 /** A task's events, read as the engine reads them: decoded and upgraded (`Journal.layer`). */
 const readJournal = (taskId: string) =>
   Effect.gen(function* () {
-    return yield* (yield* Journal).read(taskId);
+    return yield* (yield* Journal).read(TaskId.read(taskId));
   });
 
 const THREAD = '01a09996-d343-7932-8971-b2f209ba315b';

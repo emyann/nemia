@@ -9,6 +9,7 @@ import type { Effect } from 'effect';
 import { fold, verbTakes } from '../src/core/domain.ts';
 import type { Journal, JournalError } from '../src/core/engine/journal.ts';
 import { stopRefusalOf, type StopRefused } from '../src/core/engine/filing.ts';
+import type { TaskId } from '../src/core/model.ts';
 
 /**
  * The journal's fold, which the verifier does not read (it loops): pure, which the verifier checks from its source, and
@@ -19,7 +20,7 @@ export const foldIsPure = assume(fold, { pure: true });
 /** Whether a verb's guard takes a state: a lookup the verifier does not read (`.find` on a table). Pure, checked. */
 export const verbTakesIsPure = assume(verbTakes, { pure: true });
 
-const stopSpec = spec<(taskId: string) => Effect.Effect<void, StopRefused | JournalError, Journal>>({
+const stopSpec = spec<(taskId: TaskId) => Effect.Effect<void, StopRefused | JournalError, Journal>>({
   ensures: {
     readsFirst: {
       description: 'The journal is read first, and for this task',

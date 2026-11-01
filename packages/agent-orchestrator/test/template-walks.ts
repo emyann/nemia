@@ -11,7 +11,7 @@ import path from 'node:path';
 import type { DoorWalk } from './door-walks.ts';
 import { act, done } from './door-walks.ts';
 import type { TemplateDoorShape, TemplateTree } from '../src/templates/templates.store.ts';
-import { TemplateSource } from '../src/template/template.model.ts';
+import { TemplateSource } from '../src/templates/templates.model.ts';
 import type { TreeFile } from '../src/archive/archive.ts';
 
 type Walk = DoorWalk<TemplateDoorShape>;
@@ -24,7 +24,7 @@ export const aTree = (name: string, more: TreeFile[] = []): { name: string; file
   name,
   files: [
     { path: 'nemia.yaml', mode: 0o644, bytes: Buffer.from('apiVersion: nemia.dev/v1alpha1\nkind: FactoryTemplate\n') },
-    { path: 'workflows/build/run.sh', mode: 0o755, bytes: Buffer.from('#!/bin/sh\necho built\n') },
+    { path: 'workflows/dev/run.sh', mode: 0o755, bytes: Buffer.from('#!/bin/sh\necho run\n') },
     ...more,
   ],
 });
@@ -42,7 +42,7 @@ const SHOP = {
   name: 'shop',
   files: [
     { path: 'nemia.yaml', mode: 0o644, text: 'apiVersion: nemia.dev/v1alpha1\nkind: FactoryTemplate\n' },
-    { path: 'workflows/build/run.sh', mode: 0o755, text: '#!/bin/sh\necho built\n' },
+    { path: 'workflows/dev/run.sh', mode: 0o755, text: '#!/bin/sh\necho run\n' },
   ],
   problems: [],
 };
@@ -67,7 +67,7 @@ export const TEMPLATE_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       walk: ({ door, root }) => {
         const packed = done(door.templates.pack(at(root, 'shop-1.0.0.tgz'), aTree('shop')));
         done(door.templates.create(at(root, 'shop'), aTree('shop')));
-        const read = done(door.templates.read(packed.source));
+        const read = done(door.templates.read(TemplateSource.read(packed.source)));
         return {
           ...seen(read),
           same: read.digest === packed.digest && done(door.templates.read(at(root, 'shop'))).digest === packed.digest,
@@ -86,7 +86,9 @@ export const TEMPLATE_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       name: 'REFUSED: a folder that holds files is a Conflict, the first left as it was',
       walk: ({ door, root }) => {
         done(door.templates.create(at(root, 'shop'), aTree('shop')));
-        const again = act(door.templates.create(at(root, 'shop'), aTree('shop', [{ path: 'more.md', mode: 0o644, bytes: Buffer.from('x') }])));
+        const again = act(
+          door.templates.create(at(root, 'shop'), aTree('shop', [{ path: 'more.md', mode: 0o644, bytes: Buffer.from('x') }])),
+        );
         return { again, files: done(door.templates.read(at(root, 'shop'))).files.length };
       },
       says: { again: { refused: 'Conflict' }, files: 2 },
@@ -95,7 +97,10 @@ export const TEMPLATE_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       name: 'REFUSED: a place that is no folder is a Conflict, the archive left as it was',
       walk: ({ door, root }) => {
         done(door.templates.pack(at(root, 'shop'), aTree('shop')));
-        return { made: act(door.templates.create(at(root, 'shop'), aTree('shop'))), still: seen(done(door.templates.read(at(root, 'shop')))).name };
+        return {
+          made: act(door.templates.create(at(root, 'shop'), aTree('shop'))),
+          still: seen(done(door.templates.read(at(root, 'shop')))).name,
+        };
       },
       says: { made: { refused: 'Conflict' }, still: 'shop' },
     },
@@ -125,8 +130,7 @@ export const TEMPLATE_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       says: { made: { refused: 'Invalid' }, read: { refused: 'Missing' }, out: { refused: 'Missing' } },
     },
     {
-      name: 'REFUSED: a place that is no whole path is Invalid',
-      // A relative place, passed by name on purpose: the door checks it as TemplateSource.OnCreate does.
+      name: 'REFUSED: a place that is no whole path, branded by name alone as a read is, is Invalid when written',
       walk: ({ door }) => act(door.templates.create(TemplateSource.read('shop'), aTree('shop'))),
       says: { refused: 'Invalid' },
     },
@@ -144,7 +148,9 @@ export const TEMPLATE_WALKS: Readonly<Record<string, readonly Walk[]>> = {
       name: 'REFUSED: an archive there already is a Conflict, the first left as it was',
       walk: ({ door, root }) => {
         const first = done(door.templates.pack(at(root, 'shop.tgz'), aTree('shop')));
-        const again = act(door.templates.pack(at(root, 'shop.tgz'), aTree('shop', [{ path: 'more.md', mode: 0o644, bytes: Buffer.from('x') }])));
+        const again = act(
+          door.templates.pack(at(root, 'shop.tgz'), aTree('shop', [{ path: 'more.md', mode: 0o644, bytes: Buffer.from('x') }])),
+        );
         return { again, same: done(door.templates.read(at(root, 'shop.tgz'))).digest === first.digest };
       },
       says: { again: { refused: 'Conflict' }, same: true },

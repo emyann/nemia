@@ -12,7 +12,7 @@ import { scratch } from '../../test/scratch.ts';
 import { act, done, doorFrom, walksOn } from '../../test/door-walks.ts';
 import { aTree, TEMPLATE_WALKS } from '../../test/template-walks.ts';
 import { TemplateDoor, templateDoorFiles } from './templates.store.ts';
-import { TemplateSource } from '../template/template.model.ts';
+import { TemplateSource } from '../templates/templates.model.ts';
 import { StoreRoot } from '../config/root.store.ts';
 
 for (const [name, body] of walksOn(TEMPLATE_WALKS, () => {
@@ -30,7 +30,7 @@ test('a folder there and empty is written into, and a write leaves nothing stage
   done(door.templates.create(TemplateSource.read(path.join(root, 'shop')), aTree('shop')));
   done(door.templates.pack(TemplateSource.read(path.join(root, 'shop.tgz')), aTree('shop')));
   assert.deepEqual(fs.readdirSync(root).sort(), ['shop', 'shop.tgz']);
-  assert.equal(fs.statSync(path.join(root, 'shop', 'workflows', 'build', 'run.sh')).mode & 0o777, 0o755);
+  assert.equal(fs.statSync(path.join(root, 'shop', 'workflows', 'dev', 'run.sh')).mode & 0o777, 0o755);
 });
 
 test('the default door reads the files where the program was given a store root, and refuses Invalid where it was given none', () => {

@@ -19,7 +19,7 @@ import { FactoryDoor } from '../factories/factories.store.ts';
 import { TemplateDoor } from '../templates/templates.store.ts';
 import { StoreRoot } from '../config/root.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
-import { TemplateSource } from './template.model.ts';
+import { TemplateSource } from '../templates/templates.model.ts';
 import {
   archiveAsked,
   checkedTree,
@@ -228,7 +228,8 @@ const TEMPLATE_PACK: Command<{ out: string; digest: string }> = {
   class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args, _env, home) => rooted(home, 'template pack', packedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'out'), process.cwd())),
+  handler: (args, _env, home) =>
+    rooted(home, 'template pack', packedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'out'), process.cwd())),
   print: ({ out, digest }) => [`written: ${out}`, digestLine(digest)],
 };
 
@@ -254,7 +255,8 @@ const TEMPLATE_UNPACK: Command<{ dir: string; digest: string | undefined }> = {
   class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args, _env, home) => rooted(home, 'template unpack', unpackedTemplate(textOf(args, 'archive') ?? '', textOf(args, 'dir') ?? '')),
+  handler: (args, _env, home) =>
+    rooted(home, 'template unpack', unpackedTemplate(textOf(args, 'archive') ?? '', textOf(args, 'dir') ?? '')),
   print: ({ dir, digest }) => [`written: ${dir}`, digestLine(digest), `lint it: nemia template lint ${dir}`],
 };
 

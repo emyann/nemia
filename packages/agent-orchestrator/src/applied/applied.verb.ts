@@ -18,7 +18,7 @@ import { Invalid } from '../refusal/refusal.ts';
 import { addFactory, factoryRepos, readFactories } from '../factory/factory.store.ts';
 import type { Factory, FactoryConditionReason, FactoryConditionType, FactoryTemplate } from '../factory/factory.ts';
 import { openedTree, placeSkillNames, problemLine, type OpenTemplate } from '../template/template.store.ts';
-import { TemplateSource } from '../template/template.model.ts';
+import { TemplateSource } from '../templates/templates.model.ts';
 import { TemplateDoor } from '../templates/templates.store.ts';
 import { rooted } from '../wiring/wire.verb.ts';
 import type { FactorySpec } from '../template/index.ts';
@@ -93,7 +93,9 @@ const condition = (type: FactoryConditionType, status: boolean, reason: FactoryC
 const NO_CONFLICTS = condition('ConflictsPending', false, 'NoUpgrade', 'No upgrade is under way, so no change waits to be merged.');
 
 /** `render` as an answer that cannot fail: what it rendered, or, for whatever stopped it, its words as the one problem. */
-export const renderedOrNot = <R>(render: Effect.Effect<RenderedAt | Unrendered, unknown, R>): Effect.Effect<RenderedAt | Unrendered, never, R> =>
+export const renderedOrNot = <R>(
+  render: Effect.Effect<RenderedAt | Unrendered, unknown, R>,
+): Effect.Effect<RenderedAt | Unrendered, never, R> =>
   render.pipe(Effect.catchCause((cause) => Effect.succeed({ problems: [messageOf(Cause.squash(cause))] })));
 
 /** The words of what was thrown or failed. */

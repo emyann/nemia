@@ -9,7 +9,7 @@ import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { WorkflowName } from '../record/record.model.ts';
 import { AgentName } from '../agents/agents.model.ts';
-import { templateNameRefusal, templateSourceRefusal, treePathRefusal } from './source.ts';
+import { templateNameRefusal, templateSourceRefusal, treePathRefusal } from './templates.ts';
 import { pathRefusals } from '../archive/archive.ts';
 
 /** Where a template is read from: a folder that holds its `nemia.yaml`, or an archive `nemia template pack` wrote, by its whole path. */

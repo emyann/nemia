@@ -20,8 +20,8 @@ import { Context, Effect, Layer } from 'effect';
 import { checked, doorOf, rootedDoor, type DoorOf } from '../door/door.store.ts';
 import { Conflict, Invalid, Missing, type Refusal } from '../refusal/refusal.ts';
 import { ARCHIVE_LIMIT, contentDigest, packArchive, pathRefusals, unpackArchive, type TreeFile } from '../archive/archive.ts';
-import { TemplateSource, TemplateTreeWrite } from '../template/template.model.ts';
-import type { Problem } from '../template/source.ts';
+import { TemplateSource, TemplateTreeWrite } from '../templates/templates.model.ts';
+import type { Problem } from './templates.ts';
 
 /** A template's tree as read: its name (its folder's, or an archive's top folder), its files, what stops one being read, its digest. */
 export type TemplateTree = { name: string; files: TreeFile[]; problems: Problem[]; digest: string | undefined };
@@ -90,7 +90,9 @@ export const noTemplateAt = (source: string): Missing =>
  */
 export function takenFolder(at: string, kind: 'folder' | 'file' | 'files' | undefined): Conflict | null {
   if (kind === 'file')
-    return new Conflict({ message: `${at} is there, and is no folder: a template is written as a new folder. Move it away, or name another.` });
+    return new Conflict({
+      message: `${at} is there, and is no folder: a template is written as a new folder. Move it away, or name another.`,
+    });
   if (kind === 'files')
     return new Conflict({
       message: `${at} holds files already, and a template is written as a new folder: name one that is not there, or is empty.`,

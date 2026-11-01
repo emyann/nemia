@@ -312,6 +312,19 @@ a root. What still calls the stores the door is over — a start, a plan, the in
 upgrade — is counted per file in `test/factory-door.baseline.ts`, which only shrinks; `factory.store.ts`'s functions each take the
 store's root first (`readFactoryAt`, …), its old spellings the same functions at the module's root, for those callers.
 
+**The Template door.** A factory template — a folder that holds its `nemia.yaml`, or an archive `nemia template pack` wrote — is read,
+written as a new folder and packed as a new archive through `TemplateDoor` (`packages/agent-orchestrator/src/templates/templates.store.ts`),
+on the Factory door's pattern: two layers built the one way (`templateDoorOver`), the files (`templateFiles`, today's folders and
+archives, each file with its bytes and mode, a write staged beside its place and renamed into it) and a memory stand-in
+(`templateDoorMemory`, `src/templates/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/template-walks.ts`). Its id
+is where the template is read from, `TemplateSource`, checked whole on a write and read by name alone; a tree written decodes through
+`TemplateTreeWrite` — a template's name, the folder's own, each path one in its folder and short enough for an archive — or is
+`Invalid`, and a place taken is `Conflict`. Its default is rooted, as the Factory door's, though its files are outside the store: one
+pattern for every definition door. The template's lint is the verbs', never the door's: `nemia template export` and `pack` check the
+tree (`checkedTree`, pure, in `src/template/template.store.ts`) before they write it, and `unpack` writes what an archive holds. The
+factory controller reads a template through the door on every pass (`renderedAt`), and a factory's `template` is the model's
+`AppliedTemplate`, whose source names the `Template` it was applied from.
+
 Both shells are level-triggered: a pass reads the world, decides and acts, and carries nothing between passes that the
 next could not read again. The one thing the orchestrator's tick keeps in memory is a cache under that rule, not beside
 it: a finished run judged at rest on a full pass is answered from its memo while none of its inputs changed — its record,

@@ -12,7 +12,8 @@ import { scratch } from '../../test/scratch.ts';
 import { teamCopy } from '../../test/team.ts';
 
 process.env.WF_ROOT = scratch('wf-render-');
-const { exportTemplate, openTemplate } = await import('../template/template.store.ts');
+const { templated } = await import('../../test/templated.ts');
+const { exportTemplate, openTemplate } = templated(process.env.WF_ROOT);
 const { loadWorkflows } = await import('../folder/folder.store.ts');
 const { renderFactory, resolveParams } = await import('./index.ts');
 

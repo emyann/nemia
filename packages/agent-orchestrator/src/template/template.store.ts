@@ -21,10 +21,10 @@ import { splitFrontmatter, WorkflowError } from '../step/step.ts';
 import { firstPiece } from '../piece/piece.ts';
 import { contentDigest, pathRefusals, type TreeFile } from '../archive/archive.ts';
 import { walkFolder, type TemplateTree } from '../templates/templates.store.ts';
-import { templateNameRefusal, type Problem } from './source.ts';
+import { templateNameRefusal, type Problem } from '../templates/templates.ts';
 import { checkTemplate, documentFile, draftOf, type Draft, type ReadFolder, type Source, type StepSource } from './index.ts';
 
-export type { Problem } from './source.ts';
+export type { Problem } from '../templates/templates.ts';
 
 /** A document as parsed, with what turns its offsets into lines. */
 type Parsed = { doc: Document.Parsed | undefined; lines: LineCounter };
@@ -77,7 +77,8 @@ function readTemplateFolder(
 }
 
 /** The names of nemia's builtin place skills, each present to a template that names it. */
-export const placeSkillNames = (): string[] => entriesOf(PLACE_SKILLS).filter((name) => fs.existsSync(path.join(PLACE_SKILLS, name, 'SKILL.md')));
+export const placeSkillNames = (): string[] =>
+  entriesOf(PLACE_SKILLS).filter((name) => fs.existsSync(path.join(PLACE_SKILLS, name, 'SKILL.md')));
 
 /** A problem as a person reads it: `<file>:<line>:<col>: <words>`, or `<file>: <words>` where it has no line. */
 export const problemLine = (p: Problem): string => `${p.file}${p.line === undefined ? '' : `:${p.line}:${p.col ?? 1}`}: ${p.message}`;
@@ -198,7 +199,11 @@ function lookups(root: string, from: string): Pick<Source, 'agent' | 'skill'> {
 }
 
 /** The factory's parts a draft holds, as its door read them; one whose repositories do not hold `from` refused. */
-function factorySource(parts: FactoryParts, from: string, refusals: string[]): { source: NonNullable<Source['factory']>; workflows: string[] } {
+function factorySource(
+  parts: FactoryParts,
+  from: string,
+  refusals: string[],
+): { source: NonNullable<Source['factory']>; workflows: string[] } {
   const { factory, instruction, rules } = parts;
   const { name } = factory;
   if (outsideRefusal(factory, from)) {
@@ -286,7 +291,10 @@ export type ExportAsk = { dir: string; from: string; factory?: FactoryParts };
  * a folder that is no name, a factory whose repositories are not `from`, a workflow it attaches that `from` lacks, what `draftOf`
  * refuses, and a draft that does not pass its own check (Invalid), each problem by name; a `from` with no workflows/ (Missing).
  */
-export function exportTree(ask: ExportAsk, placeSkills: readonly string[]): { dir: string; name: string; files: TreeFile[]; from: Draft['from'] } {
+export function exportTree(
+  ask: ExportAsk,
+  placeSkills: readonly string[],
+): { dir: string; name: string; files: TreeFile[]; from: Draft['from'] } {
   const dir = path.resolve(ask.dir);
   const from = path.resolve(ask.from);
   const name = path.basename(dir);

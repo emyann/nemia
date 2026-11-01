@@ -22,7 +22,7 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
   `folder.store.ts` and `write.store.ts`); **S5c**, the Agent and Skill doors (one context, the same lookup roots). A run's frozen
   `workflow` and its `pinned` revisions, left out of `Run` today, are named there. **S5d**, the Template door (`TemplateDoor`,
   `src/templates/templates.store.ts`): a template's folder or archive read, written and packed, rooted as S5a's, each tree written
-  checked by `TemplateTreeWrite`; the model's `Template` (`src/template/template.model.ts`) is keyed by its source, and a factory's
+  checked by `TemplateTreeWrite`; the model's `Template` (`src/templates/templates.model.ts`) is keyed by its source, and a factory's
   `template` is an `AppliedTemplate`, whose source names it.
 - **S6, the subscription, the ledger and the feed**, each behind a door on the feed's model.
 - **AgentOnStep** is `StepAgent` in the agents' model: the agent a step is given, and what the step overrides of it, within what the

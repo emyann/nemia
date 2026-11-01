@@ -18,13 +18,14 @@ import { heldUnasked } from '../../test/unasked.ts';
 import { rawTar } from '../../test/tar.ts';
 import { teamCopy } from '../../test/team.ts';
 import { Cause, Effect, Exit } from 'effect';
+import type { StoreRoot as Root } from '../config/root.store.ts';
 import { packArchive } from '../archive/archive.ts';
 
 const ROOT = scratch('wf-template-');
 process.env.WF_ROOT = ROOT;
 const { checkedTree, placeSkillNames, problemLine } = await import('./template.store.ts');
 const { TemplateDoor } = await import('../templates/templates.store.ts');
-const { TemplateSource } = await import('./template.model.ts');
+const { TemplateSource } = await import('../templates/templates.model.ts');
 const { StoreRoot } = await import('../config/root.store.ts');
 const { addFactory, attachWorkflow, hireAgent } = await import('../runner.ts');
 const { writeRules } = await import('../rules/rules.store.ts');
@@ -36,7 +37,7 @@ heldUnasked(engine);
 const { exportedTemplate, packedTemplate, unpackedTemplate } = await import('./template.verb.ts');
 
 /** `program` run at the store's root, as the CLI runs a verb's: what it answers, or the refusal it failed with, thrown. */
-function run<A>(program: Effect.Effect<A, unknown, StoreRoot>): A {
+function run<A>(program: Effect.Effect<A, unknown, Root>): A {
   const exit = Effect.runSyncExit(Effect.provideService(program, StoreRoot, ROOT));
   if (Exit.isSuccess(exit)) return exit.value;
   throw Cause.squash(exit.cause);

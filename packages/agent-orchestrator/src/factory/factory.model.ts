@@ -8,7 +8,7 @@ import { brandedId, type Id } from '../model/brand.model.ts';
 import type { ErModel } from '../model/er.model.ts';
 import { StepName, WorkflowName } from '../record/record.model.ts';
 import { AgentName } from '../agents/agents.model.ts';
-import { TemplateSource } from '../template/template.model.ts';
+import { TemplateSource } from '../templates/templates.model.ts';
 import { factoryNameRefusal, REVISIONS_POLICIES } from './factory.ts';
 
 /** A factory's name: its file's in the store, minus `.json`, a lowercase slug (`factoryNameRefusal`, over `FACTORY_NAME`). */

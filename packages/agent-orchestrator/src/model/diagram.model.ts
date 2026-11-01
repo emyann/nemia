@@ -6,7 +6,7 @@ import { erDiagram, type ErModel } from './er.model.ts';
 import { recordModel } from '../record/record.model.ts';
 import { inboxModel } from '../inbox/inbox.model.ts';
 import { factoryModel } from '../factory/factory.model.ts';
-import { templateModel } from '../template/template.model.ts';
+import { templateModel } from '../templates/templates.model.ts';
 import { placeModel } from '../place/place.model.ts';
 import { agentsModel } from '../agents/agents.model.ts';
 import { feedModel } from '../feed/feed.model.ts';

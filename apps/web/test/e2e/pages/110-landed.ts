@@ -28,7 +28,10 @@ export default {
     );
 
     await expectVisible(section.getByText(LANDED.merged), `${ending} says what it did (${LANDED.merged})`);
-    await expectVisible(section.locator('dd', { hasText: /^base$/ }), `and its facts say it ran in the repository's own checkout (workspace base)`);
+    await expectVisible(
+      section.locator('dd', { hasText: /^base$/ }),
+      `and its facts say it ran in the repository's own checkout (workspace base)`,
+    );
     await expectVisible(section.locator('dd', { hasText: /^approved, try 1$/ }), 'and that its gate is approved');
     const approval = section.locator(`section[aria-label="The approval of ${ending}"]`);
     await expectVisible(

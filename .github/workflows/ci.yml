@@ -152,7 +152,15 @@ jobs:
           node-version: '24.16.0'
       - run: npm ci
         timeout-minutes: 10
-      # 11 m 42 s on a runner, 5 m on the owner's machine.
+      # Each contract's verdict, kept from the runs before (tsverify --cache, keyed by the text of every file its program
+      # reads): a contract whose files are unchanged is answered from it. Restored after npm ci, which empties node_modules.
+      - uses: actions/cache@v6
+        timeout-minutes: 5
+        with:
+          path: node_modules/.cache/tsverify
+          key: tsverify-${{ github.sha }}
+          restore-keys: tsverify-
+      # On the owner's machine: 102 s with no verdict kept, 5 s with every one kept.
       - run: npm run contracts
         timeout-minutes: 30
 

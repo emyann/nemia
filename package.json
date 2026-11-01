@@ -25,7 +25,7 @@
     "test": "turbo run test --continue",
     "typecheck": "turbo run typecheck",
     "lint": "oxlint && oxfmt --check",
-    "contracts": "tsverify packages/agent-runtime/src && tsverify packages/agent-orchestrator/src --project packages/agent-orchestrator/contracts/tsconfig.json",
+    "contracts": "tsverify packages/agent-runtime/src --cache && tsverify packages/agent-orchestrator/src --project packages/agent-orchestrator/contracts/tsconfig.json --cache",
     "format": "oxfmt",
     "e2e": "npm run e2e --workspace web --",
     "board:serve": "npm run board:serve --workspace web",
@@ -33,7 +33,7 @@
     "release:check": "npm run typecheck && npm test"
   },
   "devDependencies": {
-    "@emyann/tsverify": "^0.1.0",
+    "@emyann/tsverify": "^0.2.0",
     "@playwright/mcp": "0.0.80",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.19.2",

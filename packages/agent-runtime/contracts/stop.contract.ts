@@ -22,22 +22,22 @@ export const verbTakesIsPure = assume(verbTakes, { pure: true });
 const stopSpec = spec<(taskId: string) => Effect.Effect<void, StopRefused | JournalError, Journal>>({
   ensures: {
     /** The journal is read first, and for this task. */
-    readsFirst: (taskId, _out, calls) => {
+    readsFirst: ({ input: [taskId], calls }) => {
       const first = calls.at(0);
       return first !== undefined && first.op === 'read' && first.args[0] === taskId;
     },
     /** A read that fails ends the request with that failure, and nothing else is called. */
-    readFailurePassesThrough: (_taskId, out, calls) => {
+    readFailurePassesThrough: ({ output, calls }) => {
       const first = calls.at(0);
       if (first === undefined || first.outcome._tag !== 'Failure') return true;
-      return calls.length === 1 && out._tag === 'Failure' && out.error._tag === first.outcome.error._tag;
+      return calls.length === 1 && output._tag === 'Failure' && output.error._tag === first.outcome.error._tag;
     },
     /** A refused stop writes nothing. */
-    refusedWritesNothing: (_taskId, out, calls) =>
-      !(out._tag === 'Failure' && out.error._tag === 'StopRefused') || !calls.some((c) => c.op === 'append'),
+    refusedWritesNothing: ({ output, calls }) =>
+      !(output._tag === 'Failure' && output.error._tag === 'StopRefused') || !calls.some((c) => c.op === 'append'),
     /** An accepted stop writes exactly one entry, last, to this task, of kind `stop-requested`. */
-    acceptedWritesOneStop: (taskId, out, calls) => {
-      if (out._tag !== 'Success') return true;
+    acceptedWritesOneStop: ({ input: [taskId], output, calls }) => {
+      if (output._tag !== 'Success') return true;
       const last = calls.at(-1);
       return (
         calls.filter((c) => c.op === 'append').length === 1 &&
@@ -48,12 +48,12 @@ const stopSpec = spec<(taskId: string) => Effect.Effect<void, StopRefused | Jour
       );
     },
     /** The request is refused exactly when the guard, asked of the journal read, gives words. */
-    refusedExactlyWhenTheGuardSays: (taskId, out, calls) => {
+    refusedExactlyWhenTheGuardSays: ({ input: [taskId], output, calls }) => {
       const first = calls.at(0);
       if (first === undefined || first.op !== 'read' || first.outcome._tag !== 'Success') return true;
       const events = first.outcome.value;
       const refused = stopRefusalOf(taskId, events.length ? fold(taskId, events) : undefined) !== undefined;
-      return refused === (out._tag === 'Failure' && out.error._tag === 'StopRefused');
+      return refused === (output._tag === 'Failure' && output.error._tag === 'StopRefused');
     },
   },
 });

@@ -10,31 +10,33 @@ import type { LifecycleState } from '../src/core/lifecycle.ts';
 const lifecycleSpec = spec<(state: State) => LifecycleState>({
   ensures: {
     /** 1. Settled: the final state its outcome names. A terminal state is reached exactly when settled. */
-    terminalExactlyWhenSettled: (state, s) => (s === 'completed' || s === 'failed' || s === 'canceled') === (state.settled !== null),
-    succeededCompletes: (state, s) => state.settled !== 'succeeded' || s === 'completed',
-    stoppedCancels: (state, s) => state.settled !== 'stopped' || s === 'canceled',
+    terminalExactlyWhenSettled: ({ input: [state], output }) =>
+      (output === 'completed' || output === 'failed' || output === 'canceled') === (state.settled !== null),
+    succeededCompletes: ({ input: [state], output }) => state.settled !== 'succeeded' || output === 'completed',
+    stoppedCancels: ({ input: [state], output }) => state.settled !== 'stopped' || output === 'canceled',
 
     /** 2. A person's stop outranks everything except a terminal state. */
-    stopOutranks: (state, s) => state.settled !== null || !state.stopRequested || s === 'stopping',
-    stoppingOnlyWhenAsked: (state, s) => s !== 'stopping' || state.stopRequested,
+    stopOutranks: ({ input: [state], output }) => state.settled !== null || !state.stopRequested || output === 'stopping',
+    stoppingOnlyWhenAsked: ({ input: [state], output }) => output !== 'stopping' || state.stopRequested,
 
     /** 3. While the last attempt has not ended: working once spawned, else starting. */
-    inFlight: (state, s) => {
+    inFlight: ({ input: [state], output }) => {
       const last = state.attempts.at(-1);
       if (state.settled !== null || state.stopRequested || last === undefined || last.ended !== null) return true;
-      return s === (last.spawnedAt !== null ? 'working' : 'starting');
+      return output === (last.spawnedAt !== null ? 'working' : 'starting');
     },
-    workingMeansInFlight: (state, s) => {
+    workingMeansInFlight: ({ input: [state], output }) => {
       const last = state.attempts.at(-1);
-      return (s !== 'working' && s !== 'starting') || (last !== undefined && last.ended === null);
+      return (output !== 'working' && output !== 'starting') || (last !== undefined && last.ended === null);
     },
 
     /** 4–5. Only a task held open waits on a person, and only while nobody closed it. */
-    inputRequiredNeedsHoldOpen: (state, s) => s !== 'input-required' || (state.holdOpen === true && !state.closed),
-    notHeldOpenNeverWaits: (state, s) => state.holdOpen === true || s !== 'input-required',
+    inputRequiredNeedsHoldOpen: ({ input: [state], output }) => output !== 'input-required' || (state.holdOpen === true && !state.closed),
+    notHeldOpenNeverWaits: ({ input: [state], output }) => state.holdOpen === true || output !== 'input-required',
 
     /** 6. Submitted: nothing has been attempted in the current turn. */
-    submittedHasNoAttemptThisTurn: (state, s) => s !== 'submitted' || !state.attempts.some((a) => (a.turn ?? 0) === state.inputs.length),
+    submittedHasNoAttemptThisTurn: ({ input: [state], output }) =>
+      output !== 'submitted' || !state.attempts.some((a) => (a.turn ?? 0) === state.inputs.length),
   },
 });
 export type LifecycleSpec = typeof lifecycleSpec;

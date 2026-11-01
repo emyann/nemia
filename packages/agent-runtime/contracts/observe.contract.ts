@@ -23,7 +23,7 @@ import type { LifecycleEvent } from '../src/core/lifecycle.ts';
  */
 export const backoff = assume(backoffOf, {
   pure: true,
-  ensures: { withinItsCap: (_attempts, ms) => ms >= RESTART_BACKOFF.initialMs && ms <= RESTART_BACKOFF.maxMs },
+  ensures: { withinItsCap: ({ output }) => output >= RESTART_BACKOFF.initialMs && output <= RESTART_BACKOFF.maxMs },
 });
 
 /** A moment as the runtime stamps one: whole milliseconds, after 1970 and before 2^52 of them. */
@@ -61,7 +61,7 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
    * Every moment on the journal and the clock is whole milliseconds (`Monotonic`, `Instant`), and a deadline a whole
    * number of seconds: the arithmetic on them is then exact.
    */
-  requires: (state, _observed, now) =>
+  requires: ({ input: [state, , now] }) =>
     stamped(now.at.getTime()) &&
     monoStamped(now.mono) &&
     (state.deadlineSeconds === undefined ||
@@ -69,33 +69,33 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
     state.attempts.every(attemptStamped),
   ensures: {
     /** A settled task is seen settled, and only a settled one. */
-    settledExactly: (state, _observed, _now, e) => (state.settled !== null) === (e.type === 'SETTLED'),
+    settledExactly: ({ input: [state], output }) => (state.settled !== null) === (output.type === 'SETTLED'),
 
     /** With an attempt in flight. 1: a person's stop outranks the deadline, and so does an end the session came to. */
-    theStopOutranksTheDeadline: (state, _observed, _now, e) => !state.stopRequested || e.type !== 'DEADLINE_PASSED',
-    anEndOfItsOwnOutranksTheDeadline: (state, observed, _now, e) => {
+    theStopOutranksTheDeadline: ({ input: [state], output }) => !state.stopRequested || output.type !== 'DEADLINE_PASSED',
+    anEndOfItsOwnOutranksTheDeadline: ({ input: [state, observed], output }) => {
       const seen = sightingOf(state, observed);
-      return seen === undefined || !['completed', 'failed', 'rejected'].includes(seen.state) || e.type !== 'DEADLINE_PASSED';
+      return seen === undefined || !['completed', 'failed', 'rejected'].includes(seen.state) || output.type !== 'DEADLINE_PASSED';
     },
-    aDeadlineIsOneSet: (state, _observed, _now, e) =>
-      (e.type !== 'DEADLINE_PASSED' && e.type !== 'DEADLINE_SPENT') || state.deadlineSeconds !== undefined,
+    aDeadlineIsOneSet: ({ input: [state], output }) =>
+      (output.type !== 'DEADLINE_PASSED' && output.type !== 'DEADLINE_SPENT') || state.deadlineSeconds !== undefined,
     /** 2: a session seen under the attempt's name is adopted, never started a second time. */
-    aSightingIsAdopted: (state, observed, _now, e) => sightingOf(state, observed) === undefined || e.type !== 'UNSPAWNED',
+    aSightingIsAdopted: ({ input: [state, observed], output }) => sightingOf(state, observed) === undefined || output.type !== 'UNSPAWNED',
     /** 3: an unread harness neither starts the session again nor counts it lost. */
-    anUnreadHarnessIsNeitherRestartedNorLost: (state, observed, now, e) =>
+    anUnreadHarnessIsNeitherRestartedNorLost: ({ input: [state, observed, now], output }) =>
       state.settled !== null ||
       !unreadOf(state, now) ||
       sightingOf(state, observed) !== undefined ||
-      e.type === 'UNREAD' ||
-      e.type === 'DEADLINE_PASSED',
-    anUnreadHarnessLosesNothing: (state, _observed, now, e) => !unreadOf(state, now) || e.type !== 'LOST',
+      output.type === 'UNREAD' ||
+      output.type === 'DEADLINE_PASSED',
+    anUnreadHarnessLosesNothing: ({ input: [state, , now], output }) => !unreadOf(state, now) || output.type !== 'LOST',
     /** 5: lost only once spawned. */
-    lostOnlyOnceSpawned: (state, _observed, _now, e) => {
+    lostOnlyOnceSpawned: ({ input: [state], output }) => {
       const last = inFlight(state);
-      return e.type !== 'LOST' || (last !== undefined && last.spawnedAt !== null);
+      return output.type !== 'LOST' || (last !== undefined && last.spawnedAt !== null);
     },
     /** What is seen of a session is seen only of one in flight. */
-    inFlightEventsOnlyInFlight: (state, _observed, _now, e) =>
+    inFlightEventsOnlyInFlight: ({ input: [state], output }) =>
       inFlight(state) !== undefined ||
       ![
         'DEADLINE_PASSED',
@@ -110,27 +110,27 @@ const observeSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>,
         'UNSPAWNED',
         'UNSEEN_IN_GRACE',
         'LOST',
-      ].includes(e.type),
+      ].includes(output.type),
 
     /** With nothing in flight. 1: a stop leaves nothing open. */
-    aStopWithNothingInFlight: (state, _observed, _now, e) =>
-      state.settled !== null || inFlight(state) !== undefined || !state.stopRequested || e.type === 'NOTHING_OPEN',
-    nothingOpenOnlyOnAStop: (state, _observed, _now, e) => e.type !== 'NOTHING_OPEN' || state.stopRequested,
+    aStopWithNothingInFlight: ({ input: [state], output }) =>
+      state.settled !== null || inFlight(state) !== undefined || !state.stopRequested || output.type === 'NOTHING_OPEN',
+    nothingOpenOnlyOnAStop: ({ input: [state], output }) => output.type !== 'NOTHING_OPEN' || state.stopRequested,
     /** 2: closed only when held open and closed. */
-    closedOnlyWhenClosed: (state, _observed, _now, e) => e.type !== 'CLOSED' || (state.holdOpen === true && state.closed),
+    closedOnlyWhenClosed: ({ input: [state], output }) => output.type !== 'CLOSED' || (state.holdOpen === true && state.closed),
     /** 3: a person is waited on for as long as they take, ahead of the deadline. */
-    aPersonOutranksTheDeadline: (state, _observed, _now, e) =>
-      inFlight(state) !== undefined || state.stopRequested || state.closed || !waitsForInput(state) || e.type === 'AWAITING_INPUT',
-    aPersonIsWaitedOnOnlyWhenHeldOpen: (state, _observed, _now, e) => e.type !== 'AWAITING_INPUT' || state.holdOpen === true,
+    aPersonOutranksTheDeadline: ({ input: [state], output }) =>
+      inFlight(state) !== undefined || state.stopRequested || state.closed || !waitsForInput(state) || output.type === 'AWAITING_INPUT',
+    aPersonIsWaitedOnOnlyWhenHeldOpen: ({ input: [state], output }) => output.type !== 'AWAITING_INPUT' || state.holdOpen === true,
     /** 5: only a long-lived task restarts, idles or is respawned. */
-    onlyALongLivedTaskRestarts: (state, _observed, _now, e) =>
+    onlyALongLivedTaskRestarts: ({ input: [state], output }) =>
       state.restartPolicy === 'Always' ||
-      !['BACKING_OFF', 'RESTART_DUE', 'SESSION_IDLE', 'SESSION_RESPAWNING', 'RESPAWN_OVERDUE'].includes(e.type),
+      !['BACKING_OFF', 'RESTART_DUE', 'SESSION_IDLE', 'SESSION_RESPAWNING', 'RESPAWN_OVERDUE'].includes(output.type),
     /** 8: queued only while it waits for the layer above's word. */
-    queuedOnlyWhenQueued: (state, _observed, _now, e) => e.type !== 'QUEUED' || state.queued !== false,
+    queuedOnlyWhenQueued: ({ input: [state], output }) => output.type !== 'QUEUED' || state.queued !== false,
     /** 10, and a restart: a start is the next attempt. */
-    aStartIsTheNextAttempt: (state, _observed, _now, e) =>
-      (e.type !== 'READY' && e.type !== 'RESTART_DUE') || e.attempt === state.attempts.length + 1,
+    aStartIsTheNextAttempt: ({ input: [state], output }) =>
+      (output.type !== 'READY' && output.type !== 'RESTART_DUE') || output.attempt === state.attempts.length + 1,
   },
 });
 export type ObserveSpec = typeof observeSpec;

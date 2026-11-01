@@ -11,7 +11,7 @@ import { type Move, transition } from '../src/core/lifecycle.ts';
 
 export const backoff = assume(backoffOf, {
   pure: true,
-  ensures: { withinItsCap: (_attempts, ms) => ms >= RESTART_BACKOFF.initialMs && ms <= RESTART_BACKOFF.maxMs },
+  ensures: { withinItsCap: ({ output }) => output >= RESTART_BACKOFF.initialMs && output <= RESTART_BACKOFF.maxMs },
 });
 
 const ENDS = ['NO_SESSION_TO_CONTINUE', 'NOTHING_OPEN', 'CLOSED', 'DEADLINE_SPENT', 'ATTEMPT_ENDED'];
@@ -21,14 +21,17 @@ const SESSIONS = ['PREVIOUS_LIVE', 'SESSION_LIVE', 'SESSION_IDLE', 'SESSION_BLOC
 export const edges = assume(transition, {
   pure: true,
   ensures: {
-    startsOnlyWhenReady: (_from, event, moved) =>
-      'refused' in moved || moved.action.do !== 'start' || event.type === 'READY' || event.type === 'RESTART_DUE',
-    spawnsOnlyTheUnspawned: (_from, event, moved) => 'refused' in moved || moved.action.do !== 'spawn' || event.type === 'UNSPAWNED',
-    settlesOnlyOnAnEnd: (_from, event, moved) => 'refused' in moved || moved.action.do !== 'settle' || ENDS.includes(event.type),
-    stopsOnlyASession: (_from, event, moved) => 'refused' in moved || moved.action.do !== 'stop' || SESSIONS.includes(event.type),
-    stoppingNeverStarts: (from, _event, moved) =>
-      from !== 'stopping' || 'refused' in moved || (moved.action.do !== 'start' && moved.action.do !== 'spawn'),
-    aFinalStateRefuses: (from, _event, moved) => (from !== 'completed' && from !== 'failed' && from !== 'canceled') || 'refused' in moved,
+    startsOnlyWhenReady: ({ input: [, event], output }) =>
+      'refused' in output || output.action.do !== 'start' || event.type === 'READY' || event.type === 'RESTART_DUE',
+    spawnsOnlyTheUnspawned: ({ input: [, event], output }) =>
+      'refused' in output || output.action.do !== 'spawn' || event.type === 'UNSPAWNED',
+    settlesOnlyOnAnEnd: ({ input: [, event], output }) => 'refused' in output || output.action.do !== 'settle' || ENDS.includes(event.type),
+    stopsOnlyASession: ({ input: [, event], output }) =>
+      'refused' in output || output.action.do !== 'stop' || SESSIONS.includes(event.type),
+    stoppingNeverStarts: ({ input: [from], output }) =>
+      from !== 'stopping' || 'refused' in output || (output.action.do !== 'start' && output.action.do !== 'spawn'),
+    aFinalStateRefuses: ({ input: [from], output }) =>
+      (from !== 'completed' && from !== 'failed' && from !== 'canceled') || 'refused' in output,
   },
 });
 
@@ -54,7 +57,7 @@ const inFlight = (state: State): Attempt | undefined => {
 
 const decideSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>, now: Now, move?: Move) => Action>({
   /** The shipped lifecycle (`move` left to its default), on moments stamped as the runtime stamps them. */
-  requires: (state, _observed, now, move) =>
+  requires: ({ input: [state, , now, move] }) =>
     move === undefined &&
     stamped(now.at.getTime()) &&
     monoStamped(now.mono) &&
@@ -63,21 +66,21 @@ const decideSpec = spec<(state: State, observed: ReadonlyMap<string, Sighting>, 
     state.attempts.every(attemptStamped),
   ensures: {
     /** A settled task is left alone. */
-    aSettledTaskIsLeftAlone: (state, _observed, _now, _move, out) => state.settled === null || out.do === 'nothing',
+    aSettledTaskIsLeftAlone: ({ input: [state], output }) => state.settled === null || output.do === 'nothing',
     /** A person's stop is never answered by starting a session. */
-    aStopNeverStarts: (state, _observed, _now, _move, out) => !state.stopRequested || (out.do !== 'start' && out.do !== 'spawn'),
+    aStopNeverStarts: ({ input: [state], output }) => !state.stopRequested || (output.do !== 'start' && output.do !== 'spawn'),
     /**
      * A session its harness already shows under the attempt's name is adopted, never spawned a second time: the reason
      * the name is ours.
      */
-    neverSpawnsASessionItSees: (state, observed, _now, _move, out) => {
+    neverSpawnsASessionItSees: ({ input: [state, observed], output }) => {
       const last = inFlight(state);
-      return out.do !== 'spawn' || (last !== undefined && !observed.has(nameFor(state.taskId, last.n)));
+      return output.do !== 'spawn' || (last !== undefined && !observed.has(nameFor(state.taskId, last.n)));
     },
     /** A task settles only once nothing of it runs. */
-    settlesOnlyWithNothingInFlight: (state, _observed, _now, _move, out) => out.do !== 'settle' || inFlight(state) === undefined,
+    settlesOnlyWithNothingInFlight: ({ input: [state], output }) => output.do !== 'settle' || inFlight(state) === undefined,
     /** A start is a new attempt, never one while another is in flight. */
-    startsOnlyWithNothingInFlight: (state, _observed, _now, _move, out) => out.do !== 'start' || inFlight(state) === undefined,
+    startsOnlyWithNothingInFlight: ({ input: [state], output }) => output.do !== 'start' || inFlight(state) === undefined,
   },
 });
 export type DecideSpec = typeof decideSpec;

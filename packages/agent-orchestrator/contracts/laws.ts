@@ -4,6 +4,7 @@
  * keeps a record of, which the proof requires (`nemia start` writes one for each step); of a step with none it says
  * nothing.
  */
+import type { LawOf } from '@emyann/tsverify';
 import type { Verdict } from '../src/check/check.ts';
 import type { Closeout } from '../src/closeout/index.ts';
 import type { CloseoutAsked, Run, StepStatus, TaskPhase } from '../src/record/record.ts';
@@ -22,7 +23,7 @@ export type StandingOf = (
   verdictOf?: (step: string) => Verdict | undefined,
 ) => { status: StepStatus; own: StepStatus };
 
-type Law = (...a: [...Parameters<StandingOf>, out: ReturnType<StandingOf>]) => boolean;
+type Law = LawOf<StandingOf>;
 
 /** Whether a step is gated: by its workflow, or by the run (`--gate`). */
 export const gated = (step: Workflow, run: Run): boolean => step.gate === true || (run.gates ?? []).includes(step.name);
@@ -36,11 +37,14 @@ export const approved = (run: Run, name: string): boolean =>
   (run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name));
 
 /** `awaiting approval` covers both gates, and only a gate: after a step signs off, and before an ending is filed. */
-export const awaitingOnlyAtAGate: Law = (step, run, _p, _c, _a, _steps, _s, _v, out) =>
-  !Object.hasOwn(run.steps, step.name) || out.status !== 'awaiting approval' || gated(step, run);
+export const awaitingOnlyAtAGate: Law = ({ input: [step, run], output }) =>
+  !Object.hasOwn(run.steps, step.name) || output.status !== 'awaiting approval' || gated(step, run);
 /** Nobody has approved the try that waits. */
-export const awaitingIsUnapproved: Law = (step, run, _p, _c, _a, _steps, _s, _v, out) =>
-  !Object.hasOwn(run.steps, step.name) || out.status !== 'awaiting approval' || !approved(run, step.name);
+export const awaitingIsUnapproved: Law = ({ input: [step, run], output }) =>
+  !Object.hasOwn(run.steps, step.name) || output.status !== 'awaiting approval' || !approved(run, step.name);
 /** Where it stands but for its budget and its gate: its own status, or one of those two. */
-export const ownOrHeld: Law = (step, run, _p, _c, _a, _steps, _s, _v, out) =>
-  !Object.hasOwn(run.steps, step.name) || out.status === out.own || out.status === 'over budget' || out.status === 'awaiting approval';
+export const ownOrHeld: Law = ({ input: [step, run], output }) =>
+  !Object.hasOwn(run.steps, step.name) ||
+  output.status === output.own ||
+  output.status === 'over budget' ||
+  output.status === 'awaiting approval';

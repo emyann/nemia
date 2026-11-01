@@ -41,44 +41,43 @@ const approvalRefusalSpec = spec<
   ) => string | null
 >({
   /** A run holds a record of each of its steps: `nemia start` writes one for each (start.verb.ts). */
-  requires: (steps, run) => steps.every((s) => Object.hasOwn(run.steps, s.name)),
+  requires: ({ input: [steps, run] }) => steps.every((s) => Object.hasOwn(run.steps, s.name)),
   ensures: {
-    emptyWords: (_steps, _run, _name, message, _p, _c, _a, _v, _asks, _s, _st, out) =>
-      message === undefined || message.trim() !== '' || out !== null,
-    aStepOfTheWorkflow: (steps, _run, name, _m, _p, _c, _a, _v, _asks, _s, _st, out) => steps.some((s) => s.name === name) || out !== null,
-    aCancelledRunFilesNothing: (_steps, run, _name, _m, _p, _c, _a, _v, _asks, _s, _st, out) => !run.cancelledAt || out !== null,
-    aPrunedRunFilesNothing: (_steps, run, _name, _m, _p, _c, _a, _v, _asks, _s, _st, out) => !run.pruned || out !== null,
-    aHeldRunFilesNothing: (_steps, run, _name, _m, _p, _c, _a, _v, _asks, _s, _st, out) => !run.hold || out !== null,
-    onlyAGate: (steps, run, name, _m, _p, _c, _a, _v, _asks, _s, _st, out) => {
+    emptyWords: ({ input: [, , , message], output }) => message === undefined || message.trim() !== '' || output !== null,
+    aStepOfTheWorkflow: ({ input: [steps, , name], output }) => steps.some((s) => s.name === name) || output !== null,
+    aCancelledRunFilesNothing: ({ input: [, run], output }) => !run.cancelledAt || output !== null,
+    aPrunedRunFilesNothing: ({ input: [, run], output }) => !run.pruned || output !== null,
+    aHeldRunFilesNothing: ({ input: [, run], output }) => !run.hold || output !== null,
+    onlyAGate: ({ input: [steps, run, name], output }) => {
       const step = steps.find((s) => s.name === name);
-      return out !== null || (step !== undefined && gated(step, run));
+      return output !== null || (step !== undefined && gated(step, run));
     },
-    onceATry: (_steps, run, name, _m, _p, _c, _a, _v, _asks, _s, _st, out) =>
-      out !== null || !(run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name)),
-    notWhileASendBackIsAsked: (_steps, run, name, _m, _p, _c, _a, _v, asks, _s, _st, out) =>
-      out !== null || !(asks ?? []).some((x) => x.step === name && x.try === tryNow(run, name) + 1),
-    onlyWhereItWaits: (steps, run, name, _m, p, c, a, v, _asks, s, _st, out) => {
+    onceATry: ({ input: [, run, name], output }) =>
+      output !== null || !(run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name)),
+    notWhileASendBackIsAsked: ({ input: [, run, name, , , , , , asks], output }) =>
+      output !== null || !(asks ?? []).some((x) => x.step === name && x.try === tryNow(run, name) + 1),
+    onlyWhereItWaits: ({ input: [steps, run, name, , p, c, a, v, , s], output }) => {
       const step = steps.find((x) => x.name === name);
       return (
-        out !== null ||
+        output !== null ||
         (step !== undefined &&
           standing(step, run, p, c ?? (() => undefined), a ?? (() => false), steps, s ?? (() => undefined), v).status ===
             'awaiting approval')
       );
     },
     /** What `nemia approve` accepts, the step's task is held open for: the approval reaches the session that waits. */
-    heldOpenForIt: (steps, run, name, _m, p, c, a, v, _asks, s, _st, out) => {
+    heldOpenForIt: ({ input: [steps, run, name, , p, c, a, v, , s], output }) => {
       const step = steps.find((x) => x.name === name);
       return (
-        out !== null ||
+        output !== null ||
         (step !== undefined && holdsOpen(step, run, p, c ?? (() => undefined), a ?? (() => false), steps, s ?? (() => undefined), v))
       );
     },
-    anEndingAlreadyLanded: (steps, run, name, _m, _p, _c, _a, _v, _asks, _s, standings, out) => {
+    anEndingAlreadyLanded: ({ input: [steps, run, name, , , , , , , , standings], output }) => {
       const step = steps.find((x) => x.name === name);
       const on = standings ?? [];
       return (
-        out !== null ||
+        output !== null ||
         step === undefined ||
         step.workspace !== 'main' ||
         !gated(step, run) ||
@@ -87,10 +86,10 @@ const approvalRefusalSpec = spec<
         !on.every((b) => b.where === 'on')
       );
     },
-    anEndingWhileItsWorkIsSentBack: (steps, run, name, _m, _p, _c, _a, _v, asks, _s, _st, out) => {
+    anEndingWhileItsWorkIsSentBack: ({ input: [steps, run, name, , , , , , asks], output }) => {
       const step = steps.find((x) => x.name === name);
       return (
-        out !== null ||
+        output !== null ||
         step === undefined ||
         step.workspace !== 'main' ||
         !gated(step, run) ||
@@ -116,20 +115,20 @@ const holdsOpenSpec = spec<
   ) => boolean
 >({
   ensures: {
-    notOnACancelledRun: (_step, run, _p, _c, _a, _steps, _s, _v, out) => !run.cancelledAt || !out,
-    notOnAPrunedRun: (_step, run, _p, _c, _a, _steps, _s, _v, out) => !run.pruned || !out,
-    whileItSignedBlocked: (step, run, p, c, a, steps, s, v, out) =>
-      !!run.cancelledAt || !!run.pruned || standing(step, run, p, c, a, steps, s, v).own !== 'blocked' || out,
-    whileAGateChecks: (step, run, p, c, a, steps, s, v, out) =>
-      !!run.cancelledAt || !!run.pruned || !gated(step, run) || standing(step, run, p, c, a, steps, s, v).own !== 'checking' || out,
-    whileAGateWaits: (step, run, p, c, a, steps, s, v, out) =>
+    notOnACancelledRun: ({ input: [, run], output }) => !run.cancelledAt || !output,
+    notOnAPrunedRun: ({ input: [, run], output }) => !run.pruned || !output,
+    whileItSignedBlocked: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
+      !!run.cancelledAt || !!run.pruned || standing(step, run, p, c, a, steps, s, v).own !== 'blocked' || output,
+    whileAGateChecks: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
+      !!run.cancelledAt || !!run.pruned || !gated(step, run) || standing(step, run, p, c, a, steps, s, v).own !== 'checking' || output,
+    whileAGateWaits: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
       !!run.cancelledAt ||
       !!run.pruned ||
       !gated(step, run) ||
       standing(step, run, p, c, a, steps, s, v).status !== 'awaiting approval' ||
-      out,
-    anUngatedStepOnlyBlocked: (step, run, p, c, a, steps, s, v, out) =>
-      !out || gated(step, run) || standing(step, run, p, c, a, steps, s, v).own === 'blocked',
+      output,
+    anUngatedStepOnlyBlocked: ({ input: [step, run, p, c, a, steps, s, v], output }) =>
+      !output || gated(step, run) || standing(step, run, p, c, a, steps, s, v).own === 'blocked',
   },
 });
 export type HoldsOpenSpec = typeof holdsOpenSpec;

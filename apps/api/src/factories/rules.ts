@@ -55,10 +55,10 @@ export const FACTORY_RULES_WORDS: RouteWords = {
  * (commands/routes.ts), guarded, each answered as the read.
  */
 export const factoryRules = new Hono<ApiEnv>().get('/api/factories/:factory/rules', (c) =>
-  served(c, async ({ e, placeService }) => {
+  served(c, async ({ e, placeService, home }) => {
     const { factory } = c.req.param();
     const wrong = factoryNameRefusal(factory);
     if (wrong !== undefined) return c.json({ error: `GET /api/factories/${factory}/rules: ${wrong}` }, 400);
-    return c.json((await runPlaced(placeService, e, FACTORY_RULES.handler({ factory }))) satisfies FactoryRules);
+    return c.json((await runPlaced(placeService, e, FACTORY_RULES.handler({ factory }, undefined, home))) satisfies FactoryRules);
   }),
 );

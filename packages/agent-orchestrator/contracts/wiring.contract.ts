@@ -18,8 +18,8 @@ import {
   workflowNameRefusal,
   type Factory,
 } from '../src/factory/factory.ts';
-import { hiresInto, sortedNames, withEntry, withHire, withoutEntry, type WiringChange, type WiringRefused } from '../src/factory/wiring.ts';
-import { accepted, keepsTheOffer } from './laws.ts';
+import { hiresInto, withEntry, withHire, withName, withoutEntry, type WiringChange, type WiringRefused } from '../src/factory/wiring.ts';
+import { accepted, hiresOffered, keepsTheOffer, schedulesOffered } from './laws.ts';
 
 export const hireNamed = assume(hireRefusal, { pure: false });
 export const workflowNamed = assume(workflowNameRefusal, { pure: true });
@@ -37,10 +37,13 @@ export const words = [
 /** Whether hires hire into a workflow's steps: the domain's word, read the same by the laws and the code. */
 export const hiring = assume(hiresInto, { pure: true });
 
-/** Sorting keeps every name: a set of names sorted holds each it was given. */
-export const sorted = assume(sortedNames, {
+/** Names given one more hold it, and each they held. */
+export const named = assume(withName, {
   pure: true,
-  ensures: { keepsEach: ({ input: [names], output }) => names.every((n) => output.includes(n)) },
+  ensures: {
+    holdsIt: ({ input: [, name], output }) => output.includes(name),
+    keepsEach: ({ input: [names], output }) => names.every((n) => output.includes(n)),
+  },
 });
 /** Hires given a hire hold it, and no step besides those they held. */
 export const hireAdded = assume(withHire, {
@@ -112,6 +115,14 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
       condition: ({ input: [, change], output }) =>
         change.verb !== 'attach' || workflowNameRefusal(change.workflow) !== undefined || output === null,
     },
+    takesWhatItCan: {
+      description: 'A change but a hire, well named, that the factory can take is never refused',
+      condition: ({ input: [factory, change], output }) =>
+        change.verb === 'hire' ||
+        (change.verb !== 'fire' && workflowNameRefusal(change.workflow) !== undefined) ||
+        !accepted(factory, change) ||
+        output === null,
+    },
   },
 });
 export type WiringRefusal = Implementation<typeof wiringRefusalSpec>;
@@ -120,9 +131,13 @@ const rewiredSpec = spec<(factory: Factory, change: WiringChange) => Factory>({
   /** Its callers rewire only a factory that keeps the invariant, and only by a change `wiringRefusal` accepts (`accepted`). */
   requires: ({ input: [factory, change] }) => keepsTheOffer(factory) && accepted(factory, change),
   ensures: {
-    keepsTheOffer: {
-      description: 'An accepted change leaves a factory that hires and schedules only into workflows it offers',
-      condition: ({ output }) => keepsTheOffer(output),
+    hiresOnlyOffered: {
+      description: 'An accepted change leaves a factory that hires only into workflows it offers',
+      condition: ({ output }) => hiresOffered(output),
+    },
+    schedulesOnlyOffered: {
+      description: 'An accepted change leaves a factory that schedules only workflows it offers',
+      condition: ({ output }) => schedulesOffered(output),
     },
     keepsRepos: {
       description: 'A wiring change never changes the repositories',

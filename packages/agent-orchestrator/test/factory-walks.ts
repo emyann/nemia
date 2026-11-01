@@ -166,7 +166,7 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         filed(door, 'acme');
         return { none, read: done(door.rules.read(nameOf('acme'))) };
       },
-      says: { none: { refused: 'Missing' }, read: { words: null, error: null } },
+      says: { none: { refused: 'Missing' }, read: { file: '<root>/factories/acme/RULES.md', words: null, error: null } },
     },
   ],
   'rules.write': [
@@ -177,7 +177,10 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         const file = done(door.rules.write(nameOf('acme'), '  Say what you changed.\n\n'));
         return { file, read: done(door.rules.read(nameOf('acme'))) };
       },
-      says: { file: '<root>/factories/acme/RULES.md', read: { words: 'Say what you changed.', error: null } },
+      says: {
+        file: '<root>/factories/acme/RULES.md',
+        read: { file: '<root>/factories/acme/RULES.md', words: 'Say what you changed.', error: null },
+      },
     },
     {
       name: 'REFUSED: blank rules are Invalid, nothing written',
@@ -185,7 +188,7 @@ export const FACTORY_WALKS: Readonly<Record<string, readonly Walk[]>> = {
         filed(door, 'acme');
         return { written: act(door.rules.write(nameOf('acme'), '  \n')), read: done(door.rules.read(nameOf('acme'))) };
       },
-      says: { written: { refused: 'Invalid' }, read: { words: null, error: null } },
+      says: { written: { refused: 'Invalid' }, read: { file: '<root>/factories/acme/RULES.md', words: null, error: null } },
     },
   ],
   'rules.clear': [

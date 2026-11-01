@@ -86,7 +86,7 @@
     },
     {
       "term": "Door",
-      "meaning": "the one way an aggregate is read and written: an Effect service whose methods answer Effects failing with a refusal, with a files layer and a memory one held to one table of walks, each refusing a write that breaks the aggregate's invariants. Its pattern is `packages/agent-orchestrator/src/door/door.store.ts`.",
+      "meaning": "the one way an aggregate is read and written: an Effect service whose methods answer Effects failing with a refusal, with a files layer and a memory one held to one table of walks, each refusing a write that breaks the aggregate's invariants. Its pattern is `packages/agent-orchestrator/src/door/door.store.ts`; a door whose files are under the store's root is rooted (`rootedDoor`), reading the root a program is given when a method runs, as the Factory door does, while the Run door's default still reads its module's.",
       "type": "DoorOf"
     },
     {

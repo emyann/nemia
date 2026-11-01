@@ -1,15 +1,19 @@
 /**
  * `nemia factory rules`, an entry of the command table: a factory's rules, the words told to every agent hired into it — read bare,
  * written from `--file`, removed with `--clear`. The api serves the write and the clear on the routes the table generates, and the read by
- * a route of its own, which calls the same handler (`factoryRules`).
+ * a route of its own, which calls the same handler. Both through the Factory door (`FactoryDoor`); `factoryRules` reads the module's root,
+ * for the package's callers not yet on it.
  */
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { DEFAULT_FACTORY, defaultFactoryRefusal } from '../factory/factory.ts';
 import { readFactory } from '../factory/factory.store.ts';
-import { Conflict } from '../refusal/refusal.ts';
-import { tried } from '../runtime-client.ts';
-import { clearRules, readRules, rulesAt, writeRules } from './rules.store.ts';
+import { Effect } from 'effect';
+import { Conflict, type Refusal } from '../refusal/refusal.ts';
+import { FactoryName } from '../factory/factory.model.ts';
+import { FactoryDoor } from '../factory/factories.store.ts';
+import { rooted } from '../factory/wire.verb.ts';
+import { readRules, rulesAt } from './rules.store.ts';
 
 /**
  * A factory's rules as they read: its factory's `name`; `file`, the file they are kept in; `words`, null where there are none; and `error`,
@@ -70,17 +74,24 @@ const SPEC: Spec = {
  * The rules of the factory `args` name, after they are written from their words or removed with `clear`, where they ask either. Refused,
  * writing nothing: as `FACTORY_RULES` says.
  */
-function ruled(args: Args): FactoryRules {
+function ruled(args: Args, home: string | undefined): Effect.Effect<FactoryRules, Refusal> {
   const name = textOf(args, 'factory') ?? '';
   const words = textOf(args, 'words');
-  if (args.clear !== true && words === undefined) return factoryRules(name);
-  const factory = factoryOf(name, 'Nothing was written.');
-  if (args.clear === true) {
-    const removed = clearRules(factory);
-    return { ...factoryRules(name), removed };
-  }
-  writeRules(factory, words ?? '');
-  return factoryRules(name);
+  return rooted(
+    home,
+    'factory rules',
+    Effect.gen(function* () {
+      if (name === DEFAULT_FACTORY) return yield* Effect.fail(new Conflict({ message: defaultFactoryRefusal('rules') }));
+      const door = yield* FactoryDoor;
+      const factory = FactoryName.read(name);
+      if (args.clear === true) {
+        const removed = yield* door.rules.clear(factory);
+        return { name, ...(yield* door.rules.read(factory)), removed };
+      }
+      if (words !== undefined) yield* door.rules.write(factory, words);
+      return { name, ...(yield* door.rules.read(factory)) };
+    }),
+  );
 }
 
 /** What a write or a clear says of a run already started. */
@@ -118,7 +129,7 @@ export const FACTORY_RULES: Command<FactoryRules> = {
     { method: 'PUT', path: '/api/factories/:factory/rules', status: 200, sets: { clear: false } },
     { method: 'DELETE', path: '/api/factories/:factory/rules', status: 200, sets: { clear: true } },
   ],
-  handler: (args) => tried(() => ruled(args)),
+  handler: (args, _env, home) => ruled(args, home),
   print(data, args) {
     const { name } = data;
     if (data.removed !== undefined)

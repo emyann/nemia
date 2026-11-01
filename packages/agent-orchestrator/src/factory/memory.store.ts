@@ -86,8 +86,8 @@ export function factoryDoorMemory(): Layer.Layer<never> {
     },
     rules: {
       read: (name) => {
-        held(name, 'Nothing was read.');
-        return { words: rules.get(name) ?? null, error: null };
+        held(name, 'There are no rules to read.');
+        return { file: factoriesAt(name, FACTORY_RULES_FILE), words: rules.get(name) ?? null, error: null };
       },
       write: (name, words) => {
         held(name, 'Nothing was written.');
@@ -102,7 +102,7 @@ export function factoryDoorMemory(): Layer.Layer<never> {
         return file;
       },
       clear: (name) => {
-        held(name, 'Nothing was cleared.');
+        held(name, 'Nothing was removed.');
         return rules.delete(name);
       },
     },

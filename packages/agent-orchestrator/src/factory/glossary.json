@@ -17,6 +17,16 @@
       }
     },
     {
+      "term": "Factory door",
+      "meaning": "the one way a factory is read and written — its file, and the level, rules and servers the store keeps beside it: `FactoryDoor` in `packages/agent-orchestrator/src/factory/factories.store.ts`, its files layer at the store's root a program is given and a memory one, each refusing a write that breaks the model's `Factory`.",
+      "type": "FactoryDoorShape"
+    },
+    {
+      "term": "Wiring change",
+      "meaning": "a person's change of what a factory offers, hires and schedules — attach, detach, hire, fire, schedule, unschedule — judged by `wiringRefusal` and applied by `rewired` (`packages/agent-orchestrator/src/factory/wiring.ts`), whose contract proves an accepted change hires and schedules only into a workflow the factory offers.",
+      "type": "WiringChange"
+    },
+    {
       "term": "Condition type",
       "meaning": "which condition the controller says of a factory made from a template: `Applied`, whether its base holds the template, or `ConflictsPending`, whether an upgrade waits on a person's choice. Its status is `True` or `False`, and the sentence a person reads is its `message`; written by `condition` in `packages/agent-orchestrator/src/applied/applied.verb.ts`.",
       "type": "FactoryConditionType",

@@ -17,7 +17,8 @@ import {
   type FactoryListing,
   type RevisionsPolicy,
 } from './factory.ts';
-import { factoriesDir, factoryRepos, ownAgentRefusal, readFactories, refuseName } from './factory.store.ts';
+import { factoriesDir, factoryRepos, readFactories, refuseName } from './factory.store.ts';
+import { ownAgentRefusal } from './own-agent.store.ts';
 import { FactoryName } from './factory.model.ts';
 import { FactoryDoor } from './factories.store.ts';
 import { StoreRoot } from '../config/root.store.ts';

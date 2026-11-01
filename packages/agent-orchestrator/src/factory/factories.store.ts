@@ -28,8 +28,8 @@ import { factoryServers, writeFactoryServers } from '../servers/servers.store.ts
 
 /**
  * A layer of the Factory door, as plain synchronous methods: the factories (listed by name, read, filed, written back, removed, each
- * write answering the file it wrote), a factory's level (none where it follows the store's), its rules (a read's words or why they do
- * not read; a write's file; whether a clear found any), and its servers (none where it has none).
+ * write answering the file it wrote), a factory's level (none where it follows the store's), its rules (a read's file, its words or why
+ * they do not read; a write's file; whether a clear found any), and its servers (none where it has none).
  */
 export type FactoryLayer = {
   readonly factories: {
@@ -44,7 +44,7 @@ export type FactoryLayer = {
     readonly write: (name: string, level: FactoryLevelFile) => void;
   };
   readonly rules: {
-    readonly read: (name: string) => RulesRead;
+    readonly read: (name: string) => RulesRead & { readonly file: string };
     readonly write: (name: string, words: string) => string;
     readonly clear: (name: string) => boolean;
   };
@@ -106,7 +106,7 @@ export function factoryDoorOver(layer: FactoryLayer): FactoryDoorShape {
  * rules are its tree's where it is made from a template, so the rules ask the factory first, refused as a read refuses it.
  */
 export function factoryFiles(home: string): FactoryLayer {
-  const rulesOf = (name: string) => rulesAtHome(home, readFactoryAt(home, name, 'Nothing was read or written.'));
+  const rulesOf = (name: string, notDone: string) => rulesAtHome(home, readFactoryAt(home, name, notDone));
   return {
     factories: {
       list: () => readFactoriesAt(home).map((f) => f.name),
@@ -120,9 +120,15 @@ export function factoryFiles(home: string): FactoryLayer {
       write: (name, level) => writeFactoryLevelAt(home, name, level),
     },
     rules: {
-      read: (name) => readRules(rulesOf(name)),
-      write: (name, words) => rulesWritten(rulesOf(name), readFactoryAt(home, name, 'Nothing was written.'), words),
-      clear: (name) => rulesCleared(rulesOf(name)),
+      read: (name) => {
+        const file = rulesOf(name, 'There are no rules to read.');
+        return { file, ...readRules(file) };
+      },
+      write: (name, words) => {
+        const factory = readFactoryAt(home, name, 'Nothing was written.');
+        return rulesWritten(rulesAtHome(home, factory), factory, words);
+      },
+      clear: (name) => rulesCleared(rulesOf(name, 'Nothing was removed.')),
     },
     servers: {
       read: (name) => factoryServers(home, name),
@@ -141,5 +147,5 @@ export const FactoryDoor = Context.Reference<FactoryDoorShape>('agent-orchestrat
   defaultValue: () => rootedDoor((root) => factoryDoorOver(factoryFiles(root)), 'Factory door'),
 });
 
-/** The Factory door over the files of the store `root`, as a layer: for a program that names its root by the door rather than by `StoreRoot`. */
+/** The Factory door over the files of the store `root`, as a layer: for a program that names its root by the door, not by `StoreRoot`. */
 export const factoryDoorFiles = (root: string): Layer.Layer<never> => Layer.succeed(FactoryDoor)(factoryDoorOver(factoryFiles(root)));

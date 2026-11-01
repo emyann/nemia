@@ -44,8 +44,8 @@ const holds = (dict: Readonly<Record<string, unknown>>, key: string): boolean =>
 const hiredInto = (hires: Readonly<Record<string, string>>, workflow: string): string[] =>
   Object.keys(hires).filter((step) => step.startsWith(`${workflow}/`));
 
-/** `names` sorted, each named once. */
-export const sortedNames = (names: readonly string[]): string[] => [...new Set(names)].sort();
+/** `names` with `name`, sorted, each named once. */
+export const withName = (names: readonly string[], name: string): string[] => [...new Set([...names, name])].sort();
 
 /** Whether `hires` hire into a step of the workflow `workflow`: a hire's key is `<workflow>/<step>`. */
 export const hiresInto = (hires: Readonly<Record<string, string>>, workflow: string): boolean =>
@@ -74,12 +74,7 @@ const missing = (message: string): WiringRefused => ({ kind: 'Missing', message 
 
 /** Why `factory` cannot take `change`, or null where it can, each in the words its verb has always said. */
 export const wiringRefusal: WiringRefusal = (factory, change) => {
-  if (change.verb === 'hire') {
-    const bad = hireRefusal(change.step, change.agent);
-    if (bad !== undefined) return invalid(`${bad} Nothing was hired.`);
-    const workflow = workflowOfStep(change.step);
-    return factory.workflows.includes(workflow) ? null : invalid(`${unattachedHireRefusal(factory.name, workflow)} Nothing was hired.`);
-  }
+  if (change.verb === 'hire') return hireRefused(factory, change.step, change.agent);
   if (change.verb === 'fire')
     return !holds(factory.hires, change.step) ? missing(unhiredFireRefusal(factory.name, change.step, factory.hires)) : null;
   const badName = workflowNameRefusal(change.workflow);
@@ -91,12 +86,24 @@ export const wiringRefusal: WiringRefusal = (factory, change) => {
     return !holds(factory.schedules, change.workflow)
       ? missing(unscheduledRefusal(factory.name, change.workflow, Object.keys(factory.schedules)))
       : null;
-  if (!factory.workflows.includes(change.workflow)) return missing(unattachedDetachRefusal(factory, change.workflow));
-  if (hiresInto(factory.hires, change.workflow))
-    return invalid(hiredDetachRefusal(factory.name, change.workflow, hiredInto(factory.hires, change.workflow)));
-  if (holds(factory.schedules, change.workflow)) return invalid(scheduledDetachRefusal(factory.name, change.workflow));
-  return null;
+  return detachRefusal(factory, change.workflow);
 };
+
+/** Why `factory` cannot hire `agent` into `step`: a step or an agent that is not one, or a workflow it does not offer (`Invalid`). */
+function hireRefused(factory: Parameters<WiringRefusal>[0], step: string, agent: string): WiringRefused | null {
+  const bad = hireRefusal(step, agent);
+  if (bad !== undefined) return invalid(`${bad} Nothing was hired.`);
+  const workflow = workflowOfStep(step);
+  return factory.workflows.includes(workflow) ? null : invalid(`${unattachedHireRefusal(factory.name, workflow)} Nothing was hired.`);
+}
+
+/** Why `factory` cannot be relieved of `workflow`: it does not offer it (`Missing`), or still hires into or schedules it (`Invalid`). */
+function detachRefusal(factory: Parameters<WiringRefusal>[0], workflow: string): WiringRefused | null {
+  if (!factory.workflows.includes(workflow)) return missing(unattachedDetachRefusal(factory, workflow));
+  if (hiresInto(factory.hires, workflow)) return invalid(hiredDetachRefusal(factory.name, workflow, hiredInto(factory.hires, workflow)));
+  if (holds(factory.schedules, workflow)) return invalid(scheduledDetachRefusal(factory.name, workflow));
+  return null;
+}
 
 /**
  * `factory` after `change`, which `wiringRefusal` accepted: its workflows kept sorted and each named once, a hire replacing the step's
@@ -104,9 +111,7 @@ export const wiringRefusal: WiringRefusal = (factory, change) => {
  */
 export const rewired: Rewired = (factory, change) => {
   if (change.verb === 'attach')
-    return factory.workflows.includes(change.workflow)
-      ? factory
-      : { ...factory, workflows: sortedNames([...factory.workflows, change.workflow]) };
+    return factory.workflows.includes(change.workflow) ? factory : { ...factory, workflows: withName(factory.workflows, change.workflow) };
   if (change.verb === 'detach') return { ...factory, workflows: factory.workflows.filter((w) => w !== change.workflow) };
   if (change.verb === 'hire') return { ...factory, hires: withHire(factory.hires, change.step, change.agent) };
   if (change.verb === 'fire') return { ...factory, hires: withoutEntry(factory.hires, change.step) };

@@ -12,12 +12,15 @@
 import { Effect } from 'effect';
 import { EngineService, signsInMcp, tried, type McpServerState, type McpServersRead } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
-import { rootGiven } from '../config/root.store.ts';
+import { rootGiven, StoreRoot } from '../config/root.store.ts';
+import { FactoryName } from '../factory/factory.model.ts';
+import { FactoryDoor } from '../factory/factories.store.ts';
+import { rooted } from '../factory/wire.verb.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { DEFAULT_FACTORY, noFactoryLine } from '../factory/factory.ts';
 import { readFactories } from '../factory/factory.store.ts';
 import { Invalid, Missing } from '../refusal/refusal.ts';
-import { factoryServers, factoryServersFile, writeFactoryServers } from './servers.store.ts';
+import { factoryServers, factoryServersFile } from './servers.store.ts';
 import { factoryServerRefusal, serverNameRefusal, type FactoryServers } from './servers.ts';
 
 /** The text under `key`, as the spec read it. */
@@ -236,28 +239,33 @@ export const FACTORY_SERVER_ADD: Command<Added> = {
   class: 'ask',
   route: { method: 'PUT', path: '/api/factories/:factory/servers/:server', status: 200 },
   handler: (args, _env, home) =>
-    tried(() => {
-      const store = rootGiven(home, 'factory server add');
-      const factory = textOf(args, 'factory');
-      const name = textOf(args, 'server');
-      const transport = textOf(args, 'transport') || 'http';
-      const bad = serverNameRefusal(name);
-      if (bad) throw new Invalid({ message: `${bad} Nothing was recorded.` });
-      factoryThere(factory, 'recorded');
-      const headers = headersOf(args);
-      const oauth = oauthOf(args);
-      const server = {
-        type: transport as 'http' | 'sse',
-        url: textOf(args, 'url'),
-        ...(headers === undefined ? {} : { headers }),
-        ...(oauth === undefined ? {} : { oauth }),
-      };
-      const refused = factoryServerRefusal(server);
-      if (refused) throw new Invalid({ message: `${refused} Nothing was recorded.` });
-      const record = factoryServers(store, factory);
-      writeFactoryServers(store, factory, { ...record, [name]: server });
-      return { file: factoryServersFile(store, factory), name, server, replaced: record[name] ?? null };
-    }),
+    rooted(
+      home,
+      'factory server add',
+      Effect.gen(function* () {
+        const store = yield* StoreRoot;
+        const factory = textOf(args, 'factory');
+        const name = textOf(args, 'server');
+        const transport = textOf(args, 'transport') || 'http';
+        const bad = serverNameRefusal(name);
+        if (bad) return yield* Effect.fail(new Invalid({ message: `${bad} Nothing was recorded.` }));
+        yield* tried(() => factoryThere(factory, 'recorded'));
+        const headers = headersOf(args);
+        const oauth = oauthOf(args);
+        const server = {
+          type: transport as 'http' | 'sse',
+          url: textOf(args, 'url'),
+          ...(headers === undefined ? {} : { headers }),
+          ...(oauth === undefined ? {} : { oauth }),
+        };
+        const refused = factoryServerRefusal(server);
+        if (refused) return yield* Effect.fail(new Invalid({ message: `${refused} Nothing was recorded.` }));
+        const door = yield* FactoryDoor;
+        const record = yield* door.servers.read(FactoryName.read(factory));
+        yield* door.servers.write(FactoryName.read(factory), { ...record, [name]: server });
+        return { file: factoryServersFile(store, factory), name, server, replaced: record[name] ?? null };
+      }),
+    ),
   print: ({ file, name, server, replaced }, args) => [
     `${textOf(args, 'factory')}  ${name} → ${server.type} ${server.url}${replaced === null ? '' : ` (was ${replaced.url})`}`,
     `recorded: ${file}${server.oauth === undefined ? '' : ' — sign the server in before a step needs it'}`,
@@ -288,22 +296,29 @@ export const FACTORY_SERVER_RM: Command<{ file: string; removed: string }> = {
   class: 'ask',
   route: { method: 'DELETE', path: '/api/factories/:factory/servers/:server', status: 200 },
   handler: (args, _env, home) =>
-    tried(() => {
-      const store = rootGiven(home, 'factory server rm');
-      const factory = textOf(args, 'factory');
-      const name = textOf(args, 'server');
-      factoryThere(factory, 'removed');
-      const record = factoryServers(store, factory);
-      if (!Object.hasOwn(record, name)) {
-        const names = Object.keys(record);
-        throw new Missing({
-          message: `${factory} records no server \`${name}\`: ${names.length ? `its servers are ${names.join(', ')}` : 'it records none'}. Nothing was removed.`,
-        });
-      }
-      const { [name]: _gone, ...left } = record;
-      writeFactoryServers(store, factory, left);
-      return { file: factoryServersFile(store, factory), removed: name };
-    }),
+    rooted(
+      home,
+      'factory server rm',
+      Effect.gen(function* () {
+        const store = yield* StoreRoot;
+        const factory = textOf(args, 'factory');
+        const name = textOf(args, 'server');
+        yield* tried(() => factoryThere(factory, 'removed'));
+        const door = yield* FactoryDoor;
+        const record = yield* door.servers.read(FactoryName.read(factory));
+        if (!Object.hasOwn(record, name)) {
+          const names = Object.keys(record);
+          return yield* Effect.fail(
+            new Missing({
+              message: `${factory} records no server \`${name}\`: ${names.length ? `its servers are ${names.join(', ')}` : 'it records none'}. Nothing was removed.`,
+            }),
+          );
+        }
+        const { [name]: _gone, ...left } = record;
+        yield* door.servers.write(FactoryName.read(factory), left);
+        return { file: factoryServersFile(store, factory), removed: name };
+      }),
+    ),
   print: ({ file, removed }, args) => [
     `${textOf(args, 'factory')}  ${removed} removed`,
     `recorded: ${file} — the sign-in the harness filed for it is left in the harness's own store`,

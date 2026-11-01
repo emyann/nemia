@@ -312,6 +312,18 @@ first: a new run, or one written back, that breaks an invariant of the run's mod
 `Invalid` and nothing is written, and a new run at an id that has a record is refused `Conflict`. A program given no door reads the
 files. What has not moved onto it yet is counted in `test/run-door.baseline.ts`.
 
+## The Factory door
+
+A factory is read and written through `FactoryDoor` (`src/factory/factories.store.ts`), on the same pattern: its file, and the level,
+rules and servers the store keeps beside it, each method taking a `FactoryName`. Behind it are today's files under the store's root,
+unchanged on disk (a key the model does not name is kept), and a memory stand-in a test gives with `Effect.provide(program,
+factoryDoorMemory())`. A new factory under a name that is no slug, or under `default`, and a factory written that breaks the model's
+`Factory` — no repository, a hire or a schedule into a workflow it does not offer — are refused, and nothing is written. A person's
+attach, detach, hire, fire, schedule and unschedule are judged by one pure function (`wiringRefusal`, `src/factory/wiring.ts`), proved
+by `contracts/wiring.contract.ts`, then written back through the door. Unlike the Run door, a program given no door reads the files at
+the store's root it was given (`StoreRoot`), and is refused where it was given none. What has not moved onto it yet is counted in
+`test/factory-door.baseline.ts`.
+
 ## Where this stops
 
 **A workflow orders steps and hands them a workspace. Anything that decides *whether the work is

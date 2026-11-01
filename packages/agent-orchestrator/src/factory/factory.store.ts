@@ -28,7 +28,6 @@ import {
   factoriesHolding,
   factoryNameRefusal,
   hireRefusal,
-  hireRefusalOf,
   instructionPathRefusal,
   noFactoryLine,
   noFactoryRefusal,
@@ -43,11 +42,11 @@ import {
   type Schedule,
 } from './factory.ts';
 import { firesOf } from '../schedule/schedule.store.ts';
-import { frontmatterKey } from '../former/former.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
 import { firstRefusal, HOME, isDirectory } from '../record/record.store.ts';
 import { readStatusAt, readTreeWiringAt, treeDirAt, writeTreeWiringAt } from '../applied/applied.store.ts';
 import { rewired, wiringRefusal, type WiringChange } from './wiring.ts';
+import { ownAgentRefusal } from './own-agent.store.ts';
 
 /** Where the factories of the store `home` are: `<home>/factories`, beside `runs/` and `inbox/`. The default factory has no file there. */
 export const factoriesDirAt = (home: string): string => path.join(home, 'factories');
@@ -490,45 +489,6 @@ function toChange(home: string, name: string, verb: Rewrite): Factory {
 }
 
 /**
- * The folders whose `workflows/<workflow>/` a start in `factory` reads a step's own file from, in the store `home`: its repositories and
- * `home`; made from a template, the first of its tree, its repositories and `home` that holds the workflow, as a start reads it by name.
- */
-function rootsOf(home: string, factory: Factory, workflow: string): readonly string[] {
-  if (factory.tree === undefined) return [...factory.repos, home];
-  const holder = [factory.tree, ...factory.repos, home].find((root) => fs.existsSync(path.join(path.resolve(root), 'workflows', workflow)));
-  return holder === undefined ? [] : [holder];
-}
-
-/**
- * The first file of the step `step` of `workflow` that names its own agent, and the agent it names: in each of `roots`' `workflows/`,
- * where a start in the factory reads a workflow by its name. A file that is not there or does not read names none.
- */
-export function ownAgentOf(roots: readonly string[], workflow: string, step: string): { named: string; file: string } | undefined {
-  for (const root of roots) {
-    const file = path.join(path.resolve(root), 'workflows', workflow, `${step}.md`);
-    let named: string | undefined;
-    try {
-      named = frontmatterKey(fs.readFileSync(file, 'utf8'), 'agent');
-    } catch {
-      continue;
-    }
-    if (named !== undefined) return { named, file };
-  }
-  return undefined;
-}
-
-/**
- * The refusal a hire into `step` meets on disk, where its own file, in a folder a start in `factory` reads, names its agent: `Conflict`,
- * in `hireRefusalOf`'s words, then the file. What `wiringRefusal` cannot judge, since it reads no disk.
- */
-export function ownAgentRefusal(home: string, factory: Factory, step: string): Conflict | undefined {
-  const workflow = step.slice(0, step.indexOf('/'));
-  const own = ownAgentOf(rootsOf(home, factory, workflow), workflow, step.slice(workflow.length + 1));
-  if (own === undefined) return undefined;
-  return new Conflict({ message: `${hireRefusalOf(factory, workflow, own.named)} ${own.file} names it. Nothing was hired.` });
-}
-
-/**
  * What a change of the wiring of the factory `name` is refused by before the factory is read, each `Invalid` in the words
  * `wiringRefusal` says it, or the default factory a `Conflict`: a step or an agent that cannot be a hire, a workflow's name that cannot
  * be one, and a factory's name (`refuseName`).
@@ -671,7 +631,7 @@ export function setRevisionsAt(
  * not read, or a cron that never fires, quoting it (`firesOf`); an empty brief; a repository that is not one of the factory's; and none
  * named in a factory of two or more, where a scheduled start would not know which.
  */
-export function scheduleRefusal(
+function scheduleRefusal(
   factory: Factory,
   opts: { workflow: string; cron: string; brief: string; repo?: string; tz?: string },
 ): string | undefined {
@@ -694,19 +654,30 @@ export function setScheduleAt(
   home: string,
   opts: { factory: string; workflow: string; cron: string; brief: string; repo?: string; tz?: string },
 ): { file: string; schedule: Schedule; replaced?: Schedule } {
-  const schedule: Schedule = {
-    cron: opts.cron,
-    brief: opts.brief,
-    ...(opts.repo === undefined ? {} : { repo: path.resolve(opts.repo) }),
-    ...(opts.tz === undefined ? {} : { tz: opts.tz }),
-    since: new Date().toISOString(),
-  };
-  const { was, file } = wiredAt(home, opts.factory, { verb: 'schedule', workflow: opts.workflow, schedule }, (factory) => {
-    const bad = scheduleRefusal(factory, opts);
-    return bad === undefined ? undefined : new Invalid({ message: `${bad} Nothing was scheduled.` });
-  });
+  const schedule = scheduleOf(opts);
+  const { was, file } = wiredAt(home, opts.factory, { verb: 'schedule', workflow: opts.workflow, schedule }, (factory) =>
+    scheduleRefused(factory, opts),
+  );
   const replaced = was.schedules[opts.workflow];
   return { file, schedule, ...(replaced ? { replaced } : {}) };
+}
+
+/** The schedule `opts` asks for, stamped with when it was written (`since`), its repository resolved. */
+export const scheduleOf = (opts: { cron: string; brief: string; repo?: string; tz?: string }): Schedule => ({
+  cron: opts.cron,
+  brief: opts.brief,
+  ...(opts.repo === undefined ? {} : { repo: path.resolve(opts.repo) }),
+  ...(opts.tz === undefined ? {} : { tz: opts.tz }),
+  since: new Date().toISOString(),
+});
+
+/** What `scheduleRefusal` refuses of the schedule `opts` in `factory`, as the refusal a schedule throws (`Invalid`), or undefined. */
+export function scheduleRefused(
+  factory: Factory,
+  opts: { workflow: string; cron: string; brief: string; repo?: string; tz?: string },
+): Invalid | undefined {
+  const bad = scheduleRefusal(factory, opts);
+  return bad === undefined ? undefined : new Invalid({ message: `${bad} Nothing was scheduled.` });
 }
 
 /**

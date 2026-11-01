@@ -3,15 +3,16 @@
  * words name, writing nothing — the default factory, a name no factory has, a frontmatter block, blank words — and `--file` with
  * `--clear` refused by its check before anything is read.
  *
- * Rules read, written, printed and cleared through the command are a person's story in `test/factory-rules.test.ts`. `WF_ROOT` is set
- * before the import, since the store reads it as it loads.
+ * Rules read, written, printed and cleared through the command are a person's story in `test/factory-rules.test.ts`. The factory is
+ * planted through the Factory door's memory layer (`factoryDoorMemory`), which the command is given: nothing here reads the disk.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
+import { Effect } from 'effect';
 import type { Args } from '../command/command.ts';
 import { scratch } from '../../test/scratch.ts';
+import { done, doorFrom } from '../../test/door-walks.ts';
+import { aFactory } from '../../test/factory-walks.ts';
 import { testEngine } from 'agent-runtime/testing';
 import { testPlace } from '../../place/memory/index.ts';
 import { eachTest, runOver } from '../../test/placed.ts';
@@ -20,18 +21,21 @@ import { names } from '../../test/assessed.ts';
 const ROOT = scratch('wf-rules-verb-');
 process.env.WF_ROOT = ROOT;
 const { FACTORY_RULES } = await import('./rules.verb.ts');
-const { addFactory } = await import('../factory/factory.store.ts');
+const { FactoryDoor } = await import('../factory/factories.store.ts');
+const { FactoryName } = await import('../factory/factory.model.ts');
+const { factoryDoorMemory } = await import('../factory/memory.store.ts');
 const { runWith: runEngine } = await import('../runner.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const stand = eachTest(testPlace);
 const engine = eachTest(testEngine);
 const runWith = runOver(runEngine, () => stand().layer);
 
-const FILE = path.join(ROOT, 'factories', 'pipao', 'RULES.md');
-addFactory({ name: 'pipao', repos: [fs.mkdtempSync(path.join(ROOT, 'repo-'))] });
+const memory = factoryDoorMemory();
+const door = doorFrom(FactoryDoor, memory);
+done(door.factories.create(aFactory('pipao')));
 
-/** The command run with `args`, as the CLI and the api run it. */
-const run = (args: Args) => runWith(engineOf(engine().layer), FACTORY_RULES.handler(args));
+/** The command run with `args`, as the CLI and the api run it, over the memory door. */
+const run = (args: Args) => runWith(engineOf(engine().layer), Effect.provide(FACTORY_RULES.handler(args, undefined, ROOT), memory));
 
 test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
   const rows: Array<[string, Args, 'Conflict' | 'Missing' | 'Invalid', string[]]> = [
@@ -54,8 +58,8 @@ test('REFUSED: `nemia factory rules`, nothing written', async (t) => {
         names(err.message, ...facts);
         return true;
       });
-      for (const name of ['default', 'nobody']) assert.equal(fs.existsSync(path.join(ROOT, 'factories', name)), false);
-      assert.equal(fs.existsSync(FILE), false);
+      assert.deepEqual(done(door.factories.list()), ['pipao']);
+      assert.equal(done(door.rules.read(FactoryName.read('pipao'))).words, null);
     });
   await t.test('--file with --clear, by the check, before anything is read', () =>
     names(FACTORY_RULES.check?.({ factory: 'pipao', file: 'rules.md', clear: true }), 'nemia factory rules', '--file', '--clear'),

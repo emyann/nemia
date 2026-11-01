@@ -67,7 +67,7 @@
     },
     {
       "term": "MCP server type",
-      "meaning": "the transport an MCP server of a factory's `.mcp.json` declares, as Claude Code loads one (`stdio`, `http`, `sse`, the runtime's `MCP_TRANSPORTS`), or `unknown` for any other word, the word as written quoted in the server's not-asked sentence. A server with a command and no type is `stdio`.",
+      "meaning": "the transport an MCP server of a factory's `.mcp.json` declares, as a harness loads one (`stdio`, `http`, `sse`, the runtime's `MCP_TRANSPORTS`), or `unknown` for any other word, the word as written quoted in the server's not-asked sentence. A server with a command and no type is `stdio`.",
       "type": "McpServer"
     },
     {

@@ -54,7 +54,7 @@ export { LARGE_CONTEXT, budgetWord, dollars, peakMark, readWords, rebuiltCache, 
 export { answerIn, deniedWords, harnessWaitLine, isRepositoryRun, placeOf, waitingWords } from './run.ts';
 /**
  * The name the engine gives a task's session, which is the name `claude agents` lists it under: what a person is told to look for when
- * their step's session waits on them (`harnessWaitLine`); and an MCP server's transport as Claude Code loads one (`MCP_TRANSPORTS`,
+ * their step's session waits on them (`harnessWaitLine`); and an MCP server's transport as a harness loads one (`MCP_TRANSPORTS`,
  * `McpTransport`), a written `type` read as one or as `unknown` (`transportOf`). Re-exported because the api cannot import
  * agent-runtime — it is not a dependency of it — and the runtime client (`runtime-client.ts`) is the only file in the workspace that
  * knows the engine exists.

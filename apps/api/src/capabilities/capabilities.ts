@@ -25,7 +25,7 @@ export type McpServer = {
   name: string;
   source: string;
   /**
-   * `.mcp.json`'s `type`, as the transport Claude Code loads the server over (`MCP_TRANSPORTS`): `stdio` for a server with a command and
+   * `.mcp.json`'s `type`, as the transport a harness loads the server over (`MCP_TRANSPORTS`): `stdio` for a server with a command and
    * none given, and `unknown` for any other word, or a url with none, the word as written quoted in `notAsked`.
    */
   type: McpTransport | 'unknown';
@@ -139,7 +139,7 @@ export async function capabilitiesOf(
           ...entry,
           notAsked:
             server.type === 'unknown'
-              ? `Not a server Claude Code loads (${server.written === null ? 'no `type`' : `\`type: ${JSON.stringify(server.written)}\``}, at ${server.url}): give "type" one of ${MCP_TRANSPORTS.map((t) => `"${t}"`).join(', ')} in ${MCP_JSON}.`
+              ? `Not a server a harness loads (${server.written === null ? 'no `type`' : `\`type: ${JSON.stringify(server.written)}\``}, at ${server.url}): give "type" one of ${MCP_TRANSPORTS.map((t) => `"${t}"`).join(', ')} in ${MCP_JSON}.`
               : `Not a stdio server (${server.type}, at ${server.url}): the api asks only stdio servers for their tools.`,
         };
       if (!entry.enabled) {

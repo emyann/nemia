@@ -477,7 +477,7 @@ test('a server that is not stdio, or whose entry does not read, is listed with w
   );
 });
 
-test("a server's `type` is the transport Claude Code loads it over, and any other word is `unknown`, the word as written in why it was not asked", async (t) => {
+test("a server's `type` is the transport a harness loads it over, and any other word is `unknown`, the word as written in why it was not asked", async (t) => {
   const repo = repoWith({
     '.mcp.json': {
       mcpServers: {
@@ -495,11 +495,11 @@ test("a server's `type` is the transport Claude Code loads it over, and any othe
   await t.test('http and sse read as themselves', () => {
     assert.deepEqual([of('http')?.type, of('sse')?.type], ['http', 'sse']);
   });
-  await t.test('a word Claude Code loads no server over reads as unknown, and why it was not asked quotes it', () => {
+  await t.test('a word no harness loads a server over reads as unknown, and why it was not asked quotes it', () => {
     assert.equal(of('ws')?.type, 'unknown');
     assert.ok(of('ws')?.notAsked?.includes('"ws"'), of('ws')?.notAsked ?? 'no notAsked');
   });
-  await t.test('a url with no type is unknown: Claude Code loads no server from one', () => {
+  await t.test('a url with no type is unknown: a harness loads no server from one', () => {
     assert.equal(of('untyped')?.type, 'unknown');
   });
   await t.test('a command with no type is stdio', () => {

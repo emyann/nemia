@@ -29,7 +29,7 @@ const DescribedSchema = decodes<Described>()(
 export type McpServer = {
   name: string;
   source: string;
-  /** The transport Claude Code loads it over, or `unknown` for any other word, which `notAsked` quotes as written. */
+  /** The transport a harness loads it over, or `unknown` for any other word, which `notAsked` quotes as written. */
   type: 'stdio' | 'http' | 'sse' | 'unknown';
   command: string | null;
   args: string[];

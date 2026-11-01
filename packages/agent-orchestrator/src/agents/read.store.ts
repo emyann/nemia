@@ -22,7 +22,8 @@ import {
   type Agents,
   type SkillsFound,
 } from './agents.ts';
-import { folderForVersion, lookupRoots, readForVersion, sameRepository, skillsFor, type Places } from '../skills/read.store.ts';
+import { lookedUp } from '../skills/lookup.ts';
+import { folderForVersion, lookupOf, lookupRoots, readForVersion, skillsFor, type Places } from '../skills/read.store.ts';
 
 /** The file of a person's custom instructions for the agent `name`, in the store `home`: `<home>/custom-instructions/<name>.md`. */
 export const customInstructionsFile = (home: string, name: string): string =>
@@ -122,26 +123,25 @@ function withCustom(agent: Agent | WorkflowError, name: string, home: string | u
  * given the person's custom instructions for its name from the store (`places.home`, `readCustomInstructions`), whichever place it is in.
  */
 export function agentsFor(workflowDir: string, places: Places = {}): Agents {
-  const found = new Map<string, { at: string; agent: Agent | WorkflowError }>();
-  for (const root of lookupRoots(workflowDir, places)) {
-    const dir = path.join(root, AGENTS_FOLDER);
-    for (const [name, agent] of loadAgents(dir)) {
-      const first = found.get(name);
-      if (!first) {
-        found.set(name, { at: root, agent });
-        continue;
-      }
-      if (sameRepository(first.at, root)) {
-        found.set(name, {
-          at: first.at,
-          agent: new WorkflowError(
-            `${name} is an agent in both ${path.join(first.at, AGENTS_FOLDER, `${name}.md`)} and ${path.join(dir, `${name}.md`)}, one repository's two places for agents, and nothing says which runs. Keep one of them.`,
-          ),
-        });
-      }
-    }
+  const roots = lookupRoots(workflowDir, places);
+  const loaded = roots.map((root) => loadAgents(path.join(root, AGENTS_FOLDER)));
+  const found = new Map<string, Agent | WorkflowError>();
+  for (const name of new Set(loaded.flatMap((agents) => [...agents.keys()]))) {
+    const looked = lookedUp(lookupOf(roots, (at) => loaded[at]?.has(name) === true));
+    if (looked.kind === 'none') continue;
+    const agent = loaded[looked.at]?.get(name);
+    if (agent === undefined) continue;
+    const file = (at: number) => path.join(roots[at] ?? '', AGENTS_FOLDER, `${name}.md`);
+    found.set(
+      name,
+      looked.kind === 'both'
+        ? new WorkflowError(
+            `${name} is an agent in both ${file(looked.at)} and ${file(looked.again)}, one repository's two places for agents, and nothing says which runs. Keep one of them.`,
+          )
+        : agent,
+    );
   }
-  return new Map([...found].map(([name, { agent }]) => [name, withCustom(agent, name, places.home)]));
+  return new Map([...found].map(([name, agent]) => [name, withCustom(agent, name, places.home)]));
 }
 
 /**

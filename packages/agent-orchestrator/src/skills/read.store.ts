@@ -17,6 +17,7 @@ import { agentsDir } from '../folder/folder.ts';
 import { ownSkill, type Agent, type SkillsFound } from '../agents/agents.ts';
 import { givenSkillOf, type GivenSkill } from '../keys/index.ts';
 import { skillEntryOf, type AgentSkill, type SkillRule } from './skills.ts';
+import { lookedUp, type LookupRoot } from './lookup.ts';
 
 /**
  * Where else a workflow's agents and skills are looked for, beside its own folder: the repository it runs on, whose `.claude/agents/` and
@@ -41,11 +42,16 @@ export function lookupRoots(workflowDir: string, places: Places = {}): string[] 
 }
 
 /**
- * Whether two of `roots` are one repository's two places — its `workflows/` and its `.claude/` — where a name in both is refused rather
- * than one of them chosen: a person reading either folder would take the one before them for the one that runs.
+ * The repository whose two places — its `workflows/` and its `.claude/` — the root `root` is one of, or none: what `lookedUp` reads, which
+ * refuses a name one repository has in both rather than choose, since a person reading either folder would take the one before them for
+ * the one that runs.
  */
-export const sameRepository = (a: string, b: string): boolean =>
-  path.dirname(a) === path.dirname(b) && [path.basename(a), path.basename(b)].sort().join() === '.claude,workflows';
+export const repositoryOf = (root: string): string | undefined =>
+  path.basename(root) === 'workflows' || path.basename(root) === REPOSITORY_HOLDER ? path.dirname(root) : undefined;
+
+/** The roots as the precedence reads them (`lookedUp`): which repository each is a place of, and whether it holds the name. */
+export const lookupOf = (roots: readonly string[], holds: (root: number) => boolean): LookupRoot[] =>
+  roots.map((root, at) => ({ repo: repositoryOf(root), has: holds(at) }));
 
 /** The names in the folder `dir`, unsorted; none for a folder that is not there or cannot be read. */
 export function entriesOf(dir: string): string[] {
@@ -83,41 +89,34 @@ export function oneFolder(a: string, b: string): boolean {
   }
 }
 
-/**
- * The refusal of the skill `name` found in the root `first` and again in `root`, where the two are one repository's two places for skills
- * (`sameRepository`) and two folders; nothing for two roots of different places, where the first wins, and for one folder under both.
- */
-function inBoth(name: string, first: string, root: string): WorkflowError | undefined {
-  const before = path.join(first, SKILLS_FOLDER, name);
-  const at = path.join(root, SKILLS_FOLDER, name);
-  if (!sameRepository(first, root) || oneFolder(before, at)) return undefined;
-  return new WorkflowError(
-    `${name} is a skill in both ${before} and ${at}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`,
-  );
-}
-
 /** The skills of the roots `roots`, by bare name, each the folder it is or its refusal, a builtin place skill found last. */
 function rootSkills(roots: readonly string[]): Map<string, string | WorkflowError> {
-  const found = new Map<string, { at: string; dir: string | WorkflowError }>();
-  for (const root of roots) {
-    const dir = path.join(root, SKILLS_FOLDER);
-    for (const name of entriesOf(dir).sort()) {
-      const at = path.join(dir, name);
-      if (!holdsSkill(at)) continue;
-      const first = found.get(name);
-      if (!first) {
-        found.set(name, { at: root, dir: skillLinkRefusal(at) ?? rulesRefusal(at) ?? at });
-        continue;
-      }
-      const twice = inBoth(name, first.at, root);
-      if (twice) found.set(name, { at: first.at, dir: twice });
-    }
+  const held = roots.map((root) =>
+    entriesOf(path.join(root, SKILLS_FOLDER))
+      .sort()
+      .filter((name) => holdsSkill(path.join(root, SKILLS_FOLDER, name))),
+  );
+  const found = new Map<string, string | WorkflowError>();
+  for (const name of new Set(held.flat())) {
+    const looked = lookedUp(lookupOf(roots, (at) => held[at]?.includes(name) === true));
+    if (looked.kind === 'none') continue;
+    const at = path.join(roots[looked.at] ?? '', SKILLS_FOLDER, name);
+    const again = looked.kind === 'both' ? path.join(roots[looked.again] ?? '', SKILLS_FOLDER, name) : undefined;
+    // One folder under both places, the one a link to the other, is one skill, given from the first.
+    found.set(
+      name,
+      again !== undefined && !oneFolder(at, again)
+        ? new WorkflowError(
+            `${name} is a skill in both ${at} and ${again}, one repository's two places for skills, and nothing says which a session is given. Keep one of them.`,
+          )
+        : (skillLinkRefusal(at) ?? rulesRefusal(at) ?? at),
+    );
   }
   for (const name of placeSkills().sort()) {
     const at = path.join(PLACE_SKILLS, name);
-    if (!found.has(name)) found.set(name, { at: PLACE_SKILLS, dir: skillLinkRefusal(at) ?? at });
+    if (!found.has(name)) found.set(name, skillLinkRefusal(at) ?? at);
   }
-  return new Map([...found].map(([name, { dir }]) => [name, dir]));
+  return found;
 }
 
 /** The real path of `at`, or nothing where it cannot be reached. */

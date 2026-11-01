@@ -10,7 +10,7 @@
  * directory, a base git cannot read, and a git command that fails, in git's words. Throws when git cannot be started at all.
  */
 import { failedWords, isDirectory, printed, refused, type Asking, type Reply } from '../git.ts';
-import type { ChangedFile, PlaceRequests } from '../../../src/place/place.ts';
+import type { ChangedFile, FileChange, PlaceRequests } from '../../../src/place/place.ts';
 
 /** A git command that failed with an exit status: the place's refusal, in git's words. */
 class Refused extends Error {}
@@ -64,17 +64,37 @@ function numstat(out: string): Omit<ChangedFile, 'status'>[] {
   return counted;
 }
 
-/** `--name-status -z` read into each file's status letter, in git's order: a rename or copy names both ends. */
-function nameStatus(out: string): { status: string; path: string }[] {
+/**
+ * Git's status letter for a file of a range, in the place's word for it; a letter git prints only for a merge or a broken pair has none.
+ */
+const CHANGE_OF: Readonly<Record<string, FileChange>> = {
+  A: 'added',
+  M: 'modified',
+  D: 'removed',
+  R: 'renamed',
+  C: 'copied',
+  T: 'changed',
+};
+
+/**
+ * `--name-status -z` read into each file's change, in git's order: a rename or copy names both ends. A letter the place has no word for
+ * is `Refused`, never passed on as git spelled it.
+ */
+export function nameStatus(out: string): { status: FileChange; path: string }[] {
   const tokens = out.split('\0');
-  const named: { status: string; path: string }[] = [];
+  const named: { status: FileChange; path: string }[] = [];
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     if (token === undefined || token === '') break;
-    const status = token.charAt(0);
-    const both = status === 'R' || status === 'C';
+    const letter = token.charAt(0);
+    const status = CHANGE_OF[letter];
+    if (status === undefined)
+      throw new Refused(
+        `git's name-status says ${letter} of a file, a change the place has no word for: report the range without it, or name it in FileChange (src/place/place.ts)`,
+      );
+    const both = status === 'renamed' || status === 'copied';
     const path = tokens[i + (both ? 2 : 1)];
-    if (path === undefined) throw new Refused(`git's name-status ends inside the record of ${status}`);
+    if (path === undefined) throw new Refused(`git's name-status ends inside the record of ${letter}`);
     named.push({ status, path });
     i += both ? 2 : 1;
   }

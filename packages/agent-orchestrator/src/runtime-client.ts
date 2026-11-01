@@ -58,7 +58,9 @@ type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
  */
 export const enginePhaseHeld: Same<EnginePhase, TaskPhase> = true;
 
-/** The orchestrator's copy of the kinds a said message may follow (`SaidAfterKind`), held equal to the runtime's `TranscriptEvent['kind']`. */
+/**
+ * The orchestrator's copy of the kinds a said message may follow (`SaidAfterKind`), held equal to the runtime's `TranscriptEvent['kind']`.
+ */
 export const saidAfterKindHeld: Same<SaidAfterKind, TranscriptEvent['kind']> = true;
 
 /** The orchestrator's copy of A2A's session states (`StepSessionState`), held equal to the runtime's `SessionState`. */

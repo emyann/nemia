@@ -10,6 +10,7 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { gitPlace } from '../place/git/place.ts';
+import { nameStatus } from '../place/git/verbs/report.ts';
 import type { PlaceOutcome } from '../src/runner.ts';
 import { scratch } from './scratch.ts';
 
@@ -34,13 +35,18 @@ const write = (dir: string, file: string, text: string | Uint8Array): void => {
   fs.writeFileSync(path.join(dir, file), text);
 };
 
-/** A repository on `main` with a `package.json`, `src/a.ts` and `docs/old.md`, and a branch `wf/x/a` that changes each way git counts. */
+/**
+ * A repository on `main` with a `package.json`, `src/a.ts`, `docs/old.md`, `dropped.txt` and `link`, and a branch `wf/x/a` that changes
+ * each way git counts: adds, modifies, renames, removes `dropped.txt` and turns `link` into a symbolic link.
+ */
 function repository(): string {
   const dir = scratch('wf-report-');
   git(dir, 'init', '-q', '-b', 'main');
   write(dir, 'package.json', '{ "workspaces": ["packages/*"] }\n');
   write(dir, 'src/a.ts', 'export const a = 0;\n');
   write(dir, 'docs/old.md', 'one\ntwo\nthree\nfour\nfive\n');
+  write(dir, 'dropped.txt', 'gone\n');
+  write(dir, 'link', 'a file, then a link\n');
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'base');
   git(dir, 'switch', '-q', '-c', 'wf/x/a');
@@ -50,6 +56,9 @@ function repository(): string {
   write(dir, 'out/x.txt', 'x\n');
   write(dir, 'src/café\tx.ts', 'y\n');
   git(dir, 'mv', 'docs/old.md', 'docs/new.md');
+  fs.rmSync(path.join(dir, 'dropped.txt'));
+  fs.rmSync(path.join(dir, 'link'));
+  fs.symlinkSync('src/a.ts', path.join(dir, 'link'));
   git(dir, 'add', '-A');
   git(dir, 'commit', '-q', '-m', 'the work');
   git(dir, 'switch', '-q', 'main');
@@ -77,7 +86,7 @@ function answerOf(outcome: PlaceOutcome<'report'>) {
   return outcome.answer;
 }
 
-test('report answers the files a branch changed: added, modified, renamed with where it came from, binary with no counts', () => {
+test("report answers the files a branch changed in the place's words: added, modified, renamed with where it came from, removed, changed in type, binary with no counts", () => {
   const dir = repository();
   const answer = answerOf(report(request(dir)));
   assert.deepEqual(answer.at, {
@@ -87,13 +96,19 @@ test('report answers the files a branch changed: added, modified, renamed with w
   });
   const files = [...answer.files['wf/x/a']].sort((a, b) => (a.path < b.path ? -1 : 1));
   assert.deepEqual(files, [
-    { path: 'NOTES.md', status: 'A', added: 1, removed: 0 },
-    { path: 'docs/new.md', from: 'docs/old.md', status: 'R', added: 0, removed: 0 },
-    { path: 'out/x.txt', status: 'A', added: 1, removed: 0 },
-    { path: 'shot.png', status: 'A', added: null, removed: null },
-    { path: 'src/a.ts', status: 'M', added: 2, removed: 1 },
-    { path: 'src/café\tx.ts', status: 'A', added: 1, removed: 0 },
+    { path: 'NOTES.md', status: 'added', added: 1, removed: 0 },
+    { path: 'docs/new.md', from: 'docs/old.md', status: 'renamed', added: 0, removed: 0 },
+    { path: 'dropped.txt', status: 'removed', added: 0, removed: 1 },
+    { path: 'link', status: 'changed', added: 1, removed: 1 },
+    { path: 'out/x.txt', status: 'added', added: 1, removed: 0 },
+    { path: 'shot.png', status: 'added', added: null, removed: null },
+    { path: 'src/a.ts', status: 'modified', added: 2, removed: 1 },
+    { path: 'src/café\tx.ts', status: 'added', added: 1, removed: 0 },
   ]);
+});
+
+test('REFUSED: a status letter the place has no word for, rather than passed on as git spelled it', () => {
+  assert.throws(() => nameStatus('X\0a.txt\0'), Error);
 });
 
 test("report answers each path's diff it was asked, a rename's two ends as one, and none for a path the branch did not change", () => {

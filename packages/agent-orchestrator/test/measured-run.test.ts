@@ -12,9 +12,10 @@
  *
  * Plan's blocked turn is answered on the stand-in's own `answer`, which the runtime's walks hold to the real engine's
  * (`agent-runtime/test/engine-walks.ts`): the answer is the task's input, and the settle after it begins its turn, attempt 2 of the same
- * task carrying `turn: 1`. The engine's own pass does nothing (`QUIET`), every task read off the stand-in. The wall is `Date`, mocked and moved by hand (a wall
- * decision keeps its now on `Date`): each time on the timeline is a number of minutes the story chose. `WF_ROOT` is set before the
- * runner is imported, which reads it as it loads; `WF_VERIFY_REST=1` judges every run a pass answers from its memo in full.
+ * task carrying `turn: 1`. The engine's own pass does nothing (`QUIET`), every task read off the stand-in. The wall is `Date`, mocked
+ * and moved by hand (a wall decision keeps its now on `Date`): each time on the timeline is a number of minutes the story chose.
+ * `WF_ROOT` is set before the runner is imported, which reads it as it loads; `WF_VERIFY_REST=1` judges every run a pass answers from
+ * its memo in full.
  */
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';

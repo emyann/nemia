@@ -662,7 +662,7 @@ export function queueRefusal(
 /**
  * The name of the inbox card `at` names — a path under the inbox `dir`, as its path from there, less a trailing `.md`, so `<dir>/<name>` is
  * the card `nemia inbox` lists as `<name>` — or null for a path outside it, and for the inbox itself: what makes `nemia start <path>` start
- * a card out of the inbox. Both paths are taken as given; the store resolves links first (`runStore.inbox.nameAt`).
+ * a card out of the inbox. Both paths are taken as given; the Card door resolves links first (`cardNameAt`).
  *
  * Every path under the inbox goes to the start, never to a brief: whether the card is there, and whether the name is a card's — a folder
  * inside the inbox gives one with a slash — is `startFromInbox`'s to say, by name. Taken as a brief, a card's name typed without its `.md`

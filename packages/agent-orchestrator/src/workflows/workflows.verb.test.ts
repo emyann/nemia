@@ -26,7 +26,11 @@ const runWith = runOver(runEngine, () => stand().layer);
 const { runStore } = await import('../record/files.store.ts');
 const { workflowVersion } = await import('../folder/version.store.ts');
 const { removeWorkflowAt } = await import('../folder/write.store.ts');
-const { queueInInbox } = await import('../inbox/inbox.store.ts');
+const verbs = await import('../inbox/inbox.store.ts');
+const { StoreRoot } = await import('../config/root.store.ts');
+/** `nemia inbox queue`'s verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
+const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) =>
+  Effect.runSync(Effect.provideService(verbs.queueInInbox(...args), StoreRoot, ROOT));
 const { Conflict, Invalid, Missing } = await import('../refusal/refusal.ts');
 const { workflowDoorMemory } = await import('./memory.store.ts');
 

@@ -5,7 +5,7 @@ import { photograph, startOf, themeOf } from '../board.ts';
 import { expectCount, expectVisible, idle, Refused, settled, WAIT_MS, watch } from '../checks.ts';
 import { FACTORIES, WORKFLOWS } from '../seed.ts';
 import type { PageSpec } from '../visit.ts';
-import { OUT, store } from '../world.ts';
+import { OUT, store, takeBackRuns } from '../world.ts';
 
 /** The brief the page starts its run with. */
 const BRIEF = 'Start a run from the floor of its factory';
@@ -131,8 +131,7 @@ export default {
         );
     } finally {
       await other.close();
-      for (const file of fs.readdirSync(runsDir))
-        if (!runsBefore.includes(file)) fs.rmSync(path.join(runsDir, file), { recursive: true, force: true });
+      takeBackRuns(runsDir, runsBefore);
       fs.rmSync(reviewerFile, { force: true });
       fs.writeFileSync(factoryFile, factoryText);
     }

@@ -36,16 +36,19 @@ fs.writeFileSync(path.join(ROOT, 'inbox', 'notes.md'), CARD);
 
 test('`INBOX_CARD`: a card read for its page by its name — REFUSED, a name with no card', async (t) => {
   await t.test('a card is read by its name, before a stray file of the same name, with its file as written', async () => {
-    const { card, source } = await runWith(noEngine(), INBOX_CARD.handler({ name: 'notes' }));
+    const { card, source } = await runWith(noEngine(), INBOX_CARD.handler({ name: 'notes' }, undefined, ROOT));
     assert.equal(card.file, 'notes.md');
     assert.equal(card.workflow, 'dev');
     assert.equal(source, CARD);
   });
   await t.test('REFUSED: a name the inbox has no card of, a Missing naming the name and the cards there are', async () => {
-    await assert.rejects(runWith(noEngine(), INBOX_CARD.handler({ name: 'nowhere' })), (err: Error & { _tag?: string }) => {
-      assert.equal(err._tag, 'Missing');
-      names(err.message, 'no card nowhere', 'notes.');
-      return true;
-    });
+    await assert.rejects(
+      runWith(noEngine(), INBOX_CARD.handler({ name: 'nowhere' }, undefined, ROOT)),
+      (err: Error & { _tag?: string }) => {
+        assert.equal(err._tag, 'Missing');
+        names(err.message, 'no card nowhere', 'notes.');
+        return true;
+      },
+    );
   });
 });

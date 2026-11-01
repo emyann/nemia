@@ -28,6 +28,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { Effect } from 'effect';
 import { scratch } from './scratch.ts';
 import type { Engine } from '../src/runtime-client.ts';
 import { decideScreen } from './screens.ts';
@@ -84,19 +85,23 @@ const gitAsked = (): string[] => (fs.existsSync(GIT_ASKED) ? fs.readFileSync(GIT
 
 process.env.WF_ROOT = ROOT;
 const {
-  addToInbox,
   advanceRun,
   decideRun,
   forgetRun,
   list,
-  queueInInbox,
   queueLine,
   retryRun,
   startRun,
   startQueued,
   runWith: runEngine,
   gitPlaceLayer,
+  StoreRoot,
+  ...verbs
 } = await import('../src/runner.ts');
+/** An inbox verb run at this test's store root, as `nemia` gives it one: its answer, or its refusal thrown. */
+const atRoot = <A, E>(program: Effect.Effect<A, E>): A => Effect.runSync(Effect.provideService(program, StoreRoot, ROOT));
+const addToInbox = (opts: Parameters<typeof verbs.addToInbox>[0]) => atRoot(verbs.addToInbox(opts));
+const queueInInbox = (...args: Parameters<typeof verbs.queueInInbox>) => atRoot(verbs.queueInInbox(...args));
 const runWith = runOver(runEngine, gitPlaceLayer);
 const runPlaced = runGiven(gitPlaceLayer);
 const { readRun } = await import('../src/record/record.store.ts');

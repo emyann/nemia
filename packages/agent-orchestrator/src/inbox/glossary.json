@@ -3,6 +3,7 @@
   "title": "Planning",
   "about": "The cards waiting to be started.",
   "paths": [
+    "packages/agent-orchestrator/src/cards",
     "packages/agent-orchestrator/src/inbox",
     "packages/agent-orchestrator/src/plan"
   ],
@@ -53,6 +54,11 @@
           "card": "A card keeps its identity after it starts"
         }
       ]
+    },
+    {
+      "term": "Card door",
+      "meaning": "the one way a card of the inbox and the tick's tries of a queued one are read and written: `CardDoor` in `packages/agent-orchestrator/src/cards/cards.store.ts`, by `CardName`, its files layer at the store's root a program is given and a memory one, each refusing a card filed under a name that is no card's, at a name taken, or whose text does not read as a card. One run per card is the Run door's to hold.",
+      "type": "CardDoorShape"
     }
   ]
 }

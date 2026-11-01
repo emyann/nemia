@@ -26,11 +26,13 @@ import {
   type TaskView,
 } from '../src/index.ts';
 import { Engine } from '../src/index.ts';
+import { refusalWords } from '../src/service/refusal.ts';
 import { claudeCodeRefuses } from '../src/harness/claude/vocabulary.ts';
 import { claudeJob } from '../src/harness/claude/code.ts';
 import { scratch } from './scratch.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { TaskId } from '../src/core/model.ts';
 
 /** The core `file`, over a store and a harness that cost nothing. */
 const coreDoor = () => {
@@ -459,6 +461,25 @@ test("file: what only an engine refuses, in its harness's words or a brought har
   }
 });
 
+test("file: an id the Task door refuses — one no file can be named by, or one already filed — is the caller's refusal: FileRefused, exit 2, and nothing more journalled", async (t) => {
+  const ROWS = [
+    { name: 'an id that holds a `/`', id: 'a/b', first: false },
+    { name: 'an id already filed', id: 'twice', first: true },
+  ];
+  for (const row of ROWS) {
+    await t.test(row.name, async () => {
+      const { engine, journal } = harnessDoors().shipped;
+      if (row.first) await Effect.runPromise(engine.file({ ...ok, id: row.id }));
+      const before = await journal.list();
+      const err = await Effect.runPromise(Effect.flip(engine.file({ ...ok, id: row.id })));
+      assert.equal(err._tag, 'FileRefused', err.message);
+      assert.equal((refusalWords('file')(err) as { exitCode?: number }).exitCode, 2);
+      assert.deepEqual(await journal.list(), before, 'nothing was journalled');
+      if (row.first) assert.equal((await journal.read(row.id)).length, 1, 'the first filing stands alone');
+    });
+  }
+});
+
 /** The filing event a task was journalled with. */
 const filedOf = async (journal: AsyncJournal, id: string) => (await journal.read(id))[0] as Extract<Event, { kind: 'filed' }>;
 
@@ -645,7 +666,7 @@ test('file journals what it takes: on the record for the runner, under config an
     const effect = coreDoor();
     const always = await effect.run(file({ ...ok, restartPolicy: 'Always', queued: true }));
     const job = await effect.run(file(ok));
-    const filedIn = (id: string) => effect.run(Effect.flatMap(Journal, (j) => j.read(id))).then((es) => es[0]);
+    const filedIn = (id: string) => effect.run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(id)))).then((es) => es[0]);
     const filed = await filedIn(always);
     assert.equal(filed.kind === 'filed' && filed.restartPolicy, 'Always');
     assert.equal(Object.hasOwn(await filedIn(job), 'restartPolicy'), false, 'a job journals no restart policy');

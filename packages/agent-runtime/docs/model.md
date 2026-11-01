@@ -10,8 +10,11 @@ journal entry carries the journal's own schema of an event (`StoredEventSchema`,
 model's mount is held to the harness's `Mount` by `src/core/model.test.ts`. A relation to another layer is an id alone: the
 orchestrator holds a `TaskId` by its key, with no import.
 
-Nothing reads through the model yet, and nothing is reshaped by it. It leaves three seams. The Task and Journal door (S4) decodes
-what it reads through these schemas, and holds a new id to `TaskId`'s create form at `file`, where today any id is taken. A store
+The Task door (`Journal`, `src/core/engine/journal.ts`) holds the model's ids and invariant at every store: it takes and gives a
+`TaskId`, branded nominally where it reads (`TaskId.read`), so a journal written under any id still reads; and before any store is
+written it refuses, by `appendRefusal` (`src/core/engine/append-refusal.ts`), a filing under an id `taskIdRefusal` refuses, a second
+filing of a task, an entry to a task never filed, and a start that is not `attempts.length + 1`. What it reads it still decodes through
+the journal's own schema (`event-schema.ts`); nothing is reshaped by the model. Two seams are left. A store
 kept in SQLite takes the branded schemas as its `Model.Class` fields. The place a session runs, `ExecutionPlace`, is the host and
 nothing else, so a task holds no field for it (decision Q17); it gains one only when a second place exists.
 

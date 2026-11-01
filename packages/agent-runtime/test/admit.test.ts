@@ -259,7 +259,11 @@ test('a tick observes each harness once, whatever it reports, and admit observes
   const reads = b.reads.n;
   await Effect.runPromise(b.engine.admit(ids.slice(0, 2)));
   assert.equal(b.observes.n, 0, 'admit asks no harness');
-  assert.equal(b.reads.n - reads, 2, 'and reads each task it is handed once');
+  assert.equal(
+    b.reads.n - reads,
+    4,
+    'and reads each task it is handed once, and the Task door each once more before it writes its admission (`appendRefusal`)',
+  );
   b.observes.n = 0;
   await Effect.runPromise(b.engine.tick());
   assert.equal(b.observes.n, 1);

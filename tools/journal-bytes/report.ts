@@ -13,7 +13,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { Effect } from 'effect';
-import { Journal, type Event } from 'agent-runtime';
+import { Journal, TaskId, type Event } from 'agent-runtime';
 import { briefParts } from 'agent-orchestrator/run';
 
 /** What the report says of one store. */
@@ -149,7 +149,8 @@ const refile = (from: string, to: string) =>
     const { tasks, unreadable } = yield* readAll(from);
     const journal = yield* Journal;
     for (const [taskId, events] of tasks) {
-      for (const event of events) yield* journal.append(taskId, event, event.kind === 'filed' ? briefParts(event.brief) : undefined);
+      for (const event of events)
+        yield* journal.append(TaskId.read(taskId), event, event.kind === 'filed' ? briefParts(event.brief) : undefined);
     }
     return { filed: tasks.length, unreadable };
   }).pipe(Effect.provide(Journal.files(to)));

@@ -106,10 +106,10 @@ test("a held step closed and not yet settled reads as it signed, never the engin
   const listed = await runWith(engine(), list(engine(), runStore.runs.read('h-closed')));
   for (const run of [await detail('h-closed'), await summary('h-closed')]) {
     assert.deepEqual(
-      run.steps.map((s) => s.status),
-      listed.steps.map((s) => s.status),
+      run.steps.map((s) => s.message),
+      listed.steps.map((s) => s.message),
     );
-    assert.doesNotMatch(run.steps[0].status, /between-attempts|working|running/);
+    assert.doesNotMatch(run.steps[0].message, /between-attempts|working|running/);
   }
 });
 
@@ -125,7 +125,7 @@ test('each try of a held task a person answered is its own turn: the try answere
   );
   const [answered, going] = plan.tries;
   assert.deepEqual(
-    [answered.status, answered.attempts.count, answered.attempts.latest?.ended, answered.closeout?.needs],
+    [answered.message, answered.attempts.count, answered.attempts.latest?.ended, answered.closeout?.needs],
     ['succeeded', 1, 'succeeded', BLOCKED.needs],
     'the turn answered, as it signed',
   );

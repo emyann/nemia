@@ -131,22 +131,22 @@ test("a check's or an earlier try's journal that does not read marks its step un
     async () => {
       const runs = await listed();
       assert.equal(runs.get('r-good')!.unreadable, null);
-      assert.notEqual(runs.get('r-good')!.steps[0].status, 'unreadable');
+      assert.notEqual(runs.get('r-good')!.steps[0].message, 'unreadable');
       for (const [id, task] of [
         ['r-check', 'r-check-implement-check'],
         ['r-try', 'r-try-implement'],
       ]) {
         const run = runs.get(id)!;
+        assert.deepEqual(
+          run.steps.map((s) => [s.name, s.message]),
+          [['implement', 'unreadable']],
+          id,
+        );
         assert.ok(
           run.unreadable?.startsWith(`${id}'s record reads, but the journal of its task ${task} does not: ${task}'s journal (`),
           run.unreadable ?? 'null',
         );
         assert.ok(run.unreadable?.includes('So the board does not judge the run'), run.unreadable ?? 'null');
-        assert.deepEqual(
-          run.steps.map((s) => [s.name, s.status]),
-          [['implement', 'unreadable']],
-          `${id}'s step is the one whose task does not read, though its session's own journal does`,
-        );
       }
     },
   );

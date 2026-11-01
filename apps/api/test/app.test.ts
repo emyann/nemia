@@ -143,7 +143,6 @@ const firstTry = (step: {
   on: string | null;
   via: string | null;
   message: string;
-  status: string;
   attempts: object;
   check: object | null;
   closeout: object | null;
@@ -161,7 +160,6 @@ const firstTry = (step: {
     on: step.on,
     via: step.via,
     message: step.message,
-    status: step.status,
     attempts: step.attempts,
     check: step.check,
     closeout: step.closeout,
@@ -369,7 +367,6 @@ test("a store's runs read on the list and on a run's page: each summarized with 
             via: null,
             message: 'unknown',
             verdict: null,
-            status: 'unknown',
             note: null,
             roundDue: false,
             agent: null,
@@ -390,7 +387,6 @@ test("a store's runs read on the list and on a run's page: each summarized with 
             via: null,
             message: 'pending',
             verdict: null,
-            status: 'pending',
             note: null,
             roundDue: false,
             agent: null,
@@ -483,7 +479,6 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       on: null,
       via: 'closeout',
       message: 'succeeded · BLOCKED',
-      status: 'succeeded · BLOCKED',
       check: null,
       closeout: blockedCloseout,
       unreadable: null,
@@ -561,7 +556,6 @@ test("a store's runs read on the list and on a run's page: each summarized with 
       on: null,
       via: null,
       message: 'pending',
-      status: 'pending',
       check: null,
       closeout: null,
       unreadable: null,
@@ -636,7 +630,7 @@ test("a store's runs read on the list and on a run's page: each summarized with 
   await s.test('a step that signed off blocked is waiting on you in the list too', async () => {
     const run = await listed('r-2');
     assert.deepEqual(
-      run.steps.map((s: { status: string }) => s.status),
+      run.steps.map((s: { message: string }) => s.message),
       ['succeeded · BLOCKED', 'pending'],
     );
     assert.deepEqual(run.waitingOnYou, ['implement']);
@@ -647,14 +641,14 @@ test("a store's runs read on the list and on a run's page: each summarized with 
     writeRun({ ...r2, id: 'r-5', steps: { implement: { taskId: 't-5', branch: 'wf/r-5/implement' }, review: { taskId: null } } });
 
     const lost = await detailOf('r-4');
-    assert.equal(lost.steps[0].status, 'unknown');
+    assert.equal(lost.steps[0].message, 'unknown');
     assert.equal(lost.steps[0].told, null);
-    assert.equal((await listed('r-4')).steps[0].status, 'unknown');
+    assert.equal((await listed('r-4')).steps[0].message, 'unknown');
 
     const queued = await detailOf('r-5');
-    assert.equal(queued.steps[0].status, 'pending', 'a task filed and waiting for a slot is still pending');
+    assert.equal(queued.steps[0].message, 'pending', 'a task filed and waiting for a slot is still pending');
     assert.equal(queued.steps[0].told, filedBrief('t-5'));
-    assert.equal((await listed('r-5')).steps[0].status, 'pending');
+    assert.equal((await listed('r-5')).steps[0].message, 'pending');
   });
   await s.test(
     'the api words a step as list does — `unknown` for a task the engine has no record of, `pending` for one queued',
@@ -664,9 +658,9 @@ test("a store's runs read on the list and on a run's page: each summarized with 
         const words = await runWith(e, list(e, runStore.runs.read(id)));
         const run = await listed(id);
         assert.deepEqual(
-          run.steps.map(({ name, status, branch, phase, reason, on, via, verdict }) => ({
+          run.steps.map(({ name, message, branch, phase, reason, on, via, verdict }) => ({
             name,
-            status,
+            message,
             reason,
             ...(on ? { on } : {}),
             ...(via ? { via } : {}),
@@ -765,7 +759,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
         assert.ok(said.includes(`does not load: no workflow folder at ${gone}`), said);
         assert.deepEqual([listing.status, listing.moving, listing.waitingOnYou], ['running', true, []], why);
         assert.deepEqual(
-          listing.steps.map((s) => [s.name, s.status]),
+          listing.steps.map((s) => [s.name, s.message]),
           [
             ['implement', 'succeeded'],
             ['review', 'pending'],
@@ -781,7 +775,7 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       fs.writeFileSync(path.join(root, 'runs', 'r-3.cancelled'), '2026-09-12T03:00:00.000Z');
       [withFolder, withoutFolder] = [await listed('r-2'), await listed('r-3')];
       assert.deepEqual(withFolder.waitingOnYou, [], 'a run somebody called off waits on nobody');
-      assert.equal(withFolder.steps[0].status, 'succeeded · BLOCKED', 'a called-off step still says how it signed off');
+      assert.equal(withFolder.steps[0].message, 'succeeded · BLOCKED', 'a called-off step still says how it signed off');
       unjudged(withoutFolder, 'called off, it is still unjudged: the tick reads its steps to stop it');
     },
   );
@@ -818,7 +812,6 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       on: null,
       via: 'closeout',
       message: 'succeeded · BLOCKED',
-      status: 'succeeded · BLOCKED',
       check: null,
       closeout: blockedCloseout,
       unreadable: null,
@@ -868,15 +861,15 @@ test('a run whose workflow folder changes or vanishes after it starts is read of
       tries: firstTry(originalTry),
       timeline: settledTimeline('t-6'),
     });
-    assert.deepEqual([review.body, review.spec?.after, review.status], ['Review it.', ['replacement'], 'pending']);
+    assert.deepEqual([review.body, review.spec?.after, review.message], ['Review it.', ['replacement'], 'pending']);
     assert.deepEqual(
-      [replacement.body, replacement.taskId, replacement.status, replacement.closeout],
+      [replacement.body, replacement.taskId, replacement.message, replacement.closeout],
       ['Do the original thing.', null, 'pending', null],
     );
 
     const summary = await listed('r-6');
     assert.deepEqual(
-      summary.steps.map((s: { name: string; status: string }) => [s.name, s.status]),
+      summary.steps.map((s: { name: string; message: string }) => [s.name, s.message]),
       [
         ['original', 'succeeded · BLOCKED'],
         ['review', 'pending'],
@@ -1098,36 +1091,36 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
     writeRun({ ...r2, id: 'r-8u', steps: { implement: { taskId: 't-8u', branch: 'wf/r-8u/implement' }, review: { taskId: null } } });
     const unsigned = await detailOf('r-8u');
     assert.deepEqual(
-      [unsigned.steps[0].attempts, unsigned.steps[0].status],
-      [unsignedWords, 'unsigned'],
+      unsigned.steps[0].attempts,
+      unsignedWords,
       'a session that ended with no statement its task asked for, closedOut: false on an end its harness settled, reads unsigned',
     );
+    assert.equal(unsigned.steps[0].message, 'unsigned');
     quiet('t-8o', { observed: 'failed', reason: 'unsigned' }, 'failed');
     writeRun({ ...r2, id: 'r-8o', steps: { implement: { taskId: 't-8o', branch: 'wf/r-8o/implement' }, review: { taskId: null } } });
     const judgedUnsigned = await detailOf('r-8o');
     assert.deepEqual(
-      [judgedUnsigned.steps[0].attempts, judgedUnsigned.steps[0].status],
-      [unsignedWords, 'unsigned'],
+      judgedUnsigned.steps[0].attempts,
+      unsignedWords,
       'an old journal, whose end the runtime judged unsigned itself, reads the same',
     );
+    assert.equal(judgedUnsigned.steps[0].message, 'unsigned');
 
     const cappedWords = { count: 1, latest: { startedAt: at, ended: 'failed', endedAt: later, reason: 'budget' } };
     quiet('t-8b', { observed: 'failed', reason: 'harness', limit: 'budget', exitCode: 1 }, 'failed');
     writeRun({ ...r2, id: 'r-8b', steps: { implement: { taskId: 't-8b', branch: 'wf/r-8b/implement' }, review: { taskId: null } } });
     const capped = await detailOf('r-8b');
     assert.deepEqual(
-      [capped.steps[0].attempts, capped.steps[0].status],
-      [cappedWords, 'budget exhausted'],
+      capped.steps[0].attempts,
+      cappedWords,
       "a session its harness cut at its spend cap, limit: 'budget' on the harness's own end, reads budget exhausted",
     );
+    assert.equal(capped.steps[0].message, 'budget exhausted');
     quiet('t-8c', { observed: 'failed', reason: 'budget', exitCode: 1 }, 'failed');
     writeRun({ ...r2, id: 'r-8c', steps: { implement: { taskId: 't-8c', branch: 'wf/r-8c/implement' }, review: { taskId: null } } });
     const judgedCapped = await detailOf('r-8c');
-    assert.deepEqual(
-      [judgedCapped.steps[0].attempts, judgedCapped.steps[0].status],
-      [cappedWords, 'budget exhausted'],
-      'an end the runtime judged budget itself reads the same',
-    );
+    assert.deepEqual(judgedCapped.steps[0].attempts, cappedWords, 'an end the runtime judged budget itself reads the same');
+    assert.equal(judgedCapped.steps[0].message, 'budget exhausted');
 
     assert.deepEqual(
       (await detailOf('r-4')).steps[0].attempts,
@@ -1147,7 +1140,6 @@ test("a step's attempts and its log: how many, when the latest began and ended, 
         'via',
         'message',
         'verdict',
-        'status',
         'note',
         'roundDue',
         'agent',
@@ -1421,16 +1413,16 @@ function askFor(id: string, name: string, ask: object) {
 /** A step row as the list and the detail both carry it. */
 type Row = Pick<
   RunSummary['steps'][number],
-  'name' | 'status' | 'branch' | 'note' | 'roundDue' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'
+  'name' | 'message' | 'branch' | 'note' | 'roundDue' | 'phase' | 'reason' | 'on' | 'via' | 'verdict'
 >;
 
 /**
  * A step row as `list` has it: its codes, its check's verdict only where it was judged by one, a note only where it prints one, and
  * `roundDue` only where a round is due.
  */
-const asListed = ({ name, status, branch, note, roundDue, phase, reason, on, via, verdict }: Row) => ({
+const asListed = ({ name, message, branch, note, roundDue, phase, reason, on, via, verdict }: Row) => ({
   name,
-  status,
+  message,
   reason,
   ...(on ? { on } : {}),
   ...(via ? { via } : {}),
@@ -1446,7 +1438,7 @@ type Judgement = [
   status: string,
   moving: boolean,
   waitingOnYou: string[],
-  rows: Array<[name: string, status: string, note: string | null]>,
+  rows: Array<[name: string, message: string, note: string | null]>,
   why: string,
 ];
 
@@ -1463,7 +1455,7 @@ async function expectJudged(cases: readonly Judgement[]) {
     ] as const) {
       assert.deepEqual([run.status, run.moving, run.waitingOnYou], [status, moving, waitingOnYou], `${id}, ${where}: ${why}`);
       assert.deepEqual(
-        run.steps.map((s) => [s.name, s.status, s.note]),
+        run.steps.map((s) => [s.name, s.message, s.note]),
         rows,
         `${id}, ${where}: ${why}`,
       );
@@ -1490,11 +1482,11 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
     const detail = await detailOf('r-20');
     const summary = await listed('r-20');
     assert.deepEqual(
-      detail.steps.map((s) => [s.name, s.status]),
+      detail.steps.map((s) => [s.name, s.message]),
       words,
     );
     assert.deepEqual(
-      summary.steps.map((s) => [s.name, s.status]),
+      summary.steps.map((s) => [s.name, s.message]),
       words,
     );
     assert.deepEqual(
@@ -1515,9 +1507,9 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
         ['detail', detail],
       ] as const) {
         assert.deepEqual(
-          run.steps.map(({ name, status, branch, phase, reason, on, via, verdict }) => ({
+          run.steps.map(({ name, message, branch, phase, reason, on, via, verdict }) => ({
             name,
-            status,
+            message,
             reason,
             ...(on ? { on } : {}),
             ...(via ? { via } : {}),
@@ -1588,14 +1580,15 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
       ],
       steps: { a: { taskId: 't-24-a', check: { taskId: 'r-24-a-check' } }, b: { taskId: 't-24-b' }, c: { taskId: null } },
     });
+    const r24 = (await listed('r-24')).steps;
     assert.deepEqual(
-      (await listed('r-24')).steps.map((s) => [s.name, s.status]),
-      [
-        ['a', 'failed ✗ check (exit 1)'],
-        ['b', 'starting'],
-        ['c', 'pending'],
-      ],
+      r24.map((s) => s.name),
+      ['a', 'b', 'c'],
       "one root's check refused while its sibling's session still runs, and c, which waits on both, will never be filed",
+    );
+    assert.deepEqual(
+      r24.map((s) => s.message),
+      ['failed ✗ check (exit 1)', 'starting', 'pending'],
     );
 
     journal('t-25-a', [
@@ -1709,7 +1702,7 @@ test("what a run established, read as the tick and `nemia ls` have it: each step
           ['detail', await detailOf(id)],
         ] as const) {
           assert.deepEqual(
-            [run.status, run.moving, run.waitingOnYou, run.steps[0].status],
+            [run.status, run.moving, run.waitingOnYou, run.steps[0].message],
             [status, moving, waitingOnYou, word],
             `${id}, ${where}: ${why}`,
           );
@@ -1900,7 +1893,7 @@ test("a step's check read on the board: its command, and once it refused its exi
       });
 
       const { steps } = await detailOf('r-72');
-      const words = Object.fromEntries(steps.map((s) => [s.name, [s.status, s.verdict, s.check?.verdict, s.check?.refused?.exit]]));
+      const words = Object.fromEntries(steps.map((s) => [s.name, [s.message, s.verdict, s.check?.verdict, s.check?.refused?.exit]]));
       const unfinished = { result: 'unfinished', exit: null };
       assert.deepEqual(words, {
         deadline: ['failed ✗ check (unfinished)', unfinished, unfinished, 'unfinished'],
@@ -1963,7 +1956,7 @@ test("a step's check read on the board: its command, and once it refused its exi
     const res = await app.request('/api/runs/r-22');
     assert.equal(res.status, 200);
     const [test] = ((await res.json()) as RunDetail).steps;
-    assert.equal(test.status, 'failed ✗ check (exit 2)');
+    assert.equal(test.message, 'failed ✗ check (exit 2)');
     const refused = test.check?.refused;
     assert.ok(refused);
     assert.deepEqual(
@@ -2109,7 +2102,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
       });
       const passed = (taskId: string) => ({ command: 'npm test', taskId, verdict: { result: 'passed', exit: 0 }, refused: null });
       const [implement, review] = run.steps;
-      assert.deepEqual([implement.status, implement.note, implement.attempts], ['verified ✓', 'round 2 of 3', once]);
+      assert.deepEqual([implement.message, implement.note, implement.attempts], ['verified ✓', 'round 2 of 3', once]);
       assert.deepEqual(
         implement.tries,
         [
@@ -2125,7 +2118,6 @@ test("a step's tries and its closeout: every try of a looped step off one observ
             on: null,
             via: null,
             message: 'succeeded',
-            status: 'succeeded',
             attempts: once,
             /** Its check refused: the verdict, and the stderr the runtime kept. Its stdout is not read for a try that is over. */
             check: {
@@ -2150,7 +2142,6 @@ test("a step's tries and its closeout: every try of a looped step off one observ
             on: null,
             via: null,
             message: 'succeeded',
-            status: 'succeeded',
             attempts: once,
             check: passed('r-50-implement-try2-check'),
             closeout: closeout(said.implement2),
@@ -2169,7 +2160,6 @@ test("a step's tries and its closeout: every try of a looped step off one observ
             on: null,
             via: null,
             message: 'verified ✓',
-            status: 'verified ✓',
             attempts: once,
             check: passed('r-50-implement-try3-check'),
             closeout: closeout(said.implement3, { replies }),
@@ -2198,7 +2188,6 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           on: null,
           via: null,
           message: 'succeeded',
-          status: 'succeeded',
           attempts: once,
           check: null,
           /**
@@ -2220,8 +2209,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           reason: 'Succeeded',
           on: null,
           via: null,
-          message: review.status,
-          status: review.status,
+          message: review.message,
           attempts: once,
           check: null,
           closeout: closeout(said.review2, { output: { again: false, findings: [] }, schema: reviewOutput.properties }),
@@ -2229,7 +2217,7 @@ test("a step's tries and its closeout: every try of a looped step off one observ
           answer: null,
         },
       ]);
-      assert.equal(review.status, 'unverified · done');
+      assert.equal(review.message, 'unverified · done');
     },
   );
   await s.test(
@@ -3000,14 +2988,15 @@ test("where a run's time and tokens went, on its list line and its page, and the
 
       const [implement, review] = (await listed('r-denied')).steps;
       assert.deepEqual(
-        [implement.status, implement.denied],
-        ['unverified · done', denied],
-        'two attempts denied look and pytest, then look again and a path with a newline in it: each call once, and the status the chip reads as it was',
+        implement.denied,
+        denied,
+        'two attempts denied look and pytest, then look again and a path with a newline in it: each call once',
       );
+      assert.equal(implement.message, 'unverified · done', 'and the word the chip reads as it was');
       assert.equal(implement.note, null, 'nor in the note: the board says it once, from its own field');
       assert.equal(review.denied, null, 'a step denied nothing: null, not an empty list');
       const page = (await detailOf('r-denied')).steps;
-      assert.deepEqual([page[0].status, page[0].denied, page[1].denied], ['unverified · done', denied, null]);
+      assert.deepEqual([page[0].message, page[0].denied, page[1].denied], ['unverified · done', denied, null]);
     },
   );
 });

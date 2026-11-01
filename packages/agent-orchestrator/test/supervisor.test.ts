@@ -202,7 +202,7 @@ test('a pass over a step answered again and again reads what it is working on, n
   );
   const held = await runWith(e, list(e, readRun(capped.id)));
   assert.deepEqual(
-    held.steps.map((st) => st.status),
+    held.steps.map((st) => st.message),
     ['over budget $1.20 of $1'],
     'the two tries counted together against the cap',
   );

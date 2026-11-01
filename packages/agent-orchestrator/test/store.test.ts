@@ -697,7 +697,7 @@ test('an acceptance a tick has acted on is not a file to delete: the round refus
     'deleted anyway: an acceptance is level-triggered, unlike a round ask, so the loop reads out of rounds again',
   );
   assert.equal(
-    (await runWith(b.e, list(b.e, readRun(run.id)))).steps[1].status,
+    (await runWith(b.e, list(b.e, readRun(run.id)))).steps[1].message,
     'rounds exhausted',
     'which is the standing a round is filed from',
   );
@@ -1317,7 +1317,7 @@ test('a step whose harness blocked its session says what the harness waits for â
   };
 
   assert.equal(await status(), 'needs-human: waiting for a permission prompt', '`nemia ls`: beside the phase');
-  assert.equal((await step()).status, 'needs-human', 'and the status every reader compares is the bare word');
+  assert.equal((await step()).message, 'needs-human', 'and the status every reader compares is the bare word');
   assert.match(
     await decided(),
     new RegExp(`\n {2}implement: waiting for a permission prompt â€” answer it in Claude Code: claude agents, session ae/${taskId}/1$`, 'm'),

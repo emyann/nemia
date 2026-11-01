@@ -56,7 +56,7 @@ export type Listing = {
   /**
    * One line per step: its name, what to say about it, and the branch it is on — and, only for a step tried
    * again or about to be, `note`: the try it is on and how it got there (`tryNote`), or the try due (`dueNote`).
-   * Beside the status and never in it, so the words stay the vocabulary a reader of them keys on: so are `waits`, what the harness says a
+   * Beside the message and never in it, so the words stay the vocabulary a reader of them keys on: so are `waits`, what the harness says a
    * `needs-human` session waits for (`waitingWords`), and `denied`, what its current try was denied (`deniedWords`), which `nemia ls`
    * prints in the line (`shownStatus`, `shownNote`) and the board does not. `roundDue`, only on a looping step whose next round is due
    * (`roundsDue`) and which no retry takes first: what its note words as `roundDueNote`. `asks`, only on a step waiting on a person whose
@@ -64,13 +64,13 @@ export type Listing = {
    *
    * `reason` and `phase` are where the step stands as codes (`StepReason`, `StepPhase`), with `on`, what a `Waiting` step waits on, and
    * `via`, where an `AwaitingAnswer` step's answer is asked (`CodedStep`), set here from the facts the row's word is built from and never
-   * read back off it: what every door carries and compares, the word (`status`) being the message a person reads.
+   * read back off it: what every door carries and compares, the word (`message`) being what a person reads.
    * `verdict`, only on a step judged by its check: that check's, as codes (`CheckVerdict`).
    */
   steps: Array<
     CodedStep & {
       name: string;
-      status: string;
+      message: string;
       verdict?: CheckVerdict;
       branch: string | null;
       note?: string;
@@ -112,7 +112,7 @@ export type Listing = {
 };
 
 /** A run left unjudged (`unjudgedOf` in list.verb.ts): why, in one sentence, and each step's word with the branch it works on. */
-export type Unjudged = { said: string; steps: Array<{ name: string; status: string; branch?: string }> };
+export type Unjudged = { said: string; steps: Array<{ name: string; message: string; branch?: string }> };
 
 /**
  * `nemia ls`'s answer (`runsListed` in list.verb.ts): each run with its record, judged or left unjudged, and its result branches
@@ -353,10 +353,10 @@ export function listing({
     const { status: stands, own } = standing(step, run, settledOf, readable, askedCloseout, steps, spendOf, verdictOf);
     if (!taskId && (stands !== 'awaiting approval' || waitingAgain.has(name))) {
       if (checkout && waitsOnCheckout(steps, name, checkout) && !waitingAgain.has(name))
-        return { name, status: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'checkout' }), branch };
+        return { name, message: checkoutWord(checkout), ...coded({ reason: 'Waiting', on: 'checkout' }), branch };
       return { name, ...unfiled(step, waiting, held), branch };
     }
-    if (waitingAgain.has(name)) return { name, status: 'pending', ...coded({ reason: 'Pending' }), branch };
+    if (waitingAgain.has(name)) return { name, message: 'pending', ...coded({ reason: 'Pending' }), branch };
 
     const status = refiled.has(name) ? own : stands;
     if (holdsTheRun(status) && !takenByHand(name) && !due.some((r) => r.step === name) && !rounds.some((r) => r.step === name))
@@ -364,15 +364,15 @@ export function listing({
     if (status === 'over budget' || status === 'budget exhausted') {
       if (step.loop && status === 'over budget' && satisfiesAfter(own)) heldLoops.add(name);
       if (status === 'budget exhausted' || overBudget(step, run, spendOf)) priced.add(name);
-      return { name, status: budgetStatus(step, status), ...coded(REASON_OF[status]), branch };
+      return { name, message: budgetStatus(step, status), ...coded(REASON_OF[status]), branch };
     }
     if (status === 'awaiting approval') {
       atGates.add(name);
-      return { name, status: 'awaiting approval', ...coded({ reason: 'AwaitingApproval' }), branch };
+      return { name, message: 'awaiting approval', ...coded({ reason: 'AwaitingApproval' }), branch };
     }
     if (status === 'exhausted') {
       exhausted.add(name);
-      return { name, status: 'rounds exhausted', ...coded({ reason: 'AwaitingRound' }), branch };
+      return { name, message: 'rounds exhausted', ...coded({ reason: 'AwaitingRound' }), branch };
     }
     const judged = judgedRow(status, () => verdictOf(name), assessed.waitingOnPause?.checks.includes(name) === true);
     if (judged) return { name, ...judged, branch };
@@ -382,7 +382,7 @@ export function listing({
     const word = status === 'unsigned' || status === 'unverified' || !taskId ? status : phaseOf(taskId);
     const waitsFor = taskId && word === 'needs-human' ? waitingOf(taskId) : undefined;
     const waits = waitsFor ? { waits: waitingWords(waitsFor) } : {};
-    return { name, status: `${word}${said}`, ...coded(saidReason(word, c)), branch, ...waits };
+    return { name, message: `${word}${said}`, ...coded(saidReason(word, c)), branch, ...waits };
   }
 
   function budgetStatus(step: Workflow, status: StepStatus): string {
@@ -414,12 +414,12 @@ export function listing({
  * A step not filed: waiting on the steps before it (`Pending`), on the runs it `waits` on (`waitWord`; `Waiting` on `run`), on a run slot
  * the limit `held` it for (`slotWord`; `Waiting` on `limit`), or on nothing yet (`Pending`).
  */
-function unfiled(step: Workflow, waits: readonly Wait[], held: RunSlot | undefined): CodedStep & { status: string } {
-  if (step.after.length) return { status: 'pending', ...coded({ reason: 'Pending' }) };
-  if (waits.length) return { status: waitWord(waits), ...coded({ reason: 'Waiting', on: 'run' }) };
+function unfiled(step: Workflow, waits: readonly Wait[], held: RunSlot | undefined): CodedStep & { message: string } {
+  if (step.after.length) return { message: 'pending', ...coded({ reason: 'Pending' }) };
+  if (waits.length) return { message: waitWord(waits), ...coded({ reason: 'Waiting', on: 'run' }) };
   return held
-    ? { status: slotWord(held), ...coded({ reason: 'Waiting', on: 'limit' }) }
-    : { status: 'pending', ...coded({ reason: 'Pending' }) };
+    ? { message: slotWord(held), ...coded({ reason: 'Waiting', on: 'limit' }) }
+    : { message: 'pending', ...coded({ reason: 'Pending' }) };
 }
 
 /** A row's codes: its reason and what qualifies it, and the phase that reason stands in (`codedStep`). */
@@ -456,21 +456,21 @@ function judgedRow(
   status: StepStatus,
   verdictOf: () => Verdict | undefined,
   held: boolean,
-): (CodedStep & { status: string; verdict?: CheckVerdict; note?: string }) | undefined {
-  if (status === 'verified') return { status: 'verified ✓', ...coded({ reason: 'CheckPassed' }), verdict: { result: 'passed', exit: 0 } };
+): (CodedStep & { message: string; verdict?: CheckVerdict; note?: string }) | undefined {
+  if (status === 'verified') return { message: 'verified ✓', ...coded({ reason: 'CheckPassed' }), verdict: { result: 'passed', exit: 0 } };
   if (status === 'checking')
     return held
-      ? { status: PAUSE_WAIT, ...coded({ reason: 'Waiting', on: 'pause' }), verdict: CHECK_RUNNING, note: PAUSE_WAIT_NOTE }
-      : { status: 'checking', ...coded({ reason: 'Checking' }), verdict: CHECK_RUNNING };
+      ? { message: PAUSE_WAIT, ...coded({ reason: 'Waiting', on: 'pause' }), verdict: CHECK_RUNNING, note: PAUSE_WAIT_NOTE }
+      : { message: 'checking', ...coded({ reason: 'Checking' }), verdict: CHECK_RUNNING };
   if (status === 'failed (check)') {
     const verdict = verdictOf() ?? 'unfinished';
     return {
-      status: `failed ✗ check (${verdictWord(verdict)})`,
+      message: `failed ✗ check (${verdictWord(verdict)})`,
       ...coded({ reason: 'CheckFailed' }),
       verdict: checkVerdictOf('failed', verdict),
     };
   }
-  if (status === 'denied') return { status: 'denied', ...coded({ reason: 'Denied' }) };
+  if (status === 'denied') return { message: 'denied', ...coded({ reason: 'Denied' }) };
   return undefined;
 }
 
@@ -557,12 +557,12 @@ function landingWord(run: Run, name: string): string {
 const deniedRow = (denied: readonly string[]): { denied?: string } => (denied.length ? { denied: deniedWords(denied) } : {});
 
 /**
- * A step's word as `nemia ls` prints it: the bare `needs-human` the row's status keeps, then what the harness says it waits for (`waits`),
+ * A step's word as `nemia ls` prints it: the bare `needs-human` the row's message keeps, then what the harness says it waits for (`waits`),
  * then what its closeout said, where it gave one. `waits` is set on a row whose word is the engine's `needs-human` and on no other
- * (`lineOf`), so the word is built from it rather than found in the status.
+ * (`lineOf`), so the word is built from it rather than found in the message.
  */
-export const shownStatus = (s: Pick<Listing['steps'][number], 'status' | 'waits'>): string =>
-  s.waits ? `${NEEDS_HUMAN}: ${s.waits}${s.status.slice(NEEDS_HUMAN.length)}` : s.status;
+export const shownStatus = (s: Pick<Listing['steps'][number], 'message' | 'waits'>): string =>
+  s.waits ? `${NEEDS_HUMAN}: ${s.waits}${s.message.slice(NEEDS_HUMAN.length)}` : s.message;
 
 /** The engine's word for a session its harness blocked, which a row's `waits` is said beside. */
 const NEEDS_HUMAN = 'needs-human';
@@ -644,10 +644,10 @@ function asksLines(run: Run, { steps, waitingOnYou, waiting, holding, toDecide }
 function runLines({ run, listed, result }: RunsListed['runs'][number]): string[] {
   const calledOff = `${run.cancelledAt ? '  (cancelled)' : ''}${run.pruned ? '  (pruned)' : ''}`;
   if ('said' in listed) {
-    const width = Math.max(20, ...listed.steps.map((s) => s.status.length));
+    const width = Math.max(20, ...listed.steps.map((s) => s.message.length));
     return [
       `${run.id}  ${firstPiece(run.brief, '\n').slice(0, 56)}${calledOff}`,
-      ...listed.steps.map((s) => `   ${s.name.padEnd(14)} ${s.status.padEnd(width)} ${s.branch ?? ''}`),
+      ...listed.steps.map((s) => `   ${s.name.padEnd(14)} ${s.message.padEnd(width)} ${s.branch ?? ''}`),
       `   → unreadable: ${listed.said}`,
     ];
   }

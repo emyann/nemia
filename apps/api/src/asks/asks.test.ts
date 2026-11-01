@@ -369,7 +369,7 @@ test('a person answers a blocked step, rechecks a refused check and continues th
       );
       assert.deepEqual(held.asked, { try: 2, mode: 'continue', model: null, message: null, stopFirst: true });
       assert.deepEqual(
-        [held.status, held.reason, held.via],
+        [held.message, held.reason, held.via],
         ['needs-human', 'AwaitingAnswer', 'session'],
         'still blocked: no tick has stopped it',
       );

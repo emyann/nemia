@@ -418,7 +418,6 @@ const aTry: BoardTry = {
   on: null,
   via: 'closeout',
   message: 'succeeded · BLOCKED',
-  status: 'succeeded · BLOCKED',
   attempts: { count: 1, latest: null },
   check: { command: 'npm test', taskId: 't-2', verdict: { result: 'failed', exit: 1 }, refused: null },
   closeout: null,

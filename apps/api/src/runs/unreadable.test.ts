@@ -137,7 +137,7 @@ test('a run whose task journal holds an entry no runtime wrote is answered off i
       assert.equal(bad.brief, 'The brief of r-bad', 'what its record says');
       assert.equal(bad.factory, 'pipao', 'its factory among it');
       assert.deepEqual(
-        bad.steps.map((s) => [s.name, s.taskId, s.status]),
+        bad.steps.map((s) => [s.name, s.taskId, s.message]),
         [['implement', 'r-bad-implement', 'unreadable']],
       );
       assert.equal(bad.status, 'running', 'counted in flight, as the tick counts it');

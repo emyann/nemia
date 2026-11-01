@@ -311,7 +311,7 @@ export const unjudgedOf = Effect.fn('unjudgedOf')(function* (e: Engine, run: Run
   const unreadable = new Map(listed.unreadable.map((u) => [u.taskId, u.why]));
   const word = unjudgedWord(new Map(listed.views.map((v) => [v.id, v])), unreadable);
   const names = folder === undefined ? stepsOf(run).map((s) => s.name) : Object.keys(run.steps);
-  const steps = names.map((name) => ({ name, status: word(run.steps[name]), branch: run.steps[name]?.branch }));
+  const steps = names.map((name) => ({ name, message: word(run.steps[name]), branch: run.steps[name]?.branch }));
   if (folder !== undefined) return { said: unloadedWords(run.id, folder, by), steps } satisfies Unjudged;
   if (why === undefined) return undefined;
   const named = (err as { taskId: string }).taskId;

@@ -118,8 +118,7 @@ export type RunSummary = {
    * none; `since`: when its task at work started, null while none runs. `needs` and `waitingFor` are what a person has to know to
    * act on it (`StepNeeds`). `phase` and `reason` are where the step stands, as codes, which the board groups and colours by, with `on`
    * and `via` qualifying a `Waiting` and an `AwaitingAnswer` (`StepCodes`); `message` is what the CLI's `ls` prints for it, shown and
-   * never compared; `verdict` its check's, as codes, null for a step its check did not judge. `status` is `message` under its old name,
-   * which the api still sends and the board reads nowhere.
+   * never compared; `verdict` its check's, as codes, null for a step its check did not judge.
    */
   steps: Array<
     {
@@ -132,8 +131,6 @@ export type RunSummary = {
       via: AnswerVia | null;
       message: string;
       verdict: CheckVerdict | null;
-      /** @deprecated `message` under its old name: read `message`. */
-      status: string;
       note: string | null;
       roundDue: boolean;
       agent: string | null;
@@ -199,7 +196,6 @@ const RunSummarySchema = decodes<RunSummary>()(
           branch: Schema.NullOr(Schema.String),
           ...StepCodesFields,
           verdict: Schema.NullOr(CheckVerdictSchema),
-          status: Schema.String,
           note: Schema.NullOr(Schema.String),
           roundDue: Schema.Boolean,
           agent: Schema.NullOr(Schema.String),

@@ -305,8 +305,8 @@ test('a person holds a run until another lands: the list, the page and the decis
         assert.equal(api.holding.advice, holdAdvice(run, cli.holding!), id);
         assert.deepEqual(asWaits(api.holding), (await runWith(e, decideRun(id))).holding, `${id}: nemia decide's reading, which is list's`);
         assert.deepEqual(
-          api.steps.map((s) => [s.name, s.status, s.note]),
-          cli.steps.map((s) => [s.name, s.status, s.note ?? null]),
+          api.steps.map((s) => [s.name, s.message, s.note]),
+          cli.steps.map((s) => [s.name, s.message, s.note ?? null]),
           `${id}: each step as nemia ls words it`,
         );
         const page = await detail(id);
@@ -367,7 +367,7 @@ test('a person holds a run until another lands: the list, the page and the decis
         }
       }
       const page = await detail(BUDGET);
-      assert.equal(page.steps[0].status, 'over budget $1.50 of $1');
+      assert.equal(page.steps[0].message, 'over budget $1.50 of $1');
     },
   );
   await s.test(

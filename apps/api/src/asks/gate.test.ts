@@ -312,13 +312,13 @@ test('a person approves a gate on the board: the need on the list and the detail
       const run = await detail();
       assert.deepEqual(run.gates, ['plan', 'sketch'], "the start's gate and the step's own, in the order they run");
       assert.deepEqual(
-        run.steps.map(({ name, status, approve, gate }) => ({ name, status, approve, gate })),
+        run.steps.map(({ name, message, approve, gate }) => ({ name, message, approve, gate })),
         [
-          { name: 'plan', status: 'awaiting approval', approve: 'approve plan', gate: { awaiting: true, approval: null } },
-          { name: 'implement', status: 'pending', approve: null, gate: null },
-          { name: 'review', status: 'pending', approve: null, gate: null },
-          { name: 'tokens', status: 'unverified · done', approve: null, gate: null },
-          { name: 'sketch', status: 'pending', approve: null, gate: { awaiting: false, approval: null } },
+          { name: 'plan', message: 'awaiting approval', approve: 'approve plan', gate: { awaiting: true, approval: null } },
+          { name: 'implement', message: 'pending', approve: null, gate: null },
+          { name: 'review', message: 'pending', approve: null, gate: null },
+          { name: 'tokens', message: 'unverified · done', approve: null, gate: null },
+          { name: 'sketch', message: 'pending', approve: null, gate: { awaiting: false, approval: null } },
         ],
         'sketch is gated and not signed off: nothing to approve yet',
       );
@@ -406,7 +406,7 @@ test('a person approves a gate on the board: the need on the list and the detail
     assert.equal(plan.approve, null);
     assert.deepEqual([run.waitingOnYou, run.waitingOnYouWords], [[], []]);
     const words = await runWith(engine(), list(engine(), runStore.runs.read(R)));
-    assert.equal(plan.status, words.steps.find((s) => s.name === 'plan')?.status, 'as `nemia ls` has it until the tick files what waits');
+    assert.equal(plan.message, words.steps.find((s) => s.name === 'plan')?.message, 'as `nemia ls` has it until the tick files what waits');
     assert.deepEqual((await summary()).waitingOnYou, words.waitingOnYou, 'and nobody waited on, as `nemia ls` has it');
   });
 
@@ -489,7 +489,7 @@ test('a person sends a step back from its gate: refused without words, asked wit
         stopFirst: false,
       });
       assert.deepEqual(
-        [plan.status, plan.gate, plan.approve],
+        [plan.message, plan.gate, plan.approve],
         ['awaiting approval', { awaiting: true, approval: null }, null],
         'still at its gate until the tick files the try',
       );

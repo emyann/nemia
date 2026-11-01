@@ -67,7 +67,7 @@ const shown =
     m[id] ?? 'unknown';
 /** How each step signed off, by name. */
 const signedOff = (m: Record<string, Closeout>) => (name: string) => m[name];
-const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.status);
+const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.message);
 /** A run whose two steps are done and whose result sits on a branch. */
 const finished = (extra: Partial<RepositoryRun> = {}) =>
   run(
@@ -205,20 +205,15 @@ test('listing at a gate', async (t) => {
     listing({ steps: PLANNED, run: r, phaseOf: shownAs({ t1: 'succeeded' }), closeoutOf: signedDone, askedCloseout: asked });
   await t.test('the step reads awaiting approval with the two commands beside it, waiting on you as `approve plan`', () => {
     const l = at(atPlan());
-    assert.deepEqual(l.steps[0], {
-      name: 'plan',
-      status: 'awaiting approval',
-      reason: 'AwaitingApproval',
-      phase: 'waiting',
-      branch: null,
-      note: 'approve it: nemia approve r-1 plan — or send it back: nemia retry r-1 plan --message "<objection>"',
-    });
+    const { note, ...plan } = l.steps[0];
+    assert.deepEqual(plan, { name: 'plan', message: 'awaiting approval', reason: 'AwaitingApproval', phase: 'waiting', branch: null });
+    assert.equal(note, 'approve it: nemia approve r-1 plan — or send it back: nemia retry r-1 plan --message "<objection>"');
     assert.deepEqual([l.waitingOnYou, onYouWords(l)], [['plan'], ['approve plan']]);
   });
   await t.test('any other step waiting on you is named by its name', () => {
     const l = {
       steps: [
-        { name: 'implement', status: 'succeeded · BLOCKED', reason: 'AwaitingAnswer' as const, via: 'closeout' as const, branch: null },
+        { name: 'implement', message: 'succeeded · BLOCKED', reason: 'AwaitingAnswer' as const, via: 'closeout' as const, branch: null },
       ],
       waitingOnYou: ['implement'],
     };
@@ -226,7 +221,7 @@ test('listing at a gate', async (t) => {
   });
   await t.test('approved, it reads its own word again and waits on nobody', () => {
     const l = at(atPlan({ approvals: [approval('plan', 1)] }));
-    assert.deepEqual([l.steps[0].status, l.steps[0].note, l.waitingOnYou], ['unverified · done', undefined, []]);
+    assert.deepEqual([l.steps[0].message, l.steps[0].note, l.waitingOnYou], ['unverified · done', undefined, []]);
   });
   await t.test('a run called off waits on nobody', () => assert.deepEqual(at(atPlan(CANCELLED)).waitingOnYou, []));
   const waiting = shown({ t1: 'input-required', t2: 'input-required' });
@@ -580,7 +575,7 @@ test('REFUSED at a gate, pass after pass: a wordless ask for the next try is not
       verdictOf: () => undefined,
       asks: [wordless],
     });
-    assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+    assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['awaiting approval', ['plan']]);
     assert.ok(l.steps[0].note?.startsWith('approve it: nemia approve r-1 plan'), l.steps[0].note);
   });
   await t.test('REFUSED a send-back with words: nemia retry names the wordless ask and says to delete it', () => {

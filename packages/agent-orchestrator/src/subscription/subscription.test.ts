@@ -36,7 +36,7 @@ const listed = (status: string, { onYou = false, waits }: { onYou?: boolean; wai
     steps: [
       {
         name: 'review',
-        status,
+        message: status,
         ...codedStep(codesOf({ word: status }, 'Step') as QualifiedStep),
         branch: null,
         ...(waits ? { waits } : {}),

@@ -166,7 +166,7 @@ test("waitOf, waitSentence, openWord, waitTag: the one sentence and the button's
   await t.test('a check that did not finish is read off its verdict, never off the words beside it', () => {
     const said = (row: RunSummary, message: string, verdict: RunSummary['steps'][number]['verdict']): RunSummary => ({
       ...row,
-      steps: row.steps.map((step) => (step.name === 'land' ? { ...step, message, status: message, verdict } : step)),
+      steps: row.steps.map((step) => (step.name === 'land' ? { ...step, message, verdict } : step)),
     });
     const unfinished = landing('failed ✗ check (unfinished)');
     assert.equal(waitOf(said(unfinished, 'failed ✗ check (exit 1)', { result: 'unfinished', exit: null }))?.kind, 'unfinished');

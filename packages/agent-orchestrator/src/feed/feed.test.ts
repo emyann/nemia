@@ -987,11 +987,8 @@ test('feedWords says each run and step in the word nemia ls prints, with its pru
         waitingOf,
       });
     const waiting = blockedWith((id) => (id === 't1' ? 'permission prompt' : undefined));
-    assert.deepEqual(
-      [waiting.steps[0].status, waiting.steps[0].waits],
-      ['needs-human', 'waiting for a permission prompt'],
-      "the listing's status keeps the bare word, and the wait beside it",
-    );
+    assert.equal(waiting.steps[0].message, 'needs-human', "the listing's word is the bare one");
+    assert.equal(waiting.steps[0].waits, 'waiting for a permission prompt', 'and the wait is beside it');
     assert.equal(
       feedWords(waiting, run, { status: 'running' }).steps[0].word,
       'needs-human: waiting for a permission prompt',

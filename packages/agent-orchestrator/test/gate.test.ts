@@ -198,7 +198,7 @@ test('a gated run, from `nemia start --gate` to its approval', async (t) => {
   });
   await s.test('`nemia ls` says awaiting approval and `waiting on you: approve plan`', async () => {
     const l = await runWith(b.e, list(b.e, readRun(id)));
-    assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+    assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['awaiting approval', ['plan']]);
     const printed = await printedBy(['ls', id], b.e);
     assert.ok(printed.includes(`   → waiting on you: approve plan  —  nemia decide ${id}`), printed.join('\n'));
   });
@@ -311,7 +311,7 @@ test('a send-back from a gate spends the approval given before it', async (t) =>
     gate.settle(try2(), 'succeeded', { ...SIGNED, summary: 'stored, then parsed' });
     for (let pass = 1; pass <= 3; pass++) assert.deepEqual((await tick(gate.e, id)).filed, [], `pass ${pass}`);
     const l = await runWith(gate.e, list(gate.e, readRun(id)));
-    assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+    assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['awaiting approval', ['plan']]);
     assert.ok(l.steps[0].note?.startsWith('try 2, continued on your word, answered · approve it: nemia approve '), l.steps[0].note);
   });
   await s.test('the spent approval, put back by hand, opens nothing: it names try 1', async () => {
@@ -386,12 +386,12 @@ test('a gated step with `check:` is checked before it is held', async (t) => {
   );
   await s.test('checking while the check runs, nothing after it', async () => {
     b.settle(`${run.id}-plan-check`, 'working');
-    assert.equal((await runWith(b.e, list(b.e, readRun(run.id)))).steps[0].status, 'checking');
+    assert.equal((await runWith(b.e, list(b.e, readRun(run.id)))).steps[0].message, 'checking');
   });
   await s.test('awaiting approval once it passes, nothing filed', async () => {
     b.settle(`${run.id}-plan-check`, 'succeeded', undefined, 0);
     assert.deepEqual((await tick(b.e, run.id)).filed, []);
-    assert.equal((await runWith(b.e, list(b.e, readRun(run.id)))).steps[0].status, 'awaiting approval');
+    assert.equal((await runWith(b.e, list(b.e, readRun(run.id)))).steps[0].message, 'awaiting approval');
   });
   await s.test('every filing went out queued, for the tick to admit', () => {
     assert.deepEqual(b.filings, [`${run.id}-plan`, `${run.id}-plan-check`]);
@@ -428,7 +428,7 @@ test('a parent whose last step waits at its gate has not landed, though a person
   });
   await s.test('`nemia ls` of the child says it is waiting on the parent', async () => {
     await aPass(b.e);
-    assert.deepEqual((await runWith(b.e, list(b.e, readRun(child)))).steps[0].status, `waiting on ${parent}`);
+    assert.deepEqual((await runWith(b.e, list(b.e, readRun(child)))).steps[0].message, `waiting on ${parent}`);
   });
   await s.test(
     "approved by a person's file, with words, composed on read: it has landed, and the child's next tick files its roots",
@@ -486,7 +486,7 @@ test("a wordless `nemia retry` asked while a gated step's harness blocked its se
   });
   await s.test('`nemia ls` says awaiting approval and waiting on you, no try said to be due', async () => {
     const l = await runWith(b.e, list(b.e, readRun(id)));
-    assert.deepEqual([l.steps[0].status, l.waitingOnYou], ['awaiting approval', ['plan']]);
+    assert.deepEqual([l.steps[0].message, l.waitingOnYou], ['awaiting approval', ['plan']]);
     assert.ok(l.steps[0].note?.startsWith('approve it: '), l.steps[0].note);
   });
   await s.test('REFUSED: `nemia approve` and `nemia retry --message` name the ask to delete, and leave it where it is', async () => {

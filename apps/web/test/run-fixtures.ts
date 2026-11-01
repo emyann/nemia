@@ -78,17 +78,16 @@ export const CODES = {
 /** A word a test names a step by, whose codes `CODES` holds. */
 export type Word = keyof typeof CODES;
 
-/** A step's codes and its word, as a row of the api carries them: `message`, and `status` its old name, equal to it. */
-export const coded = (word: Word): Codes & { message: string; status: string } => ({ ...CODES[word], message: word, status: word });
+/** A step's codes and its word, as a row of the api carries them: `message`. */
+export const coded = (word: Word): Codes & { message: string } => ({ ...CODES[word], message: word });
 
 /** A try's codes and its word: as `coded`, with no verdict, which a try carries on its check. */
-export const triedAs = (word: Word): Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message' | 'status'> => ({
+export const triedAs = (word: Word): Pick<StepTry, 'phase' | 'reason' | 'on' | 'via' | 'message'> => ({
   phase: CODES[word].phase,
   reason: CODES[word].reason,
   on: CODES[word].on,
   via: CODES[word].via,
   message: word,
-  status: word,
 });
 
 /** What a try's session consumed, measured in part: a count nobody measured is absent. */
@@ -167,7 +166,6 @@ export const step = (extra: Partial<Step> = {}): Step => ({
   via: null,
   message: 'failed (check)',
   verdict: EXIT_1,
-  status: 'failed (check)',
   note: 'try 2',
   roundDue: false,
   commands: { approve: 'nemia approve r-1 implement', retry: 'nemia retry r-1 implement', say: 'nemia say r-1 implement' },
@@ -234,7 +232,6 @@ export const step = (extra: Partial<Step> = {}): Step => ({
       on: null,
       via: null,
       message: 'failed',
-      status: 'failed',
       attempts: { count: 1, latest: null },
       check: null,
       closeout: null,
@@ -253,7 +250,6 @@ export const step = (extra: Partial<Step> = {}): Step => ({
       on: null,
       via: null,
       message: 'failed (check)',
-      status: 'failed (check)',
       attempts: { count: 1, latest: null },
       check: { command: 'npm test', taskId: 't-3', verdict: EXIT_1, refused: null },
       closeout: null,

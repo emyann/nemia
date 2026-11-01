@@ -478,7 +478,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
     [],
     'only WF_ names, and none for streams the runtime keeps',
   );
-  assert.equal((await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!.status, 'checking');
+  assert.equal((await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!.message, 'checking');
 
   for (const phase of ['pending', 'running'] as const) {
     settle(checkId, phase);
@@ -536,7 +536,7 @@ test("an approved ending stages the merge and signs off its message; the run exe
   const { decision } = await runWith(e, decideRun(id));
   assert.equal(decision.kind, 'landed');
   const shipLine = (await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!;
-  assert.equal(shipLine.status, 'verified ✓');
+  assert.equal(shipLine.message, 'verified ✓');
   assert.equal(
     shipLine.note,
     `the run landed on main as ${head.slice(0, 7)}`,
@@ -576,7 +576,7 @@ for (const [said, exitCode, words] of [
     );
     assert.ok(pass.notes.includes(`ship: ${words}, so the run aborted its merge; nothing landed on main`), pass.notes.join('\n'));
     const shipLine = (await runWith(e, list(e, readRun(id)))).steps.find((s) => s.name === 'ship')!;
-    assert.equal(shipLine.status, `failed ✗ check (${exitCode === undefined ? 'unfinished' : 'exit 1'})`);
+    assert.equal(shipLine.message, `failed ✗ check (${exitCode === undefined ? 'unfinished' : 'exit 1'})`);
     assert.equal(shipLine.note, `nothing landed on main: ${words}`, 'and why nothing landed');
 
     const printed = (await decideLines(t, e, id)).flatMap((l) => l.split('\n'));

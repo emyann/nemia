@@ -67,7 +67,7 @@ const said = (outcome: Closeout['outcome']): Closeout => ({
   artifacts: [],
   needs: outcome === 'blocked' ? 'which flag name ships' : undefined,
 });
-const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.status);
+const statuses = (l: ReturnType<typeof listing>) => l.steps.map((s) => s.message);
 /** A run whose two steps are done and whose result sits on a branch. */
 const finished = (extra: Partial<RepositoryRun> = {}) =>
   run(
@@ -507,7 +507,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     const l = lsOf(onTry(), 'failed', 1);
     assert.deepEqual(l.steps[0], {
       name: 'implement',
-      status: 'failed ✗ check (exit 1)',
+      message: 'failed ✗ check (exit 1)',
       reason: 'CheckFailed',
       phase: 'failed',
       verdict: { result: 'failed', exit: 1 },
@@ -625,7 +625,7 @@ test('`retries:`: the tries the run files on its own when a check refuses', asyn
     assert.deepEqual(assess(RETRIED, r, p, signedDone, asked, () => 0).ready, ['review']);
     assert.deepEqual(lsOf(r, 'succeeded', undefined).steps[0], {
       name: 'implement',
-      status: 'verified ✓',
+      message: 'verified ✓',
       reason: 'CheckPassed',
       phase: 'succeeded',
       verdict: { result: 'passed', exit: 0 },
@@ -964,9 +964,10 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       { kind: 'running', waiting: ['implement'] },
       'live and due, named once',
     );
+    const { note, ...row } = noteOf('needs-human');
     assert.deepEqual(
       [
-        noteOf('needs-human'),
+        row,
         listing({
           steps: STEPS,
           run: r,
@@ -980,16 +981,16 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       [
         {
           name: 'implement',
-          status: 'needs-human',
+          message: 'needs-human',
           reason: 'AwaitingAnswer',
           via: 'session',
           phase: 'waiting',
           branch: null,
-          note: 'try 2 asked (--continue) — stopping its blocked session, then the tick files it',
         },
         [],
       ],
     );
+    assert.equal(note, 'try 2 asked (--continue) — stopping its blocked session, then the tick files it');
   });
   await t.test("REFUSED before, now honoured: without the harness's word, or once it works again, due as a session that runs on", () => {
     const a = assess(STEPS, r, live, nothingSigned, asked, () => undefined, [askFor(2)]);
@@ -1019,9 +1020,10 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       decision(STEPS, r, live, nothingShipped, nothingSigned, asked, () => undefined, [askFor(2)]),
       { kind: 'running', waiting: ['implement'] },
     );
+    const { note, ...row } = noteOf('working');
     assert.deepEqual(
       [
-        noteOf('working'),
+        row,
         listing({
           steps: STEPS,
           run: r,
@@ -1035,14 +1037,17 @@ test("a person's ask on a step whose session its harness blocked, or that works 
       [
         {
           name: 'implement',
-          status: 'working',
+          message: 'working',
           reason: 'Running',
           phase: 'running',
           branch: null,
-          note: 'try 2 asked (--continue) — stopping its session, then the tick files it',
         },
         [],
       ],
+    );
+    assert.equal(
+      note,
+      'try 2 asked (--continue) — stopping its session, then the tick files it',
       'nemia ls says so, in words of its own beside a session that works',
     );
   });
@@ -1088,7 +1093,7 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
     fullListing({ steps: STEPS, run: r, phaseOf: shown({ t1: phase }), waitingOf }).steps[0];
   await t.test('the status keeps the bare word, and `nemia ls` prints the wait beside it', () => {
     const blocked = lsWith('needs-human', waiting);
-    assert.deepEqual([blocked.status, blocked.waits], ['needs-human', 'waiting for a permission prompt']);
+    assert.deepEqual([blocked.message, blocked.waits], ['needs-human', 'waiting for a permission prompt']);
     assert.equal(shownStatus(blocked), 'needs-human: waiting for a permission prompt');
   });
   await t.test('a newline the harness sent is one line in a padded column', () => {
@@ -1099,24 +1104,24 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
   await t.test('a harness that says nothing, or a caller that asks nothing, reads as before', () => {
     assert.deepEqual(
       lsWith('needs-human', () => undefined),
-      { name: 'implement', status: 'needs-human', reason: 'AwaitingAnswer', via: 'session', phase: 'waiting', branch: null },
+      { name: 'implement', message: 'needs-human', reason: 'AwaitingAnswer', via: 'session', phase: 'waiting', branch: null },
     );
     assert.equal(
-      listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'needs-human' }), closeoutOf: signedOff({}) }).steps[0].status,
+      listing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'needs-human' }), closeoutOf: signedOff({}) }).steps[0].message,
       'needs-human',
     );
   });
   await t.test('a phase that is not needs-human takes no word, nor a task that settled', () => {
     assert.deepEqual(lsWith('working', waiting), {
       name: 'implement',
-      status: 'working',
+      message: 'working',
       reason: 'Running',
       phase: 'running',
       branch: null,
     });
     assert.deepEqual(lsWith('succeeded', waiting), {
       name: 'implement',
-      status: 'unsigned',
+      message: 'unsigned',
       reason: 'Unsigned',
       phase: 'waiting',
       branch: null,
@@ -1124,16 +1129,17 @@ test("`nemia ls` of a blocked step's harness wait: beside the engine's word, nev
   });
   await t.test("the word disturbs nothing judged on it: the blocked step's try is still due, and still stops the session first", () => {
     const l = fullListing({ steps: STEPS, run: r, phaseOf: shown({ t1: 'needs-human' }), asks: [askFor(2)], waitingOf: waiting });
-    assert.deepEqual(l.steps[0], {
+    const { note, ...row } = l.steps[0];
+    assert.deepEqual(row, {
       name: 'implement',
-      status: 'needs-human',
+      message: 'needs-human',
       reason: 'AwaitingAnswer',
       via: 'session',
       phase: 'waiting',
       branch: null,
-      note: 'try 2 asked (--continue) — stopping its blocked session, then the tick files it',
       waits: 'waiting for a permission prompt',
     });
+    assert.equal(note, 'try 2 asked (--continue) — stopping its blocked session, then the tick files it');
   });
 });
 
@@ -1306,7 +1312,7 @@ test("`nemia ls` says what a step's current try was denied after its note, never
     const [implement, review] = ls((id) => (id === 't1' ? ['Skill(look)', 'Bash(pytest)'] : []));
     assert.deepEqual(implement, {
       name: 'implement',
-      status: 'unverified · done',
+      message: 'unverified · done',
       reason: 'Succeeded',
       phase: 'succeeded',
       branch: null,
@@ -1409,7 +1415,7 @@ test('`denials: fail`: a step that signed off denied a call reads denied', async
       deniedOf: (id) => denied(id)?.denied ?? [],
     });
     assert.deepEqual(
-      [l.steps[0].status, l.steps[0].denied, shownNote(l.steps[0]), l.waitingOnYou],
+      [l.steps[0].message, l.steps[0].denied, shownNote(l.steps[0]), l.waitingOnYou],
       ['denied', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', 'denied: Write(/tmp/w/notes.md), Bash(pytest)', ['implement']],
     );
   });

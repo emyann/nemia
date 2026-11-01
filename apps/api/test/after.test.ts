@@ -177,7 +177,7 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         'a-landed has landed, so only b-running is waited on',
       );
       assert.deepEqual(
-        d.steps.map((s) => [s.name, s.status]),
+        d.steps.map((s) => [s.name, s.message]),
         [['implement', 'waiting on b-running']],
       );
 
@@ -228,8 +228,8 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         const cli = await runWith(e, list(e, runStore.runs.read(id)));
         assert.deepEqual(asWaits(api.waiting), cli.waiting, id);
         assert.deepEqual(
-          api.steps.map((s) => s.status),
-          cli.steps.map((s) => s.status),
+          api.steps.map((s) => s.message),
+          cli.steps.map((s) => s.message),
           id,
         );
         if (cli.waiting.length) {
@@ -279,8 +279,8 @@ test('a run waiting on runs, read on the list, its page and its decision as `nem
         id,
       );
       assert.deepEqual(
-        detail.steps.map((s) => s.status),
-        listed.steps.map((s) => s.status),
+        detail.steps.map((s) => s.message),
+        listed.steps.map((s) => s.message),
         id,
       );
     }

@@ -95,7 +95,7 @@ const standingSpec = spec<Stands>({
 });
 
 /** `standing`'s type, which the code takes: it then imports nothing of tsverify. */
-export type StandingOf = Implementation<typeof standingSpec>;
+export type WhereAStepStands = Implementation<typeof standingSpec>;
 
 /** `ownStatus` itself: what it says is a step's own status, never one `standing` holds it at. */
 const ownStatusSpec = spec<

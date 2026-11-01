@@ -27,7 +27,7 @@ import {
   type TaskPhase,
 } from '../record/record.ts';
 import type { CheckoutHold } from '../cap/cap.ts';
-import type { OwnStatus, StandingOf } from '../../contracts/standing.contract.ts';
+import type { OwnStatus, WhereAStepStands } from '../../contracts/standing.contract.ts';
 
 /**
  * Whether a step's closeout waits for a person before anything after it is filed: its own `gate: true`, or a gate the run was started with.
@@ -367,7 +367,7 @@ export function stepStatus(
  * are its own status's. `awaiting approval` covers both gates: after a step signs off (`atGate`), and before an ending is filed
  * (`waitsAtGate`).
  */
-export const standing: StandingOf = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf = () => undefined) => {
+export const standing: WhereAStepStands = (step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf = () => undefined) => {
   const own = ownStatus(step, run, phaseOf, closeoutOf, askedCloseout, steps, spendOf);
   if (held(step, run, own, phaseOf, closeoutOf, askedCloseout, steps, spendOf, verdictOf)) return { own, status: 'over budget' };
   if (atGate(step, run, own, closeoutOf)) return { own, status: 'awaiting approval' };

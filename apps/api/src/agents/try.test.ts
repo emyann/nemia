@@ -396,6 +396,22 @@ test('what a try refuses, and what it is fenced to: the default factory, rules o
     },
   );
 
+  await t.test(
+    "an agent whose `overridable:` line leaves out `fence` is refused a try before anything is written, in the try's words, and its listing says the same; offered, it is tried",
+    async () => {
+      fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, skills\nmodel: sonnet\n---\nSay what you see.\n');
+      const why = await refused(tryIt('closed', { brief: 'Look.' }), 422, /`overridable: model, skills`/);
+      assert.ok(why.includes('`fence`') && why.includes('try'), why);
+      assert.equal(fs.existsSync(path.join(TRIES, 'closed')), false, 'no try folder for it');
+      const agents = (await (await app().request('/api/agents')).json()) as AgentListing[];
+      assert.equal(agents.find((agent) => agent.from === 'yours' && agent.name === 'closed')?.untried?.why, why);
+      fs.writeFileSync(path.join(YOURS, 'closed.md'), '---\noverridable: model, fence\nmodel: sonnet\n---\nSay what you see.\n');
+      const id = await idOf(await tryIt('closed', { brief: 'Look.' }));
+      ended(id);
+      assert.equal((await remove(id)).status, 200);
+    },
+  );
+
   await t.test('an empty brief is refused, and a brief that is no string', async () => {
     await refused(tryIt('scribe', { brief: '   ' }), 422, /^The brief is empty, and a try asks the agent to do something\./);
     await refused(tryIt('scribe', { brief: '' }), 422, /^The brief is empty, and a try asks the agent to do something\./);

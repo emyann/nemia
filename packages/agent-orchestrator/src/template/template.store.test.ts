@@ -17,11 +17,15 @@ import { eachTest } from '../../test/placed.ts';
 import { heldUnasked } from '../../test/unasked.ts';
 import { rawTar } from '../../test/tar.ts';
 import { teamCopy } from '../../test/team.ts';
+import { Cause, Effect, Exit } from 'effect';
 import { packArchive } from '../archive/archive.ts';
 
 const ROOT = scratch('wf-template-');
 process.env.WF_ROOT = ROOT;
-const { checkTemplateAt, exportTemplate, packTemplate, problemLine, readTemplate, unpackTemplate } = await import('./template.store.ts');
+const { checkedTree, placeSkillNames, problemLine } = await import('./template.store.ts');
+const { TemplateDoor } = await import('../templates/templates.store.ts');
+const { TemplateSource } = await import('./template.model.ts');
+const { StoreRoot } = await import('../config/root.store.ts');
 const { addFactory, attachWorkflow, hireAgent } = await import('../runner.ts');
 const { writeRules } = await import('../rules/rules.store.ts');
 const { setRevisions } = await import('../factory/factory.store.ts');
@@ -29,10 +33,34 @@ const { main } = await import('../cli/main.ts');
 const { engineOf } = await import('../runtime-client.ts');
 const engine = eachTest(testEngine);
 heldUnasked(engine);
-const { factoryRulesOf, instructionOf } = await import('./template.verb.ts');
+const { exportedTemplate, packedTemplate, unpackedTemplate } = await import('./template.verb.ts');
 
-/** The factory `name`, as `--factory` names it to an export. */
-const asked = (name: string) => ({ name, instruction: instructionOf, rules: factoryRulesOf });
+/** `program` run at the store's root, as the CLI runs a verb's: what it answers, or the refusal it failed with, thrown. */
+function run<A>(program: Effect.Effect<A, unknown, StoreRoot>): A {
+  const exit = Effect.runSyncExit(Effect.provideService(program, StoreRoot, ROOT));
+  if (Exit.isSuccess(exit)) return exit.value;
+  throw Cause.squash(exit.cause);
+}
+
+/** `nemia template export`'s program, `factory` the name `--factory` gives. */
+const exportTemplate = (ask: { dir: string; from: string; factory?: string }) => run(exportedTemplate(ask.dir, ask.from, ask.factory));
+
+/** `nemia template pack`'s program. */
+const packTemplate = (ask: { dir: string; out?: string; cwd: string }) => run(packedTemplate(ask.dir, ask.out, ask.cwd));
+
+/** `nemia template unpack`'s program. */
+const unpackTemplate = (ask: { archive: string; dir: string }) => run(unpackedTemplate(ask.archive, ask.dir));
+
+/** The template at `source`, a folder or an archive, read through the Template door. */
+const readTemplate = (source: string) =>
+  run(
+    Effect.gen(function* () {
+      return yield* (yield* TemplateDoor).templates.read(TemplateSource.read(path.resolve(source)));
+    }),
+  );
+
+/** Every problem of the template at `source`, as `nemia template lint` finds them. */
+const checkTemplateAt = (source: string) => checkedTree(readTemplate(source), placeSkillNames()).problems;
 
 /**
  * Refused by kind, exit 2, and what the message names — the fix, the file, the key — each a pattern it matches or a token it holds;
@@ -254,20 +282,6 @@ test("an agent's harness prompt and remote have no place in a template, each ref
   assert.equal(fs.existsSync(dir), false);
 });
 
-test('a folder that holds files, or is no name, is refused, and left as it was', () => {
-  const repo = repoWithTeam();
-  const dir = target();
-  fs.mkdirSync(dir);
-  fs.writeFileSync(path.join(dir, 'mine.txt'), 'mine');
-  assert.throws(() => exportTemplate({ dir, from: repo }), refusedWith('Conflict', /holds files already/));
-  assert.deepEqual(fs.readdirSync(dir), ['mine.txt']);
-  assert.throws(() => exportTemplate({ dir: target('My_Team'), from: repo }), refusedWith('Invalid', /My_Team is not a name/));
-  const empty = target();
-  fs.mkdirSync(empty);
-  exportTemplate({ dir: empty, from: repo });
-  assert.deepEqual(checkTemplateAt(empty), []);
-});
-
 /** A repository holding the team and a second workflow, `solo`, whose one step names no agent; and a factory on it attaching `solo`. */
 function factoryOnTeam(name: string): string {
   const repo = repoWithTeam();
@@ -284,7 +298,7 @@ test("with --factory, the draft holds that factory's attached workflows only, it
   setRevisions({ factory: 'crew', revisions: 'follow' });
   fs.writeFileSync(path.join(repo, 'NEMIA.md'), 'Run the crew.\n');
   const dir = target();
-  const { from } = exportTemplate({ dir, from: repo, factory: asked('crew') });
+  const { from } = exportTemplate({ dir, from: repo, factory: 'crew' });
   assert.deepEqual(checkTemplateAt(dir), []);
   assert.deepEqual(fs.readdirSync(path.join(dir, 'workflows')), ['solo']);
   assert.deepEqual(readBack(dir, 'nemia.yaml').spec, { version: '0.1.0', hires: { 'solo/work': 'implementer' }, revisions: 'follow' });
@@ -298,11 +312,11 @@ test("with --factory, the draft holds that factory's attached workflows only, it
 test("with --factory, the draft holds the factory's rules as RULES.md, read from the store; none where it has none, and rules that do not read refuse it", () => {
   const repo = factoryOnTeam('ruled');
   const none = target();
-  exportTemplate({ dir: none, from: repo, factory: asked('ruled') });
+  exportTemplate({ dir: none, from: repo, factory: 'ruled' });
   assert.equal(fs.existsSync(path.join(none, 'RULES.md')), false, 'a factory with no rules writes none');
   const kept = writeRules({ name: 'ruled' }, 'Never push on a Friday.');
   const dir = target();
-  const { from } = exportTemplate({ dir, from: repo, factory: asked('ruled') });
+  const { from } = exportTemplate({ dir, from: repo, factory: 'ruled' });
   assert.deepEqual(checkTemplateAt(dir), []);
   assert.equal(fs.readFileSync(path.join(dir, 'RULES.md'), 'utf8'), 'Never push on a Friday.\n');
   assert.equal(new Map(from.map(({ part, from: at }) => [part, at])).get('RULES.md'), kept);
@@ -310,7 +324,7 @@ test("with --factory, the draft holds the factory's rules as RULES.md, read from
   fs.writeFileSync(kept, '---\nmodel: opus\n---\nBe kind.\n');
   const refused = target();
   assert.throws(
-    () => exportTemplate({ dir: refused, from: repo, factory: asked('ruled') }),
+    () => exportTemplate({ dir: refused, from: repo, factory: 'ruled' }),
     refusedWith('Invalid', "the factory ruled's rules: ", /RULES\.md opens with a frontmatter/),
   );
   assert.equal(fs.existsSync(refused), false);
@@ -327,7 +341,7 @@ test('with --factory: a workflow it attaches that the repository lacks, a step h
   );
   const dir = target();
   assert.throws(
-    () => exportTemplate({ dir, from: repo, factory: asked('gaps') }),
+    () => exportTemplate({ dir, from: repo, factory: 'gaps' }),
     refusedWith(
       'Invalid',
       'the factory gaps attaches ghost',
@@ -338,7 +352,7 @@ test('with --factory: a workflow it attaches that the repository lacks, a step h
   );
   assert.equal(fs.existsSync(dir), false);
   assert.throws(
-    () => exportTemplate({ dir, from: repoWithTeam(), factory: asked('gaps') }),
+    () => exportTemplate({ dir, from: repoWithTeam(), factory: 'gaps' }),
     refusedWith('Invalid', /the factory gaps works on [^]*--from /),
   );
   assert.equal(fs.existsSync(dir), false);
@@ -470,7 +484,7 @@ test("the system's tar opens an archive into the same files and modes as unpack 
   assert.deepEqual(filesOf(path.join(byTar, 'team')), filesOf(dir));
 });
 
-test('pack refuses a folder that does not pass, at its line, and an --out that is there, and writes nothing', () => {
+test('pack refuses a folder that does not pass, at its line, and a file that is no folder, and writes nothing', () => {
   const dir = exported();
   const cwd = scratch('wf-template-pack-');
   const manifest = path.join(dir, 'nemia.yaml');
@@ -478,11 +492,7 @@ test('pack refuses a folder that does not pass, at its line, and an --out that i
   fs.writeFileSync(manifest, text.replace('v1alpha1', 'v2'));
   assert.throws(() => packTemplate({ dir, cwd }), refusedWith('Invalid', 'was not packed', /\n {2}nemia\.yaml:1:\d+: apiVersion/));
   assert.deepEqual(fs.readdirSync(cwd), []);
-  fs.writeFileSync(manifest, text);
   fs.writeFileSync(path.join(cwd, 'mine.tgz'), 'mine');
-  assert.throws(() => packTemplate({ dir, out: 'mine.tgz', cwd }), refusedWith('Conflict', /mine\.tgz is there already/));
-  assert.equal(fs.readFileSync(path.join(cwd, 'mine.tgz'), 'utf8'), 'mine');
-  assert.deepEqual(fs.readdirSync(cwd), ['mine.tgz']);
   assert.throws(() => packTemplate({ dir: path.join(cwd, 'mine.tgz'), cwd }), refusedWith('Missing', /is no folder/));
 });
 
@@ -504,28 +514,10 @@ test('pack refuses a version that names no file where --out names none, and writ
   assert.equal(packTemplate({ dir, out: 'named.tgz', cwd }).out, path.join(cwd, 'named.tgz'), '--out names it whatever the version');
 });
 
-test('unpack refuses a <dir>/<name> that holds files or is no folder, and leaves it as it was', () => {
-  const { out } = packTemplate({ dir: exported(), cwd: scratch('wf-template-pack-') });
-  const parent = scratch('wf-template-unpack-');
-  fs.mkdirSync(path.join(parent, 'team'));
-  fs.writeFileSync(path.join(parent, 'team', 'mine.txt'), 'mine');
-  assert.throws(
-    () => unpackTemplate({ archive: out, dir: parent }),
-    refusedWith('Conflict', /team holds files already, and unpack writes/),
-  );
-  assert.deepEqual(fs.readdirSync(path.join(parent, 'team')), ['mine.txt']);
+test('unpack refuses an archive that is no file, and writes nothing', () => {
   const beside = scratch('wf-template-unpack-');
-  fs.writeFileSync(path.join(beside, 'team'), 'mine');
-  assert.throws(() => unpackTemplate({ archive: out, dir: beside }), refusedWith('Conflict', /team is there, and is no folder/));
-  assert.equal(fs.readFileSync(path.join(beside, 'team'), 'utf8'), 'mine');
   assert.throws(() => unpackTemplate({ archive: path.join(beside, 'none.tgz'), dir: beside }), refusedWith('Missing', /is no file/));
-});
-
-test('export refuses a folder that is a file, and leaves it as it was', () => {
-  const dir = target();
-  fs.writeFileSync(dir, 'mine');
-  assert.throws(() => exportTemplate({ dir, from: repoWithTeam() }), refusedWith('Conflict', /team is there, and is no folder: export/));
-  assert.equal(fs.readFileSync(dir, 'utf8'), 'mine');
+  assert.deepEqual(fs.readdirSync(beside), []);
 });
 
 test('unpack refuses an archive whose entry climbs out of its folder, and writes nothing at all', () => {

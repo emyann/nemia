@@ -83,7 +83,7 @@ const CHECK_SPEC: Spec = {
 const digestLine = (digest: string | undefined): string => `digest of the content: ${digest ?? 'none'}`;
 
 /** The folder or archive `folder`, read through the Template door and checked: it passes with its digest, or every problem is refused. */
-const linted = Effect.fn('templateLint')(function* (folder: string) {
+export const lintedTemplate = Effect.fn('templateLint')(function* (folder: string) {
   const read = yield* (yield* TemplateDoor).templates.read(TemplateSource.read(path.resolve(folder)));
   const { problems, digest } = checkedTree(read, placeSkillNames());
   if (problems.length)
@@ -106,7 +106,7 @@ const TEMPLATE_CHECK: Command<{ folder: string; digest: string | undefined }> = 
   class: 'read',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args, _env, home) => rooted(home, 'template lint', linted(textOf(args, 'folder') ?? '')),
+  handler: (args, _env, home) => rooted(home, 'template lint', lintedTemplate(textOf(args, 'folder') ?? '')),
   print: ({ folder, digest }) => [`${folder} passes`, digestLine(digest)],
 };
 
@@ -156,7 +156,7 @@ const factoryParts = Effect.fn('factoryParts')(function* (name: string) {
 });
 
 /** The template `nemia template export` asks for, made and checked (`exportTree`), then written through the Template door. */
-const exported = Effect.fn('templateExport')(function* (dir: string, from: string, factory: string | undefined) {
+export const exportedTemplate = Effect.fn('templateExport')(function* (dir: string, from: string, factory: string | undefined) {
   const parts = factory === undefined ? undefined : yield* factoryParts(factory);
   const tree = yield* tried(() => exportTree({ dir, from, factory: parts }, placeSkillNames()));
   yield* (yield* TemplateDoor).templates.create(TemplateSource.read(tree.dir), tree);
@@ -164,7 +164,7 @@ const exported = Effect.fn('templateExport')(function* (dir: string, from: strin
 });
 
 /** The folder `dir` read, checked and packed through the Template door at `out` (`packOut`): the archive and its digest. */
-const packed = Effect.fn('templatePack')(function* (dir: string, out: string | undefined, cwd: string) {
+export const packedTemplate = Effect.fn('templatePack')(function* (dir: string, out: string | undefined, cwd: string) {
   const door = yield* TemplateDoor;
   const source = yield* tried(() => folderAsked(dir));
   const read = yield* door.templates.read(TemplateSource.read(source));
@@ -174,7 +174,7 @@ const packed = Effect.fn('templatePack')(function* (dir: string, out: string | u
 });
 
 /** The archive `archive` read through the Template door and written as a folder at `<dir>/<name>`, checked by nothing but its name. */
-const unpacked = Effect.fn('templateUnpack')(function* (archive: string, dir: string) {
+export const unpackedTemplate = Effect.fn('templateUnpack')(function* (archive: string, dir: string) {
   const door = yield* TemplateDoor;
   const read = yield* door.templates.read(TemplateSource.read(yield* tried(() => archiveAsked(archive))));
   const at = yield* door.templates.create(TemplateSource.read(path.join(path.resolve(dir), read.name)), read);
@@ -195,7 +195,7 @@ const TEMPLATE_EXPORT: Command<Exported> = {
   only: HERE,
   manual: TEMPLATE_HELP,
   handler: (args, _env, home) =>
-    rooted(home, 'template export', exported(textOf(args, 'folder') ?? '', textOf(args, 'from') ?? '', textOf(args, 'factory'))),
+    rooted(home, 'template export', exportedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'from') ?? '', textOf(args, 'factory'))),
   print: ({ dir, from }) => [
     ...from.map(({ part, from: at }) => `${part}  ${at}`),
     `written: ${dir}`,
@@ -228,7 +228,7 @@ const TEMPLATE_PACK: Command<{ out: string; digest: string }> = {
   class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args, _env, home) => rooted(home, 'template pack', packed(textOf(args, 'folder') ?? '', textOf(args, 'out'), process.cwd())),
+  handler: (args, _env, home) => rooted(home, 'template pack', packedTemplate(textOf(args, 'folder') ?? '', textOf(args, 'out'), process.cwd())),
   print: ({ out, digest }) => [`written: ${out}`, digestLine(digest)],
 };
 
@@ -254,7 +254,7 @@ const TEMPLATE_UNPACK: Command<{ dir: string; digest: string | undefined }> = {
   class: 'ask',
   only: HERE,
   manual: TEMPLATE_HELP,
-  handler: (args, _env, home) => rooted(home, 'template unpack', unpacked(textOf(args, 'archive') ?? '', textOf(args, 'dir') ?? '')),
+  handler: (args, _env, home) => rooted(home, 'template unpack', unpackedTemplate(textOf(args, 'archive') ?? '', textOf(args, 'dir') ?? '')),
   print: ({ dir, digest }) => [`written: ${dir}`, digestLine(digest), `lint it: nemia template lint ${dir}`],
 };
 

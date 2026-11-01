@@ -1,0 +1,2 @@
+apiVersion: nemia.dev/v1alpha1
+kind: FactoryTemplate

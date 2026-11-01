@@ -255,7 +255,7 @@ test('a step whose job was denied a call says so — on `nemia ls` beside its li
 
   const [implement, review] = (await runWith(b.e, list(b.e, readRun(run.id)))).steps;
   assert.deepEqual(
-    [implement.status, shownNote(implement)],
+    [implement.message, shownNote(implement)],
     ['unverified · done', 'denied: Skill(look), Bash(pytest)'],
     'each call once, and the status as it was',
   );

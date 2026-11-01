@@ -9,6 +9,7 @@ import { Journal, type JournalError } from '../core/engine/index.ts';
 import type { Runner } from '../harness/index.ts';
 import { isClaude, isRemote, isSpec } from './options.ts';
 import { transcriptEndOf } from './transcript-end.ts';
+import { TaskId } from '../core/model.ts';
 
 /** Words `say` will not hand to a session, and why, in words that say what to do instead. Nothing was sent or journalled. */
 export class SayRefused extends Schema.TaggedError<SayRefused>()('SayRefused', {
@@ -110,7 +111,7 @@ export const sayVerbOf = (
       unsent((e) => `${name} was not given the words (${wordsOf(e)}). Nothing was journalled.`),
     );
     const said: Said = { at: new Date().toISOString(), attempt: last.n, text, after };
-    yield* go(Effect.flatMap(Journal, (j) => j.append(taskId, { kind: 'said', ...said }))).pipe(
+    yield* go(Effect.flatMap(Journal, (j) => j.append(TaskId.read(taskId), { kind: 'said', ...said }))).pipe(
       unsent((e) => `${name} was given the words, but they could not be journalled (${wordsOf(e)}): the record does not show them.`),
     );
     return said;

@@ -31,6 +31,7 @@ import { claudeJob } from '../src/harness/claude/code.ts';
 import { scratch } from './scratch.ts';
 import { asyncStore, asyncOps, type AsyncJournal, type AsyncRunner } from './promise-runner.ts';
 import { builtEngine } from './engine.ts';
+import { TaskId } from '../src/core/model.ts';
 
 /** The core `file`, over a store and a harness that cost nothing. */
 const coreDoor = () => {
@@ -645,7 +646,7 @@ test('file journals what it takes: on the record for the runner, under config an
     const effect = coreDoor();
     const always = await effect.run(file({ ...ok, restartPolicy: 'Always', queued: true }));
     const job = await effect.run(file(ok));
-    const filedIn = (id: string) => effect.run(Effect.flatMap(Journal, (j) => j.read(id))).then((es) => es[0]);
+    const filedIn = (id: string) => effect.run(Effect.flatMap(Journal, (j) => j.read(TaskId.read(id)))).then((es) => es[0]);
     const filed = await filedIn(always);
     assert.equal(filed.kind === 'filed' && filed.restartPolicy, 'Always');
     assert.equal(Object.hasOwn(await filedIn(job), 'restartPolicy'), false, 'a job journals no restart policy');

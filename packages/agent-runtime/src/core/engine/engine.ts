@@ -40,6 +40,7 @@ import { ownPool, toAdmit, type AdmissionRule } from '../admission.ts';
 import { countedFacts } from './counted.ts';
 import { deniedFacts } from './denied.ts';
 import { instantNow } from './now.ts';
+import { TaskId } from '../model.ts';
 
 /**
  * The lifecycle `reconcile` moves a task by: the shipped one (`lifecycle.ts`) unless a test provides another, which is how a
@@ -319,7 +320,7 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
       break;
 
     case 'start':
-      yield* journal.append(taskId, {
+      yield* journal.append(TaskId.read(taskId), {
         kind: 'starting',
         ...stamped(),
         attempt: action.attempt,
@@ -336,7 +337,7 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
       if (failed?.refused) {
         const end = spawnRefused(state, action.attempt, failed.message, move);
         if (end.do !== 'record-end') return end;
-        yield* journal.append(taskId, {
+        yield* journal.append(TaskId.read(taskId), {
           kind: 'ended',
           ...stamped(),
           attempt: end.attempt,
@@ -346,13 +347,13 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
           error: end.error,
         });
       } else {
-        yield* journal.append(taskId, spawnedEntry(action.attempt, failed?.message));
+        yield* journal.append(TaskId.read(taskId), spawnedEntry(action.attempt, failed?.message));
       }
       break;
     }
 
     case 'record-end': {
-      yield* journal.append(taskId, {
+      yield* journal.append(TaskId.read(taskId), {
         kind: 'ended',
         ...stamped(),
         attempt: action.attempt,
@@ -374,7 +375,7 @@ const reconcileOn = Effect.fn('reconcileOn')(function* (taskId: string, observed
     case 'settle': {
       const last = state.attempts.at(-1);
       const open = last && last.ended === null ? observed.get(nameFor(taskId, last.n))?.nativeId : undefined;
-      yield* journal.append(taskId, {
+      yield* journal.append(TaskId.read(taskId), {
         kind: 'settled',
         at: at(),
         outcome: action.outcome,
@@ -409,11 +410,11 @@ const notedOf = (state: State, observed: ReadonlyMap<string, Sighting>, at: stri
  */
 const notedFold = Effect.fn('notedFold')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
   const journal = yield* Journal;
-  const state = fold(taskId, yield* journal.read(taskId));
+  const state = fold(taskId, yield* journal.read(TaskId.read(taskId)));
   const now = stamped();
   const facts = notedOf(state, observed, now.at, now.mono);
-  for (const fact of facts) yield* journal.append(taskId, fact);
-  return facts.length > 0 ? fold(taskId, yield* journal.read(taskId)) : state;
+  for (const fact of facts) yield* journal.append(TaskId.read(taskId), fact);
+  return facts.length > 0 ? fold(taskId, yield* journal.read(TaskId.read(taskId))) : state;
 });
 
 /** The actions that change the task's own journal: `settleOn` steps again after one, and stops at any other. */
@@ -538,7 +539,7 @@ const letGo = Effect.fn('releaseFinished')(function* (
       measured &&
       (Object.keys(measured) as Array<keyof Usage>).some((key) => measured[key] !== undefined && attempt.usage?.[key] === undefined)
     ) {
-      yield* journal.append(state.taskId, { kind: 'measured', at: new Date().toISOString(), attempt: attempt.n, usage: measured });
+      yield* journal.append(TaskId.read(state.taskId), { kind: 'measured', at: new Date().toISOString(), attempt: attempt.n, usage: measured });
       wrote = true;
     }
   }
@@ -621,7 +622,7 @@ const forgetNamed = Effect.fn('forgetNamed')(function* (memo: TickMemoState) {
  * memo. A difference fails the pass, naming the task, rather than being mended quietly. Untraced: it runs for every kept task.
  */
 const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: ReadonlyMap<string, Sighting>, unread: ReadonlySet<string>) {
-  const fresh = fold(kept.taskId, yield* (yield* Journal).read(kept.taskId));
+  const fresh = fold(kept.taskId, yield* (yield* Journal).read(TaskId.read(kept.taskId)));
   const decided = decide(fresh, endedOnStatement(fresh, observed), nowFor(unread), yield* Lifecycle);
   const why = divergence(kept, fresh, decided);
   if (why) return yield* Effect.fail(new TickMemoDiverged({ taskId: kept.taskId, message: `the pass skipped \`${kept.taskId}\`: ${why}` }));
@@ -634,7 +635,7 @@ const verifyKept = Effect.fnUntraced(function* (kept: Releasable, observed: Read
 const admitWaiting = Effect.fn('admitWaiting')(function* (views: readonly TaskView[]) {
   const ids = new Set(toAdmit(views, yield* Admission));
   const journal = yield* Journal;
-  for (const id of ids) yield* journal.append(id, { kind: 'admitted', at: new Date().toISOString() });
+  for (const id of ids) yield* journal.append(TaskId.read(id), { kind: 'admitted', at: new Date().toISOString() });
   return views.map((v): TaskView => (ids.has(v.id) ? { ...v, admission: 'admitted' } : v));
 });
 
@@ -753,7 +754,7 @@ export const tick = Effect.fn('tick')(function* () {
 
   if (memo) {
     const listed = new Set(ids);
-    for (const id of memo.settled.keys()) if (!listed.has(id)) memo.settled.delete(id);
+    for (const id of memo.settled.keys()) if (!listed.has(TaskId.read(id))) memo.settled.delete(id);
     for (const id of memo.listed) if (!memo.settled.has(id)) memo.listed.delete(id);
   }
 
@@ -772,7 +773,7 @@ export const tick = Effect.fn('tick')(function* () {
 /** What a person wants to see. Derived, never stored. Over a full listing (`observe`), which says no session's `unreadWhy`. */
 export const view = Effect.fn('view')(function* (taskId: string, observed: ReadonlyMap<string, Sighting>) {
   const journal = yield* Journal;
-  return viewOfState(fold(taskId, yield* journal.read(taskId)), observed);
+  return viewOfState(fold(taskId, yield* journal.read(TaskId.read(taskId))), observed);
 });
 
 /** A task a read left out because its journal does not read, and why, in the words the pass says it with (`TickReport.unreadable`). */
@@ -790,7 +791,7 @@ const readEach = Effect.fn('readEach')(function* (taskIds: Iterable<string>) {
   const read: Array<{ taskId: string; events: Event[] }> = [];
   const unreadable: UnreadableTask[] = [];
   for (const taskId of taskIds) {
-    const one = yield* journal.read(taskId).pipe(
+    const one = yield* journal.read(TaskId.read(taskId)).pipe(
       Effect.map((events) => ({ events })),
       Effect.catchTag('JournalError', (e) => Effect.succeed({ why: e.message })),
     );

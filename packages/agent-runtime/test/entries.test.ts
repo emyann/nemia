@@ -28,6 +28,8 @@ const PINNED: Record<string, string[]> = {
     'HARNESS_KNOBS',
     'InputRefused',
     'Journal',
+    'APPEND_REFUSALS',
+    'TaskId',
     'JournalError',
     'KeptRefused',
     'LET_GO_MS',

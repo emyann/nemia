@@ -91,6 +91,7 @@ import { attachedSessions, putDrain, liftDrain, type Attached } from '../harness
 import type { McpServersRead } from '../harness/mcp-state.ts';
 import type { RemoteMcpServer } from '../harness/seam.ts';
 import { answerOptionsRefusalOf } from './answer-options.ts';
+import { TaskId } from '../core/model.ts';
 
 /** Options an engine cannot be built from (`optionsRefusalOf`), and why. Nothing was built. */
 export class EngineRefused extends Schema.TaggedError<EngineRefused>()('EngineRefused', {
@@ -756,7 +757,7 @@ const make = (options: EngineOptions) =>
 
     const journalOps = options.journal ?? Journal.filesOps(root);
     const journal = Journal.layer(journalOps);
-    const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(taskId)).pipe(Effect.provide(journal)));
+    const events = (taskId: string) => Effect.runPromise(Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId))).pipe(Effect.provide(journal)));
     const observed: Record<string, ObserveCount> = {};
     const counted = countedInto(observed);
     const observedNow = () => copyOf(observed);
@@ -769,13 +770,13 @@ const make = (options: EngineOptions) =>
     if (fallen === undefined) return yield* Effect.fail(new EngineRefused({ message: noFallbackRefusal(fallback, harnesses) }));
     const layer = Layer.mergeAll(journal, Runner.layer(composite(runners, fallback)), tickMemoLayer(), admissionOf(options, harnesses));
     const go = <A, E>(e: Effect.Effect<A, E, Journal | Runner>): Effect.Effect<A, E> => e.pipe(Effect.provide(layer));
-    const read = (taskId: string) => go(Effect.flatMap(Journal, (j) => j.read(taskId)));
+    const read = (taskId: string) => go(Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId))));
 
     const harnessOf = (state: State): Harnessed => own(byName, state.harness ?? fallback) ?? fallen;
 
     const viewOf = (taskId: string) =>
       Effect.gen(function* () {
-        const events = yield* Effect.flatMap(Journal, (j) => j.read(taskId));
+        const events = yield* Effect.flatMap(Journal, (j) => j.read(TaskId.read(taskId)));
         const state = fold(taskId, events);
         const last = state.attempts.at(-1);
         const { find, observe, observeFor } = harnessOf(state).runner;

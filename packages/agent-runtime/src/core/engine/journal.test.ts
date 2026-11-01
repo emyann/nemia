@@ -20,11 +20,12 @@ import { ioCounts } from './tally.ts';
 import { scratch } from '../../../test/scratch.ts';
 import { asyncOps, asyncStore, type AsyncRunner, type AsyncSighting } from '../../../test/promise-runner.ts';
 import { story } from '../../../test/checkpoints.ts';
+import { TaskId } from '../model.ts';
 
 const root = () => scratch('ae-journal-');
 /** A fresh layer over the same directory — what a restarted engine sees. */
 const run = <A, E>(dir: string, e: Effect.Effect<A, E, Journal>) => Effect.runPromise(e.pipe(Effect.provide(Journal.files(dir))));
-const readOf = (id: string) => Effect.flatMap(Journal, (j) => j.read(id));
+const readOf = (id: string) => Effect.flatMap(Journal, (j) => j.read(TaskId.read(id)));
 const feedFrom = (after: number) => Effect.flatMap(Journal, (j) => j.feed(after));
 
 const ev = (kind: Event['kind'], at: string): Event => ({ kind, at, attempt: 1 }) as Event;
@@ -32,7 +33,7 @@ const ev = (kind: Event['kind'], at: string): Event => ({ kind, at, attempt: 1 }
 const filedAt = (at: string): Event => ({ ...TODAY, at }) as Event;
 /** Each of `ids` filed, at the start of 2026, so the events a test appends after have a journal to go to. */
 const fileEach = (ids: readonly string[]) =>
-  Effect.flatMap(Journal, (j) => Effect.forEach(ids, (id) => j.append(id, filedAt('2026-01-01T00:00:00Z')), { discard: true }));
+  Effect.flatMap(Journal, (j) => Effect.forEach(ids, (id) => j.append(TaskId.read(id), filedAt('2026-01-01T00:00:00Z')), { discard: true }));
 
 /** What reading `t1`'s journal through `ops` costs (`ioCounts` deltas), and what it gives. */
 const costOf = async (ops: ReturnType<typeof Journal.filesOps>, taskId = 't1') => {
@@ -128,7 +129,7 @@ test('a board is appended to, read, followed from a cursor and resumed by a fres
       fileEach(['t1']).pipe(
         Effect.andThen(
           Effect.flatMap(Journal, (j) =>
-            Effect.forEach(['a', 'b', 'c'], (c) => j.append('t1', ev('starting', `2026-01-01T00:00:0${c.charCodeAt(0) - 97}Z`)), {
+            Effect.forEach(['a', 'b', 'c'], (c) => j.append(TaskId.read('t1'), ev('starting', `2026-01-01T00:00:0${c.charCodeAt(0) - 97}Z`)), {
               discard: true,
             }),
           ),
@@ -150,7 +151,7 @@ test('a board is appended to, read, followed from a cursor and resumed by a fres
       fileEach(['u1', 'u2', 'u3']).pipe(
         Effect.andThen(
           Effect.flatMap(Journal, (j) =>
-            Effect.all([j.append('u1', ev('starting', '2026-01-01T00:00:00Z')), j.append('u2', ev('starting', '2026-01-01T00:00:01Z'))], {
+            Effect.all([j.append(TaskId.read('u1'), ev('starting', '2026-01-01T00:00:00Z')), j.append(TaskId.read('u2'), ev('starting', '2026-01-01T00:00:01Z'))], {
               discard: true,
             }),
           ),
@@ -170,7 +171,7 @@ test('a board is appended to, read, followed from a cursor and resumed by a fres
 
     await run(
       board,
-      Effect.flatMap(Journal, (j) => j.append('u3', ev('spawned', '2026-01-01T00:00:02Z'))),
+      Effect.flatMap(Journal, (j) => j.append(TaskId.read('u3'), ev('spawned', '2026-01-01T00:00:02Z'))),
     );
     const next = await run(board, feedFrom(first.cursor));
     assert.deepEqual(
@@ -810,7 +811,7 @@ test('decode: an entry no runtime wrote fails its read, naming the task, the ent
     async () => {
       const error = await Effect.runPromise(
         Effect.flatMap(Journal, (j) =>
-          j.append('t-mem', { kind: 'filed', brief: 'b', cwd: '/r' } as never).pipe(Effect.andThen(j.read('t-mem'))),
+          j.append(TaskId.read('t-mem'), { kind: 'filed', brief: 'b', cwd: '/r' } as never).pipe(Effect.andThen(j.read(TaskId.read('t-mem')))),
         ).pipe(Effect.flip, Effect.provide(Journal.test())),
       );
       assert.deepEqual([error._tag, error.taskId], ['JournalError', 't-mem']);

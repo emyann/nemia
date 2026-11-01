@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { Effect, Logger, Option, References, Tracer } from 'effect';
 import { appendFields, Journal } from './journal.ts';
 import type { Event } from '../domain.ts';
+import { TaskId } from '../model.ts';
 
 /** What a capturing logger was handed: each log's level, its message's text and its annotations. */
 type Logged = { level: string; text: string; annotations: Record<string, unknown> };
@@ -50,8 +51,8 @@ test('an append is said at Debug, its kind, annotated with its task, its kind an
   const { logs } = await traced(
     Effect.gen(function* () {
       const journal = yield* Journal;
-      yield* journal.append('t-1', filed);
-      yield* journal.append('t-1', starting);
+      yield* journal.append(TaskId.read('t-1'), filed);
+      yield* journal.append(TaskId.read('t-1'), starting);
     }),
   );
   assert.deepEqual(logs, [
@@ -65,7 +66,7 @@ test('an append is a span of its own, append, under the span of the verb that wr
   const { spans } = await traced(
     Effect.gen(function* () {
       const journal = yield* Journal;
-      yield* journal.append('t-1', starting);
+      yield* journal.append(TaskId.read('t-1'), starting);
     }).pipe(Effect.withSpan('file')),
   );
   const append = spans.find((s) => s.name === 'append');

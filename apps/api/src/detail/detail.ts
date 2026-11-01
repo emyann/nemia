@@ -157,7 +157,7 @@ export type StepSpec = {
   context: number | null;
   after: string[];
   /**
-   * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's (`workspace: main`): the step that
+   * `main` for a step that runs in the repository's own checkout rather than a worktree of the run's (`workspace: base`): the step that
    * ends the run, whose gate holds before it is filed and whose approval is what files it. Null for every other step, which works in a
    * worktree. What tells such a gate from any other on the board, where the two read the same off the record: unfiled and awaiting
    * approval.

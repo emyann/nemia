@@ -1,8 +1,8 @@
 /**
- * The gate of an ending — a last step that works in the repository's own checkout (`workspace: main`) and is filed only once a person
+ * The gate of an ending — a last step that works in the repository's own checkout (`workspace: base`) and is filed only once a person
  * approves it — as tables: what `assess`, `stepStatus` and `to decide` say at it, the approval and the send-back it offers and refuses
  * (`approvalRefusal`, `retryable`, `retryRefusal`, `roundAsk`), and what `nemia ls`, `nemia rm` and `nemia cancel` read of it (`listing`,
- * `forgetRefusal`, `cancelPlan`, `gateLines`). What an ending is told: `workspace: main` is the repository's own checkout
+ * `forgetRefusal`, `cancelPlan`, `gateLines`). What an ending is told: `workspace: base` is the repository's own checkout
  * (`workspacePlan`), the run's result is the work the ending acts on (`resultSteps`, `tipBranches`, `handOffDue`), and its brief
  * (`composeBrief`) says where that work is, the check it was judged by, the one place its files go, and the approval that filed it.
  * Whether a run has landed or is a person's to decide: `decision`, which asks git and stores nothing; an ending's gate read against where
@@ -105,7 +105,7 @@ const landing = (note: string): Workflow[] => [
   step('review', ['implement']),
   parseWorkflow(
     'land',
-    `---\nafter: review\nplace: git\nworkspace: main\ngate: true\nagent: otto\n---\n${note}`,
+    `---\nafter: review\nplace: git\nworkspace: base\ngate: true\nagent: otto\n---\n${note}`,
     undefined,
     new Map([['otto', OTTO]]),
   ),
@@ -642,7 +642,7 @@ test("an ending's gate does not hold while the work goes round again or is being
 
 test("`workspacePlan` and the run's result: an ending works in the repository's own checkout, on the work of the steps before it", async (t) => {
   await t.test(
-    "`workspace: main` is the repository's own checkout, and the run's result is the work the ending step acts on, not its branch",
+    "`workspace: base` is the repository's own checkout, and the run's result is the work the ending step acts on, not its branch",
     () => {
       const ending: Workflow = { name: 'ship', after: ['review'], body: 'land it', workspace: 'base', gate: true };
       const dev = [step('implement'), step('review', ['implement']), ending];
@@ -835,7 +835,7 @@ test("`composeBrief` of a step in the repository's own checkout: where the work 
         /Or leave it in this workspace/,
         "the second way is false here: it would be left in a person's checkout for ever",
       );
-      assert.doesNotMatch(brief, /WF_ARTIFACTS/, 'and `workspace: main` refuses a check, so there is none to be given it');
+      assert.doesNotMatch(brief, /WF_ARTIFACTS/, 'and `workspace: base` refuses a check, so there is none to be given it');
       assert.ok(brief.includes(FILES), 'the directory the run made, by absolute path');
       assert.match(artifactsContract(FILES, true), /a file you leave here is\nnot collected and not committed/);
       assert.match(artifactsContract(FILES, true), /`nemia decide` reads a path named from\nthe workspace root as `not collected`/);

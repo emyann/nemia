@@ -354,8 +354,8 @@ export function stepSetRefusal(steps: readonly Workflow[], isolate: boolean): st
   if (line)
     return (
       `${LINE_NAME}: a step may not be named \`${LINE_NAME}\`. A run cuts its own line of work — one worktree and one branch per card — ` +
-      `under that name (\`worktrees/<run>/${LINE_NAME}\` on \`wf/<run>/${LINE_NAME}\`), so this step's cut and the run's would claim one ` +
-      `branch. Rename ${LINE_NAME}.md.`
+      `under that name (\`worktrees/<run>/${LINE_NAME}\`, on the run's branch of that name), so this step's cut and the run's ` +
+      `would claim one branch. Rename ${LINE_NAME}.md.`
     );
   const clash = steps.find((s) => s.check && steps.some((other) => other.name === `${s.name}-check`));
   if (clash)

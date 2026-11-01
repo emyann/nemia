@@ -109,7 +109,7 @@ test('the store paused, then paused at once, then resumed: nothing new starts, w
   setSchedule({ factory: 'solo', workflow: 'dev', cron: '0 9 * * 1', tz: 'America/Montreal', brief: 'Read the stats' });
   const ONE = folder(['work']);
   const CHECKED = folder(['work'], () => 'check: "true"\n');
-  const SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\nworkspace: main\ncheck: "true"\n' : ''));
+  const SHIP = folder(['work', 'ship'], (name) => (name === 'ship' ? 'gate: true\nworkspace: base\ncheck: "true"\n' : ''));
   const begun = (workflowDir: string, more: Partial<Parameters<typeof startRun>[0]> = {}) =>
     stage.runPlaced(startRun({ brief: 'paused', repo, workflowDir, isolate: false, ...more }));
   const runs: Record<'session' | 'checking' | 'asked' | 'ended' | 'landing' | 'called', Run> = {} as never;

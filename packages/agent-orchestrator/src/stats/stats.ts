@@ -1,6 +1,6 @@
 /**
  * The flow numbers of a store's history, defined on each workflow's structure and never on a step's name: the rounds of each `loop:` step
- * to acceptance, the tries of the `workspace: main` step to a landing, what a landed run cost and how long it took, and every step's tries,
+ * to acceptance, the tries of the `workspace: base` step to a landing, what a landed run cost and how long it took, and every step's tries,
  * time, cost, check verdicts and gate waits, the calls its harness refused it, where the harness records them, the skills its sessions
  * loaded, where their ends say, and the skills whose paths they touched, and each rule its skills declare, kept or broken by those calls
  * (`discipline.ts`); each count the step declares over its closeouts (`tally:`, `tally.ts`), per step and day; and each landing check
@@ -91,7 +91,7 @@ export type TryFact = RunKeys & {
 
 /**
  * One run that finished, on the UTC day its ending step's last task ended, or its last task, with no ending step. `rounds` holds, for each
- * `loop:` step whose loop ended accepted, how many rounds it ran. `landed` says whether its `workspace: main` step committed, and
+ * `loop:` step whose loop ended accepted, how many rounds it ran. `landed` says whether its `workspace: base` step committed, and
  * `firstTry` whether it did so on its first try: null with no such step or where its record does not say, and `firstTry` null on a run
  * that did not land. `costUsd` is every
  * session's cost, null unless each was measured; `wallMs` its first filing to its last end. A run counts under every step and agent it has.

@@ -37,7 +37,7 @@ the engine's `priority` and `remoteControl` put to use: a run in flight filed ab
 its package half) — and the workflow builder's package half: a step rendered back to markdown and a folder written from its steps
 (`renderStep`, `writeWorkflow`, §4) — and the builder on the board, which writes a folder of yours from its blocks and edges (§4, its board
 half) — and the web app's components on shadcn's React Aria base (§7) — and the end of a run as a step of its
-workflow, with `workspace: main`, its gate, `to decide` and `ship.md` on the four `dev*` folders (§8, its package half) — and, since, a run
+workflow, with `workspace: base`, its gate, `to decide` and `ship.md` on the four `dev*` folders (§8, its package half) — and, since, a run
 with no repository (`workspace: folder`, P2's first slice), started and read from the board (its second) — and a feed of what the
 tick judged, followed with `wf watch` (its package half; the board's half is a card of its own) — and one `wf up` per store, with a heartbeat
 in `daemon.json` that `wf ls` reads, and the Factory reads too — have shipped.
@@ -1258,7 +1258,7 @@ What was built:
   file is the branch's to answer, as before collection, so a run from before it reads as it did. `artifactLines` gives each reason its own line on `wf decide`'s screen: not in the
   workspace, a directory, not collected, not in the directory, outside the workspace, outside the directory.
 - `artifactsContract`, on every brief, says both ways. Put a file in the directory and name it by absolute path, or leave it in
-  the workspace and name it by its path from the root. (Amended since, in *Shipped: the supervisor*: a `workspace: main` step is told
+  the workspace and name it by its path from the root. (Amended since, in *Shipped: the supervisor*: a `workspace: base` step is told
   the first way alone, because the run hands nothing off in a person's checkout.)
 
 What was measured:
@@ -3737,7 +3737,7 @@ What the base does not offer, named rather than worked around:
   repository's root the skill does not load at all: its `info` refuses a monorepo root. On aria, the reference is what
   `npx shadcn@latest add <component> --view <file>` prints from `apps/web`.
 
-## Shipped: the end of a run is a step of its workflow — `workspace: main`, the ending's gate, and `to decide`
+## Shipped: the end of a run is a step of its workflow — `workspace: base`, the ending's gate, and `to decide`
 
 §8 below, the package half. A run that finished went quiet: its branch sat there, `wf decide` printed two git commands, and nothing on
 the board counted a result nobody had decided. The shape §8 chose held, with one thing it did not say in so many words, which building it
@@ -3746,19 +3746,19 @@ settled: **where an ending step's gate holds**. Read first: the README's *The en
 
 What was built, four commits:
 
-- **`workspace: main` on a step**, in `STEP_KEYS` after `input` with its line in `STEP_KEY_MEANINGS`: the step runs in the repository's
+- **`workspace: base` on a step**, in `STEP_KEYS` after `input` with its line in `STEP_KEY_MEANINGS`: the step runs in the repository's
   own checkout rather than a worktree of the run's, which is the one thing a worktree cannot do — the base branch is checked out there.
   `workspacePlan` gains `{ kind: 'main' }`, and `workspaceFor` cuts nothing, merges nothing in and provisions no `node_modules`: it is the
   repository as a person left it. `handOffDue` skips such a step, so the run commits nothing in that checkout, and `composeBrief` tells it
   where the work is — the result branch, the base branch, and the `git log` and `git diff` between them — instead of telling it to read its
   workspace. Refused with the fix: `workspace: worktree`, any other word, a `check:` beside it (the run would execute it there, on whatever
   the checkout holds), and, at load, a step anything waits on or one that ends a workflow beside another.
-- **A run's result is the work the ending acts on** (`resultSteps`): the terminal steps, and for a terminal `workspace: main` step, the
+- **A run's result is the work the ending acts on** (`resultSteps`): the terminal steps, and for a terminal `workspace: base` step, the
   steps it waits on. Read as the result, its `main` would answer *has it shipped* with yes for ever. `tipBranches`, `decision`,
   `resultBranches` and `parentOf` read it.
 - **The ending's gate holds before the step is filed.** A gate holds what its approval decides. Where steps follow, that is the handoff, and
   the step runs first — §6's gate, unchanged. An ending step in the checkout produces nothing to read: it acts, where nothing can be taken
-  back. So `approvedFirst` (gated and `workspace: main`) plus `waitsAtGate` (unfiled, unapproved, every step it waits on satisfied) reads
+  back. So `approvedFirst` (gated and `workspace: base`) plus `waitsAtGate` (unfiled, unapproved, every step it waits on satisfied) reads
   `awaiting approval` from `standing`, which is the one place the words are decided — so `assess`, `decision`, `listing`, `cancelPlan`,
   `forgetRefusal`, `gateLines` and `approvalRefusal` all saw it at once, with no second judgement to keep in step. `wf approve` files it;
   its own approval is on its brief under `## Approved` (`approvedSection`), since the words are the terms it acts on; and a send-back goes
@@ -3777,7 +3777,7 @@ What was built, four commits:
   written, the `wf approve` and the send-back. `git merge --no-ff` and `git branch -D` are printed only for a folder with no ending step:
   a folder that says what shipping is does not also tell a person to type it. `wf start` says `ends at: ship — nothing of it runs until
   wf approve <run> ship, which is what files it`.
-- **`ship.md` on `dev`, `dev-build`, `dev-planned` and `dev-planned-build`**: `after: review`, `workspace: main`, `gate: true`, implement's
+- **`ship.md` on `dev`, `dev-build`, `dev-planned` and `dev-planned-build`**: `after: review`, `workspace: base`, `gate: true`, implement's
   denies, no check of its own. Its prose is the loop the operator ran by hand on 2026-09-16 and 17 — look at the checkout, `git merge
   --no-ff --no-commit`, that folder's check whole, `git commit --no-edit`, `git merge --abort` on any failure — with what happened in its
   closeout. dev-planned's is dev's file for file; dev-planned-build's is dev-build's. CLAUDE.md's Git rule gained its one exception.
@@ -3789,9 +3789,9 @@ What was built, four commits:
   `approvalRefusal` share). The same for a person's send-back between the ask and the pass that files it, which `assess` and `listing`
   take as waiting (`unheld`). Found by the review, round 3.
 - **Two runs' ending steps never work in one checkout at once** (`heldCheckouts`, `checkoutHold`). `workspaceFor` hands `run.repo` to any
-  approved `workspace: main` step, so two approved `ship` steps filed in one pass both read `git status --porcelain` clean, both trial
+  approved `workspace: base` step, so two approved `ship` steps filed in one pass both read `git status --porcelain` clean, both trial
   merge, and the loser's `git merge --abort` throws away the winner's staged merge while its check runs; ship.md's prose was the only thing
-  in the way. Now, while a `workspace: main` task of any run on the same repository is in flight, nothing of another is filed — not a first
+  in the way. Now, while a `workspace: base` task of any run on the same repository is in flight, nothing of another is filed — not a first
   session, and not a try of one that ended blocked, which works in that same directory: it reads as waiting,
   `wf ls` says `waiting on the checkout (<run>'s ship has it)` on its line and `wf decide` names the step in it (`checkoutWord`,
   `checkoutLine`). The word is `waiting on the checkout (…)`, not `waiting for …`: the board takes `waiting`, `waiting on …` and `pending`
@@ -3837,7 +3837,7 @@ What was measured:
 - From the root, `npx turbo run test --force`, counted as this file counts them — tests, then passed and skipped: agent-orchestrator 575
   (574 passed, 1 skipped), from 548; api 200, web 243 and agent-runtime 326 (317 passed, 9 skipped) unchanged — the two api tests that
   changed are the rows below, and no api test was added. `npm run typecheck` clean in all four.
-- New tests. `workflow.test.ts`: `workspace: main` read; `worktree`, another word, no value and the line twice refused; a `check:` beside
+- New tests. `workflow.test.ts`: `workspace: base` read; `worktree`, another word, no value and the line twice refused; a `check:` beside
   it refused, either order; a step anything waits on, and one beside another ending, refused at load; the key rendered back in
   `STEP_KEYS` order. `run.test.ts`: `workspacePlan`, `resultSteps` and `tipBranches` on an ending; the brief that names the branches; the
   gate held unfiled pass after pass with `toDecide`, and gone once approved; the gate not held while the work runs or after it broke, with
@@ -3853,7 +3853,7 @@ What was measured:
 - The fence tests hold the new step: `ui-workflow.test.ts` holds every `dev*` folder's `ship` to its keys and its recipe, with each
   folder's own check in it, and the two copies to their originals; `planned-workflow.test.ts` reads dev-planned as `plan → implement ⇄
   review → ship`.
-- From the review's second round: `workflow.test.ts` refuses `resume:` beside `workspace: main`, either order, with each key on its own
+- From the review's second round: `workflow.test.ts` refuses `resume:` beside `workspace: base`, either order, with each key on its own
   still read; `ship.test.ts` files a child `--after` a run whose ending merged and holds its brief to what the work said, never to the
   ending's account of its own merge; `decide.test.ts` reads the whole screen of a run parked at a gate that worked on the base branch
   itself, which used to return before the decision was printed; `run.test.ts` holds `wf rm`'s words at both kinds of gate.
@@ -3872,7 +3872,7 @@ What was measured:
   session, which `ship.test.ts` reads between `wf cancel` and the stop; `run.test.ts` holds `heldCheckouts` to the oldest word, the id on a
   tie, a step already in it keeping it, and one repository at a time, and holds the word to the `waiting on …` prefix the board reads.
 - From its third round, one finding: a claim on the checkout is a promise the pass would file the step. `ship.test.ts` holds a merge-only
-  folder — one `workspace: main` step, which is its own root — to claiming nothing while it waits on a run that has not shipped and while
+  folder — one `workspace: base` step, which is its own root — to claiming nothing while it waits on a run that has not shipped and while
   the cap on runs in flight holds it, with the oldest word of all; and to being held all the same, once its parent has shipped, by a step
   that is in the checkout, and filed on the pass after that one settles. Each half fails without its gate, and the second fails on the
   `hasStarted` shortcut that would have opened the reverse hole.
@@ -3959,7 +3959,7 @@ What it leaves:
   starts from, and the key form's union. It does not lose it: `draftOf` and `changed` (`apps/web/src/lib/builder.ts`) spread the spec they
   were given, so the key rides a round trip of a folder that already has it, and the api's side is lossless by type (`WorkflowStepSpec`,
   `specOf`, `draftOf`), which `builder.test.ts` holds on a `dev` folder.
-- **A run with two endings.** `validate` refuses two `workspace: main` steps side by side, and `toDecide` names the first ending that waits;
+- **A run with two endings.** `validate` refuses two `workspace: base` steps side by side, and `toDecide` names the first ending that waits;
   a workflow that deliberately ends wide with two gated endings is not something anybody has run.
 - **An ending step's artifacts from its workspace are not collected**, since the run hands nothing off in that checkout: such a step writes
   into the directory its brief names, by absolute path, and one it names from the workspace reads `not collected` on `wf decide` — which is
@@ -4025,7 +4025,7 @@ What was built, four commits:
   another — a slot is a run's, not a step's, so the work beside it would leave the cap too — which is `wf start`'s refusal, with
   nothing written. It still takes a session slot (`WF_MAX_CONCURRENT`), as every session does: what the cap holds is work, and this
   session is not that.
-- **`workflows/supervisor/`**, one step: `workspace: main` (the store and the runs' branches are what it reads; the little it writes
+- **`workflows/supervisor/`**, one step: `workspace: base` (the store and the runs' branches are what it reads; the little it writes
   is bookkeeping), `slot: none`, `remote: true` so the person it asks can answer from a phone, `harness: claude` on opus, implement's
   denies, no `check:` — it produces questions and approvals, and there is nothing to verify — and no `output:`, which is what lets it
   sign off `blocked` for ever without inventing declared fields each time. Its brief is the loop: `wf ls` as the pass; a run to decide,
@@ -4035,10 +4035,10 @@ What was built, four commits:
   signing off `blocked` — the brief in `summary`, the question and options in `needs` — and on a yes says `wf approve <run> <step>` and
   nothing more. **It never types git for a run**, and what it commits here it commits by path.
 - **What a step in the person's checkout is told.** Two things the brief had wrong, both found by reading the supervisor's own first
-  brief. The artifacts contract offered it the second way — leave the file in this workspace — which for a `workspace: main` step is
+  brief. The artifacts contract offered it the second way — leave the file in this workspace — which for a `workspace: base` step is
   false and does harm: the run hands nothing off there (`handOffDue` skips it), so the file is never collected, never committed, and
   stays in a person's checkout, where the next run's ending step reads `git status --porcelain` as dirty and stops. Such a step is now
-  told the one way that is true, under a heading that names its reader, with no `WF_ARTIFACTS` sentence — `workspace: main` refuses a
+  told the one way that is true, under a heading that names its reader, with no `WF_ARTIFACTS` sentence — `workspace: base` refuses a
   check, so there is none to be given it. (The review of §8's run found this; it is that finding, closed.) And a run whose ending step
   is its whole workflow cut no branch, so "the run's work is on the run's result branch" was followed by an empty fence: it is told
   there is no work of its to read, and the base it is standing on.
@@ -4062,7 +4062,7 @@ What was built, four commits:
   keys' closed list, and the cap's own section. With, from round 2: what a supervisor costs in sessions (`WF_MAX_CONCURRENT` is 2
   unless set, per harness pool, and a session that is watching is a session at work — so at the default it leaves one slot for the work
   it watches, and the ceiling is worth raising before starting one), and the artifacts bullet that said a step is told both ways, which
-  a `workspace: main` step is not.
+  a `workspace: base` step is not.
 
 What was measured:
 
@@ -4113,7 +4113,7 @@ What it leaves:
   waiting to be answered — in the colour of a run that broke.
 - **A queued inbox card of such a workflow still waits for a free slot.** The queue starts one card a pass while a slot is free,
   whatever workflow the card names, and `startQueued` is not given the folder's steps. Start the supervisor by hand, as its README says.
-- **`--no-worktree` is refused for it**, because its step says `workspace: main` and `stepsToStart` reads that as a folder that merges.
+- **`--no-worktree` is refused for it**, because its step says `workspace: base` and `stepsToStart` reads that as a folder that merges.
   The words are about merging, which this folder does not do; the default start is what it wants, and the run's worktree costs nothing
   since its one step works in the checkout.
 - **A screen of a long-lived run still reads every try.** `wf decide` prints what the run cost and its timeline over all of them, and
@@ -4191,7 +4191,7 @@ What it leaves:
 Five things the reviews of §9's package half and of the checkout hold found and left, one commit each, in `packages/agent-orchestrator` and
 `workflows/supervisor/` only. Nothing in `apps/` and nothing in the engine: where the board would show a fix differently, the bullet says so.
 
-- **A step in the checkout is not told a sha frozen at `wf start`.** The brief of a `workspace: main` step whose run cut no branch ended "The
+- **A step in the checkout is not told a sha frozen at `wf start`.** The brief of a `workspace: base` step whose run cut no branch ended "The
   checkout is at `<run.baseRef>`": a present-tense claim made from the sha the run froze. The supervisor's run never ends and its brief is
   composed again on every answer that starts a new session, so from the first merge on it named a commit several merges behind. The clause
   is dropped rather than reworded — the sentence before it already names the base branch, `on main`, which stays true however far the
@@ -4371,7 +4371,7 @@ git, where the owner and anyone reading history later look.
   --format='%s'`, `git diff --stat`, `git rev-list --count`, base to branch), never off an account of the work. No trailers of any kind;
   `--no-edit` is named only to be forbidden.
 - **Written to a file outside the checkout, committed with `-F`.** The file goes in the directory the brief names under *Files for the
-  person who decides* — the step's artifacts directory, by absolute path. The brief of a `workspace: main` step does not name it as
+  person who decides* — the step's artifacts directory, by absolute path. The brief of a `workspace: base` step does not name it as
   `WF_ARTIFACTS`, and the step's session is not given that variable (only a check is, `checkBrief`), so the recipe points at the heading
   rather than at `$WF_ARTIFACTS`, which would be empty in the shipper's shell. Item 5 is unchanged in effect: on anything but a green check
   the merge is aborted, nothing is committed, and no message reaches git.
@@ -4381,7 +4381,7 @@ git, where the owner and anyone reading history later look.
   used to pin git's default subject. `agents-before-after.test.ts` holds every resolved key and the same eight moved bodies: the four ship
   bodies were already among them.
 
-What it leaves: nothing refuses a bare default message; this is prose. The cheapest refusal is where a settled `workspace: main` step's
+What it leaves: nothing refuses a bare default message; this is prose. The cheapest refusal is where a settled `workspace: base` step's
 closeout is read as `done` (`isShipped` and the ending's decision): a merge commit on the base with the result branch as a parent whose
 subject matches `^Merge branch '` reads as not signed off well — a finding for the person, not a revert.
 
@@ -5041,7 +5041,7 @@ Until 2026-09-25 the shipper ran the ship's check itself, mid-merge, in its own 
 wait for a suite that runs twenty minutes (the harness demands the closing statement at once, `[structured-output-enforce]`), and
 whose check nobody but the shipper read. The run executes it now, as it executes a step's check, and commits or aborts on its exit.
 
-- **A gated `workspace: main` step may carry `check:`**, and the four `dev*` folders' `ship.md` carry implement's line (cb4141e), and
+- **A gated `workspace: base` step may carry `check:`**, and the four `dev*` folders' `ship.md` carry implement's line (cb4141e), and
   so do both ui folders' since main gave them a ship (round 4, the merge of main: their `ship.md` is dev-build's, byte for byte).
   Implement's line runs the e2e only where no `WF_BASE_REF` is set, and the tick sets none on an ending's check, so the ship's check is
   where the e2e runs; `web-check.test.ts` runs each folder's line through `CHECK` with the environment the tick hands an ending.
@@ -5059,7 +5059,7 @@ whose check nobody but the shipper read. The run executes it now, as it executes
   `Bash(git merge --continue:*)` beside its own `disallowedTools:` (`filedDenies` in `ending/ending.ts`), each try and each round, so the folder
   need not repeat the agent's list. A deny is a prefix, not a sandbox: `git merge` without `--no-commit` still commits a clean merge, and
   the pass after records that as committed before its check ran. On codex, which takes no deny list, the parser refuses `check:` beside
-  `workspace: main` (review round 1).
+  `workspace: base` (review round 1).
 - **Aborted, with what `wf decide` says:** a refusal (`exit N`); a check that did not finish — no verdict, so nothing lands, and the offer
   is `wf retry <run> ship`, never `--recheck`, since the merge it checked is gone (the owner's word at the plan gate); a blank message;
   a staged merge that conflicts or leaves out a result branch; the run cancelled, or held before its check was filed; the session ending
@@ -5093,7 +5093,7 @@ status, and what landed in the step's note, as `wf ls` prints it.
 Review's finding on the run that moved the e2e to the merged tree (2026-09-25): `ui` had no ship, so no check the run executes ever ran
 the e2e for a ui run, and the change reached main tested by the implementer's own run and whatever the person merging ran by hand.
 
-- **Both ui folders end in `ship`, a copy of `workflows/dev-build/ship.md`**: `after: review`, `workspace: main`, `agent: shipper`,
+- **Both ui folders end in `ship`, a copy of `workflows/dev-build/ship.md`**: `after: review`, `workspace: base`, `agent: shipper`,
   `gate: true`, and the build folders' note on why the build and the e2e matter on the merged tree, which holds for `ui` word for word
   since its implement check is theirs. No code changed: `composeBrief` already names the folder's check under *Where to look*, and the
   shipper runs it mid-merge with nothing set, so the e2e runs there. A ui run now waits at the gate once the loop is done, for
@@ -5406,7 +5406,7 @@ Shipped 2026-09-25. Part 1 made a remote A2A agent a harness of the runtime; thi
 
 Where it departs from the plan: the api names the agent in a field of its own, `StepFiled.remote`, rather than in `runsIn`, which is a
 permission mode and has none to say; `specOf` needed no change, since `harness` already carries the name. The form still offers
-`workspace: main` on a remote step, and the save refuses it in the package's words.
+`workspace: base` on a remote step, and the save refuses it in the package's words.
 
 Left for later: **a remote step's transcript** — the runtime has no `transcript` for another party's agent, so the board's session
 view is empty for it — and **`output:` on a remote step**, a declared shape sent as the reply's schema and read as the closeout's,
@@ -5445,7 +5445,7 @@ open a pull request.
 - **A run already in flight keeps what it froze.** A step is filed from the workflow frozen on the run at `wf start` (`stepsOf`,
   `filedDenies`), not from the agent's file, so a run started before this landed keeps the four denies. Its worktree steps read the
   settings of the branch as it was cut, which still deny the five, until that branch merges main. Its ending step, in the repository's
-  own checkout (`workspace: main`), reads main's settings, which deny nothing: nothing refuses that one step a push, a forced delete
+  own checkout (`workspace: base`), reads main's settings, which deny nothing: nothing refuses that one step a push, a forced delete
   or the unsafe tool but its brief. Start such a run again rather than approve its ship unwatched. A supervisor started before this
   landed keeps its old list, without the forced delete: stop it and start it again.
 
@@ -5601,7 +5601,7 @@ which that record quotes, is in this file's history before 2026-10-23.
 
 ## 8. The end of a run is a step of its workflow, and a finished run is a decision on the board
 
-Shipped 2026-09-17 as *Shipped: the end of a run is a step of its workflow*, above: the package half — `workspace: main`, the ending's
+Shipped 2026-09-17 as *Shipped: the end of a run is a step of its workflow*, above: the package half — `workspace: base`, the ending's
 gate, `to decide`, `wf decide`'s facts and `ship.md` on the four `dev*` folders — and then the board's half, the Factory's count and
 its marked card, the Runs page's group, the run page's banner and the ending's gate panel. Its registration, which that record quotes,
 is in this file's history before 2026-10-23.

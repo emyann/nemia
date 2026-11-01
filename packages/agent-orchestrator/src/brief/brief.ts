@@ -119,7 +119,7 @@ const opened = (step: Workflow): string => [PRECEDENCE, briefBody(step)].filter(
  * A fan-in works on a branch with every step it waits on merged in, unless it works in the repository's checkout or in a folder, where
  * nothing is merged. A folder step is told which earlier steps worked in its own folder, read off the folders the record names, not the
  * plan, and the folders it was given (`givenPlan`), inside the fence — never those of steps it does not wait on; it is told to judge
- * only what it can open. A step in the repository's own checkout (`workspace: main`) is told the run's result branches, or, for a run
+ * only what it can open. A step in the repository's own checkout (`workspace: base`) is told the run's result branches, or, for a run
  * that cut none, that there is no work of its to read; never where the checkout stands, since a step composed again on every answer
  * would name a commit behind it. Unless it has a check of its own, which the run executes on its merge (`landingContract`), it is told
  * the workflow's checks its work was judged by (`workChecks`).
@@ -256,7 +256,7 @@ function laterLook(run: RepositoryRun, say: PlaceSay | undefined): string[] {
 }
 
 /**
- * Where a step in the repository's own checkout looks (`workspace: main`): that it is there, the run's result branches and how to read
+ * Where a step in the repository's own checkout looks (`workspace: base`): that it is there, the run's result branches and how to read
  * each against the base — in the place's words (`say.results`), or where its place's skill says them — or that the run cut none; the
  * workflow's checks, unless it has its own; and that the checkout is the person's.
  */

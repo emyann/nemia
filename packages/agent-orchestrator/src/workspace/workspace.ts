@@ -266,7 +266,7 @@ export function depsLines(deps: Provisioned | undefined): string[] {
  * and later its own check's litter, are in it. Handing the step off before its follower is filed is
  * enough, and `advance` does that in the same pass that files the follower.
  *
- * Never a step that works in the repository's own checkout (`workspace: main`): what lies in a person's
+ * Never a step that works in the repository's own checkout (`workspace: base`): what lies in a person's
  * checkout is not the run's to commit under a step's name, and such a step commits its own work there.
  * And once for each try (`handedOff`): what is in the workspace after the hand-off is a person's, or
  * the next step's, and not this step's to sign.
@@ -317,7 +317,7 @@ function downstreamOf(steps: readonly Workflow[], name: string): Set<string> {
  *   - **merge** — a step that waits on SEVERAL steps is a fan-in, so it gets a worktree with all
  *     of their work combined. `after: a, b` means "wait for both" and "give me both". Nobody has
  *     to learn a new key for the thing they already asked for.
- *   - **main** — the one a step says rather than the shape: `workspace: main`, the repository's own
+ *   - **main** — the one a step says rather than the shape: `workspace: base`, the repository's own
  *     checkout, for the last step of a workflow, which acts on the base branch. No worktree is cut,
  *     nothing is merged into it, and the run commits nothing there: what a person's checkout holds is
  *     theirs, and the step commits its own work as they would.
@@ -372,7 +372,7 @@ export function givenPlan(run: Pick<Run, 'place' | 'inputs' | 'steps'>, plan: Wo
 }
 
 /**
- * Which workspace a step needs (`WorkspacePlan`). Pure. `main` is said by the step (`workspace: main`), never read off the shape; a fan-in
+ * Which workspace a step needs (`WorkspacePlan`). Pure. `main` is said by the step (`workspace: base`), never read off the shape; a fan-in
  * merges onto the first of its parents by name.
  */
 export function workspacePlan(steps: readonly Workflow[], step: Workflow): WorkspacePlan {

@@ -2,7 +2,7 @@
 after: review
 place: git
 # The repository's own checkout, where the base branch is.
-workspace: main
+workspace: base
 agent: shipper
 # Nothing of this step is filed until a person approves it.
 gate: true

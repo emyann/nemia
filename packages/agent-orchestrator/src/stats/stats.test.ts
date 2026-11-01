@@ -1,6 +1,6 @@
 /**
  * The flow numbers (`factsOf`, `statsOf`, `stats.ts`), off a real timeline (`timeline`) of hand-built views: each number is keyed on a
- * workflow's structure — `loop:` for rounds, `workspace: main` for landings — never on a step's name, and absent where nothing measured it.
+ * workflow's structure — `loop:` for rounds, `workspace: base` for landings — never on a step's name, and absent where nothing measured it.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -206,7 +206,7 @@ test('a loop that has not ended accepted counts no rounds: its reviewer asked ag
   assert.deepEqual(factsOf(r).runs[0].rounds, [1], 'an acceptance of the try the loop is on ends it');
 });
 
-test('first-try landings read the `workspace: main` step: landed on try 1 counts both, on try 2 only landed, and no ending is absent', () => {
+test('first-try landings read the `workspace: base` step: landed on try 1 counts both, on try 2 only landed, and no ending is absent', () => {
   const first = twoRounds(
     'first',
     TEAM.map((s) => (s.name === 'land' ? { ...s, name: 'ship' } : s)),
@@ -231,7 +231,7 @@ test('first-try landings read the `workspace: main` step: landed on try 1 counts
   assert.deepEqual(
     [byId.get('first')?.landed, byId.get('first')?.firstTry],
     [true, true],
-    'the ending is found by `workspace: main`, not by its name',
+    'the ending is found by `workspace: base`, not by its name',
   );
   assert.deepEqual([byId.get('second')?.landed, byId.get('second')?.firstTry], [true, false]);
   assert.deepEqual([byId.get('none')?.landed, byId.get('none')?.firstTry], [null, null]);

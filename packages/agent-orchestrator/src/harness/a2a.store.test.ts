@@ -294,7 +294,7 @@ test('each key that tells a harness of ours how to run is refused on a remote st
     /^ask: `loop: plan` .*remote A2A agent/,
   );
   assert.match(
-    loadRefusal(() => parseWorkflow('ask', '---\nplace: git\nharness: a2a:reviewer\nworkspace: main\n---\nx\n')),
+    loadRefusal(() => parseWorkflow('ask', '---\nplace: git\nharness: a2a:reviewer\nworkspace: base\n---\nx\n')),
     /^ask: `workspace: base` runs the step in the repository's own checkout/,
   );
   assert.deepEqual(

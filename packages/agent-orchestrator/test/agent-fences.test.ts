@@ -783,7 +783,7 @@ test("REFUSED: a watcher's step without its own deny of the forced delete is ope
   const supervise = loadWorkflows(
     folderOf({
       supervise:
-        'workspace: main\nslot: none\nharness: claude\npermissionMode: dontAsk\n' +
+        'workspace: base\nslot: none\nharness: claude\npermissionMode: dontAsk\n' +
         'disallowedTools: Bash(git push:*), Bash(gh), Bash(gh:*), Bash(git branch -D:*), Bash(git branch --delete --force:*), ' +
         'Bash(pkill:*), Bash(killall:*), ' +
         'mcp__playwright__browser_run_code_unsafe',
@@ -1414,7 +1414,7 @@ test("REFUSED: a quick land whose check, workspace, gate, fence or budget is no 
     ['check', (text) => text.replace('receipt --run "$WF_RUN"', 'receipt --run "$WF_STEP"')],
     ['check', (text) => text.replace('git show "HEAD:workflows/build/landing.ts"', 'cat workflows/build/landing.ts')],
     ['note', (text) => text.replace('It deletes no branch and stages no merge here.', '')],
-    ['workspace', (text) => text.replace('workspace: main\n', '')],
+    ['workspace', (text) => text.replace('workspace: base\n', '')],
     ['fence', (text) => text.replace(', Bash(*:4317*)', '')],
     ['budget', (text) => text.replace('budget: 10', 'budget: 11')],
   ];

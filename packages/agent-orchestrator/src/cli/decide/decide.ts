@@ -185,7 +185,7 @@ type Awaiting = Extract<Decided['decision'], { kind: 'awaiting' }>;
 /** A run's steps, as its workflow was frozen. */
 type Steps = ReturnType<typeof stepsOf>;
 
-/** The step at `workspace: main`, the run's ending, and the line that says it waits for the checkout another run's ending has, or `''`. */
+/** The step at `workspace: base`, the run's ending, and the line that says it waits for the checkout another run's ending has, or `''`. */
 type HeldOut = { ending?: Steps[number]; heldOut: string };
 
 /** A step's closeout as `decide` read it, or why it could not be read. */

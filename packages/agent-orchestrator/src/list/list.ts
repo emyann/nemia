@@ -185,7 +185,7 @@ export interface ListingInput {
    */
   readonly standings?: readonly BranchStanding[];
   /**
-   * The run whose `workspace: main` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
+   * The run whose `workspace: base` step is in the repository's own checkout while this run's waits for it (`checkoutHold` in
    * ending.verb.ts): what this run's ending says where `waiting` would be.
    */
   readonly checkout?: CheckoutHold;

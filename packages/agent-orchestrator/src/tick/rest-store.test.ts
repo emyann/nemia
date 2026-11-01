@@ -682,7 +682,7 @@ const shipping = () => {
   fs.writeFileSync(path.join(dir, 'implement.md'), '---\nplace: git\nharness: codex\n---\nimplement it\n');
   fs.writeFileSync(
     path.join(dir, 'ship.md'),
-    '---\nplace: git\nharness: codex\nafter: implement\nworkspace: main\ngate: true\n---\nship it\n',
+    '---\nplace: git\nharness: codex\nafter: implement\nworkspace: base\ngate: true\n---\nship it\n',
   );
   return dir;
 };

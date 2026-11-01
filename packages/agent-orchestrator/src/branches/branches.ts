@@ -20,7 +20,7 @@ import type { BranchStood } from '../place/place.ts';
 
 /**
  * The steps whose branch is the run's result: the steps nothing waits on (`terminalSteps`) — and, where one of those works in the
- * repository's own checkout (`workspace: main`), the steps it waits on instead. Pure.
+ * repository's own checkout (`workspace: base`), the steps it waits on instead. Pure.
  *
  * An ending step has no branch of its own: it works on the base branch, and what it acts on is the work of the steps before it. Read as
  * the result, its `main` would be the run's own branch, and every question about the run's result — has it landed, what did it touch,
@@ -325,7 +325,7 @@ export function radiusLines(r: Radius): string[] {
  * where the work a person has to judge is.
  *
  * `base` is the run's own base branch, given only for a run that cut worktrees (`isolate`): it is dropped from that fallback, because
- * such a run's work is never on it. A step that recorded the base branch worked in the repository's own checkout (`workspace: main`),
+ * such a run's work is never on it. A step that recorded the base branch worked in the repository's own checkout (`workspace: base`),
  * where the run commits nothing — so the diff between the run's frozen base and that branch is not the run's work but the base moving
  * under it, which every other run's merge adds to, and read as the work it would show a person everything merged since the run
  * started. `tipBranches` refuses the same branch for the same reason.

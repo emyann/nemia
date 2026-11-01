@@ -235,7 +235,7 @@ export const sendBackTo = (step: Workflow, run: Run): string[] => (run.steps[ste
 
 /**
  * Whether an ending's merge is landed by the run on its check: it acts on the base branch (`endsOnBase`) and has a `check:` — which a
- * workflow takes beside `workspace: main` only with `gate: true`, so that a person's approval files it, or with a step before it that can
+ * workflow takes beside `workspace: base` only with `gate: true`, so that a person's approval files it, or with a step before it that can
  * send the work back (`loop:`), so that its pass files it (`validateBaseWorkspace`). Pure, and no reading of the gate: what the step is,
  * not who files it.
  *
@@ -250,7 +250,7 @@ export const landsOnCheck = (step: Pick<Workflow, 'name' | 'gate' | 'workspace' 
   endsOnBase(step) && step.check !== undefined;
 
 /**
- * Whether this step waits on the checkout on a pass: it works in the repository's own checkout (`workspace: main`), and another run's
+ * Whether this step waits on the checkout on a pass: it works in the repository's own checkout (`workspace: base`), and another run's
  * step is in that one directory (`heldCheckouts`). Pure. Nothing of it is filed while that is so — a first session, or another try.
  */
 export const waitsOnCheckout = (steps: readonly Workflow[], name: string, checkout: CheckoutHold | undefined): boolean =>

@@ -119,7 +119,7 @@ const stepAtWork = (
 
 /**
  * The tasks of `run` a pause at once stops: those still at work as `finishingOf` reads them, but a step's in the repository's own
- * checkout (`workspace: main`), whose session, check and merge are a landing and finish, and one the engine was already asked to stop.
+ * checkout (`workspace: base`), whose session, check and merge are a landing and finish, and one the engine was already asked to stop.
  */
 export function interruptsOf(run: Run, steps: readonly Workflow[], viewOf: (taskId: string) => FinishingView | undefined): Interrupt[] {
   return steps

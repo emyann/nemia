@@ -49,7 +49,7 @@ export const filedDenies = (
 
 /**
  * The allow list a step is filed with, each try and each round: its own, and for a step in the repository's own checkout
- * (`workspace: main`) on a harness fenced by a permission mode and its rules, a read of its own run's artifacts folder, `runArtifacts`
+ * (`workspace: base`) on a harness fenced by a permission mode and its rules, a read of its own run's artifacts folder, `runArtifacts`
  * (absolute), in the rule's `//` form. Such a step reads what the steps before it left there, and a checkout's local settings, where a
  * person's "don't ask again" writes, reach no step's session; the rule grants a read of that one run's folder and no write. Any other
  * step is filed with its own list. Pure.
@@ -59,7 +59,7 @@ export const filedAllows = (step: Pick<Workflow, 'workspace' | 'harness' | 'allo
 
 /**
  * Whether a step is filed a rule reading its run's artifacts folder (`filedAllows`): one in the repository's own checkout
- * (`workspace: main`) on a local harness fenced by a permission mode and its rules, not by a sandbox. Pure.
+ * (`workspace: base`) on a local harness fenced by a permission mode and its rules, not by a sandbox. Pure.
  */
 export const readsRunArtifacts = (step: Pick<Workflow, 'workspace' | 'harness'>): boolean =>
   endsOnBase(step) && !sandboxed(step.harness ?? DEFAULT_HARNESS) && !isRemoteHarness(step.harness);
@@ -255,7 +255,7 @@ export const onBaseNote = (run: Pick<Run, 'id' | 'branch'>, step: string, standi
  *            line of its own note (`ownNote`), for an ending that has not run — null where it has no note, and null for a gated step that
  *            has signed off (`filed`), whose closeout is what to read, since approving that one accepts what it did rather than letting it
  *            act
- *   git      nothing waits at such a gate, every step of the run finished, no step of the workflow merges (`workspace: main`), and a result
+ *   git      nothing waits at such a gate, every step of the run finished, no step of the workflow merges (`workspace: base`), and a result
  *            branch is ahead of the base branch and not gone: the branch is the product, and merging or dropping it is a person's, by hand
  *
  * A folder whose ending merges answers for its own branch, so once that step has run there is nothing here to say; every other folder hands
@@ -298,7 +298,7 @@ export const merges = (steps: readonly Workflow[]): boolean => steps.some(endsOn
  * The workflow's ending steps: the steps nothing waits on that have a gate (`hasGate`). Pure.
  *
  * An ending is where a person's word ends the run. In a folder written for it, that step says in prose what happens when the work is done
- * — merge it, open a pull request, publish the study — and where it acts on the base branch it says `workspace: main` and is held before it
+ * — merge it, open a pull request, publish the study — and where it acts on the base branch it says `workspace: base` and is held before it
  * is filed. A gate a run was started with (`--gate <the last step>`) makes an ending of a step that was written as work: approving it is
  * then acceptance, and what becomes of the branch is still a person's (`merges`). Usually one; several only where a workflow ends wide.
  *

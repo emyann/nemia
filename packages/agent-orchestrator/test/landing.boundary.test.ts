@@ -603,7 +603,7 @@ test("both land steps' checks are the receipt alone, frozen out of HEAD in the c
     assert.ok(frozen.includes('git show "HEAD:workflows/build/landing.ts"'), `the receipt is frozen out of HEAD:\n${frozen}`);
     assert.match(frozen, /mktemp -d/, `into a directory of its own:\n${frozen}`);
     assert.ok(frozen.includes('landing.ts" receipt --run "$WF_RUN"'), `and run on the run the check names:\n${frozen}`);
-    assert.doesNotMatch(frozen, /\$WF_BASE_REF/, 'a workspace: main step is given no base ref');
+    assert.doesNotMatch(frozen, /\$WF_BASE_REF/, 'a workspace: base step is given no base ref');
     assert.doesNotMatch(frozen, /turbo run test|npm test/, "the suite is ci's, on the head the review read");
     assert.doesNotMatch(frozen, /npm run e2e/, 'and so is the whole e2e');
     assert.doesNotMatch(frozen, /--delete-branch/, "and the head branch is GitHub's to delete");

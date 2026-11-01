@@ -73,7 +73,7 @@ test("the plan: workspace packages to the worktree's copy, every other package m
       { kind: 'link', path: `${nm}/.bin/third`, target: '../third/cli.js' },
       { kind: 'tree', path: `${nm}/.bin/shim`, from: '/repo/node_modules/.bin/shim' },
     ],
-    "far, a file: dependency outside the repository, and alias, a link within node_modules, are no workspace: main's, linked; shim, a bin that is a file, not npm's link to one, is hardlinked like a package",
+    "far, a file: dependency outside the repository, and alias, a link within node_modules, are no workspace: base's, linked; shim, a bin that is a file, not npm's link to one, is hardlinked like a package",
   );
 });
 

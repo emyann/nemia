@@ -36,7 +36,7 @@ export type Assessment = {
   unreachable: string[];
   /**
    * Steps waiting on the repository's own checkout on this pass (`waitsOnCheckout`): an ending a person's word would file, or a try of one,
-   * while another run's `workspace: main` step is in that one directory. Nothing of them is filed, and the run is running for them — so the
+   * while another run's `workspace: base` step is in that one directory. Nothing of them is filed, and the run is running for them — so the
    * cap on runs in flight still counts it (`slotNeed`), as it counts a run whose next step the pass files.
    */
   waitingOnCheckout: string[];
@@ -96,7 +96,7 @@ export type Assessment = {
  * @param spendOf What each task's sessions cost (`taskSpend`): what holds a step over its `budget:`. Left out, no step is over.
  * @param standings Where each result branch stands against the base branch on this pass (`branchStandings` in branches.store.ts): what says
  *   a run whose folder has no gated ending is one nobody has decided (`toDecide`). Left out, no branch is ahead, and only a gate says so.
- * @param checkout The run whose `workspace: main` step is in the repository's own checkout (`checkoutHold` in ending.verb.ts), if one is.
+ * @param checkout The run whose `workspace: base` step is in the repository's own checkout (`checkoutHold` in ending.verb.ts), if one is.
  *   Left out, nothing holds the checkout.
  */
 export function assess(

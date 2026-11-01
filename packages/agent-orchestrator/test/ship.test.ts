@@ -1385,7 +1385,7 @@ test('two runs of one repository at their endings: the oldest approval takes the
   );
 
   await s.test(
-    "a `workspace: main` task the engine has lost holds no checkout: a run nobody can stop does not hold every other run's ending for ever",
+    "a `workspace: base` task the engine has lost holds no checkout: a run nobody can stop does not hold every other run's ending for ever",
     async () => {
       const { first, second } = await at.twoApproved();
       await at.pass(second.id);

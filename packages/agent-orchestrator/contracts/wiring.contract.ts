@@ -84,9 +84,12 @@ const wiringRefusalSpec = spec<(factory: Factory, change: WiringChange) => Wirin
         change.verb !== 'fire' || Object.hasOwn(factory.hires, change.step) || output?.kind === 'Missing',
     },
     detachOnlyOffered: {
-      description: 'A detach of a workflow it does not offer is refused',
+      description: 'A detach of a well-named workflow it does not offer is refused, as Missing',
       condition: ({ input: [factory, change], output }) =>
-        change.verb !== 'detach' || factory.workflows.includes(change.workflow) || output !== null,
+        change.verb !== 'detach' ||
+        workflowNameRefusal(change.workflow) !== undefined ||
+        factory.workflows.includes(change.workflow) ||
+        output?.kind === 'Missing',
     },
     detachLeavesNoHire: {
       description: 'A detach of a workflow it still hires into is refused',

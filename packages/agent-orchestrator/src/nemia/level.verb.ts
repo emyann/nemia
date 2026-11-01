@@ -22,7 +22,10 @@ import {
   type FactoryLevel,
   type FactoryLevelFile,
 } from '../level/level.ts';
-import { readFactoryLevel, writeFactoryLevel } from '../level/level.store.ts';
+import { readFactoryLevel } from '../level/level.store.ts';
+import { FactoryName } from '../factory/factory.model.ts';
+import { FactoryDoor } from '../factories/factories.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
 import { levelsNow } from '../level/levels.verb.ts';
 import { EngineService, asked, tried, trustedFolder, type Engine } from '../runtime-client.ts';
 import { dollars, taskSpend, type Spend } from '../status/status.ts';
@@ -151,7 +154,7 @@ const factoryAskOf = (args: Args): FactoryAsk | undefined =>
  * `nemia level`'s handler: where she is, after the level asked is written, where one is. Her task is named in the store's file first, then
  * the factory's file written: a failure between them leaves a task named and nothing above `manual`, which the keeper leaves alone.
  */
-const levelBy = (args: Args) =>
+const levelBy = (args: Args, home?: string) =>
   Effect.gen(function* () {
     const e = yield* EngineService;
     const now = yield* levelNow(e);
@@ -165,7 +168,12 @@ const levelBy = (args: Args) =>
     const above = levelsAfter(now.factories, store, changed, at.getTime(), DEFAULT_FACTORY).some((row) => row.level !== 'manual');
     const storeFile = yield* tried(() => storeAsked(store, storeSet, above, now, at.toISOString()));
     if (storeFile !== undefined) yield* tried(() => writeLevel(storeFile));
-    if (changed !== undefined) yield* tried(() => writeFactoryLevel(changed.factory, changed.file));
+    if (changed !== undefined)
+      yield* rooted(
+        home,
+        'level',
+        Effect.flatMap(FactoryDoor, (door) => door.level.write(FactoryName.read(changed.factory), changed.file)),
+      );
     return yield* levelNow(e);
   });
 
@@ -266,6 +274,6 @@ export const LEVEL: Command<NemiaLevel> = {
     },
     { method: 'PUT', path: '/api/level', status: 200 },
   ],
-  handler: levelBy,
+  handler: (args, _env, home) => levelBy(args, home),
   print: levelLines,
 };

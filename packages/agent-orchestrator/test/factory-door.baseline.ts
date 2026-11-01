@@ -22,7 +22,7 @@ export const FACTORY_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/inbox/inbox.verb.ts': 3,
   'src/level/levels.verb.ts': 1,
   'src/nemia/keep.verb.ts': 1,
-  'src/nemia/level.verb.ts': 3,
+  'src/nemia/level.verb.ts': 2,
   'src/plan/plan.verb.ts': 1,
   'src/revisions/pin.verb.ts': 1,
   'src/rules/rules.verb.ts': 2,
@@ -36,5 +36,5 @@ export const FACTORY_DOOR_DEBT: Readonly<Record<string, number>> = {
   'src/template/template.verb.ts': 1,
   'src/tick/told.verb.ts': 1,
   'src/trust/trust.verb.ts': 1,
-  'src/upgrade/upgrade.verb.ts': 2,
+  'src/upgrade/upgrade.verb.ts': 1,
 };

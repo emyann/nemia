@@ -81,7 +81,6 @@ const SEAM = [
   'setRevisions',
   'setSchedule',
   'clearSchedule',
-  'retargetTemplate',
   'factoryNames',
   'startFactory',
   'templatedTree',

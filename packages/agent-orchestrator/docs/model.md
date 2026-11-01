@@ -17,7 +17,7 @@ The diagram below is printed by the code (`src/model/diagram.model.ts`, through 
   `TaskId` by key alone; S4 picks the pattern a task's id is checked by on create.
 - **S5, the definitions**, each read and written through a door on the Run door's pattern, its files today's. **S5a**, the Factory door
   (`FactoryDoor`, `src/factories/factories.store.ts`): a factory, its level, rules and servers, rooted at the store's root a program is
-  given (`rootedDoor`), its wiring judged by `wiring.ts` and proved by `contracts/wiring.contract.ts`; the callers still on its stores are
+  given (`rootedDoor`), its wiring judged by `wiring.ts`, whose refusals `contracts/wiring.contract.ts` proves; the callers still on its stores are
   counted in `test/factory-door.baseline.ts`. Still to come, each its own card on S5a: **S5b**, the Workflow door (its steps, over
   `folder.store.ts` and `write.store.ts`); **S5c**, the Agent and Skill doors (one context, the same lookup roots); **S5d**, the
   Template door. A run's frozen `workflow` and its `pinned` revisions, left out of `Run` today, are named there.

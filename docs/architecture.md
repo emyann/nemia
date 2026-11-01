@@ -302,8 +302,8 @@ controller and of each of their callers at once. What still calls the run store'
 as `FactoryName.OnCreate` checks it, the default factory is `Conflict`, and a factory written decodes through the model's `Factory`,
 whose checks are its invariants (one repository at least, hires and schedules only into a workflow it offers), or is `Invalid`. A
 person's change of a factory's wiring — attach, detach, hire, fire, schedule, unschedule — is read, judged by a pure function
-(`wiringRefusal` and `rewired`, `src/wiring/wiring.ts`, proved by `contracts/wiring.contract.ts` to keep that invariant) and written
-back through the door; only the disk's facts (a step's own agent, a cron that fires, a repository that is a directory) stay the
+(`wiringRefusal` and `rewired`, `src/wiring/wiring.ts`, whose contract proves a change that would break that invariant refused) and
+written back through the door, whose decode refuses a factory that breaks it; only the disk's facts (a step's own agent, a cron that fires, a repository that is a directory) stay the
 verb's. Its default departs from the Run door's on one point, which the pattern now carries for every door after it: it is *rooted*
 (`rootedDoor`, `src/door/door.store.ts`), the door over the files at the `StoreRoot` the program is given, read when a method runs,
 and `Invalid`, naming the fix, where none was given — a new door may read no root of its own module's (rule 4's `root-given`), and a

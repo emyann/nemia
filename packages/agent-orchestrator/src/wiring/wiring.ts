@@ -1,9 +1,10 @@
 /**
  * A factory's wiring, judged: the change a person's verb asks of what a factory offers, hires and schedules (`WiringChange`), why it is
  * refused (`wiringRefusal`), and the factory after it where it is not (`rewired`). Pure: what is on disk — that a step's own file names
- * its agent, that a cron fires — is its caller's to ask, and the words are `factory.ts`'s. Both are proved by
- * `contracts/wiring.contract.ts`, so the door's invariant — a factory hires and schedules only into a workflow it offers — is kept by
- * every change this accepts.
+ * its agent, that a cron fires — is its caller's to ask, and the words are `factory.ts`'s. `contracts/wiring.contract.ts` proves
+ * that a change which would break the door's invariant — a factory hires and schedules only into a workflow it offers — is refused,
+ * and what each accepted change does; that the factory written after it keeps the invariant is the door's model decode
+ * (`factoryChecked`, `factories.store.ts`), on every create and rewrite.
  */
 import type { Rewired, WiringRefusal } from '../../contracts/wiring.contract.ts';
 import {

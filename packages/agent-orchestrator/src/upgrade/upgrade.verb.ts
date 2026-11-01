@@ -11,7 +11,11 @@ import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import { Conflict, Invalid, Missing } from '../refusal/refusal.ts';
-import { readFactory, retargetTemplate } from '../factory/factory.store.ts';
+import { readFactory } from '../factory/factory.store.ts';
+import { FactoryName } from '../factory/factory.model.ts';
+import { FactoryDoor } from '../factories/factories.store.ts';
+import { rooted } from '../wiring/wire.verb.ts';
+import { Effect } from 'effect';
 import type { Factory, FactoryTemplate } from '../factory/factory.ts';
 import { renderedAt, setsOf, type RenderedAt } from '../applied/applied.verb.ts';
 import {
@@ -202,14 +206,24 @@ export const FACTORY_UPGRADE: Command<Upgraded> = {
   class: 'ask',
   asksAlways: true,
   only: HERE,
-  handler: (args) =>
-    tried(() => {
-      const { factory, from, to, render, base } = upgradeAsked(args, 'nemia factory upgrade', 'Nothing was upgraded.');
-      const given = textOf(args, 'template');
-      const conflicts = mergeOf(factory.name, base, render).conflicts.length;
-      const { file } = retargetTemplate(factory.name, { version: to, source: given === undefined ? undefined : path.resolve(given) });
-      return { name: factory.name, from, to, file, conflicts };
-    }),
+  handler: (args, _env, home) =>
+    rooted(
+      home,
+      'factory upgrade',
+      Effect.gen(function* () {
+        const { factory, from, to, render, base } = yield* tried(() =>
+          upgradeAsked(args, 'nemia factory upgrade', 'Nothing was upgraded.'),
+        );
+        const given = textOf(args, 'template');
+        const conflicts = yield* tried(() => mergeOf(factory.name, base, render).conflicts.length);
+        const door = yield* FactoryDoor;
+        const now = yield* door.factories.read(FactoryName.read(factory.name));
+        const template = now.template ?? factory.template;
+        const source = given === undefined ? template.source : path.resolve(given);
+        const file = yield* door.factories.rewrite({ ...now, template: { ...template, version: to, source } });
+        return { name: factory.name, from, to, file, conflicts };
+      }),
+    ),
   print: ({ name, from, to, file, conflicts }) => [
     `${name}: ${from ?? UNKNOWN} → ${to}`,
     `filed: ${file}`,

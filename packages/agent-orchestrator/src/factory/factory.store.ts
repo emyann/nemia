@@ -693,20 +693,6 @@ export function clearScheduleAt(home: string, opts: { factory: string; workflow:
 }
 
 /**
- * The template the factory `name` wants retargeted to `version`, and to `source` where given, its parameters and every other key kept, its
- * file written whole: what `nemia factory upgrade` files, and the daemon merges. Refused: the factory (`toChange`), and one not made
- * from a template (`Invalid`).
- */
-export function retargetTemplateAt(home: string, name: string, to: { version: string; source?: string }): { file: string } {
-  const factory = toChange(home, name, 'upgrade');
-  const template = factory.template;
-  if (template === undefined)
-    throw new Invalid({ message: `${name} is not made from a template, so it has none to upgrade. Nothing was upgraded.` });
-  const retargeted = { ...template, version: to.version, source: to.source ?? template.source };
-  return { file: rewriteFactoryAt(home, { ...factory, template: retargeted }, 'Nothing was upgraded.') };
-}
-
-/**
  * A function of this file taking the store's root first, as the old spelling that takes none: `at` the module's root, `HOME`. The one
  * line of this file that reads a root of its own (`test/global-roots.baseline.ts`); each spelling below is called by code not yet on the
  * Factory door (`test/factory-door.baseline.ts`).
@@ -750,5 +736,3 @@ export const setRevisions = atHome(setRevisionsAt);
 export const setSchedule = atHome(setScheduleAt);
 /** `clearScheduleAt` the module's root. */
 export const clearSchedule = atHome(clearScheduleAt);
-/** `retargetTemplateAt` the module's root. */
-export const retargetTemplate = atHome(retargetTemplateAt);

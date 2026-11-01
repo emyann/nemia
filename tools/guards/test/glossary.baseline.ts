@@ -17,8 +17,8 @@
  * and the renders that read it); what the place's words have left is the port's own inner names (`landing.store.ts`'s memo of a
  * checkout's `status` and its `heads`, the record's `stagedFile`), off the contract, which `place-contract.test.ts` holds. The same
  * card moved the run's branch prefix, `wf/<run>/`, out of the core into the place that names it (`runBranch` in `place/git/git.ts`, and
- * its mirror in the test place's `place/memory/reads.ts`): one count each there, against sixteen the core no longer says, and the prefix keeps
- * its spelling until slice 4 renames it.
+ * its mirror in the test place's `place/memory/reads.ts`): one count each there, against sixteen the core no longer says, and the
+ * prefix keeps its spelling until slice 4 renames it.
  *
  * It only shrinks: a change that takes a retired spelling out of a file lowers its count here in the same commit, and takes the entry
  * off where none is left; a new retired row in a table adds the counts of its files the day it lands. A count is never raised, nor a

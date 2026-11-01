@@ -44,6 +44,11 @@
       }
     },
     {
+      "term": "Disk kind",
+      "meaning": "what a part of the store's disk holds, the closed set under each part (`DISK_KINDS`): a worktree's checkout and dependencies; a run's pictures, handed files, agents, inputs, records and marks; the engine's session output, check output, session files, journals and bodies; the sessions' harness records; and checks, series and other, each its part whole, with `runs-other` and `engine-other` the rest of theirs. The `kind` label of a series line (`disk.bytes`).",
+      "type": "DiskKind"
+    },
+    {
       "term": "Limit",
       "meaning": "the most runs in flight; a step a run over it holds back is pending, reason `Waiting`, `on` limit.",
       "type": "WaitOn"

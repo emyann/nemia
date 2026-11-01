@@ -2,6 +2,9 @@
 export {
   addPass,
   breakdownLines,
+  FORMER_PHASE_WORDS,
+  FORMER_PHASES,
+  isPhase,
   heaviest,
   PASS_BOUNDS,
   PHASES,

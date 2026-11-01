@@ -72,12 +72,20 @@ export type Made = {
 export type HandedOff = { readonly commit: string | null };
 
 /**
- * One file a result branch changed: its path, where it came `from` when renamed, how, and its lines added and removed (null for binary).
+ * How a file changed over a range, in the place's words (GitHub's for a commit's files): `added`, `modified`, `removed`, `renamed` (its
+ * `from` says where it came from), `copied` (`from` names the original), and `changed`, its type and not its text — a file turned into a
+ * symbolic link. A place translates its own record into these; the git place maps git's status letters (`report.ts`).
+ */
+export type FileChange = 'added' | 'modified' | 'removed' | 'renamed' | 'copied' | 'changed';
+
+/**
+ * One file a result branch changed: its path, where it came `from` when renamed or copied, how (`FileChange`), and its lines added and
+ * removed (null for binary).
  */
 export type ChangedFile = {
   readonly path: string;
   readonly from?: string;
-  readonly status: string;
+  readonly status: FileChange;
   readonly added: number | null;
   readonly removed: number | null;
 };

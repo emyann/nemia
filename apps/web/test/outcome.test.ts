@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { FOLD_AT, foldsAtGate, imagePaths, MACHINE_WORDS, MARKDOWN_AT, outcomeOf, outcomeWord, outputKind } from '../src/lib/outcome.ts';
 import type { StepAttempts, StepCloseout } from '../src/lib/api.ts';
+import type { AttemptEnd, AttemptOutcome } from '../src/lib/api/tries.ts';
 
 const none = new Set<string>();
 const shot = '/wf/runs/r-1/artifacts/implement/runs-light.png';
@@ -126,7 +127,7 @@ test("the kind is the value's and its schema's, never its field's name: it is no
   assert.equal(outputKind(undefined, { findings: [] }, none), 'json');
 });
 
-const ended = (reason: string, how = 'failed'): StepAttempts => ({
+const ended = (reason: AttemptEnd, how: AttemptOutcome = 'failed'): StepAttempts => ({
   count: 1,
   latest: { startedAt: 'a', ended: how, endedAt: 'b', reason },
 });
@@ -149,7 +150,7 @@ const said = (outcome: 'done' | 'blocked') =>
   }) satisfies StepCloseout;
 
 test("a try's outcome is the agent's when it gave a statement — and says when the machine cut it after", () => {
-  assert.deepEqual(outcomeOf({ closeout: said('blocked'), unreadable: null, attempts: ended('harness', 'done') }, '-'), {
+  assert.deepEqual(outcomeOf({ closeout: said('blocked'), unreadable: null, attempts: ended('harness', 'succeeded') }, '-'), {
     by: 'agent',
     outcome: 'blocked',
     cut: null,
@@ -162,7 +163,7 @@ test("a try's outcome is the agent's when it gave a statement — and says when 
 });
 
 test("with no statement, the machine's reason says why — each reason the engine records, and a harness that ended it failed or stopped", () => {
-  for (const reason of ['unsigned', 'lost', 'unstartable', 'budget', 'operator', 'deadline']) {
+  for (const reason of ['unsigned', 'lost', 'unstartable', 'budget', 'operator', 'deadline'] as const) {
     const o = outcomeOf({ closeout: null, unreadable: null, attempts: ended(reason) }, '-');
     assert.deepEqual(o, { by: 'machine', reason, words: MACHINE_WORDS[reason] });
     assert.equal(outcomeWord(o), reason);
@@ -176,7 +177,7 @@ test("with no statement, the machine's reason says why — each reason the engin
 
 test("a statement that could not be read is the agent's, unreadable, and says why — ahead of any reason the machine gives", () => {
   const unreadable = { error: 'not an object', raw: ['done'] };
-  const o = outcomeOf({ closeout: null, unreadable, attempts: ended('harness', 'done') }, 'No closeout yet.');
+  const o = outcomeOf({ closeout: null, unreadable, attempts: ended('harness', 'succeeded') }, 'No closeout yet.');
   assert.deepEqual(o, {
     by: 'unreadable',
     words: 'It gave a closing statement that could not be read (not an object). Here it is as it came.',
@@ -199,7 +200,7 @@ test("with no statement and no reason — running, not filed, a harness's done �
     nobody,
   );
   assert.deepEqual(outcomeOf({ closeout: null, unreadable: null, attempts: { count: 0, latest: null } }, 'No closeout yet.'), nobody);
-  assert.deepEqual(outcomeOf({ closeout: null, unreadable: null, attempts: ended('harness', 'done') }, 'No closeout yet.'), nobody);
+  assert.deepEqual(outcomeOf({ closeout: null, unreadable: null, attempts: ended('harness', 'succeeded') }, 'No closeout yet.'), nobody);
   assert.equal(outcomeWord(nobody as never), 'no closeout');
 });
 

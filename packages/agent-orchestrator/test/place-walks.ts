@@ -401,9 +401,9 @@ const HANDOFF: readonly Walk[] = [
       commit: { message: 'one: hand off what was left uncommitted, before its run was forgotten', parents: ['commit-1'] },
       files: {
         'wf/r/one': [
-          { added: 1, path: 'a.txt', removed: 1, status: 'M' },
-          { added: 1, path: 'dir/new.txt', removed: 0, status: 'A' },
-          { added: 0, path: 'gone.txt', removed: 1, status: 'D' },
+          { added: 1, path: 'a.txt', removed: 1, status: 'modified' },
+          { added: 1, path: 'dir/new.txt', removed: 0, status: 'added' },
+          { added: 0, path: 'gone.txt', removed: 1, status: 'removed' },
         ],
       },
       first: { answer: { commit: 'commit-2' } },
@@ -474,9 +474,9 @@ const REPORT: readonly Walk[] = [
       diffs: { work: { 'a.txt': ['-two', '+2', '+four'], 'gone.txt': ['-bye'], 'new.txt': ['+n1', '+n2'] } },
       files: {
         work: [
-          { added: 2, path: 'a.txt', removed: 1, status: 'M' },
-          { added: 0, path: 'gone.txt', removed: 1, status: 'D' },
-          { added: 2, path: 'new.txt', removed: 0, status: 'A' },
+          { added: 2, path: 'a.txt', removed: 1, status: 'modified' },
+          { added: 0, path: 'gone.txt', removed: 1, status: 'removed' },
+          { added: 2, path: 'new.txt', removed: 0, status: 'added' },
         ],
       },
       present: { work: { 'a.txt': 'file', dir: 'directory', 'gone.txt': 'absent', nope: 'absent' } },
@@ -494,7 +494,7 @@ const REPORT: readonly Walk[] = [
         at: { baseRef: 'main', onto: null, tips: { main: 'commit-1', work: 'commit-2' } },
         atBase: { 'b.txt': null },
         diffs: { main: {}, work: {} },
-        files: { main: [], work: [{ added: 1, path: 'b.txt', removed: 0, status: 'A' }] },
+        files: { main: [], work: [{ added: 1, path: 'b.txt', removed: 0, status: 'added' }] },
         present: { main: {}, work: {} },
       },
     },
@@ -882,7 +882,7 @@ const LAND: readonly Walk[] = [
           },
         ],
       },
-      files: { main: [{ added: 1, path: 'b.txt', removed: 0, status: 'A' }] },
+      files: { main: [{ added: 1, path: 'b.txt', removed: 0, status: 'added' }] },
       landed: { answer: { commit: 'commit-1' } },
       main: 'commit-2',
       present: { main: { 'left.txt': 'absent' } },

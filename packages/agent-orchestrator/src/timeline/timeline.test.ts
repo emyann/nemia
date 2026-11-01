@@ -219,7 +219,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         startedAt: clock(0, 1),
         spawnedAt: clock(0, 4),
         endedAt: clock(9, 4),
-        reason: 'harness',
+        reason: 'harness' as const,
         usage: null,
         ended: 'succeeded' as const,
       };
@@ -248,7 +248,7 @@ test("`timeline`: a run's tries on the clock, each filed, spawned and ended, its
         startedAt: clock(600),
         spawnedAt: clock(600, 3),
         endedAt: clock(605, 3),
-        reason: 'harness',
+        reason: 'harness' as const,
         usage: null,
         ended: 'succeeded' as const,
         turn: 1,

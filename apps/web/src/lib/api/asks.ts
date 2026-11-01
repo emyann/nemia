@@ -6,13 +6,14 @@
 import { Schema } from 'effect';
 import { decodes } from './decodes.ts';
 import { send } from './read.ts';
+import { TRANSCRIPT_KINDS, type TranscriptEvent } from './steps.ts';
 
 /**
  * Mirrors `Said` in agent-orchestrator, the engine's `said` entry: words a person said to a step's running session, when, to which attempt
  * of its task, and the last event of the session's transcript before they were handed over (`after`, by its `kind` and `id`), null where
  * the transcript held none.
  */
-export type Said = { at: string; attempt: number; text: string; after: { kind: string; id: string } | null };
+export type Said = { at: string; attempt: number; text: string; after: { kind: TranscriptEvent['kind']; id: string } | null };
 
 /** Decodes a `Said`. */
 const SaidSchema = decodes<Said>()(
@@ -20,7 +21,7 @@ const SaidSchema = decodes<Said>()(
     at: Schema.String,
     attempt: Schema.Number,
     text: Schema.String,
-    after: Schema.NullOr(Schema.Struct({ kind: Schema.String, id: Schema.String })),
+    after: Schema.NullOr(Schema.Struct({ kind: Schema.Literals(TRANSCRIPT_KINDS), id: Schema.String })),
   }),
 );
 

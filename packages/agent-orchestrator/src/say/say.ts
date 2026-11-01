@@ -12,7 +12,13 @@ import { holdWord } from '../wait/wait.ts';
  * the engine read none). The engine's own `Said`, named here because this file does not import the engine: views.verb.ts reads it off
  * the task's `state.said`. The engine's journal is the record, and the run keeps no copy.
  */
-export type Said = { at: string; attempt: number; text: string; after?: { kind: string; id: string } | null };
+export type Said = { at: string; attempt: number; text: string; after?: { kind: SaidAfterKind; id: string } | null };
+
+/**
+ * The kind of the transcript event a said message follows: the runtime's `TranscriptEvent['kind']`, written out here because this file
+ * imports no runtime, and held equal to it in `runtime-client.ts` (`saidAfterKindHeld`).
+ */
+export type SaidAfterKind = 'text' | 'thinking' | 'tool_use' | 'tool_result' | 'system';
 
 /** What was said to one of a step's tries: the engine's entry, and the try whose task it is on. */
 export type SaidTo = Said & { try: number };

@@ -441,9 +441,9 @@ test("what a branch touched is the place's report: a rename at both ends, a bina
   assert.deepEqual(
     [...r.changes].sort((a, b) => a.path.localeCompare(b.path)),
     [
-      { path: 'logo.png', status: 'A', added: null, removed: null },
-      { path: 'NOTES', status: 'A', added: 1, removed: 0 },
-      { from: 'packages/x/test/add.test.ts', path: 'packages/x/spec/add.test.ts', status: 'R', added: 0, removed: 0 },
+      { path: 'logo.png', status: 'added', added: null, removed: null },
+      { path: 'NOTES', status: 'added', added: 1, removed: 0 },
+      { from: 'packages/x/test/add.test.ts', path: 'packages/x/spec/add.test.ts', status: 'renamed', added: 0, removed: 0 },
     ],
   );
   assert.deepEqual(

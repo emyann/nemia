@@ -68,7 +68,7 @@ test("duration and attemptLine: an attempt's time", async (t) => {
     const startedAt = '2026-09-13T00:47:56.000Z';
     assert.equal(attemptLine({ count: 2, latest: { startedAt, ended: null, endedAt: null, reason: null } }, true, now), '#2 · 12m 04s');
     assert.equal(
-      attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now),
+      attemptLine({ count: 1, latest: { startedAt, ended: 'succeeded', endedAt: null, reason: 'harness' } }, false, now),
       '#1 · started 12m 04s ago',
     );
     assert.equal(
@@ -82,9 +82,12 @@ test("duration and attemptLine: an attempt's time", async (t) => {
     const now = Date.parse('2026-09-13T01:00:00.000Z');
     const startedAt = '2026-09-13T00:30:00.000Z';
     const endedAt = '2026-09-13T00:59:04.000Z';
-    assert.equal(attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt, reason: 'harness' } }, false, now), '#1 · 29m 04s');
     assert.equal(
-      attemptLine({ count: 2, latest: { startedAt, ended: 'failed', endedAt, reason: 'exit' } }, true, now),
+      attemptLine({ count: 1, latest: { startedAt, ended: 'succeeded', endedAt, reason: 'harness' } }, false, now),
+      '#1 · 29m 04s',
+    );
+    assert.equal(
+      attemptLine({ count: 2, latest: { startedAt, ended: 'failed', endedAt, reason: 'harness' } }, true, now),
       '#2 · 29m 04s',
       'ended, and the step still live behind it between attempts: the attempt shown took what it took',
     );
@@ -94,7 +97,7 @@ test("duration and attemptLine: an attempt's time", async (t) => {
       'still running: the time counts',
     );
     assert.equal(
-      attemptLine({ count: 1, latest: { startedAt, ended: 'done', endedAt: null, reason: 'harness' } }, false, now),
+      attemptLine({ count: 1, latest: { startedAt, ended: 'succeeded', endedAt: null, reason: 'harness' } }, false, now),
       '#1 · started 30m 00s ago',
       'a record over and with no end: no clock to stop, so it says when it started',
     );

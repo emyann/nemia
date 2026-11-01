@@ -7,6 +7,11 @@
   ],
   "terms": [
     {
+      "term": "File change",
+      "meaning": "how a file changed over a range, as a place reports it (`ChangedFile.status`), in GitHub's words for a commit's files: added, modified, removed, renamed, copied, or changed (its type, not its text). The git place translates git's status letters into these and refuses one it has no word for; the letters stay inside it.",
+      "type": "FileChange"
+    },
+    {
       "term": "Place",
       "meaning": "where a run's steps keep their work: the git place gives each step a worktree on a branch of its own, and reads and acts on the repository for it.",
       "type": "PlaceService",

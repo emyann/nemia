@@ -93,8 +93,9 @@ The command exits 0 only when every law is proved.
 
 ## Running it
 
-- **One contract**: `npx tsverify <file> <name>`, the file where `const name: Implementation<S>` (or `contract(...)`) is
-  written. Every contract of a file: `npx tsverify <file>`. Of a folder: `npx tsverify <folder>`. `--verbose` prints every law
+- **One contract**: `npx tsverify <file> <name>`, the file the function `name` is written in, typed by its spec's type (or
+  the one that exports `contract(...)`), never the spec's own module, which holds no contract to run. Every contract of a
+  file: `npx tsverify <file>`. Of a folder: `npx tsverify <folder>`. `--verbose` prints every law
   and what each leaned on; `--json` is the same for a program.
 - **While you write**: `npx tsverify <file> --watch --cache` runs again on every change to the project's TypeScript, each run
   a process of its own, and stops a run a newer change makes stale. Run it in the background, edit, then read the newest report:

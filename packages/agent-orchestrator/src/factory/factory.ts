@@ -581,3 +581,40 @@ export function factoryLines(
 /** That the store has no factory `name`, and which it has, by name; the default factory is never one to remove. */
 export const noFactoryLine = (name: string, names: readonly string[]): string =>
   `no factory ${name} in the store. ${names.length ? `Its factories are: ${[...names].sort().join(', ')}.` : 'It has none but the default: file one with nemia factory add <name> --repo <path>.'}`;
+
+/** Why `factory` cannot be relieved of `workflow`: it has not attached it, naming those it offers. */
+export const unattachedDetachRefusal = (factory: Pick<Factory, 'name' | 'workflows'>, workflow: string): string =>
+  `${factory.name} has not attached ${workflow}. ${factory.workflows.length ? `It offers: ${factory.workflows.join(', ')}.` : 'It offers none.'} Nothing was detached.`;
+
+/** Why `factory` cannot be relieved of `workflow` while it hires into its steps `hired`: the fire of each, then the detach. */
+export const hiredDetachRefusal = (factory: string, workflow: string, hired: readonly string[]): string =>
+  `${factory} hires into ${workflow}'s steps: ${[...hired].sort().join(', ')}. Fire each first — ${[...hired]
+    .sort()
+    .map((step) => `nemia factory fire ${factory} --step ${step}`)
+    .join('; ')} — then detach it. Nothing was detached.`;
+
+/** Why `factory` cannot be relieved of `workflow` while it schedules it: the unschedule, then the detach. */
+export const scheduledDetachRefusal = (factory: string, workflow: string): string =>
+  `${factory} schedules ${workflow}: unschedule it first — nemia factory unschedule ${factory} ${workflow} — then detach it. Nothing was detached.`;
+
+/** Why `factory` fires no one from `step`: it hires no one there, naming the steps it hires into. */
+export const unhiredFireRefusal = (factory: string, step: string, hires: Hires): string => {
+  const there = Object.keys(hires).sort();
+  return `${factory} hires no agent into ${step}. ${there.length ? `It hires into: ${there.join(', ')}.` : 'It hires none.'} Nothing was fired.`;
+};
+
+/** Why `factory` schedules none of the runs of `workflow`, which it does not offer: the attach, then the schedule. */
+export const unofferedScheduleRefusal = (factory: string, workflow: string): string =>
+  `${factory} does not offer the workflow ${workflow}, so it schedules none of its runs. Attach it first — nemia factory attach ${factory} ${workflow} — then schedule it. Nothing was scheduled.`;
+
+/** Why `factory` unschedules nothing of `workflow`: it does not schedule it, naming those it does. */
+export const unscheduledRefusal = (factory: string, workflow: string, scheduled: readonly string[]): string =>
+  `${factory} does not schedule ${workflow}. ${scheduled.length ? `It schedules: ${[...scheduled].sort().join(', ')}.` : 'It schedules none.'} Nothing was unscheduled.`;
+
+/** Why a factory `name` is not filed: there is one already, at `file`, left as it was. */
+export const takenFactoryRefusal = (name: string, file: string): string =>
+  `There is a factory ${name} already, at ${file}, and it was left as it was. See it with nemia factory ls; to name other repositories, nemia factory rm ${name}, then add it again.`;
+
+/** Why the wiring of a templated factory `name` is not written: its tree, at `tree`, is not rendered yet; then what was not done. */
+export const unrenderedTreeRefusal = (name: string, tree: string, notDone: string): string =>
+  `${name} is made from a template, and its tree is not rendered yet, at ${tree}: start the daemon, nemia up, and try again once nemia factory ls shows it applied. ${notDone}`;

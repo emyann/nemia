@@ -20,14 +20,21 @@ import { digestOf } from '../revisions/revisions.ts';
 export type RulesRead = { words: string | null; error: string | null };
 
 /** The folder the store keeps for the factory `name`, beside its file: `$WF_ROOT/factories/<name>`. Refused: a bad name (`Invalid`). */
-export function rulesFolder(name: string): string {
+export const rulesFolder = (name: string): string => rulesFolderAt(HOME, name);
+
+/** The folder the store `home` keeps for the factory `name` (`rulesFolder`). Refused: a bad name (`Invalid`). */
+export function rulesFolderAt(home: string, name: string): string {
   const bad = factoryNameRefusal(name);
   if (bad) throw new Invalid({ message: bad });
-  return path.join(HOME, 'factories', name);
+  return path.join(home, 'factories', name);
 }
 
 /** The file the rules of `factory` are kept in (`rulesFile`): its tree's, or the store's folder's for its name. */
 export const rulesAt = (factory: Pick<Factory, 'name' | 'tree'>): string => rulesFile(factory, rulesFolder(factory.name));
+
+/** The file the rules of `factory` are kept in, in the store `home` (`rulesAt`). */
+export const rulesAtHome = (home: string, factory: Pick<Factory, 'name' | 'tree'>): string =>
+  rulesFile(factory, rulesFolderAt(home, factory.name));
 
 /**
  * The rules kept at `file`, read afresh (`RulesRead`). A link is not read: the store keeps its own file, and words read through a link
@@ -75,9 +82,12 @@ export function factoryFills(factory: Pick<Factory, 'name' | 'hires' | 'tree'>, 
  * writing nothing: blank words and a frontmatter block (`Invalid`), and a tree not rendered yet (`Conflict`), which a write would leave
  * unseeded.
  */
-export function writeRules(factory: Pick<Factory, 'name' | 'tree'>, words: string): string {
+export const writeRules = (factory: Pick<Factory, 'name' | 'tree'>, words: string): string =>
+  rulesWritten(rulesAt(factory), factory, words);
+
+/** The rules of `factory` written onto `file`, its rules' file in a store (`rulesAtHome`), refused as `writeRules` refuses. */
+export function rulesWritten(file: string, factory: Pick<Factory, 'name' | 'tree'>, words: string): string {
   const { name } = factory;
-  const file = rulesAt(factory);
   if (!words.trim())
     throw new Invalid({
       message: `the rules of ${name} are blank. Write the words every agent hired into it is to be told, or clear them: nemia factory rules ${name} --clear. Nothing was written.`,
@@ -98,8 +108,10 @@ export function writeRules(factory: Pick<Factory, 'name' | 'tree'>, words: strin
 }
 
 /** The rules of `factory` removed, whatever is at their file: whether there was anything. */
-export function clearRules(factory: Pick<Factory, 'name' | 'tree'>): boolean {
-  const file = rulesAt(factory);
+export const clearRules = (factory: Pick<Factory, 'name' | 'tree'>): boolean => rulesCleared(rulesAt(factory));
+
+/** The rules at `file`, its rules' file in a store, removed whatever is there: whether there was anything. */
+export function rulesCleared(file: string): boolean {
   if (!fs.lstatSync(file, { throwIfNoEntry: false })) return false;
   fs.rmSync(file, { recursive: true, force: true });
   return true;

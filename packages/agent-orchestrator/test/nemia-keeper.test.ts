@@ -68,7 +68,7 @@ const viewed = () => {
 /** One beat of the keeper, and what it did. */
 const beat = () => stage.runWith(viewed(), keepOnce());
 /** `nemia level` with `args`, as its handler answers it. */
-const level = (args: Record<string, string | boolean>) => stage.runWith(viewed(), LEVEL.handler(args));
+const level = (args: Record<string, string | boolean>) => stage.runWith(viewed(), LEVEL.handler(args, process.env, ROOT));
 
 /** Her folder trusted or not, as the harness keeps it in its config file. */
 const trust = (trusted: boolean) =>

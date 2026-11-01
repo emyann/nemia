@@ -13,8 +13,17 @@ import { Result, Schema } from 'effect';
 import { FACTORY_CONDITION_REASONS, FACTORY_CONDITION_TYPES, REVISIONS_POLICIES } from '../factory/factory.ts';
 import { firstRefusal, HOME } from '../record/record.store.ts';
 
-/** The folder the store keeps a factory's own files in, beside its `<name>.json`. */
-const folderOf = (name: string): string => path.join(HOME, 'factories', name);
+/** The folder the store `home` keeps a factory's own files in, beside its `<name>.json`. */
+const folderAt = (home: string, name: string): string => path.join(home, 'factories', name);
+
+/** The folder the store keeps a factory's own files in, at the module's root. */
+const folderOf = (name: string): string => folderAt(HOME, name);
+
+/** The folder a templated factory of the store `home` runs from (`treeDir`). */
+export const treeDirAt = (home: string, name: string): string => path.join(folderAt(home, name), 'tree');
+
+/** What the controller last observed of a templated factory of the store `home` (`readStatus`). */
+export const readStatusAt = (home: string, name: string): Status | undefined => statusIn(path.join(folderAt(home, name), 'status.json'));
 
 /** The folder a templated factory runs from: today's format, seeded once from its base, then the person's. */
 export const treeDir = (name: string): string => path.join(folderOf(name), 'tree');
@@ -51,8 +60,14 @@ const wiringFile = (name: string): string => path.join(treeDir(name), 'factory.j
  * The wiring of the factory `name`'s tree: what its `factory.json` holds, none (`absent`) while the tree is not rendered, or why it does
  * not read (`error`), naming the fix.
  */
-export function readTreeWiring(name: string): { wiring: TreeWiring } | { absent: true } | { error: string } {
-  const file = wiringFile(name);
+export const readTreeWiring = (name: string): { wiring: TreeWiring } | { absent: true } | { error: string } => wiringIn(wiringFile(name));
+
+/** The wiring of the factory `name`'s tree in the store `home` (`readTreeWiring`). */
+export const readTreeWiringAt = (home: string, name: string): { wiring: TreeWiring } | { absent: true } | { error: string } =>
+  wiringIn(path.join(treeDirAt(home, name), 'factory.json'));
+
+/** The wiring a tree's `file` holds, none while it is not there, or why it does not read. */
+function wiringIn(file: string): { wiring: TreeWiring } | { absent: true } | { error: string } {
   let raw: unknown;
   try {
     raw = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -79,8 +94,15 @@ function writeWhole(file: string, content: string): void {
 }
 
 /** The tree's wiring of the factory `name` written whole, `workflows` kept sorted. */
-export const writeTreeWiring = (name: string, wiring: TreeWiring): void =>
-  writeWhole(wiringFile(name), `${JSON.stringify({ ...wiring, workflows: [...wiring.workflows].sort() }, null, 2)}\n`);
+export const writeTreeWiring = (name: string, wiring: TreeWiring): void => wiringWritten(wiringFile(name), wiring);
+
+/** The tree's wiring of the factory `name` in the store `home` written whole (`writeTreeWiring`). */
+export const writeTreeWiringAt = (home: string, name: string, wiring: TreeWiring): void =>
+  wiringWritten(path.join(treeDirAt(home, name), 'factory.json'), wiring);
+
+/** `wiring` written whole onto a tree's `file`, `workflows` kept sorted. */
+const wiringWritten = (file: string, wiring: TreeWiring): void =>
+  writeWhole(file, `${JSON.stringify({ ...wiring, workflows: [...wiring.workflows].sort() }, null, 2)}\n`);
 
 /** A condition of a templated factory, as Kubernetes words one: its type, `True` or `False`, a reason in one word, and a sentence. */
 const ConditionSchema = Schema.Struct({
@@ -123,9 +145,12 @@ export type Status = typeof StatusSchema.Type;
 export type Condition = typeof ConditionSchema.Type;
 
 /** The status of the factory `name`, or none where the controller wrote none yet or it does not read: the next pass writes it again. */
-export function readStatus(name: string): Status | undefined {
+export const readStatus = (name: string): Status | undefined => statusIn(statusFile(name));
+
+/** The status a factory's `file` holds, or none where it is not there or does not read. */
+function statusIn(file: string): Status | undefined {
   try {
-    const decoded = Schema.decodeUnknownResult(StatusSchema)(JSON.parse(fs.readFileSync(statusFile(name), 'utf8')));
+    const decoded = Schema.decodeUnknownResult(StatusSchema)(JSON.parse(fs.readFileSync(file, 'utf8')));
     return Result.isSuccess(decoded) ? decoded.success : undefined;
   } catch {
     return undefined;

@@ -4,7 +4,9 @@
   "about": "A body of work's repositories, workflows and hires.",
   "paths": [
     "packages/agent-orchestrator/src/factory",
-    "packages/agent-orchestrator/src/template"
+    "packages/agent-orchestrator/src/template",
+    "packages/agent-orchestrator/src/factories",
+    "packages/agent-orchestrator/src/wiring"
   ],
   "terms": [
     {
@@ -15,6 +17,16 @@
         "label": "Factories",
         "href": "/factories/"
       }
+    },
+    {
+      "term": "Factory door",
+      "meaning": "the one way a factory is read and written — its file, and the level, rules and servers the store keeps beside it: `FactoryDoor` in `packages/agent-orchestrator/src/factories/factories.store.ts`, its files layer at the store's root a program is given and a memory one, each refusing a write that breaks the model's `Factory`.",
+      "type": "FactoryDoorShape"
+    },
+    {
+      "term": "Wiring change",
+      "meaning": "a person's change of what a factory offers, hires and schedules — attach, detach, hire, fire, schedule, unschedule — judged by `wiringRefusal` and applied by `rewired` (`packages/agent-orchestrator/src/wiring/wiring.ts`), whose contract proves that a change which would hire or schedule outside the factory's offer is refused; the door's decode through the model `Factory` refuses a factory written that does.",
+      "type": "WiringChange"
     },
     {
       "term": "Condition type",

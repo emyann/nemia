@@ -1,7 +1,10 @@
 /**
  * The factories on disk, `$WF_ROOT/factories/`, as tables: what each `nemia factory` verb refuses — each row refused by kind (`_tag`),
  * exit 2 and the facts its words name, and nothing written — and what `nemia factory ls` says of a file that does not read. And the
- * create that two adds of one name cannot both win, a race kept focused.
+ * create that two adds of one name cannot both win, a race kept focused. What a factory's door refuses of any layer — a name taken, the
+ * default factory filed, no factory to remove — is its walks' (`test/factory-walks.ts`), and what a change of its wiring refuses for what
+ * it offers, hires and schedules is `wiringRefusal`'s laws (`contracts/wiring.contract.ts`): these rows keep what only the verbs and the
+ * disk say.
  *
  * A factory filed, given workflows, hires and a schedule, listed, started in and removed is a person's story, in
  * `test/factory-start.test.ts`; names and lines are pure, in `factory.test.ts`. `WF_ROOT` is set before the import, since the module
@@ -21,18 +24,8 @@ const ROOT = scratch('wf-factory-');
 const FACTORIES = path.join(ROOT, 'factories');
 
 process.env.WF_ROOT = ROOT;
-const {
-  addFactory,
-  attachWorkflow,
-  clearSchedule,
-  detachWorkflow,
-  factoriesDir,
-  fireAgent,
-  hireAgent,
-  readFactories,
-  readFactory,
-  setSchedule,
-} = await import('../runner.ts');
+const { addFactory, attachWorkflow, detachWorkflow, fireAgent, hireAgent, readFactories, readFactory, setSchedule } =
+  await import('../runner.ts');
 const { main } = await import('../cli/main.ts');
 
 const { engineOf } = await import('../runtime-client.ts');
@@ -108,27 +101,6 @@ test('REFUSED: two adds of one name, the second while the first is between its w
 });
 
 test('REFUSED: `nemia factory add`, nothing filed', async (t) => {
-  await t.test('a name already filed is a Conflict, naming ls and rm, the file left byte for byte', async () => {
-    const repo = fresh();
-    assert.equal(factoriesDir(), FACTORIES);
-    await main(['factory', 'add', 'pipao', '--repo', repo], noEngine());
-    const before = bytesOf('pipao');
-    const other = fs.mkdtempSync(path.join(ROOT, 'repo-'));
-    await assert.rejects(
-      main(['factory', 'add', 'pipao', '--repo', other], noEngine()),
-      refused('Conflict', 'pipao', 'nemia factory ls', 'nemia factory rm pipao'),
-    );
-    assert.deepEqual(bytesOf('pipao'), before);
-    assert.deepEqual(filed(), ['pipao.json'], 'no hidden file left behind');
-  });
-  await t.test('the default factory is a Conflict, and no file of its name is written', async () => {
-    const repo = fresh();
-    await assert.rejects(
-      main(['factory', 'add', 'default', '--repo', repo], noEngine()),
-      refused('Conflict', '`default`', 'nemia factory add'),
-    );
-    assert.deepEqual(filed(), []);
-  });
   await t.test('no --repo is Invalid, naming the flag', async () => {
     fresh();
     await assert.rejects(main(['factory', 'add', 'pipao'], noEngine()), refused('Invalid', 'nemia factory add pipao --repo <path>'));
@@ -158,7 +130,6 @@ test('REFUSED: `nemia factory add`, nothing filed', async (t) => {
 test('REFUSED: `nemia factory rm`, nothing removed', async (t) => {
   const rows: Array<[string, string, 'Missing' | 'Conflict' | 'Invalid', string[]]> = [
     ['the default factory is a Conflict', 'default', 'Conflict', ['nemia factory rm']],
-    ['a name with no factory is Missing, naming those there are', 'nope', 'Missing', ['nope', 'pipao']],
     ['a name that is no slug is Invalid', '../runs', 'Invalid', ['`../runs`']],
   ];
   for (const [row, name, tag, facts] of rows)
@@ -302,18 +273,6 @@ test('REFUSED: `nemia factory hire` and `fire`, nothing written', async (t) => {
       'Invalid',
       ['`a/b`'],
     ],
-    [
-      'a hire into a workflow it has not attached is Invalid, naming the attach',
-      () => hireAgent({ factory: 'pipao', agent: 'ada', step: 'intake/frame' }),
-      'Invalid',
-      ['pipao', 'intake', 'nemia factory attach pipao intake'],
-    ],
-    [
-      'a fire of a step it hires no one into is Missing, naming its hires',
-      () => fireAgent({ factory: 'pipao', step: 'build/implement' }),
-      'Missing',
-      ['pipao', 'build/implement', 'build/review'],
-    ],
   ];
   for (const [row, act, tag, facts] of rows)
     await t.test(row, async () => {
@@ -322,13 +281,6 @@ test('REFUSED: `nemia factory hire` and `fire`, nothing written', async (t) => {
       assert.deepEqual(bytesOf('pipao'), before);
       assert.deepEqual(filed(), ['pipao.json']);
     });
-
-  await t.test('a fire in a factory that hires none is Missing', () => {
-    pipao('build');
-    hireAgent({ factory: 'pipao', agent: 'agora', step: 'build/review' });
-    fireAgent({ factory: 'pipao', step: 'build/review' });
-    assert.throws(() => fireAgent({ factory: 'pipao', step: 'build/review' }), refused('Missing', 'pipao', 'build/review'));
-  });
 
   await t.test(
     'a hire into a step whose own file names its agent is a Conflict, naming the file; a file naming none, and no file, take one',
@@ -411,39 +363,11 @@ test('REFUSED: `nemia factory attach` and `detach`, nothing written', async (t) 
       "builder's hire does not hold build",
     );
   });
-
-  await t.test('a detach of one it has not attached is Missing, naming what it offers, or none', () => {
-    pipao('build', 'builder');
-    assert.throws(() => detachWorkflow({ factory: 'pipao', workflow: 'intake' }), refused('Missing', 'pipao', 'intake', 'build, builder'));
-    detachWorkflow({ factory: 'pipao', workflow: 'build' });
-    detachWorkflow({ factory: 'pipao', workflow: 'builder' });
-    assert.throws(() => detachWorkflow({ factory: 'pipao', workflow: 'builder' }), refused('Missing', 'pipao', 'builder'));
-  });
-
-  await t.test('a detach of a workflow it schedules is Invalid, naming the unschedule; once unscheduled, it detaches', () => {
-    pipao('janitor');
-    setSchedule({ factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' });
-    const before = bytesOf('pipao');
-    assert.throws(
-      () => detachWorkflow({ factory: 'pipao', workflow: 'janitor' }),
-      refused('Invalid', 'janitor', 'nemia factory unschedule pipao janitor'),
-    );
-    assert.deepEqual(bytesOf('pipao'), before);
-    clearSchedule({ factory: 'pipao', workflow: 'janitor' });
-    detachWorkflow({ factory: 'pipao', workflow: 'janitor' });
-    assert.deepEqual(readFactory('pipao').workflows, []);
-  });
 });
 
 test('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', async (t) => {
   const at = { factory: 'pipao', workflow: 'janitor', cron: '0 9 * * 1', brief: 'Read the stats' };
   const rows: Array<[string, (repo: string) => unknown, 'Missing' | 'Invalid', (repo: string) => string[]]> = [
-    [
-      'a workflow not attached, naming the attach',
-      () => setSchedule({ ...at, workflow: 'build' }),
-      'Invalid',
-      () => ['pipao', 'build', 'nemia factory attach pipao build'],
-    ],
     [
       'a cron Cron does not read, quoting it',
       () => setSchedule({ ...at, cron: '61 * * * *' }),
@@ -458,12 +382,6 @@ test('REFUSED: `nemia factory schedule` and `unschedule`, nothing written', asyn
       () => setSchedule({ ...at, repo: '/elsewhere' }),
       'Invalid',
       (repo) => ['/elsewhere', 'pipao', repo, '--repo'],
-    ],
-    [
-      'an unschedule of one not scheduled',
-      () => clearSchedule({ factory: 'pipao', workflow: 'janitor' }),
-      'Missing',
-      () => ['pipao', 'janitor'],
     ],
     [
       'a bad cron through the command line',

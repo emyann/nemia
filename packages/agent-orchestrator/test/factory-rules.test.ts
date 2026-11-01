@@ -185,7 +185,8 @@ const promptOf = (run: Parameters<typeof agentFilesDir>[0], step: string): strin
 const runsWritten = (): string[] => (fs.existsSync(path.join(ROOT, 'runs')) ? fs.readdirSync(path.join(ROOT, 'runs')) : []);
 
 /** `nemia factory rules` run with `args`, as the CLI and the api run it. */
-const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) => stage.runWith(stage.board().e, FACTORY_RULES.handler(args));
+const rulesOf = (args: Parameters<typeof FACTORY_RULES.handler>[0]) =>
+  stage.runWith(stage.board().e, FACTORY_RULES.handler(args, undefined, ROOT));
 
 type Mocker = { mock: { method: (o: object, m: string, f: (...a: unknown[]) => void) => { mock: { restore: () => void } } } };
 

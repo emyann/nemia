@@ -4,6 +4,8 @@
  */
 import type { Run } from '../src/record/record.ts';
 import type { Workflow } from '../src/step/step.ts';
+import type { Factory } from '../src/factory/factory.ts';
+import { hiresInto, type WiringChange } from '../src/wiring/wiring.ts';
 
 /** Whether a step is gated: by its workflow, or by the run (`--gate`). */
 export const gated = (step: Workflow, run: Run): boolean => step.gate === true || (run.gates ?? []).includes(step.name);
@@ -15,3 +17,22 @@ export const tryNow = (run: Run, name: string): number => {
 /** Whether a person approved the try a step is on. */
 export const approved = (run: Run, name: string): boolean =>
   (run.approvals ?? []).some((x) => x.step === name && x.try === tryNow(run, name));
+
+/**
+ * Whether a factory takes a change of its wiring, its names aside, as `wiringRefusal` judges it: a hire or a schedule only into a
+ * workflow it offers, a detach only of one it offers and no longer hires into nor schedules, a fire only of a step it hires into, an
+ * unschedule only of a workflow it schedules.
+ */
+export const accepted = (factory: Pick<Factory, 'workflows' | 'hires' | 'schedules'>, change: WiringChange): boolean => {
+  if (change.verb === 'hire') return factory.workflows.includes(change.step.slice(0, change.step.indexOf('/')));
+  if (change.verb === 'schedule') return factory.workflows.includes(change.workflow);
+  if (change.verb === 'detach')
+    return (
+      factory.workflows.includes(change.workflow) &&
+      !hiresInto(factory.hires, change.workflow) &&
+      !Object.hasOwn(factory.schedules, change.workflow)
+    );
+  if (change.verb === 'fire') return Object.hasOwn(factory.hires, change.step);
+  if (change.verb === 'unschedule') return Object.hasOwn(factory.schedules, change.workflow);
+  return true;
+};

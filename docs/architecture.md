@@ -285,7 +285,7 @@ imports: `STAND_INS` in `test/boundary.test.ts`). Each write is checked first, o
 (`src/record/record.model.ts`) with its id as `RunId.OnCreate` checks it, a run written back through `Run`, and a break of an invariant
 is `Invalid`; a new run at an id with a record is `Conflict`, the files' `wx`. One table of walks holds the layers to each other
 (`test/run-walks.ts`, run on files by `test/run-store.test.ts` and on memory by `src/runs/memory.store.test.ts`), as the place's do;
-the pattern — `doorOf`, `checked`, `fromThrow` in `src/door/door.store.ts`, and the walk runner `test/door-walks.ts` — names no
+the pattern — `doorOf`, `checked`, `fromThrow` and `rootedDoor` in `src/door/door.store.ts`, and the walk runner `test/door-walks.ts` — names no
 aggregate, for the doors after it. Unlike `PlaceService` and `StoreRoot`, the door has a default: it is a `Context.Reference` whose
 default value is the files door, so a program given none reads today's records and one given the memory layer reads that, and no
 program's requirements change while the run store's callers move onto it. A default here departs from the rule above on purpose:
@@ -293,6 +293,24 @@ program's requirements change while the run store's callers move onto it. A defa
 controller and of each of their callers at once. What still calls the run store's run groups (`runStore.runs`, `.asks`, `.holds`,
 `.refresh`, `.forgetting`) — synchronous callers, the stats, the run list, the pages, the command line — is a debt counted per file in
 `test/run-door.baseline.ts`, which only shrinks; the run store's inbox is the Card door's seam and no part of it.
+
+**The Factory door.** A factory — its file, and the level, rules and servers the store keeps beside it — is read and written through
+`FactoryDoor` (`packages/agent-orchestrator/src/factories/factories.store.ts`), on the Run door's pattern: two layers built the one way
+(`factoryDoorOver`), the files (`factoryFiles(home)`, over `factory.store.ts`, `level.store.ts`, `rules.store.ts` and
+`servers.store.ts`, so a file keeps its bytes and a key the model does not name) and a memory stand-in (`factoryDoorMemory`,
+`src/factories/memory.store.ts`, in `STAND_INS`), held to one table of walks (`test/factory-walks.ts`). A new factory's name is checked
+as `FactoryName.OnCreate` checks it, the default factory is `Conflict`, and a factory written decodes through the model's `Factory`,
+whose checks are its invariants (one repository at least, hires and schedules only into a workflow it offers), or is `Invalid`. A
+person's change of a factory's wiring — attach, detach, hire, fire, schedule, unschedule — is read, judged by a pure function
+(`wiringRefusal` and `rewired`, `src/wiring/wiring.ts`, whose contract proves a change that would break that invariant refused) and
+written back through the door, whose decode refuses a factory that breaks it; only the disk's facts (a step's own agent, a cron that fires, a repository that is a directory) stay the
+verb's. Its default departs from the Run door's on one point, which the pattern now carries for every door after it: it is *rooted*
+(`rootedDoor`, `src/door/door.store.ts`), the door over the files at the `StoreRoot` the program is given, read when a method runs,
+and `Invalid`, naming the fix, where none was given — a new door may read no root of its own module's (rule 4's `root-given`), and a
+required service would change every controller's type at once. The Run door keeps its module-root default until its files store takes
+a root. What still calls the stores the door is over — a start, a plan, the inbox, the level read on every beat, the instruction, the
+upgrade — is counted per file in `test/factory-door.baseline.ts`, which only shrinks; `factory.store.ts`'s functions each take the
+store's root first (`readFactoryAt`, …), its old spellings the same functions at the module's root, for those callers.
 
 Both shells are level-triggered: a pass reads the world, decides and acts, and carries nothing between passes that the
 next could not read again. The one thing the orchestrator's tick keeps in memory is a cache under that rule, not beside

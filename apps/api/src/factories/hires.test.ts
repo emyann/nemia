@@ -115,6 +115,8 @@ test('the hire routes: what a hire or a fire refuses, the factory file as it was
   await t.test("and one of yours, read under the app's store root", async () => {
     const home = scratch('nemia-api-hires-home-');
     const file = naming(home, 'mine', 'otto');
+    fs.mkdirSync(path.join(home, 'factories'), { recursive: true });
+    fs.copyFileSync(RECORD, path.join(home, 'factories', 'mill.json'));
     const { app: moved } = appOf(Layer.merge(liveOf(), Layer.succeed(StoreRoot)(home)));
     const put = () =>
       moved.request('/api/factories/mill/hires/build%2Fmine', { method: 'PUT', headers: json, body: JSON.stringify({ agent: 'ada' }) });

@@ -32,7 +32,7 @@ export const GLOBAL_ROOTS: Readonly<Record<string, number>> = {
   'src/daemon/daemon.store.ts': 15,
   'src/daemon/up.verb.ts': 1,
   'src/disk/disk.store.ts': 4,
-  'src/factory/factory.store.ts': 5,
+  'src/factory/factory.store.ts': 1,
   'src/factory/instruction.store.ts': 1,
   'src/feed/feed.store.ts': 1,
   'src/folder/lookup.store.ts': 1,

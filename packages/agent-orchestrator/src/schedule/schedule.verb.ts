@@ -5,13 +5,15 @@
  */
 import path from 'node:path';
 import { Cause, Effect, Exit } from 'effect';
-import { tried } from '../runtime-client.ts';
 import { leftOut, type Args, type Flag, type Spec } from '../command/command.ts';
 import type { Command } from '../command/entry.verb.ts';
 import type { Run } from '../record/record.ts';
 import { isDue, schedulesRead, type Read } from './listed.store.ts';
 import { workflowFolder } from '../folder/folder.store.ts';
-import { clearSchedule, setSchedule } from '../factory/factory.store.ts';
+import { scheduleOf, scheduleRefused } from '../factory/factory.store.ts';
+import { rooted, wire } from '../wiring/wire.verb.ts';
+import { unscheduledRefusal } from '../factory/factory.ts';
+import { Missing } from '../refusal/refusal.ts';
 import type { Schedule } from '../factory/factory.ts';
 import { repoFor, startRun } from '../start/start.verb.ts';
 import { putScheduleTry } from './schedule.store.ts';
@@ -129,20 +131,21 @@ export const FACTORY_SCHEDULE: Command<Scheduled> = {
   writes: true,
   class: 'ask',
   route: { method: 'PUT', path: '/api/factories/:factory/schedules/:workflow', status: 200 },
-  handler: (args) =>
-    tried(() => {
-      const repo = textOf(args, 'repo');
-      const tz = textOf(args, 'tz');
-      const { file, schedule, replaced } = setSchedule({
-        factory: textOf(args, 'factory'),
-        workflow: textOf(args, 'workflow'),
-        cron: textOf(args, 'cron'),
-        brief: textOf(args, 'brief'),
-        ...(repo ? { repo } : {}),
-        ...(tz ? { tz } : {}),
-      });
-      return { file, schedule, replaced: replaced ?? null };
-    }),
+  handler: (args, _env, home) => {
+    const repo = textOf(args, 'repo');
+    const tz = textOf(args, 'tz');
+    const workflow = textOf(args, 'workflow');
+    const opts = { workflow, cron: textOf(args, 'cron'), brief: textOf(args, 'brief'), ...(repo ? { repo } : {}), ...(tz ? { tz } : {}) };
+    const schedule = scheduleOf(opts);
+    return rooted(
+      home,
+      'factory schedule',
+      Effect.map(
+        wire(textOf(args, 'factory'), { verb: 'schedule', workflow, schedule }, (factory) => scheduleRefused(factory, opts)),
+        ({ was, file }) => ({ file, schedule, replaced: was.schedules[workflow] ?? null }),
+      ),
+    );
+  },
   print: ({ file, schedule, replaced }, args) => [
     `${textOf(args, 'factory')}  ${textOf(args, 'workflow')} at ${schedule.cron}${schedule.tz ? ` (${schedule.tz})` : ''}${replaced ? ` (was ${replaced.cron})` : ''}`,
     `scheduled: ${file} — its first run starts at its next fire`,
@@ -169,7 +172,21 @@ export const FACTORY_UNSCHEDULE: Command<{ file: string; cleared: Schedule }> = 
   writes: true,
   class: 'ask',
   route: { method: 'DELETE', path: '/api/factories/:factory/schedules/:workflow', status: 200 },
-  handler: (args) => tried(() => clearSchedule({ factory: textOf(args, 'factory'), workflow: textOf(args, 'workflow') })),
+  handler: (args, _env, home) => {
+    const factory = textOf(args, 'factory');
+    const workflow = textOf(args, 'workflow');
+    return rooted(
+      home,
+      'factory unschedule',
+      Effect.gen(function* () {
+        const { was, file } = yield* wire(factory, { verb: 'unschedule', workflow });
+        const cleared = was.schedules[workflow];
+        if (cleared === undefined)
+          return yield* Effect.fail(new Missing({ message: unscheduledRefusal(factory, workflow, Object.keys(was.schedules)) }));
+        return { file, cleared };
+      }),
+    );
+  },
   print: ({ file, cleared }, args) => [
     `${textOf(args, 'factory')}  ${textOf(args, 'workflow')} no longer at ${cleared.cron}`,
     `unscheduled: ${file}`,

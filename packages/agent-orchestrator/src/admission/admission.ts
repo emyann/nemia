@@ -123,18 +123,18 @@ const raiseWords = (factory: string, least: Level): string =>
 /** The denial of `line`, which acts on the factory `factory` at `level`, below `least`, through `what`. */
 const below = (line: string, what: string, factory: string, level: Level, least: Level): AdmissionAnswer => ({
   decision: 'deny',
-  reason: `${line} acts on ${what}the factory ${factory}, at ${level}: below ${least}, it is left alone. Raising it is the person's: ${raiseWords(factory, least)}.`,
+  message: `${line} acts on ${what}the factory ${factory}, at ${level}: below ${least}, it is left alone. Raising it is the person's: ${raiseWords(factory, least)}.`,
 });
 
 /** Scope's answer for one typed command: a denial where it names a run or factory below the floor, an ask where it cannot be read. */
 function scopedOf(typed: Typed & Named, scope: Scope): AdmissionAnswer | undefined {
   const line = ['nemia', typed.name, ...typed.args].join(' ');
   if (typed.unread)
-    return { decision: 'ask', reason: `${line} does not read as its command, so admission cannot read the runs it acts on.` };
+    return { decision: 'ask', message: `${line} does not read as its command, so admission cannot read the runs it acts on.` };
   for (const runId of typed.runs) {
     const run = scope.runOf(runId);
     if (run === undefined)
-      return { decision: 'ask', reason: `${line} names ${runId}, which does not read, so admission cannot read its factory.` };
+      return { decision: 'ask', message: `${line} names ${runId}, which does not read, so admission cannot read its factory.` };
     if (!atLeast(run.level, scope.atLeast)) return below(line, `${runId} of `, run.factory, run.level, scope.atLeast);
   }
   for (const factory of typed.factories) {
@@ -226,7 +226,7 @@ function autoAllows(typed: Typed, table: readonly Entry[], auto: Auto | undefine
 function alwaysAsked(line: string, table: readonly Entry[]): AdmissionAnswer | undefined {
   const typed = typedIn(line, table).find((t) => table.find((e) => e.name === t.name)?.asksAlways);
   if (typed === undefined) return undefined;
-  return { decision: 'ask', reason: `${['nemia', typed.name, ...typed.args].join(' ')} is yours, asked every time: no allow reaches it.` };
+  return { decision: 'ask', message: `${['nemia', typed.name, ...typed.args].join(' ')} is yours, asked every time: no allow reaches it.` };
 }
 
 /**
@@ -252,7 +252,7 @@ export function admissionOf(
   if (always !== undefined) return always;
   for (const typed of typedIn(line, table).filter((t) => t.class === 'answer')) {
     const why = askedOf(typed, waitOf);
-    if (why !== undefined && !autoAllows(typed, table, auto)) return { decision: 'ask', reason: why };
+    if (why !== undefined && !autoAllows(typed, table, auto)) return { decision: 'ask', message: why };
   }
   return undefined;
 }

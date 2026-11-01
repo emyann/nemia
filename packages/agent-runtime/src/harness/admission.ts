@@ -15,8 +15,11 @@ export type Admission = { command: string[]; tools: string[] };
 /** A call the session is about to make: the tool's name, its input as the harness gives it, and the folder the session is in. */
 export type AdmissionCall = { tool: string; input: Record<string, unknown>; cwd: string };
 
-/** What admission says of a call: run it unasked, ask the person, or refuse it; and why, in words the person reads at the prompt. */
-export type AdmissionAnswer = { decision: 'allow' | 'ask' | 'deny'; reason: string };
+/**
+ * What admission says of a call: run it unasked, ask the person, or refuse it; and why, in words the person reads at the prompt
+ * (`message`, once spelled `reason`, which the adapter still reads from a command that prints it).
+ */
+export type AdmissionAnswer = { decision: 'allow' | 'ask' | 'deny'; message: string };
 
 /** The decisions an answer takes. */
 export const ADMISSION_DECISIONS: ReadonlyArray<AdmissionAnswer['decision']> = ['allow', 'ask', 'deny'];

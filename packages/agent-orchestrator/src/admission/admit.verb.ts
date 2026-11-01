@@ -170,7 +170,7 @@ export const admitted = Effect.fnUntraced(function* (
   home: string = HOME,
 ) {
   const call = callOf(given);
-  if (call === undefined) return { decision: 'ask', reason: 'nemia admit was handed no call it reads.' } satisfies AdmissionAnswer;
+  if (call === undefined) return { decision: 'ask', message: 'nemia admit was handed no call it reads.' } satisfies AdmissionAnswer;
   const line = typeof call.input.command === 'string' ? call.input.command : '';
   const waits = new Map<string, string | undefined>();
   for (const { args } of typedIn(line, table).filter((t) => t.name === 'retry')) {

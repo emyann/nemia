@@ -88,9 +88,10 @@ the harnesses that do (`HarnessSpec.mounts`, `mountsMisplaced` in `src/service/h
 
 A task asks a command before each of its session's calls to some tools through `config.callAdmission`, as a Pod's probe gives the kubelet
 an `exec` to run: `{ "command": ["my-admit"], "tools": ["Bash"] }` (`Admission`, `src/harness/admission.ts`). The command reads the
-call on its stdin, `{ tool, input, cwd }` (`AdmissionCall`), and prints `{ decision, reason }` (`AdmissionAnswer`): `allow`, `ask`
+call on its stdin, `{ tool, input, cwd }` (`AdmissionCall`), and prints `{ decision, message }` (`AdmissionAnswer`): `allow`, `ask`
 the person, or `deny`; or nothing, for no opinion, and the call meets the session's own rules. A command that fails, runs past 20
-seconds or prints what is no answer answers `ask`: a fault goes to the person, never through. A call to a tool `tools` does not name
+seconds or prints what is no answer answers `ask`: a fault goes to the person, never through. An answer that says its sentence as
+`reason`, the spelling `message` retired, is read as its `message`, the adapter saying the fix on its stderr. A call to a tool `tools` does not name
 pays no process. `file()` refuses a value that is not `command` and `tools` alone, a command that is not a list of strings with no NUL,
 and `tools` that names no tool (`admissionRefusalOf`); and admission on a harness that runs no command before a call — Codex, the
 command harness, a remote agent, a `HarnessSpec` that does not declare `callAdmission` — naming those that do (`admissionMisplaced`).
